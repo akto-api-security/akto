@@ -53,9 +53,7 @@ import org.bson.types.ObjectId;
 import org.json.JSONObject;
 
 import com.akto.DaoInit;
-import com.akto.action.AdminSettingsAction;
 import com.akto.action.ApiCollectionsAction;
-import com.akto.action.CustomDataTypeAction;
 import com.akto.action.EventMetricsAction;
 import com.akto.action.observe.InventoryAction;
 import com.akto.action.settings.AdvancedTrafficFiltersAction;
@@ -68,7 +66,6 @@ import com.akto.dao.ActivitiesDao;
 import com.akto.dao.AktoDataTypeDao;
 import com.akto.dao.AnalyserLogsDao;
 import com.akto.dao.ApiCollectionsDao;
-import com.akto.dao.ApiInfoDao;
 import com.akto.dao.ApiTokensDao;
 import com.akto.dao.AuthMechanismsDao;
 import com.akto.dao.BackwardCompatibilityDao;
@@ -85,7 +82,6 @@ import com.akto.dao.ProtectionLogsDao;
 import com.akto.dao.PupeteerLogsDao;
 import com.akto.dao.RBACDao;
 import com.akto.dao.RuntimeLogsDao;
-import com.akto.dao.SSOConfigsDao;
 import com.akto.dao.SampleDataDao;
 import com.akto.dao.SensitiveSampleDataDao;
 import com.akto.dao.SetupDao;
@@ -115,12 +111,7 @@ import com.akto.dto.AktoDataType;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.ApiCollectionUsers;
 import com.akto.dto.ApiCollectionUsers.CollectionType;
-import com.akto.dto.ApiInfo;
 import com.akto.dto.BackwardCompatibility;
-import com.akto.dto.Config;
-import com.akto.dto.Config.AzureConfig;
-import com.akto.dto.Config.ConfigType;
-import com.akto.dto.Config.OktaConfig;
 import com.akto.dto.CustomDataType;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.IgnoreData;
@@ -149,7 +140,6 @@ import com.akto.dto.notifications.SlackWebhook;
 import com.akto.dto.pii.PIISource;
 import com.akto.dto.pii.PIIType;
 import com.akto.dto.settings.DefaultPayload;
-import com.akto.dto.sso.SAMLConfig;
 import com.akto.dto.test_editor.TestConfig;
 import com.akto.dto.test_editor.TestLibrary;
 import com.akto.dto.test_editor.YamlTemplate;
@@ -163,7 +153,6 @@ import com.akto.dto.testing.Remediation;
 import com.akto.dto.testing.RiskScoreTestingEndpoints;
 import com.akto.dto.testing.TestRoles;
 import com.akto.dto.testing.TestingEndpoints;
-import com.akto.dto.testing.TestingRunResultSummary;
 import com.akto.dto.testing.custom_groups.AllAPIsGroup;
 import com.akto.dto.testing.custom_groups.UnauthenticatedEndpoint;
 import com.akto.dto.testing.sources.AuthWithCond;
@@ -172,7 +161,6 @@ import com.akto.dto.traffic.SampleData;
 import com.akto.dto.traffic.SuspectSampleData;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods;
-import com.akto.dto.type.URLMethods.Method;
 import com.akto.dto.upload.FileUpload;
 import com.akto.dto.usage.UsageMetric;
 import com.akto.log.CacheLoggerMaker;
@@ -1811,16 +1799,6 @@ public class InitializerListener implements ServletContextListener {
         );
     }
 
-    public static void dropSampleDataIfEarlierNotDroped(AccountSettings accountSettings) {
-        if (accountSettings == null) return;
-        if (accountSettings.isRedactPayload() && !accountSettings.isSampleDataCollectionDropped()) {
-            AdminSettingsAction.dropCollections(Context.accountId.get());
-        }
-        ApiCollectionsAction.dropSampleDataForApiCollection();
-        CustomDataTypeAction.handleDataTypeRedaction();
-
-    }
-
     public static void deleteAccessListFromApiToken(BackwardCompatibility backwardCompatibility) {
         if (backwardCompatibility.getDeleteAccessListFromApiToken() == 0) {
             ApiTokensDao.instance.updateMany(new BasicDBObject(), Updates.unset("accessList"));
@@ -1984,17 +1962,6 @@ public class InitializerListener implements ServletContextListener {
         );
     }
 
-    public static void setAktoDefaultNewUI(BackwardCompatibility backwardCompatibility){
-        if(backwardCompatibility.getAktoDefaultNewUI() == 0){
-
-            UsersDao.instance.updateMany(Filters.empty(), Updates.set(User.AKTO_UI_MODE, AktoUIMode.VERSION_2));
-
-            BackwardCompatibilityDao.instance.updateOne(
-                Filters.eq("_id", backwardCompatibility.getId()),
-                Updates.set(BackwardCompatibility.DEFAULT_NEW_UI, Context.now())
-            );
-        }
-    }
 
     public static void initializeOrganizationAccountBelongsTo(BackwardCompatibility backwardCompatibility) {
         // lets keep this for now. This function is re-entrant.
@@ -2914,172 +2881,6 @@ public class InitializerListener implements ServletContextListener {
         }
     }
 
-    private static void backFillDiscovered() {
-
-        long count = ApiInfoDao.instance.count(Filters.exists(ApiInfo.DISCOVERED_TIMESTAMP, false));
-        if (count == 0) {
-            logger.debugAndAddToDb("No need to backFillDiscovered");
-            return;
-        }
-
-        logger.debugAndAddToDb("Running back fill discovered");
-
-        List<SingleTypeInfo> singleTypeInfos = new ArrayList<>();
-        ObjectId id = null;
-        Bson sort = Sorts.ascending("_id");
-        do {
-            Map<ApiInfo.ApiInfoKey, ApiInfo> apiInfoMap = new HashMap<>();
-            Bson idFilter = id == null ? Filters.empty() : Filters.gt("_id", id);
-            singleTypeInfos = SingleTypeInfoDao.instance.findAll(idFilter, 0, 100_000, sort, Projections.include(SingleTypeInfo._TIMESTAMP, SingleTypeInfo._URL, SingleTypeInfo._API_COLLECTION_ID, SingleTypeInfo._METHOD));
-            for (SingleTypeInfo singleTypeInfo: singleTypeInfos) {
-                id = singleTypeInfo.getId();
-                ApiInfo.ApiInfoKey apiInfoKey = new ApiInfo.ApiInfoKey(singleTypeInfo.getApiCollectionId(), singleTypeInfo.getUrl(), Method.fromString(singleTypeInfo.getMethod()));
-                ApiInfo apiInfo = apiInfoMap.getOrDefault(apiInfoKey, new ApiInfo(apiInfoKey));
-                if (apiInfo.getDiscoveredTimestamp() == 0 || apiInfo.getDiscoveredTimestamp() > singleTypeInfo.getTimestamp()) {
-                    apiInfo.setDiscoveredTimestamp(singleTypeInfo.getTimestamp());
-                }
-                apiInfoMap.put(apiInfoKey, apiInfo);
-            }
-
-            List<WriteModel<ApiInfo>> updates = new ArrayList<>();
-            for (ApiInfo apiInfo: apiInfoMap.values()) {
-                updates.add(
-                        new UpdateOneModel<>(
-                                Filters.and(
-                                    ApiInfoDao.getFilter(apiInfo.getId()),
-                                    Filters.exists(ApiInfo.DISCOVERED_TIMESTAMP, false)
-                                ),
-                                Updates.set(ApiInfo.DISCOVERED_TIMESTAMP, apiInfo.getDiscoveredTimestamp()),
-                                new UpdateOptions().upsert(false)
-                        )
-                );
-
-                updates.add(
-                        new UpdateOneModel<>(
-                                Filters.and(
-                                    ApiInfoDao.getFilter(apiInfo.getId()),
-                                    Filters.exists(ApiInfo.DISCOVERED_TIMESTAMP, true)
-                                ),
-                                Updates.min(ApiInfo.DISCOVERED_TIMESTAMP, apiInfo.getDiscoveredTimestamp()),
-                                new UpdateOptions().upsert(false)
-                        )
-                );
-            }
-            if (!updates.isEmpty()) ApiInfoDao.instance.getMCollection().bulkWrite(updates);
-
-        } while (!singleTypeInfos.isEmpty());
-
-        logger.debugAndAddToDb("Finished running back fill discovered");
-    }
-
-    private static void backFillStatusCodeType() {
-        long count = ApiInfoDao.instance.count(Filters.exists(ApiInfo.API_TYPE, false));
-        if (count == 0) {
-            logger.debugAndAddToDb("No need to run backFillStatusCodeType");
-            return;
-        }
-
-        logger.debugAndAddToDb("Running backFillStatusCodeType");
-
-        List<SampleData> sampleDataList = new ArrayList<>();
-        Bson sort = Sorts.ascending("_id.apiCollectionId", "_id.url", "_id.method");
-        int skip = 0;
-        do {
-            sampleDataList = SampleDataDao.instance.findAll(Filters.empty(), skip, 100, sort);
-            skip += sampleDataList.size();
-            List<ApiInfo> apiInfoList = new ArrayList<>();
-            for (SampleData sampleData: sampleDataList) {
-                Key id = sampleData.getId();
-                List<String> samples = sampleData.getSamples();
-                if (samples == null || samples.isEmpty()) continue;
-                ApiInfo apiInfo = new ApiInfo(new ApiInfo.ApiInfoKey(id.getApiCollectionId(), id.getUrl(), id.getMethod()));
-                apiInfo.setResponseCodes(new ArrayList<>());
-                for (String sample: samples) {
-                    try {
-                        HttpResponseParams httpResponseParams = HttpCallParser.parseKafkaMessage(sample);
-
-                        int statusCode = httpResponseParams.getStatusCode();
-                        if (!apiInfo.getResponseCodes().contains(statusCode)) {
-                            apiInfo.getResponseCodes().add(statusCode);
-                        }
-
-                        ApiInfo.ApiType apiType = ApiInfo.findApiTypeFromResponseParams(httpResponseParams);
-                        apiInfo.setApiType(apiType);
-                    } catch (Exception e) {
-                        continue;
-                    }
-                }
-                apiInfoList.add(apiInfo);
-            }
-
-            List<WriteModel<ApiInfo>> updates = new ArrayList<>();
-            for (ApiInfo apiInfo: apiInfoList) {
-                List<Bson> subUpdates = new ArrayList<>();
-
-                // response codes
-                subUpdates.add(Updates.addEachToSet(ApiInfo.RESPONSE_CODES, apiInfo.getResponseCodes()));
-
-                // api type
-                subUpdates.add(Updates.set(ApiInfo.API_TYPE, apiInfo.getApiType()));
-                updates.add(
-                        new UpdateOneModel<>(
-                                ApiInfoDao.getFilter(apiInfo.getId()),
-                                Updates.combine(subUpdates),
-                                new UpdateOptions().upsert(false)
-                        )
-                );
-            }
-            if (!updates.isEmpty()) ApiInfoDao.instance.getMCollection().bulkWrite(updates);
-
-        } while (!sampleDataList.isEmpty());
-
-        logger.debugAndAddToDb("Finished running backFillStatusCodeType");
-    }
-
-    private static void dropLastCronRunInfoField(BackwardCompatibility backwardCompatibility){
-        if(backwardCompatibility.getDeleteLastCronRunInfo() == 0){
-            AccountSettingsDao.instance.updateOne(Filters.empty(), Updates.unset(AccountSettings.LAST_UPDATED_CRON_INFO));
-
-            BackwardCompatibilityDao.instance.updateOne(
-                        Filters.eq("_id", backwardCompatibility.getId()),
-                        Updates.set(BackwardCompatibility.DELETE_LAST_CRON_RUN_INFO, Context.now())
-                );
-        }
-    }
-
-    private static void makeFirstUserAdmin(BackwardCompatibility backwardCompatibility){
-        if(backwardCompatibility.getAddAdminRoleIfAbsent() < 1733228772){
-           
-            User firstUser = UsersDao.instance.getFirstUser(Context.accountId.get());
-            if(firstUser == null){
-                return;
-            }
-
-            RBAC firstUserAdminRbac = RBACDao.instance.findOne(Filters.and(
-                Filters.eq(RBAC.USER_ID, firstUser.getId()),
-                Filters.eq(RBAC.ROLE, Role.ADMIN.name())
-            ));
-
-            if(firstUserAdminRbac != null){
-                logger.debugAndAddToDb("Found admin rbac for first user: " + firstUser.getLogin() + " , thus deleting it's member role RBAC", LogDb.DASHBOARD);
-                RBACDao.instance.deleteAll(Filters.and(
-                    Filters.eq(RBAC.USER_ID, firstUser.getId()),
-                    Filters.eq(RBAC.ROLE, Role.MEMBER.name())
-                ));
-            }else{
-                logger.debugAndAddToDb("Found non-admin rbac for first user: " + firstUser.getLogin() + " , thus inserting admin role", LogDb.DASHBOARD);
-                RBACDao.instance.insertOne(
-                    new RBAC(firstUser.getId(), Role.ADMIN.name(), Context.accountId.get())
-                );
-            }
-
-            BackwardCompatibilityDao.instance.updateOne(
-                        Filters.eq("_id", backwardCompatibility.getId()),
-                        Updates.set(BackwardCompatibility.ADD_ADMIN_ROLE, Context.now())
-                );
-        }
-    }
-
     private static void addDefaultAdvancedFilters(BackwardCompatibility backwardCompatibility){
         if(backwardCompatibility.getAddDefaultFilters() == 0 || backwardCompatibility.getAddDefaultFilters() < 1734502264){
             String contentAllow = "id: DEFAULT_ALLOW_FILTER\nfilter:\n    url:\n        regex: '.*'";
@@ -3132,180 +2933,56 @@ public class InitializerListener implements ServletContextListener {
         }
     }
 
-    private static void moveAzureSamlConfig(BackwardCompatibility backwardCompatibility){
-        if(backwardCompatibility.getMoveAzureSamlToNormalSaml() == 0){
+    public static void setAktoDefaultNewUI(BackwardCompatibility backwardCompatibility){
+        if(backwardCompatibility.getAktoDefaultNewUI() == 0){
 
-            if(DashboardMode.isOnPremDeployment()){
-                Bson filterQ = Filters.eq(Constants.ID, AzureConfig.CONFIG_ID);
-                Config.AzureConfig azureConfig = (AzureConfig) ConfigsDao.instance.findOne(filterQ);
-                if(azureConfig != null){
-                    String adminEmail = "";
-                    Organization org = OrganizationsDao.instance.findOne(Filters.empty());
-                    if(org == null){
-                        RBAC rbac = RBACDao.instance.findOne(Filters.eq(RBAC.ROLE, RBAC.Role.ADMIN.name()));
-                        User adminUser = UsersDao.instance.findOne(Filters.eq("login", rbac.getUserId()));
-                        adminEmail = adminUser.getLogin();
-                    }else{
-                        adminEmail = org.getAdminEmail();
-                    }
-                    
-                    String domain = "";
-                    if(!adminEmail.isEmpty()){
-                        domain = OrganizationUtils.determineEmailDomain(adminEmail);
-                    }
+            UsersDao.instance.updateMany(Filters.empty(), Updates.set(User.AKTO_UI_MODE, AktoUIMode.VERSION_2));
 
-                    SAMLConfig samlConfig = SAMLConfig.convertAzureConfigToSAMLConfig(azureConfig);
-                    samlConfig.setId("1000000");
-                    samlConfig.setOrganizationDomain(domain);
-                    if(SSOConfigsDao.instance.estimatedDocumentCount() == 0){
-                        SSOConfigsDao.instance.insertOne(samlConfig);
-                    }
-                    ConfigsDao.instance.deleteAll(filterQ);
-                }
-            }
-            
             BackwardCompatibilityDao.instance.updateOne(
                 Filters.eq("_id", backwardCompatibility.getId()),
-                Updates.set(BackwardCompatibility.MOVE_AZURE_SAML, Context.now())
+                Updates.set(BackwardCompatibility.DEFAULT_NEW_UI, Context.now())
             );
         }
     }
 
-    private static void deleteOptionsAPIs(BackwardCompatibility backwardCompatibility){
-        if(backwardCompatibility.getDeleteOptionsAPIs() == 0){
-            List<ApiCollection> apiCollections = ApiCollectionsDao.instance.findAll(Filters.nin(Constants.ID,UsageMetricCalculator.getDeactivated()),
-                                Projections.include(Constants.ID, ApiCollection.NAME, ApiCollection.HOST_NAME));
-            CleanInventory.deleteOptionsAPIs(apiCollections);
-            BackwardCompatibilityDao.instance.updateOne(
-                Filters.eq("_id", backwardCompatibility.getId()),
-                Updates.set(BackwardCompatibility.DELETE_OPTIONS_API, Context.now())
-            );
-        }
-    }
-
-    private static void moveOktaOidcSSO(BackwardCompatibility backwardCompatibility){
-        if(backwardCompatibility.getMoveOktaOidcSSO() == 0){
-            String saltId = ConfigType.OKTA.name() + Config.CONFIG_SALT;
-            Config.OktaConfig oktaConfig = (Config.OktaConfig) ConfigsDao.instance.findOne(
-                Filters.eq(Constants.ID, saltId)
-            );
-            if(oktaConfig != null){
-                int accountId = Context.accountId.get();
-                oktaConfig.setId(OktaConfig.getOktaId(accountId));
-                ConfigsDao.instance.insertOne(oktaConfig);
-                ConfigsDao.instance.deleteAll(
-                    Filters.eq(Constants.ID, saltId)
-                );
-            }
-            BackwardCompatibilityDao.instance.updateOne(
-                Filters.eq("_id", backwardCompatibility.getId()),
-                Updates.set(BackwardCompatibility.MOVE_OKTA_OIDC_SSO, Context.now())
-            );
-        }
-    }
-
-    private static void markSummariesAsVulnerable(BackwardCompatibility backwardCompatibility){
-        // case for the customers where vulnerable are stored in new collection and only testing runs are marked as new.
-
-        if(backwardCompatibility.getMarkSummariesVulnerable() == 0){
-
-            List<ObjectId> summaryIds = VulnerableTestingRunResultDao.instance.summaryIdsStoredForVulnerableTests();
-            if(!summaryIds.isEmpty()){
-                TestingRunResultSummariesDao.instance.updateMany(
-                    Filters.in(Constants.ID, summaryIds), 
-                    Updates.set(TestingRunResultSummary.IS_NEW_TESTING_RUN_RESULT_SUMMARY, true)
-                );
-            }
-
-            BackwardCompatibilityDao.instance.updateOne(
-                Filters.eq("_id", backwardCompatibility.getId()),
-                Updates.set(BackwardCompatibility.MARK_SUMMARIES_NEW_FOR_VULNERABLE, Context.now())
-            );
-        }
-    }
-
-    private static void updateCustomDataTypeOperator(BackwardCompatibility backwardCompatibility){
-        if(backwardCompatibility.getChangeOperatorConditionInCDT() == 0){
-            CustomDataTypeDao.instance.updateOneNoUpsert(
-                Filters.and(
-                    Filters.eq(CustomDataType.NAME, "TOKEN"),
-                    Filters.or(
-                        Filters.exists(CustomDataType.USER_MODIFIED_TIMESTAMP, false),
-                        Filters.eq(CustomDataType.USER_MODIFIED_TIMESTAMP, 0)
-                    )  
-                ),
-                Updates.set(CustomDataType.OPERATOR, Operator.AND) 
-            );
-
-            BackwardCompatibilityDao.instance.updateOne(
-                Filters.eq("_id", backwardCompatibility.getId()),
-                Updates.set(BackwardCompatibility.CHANGE_OPERATOR_CONDITION_IN_CDT, Context.now())
-            );
-        }
-    }
-
-    private static void cleanupRbacEntriesForDeveloperRole(BackwardCompatibility backwardCompatibility){
-        if(backwardCompatibility.getCleanupRbacEntries() == 0){
-            int count = (int) RBACDao.instance.count(
-                Filters.and(
-                    Filters.eq(RBAC.ROLE, Role.DEVELOPER.name()),
-                    Filters.eq(RBAC.USER_ID, 1696481097)
-                )
-            );
-            if(count > 1){
-                RBACDao.instance.deleteAll(
-                    Filters.and(
-                        Filters.eq(RBAC.ROLE, Role.DEVELOPER.name()),
-                        Filters.eq(RBAC.USER_ID, 1696481097)
-                    )
-                );
-                RBACDao.instance.insertOne(
-                    new RBAC(1696481097, Role.DEVELOPER.name(), Context.accountId.get())
-                );
-            }
-
-            BackwardCompatibilityDao.instance.updateOne(
-                Filters.eq("_id", backwardCompatibility.getId()),
-                Updates.set(BackwardCompatibility.CLEANUP_RBAC_ENTRIES, Context.now())
-            );
-        }
-    }
-
-    public static void setBackwardCompatibilities(BackwardCompatibility backwardCompatibility){
+    public static void setBackwardCompatibilities(BackwardCompatibility backwardCompatibility, boolean isNewAccount){
         if (DashboardMode.isMetered()) {
             initializeOrganizationAccountBelongsTo(backwardCompatibility);
             setOrganizationsInBilling(backwardCompatibility);
         }
-        setAktoDefaultNewUI(backwardCompatibility);
-        updateCustomDataTypeOperator(backwardCompatibility);
-        markSummariesAsVulnerable(backwardCompatibility);
-        dropLastCronRunInfoField(backwardCompatibility);
-        cleanupRbacEntriesForDeveloperRole(backwardCompatibility);
-        fetchIntegratedConnections(backwardCompatibility);
-        dropFilterSampleDataCollection(backwardCompatibility);
-        dropApiDependencies(backwardCompatibility);
-        resetSingleTypeInfoCount(backwardCompatibility);
-        dropWorkflowTestResultCollection(backwardCompatibility);
-        readyForNewTestingFramework(backwardCompatibility);
-        addAktoDataTypes(backwardCompatibility);
-        updateDeploymentStatus(backwardCompatibility);
-        dropAuthMechanismData(backwardCompatibility);
-        moveAuthMechanismDataToRole(backwardCompatibility);
-        createLoginSignupGroups(backwardCompatibility);
-        createRiskScoreGroups(backwardCompatibility);
-        setApiCollectionAutomatedField(backwardCompatibility);
-        createAutomatedAPIGroups(backwardCompatibility);
-        deleteOptionsAPIs(backwardCompatibility);
-        deleteAccessListFromApiToken(backwardCompatibility);
-        deleteNullSubCategoryIssues(backwardCompatibility);
-        enableNewMerging(backwardCompatibility);
-        setDefaultTelemetrySettings(backwardCompatibility);
-        disableAwsSecretPiiType(backwardCompatibility);
-        makeFirstUserAdmin(backwardCompatibility);
-        dropSpecialCharacterApiCollections(backwardCompatibility);
-        addDefaultAdvancedFilters(backwardCompatibility);
-        moveAzureSamlConfig(backwardCompatibility);
-        moveOktaOidcSSO(backwardCompatibility);
+        if(isNewAccount){
+            setAktoDefaultNewUI(backwardCompatibility);
+            addAktoDataTypes(backwardCompatibility);
+            updateDeploymentStatus(backwardCompatibility);
+            moveAuthMechanismDataToRole(backwardCompatibility);
+            createLoginSignupGroups(backwardCompatibility);
+            createRiskScoreGroups(backwardCompatibility);
+            setApiCollectionAutomatedField(backwardCompatibility);
+            createAutomatedAPIGroups(backwardCompatibility);
+            enableNewMerging(backwardCompatibility);
+            setDefaultTelemetrySettings(backwardCompatibility);
+            disableAwsSecretPiiType(backwardCompatibility);
+            addDefaultAdvancedFilters(backwardCompatibility);
+        }
+        // updateCustomDataTypeOperator(backwardCompatibility); // don't need this, fixed using pii-sources, and for old customers, ensured this ran
+        // markSummariesAsVulnerable(backwardCompatibility); this was to shift some tests for fetching vulnerable tests from separate collection, not needed anymore
+        // dropLastCronRunInfoField(backwardCompatibility); // this was only needed once to fix the risk scores
+        // cleanupRbacEntriesForDeveloperRole(backwardCompatibility);// not needed now, all developer roles for `special user` are inactive
+        // fetchIntegratedConnections(backwardCompatibility); // feature not used anymore
+        // dropFilterSampleDataCollection(backwardCompatibility); // not needed anymore
+        // dropApiDependencies(backwardCompatibility); // dependency graph initial fix, not needed anymore
+        // resetSingleTypeInfoCount(backwardCompatibility); // not needed now
+        // dropWorkflowTestResultCollection(backwardCompatibility); // not needed now
+        // readyForNewTestingFramework(backwardCompatibility); // already using this by default, not needed now
+        // dropAuthMechanismData(backwardCompatibility); // earlier used to shift to roles
+        // deleteOptionsAPIs(backwardCompatibility); // not needed now, using advanced filters and runtime filters
+        // deleteAccessListFromApiToken(backwardCompatibility); // feature not used anymore
+        // deleteNullSubCategoryIssues(backwardCompatibility); // not needed now
+        // makeFirstUserAdmin(backwardCompatibility); // not needed now, for new account, we directly set as admin now
+        // dropSpecialCharacterApiCollections(backwardCompatibility); // only needed for some old customers, not needed now
+        
+        // moveAzureSamlConfig(backwardCompatibility); // moved to common, all saas customers
+        // moveOktaOidcSSO(backwardCompatibility); // moved to common, all saas customers
     }
 
     public static void printMultipleHosts(int apiCollectionId) {
@@ -3337,21 +3014,17 @@ public class InitializerListener implements ServletContextListener {
 
         // backward compatibility
         try {
-            setBackwardCompatibilities(backwardCompatibility);
+            setBackwardCompatibilities(backwardCompatibility, false);
             logger.debugAndAddToDb("Backward compatibilities set for " + Context.accountId.get(), LogDb.DASHBOARD);
             insertPiiSources();
             logger.debugAndAddToDb("PII sources inserted set for " + Context.accountId.get(), LogDb.DASHBOARD);
 
-//            setUpPiiCleanerScheduler();
-//            setUpDailyScheduler();
-//            setUpWebhookScheduler();
-//            setUpPiiAndTestSourcesScheduler();
+            // commenting this as it is old compatibility, customers data might be fixed already
+            // dropSampleDataIfEarlierNotDroped(accountSettings);
 
-            AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
-            dropSampleDataIfEarlierNotDroped(accountSettings);
-
-            backFillDiscovered();
-            backFillStatusCodeType();
+            // commenting these, these were used for API-security posture, one-time needed, removing those now
+            // backFillDiscovered();
+            // backFillStatusCodeType();
         } catch (Exception e) {
             logger.errorAndAddToDb(e,"error while setting up dashboard: " + e.toString(), LogDb.DASHBOARD);
         }

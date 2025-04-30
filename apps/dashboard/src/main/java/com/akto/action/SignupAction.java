@@ -941,6 +941,8 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
 
             servletRequest.getSession().setAttribute("user", user);
             servletRequest.getSession().setAttribute("accountId", accountId);
+            // set active account here
+            AccountsDao.instance.updateLastActiveAccount(accountId);
             LoginAction.loginUser(user, servletResponse, true, servletRequest);
             servletRequest.setAttribute("username", userEmail);
             servletResponse.sendRedirect("/dashboard/onboarding");

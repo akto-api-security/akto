@@ -78,6 +78,7 @@ public class ProfileAction extends UserAction {
         } else {
             logger.debug("setting session: " + sessionAccId);
             request.getSession().setAttribute("accountId", sessionAccId);
+            AccountsDao.instance.updateLastActiveAccount(sessionAccId);
             Context.accountId.set(sessionAccId);
         }
 

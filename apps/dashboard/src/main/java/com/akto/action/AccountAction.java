@@ -327,7 +327,7 @@ public class AccountAction extends UserAction {
                     backwardCompatibility = new BackwardCompatibility();
                     BackwardCompatibilityDao.instance.insertOne(backwardCompatibility);
                 }
-                InitializerListener.setBackwardCompatibilities(backwardCompatibility);
+                InitializerListener.setBackwardCompatibilities(backwardCompatibility, true);
                 loggerMaker.debugAndAddToDb("start create indices", LogDb.DASHBOARD);
                 DaoInit.createIndices();
 
@@ -385,7 +385,7 @@ public class AccountAction extends UserAction {
     public String goToAccount() {
         if (getSUser().getAccounts().containsKey(newAccountId+"")) {
             getSession().put("accountId", newAccountId);
-
+            AccountsDao.instance.updateLastActiveAccount(newAccountId);
             Context.accountId.set(newAccountId);
             return SUCCESS.toUpperCase();
         }
