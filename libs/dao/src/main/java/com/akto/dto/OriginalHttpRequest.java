@@ -6,7 +6,11 @@ import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONObject;
 import com.google.gson.Gson;
 import com.mongodb.BasicDBObject;
+
+import lombok.Getter;
+import lombok.Setter;
 import okhttp3.HttpUrl;
+import okhttp3.OkHttpClient;
 
 import java.net.URI;
 import java.util.*;
@@ -23,9 +27,13 @@ public class OriginalHttpRequest {
     private String destinationIp;
     private Map<String, List<String>> headers;
 
+    @Getter
+    @Setter
+    private OkHttpClient client;
+
     public OriginalHttpRequest() { }
 
-    // before adding any fields make sure to add them to copy function as wel
+    // before adding any fields make sure to add them to copy function as well
     public OriginalHttpRequest(String url, String queryParams, String method, String body, Map<String, List<String>> headers, String type) {
         this.url = url;
         this.queryParams = queryParams;
@@ -45,6 +53,10 @@ public class OriginalHttpRequest {
         this.destinationIp = destinationIp;
         this.headers = headers;
         this.type = type;
+    }
+    public OriginalHttpRequest(String url, String queryParams, String method, String body, Map<String, List<String>> headers, String type, OkHttpClient client) {
+        this(url, queryParams, method, body, headers, type);
+        this.client = client;
     }
 
     public OriginalHttpRequest copy() {
