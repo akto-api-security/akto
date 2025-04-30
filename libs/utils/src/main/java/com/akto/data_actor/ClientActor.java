@@ -2231,26 +2231,34 @@ public class ClientActor extends DataActor {
                     case "LOGIN_REQUEST":
                         authParam.put("_t", "com.akto.dto.testing.LoginRequestAuthParam");
                         break;
+                    case "TLS_AUTH":
+                        authParam.put("_t", "com.akto.dto.testing.TLSAuthParam");
+                        break;
                     default:
                         break;
                 }
             }
         }
         Document defaultAuthMechanism = (Document) testRole.get("defaultAuthMechanism");
-        defaultAuthMechanism.put("_t", "com.akto.dto.testing.HardcodedAuthParam");
-        String type = defaultAuthMechanism.getString("type");
-        List<Document> defaultAuthParams = (List<Document>) defaultAuthMechanism.get("authParams");
-        for (Document defaultAuthParam: defaultAuthParams) {
-            switch (type) {
-                case "HardCoded":
-                case "HARDCODED":
-                    defaultAuthParam.put("_t", "com.akto.dto.testing.HardcodedAuthParam");
-                    break;
-                case "LOGIN_REQUEST":
-                    defaultAuthParam.put("_t", "com.akto.dto.testing.LoginRequestAuthParam");
-                    break;
-                default:
-                    break;
+        if (defaultAuthMechanism != null) {
+            defaultAuthMechanism.put("_t", "com.akto.dto.testing.HardcodedAuthParam");
+            String type = defaultAuthMechanism.getString("type");
+            List<Document> defaultAuthParams = (List<Document>) defaultAuthMechanism.get("authParams");
+            for (Document defaultAuthParam: defaultAuthParams) {
+                switch (type) {
+                    case "HardCoded":
+                    case "HARDCODED":
+                        defaultAuthParam.put("_t", "com.akto.dto.testing.HardcodedAuthParam");
+                        break;
+                    case "LOGIN_REQUEST":
+                        defaultAuthParam.put("_t", "com.akto.dto.testing.LoginRequestAuthParam");
+                        break;
+                    case "TLS_AUTH":
+                        defaultAuthParam.put("_t", "com.akto.dto.testing.TLSAuthParam");
+                        break;
+                    default:
+                        break;
+                }
             }
         }
         testRole.put("endpointLogicalGroupId", new ObjectId(testRole.getString("endpointLogicalGroupIdHexId")));
@@ -3634,13 +3642,16 @@ public class ClientActor extends DataActor {
             BasicDBObject payloadObj;
             try {
                 payloadObj = BasicDBObject.parse(responsePayload);
-                BasicDBObject testingRunPlaygroundObj = (BasicDBObject) payloadObj.get("testingRunPlayground");
+                BasicDBObject testingRunPlaygroundObj = (BasicDBObject) payloadObj.getOrDefault("testingRunPlayground", null);
+                if (testingRunPlaygroundObj == null) {
+                    return null;
+                }
                 return objectMapper.readValue(testingRunPlaygroundObj.toJson(), TestingRunPlayground.class);
             } catch (Exception e) {
-                loggerMaker.errorAndAddToDb("error extracting response in fetchEditorTest" + e, LoggerMaker.LogDb.TESTING);
+                loggerMaker.errorAndAddToDb("error extracting response in fetchEditorTest " + e, LoggerMaker.LogDb.TESTING);
             }
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("error in fetchEditorTest" + e, LoggerMaker.LogDb.TESTING);
+            loggerMaker.errorAndAddToDb("error in fetchEditorTest " + e, LoggerMaker.LogDb.TESTING);
         }
         return null;
     }
