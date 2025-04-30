@@ -37,6 +37,7 @@ import org.bson.types.ObjectId;
 import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.billing.TokensDao;
 import com.akto.dao.context.Context;
+import com.akto.dao.file.FilesDao;
 import com.akto.dao.monitoring.FilterYamlTemplateDao;
 import com.akto.dao.runtime_filters.AdvancedTrafficFiltersDao;
 import com.akto.dao.test_editor.TestingRunPlaygroundDao;
@@ -58,10 +59,12 @@ import com.akto.dao.testing.sources.TestSourceConfigsDao;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dao.traffic_metrics.RuntimeMetricsDao;
 import com.akto.dao.traffic_metrics.TrafficMetricsDao;
+import com.akto.dao.upload.FileUploadsDao;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.billing.Tokens;
 import com.akto.dto.dependency_flow.Node;
+import com.akto.dto.files.File;
 import com.akto.dto.runtime_filters.RuntimeFilter;
 import com.akto.dto.test_editor.TestingRunPlayground;
 import com.akto.dto.test_editor.YamlTemplate;
@@ -90,6 +93,7 @@ import com.akto.dto.traffic_metrics.TrafficMetrics;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods;
 import com.akto.dto.type.URLMethods.Method;
+import com.akto.dto.upload.SwaggerFileUpload;
 import com.akto.dto.usage.MetricTypes;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
@@ -1331,5 +1335,23 @@ public class DbLayer {
 
     public static void insertJob(Job job) {
         JobsDao.instance.insertOne(job);
+    }
+
+    public static String fetchOpenApiSchema(int apiCollectionId) {
+
+        Bson sort = Sorts.descending("uploadTs");
+        SwaggerFileUpload fileUpload = FileUploadsDao.instance.getSwaggerMCollection().find(Filters.eq("collectionId", apiCollectionId)).sort(sort).limit(1).projection(Projections.fields(Projections.include("swaggerFileId"))).first();
+        if (fileUpload == null) {
+            return null;
+        }
+
+        ObjectId objectId = new ObjectId(fileUpload.getSwaggerFileId());
+
+        File file = FilesDao.instance.findOne(Filters.eq("_id", objectId));
+        if (file == null) {
+            return null;
+        }
+
+        return file.getCompressedContent();
     }
 }
