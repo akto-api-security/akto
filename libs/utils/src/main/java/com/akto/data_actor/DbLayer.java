@@ -923,40 +923,6 @@ public class DbLayer {
         AccountsDao.instance.updateOne(Filters.eq("_id", accountId), Updates.set(Account.HYBRID_TESTING_ENABLED, hybridTestingEnabled));
     }
 
-    //Todo handle this case
-    public static void fetchAndFailOutdatedTests(Account account) {
-//        if(account != null && account.getMiniTestingHeartbeat() != null) {
-//            List<TestingRun> testingRunList = TestingRunDao.instance.findAll(
-//                    Filters.or(
-//                            Filters.eq(TestingRun.STATE, State.SCHEDULED),
-//                            Filters.eq(TestingRun.STATE, State.RUNNING)
-//                    )
-//            );
-//            List<MiniTestingServiceHeartbeat> miniTestingHeartbeat = account.getMiniTestingHeartbeat();
-//            for (TestingRun testingRun : testingRunList) {
-//                String miniTestingServiceName = testingRun.getMiniTestingServiceName();
-//                if(miniTestingServiceName != null && !miniTestingServiceName.isEmpty()) {
-//                    boolean isValid = miniTestingHeartbeat.stream()
-//                            .anyMatch(heartbeat ->
-//                                    miniTestingServiceName.equals(heartbeat.getMiniTestingServiceName()) &&
-//                                            Context.now() - heartbeat.getLastHeartbeatTimestamp() <= 300
-//                            );
-//                    if(!isValid) {
-//                        Bson filter = Filters.or(
-//                                Filters.eq(TestingRun.STATE, State.SCHEDULED),
-//                                Filters.eq(TestingRun.STATE, State.RUNNING));
-//                        TestingRunDao.instance.updateOne(
-//                                Filters.and(filter, Filters.eq(Constants.ID, testingRun.getId())),
-//                                Updates.set(TestingRun.STATE, State.FAILED));
-//                        TestingRunResultSummariesDao.instance.updateOneNoUpsert(
-//                                Filters.eq(TestingRunResultSummary.TESTING_RUN_ID, testingRun.getId()),
-//                                Updates.set(TestingRunResultSummary.STATE, State.FAILED)
-//                        );
-//                    }
-//                }
-//            }
-//        }
-    }
 
     public static DataControlSettings fetchDataControlSettings(String prevResult, String prevCommand) {
         Integer accountId = Context.accountId.get();

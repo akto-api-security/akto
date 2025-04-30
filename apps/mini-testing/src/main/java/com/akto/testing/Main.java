@@ -252,6 +252,7 @@ public class Main {
 
     public static void main(String[] args) throws InterruptedException {
         AccountSettings accountSettings = dataActor.fetchAccountSettings();
+        dataActor.modifyHybridTestingSetting(RuntimeMode.isHybridDeployment());
         setupRateLimitWatcher(accountSettings);
         checkForPlaygroundTest();
 
