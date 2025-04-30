@@ -43,19 +43,10 @@ public class OriginalHttpRequest {
         this.type = type;
     }
 
-
-    public OriginalHttpRequest(String url, String queryParams, String method, String body, String sourceIp, String destinationIp, Map<String, List<String>> headers, String type) {
-        this.url = url;
-        this.queryParams = queryParams;
-        this.method = method;
-        this.body = body;
+    public OriginalHttpRequest(String url, String queryParams, String method, String body, String sourceIp, String destinationIp, Map<String, List<String>> headers, String type, OkHttpClient client) {
+        this(url, queryParams, method, body, headers, type);
         this.sourceIp = sourceIp;
         this.destinationIp = destinationIp;
-        this.headers = headers;
-        this.type = type;
-    }
-    public OriginalHttpRequest(String url, String queryParams, String method, String body, Map<String, List<String>> headers, String type, OkHttpClient client) {
-        this(url, queryParams, method, body, headers, type);
         this.client = client;
     }
 
@@ -67,7 +58,8 @@ public class OriginalHttpRequest {
             headersCopy.put(headerKV.getKey(), headerValues);
         }
         return new OriginalHttpRequest(
-                this.url, this.queryParams, this.method, this.body, this.sourceIp, this.destinationIp, headersCopy, this.type
+                this.url, this.queryParams, this.method, this.body, this.sourceIp, this.destinationIp, headersCopy, this.type, 
+                this.client
         );
     }
 
