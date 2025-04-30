@@ -20,16 +20,19 @@ public class ModuleInfoWorker {
     private final int startedTs = Context.now();
     private final String version;
     private final DataActor dataActor;
-    private ModuleInfoWorker(ModuleInfo.ModuleType moduleType, String version, DataActor dataActor) {
+    private final String moduleName;
+    private ModuleInfoWorker(ModuleInfo.ModuleType moduleType, String version, DataActor dataActor, String name) {
         this.moduleType = moduleType;
         this.version = version;
         this.dataActor = dataActor;
+        this.moduleName = name;
     }
 
     private ModuleInfoWorker() {
         this.moduleType = null;
         this.version = null;
         this.dataActor = null;
+        this.moduleName = null;
     }
 
     private void scheduleHeartBeatUpdate () {
@@ -39,6 +42,7 @@ public class ModuleInfoWorker {
         moduleInfo.setCurrentVersion(this.version);
         moduleInfo.setStartedTs(this.startedTs);
         moduleInfo.setId(moduleInfo.getId());//Setting new uuid for id
+        moduleInfo.setName(this.moduleName);
 
         scheduler.scheduleWithFixedDelay(() -> {
             moduleInfo.setLastHeartbeatReceived(Context.now());
@@ -49,6 +53,10 @@ public class ModuleInfoWorker {
     }
 
     public static void init(ModuleInfo.ModuleType moduleType, DataActor dataActor) {
+        init(moduleType, dataActor, null);
+    }
+
+    public static void init(ModuleInfo.ModuleType moduleType, DataActor dataActor, String name) {
         String version;
         try (InputStream in = ModuleInfoWorker.class.getResourceAsStream("/version.txt")) {
             if (in != null) {
@@ -61,7 +69,7 @@ public class ModuleInfoWorker {
             return;
         }
         loggerMaker.infoAndAddToDb("Starting heartbeat update for module:" + moduleType.name());
-        ModuleInfoWorker infoWorker = new ModuleInfoWorker(moduleType, version, dataActor);
+        ModuleInfoWorker infoWorker = new ModuleInfoWorker(moduleType, version, dataActor, name);
         infoWorker.scheduleHeartBeatUpdate();
     }
 }

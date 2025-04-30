@@ -2,7 +2,13 @@ package com.akto.data_actor;
 
 import static com.akto.util.Constants.ID;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 import com.akto.bulk_update_util.ApiInfoBulkUpdate;
 import com.akto.dao.*;
@@ -454,19 +460,14 @@ public class DbLayer {
         );
     }
 
-    public static TestingRun findPendingTestingRun(int delta, String miniTestingServiceName) {
-
-        Bson miniTestingServiceNameFilter;
-        miniTestingServiceNameFilter = Filters.eq(TestingRun.MINI_TESTING_SERVICE_NAME, miniTestingServiceName);
+    public static TestingRun findPendingTestingRun(int delta) {
 
         Bson filter1 = Filters.and(Filters.eq(TestingRun.STATE, TestingRun.State.SCHEDULED),
-                Filters.lte(TestingRun.SCHEDULE_TIMESTAMP, Context.now()),
-                miniTestingServiceNameFilter
+                Filters.lte(TestingRun.SCHEDULE_TIMESTAMP, Context.now())
         );
         Bson filter2 = Filters.and(
                 Filters.eq(TestingRun.STATE, TestingRun.State.RUNNING),
-                Filters.lte(TestingRun.PICKED_UP_TIMESTAMP, delta),
-                miniTestingServiceNameFilter
+                Filters.lte(TestingRun.PICKED_UP_TIMESTAMP, delta)
         );
 
         Bson update = Updates.combine(
@@ -479,23 +480,18 @@ public class DbLayer {
                 Filters.or(filter1,filter2), update);
     }
 
-    public static TestingRunResultSummary findPendingTestingRunResultSummary(int now, int delta, String miniTestingServiceName) {
-
-        Bson miniTestingServiceNameFilter;
-        miniTestingServiceNameFilter = Filters.eq(TestingRun.MINI_TESTING_SERVICE_NAME, miniTestingServiceName);
+    public static TestingRunResultSummary findPendingTestingRunResultSummary(int now, int delta) {
 
         Bson filter1 = Filters.and(
-                Filters.eq(TestingRun.STATE, TestingRun.State.SCHEDULED),
-                Filters.lte(TestingRunResultSummary.START_TIMESTAMP, now),
-                Filters.gt(TestingRunResultSummary.START_TIMESTAMP, delta),
-                miniTestingServiceNameFilter
+            Filters.eq(TestingRun.STATE, TestingRun.State.SCHEDULED),
+            Filters.lte(TestingRunResultSummary.START_TIMESTAMP, now),
+            Filters.gt(TestingRunResultSummary.START_TIMESTAMP, delta)
         );
 
         Bson filter2 = Filters.and(
-                Filters.eq(TestingRun.STATE, TestingRun.State.RUNNING),
-                Filters.lte(TestingRunResultSummary.START_TIMESTAMP, now - 5*60),
-                Filters.gt(TestingRunResultSummary.START_TIMESTAMP, delta),
-                miniTestingServiceNameFilter
+            Filters.eq(TestingRun.STATE, TestingRun.State.RUNNING),
+            Filters.lte(TestingRunResultSummary.START_TIMESTAMP, now - 5*60),
+            Filters.gt(TestingRunResultSummary.START_TIMESTAMP, delta)
         );
 
         Bson update = Updates.set(TestingRun.STATE, TestingRun.State.RUNNING);
@@ -924,85 +920,43 @@ public class DbLayer {
 
     public static void modifyHybridTestingSetting(boolean hybridTestingEnabled) {
         Integer accountId = Context.accountId.get();
-        Account account = AccountsDao.instance.updateOne(Filters.eq("_id", accountId), Updates.combine(
-                Updates.set(Account.HYBRID_TESTING_ENABLED, hybridTestingEnabled)
-        ));
-
-        fetchAndFailOutdatedTests(account);
+        AccountsDao.instance.updateOne(Filters.eq("_id", accountId), Updates.set(Account.HYBRID_TESTING_ENABLED, hybridTestingEnabled));
     }
 
-    public static void modifyHybridTestingSettingWithCustomName(boolean hybridTestingEnabled, String serviceName) {
-        Integer accountId = Context.accountId.get();
-
-        boolean serviceExists;
-        Account account = AccountsDao.instance.findOne(
-                Filters.and(
-                        Filters.eq("_id", accountId),
-                        Filters.eq("miniTestingHeartbeat.miniTestingServiceName", serviceName)
-                )
-        );
-        serviceExists = account != null;
-
-        if (serviceExists) {
-            AccountsDao.instance.updateOne(
-                    Filters.and(
-                            Filters.eq("_id", accountId),
-                            Filters.eq("miniTestingHeartbeat.miniTestingServiceName", serviceName)
-                    ),
-                    Updates.combine(
-                            Updates.set(Account.HYBRID_TESTING_ENABLED, hybridTestingEnabled),
-                            Updates.set("miniTestingHeartbeat.$.lastHeartbeatTimestamp", Context.now())
-                    )
-            );
-        } else {
-            AccountsDao.instance.updateOne(
-                    Filters.eq("_id", accountId),
-                    Updates.combine(
-                            Updates.set(Account.HYBRID_TESTING_ENABLED, hybridTestingEnabled),
-                            Updates.addToSet(Account.MINI_TESTING_HEARTBEAT,
-                                    new MiniTestingServiceHeartbeat(serviceName, Context.now()))
-                    )
-            );
-        }
-
-        fetchAndFailOutdatedTests(account);
-    }
-
+    //Todo handle this case
     public static void fetchAndFailOutdatedTests(Account account) {
-        if(account != null && account.getMiniTestingHeartbeat() != null) {
-            List<TestingRun> testingRunList = TestingRunDao.instance.findAll(
-                    Filters.or(
-                            Filters.eq(TestingRun.STATE, State.SCHEDULED),
-                            Filters.eq(TestingRun.STATE, State.RUNNING)
-                    )
-            );
-            List<MiniTestingServiceHeartbeat> miniTestingHeartbeat = account.getMiniTestingHeartbeat();
-            for (TestingRun testingRun : testingRunList) {
-                String miniTestingServiceName = testingRun.getMiniTestingServiceName();
-                if(miniTestingServiceName != null && !miniTestingServiceName.isEmpty()) {
-                    boolean isValid = miniTestingHeartbeat.stream()
-                            .anyMatch(heartbeat ->
-                                    miniTestingServiceName.equals(heartbeat.getMiniTestingServiceName()) &&
-                                            Context.now() - heartbeat.getLastHeartbeatTimestamp() <= 300
-                            );
-
-                    if(!isValid) {
-                        Bson filter = Filters.or(
-                                Filters.eq(TestingRun.STATE, State.SCHEDULED),
-                                Filters.eq(TestingRun.STATE, State.RUNNING));
-                        TestingRunDao.instance.updateOne(
-                                Filters.and(filter, Filters.eq(Constants.ID, testingRun.getId())),
-                                Updates.set(TestingRun.STATE, State.FAILED));
-                        TestingRunResultSummariesDao.instance.updateOneNoUpsert(
-                                Filters.eq(TestingRunResultSummary.TESTING_RUN_ID, testingRun.getId()),
-                                Updates.set(TestingRunResultSummary.STATE, State.FAILED)
-                        );
-                    }
-                }
-            }
-        }
+//        if(account != null && account.getMiniTestingHeartbeat() != null) {
+//            List<TestingRun> testingRunList = TestingRunDao.instance.findAll(
+//                    Filters.or(
+//                            Filters.eq(TestingRun.STATE, State.SCHEDULED),
+//                            Filters.eq(TestingRun.STATE, State.RUNNING)
+//                    )
+//            );
+//            List<MiniTestingServiceHeartbeat> miniTestingHeartbeat = account.getMiniTestingHeartbeat();
+//            for (TestingRun testingRun : testingRunList) {
+//                String miniTestingServiceName = testingRun.getMiniTestingServiceName();
+//                if(miniTestingServiceName != null && !miniTestingServiceName.isEmpty()) {
+//                    boolean isValid = miniTestingHeartbeat.stream()
+//                            .anyMatch(heartbeat ->
+//                                    miniTestingServiceName.equals(heartbeat.getMiniTestingServiceName()) &&
+//                                            Context.now() - heartbeat.getLastHeartbeatTimestamp() <= 300
+//                            );
+//                    if(!isValid) {
+//                        Bson filter = Filters.or(
+//                                Filters.eq(TestingRun.STATE, State.SCHEDULED),
+//                                Filters.eq(TestingRun.STATE, State.RUNNING));
+//                        TestingRunDao.instance.updateOne(
+//                                Filters.and(filter, Filters.eq(Constants.ID, testingRun.getId())),
+//                                Updates.set(TestingRun.STATE, State.FAILED));
+//                        TestingRunResultSummariesDao.instance.updateOneNoUpsert(
+//                                Filters.eq(TestingRunResultSummary.TESTING_RUN_ID, testingRun.getId()),
+//                                Updates.set(TestingRunResultSummary.STATE, State.FAILED)
+//                        );
+//                    }
+//                }
+//            }
+//        }
     }
-
 
     public static DataControlSettings fetchDataControlSettings(String prevResult, String prevCommand) {
         Integer accountId = Context.accountId.get();
