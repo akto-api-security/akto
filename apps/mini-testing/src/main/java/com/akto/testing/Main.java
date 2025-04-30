@@ -68,6 +68,11 @@ public class Main {
 
     public static boolean SKIP_SSRF_CHECK = ("true".equalsIgnoreCase(System.getenv("SKIP_SSRF_CHECK")) || !DashboardMode.isSaasDeployment());
     public static final boolean IS_SAAS = "true".equalsIgnoreCase(System.getenv("IS_SAAS"));
+    
+    public static final String customMiniTestingServiceName;
+    static {
+        customMiniTestingServiceName = System.getenv("MINI_TESTING_NAME") == null? "Default_" + UUID.randomUUID().toString().substring(0, 4) : System.getenv("MINI_TESTING_NAME");
+    }
 
     private static void setupRateLimitWatcher (AccountSettings settings) {
         
@@ -263,7 +268,7 @@ public class Main {
         Producer testingProducer = new Producer();
         ConsumerUtil testingConsumer = new ConsumerUtil();
         TestCompletion testCompletion = new TestCompletion();
-        ModuleInfoWorker.init(ModuleInfo.ModuleType.MINI_TESTING, dataActor);
+        ModuleInfoWorker.init(ModuleInfo.ModuleType.MINI_TESTING, dataActor, customMiniTestingServiceName);
         loggerMaker.infoAndAddToDb("Starting.......", LogDb.TESTING);
 
         if(Constants.IS_NEW_TESTING_ENABLED){
@@ -366,7 +371,9 @@ public class Main {
                 testingRun = dataActor.findTestingRun(trrs.getTestingRunId().toHexString());
             }
 
-            if (testingRun == null) {
+            if (testingRun == null ||
+                    (testingRun.getMiniTestingServiceName() != null &&
+                            !testingRun.getMiniTestingServiceName().equalsIgnoreCase(customMiniTestingServiceName))) {
                 Thread.sleep(1000);
                 continue;
             }
