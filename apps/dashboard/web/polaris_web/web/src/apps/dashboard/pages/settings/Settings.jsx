@@ -27,7 +27,7 @@ const Settings = () => {
     const navigate = useNavigate();
 
     const handleSettingsClose = () => {
-        navigate(-1);
+        navigate("/dashboard/observe/inventory");
     }
 
     useEffect(() => {
