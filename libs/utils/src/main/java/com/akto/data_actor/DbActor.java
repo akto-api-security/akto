@@ -235,12 +235,12 @@ public class DbActor extends DataActor {
         return DbLayer.createTRRSummaryIfAbsent(testingRunHexId, start);
     }
 
-    public TestingRun findPendingTestingRun(int delta, String miniTestingServiceName) {
-        return DbLayer.findPendingTestingRun(delta, miniTestingServiceName);
+    public TestingRun findPendingTestingRun(int delta) {
+        return DbLayer.findPendingTestingRun(delta);
     }
 
-    public TestingRunResultSummary findPendingTestingRunResultSummary(int now, int delta, String miniTestingServiceName) {
-        return DbLayer.findPendingTestingRunResultSummary(now, delta, miniTestingServiceName);
+    public TestingRunResultSummary findPendingTestingRunResultSummary(int now, int delta) {
+        return DbLayer.findPendingTestingRunResultSummary(now, delta);
     }
 
     public TestingRunConfig findTestingRunConfig(int testIdConfig) {
@@ -473,10 +473,6 @@ public class DbActor extends DataActor {
 
     public void modifyHybridTestingSetting(boolean hybridTestingEnabled) {
         DbLayer.modifyHybridTestingSetting(hybridTestingEnabled);
-    }
-
-    public void modifyHybridTestingSettingWithCustomName(boolean hybridTestingEnabled, String serviceName) {
-        DbLayer.modifyHybridTestingSettingWithCustomName(hybridTestingEnabled, serviceName);
     }
 
     public void insertTestingLog(Log log) {

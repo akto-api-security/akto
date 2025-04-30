@@ -1312,11 +1312,10 @@ public class ClientActor extends DataActor {
         }
     }
 
-    public TestingRun findPendingTestingRun(int delta, String miniTestingServiceName) {
+    public TestingRun findPendingTestingRun(int delta) {
         Map<String, List<String>> headers = buildHeaders();
         BasicDBObject obj = new BasicDBObject();
         obj.put("delta", delta);
-        obj.put("miniTestingServiceName", miniTestingServiceName);
         OriginalHttpRequest request = new OriginalHttpRequest(url + "/findPendingTestingRun", "", "POST", obj.toString(), headers, "");
         try {
             OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
@@ -1368,12 +1367,11 @@ public class ClientActor extends DataActor {
         return codec.decode(bsonReader, DecoderContext.builder().build());
     }
 
-    public TestingRunResultSummary findPendingTestingRunResultSummary(int now, int delta, String miniTestingServiceName) {
+    public TestingRunResultSummary findPendingTestingRunResultSummary(int now, int delta) {
         Map<String, List<String>> headers = buildHeaders();
         BasicDBObject obj = new BasicDBObject();
         obj.put("now", now);
         obj.put("delta", delta);
-        obj.put("miniTestingServiceName", miniTestingServiceName);
         OriginalHttpRequest request = new OriginalHttpRequest(url + "/findPendingTestingRunResultSummary", "", "POST", obj.toString(), headers, "");
         try {
             OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
@@ -3004,25 +3002,6 @@ public class ClientActor extends DataActor {
             }
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("error in modifyTestingSetting" + e, LoggerMaker.LogDb.RUNTIME);
-            return;
-        }
-    }
-
-    public void modifyHybridTestingSettingWithCustomName(boolean hybridTestingEnabled, String serviceName) {
-        Map<String, List<String>> headers = buildHeaders();
-        BasicDBObject obj = new BasicDBObject();
-        obj.put("hybridTestingEnabled", hybridTestingEnabled);
-        obj.put("miniTestingServiceName", serviceName);
-        OriginalHttpRequest request = new OriginalHttpRequest(url + "/modifyTestingSettingWithCustomName", "", "POST", obj.toString(), headers, "");
-        try {
-            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
-            String responsePayload = response.getBody();
-            if (response.getStatusCode() != 200 || responsePayload == null) {
-                loggerMaker.errorAndAddToDb("non 2xx response in modifyTestingSettingWithCustomName", LoggerMaker.LogDb.RUNTIME);
-                return;
-            }
-        } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("error in modifyTestingSettingWithCustomName" + e, LoggerMaker.LogDb.RUNTIME);
             return;
         }
     }
