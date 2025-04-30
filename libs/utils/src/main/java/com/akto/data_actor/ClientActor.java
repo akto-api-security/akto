@@ -3664,6 +3664,9 @@ public class ClientActor extends DataActor {
             try {
                 payloadObj = BasicDBObject.parse(responsePayload);
                 BasicDBObject testingRunPlaygroundObj = (BasicDBObject) payloadObj.get("testingRunPlayground");
+                if (testingRunPlaygroundObj == null) {
+                    return null;
+                }
                 return objectMapper.readValue(testingRunPlaygroundObj.toJson(), TestingRunPlayground.class);
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb("error extracting response in fetchEditorTest" + e, LoggerMaker.LogDb.TESTING);
