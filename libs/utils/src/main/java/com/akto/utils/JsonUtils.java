@@ -3,7 +3,6 @@ package com.akto.utils;
 import com.akto.log.LoggerMaker;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import java.util.List;
 import java.util.Map;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
@@ -23,12 +22,16 @@ public final class JsonUtils {
         }
     }
 
-    public static <T> T jsonToMap(String json, TypeReference<T> typeRef) {
+    public static <T> T fromJson(String json, TypeReference<T> typeRef) {
         try {
             return mapper.readValue(json, typeRef);
         } catch (Exception e) {
             logger.error("Error while parsing JSON", e);
             return null;
         }
+    }
+
+    public static Map<String, Object> getMap(String json) {
+        return fromJson(json, new TypeReference<Map<String, Object>>() {});
     }
 }
