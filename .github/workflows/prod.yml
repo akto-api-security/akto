@@ -137,7 +137,19 @@ jobs:
         with:
           payload: |
             {
-              "text": "Hybrid Runtime and testing version v${{ github.event.inputs.release_version }} released!"
+              "text": "Hybrid Runtime and testing version v${{ github.event.inputs.release_version }} released!",
+              "attachments": [
+                {
+                  "color": "#36a64f",
+                  "fields": [
+                    {
+                      "title": "Services Deployed",
+                      "value": "${{ github.event.inputs.mini-runtime == 'true' && 'Mini-Runtime ✅\\n' || '' }}${{ github.event.inputs.mini-testing == 'true' && 'Mini-Testing ✅\\n' || '' }}${{ github.event.inputs.testing-db-layer == 'true' && 'Testing-Db-Layer ✅' || '' }}",
+                      "short": false
+                    }
+                  ]
+                }
+              ]
             }
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
