@@ -1475,6 +1475,9 @@ public class StartTestAction extends UserAction {
         List<ModuleInfo> moduleInfos = ModuleInfoDao.instance.findAll(Filters.and(
                         Filters.eq(ModuleInfo.MODULE_TYPE, ModuleInfo.ModuleType.MINI_TESTING),
                         Filters.gt(ModuleInfo.LAST_HEARTBEAT_RECEIVED, Context.now() - 20 * 60)));
+        if (this.miniTestingServiceNames == null) {
+            this.miniTestingServiceNames = new HashSet<>();
+        }
         for (ModuleInfo moduleInfo : moduleInfos) {
             if (moduleInfo.getName() != null) {
                 this.miniTestingServiceNames.add(moduleInfo.getName());

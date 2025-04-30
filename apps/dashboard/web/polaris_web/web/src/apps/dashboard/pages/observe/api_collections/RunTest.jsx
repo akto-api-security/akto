@@ -85,8 +85,6 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
     const [teamsTestingWebhookIntegrated, setTeamsTestingWebhookIntegrated] = useState(false)
 
     const [miniTestingServiceNames, setMiniTestingServiceNames] = useState([])
-    const [isHybridTestingEnabled, setIsHybridTestingEnabled] = useState(false)
-
     const emptyCondition = { data: { key: '', value: '' }, operator: { 'type': 'ADD_HEADER' } }
     const [conditions, dispatchConditions] = useReducer(produce((draft, action) => func.conditionsReducer(draft, action)), []);
 
@@ -179,7 +177,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
         const authMechanismDataResponse = await testingApi.fetchAuthMechanismData()
         if (authMechanismDataResponse.authMechanism)
             authMechanismPresent = true
-        testingApi.fetchMiniTestingServiceNames().then(({miniTestingServiceNames, isHybridTestingEnabled}) => {
+        testingApi.fetchMiniTestingServiceNames().then(({miniTestingServiceNames}) => {
             const miniTestingServiceNamesOptions = (miniTestingServiceNames || []).map(name => {
                 return {
                     label: name,
@@ -187,7 +185,6 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                 }
             })
             setMiniTestingServiceNames(miniTestingServiceNamesOptions)
-            setIsHybridTestingEnabled(isHybridTestingEnabled)
         })
 
         setTestRun(prev => {
@@ -752,7 +749,6 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                         getLabel={getLabel}
                         jiraProjectMap={jiraProjectMap}
                         generateLabelForJiraIntegration={generateLabelForJiraIntegration}
-                        isHybridTestingEnabled={isHybridTestingEnabled}
                         miniTestingServiceNames={miniTestingServiceNames}
                     />
                     <AdvancedSettingsComponent dispatchConditions={dispatchConditions} conditions={conditions} />
@@ -930,7 +926,6 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                                     getLabel={getLabel}
                                     jiraProjectMap={jiraProjectMap}
                                     generateLabelForJiraIntegration={generateLabelForJiraIntegration}
-                                    isHybridTestingEnabled={isHybridTestingEnabled}
                                     miniTestingServiceNames={miniTestingServiceNames}
                                 />
 
@@ -967,7 +962,6 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                                         getLabel={getLabel}
                                         jiraProjectMap={jiraProjectMap}
                                         generateLabelForJiraIntegration={generateLabelForJiraIntegration}
-                                        isHybridTestingEnabled={isHybridTestingEnabled}
                                         miniTestingServiceNames={miniTestingServiceNames}
                                     />
                                     <AdvancedSettingsComponent dispatchConditions={dispatchConditions} conditions={conditions} />
