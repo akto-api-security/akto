@@ -1,5 +1,5 @@
 import LayoutWithTabs from "../../../components/layouts/LayoutWithTabs"
-import { Box, Button, Popover, Modal, Tooltip, VerticalStack } from "@shopify/polaris"
+import { Box, Button, Popover, Modal, Tooltip, VerticalStack, ActionList } from "@shopify/polaris"
 import FlyLayout from "../../../components/layouts/FlyLayout";
 import GithubCell from "../../../components/tables/cells/GithubCell";
 import SampleDataList from "../../../components/shared/SampleDataList";
@@ -138,15 +138,20 @@ function ApiDetails(props) {
             })
 
             const queryPayload = dashboardFunc.getApiPrompts(apiCollectionId, endpoint, method)[0].prepareQuery();
-
-            await gptApi.ask_ai(queryPayload).then((res) => {
-                if (res.response.responses && res.response.responses.length > 0) {
-                    setHeadersWithData(res.response.responses)
+            try{
+                if(isGptActive && window.STIGG_FEATURE_WISE_ALLOWED["AKTO_GPT_AI"] && window.STIGG_FEATURE_WISE_ALLOWED["AKTO_GPT_AI"]?.isGranted === true){
+                    await gptApi.ask_ai(queryPayload).then((res) => {
+                        if (res.response.responses && res.response.responses.length > 0) {
+                            setHeadersWithData(res.response.responses)
+                        }
+                    }
+                    ).catch((err) => {
+                        console.error("Failed to fetch prompts:", err);
+                    })
                 }
+            }catch (e) {
             }
-            ).catch((err) => {
-                console.error("Failed to fetch prompts:", err);
-            })
+            
         }
     }
 
@@ -332,12 +337,12 @@ function ApiDetails(props) {
                         onClose={() => setShowMoreActions(false)}
                     >
                         <Popover.Pane fixed>
-                            <Popover.Section>
-                                <VerticalStack gap={"2"}>
-                                    {isGptActive ? <Button plain monochrome removeUnderline onClick={displayGPT} size="slim">Ask AktoGPT</Button> : null}
-                                    {isDemergingActive ? <Button plain monochrome removeUnderline size="slim" onClick={deMergeApis}>De merge</Button> : null}
-                                </VerticalStack>
-                            </Popover.Section>
+                            <ActionList
+                                items={[
+                                    isGptActive ? { content: "Ask AktoGPT", onAction: displayGPT } : null,
+                                    isDemergingActive ? { content: "De-merge", onAction: deMergeApis } : null,
+                                ]}
+                            />
                         </Popover.Pane>
                     </Popover> : null
                 }

@@ -532,17 +532,17 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
             try {
                 payloadObj = BasicDBObject.parse(responsePayload);
                 List<BasicDBObject> issues = (List<BasicDBObject>) payloadObj.get("issues");
-                for (BasicDBObject issue : issues) {
+                for (int i = 0; i < Math.min(issues.size(), jiraMetaDataList.size()); i++) {
+                    BasicDBObject issue = issues.get(i);
                     String issueKey = issue.getString("key");
                     String jiraTicketUrl = jiraIntegration.getBaseUrl() + "/browse/" + issueKey;
 
-                    for (JiraMetaData metaData : jiraMetaDataList) {
-                        TestingRunIssuesDao.instance.getMCollection().updateOne(
-                                Filters.eq(Constants.ID, metaData.getTestingIssueId()),
-                                Updates.combine(Updates.set("jiraIssueUrl", jiraTicketUrl)),
-                                new UpdateOptions().upsert(false)
-                        );
-                    }
+                    JiraMetaData metaData = jiraMetaDataList.get(i);
+                    TestingRunIssuesDao.instance.getMCollection().updateOne(
+                            Filters.eq(Constants.ID, metaData.getTestingIssueId()),
+                            Updates.combine(Updates.set("jiraIssueUrl", jiraTicketUrl)),
+                            new UpdateOptions().upsert(false)
+                    );
                 }
 
                 for (int i = 0; i < issues.size(); i++) {

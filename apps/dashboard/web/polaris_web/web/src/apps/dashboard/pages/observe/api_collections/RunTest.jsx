@@ -252,7 +252,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                     testRunTime: testIdConfig.testRunTime,
                     testRoleId: testIdConfig.testingRunConfig.testRoleId,
                     testRunTimeLabel: (testIdConfig.testRunTime === -1) ? "30 minutes" : getLabel(testRunTimeOptions, testIdConfig.testRunTime.toString())?.label,
-                    testRoleLabel: getLabel(testRolesArr, testIdConfig?.testingRunConfig?.testRoleId).label,
+                    testRoleLabel: getLabel(testRolesArr, testIdConfig?.testingRunConfig?.testRoleId)?.label,
                     runTypeLabel: getRunTypeLabel(testRunType),
                     testName: testIdConfig.name,
                     sendSlackAlert: testIdConfig?.sendSlackAlert,
@@ -261,7 +261,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                     recurringMonthly: testIdConfig?.periodInSeconds === (86400 * 30), // 30 days
                     recurringWeekly: testIdConfig?.periodInSeconds === (86400 * 7),  // one week
                     continuousTesting: testIdConfig?.periodInSeconds === -1,
-                    autoTicketingDetails: testIdConfig?.autoTicketingDetails || initialAutoTicketingDetails,
+                    autoTicketingDetails: testIdConfig?.testingRunConfig?.autoTicketingDetails || initialAutoTicketingDetails,
                 }));
                 setTestSuiteIds(testIdConfig?.testingRunConfig?.testSuiteIds || [])
                 setTestNameSuiteModal(testIdConfig?.name||"")
@@ -675,6 +675,19 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
         );
     }
 
+    function generateLabelForJiraIntegration() {
+        return (
+            <HorizontalStack gap={1}>
+                {!jiraProjectMap && <Link url='/dashboard/settings/integrations/jira' target="_blank" rel="noopener noreferrer" style={{ color: "#3385ff", textDecoration: 'none' }}>
+                    Enable
+                </Link>}
+                <Text>
+                    Auto-create tickets
+                </Text>
+            </HorizontalStack>
+        )
+    }
+
     const handleButtonClick = (check) => {
         setTestMode(check);
     }
@@ -687,6 +700,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
         await testingApi.modifyTestingRunConfig(testIdConfig?.testingRunConfig?.id, editableConfigObject).then(() => {
             func.setToast(true, false, "Modified testing run config successfully")
             setShowEditableSettings(false)
+            window.location.reload()
         })
         if(activeFromTesting){
             toggleRunTest();
@@ -737,6 +751,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                         generateLabelForTeamsIntegration={generateLabelForTeamsIntegration}
                         getLabel={getLabel}
                         jiraProjectMap={jiraProjectMap}
+                        generateLabelForJiraIntegration={generateLabelForJiraIntegration}
                         isHybridTestingEnabled={isHybridTestingEnabled}
                         miniTestingServiceNames={miniTestingServiceNames}
                     />
@@ -914,6 +929,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                                     generateLabelForTeamsIntegration={generateLabelForTeamsIntegration}
                                     getLabel={getLabel}
                                     jiraProjectMap={jiraProjectMap}
+                                    generateLabelForJiraIntegration={generateLabelForJiraIntegration}
                                     isHybridTestingEnabled={isHybridTestingEnabled}
                                     miniTestingServiceNames={miniTestingServiceNames}
                                 />
@@ -950,6 +966,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                                         generateLabelForTeamsIntegration={generateLabelForTeamsIntegration}
                                         getLabel={getLabel}
                                         jiraProjectMap={jiraProjectMap}
+                                        generateLabelForJiraIntegration={generateLabelForJiraIntegration}
                                         isHybridTestingEnabled={isHybridTestingEnabled}
                                         miniTestingServiceNames={miniTestingServiceNames}
                                     />

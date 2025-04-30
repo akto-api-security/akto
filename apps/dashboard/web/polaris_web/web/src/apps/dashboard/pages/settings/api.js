@@ -456,6 +456,15 @@ const settingRequests = {
             }
         })
     },
+    switchTestingModule(miniTestingEnabled){
+        return request({
+            url: '/api/switchTestingModule',
+            method: "post",
+            data: {
+                miniTestingEnabled
+            }
+        })
+    },
     resetUserPassword(userEmail) {
         return request({
             url: '/api/resetUserPassword',

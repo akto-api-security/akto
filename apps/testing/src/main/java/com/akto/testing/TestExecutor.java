@@ -51,7 +51,6 @@ import com.akto.dto.testing.TestRoles;
 import com.akto.dto.testing.TestingEndpoints;
 import com.akto.dto.testing.TestingRun;
 import com.akto.dto.testing.TestingRun.State;
-import com.akto.dto.testing.config.TestSuites;
 import com.akto.dto.testing.TestingRunConfig;
 import com.akto.dto.testing.TestingRunResult;
 import com.akto.dto.testing.TestingRunResultSummary;
@@ -83,6 +82,8 @@ import com.akto.util.Constants;
 import com.akto.util.JSONUtils;
 import com.akto.util.enums.GlobalEnums.Severity;
 import com.akto.util.enums.LoginFlowEnums;
+import com.alibaba.fastjson2.JSON;
+import com.alibaba.fastjson2.JSONObject;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.Gson;
 import com.mongodb.BasicDBObject;
@@ -113,8 +114,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.commons.lang3.StringUtils;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
-import org.json.JSONObject;
-import org.mortbay.util.ajax.JSON;
 
 public class TestExecutor {
 
@@ -126,12 +125,6 @@ public class TestExecutor {
     public static final String REQUEST_HOUR = "requestHour";
     public static final String COUNT = "count";
     public static final int ALLOWED_REQUEST_PER_HOUR = 100;
-
-    private static int expiryTimeOfAuthToken = -1;
-
-    public static synchronized void setExpiryTimeOfAuthToken(int newExpiryTime) {
-        expiryTimeOfAuthToken = newExpiryTime;
-    }
 
     public void init(TestingRun testingRun, ObjectId summaryId, SyncLimit syncLimit, boolean shouldInitOnly) {
         if (testingRun.getTestIdConfig() != 1) {
@@ -356,6 +349,24 @@ public class TestExecutor {
             for (ApiInfo.ApiInfoKey apiInfoKey: apiInfoKeyList) {
 
                 List<String> messages = testingUtil.getSampleMessages().get(apiInfoKey);
+                if (messages == null || messages.isEmpty()) {
+                    loggerMaker.debugAndAddToDb("No sample messages found for apiInfoKey: " + apiInfoKey.toString(), LogDb.TESTING);
+                    continue;
+                }
+                String sample = messages.get(messages.size() - 1);
+                if(sample == null || sample.isEmpty()){
+                    loggerMaker.debugAndAddToDb("Sample message is empty for apiInfoKey: " + apiInfoKey.toString(), LogDb.TESTING);
+                    continue;
+                }
+                if(sample.contains("originalRequestPayload")){
+                    // make map of original request payload if this key is present
+                    Map<String, Object> json = gson.fromJson(sample, Map.class);
+                    String originalRequestPayload = (String) json.get("originalRequestPayload");
+                    if(originalRequestPayload != null && !originalRequestPayload.isEmpty()){
+                        String key = apiInfoKey.getMethod() + "_" + apiInfoKey.getUrl();
+                        OriginalReqResPayloadInformation.getInstance().getOriginalReqPayloadMap().put(key, originalRequestPayload);
+                    }
+                }
                 if(Constants.IS_NEW_TESTING_ENABLED){
                     for (String testSubCategory: testingRunSubCategories) {
                         if (apiInfoKeySubcategoryMap == null || apiInfoKeySubcategoryMap.get(apiInfoKey).contains(testSubCategory)) {
@@ -583,23 +594,6 @@ public class TestExecutor {
         return null;
     }
 
-    private LoginFlowResponse triggerLoginFlow(AuthMechanism authMechanism, int retries) {
-        LoginFlowResponse loginFlowResponse = null;
-        for (int i=0; i<retries; i++) {
-            try {
-                loggerMaker.debug("retry attempt: " + i + " for login flow");
-                loginFlowResponse = executeLoginFlow(authMechanism, null, null);
-                if (loginFlowResponse.getSuccess()) {
-                    loggerMaker.debugAndAddToDb("login flow success", LogDb.TESTING);
-                    break;
-                }
-            } catch (Exception e) {
-                loggerMaker.errorAndAddToDb(e.getMessage(), LogDb.TESTING);
-            }
-        }
-        return loginFlowResponse;
-    }
-
     public static LoginFlowResponse executeLoginFlow(AuthMechanism authMechanism, LoginFlowParams loginFlowParams, String roleName) throws Exception {
 
         if (authMechanism.getType() == null) {
@@ -615,7 +609,6 @@ public class TestExecutor {
         loggerMaker.debugAndAddToDb("login flow execution started", LogDb.TESTING);
 
         WorkflowTest workflowObj = convertToWorkflowGraph(authMechanism.getRequestData());
-        ApiWorkflowExecutor apiWorkflowExecutor = new ApiWorkflowExecutor();
         LoginFlowResponse loginFlowResp;
         loginFlowResp =  com.akto.testing.workflow_node_executor.Utils.runLoginFlow(workflowObj, authMechanism, loginFlowParams, roleName);
         return loginFlowResp;
