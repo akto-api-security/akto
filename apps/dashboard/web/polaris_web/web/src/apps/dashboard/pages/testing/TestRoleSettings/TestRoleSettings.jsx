@@ -15,6 +15,7 @@ import JsonRecording from '../user_config/JsonRecording';
 import Dropdown from '../../../components/layouts/Dropdown';
 import { useSearchParams } from 'react-router-dom';
 import TestingStore from '../testingStore';
+import TlsAuth from '../user_config/TlsAuth';
 
 const selectOptions = [
     {
@@ -59,6 +60,7 @@ function TestRoleSettings() {
     const [change, setChange] = useState(false);
     const [currentInfo, setCurrentInfo] = useState({steps: [], authParams: {}});
     const [hardCodeAuthInfo, setHardCodeAuthInfo] = useState({authParams:[]})
+    const [tlsAuthInfo, setTlsAuthInfo] = useState({authParams:[]})
     const [showAuthComponent, setShowAuthComponent] = useState(false)
     const [showAuthDeleteModal, setShowAuthDeleteModal] = useState(false)
     const [deletedIndex, setDeletedIndex] = useState(-1);
@@ -179,6 +181,13 @@ function TestRoleSettings() {
         }))
     }
 
+    const setTlsInfo = (obj) => {
+        setTlsAuthInfo(prev => ({
+            ...prev,
+            authParams: obj.authParams
+        }))
+    }
+
     const handleOpenEdit = (authObj,index) => {
         setAuthMechanism(authObj.authMechanism)
         const headerKVPairs = authObj.headerKVPairs || {}
@@ -187,7 +196,13 @@ function TestRoleSettings() {
             setAdvancedHeaderSettingsOpen(true)
         }
         setShowAuthComponent(true)
-        setHardcodedOpen(authObj?.authMechanism?.type === "HardCoded")
+        if (authObj?.authMechanism?.type === "HardCoded") {
+            setOpenAuth(HARDCODED)
+        } else if (authObj?.authMechanism?.type === "LOGIN_REQUEST") {
+            setOpenAuth(LOGIN_REQUEST)
+        } else if (authObj?.authMechanism?.type === "TLS_AUTH") {
+            setOpenAuth(TLS_AUTH)
+        }
         setEditableDocs(index)
     }
 
@@ -282,9 +297,15 @@ function TestRoleSettings() {
         : null
     )
 
-    const [hardcodedOpen, setHardcodedOpen] = useState(true);
+    const HARDCODED = "HARDCODED"
+    const LOGIN_REQUEST = "LOGIN_REQUEST"
+    const TLS_AUTH = "TLS_AUTH"
 
-    const handleToggleHardcodedOpen = () => setHardcodedOpen((prev) => !prev)
+    const [openAuth, setOpenAuth] = useState(HARDCODED);
+
+    function checkOpenAuth(type) {
+        return openAuth === type
+    }
 
     const handleLoginInfo = (obj) => {
         setCurrentInfo(prev => ({
@@ -306,15 +327,16 @@ function TestRoleSettings() {
         setHeaderKey('')
         setHeaderValue('')
         setHardCodeAuthInfo({authParams:[]})
+        setTlsAuthInfo({authParams:[]})
         setAuthMechanism(null)
-        setHardcodedOpen(true)
+        setOpenAuth(HARDCODED)
         setEditableDocs(-1)
     }
 
     const handleSaveAuthMechanism = async() => {
         const apiCond = {[headerKey] : headerValue};
         let resp = {}
-        if(hardcodedOpen){
+        if(openAuth === HARDCODED){
             const automationType = "HardCoded";
             const authParamData = hardCodeAuthInfo.authParams
             if(editableDoc > -1){
@@ -323,7 +345,7 @@ function TestRoleSettings() {
                 resp = await api.addAuthToRole(initialItems.name, apiCond, authParamData, automationType, null)
             }
             
-        }else{
+        } else if (openAuth === LOGIN_REQUEST) {
             const automationType = "LOGIN_REQUEST";
             
             let recordedLoginFlowInput = null;
@@ -345,6 +367,14 @@ function TestRoleSettings() {
             } else {
                 func.setToast(true, true, "Request data cannot be empty!")
             }
+        } else if (openAuth === TLS_AUTH) {
+            const automationType = TLS_AUTH;
+            const authParamData = tlsAuthInfo.authParams
+            if(editableDoc > -1){
+                resp = await api.updateAuthInRole(initialItems.name, apiCond, editableDoc, authParamData, automationType)
+            }else{
+                resp = await api.addAuthToRole(initialItems.name, apiCond, authParamData, automationType, null)
+            }
         }
         handleCancel()
         await saveAction(true, resp.selectedRole.authWithCondList)
@@ -357,15 +387,15 @@ function TestRoleSettings() {
                     <LegacyStack vertical>
                         <Button
                             id={"hardcoded-token-expand-button"}
-                            onClick={handleToggleHardcodedOpen}
-                            ariaExpanded={hardcodedOpen}
-                            icon={hardcodedOpen ? ChevronDownMinor : ChevronRightMinor}
+                            onClick={() => setOpenAuth(HARDCODED)}
+                            ariaExpanded={checkOpenAuth(HARDCODED)}
+                            icon={checkOpenAuth(HARDCODED) ? ChevronDownMinor : ChevronRightMinor}
                             ariaControls="hardcoded"
                         >
                             Hard coded
                         </Button>
                         <Collapsible
-                            open={hardcodedOpen}
+                            open={checkOpenAuth(HARDCODED)}
                             id="hardcoded"
                             transition={{ duration: '500ms', timingFunction: 'ease-in-out' }}
                             expandOnPrint
@@ -377,15 +407,15 @@ function TestRoleSettings() {
                     <LegacyStack vertical>
                         <Button
                             id={"automated-token-expand-button"}
-                            onClick={handleToggleHardcodedOpen}
-                            ariaExpanded={!hardcodedOpen}
-                            icon={!hardcodedOpen ? ChevronDownMinor : ChevronRightMinor}
+                            onClick={() => setOpenAuth(LOGIN_REQUEST)}
+                            ariaExpanded={checkOpenAuth(LOGIN_REQUEST)}
+                            icon={checkOpenAuth(LOGIN_REQUEST) ? ChevronDownMinor : ChevronRightMinor}
                             ariaControls="automated"
                         >
                             Automated
                         </Button>
                         <Collapsible
-                            open={!hardcodedOpen}
+                            open={checkOpenAuth(LOGIN_REQUEST)}
                             id="automated"
                             transition={{ duration: '500ms', timingFunction: 'ease-in-out' }}
                             expandOnPrint
@@ -405,7 +435,28 @@ function TestRoleSettings() {
                             { automationType === "RECORDED_FLOW" && <JsonRecording extractInformation = {true} showOnlyApi={true} setStoreData={handleLoginInfo}/> }
                         </Collapsible>
                     </LegacyStack>
+
+                    <LegacyStack vertical>
+                        <Button
+                            id={"tls-token-expand-button"}
+                            onClick={() => setOpenAuth(TLS_AUTH)}
+                            ariaExpanded={checkOpenAuth(TLS_AUTH)}
+                            icon={checkOpenAuth(TLS_AUTH) ? ChevronDownMinor : ChevronRightMinor}
+                            ariaControls="TLS_AUTH"
+                        >
+                            TLS Authentication
+                        </Button>
+                        <Collapsible
+                            open={checkOpenAuth(TLS_AUTH)}
+                            id="TLS_AUTH"
+                            transition={{ duration: '500ms', timingFunction: 'ease-in-out' }}
+                            expandOnPrint
+                        >
+                            <TlsAuth setInformation={setTlsInfo}/>
+                        </Collapsible>
+                    </LegacyStack>
                 </LegacyCard.Section>
+
                 <LegacyCard.Section title="More settings">
                     <VerticalStack gap={"2"}>
                         <Box>

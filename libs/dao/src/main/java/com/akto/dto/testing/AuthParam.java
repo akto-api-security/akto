@@ -21,6 +21,7 @@ public abstract class AuthParam {
 
     public enum Location {
         HEADER,
-        BODY
+        BODY,
+        TLS
     }
 }
