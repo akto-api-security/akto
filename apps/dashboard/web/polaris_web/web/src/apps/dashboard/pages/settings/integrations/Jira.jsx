@@ -30,7 +30,9 @@ function Jira() {
         setApiToken(jiraInteg != null ? jiraInteg.apiToken : '')
         setUserEmail(jiraInteg != null ? jiraInteg.userEmail : '')
         const projectMappings = jiraInteg?.projectMappings ?? {};
+        let projectIds = new Set();
         Object.entries(projectMappings).forEach(([projectId, projectMapping], index) => {
+            projectIds.add(projectId);
             setProjectMap({
                 type: 'APPEND',
                 payload: {
@@ -42,9 +44,15 @@ function Jira() {
                         OPEN: []
                     },
                     statuses: projectMapping.statuses,
-                    jiraStatusLabel: projectMapping?.statuses?.map(x => { return { "label": x?.name ?? "", "value": x?.id ?? "" } }) ?? {}
+                    jiraStatusLabel: projectMapping?.statuses?.map(x => { return { "label": x?.name ?? "", "value": x?.id ?? "" } }) ?? {},
+                    fromIdsMap:false
                 }
             })
+        })
+        Object.entries(jiraInteg?.projectIdsMap||{}).forEach(([projectId, issueMapping], index) => {
+            if(!projectIds.has(projectId)){
+                setProjectMap({ type: 'APPEND', payload: { projectId, fromIdsMap:true, enableBiDirIntegraion:false } })
+            }
         })
     }
 
@@ -66,11 +74,11 @@ function Jira() {
             return;
         }
         if (!baseUrl?.trim() || !userEmail?.trim() || !apiToken?.trim() || !projId?.trim()) {
-            func.setToast(true, true, "Please fill all fields");
+            func.setToast(true, true, "Please fill all required fields");
             return;
         }
-        
-        
+
+
         const existingProject = projectMap?.find(project => project?.projectId === projId);
         if (existingProject?.statuses?.length > 0) {
             toggleCheckbox(index);
@@ -92,13 +100,13 @@ function Jira() {
                 })
                 toggleCheckbox(index)
             }).catch((err) => {
-                func.setToast(true, true, "Error while fetching Jira Project statuses check Project ID");
+                func.setToast(true, true, "Failed to fetch Jira statuses. Verify Project ID");
                 return;
             })
         } catch {
-            
+
         }
-        
+
     }
 
     useEffect(() => {
@@ -108,7 +116,7 @@ function Jira() {
 
     function transformJiraObject() {
         if (!baseUrl?.trim() || !userEmail?.trim() || !apiToken?.trim()) {
-            func.setToast(true, true, "Please fill all fields");
+            func.setToast(true, true, "Please fill all required fields");
             return null;
         }
         if (!projectMap?.some(project => project?.projectId?.trim())) {
@@ -147,7 +155,7 @@ function Jira() {
 
 
     function projectMapReducer(draft, action) {
-        
+
         switch (action.type) {
             case 'ADD':
                 draft.push({
@@ -159,7 +167,8 @@ function Jira() {
                         OPEN: []
                     },
                     statuses: [],
-                    jiraStatusLabel: []
+                    jiraStatusLabel: [],
+                    fromIdsMap:false
                 });
                 break;
             case 'REMOVE':
@@ -202,7 +211,7 @@ function Jira() {
 
     async function addJiraIntegration() {
         await settingFunctions.addJiraIntegration(userEmail, apiToken, baseUrl, projId, projectIssueMap)
-        func.setToast(true, false, "Successfully added Jira Integration")
+        func.setToast(true, false, "Jira integration saved successfully")
         fetchJiraInteg()
     }
 
@@ -224,7 +233,7 @@ function Jira() {
                                 <Text fontWeight='semibold' variant='headingSm'>{`Project ${index + 1}`}</Text>
                                 <Button plain removeUnderline destructive size='slim' onClick={() => setProjectMap({ type: 'REMOVE', index })}>Delete Project</Button>
                             </HorizontalStack>
-                            <TextField requiredIndicator={index == 0} value={project?.projectId || ""} label="Project key" placeholder={project.projectId}
+                            <TextField maxLength={10} showCharacterCount requiredIndicator={index == 0} value={project?.projectId || ""} label="Project key" placeholder={project.projectId}
                                 onChange={(val) => setProjectMap({
                                     type: 'UPDATE',
                                     payload: {
@@ -243,6 +252,7 @@ function Jira() {
                                     }
                                 })} />
                             <Checkbox label="Enable bi-directional integration"
+                                disabled={!project?.projectId?.trim() || project.fromIdsMap}
                                 checked={project.enableBiDirIntegraion}
                                 onChange={() => {
                                     fetchJiraStatusMapping(project.projectId, index)
