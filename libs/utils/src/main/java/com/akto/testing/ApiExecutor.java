@@ -6,6 +6,7 @@ import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.CollectionConditions.ConditionsType;
 import com.akto.dto.CollectionConditions.TestConfigsAdvancedSettings;
+import com.akto.dto.testing.TLSAuthParam;
 import com.akto.dto.testing.TestingRunConfig;
 import com.akto.dto.testing.TestingRunResult;
 import com.akto.dto.testing.rate_limit.RateLimitHandler;
@@ -31,12 +32,12 @@ import java.net.URL;
 import java.util.*;
 
 public class ApiExecutor {
-    private static final LoggerMaker loggerMaker = new LoggerMaker(ApiExecutor.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(ApiExecutor.class, LogDb.TESTING);
 
     // Load only first 1 MiB of response body into memory.
     private static final int MAX_RESPONSE_SIZE = 1024*1024;
     
-    private static OriginalHttpResponse common(Request request, boolean followRedirects, boolean debug, List<TestingRunResult.TestLog> testLogs, boolean skipSSRFCheck, boolean nonTestingContext, String requestProtocol) throws Exception {
+    private static OriginalHttpResponse common(Request request, boolean followRedirects, boolean debug, List<TestingRunResult.TestLog> testLogs, boolean skipSSRFCheck, boolean nonTestingContext, String requestProtocol, TLSAuthParam authParam) throws Exception {
 
         Integer accountId = Context.accountId.get();
         if (accountId != null) {
@@ -79,6 +80,10 @@ public class ApiExecutor {
         }
         boolean isCyborgCall = request.url().toString().contains("cyborg.akto.io");
         long start = System.currentTimeMillis();
+
+        if (authParam != null) {
+            client = CustomHTTPClientHandler.instance.getClient(authParam, request.isHttps(), followRedirects, requestProtocol);
+        }
 
         Call call = client.newCall(request);
         Response response = null;
@@ -373,7 +378,7 @@ public class ApiExecutor {
 
     private static OriginalHttpResponse getRequest(OriginalHttpRequest request, Request.Builder builder, boolean followRedirects, boolean debug, List<TestingRunResult.TestLog> testLogs, boolean skipSSRFCheck, boolean nonTestingContext)  throws Exception{
         Request okHttpRequest = builder.build();
-        return common(okHttpRequest, followRedirects, debug, testLogs, skipSSRFCheck, nonTestingContext, "application/json");
+        return common(okHttpRequest, followRedirects, debug, testLogs, skipSSRFCheck, nonTestingContext, "application/json", request.getTlsAuthParam());
     }
 
     public static RequestBody getFileRequestBody(String fileUrl){
@@ -466,7 +471,7 @@ public class ApiExecutor {
             builder.removeHeader(Constants.AKTO_ATTACH_FILE);
             Request updatedRequest = builder.build();
 
-            return common(updatedRequest, followRedirects, debug, testLogs, skipSSRFCheck, nonTestingContext, requestProtocol);
+            return common(updatedRequest, followRedirects, debug, testLogs, skipSSRFCheck, nonTestingContext, requestProtocol, request.getTlsAuthParam());
         }
 
         String contentType = request.findContentType();
@@ -510,6 +515,6 @@ public class ApiExecutor {
         }
         builder = builder.method(request.getMethod(), body);
         Request okHttpRequest = builder.build();
-        return common(okHttpRequest, followRedirects, debug, testLogs, skipSSRFCheck, nonTestingContext, requestProtocol);
+        return common(okHttpRequest, followRedirects, debug, testLogs, skipSSRFCheck, nonTestingContext, requestProtocol, request.getTlsAuthParam());
     }
 }
