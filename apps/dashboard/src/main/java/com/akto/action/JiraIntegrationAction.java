@@ -309,44 +309,37 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
 
     public String addIntegrationV2() {
 
+        addAktoHostUrl();
+
         if (projectMappings == null || projectMappings.isEmpty()) {
             addActionError("Project mappings cannot be empty");
+            return Action.ERROR.toUpperCase();
+        }
+
+        this.projectAndIssueMap = new HashMap<>();
+        try {
+            for (Map.Entry<String, ProjectMapping> entry : projectMappings.entrySet()) {
+                List<BasicDBObject> issueTypes = getProjectMetadata(entry.getKey());
+                this.projectAndIssueMap.put(entry.getKey(), issueTypes);
+            }
+        } catch (Exception ex) {
+            loggerMaker.error("Error while fetching project metadata", ex);
+            addActionError("Error while fetching project metadata");
             return Action.ERROR.toUpperCase();
         }
 
         JiraIntegration existingIntegration = JiraIntegrationDao.instance.findOne(new BasicDBObject());
 
         if (existingIntegration == null) {
-            this.projectAndIssueMap = new HashMap<>();
-            try {
-                for (Map.Entry<String, ProjectMapping> entry : projectMappings.entrySet()) {
-                    List<BasicDBObject> issueTypes = getProjectMetadata(entry.getKey());
-                    this.projectAndIssueMap.put(entry.getKey(), issueTypes);
-                }
-            } catch (Exception ex) {
-                loggerMaker.error("Error while fetching project metadata", ex);
-                addActionError("Error while fetching project metadata");
-                return Action.ERROR.toUpperCase();
-            }
             String response = addIntegration();
             this.jiraIntegration = JiraIntegrationDao.instance.findOne(new BasicDBObject());
             return response;
         }
 
-        addAktoHostUrl();
-
         Map<String, ProjectMapping> existingProjectMappings = existingIntegration.getProjectMappings();
 
         if (existingProjectMappings == null) {
             existingProjectMappings = new HashMap<>();
-        }
-
-        for (Map.Entry<String, ProjectMapping> entry : projectMappings.entrySet()) {
-            if (existingProjectMappings.containsKey(entry.getKey())) {
-                loggerMaker.error("Project Key: {} is already mapped", entry.getKey());
-                addActionError("Project Key: " + entry.getKey() + " is already mapped");
-                return Action.ERROR.toUpperCase();
-            }
         }
 
         existingProjectMappings.putAll(projectMappings);
@@ -365,16 +358,7 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
             existingProjectIdMap = new HashMap<>();
         }
 
-        try {
-            for (Map.Entry<String, ProjectMapping> entry : projectMappings.entrySet()) {
-                List<BasicDBObject> issueTypes = getProjectMetadata(entry.getKey());
-                existingProjectIdMap.put(entry.getKey(), issueTypes);
-            }
-        } catch (Exception ex) {
-            loggerMaker.error("Error while fetching project metadata", ex);
-            addActionError("Error while fetching project metadata");
-            return Action.ERROR.toUpperCase();
-        }
+        existingProjectIdMap.putAll(this.projectAndIssueMap);
 
         integrationUpdate = Updates.combine(integrationUpdate, Updates.set("projectIdsMap", existingProjectIdMap));
 
@@ -385,6 +369,42 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
         );
 
         this.jiraIntegration = JiraIntegrationDao.instance.findOne(new BasicDBObject());
+
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String deleteProject() {
+        if (this.projId == null || this.projId.isEmpty()) {
+            addActionError("Project Id cannot be null");
+            return Action.ERROR.toUpperCase();
+        }
+
+        JiraIntegration jira = JiraIntegrationDao.instance.findOne(new BasicDBObject());
+        if (jira == null) {
+            addActionError("Jira Integration not found. AccountId: " + Context.accountId.get());
+            return Action.ERROR.toUpperCase();
+        }
+
+        Map<String, List<BasicDBObject>> existingProjectIdsMap = jira.getProjectIdsMap();
+        Map<String, ProjectMapping> existingProjectMappings = jira.getProjectMappings();
+
+        existingProjectIdsMap.remove(this.projId);
+        existingProjectMappings.remove(this.projId);
+
+        UpdateOptions updateOptions = new UpdateOptions();
+        updateOptions.upsert(false);
+
+        Bson integrationUpdate = Updates.combine(
+            Updates.set("updatedTs", Context.now()),
+            Updates.set("projectMappings", existingProjectMappings),
+            Updates.set("projectIdsMap", existingProjectIdsMap)
+        );
+
+        JiraIntegrationDao.instance.getMCollection().updateOne(
+            new BasicDBObject(),
+            integrationUpdate,
+            updateOptions
+        );
 
         return Action.SUCCESS.toUpperCase();
     }
