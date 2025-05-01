@@ -93,4 +93,6 @@ public abstract class DataActor {
     public abstract void updateRepoLastRun( CodeAnalysisRepo codeAnalysisRepo);
 
     public abstract Set<MergedUrls> fetchMergedUrls();
+
+    public abstract String fetchOpenApiSchema(int apiCollectionId);
 }

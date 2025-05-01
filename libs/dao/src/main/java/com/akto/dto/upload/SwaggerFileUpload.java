@@ -14,6 +14,7 @@ public class SwaggerFileUpload extends FileUpload{
     private int collectionId;
     private int uploadTs;
 
+
     private List<FileUploadError> errors;
 
 }

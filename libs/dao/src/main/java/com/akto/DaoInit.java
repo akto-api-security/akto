@@ -7,6 +7,7 @@ import com.akto.dao.jobs.JobsDao;
 import com.akto.dao.loaders.LoadersDao;
 import com.akto.dao.test_editor.TestingRunPlaygroundDao;
 import com.akto.dao.testing.TestRolesDao;
+import com.akto.dto.files.File;
 import com.akto.dao.testing.TestingRunDao;
 import com.akto.dao.testing.TestingRunResultDao;
 import com.akto.dao.testing.TestingRunResultSummariesDao;
@@ -290,6 +291,7 @@ public class DaoInit {
         ClassModel<Model> agentModel = ClassModel.builder(Model.class).enableDiscriminator(true).build();
         ClassModel<ModuleInfo> ModuleInfoClassModel = ClassModel.builder(ModuleInfo.class).enableDiscriminator(true).build();
         ClassModel<TLSAuthParam> tlsAuthClassModel = ClassModel.builder(TLSAuthParam.class).enableDiscriminator(true).build();
+        ClassModel<File> fileClassModel = ClassModel.builder(File.class).enableDiscriminator(true).build();
 
         CodecRegistry pojoCodecRegistry = fromProviders(PojoCodecProvider.builder().register(
                 configClassModel, signupInfoClassModel, apiAuthClassModel, attempResultModel, urlTemplateModel,
@@ -330,7 +332,7 @@ public class DaoInit {
                 eventsExampleClassModel, remediationClassModel, complianceInfoModel, complianceMappingModel,
                 RuntimeMetricsClassModel, codeAnalysisRepoModel, codeAnalysisApiModel, historicalDataClassModel,
                 configSettingClassModel, configSettingsConditionTypeClassModel, roleClassModel, testingInstanceHeartBeat,
-                jobParams, autoTicketParams, agentModel, ModuleInfoClassModel, tlsAuthClassModel)
+                jobParams, autoTicketParams, agentModel, ModuleInfoClassModel, tlsAuthClassModel, fileClassModel)
             .automatic(true).build());
 
         final CodecRegistry customEnumCodecs = CodecRegistries.fromCodecs(

@@ -224,4 +224,8 @@ public class DbActor extends DataActor {
     public Set<MergedUrls> fetchMergedUrls() {
         return DbLayer.fetchMergedUrls();
     }
+
+    public String fetchOpenApiSchema(int apiCollectionId) {
+        return DbLayer.fetchOpenApiSchema(apiCollectionId);
+    }
 }

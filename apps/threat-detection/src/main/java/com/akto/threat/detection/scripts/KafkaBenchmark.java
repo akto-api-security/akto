@@ -28,7 +28,7 @@ public class KafkaBenchmark {
     public static String FILE_PATH = "sample-payloads/";
     public static String payloadFormat = "json";
     public static String payloadSize = payloadSizes.get(0);
-    public static long numRecords = 410000L;
+    public static long numRecords = 10000L;
     
     
     

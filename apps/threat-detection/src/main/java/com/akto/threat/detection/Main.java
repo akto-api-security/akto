@@ -27,6 +27,8 @@ public class Main {
     
     SessionFactory sessionFactory = null;
     RedisClient localRedis = null;
+    DaoInit.init(new ConnectionString(System.getenv("AKTO_MONGO_CONN")));
+    System.out.println(System.getenv("************** + AKTO_MONGO_CONN"));
 
     logger.warn("aggregation rules enabled {}", aggregationRulesEnabled);
 

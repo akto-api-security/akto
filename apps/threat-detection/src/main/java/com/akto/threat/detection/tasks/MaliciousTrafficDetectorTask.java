@@ -136,9 +136,9 @@ public class MaliciousTrafficDetectorTask implements Task {
 
   private Map<String, FilterConfig> getFilters() {
     int now = (int) (System.currentTimeMillis() / 1000);
-    if (now - filterLastUpdatedAt < filterUpdateIntervalSec) {
-      return apiFilters;
-    }
+//    if (now - filterLastUpdatedAt < filterUpdateIntervalSec) {
+//      return apiFilters;
+//    }
 
     List<YamlTemplate> templates = dataActor.fetchFilterYamlTemplates();
     apiFilters = FilterYamlTemplateDao.fetchFilterConfig(false, templates, false);
@@ -162,6 +162,16 @@ public class MaliciousTrafficDetectorTask implements Task {
     }
 
     return false;
+  }
+
+  private String getApiSchema(String apiCollectionId) {
+    String apiSchema = null;
+    try {
+      apiSchema = "";
+    } catch (Exception e) {
+      logger.error("Error while fetching api schema for id {}", apiCollectionId, e);
+    }
+    return apiSchema;
   }
 
   private void processRecord(HttpResponseParam record) throws Exception {

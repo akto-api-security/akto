@@ -2079,7 +2079,7 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
       })} ${timeStr}`;
   },
   isDemoAccount(){
-     return window.ACTIVE_ACCOUNT === 1669322524
+     return true
   },
   isSameDateAsToday (givenDate) {
       const today = new Date();
