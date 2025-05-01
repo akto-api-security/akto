@@ -1,5 +1,6 @@
 package com.akto.log;
 
+import com.akto.RuntimeMode;
 import com.akto.dao.*;
 import com.akto.dao.context.Context;
 import com.akto.data_actor.DataActor;
@@ -46,6 +47,11 @@ public class LoggerMaker  {
             @Override
             public void run() {
                 try {
+
+                    if(RuntimeMode.isHybridDeployment()){
+                        return;
+                    }
+
                     Config config = ConfigsDao.instance.findOne("_id", Config.SlackAlertConfig.CONFIG_ID);
                     if (config == null) {
                         return;
