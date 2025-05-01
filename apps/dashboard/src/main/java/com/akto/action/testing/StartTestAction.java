@@ -3,94 +3,50 @@ package com.akto.action.testing;
 import com.akto.action.UserAction;
 import com.akto.billing.UsageMetricUtils;
 import com.akto.dao.context.Context;
+import com.akto.dao.monitoring.ModuleInfoDao;
 import com.akto.dao.test_editor.YamlTemplateDao;
-import com.akto.dao.testing.DeleteTestRunsDao;
-import com.akto.dao.testing.TestRolesDao;
-import com.akto.dao.testing.TestingRunConfigDao;
-import com.akto.dao.testing.TestingRunDao;
-import com.akto.dao.testing.TestingRunResultDao;
-import com.akto.dao.testing.TestingRunResultSummariesDao;
-import com.akto.dao.testing.VulnerableTestingRunResultDao;
-import com.akto.dao.testing.WorkflowTestsDao;
+import com.akto.dao.testing.*;
 import com.akto.dao.testing.sources.TestSourceConfigsDao;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
-import com.akto.dao.testing.*;
-import com.akto.dao.testing.config.TestSuiteDao;
-import com.akto.dto.ApiCollection;
-import com.akto.dto.billing.FeatureAccess;
-import com.akto.dto.testing.config.EditableTestingRunConfig;
-import com.akto.dto.testing.config.TestSuites;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.ApiToken.Utility;
 import com.akto.dto.CollectionConditions.TestConfigsAdvancedSettings;
 import com.akto.dto.User;
+import com.akto.dto.billing.FeatureAccess;
+import com.akto.dto.monitoring.ModuleInfo;
 import com.akto.dto.test_editor.Info;
 import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.test_run_findings.TestingRunIssues;
-import com.akto.dto.testing.AuthMechanism;
-import com.akto.dto.testing.AutoTicketingDetails;
-import com.akto.dto.testing.CollectionWiseTestingEndpoints;
-import com.akto.dto.testing.CustomTestingEndpoints;
-import com.akto.dto.testing.DeleteTestRuns;
-import com.akto.dto.testing.GenericTestResult;
-import com.akto.dto.testing.MultiExecTestResult;
-import com.akto.dto.testing.TestResult;
+import com.akto.dto.testing.*;
 import com.akto.dto.testing.TestResult.TestError;
-import com.akto.dto.testing.TestingEndpoints;
-import com.akto.dto.testing.TestingRun;
 import com.akto.dto.testing.TestingRun.State;
 import com.akto.dto.testing.TestingRun.TestingRunType;
-import com.akto.dto.testing.TestingRunConfig;
-import com.akto.dto.testing.TestingRunResult;
-import com.akto.dto.testing.TestingRunResultSummary;
-import com.akto.dto.testing.WorkflowTest;
-import com.akto.dto.testing.WorkflowTestingEndpoints;
 import com.akto.dto.testing.config.EditableTestingRunConfig;
 import com.akto.dto.testing.info.CurrentTestsStatus;
 import com.akto.dto.testing.info.CurrentTestsStatus.StatusForIndividualTest;
 import com.akto.dto.testing.sources.TestSourceConfig;
-import com.akto.dto.usage.MetricTypes;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
-import com.akto.testing.TestCompletion;
 import com.akto.usage.UsageMetricCalculator;
-import com.akto.usage.UsageMetricHandler;
 import com.akto.util.Constants;
-import com.akto.util.UsageUtils;
 import com.akto.util.enums.GlobalEnums;
 import com.akto.util.enums.GlobalEnums.Severity;
 import com.akto.util.enums.GlobalEnums.TestErrorSource;
 import com.akto.utils.DeleteTestRunUtils;
 import com.akto.utils.Utils;
 import com.google.gson.Gson;
-import com.mongodb.client.model.Aggregates;
-import com.mongodb.client.model.Filters;
-import com.mongodb.client.model.Projections;
-import com.mongodb.client.model.Sorts;
-import com.mongodb.client.model.Updates;
+import com.mongodb.client.model.*;
 import com.mongodb.client.result.InsertOneResult;
 import com.opensymphony.xwork2.Action;
-import java.time.Instant;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.UUID;
-import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
-import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
+
+import java.time.Instant;
+import java.util.*;
+import java.util.concurrent.*;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 public class StartTestAction extends UserAction {
 
@@ -161,7 +117,7 @@ public class StartTestAction extends UserAction {
     private boolean sendSlackAlert = false;
     private boolean sendMsTeamsAlert = false;
 
-    private TestingRun createTestingRun(int scheduleTimestamp, int periodInSeconds) {
+    private TestingRun createTestingRun(int scheduleTimestamp, int periodInSeconds, String miniTestingServiceName) {
         User user = getSUser();
 
         if (!StringUtils.isEmpty(this.overriddenTestAppUrl)) {
@@ -221,9 +177,10 @@ public class StartTestAction extends UserAction {
 
         return new TestingRun(scheduleTimestamp, user.getLogin(),
                 testingEndpoints, testIdConfig, State.SCHEDULED, periodInSeconds, testName, this.testRunTime,
-                this.maxConcurrentRequests, this.sendSlackAlert, this.sendMsTeamsAlert);
+                this.maxConcurrentRequests, this.sendSlackAlert, this.sendMsTeamsAlert, miniTestingServiceName);
     }
 
+    String selectedMiniTestingServiceName;
     private List<String> selectedTests;
     private List<TestConfigsAdvancedSettings> testConfigsAdvancedSettings;
 
@@ -268,7 +225,7 @@ public class StartTestAction extends UserAction {
         }
         if (localTestingRun == null) {
             try {
-                localTestingRun = createTestingRun(scheduleTimestamp, getPeriodInSeconds(recurringDaily, recurringWeekly, recurringMonthly));
+                localTestingRun = createTestingRun(scheduleTimestamp, getPeriodInSeconds(recurringDaily, recurringWeekly, recurringMonthly), selectedMiniTestingServiceName);
                 // pass boolean from ui, which will tell if testing is coniinuous on new endpoints
                 if (this.continuousTesting) {
                     localTestingRun.setPeriodInSeconds(-1);
@@ -331,7 +288,7 @@ public class StartTestAction extends UserAction {
                             Updates.set(TestingRun.STATE, TestingRun.State.COMPLETED),
                             Updates.set(TestingRun.END_TIMESTAMP, Context.now())));
                 }
-                 
+
             }
 
             if (this.overriddenTestAppUrl != null || this.selectedTests != null) {
@@ -342,7 +299,7 @@ public class StartTestAction extends UserAction {
                 testingRunConfig.setTestSuiteIds(testSuiteIdsObj);
                 this.testIdConfig = testingRunConfig.getId();
                 TestingRunConfigDao.instance.insertOne(testingRunConfig);
-            } 
+            }
 
         }
 
@@ -760,7 +717,7 @@ public class StartTestAction extends UserAction {
             return ERROR.toUpperCase();
         }
 
-        
+
         int accountId = Context.accountId.get();
 
         testCountMap = new HashMap<>();
@@ -787,9 +744,9 @@ public class StartTestAction extends UserAction {
                 } catch (Exception e) {
                     e.printStackTrace();
                 }
-                
+
             }
-            
+
         } catch (Exception e) {
             e.printStackTrace();
             return ERROR.toUpperCase();
@@ -938,9 +895,9 @@ public class StartTestAction extends UserAction {
             }else{
                 testingRunResultList = TestingRunResultDao.instance.findAll(filters, skip, 50, null);
             }
-            
 
-            
+
+
             // Map<String, String> sampleDataVsCurlMap = new HashMap<>();
             // for (TestingRunResult runResult: testingRunResultList) {
             //     WorkflowTest workflowTest = runResult.getWorkflowTest();
@@ -1138,8 +1095,6 @@ public class StartTestAction extends UserAction {
 
         long continuousTestsCount = TestingRunDao.instance.getMCollection().countDocuments(Filters.and(continuousTestsFilter));
 
-        System.out.println("cont count" + continuousTestsCount);
-
         long scheduleCount = totalCount - oneTimeCount - cicdCount - continuousTestsCount;
 
         
@@ -1306,11 +1261,11 @@ public class StartTestAction extends UserAction {
                 if (editableTestingRunConfig.getTestSubCategoryList() != null && !editableTestingRunConfig.getTestSubCategoryList().equals(existingTestingRunConfig.getTestSubCategoryList())) {
                     updates.add(Updates.set(TestingRunConfig.TEST_SUBCATEGORY_LIST, editableTestingRunConfig.getTestSubCategoryList()));
                 }
-                
+
                 if (editableTestingRunConfig.getTestRoleId() != null && !editableTestingRunConfig.getTestRoleId().equals(existingTestingRunConfig.getTestRoleId())) {
                     updates.add(Updates.set(TestingRunConfig.TEST_ROLE_ID, editableTestingRunConfig.getTestRoleId()));
                 }
-                
+
                 if (editableTestingRunConfig.getOverriddenTestAppUrl() != null && !editableTestingRunConfig.getOverriddenTestAppUrl().equals(existingTestingRunConfig.getOverriddenTestAppUrl())) {
                     updates.add(Updates.set(TestingRunConfig.OVERRIDDEN_TEST_APP_URL, editableTestingRunConfig.getOverriddenTestAppUrl()));
                 }
@@ -1320,17 +1275,17 @@ public class StartTestAction extends UserAction {
                     updates.add(Updates.set(TestingRunConfig.AUTO_TICKETING_DETAILS,
                         editableTestingRunConfig.getAutoTicketingDetails()));
                 }
-                
+
                 if (!updates.isEmpty()) {
                     TestingRunConfigDao.instance.updateOne(
                         Filters.eq(Constants.ID, this.testingRunConfigId),
-                        Updates.combine(updates) 
+                        Updates.combine(updates)
                     );
                 }
             }
 
             if (editableTestingRunConfig.getTestingRunHexId() != null) {
-            
+
                 TestingRun existingTestingRun = TestingRunDao.instance.findOne(Filters.eq(Constants.ID, new ObjectId(editableTestingRunConfig.getTestingRunHexId())));
 
                 if (existingTestingRun != null) {
@@ -1375,15 +1330,15 @@ public class StartTestAction extends UserAction {
                             )
                         );
                     }
-                
+
                     if (!updates.isEmpty()) {
                         TestingRunDao.instance.updateOne(
                             Filters.eq(Constants.ID,new ObjectId(editableTestingRunConfig.getTestingRunHexId())),
-                            Updates.combine(updates) 
+                            Updates.combine(updates)
                         );
                     }
                 }
-                
+
             }
 
 
@@ -1468,7 +1423,7 @@ public class StartTestAction extends UserAction {
                             Updates.set(TestingRunResult.IS_IGNORED_RESULT, true)
                         );
                     }
-                    
+
                 } catch (Exception e) {
                     e.printStackTrace();
                 }
@@ -1509,6 +1464,22 @@ public class StartTestAction extends UserAction {
             }
         }
         return true;
+    }
+
+    private Set<String> miniTestingServiceNames;
+    public String fetchMiniTestingServiceNames() {
+        List<ModuleInfo> moduleInfos = ModuleInfoDao.instance.findAll(Filters.and(
+                        Filters.eq(ModuleInfo.MODULE_TYPE, ModuleInfo.ModuleType.MINI_TESTING),
+                        Filters.gt(ModuleInfo.LAST_HEARTBEAT_RECEIVED, Context.now() - 20 * 60)));
+        if (this.miniTestingServiceNames == null) {
+            this.miniTestingServiceNames = new HashSet<>();
+        }
+        for (ModuleInfo moduleInfo : moduleInfos) {
+            if (moduleInfo.getName() != null) {
+                this.miniTestingServiceNames.add(moduleInfo.getName());
+            }
+        }
+        return SUCCESS.toUpperCase();
     }
 
 
@@ -1893,7 +1864,7 @@ public class StartTestAction extends UserAction {
     public void setRecurringWeekly(boolean recurringWeekly) {
         this.recurringWeekly = recurringWeekly;
     }
-    
+
     public void setRecurringMonthly(boolean recurringMonthly) {
         this.recurringMonthly = recurringMonthly;
     }
@@ -1904,5 +1875,17 @@ public class StartTestAction extends UserAction {
 
     public void setAutoTicketingDetails(AutoTicketingDetails autoTicketingDetails) {
         this.autoTicketingDetails = autoTicketingDetails;
+    }
+
+    public Set<String> getMiniTestingServiceNames() {
+        return miniTestingServiceNames;
+    }
+
+    public void setMiniTestingServiceNames(Set<String> miniTestingServiceNames) {
+        this.miniTestingServiceNames = miniTestingServiceNames;
+    }
+
+    public void setSelectedMiniTestingServiceName(String selectedMiniTestingServiceName) {
+        this.selectedMiniTestingServiceName = selectedMiniTestingServiceName;
     }
 }

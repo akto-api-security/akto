@@ -7,6 +7,8 @@ import com.akto.dao.DashboardLogsDao;
 import com.akto.dao.LogsDao;
 import com.akto.dao.PupeteerLogsDao;
 import com.akto.dao.RuntimeLogsDao;
+import com.akto.RuntimeMode;
+import com.akto.dao.*;
 import com.akto.dao.context.Context;
 import com.akto.data_actor.DataActor;
 import com.akto.data_actor.DataActorFactory;
@@ -54,6 +56,11 @@ public class LoggerMaker  {
             @Override
             public void run() {
                 try {
+
+                    if(RuntimeMode.isHybridDeployment()){
+                        return;
+                    }
+
                     Config config = ConfigsDao.instance.findOne("_id", Config.SlackAlertConfig.CONFIG_ID);
                     if (config == null) {
                         return;

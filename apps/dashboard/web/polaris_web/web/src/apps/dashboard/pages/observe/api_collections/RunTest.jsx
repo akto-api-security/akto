@@ -50,6 +50,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
         sendMsTeamsAlert: false,
         cleanUpTestingResources: false,
         autoTicketingDetails: initialAutoTicketingDetails,
+        miniTestingServiceName: ""
     }
     const navigate = useNavigate()
 
@@ -83,6 +84,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
     const [slackIntegrated, setSlackIntegrated] = useState(false)
     const [teamsTestingWebhookIntegrated, setTeamsTestingWebhookIntegrated] = useState(false)
 
+    const [miniTestingServiceNames, setMiniTestingServiceNames] = useState([])
     const emptyCondition = { data: { key: '', value: '' }, operator: { 'type': 'ADD_HEADER' } }
     const [conditions, dispatchConditions] = useReducer(produce((draft, action) => func.conditionsReducer(draft, action)), []);
 
@@ -121,7 +123,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                 if (webhookPresent) {
                     setTeamsTestingWebhookIntegrated(true)
                 }
-                
+
                 setJiraProjectMap(jiraResp?.projectIdsMap || null);
             })
 
@@ -175,6 +177,16 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
         const authMechanismDataResponse = await testingApi.fetchAuthMechanismData()
         if (authMechanismDataResponse.authMechanism)
             authMechanismPresent = true
+        testingApi.fetchMiniTestingServiceNames().then(({miniTestingServiceNames}) => {
+            const miniTestingServiceNamesOptions = (miniTestingServiceNames || []).map(name => {
+                return {
+                    label: name,
+                    value: name
+                }
+            })
+            setMiniTestingServiceNames(miniTestingServiceNamesOptions)
+        })
+
         setTestRun(prev => {
             const state = {
                 ...prev,
@@ -471,7 +483,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
         if (testRun.hourlyLabel === "Now") {
             if (testRun.recurringDaily) {
                 return <div data-testid="schedule_run_button">Run daily at this time</div>
-            } else if (testRun.recurringWeekly) { 
+            } else if (testRun.recurringWeekly) {
                 return <div data-testid="schedule_run_button">Run weekly at this time</div>
             } else if (testRun.recurringMonthly) {
                 return <div data-testid="schedule_run_button">Run monthly at this time</div>
@@ -484,7 +496,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
         } else {
             if (testRun.recurringDaily) {
                 return <div data-testid="schedule_run_button">Run daily at {testRun.hourlyLabel}</div>
-            } else if (testRun.recurringWeekly) { 
+            } else if (testRun.recurringWeekly) {
                 return <div data-testid="schedule_run_button">Run weekly on every {func.getDayOfWeek(testRun.startTimestamp)} at {testRun.hourlyLabel}</div>
             } else if (testRun.recurringMonthly) {
                 return <div data-testid="schedule_run_button">Run monthly on every {new Date(testRun.startTimestamp * 1000).getDate()} at {testRun.hourlyLabel}</div>
@@ -520,7 +532,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
     }
 
     async function handleRun() {
-        const { startTimestamp, recurringDaily, recurringMonthly, recurringWeekly, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, cleanUpTestingResources } = testRun
+        const { startTimestamp, recurringDaily, recurringMonthly, recurringWeekly, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, cleanUpTestingResources, miniTestingServiceName } = testRun
         let {testName} = testRun;
         const autoTicketingDetails = jiraProjectMap ? testRun.autoTicketingDetails : null;
         const collectionId = parseInt(apiCollectionId)
@@ -568,9 +580,9 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
         }
 
         if (filtered || selectedResourcesForPrimaryAction?.length > 0) {
-            await observeApi.scheduleTestForCustomEndpoints(apiInfoKeyList, startTimestamp, recurringDaily, recurringWeekly, recurringMonthly, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, "TESTING_UI", testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, finalAdvancedConditions, cleanUpTestingResources, testMode? []: testSuiteIds,autoTicketingDetails)
+            await observeApi.scheduleTestForCustomEndpoints(apiInfoKeyList, startTimestamp, recurringDaily, recurringWeekly, recurringMonthly, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, "TESTING_UI", testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, finalAdvancedConditions, cleanUpTestingResources, testMode? []: testSuiteIds, (miniTestingServiceName || miniTestingServiceNames?.[0]?.value), autoTicketingDetails)
         } else {
-            await observeApi.scheduleTestForCollection(collectionId, startTimestamp, recurringDaily, recurringWeekly, recurringMonthly, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, finalAdvancedConditions, cleanUpTestingResources, testMode? []: testSuiteIds,autoTicketingDetails)
+            await observeApi.scheduleTestForCollection(collectionId, startTimestamp, recurringDaily, recurringWeekly, recurringMonthly, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, finalAdvancedConditions, cleanUpTestingResources, testMode? []: testSuiteIds, (miniTestingServiceName || miniTestingServiceNames?.[0]?.value), autoTicketingDetails)
         }
 
         setActive(false)
@@ -677,7 +689,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
         setTestMode(check);
     }
 
-    // only for configurations 
+    // only for configurations
     const handleModifyConfig = async () => {
         const settings = transform.prepareConditionsForTesting(conditions)
         let autoTicketingDetails = jiraProjectMap? testRun.autoTicketingDetails : null;
@@ -737,6 +749,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                         getLabel={getLabel}
                         jiraProjectMap={jiraProjectMap}
                         generateLabelForJiraIntegration={generateLabelForJiraIntegration}
+                        miniTestingServiceNames={miniTestingServiceNames}
                     />
                     <AdvancedSettingsComponent dispatchConditions={dispatchConditions} conditions={conditions} />
                 </>
@@ -913,6 +926,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                                     getLabel={getLabel}
                                     jiraProjectMap={jiraProjectMap}
                                     generateLabelForJiraIntegration={generateLabelForJiraIntegration}
+                                    miniTestingServiceNames={miniTestingServiceNames}
                                 />
 
                             </VerticalStack>
@@ -948,6 +962,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                                         getLabel={getLabel}
                                         jiraProjectMap={jiraProjectMap}
                                         generateLabelForJiraIntegration={generateLabelForJiraIntegration}
+                                        miniTestingServiceNames={miniTestingServiceNames}
                                     />
                                     <AdvancedSettingsComponent dispatchConditions={dispatchConditions} conditions={conditions} />
                                 </>

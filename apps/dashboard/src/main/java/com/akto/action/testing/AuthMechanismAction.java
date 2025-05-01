@@ -67,7 +67,7 @@ public class AuthMechanismAction extends UserAction {
                     authParamData.get(0).getValue(), true));
             }
             
-        } else {
+        } else if (type.equals(LoginFlowEnums.AuthMechanismTypes.LOGIN_REQUEST.toString())) {
 
             for (AuthParamData param: authParamData) {
                 if (!param.validate()) {
@@ -87,7 +87,8 @@ public class AuthMechanismAction extends UserAction {
     public String triggerLoginFlowSteps() {
         List<AuthParam> authParams = new ArrayList<>();
 
-        if (type.equals(LoginFlowEnums.AuthMechanismTypes.HARDCODED.toString())) {
+        if (type.equals(LoginFlowEnums.AuthMechanismTypes.HARDCODED.toString()) ||
+                type.equals(LoginFlowEnums.AuthMechanismTypes.TLS_AUTH.toString())) {
             addActionError("Invalid Type Value");
             return ERROR.toUpperCase();
         }
@@ -119,7 +120,8 @@ public class AuthMechanismAction extends UserAction {
     public String triggerSingleLoginFlowStep() {
         List<AuthParam> authParams = new ArrayList<>();
 
-        if (type.equals(LoginFlowEnums.AuthMechanismTypes.HARDCODED.toString())) {
+        if (type.equals(LoginFlowEnums.AuthMechanismTypes.HARDCODED.toString()) ||
+                type.equals(LoginFlowEnums.AuthMechanismTypes.TLS_AUTH.toString())) {
             addActionError("Invalid Type Value");
             return ERROR.toUpperCase();
         }

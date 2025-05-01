@@ -20,6 +20,7 @@ import com.akto.dto.testing.EndpointLogicalGroup;
 import com.akto.dto.testing.HardcodedAuthParam;
 import com.akto.dto.testing.LoginRequestAuthParam;
 import com.akto.dto.testing.RequestData;
+import com.akto.dto.testing.TLSAuthParam;
 import com.akto.dto.testing.TestRoles;
 import com.akto.dto.testing.config.TestCollectionProperty;
 import com.akto.dto.testing.sources.AuthWithCond;
@@ -90,16 +91,24 @@ public class TestRolesAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
-    private AuthWithCond makeAuthWithConditionFromParamData(TestRoles role){
-        if (authParamData != null) {            
+    private AuthWithCond makeAuthWithConditionFromParamData(TestRoles role) {
+        if (authParamData != null) {
             List<AuthParam> authParams = new ArrayList<>();
 
             for (AuthParamData authParamDataElem : authParamData) {
                 AuthParam param = null;
                 if (authAutomationType.toUpperCase().equals(LoginFlowEnums.AuthMechanismTypes.HARDCODED.toString())) {
-                    param = new HardcodedAuthParam(authParamDataElem.getWhere(), authParamDataElem.getKey(), authParamDataElem.getValue(), true);
-                } else {
-                    param = new LoginRequestAuthParam(authParamDataElem.getWhere(), authParamDataElem.getKey(), authParamDataElem.getValue(), authParamDataElem.getShowHeader());
+                    param = new HardcodedAuthParam(authParamDataElem.getWhere(), authParamDataElem.getKey(),
+                            authParamDataElem.getValue(), true);
+                } else if (authAutomationType.toUpperCase()
+                        .equals(LoginFlowEnums.AuthMechanismTypes.LOGIN_REQUEST.toString())) {
+                    param = new LoginRequestAuthParam(authParamDataElem.getWhere(), authParamDataElem.getKey(),
+                            authParamDataElem.getValue(), authParamDataElem.getShowHeader());
+                } else if (authAutomationType.toUpperCase()
+                        .equals(LoginFlowEnums.AuthMechanismTypes.TLS_AUTH.toString())) {
+                    param = new TLSAuthParam(authParamDataElem.getCertAuthorityCertificate(),
+                            authParamDataElem.getCertificateType(), authParamDataElem.getClientCertificate(),
+                            authParamDataElem.getClientKey());
                 }
                 authParams.add(param);
             }
@@ -107,7 +116,7 @@ public class TestRolesAction extends UserAction {
             AuthMechanism authM = new AuthMechanism(authParams, this.reqData, authAutomationType, null);
             AuthWithCond authWithCond = new AuthWithCond(authM, apiCond, recordedLoginFlowInput);
             return authWithCond;
-        }else{
+        } else {
             return null;
         }
     }
