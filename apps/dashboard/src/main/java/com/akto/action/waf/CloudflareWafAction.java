@@ -12,12 +12,13 @@ public class CloudflareWafAction extends UserAction {
 
     private String apiKey;
     private String email;
+    private String integrationType;
     private String accountOrZoneId;
 
     private Config.CloudflareWafConfig cloudflareWafConfig;
 
     public String addCloudflareWafIntegration() {
-        if(email == null || accountOrZoneId == null) {
+        if(email == null || integrationType == null || accountOrZoneId == null) {
             addActionError("Please provide valid parameters.");
         }
 
@@ -44,11 +45,12 @@ public class CloudflareWafAction extends UserAction {
         if (existingConfig != null) {
             Bson updates = Updates.combine(
                     Updates.set(Config.CloudflareWafConfig.ACCOUNT_OR_ZONE_ID, accountOrZoneId),
+                    Updates.set(Config.CloudflareWafConfig.INTEGRATION_TYPE, integrationType),
                     Updates.set(Config.CloudflareWafConfig.EMAIL, email)
             );
             ConfigsDao.instance.updateOne(filters, updates);
         } else {
-            Config.CloudflareWafConfig config = new Config.CloudflareWafConfig(apiKey, email, accountOrZoneId, accId);
+            Config.CloudflareWafConfig config = new Config.CloudflareWafConfig(apiKey, email, integrationType, accountOrZoneId, accId);
             ConfigsDao.instance.insertOne(config);
         }
 
@@ -56,6 +58,11 @@ public class CloudflareWafAction extends UserAction {
     }
 
     public String deleteCloudflareWafIntegration() {
+        Bson filters = Filters.and(
+                Filters.eq(Config.CloudflareWafConfig.ACCOUNT_ID, Context.accountId.get()),
+                Filters.eq(Config.CloudflareWafConfig._CONFIG_ID, Config.ConfigType.CLOUDFLARE_WAF.name())
+        );
+        ConfigsDao.instance.getMCollection().deleteOne(filters);
         return SUCCESS.toUpperCase();
     }
 
@@ -93,5 +100,13 @@ public class CloudflareWafAction extends UserAction {
 
     public Config.CloudflareWafConfig getCloudflareWafConfig() {
         return cloudflareWafConfig;
+    }
+
+    public String getIntegrationType() {
+        return integrationType;
+    }
+
+    public void setIntegrationType(String integrationType) {
+        this.integrationType = integrationType;
     }
 }

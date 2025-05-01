@@ -7,12 +7,8 @@ import com.akto.billing.UsageMetricUtils;
 import com.akto.dao.*;
 import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.context.Context;
-import com.akto.dto.Account;
-import com.akto.dto.AccountSettings;
+import com.akto.dto.*;
 import com.akto.dto.ApiToken.Utility;
-import com.akto.dto.RBAC;
-import com.akto.dto.User;
-import com.akto.dto.UserAccountEntry;
 import com.akto.dto.billing.FeatureAccess;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.jira_integration.JiraIntegration;
@@ -148,6 +144,16 @@ public class ProfileAction extends UserAction {
             orgName = organization.getName();
         }
 
+        long awsWafCount = ConfigsDao.instance.count(Filters.and(
+                Filters.eq(Config.CloudflareWafConfig.ACCOUNT_ID, sessionAccId),
+                Filters.eq(Config.CloudflareWafConfig._CONFIG_ID, Config.ConfigType.AWS_WAF.name())
+        ));
+
+        long cloudflareWafCount = ConfigsDao.instance.count(Filters.and(
+                Filters.eq(Config.CloudflareWafConfig.ACCOUNT_ID, sessionAccId),
+                Filters.eq(Config.CloudflareWafConfig._CONFIG_ID, Config.ConfigType.CLOUDFLARE_WAF.name())
+        ));
+
         userDetails.append("accounts", accounts)
                 .append("username",username)
                 .append("userFullName", userActualName)
@@ -163,7 +169,9 @@ public class ProfileAction extends UserAction {
                 .append("azureBoardsIntegrated", azureBoardsIntegrated)
                 .append("userRole", userRole.toString().toUpperCase())
                 .append("currentTimeZone", timeZone)
-                .append("organizationName", orgName);
+                .append("organizationName", orgName)
+                .append("isAwsWafIntegrated", awsWafCount != 0)
+                .append("isCloudflareWafIntegrated", cloudflareWafCount != 0);
 
         if (DashboardMode.isOnPremDeployment()) {
             userDetails.append("userHash", Intercom.getUserHash(user.getLogin()));

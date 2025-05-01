@@ -4,6 +4,8 @@ import FlyLayout from "../../../components/layouts/FlyLayout"
 import { ActivityLog } from "./ActivityLog";
 import Store from "../../../store";
 import api from "../api";
+import func from "@/util/func";
+import BlockUnblockWafSelector from "./BlockUnblockWafSelector";
 export const ActorDetails = ({ actorDetails, setShowActorDetails }) => {
     const [ipStatus, setIpStatus] = useState(actorDetails.status || "active")
     const [showModal, setShowModal] = useState(false)
@@ -17,15 +19,17 @@ export const ActorDetails = ({ actorDetails, setShowActorDetails }) => {
         })
     }
 
-    const handleBlockUnblockIp = async (status) => {
-        try {
-            const res = await api.modifyThreatActorStatus(actorDetails.latestApiIp, status)
-            setIpStatus(status)
-            setShowModal(false)
-        } catch (error) {
-            console.error(error)
-            setToast(true, true, "Failed to block IP")
+    const [active, setActive] = useState(false)
+    const handleBlockUnblockIP = async (wafType) => {
+        const status = ipStatus.toLowerCase() === "active" ? "blocked" : "active";
+        if(wafType === "aws") {
+            await api.modifyThreatActorStatus(actorDetails.latestApiIp, status)
+            func.setToast(true, false, "Successfully blocked IP")
+        } else if(wafType === "cloudflare") {
+            await api.modifyThreatActorStatusCloudflare(actorDetails.latestApiIp, status)
+            func.setToast(true, false, "Successfully blocked IP")
         }
+        setIpStatus(status)
     }
 
     const ThreatActorHeader = () => {
@@ -44,7 +48,10 @@ export const ActorDetails = ({ actorDetails, setShowActorDetails }) => {
                     activator={<Button destructive={ipStatus.toLowerCase() === "active"} size="slim" onClick={() => setShowModal(!showModal)}>{ipStatus.toLowerCase() === "active" ? "Block IP" : "Unblock IP"}</Button>}
                     open={showModal}
                     onClose={() => setShowModal(false)}
-                    primaryAction={{content: ipStatus.toLowerCase() === "active" ? "Block IP" : "Unblock IP", onAction: () => handleBlockUnblockIp(ipStatus.toLowerCase() === "active" ? "blocked" : "active")}}
+                    primaryAction={{
+                            content: ipStatus.toLowerCase() === "active" ? "Block IP" : "Unblock IP",
+                            onAction: () => setActive(!active)
+                        }}
                     title={ipStatus.toLowerCase() === "active" ? "Block IP" : "Unblock IP"}
                 >
                     <Modal.Section>
@@ -56,6 +63,12 @@ export const ActorDetails = ({ actorDetails, setShowActorDetails }) => {
                     </Modal.Section>
                 </Modal>
                </HorizontalStack>
+
+               <BlockUnblockWafSelector
+                    active={active}
+                    setActive={setActive}
+                    handleBlockUnblockIP={handleBlockUnblockIP}
+                />
             </Box>
         )
     }

@@ -577,11 +577,11 @@ const settingRequests = {
             data: {}
         })
     },
-    async addCloudflareWafIntegration(accountOrZoneId, apiKey, email) {
+    async addCloudflareWafIntegration(accountOrZoneId, apiKey, email, integrationType) {
         return await request({
             url: '/api/addCloudflareWafIntegration',
             method: 'post',
-            data: {accountOrZoneId, apiKey, email}
+            data: {accountOrZoneId, apiKey, email, integrationType}
         })
     },
 }

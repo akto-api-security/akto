@@ -4,6 +4,8 @@ import com.akto.dao.ConfigsDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.Config;
 import com.akto.dto.Config.AwsWafConfig;
+import com.akto.dto.OriginalHttpRequest;
+import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.type.URLMethods;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
@@ -12,7 +14,11 @@ import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.Li
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatActorByCountryResponse;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatActorFilterResponse;
 import com.akto.proto.utils.ProtoMessageUtils;
+import com.akto.testing.ApiExecutor;
+import com.akto.util.Constants;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.mongodb.BasicDBList;
+import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
@@ -24,10 +30,7 @@ import software.amazon.awssdk.services.wafv2.model.GetIpSetResponse;
 import software.amazon.awssdk.services.wafv2.model.UpdateIpSetRequest;
 import software.amazon.awssdk.services.wafv2.model.Wafv2Exception;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.stream.Collectors;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpGet;
@@ -62,6 +65,8 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
   String eventType;
 
   private final CloseableHttpClient httpClient;
+
+  public static final String CLOUDFLARE_WAF_BASE_URL = "https://api.cloudflare.com/client/v4";
 
   private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -257,6 +262,139 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
         return getResponse;
     }
 
+    public String modifyThreatActorStatusCloudflare() {
+        int accId = Context.accountId.get();
+        Bson filters = Filters.and(
+            Filters.eq(Constants.ID, accId + "_" + Config.ConfigType.CLOUDFLARE_WAF),
+            Filters.eq(Config.CloudflareWafConfig.ACCOUNT_ID, accId)
+        );
+
+        Config config = ConfigsDao.instance.findOne(filters);
+        Config.CloudflareWafConfig cloudflareWafConfig;
+        if(config instanceof Config.CloudflareWafConfig) {
+            cloudflareWafConfig = (Config.CloudflareWafConfig) config;
+        } else {
+            addActionError("Cloudflare WAF integration not found.");
+            return ERROR.toUpperCase();
+        }
+
+        boolean result;
+        if(status.equalsIgnoreCase("blocked")) {
+            result = blockIPInCloudflareWaf(cloudflareWafConfig);
+        } else {
+            result = unblockIPInCloudflareWaf(cloudflareWafConfig);
+        }
+
+        if(result) {
+            boolean backendRes = sendModifyThreatActorStatusToBackend(actorIp);
+
+            if (!backendRes) {
+                return ERROR.toUpperCase();
+            } else {
+                return SUCCESS.toUpperCase();
+            }
+        }
+
+        return ERROR.toUpperCase();
+    }
+
+    public boolean blockIPInCloudflareWaf(Config.CloudflareWafConfig cloudflareWafConfig) {
+        try {
+            Map<String, List<String>> headers = new HashMap<>();
+            headers.put("Content-Type", Collections.singletonList("application/json"));
+            headers.put("X-Auth-Key", Collections.singletonList(cloudflareWafConfig.getApiKey()));
+            headers.put("X-Auth-Email", Collections.singletonList(cloudflareWafConfig.getEmail()));
+
+            String url = CLOUDFLARE_WAF_BASE_URL + "/" + cloudflareWafConfig.getIntegrationType() + "/" + cloudflareWafConfig.getAccountOrZoneId() + "/firewall/access_rules/rules";
+
+            BasicDBObject reqPayload = new BasicDBObject();
+            reqPayload.put("mode", "block");
+            BasicDBObject configuration = new BasicDBObject();
+            configuration.put("target", "ip");
+            configuration.put("value", actorIp);
+            reqPayload.put("configuration", configuration);
+
+            OriginalHttpRequest request = new OriginalHttpRequest(url, "", "POST", reqPayload.toString(), headers, "");
+
+            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, new ArrayList<>());
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() > 201 || responsePayload == null) {
+                addActionError("Unable to block IP address. Try again later.");
+                return false;
+            }
+
+        } catch (Exception e) {
+            addActionError("Unable to block IP address. Try again later.");
+            loggerMaker.debugAndAddToDb("Error modifying threat actor status: " + e.getMessage());
+            return false;
+        }
+
+        return true;
+    }
+
+    public boolean unblockIPInCloudflareWaf(Config.CloudflareWafConfig cloudflareWafConfig) {
+        try {
+            String ruleId = getCloudFlareIPAccessRuleByActorIP(actorIp, cloudflareWafConfig);
+
+            if(ruleId == null) {
+                addActionError("The IP is already unblocked or does not exist.");
+                return false;
+            }
+
+            Map<String, List<String>> headers = new HashMap<>();
+            headers.put("X-Auth-Key", Collections.singletonList(cloudflareWafConfig.getApiKey()));
+            headers.put("X-Auth-Email", Collections.singletonList(cloudflareWafConfig.getEmail()));
+
+            String url = CLOUDFLARE_WAF_BASE_URL + "/" + cloudflareWafConfig.getIntegrationType() + "/" + cloudflareWafConfig.getAccountOrZoneId() + "/firewall/access_rules/rules/" + ruleId;
+
+            OriginalHttpRequest request = new OriginalHttpRequest(url, "", "DELETE", "", headers, "");
+
+            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, new ArrayList<>());
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() > 201 || responsePayload == null) {
+                return false;
+            }
+
+            BasicDBObject responseObj = BasicDBObject.parse(responsePayload);
+            BasicDBList result = (BasicDBList) responseObj.get("result");
+            if(result == null) {
+                return false;
+            }
+
+        } catch (Exception e) {
+            addActionError("Unable to unblock IP address. Try again later.");
+            loggerMaker.debugAndAddToDb("Error modifying threat actor status: " + e.getMessage());
+            return false;
+        }
+
+        return true;
+    }
+
+    public static String getCloudFlareIPAccessRuleByActorIP(String actorIp, Config.CloudflareWafConfig cloudflareWafConfig) {
+        try {
+            String url = CLOUDFLARE_WAF_BASE_URL + "/" + cloudflareWafConfig.getIntegrationType() + "/" + cloudflareWafConfig.getAccountOrZoneId() + "/firewall/access_rules/rules?configuration.target=ip&configuration.value=" + actorIp;
+
+            Map<String, List<String>> headers = new HashMap<>();
+            headers.put("X-Auth-Key", Collections.singletonList(cloudflareWafConfig.getApiKey()));
+            headers.put("X-Auth-Email", Collections.singletonList(cloudflareWafConfig.getEmail()));
+
+            OriginalHttpRequest request = new OriginalHttpRequest(url, "", "GET", "", headers, "");
+            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, new ArrayList<>());
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() > 201 || responsePayload == null) {
+                return null;
+            }
+
+            BasicDBObject respPayloadObj = BasicDBObject.parse(responsePayload);
+            BasicDBList result = (BasicDBList) respPayloadObj.get("result");
+            BasicDBObject resultObj = (BasicDBObject) result.get(0);
+            return resultObj.getString("id");
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error while fetching ip access rule id: " + e.getMessage());
+            return null;
+        }
+    }
+
     public String modifyThreatActorStatus() {
         Wafv2Client wafClient = null;
         int accId = Context.accountId.get();
@@ -301,34 +439,12 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
             }
 
             if (resp) {
-
-              HttpPost post =
-                new HttpPost(String.format("%s/api/dashboard/modifyThreatActorStatus", this.getBackendUrl()));
-                  post.addHeader("Authorization", "Bearer " + this.getApiToken());
-                  post.addHeader("Content-Type", "application/json");
-
-                  Map<String, Object> body =
-                      new HashMap<String, Object>() {
-                        {
-                          put("updated_ts", Context.now());
-                          put("ip", ipWithCidr);
-                          put("status", status);
-                        }
-                      };
-                  String msg = objectMapper.valueToTree(body).toString();
-
-                  StringEntity requestEntity = new StringEntity(msg, ContentType.APPLICATION_JSON);
-                  post.setEntity(requestEntity);
-
-                  try (CloseableHttpResponse response = this.httpClient.execute(post)) {
-                      loggerMaker.debugAndAddToDb("updated threat actor status");
-                  } catch (Exception e) {
-                    e.printStackTrace();
+                boolean res = sendModifyThreatActorStatusToBackend(ipWithCidr);
+                if(!res) {
                     return ERROR.toUpperCase();
-                  }
-
-
-              return SUCCESS.toUpperCase();
+                } else {
+                    return SUCCESS.toUpperCase();
+                }
             }
             return SUCCESS.toUpperCase();
             
@@ -336,6 +452,36 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
             loggerMaker.debugAndAddToDb("Error modiftying threat actor status: " + e.getMessage());
             return ERROR.toUpperCase();
         }
+    }
+
+    public boolean sendModifyThreatActorStatusToBackend(String ip) {
+        HttpPost post =
+                new HttpPost(String.format("%s/api/dashboard/modifyThreatActorStatus", this.getBackendUrl()));
+        post.addHeader("Authorization", "Bearer " + this.getApiToken());
+        post.addHeader("Content-Type", "application/json");
+
+        Map<String, Object> body =
+                new HashMap<String, Object>() {
+                    {
+                        put("updated_ts", Context.now());
+                        put("ip", ip);
+                        put("status", status);
+                    }
+                };
+        String msg = objectMapper.valueToTree(body).toString();
+
+        StringEntity requestEntity = new StringEntity(msg, ContentType.APPLICATION_JSON);
+        post.setEntity(requestEntity);
+
+        try (CloseableHttpResponse response = this.httpClient.execute(post)) {
+            loggerMaker.debugAndAddToDb("updated threat actor status");
+        } catch (Exception e) {
+            e.printStackTrace();
+            loggerMaker.errorAndAddToDb("Error sending threat actor status " + e.getMessage());
+            return false;
+        }
+
+        return true;
     }
 
     public boolean blockActorIp(List<String> ipAddresses, String ipWithCidr, Wafv2Client wafClient, AwsWafConfig awsWafConfig, GetIpSetResponse getResponse) {

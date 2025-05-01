@@ -695,6 +695,8 @@ public abstract class Config {
         private String apiKey;
         public static final String EMAIL = "email";
         private String email;
+        public static final String INTEGRATION_TYPE = "integrationType";
+        private String integrationType;
         public static final String ACCOUNT_OR_ZONE_ID = "accountOrZoneId";
         private String accountOrZoneId;
         public static final String ACCOUNT_ID = "accountId";
@@ -708,9 +710,10 @@ public abstract class Config {
             this.id = CONFIG_ID;
         }
 
-        public CloudflareWafConfig(String apiKey, String email, String accountOrZoneId, int accountId) {
+        public CloudflareWafConfig(String apiKey, String email, String integrationType, String accountOrZoneId, int accountId) {
             this.apiKey = apiKey;
             this.email = email;
+            this.integrationType = integrationType;
             this.accountOrZoneId = accountOrZoneId;
             this.accountId = accountId;
             this.id = accountId + "_" + CONFIG_ID;
@@ -730,6 +733,14 @@ public abstract class Config {
 
         public void setEmail(String email) {
             this.email = email;
+        }
+
+        public String getIntegrationType() {
+            return integrationType;
+        }
+
+        public void setIntegrationType(String integrationType) {
+            this.integrationType = integrationType;
         }
 
         public String getAccountOrZoneId() {
