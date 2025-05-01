@@ -33,12 +33,12 @@ public class CloudflareWafAction extends UserAction {
         Config.CloudflareWafConfig existingConfig;
         if(configObj instanceof Config.CloudflareWafConfig) {
             existingConfig = (Config.CloudflareWafConfig) configObj;
-
+        } else {
             if(apiKey == null) {
                 addActionError("Please provide a valid API Key.");
                 return ERROR.toUpperCase();
             }
-        } else {
+
             existingConfig = null;
         }
 
