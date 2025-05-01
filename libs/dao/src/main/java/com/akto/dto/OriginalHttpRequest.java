@@ -1,11 +1,15 @@
 package com.akto.dto;
 
+import com.akto.dto.testing.TLSAuthParam;
 import com.akto.dto.type.RequestTemplate;
 import com.akto.util.HttpRequestResponseUtils;
 import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONObject;
 import com.google.gson.Gson;
 import com.mongodb.BasicDBObject;
+
+import lombok.Getter;
+import lombok.Setter;
 import okhttp3.HttpUrl;
 
 import java.net.URI;
@@ -23,9 +27,13 @@ public class OriginalHttpRequest {
     private String destinationIp;
     private Map<String, List<String>> headers;
 
+    @Getter
+    @Setter
+    private TLSAuthParam tlsAuthParam;
+
     public OriginalHttpRequest() { }
 
-    // before adding any fields make sure to add them to copy function as wel
+    // before adding any fields make sure to add them to copy function as well
     public OriginalHttpRequest(String url, String queryParams, String method, String body, Map<String, List<String>> headers, String type) {
         this.url = url;
         this.queryParams = queryParams;
@@ -35,16 +43,11 @@ public class OriginalHttpRequest {
         this.type = type;
     }
 
-
-    public OriginalHttpRequest(String url, String queryParams, String method, String body, String sourceIp, String destinationIp, Map<String, List<String>> headers, String type) {
-        this.url = url;
-        this.queryParams = queryParams;
-        this.method = method;
-        this.body = body;
+    public OriginalHttpRequest(String url, String queryParams, String method, String body, String sourceIp, String destinationIp, Map<String, List<String>> headers, String type, TLSAuthParam tlsAuthParam) {
+        this(url, queryParams, method, body, headers, type);
         this.sourceIp = sourceIp;
         this.destinationIp = destinationIp;
-        this.headers = headers;
-        this.type = type;
+        this.tlsAuthParam = tlsAuthParam;
     }
 
     public OriginalHttpRequest copy() {
@@ -55,7 +58,8 @@ public class OriginalHttpRequest {
             headersCopy.put(headerKV.getKey(), headerValues);
         }
         return new OriginalHttpRequest(
-                this.url, this.queryParams, this.method, this.body, this.sourceIp, this.destinationIp, headersCopy, this.type
+                this.url, this.queryParams, this.method, this.body, this.sourceIp, this.destinationIp, headersCopy, this.type, 
+                this.tlsAuthParam
         );
     }
 

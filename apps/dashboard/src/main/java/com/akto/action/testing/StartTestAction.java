@@ -1095,8 +1095,6 @@ public class StartTestAction extends UserAction {
 
         long continuousTestsCount = TestingRunDao.instance.getMCollection().countDocuments(Filters.and(continuousTestsFilter));
 
-        System.out.println("cont count" + continuousTestsCount);
-
         long scheduleCount = totalCount - oneTimeCount - cicdCount - continuousTestsCount;
 
         
