@@ -456,6 +456,15 @@ const settingRequests = {
             }
         })
     },
+    switchTestingModule(miniTestingEnabled){
+        return request({
+            url: '/api/switchTestingModule',
+            method: "post",
+            data: {
+                miniTestingEnabled
+            }
+        })
+    },
     resetUserPassword(userEmail) {
         return request({
             url: '/api/resetUserPassword',
@@ -554,6 +563,13 @@ const settingRequests = {
             url: '/api/removeInvitation',
             method: 'post',
             data: {email}
+        })
+    },
+    async fetchModuleInfo() {
+        return await request({
+            url: '/api/fetchModuleInfo',
+            method: 'post',
+            data: {}
         })
     }
 }

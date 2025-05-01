@@ -125,6 +125,11 @@ const apiDetailsHeaders = [
         alignVertical: "bottom",
         component: (data) => (<Button plain onClick={data?.action} textAlign="left">Add description</Button>),
         action: () => {}
+    },
+    {
+        text: "AI-Data",
+        value: "headersInfo",
+        itemOrder: 4,
     }
 ]
 

@@ -30,6 +30,7 @@ import com.akto.dto.jobs.JobParams;
 import com.akto.dto.loaders.Loader;
 import com.akto.dto.loaders.NormalLoader;
 import com.akto.dto.loaders.PostmanUploadLoader;
+import com.akto.dto.monitoring.ModuleInfo;
 import com.akto.dto.notifications.CustomWebhook;
 import com.akto.dto.notifications.CustomWebhookResult;
 import com.akto.dto.runtime_filters.FieldExistsFilter;
@@ -287,6 +288,8 @@ public class DaoInit {
         ClassModel<JobParams> jobParams = ClassModel.builder(JobParams.class).enableDiscriminator(true).build();
         ClassModel<AutoTicketParams> autoTicketParams = ClassModel.builder(AutoTicketParams.class).enableDiscriminator(true).build();
         ClassModel<Model> agentModel = ClassModel.builder(Model.class).enableDiscriminator(true).build();
+        ClassModel<ModuleInfo> ModuleInfoClassModel = ClassModel.builder(ModuleInfo.class).enableDiscriminator(true).build();
+        ClassModel<TLSAuthParam> tlsAuthClassModel = ClassModel.builder(TLSAuthParam.class).enableDiscriminator(true).build();
 
         CodecRegistry pojoCodecRegistry = fromProviders(PojoCodecProvider.builder().register(
                 configClassModel, signupInfoClassModel, apiAuthClassModel, attempResultModel, urlTemplateModel,
@@ -327,7 +330,7 @@ public class DaoInit {
                 eventsExampleClassModel, remediationClassModel, complianceInfoModel, complianceMappingModel,
                 RuntimeMetricsClassModel, codeAnalysisRepoModel, codeAnalysisApiModel, historicalDataClassModel,
                 configSettingClassModel, configSettingsConditionTypeClassModel, roleClassModel, testingInstanceHeartBeat,
-                jobParams, autoTicketParams, agentModel)
+                jobParams, autoTicketParams, agentModel, ModuleInfoClassModel, tlsAuthClassModel)
             .automatic(true).build());
 
         final CodecRegistry customEnumCodecs = CodecRegistries.fromCodecs(
@@ -375,7 +378,9 @@ public class DaoInit {
                 new EnumCodec<>(ApiInfo.ApiType.class),
                 new EnumCodec<>(CodeAnalysisRepo.SourceCodeType.class),
                 new EnumCodec<>(State.class),
-                new EnumCodec<>(ModelType.class)
+                new EnumCodec<>(ModelType.class),
+                new EnumCodec<>(ModuleInfo.ModuleType.class),
+                new EnumCodec<>(TLSAuthParam.CertificateType.class)
         );
 
         return fromRegistries(MongoClientSettings.getDefaultCodecRegistry(), pojoCodecRegistry,

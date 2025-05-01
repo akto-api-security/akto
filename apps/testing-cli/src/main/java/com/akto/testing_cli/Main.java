@@ -32,6 +32,7 @@ import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.CustomAuthType;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.OriginalHttpResponse;
+import com.akto.dto.RawApi;
 import com.akto.dto.test_editor.TestConfig;
 import com.akto.dto.testing.AuthMechanism;
 import com.akto.dto.testing.TestingRunConfig;
@@ -325,7 +326,8 @@ public class Main {
                     List<String> samples = testingUtil.getSampleMessages().get(it);
                     testingRunResult = Utils.generateFailedRunResultForMessage(null, it, testConfig.getInfo().getCategory().getName(), testConfig.getInfo().getSubCategory(), null,samples , null);
                     if(testingRunResult == null){
-                        testingRunResult = testExecutor.runTestNew(it, null, testingUtil, null, testConfig, null, false, new ArrayList<>(), samples.get(samples.size() - 1));
+                        String sample = samples.get(samples.size() - 1);
+                        testingRunResult = testExecutor.runTestNew(it, null, testingUtil, null, testConfig, null, false, new ArrayList<>(), sample);
                     }
                 } catch (Exception e) {
                     e.printStackTrace();

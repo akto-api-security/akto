@@ -150,11 +150,13 @@ public class OpenApiAction extends UserAction implements ServletResponseAware {
 
         File file = new File(FileUpload.UploadType.SWAGGER_FILE.toString(), GzipUtils.zipString(openAPIString));
         InsertOneResult fileInsertId = FilesDao.instance.insertOne(file);
-        String fileId = fileInsertId.getInsertedId().asObjectId().toString();
+        String fileId = fileInsertId.getInsertedId().asObjectId().getValue().toHexString();
         SwaggerFileUpload fileUpload = new SwaggerFileUpload();
         fileUpload.setSwaggerFileId(fileId);
         fileUpload.setUploadType(FileUpload.UploadType.SWAGGER_FILE);
         fileUpload.setUploadStatus(FileUpload.UploadStatus.IN_PROGRESS);
+        fileUpload.setCollectionId(apiCollectionId);
+        fileUpload.setUploadTs(Context.now());
         InsertOneResult insertOneResult = FileUploadsDao.instance.insertOne(fileUpload);
         String fileUploadId = insertOneResult.getInsertedId().asObjectId().getValue().toString();
         this.uploadId = fileUploadId;
