@@ -562,7 +562,28 @@ const settingRequests = {
             method: 'post',
             data: {}
         })
-    }
+    },
+    async fetchCloudflareWafIntegration() {
+        return await request({
+            url: '/api/fetchCloudflareWafIntegration',
+            method: 'post',
+            data: {}
+        })
+    },
+    async deleteCloudflareWafIntegration() {
+        return await request({
+            url: '/api/deleteCloudflareWafIntegration',
+            method: 'post',
+            data: {}
+        })
+    },
+    async addCloudflareWafIntegration(accountOrZoneId, apiKey, email) {
+        return await request({
+            url: '/api/addCloudflareWafIntegration',
+            method: 'post',
+            data: {accountOrZoneId, apiKey, email}
+        })
+    },
 }
 
 export default settingRequests
