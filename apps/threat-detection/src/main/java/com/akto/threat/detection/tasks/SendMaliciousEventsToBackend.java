@@ -149,8 +149,8 @@ public class SendMaliciousEventsToBackend extends AbstractKafkaConsumerTask<byte
                       req.setEntity(requestEntity);
                       try {
                         logger.debug("sending malicious event to threat backend for url {} filterId {} eventType {}", evt.getLatestApiEndpoint(), evt.getFilterId(), evt.getEventType().toString());
-                        this.httpClient.execute(req);
-                      } catch (IOException e) {
+                        //this.httpClient.execute(req);
+                      } catch (Exception e) {
                         e.printStackTrace();
                       }
 

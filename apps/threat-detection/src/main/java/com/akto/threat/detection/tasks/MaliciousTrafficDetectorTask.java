@@ -39,6 +39,7 @@ import com.akto.RawApiMetadataFactory;
 
 import io.lettuce.core.RedisClient;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -46,6 +47,11 @@ import java.util.function.Supplier;
 
 import org.apache.commons.lang3.math.NumberUtils;
 import org.apache.kafka.clients.consumer.*;
+import org.apache.kafka.streams.KeyValue;
+import org.apache.kafka.streams.state.ReadOnlyWindowStore;
+import org.apache.kafka.streams.state.ValueAndTimestamp;
+import org.apache.kafka.streams.state.WindowStore;
+import org.apache.kafka.streams.state.WindowStoreIterator;
 
 /*
 Class is responsible for consuming traffic data from the Kafka topic.
@@ -73,6 +79,8 @@ public class MaliciousTrafficDetectorTask implements Task {
   private static final HttpResponseParams responseParams = new HttpResponseParams();
   private static Map<String, Object> varMap = new HashMap<>();
   private static Supplier<String> lazyToString;
+  private int notifiedTs = 0;
+  private int cnt = 0;
 
   public MaliciousTrafficDetectorTask(
       KafkaConfig trafficConfig, KafkaConfig internalConfig, RedisClient redisClient) throws Exception {
@@ -120,7 +128,7 @@ public class MaliciousTrafficDetectorTask implements Task {
             try {
               for (ConsumerRecord<String, byte[]> record : records) {
                 HttpResponseParam httpResponseParam = HttpResponseParam.parseFrom(record.value());
-                processRecord(httpResponseParam);
+                //processRecord(httpResponseParam);
               }
 
               if (!records.isEmpty()) {
@@ -142,7 +150,7 @@ public class MaliciousTrafficDetectorTask implements Task {
 
     List<YamlTemplate> templates = dataActor.fetchFilterYamlTemplates();
     apiFilters = FilterYamlTemplateDao.fetchFilterConfig(false, templates, false);
-    logger.debug("total filters fetched {} ", apiFilters.size());
+    logger.info("total filters fetched {} ", apiFilters.size());
     this.filterLastUpdatedAt = now;
     return apiFilters;
   }
@@ -164,7 +172,7 @@ public class MaliciousTrafficDetectorTask implements Task {
     return false;
   }
 
-  private void processRecord(HttpResponseParam record) throws Exception {
+  public void processRecord(HttpResponseParam record, WindowStore<String, Long> store) throws Exception {
     HttpResponseParams responseParam = buildHttpResponseParam(record);
     String actor = SourceIPActorGenerator.instance.generate(responseParam).orElse("");
     responseParam.setSourceIP(actor);
@@ -174,7 +182,10 @@ public class MaliciousTrafficDetectorTask implements Task {
       return;
     }
 
-    logger.debug("Processing record with actor IP: {}", responseParam.getSourceIP());
+    cnt++;
+    if (cnt % 5000 == 0){
+      logger.info("Processing record with actor IP: {} {}", Context.now(), responseParam.getSourceIP());
+    }
     Context.accountId.set(Integer.parseInt(responseParam.getAccountId()));
     Map<String, FilterConfig> filters = this.getFilters();
     if (filters.isEmpty()) {
@@ -193,6 +204,10 @@ public class MaliciousTrafficDetectorTask implements Task {
     URLMethods.Method method =
         URLMethods.Method.fromString(responseParam.getRequestParams().getMethod());
     ApiInfo.ApiInfoKey apiInfoKey = new ApiInfo.ApiInfoKey(apiCollectionId, url, method);
+
+    // increment api hit count
+
+    String apiHitKey = apiCollectionId + "|" + url + "|" + method;
 
     for (FilterConfig apiFilter : apiFilters.values()) {
       boolean hasPassedFilter = validateFilterForRequest(apiFilter, rawApi, apiInfoKey);
@@ -247,18 +262,52 @@ public class MaliciousTrafficDetectorTask implements Task {
           WindowBasedThresholdNotifier.Result result = this.windowBasedThresholdNotifier.shouldNotify(aggKey,
               maliciousReq, rule);
 
-          if (result.shouldNotify()) {
-            logger.debug("aggregate condition satisfied for url {} filterId {}", apiInfoKey.getUrl(), apiFilter.getId());
+          // ReadOnlyWindowStore<String, Long> countsStore = (ReadOnlyWindowStore<String, Long>) store;
+          long windowSizeMs = 10 * 60 * 1000L;
+          Instant windowEnd = Instant.ofEpochMilli(Context.now() * 1000L);
+          Instant windowStart = windowEnd.minusMillis(windowSizeMs);
+
+          String key = responseParam.getRequestParams().getApiCollectionId() + "|" + responseParam.getRequestParams().getURL() + "|" + responseParam.getRequestParams().getMethod();
+
+          long totalCount = 0;
+
+          WindowStoreIterator<Long> iterator = store.fetch(key, windowStart, windowEnd);
+          while (iterator.hasNext()) {
+              KeyValue<Long, ?> entry = iterator.next();
+              Object value = entry.value;
+              //System.out.println("value log " + value);
+              if (value instanceof Long) {
+                  totalCount += (Long) value;
+              } else if (value instanceof ValueAndTimestamp) {
+                  totalCount += ((ValueAndTimestamp<Long>) value).value();
+              } else {
+                  System.err.println("Unexpected value type in state store: " + value.getClass().getName());
+              }
+          }
+
+          if (totalCount > rule.getCondition().getMatchCount() && (Context.now() - 10) > notifiedTs) {
+            notifiedTs = Context.now();
+            logger.info("total count for key {} totalCount {} filterId {} threshold {}", key, totalCount, apiInfoKey.getApiCollectionId(), apiFilter.getId());
             generateAndPushMaliciousEventRequest(
                 apiFilter,
                 actor,
                 responseParam,
                 maliciousReq,
                 EventType.EVENT_TYPE_AGGREGATED);
+            }
           }
+
+          // if (result.shouldNotify()) {
+          //   logger.debug("aggregate condition satisfied for url {} filterId {}", apiInfoKey.getUrl(), apiFilter.getId());
+          //   generateAndPushMaliciousEventRequest(
+          //       apiFilter,
+          //       actor,
+          //       responseParam,
+          //       maliciousReq,
+          //       EventType.EVENT_TYPE_AGGREGATED);
+          // }
         }
       }
-    }
 
     // Should we push all the messages in one go
     // or call kafka.send for each HttpRequestParams

@@ -28,7 +28,7 @@ public class KafkaBenchmark {
     public static String FILE_PATH = "sample-payloads/";
     public static String payloadFormat = "json";
     public static String payloadSize = payloadSizes.get(0);
-    public static long numRecords = 410000L;
+    public static long numRecords = 80000;
     
     
     
@@ -123,7 +123,7 @@ public class KafkaBenchmark {
             .setDirection("INBOUND")
             .setIsPending(false)
             .setSource("MIRRORING")
-            .setAktoVxlanId("vxlan-id");
+            .setAktoVxlanId("123");
         
         for (long i = 0; i < numRecords; i++) {
             if (i%100 == 0) {
@@ -135,6 +135,7 @@ public class KafkaBenchmark {
             records.add(record);
         }
 
+        
         return records;
     }
 

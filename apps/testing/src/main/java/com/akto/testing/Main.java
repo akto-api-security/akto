@@ -93,6 +93,8 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
+
+import org.apache.kafka.streams.StreamsBuilder;
 import org.bson.Document;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
@@ -428,6 +430,9 @@ public class Main {
         }
 
         loggerMaker.debugAndAddToDb("Starting.......", LogDb.TESTING);
+
+
+        StreamsBuilder builder = new StreamsBuilder();
 
         Producer testingProducer = new Producer();
         ConsumerUtil testingConsumer = new ConsumerUtil();

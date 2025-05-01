@@ -56,6 +56,12 @@ public class WindowBasedThresholdNotifier {
     this.config = config;
   }
 
+  public void incrementApiHitCount(String apiKey, int ts) {
+    int binId = ts/60;
+    String cacheKey = apiKey + "|" + binId;
+    this.cache.increment(cacheKey);
+  }
+
   public Result shouldNotify(String aggKey, SampleMaliciousRequest maliciousEvent, Rule rule) {
     int binId = (int) maliciousEvent.getTimestamp() / 60;
     String cacheKey = aggKey + "|" + binId;
