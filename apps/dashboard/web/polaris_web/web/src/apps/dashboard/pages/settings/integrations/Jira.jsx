@@ -9,6 +9,7 @@ import DropdownSearch from '../../../components/shared/DropdownSearch';
 import { produce } from "immer"
 import api from '../api';
 
+
 const aktoStatusForJira = ["Fixed", "Ignored", "Open"]
 
 function Jira() {
@@ -21,6 +22,7 @@ function Jira() {
     const [projectMap, setProjectMap] = useReducer(produce((draft, action) => { projectMapReducer(draft, action) }), []);
     const [isAlreadyIntegrated, setIsAlreadyIntegrated] = useState(false)
     const [existingProjectIds, setExistingProjectIds] = useState([])
+
 
     async function fetchJiraInteg() {
         let jiraInteg = await settingFunctions.fetchJiraIntegration();
@@ -113,6 +115,86 @@ function Jira() {
     } 
 
     
+
+        const projectMappings = jiraInteg?.projectMappings ?? {};
+        let projectIds = new Set();
+        Object.entries(projectMappings).forEach(([projectId, projectMapping], index) => {
+            projectIds.add(projectId);
+            setProjectMap({
+                type: 'APPEND',
+                payload: {
+                    projectId,
+                    enableBiDirIntegraion: projectMapping?.biDirectionalSyncSettings?.enabled || false,
+                    aktoToJiraStatusMap: projectMapping?.biDirectionalSyncSettings?.aktoStatusMappings || {
+                        FIXED: [],
+                        IGNORED: [],
+                        OPEN: []
+                    },
+                    statuses: projectMapping.statuses,
+                    jiraStatusLabel: projectMapping?.statuses?.map(x => { return { "label": x?.name ?? "", "value": x?.id ?? "" } }) ?? {},
+                    fromIdsMap:false
+                }
+            })
+        })
+        Object.entries(jiraInteg?.projectIdsMap||{}).forEach(([projectId, issueMapping], index) => {
+            if(!projectIds.has(projectId)){
+                setProjectMap({ type: 'APPEND', payload: { projectId, fromIdsMap:true, enableBiDirIntegraion:false } })
+            }
+        })
+    }
+
+    function toggleCheckbox(index){
+        setProjectMap({
+            type: 'UPDATE',
+            payload: {
+                index: index,
+                updates: {
+                    enableBiDirIntegraion: !projectMap[index]?.enableBiDirIntegraion || false
+                }
+            }
+        })
+    }
+
+    async function fetchJiraStatusMapping(projId, index) {
+        if(projectMap[index]?.enableBiDirIntegraion) {
+            toggleCheckbox(index);
+            return;
+        }
+        if (!baseUrl?.trim() || !userEmail?.trim() || !apiToken?.trim() || !projId?.trim()) {
+            func.setToast(true, true, "Please fill all required fields");
+            return;
+        }
+
+
+        const existingProject = projectMap?.find(project => project?.projectId === projId);
+        if (existingProject?.statuses?.length > 0) {
+            toggleCheckbox(index);
+            return;
+        }
+
+        try {
+            api.fetchJiraStatusMapping(projId, baseUrl, userEmail, apiToken).then((res) => {
+                const jiraStatusLabel = res[projId].statuses.map(x => { return { "label": x?.name ?? "", "value": x?.id ?? "" } });
+                setProjectMap({
+                    type: 'UPDATE',
+                    payload: {
+                        index: index,
+                        updates: {
+                            statuses: res[projId].statuses,
+                            jiraStatusLabel
+                        }
+                    }
+                })
+                toggleCheckbox(index)
+            }).catch((err) => {
+                func.setToast(true, true, "Failed to fetch Jira statuses. Verify Project ID");
+                return;
+            })
+        } catch {
+
+        }
+
+    }
 
     useEffect(() => {
         fetchJiraInteg()

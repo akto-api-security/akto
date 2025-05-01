@@ -277,6 +277,7 @@ const settingRequests = {
         })
     },
 
+
     deleteJiraIntegratedProject(projId) {
         return request({
             url: '/api/jira/delete',
