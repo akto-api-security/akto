@@ -68,7 +68,7 @@ public class TicketSyncJobExecutor extends JobExecutor<TicketSyncJobParams> {
 
         Bson filter = Filters.and(Filters.eq(TestingRunIssues.TICKET_PROJECT_KEY, projectKey),
             Filters.eq(TestingRunIssues.TICKET_SOURCE, params.getTicketSource()),
-            Filters.gte(TestingRunIssues.LAST_UPDATED, lastSyncedAt));
+            Filters.gt(TestingRunIssues.LAST_UPDATED, lastSyncedAt));
 
         List<TestingRunIssues> eligibleAktoIssues = TestingRunIssuesDao.instance.findAll(filter);
 
@@ -116,10 +116,10 @@ public class TicketSyncJobExecutor extends JobExecutor<TicketSyncJobParams> {
                 continue;
             }
             int jiraUpdatedAt = jiraIssue.getInt("jiraUpdatedAt");
-            if (jiraUpdatedAt > issue.getTicketLastUpdatedAt()) {
+            if (jiraUpdatedAt > issue.getLastUpdated()) {
                 aktoIssuesToBeUpdated.add(issue);
-            } else {
                 jiraIssuesForAkto.put(issue.getTicketId(), jiraIssue);
+            } else {
                 jiraIssuesToBeUpdated.add(issue);
             }
         }
@@ -298,12 +298,12 @@ public class TicketSyncJobExecutor extends JobExecutor<TicketSyncJobParams> {
                     TestRunIssueStatus status = TestRunIssueStatus.valueOf(aktoStatus);
 
                     if (status == issue.getTestRunIssueStatus()) {
-                        logger.info("Skipping update for issue: {} as status is already: {}", issue.getId(),
+                        logger.info("Skipping update for issue: {}, ticketId: {} as status is already: {}", issue.getId(),
                             issue.getTicketId(), status);
                         continue;
                     }
 
-                    logger.info("Updating issue: {}, ticketId: {}with status: {}. old status: {}", issue.getId(),
+                    logger.info("Updating issue: {}, ticketId: {} with status: {}. old status: {}", issue.getId(),
                         issue.getTicketId(), issue.getTestRunIssueStatus());
 
                     int now = Context.now();
