@@ -31,6 +31,7 @@ import com.akto.rules.TestPlugin;
 import com.akto.test_editor.OrgUtils;
 import com.akto.test_editor.Utils;
 import com.akto.util.Constants;
+import com.akto.util.HttpRequestResponseUtils;
 import com.akto.util.JSONUtils;
 import com.akto.util.modifier.JWTPayloadReplacer;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -183,6 +184,17 @@ public class Executor {
             }
             try {
                 // follow redirects = true for now
+                List<String> contentType = origRawApi.getRequest().getHeaders().getOrDefault("content-type", new ArrayList<>());
+                String contentTypeString = "";
+                if(!contentType.isEmpty()){
+                    contentTypeString = contentType.get(0);
+                }
+                if(!contentTypeString.isEmpty() && (contentTypeString.contains(HttpRequestResponseUtils.SOAP) || contentTypeString.contains(HttpRequestResponseUtils.XML))){
+                    // since we are storing a map for original raw payload, we need original raw url and method to float to api executor
+                    // we are adding custom header here and when sending request we will remove them
+                    testReq.getRequest().getHeaders().put("x-akto-original-url", Collections.singletonList(origRawApi.getRequest().getUrl()));
+                    testReq.getRequest().getHeaders().put("x-akto-original-method", Collections.singletonList(origRawApi.getRequest().getMethod()));   
+                }
                 testResponse = ApiExecutor.sendRequest(testReq.getRequest(), followRedirect, testingRunConfig, debug, testLogs, Main.SKIP_SSRF_CHECK);
                 requestSent = true;
                 ExecutionResult attempt = new ExecutionResult(singleReq.getSuccess(), singleReq.getErrMsg(), testReq.getRequest(), testResponse);
