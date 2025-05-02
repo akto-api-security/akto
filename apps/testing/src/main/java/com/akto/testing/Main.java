@@ -763,13 +763,6 @@ public class Main {
                             */
                             //TestingInstanceHeartBeatDao.instance.setTestingRunId(testingInstanceId, testingRun.getHexId());
                             ExecuteJob.executeTestingJob(accountId, testingRun.getHexId());
-
-                            Bson completedUpdate = Updates.combine(
-                                    Updates.set(TestingRun.STATE, TestingRun.State.COMPLETED),
-                                    Updates.set(TestingRun.END_TIMESTAMP, Context.now()));
-
-                            TestingRunDao.instance.getMCollection().withWriteConcern(WriteConcern.W1).findOneAndUpdate(
-                                    Filters.eq("_id", testingRun.getId()), completedUpdate);
                         } catch(Exception e) {
                             e.printStackTrace();
                         }
