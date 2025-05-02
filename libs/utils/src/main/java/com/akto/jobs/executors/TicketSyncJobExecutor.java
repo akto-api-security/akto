@@ -215,7 +215,7 @@ public class TicketSyncJobExecutor extends JobExecutor<TicketSyncJobParams> {
                             retryCount++;
                             if (retryCount < maxRetries) {
                                 logger.info("Retrying bulk transition (attempt {}/{})", retryCount + 1, maxRetries);
-                                Thread.sleep(2000 * retryCount); // Exponential backoff
+                                Thread.sleep(1000 * retryCount); // Exponential backoff
                             }
                         } catch (Exception e) {
                             lastException = e;
