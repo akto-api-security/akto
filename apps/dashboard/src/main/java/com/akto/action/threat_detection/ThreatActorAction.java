@@ -274,7 +274,7 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
         if(config instanceof Config.CloudflareWafConfig) {
             cloudflareWafConfig = (Config.CloudflareWafConfig) config;
         } else {
-            addActionError("Cloudflare WAF integration not found.");
+            addActionError("WAF integration not found.");
             return ERROR.toUpperCase();
         }
 
@@ -356,7 +356,7 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
             }
 
             BasicDBObject responseObj = BasicDBObject.parse(responsePayload);
-            BasicDBList result = (BasicDBList) responseObj.get("result");
+            BasicDBObject result = (BasicDBObject) responseObj.get("result");
             if(result == null) {
                 return false;
             }
@@ -403,6 +403,12 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
             Filters.eq("accountId", accId)
         );
         Config.AwsWafConfig awsWafConfig = (Config.AwsWafConfig) ConfigsDao.instance.findOne(filters);
+
+        if(awsWafConfig == null) {
+            loggerMaker.debugAndAddToDb("AWS Waf config not found. Trying Cloudflare Waf.");
+            return modifyThreatActorStatusCloudflare();
+        }
+
         try {
             wafClient = getAwsWafClient(awsWafConfig.getAwsAccessKey(), awsWafConfig.getAwsSecretKey(), awsWafConfig.getRegion());
             //ListWebAcLsResponse webAclsResponse = wafClient.listWebACLs(ListWebAcLsRequest.builder().scope(SCOPE).build());
