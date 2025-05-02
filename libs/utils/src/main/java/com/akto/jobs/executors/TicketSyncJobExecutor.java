@@ -253,7 +253,8 @@ public class TicketSyncJobExecutor extends JobExecutor<TicketSyncJobParams> {
                             logger.info("Updated last updated timestamp for {} Akto issues", writeModels.size());
                         }
                     } else {
-                        logger.error("Failed to transition Jira tickets to status: {}", targetJiraStatus);
+                        logger.error("Failed to transition Jira tickets to status: {}. ticketIds: {}", targetJiraStatus,
+                            issueKeys);
                     }
                 } catch (Exception e) {
                     logger.error("Error getting transitions or performing bulk transition for Akto status: {} to Jira status: {}",

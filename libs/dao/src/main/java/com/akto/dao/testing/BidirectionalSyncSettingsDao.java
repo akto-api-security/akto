@@ -1,7 +1,6 @@
 package com.akto.dao.testing;
 
 import com.akto.dao.AccountsContextDao;
-import com.akto.dao.MCollection;
 import com.akto.dao.context.Context;
 import com.akto.dto.testing.BidirectionalSyncSettings;
 import com.mongodb.client.model.CreateCollectionOptions;
