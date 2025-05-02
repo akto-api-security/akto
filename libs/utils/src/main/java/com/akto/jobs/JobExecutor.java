@@ -42,26 +42,30 @@ public abstract class JobExecutor<T extends JobParams> {
     }
 
     private Job logSuccess(ObjectId id) {
+        int now = Context.now();
         return JobsDao.instance.getMCollection().findOneAndUpdate(
             Filters.and(
                 Filters.eq(Job.ID, id),
                 Filters.eq(Job.JOB_STATUS, JobStatus.RUNNING.name())
             ),
             Updates.combine(
-                Updates.set(Job.FINISHED_AT, Context.now()),
+                Updates.set(Job.FINISHED_AT, now),
+                Updates.set(Job.LAST_UPDATED_AT, now),
                 Updates.set(Job.JOB_STATUS, JobStatus.COMPLETED.name())
             ),
             new FindOneAndUpdateOptions().returnDocument(ReturnDocument.AFTER));
     }
 
     protected Job logFailure(ObjectId id, Exception e) {
+        int now = Context.now();
         return JobsDao.instance.getMCollection().findOneAndUpdate(
             Filters.and(
                 Filters.eq(Job.ID, id),
                 Filters.eq(Job.JOB_STATUS, JobStatus.RUNNING.name())
             ),
             Updates.combine(
-                Updates.set(Job.FINISHED_AT, Context.now()),
+                Updates.set(Job.FINISHED_AT, now),
+                Updates.set(Job.LAST_UPDATED_AT, now),
                 Updates.set(Job.JOB_STATUS, JobStatus.FAILED.name()),
                 Updates.set("error", e.getMessage())
             ),
@@ -69,12 +73,16 @@ public abstract class JobExecutor<T extends JobParams> {
     }
 
     protected void updateJobHeartbeat(Job job) {
+        int now = Context.now();
         JobsDao.instance.getMCollection().updateOne(
             Filters.and(
                 Filters.eq(Job.ID, job.getId()),
                 Filters.eq(Job.JOB_STATUS, JobStatus.RUNNING.name())
             ),
-            Updates.set(Job.HEARTBEAT_AT, Context.now())
+            Updates.combine(
+                Updates.set(Job.HEARTBEAT_AT, now),
+                Updates.set(Job.LAST_UPDATED_AT, now)
+            )
         );
         logger.info("Job is still running. Updated heartbeat for job: {}", job);
     }
@@ -84,18 +92,23 @@ public abstract class JobExecutor<T extends JobParams> {
             Filters.and(
                 Filters.eq(Job.ID, job.getId())
             ),
-            Updates.set(Job.JOB_PARAMS, params)
+            Updates.combine(
+                Updates.set(Job.JOB_PARAMS, params),
+                Updates.set(Job.LAST_UPDATED_AT, Context.now())
+            )
         );
     }
 
     private Job reScheduleJob(Job job) {
+        int now = Context.now();
         return JobsDao.instance.getMCollection().findOneAndUpdate(
             Filters.and(
                 Filters.eq(Job.ID, job.getId()),
                 Filters.eq(Job.JOB_STATUS, JobStatus.RUNNING.name())
             ),
             Updates.combine(
-                Updates.set(Job.FINISHED_AT, Context.now() + 300),
+                Updates.set(Job.FINISHED_AT, now + 300),
+                Updates.set(Job.LAST_UPDATED_AT, now),
                 Updates.set(Job.JOB_STATUS, JobStatus.SCHEDULED.name())
             ),
             new FindOneAndUpdateOptions().returnDocument(ReturnDocument.AFTER));
@@ -106,13 +119,15 @@ public abstract class JobExecutor<T extends JobParams> {
             return;
         }
         logger.info("Re-scheduling recurring job: {}", job);
+        int now = Context.now();
         JobsDao.instance.getMCollection().findOneAndUpdate(
             Filters.and(
                 Filters.eq(Job.ID, job.getId())
             ),
             Updates.combine(
-                Updates.set(Job.SCHEDULED_AT, Context.now() + job.getRecurringIntervalSeconds()),
-                Updates.set(Job.JOB_STATUS, JobStatus.SCHEDULED.name())
+                Updates.set(Job.SCHEDULED_AT, now + job.getRecurringIntervalSeconds()),
+                Updates.set(Job.JOB_STATUS, JobStatus.SCHEDULED.name()),
+                Updates.set(Job.LAST_UPDATED_AT, now)
             )
         );
     }

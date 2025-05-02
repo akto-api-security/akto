@@ -30,6 +30,7 @@ public final class JobScheduler {
                     0,
                     0,
                     0,
+                    now,
                     now
                 ));
             logger.debug("Job scheduled with parameters. accountId: {}. jobParams: {}", accountId, params);
@@ -52,6 +53,7 @@ public final class JobScheduler {
                 0,
                 0,
                 0,
+                now,
                 now,
                 recurringIntervalSeconds
             );

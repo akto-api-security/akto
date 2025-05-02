@@ -47,7 +47,8 @@ public class Job {
         int startedAt,
         int finishedAt,
         int heartbeatAt,
-        int createdAt) {
+        int createdAt,
+        int lastUpdatedAt) {
         this.jobParams = jobParams;
         this.accountId = accountId;
         this.scheduleType = scheduleType;
@@ -58,6 +59,7 @@ public class Job {
         this.finishedAt = finishedAt;
         this.heartbeatAt = heartbeatAt;
         this.createdAt = createdAt;
+        this.lastUpdatedAt = lastUpdatedAt;
     }
 
     public Job(int accountId,
@@ -70,6 +72,7 @@ public class Job {
         int finishedAt,
         int heartbeatAt,
         int createdAt,
+        int lastUpdatedAt,
         int recurringIntervalSeconds) {
         this.accountId = accountId;
         this.scheduleType = scheduleType;
@@ -81,6 +84,7 @@ public class Job {
         this.finishedAt = finishedAt;
         this.heartbeatAt = heartbeatAt;
         this.createdAt = createdAt;
+        this.lastUpdatedAt = lastUpdatedAt;
         this.recurringIntervalSeconds = recurringIntervalSeconds;
     }
 }

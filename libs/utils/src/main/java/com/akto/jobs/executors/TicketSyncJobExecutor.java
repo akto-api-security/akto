@@ -74,18 +74,22 @@ public class TicketSyncJobExecutor extends JobExecutor<TicketSyncJobParams> {
 
         if (eligibleJiraTickets.isEmpty() && eligibleAktoIssues.isEmpty()) {
             logger.info("No eligible issues found for syncing");
+            params.setLastSyncedAt(Context.now());
+            updateJobParams(job, params);
             return;
         }
 
         if (eligibleJiraTickets.isEmpty()) {
-            logger.info("No eligible Akto issues found for syncing. Updating {} Jira issues.",
+            logger.info("No Akto issues to be updated. Updating {} Jira tickets.",
                 eligibleAktoIssues.size());
-            updateJiraIssues(jira, eligibleAktoIssues, aktoToJiraStatusMappings);
+            updateJiraTickets(jira, eligibleAktoIssues, aktoToJiraStatusMappings);
+            params.setLastSyncedAt(Context.now());
+            updateJobParams(job, params);
             return;
         }
 
         if (eligibleAktoIssues.isEmpty()) {
-            logger.info("No eligible Jira issues found for syncing. Updating {} Akto issues.",
+            logger.info("No Jira Tickets to be updated. Updating {} Akto issues.",
                 eligibleJiraTickets.size());
             Bson query = Filters.and(
                 Filters.eq(TestingRunIssues.TICKET_PROJECT_KEY, projectKey),
@@ -94,6 +98,8 @@ public class TicketSyncJobExecutor extends JobExecutor<TicketSyncJobParams> {
             );
             eligibleAktoIssues = TestingRunIssuesDao.instance.findAll(query);
             updateAktoIssues(eligibleAktoIssues, eligibleJiraTickets, jiraToAktoStatusMappings);
+            params.setLastSyncedAt(Context.now());
+            updateJobParams(job, params);
             return;
         }
 
@@ -119,7 +125,7 @@ public class TicketSyncJobExecutor extends JobExecutor<TicketSyncJobParams> {
         }
 
         // Handle Akto issues that need to be updated in Jira
-        updateJiraIssues(jira, jiraIssuesToBeUpdated, aktoToJiraStatusMappings);
+        updateJiraTickets(jira, jiraIssuesToBeUpdated, aktoToJiraStatusMappings);
 
         // Handle Jira issues that need to be updated in Akto
         updateAktoIssues(aktoIssuesToBeUpdated, jiraIssuesForAkto, jiraToAktoStatusMappings);
@@ -146,7 +152,7 @@ public class TicketSyncJobExecutor extends JobExecutor<TicketSyncJobParams> {
         updateJobParams(job, params);
     }
 
-    private void updateJiraIssues(JiraIntegration jira, List<TestingRunIssues> issues,
+    private void updateJiraTickets(JiraIntegration jira, List<TestingRunIssues> issues,
         Map<String, List<String>> aktoToJiraStatusMappings) {
         if (issues.isEmpty()) {
             return;
@@ -215,7 +221,7 @@ public class TicketSyncJobExecutor extends JobExecutor<TicketSyncJobParams> {
                             retryCount++;
                             if (retryCount < maxRetries) {
                                 logger.info("Retrying bulk transition (attempt {}/{})", retryCount + 1, maxRetries);
-                                Thread.sleep(1000 * retryCount); // Exponential backoff
+                                Thread.sleep(2000 * retryCount); // Exponential backoff
                             }
                         } catch (Exception e) {
                             lastException = e;
@@ -228,8 +234,8 @@ public class TicketSyncJobExecutor extends JobExecutor<TicketSyncJobParams> {
                         }
                     }
 
-                    logger.info("Successfully transitioned {} Jira issues to status: {}",
-                        issueKeys.size(), targetJiraStatus);
+                    logger.info("Successfully transitioned {} Jira tickets to status: {}. ticketIds: {}",
+                        issueKeys.size(), targetJiraStatus, issueKeys);
 
                     if (success) {
                         // Update last updated timestamp in Akto
@@ -247,7 +253,7 @@ public class TicketSyncJobExecutor extends JobExecutor<TicketSyncJobParams> {
                             logger.info("Updated last updated timestamp for {} Akto issues", writeModels.size());
                         }
                     } else {
-                        logger.error("Failed to transition Jira issues to status: {}", targetJiraStatus);
+                        logger.error("Failed to transition Jira tickets to status: {}", targetJiraStatus);
                     }
                 } catch (Exception e) {
                     logger.error("Error getting transitions or performing bulk transition for Akto status: {} to Jira status: {}",
@@ -255,7 +261,7 @@ public class TicketSyncJobExecutor extends JobExecutor<TicketSyncJobParams> {
                 }
             }
         } catch (Exception e) {
-            logger.error("Error updating Jira issues: {}", e.getMessage(), e);
+            logger.error("Error updating Jira tickets: {}", e.getMessage(), e);
         }
     }
 
@@ -292,17 +298,19 @@ public class TicketSyncJobExecutor extends JobExecutor<TicketSyncJobParams> {
                     TestRunIssueStatus status = TestRunIssueStatus.valueOf(aktoStatus);
 
                     if (status == issue.getTestRunIssueStatus()) {
-                        logger.info("Skipping update for issue: {} as status is already: {}", issue.getId(), status);
+                        logger.info("Skipping update for issue: {} as status is already: {}", issue.getId(),
+                            issue.getTicketId(), status);
                         continue;
                     }
 
-                    logger.info("Updating issue: {} with status: {}. old status: {}", issue.getId(), status,
-                        issue.getTestRunIssueStatus());
+                    logger.info("Updating issue: {}, ticketId: {}with status: {}. old status: {}", issue.getId(),
+                        issue.getTicketId(), issue.getTestRunIssueStatus());
 
+                    int now = Context.now();
                     Bson query = Filters.eq(Constants.ID, issue.getId());
                     Bson update = Updates.combine(
                         Updates.set(TestingRunIssues.TEST_RUN_ISSUES_STATUS, status),
-                        Updates.set(TestingRunIssues.TICKET_LAST_UPDATED_AT, Context.now())
+                        Updates.set(TestingRunIssues.LAST_UPDATED, now)
                     );
                     writeModelList.add(new UpdateOneModel<>(query, update));
                 } catch (Exception e) {
