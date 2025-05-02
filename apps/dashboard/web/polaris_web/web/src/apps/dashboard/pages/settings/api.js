@@ -263,7 +263,7 @@ const settingRequests = {
 
     fetchJiraStatusMapping(projId, baseUrl, userEmail, apiToken){
         return request({
-            url: '/api/fetchJiraStatusMappings',
+            url: '/api/jira/fetchProjectStatuses',
             method: 'post',
             data: {projId, baseUrl, userEmail, apiToken}
         })
@@ -271,9 +271,18 @@ const settingRequests = {
 
     addJiraIntegrationV2(data) {
         return request({
-            url: '/api/addIntegration/v2',
+            url: '/api/jira/add',
             method: 'post',
             data: {...data}
+        })
+    },
+
+
+    deleteJiraIntegratedProject(projId) {
+        return request({
+            url: '/api/jira/delete',
+            method: 'post',
+            data: {projId}
         })
     },
 
