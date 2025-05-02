@@ -338,13 +338,6 @@ public class TicketSyncJobExecutor extends JobExecutor<TicketSyncJobParams> {
         return integration;
     }
 
-    private Date subtractDays(Date date, int daysToSubtract) {
-        Calendar calendar = Calendar.getInstance();
-        calendar.setTime(date);
-        calendar.add(Calendar.DAY_OF_MONTH, -daysToSubtract);
-        return calendar.getTime();
-    }
-
     private Map<String, List<String>> getIssueStatusMappings(JiraIntegration jiraIntegration, String projectKey) throws Exception {
         Map<String, ProjectMapping> mappings = jiraIntegration.getProjectMappings();
         if (mappings == null) {
@@ -394,100 +387,15 @@ public class TicketSyncJobExecutor extends JobExecutor<TicketSyncJobParams> {
     private Map<String, BasicDBObject> fetchJiraTicketsWithPagination(JiraIntegration jira, String projectKey,
         int updatedAfter) throws Exception {
         Map<String, BasicDBObject> allResults = new HashMap<>();
-        boolean hasMore = true;
-
-        //while (hasMore) {
-            try {
-                // Use the existing fetchUpdatedTickets method but add pagination parameters
-                Map<String, BasicDBObject> pageResults = JiraApiClient.fetchUpdatedTickets(jira, projectKey,
-                    updatedAfter);
-                allResults.putAll(pageResults);
-
-/*                if (pageResults.isEmpty()) {
-                    hasMore = false;
-                } else {
-                    allResults.putAll(pageResults);
-                    startAt += maxResults;
-
-                    // If we got fewer results than maxResults, we've reached the end
-                    if (pageResults.size() < maxResults) {
-                        hasMore = false;
-                    }
-
-                    logger.info("Fetched {} Jira tickets (total: {})", pageResults.size(), allResults.size());
-                }*/
-            } catch (Exception e) {
-                logger.error("Error fetching Jira tickets.", e);
-                throw e;
-            }
-        //}
+        try {
+            Map<String, BasicDBObject> pageResults = JiraApiClient.fetchUpdatedTickets(jira, projectKey,
+                updatedAfter);
+            allResults.putAll(pageResults);
+        } catch (Exception e) {
+            logger.error("Error fetching Jira tickets.", e);
+            throw e;
+        }
 
         return allResults;
-    }
-
-    private Map<String, BasicDBObject> fetchJiraTicketsPage(JiraIntegration jira, String projectKey, Date updatedAfter,
-                                                          int startAt, int maxResults) throws Exception {
-        String jql = String.format("project = \"%s\" AND updated >= \"%s\" AND labels = \"%s\" ORDER BY updated ASC",
-                                 projectKey, formatJiraDate(updatedAfter), JobConstants.TICKET_LABEL_AKTO_SYNC);
-
-        BasicDBObject body = new BasicDBObject("jql", jql)
-            .append("fields", Arrays.asList("status", "updated"))
-            .append("startAt", startAt)
-            .append("maxResults", maxResults);
-
-        String url = jira.getBaseUrl() + "/rest/api/3/search/jql";
-        Request request = new Request.Builder()
-            .url(url)
-            .post(RequestBody.create(body.toJson().getBytes()))
-            .addHeader("Authorization", Credentials.basic(jira.getUserEmail(), jira.getApiToken()))
-            .addHeader("Content-Type", "application/json")
-            .build();
-
-        try (Response response = CoreHTTPClient.client.newCall(request).execute()) {
-            if (!response.isSuccessful()) {
-                logger.error("Failed to fetch Jira tickets: Url: {}, Response: {}", url, response);
-                throw new IOException("Failed to fetch Jira tickets: " + response);
-            }
-
-            if (response.body() == null) {
-                logger.error("Response body is null. Url: {}, Response: {}", url, response);
-                throw new Exception("Response body is null.");
-            }
-
-            String responseBody = response.body().string();
-
-            BasicDBObject responseObj = BasicDBObject.parse(responseBody);
-            Map<String, BasicDBObject> results = new HashMap<>();
-
-            List<?> issues = (List<?>) responseObj.get("issues");
-            if (issues != null) {
-                for (Object obj : issues) {
-                    BasicDBObject issue = (BasicDBObject) obj;
-                    BasicDBObject fields = (BasicDBObject) issue.get("fields");
-                    BasicDBObject statusObj = (BasicDBObject) fields.get("status");
-                    String key = issue.getString("key");
-                    BasicDBObject ticket = new BasicDBObject("ticketKey", key)
-                        .append("ticketStatus", statusObj.getString("name"))
-                        .append("ticketStatusId", statusObj.getString("id"))
-                        .append("jiraUpdatedAt", convertToEpochSeconds(fields.getString("updated")));
-
-                    results.put(key, ticket);
-                }
-            }
-            return results;
-        }
-    }
-
-    private int convertToEpochSeconds(String date) {
-        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSSZ");
-        OffsetDateTime odt = OffsetDateTime.parse(date, formatter);
-        long epochSeconds = odt.toEpochSecond();
-        return (int) epochSeconds;
-    }
-
-    private String formatJiraDate(Date date) {
-        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm");
-        sdf.setTimeZone(TimeZone.getTimeZone("UTC"));
-        return sdf.format(date);
     }
 }
