@@ -35,7 +35,7 @@ public class ExecuteJob {
                             .build())
                     .build();
 
-            jobsClient.runJobAsync(request).get();
+            jobsClient.runJobAsync(request);
             loggerMaker.info("Testing job submitted for execution");
         } catch (Exception e) {
             loggerMaker.error("Error while submitting job");

@@ -678,6 +678,11 @@ public class Main {
                         return;
                     }
 
+                    /*
+                    * GCP Cloud run job change
+                    * 
+                    * implementation requires changes for cloud run jobs
+                    */
                     if (!TestingInstanceHeartBeatDao.instance.isTestEligibleForInstance(testingRun.getHexId())) {
                         return;
                     }
