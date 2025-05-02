@@ -10,7 +10,11 @@ import { produce } from "immer"
 import api from '../api';
 
 
-const aktoStatusForJira = ["Fixed", "Ignored", "Open"]
+const aktoStatusForJira = ["Open","Fixed", "Ignored"]
+const intialEmptyMapping = aktoStatusForJira.reduce((acc, status) => {
+    acc[status.toUpperCase()] = [];
+    return acc;
+  }, {});
 
 function Jira() {
 
@@ -45,11 +49,7 @@ function Jira() {
                 payload: {
                     projectId,
                     enableBiDirIntegraion: projectMapping?.biDirectionalSyncSettings?.enabled || false,
-                    aktoToJiraStatusMap: projectMapping?.biDirectionalSyncSettings?.aktoStatusMappings || {
-                        FIXED: [],
-                        IGNORED: [],
-                        OPEN: []
-                    },
+                    aktoToJiraStatusMap: projectMapping?.biDirectionalSyncSettings?.aktoStatusMappings || JSON.parse(JSON.stringify(intialEmptyMapping)),
                     statuses: projectMapping.statuses,
                     jiraStatusLabel: projectMapping?.statuses?.map(x => { return { "label": x?.name ?? "", "value": x?.id ?? "" } }) ?? {},
                 }
@@ -57,7 +57,7 @@ function Jira() {
         })
         Object.entries(jiraInteg?.projectIdsMap||{}).forEach(([projectId, issueMapping], index) => {
             if(!projectIds.has(projectId)){
-                setProjectMap({ type: 'APPEND', payload: { projectId, enableBiDirIntegraion:false, aktoToJiraStatusMap: { FIXED: [], IGNORED: [], OPEN: [] }, statuses: [], jiraStatusLabel: [] } })
+                setProjectMap({ type: 'APPEND', payload: { projectId, enableBiDirIntegraion:false, aktoToJiraStatusMap: JSON.parse(JSON.stringify(intialEmptyMapping)), statuses: [], jiraStatusLabel: [] } })
             }
             projectIds.add(projectId)
         })
@@ -96,103 +96,34 @@ function Jira() {
 
 
         api.fetchJiraStatusMapping(projId, baseUrl, userEmail, apiToken).then((res) => {
-            const jiraStatusLabel = res[projId].statuses.map(x => { return { "label": x?.name ?? "", "value": x?.id ?? "" } });
+            const jiraStatusLabel = res[projId]?.statuses?.map(x => { return { "label": x?.name ?? "", "value": x?.id ?? "" } });
+            // for preSelected
+            const intialIssue = res[projId]?.statuses?.map(x => x?.id) || [];
+            let aktoToJiraStatusMap = JSON.parse(JSON.stringify(intialEmptyMapping))
+            aktoStatusForJira?.forEach((x, i) => {
+                if(!aktoToJiraStatusMap.hasOwnProperty(x?.toUpperCase())){
+                    aktoToJiraStatusMap[x?.toUpperCase()] = [];
+                }
+                if (i >= intialIssue.length) return;
+                aktoToJiraStatusMap[x?.toUpperCase()].push(intialIssue[i])
+            })
+
             setProjectMap({
                 type: 'UPDATE',
                 payload: {
                     index: index,
                     updates: {
                         statuses: res[projId].statuses,
-                        jiraStatusLabel
+                        jiraStatusLabel,
+                        aktoToJiraStatusMap
                     }
                 }
             })
             toggleCheckbox(index)
-        }).catch((err) => {
+        }).catch(err => {
             func.setToast(true, true, "Failed to fetch Jira statuses. Verify Project ID");
             return;
         })
-    } 
-
-    
-
-        const projectMappings = jiraInteg?.projectMappings ?? {};
-        let projectIds = new Set();
-        Object.entries(projectMappings).forEach(([projectId, projectMapping], index) => {
-            projectIds.add(projectId);
-            setProjectMap({
-                type: 'APPEND',
-                payload: {
-                    projectId,
-                    enableBiDirIntegraion: projectMapping?.biDirectionalSyncSettings?.enabled || false,
-                    aktoToJiraStatusMap: projectMapping?.biDirectionalSyncSettings?.aktoStatusMappings || {
-                        FIXED: [],
-                        IGNORED: [],
-                        OPEN: []
-                    },
-                    statuses: projectMapping.statuses,
-                    jiraStatusLabel: projectMapping?.statuses?.map(x => { return { "label": x?.name ?? "", "value": x?.id ?? "" } }) ?? {},
-                    fromIdsMap:false
-                }
-            })
-        })
-        Object.entries(jiraInteg?.projectIdsMap||{}).forEach(([projectId, issueMapping], index) => {
-            if(!projectIds.has(projectId)){
-                setProjectMap({ type: 'APPEND', payload: { projectId, fromIdsMap:true, enableBiDirIntegraion:false } })
-            }
-        })
-    }
-
-    function toggleCheckbox(index){
-        setProjectMap({
-            type: 'UPDATE',
-            payload: {
-                index: index,
-                updates: {
-                    enableBiDirIntegraion: !projectMap[index]?.enableBiDirIntegraion || false
-                }
-            }
-        })
-    }
-
-    async function fetchJiraStatusMapping(projId, index) {
-        if(projectMap[index]?.enableBiDirIntegraion) {
-            toggleCheckbox(index);
-            return;
-        }
-        if (!baseUrl?.trim() || !userEmail?.trim() || !apiToken?.trim() || !projId?.trim()) {
-            func.setToast(true, true, "Please fill all required fields");
-            return;
-        }
-
-
-        const existingProject = projectMap?.find(project => project?.projectId === projId);
-        if (existingProject?.statuses?.length > 0) {
-            toggleCheckbox(index);
-            return;
-        }
-
-        try {
-            api.fetchJiraStatusMapping(projId, baseUrl, userEmail, apiToken).then((res) => {
-                const jiraStatusLabel = res[projId].statuses.map(x => { return { "label": x?.name ?? "", "value": x?.id ?? "" } });
-                setProjectMap({
-                    type: 'UPDATE',
-                    payload: {
-                        index: index,
-                        updates: {
-                            statuses: res[projId].statuses,
-                            jiraStatusLabel
-                        }
-                    }
-                })
-                toggleCheckbox(index)
-            }).catch((err) => {
-                func.setToast(true, true, "Failed to fetch Jira statuses. Verify Project ID");
-                return;
-            })
-        } catch {
-
-        }
 
     }
 
@@ -308,8 +239,9 @@ function Jira() {
     }
 
     function getLabel(value, project) {
-        if (!value) return [];
-        return value.map((x) => {
+        if (!value || !Array.isArray(value)) return [];
+
+        return value?.map((x) => {
             const match = project?.jiraStatusLabel?.find((y) => y.value === x);
             return match ? match.label : null;
         }).filter(Boolean);
@@ -317,7 +249,28 @@ function Jira() {
 
     function deleteProject(index) {
         setProjectMap({ type: 'REMOVE', index }); 
-        if(existingProjectIds.includes(projectMap[index]?.projectId))api.deleteJiraIntegratedProject(projectMap[index]?.projectId)
+        if(existingProjectIds.includes(projectMap[index]?.projectId))api.deleteJiraIntegratedProject(projectMap[index]?.projectId);
+        func.setToast(true,false,"Project removed successfully")
+        
+    }
+
+    function projectkeyChangeHandler(index,val){
+        if(projectMap.some((project, i) => project.projectId === val)){
+            func.setToast(true, true, "Project key already exists")
+        }
+        setProjectMap({
+            type: 'UPDATE',
+            payload: {
+                index,
+                updates: {
+                    projectId: val,
+                    statuses: [],
+                    jiraStatusLabel: [],
+                    aktoToJiraStatusMap:JSON.parse(JSON.stringify(intialEmptyMapping)),
+                    enableBiDirIntegraion: false
+                }
+            }
+        })
     }
 
     const ProjectsCard = (
@@ -330,24 +283,8 @@ function Jira() {
                                 <Text fontWeight='semibold' variant='headingSm'>{`Project ${index + 1}`}</Text>
                                 <Button plain removeUnderline destructive size='slim' onClick={() => deleteProject(index)}>Delete Project</Button>
                             </HorizontalStack>
-                            <TextField maxLength={10} showCharacterCount requiredIndicator={index == 0} value={project?.projectId || ""} label="Project key" placeholder={"Project Key"}
-                                onChange={(val) => setProjectMap({
-                                    type: 'UPDATE',
-                                    payload: {
-                                        index,
-                                        updates: {
-                                            projectId: val,
-                                            statuses: [],
-                                            jiraStatusLabel: [],
-                                            aktoToJiraStatusMap: {
-                                                FIXED: [],
-                                                IGNORED: [],
-                                                OPEN: []
-                                            },
-                                            enableBiDirIntegraion: false
-                                        }
-                                    }
-                                })} />
+                            <TextField maxLength={10} showCharacterCount value={project?.projectId || ""} label="Project key" placeholder={"Project Key"}
+                                onChange={(val)=> projectkeyChangeHandler(index,val)} />
                             <Checkbox label="Enable bi-directional integration"
                                 disabled={!project?.projectId?.trim()}
                                 checked={project.enableBiDirIntegraion}
@@ -420,7 +357,7 @@ function Jira() {
           </LegacyCard.Section>
 
           <LegacyCard.Section>
-                <VerticalStack gap={"2"}>
+                <VerticalStack gap={"4"}>
                     <TextField label="Base Url" value={baseUrl} helpText="Specify the base url of your jira project(for ex - https://jiraintegloc.atlassian.net)"  placeholder='Base Url' requiredIndicator onChange={setBaseUrl} />
                     <TextField label="Email" value={userEmail} helpText="Specify your email id for which api token will be generated" placeholder='Email' requiredIndicator onChange={setUserEmail} />
                     <PasswordTextField label="Api Token" helpText="Specify the api token created for your user email" field={apiToken} onFunc={true} setField={setApiToken} />
