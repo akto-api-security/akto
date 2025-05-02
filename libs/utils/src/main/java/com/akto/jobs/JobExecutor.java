@@ -31,15 +31,14 @@ public abstract class JobExecutor<T extends JobParams> {
             runJob(job);
             executedJob = logSuccess(jobId);
             logger.info("Finished executing job: {}", executedJob);
-            handleRecurringJob(job);
         } catch (RetryableJobException rex) {
             executedJob = reScheduleJob(job);
             logger.error("Error occurred while executing the job. Re-scheduling the job. {}", executedJob, rex);
         } catch (Exception e) {
             executedJob = logFailure(jobId, e);
             logger.error("Error occurred while executing the job. Not re-scheduling. {}", executedJob, e);
-            handleRecurringJob(job);
         }
+        handleRecurringJob(executedJob);
     }
 
     private Job logSuccess(ObjectId id) {
@@ -80,6 +79,15 @@ public abstract class JobExecutor<T extends JobParams> {
         logger.info("Job is still running. Updated heartbeat for job: {}", job);
     }
 
+    protected void updateJobParams(Job job, T params) {
+        JobsDao.instance.getMCollection().updateOne(
+            Filters.and(
+                Filters.eq(Job.ID, job.getId())
+            ),
+            Updates.set(Job.JOB_PARAMS, params)
+        );
+    }
+
     private Job reScheduleJob(Job job) {
         return JobsDao.instance.getMCollection().findOneAndUpdate(
             Filters.and(
@@ -98,12 +106,14 @@ public abstract class JobExecutor<T extends JobParams> {
             return;
         }
         logger.info("Re-scheduling recurring job: {}", job);
-        JobsDao.instance.getMCollection().updateOne(
+        JobsDao.instance.getMCollection().findOneAndUpdate(
             Filters.and(
-                Filters.eq(Job.ID, job.getId()),
-                Filters.eq(Job.JOB_STATUS, JobStatus.COMPLETED.name())
+                Filters.eq(Job.ID, job.getId())
             ),
-            Updates.set(Job.SCHEDULED_AT, Context.now() + 60 * 60)
+            Updates.combine(
+                Updates.set(Job.SCHEDULED_AT, Context.now() + job.getRecurringIntervalSeconds()),
+                Updates.set(Job.JOB_STATUS, JobStatus.SCHEDULED.name())
+            )
         );
     }
 

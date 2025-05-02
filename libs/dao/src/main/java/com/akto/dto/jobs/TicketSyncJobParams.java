@@ -1,12 +1,12 @@
 package com.akto.dto.jobs;
 
-import com.akto.util.enums.GlobalEnums.TicketSource;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
 import org.bson.codecs.pojo.annotations.BsonDiscriminator;
+import org.bson.codecs.pojo.annotations.BsonIgnore;
 
 @Getter
 @Setter
@@ -18,7 +18,6 @@ public class TicketSyncJobParams extends JobParams {
 
     private String ticketSource;
     private String projectKey;
-    private String ticketId;
     private int lastSyncedAt;
 
     @Override
@@ -26,6 +25,7 @@ public class TicketSyncJobParams extends JobParams {
         return JobType.TICKET_SYNC;
     }
 
+    @BsonIgnore
     @Override
     public Class<? extends JobParams> getParamsClass() {
         return TicketSyncJobParams.class;

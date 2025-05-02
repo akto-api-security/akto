@@ -45,7 +45,7 @@ public class TicketSyncJobExecutor2 extends JobExecutor<TicketSyncJobParams> {
         Map<String, String> jiraToAktoStatusMappings = invertMapWithListValues(aktoToJiraStatusMappings);
 
         Map<String, BasicDBObject> eligibleJiraTickets = JiraApiClient.fetchUpdatedTickets(jira, projectKey,
-            new Date(lastSyncedAt));
+            lastSyncedAt);
 
         Bson filter = Filters.and(Filters.eq(TestingRunIssues.TICKET_PROJECT_KEY, projectKey),
             Filters.eq(TestingRunIssues.TICKET_SOURCE, params.getTicketSource()),

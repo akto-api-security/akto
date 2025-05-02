@@ -59,7 +59,12 @@ public class TicketSyncJobExecutor extends JobExecutor<TicketSyncJobParams> {
         Map<String, List<String>> aktoToJiraStatusMappings = getIssueStatusMappings(jira, projectKey);
         Map<String, String> jiraToAktoStatusMappings = invertMapWithListValues(aktoToJiraStatusMappings);
 
-        Map<String, BasicDBObject> eligibleJiraTickets = fetchJiraTicketsWithPagination(jira, projectKey, new Date(lastSyncedAt));
+        int diff = Context.now() - lastSyncedAt;
+        int updatedAfterMinutes = (int) Math.ceil(diff / 60.0);
+
+
+        Map<String, BasicDBObject> eligibleJiraTickets = fetchJiraTicketsWithPagination(jira, projectKey,
+            updatedAfterMinutes);
 
         Bson filter = Filters.and(Filters.eq(TestingRunIssues.TICKET_PROJECT_KEY, projectKey),
             Filters.eq(TestingRunIssues.TICKET_SOURCE, params.getTicketSource()),
@@ -73,13 +78,15 @@ public class TicketSyncJobExecutor extends JobExecutor<TicketSyncJobParams> {
         }
 
         if (eligibleJiraTickets.isEmpty()) {
-            logger.info("No eligible Jira issues found for syncing");
+            logger.info("No eligible Akto issues found for syncing. Updating {} Jira issues.",
+                eligibleAktoIssues.size());
             updateJiraIssues(jira, eligibleAktoIssues, aktoToJiraStatusMappings);
             return;
         }
 
         if (eligibleAktoIssues.isEmpty()) {
-            logger.info("No eligible Akto issues found for syncing");
+            logger.info("No eligible Jira issues found for syncing. Updating {} Akto issues.",
+                eligibleJiraTickets.size());
             Bson query = Filters.and(
                 Filters.eq(TestingRunIssues.TICKET_PROJECT_KEY, projectKey),
                 Filters.eq(TestingRunIssues.TICKET_SOURCE, params.getTicketSource()),
@@ -104,10 +111,10 @@ public class TicketSyncJobExecutor extends JobExecutor<TicketSyncJobParams> {
             }
             int jiraUpdatedAt = jiraIssue.getInt("jiraUpdatedAt");
             if (jiraUpdatedAt > issue.getTicketLastUpdatedAt()) {
-                jiraIssuesToBeUpdated.add(issue);
+                aktoIssuesToBeUpdated.add(issue);
             } else {
                 jiraIssuesForAkto.put(issue.getTicketId(), jiraIssue);
-                aktoIssuesToBeUpdated.add(issue);
+                jiraIssuesToBeUpdated.add(issue);
             }
         }
 
@@ -134,9 +141,13 @@ public class TicketSyncJobExecutor extends JobExecutor<TicketSyncJobParams> {
                 updateAktoIssues(remainingAktoIssues, eligibleJiraTickets, jiraToAktoStatusMappings);
             }
         }
+
+        params.setLastSyncedAt(Context.now());
+        updateJobParams(job, params);
     }
 
-    private void updateJiraIssues(JiraIntegration jira, List<TestingRunIssues> issues, Map<String, List<String>> aktoToJiraStatusMappings) {
+    private void updateJiraIssues(JiraIntegration jira, List<TestingRunIssues> issues,
+        Map<String, List<String>> aktoToJiraStatusMappings) {
         if (issues.isEmpty()) {
             return;
         }
@@ -161,6 +172,9 @@ public class TicketSyncJobExecutor extends JobExecutor<TicketSyncJobParams> {
                     logger.warn("No Jira status mapping found for Akto status: {}", aktoStatus);
                     continue;
                 }
+
+                logger.debug("Found {} statues mapped with akto status {}. Using the first one", jiraStatuses.size(),
+                    aktoStatus);
 
                 // Use the first mapped status as the target
                 String targetJiraStatus = jiraStatuses.get(0);
@@ -277,7 +291,12 @@ public class TicketSyncJobExecutor extends JobExecutor<TicketSyncJobParams> {
 
                     TestRunIssueStatus status = TestRunIssueStatus.valueOf(aktoStatus);
 
-                    logger.debug("Updating issue: {} with status: {}. old status: {}", issue.getId(), status,
+                    if (status == issue.getTestRunIssueStatus()) {
+                        logger.info("Skipping update for issue: {} as status is already: {}", issue.getId(), status);
+                        continue;
+                    }
+
+                    logger.info("Updating issue: {} with status: {}. old status: {}", issue.getId(), status,
                         issue.getTestRunIssueStatus());
 
                     Bson query = Filters.eq(Constants.ID, issue.getId());
@@ -363,18 +382,19 @@ public class TicketSyncJobExecutor extends JobExecutor<TicketSyncJobParams> {
         return result;
     }
 
-    private Map<String, BasicDBObject> fetchJiraTicketsWithPagination(JiraIntegration jira, String projectKey, Date updatedAfter) throws Exception {
+    private Map<String, BasicDBObject> fetchJiraTicketsWithPagination(JiraIntegration jira, String projectKey,
+        int updatedAfter) throws Exception {
         Map<String, BasicDBObject> allResults = new HashMap<>();
-        int startAt = 0;
-        int maxResults = 100;
         boolean hasMore = true;
 
-        while (hasMore) {
+        //while (hasMore) {
             try {
                 // Use the existing fetchUpdatedTickets method but add pagination parameters
-                Map<String, BasicDBObject> pageResults = fetchJiraTicketsPage(jira, projectKey, updatedAfter, startAt, maxResults);
+                Map<String, BasicDBObject> pageResults = JiraApiClient.fetchUpdatedTickets(jira, projectKey,
+                    updatedAfter);
+                allResults.putAll(pageResults);
 
-                if (pageResults.isEmpty()) {
+/*                if (pageResults.isEmpty()) {
                     hasMore = false;
                 } else {
                     allResults.putAll(pageResults);
@@ -386,12 +406,12 @@ public class TicketSyncJobExecutor extends JobExecutor<TicketSyncJobParams> {
                     }
 
                     logger.info("Fetched {} Jira tickets (total: {})", pageResults.size(), allResults.size());
-                }
+                }*/
             } catch (Exception e) {
-                logger.error("Error fetching Jira tickets page starting at {}: {}", startAt, e.getMessage(), e);
+                logger.error("Error fetching Jira tickets.", e);
                 throw e;
             }
-        }
+        //}
 
         return allResults;
     }

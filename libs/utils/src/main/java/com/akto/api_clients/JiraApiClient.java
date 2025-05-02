@@ -8,7 +8,6 @@ import com.akto.utils.JsonUtils;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mongodb.BasicDBObject;
-import io.swagger.models.auth.In;
 import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.time.OffsetDateTime;
@@ -45,7 +44,7 @@ public class JiraApiClient {
     private static final String JIRA_SEARCH_ENDPOINT = "/rest/api/3/search/jql";
     private static final String GET_BULK_TRANSITIONS_ENDPOINT = "/rest/api/3/bulk/issues/transition?issueIdsOrKeys=";
     private static final String POST_BULK_TRANSITIONS_ENDPOINT = "/rest/api/3/bulk/issues/transition";
-    private static final String SEARCH_JQL = "project = \"%s\" AND updated >= \"%s\" AND labels = \"%s\" ORDER BY updated ASC";
+    private static final String SEARCH_JQL = "project = \"%s\" AND updated >= \"-%dm\" AND labels = \"%s\" ORDER BY updated ASC";
 
     public static String getTransitionIdForStatus(JiraIntegration jira, String issueKey, String statusName)
         throws Exception {
@@ -119,61 +118,80 @@ public class JiraApiClient {
     }
 
 
-    public static Map<String, BasicDBObject> fetchUpdatedTickets(JiraIntegration jira, String projectKey, Date updatedAfter)
+    public static Map<String, BasicDBObject> fetchUpdatedTickets(JiraIntegration jira, String projectKey,
+        int updatedAfter)
         throws Exception {
-        String jql = String.format(SEARCH_JQL, projectKey, toJiraDate(updatedAfter), JobConstants.TICKET_LABEL_AKTO_SYNC);
-        BasicDBObject body = new BasicDBObject("jql", jql)
-            .append("fields", Arrays.asList("status", "updated"))
-            .append("maxResults", 1000);
+        String jql = String.format(SEARCH_JQL, projectKey, updatedAfter, JobConstants.TICKET_LABEL_AKTO_SYNC);
 
-        String url = jira.getBaseUrl() + JIRA_SEARCH_ENDPOINT;
-        Request request = new Request.Builder()
-            .url(url)
-            .post(RequestBody.create(body.toJson().getBytes()))
-            .addHeader("Authorization", getBasicAuthHeaders(jira.getUserEmail(), jira.getApiToken()))
-            .addHeader("Content-Type", "application/json")
-            .build();
+        boolean hasMore = true;
+        Map<String, BasicDBObject> results = new HashMap<>();
+        String nextPageToken = null;
 
-        try (Response response = client.newCall(request).execute()) {
-            if (!response.isSuccessful()) {
-                logger.error("Failed to get transitions: Url: {}, Response: {}", url, response);
-                throw new IOException("Failed to get transitions: " + response);
+        while (hasMore) {
+
+            BasicDBObject body = new BasicDBObject("jql", jql)
+                .append("fields", Arrays.asList("status", "updated"));
+            if (nextPageToken != null) {
+                body.append("nextPageToken", nextPageToken);
             }
 
-            if (response.body() == null) {
-                logger.error("Response body is null. Url: {}, Response: {}", url, response);
-                throw new Exception("Response body is null.");
-            }
+            String url = jira.getBaseUrl() + JIRA_SEARCH_ENDPOINT;
+            Request request = new Request.Builder()
+                .url(url)
+                .post(RequestBody.create(body.toJson().getBytes()))
+                .addHeader("Authorization", getBasicAuthHeaders(jira.getUserEmail(), jira.getApiToken()))
+                .addHeader("Content-Type", "application/json")
+                .build();
 
-            String responseBody = response.body().string();
-
-            BasicDBObject responseObj = BasicDBObject.parse(responseBody);
-            Map<String, BasicDBObject> results = new HashMap<>();
-
-            List<?> issues = (List<?>) responseObj.get("issues");
-            if (issues != null) {
-                for (Object obj : issues) {
-                    BasicDBObject issue = (BasicDBObject) obj;
-                    BasicDBObject fields = (BasicDBObject) issue.get("fields");
-                    BasicDBObject statusObj = (BasicDBObject) fields.get("status");
-                    String key = issue.getString("key");
-                    BasicDBObject ticket = new BasicDBObject("ticketKey", key)
-                        .append("ticketStatus", statusObj.getString("name"))
-                        .append("ticketStatusId", statusObj.getString("id"))
-                        .append("jiraUpdatedAt", covertToEpochSeconds(fields.getString("updated")));
-
-                    results.put(key, ticket);
+            try (Response response = client.newCall(request).execute()) {
+                if (!response.isSuccessful()) {
+                    if (response.body() != null) {
+                        logger.error("Failed to get Jira Tickets. Url: {}, Response body: {}", url,
+                            response.body().string());
+                    } else {
+                        logger.error("Failed to get Jira tickets: Url: {}, Response: {}", url, response);
+                    }
+                    throw new IOException("Failed to get tickets: " + response);
                 }
+
+                if (response.body() == null) {
+                    logger.error("Response body is null. Url: {}, Response: {}", url, response);
+                    throw new Exception("Response body is null.");
+                }
+
+                String responseBody = response.body().string();
+
+                BasicDBObject responseObj = BasicDBObject.parse(responseBody);
+
+                List<?> issues = (List<?>) responseObj.get("issues");
+                if (issues != null) {
+                    for (Object obj : issues) {
+                        BasicDBObject issue = (BasicDBObject) obj;
+                        BasicDBObject fields = (BasicDBObject) issue.get("fields");
+                        BasicDBObject statusObj = (BasicDBObject) fields.get("status");
+                        String key = issue.getString("key");
+                        BasicDBObject ticket = new BasicDBObject("ticketKey", key)
+                            .append("ticketStatus", statusObj.getString("name"))
+                            .append("ticketStatusId", statusObj.getString("id"))
+                            .append("jiraUpdatedAt", covertToEpochSeconds(fields.getString("updated")));
+
+                        results.put(key, ticket);
+                    }
+                }
+                nextPageToken = (String) responseObj.get("nextPageToken");
+                hasMore = nextPageToken != null;
             }
-            return results;
         }
+
+        return results;
     }
 
     // add pagination if issue size is greater than 1000
     public static Map<Integer, List<String>> getTransitions(JiraIntegration jira, List<String> issueKeys,
         String targetStatusName) throws Exception {
         if (issueKeys.size() > 1000) {
-            throw new Exception("Issue keys list size cannot exceed 1000.");
+            throw new Exception(
+                "Issue keys list size cannot exceed 1000. Jira transition API supports 1000 issues at a time.");
         }
         String joinedKeys = String.join(",", issueKeys);
         String url = jira.getBaseUrl() + GET_BULK_TRANSITIONS_ENDPOINT + joinedKeys;

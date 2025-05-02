@@ -16,7 +16,9 @@ public class BidirectionalSyncSettings {
     public static final String ID = "_id";
     public static final String SOURCE = "source";
     public static final String PROJECT_KEY = "projectKey";
-
+    public static final String ACTIVE = "active";
+    public static final String JOB_ID = "jobId";
+    public static final String LAST_SYNCED_AT = "lastSyncedAt";
 
     private ObjectId id;
     private TicketSource source;
