@@ -304,7 +304,7 @@ public class TicketSyncJobExecutor extends JobExecutor<TicketSyncJobParams> {
                     }
 
                     logger.info("Updating issue: {}, ticketId: {} with status: {}. old status: {}", issue.getId(),
-                        issue.getTicketId(), issue.getTestRunIssueStatus());
+                        issue.getTicketId(), status, issue.getTestRunIssueStatus());
 
                     int now = Context.now();
                     Bson query = Filters.eq(Constants.ID, issue.getId());
