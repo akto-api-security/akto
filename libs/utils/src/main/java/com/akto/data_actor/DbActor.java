@@ -475,6 +475,10 @@ public class DbActor extends DataActor {
         DbLayer.modifyHybridTestingSetting(hybridTestingEnabled);
     }
 
+    public void modifyHybridTestingSettingWithCustomName(boolean hybridTestingEnabled, String serviceName) {
+        DbLayer.modifyHybridTestingSettingWithCustomName(hybridTestingEnabled, serviceName);
+    }
+
     public void insertTestingLog(Log log) {
         DbLayer.insertTestingLog(log);
     }

@@ -74,6 +74,8 @@ public class Main {
         customMiniTestingServiceName = System.getenv("MINI_TESTING_NAME") == null? "Default_" + UUID.randomUUID().toString().substring(0, 4) : System.getenv("MINI_TESTING_NAME");
     }
 
+    private static String customMiniTestingServiceName = System.getenv("MINI_TESTING_NAME");
+
     private static void setupRateLimitWatcher (AccountSettings settings) {
         
         scheduler.scheduleAtFixedRate(new Runnable() {
@@ -250,8 +252,20 @@ public class Main {
         }, 0, 5, TimeUnit.MINUTES);
     }
 
+    public static void modifyHybridTestingSettingWithCustomName() {
+        scheduler.scheduleAtFixedRate(new Runnable() {
+            public void run() {
+                dataActor.modifyHybridTestingSettingWithCustomName(RuntimeMode.isHybridDeployment(), customMiniTestingServiceName);
+            }
+        }, 0, 1, TimeUnit.MINUTES);
+    }
+
     public static void main(String[] args) throws InterruptedException {
         AccountSettings accountSettings = dataActor.fetchAccountSettings();
+        if(customMiniTestingServiceName == null || customMiniTestingServiceName.trim().isEmpty()) {
+            customMiniTestingServiceName = "Default_" + UUID.randomUUID().toString().substring(0, 4);
+        }
+        modifyHybridTestingSettingWithCustomName();
         dataActor.modifyHybridTestingSetting(RuntimeMode.isHybridDeployment());
         setupRateLimitWatcher(accountSettings);
         checkForPlaygroundTest();
