@@ -168,13 +168,12 @@ public class ApiInfo {
 
     public static boolean isRestContentType(String contentType) {
         return contentType.contains("application/json")
-                || contentType.contains("application/xml")
                 || contentType.contains("application/x-www-form-urlencoded")
                 || contentType.contains("multipart/form-data");
     }
 
     public static boolean isSoapContentType(String contentType) {
-        return contentType.contains("soap");
+        return contentType.contains("soap") ||  contentType.contains("xml");
     }
 
     public static boolean isGrpcContentType(String contentType) {
