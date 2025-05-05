@@ -11,6 +11,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 import com.akto.bulk_update_util.ApiInfoBulkUpdate;
 import com.akto.dao.*;
@@ -35,6 +36,7 @@ import org.bson.types.ObjectId;
 import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.billing.TokensDao;
 import com.akto.dao.context.Context;
+import com.akto.dao.file.FilesDao;
 import com.akto.dao.monitoring.FilterYamlTemplateDao;
 import com.akto.dao.runtime_filters.AdvancedTrafficFiltersDao;
 import com.akto.dao.test_editor.TestingRunPlaygroundDao;
@@ -56,10 +58,12 @@ import com.akto.dao.testing.sources.TestSourceConfigsDao;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dao.traffic_metrics.RuntimeMetricsDao;
 import com.akto.dao.traffic_metrics.TrafficMetricsDao;
+import com.akto.dao.upload.FileUploadsDao;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.billing.Tokens;
 import com.akto.dto.dependency_flow.Node;
+import com.akto.dto.files.File;
 import com.akto.dto.runtime_filters.RuntimeFilter;
 import com.akto.dto.test_editor.TestingRunPlayground;
 import com.akto.dto.test_editor.YamlTemplate;
@@ -88,6 +92,7 @@ import com.akto.dto.traffic_metrics.TrafficMetrics;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods;
 import com.akto.dto.type.URLMethods.Method;
+import com.akto.dto.upload.SwaggerFileUpload;
 import com.akto.dto.usage.MetricTypes;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
@@ -101,6 +106,12 @@ import com.mongodb.client.MongoCursor;
 public class DbLayer {
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(DbLayer.class, LoggerMaker.LogDb.DASHBOARD);
+
+    private static final ConcurrentHashMap<Integer, Integer> lastUpdatedTsMap = new ConcurrentHashMap<>();
+
+    private static int getLastUpdatedTsForAccount(int accountId) {
+        return lastUpdatedTsMap.computeIfAbsent(accountId, k -> 0);
+    }
 
     public DbLayer() {
     }
@@ -134,8 +145,60 @@ public class DbLayer {
                         Updates.setOnInsert(ModuleInfo.MODULE_TYPE, moduleInfo.getModuleType()),
                         Updates.setOnInsert(ModuleInfo.STARTED_TS, moduleInfo.getStartedTs()),
                         Updates.setOnInsert(ModuleInfo.CURRENT_VERSION, moduleInfo.getCurrentVersion()),
+                        Updates.setOnInsert(ModuleInfo.NAME, moduleInfo.getName()),
                         Updates.set(ModuleInfo.LAST_HEARTBEAT_RECEIVED, moduleInfo.getLastHeartbeatReceived())
                 ), updateOptions);
+        if (moduleInfo.getModuleType() == ModuleInfo.ModuleType.MINI_TESTING) {
+            //Only for mini-testing heartbeat mark testing run failed state
+            if (Context.now() - getLastUpdatedTsForAccount(Context.accountId.get()) > 10 * 60) {
+                try {
+                    fetchAndFailOutdatedTests();
+                } catch (Exception e) {
+                    loggerMaker.errorAndAddToDb("Error while updating out");
+                    //Ignore
+                }
+                lastUpdatedTsMap.put(Context.accountId.get(), Context.now());
+            }
+        }
+    }
+
+    public static void fetchAndFailOutdatedTests() {
+        List<TestingRun> testingRunList = TestingRunDao.instance.findAll(
+                Filters.and(
+                        Filters.or(
+                                Filters.eq(TestingRun.STATE, State.SCHEDULED),
+                                Filters.eq(TestingRun.STATE, State.RUNNING)
+                        ),
+                        Filters.exists(ModuleInfo.NAME, true),
+                        Filters.ne(ModuleInfo.NAME, null)
+                )
+        );
+
+        for (TestingRun testingRun : testingRunList) {
+            String miniTestingServiceName = testingRun.getMiniTestingServiceName();
+            if(!miniTestingServiceName.isEmpty()) {
+                List<ModuleInfo> moduleInfos = ModuleInfoDao.instance.
+                        findAll(Filters.eq(ModuleInfo.NAME, miniTestingServiceName), 0, 1,
+                                Sorts.descending(ModuleInfo.LAST_HEARTBEAT_RECEIVED));
+                boolean isValid = true;
+                if (moduleInfos != null && !moduleInfos.isEmpty()) {
+                    isValid = Context.now() - moduleInfos.get(0).getLastHeartbeatReceived() < 20 * 60;
+                }
+
+                if(!isValid) {
+                    Bson filter = Filters.or(
+                            Filters.eq(TestingRun.STATE, State.SCHEDULED),
+                            Filters.eq(TestingRun.STATE, State.RUNNING));
+                    TestingRunDao.instance.updateOne(
+                            Filters.and(filter, Filters.eq(Constants.ID, testingRun.getId())),
+                            Updates.set(TestingRun.STATE, State.FAILED));
+                    TestingRunResultSummariesDao.instance.updateOneNoUpsert(
+                            Filters.eq(TestingRunResultSummary.TESTING_RUN_ID, testingRun.getId()),
+                            Updates.set(TestingRunResultSummary.STATE, State.FAILED)
+                    );
+                }
+            }
+        }
     }
 
 
@@ -1286,5 +1349,23 @@ public class DbLayer {
 
     public static void insertJob(Job job) {
         JobsDao.instance.insertOne(job);
+    }
+
+    public static String fetchOpenApiSchema(int apiCollectionId) {
+
+        Bson sort = Sorts.descending("uploadTs");
+        SwaggerFileUpload fileUpload = FileUploadsDao.instance.getSwaggerMCollection().find(Filters.eq("collectionId", apiCollectionId)).sort(sort).limit(1).projection(Projections.fields(Projections.include("swaggerFileId"))).first();
+        if (fileUpload == null) {
+            return null;
+        }
+
+        ObjectId objectId = new ObjectId(fileUpload.getSwaggerFileId());
+
+        File file = FilesDao.instance.findOne(Filters.eq("_id", objectId));
+        if (file == null) {
+            return null;
+        }
+
+        return file.getCompressedContent();
     }
 }

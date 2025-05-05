@@ -2265,26 +2265,34 @@ public class ClientActor extends DataActor {
                     case "LOGIN_REQUEST":
                         authParam.put("_t", "com.akto.dto.testing.LoginRequestAuthParam");
                         break;
+                    case "TLS_AUTH":
+                        authParam.put("_t", "com.akto.dto.testing.TLSAuthParam");
+                        break;
                     default:
                         break;
                 }
             }
         }
         Document defaultAuthMechanism = (Document) testRole.get("defaultAuthMechanism");
-        defaultAuthMechanism.put("_t", "com.akto.dto.testing.HardcodedAuthParam");
-        String type = defaultAuthMechanism.getString("type");
-        List<Document> defaultAuthParams = (List<Document>) defaultAuthMechanism.get("authParams");
-        for (Document defaultAuthParam: defaultAuthParams) {
-            switch (type) {
-                case "HardCoded":
-                case "HARDCODED":
-                    defaultAuthParam.put("_t", "com.akto.dto.testing.HardcodedAuthParam");
-                    break;
-                case "LOGIN_REQUEST":
-                    defaultAuthParam.put("_t", "com.akto.dto.testing.LoginRequestAuthParam");
-                    break;
-                default:
-                    break;
+        if (defaultAuthMechanism != null) {
+            defaultAuthMechanism.put("_t", "com.akto.dto.testing.HardcodedAuthParam");
+            String type = defaultAuthMechanism.getString("type");
+            List<Document> defaultAuthParams = (List<Document>) defaultAuthMechanism.get("authParams");
+            for (Document defaultAuthParam: defaultAuthParams) {
+                switch (type) {
+                    case "HardCoded":
+                    case "HARDCODED":
+                        defaultAuthParam.put("_t", "com.akto.dto.testing.HardcodedAuthParam");
+                        break;
+                    case "LOGIN_REQUEST":
+                        defaultAuthParam.put("_t", "com.akto.dto.testing.LoginRequestAuthParam");
+                        break;
+                    case "TLS_AUTH":
+                        defaultAuthParam.put("_t", "com.akto.dto.testing.TLSAuthParam");
+                        break;
+                    default:
+                        break;
+                }
             }
         }
         testRole.put("endpointLogicalGroupId", new ObjectId(testRole.getString("endpointLogicalGroupIdHexId")));
@@ -3668,13 +3676,16 @@ public class ClientActor extends DataActor {
             BasicDBObject payloadObj;
             try {
                 payloadObj = BasicDBObject.parse(responsePayload);
-                BasicDBObject testingRunPlaygroundObj = (BasicDBObject) payloadObj.get("testingRunPlayground");
+                BasicDBObject testingRunPlaygroundObj = (BasicDBObject) payloadObj.getOrDefault("testingRunPlayground", null);
+                if (testingRunPlaygroundObj == null) {
+                    return null;
+                }
                 return objectMapper.readValue(testingRunPlaygroundObj.toJson(), TestingRunPlayground.class);
             } catch (Exception e) {
-                loggerMaker.errorAndAddToDb("error extracting response in fetchEditorTest" + e, LoggerMaker.LogDb.TESTING);
+                loggerMaker.errorAndAddToDb("error extracting response in fetchEditorTest " + e, LoggerMaker.LogDb.TESTING);
             }
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("error in fetchEditorTest" + e, LoggerMaker.LogDb.TESTING);
+            loggerMaker.errorAndAddToDb("error in fetchEditorTest " + e, LoggerMaker.LogDb.TESTING);
         }
         return null;
     }
@@ -3836,6 +3847,32 @@ public class ClientActor extends DataActor {
             loggerMaker.errorAndAddToDb("error in updateSvcToSvcGraphNodes" + e, LoggerMaker.LogDb.RUNTIME);
             return;
         }
+    }
+
+    public String fetchOpenApiSchema(int apiCollectionId) {
+        Map<String, List<String>> headers = buildHeaders();
+        BasicDBObject obj = new BasicDBObject();
+        obj.put("apiCollectionId", apiCollectionId);
+        String openApiSchema = null;
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/fetchOpenApiSchema", "", "POST", obj.toString(), headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb("non 2xx response in fetchOpenApiSchema", LoggerMaker.LogDb.RUNTIME);
+                return null;
+            }
+            BasicDBObject payloadObj;
+            try {
+                payloadObj =  BasicDBObject.parse(responsePayload);
+                openApiSchema = payloadObj.get("openApiSchema").toString();
+            } catch(Exception e) {
+                return openApiSchema;
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in fetchOpenApiSchema" + e, LoggerMaker.LogDb.RUNTIME);
+        }
+        return openApiSchema;
     }
 
 }

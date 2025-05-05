@@ -350,4 +350,6 @@ public abstract class DataActor {
 
     public abstract void updateTestingRunPlayground(TestingRunPlayground testingRunPlayground);
 
+    public abstract String fetchOpenApiSchema(int apiCollectionId);
+
 }

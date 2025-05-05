@@ -13,6 +13,7 @@ public class ModuleInfo {
     private int startedTs;
     public static final String LAST_HEARTBEAT_RECEIVED = "lastHeartbeatReceived";
     private int lastHeartbeatReceived;
+    public static final String NAME = "name";
     private String name;
 
     public ModuleType getModuleType() {
