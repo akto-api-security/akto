@@ -43,6 +43,8 @@ public class JiraApiClient {
     private static final String POST_BULK_TRANSITIONS_ENDPOINT = "/rest/api/3/bulk/issues/transition";
     private static final String SEARCH_JQL = "project = \"%s\" AND updated >= \"-%dm\" AND labels = \"%s\" ORDER BY updated ASC";
 
+    private static final String PROJECT_KEY_REGEX = "^[A-Z][A-Z0-9]+$";
+
     public static String getTransitionIdForStatus(JiraIntegration jira, String issueKey, String statusName)
         throws Exception {
 
@@ -116,9 +118,9 @@ public class JiraApiClient {
 
 
     public static Map<String, BasicDBObject> fetchUpdatedTickets(JiraIntegration jira, String projectKey,
-        int updatedAfter)
-        throws Exception {
-        String jql = String.format(SEARCH_JQL, projectKey, updatedAfter, JobConstants.TICKET_LABEL_AKTO_SYNC);
+        int updatedAfter) throws Exception {
+
+        String jql = buildJql(projectKey, updatedAfter);
 
         boolean hasMore = true;
         Map<String, BasicDBObject> results = new HashMap<>();
@@ -181,6 +183,18 @@ public class JiraApiClient {
         }
 
         return results;
+    }
+
+    private static String buildJql(String projectKey, int updatedAfter) {
+        if (!projectKey.matches(PROJECT_KEY_REGEX)) {
+            throw new IllegalArgumentException("Invalid project key");
+        }
+
+        if (updatedAfter >= 0) {
+            throw new IllegalArgumentException("Invalid time range. updatedAfter must be in past.");
+        }
+
+        return String.format(SEARCH_JQL, projectKey, updatedAfter, JobConstants.TICKET_LABEL_AKTO_SYNC);
     }
 
     // add pagination if issue size is greater than 1000
