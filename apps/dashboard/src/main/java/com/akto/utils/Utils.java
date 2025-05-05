@@ -287,7 +287,7 @@ public class Utils {
             } else {
                 JsonNode respHeaders = response.get("header");
                 Map<String, String> responseHeadersMap = new HashMap<>();
-                if (respHeaders == null) {
+                if (respHeaders != null) {
                     responseHeadersMap = getHeaders((ArrayNode) response.get("header"), variables);
                 }
 
