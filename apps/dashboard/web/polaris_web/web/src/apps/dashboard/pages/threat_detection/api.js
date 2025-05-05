@@ -135,6 +135,13 @@ const threatDetectionRequests = {
             method: 'post',
             data: {actorIp, status}
         })
+    },
+    modifyThreatActorStatusCloudflare(actorIp, status) {
+        return request({
+            url: '/api/modifyThreatActorStatusCloudflare',
+            method: 'post',
+            data: {actorIp, status}
+        })
     }
 }
 export default threatDetectionRequests
