@@ -127,6 +127,9 @@ function TestRoleSettings() {
   }
 
   const testRoleMetaInfo = async () => {
+    if (!func.checkForFeatureSaas("TEST_ROLE_SCOPE_ROLES")) {
+      return;
+    }
     await api
     .saveTestRoleMeta(roleName, scopeRoles)
     .then((res) => {

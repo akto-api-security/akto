@@ -264,12 +264,14 @@ public class TestRolesAction extends UserAction {
         if(scopeRoles != null && scopeRoles.size() > 0) {
             TestRoles role = getRole();
             if (role == null) {
+                addActionError("Test role does not exist");
                 return ERROR.toUpperCase();
             }
             Bson roleFilter = Filters.eq(Constants.ID, role.getId());
             TestRolesDao.instance.updateOne(roleFilter,  Updates.set(TestRoles.SCOPE_ROLES, scopeRoles));
             return SUCCESS.toUpperCase();
         } 
+        addActionError("Scope roles are empty");
         return ERROR.toUpperCase();
     }
 

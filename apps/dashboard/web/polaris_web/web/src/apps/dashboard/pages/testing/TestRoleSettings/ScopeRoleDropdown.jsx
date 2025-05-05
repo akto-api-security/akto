@@ -9,7 +9,6 @@ const ScopeRoleDropdown = ({ dispatch, initialItems }) => {
   // This is a placeholder for the actual feature flag check
   
   if (!func.checkForFeatureSaas("TEST_ROLE_SCOPE_ROLES")) {
-     console.error("Feature flag TEST_ROLE_SCOPE_ROLES is not enabled.");
      return null;
   }
 
