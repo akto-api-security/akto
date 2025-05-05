@@ -29,17 +29,10 @@ public class CloudflareWafAction extends UserAction {
                 Filters.eq(Config.CloudflareWafConfig.ACCOUNT_ID, accId),
                 Filters.eq(Config.CloudflareWafConfig._CONFIG_ID, Config.ConfigType.CLOUDFLARE_WAF.name())
         );
-        Config configObj = ConfigsDao.instance.findOne(filters);
-        Config.CloudflareWafConfig existingConfig;
-        if(configObj instanceof Config.CloudflareWafConfig) {
-            existingConfig = (Config.CloudflareWafConfig) configObj;
-        } else {
-            if(apiKey == null) {
-                addActionError("Please provide a valid API Key.");
-                return ERROR.toUpperCase();
-            }
-
-            existingConfig = null;
+        Config.CloudflareWafConfig existingConfig = (Config.CloudflareWafConfig) ConfigsDao.instance.findOne(filters);
+        if(existingConfig == null && apiKey == null) {
+            addActionError("Please provide a valid API Key.");
+            return ERROR.toUpperCase();
         }
 
         if (existingConfig != null) {
@@ -69,11 +62,7 @@ public class CloudflareWafAction extends UserAction {
     public String fetchCloudflareWafIntegration() {
         int accountId = Context.accountId.get();
 
-        Config config = ConfigsDao.instance.findOne(Filters.eq(Config.CloudflareWafConfig.ACCOUNT_ID, accountId));
-
-        if(config instanceof Config.CloudflareWafConfig) {
-            cloudflareWafConfig = (Config.CloudflareWafConfig) config;
-        }
+        cloudflareWafConfig = (Config.CloudflareWafConfig) ConfigsDao.instance.findOne(Filters.eq(Config.CloudflareWafConfig.ACCOUNT_ID, accountId));
 
         return SUCCESS.toUpperCase();
     }

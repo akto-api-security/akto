@@ -269,14 +269,7 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
             Filters.eq(Config.CloudflareWafConfig.ACCOUNT_ID, accId)
         );
 
-        Config config = ConfigsDao.instance.findOne(filters);
-        Config.CloudflareWafConfig cloudflareWafConfig;
-        if(config instanceof Config.CloudflareWafConfig) {
-            cloudflareWafConfig = (Config.CloudflareWafConfig) config;
-        } else {
-            addActionError("WAF integration not found.");
-            return ERROR.toUpperCase();
-        }
+        Config.CloudflareWafConfig cloudflareWafConfig = (Config.CloudflareWafConfig) ConfigsDao.instance.findOne(filters);
 
         boolean result;
         if(status.equalsIgnoreCase("blocked")) {
@@ -325,7 +318,7 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
 
         } catch (Exception e) {
             addActionError("Unable to block IP address. Try again later.");
-            loggerMaker.debugAndAddToDb("Error modifying threat actor status: " + e.getMessage());
+            loggerMaker.errorAndAddToDb("Error modifying threat actor status: " + e.getMessage());
             return false;
         }
 
@@ -405,7 +398,7 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
         Config.AwsWafConfig awsWafConfig = (Config.AwsWafConfig) ConfigsDao.instance.findOne(filters);
 
         if(awsWafConfig == null) {
-            loggerMaker.debugAndAddToDb("AWS Waf config not found. Trying Cloudflare Waf.");
+            loggerMaker.debugAndAddToDb("Trying Cloudflare Waf.");
             return modifyThreatActorStatusCloudflare();
         }
 

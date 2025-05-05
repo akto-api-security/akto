@@ -44,7 +44,13 @@ export const ActorDetails = ({ actorDetails, setShowActorDetails }) => {
                     activator={<Button destructive={ipStatus.toLowerCase() === "active"} size="slim" onClick={() => setShowModal(!showModal)}>{ipStatus.toLowerCase() === "active" ? "Block IP" : "Unblock IP"}</Button>}
                     open={showModal}
                     onClose={() => setShowModal(false)}
-                    primaryAction={{content: ipStatus.toLowerCase() === "active" ? "Block IP" : "Unblock IP", onAction: () => handleBlockUnblockIp(ipStatus.toLowerCase() === "active" ? "blocked" : "active")}}
+                    primaryAction={
+                        {
+                            content: ipStatus.toLowerCase() === "active" ? "Block IP" : "Unblock IP",
+                            onAction: () => handleBlockUnblockIp(ipStatus.toLowerCase() === "active" ? "blocked" : "active"),
+                            disabled: window.IS_AWS_WAF_INTEGRATED === 'false' && window.IS_CLOUDFLARE_WAF_INTEGRATED === 'false',
+                        }
+                    }
                     title={ipStatus.toLowerCase() === "active" ? "Block IP" : "Unblock IP"}
                 >
                     <Modal.Section>
