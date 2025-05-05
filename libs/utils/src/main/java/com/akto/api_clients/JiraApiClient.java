@@ -190,7 +190,7 @@ public class JiraApiClient {
             throw new IllegalArgumentException("Invalid project key");
         }
 
-        if (updatedAfter >= 0) {
+        if (updatedAfter <= 0) {
             throw new IllegalArgumentException("Invalid time range. updatedAfter must be in past.");
         }
 
