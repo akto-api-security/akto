@@ -81,6 +81,7 @@ import com.akto.dto.auth.APIAuth;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.billing.OrganizationFlags;
 import com.akto.util.enums.GlobalEnums;
+import com.akto.util.enums.GlobalEnums.TicketSource;
 import com.mongodb.ConnectionString;
 import com.mongodb.MongoClientSettings;
 import com.mongodb.ReadPreference;
@@ -386,7 +387,8 @@ public class DaoInit {
                 new EnumCodec<>(State.class),
                 new EnumCodec<>(ModelType.class),
                 new EnumCodec<>(ModuleInfo.ModuleType.class),
-                new EnumCodec<>(TLSAuthParam.CertificateType.class)
+                new EnumCodec<>(TLSAuthParam.CertificateType.class),
+                new EnumCodec<>(TicketSource.class)
         );
 
         return fromRegistries(MongoClientSettings.getDefaultCodecRegistry(), pojoCodecRegistry,
