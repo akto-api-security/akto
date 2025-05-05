@@ -35,7 +35,6 @@ import com.akto.utils.FileUtils;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
-import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.Updates;
 
@@ -216,8 +215,7 @@ public class JiraTicketJobExecutor extends JobExecutor<AutoTicketParams> {
                     Filters.eq(TestingRunResult.TEST_SUB_TYPE, id.getTestSubCategory()),
                     Filters.eq(TestingRunResult.API_INFO_KEY, id.getApiInfoKey()),
                     Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, data.getTestSummaryId())
-                ),
-                Projections.include("_id", "testResults")
+                )
             );
             if (result != null) results.add(result);
         }
