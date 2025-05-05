@@ -1,6 +1,7 @@
 package com.akto.action.testing;
 
 import com.akto.action.UserAction;
+import com.akto.billing.UsageMetricUtils;
 import com.akto.dao.RBACDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.testing.EndpointLogicalGroupDao;
@@ -9,6 +10,7 @@ import com.akto.dao.testing.config.TestCollectionPropertiesDao;
 import com.akto.dto.RBAC;
 import com.akto.dto.RecordedLoginFlowInput;
 import com.akto.dto.User;
+import com.akto.dto.billing.FeatureAccess;
 import com.akto.dto.data_types.Conditions;
 import com.akto.dto.data_types.Conditions.Operator;
 import com.akto.dto.data_types.Predicate;
@@ -51,6 +53,15 @@ public class TestRolesAction extends UserAction {
     private String authAutomationType;
     private ArrayList<RequestData> reqData;
     private RecordedLoginFlowInput recordedLoginFlowInput;
+    private List<String> scopeRoles;
+
+    public List<String> getScopeRoles() {
+        return scopeRoles;
+    }
+
+    public void setScopeRoles(List<String> scopeRoles) {
+        this.scopeRoles = scopeRoles;
+    }
 
     public static class RolesConditionUtils {
         private Operator operator;
@@ -77,7 +88,27 @@ public class TestRolesAction extends UserAction {
     }
 
     public String fetchAllRolesAndLogicalGroups() {
-        testRoles = TestRolesDao.instance.findAll(Filters.empty());
+
+        User user = getSUser();
+        Bson filterRbac = Filters.and(
+            Filters.eq(RBAC.USER_ID, user.getId()),
+            Filters.eq(RBAC.ACCOUNT_ID, Context.accountId.get()));
+
+        RBAC userRbac = RBACDao.instance.findOne(filterRbac);
+        String userRole = userRbac.getRole().toUpperCase();
+        Bson testRoleQ = Filters.or(
+            Filters.exists(TestRoles.SCOPE_ROLES, false), // case when scope_roles field does not exist
+            Filters.in(TestRoles.SCOPE_ROLES, userRole)   // case when user's role is in the scope_roles array
+        );        
+
+        FeatureAccess featureAccess = UsageMetricUtils.getFeatureAccessSaas(Context.accountId.get(),
+                "TEST_ROLE_SCOPE_ROLES");
+        if (!featureAccess.getIsGranted() || userRole.equals(RBAC.Role.ADMIN.toString())) {
+            testRoles = TestRolesDao.instance.findAll(Filters.empty());
+        } else {
+            testRoles = TestRolesDao.instance.findAll(testRoleQ);
+        }
+
         List<EndpointLogicalGroup> endpointLogicalGroups = EndpointLogicalGroupDao.instance.findAll(Filters.empty());
 
         testRoles.forEach((item) -> {
@@ -227,6 +258,21 @@ public class TestRolesAction extends UserAction {
         TestRolesDao.instance.updateOne(Filters.eq(Constants.ID, role.getId()), Updates.set(TestRoles.LAST_UPDATED_TS, Context.now()));
         return SUCCESS.toUpperCase();
     }
+
+    public String saveTestRoleMeta() {
+        
+        if(scopeRoles != null && scopeRoles.size() > 0) {
+            TestRoles role = getRole();
+            if (role == null) {
+                return ERROR.toUpperCase();
+            }
+            Bson roleFilter = Filters.eq(Constants.ID, role.getId());
+            TestRolesDao.instance.updateOne(roleFilter,  Updates.set(TestRoles.SCOPE_ROLES, scopeRoles));
+            return SUCCESS.toUpperCase();
+        } 
+        return ERROR.toUpperCase();
+    }
+
     public String createTestRole () {
         if (roleName == null || roleName.isEmpty()) {
             addActionError("Test role name is empty");
