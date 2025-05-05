@@ -840,7 +840,7 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
                                 Updates.set("jiraIssueUrl", jiraTicketUrl),
                                 Updates.set(TestingRunIssues.TICKET_SOURCE, GlobalEnums.TicketSource.JIRA.name()),
                                 Updates.set(TestingRunIssues.TICKET_PROJECT_KEY, projId),
-                                Updates.set(TestingRunIssues.TICKET_ID, this.jiraTicketKey),
+                                Updates.set(TestingRunIssues.TICKET_ID, issueKey),
                                 Updates.set(TestingRunIssues.TICKET_LAST_UPDATED_AT, Context.now())
                             ),
                             new UpdateOptions().upsert(false)
