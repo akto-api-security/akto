@@ -91,6 +91,7 @@ import F5Waf from "../dashboard/pages/settings/integrations/F5Waf";
 import AWSWaf from "../dashboard/pages/settings/integrations/AWSWaf";
 import AgentConfig from "../dashboard/pages/settings/integrations/AgentConfig";
 import AzureBoards from "../dashboard/pages/settings/integrations/AzureBoards";
+import CloudflareWaf from "../dashboard/pages/settings/integrations/CloudflareWaf";
 
 // if you add a component in a new path, please verify the search implementation in function -> 'getSearchItemsArr' in func.js
 
@@ -293,6 +294,10 @@ const router = createBrowserRouter([
                     {
                         path: "integrations/aws_waf",
                         element: <AWSWaf/>,
+                    },
+                    {
+                        path: "integrations/cloudflare_waf",
+                        element: <CloudflareWaf/>,
                     },
                     {
                         path: "integrations/agents",

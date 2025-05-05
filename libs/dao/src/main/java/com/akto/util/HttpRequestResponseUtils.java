@@ -124,7 +124,7 @@ public class HttpRequestResponseUtils {
 
     public static String convertXmlToJson(String rawRequest) {
         try {
-            String removeXmlLine = rawRequest.replaceFirst("<\\?xml.*?\\?>", "").trim();
+            String removeXmlLine = rawRequest.replaceFirst("<\\?xml.*?\\?>", "").replaceAll("<(/?)(\\w+):(\\w+)([^>]*)>", "<$1$3$4>").trim();
             JsonNode rootNode = xmlMapper.readTree(removeXmlLine);
             JsonNode bodyNode = rootNode.get("Body");
             if (bodyNode == null) {
@@ -141,6 +141,7 @@ public class HttpRequestResponseUtils {
     }
 
     public static String updateXmlWithModifiedJson(String originalXml, String modifiedJson) throws Exception {
+        originalXml = originalXml.replaceFirst("<\\?xml.*?\\?>", "").replaceAll("<(/?)(\\w+):(\\w+)([^>]*)>", "<$1$3$4>").trim();
         ObjectMapper objectMapper = new ObjectMapper();
 
         DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
@@ -167,6 +168,10 @@ public class HttpRequestResponseUtils {
             while (targetElement.hasChildNodes()) {
                 targetElement.removeChild(targetElement.getFirstChild());
             }
+        }
+
+        if (modifiedJson != null && modifiedJson.startsWith("<")) {
+            return modifiedJson;
         }
 
         JsonNode modifiedBody = objectMapper.readTree(modifiedJson);
