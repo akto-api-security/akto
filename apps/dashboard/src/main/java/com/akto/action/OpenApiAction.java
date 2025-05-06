@@ -247,7 +247,7 @@ public class OpenApiAction extends UserAction implements ServletResponseAware {
 
                         try {
                             loggerMaker.debugAndAddToDb("Calling Utils.pushDataToKafka for openapi file, for apiCollection id " + apiCollectionId, LogDb.DASHBOARD);
-                            Utils.pushDataToKafka(apiCollectionId, topic, stringMessages, stringErrors, true, false);
+                            Utils.pushDataToKafka(apiCollectionId, topic, stringMessages, stringErrors, true, false, true);
                         } catch (Exception e) {
                             throw new RuntimeException(e);
                         }
@@ -386,7 +386,7 @@ public class OpenApiAction extends UserAction implements ServletResponseAware {
                     ApiCollectionsDao.instance.insertOne(ApiCollection.createManualCollection(aktoCollectionId, collectionName));
                 }
                 loggerMaker.debugAndAddToDb(String.format("Pushing data in akto collection id %s", aktoCollectionId), LogDb.DASHBOARD);
-                Utils.pushDataToKafka(aktoCollectionId, topic, msgs, new ArrayList<>(), skipKafka, true);
+                Utils.pushDataToKafka(aktoCollectionId, topic, msgs, new ArrayList<>(), skipKafka, true, true);
                 loggerMaker.debugAndAddToDb(String.format("Pushed data in akto collection id %s", aktoCollectionId), LogDb.DASHBOARD);
                 FileUploadsDao.instance.getSwaggerMCollection().updateOne(Filters.eq("_id", new ObjectId(uploadId)), new BasicDBObject("$set", new BasicDBObject("ingestionComplete", true).append("markedForDeletion", true)), new UpdateOptions().upsert(false));
                 loggerMaker.debugAndAddToDb("Ingestion complete for " + swaggerFileUpload.getId().toString(), LogDb.DASHBOARD);
