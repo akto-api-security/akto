@@ -258,6 +258,36 @@ public class ApiExecutor {
 
         
     }
+    
+    private static final List<Integer> BACK_OFF_LIMITS = new ArrayList<>(Arrays.asList(1, 2, 5));
+    public static OriginalHttpResponse sendRequestBackOff(OriginalHttpRequest request, boolean followRedirects, TestingRunConfig testingRunConfig, boolean debug, List<TestingRunResult.TestLog> testLogs) throws Exception {
+        OriginalHttpResponse response = null;
+
+        for (int limit : BACK_OFF_LIMITS) {
+            try {
+                response = sendRequest(request, followRedirects, testingRunConfig, debug, testLogs, false);
+                if (response == null) {
+                    throw new NullPointerException(String.format("Response is null"));
+                }
+                if (response.getStatusCode() != 200) {
+                    throw new Exception(String.format("Invalid response code %d", response.getStatusCode()));
+                }
+                break;
+            } catch (Exception e) {
+                String message = String.format("Error in sending request for api : %s , will retry after %d seconds : %s", request.getUrl(),
+                        limit, e.toString());
+                loggerMaker.error(message);
+                try {
+                    Thread.sleep(1000 * limit);
+                } catch (Exception f) {
+                    String backoffMessage = String.format("Error in exponential backoff at limit %d  : %s", limit, f.toString());
+                    loggerMaker.error(backoffMessage);
+                }
+            }
+        }
+        return response;
+    }
+
 
     public static Request buildRequest(OriginalHttpRequest request, TestingRunConfig testingRunConfig) throws Exception{
         boolean executeScript = testingRunConfig != null;
