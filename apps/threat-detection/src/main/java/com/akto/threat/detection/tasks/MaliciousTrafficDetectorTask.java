@@ -1,5 +1,25 @@
 package com.akto.threat.detection.tasks;
 
+import java.time.Duration;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Properties;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.function.Supplier;
+
+import org.apache.commons.lang3.math.NumberUtils;
+import org.apache.kafka.clients.consumer.Consumer;
+import org.apache.kafka.clients.consumer.ConsumerConfig;
+import org.apache.kafka.clients.consumer.ConsumerRecord;
+import org.apache.kafka.clients.consumer.ConsumerRecords;
+import org.apache.kafka.clients.consumer.KafkaConsumer;
+
+import com.akto.IPLookupClient;
+import com.akto.RawApiMetadataFactory;
 import com.akto.dao.context.Context;
 import com.akto.dao.monitoring.FilterYamlTemplateDao;
 import com.akto.data_actor.DataActor;
@@ -17,6 +37,7 @@ import com.akto.dto.type.URLMethods;
 import com.akto.hybrid_parsers.HttpCallParser;
 import com.akto.kafka.KafkaConfig;
 import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import com.akto.proto.generated.threat_detection.message.malicious_event.event_type.v1.EventType;
 import com.akto.proto.generated.threat_detection.message.malicious_event.v1.MaliciousEventKafkaEnvelope;
 import com.akto.proto.generated.threat_detection.message.malicious_event.v1.MaliciousEventMessage;
@@ -25,7 +46,6 @@ import com.akto.proto.generated.threat_detection.message.sample_request.v1.Sampl
 import com.akto.proto.generated.threat_detection.message.sample_request.v1.SampleRequestKafkaEnvelope;
 import com.akto.proto.http_response_param.v1.HttpResponseParam;
 import com.akto.rules.TestPlugin;
-import com.akto.test_editor.execution.VariableResolver;
 import com.akto.test_editor.filter.data_operands_impl.ValidationResult;
 import com.akto.threat.detection.actor.SourceIPActorGenerator;
 import com.akto.threat.detection.cache.RedisBackedCounterCache;
@@ -34,18 +54,8 @@ import com.akto.threat.detection.kafka.KafkaProtoProducer;
 import com.akto.threat.detection.smart_event_detector.window_based.WindowBasedThresholdNotifier;
 import com.akto.util.HttpRequestResponseUtils;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.akto.IPLookupClient;
-import com.akto.RawApiMetadataFactory;
 
 import io.lettuce.core.RedisClient;
-import java.time.Duration;
-import java.util.*;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.function.Supplier;
-
-import org.apache.commons.lang3.math.NumberUtils;
-import org.apache.kafka.clients.consumer.*;
 
 /*
 Class is responsible for consuming traffic data from the Kafka topic.
@@ -66,7 +76,7 @@ public class MaliciousTrafficDetectorTask implements Task {
   private final KafkaProtoProducer internalKafka;
 
   private static final DataActor dataActor = DataActorFactory.fetchInstance();
-  private static final LoggerMaker logger = new LoggerMaker(MaliciousTrafficDetectorTask.class);
+  private static final LoggerMaker logger = new LoggerMaker(MaliciousTrafficDetectorTask.class, LogDb.THREAT_DETECTION);
 
   private static final ObjectMapper objectMapper = new ObjectMapper();
   private static final HttpRequestParams requestParams = new HttpRequestParams();
@@ -142,7 +152,7 @@ public class MaliciousTrafficDetectorTask implements Task {
 
     List<YamlTemplate> templates = dataActor.fetchFilterYamlTemplates();
     apiFilters = FilterYamlTemplateDao.fetchFilterConfig(false, templates, false);
-    logger.debug("total filters fetched {} ", apiFilters.size());
+    logger.debugAndAddToDb("total filters fetched  " + apiFilters.size());
     this.filterLastUpdatedAt = now;
     return apiFilters;
   }
@@ -170,11 +180,11 @@ public class MaliciousTrafficDetectorTask implements Task {
     responseParam.setSourceIP(actor);
 
     if (actor == null || actor.isEmpty()) {
-      logger.warn("Dropping processing of record with no actor IP, account:{}", responseParam.getAccountId());
+      logger.warnAndAddToDb("Dropping processing of record with no actor IP, account: " + responseParam.getAccountId());
       return;
     }
 
-    logger.debug("Processing record with actor IP: {}", responseParam.getSourceIP());
+    logger.debugAndAddToDb("Processing record with actor IP: " + responseParam.getSourceIP());
     Context.accountId.set(Integer.parseInt(responseParam.getAccountId()));
     Map<String, FilterConfig> filters = this.getFilters();
     if (filters.isEmpty()) {
@@ -200,7 +210,7 @@ public class MaliciousTrafficDetectorTask implements Task {
       // If a request passes any of the filter, then it's a malicious request,
       // and so we push it to kafka
       if (hasPassedFilter) {
-        logger.debug("filter condition satisfied for url {} filterId {}", apiInfoKey.getUrl(), apiFilter.getId());
+        logger.debugAndAddToDb("filter condition satisfied for url " + apiInfoKey.getUrl() + " filterId " + apiFilter.getId());
         // Later we will also add aggregation support
         // Eg: 100 4xx requests in last 10 minutes.
         // But regardless of whether request falls in aggregation or not,
@@ -248,7 +258,7 @@ public class MaliciousTrafficDetectorTask implements Task {
               maliciousReq, rule);
 
           if (result.shouldNotify()) {
-            logger.debug("aggregate condition satisfied for url {} filterId {}", apiInfoKey.getUrl(), apiFilter.getId());
+            logger.debugAndAddToDb("aggregate condition satisfied for url " + apiInfoKey.getUrl() + " filterId " + apiFilter.getId());
             generateAndPushMaliciousEventRequest(
                 apiFilter,
                 actor,
