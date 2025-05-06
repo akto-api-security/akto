@@ -508,7 +508,12 @@ public class Utils {
                 makeApisCaseInsensitive = accountSettings.getHandleApisCaseInsensitive();
             }
 
-            info.getHttpCallParser().syncFunction(responses, true, false, accountSettings);
+            /*
+             * this function is used primarily for non-automated traffic collection, like
+             * postman, har and openAPI.
+             * Thus, we can skip advanced traffic filters for these cases.
+             */
+            info.getHttpCallParser().syncFunction(responses, true, false, accountSettings, true);
             APICatalogSync.mergeUrlsAndSave(apiCollectionId, true, false, info.getHttpCallParser().apiCatalogSync.existingAPIsInDb, makeApisCaseInsensitive);
             info.getHttpCallParser().apiCatalogSync.buildFromDB(false, false);
             APICatalogSync.updateApiCollectionCount(info.getHttpCallParser().apiCatalogSync.getDbState(apiCollectionId), apiCollectionId);
