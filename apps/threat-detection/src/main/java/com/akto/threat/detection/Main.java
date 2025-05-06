@@ -9,6 +9,7 @@ import com.akto.kafka.KafkaConsumerConfig;
 import com.akto.kafka.KafkaProducerConfig;
 import com.akto.kafka.Serializer;
 import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import com.akto.metrics.ModuleInfoWorker;
 import com.akto.threat.detection.constants.KafkaTopic;
 import com.akto.threat.detection.session_factory.SessionFactoryUtils;
@@ -24,7 +25,7 @@ import org.hibernate.SessionFactory;
 public class Main {
 
   private static final String CONSUMER_GROUP_ID = "akto.threat_detection";
-  private static final LoggerMaker logger = new LoggerMaker(Main.class);
+  private static final LoggerMaker logger = new LoggerMaker(Main.class, LogDb.THREAT_DETECTION);
   private static boolean aggregationRulesEnabled = System.getenv().getOrDefault("AGGREGATION_RULES_ENABLED", "true").equals("true");
 
   private static final DataActor dataActor = DataActorFactory.fetchInstance();
@@ -34,7 +35,7 @@ public class Main {
     SessionFactory sessionFactory = null;
     RedisClient localRedis = null;
 
-    logger.warn("aggregation rules enabled {}", aggregationRulesEnabled);
+    logger.warnAndAddToDb("aggregation rules enabled " + aggregationRulesEnabled);
     ModuleInfoWorker.init(ModuleInfo.ModuleType.THREAT_DETECTION, dataActor);
 
     if (aggregationRulesEnabled) {

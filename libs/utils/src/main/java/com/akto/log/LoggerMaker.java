@@ -35,6 +35,8 @@ public class LoggerMaker  {
 
     static {
         System.setProperty(SimpleLogger.DEFAULT_LOG_LEVEL_KEY, System.getenv().getOrDefault("AKTO_LOG_LEVEL", "WARN"));
+        System.setProperty("org.slf4j.simpleLogger.log.org.apache.kafka", "ERROR");
+        System.setProperty("org.slf4j.simpleLogger.log.io.lettuce", "ERROR");
         System.out.printf("AKTO_LOG_LEVEL is set to: %s \n", System.getProperty(SimpleLogger.DEFAULT_LOG_LEVEL_KEY));
     }
 
@@ -211,12 +213,27 @@ public class LoggerMaker  {
         }
     }
 
+    public void warnAndAddToDb(String info, LogDb db) {
+        String accountId = Context.accountId.get() != null ? Context.accountId.get().toString() : "NA";
+        String infoMessage = "acc: " + accountId + ", " + info;
+        logger.info(infoMessage);
+        try{
+            insert(infoMessage, "warn",db);
+        } catch (Exception e){
+
+        }
+    }
+
     public void errorAndAddToDb(String err) {
         errorAndAddToDb(err, this.db);
     }
 
     public void infoAndAddToDb(String info) {
         infoAndAddToDb(info, this.db);
+    }
+
+    public void warnAndAddToDb(String info) {
+        warnAndAddToDb(info, this.db);
     }
 
     private Boolean checkUpdate(){
