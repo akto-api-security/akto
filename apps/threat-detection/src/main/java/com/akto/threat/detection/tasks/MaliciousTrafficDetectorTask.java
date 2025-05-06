@@ -186,10 +186,10 @@ public class MaliciousTrafficDetectorTask implements Task {
       return;
     }
 
-    logger.debugAndAddToDb("Processing record with actor IP: " + responseParam.getSourceIP());
     Context.accountId.set(Integer.parseInt(responseParam.getAccountId()));
     Map<String, FilterConfig> filters = this.getFilters();
     if (filters.isEmpty()) {
+      logger.warnAndAddToDb("No filters found for account " + responseParam.getAccountId());
       return;
     }
 
@@ -207,6 +207,7 @@ public class MaliciousTrafficDetectorTask implements Task {
     ApiInfo.ApiInfoKey apiInfoKey = new ApiInfo.ApiInfoKey(apiCollectionId, url, method);
 
     for (FilterConfig apiFilter : apiFilters.values()) {
+      logger.debugAndAddToDb("Evaluating filter condition for url " + apiInfoKey.getUrl() + " filterId " + apiFilter.getId());
       boolean hasPassedFilter = validateFilterForRequest(apiFilter, rawApi, apiInfoKey);
 
       // If a request passes any of the filter, then it's a malicious request,
