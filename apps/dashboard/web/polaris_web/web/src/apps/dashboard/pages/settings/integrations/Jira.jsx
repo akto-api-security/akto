@@ -1,23 +1,23 @@
-import React, {useEffect, useReducer, useRef, useState} from 'react'
+import React, {useEffect, useReducer} from 'react'
 import {
-    Badge,
-    Box,
-    Button,
-    Card,
-    Checkbox,
-    Divider,
-    HorizontalStack,
-    LegacyCard,
-    Text,
-    TextField,
-    VerticalStack
+  Badge,
+  Box,
+  Button,
+  Card,
+  Checkbox,
+  Divider,
+  HorizontalStack,
+  LegacyCard,
+  Spinner,
+  Text,
+  TextField,
+  VerticalStack
 } from '@shopify/polaris';
 import settingFunctions from '../module';
 import IntegrationsLayout from './IntegrationsLayout';
 import PasswordTextField from '../../../components/layouts/PasswordTextField';
 import func from "@/util/func"
 import DropdownSearch from '../../../components/shared/DropdownSearch';
-import {produce} from "immer"
 import api from '../api';
 
 const aktoStatusForJira = ["Open","Fixed", "Ignored"]
@@ -26,29 +26,257 @@ const intialEmptyMapping = aktoStatusForJira.reduce((acc, status) => {
     return acc;
   }, {});
 
-function Jira() {
+// Define initial state for the form
+const initialState = {
+  credentials: {
+    baseUrl: '',
+    apiToken: '',
+    userEmail: ''
+  },
+  projects: [],
+  existingProjectIds: [],
+  isAlreadyIntegrated: false,
+  isSaving: false,
+  initialFormData: null,
+  projectIssueMap: {},
+  loadingProjectIndex: null
+};
 
-    const [baseUrl, setBaseUrl] = useState('');
-    const [projId, setProjId] = useState('');
-    const [apiToken, setApiToken] = useState('');
-    const [userEmail, setUserEmail] = useState('');
-    const [projectIssueMap, setProjectIssuesMap] = useState({})
-    const [projectMap, setProjectMap] = useReducer(produce((draft, action) => { projectMapReducer(draft, action) }), []);
-    const [isAlreadyIntegrated, setIsAlreadyIntegrated] = useState(false)
-    const [existingProjectIds, setExistingProjectIds] = useState([])
-    const [isSaving, setIsSaving] = useState(false)
-    const [initialFormData, setInitialFormData] = useState(null)
+// Define action types
+const ACTION_TYPES = {
+  SET_CREDENTIALS: 'SET_CREDENTIALS',
+  SET_PROJECTS: 'SET_PROJECTS',
+  ADD_PROJECT: 'ADD_PROJECT',
+  REMOVE_PROJECT: 'REMOVE_PROJECT',
+  UPDATE_PROJECT: 'UPDATE_PROJECT',
+  SET_EXISTING_PROJECT_IDS: 'SET_EXISTING_PROJECT_IDS',
+  SET_IS_ALREADY_INTEGRATED: 'SET_IS_ALREADY_INTEGRATED',
+  SET_IS_SAVING: 'SET_IS_SAVING',
+  SET_INITIAL_FORM_DATA: 'SET_INITIAL_FORM_DATA',
+  SET_PROJECT_ISSUE_MAP: 'SET_PROJECT_ISSUE_MAP',
+  CLEAR_PROJECTS: 'CLEAR_PROJECTS',
+  SET_LOADING_PROJECT_INDEX: 'SET_LOADING_PROJECT_INDEX'
+};
+
+// Main reducer function
+function jiraReducer(state, action) {
+  switch (action.type) {
+    case ACTION_TYPES.SET_CREDENTIALS:
+      return {
+        ...state,
+        credentials: {
+          ...state.credentials,
+          ...action.payload
+        }
+      };
+
+    case ACTION_TYPES.SET_PROJECTS:
+      return {
+        ...state,
+        projects: action.payload
+      };
+
+    case ACTION_TYPES.ADD_PROJECT:
+      return {
+        ...state,
+        projects: [
+          ...state.projects,
+          {
+            projectId: "",
+            enableBiDirIntegration: false,
+            aktoToJiraStatusMap: JSON.parse(JSON.stringify(intialEmptyMapping)),
+            statuses: [],
+            jiraStatusLabel: []
+          }
+        ]
+      };
+
+    case ACTION_TYPES.REMOVE_PROJECT:
+      return {
+        ...state,
+        projects: state.projects.filter((_, index) => index !== action.payload)
+      };
+
+    case ACTION_TYPES.UPDATE_PROJECT:
+      return {
+        ...state,
+        projects: state.projects.map((project, index) => {
+          if (index === action.payload.index) {
+            // Handle special case for aktoToJiraStatusMap
+            if (action.payload.updates.aktoToJiraStatusMap) {
+              return {
+                ...project,
+                ...action.payload.updates,
+                aktoToJiraStatusMap: {
+                  ...project.aktoToJiraStatusMap,
+                  ...action.payload.updates.aktoToJiraStatusMap
+                }
+              };
+            }
+            return {
+              ...project,
+              ...action.payload.updates
+            };
+          }
+          return project;
+        })
+      };
+
+    case ACTION_TYPES.SET_EXISTING_PROJECT_IDS:
+      return {
+        ...state,
+        existingProjectIds: action.payload
+      };
+
+    case ACTION_TYPES.SET_IS_ALREADY_INTEGRATED:
+      return {
+        ...state,
+        isAlreadyIntegrated: action.payload
+      };
+
+    case ACTION_TYPES.SET_IS_SAVING:
+      return {
+        ...state,
+        isSaving: action.payload
+      };
+
+    case ACTION_TYPES.SET_INITIAL_FORM_DATA:
+      return {
+        ...state,
+        initialFormData: action.payload
+      };
+
+    case ACTION_TYPES.SET_PROJECT_ISSUE_MAP:
+      return {
+        ...state,
+        projectIssueMap: action.payload
+      };
+
+    case ACTION_TYPES.CLEAR_PROJECTS:
+      return {
+        ...state,
+        projects: []
+      };
+
+    case ACTION_TYPES.SET_LOADING_PROJECT_INDEX:
+      return {
+        ...state,
+        loadingProjectIndex: action.payload
+      };
+
+    default:
+      return state;
+  }
+}
+
+function Jira() {
+    // Use our new reducer for state management
+    const [state, dispatch] = useReducer(jiraReducer, initialState);
+
+    // Destructure state for easier access
+    const {
+        credentials: { baseUrl, apiToken, userEmail },
+        projects,
+        existingProjectIds,
+        isAlreadyIntegrated,
+        isSaving,
+        initialFormData,
+        projectIssueMap,
+        loadingProjectIndex
+    } = state;
+
+    // Helper functions to dispatch actions
+    const setCredentials = (field, value) => {
+        dispatch({
+            type: ACTION_TYPES.SET_CREDENTIALS,
+            payload: { [field]: value }
+        });
+    };
+
+    const addProject = () => {
+        dispatch({ type: ACTION_TYPES.ADD_PROJECT });
+    };
+
+    const removeProject = (index) => {
+        dispatch({
+            type: ACTION_TYPES.REMOVE_PROJECT,
+            payload: index
+        });
+    };
+
+    const updateProject = (index, updates) => {
+        dispatch({
+            type: ACTION_TYPES.UPDATE_PROJECT,
+            payload: { index, updates }
+        });
+    };
+
+    const clearProjects = () => {
+        dispatch({ type: ACTION_TYPES.CLEAR_PROJECTS });
+    };
+
+    const setProjects = (projects) => {
+        dispatch({
+            type: ACTION_TYPES.SET_PROJECTS,
+            payload: projects
+        });
+    };
+
+    const setExistingProjectIds = (ids) => {
+        dispatch({
+            type: ACTION_TYPES.SET_EXISTING_PROJECT_IDS,
+            payload: ids
+        });
+    };
+
+    const setIsAlreadyIntegrated = (value) => {
+        dispatch({
+            type: ACTION_TYPES.SET_IS_ALREADY_INTEGRATED,
+            payload: value
+        });
+    };
+
+    const setIsSaving = (value) => {
+        dispatch({
+            type: ACTION_TYPES.SET_IS_SAVING,
+            payload: value
+        });
+    };
+
+    const setInitialFormData = (data) => {
+        dispatch({
+            type: ACTION_TYPES.SET_INITIAL_FORM_DATA,
+            payload: data
+        });
+    };
+
+    const setProjectIssuesMap = (map) => {
+        dispatch({
+            type: ACTION_TYPES.SET_PROJECT_ISSUE_MAP,
+            payload: map
+        });
+    };
+
+    const setLoadingProjectIndex = (index) => {
+        dispatch({
+            type: ACTION_TYPES.SET_LOADING_PROJECT_INDEX,
+            payload: index
+        });
+    };
 
 
     async function fetchJiraInteg() {
         let jiraInteg = await settingFunctions.fetchJiraIntegration();
         if (jiraInteg !== null) {
-            setIsAlreadyIntegrated(true)
-            setBaseUrl(jiraInteg.baseUrl)
-            setProjId(jiraInteg.projId)
-            setApiToken(jiraInteg.apiToken)
-            setUserEmail(jiraInteg.userEmail)
-            updateProjectMap(jiraInteg)
+            setIsAlreadyIntegrated(true);
+
+            // Update credentials
+            setCredentials('baseUrl', jiraInteg.baseUrl);
+            setCredentials('apiToken', jiraInteg.apiToken);
+            setCredentials('userEmail', jiraInteg.userEmail);
+
+            // Update projects
+            updateProjectMap(jiraInteg);
 
             // Store initial form data for change detection
             setInitialFormData({
@@ -59,36 +287,16 @@ function Jira() {
             });
         } else {
             // If integration is not present, add a default empty project
-            setProjectMap({ type: 'ADD' });
+            addProject();
         }
     }
 
-    const prevInitialFormDataRef = useRef();
-
-    useEffect(() => {
-        console.log("Initial form data changed");
-        if (prevInitialFormDataRef.current !== undefined) {
-            console.log("Previous initialFormData:", prevInitialFormDataRef.current);
-            console.log("Current initialFormData:", initialFormData);
-        }
-        prevInitialFormDataRef.current = initialFormData;
-    }, [initialFormData]);
-
-    const prevProjectMapRef = useRef();
-
-    useEffect(() => {
-        console.log("Project map changed");
-        if (prevProjectMapRef.current !== undefined) {
-            console.log("Previous projectMap:", prevProjectMapRef.current);
-            console.log("Current projectMap:", projectMap);
-        }
-        prevProjectMapRef.current = projectMap;
-    }, [projectMap]);
-
     function updateProjectMap(jiraInteg){
-        setProjectMap({ type: 'CLEAR' })
+        clearProjects();
         const projectMappings = jiraInteg?.projectMappings ?? {};
         let projectIds = new Set();
+        const newProjects = [];
+
         Object.entries(projectMappings).forEach(([projectId, projectMapping], index) => {
             projectIds.add(projectId);
 
@@ -113,102 +321,105 @@ function Jira() {
 
             let isBidirectionalEnabled = projectMapping?.biDirectionalSyncSettings?.enabled || false;
 
-            setProjectMap({
-                type: 'APPEND',
-                payload: {
-                    projectId,
-                    enableBiDirIntegration: isBidirectionalEnabled,
-                    aktoToJiraStatusMap,
-                    statuses: isBidirectionalEnabled ? statuses : null,
-                    jiraStatusLabel,
-                }
-            })
-        })
+            newProjects.push({
+                projectId,
+                enableBiDirIntegration: isBidirectionalEnabled,
+                aktoToJiraStatusMap,
+                statuses: isBidirectionalEnabled ? statuses : null,
+                jiraStatusLabel,
+            });
+        });
+
         Object.entries(jiraInteg?.projectIdsMap||{}).forEach(([projectId, issueMapping], index) => {
             if(!projectIds.has(projectId)){
-                setProjectMap({
-                    type: 'APPEND',
-                    payload: {
-                        projectId,
-                        enableBiDirIntegration: false,
-                        aktoToJiraStatusMap: JSON.parse(
-                            JSON.stringify(intialEmptyMapping)),
-                        statuses: [],
-                        jiraStatusLabel: []
-                    }
-                })
+                newProjects.push({
+                    projectId,
+                    enableBiDirIntegration: false,
+                    aktoToJiraStatusMap: JSON.parse(JSON.stringify(intialEmptyMapping)),
+                    statuses: [],
+                    jiraStatusLabel: []
+                });
             }
-            projectIds.add(projectId)
-        })
-        setExistingProjectIds(Array.from(projectIds))
+            projectIds.add(projectId);
+        });
+
+        setProjects(newProjects);
+        setExistingProjectIds(Array.from(projectIds));
     }
 
 
-    function toggleCheckbox(index){
-        setProjectMap({
-            type: 'UPDATE',
-            payload: {
-                index: index,
-                updates: {
-                    enableBiDirIntegration: !projectMap[index]?.enableBiDirIntegration || false
-                }
+    function fetchJiraStatusMapping(projId, index) {
+      if (projects[index]?.enableBiDirIntegration) {
+        updateProject(index, {
+          enableBiDirIntegration: false
+        });
+        return;
+      }
+
+      if (!baseUrl?.trim() || !userEmail?.trim() || !apiToken?.trim()
+          || !projId?.trim()) {
+        func.setToast(true, true, "Please fill all required fields");
+        return;
+      }
+
+      if (projects[index]?.statuses?.length > 0) {
+        const aktoToJiraStatusMap = projects[index]?.aktoToJiraStatusMap
+            || JSON.parse(JSON.stringify(intialEmptyMapping));
+        const jiraStatusLabel = projects[index]?.jiraStatusLabel ||
+            projects[index]?.statuses?.map(x => {
+              return {"label": x?.name ?? "", "value": x?.name ?? ""}
+            }) || [];
+        if (jiraStatusLabel.length > 0) {
+          aktoStatusForJira.forEach((status) => {
+            const upperStatus = status.toUpperCase();
+            if (!aktoToJiraStatusMap[upperStatus]
+                || aktoToJiraStatusMap[upperStatus].length === 0) {
+              if (jiraStatusLabel.length > 0) {
+                aktoToJiraStatusMap[upperStatus] = [jiraStatusLabel[0].value];
+              }
             }
-        })
-    }
-
-    async function fetchJiraStatusMapping(projId, index) {
-        if (projectMap[index]?.enableBiDirIntegration) {
-            toggleCheckbox(index);
-            console.log("1");
-            return;
-        }
-        if (!baseUrl?.trim() || !userEmail?.trim() || !apiToken?.trim() || !projId?.trim()) {
-            func.setToast(true, true, "Please fill all required fields");
-            console.log("2");
-            return;
+          });
         }
 
+        updateProject(index, {
+          enableBiDirIntegration: true,
+          aktoToJiraStatusMap,
+          jiraStatusLabel
+        });
+        return;
+      }
 
-        const existingProject = projectMap?.find(project => project?.projectId === projId);
-        if (existingProject?.statuses?.length > 0) {
-            toggleCheckbox(index);
-            console.log("3");
-            return;
-        }
+      setLoadingProjectIndex(index);
 
-        console.log("4");
+      api.fetchJiraStatusMapping(projId, baseUrl, userEmail, apiToken).then(
+          (res) => {
+            const jiraStatusLabel = res[projId]?.statuses?.map(x => {
+              return {"label": x?.name ?? "", "value": x?.name ?? ""}
+            });
+            const aktoToJiraStatusMap = JSON.parse(
+                JSON.stringify(intialEmptyMapping));
 
+            if (jiraStatusLabel.length > 0) {
+              aktoStatusForJira.forEach((status, index) => {
+                const upperStatus = status.toUpperCase();
+                const statusIndex = Math.min(index, jiraStatusLabel.length - 1);
+                aktoToJiraStatusMap[upperStatus] = [jiraStatusLabel[statusIndex].value];
+              });
+            }
 
-        api.fetchJiraStatusMapping(projId, baseUrl, userEmail, apiToken).then((res) => {
-            const jiraStatusLabel = res[projId]?.statuses?.map(x => { return { "label": x?.name ?? "", "value": x?.name ?? "" } });
-            // for preSelected
-            const intialIssue = res[projId]?.statuses?.map(x => x?.name) || [];
-            let aktoToJiraStatusMap = JSON.parse(JSON.stringify(intialEmptyMapping))
-            aktoStatusForJira?.forEach((x, i) => {
-                if(!aktoToJiraStatusMap.hasOwnProperty(x?.toUpperCase())){
-                    aktoToJiraStatusMap[x?.toUpperCase()] = [];
-                }
-                if (i >= intialIssue.length) return;
-                aktoToJiraStatusMap[x?.toUpperCase()].push(intialIssue[i])
-            })
+            updateProject(index, {
+              statuses: res[projId].statuses,
+              jiraStatusLabel,
+              aktoToJiraStatusMap,
+              enableBiDirIntegration: true
+            });
 
-            setProjectMap({
-                type: 'UPDATE',
-                payload: {
-                    index: index,
-                    updates: {
-                        statuses: res[projId].statuses,
-                        jiraStatusLabel,
-                        aktoToJiraStatusMap
-                    }
-                }
-            })
-            toggleCheckbox(index)
-        }).catch(err => {
-            func.setToast(true, true, "Failed to fetch Jira statuses. Verify Project ID");
-            return;
-        })
-
+            setLoadingProjectIndex(null);
+          }).catch(err => {
+        func.setToast(true, true,
+            "Failed to fetch Jira statuses. Verify Project ID");
+        setLoadingProjectIndex(null);
+      });
     }
 
     useEffect(() => {
@@ -221,47 +432,44 @@ function Jira() {
             func.setToast(true, true, "Please fill all required fields");
             return null;
         }
-        if (!projectMap?.some(project => project?.projectId?.trim())) {
+        if (!projects?.some(project => project?.projectId?.trim())) {
             func.setToast(true, true, "Please add at least one project");
             return null;
         }
 
-        // Validate that all projects with bidirectional enabled have status mappings
-        for (const project of projectMap) {
-            if (project?.enableBiDirIntegration) {
-                let hasAnyMapping = false;
-
-                // Check if any status has mappings
-                for (const status in project?.aktoToJiraStatusMap || {}) {
-                    const mappings = project?.aktoToJiraStatusMap[status];
-                    if (Array.isArray(mappings) && mappings.length > 0) {
-                        hasAnyMapping = true;
-                        break;
-                    }
+        const projectIds = new Set();
+        for (const project of projects) {
+            if (project?.projectId?.trim()) {
+                if (projectIds.has(project.projectId)) {
+                    func.setToast(true, true, `Duplicate project key: ${project.projectId}. Each project must have a unique key.`);
+                    return null;
                 }
+                projectIds.add(project.projectId);
+            }
+        }
 
-                if (!hasAnyMapping) {
-                    func.setToast(true, true, `Project ${project.projectId}: Status mappings are required when bidirectional integration is enabled`);
+        for (const project of projects) {
+            if (project?.enableBiDirIntegration) {
+                const validation = validateStatusMappings(project);
+                if (!validation.isValid) {
+                    func.setToast(true, true, validation.message);
                     return null;
                 }
             }
         }
 
         const projectMappings = {};
-        projectMap?.forEach((project) => {
+        projects?.forEach((project) => {
             if (!project?.projectId?.trim()) return;
 
-            // Use status names directly in aktoStatusMappings
             const aktoStatusMappings = {};
             if (project?.enableBiDirIntegration) {
-                // Just use the aktoToJiraStatusMap directly, as it already contains names
                 Object.entries(project?.aktoToJiraStatusMap || {}).forEach(([status, nameList]) => {
                     if (!nameList || !Array.isArray(nameList)) {
                         aktoStatusMappings[status] = [];
                         return;
                     }
 
-                    // Use the names directly
                     aktoStatusMappings[status] = nameList;
                 });
             }
@@ -288,21 +496,11 @@ function Jira() {
             setIsAlreadyIntegrated(true);
             updateProjectMap(res);
 
-            // Update initial form data after successful save
-            // Use the transformed data to ensure consistency
-            const currentProjectMap = [];
-            projectMap.forEach(project => {
-                currentProjectMap.push({
-                    ...project
-                });
-            });
-
             setInitialFormData({
                 baseUrl: data.baseUrl,
                 apiToken: data.apiToken,
                 userEmail: data.userEmail,
                 projectMappings: data.projectMappings,
-                currentProjectMap // Store the current project map for comparison
             });
 
             func.setToast(true, false, "Jira configurations saved successfully");
@@ -314,82 +512,48 @@ function Jira() {
 
     }
 
-
-    function projectMapReducer(draft, action) {
-
-        switch (action.type) {
-            case 'ADD':
-                draft.push({
-                    projectId: "",
-                    enableBiDirIntegration: false,
-                    aktoToJiraStatusMap: {
-                        FIXED: [],
-                        IGNORED: [],
-                        OPEN: []
-                    },
-                    statuses: [],
-                    jiraStatusLabel: [],
-                });
-                break;
-            case 'REMOVE':
-                draft.splice(action.index, 1);
-                break
-            case 'UPDATE':
-                const { index, updates } = action.payload;
-                if (index !== -1 && updates) {
-                    const current = draft[index];
-                    // If we're updating aktoToJiraStatusMap, merge it properly
-                    if (updates.aktoToJiraStatusMap) {
-                        current.aktoToJiraStatusMap = {
-                            ...current.aktoToJiraStatusMap,
-                            ...updates.aktoToJiraStatusMap
-                        };
-                    }
-                    Object.keys(updates).forEach((key) => {
-                        if (key !== "aktoToJiraStatusMap") {
-                            current[key] = updates[key];
-                        }
-                    });
-                }
-                break;
-            case 'APPEND':
-                if (action.payload && typeof action.payload === 'object') {
-                    draft.push({ ...action.payload });
-                }
-                break;
-            case 'CLEAR':
-                draft.length = 0;
-                break;
-            default:
-                return draft;
-        }
-    }
-
-    async function testJiraIntegration() {
-        func.setToast(true, false, "Testing Jira Integration")
-        let issueTypeMap = await settingFunctions.testJiraIntegration(userEmail, apiToken, baseUrl, projId)
-        setProjectIssuesMap(issueTypeMap)
-        func.setToast(true, false, "Fetched project maps")
-    }
-
-    async function addJiraIntegration() {
-        await settingFunctions.addJiraIntegration(userEmail, apiToken, baseUrl, projId, projectIssueMap)
-        func.setToast(true, false, "Jira integration saved successfully")
-        fetchJiraInteg()
-    }
-
     function getLabel(value, project) {
         if (!value || !Array.isArray(value)) return [];
 
-        // Since we're using names directly, we can just return the values
-        // But we'll still check if they exist in the jiraStatusLabel array
         return value?.map((x) => {
             const match = project?.jiraStatusLabel?.find((y) => y.value === x);
-            return match ? match.label : x; // Return the name directly if not found in jiraStatusLabel
+            return match ? match.label : x;
         }).filter(Boolean);
     }
 
-    // Function to check if a status is already selected for another Akto status
+    function validateStatusMappings(project) {
+        if (!project?.enableBiDirIntegration) {
+            return { isValid: true, message: '' };
+        }
+
+        const aktoToJiraStatusMap = project?.aktoToJiraStatusMap || {};
+        const usedStatuses = new Set();
+        let hasDuplicates = false;
+        let duplicateStatus = '';
+
+        for (const status in aktoToJiraStatusMap) {
+            const mappings = aktoToJiraStatusMap[status] || [];
+            for (const mapping of mappings) {
+                if (mapping && usedStatuses.has(mapping)) {
+                    hasDuplicates = true;
+                    duplicateStatus = mapping;
+                    break;
+                }
+                if (mapping) usedStatuses.add(mapping);
+            }
+            if (hasDuplicates) break;
+        }
+
+        if (hasDuplicates) {
+            return {
+                isValid: false,
+                message: `Status '${duplicateStatus}' is assigned to multiple Akto statuses. Each Jira status must be unique.`
+            };
+        }
+
+        return { isValid: true, message: '' };
+    }
+
     function isStatusAlreadySelected(project, currentStatus, statusValue) {
         if (!project || !project.aktoToJiraStatusMap) return false;
 
@@ -406,63 +570,90 @@ function Jira() {
         return false;
     }
 
-    function deleteProject(index) {
-        const projectId = projectMap[index]?.projectId;
+    async function deleteProject(index) {
+        if (loadingProjectIndex !== null || isSaving) {
+            func.setToast(true, true, "Please wait for the current operation to complete.");
+            return;
+        }
+
+        const projectId = projects[index]?.projectId;
+        if (!projectId?.trim()) {
+            removeProject(index);
+            func.setToast(true, false, "Project removed successfully");
+            return;
+        }
+
         const isExistingProject = existingProjectIds.includes(projectId);
 
-        // Check if this is the last existing project from backend
-        const existingProjectsInMap = projectMap.filter(p => existingProjectIds.includes(p.projectId));
+        const existingProjectsInMap = projects.filter(p => existingProjectIds.includes(p.projectId));
         if (isExistingProject && existingProjectsInMap.length <= 1) {
             func.setToast(true, true, "Cannot delete the last project from the integration. Add another project first.");
             return;
         }
 
-        setProjectMap({ type: 'REMOVE', index });
-        if (isExistingProject && projectId) {
-            api.deleteJiraIntegratedProject(projectId);
+        if (isExistingProject) {
+            try {
+                setLoadingProjectIndex(index);
+                await api.deleteJiraIntegratedProject(projectId);
+                removeProject(index);
+                setLoadingProjectIndex(null);
+                func.setToast(true, false, "Project removed successfully");
+            } catch (error) {
+                setLoadingProjectIndex(null);
+                func.setToast(true, true, `Failed to delete project: ${error.message || 'Unknown error'}`);
+            }
+        } else {
+            removeProject(index);
+            func.setToast(true, false, "Project removed successfully");
         }
-        func.setToast(true, false, "Project removed successfully");
     }
 
     function projectKeyChangeHandler(index, val) {
-        if (projectMap.some((project, i) => project.projectId === val)) {
-            func.setToast(true, true, "Project key already exists")
-        }
-        setProjectMap({
-            type: 'UPDATE',
-            payload: {
-                index,
-                updates: {
-                    projectId: val,
-                    statuses: [],
-                    jiraStatusLabel: [],
-                    aktoToJiraStatusMap: JSON.parse(
-                        JSON.stringify(intialEmptyMapping)),
-                    enableBiDirIntegration: false
-                }
-            }
-        })
+      if (val && !/^[A-Z0-9]+$/.test(val)) {
+        func.setToast(true, true, "Project key must contain only capital letters and numbers");
+        return;
+      }
+
+      if (projects.some((project, i) => i !== index && project.projectId === val)) {
+        func.setToast(true, true, "Project key already exists");
+        return;
+      }
+
+      updateProject(index, {
+        projectId: val,
+        statuses: [],
+        jiraStatusLabel: [],
+        aktoToJiraStatusMap: JSON.parse(JSON.stringify(intialEmptyMapping)),
+        enableBiDirIntegration: false
+      });
     }
 
     const ProjectsCard = (
         <VerticalStack gap={4}>
-            {projectMap?.map((project, index) => {
+            {projects?.map((project, index) => {
                 return (
                     <Card roundedAbove="sm">
                         <VerticalStack gap={4}>
                             <HorizontalStack align='space-between'>
                                 <Text fontWeight='semibold' variant='headingSm'>{`Project ${index + 1}`}</Text>
-                                <Button plain removeUnderline destructive size='slim' disabled={projectMap.length <= 1} onClick={() => deleteProject(index)}>Delete Project</Button>
+                                <Button plain removeUnderline destructive size='slim' disabled={projects.length <= 1} onClick={() => deleteProject(index)}>Delete Project</Button>
                             </HorizontalStack>
                             <TextField maxLength={10} showCharacterCount value={project?.projectId || ""} label="Project key" placeholder={"Project Key"}
                                 onChange={(val)=> projectKeyChangeHandler(index,val)} />
-                            <Checkbox label="Enable bi-directional integration"
-                                disabled={!project?.projectId?.trim()}
-                                checked={project.enableBiDirIntegration}
-                                onChange={() => {
-                                    fetchJiraStatusMapping(project.projectId, index)
-                                }}
-                            />
+                            {loadingProjectIndex === index ? (
+                                <div style={{ display: 'flex', alignItems: 'center', margin: '8px 0' }}>
+                                    <Spinner size="small" />
+                                    <Text variant="bodyMd" as="span" style={{ marginLeft: '8px' }}>&nbsp;&nbsp;Loading status mappings...</Text>
+                                </div>
+                            ) : (
+                                <Checkbox label="Enable bi-directional integration"
+                                    disabled={!project?.projectId?.trim()}
+                                    checked={project.enableBiDirIntegration}
+                                    onChange={() => {
+                                        fetchJiraStatusMapping(project.projectId, index)
+                                    }}
+                                />
+                            )}
                             {project.enableBiDirIntegration &&
                                 <VerticalStack gap={3} align='start'>
                                     <HorizontalStack gap={12}>
@@ -476,15 +667,9 @@ function Jira() {
                                                     <Box width='82px'><Badge >{val}</Badge></Box>
                                                     <DropdownSearch setSelected={(value) => {
                                                         const label = val.toUpperCase();
-                                                        setProjectMap({
-                                                            type: "UPDATE",
-                                                            payload: {
-                                                                index,
-                                                                updates: {
-                                                                    aktoToJiraStatusMap: {
-                                                                        [label]: value
-                                                                    }
-                                                                }
+                                                        updateProject(index, {
+                                                            aktoToJiraStatusMap: {
+                                                                [label]: value
                                                             }
                                                         })
                                                     }}
@@ -509,74 +694,96 @@ function Jira() {
     )
 
     function hasFormChanges() {
-        // If there's no initial data, it's a new integration, so there are changes
-        if (!initialFormData) return true;
+      if (!initialFormData) {
+        return true;
+      }
 
-        // Check if basic fields have changed
-        if (baseUrl !== initialFormData.baseUrl ||
-            apiToken !== initialFormData.apiToken ||
-            userEmail !== initialFormData.userEmail) {
-            return true;
-        }
+      if (baseUrl !== initialFormData.baseUrl ||
+          apiToken !== initialFormData.apiToken ||
+          userEmail !== initialFormData.userEmail) {
+        return true;
+      }
 
-        // Check if project mappings have changed
-        const currentData = transformJiraObject();
-        if (!currentData) return false;
-
-        // Compare project mappings
-        const initialProjectIds = Object.keys(initialFormData.projectMappings || {});
-        const currentProjectIds = Object.keys(currentData.projectMappings || {});
-
-        // If the number of projects has changed
-        if (initialProjectIds.length !== currentProjectIds.length) {
-            return true;
-        }
-
-        // Check if any project has been added or removed
-        for (const projectId of currentProjectIds) {
-            if (!initialFormData.projectMappings[projectId]) {
-                return true;
-            }
-        }
-
-        // Check if any project settings have changed
-        for (const projectId of currentProjectIds) {
-            const initialProject = initialFormData.projectMappings[projectId];
-            const currentProject = currentData.projectMappings[projectId];
-
-            if (!initialProject) continue;
-
-            // Check if bi-directional integration setting has changed
-            if (initialProject.biDirectionalSyncSettings?.enabled !==
-                currentProject.biDirectionalSyncSettings?.enabled) {
-                return true;
-            }
-
-            // If bi-directional integration is enabled, check if mappings have changed
-            if (currentProject.biDirectionalSyncSettings?.enabled) {
-                const initialMappings = initialProject.biDirectionalSyncSettings?.aktoStatusMappings || {};
-                const currentMappings = currentProject.biDirectionalSyncSettings?.aktoStatusMappings || {};
-
-                // Check if the mappings are different
-                for (const status of Object.keys(currentMappings)) {
-                    const initialStatusMappings = initialMappings[status] || [];
-                    const currentStatusMappings = currentMappings[status] || [];
-
-                    // Compare arrays
-                    if (initialStatusMappings.length !== currentStatusMappings.length) {
-                        return true;
-                    }
-
-                    for (let i = 0; i < currentStatusMappings.length; i++) {
-                        if (!initialStatusMappings.includes(currentStatusMappings[i])) {
-                            return true;
-                        }
-                    }
-                }
-            }
-        }
-
+      const currentData = transformJiraObject();
+      if (!currentData) {
         return false;
+      }
+
+      const initialProjectIds = Object.keys(initialFormData.projectMappings || {});
+      const currentProjectIds = Object.keys(currentData.projectMappings || {});
+
+      if (initialProjectIds.length !== currentProjectIds.length) {
+        return true;
+      }
+
+      for (const projectId of currentProjectIds) {
+        if (!initialFormData.projectMappings[projectId]) {
+          return true;
+        }
+      }
+
+      for (const projectId of initialProjectIds) {
+        if (!currentData.projectMappings[projectId]) {
+          return true;
+        }
+      }
+
+      for (const projectId of currentProjectIds) {
+        const initialProject = initialFormData.projectMappings[projectId];
+        const currentProject = currentData.projectMappings[projectId];
+
+        if (!initialProject) {
+          continue;
+        }
+
+        if (initialProject.biDirectionalSyncSettings?.enabled !==
+            currentProject.biDirectionalSyncSettings?.enabled) {
+          return true;
+        }
+
+        if (currentProject.biDirectionalSyncSettings?.enabled) {
+          const initialMappings = initialProject.biDirectionalSyncSettings?.aktoStatusMappings
+              || {};
+          const currentMappings = currentProject.biDirectionalSyncSettings?.aktoStatusMappings
+              || {};
+
+          const initialStatusKeys = Object.keys(initialMappings);
+          const currentStatusKeys = Object.keys(currentMappings);
+
+          if (initialStatusKeys.length !== currentStatusKeys.length) {
+            return true;
+          }
+
+          for (const status of currentStatusKeys) {
+            if (!initialMappings.hasOwnProperty(status)) {
+              return true;
+            }
+          }
+
+          for (const status of currentStatusKeys) {
+            const initialStatusMappings = initialMappings[status] || [];
+            const currentStatusMappings = currentMappings[status] || [];
+
+            if (initialStatusMappings.length !== currentStatusMappings.length) {
+              return true;
+            }
+
+            for (const mapping of currentStatusMappings) {
+              if (!initialStatusMappings.includes(mapping)) {
+                return true;
+              }
+            }
+
+            for (const mapping of initialStatusMappings) {
+              if (!currentStatusMappings.includes(mapping)) {
+                return true;
+              }
+            }
+          }
+        }
+      }
+
+      return false;
     }
 
     function isSaveButtonDisabled() {
@@ -584,37 +791,23 @@ function Jira() {
             return true;
         }
 
-        // Check if required fields are filled
         if (!baseUrl?.trim() || !userEmail?.trim() || !apiToken?.trim()) {
             return true;
         }
 
-        // Check if ALL projects have a valid project ID
-        if (projectMap?.length === 0 || projectMap?.some(project => !project?.projectId?.trim())) {
+        if (projects?.length === 0 || projects?.some(project => !project?.projectId?.trim())) {
             return true;
         }
 
-        // Check if projects with bidirectional integration have status mappings
-        for (const project of projectMap) {
+        for (const project of projects) {
             if (project?.enableBiDirIntegration) {
-                let hasAnyMapping = false;
-
-                // Check if any status has mappings
-                for (const status in project?.aktoToJiraStatusMap || {}) {
-                    const mappings = project?.aktoToJiraStatusMap[status];
-                    if (Array.isArray(mappings) && mappings.length > 0) {
-                        hasAnyMapping = true;
-                        break;
-                    }
-                }
-
-                if (!hasAnyMapping) {
+                const validation = validateStatusMappings(project);
+                if (!validation.isValid) {
                     return true;
                 }
             }
         }
 
-        // Disable save button if there are no changes
         if (!hasFormChanges()) {
             return true;
         }
@@ -637,15 +830,14 @@ function Jira() {
 
           <LegacyCard.Section>
                 <VerticalStack gap={"4"}>
-                    <TextField label="Base Url" value={baseUrl} helpText="Specify the base url of your jira project(for ex - https://jiraintegloc.atlassian.net)"  placeholder='Base Url' requiredIndicator onChange={setBaseUrl} />
-                    <TextField label="Email" value={userEmail} helpText="Specify your email id for which api token will be generated" placeholder='Email' requiredIndicator onChange={setUserEmail} />
-                    <PasswordTextField label="Api Token" helpText="Specify the api token created for your user email" field={apiToken} onFunc={true} setField={setApiToken} />
-                    {/* <TextField label="Add project ids" helpText="Specify the projects ids in comma separated string" value={projId} placeholder='Project Names' requiredIndicator onChange={setProjId} /> */}
+                    <TextField label="Base Url" value={baseUrl} helpText="Specify the base url of your jira project(for ex - https://jiraintegloc.atlassian.net)"  placeholder='Base Url' requiredIndicator onChange={(value) => setCredentials('baseUrl', value)} />
+                    <TextField label="Email" value={userEmail} helpText="Specify your email id for which api token will be generated" placeholder='Email' requiredIndicator onChange={(value) => setCredentials('userEmail', value)} />
+                    <PasswordTextField label="Api Token" helpText="Specify the api token created for your user email" field={apiToken} onFunc={true} setField={(value) => setCredentials('apiToken', value)} />
                     <HorizontalStack align='space-between'>
                         <Text fontWeight='semibold' variant='headingMd'>Projects</Text>
-                        <Button plain monochrome onClick={() => setProjectMap({ type: 'ADD' })}>Add Project</Button>
+                        <Button plain monochrome onClick={addProject}>Add Project</Button>
                     </HorizontalStack>
-                    {projectMap.length !== 0 ? ProjectsCard : null}
+                    {projects.length !== 0 ? ProjectsCard : null}
                 </VerticalStack>
           </LegacyCard.Section>
           <Divider />
