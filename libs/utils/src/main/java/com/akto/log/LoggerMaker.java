@@ -312,6 +312,9 @@ public class LoggerMaker  {
             case PUPPETEER:
                 logs = PupeteerLogsDao.instance.findAll(filters, Projections.include("log", Log.TIMESTAMP));
                 break;
+            case THREAT_DETECTION:
+                logs = ProtectionLogsDao.instance.findAll(filters, Projections.include("log", Log.TIMESTAMP));
+                break;
             default:
                 break;
         }
