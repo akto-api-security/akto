@@ -138,6 +138,7 @@ public class MaliciousTrafficDetectorTask implements Task {
                 kafkaConsumer.commitSync();
               }
             } catch (Exception e) {
+              logger.errorAndAddToDb("Error in processing record " + e.getMessage());
               e.printStackTrace();
             }
           }
@@ -168,6 +169,7 @@ public class MaliciousTrafficDetectorTask implements Task {
 
       return res.getIsValid();
     } catch (Exception e) {
+      logger.errorAndAddToDb("Error in validateFilterForRequest " + e.getMessage());
       e.printStackTrace();
     }
 
@@ -278,6 +280,7 @@ public class MaliciousTrafficDetectorTask implements Task {
             internalKafka.send(KafkaTopic.ThreatDetection.MALICIOUS_EVENTS, sample);
           });
     } catch (Exception e) {
+      logger.errorAndAddToDb("Error in sending malicious event to kafka " + e.getMessage());
       e.printStackTrace();
     }
   }
