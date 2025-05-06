@@ -163,6 +163,9 @@ function ApiDetails(props) {
         
         setIsEditingDescription(false);
         
+        if(editableDescription === description) {
+            return
+        }
         await api.saveEndpointDescription(apiCollectionId, endpoint, method, editableDescription)
             .then(() => {
                 setDescription(editableDescription);
