@@ -210,7 +210,18 @@ export default {
         const resp = await request({
             url: '/api/updateTestRoles',
             method: 'post',
-            data: { roleName, andConditions, orConditions }
+            data: { roleName, andConditions, orConditions}
+        })
+        return resp        
+    },
+    async saveTestRoleMeta(roleName, scopeRoles) {
+        if(scopeRoles && scopeRoles.length === 0){
+            return;
+        }
+        const resp = await request({
+            url: '/api/saveTestRoleMeta',
+            method: 'post',
+            data: { roleName, scopeRoles}
         })
         return resp        
     },

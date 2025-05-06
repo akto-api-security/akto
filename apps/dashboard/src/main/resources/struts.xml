@@ -4540,6 +4540,35 @@
             </result>
         </action>
 
+        <action name="api/saveTestRoleMeta" class="com.akto.action.testing.TestRolesAction" method="saveTestRoleMeta">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">TEST_ROLES</param>
+                <param name="accessType">READ_WRITE</param>
+                <param name="actionDescription">User updated test role meta</param>
+            </interceptor-ref>
+            <interceptor-ref name="usageInterceptor">
+                <param name="featureLabel">TEST_ROLE_SCOPE_ROLES</param>
+            </interceptor-ref>
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="UNAUTHORIZED" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
         <action name="api/deleteTestRole" class="com.akto.action.testing.TestRolesAction" method="deleteTestRole">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />

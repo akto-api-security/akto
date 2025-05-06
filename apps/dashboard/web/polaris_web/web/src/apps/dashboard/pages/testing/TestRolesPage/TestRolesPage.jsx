@@ -70,6 +70,7 @@ function TestRolesPage(){
                     content: 'Access matrix',
                     onAction: () => navigate("access-matrix", {state: {
                         name: item.name,
+                        scopeRoles: item?.scopeRoles || [],
                         endpoints: item.endpointLogicalGroup.testingEndpoints,
                         authWithCondList: item.authWithCondList
                     }})
@@ -130,6 +131,7 @@ function TestRolesPage(){
 
     const onTestRoleClick = (item) => navigate("details", {state: {
         name: item.name,
+        scopeRoles: item?.scopeRoles || [],
         endpoints: item?.endpointLogicalGroup?.testingEndpoints || [],
         authWithCondList: item?.authWithCondList || []
     }})
