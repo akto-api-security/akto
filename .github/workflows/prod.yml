@@ -50,6 +50,7 @@ jobs:
   build-akto:
     # The type of runner that the job will run on
     runs-on: ubuntu-22.04
+    if: ${{ github.event.inputs.dashboard == 'true' || github.event.inputs.testing == 'true' || github.event.inputs.billing == 'true' || github.event.inputs.internal == 'true'}}
 
     # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
