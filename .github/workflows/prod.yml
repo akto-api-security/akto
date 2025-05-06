@@ -213,9 +213,6 @@ jobs:
           distribution: "adopt"
           java-version: "8"
           architecture: x64
-      - uses: actions/setup-node@v2
-        with:
-          node-version: '17'
       - name: Setup Protoc
         uses: arduino/setup-protoc@v3
         with:
@@ -290,7 +287,7 @@ jobs:
         uses: mathieudutour/github-tag-action@v6.1
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          custom_tag: ${{ github.event.inputs.release_version }}
+          custom_tag: threat-${{ github.event.inputs.release_version_threat }}
       - name: Create a GitHub release
         uses: ncipollo/release-action@v1.12.0
         with:
@@ -303,7 +300,7 @@ jobs:
         with:
           payload: |
             {
-              "text": "Akto Open Source v${{ github.event.inputs.release_version }} released!"
+              "text": "Akto Open Source Threat v${{ github.event.inputs.release_version_threat }} released!"
             }
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
