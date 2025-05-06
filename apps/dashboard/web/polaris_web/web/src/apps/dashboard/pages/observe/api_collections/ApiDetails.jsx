@@ -18,7 +18,7 @@ import gptApi from "../../../components/aktoGpt/api";
 
 import { HorizontalDotsMinor, FileMinor } from "@shopify/polaris-icons"
 import LocalStore from "../../../../main/LocalStorageStore";
-import APICollectionDescriptionModal from "../../../components/shared/APICollectionDescriptionModal";
+import InlineEditableText from "../../../components/shared/InlineEditableText";
 
 function ApiDetails(props) {
 
@@ -40,6 +40,8 @@ function ApiDetails(props) {
     const [description, setDescription] = useState("")
     const [showDescriptionModal, setShowDescriptionModal] = useState(false)
     const [headersWithData, setHeadersWithData] = useState([])
+    const [isEditingDescription, setIsEditingDescription] = useState(false)
+    const [editableDescription, setEditableDescription] = useState(description)
 
     const [useLocalSubCategoryData, setUseLocalSubCategoryData] = useState(false)
 
@@ -73,10 +75,11 @@ function ApiDetails(props) {
 
             setTimeout(() => {
                 setDescription(description == null ? "" : description)
+                setEditableDescription(description == null ? "" : description)
             }, 100)
             headers.forEach((header) => {
                 if (header.value === "description") {
-                    header.action = () => setShowDescriptionModal(true)
+                    header.action = () => setIsEditingDescription(true)
                 }
             })
 
@@ -151,17 +154,18 @@ function ApiDetails(props) {
                 }
             }catch (e) {
             }
-            
+
         }
     }
 
     const handleSaveDescription = async () => {
         const { apiCollectionId, endpoint, method } = apiDetail;
         
-        setShowDescriptionModal(false);
+        setIsEditingDescription(false);
         
-        await api.saveEndpointDescription(apiCollectionId, endpoint, method, description)
+        await api.saveEndpointDescription(apiCollectionId, endpoint, method, editableDescription)
             .then(() => {
+                setDescription(editableDescription);
                 func.setToast(true, false, "Description saved successfully");
             })
             .catch((err) => {
@@ -255,6 +259,7 @@ function ApiDetails(props) {
                 heading={"Sample values"}
                 minHeight={"35vh"}
                 vertical={true}
+                isAPISampleData={true}
                 metadata={headersWithData.map(x => x.split(" ")[0])}
             />
         </Box>,
@@ -278,7 +283,8 @@ function ApiDetails(props) {
             window.location.reload()
         })
     }
-    let newData = apiDetail
+
+    let newData = JSON.parse(JSON.stringify(apiDetail))
     newData['copyEndpoint'] = {
         method: apiDetail.method,
         endpoint: apiDetail.endpoint
@@ -298,6 +304,8 @@ function ApiDetails(props) {
         newData['headersInfo'] = [...new Set(headersWithData.map(x => x.split(" ").slice(1,x.length - 1).join(" ")))]
     } catch (e) {
     }
+
+    newData['description'] = (isEditingDescription?<InlineEditableText textValue={editableDescription} setTextValue={setEditableDescription} handleSaveClick={handleSaveDescription} setIsEditing={setIsEditingDescription}  placeholder={"Add a brief description"} maxLength={64}/> : description )
 
     const headingComp = (
         <div style={{ display: "flex", justifyContent: "space-between" }} key="heading">
@@ -369,15 +377,6 @@ function ApiDetails(props) {
                 setShow={setShowDetails}
                 components={components}
                 loading={loading}
-            />
-            <APICollectionDescriptionModal
-                showDescriptionModal={showDescriptionModal}
-                setShowDescriptionModal={setShowDescriptionModal}
-                title="API Endpoint Description"
-                handleSaveDescription={handleSaveDescription}
-                description={description}
-                setDescription={setDescription}
-                placeholder={"Add a brief description for this endpoint"}
             />
             <Modal large open={isGptScreenActive} onClose={() => setIsGptScreenActive(false)} title="Akto GPT">
                 <Modal.Section flush>
