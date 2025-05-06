@@ -215,6 +215,9 @@ export default {
         return resp        
     },
     async saveTestRoleMeta(roleName, scopeRoles) {
+        if(scopeRoles && scopeRoles.length === 0){
+            return;
+        }
         const resp = await request({
             url: '/api/saveTestRoleMeta',
             method: 'post',

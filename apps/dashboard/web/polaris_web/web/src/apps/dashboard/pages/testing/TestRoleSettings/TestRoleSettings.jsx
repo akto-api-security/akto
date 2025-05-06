@@ -12,6 +12,7 @@ import TestingStore from '../testingStore';
 import DescriptionCard from "./DescriptionCard";
 import AuthComponent from "./AuthComponent";
 import SavedParamComponent from "./SavedParamComponent";
+import { HARDCODED } from "./testRoleConstants"; 
 
 const selectOptions = [
   {
@@ -67,6 +68,8 @@ function TestRoleSettings() {
   const [refresh, setRefresh] = useState(false)
   const setAuthMechanism = TestingStore.getState().setAuthMechanism
   const [editableDoc, setEditableDocs] = useState(-1)
+  const [openAuth, setOpenAuth] = useState(HARDCODED);
+  const [advancedHeaderSettingsOpen, setAdvancedHeaderSettingsOpen] = useState(false)
 
   function getAuthWithCondList() {
     return  initialItems?.authWithCondList
@@ -115,7 +118,7 @@ function TestRoleSettings() {
   }, [conditions])
 
   useEffect(() => {
-    if (func.deepComparison(scopeRoles, transform.createConditions(initialItems.endpoints))) {
+    if (func.deepComparison(scopeRoles, transform.createConditions(initialItems.scopeRoles))) {
       setChange(false);
     } else {
       setChange(true);
@@ -268,7 +271,7 @@ function TestRoleSettings() {
 
   const authComponent = (
     <AuthComponent
-      showshowAuthComponent={showAuthComponent}
+      showAuthComponent={showAuthComponent}
       setShowAuthComponent={setShowAuthComponent}
       hardcodedOpen={hardcodedOpen}
       setHardcodedOpen={setHardcodedOpen}
@@ -278,6 +281,10 @@ function TestRoleSettings() {
       initialItems={initialItems}
       saveAction={saveAction}
       isNew={isNew}
+      openAuth={openAuth}
+      setOpenAuth={setOpenAuth}
+      advancedHeaderSettingsOpen={advancedHeaderSettingsOpen}
+      setAdvancedHeaderSettingsOpen={setAdvancedHeaderSettingsOpen}
     />
   );
 
@@ -285,11 +292,12 @@ function TestRoleSettings() {
     <SavedParamComponent
       getAuthWithCondList={getAuthWithCondList}
       setShowAuthComponent={setShowAuthComponent}
-      setHardcodedOpen={setHardcodedOpen}
       setEditableDocs={setEditableDocs}
       saveAction={saveAction}
       initialItems={initialItems}
       setAuthMechanism={setAuthMechanism}
+      setOpenAuth={setOpenAuth}
+      setAdvancedHeaderSettingsOpen={setAdvancedHeaderSettingsOpen}
     />
   );
 

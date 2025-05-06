@@ -1,8 +1,11 @@
 import React, { useState } from "react";
 import {
+  Box,
   Button,
-  LegacyCard,
+  FormLayout, 
+  LegacyCard, 
   HorizontalStack,
+  LegacyStack,
   VerticalStack,
   Text,
   Collapsible,
@@ -18,6 +21,7 @@ import HardCoded from '../user_config/HardCoded';
 import JsonRecording from '../user_config/JsonRecording';
 import Dropdown from '../../../components/layouts/Dropdown';
 import TlsAuth from '../user_config/TlsAuth';
+import { HARDCODED, LOGIN_REQUEST, TLS_AUTH } from "./testRoleConstants"; 
 
 
 
@@ -32,11 +36,12 @@ const AuthComponent = ({
   initialItems,
   saveAction,
   isNew,
+  openAuth,
+  setOpenAuth,
+  advancedHeaderSettingsOpen,
+  setAdvancedHeaderSettingsOpen
 }) => {
 
-  const HARDCODED = "HARDCODED"
-  const LOGIN_REQUEST = "LOGIN_REQUEST"
-  const TLS_AUTH = "TLS_AUTH"
 
   const [currentInfo, setCurrentInfo] = useState({ steps: [], authParams: {} });
   const [headerKey, setHeaderKey] = useState("");
@@ -44,7 +49,6 @@ const AuthComponent = ({
   const [automationType, setAutomationType] = useState("LOGIN_STEP_BUILDER");
   const [hardCodeAuthInfo, setHardCodeAuthInfo] = useState({ authParams: [] });
   const [tlsAuthInfo, setTlsAuthInfo] = useState({authParams:[]})
-  const [openAuth, setOpenAuth] = useState(HARDCODED);
 
   const automationOptions = [
     { label: "Login Step Builder", value: "LOGIN_STEP_BUILDER" },
@@ -78,6 +82,7 @@ const AuthComponent = ({
   };
 
   const handleCancel = () => {
+
     setShowAuthComponent(false);
     setCurrentInfo({});
     setHeaderKey("");
@@ -98,7 +103,7 @@ const AuthComponent = ({
     const apiCond = { [headerKey]: headerValue };
     let resp = {};
     if (openAuth === HARDCODED) {
-      const automationType = "HardCoded";
+      const currentAutomationType = "HardCoded";
       const authParamData = hardCodeAuthInfo.authParams;
       if (editableDoc > -1) {
         resp = await api.updateAuthInRole(
@@ -106,19 +111,19 @@ const AuthComponent = ({
           apiCond,
           editableDoc,
           authParamData,
-          automationType
+          currentAutomationType
         );
       } else {
         resp = await api.addAuthToRole(
           initialItems.name,
           apiCond,
           authParamData,
-          automationType,
+          currentAutomationType,
           null
         );
       }
     } else if (openAuth === LOGIN_REQUEST) {
-      const automationType = "LOGIN_REQUEST";
+      const currentAutomationType = "LOGIN_REQUEST";
 
       let recordedLoginFlowInput = null;
       if (currentInfo.steps && currentInfo.steps.length > 0) {
@@ -137,7 +142,7 @@ const AuthComponent = ({
             apiCond,
             editableDoc,
             currentInfo.authParams,
-            automationType,
+            currentAutomationType,
             currentInfo.steps,
             recordedLoginFlowInput
           );
@@ -146,7 +151,7 @@ const AuthComponent = ({
             initialItems.name,
             apiCond,
             currentInfo.authParams,
-            automationType,
+            currentAutomationType,
             currentInfo.steps,
             recordedLoginFlowInput
           );
@@ -155,12 +160,12 @@ const AuthComponent = ({
         func.setToast(true, true, "Request data cannot be empty!");
       }
     } else if (openAuth === TLS_AUTH) {
-                const automationType = TLS_AUTH;
+                const currentAutomationType = TLS_AUTH;
                 const authParamData = tlsAuthInfo.authParams
                 if(editableDoc > -1){
-                    resp = await api.updateAuthInRole(initialItems.name, apiCond, editableDoc, authParamData, automationType)
+                    resp = await api.updateAuthInRole(initialItems.name, apiCond, editableDoc, authParamData, currentAutomationType)
                 }else{
-                    resp = await api.addAuthToRole(initialItems.name, apiCond, authParamData, automationType, null)
+                    resp = await api.addAuthToRole(initialItems.name, apiCond, authParamData, currentAutomationType, null)
                 }
             }
     handleCancel();

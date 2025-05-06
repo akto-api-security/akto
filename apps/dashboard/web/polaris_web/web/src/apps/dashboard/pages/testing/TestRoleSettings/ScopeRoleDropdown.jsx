@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import settingRequests from "../../settings/api";
 import DropdownSearch from "../../../components/shared/DropdownSearch";
 import func from "@/util/func"
@@ -12,7 +12,6 @@ const ScopeRoleDropdown = ({ dispatch, initialItems }) => {
      return null;
   }
 
-
   let rbacAccess = func.checkForRbacFeatureBasic();
   let rbacAccessAdvanced = func.checkForRbacFeature();
   
@@ -21,11 +20,13 @@ const ScopeRoleDropdown = ({ dispatch, initialItems }) => {
   const [errorLoadingList, setErrorLoadingList] = useState(false);
   const [selectedRoles, setSelectedRoles] = useState([]);
   const [rolesOptions, setRolesOptions] = useState([]);
+  const hasDispatchedOnce = useRef(false);
 
   useEffect(() => {
-    if (initialItems) {
+    if (initialItems && !hasDispatchedOnce.current) {
       if(initialItems.scopeRoles && initialItems.scopeRoles.length > 0) {
         setSelectedRoles(initialItems.scopeRoles);
+        hasDispatchedOnce.current = true;
       }
       else{
         let defaultSelected = rolesOptions.map((item) => item.key);
@@ -33,8 +34,6 @@ const ScopeRoleDropdown = ({ dispatch, initialItems }) => {
       }
     }
   }, [initialItems, rolesOptions]);
-
-  
 
     const fetchRolesData = async () => {
       setCustomRolesLoading(true);
@@ -84,7 +83,6 @@ const ScopeRoleDropdown = ({ dispatch, initialItems }) => {
   };
 
   useEffect(() => {
-    // getRoleData();
     fetchRolesData();
   }, [rbacAccess, rbacAccessAdvanced]);
 

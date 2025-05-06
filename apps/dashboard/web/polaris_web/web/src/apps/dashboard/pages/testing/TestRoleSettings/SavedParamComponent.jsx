@@ -2,23 +2,23 @@ import React, { useState } from "react";
 import { LegacyCard, Text, Divider, VerticalStack } from "@shopify/polaris";
 import ParamsCard from "./ParamsCard";
 import DeleteModal from "./DeleteModal";
+import { HARDCODED, LOGIN_REQUEST, TLS_AUTH } from "./testRoleConstants";
+
 
 const SavedParamComponent = ({
   getAuthWithCondList,
   setShowAuthComponent,
-  setHardcodedOpen,
   setEditableDocs,
   saveAction,
   initialItems,
-  setAuthMechanism
+  setAuthMechanism,
+  setOpenAuth,
+  setAdvancedHeaderSettingsOpen
 }) => {
-  const HARDCODED = "HARDCODED"
-  const LOGIN_REQUEST = "LOGIN_REQUEST"
-  const TLS_AUTH = "TLS_AUTH"
+
   const [deletedIndex, setDeletedIndex] = useState(-1);
   const [showAuthDeleteModal, setShowAuthDeleteModal] = useState(false);
-  const [advancedHeaderSettingsOpen, setAdvancedHeaderSettingsOpen] =
-    useState(false);
+
 
   const handleOpenEdit = (authObj, index) => {
     setAuthMechanism(authObj.authMechanism);
