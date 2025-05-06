@@ -361,6 +361,13 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
             existingProjectMappings = new HashMap<>();
         }
 
+        for (Map.Entry<String, ProjectMapping> entry : projectMappings.entrySet()) {
+            ProjectMapping mapping = entry.getValue();
+            if (!mapping.getBiDirectionalSyncSettings().isEnabled()) {
+                mapping.setStatuses(null);
+            }
+        }
+
         existingProjectMappings.putAll(projectMappings);
 
         UpdateOptions updateOptions = new UpdateOptions();
