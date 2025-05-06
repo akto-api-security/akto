@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { LegacyCard, Text, Divider, VerticalStack } from "@shopify/polaris";
 import ParamsCard from "./ParamsCard";
 import DeleteModal from "./DeleteModal";
-import { HARDCODED, LOGIN_REQUEST, TLS_AUTH } from "./testRoleConstants";
+import { HARDCODED, LOGIN_REQUEST, TLS_AUTH } from "./TestRoleConstants";
 
 
 const SavedParamComponent = ({

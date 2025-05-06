@@ -12,7 +12,7 @@ import TestingStore from '../testingStore';
 import DescriptionCard from "./DescriptionCard";
 import AuthComponent from "./AuthComponent";
 import SavedParamComponent from "./SavedParamComponent";
-import { HARDCODED } from "./testRoleConstants"; 
+import { HARDCODED } from "./TestRoleConstants";
 
 const selectOptions = [
   {
