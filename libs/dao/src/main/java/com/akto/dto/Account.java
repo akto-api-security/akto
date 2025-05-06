@@ -19,6 +19,9 @@ public class Account {
     public static final String HYBRID_TESTING_ENABLED = "hybridTestingEnabled";
     private boolean hybridTestingEnabled;
 
+    public static final String LAST_ACTIVE_TS = "lastActiveTimestamp";
+    private int lastActiveTimestamp;
+
     public Account() {}
 
     public Account(int id, String name) {
@@ -104,5 +107,13 @@ public class Account {
 
     public void setHybridTestingEnabled(boolean hybridTestingEnabled) {
         this.hybridTestingEnabled = hybridTestingEnabled;
+    }
+
+    public int getLastActiveTimestamp() {
+        return lastActiveTimestamp;
+    }
+
+    public void setLastActiveTimestamp(int lastActiveTimestamp) {
+        this.lastActiveTimestamp = lastActiveTimestamp;
     }
 }

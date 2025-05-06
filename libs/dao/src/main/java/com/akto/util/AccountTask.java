@@ -7,9 +7,12 @@ import java.util.Set;
 import java.util.function.Consumer;
 
 import com.akto.dao.AccountsDao;
+import com.akto.dao.UsersDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.Account;
+import com.akto.dto.User;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Projections;
 
 import org.bson.conversions.Bson;
 import org.slf4j.Logger;
@@ -263,7 +266,7 @@ public class AccountTask {
 
         List<Account> activeAccounts = AccountsDao.instance.findAll(Filters.and(activeFilter, nonHybridAccountsFilter));
         for(Account account: activeAccounts) {
-            if (inactiveAccountsSet.contains(account.getId())) {
+            if (inactiveAccountsSet.contains(account.getId()) || !shouldRunJobsOnAccount(account)) {
                 continue;
             }
             try {
@@ -274,5 +277,30 @@ public class AccountTask {
                 logger.error(msgString, e);
             }
         }
+    }
+
+    private boolean shouldRunJobsOnAccount(Account account){
+        if(account == null){
+            return false;
+        }
+
+        if(Context.now() - account.getLastActiveTimestamp() > Constants.ONE_MONTH_TIMESTAMP){
+            // get all users and check their lastLoginTs just to verify if that account is active
+            int accountId = account.getId();
+            List<User> users = UsersDao.instance.findAll(Filters.eq(Filters.exists("accounts."+accountId)), Projections.include(User.LAST_LOGIN_TS));
+            if(users == null || users.isEmpty()){
+                return false;
+            }
+            int maxLoginTs = 0;
+            for(User user: users){
+                if(user.getLastLoginTs() > maxLoginTs){
+                    maxLoginTs = user.getLastLoginTs();
+                }
+            }
+            if(Context.now() - maxLoginTs > Constants.ONE_MONTH_TIMESTAMP){
+                return false;
+            }
+        }
+        return true;
     }
 }

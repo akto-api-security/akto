@@ -1,7 +1,11 @@
 package com.akto.dao;
 
+import com.akto.dao.context.Context;
 import com.akto.dto.Account;
+import com.akto.util.Constants;
 import com.mongodb.BasicDBObject;
+import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Updates;
 
 import java.util.List;
 
@@ -14,6 +18,13 @@ public class AccountsDao extends CommonContextDao<Account> {
         String[] fieldNames = { Account.INACTIVE_STR };
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, true);
 
+    }
+
+    public void updateLastActiveAccount(int accountId){
+        instance.updateOneNoUpsert(
+            Filters.eq(Constants.ID, accountId),
+            Updates.set(Account.LAST_ACTIVE_TS, Context.now())
+        );
     }
 
     @Override
