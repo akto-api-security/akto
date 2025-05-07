@@ -7,6 +7,7 @@ import com.akto.dao.AccountsDao;
 import com.akto.dao.CustomAuthTypeDao;
 import com.akto.dao.SampleDataDao;
 import com.akto.dao.context.Context;
+import com.akto.dao.monitoring.ModuleInfoDao;
 import com.akto.dao.test_editor.TestConfigYamlParser;
 import com.akto.dao.test_editor.TestingRunPlaygroundDao;
 import com.akto.dao.test_editor.YamlTemplateDao;
@@ -19,6 +20,7 @@ import com.akto.dto.AccountSettings;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.CustomAuthType;
 import com.akto.dto.RawApi;
+import com.akto.dto.monitoring.ModuleInfo;
 import com.akto.dto.test_editor.Category;
 import com.akto.dto.test_editor.Info;
 import com.akto.dto.test_editor.TestConfig;
@@ -55,11 +57,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import com.fasterxml.jackson.dataformat.yaml.YAMLGenerator;
 import com.mongodb.BasicDBObject;
-import com.mongodb.client.model.Filters;
-import com.mongodb.client.model.FindOneAndUpdateOptions;
-import com.mongodb.client.model.Projections;
-import com.mongodb.client.model.ReturnDocument;
-import com.mongodb.client.model.Updates;
+import com.mongodb.client.model.*;
 import com.mongodb.client.result.InsertOneResult;
 
 import org.bson.conversions.Bson;
@@ -264,6 +262,26 @@ public class SaveTestEditorAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
+    public static int compareVersions(String v1, String v2) {
+        try {
+            String[] parts1 = v1.split("\\.");
+            String[] parts2 = v2.split("\\.");
+
+            int length = Math.max(parts1.length, parts2.length);
+            for (int i = 0; i < length; i++) {
+                int num1 = i < parts1.length ? Integer.parseInt(parts1[i]) : 0;
+                int num2 = i < parts2.length ? Integer.parseInt(parts2[i]) : 0;
+                if (num1 != num2) {
+                    return Integer.compare(num1, num2);
+                }
+            }
+            return 0;
+        } catch (Exception e) {
+            //ignore
+        }
+        return 1;
+    }
+
     public String runTestForGivenTemplate() {
         TestExecutor executor = new TestExecutor();
         TestConfig testConfig;
@@ -290,28 +308,34 @@ public class SaveTestEditorAction extends UserAction {
             return ERROR.toUpperCase();
         }
 
-//        Account account = AccountsDao.instance.findOne(Filters.eq(Constants.ID, Context.accountId.get()));
+        Account account = AccountsDao.instance.findOne(Filters.eq(Constants.ID, Context.accountId.get()));
         ApiInfo.ApiInfoKey infoKey = new ApiInfo.ApiInfoKey(apiInfoKey.getInt(ApiInfo.ApiInfoKey.API_COLLECTION_ID),
                 apiInfoKey.getString(ApiInfo.ApiInfoKey.URL),
                 URLMethods.Method.valueOf(apiInfoKey.getString(ApiInfo.ApiInfoKey.METHOD)));
 
-//        if (account.getHybridTestingEnabled()) {
-//            TestingRunPlayground testingRunPlayground = new TestingRunPlayground();
-//            testingRunPlayground.setTestTemplate(content);
-//            testingRunPlayground.setState(State.SCHEDULED);
-//            testingRunPlayground.setSamples(sampleDataList.get(0).getSamples());
-//            testingRunPlayground.setApiInfoKey(infoKey);
-//            testingRunPlayground.setCreatedAt(Context.now());
-//
-//            InsertOneResult insertOne = TestingRunPlaygroundDao.instance.insertOne(testingRunPlayground);
-//            if (insertOne.wasAcknowledged()) {
-//                testingRunPlaygroundHexId = Objects.requireNonNull(insertOne.getInsertedId()).asObjectId().getValue().toHexString();
-//                return SUCCESS.toUpperCase();
-//            } else {
-//                addActionError("Failed to create TestingRunPlayground");
-//                return ERROR.toUpperCase();
-//            }
-//        }
+        if (account.getHybridTestingEnabled()) {
+            ModuleInfo moduleInfo = ModuleInfoDao.instance.getMCollection().find(Filters.eq(ModuleInfo.MODULE_TYPE, ModuleInfo.ModuleType.MINI_TESTING)).sort(Sorts.descending(ModuleInfo.LAST_HEARTBEAT_RECEIVED)).limit(1).first();
+            if (moduleInfo != null) {
+                String version = moduleInfo.getCurrentVersion().split(" - ")[0];
+                if (compareVersions("1.44.9", version) <= 0) {//latest version
+                    TestingRunPlayground testingRunPlayground = new TestingRunPlayground();
+                    testingRunPlayground.setTestTemplate(content);
+                    testingRunPlayground.setState(State.SCHEDULED);
+                    testingRunPlayground.setSamples(sampleDataList.get(0).getSamples());
+                    testingRunPlayground.setApiInfoKey(infoKey);
+                    testingRunPlayground.setCreatedAt(Context.now());
+
+                    InsertOneResult insertOne = TestingRunPlaygroundDao.instance.insertOne(testingRunPlayground);
+                    if (insertOne.wasAcknowledged()) {
+                        testingRunPlaygroundHexId = Objects.requireNonNull(insertOne.getInsertedId()).asObjectId().getValue().toHexString();
+                        return SUCCESS.toUpperCase();
+                    } else {
+                        addActionError("Failed to create TestingRunPlayground");
+                        return ERROR.toUpperCase();
+                    }
+                }
+            }
+        }
 
         try {
             if (!TestConfig.DYNAMIC_SEVERITY.equals(testConfig.getInfo().getSeverity())) {
