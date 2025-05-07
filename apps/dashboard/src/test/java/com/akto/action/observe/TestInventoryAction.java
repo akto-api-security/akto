@@ -159,7 +159,7 @@ public class TestInventoryAction extends MongoBasedTest {
         BloomFilter<CharSequence> existingAPIsInDb = BloomFilter.create(Funnels.stringFunnel(Charsets.UTF_8), 1_000_000, 0.001 );
         APICatalogSync.mergeUrlsAndSave(apiCollectionId, true, true, existingAPIsInDb);
 
-        List<SingleTypeInfo> singleTypeInfoObjectIdList  = SingleTypeInfoDao.instance.findAll(SingleTypeInfoDao.filterForSTIUsingURL(apiCollectionId, "api/books/OBJECT_ID", URLMethods.Method.POST));
+        List<SingleTypeInfo> singleTypeInfoObjectIdList  = SingleTypeInfoDao.instance.findAll(SingleTypeInfoDao.filterForSTIUsingURL(apiCollectionId, "/api/books/OBJECT_ID", URLMethods.Method.POST));
         assertEquals(5, singleTypeInfoObjectIdList.size());
 
         List<SingleTypeInfo> singleTypeInfoHiList  = SingleTypeInfoDao.instance.findAll(SingleTypeInfoDao.filterForSTIUsingURL(apiCollectionId, "/api/books/hi", URLMethods.Method.POST));
@@ -168,7 +168,7 @@ public class TestInventoryAction extends MongoBasedTest {
         List<SingleTypeInfo> singleTypeInfoHelloList  = SingleTypeInfoDao.instance.findAll(SingleTypeInfoDao.filterForSTIUsingURL(apiCollectionId, "/api/books/hello", URLMethods.Method.POST));
         assertEquals(4, singleTypeInfoHelloList.size());
 
-        SampleData sampleDataObjectId = SampleDataDao.instance.findOne(SampleDataDao.filterForSampleData(apiCollectionId, "api/books/OBJECT_ID", URLMethods.Method.POST));
+        SampleData sampleDataObjectId = SampleDataDao.instance.findOne(SampleDataDao.filterForSampleData(apiCollectionId, "/api/books/OBJECT_ID", URLMethods.Method.POST));
         assertNotNull(sampleDataObjectId);
 
         SampleData sampleDataHi = SampleDataDao.instance.findOne(SampleDataDao.filterForSampleData(apiCollectionId, "/api/books/hi", URLMethods.Method.POST));
@@ -177,7 +177,7 @@ public class TestInventoryAction extends MongoBasedTest {
         SampleData sampleDataHello = SampleDataDao.instance.findOne(SampleDataDao.filterForSampleData(apiCollectionId, "/api/books/hello", URLMethods.Method.POST));
         assertNotNull(sampleDataHello);
 
-        ApiInfo apiInfoObjectId = ApiInfoDao.instance.findOne(SampleDataDao.filterForSampleData(apiCollectionId, "api/books/OBJECT_ID", URLMethods.Method.POST));
+        ApiInfo apiInfoObjectId = ApiInfoDao.instance.findOne(SampleDataDao.filterForSampleData(apiCollectionId, "/api/books/OBJECT_ID", URLMethods.Method.POST));
         assertNotNull(apiInfoObjectId);
 
         ApiInfo apiInfoHi = ApiInfoDao.instance.findOne(SampleDataDao.filterForSampleData(apiCollectionId, "/api/books/hi", URLMethods.Method.POST));
