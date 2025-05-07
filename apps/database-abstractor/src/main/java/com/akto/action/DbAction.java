@@ -241,7 +241,8 @@ public class DbAction extends ActionSupport {
     KafkaUtils kafkaUtils = new KafkaUtils();
     String endpointLogicalGroupId;
     String vpcId;
-
+    private TestingRunPlayground.TestingRunPlaygroundType testingRunPlaygroundType;
+    private OriginalHttpResponse originalHttpResponse;
     String metricType;
 
     public String getMetricType() {
@@ -2421,14 +2422,22 @@ public class DbAction extends ActionSupport {
 
     public String updateTestingRunPlaygroundStateAndResult(){
         try {
-            TestingRunResult testingRunResult = objectMapper.readValue(this.testingRunResult.toJson(), TestingRunResult.class);
-            if(testingRunResult.getSingleTestResults()!=null){
-                testingRunResult.setTestResults(new ArrayList<>(testingRunResult.getSingleTestResults()));
-            }else if(testingRunResult.getMultiExecTestResults() !=null){
-                testingRunResult.setTestResults(new ArrayList<>(testingRunResult.getMultiExecTestResults()));
-            }
+            switch (this.getTestingRunPlaygroundType()) {
+                case TEST_EDITOR_PLAYGROUND:
+                    TestingRunResult testingRunResult = objectMapper.readValue(this.testingRunResult.toJson(), TestingRunResult.class);
+                    if(testingRunResult.getSingleTestResults()!=null){
+                        testingRunResult.setTestResults(new ArrayList<>(testingRunResult.getSingleTestResults()));
+                    }else if(testingRunResult.getMultiExecTestResults() !=null){
+                        testingRunResult.setTestResults(new ArrayList<>(testingRunResult.getMultiExecTestResults()));
+                    }
 
-            DbLayer.updateTestingRunPlayground(new ObjectId(this.testingRunPlaygroundId), testingRunResult);
+                    DbLayer.updateTestingRunPlayground(new ObjectId(this.testingRunPlaygroundId), testingRunResult);
+                    break;
+                case POSTMAN_IMPORTS:
+                    if (this.getOriginalHttpResponse() != null) {
+                        DbLayer.updateTestingRunPlayground(new ObjectId(this.testingRunPlaygroundId), this.getOriginalHttpResponse());
+                    }
+            }
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error in updateTestingRunPlaygroundStateAndResult " + e.toString());
             return Action.ERROR.toUpperCase();
@@ -3551,4 +3560,22 @@ public class DbAction extends ActionSupport {
         this.openApiSchema = openApiSchema;
     }
 
+    public TestingRunPlayground.TestingRunPlaygroundType getTestingRunPlaygroundType() {
+        if (testingRunPlaygroundType == null) {
+            return TestingRunPlayground.TestingRunPlaygroundType.TEST_EDITOR_PLAYGROUND;
+        }
+        return testingRunPlaygroundType;
+    }
+
+    public void setTestingRunPlaygroundType(TestingRunPlayground.TestingRunPlaygroundType testingRunPlaygroundType) {
+        this.testingRunPlaygroundType = testingRunPlaygroundType;
+    }
+
+    public OriginalHttpResponse getOriginalHttpResponse() {
+        return originalHttpResponse;
+    }
+
+    public void setOriginalHttpResponse(OriginalHttpResponse originalHttpResponse) {
+        this.originalHttpResponse = originalHttpResponse;
+    }
 }

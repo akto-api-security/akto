@@ -1346,6 +1346,15 @@ public class DbLayer {
                 )
             );
     }
+    public static void updateTestingRunPlayground(ObjectId id, OriginalHttpResponse originalHttpResponse) {
+        TestingRunPlaygroundDao.instance.updateOne(
+                Filters.eq(Constants.ID, id),
+                Updates.combine(
+                        Updates.set(TestingRunPlayground.STATE, State.COMPLETED),
+                        Updates.set(TestingRunPlayground.ORIGINAL_HTTP_RESPONSE, originalHttpResponse)
+                )
+            );
+    }
 
     public static void insertJob(Job job) {
         JobsDao.instance.insertOne(job);

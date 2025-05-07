@@ -27,6 +27,7 @@ public class TestingRunPlayground {
     private TestingRunResult testingRunResult;
     private String miniTestingName;
     private OriginalHttpRequest originalHttpRequest;
+    public static final String ORIGINAL_HTTP_RESPONSE = "originalHttpResponse";
     private OriginalHttpResponse originalHttpResponse;
     @BsonIgnore
     private String hexId;
