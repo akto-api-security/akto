@@ -112,12 +112,12 @@ let filterOptions = [
 
 function SingleTestRunPage() {
 
-  const [testRunResultsText, setTestRunResultsText] = useState({ vulnerable: [], no_vulnerability_found: [], skipped: [], need_configurations: [], ignored_issues: [] })
+  const [testRunResultsText, setTestRunResultsText] = useState({ vulnerable: [], no_vulnerability_found: [], not_applicable: [], need_configurations: [], ignored_issues: [] })
   const [selectedTestRun, setSelectedTestRun] = useState({});
   const subCategoryFromSourceConfigMap = PersistStore(state => state.subCategoryFromSourceConfigMap);
   const params = useParams()
   const [loading, setLoading] = useState(false);
-  const [tempLoading, setTempLoading] = useState({ vulnerable: false, no_vulnerability_found: false, skipped: false, running: false, need_configurations: false, ignored_issues: false })
+  const [tempLoading, setTempLoading] = useState({ vulnerable: false, no_vulnerability_found: false, not_applicable: false, running: false, need_configurations: false, ignored_issues: false })
   const [selectedTab, setSelectedTab] = useState("vulnerable")
   const [selected, setSelected] = useState(0)
   const [workflowTest, setWorkflowTest] = useState(false);
@@ -156,7 +156,7 @@ function SingleTestRunPage() {
   const tableTabMap = {
     vulnerable: "VULNERABLE",
     domain_unreachable: "SKIPPED_EXEC_API_REQUEST_FAILED",
-    skipped: "SKIPPED_EXEC",
+    not_applicable: "SKIPPED_EXEC",
     need_configurations: "SKIPPED_EXEC_NEED_CONFIG",
     no_vulnerability_found: "SECURED",
     ignored_issues: "IGNORED_ISSUES"
@@ -193,7 +193,7 @@ function SingleTestRunPage() {
   const tableTabsOrder = [
     "vulnerable",
     "need_configurations",
-    "skipped",
+    "not_applicable",
     "no_vulnerability_found",
     "domain_unreachable",
     "ignored_issues"
@@ -332,7 +332,7 @@ function SingleTestRunPage() {
         await api.fetchTestingRunResults(localSelectedTestRun.testingRunResultSummaryHexId, tableTabMap[selectedTab], sortKey, sortOrder, skip, limit, filters, queryValue).then(({ testingRunResults, errorEnums, issueslistCount }) => {
           ignoredIssueListCount = issueslistCount
           testRunResultsRes = transform.prepareTestRunResults(hexId, testingRunResults, localSubCategoryMap, subCategoryFromSourceConfigMap)
-          if (selectedTab === 'domain_unreachable' || selectedTab === 'skipped' || selectedTab === 'need_configurations') {
+          if (selectedTab === 'domain_unreachable' || selectedTab === 'Not applicable' || selectedTab === 'need_configurations') {
             errorEnums['UNKNOWN_ERROR_OCCURRED'] = "OOPS! Unknown error occurred."
             setErrorsObject(errorEnums)
             setMissingConfigs(transform.getMissingConfigs(testRunResultsRes))
@@ -479,7 +479,7 @@ function SingleTestRunPage() {
       </div> : null
   )
 
-  const definedTableTabs = ['Vulnerable', 'Need configurations', 'Skipped', 'No vulnerability found', 'Domain unreachable', 'Ignored Issues']
+  const definedTableTabs = ['Vulnerable', 'Need configurations', 'Not applicable', 'No vulnerability found', 'Domain unreachable', 'Ignored Issues']
 
   const { tabsInfo } = useTable()
   const tableCountObj = func.getTabsCount(definedTableTabs, {}, Object.values(testRunResultsCount))
