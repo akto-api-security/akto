@@ -444,7 +444,6 @@ function Jira() {
             if (project?.enableBiDirIntegration) {
                 const validation = validateStatusMappings(project);
                 if (!validation.isValid) {
-                    func.setToast(true, true, validation.message);
                     return null;
                 }
             }
@@ -847,7 +846,6 @@ function Jira() {
             if (project?.enableBiDirIntegration) {
                 const validation = validateStatusMappings(project);
                 if (!validation.isValid) {
-                    func.setToast(true, true, validation.message);
                     return true;
                 }
             }
