@@ -6,72 +6,60 @@ import func from "@/util/func";
 function DropdownSearchWithDisabled(props) {
     const id = props.id ? props.id : "dropdown-search"
 
-    const { 
-        disabled, 
-        label, 
-        placeholder, 
-        optionsList, 
-        setSelected, 
-        value, 
-        avatarIcon, 
-        preSelected, 
-        allowMultiple, 
-        itemName, 
-        dropdownSearchKey, 
-        isNested, 
-        sliceMaxVal, 
-        showSelectedItemLabels=false, 
+    const {
+        disabled,
+        label,
+        placeholder,
+        optionsList,
+        setSelected,
+        value,
+        avatarIcon,
+        preSelected,
+        allowMultiple,
+        itemName,
+        dropdownSearchKey,
+        isNested,
+        sliceMaxVal,
+        showSelectedItemLabels=false,
         searchDisable=false,
-        disabledOptions=[] 
+        disabledOptions=[]
     } = props
 
     // Create a modified options list with disabled property
-    const deselectedOptions = optionsList.map(option => ({
-        ...option,
-        disabled: disabledOptions.includes(option.value)
-    }));
-
-    const [selectedOptions, setSelectedOptions] = useState(preSelected ? preSelected : []);
-    const [inputValue, setInputValue] = useState(value ? value : undefined);
-    const [options, setOptions] = useState(deselectedOptions);
-    const [loading, setLoading] = useState(false);
-    const [checked, setChecked] = useState(false);
-
-    useEffect(() => {
-        if(value!==undefined){
-            setInputValue((prev) => {
-                if(prev === value){
-                    return prev;
-                }
-                return value;
-            });
-        }
-        if(preSelected!==undefined){
-            setSelectedOptions((prev) => {
-                if(func.deepComparison(prev,preSelected)){
-                    return prev;
-                }
-                return [...preSelected];
-            });
-        }
-        
-        // Update options with disabled property
-        const updatedOptions = optionsList.map(option => ({
+    const deselectedOptions = React.useMemo(() => {
+        return optionsList.map(option => ({
             ...option,
             disabled: disabledOptions.includes(option.value)
         }));
-        
-        setOptions((prev) => {
-            if(selectedOptions.length > 0 || prev.length > 0){
-                // Preserve disabled status when updating options
-                return prev.map(option => ({
-                    ...option,
-                    disabled: disabledOptions.includes(option.value)
-                }));
-            }
-            return updatedOptions;
-        });
+    }, [optionsList, disabledOptions]);
 
+    const [selectedOptions, setSelectedOptions] = useState(preSelected ? preSelected : []);
+    const [inputValue, setInputValue] = useState(value ? value : undefined);
+    const [options, setOptions] = useState([]);
+    const [loading, setLoading] = useState(false);
+    const [checked, setChecked] = useState(false);
+
+    // Update input value when value prop changes
+    useEffect(() => {
+        if(value !== undefined && value !== inputValue){
+            setInputValue(value);
+        }
+    }, [value, inputValue]);
+
+    // Update selected options when preSelected prop changes
+    useEffect(() => {
+        if(preSelected !== undefined && !func.deepComparison(selectedOptions, preSelected)){
+            setSelectedOptions([...preSelected]);
+        }
+    }, [preSelected, selectedOptions]);
+
+    // Initialize and update options when deselectedOptions change
+    useEffect(() => {
+        setOptions(deselectedOptions);
+    }, [deselectedOptions]);
+
+    // Update checked state for select all functionality
+    useEffect(() => {
         if(allowMultiple){
             let totalItems = deselectedOptions.length
             if(isNested){
@@ -80,13 +68,9 @@ function DropdownSearchWithDisabled(props) {
                     totalItems += opt.options.length
                 })
             }
-            if(preSelected.length === totalItems){
-                setChecked(true)
-            }else{
-                setChecked(false)
-            }
+            setChecked(preSelected.length === totalItems);
         }
-    }, [deselectedOptions, value, preSelected, disabledOptions]);
+    }, [allowMultiple, deselectedOptions, isNested, preSelected]);
 
     const updateText = useCallback(
         (value) => {
@@ -120,7 +104,7 @@ function DropdownSearchWithDisabled(props) {
                         const options = opt.options.filter((option) =>
                           option[searchKey].match(filterRegex),
                         );
-                
+
                         resultOptions.push({
                           title: opt.title,
                           options,
@@ -157,23 +141,23 @@ function DropdownSearchWithDisabled(props) {
             const filteredSelected = selected.filter(
                 selectedItem => !disabledOptions.includes(selectedItem)
             );
-            
+
             const selectedText = filteredSelected.map((selectedItem) => {
-                const matchedOption = optionsList.find((option) => {  
+                const matchedOption = optionsList.find((option) => {
                     if (typeof option.value === "string")
                         return option.value.match(selectedItem);
-                    else 
+                    else
                         return option.value === selectedItem
                 });
                 return matchedOption && matchedOption.label;
             });
-            
+
             setSelectedOptions([...filteredSelected]);
-            
+
             if (avatarIcon) {
                 setInputValue(filteredSelected[0])
             } else if (allowMultiple) {
-                if(showSelectedItemLabels) {                    
+                if(showSelectedItemLabels) {
                     if(selectedText.length === optionsList.length) setInputValue("All items selected");
                     else setInputValue(func.getSelectedItemsText(selectedText))
                 }
@@ -189,7 +173,7 @@ function DropdownSearchWithDisabled(props) {
                 setSelected(filteredSelected[0])
             }
         },
-        [optionsList, disabledOptions],
+        [optionsList, disabledOptions, allowMultiple, showSelectedItemLabels, itemName, avatarIcon, setSelected],
     );
 
     const selectAllFunc = () => {
@@ -225,13 +209,13 @@ function DropdownSearchWithDisabled(props) {
             {...(!searchDisable ? {onChange:updateText}:{})}
             label={label}
             value={inputValue}
-            {...(!searchDisable ? { 
+            {...(!searchDisable ? {
                 prefix: (
                     <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
                         <Icon source={SearchMinor} color="base" />
                         {avatarIcon && avatarIcon.length > 0 ? <Avatar customer size="extraSmall" name={avatarIcon} source={avatarIcon} /> : null}
                     </div>
-                ) 
+                )
             } : {})}
             suffix={<Icon source={ChevronDownMinor} color="base" />}
             placeholder={placeholder}
@@ -255,12 +239,12 @@ function DropdownSearchWithDisabled(props) {
     // Custom renderOption function to style disabled options
     const renderOption = (option, isSelected) => {
         const { label, value, disabled } = option;
-        
+
         if (disabled) {
             return (
-                <div 
-                    style={{ 
-                        opacity: 0.5, 
+                <div
+                    style={{
+                        opacity: 0.5,
                         cursor: 'not-allowed',
                         backgroundColor: '#f4f6f8',
                         padding: '8px',
@@ -271,7 +255,7 @@ function DropdownSearchWithDisabled(props) {
                 </div>
             );
         }
-        
+
         return undefined; // Return undefined to use default rendering for enabled options
     };
 
