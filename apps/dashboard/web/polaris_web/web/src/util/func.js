@@ -541,18 +541,17 @@ prettifyEpoch(epoch) {
     }
 
     Object.keys(requestHeaders).forEach((key) => {
-      const temp = key.toLowerCase()
-      if(metaDataSet.has(temp)){
+      if(metaDataSet.has(key)){
         highlightPaths.push({
             "highlightValue": {
-                "value": temp,
+                "value": key,
                 "wholeRow": true,
                 "className": "akto-decoded",
                 "highlight": true,
             },
             "responseCode": -1,
-            "header": temp,
-            "param": temp,
+            "header": key,
+            "param": key,
         })
       }
     })
@@ -594,6 +593,7 @@ prettifyEpoch(epoch) {
 
     let responseHeadersString = "{}"
     let responsePayloadString = "{}"
+    const metaDataSet = new Set(metadata.map((x) => x.toLowerCase()))
     if (message["request"]) {
       responseHeadersString = message["response"]["headers"] || "{}"
       responsePayloadString = message["response"]["body"] || "{}"
@@ -613,22 +613,19 @@ prettifyEpoch(epoch) {
       responsePayload = JSON.parse(responsePayloadString)
     } catch (e) {
       responsePayload = responsePayloadString
-    }
-    const metaDataSet = new Set(metadata.map((x) => x.toLowerCase()))
+    }    
 
     Object.keys(responseHeaders).forEach((key) => {
-      const temp = key.toLowerCase()
-      if(metaDataSet.has(temp)){
+      if(metaDataSet.has(key)){
         highlightPaths.push({
             "highlightValue": {
-                "value": temp,
+                "value": key,
                 "wholeRow": true,
                 "className": "akto-decoded",
                 "highlight": true,
             },
-            "responseCode": -1,
-            "header": temp,
-            "param": temp,
+            "header": key,
+            "param": key,
         })
       }
     })

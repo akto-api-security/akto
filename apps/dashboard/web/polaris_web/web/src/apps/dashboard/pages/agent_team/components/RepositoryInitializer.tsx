@@ -10,6 +10,7 @@ function RepoSelector({ handleClickRepo, selectedRepo, selectedProject, selected
     const [reposList, setReposList] = useState<RepoPayload[]>([])
     const [newRepoName, setNewRepoName] = React.useState<string>('');
     const [newProjectName, setNewProjectName] = React.useState<string>('');
+    const [githubAccessToken, setGithubAccessToken] = React.useState<string | null>(null);
 
     const handleAddRepository = async () => {
         if (newRepoName && newProjectName) {
@@ -18,12 +19,13 @@ function RepoSelector({ handleClickRepo, selectedRepo, selectedProject, selected
                 repo: newRepoName,
                 project: newProjectName,
                 lastRun: 0,  // Default value for new repo
-                scheduleTime: 0  // Default value for new repo
+                scheduleTime: 0 , // Default value for new repo
+                accessToken: githubAccessToken // Add access token if needed
             };
             setReposList(prev => [...prev, newRepo]);
 
             // Trigger the analysis for the new repository
-            await handleClickRepo(newRepoName, newProjectName, null);
+            await handleClickRepo(newRepoName, newProjectName, null, githubAccessToken);
 
             // Clear the input fields
             setNewRepoName('');
@@ -56,6 +58,15 @@ function RepoSelector({ handleClickRepo, selectedRepo, selectedProject, selected
                                 value={newProjectName}
                                 onChange={(value) => setNewProjectName(value)}
                                 placeholder="Enter project name"
+                            />
+                        </Box>
+                        <Box width='200px'>
+                            <TextField
+                                label="Access Token"
+                                autoComplete="off"
+                                value={githubAccessToken || ""}
+                                onChange={(value) => setGithubAccessToken(value)}
+                                placeholder="Enter access token in case of private repo"
                             />
                         </Box>
                     </HorizontalStack>
@@ -129,7 +140,7 @@ function RepositoryInitializer({ agentType }: { agentType: string }) {
         }
     }
 
-    const handleClickRepo = async (repo: string, project: string, localString: string | null) => {
+    const handleClickRepo = async (repo: string, project: string, localString: string | null, accessToken: string|null) => {
         setSelectedProject(project);
         setSelectedRepo(repo);
 
@@ -144,6 +155,9 @@ function RepositoryInitializer({ agentType }: { agentType: string }) {
                 : {};
 
         if (Object.keys(data).length === 0) return;
+        if(accessToken !== null) {
+            data['accessToken'] = accessToken;
+        }
 
         await agentApi.createAgentRun({ 
             agent: agentType, 
@@ -195,7 +209,7 @@ function RepositoryInitializer({ agentType }: { agentType: string }) {
                                     value={temp}
                                     focused={true}
                                     onChange={(x: string) => setTemp(x)}
-                                    connectedRight={<Button onClick={() => handleClickRepo("", "", temp)}>Start</Button>}
+                                    connectedRight={<Button onClick={() => handleClickRepo("", "", temp, null)}>Start</Button>}
                                 /> : null}
                             </VerticalStack>
                         </VerticalStack>

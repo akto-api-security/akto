@@ -1,6 +1,7 @@
 package com.akto.action.waf;
 
 import com.akto.action.UserAction;
+import com.akto.action.threat_detection.ThreatActorAction;
 import com.akto.dao.ConfigsDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.Config;
@@ -30,8 +31,19 @@ public class CloudflareWafAction extends UserAction {
                 Filters.eq(Config.CloudflareWafConfig._CONFIG_ID, Config.ConfigType.CLOUDFLARE_WAF.name())
         );
         Config.CloudflareWafConfig existingConfig = (Config.CloudflareWafConfig) ConfigsDao.instance.findOne(filters);
-        if(existingConfig == null && apiKey == null) {
+        if(existingConfig == null && (apiKey == null || apiKey.isEmpty())) {
             addActionError("Please provide a valid API Key.");
+            return ERROR.toUpperCase();
+        }
+
+
+        if(existingConfig != null) {
+            setApiKey(existingConfig.getApiKey());
+        }
+        Config.CloudflareWafConfig config = new Config.CloudflareWafConfig(apiKey, email, integrationType, accountOrZoneId, accId);
+        String cloudFlareIPAccessRuleByActorIP = ThreatActorAction.getCloudFlareIPAccessRuleByActorIP("", config);
+        if(cloudFlareIPAccessRuleByActorIP == null) {
+            addActionError("Invalid cloudflare credentials.");
             return ERROR.toUpperCase();
         }
 
@@ -43,7 +55,6 @@ public class CloudflareWafAction extends UserAction {
             );
             ConfigsDao.instance.updateOne(filters, updates);
         } else {
-            Config.CloudflareWafConfig config = new Config.CloudflareWafConfig(apiKey, email, integrationType, accountOrZoneId, accId);
             ConfigsDao.instance.insertOne(config);
         }
 
@@ -62,7 +73,10 @@ public class CloudflareWafAction extends UserAction {
     public String fetchCloudflareWafIntegration() {
         int accountId = Context.accountId.get();
 
-        cloudflareWafConfig = (Config.CloudflareWafConfig) ConfigsDao.instance.findOne(Filters.eq(Config.CloudflareWafConfig.ACCOUNT_ID, accountId));
+        cloudflareWafConfig = (Config.CloudflareWafConfig) ConfigsDao.instance.findOne(Filters.and(
+                Filters.eq(Config.CloudflareWafConfig.ACCOUNT_ID, accountId),
+                Filters.eq(Config.CloudflareWafConfig._CONFIG_ID, Config.ConfigType.CLOUDFLARE_WAF.name())
+        ));
 
         return SUCCESS.toUpperCase();
     }

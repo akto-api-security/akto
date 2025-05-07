@@ -1,5 +1,5 @@
 import LayoutWithTabs from "../../../components/layouts/LayoutWithTabs"
-import { Box, Button, Popover, Modal, Tooltip, VerticalStack, ActionList } from "@shopify/polaris"
+import { Box, Button, Popover, Modal, Tooltip, ActionList, VerticalStack, HorizontalStack, Tag, Text } from "@shopify/polaris"
 import FlyLayout from "../../../components/layouts/FlyLayout";
 import GithubCell from "../../../components/tables/cells/GithubCell";
 import SampleDataList from "../../../components/shared/SampleDataList";
@@ -18,7 +18,17 @@ import gptApi from "../../../components/aktoGpt/api";
 
 import { HorizontalDotsMinor, FileMinor } from "@shopify/polaris-icons"
 import LocalStore from "../../../../main/LocalStorageStore";
-import APICollectionDescriptionModal from "../../../components/shared/APICollectionDescriptionModal";
+import InlineEditableText from "../../../components/shared/InlineEditableText";
+import GridRows from "../../../components/shared/GridRows";
+
+function TechCard(props){
+    const {cardObj} = props;
+    return(
+        <Tag key={cardObj.id}>
+            <Text variant="bodyMd" as="span">{cardObj.name}</Text>
+        </Tag> 
+    )
+}
 
 function ApiDetails(props) {
 
@@ -38,8 +48,9 @@ function ApiDetails(props) {
     const setSelectedSampleApi = PersistStore(state => state.setSelectedSampleApi)
     const [disabledTabs, setDisabledTabs] = useState([])
     const [description, setDescription] = useState("")
-    const [showDescriptionModal, setShowDescriptionModal] = useState(false)
     const [headersWithData, setHeadersWithData] = useState([])
+    const [isEditingDescription, setIsEditingDescription] = useState(false)
+    const [editableDescription, setEditableDescription] = useState(description)
 
     const [useLocalSubCategoryData, setUseLocalSubCategoryData] = useState(false)
 
@@ -48,15 +59,14 @@ function ApiDetails(props) {
             if (paramList && paramList.length > 0 &&
                 paramList.filter(x => x?.nonSensitiveDataType).map(x => x.subTypeString).includes(x)) {
                 return "info"
-            }else if(headersWithData && headersWithData.length > 0 &&
-                headersWithData.filter(h => h.includes(x)).length > 0){
-                return "success"
             }
         } catch (e) {
 
         }
         return "warning"
     }
+
+    const standardHeaders = new Set(transform.getStandardHeaderList())
 
     const fetchData = async () => {
         if (showDetails) {
@@ -73,10 +83,11 @@ function ApiDetails(props) {
 
             setTimeout(() => {
                 setDescription(description == null ? "" : description)
+                setEditableDescription(description == null ? "" : description)
             }, 100)
             headers.forEach((header) => {
                 if (header.value === "description") {
-                    header.action = () => setShowDescriptionModal(true)
+                    header.action = () => setIsEditingDescription(true)
                 }
             })
 
@@ -142,7 +153,8 @@ function ApiDetails(props) {
                 if(isGptActive && window.STIGG_FEATURE_WISE_ALLOWED["AKTO_GPT_AI"] && window.STIGG_FEATURE_WISE_ALLOWED["AKTO_GPT_AI"]?.isGranted === true){
                     await gptApi.ask_ai(queryPayload).then((res) => {
                         if (res.response.responses && res.response.responses.length > 0) {
-                            setHeadersWithData(res.response.responses)
+                            const metaHeaderResp = res.response.responses.filter(x => !standardHeaders.has(x.split(" ")[0]))
+                            setHeadersWithData(metaHeaderResp)
                         }
                     }
                     ).catch((err) => {
@@ -151,17 +163,21 @@ function ApiDetails(props) {
                 }
             }catch (e) {
             }
-            
+
         }
     }
 
     const handleSaveDescription = async () => {
         const { apiCollectionId, endpoint, method } = apiDetail;
         
-        setShowDescriptionModal(false);
+        setIsEditingDescription(false);
         
-        await api.saveEndpointDescription(apiCollectionId, endpoint, method, description)
+        if(editableDescription === description) {
+            return
+        }
+        await api.saveEndpointDescription(apiCollectionId, endpoint, method, editableDescription)
             .then(() => {
+                setDescription(editableDescription);
                 func.setToast(true, false, "Description saved successfully");
             })
             .catch((err) => {
@@ -255,6 +271,7 @@ function ApiDetails(props) {
                 heading={"Sample values"}
                 minHeight={"35vh"}
                 vertical={true}
+                isAPISampleData={true}
                 metadata={headersWithData.map(x => x.split(" ")[0])}
             />
         </Box>,
@@ -278,7 +295,8 @@ function ApiDetails(props) {
             window.location.reload()
         })
     }
-    let newData = apiDetail
+
+    let newData = JSON.parse(JSON.stringify(apiDetail))
     newData['copyEndpoint'] = {
         method: apiDetail.method,
         endpoint: apiDetail.endpoint
@@ -294,15 +312,25 @@ function ApiDetails(props) {
     } catch (e){
     }
 
+    let gridData = [];
     try {
-        newData['headersInfo'] = [...new Set(headersWithData.map(x => x.split(" ").slice(1,x.length - 1).join(" ")))]
-    } catch (e) {
+        const techValues = [...new Set(headersWithData.filter(x => x.split(" ")[1].length < 50).map(x => x.split(" ")[1]))]
+        gridData = techValues.map((x) => {
+            return {
+                id: x,
+                name: x
+            }
+        })
+    } catch (error) {
+        
     }
 
+    newData['description'] = (isEditingDescription?<InlineEditableText textValue={editableDescription} setTextValue={setEditableDescription} handleSaveClick={handleSaveDescription} setIsEditing={setIsEditingDescription}  placeholder={"Add a brief description"} maxLength={64}/> : description )
+
     const headingComp = (
-        <div style={{ display: "flex", justifyContent: "space-between" }} key="heading">
-            <div style={{ display: "flex", flexDirection: "column"}}>
-                <div style={{ display: "flex", gap: '8px' }}>
+        <HorizontalStack align="space-between" wrap={false} key="heading">
+            <VerticalStack>
+                <HorizontalStack gap={"2"} wrap={false} >
                     <GithubCell
                         width="32vw"
                         data={newData}
@@ -311,9 +339,10 @@ function ApiDetails(props) {
                         isBadgeClickable={true}
                         badgeClicked={badgeClicked}
                     />
-                </div>
-            </div>
-            <div style={{ display: "flex", gap: '8px' }}>
+                </HorizontalStack>
+            </VerticalStack>
+            <VerticalStack gap="3" align="space-between">
+            <HorizontalStack gap={"1"} wrap={false} >
                 <RunTest
                     apiCollectionId={apiDetail["apiCollectionId"]}
                     endpoints={[apiDetail]}
@@ -339,16 +368,23 @@ function ApiDetails(props) {
                         <Popover.Pane fixed>
                             <ActionList
                                 items={[
-                                    isGptActive ? { content: "Ask AktoGPT", onAction: displayGPT } : null,
-                                    isDemergingActive ? { content: "De-merge", onAction: deMergeApis } : null,
+                                    isGptActive ? { content: "Ask AktoGPT", onAction: displayGPT } : {},
+                                    isDemergingActive ? { content: "De-merge", onAction: deMergeApis } : {},
                                 ]}
                             />
                         </Popover.Pane>
                     </Popover> : null
                 }
 
-            </div>
-        </div>
+            </HorizontalStack>
+            {headersWithData.length > 0 && 
+                <VerticalStack gap={"1"}>
+                    <Text variant="headingSm" color="subdued">Technologies used</Text>
+                    <GridRows verticalGap={"2"}horizontalGap={"1"} columns={3} items={gridData.slice(0,Math.min(gridData.length ,12))} CardComponent={TechCard} />
+                </VerticalStack>
+            }
+            </VerticalStack>
+        </HorizontalStack>
     )
 
     const components = [
@@ -369,15 +405,6 @@ function ApiDetails(props) {
                 setShow={setShowDetails}
                 components={components}
                 loading={loading}
-            />
-            <APICollectionDescriptionModal
-                showDescriptionModal={showDescriptionModal}
-                setShowDescriptionModal={setShowDescriptionModal}
-                title="API Endpoint Description"
-                handleSaveDescription={handleSaveDescription}
-                description={description}
-                setDescription={setDescription}
-                placeholder={"Add a brief description for this endpoint"}
             />
             <Modal large open={isGptScreenActive} onClose={() => setIsGptScreenActive(false)} title="Akto GPT">
                 <Modal.Section flush>

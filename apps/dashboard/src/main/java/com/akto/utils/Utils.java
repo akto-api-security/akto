@@ -457,6 +457,15 @@ public class Utils {
     }
 
     public static void pushDataToKafka(int apiCollectionId, String topic, List<String> messages, List<String> errors, boolean skipKafka, boolean takeFromMsg) throws Exception {
+        pushDataToKafka(apiCollectionId, topic, messages, errors, skipKafka, takeFromMsg, false);
+    }
+    
+    /*
+    * this function is used primarily for non-automated traffic collection, like
+    * postman, har and openAPI.
+    * Thus, we can skip advanced traffic filters for these cases.
+    */
+    public static void pushDataToKafka(int apiCollectionId, String topic, List<String> messages, List<String> errors, boolean skipKafka, boolean takeFromMsg, boolean skipAdvancedFilters) throws Exception {
         List<HttpResponseParams> responses = new ArrayList<>();
         for (String message: messages){
             int messageLimit = (int) Math.round(0.8 * KafkaListener.BATCH_SIZE_CONFIG);
@@ -508,7 +517,7 @@ public class Utils {
                 makeApisCaseInsensitive = accountSettings.getHandleApisCaseInsensitive();
             }
 
-            info.getHttpCallParser().syncFunction(responses, true, false, accountSettings);
+            info.getHttpCallParser().syncFunction(responses, true, false, accountSettings, skipAdvancedFilters);
             APICatalogSync.mergeUrlsAndSave(apiCollectionId, true, false, info.getHttpCallParser().apiCatalogSync.existingAPIsInDb, makeApisCaseInsensitive);
             info.getHttpCallParser().apiCatalogSync.buildFromDB(false, false);
             APICatalogSync.updateApiCollectionCount(info.getHttpCallParser().apiCatalogSync.getDbState(apiCollectionId), apiCollectionId);
