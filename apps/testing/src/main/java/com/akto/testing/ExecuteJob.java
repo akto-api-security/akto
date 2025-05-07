@@ -3,6 +3,7 @@ package com.akto.testing;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.google.cloud.run.v2.EnvVar;
+import com.google.cloud.run.v2.Execution;
 import com.google.cloud.run.v2.JobName;
 import com.google.cloud.run.v2.JobsClient;
 import com.google.cloud.run.v2.RunJobRequest;
@@ -14,7 +15,7 @@ public class ExecuteJob {
     public static void executeTestingJob(int accountId, String testingRunHexId) {
         String gcpProject = System.getenv("GCP_PROJECT");
         try (JobsClient jobsClient = JobsClient.create()) {
-            JobName name = JobName.of(gcpProject, "us-central1", "hello-world-job");
+            JobName name = JobName.of(gcpProject, "us-central1", "testing-run-job");
 
             EnvVar jobAccountId = EnvVar.newBuilder()
                 .setName("JOB_ACCOUNT_ID")
@@ -30,12 +31,19 @@ public class ExecuteJob {
                     .setName(name.toString())
                     .setOverrides(RunJobRequest.Overrides.newBuilder()
                             .addContainerOverrides(RunJobRequest.Overrides.ContainerOverride.newBuilder()
+                                    .setName("job-executor")
                                     .addEnv(jobAccountId)
                                     .addEnv(jobTestingRunHexId))
                             .build())
                     .build();
 
+            /*
+             * If job executions are not being created.
+             * 
+             * Wait for the execution to complete to debug
+             */
             jobsClient.runJobAsync(request);
+
             loggerMaker.info("Testing job submitted for execution");
         } catch (Exception e) {
             loggerMaker.error("Error while submitting job");
