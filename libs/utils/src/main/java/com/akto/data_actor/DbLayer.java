@@ -768,7 +768,8 @@ public class DbLayer {
                 Filters.or(
                     Filters.exists(YamlTemplate.INACTIVE, false),
                     Filters.eq(YamlTemplate.INACTIVE, false)
-                )
+                ),
+                filter
             );
         }
         return YamlTemplateDao.instance.findAll(filter);
