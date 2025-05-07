@@ -815,24 +815,6 @@ public class ApiCollectionsAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
-    private Set<MergedUrls> mergedUrls;
-    public String getDeMergedApis() {
-        mergedUrls = MergedUrlsDao.instance.getMergedUrls();
-        return SUCCESS.toUpperCase();
-    }
-
-    public String undoDemergedApis() {
-        for(MergedUrls mergedUrl : mergedUrls) {
-            Bson filters = Filters.and(
-                    Filters.eq(MergedUrls.API_COLLECTION_ID, mergedUrl.getApiCollectionId()),
-                    Filters.eq(MergedUrls.URL, mergedUrl.getUrl()),
-                    Filters.eq(MergedUrls.METHOD, mergedUrl.getMethod())
-            );
-            MergedUrlsDao.instance.getMCollection().deleteOne(filters);
-        }
-        return SUCCESS.toUpperCase();
-    }
-
     public void setUserCollectionMap(Map<String, List<Integer>> userCollectionMap) {
         this.userCollectionMap = userCollectionMap;
     }
@@ -1002,13 +984,5 @@ public class ApiCollectionsAction extends UserAction {
 
     public void setDescription(String description) {
         this.description = description;
-    }
-
-    public Set<MergedUrls> getMergedUrls() {
-        return mergedUrls;
-    }
-
-    public void setMergedUrls(Set<MergedUrls> mergedUrls) {
-        this.mergedUrls = mergedUrls;
     }
 }

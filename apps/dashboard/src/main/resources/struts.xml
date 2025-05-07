@@ -9803,7 +9803,7 @@
             </result>
         </action>
 
-        <action name="api/getDeMergedApis" class="com.akto.action.ApiCollectionsAction" method="getDeMergedApis">
+        <action name="api/getDeMergedApis" class="com.akto.action.observe.InventoryAction" method="getDeMergedApis">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
@@ -9827,13 +9827,13 @@
         </action>
 
 
-        <action name="api/undoDemergedApis" class="com.akto.action.ApiCollectionsAction" method="undoDemergedApis">
+        <action name="api/undoDemergedApis" class="com.akto.action.observe.InventoryAction" method="undoDemergedApis">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">API_COLLECTIONS</param>
                 <param name="accessType">READ_WRITE</param>
-                <param name="">User undid a de-merged API.</param>
+                <param name="">User reverted a de-merged API.</param>
             </interceptor-ref>
 
             <result name="FORBIDDEN" type="json">
