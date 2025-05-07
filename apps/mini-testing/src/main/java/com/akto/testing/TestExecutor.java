@@ -150,27 +150,36 @@ public class TestExecutor {
             dataActor.updateTestInitiatedCountInTestSummary(summaryId.toHexString(), testingRunSubCategories.size());
         }
 
-        SampleMessageStore sampleMessageStore = SampleMessageStore.create();
-        sampleMessageStore.fetchSampleMessages(Main.extractApiCollectionIds(testingRun.getTestingEndpoints().returnApis()));
-
         List<ApiInfo.ApiInfoKey> apiInfoKeyList = testingEndpoints.returnApis();
         if (apiInfoKeyList == null || apiInfoKeyList.isEmpty()) return;
         loggerMaker.infoAndAddToDb("APIs found: " + apiInfoKeyList.size(), LogDb.TESTING);
+        boolean collectionWise = testingEndpoints.getType().equals(TestingEndpoints.Type.COLLECTION_WISE);
+
+        SampleMessageStore sampleMessageStore = SampleMessageStore.create();
+        if(collectionWise || apiInfoKeyList.size() > 500){
+            sampleMessageStore.fetchSampleMessages(Main.extractApiCollectionIds(testingRun.getTestingEndpoints().returnApis()));
+        }else{
+            sampleMessageStore.fetchSampleMessages(apiInfoKeyList);
+        }
+        
 
         List<TestRoles> testRoles = sampleMessageStore.fetchTestRoles();
         TestRoles attackerTestRole = Executor.fetchOrFindAttackerRole();
         
         List<YamlTemplate> yamlTemplates = new ArrayList<>();
         final int TEST_LIMIT = 50;
-        for (int i = 0; i < 100; i++) {
-            List<YamlTemplate> temp = dataActor.fetchYamlTemplates(true, i * TEST_LIMIT);
-            if (temp == null || temp.isEmpty()) {
-                break;
+        // fetch only those active templates which are used in the test run
+        List<String> subCategories = new ArrayList<>();
+        List<YamlTemplate> yamlTemplatesTemp = new ArrayList<>();
+        for(int i = 0; i < testingRunSubCategories.size(); i += TEST_LIMIT) {
+            int end = Math.min(i + TEST_LIMIT, testingRunSubCategories.size());
+            subCategories = testingRunSubCategories.subList(i, end);
+            yamlTemplatesTemp = dataActor.fetchYamlTemplatesWithIds(subCategories, true);
+            if (yamlTemplatesTemp != null) {
+                yamlTemplates.addAll(yamlTemplatesTemp);
+                yamlTemplatesTemp.clear();
             }
-            yamlTemplates.addAll(temp);
-            if (temp.size() < TEST_LIMIT) {
-                break;
-            }
+            subCategories.clear();
         }
 
         Map<String, TestConfig> testConfigMap = YamlTemplateDao.instance.fetchTestConfigMap(false, false, yamlTemplates);

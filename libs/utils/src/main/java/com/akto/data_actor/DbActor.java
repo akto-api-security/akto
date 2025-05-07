@@ -358,6 +358,10 @@ public class DbActor extends DataActor {
         return DbLayer.fetchYamlTemplates(fetchOnlyActive, skip);
     }
 
+    public List<YamlTemplate> fetchYamlTemplatesWithIds(List<String> ids, boolean fetchOnlyActive){
+        return DbLayer.fetchYamlTemplatesWithIds(ids, fetchOnlyActive);
+    }
+
     public ApiCollection findApiCollectionByName(String apiCollectionName) {
         return DbLayer.findApiCollectionByName(apiCollectionName);
     }
