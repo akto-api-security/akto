@@ -593,6 +593,20 @@ const settingRequests = {
             data: {accountOrZoneId, apiKey, email, integrationType}
         })
     },
+    async getDeMergedApis() {
+        return await request({
+            url: '/api/getDeMergedApis',
+            method: 'post',
+            data: {}
+        })
+    },
+    async undoDemergedApis(mergedApis) {
+        return await request({
+            url: '/api/undoDemergedApis',
+            method: 'post',
+            data: {mergedUrls: mergedApis}
+        })
+    }
 }
 
 export default settingRequests

@@ -350,8 +350,8 @@ function ApiDetails(props) {
                         <Popover.Pane fixed>
                             <ActionList
                                 items={[
-                                    isGptActive ? { content: "Ask AktoGPT", onAction: displayGPT } : null,
-                                    isDemergingActive ? { content: "De-merge", onAction: deMergeApis } : null,
+                                    isGptActive ? { content: "Ask AktoGPT", onAction: displayGPT } : {},
+                                    isDemergingActive ? { content: "De-merge", onAction: deMergeApis } : {},
                                 ]}
                             />
                         </Popover.Pane>
