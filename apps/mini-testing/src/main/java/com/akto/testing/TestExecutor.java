@@ -169,13 +169,17 @@ public class TestExecutor {
         List<YamlTemplate> yamlTemplates = new ArrayList<>();
         final int TEST_LIMIT = 50;
         // fetch only those active templates which are used in the test run
+        List<String> subCategories = new ArrayList<>();
+        List<YamlTemplate> yamlTemplatesTemp = new ArrayList<>();
         for(int i = 0; i < testingRunSubCategories.size(); i += TEST_LIMIT) {
             int end = Math.min(i + TEST_LIMIT, testingRunSubCategories.size());
-            List<String> subCategories = testingRunSubCategories.subList(i, end);
-            List<YamlTemplate> yamlTemplatesTemp = dataActor.fetchYamlTemplatesWithIds(subCategories, true);
+            subCategories = testingRunSubCategories.subList(i, end);
+            yamlTemplatesTemp = dataActor.fetchYamlTemplatesWithIds(subCategories, true);
             if (yamlTemplatesTemp != null) {
                 yamlTemplates.addAll(yamlTemplatesTemp);
+                yamlTemplatesTemp.clear();
             }
+            subCategories.clear();
         }
 
         Map<String, TestConfig> testConfigMap = YamlTemplateDao.instance.fetchTestConfigMap(false, false, yamlTemplates);
