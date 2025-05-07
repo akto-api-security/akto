@@ -1,11 +1,15 @@
 package com.akto.threat.detection;
 
 import com.akto.DaoInit;
+import com.akto.data_actor.DataActor;
+import com.akto.data_actor.DataActorFactory;
+import com.akto.dto.monitoring.ModuleInfo;
 import com.akto.kafka.KafkaConfig;
 import com.akto.kafka.KafkaConsumerConfig;
 import com.akto.kafka.KafkaProducerConfig;
 import com.akto.kafka.Serializer;
 import com.akto.log.LoggerMaker;
+import com.akto.metrics.ModuleInfoWorker;
 import com.akto.threat.detection.constants.KafkaTopic;
 import com.akto.threat.detection.session_factory.SessionFactoryUtils;
 import com.akto.threat.detection.tasks.CleanupTask;
@@ -23,12 +27,15 @@ public class Main {
   private static final LoggerMaker logger = new LoggerMaker(Main.class);
   private static boolean aggregationRulesEnabled = System.getenv().getOrDefault("AGGREGATION_RULES_ENABLED", "true").equals("true");
 
+  private static final DataActor dataActor = DataActorFactory.fetchInstance();
+
   public static void main(String[] args) throws Exception {
     
     SessionFactory sessionFactory = null;
     RedisClient localRedis = null;
 
     logger.warn("aggregation rules enabled {}", aggregationRulesEnabled);
+    ModuleInfoWorker.init(ModuleInfo.ModuleType.THREAT_DETECTION, dataActor);
 
     if (aggregationRulesEnabled) {
         runMigrations();

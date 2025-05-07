@@ -67,7 +67,8 @@ public class ModuleInfo {
         MINI_RUNTIME,
         MINI_TESTING,
         K8S,
-        EBPF
+        EBPF,
+        THREAT_DETECTION
     }
 
 }

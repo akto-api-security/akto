@@ -8,6 +8,7 @@ import com.akto.dao.loaders.LoadersDao;
 import com.akto.dao.test_editor.TestingRunPlaygroundDao;
 import com.akto.dao.testing.TestRolesDao;
 import com.akto.dao.testing.TestingRunDao;
+import com.akto.dao.testing.BidirectionalSyncSettingsDao;
 import com.akto.dao.testing.TestingRunResultDao;
 import com.akto.dao.testing.TestingRunResultSummariesDao;
 import com.akto.dao.testing.VulnerableTestingRunResultDao;
@@ -27,6 +28,7 @@ import com.akto.dto.gpt.AktoGptConfigState;
 import com.akto.dto.jira_integration.JiraIntegration;
 import com.akto.dto.jobs.AutoTicketParams;
 import com.akto.dto.jobs.JobParams;
+import com.akto.dto.jobs.TicketSyncJobParams;
 import com.akto.dto.loaders.Loader;
 import com.akto.dto.loaders.NormalLoader;
 import com.akto.dto.loaders.PostmanUploadLoader;
@@ -79,6 +81,7 @@ import com.akto.dto.auth.APIAuth;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.billing.OrganizationFlags;
 import com.akto.util.enums.GlobalEnums;
+import com.akto.util.enums.GlobalEnums.TicketSource;
 import com.mongodb.ConnectionString;
 import com.mongodb.MongoClientSettings;
 import com.mongodb.ReadPreference;
@@ -290,6 +293,9 @@ public class DaoInit {
         ClassModel<Model> agentModel = ClassModel.builder(Model.class).enableDiscriminator(true).build();
         ClassModel<ModuleInfo> ModuleInfoClassModel = ClassModel.builder(ModuleInfo.class).enableDiscriminator(true).build();
         ClassModel<TLSAuthParam> tlsAuthClassModel = ClassModel.builder(TLSAuthParam.class).enableDiscriminator(true).build();
+        ClassModel<BidirectionalSyncSettings> testingIssueTicketsModel = ClassModel.builder(BidirectionalSyncSettings.class).enableDiscriminator(true).build();
+        ClassModel<TicketSyncJobParams> ticketSyncJobParamsClassModel = ClassModel.builder(TicketSyncJobParams.class).enableDiscriminator(true).build();
+
 
         CodecRegistry pojoCodecRegistry = fromProviders(PojoCodecProvider.builder().register(
                 configClassModel, signupInfoClassModel, apiAuthClassModel, attempResultModel, urlTemplateModel,
@@ -330,7 +336,8 @@ public class DaoInit {
                 eventsExampleClassModel, remediationClassModel, complianceInfoModel, complianceMappingModel,
                 RuntimeMetricsClassModel, codeAnalysisRepoModel, codeAnalysisApiModel, historicalDataClassModel,
                 configSettingClassModel, configSettingsConditionTypeClassModel, roleClassModel, testingInstanceHeartBeat,
-                jobParams, autoTicketParams, agentModel, ModuleInfoClassModel, tlsAuthClassModel)
+                jobParams, autoTicketParams, agentModel, ModuleInfoClassModel, testingIssueTicketsModel, tlsAuthClassModel,
+                ticketSyncJobParamsClassModel)
             .automatic(true).build());
 
         final CodecRegistry customEnumCodecs = CodecRegistries.fromCodecs(
@@ -380,7 +387,8 @@ public class DaoInit {
                 new EnumCodec<>(State.class),
                 new EnumCodec<>(ModelType.class),
                 new EnumCodec<>(ModuleInfo.ModuleType.class),
-                new EnumCodec<>(TLSAuthParam.CertificateType.class)
+                new EnumCodec<>(TLSAuthParam.CertificateType.class),
+                new EnumCodec<>(TicketSource.class)
         );
 
         return fromRegistries(MongoClientSettings.getDefaultCodecRegistry(), pojoCodecRegistry,
@@ -451,6 +459,6 @@ public class DaoInit {
         PupeteerLogsDao.instance.createIndicesIfAbsent();
         SourceCodeVulnerabilitiesDao.instance.createIndicesIfAbsent();
         JobsDao.instance.createIndicesIfAbsent();
+        BidirectionalSyncSettingsDao.instance.createIndicesIfAbsent();
     }
-
 }
