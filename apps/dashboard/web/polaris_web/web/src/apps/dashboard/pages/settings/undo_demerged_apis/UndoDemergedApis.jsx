@@ -40,6 +40,31 @@ const UndoDemergedApis = () => {
         })
     }
 
+    const resourceListRenderItems = (item) => {
+        const { id, url, method, apiCollectionId } = item
+        const collectionName = collectionsMap[apiCollectionId] || ''
+
+        const shortcutActions = [
+            {
+                content: <Button plain>Undo</Button>,
+                onAction: () => undoDemergedApis([item])
+            }
+        ]
+
+        return (
+            <ResourceItem
+                id={id}
+                shortcutActions={shortcutActions}
+                persistActions
+            >
+                <GetPrettifyEndpoint method={method} methodBoxWidth={" "} url={url} isNew={false} />
+                {/* <Text variant="bodyMd">
+                    {collectionName}
+                </Text> */}
+            </ResourceItem>
+        )
+    }
+
     const table = (
         <LegacyCard>
             {
@@ -47,30 +72,7 @@ const UndoDemergedApis = () => {
                 <ResourceList
                     resourceName={{ singular: 'merged api', plural: 'merged apis' }}
                     items={mergedApis}
-                    renderItem={(item) => {
-                        const { id, url, method, apiCollectionId } = item
-                        const collectionName = collectionsMap[apiCollectionId] || ''
-
-                        const shortcutActions = [
-                            {
-                                content: <Button plain>Undo</Button>,
-                                onAction: () => undoDemergedApis([item])
-                            }
-                        ]
-
-                        return (
-                            <ResourceItem
-                                id={id}
-                                shortcutActions={shortcutActions}
-                                persistActions
-                            >
-                                <GetPrettifyEndpoint method={method} methodBoxWidth={" "} url={url} isNew={false} />
-                                {/* <Text variant="bodyMd">
-                                    {collectionName}
-                                </Text> */}
-                            </ResourceItem>
-                        )
-                    }}
+                    renderItem={resourceListRenderItems}
                     headerContent={`Showing ${mergedApis.length} merged api${mergedApis.length > 1 ? 's': ''}`}
                     showHeader
                     loading={loading}
