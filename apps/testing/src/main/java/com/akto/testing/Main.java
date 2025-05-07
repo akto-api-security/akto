@@ -603,11 +603,11 @@ public class Main {
 
                 loggerMaker.info(String.format("IS_NEW_TESTING_ENABLED=%s", Constants.IS_NEW_TESTING_ENABLED));
 
-                // testingProducer.initProducer(testingRun, summaryId, syncLimit, false);
-                // testingConsumer.init(maxRunTime);            
+                testingProducer.initProducer(testingRun, summaryId, syncLimit, false);
+                testingConsumer.init(maxRunTime);            
 
-                TestExecutor testExecutor = new TestExecutor();
-                testExecutor.init(testingRun, summaryId, syncLimit, false);
+                // TestExecutor testExecutor = new TestExecutor();
+                // testExecutor.init(testingRun, summaryId, syncLimit, false);
 
                 loggerMaker.info("Testing run completed execution.");
             }  catch (Exception e) {
