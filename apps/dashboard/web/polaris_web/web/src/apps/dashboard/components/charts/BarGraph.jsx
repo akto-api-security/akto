@@ -4,7 +4,7 @@ import Highcharts from "highcharts"
 import { useRef } from "react";
 import observeFunc from "../../pages/observe/transform"
 
-function BarGraph({defaultChartOptions, backgroundColor, height, title, data, xAxisTitle,barWidth, yAxisTitle, barGap, showGridLines, showYAxis}) {
+function BarGraph({defaultChartOptions, backgroundColor, height, title, data, xAxisTitle,barWidth, yAxisTitle, barGap, showGridLines, showYAxis, onBarClick}) {
 
     const chartComponentRef = useRef(null)
     let xCategories = []
@@ -12,6 +12,7 @@ function BarGraph({defaultChartOptions, backgroundColor, height, title, data, xA
     data.forEach((x) => {
         xCategories.push(x.text)
         seriesData.push({
+            ...x,
             y: x.value,
             color: x.color,
             name: x.text
@@ -73,7 +74,13 @@ function BarGraph({defaultChartOptions, backgroundColor, height, title, data, xA
         },
         series:[{
             data: seriesData,
+            cursor: "pointer",
             colorByPoint: true,
+            events: {
+                click: (e) => {
+                    onBarClick(e.point);
+                }
+            },
             states: {
                 inactive: {
                     opacity: 1

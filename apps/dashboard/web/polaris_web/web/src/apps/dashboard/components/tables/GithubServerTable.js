@@ -228,6 +228,13 @@ function GithubServerTable(props) {
     setAppliedFilters(temp);
   }, [appliedFilters, props.disambiguateLabel, handleRemoveAppliedFilter, setFiltersMap, currentPageKey, pageFiltersMap]);
 
+  useEffect(() => {
+    if (props.externalFilter) {
+      const { key, value } = props.externalFilter;
+      changeAppliedFilters(key, value);
+    }
+  }, [props.externalFilter]);
+
   const debouncedSearch = debounce((searchQuery) => {
       fetchData(searchQuery)
   }, 500);
@@ -415,6 +422,7 @@ function GithubServerTable(props) {
   if (typeof props.setSelectedResourcesForPrimaryAction === 'function') {
     props.setSelectedResourcesForPrimaryAction(bulkActionResources)
   }
+
   return (
     <div className={tableClass} style={{display: "flex", flexDirection: "column", gap: "20px"}}>
       <LegacyCard>

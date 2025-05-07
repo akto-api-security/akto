@@ -1,4 +1,4 @@
-import { useReducer, useState, useEffect } from "react";
+import { useReducer, useState, useEffect, useRef } from "react";
 import DateRangeFilter from "../../components/layouts/DateRangeFilter";
 import PageWithMultipleCards from "../../components/layouts/PageWithMultipleCards";
 import TitleWithInfo from "../../components/shared/TitleWithInfo";
@@ -18,7 +18,7 @@ import { ThreatSummary } from "./components/ThreatSummary";
 import ThreatActivityTimeline from "./components/ThreatActivityTimeline";
 import React from "react";
 
-const ChartComponent = ({ mapData, loading, onSubCategoryClick, currDateRange }) => {
+const ChartComponent = ({ mapData, loading, onSubCategoryClick, currDateRange, onCountryClick }) => {
     return (
         <VerticalStack gap={4} columns={2}>
             <HorizontalGrid gap={4} columns={2}>
@@ -35,6 +35,7 @@ const ChartComponent = ({ mapData, loading, onSubCategoryClick, currDateRange })
                     }}
                     loading={loading}
                     key={"threat-actor-world-map"}
+                    onCountryClick={onCountryClick}
                 />
             </HorizontalGrid>
         </VerticalStack>
@@ -55,6 +56,8 @@ function ThreatActorPage() {
     produce((draft, action) => func.dateRangeReducer(draft, action)),
     initialVal
   );
+
+  const [externalFilter, setExternalFilter] = useState(null);
 
   useEffect(() => {
     const fetchActorsPerCountry = async () => {
@@ -86,7 +89,11 @@ function ThreatActorPage() {
   }, []);
 
   const onSubCategoryClick = (subCategory) => {
-    console.log({ subCategory });
+    setExternalFilter({key: "latestAttack", value: [subCategory]});
+  }
+
+  const onCountryClick = (country) => {
+    setExternalFilter({key: "country", value: [country]});
   }
 
   const onRowClick = (data) => {
@@ -100,6 +107,7 @@ function ThreatActorPage() {
       mapData={mapData}
       loading={loading}
       onSubCategoryClick={onSubCategoryClick}
+      onCountryClick={onCountryClick}
       currDateRange={currDateRange}
     />,
     <ThreatActorTable
@@ -107,6 +115,7 @@ function ThreatActorPage() {
       currDateRange={currDateRange}
       loading={loading}
       handleRowClick={onRowClick}
+      externalFilter={externalFilter}
     />,
     ...(showActorDetails ? [<ActorDetails actorDetails={actorDetails} setShowActorDetails={setShowActorDetails} />] : [])
   ];

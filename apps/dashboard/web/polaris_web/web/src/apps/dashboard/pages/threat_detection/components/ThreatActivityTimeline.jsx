@@ -27,6 +27,7 @@ const ThreatActivityTimeline = ({ startTimestamp, endTimestamp, onSubCategoryCli
         const distinctSubCategories = [...new Set(response.threatActivityTimelines.flatMap(item => item.subCategoryWiseData.map(subItem => subItem.subcategory)))];
         console.log({ response });
         const series = distinctSubCategories.map((subCategory, index) => ({
+            cursor: "pointer",
             color: COLORMAP[index % 5],
             name: subCategory,
             data: sortedTimelines.map(item => {

@@ -29,6 +29,7 @@ const threatDetectionFunc = {
                   text: usedName,
                   value: subCategoryRes[x],
                   color: "#A5B4FC",
+                  subCategory: x,
                 };
             })
     

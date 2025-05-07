@@ -64,6 +64,8 @@ public class ThreatApiService {
                         .append("method", "$latestApiMethod"))
                 .append("discoveredAt", new Document("$last", "$detectedAt"))
                 .append("distinctActors", new Document("$addToSet", "$actor"))
+                .append("severity", new Document("$last", "$severity"))
+                .append("subCategory", new Document("$last", "$subCategory"))
                 .append("requestsCount", new Document("$sum", 1))));
     base.add(
         new Document(
@@ -98,6 +100,8 @@ public class ThreatApiService {
                 .setEndpoint(agg.getString("endpoint"))
                 .setMethod(agg.getString("method"))
                 .setDiscoveredAt(doc.getLong("discoveredAt"))
+                .setSeverity(doc.getString("severity"))
+                .setSubCategory(doc.getString("subCategory"))
                 .setActorsCount(doc.getInteger("actorsCount", 0))
                 .setRequestsCount(doc.getInteger("requestsCount", 0))
                 .build());
