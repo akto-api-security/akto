@@ -17,7 +17,7 @@ import settingFunctions from '../module';
 import IntegrationsLayout from './IntegrationsLayout';
 import PasswordTextField from '../../../components/layouts/PasswordTextField';
 import func from "@/util/func"
-import DropdownSearch from '../../../components/shared/DropdownSearch';
+import DropdownSearchWithDisabled from '../../../components/shared/DropdownSearchWithDisabled';
 import api from '../api';
 
 const aktoStatusForJira = ["Open","Fixed", "Ignored"]
@@ -341,7 +341,8 @@ function Jira() {
     function fetchJiraStatusMapping(projId, index) {
       if (projects[index]?.enableBiDirIntegration) {
         updateProject(index, {
-          enableBiDirIntegration: false
+          enableBiDirIntegration: false,
+          aktoToJiraStatusMap: JSON.parse(JSON.stringify(intialEmptyMapping)),
         });
         return;
       }
@@ -360,12 +361,13 @@ function Jira() {
               return {"label": x?.name ?? "", "value": x?.name ?? ""}
             }) || [];
         if (jiraStatusLabel.length > 0) {
-          aktoStatusForJira.forEach((status) => {
+          aktoStatusForJira.forEach((status, idx) => {
             const upperStatus = status.toUpperCase();
             if (!aktoToJiraStatusMap[upperStatus]
                 || aktoToJiraStatusMap[upperStatus].length === 0) {
+              const statusIndex = Math.min(idx, jiraStatusLabel.length - 1);
               if (jiraStatusLabel.length > 0) {
-                aktoToJiraStatusMap[upperStatus] = [jiraStatusLabel[0].value];
+                aktoToJiraStatusMap[upperStatus] = [jiraStatusLabel[statusIndex].value];
               }
             }
           });
@@ -559,25 +561,24 @@ function Jira() {
         return { isValid: true, message: '' };
     }
 
-    function isStatusAlreadySelected(project, currentStatus, statusValue) {
-        if (!project || !project.aktoToJiraStatusMap) return false;
+    function getDisabledOptions(project, currentStatus) {
+        if (!project || !project.aktoToJiraStatusMap) return [];
 
-        // Check all Akto statuses except the current one
+        const disabledOptions = [];
+
+        // Collect all selected statuses from other dropdowns
         for (const aktoStatus in project.aktoToJiraStatusMap) {
             if (aktoStatus !== currentStatus) {
                 const selectedStatuses = project.aktoToJiraStatusMap[aktoStatus] || [];
-                if (selectedStatuses.includes(statusValue)) {
-                    return true;
-                }
+                disabledOptions.push(...selectedStatuses);
             }
         }
 
-        return false;
+        return disabledOptions;
     }
 
     function handleStatusSelection(index, project, aktoStatus, newValues) {
         const upperStatus = aktoStatus.toUpperCase();
-        const previousValues = project?.aktoToJiraStatusMap?.[upperStatus] || [];
 
         // Create a new copy of the project to ensure React detects the change
         const updatedProject = JSON.parse(JSON.stringify(project));
@@ -706,21 +707,18 @@ function Jira() {
                                             return (
                                                 <HorizontalStack gap={8}>
                                                     <Box width='82px'><Badge >{val}</Badge></Box>
-                                                    <DropdownSearch setSelected={(value) => {
-                                                        const label = val.toUpperCase();
-                                                        updateProject(index, {
-                                                            aktoToJiraStatusMap: {
-                                                                [label]: value
-                                                            }
-                                                        })
-                                                    }}
+                                                    <DropdownSearchWithDisabled
+                                                        setSelected={(value) => {
+                                                            handleStatusSelection(index, project, val, value);
+                                                        }}
                                                         optionsList={project?.jiraStatusLabel || []}
                                                         placeholder="Select Jira Status"
                                                         searchDisable={true}
                                                         showSelectedItemLabels={true}
                                                         allowMultiple={true}
                                                         preSelected={project?.aktoToJiraStatusMap?.[val?.toUpperCase()] || []}
-                                                        value={func.getSelectedItemsText(getLabel(project?.aktoToJiraStatusMap?.[val?.toUpperCase()], project) || [])} />
+                                                        value={func.getSelectedItemsText(getLabel(project?.aktoToJiraStatusMap?.[val?.toUpperCase()], project) || [])}
+                                                        disabledOptions={getDisabledOptions(project, val.toUpperCase())} />
                                                     {project?.enableBiDirIntegration && (!project?.aktoToJiraStatusMap?.[val?.toUpperCase()] || project?.aktoToJiraStatusMap?.[val?.toUpperCase()].length === 0) &&
                                                         <Text variant="bodySm" color="critical">
                                                             <span style={{ color: 'var(--p-color-critical)', marginLeft: '8px' }}>* Required</span>
