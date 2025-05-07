@@ -25,13 +25,15 @@ import com.akto.proto.generated.threat_detection.message.sample_request.v1.Sampl
 import com.akto.proto.generated.threat_detection.message.sample_request.v1.SampleRequestKafkaEnvelope;
 import com.akto.proto.http_response_param.v1.HttpResponseParam;
 import com.akto.rules.TestPlugin;
-import com.akto.test_editor.execution.VariableResolver;
 import com.akto.test_editor.filter.data_operands_impl.ValidationResult;
 import com.akto.threat.detection.actor.SourceIPActorGenerator;
+import com.akto.threat.detection.cache.ApiCountCacheLayer;
 import com.akto.threat.detection.cache.RedisBackedCounterCache;
 import com.akto.threat.detection.constants.KafkaTopic;
+import com.akto.threat.detection.constants.RedisKeyInfo;
 import com.akto.threat.detection.kafka.KafkaProtoProducer;
 import com.akto.threat.detection.smart_event_detector.window_based.WindowBasedThresholdNotifier;
+import com.akto.threat.detection.utils.Utils;
 import com.akto.util.HttpRequestResponseUtils;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.akto.IPLookupClient;
@@ -57,6 +59,7 @@ public class MaliciousTrafficDetectorTask implements Task {
   private final KafkaConfig kafkaConfig;
   private final HttpCallParser httpCallParser;
   private final WindowBasedThresholdNotifier windowBasedThresholdNotifier;
+  private final WindowBasedThresholdNotifier apiCountWindowBasedThresholdNotifier;
   private final RawApiMetadataFactory rawApiFactory;
 
   private Map<String, FilterConfig> apiFilters;
@@ -101,6 +104,11 @@ public class MaliciousTrafficDetectorTask implements Task {
         new WindowBasedThresholdNotifier(
             new RedisBackedCounterCache(redisClient, "wbt"),
             new WindowBasedThresholdNotifier.Config(100, 10 * 60));
+    
+    this.apiCountWindowBasedThresholdNotifier =
+      new WindowBasedThresholdNotifier(
+          new ApiCountCacheLayer(redisClient),
+          new WindowBasedThresholdNotifier.Config(100, 10 * 60));
 
     this.internalKafka = new KafkaProtoProducer(internalConfig);
     this.rawApiFactory = new RawApiMetadataFactory(new IPLookupClient());
@@ -194,6 +202,9 @@ public class MaliciousTrafficDetectorTask implements Task {
         URLMethods.Method.fromString(responseParam.getRequestParams().getMethod());
     ApiInfo.ApiInfoKey apiInfoKey = new ApiInfo.ApiInfoKey(apiCollectionId, url, method);
 
+    String apiHitCountKey = Utils.buildApiHitCountKey(apiCollectionId, url, method.toString());
+    this.apiCountWindowBasedThresholdNotifier.incrementApiHitcount(apiHitCountKey, responseParam.getTime(), RedisKeyInfo.API_COUNTER_SORTED_SET);
+
     for (FilterConfig apiFilter : apiFilters.values()) {
       boolean hasPassedFilter = validateFilterForRequest(apiFilter, rawApi, apiInfoKey);
 
@@ -243,9 +254,13 @@ public class MaliciousTrafficDetectorTask implements Task {
         }
 
         // Aggregation rules
+        WindowBasedThresholdNotifier.Result result;
         for (Rule rule : aggRules.getRule()) {
-          WindowBasedThresholdNotifier.Result result = this.windowBasedThresholdNotifier.shouldNotify(aggKey,
-              maliciousReq, rule);
+          if (apiFilter.getInfo().getSubCategory().equalsIgnoreCase("API_LEVEL_RATE_LIMITING")) {
+              result = this.apiCountWindowBasedThresholdNotifier.calcApiCount(apiHitCountKey, maliciousReq, rule);
+          } else {
+              result = this.windowBasedThresholdNotifier.shouldNotify(aggKey, maliciousReq, rule);
+          }
 
           if (result.shouldNotify()) {
             logger.debug("aggregate condition satisfied for url {} filterId {}", apiInfoKey.getUrl(), apiFilter.getId());

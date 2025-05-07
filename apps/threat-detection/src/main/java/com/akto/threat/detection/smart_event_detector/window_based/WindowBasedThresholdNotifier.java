@@ -5,6 +5,7 @@ import com.akto.proto.generated.threat_detection.message.sample_request.v1.Sampl
 import com.akto.threat.detection.cache.CounterCache;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 public class WindowBasedThresholdNotifier {
 
@@ -87,4 +88,29 @@ public class WindowBasedThresholdNotifier {
     }
     return binData;
   }
+
+  public void incrementApiHitcount(String key, int ts, String sortedSetKey) {
+    int binId = (int) ts / 60;
+    String cachekey = key + "|" + binId;
+    this.cache.increment(cachekey);
+    this.cache.addToSortedSet(sortedSetKey, cachekey, binId);
+  }
+
+
+  public Result calcApiCount(String aggKey, SampleMaliciousRequest maliciousEvent, Rule rule) {
+      int binId = (int) maliciousEvent.getTimestamp() / 60;
+      int startBinId = binId - rule.getCondition().getWindowThreshold() + 1;
+      String cacheKey;
+      List<String> keys = new ArrayList<>();
+      for (int i = startBinId; i <= binId; i++) {
+        cacheKey = aggKey + "|" + i;
+        keys.add(cacheKey);
+      }
+      Map<String, Long> keyValData = this.cache.mget(keys.toArray(new String[0]));
+      long windowCount = keyValData.values().stream().mapToLong(Long::longValue).sum();
+
+      boolean thresholdBreached = windowCount >= rule.getCondition().getMatchCount();
+      return new Result(thresholdBreached);
+  }
+
 }

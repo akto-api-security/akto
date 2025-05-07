@@ -7,6 +7,7 @@ import com.akto.kafka.KafkaProducerConfig;
 import com.akto.kafka.Serializer;
 import com.akto.log.LoggerMaker;
 import com.akto.threat.detection.constants.KafkaTopic;
+import com.akto.threat.detection.crons.ApiCountInfoRelayCron;
 import com.akto.threat.detection.session_factory.SessionFactoryUtils;
 import com.akto.threat.detection.tasks.CleanupTask;
 import com.akto.threat.detection.tasks.FlushSampleDataTask;
@@ -35,6 +36,8 @@ public class Main {
         sessionFactory = SessionFactoryUtils.createFactory();
         localRedis = createLocalRedisClient();
     }
+
+    triggerApiInfoRelayCron(localRedis);
 
     KafkaConfig trafficKafka =
         KafkaConfig.newBuilder()
@@ -79,6 +82,19 @@ public class Main {
     new SendMaliciousEventsToBackend(
             sessionFactory, internalKafka, KafkaTopic.ThreatDetection.ALERTS)
         .run();
+
+  }
+
+  public static void triggerApiInfoRelayCron(RedisClient localRedis) {
+    if (localRedis == null) {
+        return;
+    }
+    ApiCountInfoRelayCron apiCountInfoRelayCron = new ApiCountInfoRelayCron(localRedis);
+    try {
+        apiCountInfoRelayCron.relayApiCountInfo();
+    } catch (Exception e) {
+        System.out.println(e);
+    }
   }
 
   public static RedisClient createLocalRedisClient() {

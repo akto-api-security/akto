@@ -50,6 +50,7 @@ import com.akto.dto.billing.Organization;
 import com.akto.dto.rbac.UsersCollectionsList;
 import com.akto.dto.runtime_filters.RuntimeFilter;
 import com.akto.dto.test_editor.YamlTemplate;
+import com.akto.dto.threat_detection.ApiHitCountInfo;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.traffic.SuspectSampleData;
 import com.akto.dto.traffic.TrafficInfo;
@@ -402,5 +403,9 @@ public class DbLayer {
 
     public static Set<MergedUrls> fetchMergedUrls() {
         return MergedUrlsDao.instance.getMergedUrls();
+    }
+
+    public static void relayNewApiCountInfo(List<ApiHitCountInfo> payload) throws Exception {
+        // add db call here
     }
 }

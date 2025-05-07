@@ -22,6 +22,7 @@ import com.akto.dto.runtime_filters.FieldExistsFilter;
 import com.akto.dto.runtime_filters.ResponseCodeRuntimeFilter;
 import com.akto.dto.runtime_filters.RuntimeFilter;
 import com.akto.dto.test_editor.YamlTemplate;
+import com.akto.dto.threat_detection.ApiHitCountInfo;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
@@ -1342,4 +1343,23 @@ public class ClientActor extends DataActor {
 
         return new HashSet<>(respList);
     }
+
+    public void relayNewApiCountInfo(List<ApiHitCountInfo> payload) throws Exception {
+        Map<String, List<String>> headers = buildHeaders();
+        BasicDBObject obj = new BasicDBObject();
+        obj.put("apiHitCountInfo", payload);
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/relayNewApiCountInfo", "", "POST", obj.toString(), headers, "");
+        try {
+            OriginalHttpResponse response = null;//ApiExecutor.sendRequest(request, true, null, false, null);
+            // if (response.getStatusCode() != 200) {
+            //     loggerMaker.errorAndAddToDb("non 2xx response in relayNewApiCountInfo", LoggerMaker.LogDb.RUNTIME);
+            //     return;
+            // }
+        } catch (Exception e) {
+            e.printStackTrace();
+            loggerMaker.error("error in relayNewApiCountInfo {}", e.getMessage());
+            throw e;
+        }
+    }
+
 }
