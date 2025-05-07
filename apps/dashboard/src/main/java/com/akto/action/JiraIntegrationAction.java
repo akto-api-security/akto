@@ -31,6 +31,7 @@ import com.akto.dto.testing.BidirectionalSyncSettings;
 import com.akto.dto.testing.TestResult;
 import com.akto.dto.testing.TestingRunResult;
 import com.akto.jobs.JobScheduler;
+import com.akto.jobs.utils.JobConstants;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.test_editor.Utils;
@@ -105,8 +106,7 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
     private static final String ISSUE_STATUS_ENDPOINT = "/rest/api/3/project/%s/statuses";
     private static final LoggerMaker loggerMaker = new LoggerMaker(ApiExecutor.class, LogDb.DASHBOARD);
 
-    private static final int TICKET_SYNC_JOB_RECURRING_INTERVAL_SECONDS = 3600;
-    private static final int TICKET_SYNC_JOB_INITIAL_LAST_SYNC_SECONDS = 3600; // 1 hour
+    private static final int TICKET_SYNC_JOB_RECURRING_INTERVAL_SECONDS = 60 * 2;
     private static final OkHttpClient client = CoreHTTPClient.client.newBuilder()
             .connectTimeout(60, TimeUnit.SECONDS)
             .readTimeout(60, TimeUnit.SECONDS)
@@ -913,6 +913,8 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
         BasicDBObject issueTypeObj = new BasicDBObject();
         issueTypeObj.put("id", this.issueType);
         fields.put("issuetype", issueTypeObj);
+        fields.put("labels", new String[] {JobConstants.TICKET_LABEL_AKTO_SYNC});
+
 
         // Project ID
         BasicDBObject project = new BasicDBObject();
