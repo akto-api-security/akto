@@ -11,7 +11,6 @@ import com.akto.log.LoggerMaker;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.FindOneAndUpdateOptions;
 import com.mongodb.client.model.ReturnDocument;
-import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.Updates;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
@@ -88,6 +87,5 @@ public final class JobScheduler {
 
         return JobsDao.instance.getMCollection().findOneAndUpdate(query, update,
             new FindOneAndUpdateOptions().returnDocument(ReturnDocument.AFTER));
-
     }
 }

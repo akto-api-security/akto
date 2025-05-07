@@ -25,7 +25,6 @@ function DropdownSearchWithDisabled(props) {
         disabledOptions=[] 
     } = props
 
-    // Create a modified options list with disabled property
     const deselectedOptions = optionsList.map(option => ({
         ...option,
         disabled: disabledOptions.includes(option.value)
@@ -55,7 +54,6 @@ function DropdownSearchWithDisabled(props) {
             });
         }
         
-        // Update options with disabled property
         const updatedOptions = optionsList.map(option => ({
             ...option,
             disabled: disabledOptions.includes(option.value)
@@ -63,7 +61,6 @@ function DropdownSearchWithDisabled(props) {
         
         setOptions((prev) => {
             if(selectedOptions.length > 0 || prev.length > 0){
-                // Preserve disabled status when updating options
                 return prev.map(option => ({
                     ...option,
                     disabled: disabledOptions.includes(option.value)
@@ -153,7 +150,6 @@ function DropdownSearchWithDisabled(props) {
 
     const updateSelection = useCallback(
         (selected) => {
-            // Filter out any disabled options that might have been selected
             const filteredSelected = selected.filter(
                 selectedItem => !disabledOptions.includes(selectedItem)
             );
@@ -252,7 +248,6 @@ function DropdownSearchWithDisabled(props) {
         </React.Fragment>
     );
 
-    // Custom renderOption function to style disabled options
     const renderOption = (option, isSelected) => {
         const { label, value, disabled } = option;
         
@@ -272,7 +267,7 @@ function DropdownSearchWithDisabled(props) {
             );
         }
         
-        return undefined; // Return undefined to use default rendering for enabled options
+        return undefined;
     };
 
     return (

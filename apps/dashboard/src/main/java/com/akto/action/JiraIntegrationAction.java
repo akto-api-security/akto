@@ -45,7 +45,9 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.FindOneAndUpdateOptions;
 import com.mongodb.client.model.Projections;
+import com.mongodb.client.model.ReturnDocument;
 import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.Updates;
 import com.opensymphony.xwork2.Action;
@@ -416,17 +418,19 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
         Map<String, List<BasicDBObject>> existingProjectIdsMap = jira.getProjectIdsMap();
         Map<String, ProjectMapping> existingProjectMappings = jira.getProjectMappings();
 
-        List<BasicDBObject> removedProject = existingProjectIdsMap.remove(this.projId);
-        ProjectMapping removedProjectMap = existingProjectMappings.remove(this.projId);
-
-        if (removedProject == null && removedProjectMap == null) {
-            loggerMaker.debug("Preject Key not found in Jira Integration: projId: {}", this.projId);
-            return Action.SUCCESS.toUpperCase();
-        }
-
-        if (existingProjectIdsMap.isEmpty() || existingProjectMappings.isEmpty()) {
+        if (existingProjectIdsMap.isEmpty() || (existingProjectMappings != null && existingProjectMappings.isEmpty())) {
             addActionError("Atleast one project is required for Jira Integration");
             return Action.ERROR.toUpperCase();
+        }
+
+        List<BasicDBObject> removedProjectIdMap = existingProjectIdsMap.remove(this.projId);
+
+        // null check for backward compatibility - users who already have jira integration before this change.
+        ProjectMapping removedProjectMapping = existingProjectMappings == null ? null : existingProjectMappings.remove(this.projId);
+
+        if (removedProjectIdMap == null && removedProjectMapping == null) {
+            loggerMaker.debug("Project Key not found in Jira Integration: projId: {}", this.projId);
+            return Action.SUCCESS.toUpperCase();
         }
 
         UpdateOptions updateOptions = new UpdateOptions();
@@ -434,9 +438,12 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
 
         Bson integrationUpdate = Updates.combine(
             Updates.set("updatedTs", Context.now()),
-            Updates.set("projectMappings", existingProjectMappings),
             Updates.set("projectIdsMap", existingProjectIdsMap)
         );
+
+        if (existingProjectMappings != null) {
+            integrationUpdate = Updates.combine(integrationUpdate, Updates.set("projectMappings", existingProjectMappings));
+        }
 
         JiraIntegrationDao.instance.getMCollection().updateOne(
             new BasicDBObject(),
@@ -444,16 +451,20 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
             updateOptions
         );
 
-        BidirectionalSyncSettings deletedSettings = BidirectionalSyncSettingsDao.instance.getMCollection()
-            .findOneAndDelete(
+        BidirectionalSyncSettings disabledSettings = BidirectionalSyncSettingsDao.instance.getMCollection()
+            .findOneAndUpdate(
                 Filters.and(
                     Filters.eq(BidirectionalSyncSettings.SOURCE, TicketSource.JIRA.name()),
                     Filters.eq(BidirectionalSyncSettings.PROJECT_KEY, this.projId)
-                )
+                ),
+                Updates.combine(
+                    Updates.set(BidirectionalSyncSettings.ACTIVE, false),
+                    Updates.set(BidirectionalSyncSettings.LAST_SYNCED_AT, Context.now())
+                ),
+                new FindOneAndUpdateOptions().returnDocument(ReturnDocument.AFTER)
             );
-
-        if (deletedSettings != null) {
-            JobScheduler.deleteJob(deletedSettings.getJobId());
+        if (disabledSettings != null) {
+            JobScheduler.deleteJob(disabledSettings.getJobId());
         }
         return Action.SUCCESS.toUpperCase();
     }

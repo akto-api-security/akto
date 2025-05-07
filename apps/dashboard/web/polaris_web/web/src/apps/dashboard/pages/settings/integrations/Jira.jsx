@@ -665,7 +665,7 @@ function Jira() {
         <VerticalStack gap={4}>
             {projects?.map((project, index) => {
                 return (
-                    <Card roundedAbove="sm">
+                    <Card key={`project-${index}`} roundedAbove="sm">
                         <VerticalStack gap={4}>
                             <HorizontalStack align='space-between'>
                                 <Text fontWeight='semibold' variant='headingSm'>{`Project ${index + 1}`}</Text>
@@ -699,12 +699,15 @@ function Jira() {
                                 <VerticalStack gap={3} align='start'>
                                     <HorizontalStack gap={12}>
                                         <Text fontWeight='semibold' variant='headingXs'>Akto Status</Text>
-                                        <Text fontWeight='semibold' variant='headingXs'>Jira Status</Text>
+                                        <HorizontalStack gap={0}>
+                                            <Text fontWeight='semibold' variant='headingXs'>Jira Status </Text>
+                                            <Text fontWeight='semibold' variant='headingXs' color="critical">*</Text>
+                                        </HorizontalStack>
                                     </HorizontalStack>
                                     {
                                         aktoStatusForJira.map(val => {
                                             return (
-                                                <HorizontalStack gap={8}>
+                                                <HorizontalStack key={`status-${val}`} gap={8}>
                                                     <Box width='82px'><Badge >{val}</Badge></Box>
                                                     <DropdownSearchWithDisabled
                                                         setSelected={(value) => {
@@ -718,11 +721,6 @@ function Jira() {
                                                         preSelected={project?.aktoToJiraStatusMap?.[val?.toUpperCase()] || []}
                                                         value={func.getSelectedItemsText(getLabel(project?.aktoToJiraStatusMap?.[val?.toUpperCase()], project) || [])}
                                                         disabledOptions={getDisabledOptions(project, val.toUpperCase())} />
-                                                    {project?.enableBiDirIntegration && (!project?.aktoToJiraStatusMap?.[val?.toUpperCase()] || project?.aktoToJiraStatusMap?.[val?.toUpperCase()].length === 0) &&
-                                                        <Text variant="bodySm" color="critical">
-                                                            <span style={{ color: 'var(--p-color-critical)', marginLeft: '8px' }}>* Required</span>
-                                                        </Text>
-                                                    }
                                                 </HorizontalStack>
                                             )
                                         })
