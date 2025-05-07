@@ -104,7 +104,7 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
     private static final LoggerMaker loggerMaker = new LoggerMaker(ApiExecutor.class, LogDb.DASHBOARD);
 
     private static final int TICKET_SYNC_JOB_RECURRING_INTERVAL_SECONDS = 3600;
-    private static final int TICKET_SYNC_JOB_INITIAL_LAST_SYNC_SECONDS = 3600 * 2; // 2 hours
+    private static final int TICKET_SYNC_JOB_INITIAL_LAST_SYNC_SECONDS = 3600; // 1 hour
     private static final OkHttpClient client = CoreHTTPClient.client.newBuilder()
             .connectTimeout(60, TimeUnit.SECONDS)
             .readTimeout(60, TimeUnit.SECONDS)
@@ -1098,11 +1098,12 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
                         // Check if we need to restart the job (if previously inactive)
                         ObjectId jobId = existingSettings.getJobId();
                         if (!existingSettings.isActive()) {
-                            Job job = createRecurringJob(projectKey);
+                            Job job = JobScheduler.restartJob(jobId);
                             if (job == null) {
-                                loggerMaker.error("Error while creating recurring job for project key: {}", projectKey);
+                                loggerMaker.error("Error while restarting recurring job for project key: {}", projectKey);
                                 continue;
                             }
+                            loggerMaker.info("Restarted recurring job for project key: {}", projectKey);
                             jobId = job.getId();
                         }
                         BidirectionalSyncSettingsDao.instance.updateOne(
@@ -1120,6 +1121,9 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
                             loggerMaker.error("Error while creating recurring job for project key: {}", projectKey);
                             continue;
                         }
+
+                        loggerMaker.info("Created recurring job for project key: {}", projectKey);
+
                         BidirectionalSyncSettings bidirectionalSyncSettings = new BidirectionalSyncSettings();
                         bidirectionalSyncSettings.setSource(TicketSource.JIRA);
                         bidirectionalSyncSettings.setProjectKey(projectKey);
@@ -1169,7 +1173,7 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
             new TicketSyncJobParams(
                 TicketSource.JIRA.name(),
                 projectKey,
-                Context.now() - TICKET_SYNC_JOB_INITIAL_LAST_SYNC_SECONDS
+                Context.now()
             ),
             JobExecutorType.DASHBOARD,
             TICKET_SYNC_JOB_RECURRING_INTERVAL_SECONDS

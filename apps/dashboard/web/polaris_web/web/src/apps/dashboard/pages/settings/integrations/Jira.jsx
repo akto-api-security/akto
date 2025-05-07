@@ -178,10 +178,8 @@ function Jira() {
         credentials: { baseUrl, apiToken, userEmail },
         projects,
         existingProjectIds,
-        isAlreadyIntegrated,
         isSaving,
         initialFormData,
-        projectIssueMap,
         loadingProjectIndex
     } = state;
 
@@ -249,15 +247,7 @@ function Jira() {
             payload: data
         });
     };
-
-    const setProjectIssuesMap = (map) => {
-        dispatch({
-            type: ACTION_TYPES.SET_PROJECT_ISSUE_MAP,
-            payload: map
-        });
-    };
-
-    const setLoadingProjectIndex = (index) => {
+  const setLoadingProjectIndex = (index) => {
         dispatch({
             type: ACTION_TYPES.SET_LOADING_PROJECT_INDEX,
             payload: index
@@ -527,6 +517,21 @@ function Jira() {
         }
 
         const aktoToJiraStatusMap = project?.aktoToJiraStatusMap || {};
+
+        // Check if all required statuses have values
+        for (const status of aktoStatusForJira) {
+            const upperStatus = status.toUpperCase();
+            const mappings = aktoToJiraStatusMap[upperStatus] || [];
+
+            if (mappings.length === 0) {
+                return {
+                    isValid: false,
+                    message: `Status mapping for ${status} is required when bidirectional integration is enabled.`
+                };
+            }
+        }
+
+        // Check for duplicate status assignments
         const usedStatuses = new Set();
         let hasDuplicates = false;
         let duplicateStatus = '';
@@ -547,7 +552,7 @@ function Jira() {
         if (hasDuplicates) {
             return {
                 isValid: false,
-                message: `Status '${duplicateStatus}' is assigned to multiple Akto statuses. Each Jira status must be unique.`
+                message: `Jira Status '${duplicateStatus}' is assigned to multiple Akto statuses. Each Jira status must be unique.`
             };
         }
 
@@ -568,6 +573,24 @@ function Jira() {
         }
 
         return false;
+    }
+
+    function handleStatusSelection(index, project, aktoStatus, newValues) {
+        const upperStatus = aktoStatus.toUpperCase();
+        const previousValues = project?.aktoToJiraStatusMap?.[upperStatus] || [];
+
+        // Create a new copy of the project to ensure React detects the change
+        const updatedProject = JSON.parse(JSON.stringify(project));
+
+        // Update the status mapping for this Akto status
+        updatedProject.aktoToJiraStatusMap[upperStatus] = newValues;
+
+        // Replace the entire project to ensure React re-renders all dropdowns
+        const newProjects = [...projects];
+        newProjects[index] = updatedProject;
+
+        // Update the state with the new projects array
+        setProjects(newProjects);
     }
 
     async function deleteProject(index) {
@@ -594,7 +617,17 @@ function Jira() {
         if (isExistingProject) {
             try {
                 setLoadingProjectIndex(index);
-                await api.deleteJiraIntegratedProject(projectId);
+                await api.deleteJiraIntegratedProject(projectId).then((res) => {
+                  if (initialFormData) {
+                    const updatedProjectMappings = { ...initialFormData.projectMappings };
+                    delete updatedProjectMappings[projectId];
+                    initialFormData.projectMappings = updatedProjectMappings;
+                    setInitialFormData({
+                      ...initialFormData,
+                      projectMappings: updatedProjectMappings
+                    });
+                  }
+                });
                 removeProject(index);
                 setLoadingProjectIndex(null);
                 func.setToast(true, false, "Project removed successfully");
@@ -638,7 +671,7 @@ function Jira() {
                                 <Text fontWeight='semibold' variant='headingSm'>{`Project ${index + 1}`}</Text>
                                 <Button plain removeUnderline destructive size='slim' disabled={projects.length <= 1} onClick={() => deleteProject(index)}>Delete Project</Button>
                             </HorizontalStack>
-                            <TextField maxLength={10} showCharacterCount value={project?.projectId || ""} label="Project key" placeholder={"Project Key"}
+                            <TextField maxLength={10} showCharacterCount value={project?.projectId || ""} label="Project key" placeholder={"Project Key"} requiredIndicator
                                 onChange={(val)=> projectKeyChangeHandler(index,val)} />
                             {loadingProjectIndex === index ? (
                                 <div style={{ display: 'flex', alignItems: 'center', margin: '8px 0' }}>
@@ -646,13 +679,21 @@ function Jira() {
                                     <Text variant="bodyMd" as="span" style={{ marginLeft: '8px' }}>&nbsp;&nbsp;Loading status mappings...</Text>
                                 </div>
                             ) : (
-                                <Checkbox label="Enable bi-directional integration"
-                                    disabled={!project?.projectId?.trim()}
-                                    checked={project.enableBiDirIntegration}
-                                    onChange={() => {
-                                        fetchJiraStatusMapping(project.projectId, index)
-                                    }}
-                                />
+                                <div style={{ display: 'flex', alignItems: 'center' }}>
+                                    <Checkbox
+                                        disabled={!project?.projectId?.trim()}
+                                        checked={project.enableBiDirIntegration}
+                                        onChange={() => {
+                                            if (project?.projectId?.trim()) {
+                                                fetchJiraStatusMapping(project.projectId, index);
+                                            }
+                                        }}
+                                        label=""
+                                    />
+                                    <span style={{ marginLeft: '4px', opacity: project?.projectId?.trim() ? 1 : 0.5 }}>
+                                        Enable bi-directional integration
+                                    </span>
+                                </div>
                             )}
                             {project.enableBiDirIntegration &&
                                 <VerticalStack gap={3} align='start'>
@@ -680,6 +721,11 @@ function Jira() {
                                                         allowMultiple={true}
                                                         preSelected={project?.aktoToJiraStatusMap?.[val?.toUpperCase()] || []}
                                                         value={func.getSelectedItemsText(getLabel(project?.aktoToJiraStatusMap?.[val?.toUpperCase()], project) || [])} />
+                                                    {project?.enableBiDirIntegration && (!project?.aktoToJiraStatusMap?.[val?.toUpperCase()] || project?.aktoToJiraStatusMap?.[val?.toUpperCase()].length === 0) &&
+                                                        <Text variant="bodySm" color="critical">
+                                                            <span style={{ color: 'var(--p-color-critical)', marginLeft: '8px' }}>* Required</span>
+                                                        </Text>
+                                                    }
                                                 </HorizontalStack>
                                             )
                                         })
@@ -803,6 +849,7 @@ function Jira() {
             if (project?.enableBiDirIntegration) {
                 const validation = validateStatusMappings(project);
                 if (!validation.isValid) {
+                    func.setToast(true, true, validation.message);
                     return true;
                 }
             }

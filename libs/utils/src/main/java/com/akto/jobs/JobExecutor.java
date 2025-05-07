@@ -51,7 +51,8 @@ public abstract class JobExecutor<T extends JobParams> {
             Updates.combine(
                 Updates.set(Job.FINISHED_AT, now),
                 Updates.set(Job.LAST_UPDATED_AT, now),
-                Updates.set(Job.JOB_STATUS, JobStatus.COMPLETED.name())
+                Updates.set(Job.JOB_STATUS, JobStatus.COMPLETED.name()),
+                Updates.unset("error")
             ),
             new FindOneAndUpdateOptions().returnDocument(ReturnDocument.AFTER));
     }
