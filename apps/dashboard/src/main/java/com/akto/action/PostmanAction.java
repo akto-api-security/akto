@@ -337,7 +337,7 @@ public class PostmanAction extends UserAction {
         return postmanUploadLoader.getId();
     }
 
-    private static void importDataFromPostmanMain(String workspaceId, String apiKey, boolean allowReplay, ObjectId uploadId) {
+    private void importDataFromPostmanMain(String workspaceId, String apiKey, boolean allowReplay, ObjectId uploadId) {
         PostmanWorkspaceUpload upload = FileUploadsDao.instance.getPostmanMCollection().find(Filters.eq("_id", uploadId)).first();
         if(upload == null){
             loggerMaker.debugAndAddToDb("No upload found with id: " + uploadId, LogDb.DASHBOARD);
@@ -470,6 +470,7 @@ public class PostmanAction extends UserAction {
     }
     private List<PostmanUploadLog> postmanUploadLogs;
     private FileUpload.UploadStatus uploadStatus;
+    private String miniTestingName;
 
     private BasicDBObject uploadDetails;
     public String fetchImportLogs(){
@@ -550,6 +551,15 @@ public class PostmanAction extends UserAction {
 
     public String uploadId;
     public ImportType importType;
+
+    public String getMiniTestingName() {
+        return miniTestingName;
+    }
+
+    public void setMiniTestingName(String miniTestingName) {
+        this.miniTestingName = miniTestingName;
+    }
+
     public enum ImportType{
         ONLY_SUCCESSFUL_APIS,
         ALL_APIS
@@ -623,7 +633,7 @@ public class PostmanAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
-    private static void importDataFromPostmanFileMain(JsonNode collectionDetailsObj, int aktoCollectionId, String collectionId, String collectionName, boolean allowReplay, ObjectId uploadId) {
+    private void importDataFromPostmanFileMain(JsonNode collectionDetailsObj, int aktoCollectionId, String collectionId, String collectionName, boolean allowReplay, ObjectId uploadId) {
         PostmanWorkspaceUpload postmanWorkspaceUpload = FileUploadsDao.instance.getPostmanMCollection().find(Filters.eq("_id", uploadId)).first();
         if(postmanWorkspaceUpload == null){
             loggerMaker.debugAndAddToDb("No upload found with id: " + uploadId, LogDb.DASHBOARD);
@@ -651,7 +661,7 @@ public class PostmanAction extends UserAction {
         return jsonNodes.size();
     }
 
-    private static List<FileUploadError> generateMessages(JsonNode collectionDetailsObj, String workspaceId, int aktoCollectionId, String collectionName, String postmanCollectionId, boolean allowReplay, PostmanWorkspaceUpload fileUpload) {
+    private List<FileUploadError> generateMessages(JsonNode collectionDetailsObj, String workspaceId, int aktoCollectionId, String collectionName, String postmanCollectionId, boolean allowReplay, PostmanWorkspaceUpload fileUpload) {
         int accountId = Context.accountId.get();
         int noUrls = 0;
         List<FileUploadError> collectionErrors = new ArrayList<>();
@@ -689,7 +699,7 @@ public class PostmanAction extends UserAction {
                 continue;
             }
             uploadLog.setUrl(path);
-            Pair<Map<String, String>,List<FileUploadError>> result = Utils.convertApiInAktoFormat(item, variablesMap, String.valueOf(accountId), allowReplay, authMap);
+            Pair<Map<String, String>,List<FileUploadError>> result = Utils.convertApiInAktoFormat(item, variablesMap, String.valueOf(accountId), allowReplay, authMap, this.miniTestingName);
             List<FileUploadError> errors = result.getRight();
             if(result.getLeft() != null){
                 Map<String, String> apiInAktoFormat = result.getLeft();
