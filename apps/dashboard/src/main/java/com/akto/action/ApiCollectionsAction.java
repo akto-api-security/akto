@@ -4,7 +4,9 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 import com.akto.action.observe.InventoryAction;
+import com.akto.dao.filter.MergedUrlsDao;
 import com.akto.dto.*;
+import com.akto.dto.filter.MergedUrls;
 import com.akto.util.Pair;
 import org.bson.conversions.Bson;
 
