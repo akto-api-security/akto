@@ -2417,7 +2417,7 @@ public class InitializerListener implements ServletContextListener {
                     public void accept(Account account) {
                         AccountSettingsDao.instance.getStats();
                         Intercom.setToken(System.getenv("INTERCOM_TOKEN"));
-                        setDashboardVersionForAccount();
+                        // setDashboardVersionForAccount();
                     }
                 }, "context-initializer");
 
@@ -2428,12 +2428,13 @@ public class InitializerListener implements ServletContextListener {
 
                     logger.debug("Starting init functions and scheduling jobs at " + now);
 
-                    AccountTask.instance.executeTask(new Consumer<Account>() {
-                        @Override
-                        public void accept(Account account) {
-                            runInitializerFunctions();
-                        }
-                    }, "context-initializer-secondary");
+                    // AccountTask.instance.executeTask(new Consumer<Account>() {
+                    //     @Override
+                    //     public void accept(Account account) {
+                    //         runInitializerFunctions();
+                    //     }
+                    // }, "context-initializer-secondary");
+                    setUpTestEditorTemplatesScheduler();
 
                     crons.trafficAlertsScheduler();
                     // crons.insertHistoricalDataJob();
@@ -2451,7 +2452,6 @@ public class InitializerListener implements ServletContextListener {
                     setUpWebhookScheduler();
                     cleanInventoryJobRunner();
                     setUpDefaultPayloadRemover();
-                    setUpTestEditorTemplatesScheduler();
                     setUpDependencyFlowScheduler();
                     tokenGeneratorCron.tokenGeneratorScheduler();
                     crons.deleteTestRunsScheduler();
@@ -3791,9 +3791,14 @@ public class InitializerListener implements ServletContextListener {
                             String testConfigId = testConfig.getId();
 
                             existingTemplatesInDb = mapIdToHash.get(testConfigId);
-
+                            loggerMaker.infoAndAddToDb("Trying to add test yaml: " + testConfigId + " existingTemplatesInDb: " + existingTemplatesInDb, LogDb.DASHBOARD);
+                            
                             if (existingTemplatesInDb != null && existingTemplatesInDb.size() == 1) {
+                                loggerMaker.infoAndAddToDb("Trying to add test yaml: " + testConfigId + " existingTemplatesInDb size: " + existingTemplatesInDb.size(), LogDb.DASHBOARD);
+
                                 int existingTemplateHash = existingTemplatesInDb.get(0).getHash();
+                                loggerMaker.infoAndAddToDb("Hashes: " + testConfigId + " hashDB: " + existingTemplateHash + " template: " + templateContent.hashCode(), LogDb.DASHBOARD);
+
                                 if (existingTemplateHash == templateContent.hashCode()) {
                                     countUnchangedTemplates++;
                                     if(TestConfig.isTestMultiNode(testConfig)){
@@ -3804,6 +3809,7 @@ public class InitializerListener implements ServletContextListener {
                                     logger.debugAndAddToDb("Updating test yaml: " + testConfigId, LogDb.DASHBOARD);
                                 }
                             }
+                            loggerMaker.infoAndAddToDb("Reached end: " + testConfigId, LogDb.DASHBOARD);
 
                         } catch (Exception e) {
                             logger.errorAndAddToDb(e,
