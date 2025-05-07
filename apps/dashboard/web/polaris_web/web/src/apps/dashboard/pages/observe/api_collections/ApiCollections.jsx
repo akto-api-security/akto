@@ -127,6 +127,10 @@ const headers = [
         showFilter: true,
         textValue: 'envType',
         tooltipContent: (<Text variant="bodySm">Environment type for an API collection, Staging or Production </Text>),
+        mergeType: (a, b) => {
+            return Math.max(a || 0, b || 0);
+        },
+        shouldMerge: true,
     },
     {   
         title: <HeadingWithTooltip content={<Text variant="bodySm">The most recent time an endpoint within collection was either discovered for the first time or seen again</Text>} title="Last traffic seen" />, 
@@ -657,7 +661,10 @@ function ApiCollections() {
         const toggleTypeContent = (
             <Popover
                 activator={<div onClick={() => setPopover(!popover)}>Set ENV type</div>}
-                onClose={() => setPopover(false)}
+                onClose={() => {
+                    setPopover(false)
+                    setTextFieldActive(false)
+                }}
                 active={popover}
                 autofocusTarget="first-node"
             >
@@ -703,7 +710,7 @@ function ApiCollections() {
         Object.keys(copyObj).forEach((key) => {
             data[key].length > 0 && data[key].forEach((c) => {
                 c['envType'] = dataMap[c.id]
-                c['envTypeComp'] = dataMap[c.id] ? <Badge size="small" status="info">{dataMap[c.id]}</Badge> : null
+                c['envTypeComp'] = transform.getCollectionTypeList(dataMap[c.id])
             })
         })
         setData(copyObj)
@@ -712,13 +719,36 @@ function ApiCollections() {
 
     const updateEnvType = (apiCollectionIds,type) => {
         let copyObj = JSON.parse(JSON.stringify(envTypeMap))
-        apiCollectionIds.forEach(id => copyObj[id] = type)
-        api.updateEnvTypeOfCollection(type,apiCollectionIds).then((resp) => {
+        const envTypes = type ? type?.split(",") : []
+
+
+        apiCollectionIds.forEach(id => {
+            if (!copyObj[id]) {
+                copyObj[id] = []
+            }
+    
+            if(type === null) {
+                copyObj[id] = []
+            } else {
+                envTypes.forEach(env => {
+                    const index = copyObj[id].indexOf(env)
+                    if (index > -1) {
+                        copyObj[id].splice(index, 1)
+                    } else {
+                        copyObj[id].push(env)
+                    }
+                })
+            }
+        })
+
+        api.updateEnvTypeOfCollection(envTypes,apiCollectionIds,type === null).then((resp) => {
             func.setToast(true, false, "ENV type updated successfully")
             setEnvTypeMap(copyObj)
             updateData(copyObj)
         })
         resetResourcesSelected();
+        setPopover(false)
+        setTextFieldActive(false)
 
     }
 
