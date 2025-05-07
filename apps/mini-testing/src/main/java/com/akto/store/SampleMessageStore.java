@@ -72,13 +72,17 @@ public class SampleMessageStore {
 
     public void fetchSampleMessages(List<ApiInfo.ApiInfoKey> apiInfoKeyList){
         List<SampleData> sampleDataList = new ArrayList<>();
+        List<ApiInfo.ApiInfoKey> subList =  new ArrayList<>();
+        List<SampleData> sampleDataBatch = new ArrayList<>();
         for(int i = 0 ; i < apiInfoKeyList.size(); i += DbLayer.SAMPLE_DATA_LIMIT){
-            List<ApiInfo.ApiInfoKey> subList = apiInfoKeyList.subList(i, Math.min(i + DbLayer.SAMPLE_DATA_LIMIT, apiInfoKeyList.size()));  
-            List<SampleData> sampleDataBatch = dataActor.fetchSampleDataForEndpoints(subList);
+            subList = apiInfoKeyList.subList(i, Math.min(i + DbLayer.SAMPLE_DATA_LIMIT, apiInfoKeyList.size()));  
+            sampleDataBatch = dataActor.fetchSampleDataForEndpoints(subList);
             if (sampleDataBatch == null || sampleDataBatch.isEmpty()) {
                 break;
             }
             sampleDataList.addAll(sampleDataBatch);
+            sampleDataBatch.clear();
+            subList.clear();
         }
         fillSampleDataMap(sampleDataList);
     }
