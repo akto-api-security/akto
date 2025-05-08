@@ -391,7 +391,7 @@ public class Main {
             long startDetailed = System.currentTimeMillis();
             int delta = start - 20*60;
 
-            TestingRunResultSummary trrs = dataActor.findPendingTestingRunResultSummary(start, delta);
+            TestingRunResultSummary trrs = dataActor.findPendingTestingRunResultSummary(start, delta, null);
             boolean isSummaryRunning = trrs != null && trrs.getState().equals(State.RUNNING);
             TestingRun testingRun;
             ObjectId summaryId = null;
