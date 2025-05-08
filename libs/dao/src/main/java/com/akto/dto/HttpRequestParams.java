@@ -122,6 +122,11 @@ public class HttpRequestParams {
         return this.method;
     }
 
+    public String setMethod(String method) {
+        this.method = method;
+        return this.method;
+    } 
+
     public int getApiCollectionId() {
         return this.apiCollectionId;
     }

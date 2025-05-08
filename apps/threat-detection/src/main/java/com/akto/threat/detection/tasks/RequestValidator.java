@@ -2,7 +2,6 @@ package com.akto.threat.detection.tasks;
 
 import com.akto.dto.HttpResponseParams;
 import com.akto.log.LoggerMaker;
-import com.akto.proto.generated.threat_detection.message.sample_request.v1.Metadata;
 import com.akto.proto.generated.threat_detection.message.sample_request.v1.SchemaConformanceError;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -20,12 +19,14 @@ import lombok.Setter;
 import java.util.List;
 import java.util.Set;
 import java.util.ArrayList;
+import java.util.Iterator;
 
 @Getter
 @Setter
 @AllArgsConstructor
 public class RequestValidator {
-  private static List<SchemaConformanceError> errors;
+  private static List<SchemaConformanceError> errors = new ArrayList<>();
+  private static SchemaConformanceError.Builder errorBuilder = SchemaConformanceError.newBuilder();
 
   private static ObjectMapper objectMapper = new ObjectMapper();
   private static final LoggerMaker logger = new LoggerMaker(MaliciousTrafficDetectorTask.class);
@@ -33,83 +34,177 @@ public class RequestValidator {
       builder -> builder.metaSchema(OpenApi31.getInstance())
           .defaultMetaSchemaIri(OpenApi31.getInstance().getIri()));
 
-  private static String getUrlToSearch(JsonNode rootSchemaNode, String url) {
+  public static List<SchemaConformanceError> getErrors() {
+    return errors;
+  }
+
+  public static String transformTrafficUrlToSchemaUrl(JsonNode rootSchemaNode, String url) {
+
     if (!rootSchemaNode.path("servers").isArray()) {
-        return url;
+      return url;
     }
 
     // Remove the server URL prefix from the input URL
     for (JsonNode server : rootSchemaNode.path("servers")) {
-        if (server.path("url").isMissingNode()) {
-            return url;
-        }
-        String serverUrl = server.path("url").asText();
-        if (url.startsWith(serverUrl)) {
-            url = url.substring(serverUrl.length());
-            break;
-        }
+
+      if (server.path("url").isMissingNode()) {
+        continue;
+      }
+
+      String serverUrl = server.path("url").asText();
+
+      if (url.startsWith(serverUrl)) {
+        url = url.substring(serverUrl.length());
+        break;
+      }
+
     }
 
-    // Match the URL against the paths in the schema
     JsonNode pathsNode = rootSchemaNode.path("paths");
+
     if (pathsNode.isMissingNode() || !pathsNode.isObject()) {
-        return url; // No paths defined, return the original URL
+      logger.debug("No paths found in schema for api collection id {}, path {}, method {}",
+          rootSchemaNode.path("info").path("title").asText(),
+          url,
+          "GET");
+      return url;
     }
-    // Iterate through the paths and check for a match
-    // for (String pathKey : pathsNode.fieldNames()) {
-    //     if (isPathMatching(pathKey, url)) {
-    //         return pathKey; // Return the matching path key
-    //     }
-    // }
 
-    return url; 
-}
+    Iterator<String> pathKeys = pathsNode.fieldNames();
 
-private static boolean isPathMatching(String pathKey, String url) {
-    // Split the path and URL into segments
+    while (pathKeys.hasNext()) {
+      String pathKey = pathKeys.next();
+      if (matchesParameterizedPath(pathKey, url)) {
+        return pathKey;
+      }
+    }
+
+    return url;
+  }
+
+  private static boolean matchesParameterizedPath(String pathKey, String url) {
+
+    // TODO: handle cases like
+    // /pets/{petId} and /pets/mine both are present in schema
+
     String[] pathSegments = pathKey.split("/");
     String[] urlSegments = url.split("/");
 
     if (pathSegments.length != urlSegments.length) {
-        return false; // The number of segments must match
+      return false;
     }
 
-    // Compare each segment
     for (int i = 0; i < pathSegments.length; i++) {
-        String pathSegment = pathSegments[i];
-        String urlSegment = urlSegments[i];
+      String pathSegment = pathSegments[i];
+      String urlSegment = urlSegments[i];
 
-        // If the path segment is a parameter (e.g., {petId}), skip the comparison
-        if (pathSegment.startsWith("{") && pathSegment.endsWith("}")) {
-            continue;
-        }
+      // Skip if the path segment is a parameter (e.g., {userId})
+      if (pathSegment.startsWith("{") && pathSegment.endsWith("}")) {
+        continue;
+      }
 
-        // Otherwise, the segments must match exactly
-        if (!pathSegment.equals(urlSegment)) {
-            return false;
-        }
+      if (!pathSegment.equals(urlSegment)) {
+        return false;
+      }
     }
 
-    return true; // All segments match
-}
+    return true;
+  }
 
-  private static JsonNode getRequestBodySchema(JsonNode schemaNode, HttpResponseParams responseParam) {
-    JsonNode paths = schemaNode.path("paths");
-    String url = getUrlToSearch(schemaNode, responseParam.getRequestParams().getURL());
-    JsonNode requestBodySchemaNode = paths.path(url)
-        .path(responseParam.getRequestParams().getMethod().toLowerCase())
-        .path("requestBody")
-        .path("content")
-        .path(responseParam.getRequestParams().getHeaders().get("content-type").get(0))
-        .path("schema");
+  public static JsonNode getRequestBodySchemaNode(JsonNode rootSchemaNode, HttpResponseParams responseParam) {
+    String url = transformTrafficUrlToSchemaUrl(rootSchemaNode, responseParam.getRequestParams().getURL());
 
-    return requestBodySchemaNode;
+    JsonNode pathNode = getPathNode(rootSchemaNode, url, responseParam);
+    if (pathNode == null) {
+      return null;
+    }
+
+    JsonNode methodNode = getMethodNode(pathNode, url, responseParam);
+    if (methodNode == null) {
+      return null;
+    }
+
+    JsonNode requestBodyNode = getRequestBodyNode(methodNode, url, responseParam);
+    if (requestBodyNode == null) {
+      return null;
+    }
+
+    return getContentSchemaNode(requestBodyNode, responseParam);
+  }
+
+  private static JsonNode getPathNode(JsonNode rootSchemaNode, String url, HttpResponseParams responseParam) {
+    JsonNode pathNode = rootSchemaNode.path("paths").path(url);
+
+    if (pathNode.isMissingNode()) {
+      addError("#/paths", url, "url", "URL path not found in schema: " + responseParam.getRequestParams().getURL());
+      return null;
+    }
+
+    return pathNode;
+  }
+
+  private static JsonNode getMethodNode(JsonNode pathNode, String url, HttpResponseParams responseParam) {
+    String method = responseParam.getRequestParams().getMethod().toLowerCase();
+    JsonNode methodNode = pathNode.path(method);
+
+    if (methodNode.isMissingNode()) {
+      addError("#/paths" + url, method, "method",
+          String.format("Method %s not available for path %s in schema", method.toUpperCase(),
+              responseParam.getRequestParams().getURL()));
+      return null;
+    }
+
+    return methodNode;
+  }
+
+  private static JsonNode getRequestBodyNode(JsonNode methodNode, String url, HttpResponseParams responseParam) {
+    JsonNode requestBodyNode = methodNode.path("requestBody");
+
+    if (requestBodyNode.isMissingNode()) {
+      String method = responseParam.getRequestParams().getMethod().toLowerCase();
+      addError("#/paths" + url + "/" + method, url + "." + method + ".requestBody", "requestBody",
+          String.format("Request body not available for method %s for path %s in schema",
+              responseParam.getRequestParams().getMethod(), responseParam.getRequestParams().getURL()));
+      return null;
+    }
+
+    return requestBodyNode;
+  }
+
+  private static JsonNode getContentSchemaNode(JsonNode requestBodyNode, HttpResponseParams responseParam) {
+    String contentType = responseParam.getRequestParams().getHeaders().get("content-type").get(0);
+    JsonNode schemaNode = requestBodyNode.path("content").path(contentType).path("schema");
+
+    if (schemaNode.isMissingNode()) {
+      String method = responseParam.getRequestParams().getMethod().toLowerCase();
+      addError(
+          "#/paths" + responseParam.getRequestParams().getURL() + "/" + method + "/requestBody/content/" + contentType,
+          "", "requestBody",
+          String.format("Request body not available for method %s for path %s for content-type %s in schema",
+              responseParam.getRequestParams().getMethod(), responseParam.getRequestParams().getURL(), contentType));
+      return null;
+    }
+    return schemaNode;
+  }
+
+  private static void addError(String schemaPath, String instancePath, String attribute, String message) {
+    errors.clear();
+    errorBuilder.clear();
+    errorBuilder.setSchemaPath(schemaPath);
+    errorBuilder.setInstancePath(instancePath);
+    errorBuilder.setAttribute(attribute);
+    errorBuilder.setMessage(message);
+    errors.add(errorBuilder.build());
   }
 
   private static List<SchemaConformanceError> validateRequestBody(HttpResponseParams httpResponseParams,
       JsonNode rootSchemaNode) throws Exception {
 
-    JsonNode schemaNode = getRequestBodySchema(rootSchemaNode, httpResponseParams);
+    JsonNode schemaNode = getRequestBodySchemaNode(rootSchemaNode, httpResponseParams);
+
+    if (!errors.isEmpty()) {
+      return errors;
+    }
 
     if (schemaNode == null || schemaNode.isMissingNode()) {
       logger.warn("No request body schema found for api collection id {}, path {}, method {}",
@@ -117,6 +212,8 @@ private static boolean isPathMatching(String pathKey, String url) {
           httpResponseParams.getRequestParams().getURL(),
           httpResponseParams.getRequestParams().getMethod());
 
+      // TODO: Case of shadow API vs body not found due to incorrect schema/parsing?
+      // For shadow API we should mark it as a threat ??
       return errors;
     }
 
@@ -134,9 +231,9 @@ private static boolean isPathMatching(String pathKey, String url) {
     logger.debug("Request not conforming to schema for api collection id {}",
         httpResponseParams.getRequestParams().getApiCollectionId());
 
-    errors = new ArrayList<>();
+    errors.clear();
     for (ValidationMessage message : validationMessages) {
-      SchemaConformanceError.Builder errorBuilder = SchemaConformanceError.newBuilder();
+      errorBuilder.clear();
       errorBuilder.setSchemaPath(message.getSchemaLocation().toString());
       errorBuilder.setInstancePath(message.getInstanceLocation().toString());
       errorBuilder.setAttribute("requestBody");
@@ -147,15 +244,18 @@ private static boolean isPathMatching(String pathKey, String url) {
     return errors;
   }
 
-  public static List<SchemaConformanceError> validate(HttpResponseParams responseParam, String apiSchema, String apiInfoKey) {
+  public static List<SchemaConformanceError> validate(HttpResponseParams responseParam, String apiSchema,
+      String apiInfoKey) {
     try {
-      
 
-      ObjectMapper objectMapper = new ObjectMapper();
+      // Reset the errors, done to prevent new obj allocations..
+      errors.clear();
+      errorBuilder.clear();
 
       JsonNode rootSchemaNode = objectMapper.readTree(apiSchema);
+
       if (rootSchemaNode == null || rootSchemaNode.isEmpty()) {
-        logger.debug("Unable to parse schema for api info key", apiInfoKey);
+        logger.error("Unable to parse schema for api info key", apiInfoKey);
         return errors;
       }
 

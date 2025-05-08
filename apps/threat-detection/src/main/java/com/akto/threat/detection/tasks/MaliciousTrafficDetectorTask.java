@@ -239,7 +239,7 @@ public class MaliciousTrafficDetectorTask implements Task {
 
       if(apiFilter.getInfo().getCategory().getName().equalsIgnoreCase("SchemaConform")) {
 
-        String apiSchema = getApiSchema(1746095071);
+        String apiSchema = getApiSchema(apiCollectionId);
         
         if (apiSchema == null || apiSchema.isEmpty()) {
 
