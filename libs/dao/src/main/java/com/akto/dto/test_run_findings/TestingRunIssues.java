@@ -42,6 +42,8 @@ public class TestingRunIssues {
     public static final String UNREAD = "unread";
     private boolean unread;
     private List<Integer> collectionIds;
+    public static final String DESCRIPTION = "description";
+    private String description;
 
     public static final String ID_API_COLLECTION_ID = Constants.ID + "." + TestingIssuesId.API_KEY_INFO + "." + ApiInfoKey.API_COLLECTION_ID;
     public static final String ID_URL = Constants.ID + "." + TestingIssuesId.API_KEY_INFO + "." + ApiInfoKey.URL;
@@ -218,5 +220,12 @@ public class TestingRunIssues {
 
     public void setTicketId(String ticketId) {
         this.ticketId = ticketId;
+    }
+    public String getDescription() {
+        return description;
+    }
+
+    public void setDescription(String description) {
+        this.description = description;
     }
 }

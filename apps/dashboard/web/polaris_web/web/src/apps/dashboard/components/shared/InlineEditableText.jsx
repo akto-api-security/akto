@@ -2,6 +2,7 @@ import React from 'react';
 import { Box, TextField } from '@shopify/polaris';
 const InlineEditableText = (props) => {
     const {textValue, setTextValue, handleSaveClick, setIsEditing, placeholder, maxLength} = props;
+    
     const handleKeyDown = (event) => {
         if (event.key === 'Enter') {
           handleSaveClick();

@@ -576,5 +576,12 @@ export default {
             method: 'post',
             data: {}
         })
+    },
+    updateIssueDescription(issueId, description) {
+        return request({
+            url: '/api/updateIssueDescription',
+            method: 'post',
+            data: {issueId, description}
+        })
     }
 }
