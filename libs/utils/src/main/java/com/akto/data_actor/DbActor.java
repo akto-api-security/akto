@@ -226,8 +226,7 @@ public class DbActor extends DataActor {
         return DbLayer.fetchMergedUrls();
     }
 
-    @Override
-    public void relayNewApiCountInfo(List<ApiHitCountInfo> payload) throws Exception {
-        DbLayer.relayNewApiCountInfo(payload);   
+    public void bulkInsertApiHitCount(List<ApiHitCountInfo> apiHitCountInfoList) throws Exception {
+        DbLayer.bulkinsertApiHitCount(apiHitCountInfoList);
     }
 }

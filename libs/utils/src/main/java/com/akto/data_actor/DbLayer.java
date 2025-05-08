@@ -33,6 +33,7 @@ import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.monitoring.FilterYamlTemplateDao;
 import com.akto.dao.test_editor.YamlTemplateDao;
+import com.akto.dao.threat_detection.ApiHitCountInfoDao;
 import com.akto.dao.traffic_metrics.TrafficMetricsDao;
 import com.akto.dto.APIConfig;
 import com.akto.dto.Account;
@@ -68,6 +69,7 @@ import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.FindOneAndUpdateOptions;
 import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.Sorts;
+import com.mongodb.client.model.UpdateOneModel;
 import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.Updates;
 import com.mongodb.client.model.WriteModel;
@@ -405,7 +407,36 @@ public class DbLayer {
         return MergedUrlsDao.instance.getMergedUrls();
     }
 
-    public static void relayNewApiCountInfo(List<ApiHitCountInfo> payload) throws Exception {
-        // add db call here
+    public static void bulkinsertApiHitCount(List<ApiHitCountInfo> apiHitCountInfoList) throws Exception {
+        try {
+            List<WriteModel<ApiHitCountInfo>> updates = new ArrayList<>();
+            for (ApiHitCountInfo apiHitCountInfo: apiHitCountInfoList) {
+                // Create a filter to find existing documents with the same key fields
+                Bson filter = Filters.and(
+                    Filters.eq("apiCollectionId", apiHitCountInfo.getApiCollectionId()),
+                    Filters.eq("url", apiHitCountInfo.getUrl()),
+                    Filters.eq("method", apiHitCountInfo.getMethod()),
+                    Filters.eq("ts", apiHitCountInfo.getTs())
+                );
+
+                // Use updateOne with upsert instead of insertOne to ensure uniqueness
+                updates.add(new UpdateOneModel<>(
+                    filter,
+                    Updates.combine(
+                        Updates.setOnInsert("apiCollectionId", apiHitCountInfo.getApiCollectionId()),
+                        Updates.setOnInsert("url", apiHitCountInfo.getUrl()),
+                        Updates.setOnInsert("method", apiHitCountInfo.getMethod()),
+                        Updates.setOnInsert("ts", apiHitCountInfo.getTs()),
+                        Updates.set("count", apiHitCountInfo.getCount())
+                    ),
+                    new UpdateOptions().upsert(true)
+                ));
+            }
+            ApiHitCountInfoDao.instance.getMCollection().bulkWrite(updates);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "error in bulkinsertApiHitCount " + e.toString());
+            throw e;
+        }
     }
+
 }

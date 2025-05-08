@@ -95,5 +95,5 @@ public abstract class DataActor {
 
     public abstract Set<MergedUrls> fetchMergedUrls();
 
-    public abstract void relayNewApiCountInfo(List<ApiHitCountInfo> payload) throws Exception;
+    public abstract void bulkInsertApiHitCount(List<ApiHitCountInfo> apiHitCountInfoList) throws Exception;
 }

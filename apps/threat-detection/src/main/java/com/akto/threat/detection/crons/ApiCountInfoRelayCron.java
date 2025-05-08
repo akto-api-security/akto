@@ -36,7 +36,7 @@ public class ApiCountInfoRelayCron {
         scheduler.scheduleAtFixedRate(new Runnable() {
             public void run(){
                 try {
-                    //logger.infoAndAddToDb("relayApiCountInfo cron started", LoggerMaker.LogDb.RUNTIME);
+                    logger.info("relayApiCountInfo cron started " + Context.now());
                     long lastSuccessfulUpdateTs = cache.get(RedisKeyInfo.API_COUNTER_RELAY_LAST_UPDATE_TS);
                     long endBinId = (Context.now()/60) - 5; // pick keys which are older than atleast 5 mins
                     long startBinId = Math.max(endBinId - 30, lastSuccessfulUpdateTs);
@@ -52,7 +52,7 @@ public class ApiCountInfoRelayCron {
                     // build api hit count payload and call cyborg
                     List<ApiHitCountInfo> hitCountInfos = ApiCountInfoRelayUtils.buildPayload(keyValData);
                     try {
-                        dataActor.relayNewApiCountInfo(hitCountInfos);
+                        dataActor.bulkInsertApiHitCount(hitCountInfos);
                         cache.set(RedisKeyInfo.API_COUNTER_RELAY_LAST_UPDATE_TS, endBinId);
                         cache.removeMembersFromSortedSet(RedisKeyInfo.API_COUNTER_SORTED_SET, startBinId, endBinId);
                     } catch (Exception e) {
