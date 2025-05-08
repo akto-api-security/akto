@@ -27,6 +27,7 @@ import com.akto.dto.testing.WorkflowTest;
 import com.akto.dto.testing.WorkflowTestResult;
 import com.akto.dto.testing.config.TestScript;
 import com.akto.dto.testing.sources.TestSourceConfig;
+import com.akto.dto.threat_detection.ApiHitCountInfo;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods;
@@ -347,5 +348,7 @@ public abstract class DataActor {
     public abstract TestingRunPlayground getCurrentTestingRunDetailsFromEditor(int timestamp);
 
     public abstract void updateTestingRunPlayground(TestingRunPlayground testingRunPlayground);
+
+    public abstract void bulkInsertApiHitCount(List<ApiHitCountInfo> apiHitCountInfoList) throws Exception;
 
 }

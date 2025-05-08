@@ -3,6 +3,7 @@ package com.akto.action;
 import com.akto.dao.*;
 import com.akto.dao.context.Context;
 import com.akto.dao.test_editor.YamlTemplateDao;
+import com.akto.dao.threat_detection.ApiHitCountInfoDao;
 import com.akto.dao.traffic_collector.TrafficCollectorInfoDao;
 import com.akto.dao.traffic_collector.TrafficCollectorMetricsDao;
 import com.akto.data_actor.DbLayer;
@@ -27,6 +28,7 @@ import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.testing.*;
 import com.akto.dto.testing.config.TestScript;
 import com.akto.dto.testing.sources.TestSourceConfig;
+import com.akto.dto.threat_detection.ApiHitCountInfo;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.traffic.SuspectSampleData;
 import com.akto.dto.traffic.TrafficInfo;
@@ -242,6 +244,7 @@ public class DbAction extends ActionSupport {
     String vpcId;
 
     String metricType;
+    List<BasicDBObject> apiHitCountInfoList;
 
     public String getMetricType() {
         return metricType;
@@ -2296,6 +2299,23 @@ public class DbAction extends ActionSupport {
         return Action.SUCCESS.toUpperCase();
     }
 
+    public String bulkinsertApiHitCount() {
+
+        try {
+            List<ApiHitCountInfo> apiHitCountInfos = new ArrayList<>();
+            for (BasicDBObject obj: apiHitCountInfoList) {
+                ApiHitCountInfo apiHitCountInfo = objectMapper.readValue(obj.toJson(), ApiHitCountInfo.class);
+                apiHitCountInfos.add(apiHitCountInfo);
+            }
+            DbLayer.bulkinsertApiHitCount(apiHitCountInfos);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "error in bulkinsertApiHitCount " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+
+        return Action.SUCCESS.toUpperCase();
+    }
+
     List<DependencyNode> dependencyNodes;
 
     public List<DependencyNode> getDependencyNodes() {
@@ -3510,4 +3530,13 @@ public class DbAction extends ActionSupport {
     public void setModuleInfo(ModuleInfo moduleInfo) {
         this.moduleInfo = moduleInfo;
     }
+
+    public List<BasicDBObject> getApiHitCountInfoList() {
+        return apiHitCountInfoList;
+    }
+
+    public void setApiHitCountInfoList(List<BasicDBObject> apiHitCountInfoList) {
+        this.apiHitCountInfoList = apiHitCountInfoList;
+    }
+
 }
