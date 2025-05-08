@@ -50,6 +50,7 @@ import com.akto.dto.testing.WorkflowTest;
 import com.akto.dto.testing.WorkflowTestResult;
 import com.akto.dto.testing.config.TestScript;
 import com.akto.dto.testing.sources.TestSourceConfig;
+import com.akto.dto.threat_detection.ApiHitCountInfo;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods;
@@ -3848,6 +3849,26 @@ public class ClientActor extends DataActor {
             return;
         }
     }
+
+    public void bulkInsertApiHitCount(List<ApiHitCountInfo> payload) throws Exception {
+        BasicDBObject obj = new BasicDBObject();
+        obj.put("apiHitCountInfoList", payload);
+        String objString = gson.toJson(obj);
+        Map<String, List<String>> headers = buildHeaders();
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/bulkInsertApiHitCount", "", "POST", objString, headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+            if (response.getStatusCode() != 200) {
+                logger.error("non 2xx response in bulkInsertApiHitCount");
+                return;
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+            logger.error("error in bulkInsertApiHitCount {}", e.getMessage());
+            throw e;
+        }
+    }
+
 
     public String fetchOpenApiSchema(int apiCollectionId) {
         Map<String, List<String>> headers = buildHeaders();

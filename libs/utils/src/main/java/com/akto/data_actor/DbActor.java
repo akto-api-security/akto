@@ -28,6 +28,7 @@ import com.akto.dto.testing.TestingRunResultSummary;
 import com.akto.dto.testing.WorkflowTest;
 import com.akto.dto.testing.WorkflowTestResult;
 import com.akto.dto.testing.sources.TestSourceConfig;
+import com.akto.dto.threat_detection.ApiHitCountInfo;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.traffic.SuspectSampleData;
 import com.akto.dto.traffic.TrafficInfo;
@@ -610,6 +611,10 @@ public class DbActor extends DataActor {
 
     public List<String> findTestSubCategoriesByTestSuiteId(List<String> testSuiteId) {
         return DbLayer.findTestSubCategoriesByTestSuiteId(testSuiteId);
+    }
+
+    public void bulkInsertApiHitCount(List<ApiHitCountInfo> apiHitCountInfoList) throws Exception {
+        DbLayer.bulkinsertApiHitCount(apiHitCountInfoList);
     }
 
     public String fetchOpenApiSchema(int apiCollectionId) {

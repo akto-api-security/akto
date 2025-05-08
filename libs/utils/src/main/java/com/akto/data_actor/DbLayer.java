@@ -56,6 +56,7 @@ import com.akto.dao.testing.WorkflowTestsDao;
 import com.akto.dao.testing.config.TestScriptsDao;
 import com.akto.dao.testing.sources.TestSourceConfigsDao;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
+import com.akto.dao.threat_detection.ApiHitCountInfoDao;
 import com.akto.dao.traffic_metrics.RuntimeMetricsDao;
 import com.akto.dao.traffic_metrics.TrafficMetricsDao;
 import com.akto.dao.upload.FileUploadsDao;
@@ -84,6 +85,7 @@ import com.akto.dto.testing.WorkflowTestResult;
 import com.akto.dto.testing.TestingRun.State;
 import com.akto.dto.testing.config.TestScript;
 import com.akto.dto.testing.sources.TestSourceConfig;
+import com.akto.dto.threat_detection.ApiHitCountInfo;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.traffic.SuspectSampleData;
 import com.akto.dto.traffic.TrafficInfo;
@@ -1350,6 +1352,38 @@ public class DbLayer {
 
     public static void insertJob(Job job) {
         JobsDao.instance.insertOne(job);
+    }
+
+    public static void bulkinsertApiHitCount(List<ApiHitCountInfo> apiHitCountInfoList) throws Exception {
+        try {
+            List<WriteModel<ApiHitCountInfo>> updates = new ArrayList<>();
+            for (ApiHitCountInfo apiHitCountInfo: apiHitCountInfoList) {
+                // Create a filter to find existing documents with the same key fields
+                Bson filter = Filters.and(
+                    Filters.eq("apiCollectionId", apiHitCountInfo.getApiCollectionId()),
+                    Filters.eq("url", apiHitCountInfo.getUrl()),
+                    Filters.eq("method", apiHitCountInfo.getMethod()),
+                    Filters.eq("ts", apiHitCountInfo.getTs())
+                );
+                
+                // Use updateOne with upsert instead of insertOne to ensure uniqueness
+                updates.add(new UpdateOneModel<>(
+                    filter,
+                    Updates.combine(
+                        Updates.setOnInsert("apiCollectionId", apiHitCountInfo.getApiCollectionId()),
+                        Updates.setOnInsert("url", apiHitCountInfo.getUrl()),
+                        Updates.setOnInsert("method", apiHitCountInfo.getMethod()),
+                        Updates.setOnInsert("ts", apiHitCountInfo.getTs()),
+                        Updates.set("count", apiHitCountInfo.getCount())
+                    ),
+                    new UpdateOptions().upsert(true)
+                ));
+            }
+            ApiHitCountInfoDao.instance.getMCollection().bulkWrite(updates);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "error in bulkinsertApiHitCount " + e.toString());
+            throw e;
+        }
     }
 
     public static String fetchOpenApiSchema(int apiCollectionId) {
