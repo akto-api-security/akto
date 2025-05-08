@@ -56,7 +56,6 @@ public final class FilterAction {
         put("contains_either", new ContainsEitherFilter());
         put("contains_either_cidr", new ContainsEitherIpFilter());
         put("not_contains_cidr", new NotContainsIpFilter());
-        put("conform_schema", new ConformSchemaFilter());
         put("not_contains", new NotContainsFilter());
         put("regex", new RegexFilter());
         put("eq", new EqFilter());
@@ -341,11 +340,10 @@ public final class FilterAction {
 
         String origPayload = payload;
         BasicDBObject payloadObj = new BasicDBObject();
-        JSONObject jsonObj;
         if (!filterActionRequest.getOperand().equals(TestEditorEnums.DataOperands.REGEX.toString()) || (filterActionRequest.getCollectionProperty() != null && filterActionRequest.getCollectionProperty().equals(TestEditorEnums.CollectionOperands.FOR_ONE.toString())) ) {
             try {
                 payload = Utils.jsonifyIfArray(payload);
-                jsonObj = JSON.parseObject(payload);
+                JSONObject jsonObj = JSON.parseObject(payload);
                 payloadObj = new BasicDBObject(jsonObj);
             } catch(Exception e) {
                 // add log
