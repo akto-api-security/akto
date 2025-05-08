@@ -1,4 +1,4 @@
-import { Autocomplete, Box, Icon } from '@shopify/polaris'
+import { Autocomplete, Box, Icon, Link, TextContainer } from '@shopify/polaris'
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import {CircleRightMajor, ChevronDownMinor} from "@shopify/polaris-icons"
 import func from "@/util/func"
@@ -7,50 +7,112 @@ function Dropdown(props) {
 
     const id = props.id ? props.id : "dropdown";
 
-    const deselectedOptions = useMemo(() => props.menuItems,[props.menuItems],);
-    const [selectedOptions, setSelectedOptions] = useState([]);
-    const [inputValue, setInputValue] = useState(props.initial);
-    const [options, setOptions] = useState(deselectedOptions);
+    const deselectedOptions = useMemo(() => {
+        if (!props.menuItems || !Array.isArray(props.menuItems)) {
+            return [];
+        }
 
-    const updateSelection = useCallback(selected => {
-        const selectedValue = selected.map((selectedItem) => {
-            const matchedOption = options.find((option) => {
-                if (typeof option.value === "string")
-                    return option.value.match(selectedItem);
-                else 
-                    return option.value === selectedItem
+        return props.menuItems.map(option => ({
+            ...option,
+            disabled: props?.disabledOptions?.includes?.(option.value) || false
+        }));
+    }, [props.menuItems, props.disabledOptions]);
+
+
+    const [selectedOptions, setSelectedOptions] = useState(props.preSelected || []);
+    const [inputValue, setInputValue] = useState(props.value || props.initial || '');
+    const [options, setOptions] = useState(deselectedOptions || []);
+
+
+    const updateSelection = useCallback(
+        (selected) => {
+            const filteredSelected = selected.filter(selectedItem => {
+                if (!props.disabledOptions || !Array.isArray(props.disabledOptions)) {
+                    return true;
+                }
+                return !props.disabledOptions.includes(selectedItem);
             });
-            return matchedOption && matchedOption.label;
-        });
-        props.selected(selected[0])
-        setSelectedOptions(selected);
-        setInputValue(selectedValue[0]);
-    },[options]);
 
-    const getLabel  = (id) => {
-        props.menuItems.forEach(element => {
-            if(element.value === id){
-                setInputValue((prev) => {
-                    if(prev == element.label){
-                        return prev
+            const selectedText = filteredSelected.map((selectedItem) => {
+                const matchedOption = options.find((option) => {
+                    if (typeof option.value === "string")
+                        return option.value.match(selectedItem);
+                    else
+                        return option.value === selectedItem
+                });
+                return matchedOption && matchedOption.label;
+            });
+
+            setSelectedOptions([...filteredSelected]);
+
+            if (props?.allowMultiple) {
+                if (props?.showSelectedItemLabels) {
+                    if (selectedText.length === (props.menuItems?.length || 0)) {
+                        setInputValue("All items selected");
+                    } else if (typeof func.getSelectedItemsText === 'function') {
+                        setInputValue(func.getSelectedItemsText(selectedText));
+                    } else {
+                        setInputValue(`${filteredSelected.length} selected`);
                     }
-                    return element.label;
-                })
-                let arr = [id]
-                setSelectedOptions((prev) => {
-                    if(func.deepComparison(prev, arr)){
-                        return arr;
-                    }
-                    return arr;
-                })
+                } else {
+                    setInputValue(`${filteredSelected.length} ${props?.itemName ? props?.itemName : "item"}${filteredSelected.length === 1 ? "" : "s"} selected`);
+                }
+            } else {
+                setInputValue(selectedText[0] || '');
             }
-        });
+
+            if (props?.allowMultiple) {
+                props.selected(filteredSelected);
+            } else {
+                props.selected(filteredSelected[0]);
+            }
+        },
+        [options, props.menuItems, props.disabledOptions, props.showSelectedItemLabels, props.itemName, props.allowMultiple],
+    );
+
+    const getLabel = (id) => {
+        if (!props.menuItems || !Array.isArray(props.menuItems)) {
+            return;
+        }
+        const matchingElement = props.menuItems.find(element => element.value === id);
+
+        if (matchingElement) {
+            setInputValue((prev) => {
+                if (prev === matchingElement.label) {
+                    return prev;
+                }
+                return matchingElement.label;
+            });
+
+            const arr = [id];
+            setSelectedOptions((prev) => {
+                if (func.deepComparison && typeof func.deepComparison === 'function' && func.deepComparison(prev, arr)) {
+                    return arr;
+                }
+                return arr;
+            });
+        }
     }
 
-    useEffect(()=>{
-        getLabel(props.initial)
-        setOptions(deselectedOptions)
-    },[deselectedOptions, props.initial])
+
+
+    useEffect(() => {
+        if (props.initial) {
+            getLabel(props.initial);
+        }
+
+        setOptions(deselectedOptions);
+
+        if (props.preSelected !== undefined) {
+            setSelectedOptions(props.preSelected);
+        }
+
+        if (props.value !== undefined) {
+            setInputValue(props.value);
+        }
+
+
+    }, [deselectedOptions, props.initial, props.preSelected, props.value, props.menuItems, props.allowMultiple])
 
     const textField = (
         <Autocomplete.TextField
@@ -65,6 +127,16 @@ function Dropdown(props) {
         />
 
     );
+
+
+    const emptyState = (
+        <div style={{ textAlign: 'center' }}>
+            <TextContainer>No options available</TextContainer>
+        </div>
+    );
+
+
+
     return (
         <Autocomplete
             options={options}
@@ -72,12 +144,14 @@ function Dropdown(props) {
             onSelect={updateSelection}
             textField={textField}
             preferredPosition='below'
-            {...props.subItems ? {actionBefore:{
+            emptyState={emptyState}
+            {...props?.allowMultiple === true? {allowMultiple:true} : {}}
+            {...(props.subItems ? {actionBefore:{
                 content: props.subContent,
                 wrapOverflow: true,
                 onAction: props.subClick,
                 suffix: <Box><Icon source={CircleRightMajor}/></Box>
-            }} : null}
+            }} : null)}
         />
     )
 }
