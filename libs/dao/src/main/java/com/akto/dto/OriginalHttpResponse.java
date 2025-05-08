@@ -99,21 +99,21 @@ public class OriginalHttpResponse {
         this.statusCode = statusCode;
     }
 
-    public boolean setStatusFromLine(String line) {
-        String[] tokens = line.split(" ");
-        if (tokens.length < 3) {
-            return false;
-        } 
-
-        String statusStr = tokens[1];
-        if (NumberUtils.isDigits(statusStr)) {
-            this.statusCode = Integer.parseInt(statusStr);
-            return true;
-        } else {
-            return false;
-        }
-    }
-
+//    public boolean setStatusFromLine(String line) {
+//        String[] tokens = line.split(" ");
+//        if (tokens.length < 3) {
+//            return false;
+//        }
+//
+//        String statusStr = tokens[1];
+//        if (NumberUtils.isDigits(statusStr)) {
+//            this.statusCode = Integer.parseInt(statusStr);
+//            return true;
+//        } else {
+//            return false;
+//        }
+//    }
+//
     public String getJsonResponseBody() {
         return HttpRequestResponseUtils.rawToJsonString(body, headers);
     }
