@@ -21,6 +21,7 @@ public class AgentRun {
      * 
      * Generic Map data type because the data may vary according to agent.
      */
+    public static final String AGENT_INIT_DOCUMENT = "agentInitDocument";
     Map<String, Object> agentInitDocument;
     Agent agent;
     int createdTimestamp;
@@ -32,10 +33,14 @@ public class AgentRun {
     State state;
     final public static String _STATE = "state";
 
+    public static final String _AGENT_MODEL = "model";
     Model model;
 
+    public static final String _PRIVATE_DATA = "privateData";
+    Map<String, String> privateData;
+
     public AgentRun(String processId, Map<String, Object> agentInitDocument, Agent agent, int createdTimestamp,
-            int startTimestamp, int endTimestamp, State state, Model model) {
+            int startTimestamp, int endTimestamp, State state, Model model, Map<String, String> privateData) {
         this.processId = processId;
         this.agentInitDocument = agentInitDocument;
         this.agent = agent;
@@ -44,6 +49,7 @@ public class AgentRun {
         this.endTimestamp = endTimestamp;
         this.state = state;
         this.model = model;
+        this.privateData = privateData;
     }
 
     public AgentRun() {
@@ -111,6 +117,14 @@ public class AgentRun {
 
     public void setModel(Model model) {
         this.model = model;
+    }
+
+    public Map<String, String> getPrivateData() {
+        return privateData;
+    }
+
+    public void setPrivateData(Map<String, String> privateData) {
+        this.privateData = privateData;
     }
 
 }

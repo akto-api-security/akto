@@ -4,6 +4,7 @@ import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.util.Constants;
 import com.akto.util.enums.GlobalEnums;
 
+import com.akto.util.enums.GlobalEnums.TicketSource;
 import java.util.Arrays;
 import java.util.List;
 
@@ -26,6 +27,14 @@ public class TestingRunIssues {
     private String ignoreReason;
     public static final String JIRA_ISSUE_URL = "jiraIssueUrl";
     private String jiraIssueUrl;
+    public static final String TICKET_SOURCE = "ticketSource";
+    private TicketSource ticketSource;
+    public static final String TICKET_PROJECT_KEY = "ticketProjectKey";
+    private String ticketProjectKey;
+    public static final String TICKET_ID = "ticketId";
+    private String ticketId;
+    public static final String TICKET_LAST_UPDATED_AT = "ticketLastUpdatedAt";
+    private int ticketLastUpdatedAt;
     public static final String AZURE_BOARDS_WORK_ITEM_URL = "azureBoardsWorkItemUrl";
     private String azureBoardsWorkItemUrl;
     public static final String LAST_UPDATED = "lastUpdated";
@@ -33,6 +42,8 @@ public class TestingRunIssues {
     public static final String UNREAD = "unread";
     private boolean unread;
     private List<Integer> collectionIds;
+    public static final String DESCRIPTION = "description";
+    private String description;
 
     public static final String ID_API_COLLECTION_ID = Constants.ID + "." + TestingIssuesId.API_KEY_INFO + "." + ApiInfoKey.API_COLLECTION_ID;
     public static final String ID_URL = Constants.ID + "." + TestingIssuesId.API_KEY_INFO + "." + ApiInfoKey.URL;
@@ -177,5 +188,44 @@ public class TestingRunIssues {
 
     public void setAzureBoardsWorkItemUrl(String azureBoardsWorkItemUrl) {
         this.azureBoardsWorkItemUrl = azureBoardsWorkItemUrl;
+    }
+
+    public TicketSource getTicketSource() {
+        return ticketSource;
+    }
+
+    public void setTicketSource(TicketSource ticketSource) {
+        this.ticketSource = ticketSource;
+    }
+
+    public String getTicketProjectKey() {
+        return ticketProjectKey;
+    }
+
+    public void setTicketProjectKey(String ticketProjectKey) {
+        this.ticketProjectKey = ticketProjectKey;
+    }
+
+    public int getTicketLastUpdatedAt() {
+        return ticketLastUpdatedAt;
+    }
+
+    public void setTicketLastUpdatedAt(int ticketLastUpdatedAt) {
+        this.ticketLastUpdatedAt = ticketLastUpdatedAt;
+    }
+
+    public String getTicketId() {
+        return ticketId;
+    }
+
+    public void setTicketId(String ticketId) {
+        this.ticketId = ticketId;
+    }
+    public String getDescription() {
+        return description;
+    }
+
+    public void setDescription(String description) {
+        this.description = description;
     }
 }

@@ -5,7 +5,7 @@ import transform from '../transform'
 import SampleDataList from '../../../components/shared/SampleDataList'
 import SampleData from '../../../components/shared/SampleData'
 import LayoutWithTabs from '../../../components/layouts/LayoutWithTabs'
-import { Badge, Box, Button, Divider, HorizontalStack, Icon, Popover, Text, VerticalStack, Link, Modal } from '@shopify/polaris'
+import { Badge, Box, Button, Divider, HorizontalStack, Icon, Popover, Text, VerticalStack, Link, Modal, InlineCode } from '@shopify/polaris'
 import api from '../../observe/api'
 import issuesApi from "../../issues/api"
 import testingApi from "../api"
@@ -18,6 +18,7 @@ import observeFunc from "../../observe/transform.js"
 import settingFunctions from '../../settings/module.js'
 import JiraTicketCreationModal from '../../../components/shared/JiraTicketCreationModal.jsx'
 import MarkdownViewer from '../../../components/shared/MarkdownViewer.jsx'
+import InlineEditableText from '../../../components/shared/InlineEditableText.jsx'
 
 function TestRunResultFlyout(props) {
 
@@ -36,6 +37,10 @@ function TestRunResultFlyout(props) {
     const [projectToWorkItemsMap, setProjectToWorkItemsMap] = useState({})
     const [projectId, setProjectId] = useState('')
     const [workItemType, setWorkItemType] = useState('')
+
+    const [description, setDescription] = useState("")
+    const [editDescription, setEditDescription] = useState(description)
+    const [isEditingDescription, setIsEditingDescription] = useState(false)
 
     // modify testing run result and headers
     const infoStateFlyout = infoState && infoState.length > 0 ? infoState.filter((item) => item.title !== 'Jira') : []
@@ -81,7 +86,28 @@ function TestRunResultFlyout(props) {
        if(issueDetails && Object.keys(issueDetails).length > 0){       
             fetchApiInfo(issueDetails.id.apiInfoKey)
        }
+       setTimeout(() => {
+            setDescription(issueDetails?.description || "")
+            setEditDescription(issueDetails?.description || "")
+       }, [100])
     },[issueDetails?.id?.apiInfoKey])
+
+    const handleSaveDescription = async () => {
+        setIsEditingDescription(false);
+        
+        if(editDescription === description) {
+            return
+        }
+        await testingApi.updateIssueDescription(issueDetails.id, editDescription)
+            .then(() => {
+                setDescription(editDescription);
+                func.setToast(true, false, "Description saved successfully");
+            })
+            .catch((err) => {
+                console.error("Failed to save description:", err);
+                func.setToast(true, true, "Failed to save description");
+            })
+    }
 
     useEffect(() => {
         if (!remediationSrc) {
@@ -221,15 +247,40 @@ function TestRunResultFlyout(props) {
     function TitleComponent() {
         const severity = (selectedTestRunResult && selectedTestRunResult.vulnerable) ? issueDetails.severity : ""
         return(
-            <div style={{display: 'flex', justifyContent: "space-between", gap:"24px", padding: "16px", paddingTop: '0px'}}>
+            <div style={{display: 'flex', justifyContent: "space-between", alignItems: "flex-start", gap:"24px", padding: "16px", paddingTop: '0px'}}>
                 <VerticalStack gap={"2"}>
                     <Box width="100%">
-                        <div style={{display: 'flex', gap: '4px'}} className='test-title'>
+                        <div style={{display: 'flex', gap: '4px', marginBottom: '4px'}} className='test-title'>
                             <Button removeUnderline plain monochrome onClick={() => openTest()}>
                                 <Text variant="headingSm" alignment="start" breakWord>{selectedTestRunResult?.name}</Text>
                             </Button>
                             {(severity && severity?.length > 0) ? (issueDetails?.testRunIssueStatus === 'IGNORED' ? <Badge size='small'>Ignored</Badge> : <Box className={`badge-wrapper-${severity.toUpperCase()}`}><Badge size="small" status={observeFunc.getColor(severity)}>{severity}</Badge></Box>) : null}
                         </div>
+
+                        {
+                            isEditingDescription ? (
+                                <InlineEditableText
+                                    textValue={editDescription}
+                                    setTextValue={setEditDescription}
+                                    handleSaveClick={handleSaveDescription}
+                                    setIsEditing={setIsEditingDescription}
+                                    placeholder={"Add a brief description"}
+                                    maxLength={64}
+                                />
+                            ) : (
+                                !description ? (
+                                    <Button plain removeUnderline onClick={() => setIsEditingDescription(true)}>
+                                        Add description
+                                    </Button>
+                                ) : (
+                                    <Button plain removeUnderline onClick={() => setIsEditingDescription(true)}>
+                                        <Text as="span" variant="bodyMd" color="subdued" alignment="start">
+                                            {description}
+                                        </Text>
+                                    </Button>
+                                    )
+                            )
+                        }
                     </Box>
                     <HorizontalStack gap={"2"}>
                         <Text color="subdued" variant="bodySm">{transform.getTestingRunResultUrl(selectedTestRunResult)}</Text>

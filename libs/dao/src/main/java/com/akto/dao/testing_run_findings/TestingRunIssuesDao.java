@@ -63,7 +63,14 @@ public class TestingRunIssuesDao extends AccountsContextDaoWithRbac<TestingRunIs
 
         fieldNames =  new String[] {Constants.ID, TestingRunIssues.TEST_RUN_ISSUES_STATUS};
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, true);
-    
+
+        fieldNames = new String[]{TestingRunIssues.TICKET_PROJECT_KEY, TestingRunIssues.TICKET_SOURCE,
+            TestingRunIssues.LAST_UPDATED};
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, true);
+
+        fieldNames = new String[]{TestingRunIssues.TICKET_PROJECT_KEY, TestingRunIssues.TICKET_SOURCE,
+            TestingRunIssues.TICKET_ID};
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, true);
     }
 
     private List<Bson> getPipelineForSeverityCount(Bson filter, boolean expandApiGroups, BasicDBObject groupedId) {

@@ -2,6 +2,7 @@ package com.akto.data_actor;
 
 import com.akto.dto.*;
 import com.akto.dto.billing.Organization;
+import com.akto.dto.monitoring.ModuleInfo;
 import com.akto.dto.filter.MergedUrls;
 import com.akto.dto.runtime_filters.RuntimeFilter;
 import com.akto.dto.test_editor.YamlTemplate;
@@ -229,4 +230,8 @@ public class DbActor extends DataActor {
     public void bulkInsertApiHitCount(List<ApiHitCountInfo> apiHitCountInfoList) throws Exception {
         DbLayer.bulkinsertApiHitCount(apiHitCountInfoList);
     }
+    public void updateModuleInfo(ModuleInfo moduleInfo) {
+        return;
+    }
+
 }

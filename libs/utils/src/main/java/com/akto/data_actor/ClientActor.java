@@ -5,6 +5,7 @@ import com.akto.testing.ApiExecutor;
 import com.auth0.jwt.JWT;
 import com.auth0.jwt.interfaces.DecodedJWT;
 import com.akto.dto.*;
+import com.akto.dto.monitoring.ModuleInfo;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.bulk_updates.BulkUpdates;
 import com.akto.dto.data_types.BelongsToPredicate;
@@ -54,6 +55,7 @@ public class ClientActor extends DataActor {
     private static final Gson gson = new Gson();
     public static final String CYBORG_URL = "https://cyborg.akto.io";
     private static ExecutorService threadPool = Executors.newFixedThreadPool(maxConcurrentBatchWrites);
+    private static ExecutorService logThreadPool = Executors.newFixedThreadPool(50);
     private static AccountSettings accSettings;
     private static final LoggerMaker logger = new LoggerMaker(ClientActor.class);
     
@@ -1074,12 +1076,9 @@ public class ClientActor extends DataActor {
         obj.put("log", logObj);
         OriginalHttpRequest request = new OriginalHttpRequest(url + "/insertProtectionLog", "", "POST", obj.toString(), headers, "");
         try {
-            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
-            String responsePayload = response.getBody();
-            if (response.getStatusCode() != 200 || responsePayload == null) {
-                System.out.println("non 2xx response in insertProtectionLog");
-                return;
-            }
+            logThreadPool.submit(
+                () -> ApiExecutor.sendRequest(request, true, null, false, null)
+            );
         } catch (Exception e) {
             System.out.println("error in insertProtectionLog" + e);
             return;
@@ -1364,4 +1363,20 @@ public class ClientActor extends DataActor {
         }
     }
 
+    public void updateModuleInfo(ModuleInfo moduleInfo) {
+        Map<String, List<String>> headers = buildHeaders();
+        BasicDBObject obj = new BasicDBObject();
+        obj.put("moduleInfo", moduleInfo);
+
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/updateModuleInfoForHeartbeat", "", "POST", gson.toJson(obj), headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
+            if (response.getStatusCode() != 200) {
+                loggerMaker.errorAndAddToDb("non 2xx response in updateModuleInfoForHeartbeat", LoggerMaker.LogDb.RUNTIME);
+                return;
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error updating heartbeat for :" + moduleInfo.getModuleType().name(), LoggerMaker.LogDb.RUNTIME);
+        }
+    }
 }

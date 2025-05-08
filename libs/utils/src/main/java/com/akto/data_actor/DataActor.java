@@ -1,6 +1,7 @@
 package com.akto.data_actor;
 
 import com.akto.dto.*;
+import com.akto.dto.monitoring.ModuleInfo;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.filter.MergedUrls;
 import com.akto.dto.runtime_filters.RuntimeFilter;
@@ -96,4 +97,5 @@ public abstract class DataActor {
     public abstract Set<MergedUrls> fetchMergedUrls();
 
     public abstract void bulkInsertApiHitCount(List<ApiHitCountInfo> apiHitCountInfoList) throws Exception;
+    public abstract void updateModuleInfo(ModuleInfo moduleInfo);
 }

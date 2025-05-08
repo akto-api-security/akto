@@ -126,6 +126,9 @@ public class GlobalEnums {
         BASE_64_ENCODED, JWT
     }
 
+    public enum TicketSource {
+        JIRA, AZURE_BOARDS
+    }
 
     /* ********************************************************************** */
 }
