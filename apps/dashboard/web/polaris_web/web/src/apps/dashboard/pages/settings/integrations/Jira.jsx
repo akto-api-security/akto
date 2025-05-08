@@ -710,6 +710,7 @@ function Jira() {
                                                 <HorizontalStack key={`status-${val}`} gap={8}>
                                                     <Box width='82px'><Badge >{val}</Badge></Box>
                                                     <DropdownSearchWithDisabled
+                                                        id={`akto-status-${project.projectId}-${val}`}
                                                         setSelected={(value) => {
                                                             handleStatusSelection(index, project, val, value);
                                                         }}
