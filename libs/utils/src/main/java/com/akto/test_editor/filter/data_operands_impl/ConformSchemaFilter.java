@@ -5,9 +5,11 @@ import com.akto.dto.test_editor.DataOperandFilterRequest;
 import com.networknt.schema.JsonSchema;
 import com.networknt.schema.JsonSchemaFactory;
 import com.networknt.schema.ValidationMessage;
+import com.networknt.schema.oas.OpenApi31;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.networknt.schema.SpecVersion;
+import com.networknt.schema.SpecVersion.VersionFlag;
 
 import java.io.InputStream;
 import java.util.Set;
@@ -37,7 +39,9 @@ public class ConformSchemaFilter extends DataOperandsImpl {
             JsonNode dataNode = objectMapper.readTree(data.toString());
 
             // Create a JsonSchema instance
-            JsonSchemaFactory factory = JsonSchemaFactory.getInstance(SpecVersion.VersionFlag.V201909);
+            JsonSchemaFactory factory = JsonSchemaFactory.getInstance(VersionFlag.V202012,
+        builder -> builder.metaSchema(OpenApi31.getInstance())
+                .defaultMetaSchemaIri(OpenApi31.getInstance().getIri()));
             JsonSchema schema = factory.getSchema(schemaNode);
 
             // Validate the data against the schema

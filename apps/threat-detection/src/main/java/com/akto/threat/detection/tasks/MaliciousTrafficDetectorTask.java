@@ -23,21 +23,26 @@ import com.akto.proto.generated.threat_detection.message.malicious_event.v1.Mali
 import com.akto.proto.generated.threat_detection.message.sample_request.v1.Metadata;
 import com.akto.proto.generated.threat_detection.message.sample_request.v1.SampleMaliciousRequest;
 import com.akto.proto.generated.threat_detection.message.sample_request.v1.SampleRequestKafkaEnvelope;
+import com.akto.proto.generated.threat_detection.message.sample_request.v1.SchemaConformanceError;
 import com.akto.proto.http_response_param.v1.HttpResponseParam;
 import com.akto.rules.TestPlugin;
-import com.akto.test_editor.execution.VariableResolver;
 import com.akto.test_editor.filter.data_operands_impl.ValidationResult;
 import com.akto.threat.detection.actor.SourceIPActorGenerator;
 import com.akto.threat.detection.cache.RedisBackedCounterCache;
 import com.akto.threat.detection.constants.KafkaTopic;
 import com.akto.threat.detection.kafka.KafkaProtoProducer;
+import com.akto.threat.detection.scripts.KafkaBenchmark;
 import com.akto.threat.detection.smart_event_detector.window_based.WindowBasedThresholdNotifier;
 import com.akto.util.HttpRequestResponseUtils;
+import com.akto.utils.GzipUtils;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.akto.IPLookupClient;
 import com.akto.RawApiMetadataFactory;
 
 import io.lettuce.core.RedisClient;
+import io.lettuce.core.api.StatefulRedisConnection;
+import io.lettuce.core.codec.StringCodec;
+
 import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.ExecutorService;
@@ -74,6 +79,9 @@ public class MaliciousTrafficDetectorTask implements Task {
   private static Map<String, Object> varMap = new HashMap<>();
   private static Supplier<String> lazyToString;
 
+  private final StatefulRedisConnection<String, String> apiCache;
+  public static final List<HttpResponseParam> records = KafkaBenchmark.buildRecords("4KB", 100000L);
+
   public MaliciousTrafficDetectorTask(
       KafkaConfig trafficConfig, KafkaConfig internalConfig, RedisClient redisClient) throws Exception {
     this.kafkaConfig = trafficConfig;
@@ -96,6 +104,8 @@ public class MaliciousTrafficDetectorTask implements Task {
     this.kafkaConsumer = new KafkaConsumer<>(properties);
 
     this.httpCallParser = new HttpCallParser(120, 1000);
+    this.apiCache = redisClient.connect(new StringCodec());
+    
 
     this.windowBasedThresholdNotifier =
         new WindowBasedThresholdNotifier(
@@ -164,15 +174,34 @@ public class MaliciousTrafficDetectorTask implements Task {
     return false;
   }
 
-  private String getApiSchema(String apiCollectionId) {
+  private String getApiSchema(int apiCollectionId) {
     String apiSchema = null;
     try {
-      apiSchema = "";
+      apiSchema = this.apiCache.sync().get("akto:threat:schema:" + apiCollectionId);
+
+      if (apiSchema != null && !apiSchema.isEmpty()) {
+        apiSchema = GzipUtils.unzipString(apiSchema);
+
+        return apiSchema;
+      }
+
+      apiSchema = dataActor.fetchOpenApiSchema(apiCollectionId);
+
+      if (apiSchema == null || apiSchema.isEmpty()) {
+        logger.warn("No schema found for api collection id {}", apiCollectionId);
+
+        return null;
+      }
+      this.apiCache.sync().setex("akto:threat:schema:" + apiCollectionId, 24 * 60 * 60, apiSchema);
+      // unzip this schema using gzip
+      apiSchema = GzipUtils.unzipString(apiSchema);
     } catch (Exception e) {
       logger.error("Error while fetching api schema for id {}", apiCollectionId, e);
     }
     return apiSchema;
   }
+
+
 
   private void processRecord(HttpResponseParam record) throws Exception {
     HttpResponseParams responseParam = buildHttpResponseParam(record);
@@ -204,8 +233,27 @@ public class MaliciousTrafficDetectorTask implements Task {
         URLMethods.Method.fromString(responseParam.getRequestParams().getMethod());
     ApiInfo.ApiInfoKey apiInfoKey = new ApiInfo.ApiInfoKey(apiCollectionId, url, method);
 
+    List<SchemaConformanceError> errors = null; 
     for (FilterConfig apiFilter : apiFilters.values()) {
-      boolean hasPassedFilter = validateFilterForRequest(apiFilter, rawApi, apiInfoKey);
+      boolean hasPassedFilter = false; 
+
+      if(apiFilter.getInfo().getCategory().getName().equalsIgnoreCase("SchemaConform")) {
+
+        String apiSchema = getApiSchema(1746095071);
+        
+        if (apiSchema == null || apiSchema.isEmpty()) {
+
+          continue;
+
+        }
+
+        errors = RequestValidator.validate(responseParam, apiSchema, apiInfoKey.toString());
+        hasPassedFilter = errors != null && !errors.isEmpty();
+
+      }else {
+
+        hasPassedFilter = validateFilterForRequest(apiFilter, rawApi, apiInfoKey);
+      }
 
       // If a request passes any of the filter, then it's a malicious request,
       // and so we push it to kafka
@@ -228,17 +276,24 @@ public class MaliciousTrafficDetectorTask implements Task {
         String groupKey = apiFilter.getId();
         String aggKey = actor + "|" + groupKey;
 
-        SampleMaliciousRequest maliciousReq = SampleMaliciousRequest.newBuilder()
+        Metadata.Builder metadataBuilder = Metadata.newBuilder();
+        SampleMaliciousRequest.Builder maliciousReqBuilder = SampleMaliciousRequest.newBuilder()
             .setUrl(responseParam.getRequestParams().getURL())
             .setMethod(responseParam.getRequestParams().getMethod())
             .setPayload(responseParam.getOriginalMsg().get())
             .setIp(actor) // For now using actor as IP
             .setApiCollectionId(responseParam.getRequestParams().getApiCollectionId())
             .setTimestamp(responseParam.getTime())
-            .setFilterId(apiFilter.getId())
-            .setMetadata(Metadata.newBuilder().setCountryCode(metadata.getCountryCode()))
-            .build();
+            .setFilterId(apiFilter.getId());
 
+        if(errors != null && !errors.isEmpty()) {
+          metadataBuilder.addAllSchemaErrors(errors);
+        }
+
+        metadataBuilder.setCountryCode(metadata.getCountryCode());
+        maliciousReqBuilder.setMetadata(metadataBuilder.build());
+
+        SampleMaliciousRequest maliciousReq = maliciousReqBuilder.build();
         maliciousMessages.add(
             SampleRequestKafkaEnvelope.newBuilder()
                 .setActor(actor)

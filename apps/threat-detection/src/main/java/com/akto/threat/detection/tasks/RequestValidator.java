@@ -35,26 +35,63 @@ public class RequestValidator {
 
   private static String getUrlToSearch(JsonNode rootSchemaNode, String url) {
     if (!rootSchemaNode.path("servers").isArray()) {
-      return url;
-    }
-
-    // TODO handle urls with path params. Eg: /api/v1/pet/{petId}
-    for (JsonNode server : rootSchemaNode.path("servers")) {
-
-      // Example {servers: [{url: "https://api.example.com/api/v1"}]}
-      // url: /api/v1/pet
-      // output: /pet
-      if (server.path("url").isMissingNode()) {
         return url;
-      }
-      String serverUrl = server.path("url").asText();
-      if (url.startsWith(serverUrl)) {
-        return url.substring(serverUrl.length());
-      }
     }
 
-    return url;
-  }
+    // Remove the server URL prefix from the input URL
+    for (JsonNode server : rootSchemaNode.path("servers")) {
+        if (server.path("url").isMissingNode()) {
+            return url;
+        }
+        String serverUrl = server.path("url").asText();
+        if (url.startsWith(serverUrl)) {
+            url = url.substring(serverUrl.length());
+            break;
+        }
+    }
+
+    // Match the URL against the paths in the schema
+    JsonNode pathsNode = rootSchemaNode.path("paths");
+    if (pathsNode.isMissingNode() || !pathsNode.isObject()) {
+        return url; // No paths defined, return the original URL
+    }
+    // Iterate through the paths and check for a match
+    // for (String pathKey : pathsNode.fieldNames()) {
+    //     if (isPathMatching(pathKey, url)) {
+    //         return pathKey; // Return the matching path key
+    //     }
+    // }
+
+    return url; 
+}
+
+private static boolean isPathMatching(String pathKey, String url) {
+    // Split the path and URL into segments
+    String[] pathSegments = pathKey.split("/");
+    String[] urlSegments = url.split("/");
+
+    if (pathSegments.length != urlSegments.length) {
+        return false; // The number of segments must match
+    }
+
+    // Compare each segment
+    for (int i = 0; i < pathSegments.length; i++) {
+        String pathSegment = pathSegments[i];
+        String urlSegment = urlSegments[i];
+
+        // If the path segment is a parameter (e.g., {petId}), skip the comparison
+        if (pathSegment.startsWith("{") && pathSegment.endsWith("}")) {
+            continue;
+        }
+
+        // Otherwise, the segments must match exactly
+        if (!pathSegment.equals(urlSegment)) {
+            return false;
+        }
+    }
+
+    return true; // All segments match
+}
 
   private static JsonNode getRequestBodySchema(JsonNode schemaNode, HttpResponseParams responseParam) {
     JsonNode paths = schemaNode.path("paths");
@@ -74,21 +111,19 @@ public class RequestValidator {
 
     JsonNode schemaNode = getRequestBodySchema(rootSchemaNode, httpResponseParams);
 
-    if (schemaNode == null || schemaNode.isEmpty()) {
-      logger.debug("No request body schema found for api collection id {}",
-          httpResponseParams.getRequestParams().getApiCollectionId());
+    if (schemaNode == null || schemaNode.isMissingNode()) {
+      logger.warn("No request body schema found for api collection id {}, path {}, method {}",
+          httpResponseParams.getRequestParams().getApiCollectionId(),
+          httpResponseParams.getRequestParams().getURL(),
+          httpResponseParams.getRequestParams().getMethod());
 
       return errors;
     }
 
     JsonNode dataNode = objectMapper.readTree(httpResponseParams.getRequestParams().getPayload());
-    dataNode = objectMapper.readTree(
-        "{\"id\":10,\"name\":\"Dogs\",\"category\":{\"id\":\"test\"},\"tags\":[{\"id\":0,\"name\":\"string\"}],\"status\":\"available\"}");
 
-    // Create a JsonSchema instance
     JsonSchema schema = factory.getSchema(schemaNode);
 
-    // Validate the data against the schema
     Set<ValidationMessage> validationMessages = schema.validate(dataNode);
 
     if (validationMessages.isEmpty()) {
@@ -112,24 +147,22 @@ public class RequestValidator {
     return errors;
   }
 
-  public static List<SchemaConformanceError> validate(HttpResponseParams responseParam, String apiSchema) {
+  public static List<SchemaConformanceError> validate(HttpResponseParams responseParam, String apiSchema, String apiInfoKey) {
     try {
-      if (apiSchema == null || apiSchema.isEmpty()) {
-        return errors;
-      }
+      
 
       ObjectMapper objectMapper = new ObjectMapper();
 
       JsonNode rootSchemaNode = objectMapper.readTree(apiSchema);
       if (rootSchemaNode == null || rootSchemaNode.isEmpty()) {
-        logger.debug("No schema found for api collection id {}", responseParam.getRequestParams().getApiCollectionId());
+        logger.debug("Unable to parse schema for api info key", apiInfoKey);
         return errors;
-      } 
+      }
 
       return validateRequestBody(responseParam, rootSchemaNode);
     } catch (Exception e) {
-      logger.warn("Request not conforming to schema for api collection id {}",
-          responseParam.getRequestParams().getApiCollectionId());
+      logger.error("Error conforming to schema for api info key  {}",
+          apiInfoKey, e);
       return errors;
     }
   }
