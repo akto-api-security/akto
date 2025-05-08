@@ -1,4 +1,4 @@
-import { Autocomplete, Box, Icon, Link, TextContainer } from '@shopify/polaris'
+import { Autocomplete, Box, Icon } from '@shopify/polaris'
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import {CircleRightMajor, ChevronDownMinor} from "@shopify/polaris-icons"
 import func from "@/util/func"
@@ -128,15 +128,6 @@ function Dropdown(props) {
 
     );
 
-
-    const emptyState = (
-        <div style={{ textAlign: 'center' }}>
-            <TextContainer>No options available</TextContainer>
-        </div>
-    );
-
-
-
     return (
         <Autocomplete
             options={options}
@@ -144,7 +135,6 @@ function Dropdown(props) {
             onSelect={updateSelection}
             textField={textField}
             preferredPosition='below'
-            emptyState={emptyState}
             {...props?.allowMultiple === true? {allowMultiple:true} : {}}
             {...(props.subItems ? {actionBefore:{
                 content: props.subContent,
