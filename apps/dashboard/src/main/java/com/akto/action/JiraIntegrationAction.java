@@ -106,7 +106,7 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
     private static final String ISSUE_STATUS_ENDPOINT = "/rest/api/3/project/%s/statuses";
     private static final LoggerMaker loggerMaker = new LoggerMaker(ApiExecutor.class, LogDb.DASHBOARD);
 
-    private static final int TICKET_SYNC_JOB_RECURRING_INTERVAL_SECONDS = 60 * 2;
+    private static final int TICKET_SYNC_JOB_RECURRING_INTERVAL_SECONDS = 3600;
     private static final OkHttpClient client = CoreHTTPClient.client.newBuilder()
             .connectTimeout(60, TimeUnit.SECONDS)
             .readTimeout(60, TimeUnit.SECONDS)
