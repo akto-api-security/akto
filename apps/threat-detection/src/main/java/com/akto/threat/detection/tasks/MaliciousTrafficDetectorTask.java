@@ -238,7 +238,7 @@ public class MaliciousTrafficDetectorTask implements Task {
       boolean hasPassedFilter = false; 
 
       if(apiFilter.getInfo().getCategory().getName().equalsIgnoreCase("SchemaConform")) {
-
+        logger.debug("SchemaConform filter found for url {} filterId {}", apiInfoKey.getUrl(), apiFilter.getId());
         String apiSchema = getApiSchema(apiCollectionId);
         
         if (apiSchema == null || apiSchema.isEmpty()) {
