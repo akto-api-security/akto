@@ -791,6 +791,19 @@ public class IssuesAction extends UserAction {
         this.severityInfo = TestingRunIssuesDao.instance.getSeveritiesMapForCollections(filter, false, groupedId);
         return Action.SUCCESS.toUpperCase();
     }
+    String description;
+    public String updateIssueDescription() {
+        if(issueId == null){
+            addActionError("Issue id cannot be null");
+            return ERROR.toUpperCase();
+        }
+        if(description == null){
+            addActionError("Description cannot be null");
+            return ERROR.toUpperCase();
+        }
+        TestingRunIssuesDao.instance.updateOneNoUpsert(Filters.eq(Constants.ID, issueId), Updates.set(TestingRunIssues.DESCRIPTION, description));
+        return SUCCESS.toUpperCase();
+    }
 
 
     public List<TestingRunIssues> getIssues() {
@@ -1069,5 +1082,11 @@ public class IssuesAction extends UserAction {
 
     public void setFilterCompliance(List<String> filterCompliance) {
         this.filterCompliance = filterCompliance;
+    }
+    public void setDescription(String description) {
+        this.description = description;
+    }
+    public String getDescription() {
+        return description;
     }
 }

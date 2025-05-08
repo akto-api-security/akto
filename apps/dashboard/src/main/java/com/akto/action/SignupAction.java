@@ -547,8 +547,13 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
                 servletResponse.sendRedirect("/login");
                 return ERROR.toUpperCase();
             }
-
-            String domainUrl = "https://" + oktaConfig.getOktaDomainUrl() + "/oauth2/" + oktaConfig.getAuthorisationServerId() + "/v1";
+            String domainUrl = "https://" + oktaConfig.getOktaDomainUrl() + "/oauth2/";
+            if(oktaConfig.getAuthorisationServerId() == null || oktaConfig.getAuthorisationServerId().isEmpty()){
+                domainUrl += "/v1";
+            }else{
+                domainUrl += oktaConfig.getAuthorisationServerId() + "/v1";
+            }
+            logger.infoAndAddToDb("Trying to login with okta sso for account id: " + accountId + " domain url: " + domainUrl);
             String clientId = oktaConfig.getClientId();
             String clientSecret = oktaConfig.getClientSecret();
             String redirectUri = oktaConfig.getRedirectUri();
@@ -559,7 +564,6 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             params.put("client_id", clientId);
             params.put("client_secret", clientSecret);
             params.put("redirect_uri", redirectUri);
-
             Map<String,Object> tokenData = CustomHttpRequest.postRequestEncodedType(domainUrl +"/token",params);
             String accessToken = tokenData.get("access_token").toString();
             Map<String,Object> userInfo = CustomHttpRequest.getRequest( domainUrl + "/userinfo","Bearer " + accessToken);
@@ -572,6 +576,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             code = "";
         } catch (Exception e) {
             logger.errorAndAddToDb("Error while signing in via okta sso \n" + e.getMessage(), LogDb.DASHBOARD);
+            e.printStackTrace();
             servletResponse.sendRedirect("/login");
             return ERROR.toUpperCase();
         }

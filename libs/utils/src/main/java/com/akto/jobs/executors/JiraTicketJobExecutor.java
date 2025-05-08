@@ -2,10 +2,10 @@ package com.akto.jobs.executors;
 
 import com.akto.dao.ConfigsDao;
 import com.akto.dao.JiraIntegrationDao;
+import com.akto.dao.context.Context;
 import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dao.testing.TestingRunResultDao;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
-import com.akto.dto.Config;
 import com.akto.dto.Config.AktoHostUrlConfig;
 import com.akto.dto.Config.ConfigType;
 import com.akto.dto.OriginalHttpRequest;
@@ -28,13 +28,13 @@ import com.akto.testing.ApiExecutor;
 import com.akto.util.Constants;
 import com.akto.util.DashboardMode;
 import com.akto.util.enums.GlobalEnums.TestRunIssueStatus;
+import com.akto.util.enums.GlobalEnums.TicketSource;
 import com.akto.util.http_util.CoreHTTPClient;
 
 import com.akto.utils.FileUtils;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
-import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.Updates;
 
@@ -200,7 +200,7 @@ public class JiraTicketJobExecutor extends JobExecutor<AutoTicketParams> {
 
     private void processJiraBatch(List<JiraMetaData> batch, String issueType, String projId, JiraIntegration jira) throws Exception {
         BasicDBObject payload = buildJiraPayload(batch, issueType, projId);
-        List<String> createdKeys = sendJiraBulkCreate(jira, payload, batch);
+        List<String> createdKeys = sendJiraBulkCreate(jira, payload, batch, projId);
         logger.info("Created {} Jira issues out of {} Akto issues", createdKeys.size(), batch.size());
         List<TestingRunResult> results = fetchRunResults(batch);
         attachFilesToIssues(jira, createdKeys, results);
@@ -215,8 +215,7 @@ public class JiraTicketJobExecutor extends JobExecutor<AutoTicketParams> {
                     Filters.eq(TestingRunResult.TEST_SUB_TYPE, id.getTestSubCategory()),
                     Filters.eq(TestingRunResult.API_INFO_KEY, id.getApiInfoKey()),
                     Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, data.getTestSummaryId())
-                ),
-                Projections.include("_id", "testResults")
+                )
             );
             if (result != null) results.add(result);
         }
@@ -234,7 +233,8 @@ public class JiraTicketJobExecutor extends JobExecutor<AutoTicketParams> {
         return payload;
     }
 
-    private List<String> sendJiraBulkCreate(JiraIntegration jira, BasicDBObject payload, List<JiraMetaData> metaList) throws Exception {
+    private List<String> sendJiraBulkCreate(JiraIntegration jira, BasicDBObject payload, List<JiraMetaData> metaList,
+        String projId) throws Exception {
         String url = jira.getBaseUrl() + CREATE_ISSUE_ENDPOINT_BULK;
         String authHeader = Base64.getEncoder().encodeToString((jira.getUserEmail() + ":" + jira.getApiToken()).getBytes());
 
@@ -268,7 +268,13 @@ public class JiraTicketJobExecutor extends JobExecutor<AutoTicketParams> {
             JiraMetaData meta = metaList.get(i);
             TestingRunIssuesDao.instance.getMCollection().updateOne(
                 Filters.eq(Constants.ID, meta.getTestingIssueId()),
-                Updates.set("jiraIssueUrl", jira.getBaseUrl() + "/browse/" + key),
+                Updates.combine(
+                    Updates.set("jiraIssueUrl", jira.getBaseUrl() + "/browse/" + key),
+                    Updates.set(TestingRunIssues.TICKET_SOURCE, TicketSource.JIRA.name()),
+                    Updates.set(TestingRunIssues.TICKET_PROJECT_KEY, projId),
+                    Updates.set(TestingRunIssues.TICKET_ID, key),
+                    Updates.set(TestingRunIssues.TICKET_LAST_UPDATED_AT, Context.now())
+                ),
                 new UpdateOptions().upsert(false)
             );
             logger.info("Created Jira issue: {} for TestingRunIssue ID: {}", key, meta.getTestingIssueId());

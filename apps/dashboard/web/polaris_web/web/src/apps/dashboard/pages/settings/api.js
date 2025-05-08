@@ -571,6 +571,41 @@ const settingRequests = {
             method: 'post',
             data: {}
         })
+    },
+    async fetchCloudflareWafIntegration() {
+        return await request({
+            url: '/api/fetchCloudflareWafIntegration',
+            method: 'post',
+            data: {}
+        })
+    },
+    async deleteCloudflareWafIntegration() {
+        return await request({
+            url: '/api/deleteCloudflareWafIntegration',
+            method: 'post',
+            data: {}
+        })
+    },
+    async addCloudflareWafIntegration(accountOrZoneId, apiKey, email, integrationType) {
+        return await request({
+            url: '/api/addCloudflareWafIntegration',
+            method: 'post',
+            data: {accountOrZoneId, apiKey, email, integrationType}
+        })
+    },
+    async getDeMergedApis() {
+        return await request({
+            url: '/api/getDeMergedApis',
+            method: 'post',
+            data: {}
+        })
+    },
+    async undoDemergedApis(mergedApis) {
+        return await request({
+            url: '/api/undoDemergedApis',
+            method: 'post',
+            data: {mergedUrls: mergedApis}
+        })
     }
 }
 

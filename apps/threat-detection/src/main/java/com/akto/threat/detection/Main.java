@@ -1,11 +1,16 @@
 package com.akto.threat.detection;
 
 import com.akto.DaoInit;
+import com.akto.data_actor.DataActor;
+import com.akto.data_actor.DataActorFactory;
+import com.akto.dto.monitoring.ModuleInfo;
 import com.akto.kafka.KafkaConfig;
 import com.akto.kafka.KafkaConsumerConfig;
 import com.akto.kafka.KafkaProducerConfig;
 import com.akto.kafka.Serializer;
 import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
+import com.akto.metrics.ModuleInfoWorker;
 import com.akto.threat.detection.constants.KafkaTopic;
 import com.akto.threat.detection.session_factory.SessionFactoryUtils;
 import com.akto.threat.detection.tasks.CleanupTask;
@@ -20,8 +25,10 @@ import org.hibernate.SessionFactory;
 public class Main {
 
   private static final String CONSUMER_GROUP_ID = "akto.threat_detection";
-  private static final LoggerMaker logger = new LoggerMaker(Main.class);
+  private static final LoggerMaker logger = new LoggerMaker(Main.class, LogDb.THREAT_DETECTION);
   private static boolean aggregationRulesEnabled = System.getenv().getOrDefault("AGGREGATION_RULES_ENABLED", "true").equals("true");
+
+  private static final DataActor dataActor = DataActorFactory.fetchInstance();
 
   public static void main(String[] args) throws Exception {
     
@@ -30,7 +37,8 @@ public class Main {
     DaoInit.init(new ConnectionString(System.getenv("AKTO_MONGO_CONN")));
     System.out.println(System.getenv("************** + AKTO_MONGO_CONN"));
 
-    logger.warn("aggregation rules enabled {}", aggregationRulesEnabled);
+    logger.warnAndAddToDb("aggregation rules enabled " + aggregationRulesEnabled);
+    ModuleInfoWorker.init(ModuleInfo.ModuleType.THREAT_DETECTION, dataActor);
 
     if (aggregationRulesEnabled) {
         runMigrations();
