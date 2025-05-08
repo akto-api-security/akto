@@ -13,6 +13,7 @@ public class ModuleInfo {
     private int startedTs;
     public static final String LAST_HEARTBEAT_RECEIVED = "lastHeartbeatReceived";
     private int lastHeartbeatReceived;
+    public static final String NAME = "name";
     private String name;
 
     public ModuleType getModuleType() {
@@ -70,7 +71,8 @@ public class ModuleInfo {
         MINI_RUNTIME,
         MINI_TESTING,
         K8S,
-        EBPF
+        EBPF,
+        THREAT_DETECTION
     }
 
 }

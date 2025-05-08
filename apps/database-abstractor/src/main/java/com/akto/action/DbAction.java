@@ -101,6 +101,7 @@ public class DbAction extends ActionSupport {
     List<BulkUpdates> writesForSuspectSampleData;
     List<DependencyNode> dependencyNodeList;
     TestScript testScript;
+    String openApiSchema;
 
     private ModuleInfo moduleInfo;
 
@@ -1654,6 +1655,18 @@ public class DbAction extends ActionSupport {
         return Action.SUCCESS.toUpperCase();
     }
 
+    List<String> ids;
+
+    public String fetchYamlTemplatesWithIds() {
+        try {
+            yamlTemplates = DbLayer.fetchYamlTemplatesWithIds(ids, fetchOnlyActive);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in fetchYamlTemplatesWithIds " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
     public String findApiCollectionByName() {
         try {
             apiCollection = DbLayer.findApiCollectionByName(apiCollectionName);
@@ -2366,7 +2379,7 @@ public class DbAction extends ActionSupport {
         }
         return Action.SUCCESS.toUpperCase();
     }
-    
+
     public String getCurrentTestingRunDetailsFromEditor(){
         try {
             testingRunPlayground = DbLayer.getCurrentTestingRunDetailsFromEditor(this.ts);
@@ -2438,6 +2451,17 @@ public class DbAction extends ActionSupport {
             DbLayer.updateTestingRunPlayground(new ObjectId(this.testingRunPlaygroundId), testingRunResult);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error in updateTestingRunPlaygroundStateAndResult " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String fetchOpenApiSchema() {
+        try {
+            openApiSchema = DbLayer.fetchOpenApiSchema(apiCollectionId);
+        } catch (Exception e) {
+            e.printStackTrace();
+            loggerMaker.errorAndAddToDb(e, "Error in fetchOpenApiSchema " + e.toString());
             return Action.ERROR.toUpperCase();
         }
         return Action.SUCCESS.toUpperCase();
@@ -3493,7 +3517,7 @@ public class DbAction extends ActionSupport {
     public List<String> getTestSuiteTestSubCategories() {
         return testSuiteTestSubCategories;
     }
-    
+
     public TestingRunPlayground getTestingRunPlayground() {
         return testingRunPlayground;
     }
@@ -3537,6 +3561,22 @@ public class DbAction extends ActionSupport {
 
     public void setApiHitCountInfoList(List<BasicDBObject> apiHitCountInfoList) {
         this.apiHitCountInfoList = apiHitCountInfoList;
+    }
+
+    public List<String> getIds() {
+        return ids;
+    }
+
+    public void setIds(List<String> ids) {
+        this.ids = ids;
+    }
+    
+    public String getOpenApiSchema() {
+        return openApiSchema;
+    }
+
+    public void setOpenApiSchema(String openApiSchema) {
+        this.openApiSchema = openApiSchema;
     }
 
 }

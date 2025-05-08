@@ -359,6 +359,10 @@ public class DbActor extends DataActor {
         return DbLayer.fetchYamlTemplates(fetchOnlyActive, skip);
     }
 
+    public List<YamlTemplate> fetchYamlTemplatesWithIds(List<String> ids, boolean fetchOnlyActive){
+        return DbLayer.fetchYamlTemplatesWithIds(ids, fetchOnlyActive);
+    }
+
     public ApiCollection findApiCollectionByName(String apiCollectionName) {
         return DbLayer.findApiCollectionByName(apiCollectionName);
     }
@@ -613,4 +617,7 @@ public class DbActor extends DataActor {
         DbLayer.bulkinsertApiHitCount(apiHitCountInfoList);
     }
 
+    public String fetchOpenApiSchema(int apiCollectionId) {
+        return DbLayer.fetchOpenApiSchema(apiCollectionId);
+    }
 }
