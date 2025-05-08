@@ -250,7 +250,7 @@ public class MaliciousTrafficDetectorTask implements Task {
         if (!isAggFilter) {
           generateAndPushMaliciousEventRequest(
               apiFilter, actor, responseParam, maliciousReq, EventType.EVENT_TYPE_SINGLE);
-          return;
+          continue;
         }
 
         // Aggregation rules

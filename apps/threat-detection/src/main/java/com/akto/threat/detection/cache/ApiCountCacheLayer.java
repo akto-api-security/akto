@@ -106,7 +106,7 @@ public class ApiCountCacheLayer implements CounterCache {
         List<String> remainingKeys = new ArrayList<>();
         for (String key: keys) {
             if (this.localCache.asMap().containsKey(key)) {
-                count += this.localCache.asMap().get(key);
+                count = this.localCache.asMap().get(key);
                 keyValMap.put(key, count);
             } else {
                 remainingKeys.add(key);
