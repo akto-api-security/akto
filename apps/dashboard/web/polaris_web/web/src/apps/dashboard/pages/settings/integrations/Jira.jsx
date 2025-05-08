@@ -1,4 +1,4 @@
-import React, {useEffect, useReducer} from 'react'
+import React, {useEffect} from 'react'
 import {
   Badge,
   Box,
@@ -19,161 +19,16 @@ import PasswordTextField from '../../../components/layouts/PasswordTextField';
 import func from "@/util/func"
 import api from '../api';
 import Dropdown from "../../../components/layouts/Dropdown";
-
-const aktoStatusForJira = ["Open","Fixed", "Ignored"]
-const intialEmptyMapping = aktoStatusForJira.reduce((acc, status) => {
-    acc[status.toUpperCase()] = [];
-    return acc;
-  }, {});
-
-// Define initial state for the form
-const initialState = {
-  credentials: {
-    baseUrl: '',
-    apiToken: '',
-    userEmail: ''
-  },
-  projects: [],
-  existingProjectIds: [],
-  isAlreadyIntegrated: false,
-  isSaving: false,
-  initialFormData: null,
-  projectIssueMap: {},
-  loadingProjectIndex: null
-};
-
-// Define action types
-const ACTION_TYPES = {
-  SET_CREDENTIALS: 'SET_CREDENTIALS',
-  SET_PROJECTS: 'SET_PROJECTS',
-  ADD_PROJECT: 'ADD_PROJECT',
-  REMOVE_PROJECT: 'REMOVE_PROJECT',
-  UPDATE_PROJECT: 'UPDATE_PROJECT',
-  SET_EXISTING_PROJECT_IDS: 'SET_EXISTING_PROJECT_IDS',
-  SET_IS_ALREADY_INTEGRATED: 'SET_IS_ALREADY_INTEGRATED',
-  SET_IS_SAVING: 'SET_IS_SAVING',
-  SET_INITIAL_FORM_DATA: 'SET_INITIAL_FORM_DATA',
-  SET_PROJECT_ISSUE_MAP: 'SET_PROJECT_ISSUE_MAP',
-  CLEAR_PROJECTS: 'CLEAR_PROJECTS',
-  SET_LOADING_PROJECT_INDEX: 'SET_LOADING_PROJECT_INDEX'
-};
-
-// Main reducer function
-function jiraReducer(state, action) {
-  switch (action.type) {
-    case ACTION_TYPES.SET_CREDENTIALS:
-      return {
-        ...state,
-        credentials: {
-          ...state.credentials,
-          ...action.payload
-        }
-      };
-
-    case ACTION_TYPES.SET_PROJECTS:
-      return {
-        ...state,
-        projects: action.payload
-      };
-
-    case ACTION_TYPES.ADD_PROJECT:
-      return {
-        ...state,
-        projects: [
-          ...state.projects,
-          {
-            projectId: "",
-            enableBiDirIntegration: false,
-            aktoToJiraStatusMap: JSON.parse(JSON.stringify(intialEmptyMapping)),
-            statuses: [],
-            jiraStatusLabel: []
-          }
-        ]
-      };
-
-    case ACTION_TYPES.REMOVE_PROJECT:
-      return {
-        ...state,
-        projects: state.projects.filter((_, index) => index !== action.payload)
-      };
-
-    case ACTION_TYPES.UPDATE_PROJECT:
-      return {
-        ...state,
-        projects: state.projects.map((project, index) => {
-          if (index === action.payload.index) {
-            // Handle special case for aktoToJiraStatusMap
-            if (action.payload.updates.aktoToJiraStatusMap) {
-              return {
-                ...project,
-                ...action.payload.updates,
-                aktoToJiraStatusMap: {
-                  ...project.aktoToJiraStatusMap,
-                  ...action.payload.updates.aktoToJiraStatusMap
-                }
-              };
-            }
-            return {
-              ...project,
-              ...action.payload.updates
-            };
-          }
-          return project;
-        })
-      };
-
-    case ACTION_TYPES.SET_EXISTING_PROJECT_IDS:
-      return {
-        ...state,
-        existingProjectIds: action.payload
-      };
-
-    case ACTION_TYPES.SET_IS_ALREADY_INTEGRATED:
-      return {
-        ...state,
-        isAlreadyIntegrated: action.payload
-      };
-
-    case ACTION_TYPES.SET_IS_SAVING:
-      return {
-        ...state,
-        isSaving: action.payload
-      };
-
-    case ACTION_TYPES.SET_INITIAL_FORM_DATA:
-      return {
-        ...state,
-        initialFormData: action.payload
-      };
-
-    case ACTION_TYPES.SET_PROJECT_ISSUE_MAP:
-      return {
-        ...state,
-        projectIssueMap: action.payload
-      };
-
-    case ACTION_TYPES.CLEAR_PROJECTS:
-      return {
-        ...state,
-        projects: []
-      };
-
-    case ACTION_TYPES.SET_LOADING_PROJECT_INDEX:
-      return {
-        ...state,
-        loadingProjectIndex: action.payload
-      };
-
-    default:
-      return state;
-  }
-}
+import {
+  useJiraReducer,
+  intialEmptyMapping,
+  aktoStatusForJira
+} from './reducers/useJiraReducer';
 
 function Jira() {
-    // Use our new reducer for state management
-    const [state, dispatch] = useReducer(jiraReducer, initialState);
+    // Use our custom hook that provides both state and actions
+    const { state, actions } = useJiraReducer();
 
-    // Destructure state for easier access
     const {
         credentials: { baseUrl, apiToken, userEmail },
         projects,
@@ -183,93 +38,22 @@ function Jira() {
         loadingProjectIndex
     } = state;
 
-    // Helper functions to dispatch actions
-    const setCredentials = (field, value) => {
-        dispatch({
-            type: ACTION_TYPES.SET_CREDENTIALS,
-            payload: { [field]: value }
-        });
-    };
-
-    const addProject = () => {
-        dispatch({ type: ACTION_TYPES.ADD_PROJECT });
-    };
-
-    const removeProject = (index) => {
-        dispatch({
-            type: ACTION_TYPES.REMOVE_PROJECT,
-            payload: index
-        });
-    };
-
-    const updateProject = (index, updates) => {
-        dispatch({
-            type: ACTION_TYPES.UPDATE_PROJECT,
-            payload: { index, updates }
-        });
-    };
-
-    const clearProjects = () => {
-        dispatch({ type: ACTION_TYPES.CLEAR_PROJECTS });
-    };
-
-    const setProjects = (projects) => {
-        dispatch({
-            type: ACTION_TYPES.SET_PROJECTS,
-            payload: projects
-        });
-    };
-
-    const setExistingProjectIds = (ids) => {
-        dispatch({
-            type: ACTION_TYPES.SET_EXISTING_PROJECT_IDS,
-            payload: ids
-        });
-    };
-
-    const setIsAlreadyIntegrated = (value) => {
-        dispatch({
-            type: ACTION_TYPES.SET_IS_ALREADY_INTEGRATED,
-            payload: value
-        });
-    };
-
-    const setIsSaving = (value) => {
-        dispatch({
-            type: ACTION_TYPES.SET_IS_SAVING,
-            payload: value
-        });
-    };
-
-    const setInitialFormData = (data) => {
-        dispatch({
-            type: ACTION_TYPES.SET_INITIAL_FORM_DATA,
-            payload: data
-        });
-    };
-  const setLoadingProjectIndex = (index) => {
-        dispatch({
-            type: ACTION_TYPES.SET_LOADING_PROJECT_INDEX,
-            payload: index
-        });
-    };
-
 
     async function fetchJiraInteg() {
         let jiraInteg = await settingFunctions.fetchJiraIntegration();
         if (jiraInteg !== null) {
-            setIsAlreadyIntegrated(true);
+            actions.setIsAlreadyIntegrated(true);
 
             // Update credentials
-            setCredentials('baseUrl', jiraInteg.baseUrl);
-            setCredentials('apiToken', jiraInteg.apiToken);
-            setCredentials('userEmail', jiraInteg.userEmail);
+            actions.setCredentials('baseUrl', jiraInteg.baseUrl);
+            actions.setCredentials('apiToken', jiraInteg.apiToken);
+            actions.setCredentials('userEmail', jiraInteg.userEmail);
 
             // Update projects
             updateProjectMap(jiraInteg);
 
             // Store initial form data for change detection
-            setInitialFormData({
+            actions.setInitialFormData({
                 baseUrl: jiraInteg.baseUrl,
                 apiToken: jiraInteg.apiToken,
                 userEmail: jiraInteg.userEmail,
@@ -277,12 +61,12 @@ function Jira() {
             });
         } else {
             // If integration is not present, add a default empty project
-            addProject();
+            actions.addProject();
         }
     }
 
     function updateProjectMap(jiraInteg){
-        clearProjects();
+        actions.clearProjects();
         const projectMappings = jiraInteg?.projectMappings ?? {};
         let projectIds = new Set();
         const newProjects = [];
@@ -333,14 +117,14 @@ function Jira() {
             projectIds.add(projectId);
         });
 
-        setProjects(newProjects);
-        setExistingProjectIds(Array.from(projectIds));
+        actions.setProjects(newProjects);
+        actions.setExistingProjectIds(Array.from(projectIds));
     }
 
 
     function fetchJiraStatusMapping(projId, index) {
       if (projects[index]?.enableBiDirIntegration) {
-        updateProject(index, {
+        actions.updateProject(index, {
           enableBiDirIntegration: false,
           aktoToJiraStatusMap: JSON.parse(JSON.stringify(intialEmptyMapping)),
         });
@@ -373,7 +157,7 @@ function Jira() {
           });
         }
 
-        updateProject(index, {
+        actions.updateProject(index, {
           enableBiDirIntegration: true,
           aktoToJiraStatusMap,
           jiraStatusLabel
@@ -381,7 +165,7 @@ function Jira() {
         return;
       }
 
-      setLoadingProjectIndex(index);
+      actions.setLoadingProjectIndex(index);
 
       api.fetchJiraStatusMapping(projId, baseUrl, userEmail, apiToken).then(
           (res) => {
@@ -399,18 +183,18 @@ function Jira() {
               });
             }
 
-            updateProject(index, {
+            actions.updateProject(index, {
               statuses: res[projId].statuses,
               jiraStatusLabel,
               aktoToJiraStatusMap,
               enableBiDirIntegration: true
             });
 
-            setLoadingProjectIndex(null);
+            actions.setLoadingProjectIndex(null);
           }).catch(err => {
         func.setToast(true, true,
             "Failed to fetch Jira statuses. Verify Project ID");
-        setLoadingProjectIndex(null);
+        actions.setLoadingProjectIndex(null);
       });
     }
 
@@ -482,12 +266,12 @@ function Jira() {
         const data = transformJiraObject();
         if (!data) return;
 
-        setIsSaving(true);
+        actions.setIsSaving(true);
         api.addJiraIntegrationV2(data).then((res) => {
-            setIsAlreadyIntegrated(true);
+            actions.setIsAlreadyIntegrated(true);
             updateProjectMap(res);
 
-            setInitialFormData({
+            actions.setInitialFormData({
                 baseUrl: data.baseUrl,
                 apiToken: data.apiToken,
                 userEmail: data.userEmail,
@@ -498,7 +282,7 @@ function Jira() {
         }).catch(() => {
             func.setToast(true, true, "Failed to save Jira configurations check all required fields");
         }).finally(() => {
-            setIsSaving(false);
+            actions.setIsSaving(false);
         });
 
     }
@@ -590,7 +374,7 @@ function Jira() {
         newProjects[index] = updatedProject;
 
         // Update the state with the new projects array
-        setProjects(newProjects);
+        actions.setProjects(newProjects);
     }
 
     async function deleteProject(index) {
@@ -601,7 +385,7 @@ function Jira() {
 
         const projectId = projects[index]?.projectId;
         if (!projectId?.trim()) {
-            removeProject(index);
+            actions.removeProject(index);
             func.setToast(true, false, "Project removed successfully");
             return;
         }
@@ -616,27 +400,27 @@ function Jira() {
 
         if (isExistingProject) {
             try {
-                setLoadingProjectIndex(index);
+                actions.setLoadingProjectIndex(index);
                 await api.deleteJiraIntegratedProject(projectId).then((res) => {
                   if (initialFormData) {
                     const updatedProjectMappings = { ...initialFormData.projectMappings };
                     delete updatedProjectMappings[projectId];
                     initialFormData.projectMappings = updatedProjectMappings;
-                    setInitialFormData({
+                    actions.setInitialFormData({
                       ...initialFormData,
                       projectMappings: updatedProjectMappings
                     });
                   }
                 });
-                removeProject(index);
-                setLoadingProjectIndex(null);
+                actions.removeProject(index);
+                actions.setLoadingProjectIndex(null);
                 func.setToast(true, false, "Project removed successfully");
             } catch (error) {
-                setLoadingProjectIndex(null);
+                actions.setLoadingProjectIndex(null);
                 func.setToast(true, true, `Failed to delete project: ${error.message || 'Unknown error'}`);
             }
         } else {
-            removeProject(index);
+            actions.removeProject(index);
             func.setToast(true, false, "Project removed successfully");
         }
     }
@@ -652,7 +436,7 @@ function Jira() {
         return;
       }
 
-      updateProject(index, {
+      actions.updateProject(index, {
         projectId: val,
         statuses: [],
         jiraStatusLabel: [],
@@ -849,11 +633,7 @@ function Jira() {
             }
         }
 
-        if (!hasFormChanges()) {
-            return true;
-        }
-
-        return false;
+        return !hasFormChanges();
     }
 
     const JCard = (
@@ -871,12 +651,12 @@ function Jira() {
 
           <LegacyCard.Section>
                 <VerticalStack gap={"4"}>
-                    <TextField label="Base Url" value={baseUrl} helpText="Specify the base url of your jira project(for ex - https://jiraintegloc.atlassian.net)"  placeholder='Base Url' requiredIndicator onChange={(value) => setCredentials('baseUrl', value)} />
-                    <TextField label="Email" value={userEmail} helpText="Specify your email id for which api token will be generated" placeholder='Email' requiredIndicator onChange={(value) => setCredentials('userEmail', value)} />
-                    <PasswordTextField label="Api Token" helpText="Specify the api token created for your user email" field={apiToken} onFunc={true} setField={(value) => setCredentials('apiToken', value)} />
+                    <TextField label="Base Url" value={baseUrl} helpText="Specify the base url of your jira project(for ex - https://jiraintegloc.atlassian.net)"  placeholder='Base Url' requiredIndicator onChange={(value) => actions.setCredentials('baseUrl', value)} />
+                    <TextField label="Email" value={userEmail} helpText="Specify your email id for which api token will be generated" placeholder='Email' requiredIndicator onChange={(value) => actions.setCredentials('userEmail', value)} />
+                    <PasswordTextField label="Api Token" helpText="Specify the api token created for your user email" field={apiToken} onFunc={true} setField={(value) => actions.setCredentials('apiToken', value)} />
                     <HorizontalStack align='space-between'>
                         <Text fontWeight='semibold' variant='headingMd'>Projects</Text>
-                        <Button plain monochrome onClick={addProject}>Add Project</Button>
+                        <Button plain monochrome onClick={() => actions.addProject()}>Add Project</Button>
                     </HorizontalStack>
                     {projects.length !== 0 ? ProjectsCard : null}
                 </VerticalStack>
