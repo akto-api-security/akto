@@ -115,7 +115,7 @@ public abstract class DataActor {
 
     public abstract TestingRun findPendingTestingRun(int delta, String miniTestingName);
 
-    public abstract TestingRunResultSummary findPendingTestingRunResultSummary(int now, int delta);
+    public abstract TestingRunResultSummary findPendingTestingRunResultSummary(int now, int delta, String miniTestingName);
 
     public abstract TestingRun findTestingRun(String testingRunId);
 

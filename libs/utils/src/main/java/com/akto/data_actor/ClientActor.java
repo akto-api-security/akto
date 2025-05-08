@@ -1383,11 +1383,12 @@ public class ClientActor extends DataActor {
         return codec.decode(bsonReader, DecoderContext.builder().build());
     }
 
-    public TestingRunResultSummary findPendingTestingRunResultSummary(int now, int delta) {
+    public TestingRunResultSummary findPendingTestingRunResultSummary(int now, int delta, String miniTestingName) {
         Map<String, List<String>> headers = buildHeaders();
         BasicDBObject obj = new BasicDBObject();
         obj.put("now", now);
         obj.put("delta", delta);
+        obj.put("miniTestingName", miniTestingName);
         OriginalHttpRequest request = new OriginalHttpRequest(url + "/findPendingTestingRunResultSummary", "", "POST", obj.toString(), headers, "");
         try {
             OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);

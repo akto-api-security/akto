@@ -239,7 +239,7 @@ public class DbActor extends DataActor {
         return DbLayer.findPendingTestingRun(delta);
     }
 
-    public TestingRunResultSummary findPendingTestingRunResultSummary(int now, int delta) {
+    public TestingRunResultSummary findPendingTestingRunResultSummary(int now, int delta, String miniTestingName) {
         return DbLayer.findPendingTestingRunResultSummary(now, delta);
     }
 
