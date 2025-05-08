@@ -617,7 +617,7 @@ public class DbLayer {
             return null;
         }
 
-        // Only now do the update and return the updated summary
+        // Might result in race condition under extreme case when multiple mini-testing has same name, also one query is slower than other
         Bson update = Updates.set(TestingRun.STATE, TestingRun.State.RUNNING);
         return TestingRunResultSummariesDao.instance.getMCollection()
             .findOneAndUpdate(Filters.eq(ID, trrs.getId()), update);
