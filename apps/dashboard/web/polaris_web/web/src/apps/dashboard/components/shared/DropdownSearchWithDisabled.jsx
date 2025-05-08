@@ -25,8 +25,6 @@ function DropdownSearchWithDisabled(props) {
         disabledOptions=[]
     } = props
 
-    console.log("value", props.id);
-
     const deselectedOptions = optionsList.map(option => ({
         ...option,
         disabled: disabledOptions.includes(option.value)
