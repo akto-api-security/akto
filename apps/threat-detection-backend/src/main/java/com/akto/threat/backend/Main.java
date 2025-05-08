@@ -13,7 +13,6 @@ import com.akto.threat.backend.service.MaliciousEventService;
 import com.akto.threat.backend.service.ThreatActorService;
 import com.akto.threat.backend.service.ThreatApiService;
 import com.akto.threat.backend.tasks.FlushMessagesToDB;
-import com.itextpdf.text.log.SysoCounter;
 import com.mongodb.ConnectionString;
 import com.mongodb.MongoClientSettings;
 import com.mongodb.ReadPreference;

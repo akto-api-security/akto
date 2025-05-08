@@ -62,9 +62,7 @@ import io.lettuce.core.RedisClient;
 import io.lettuce.core.api.StatefulRedisConnection;
 import io.lettuce.core.codec.StringCodec;
 
-import java.util.*;
 
-import org.apache.kafka.clients.consumer.*;
 
 /*
 Class is responsible for consuming traffic data from the Kafka topic.
@@ -94,7 +92,6 @@ public class MaliciousTrafficDetectorTask implements Task {
   private static Supplier<String> lazyToString;
 
   private final StatefulRedisConnection<String, String> apiCache;
-  public static final List<HttpResponseParam> records = KafkaBenchmark.buildRecords("4KB", 100000L);
 
   public MaliciousTrafficDetectorTask(
       KafkaConfig trafficConfig, KafkaConfig internalConfig, RedisClient redisClient) throws Exception {
@@ -161,9 +158,9 @@ public class MaliciousTrafficDetectorTask implements Task {
 
   private Map<String, FilterConfig> getFilters() {
     int now = (int) (System.currentTimeMillis() / 1000);
-   if (now - filterLastUpdatedAt < filterUpdateIntervalSec) {
-     return apiFilters;
-   }
+    if (now - filterLastUpdatedAt < filterUpdateIntervalSec) {
+      return apiFilters;
+    }
 
     List<YamlTemplate> templates = dataActor.fetchFilterYamlTemplates();
     apiFilters = FilterYamlTemplateDao.fetchFilterConfig(false, templates, false);

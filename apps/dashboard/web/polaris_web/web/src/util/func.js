@@ -2076,7 +2076,7 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
       })} ${timeStr}`;
   },
   isDemoAccount(){
-     return true
+     return window.ACTIVE_ACCOUNT === 1669322524
   },
   isSameDateAsToday (givenDate) {
       const today = new Date();
