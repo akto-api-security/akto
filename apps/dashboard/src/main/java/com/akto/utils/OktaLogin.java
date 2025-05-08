@@ -56,7 +56,11 @@ public class OktaLogin {
 
         String queryString = SsoUtils.getQueryString(paramMap);
 
-        String authUrl = "https://" + oktaConfig.getOktaDomainUrl() + "/oauth2/" + oktaConfig.getAuthorisationServerId() + "/v1/authorize?" + queryString;
+        String authUrl = "https://" + oktaConfig.getOktaDomainUrl() + "/oauth2/";
+        if(!oktaConfig.getAuthorisationServerId().isEmpty()){
+            authUrl += oktaConfig.getAuthorisationServerId();
+        }
+        authUrl += "/v1/authorize?" + queryString;
         return authUrl;
     }
 
@@ -72,7 +76,11 @@ public class OktaLogin {
 
         String queryString = SsoUtils.getQueryString(paramMap);
 
-        String authUrl = "https://" + oktaConfig.getOktaDomainUrl() + "/oauth2/" + oktaConfig.getAuthorisationServerId() + "/v1/authorize?" + queryString;
+        String authUrl = "https://" + oktaConfig.getOktaDomainUrl() + "/oauth2/";
+        if(!oktaConfig.getAuthorisationServerId().isEmpty()){
+            authUrl += oktaConfig.getAuthorisationServerId();
+        }
+        authUrl += "/v1/authorize?" + queryString;
         return authUrl;
     }
 

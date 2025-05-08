@@ -547,8 +547,12 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
                 servletResponse.sendRedirect("/login");
                 return ERROR.toUpperCase();
             }
-
-            String domainUrl = "https://" + oktaConfig.getOktaDomainUrl() + "/oauth2/" + oktaConfig.getAuthorisationServerId() + "/v1";
+            String domainUrl = "https://" + oktaConfig.getOktaDomainUrl() + "/oauth2/";
+            if(oktaConfig.getAuthorisationServerId() == null || oktaConfig.getAuthorisationServerId().isEmpty()){
+                domainUrl += "/v1";
+            }else{
+                domainUrl += oktaConfig.getAuthorisationServerId() + "/v1";
+            }
             String clientId = oktaConfig.getClientId();
             String clientSecret = oktaConfig.getClientSecret();
             String redirectUri = oktaConfig.getRedirectUri();
