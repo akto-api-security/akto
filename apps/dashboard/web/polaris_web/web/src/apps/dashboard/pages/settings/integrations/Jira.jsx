@@ -19,6 +19,8 @@ import PasswordTextField from '../../../components/layouts/PasswordTextField';
 import func from "@/util/func"
 import DropdownSearchWithDisabled from '../../../components/shared/DropdownSearchWithDisabled';
 import api from '../api';
+import SimpleDropdownWithDisabled
+  from "../../../components/shared/SimpleDropdownWithDisabled";
 
 const aktoStatusForJira = ["Open","Fixed", "Ignored"]
 const intialEmptyMapping = aktoStatusForJira.reduce((acc, status) => {
@@ -709,7 +711,7 @@ function Jira() {
                                             return (
                                                 <HorizontalStack key={`status-${val}`} gap={8}>
                                                     <Box width='82px'><Badge >{val}</Badge></Box>
-                                                    <DropdownSearchWithDisabled
+                                                    <SimpleDropdownWithDisabled
                                                         id={`akto-status-${project.projectId}-${val}`}
                                                         setSelected={(value) => {
                                                             handleStatusSelection(index, project, val, value);
