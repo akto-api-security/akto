@@ -718,7 +718,6 @@ function Jira() {
                                                         }}
                                                         optionsList={project?.jiraStatusLabel || []}
                                                         placeholder="Select Jira Status"
-                                                        searchDisable={true}
                                                         showSelectedItemLabels={true}
                                                         allowMultiple={true}
                                                         preSelected={project?.aktoToJiraStatusMap?.[val?.toUpperCase()] || []}

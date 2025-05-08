@@ -3,6 +3,8 @@ import { SearchMinor, ChevronDownMinor } from '@shopify/polaris-icons';
 import React, { useState, useCallback, useEffect } from 'react';
 import func from "@/util/func";
 
+// this was implemented by amit had search functionality which was not needed.
+// have created a new component. I am keeping this as it is for reference. will remove it in the next release.
 function DropdownSearchWithDisabled(props) {
     const id = props.id ? props.id : "dropdown-search"
 

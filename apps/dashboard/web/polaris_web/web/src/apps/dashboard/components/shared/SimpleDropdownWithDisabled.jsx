@@ -5,17 +5,16 @@ import React, { useState, useCallback, useEffect } from 'react';
 function SimpleDropdownWithDisabled(props) {
     const id = props.id ? props.id : "simple-dropdown"
 
-    const { 
-        disabled, 
-        label, 
-        placeholder, 
-        optionsList, 
-        setSelected, 
-        value, 
-        preSelected, 
-        allowMultiple, 
-        itemName, 
-        disabledOptions=[] 
+    const {
+        disabled,
+        label,
+        placeholder,
+        optionsList,
+        setSelected,
+        value,
+        preSelected,
+        itemName,
+        disabledOptions=[]
     } = props
 
     const deselectedOptions = optionsList.map(option => ({
@@ -31,51 +30,43 @@ function SimpleDropdownWithDisabled(props) {
         if (value !== undefined) {
             setInputValue(value);
         }
-        
+
         if (preSelected !== undefined) {
             setSelectedOptions(preSelected);
         }
-        
-        if (allowMultiple && preSelected) {
+
+        if (preSelected) {
             setChecked(preSelected.length === optionsList.length);
         }
-    }, [value, preSelected, optionsList, allowMultiple]);
+    }, [value, preSelected, optionsList]);
 
     const updateSelection = useCallback(
         (selected) => {
             const filteredSelected = selected.filter(
                 selectedItem => !disabledOptions.includes(selectedItem)
             );
-            
+
             const selectedText = filteredSelected.map((selectedItem) => {
                 const matchedOption = optionsList.find((option) => {
                     if (typeof option.value === "string")
                         return option.value.match(selectedItem);
-                    else 
+                    else
                         return option.value === selectedItem
                 });
                 return matchedOption && matchedOption.label;
             });
-            
+
             setSelectedOptions(filteredSelected);
-            
-            if (allowMultiple) {
-                if (selectedText.length === optionsList.length) {
-                    setInputValue("All items selected");
-                } else {
-                    setInputValue(`${filteredSelected.length} ${itemName ? itemName : "item"}${filteredSelected.length === 1 ? "" : "s"} selected`);
-                }
+
+            if (selectedText.length === optionsList.length) {
+                setInputValue("All items selected");
             } else {
-                setInputValue(selectedText[0] || '');
+                setInputValue(`${filteredSelected.length} ${itemName ? itemName : "item"}${filteredSelected.length === 1 ? "" : "s"} selected`);
             }
 
-            if (allowMultiple) {
-                setSelected(filteredSelected);
-            } else {
-                setSelected(filteredSelected[0]);
-            }
+            setSelected(filteredSelected);
         },
-        [optionsList, disabledOptions, allowMultiple, itemName, setSelected],
+        [optionsList, disabledOptions, itemName, setSelected],
     );
 
     const selectAllFunc = useCallback(() => {
@@ -83,7 +74,7 @@ function SimpleDropdownWithDisabled(props) {
             const valueArr = deselectedOptions
                 .filter(opt => !opt.disabled)
                 .map(opt => opt.value);
-                
+
             updateSelection(valueArr);
             setChecked(true);
         } else {
@@ -104,9 +95,9 @@ function SimpleDropdownWithDisabled(props) {
         />
     );
 
-    const showSelectAll = (allowMultiple && optionsList.length > 5);
-    const checkboxLabel = checked ? 
-        <Link removeUnderline>Deselect all</Link> : 
+    const showSelectAll = optionsList.length > 5;
+    const checkboxLabel = checked ?
+        <Link removeUnderline>Deselect all</Link> :
         <Link removeUnderline>Select all</Link>;
 
     const emptyState = (
@@ -117,12 +108,12 @@ function SimpleDropdownWithDisabled(props) {
 
     const renderOption = (option, isSelected) => {
         const { label, disabled } = option;
-        
+
         if (disabled) {
             return (
-                <div 
-                    style={{ 
-                        opacity: 0.5, 
+                <div
+                    style={{
+                        opacity: 0.5,
                         cursor: 'not-allowed',
                         backgroundColor: '#f4f6f8',
                         padding: '8px',
@@ -133,13 +124,13 @@ function SimpleDropdownWithDisabled(props) {
                 </div>
             );
         }
-        
+
         return undefined;
     };
 
     return (
         <Autocomplete
-            {...(allowMultiple ? {allowMultiple: true} : {})}
+            allowMultiple={true}
             options={[{title: "Options", options: deselectedOptions}]}
             selected={selectedOptions}
             onSelect={updateSelection}
