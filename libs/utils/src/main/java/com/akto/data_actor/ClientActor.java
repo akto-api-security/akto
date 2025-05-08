@@ -1313,10 +1313,11 @@ public class ClientActor extends DataActor {
         }
     }
 
-    public TestingRun findPendingTestingRun(int delta) {
+    public TestingRun findPendingTestingRun(int delta, String miniTestingName) {
         Map<String, List<String>> headers = buildHeaders();
         BasicDBObject obj = new BasicDBObject();
         obj.put("delta", delta);
+        obj.put("miniTestingName", miniTestingName);
         OriginalHttpRequest request = new OriginalHttpRequest(url + "/findPendingTestingRun", "", "POST", obj.toString(), headers, "");
         try {
             OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);

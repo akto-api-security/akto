@@ -161,7 +161,7 @@ public class Main {
             ObjectId summaryId = null;
             if (trrs == null) {
                 delta = Context.now() - 20*60;
-                testingRun = dataActor.findPendingTestingRun(delta);
+                testingRun = dataActor.findPendingTestingRun(delta, null);
             } else {
                 summaryId = trrs.getId();
                 loggerMaker.infoAndAddToDb("Found trrs " + trrs.getHexId() +  " for account: " + accountId);

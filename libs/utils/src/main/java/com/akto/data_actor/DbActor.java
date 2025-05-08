@@ -236,12 +236,12 @@ public class DbActor extends DataActor {
         return DbLayer.createTRRSummaryIfAbsent(testingRunHexId, start);
     }
 
-    public TestingRun findPendingTestingRun(int delta) {
-        return DbLayer.findPendingTestingRun(delta);
+    public TestingRun findPendingTestingRun(int delta, String miniTestingName) {
+        return DbLayer.findPendingTestingRun(delta, miniTestingName);
     }
 
     public TestingRunResultSummary findPendingTestingRunResultSummary(int now, int delta) {
-        return DbLayer.findPendingTestingRunResultSummary(now, delta);
+        return DbLayer.findPendingTestingRunResultSummary(now, delta, null);
     }
 
     public TestingRunConfig findTestingRunConfig(int testIdConfig) {
