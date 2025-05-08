@@ -1,13 +1,11 @@
 import { useReducer } from 'react';
 
-// Constants
 export const aktoStatusForJira = ["Open", "Fixed", "Ignored"];
-export const intialEmptyMapping = aktoStatusForJira.reduce((acc, status) => {
+export const initialEmptyMapping = aktoStatusForJira.reduce((acc, status) => {
   acc[status.toUpperCase()] = [];
   return acc;
 }, {});
 
-// Initial state
 const initialState = {
   credentials: {
     baseUrl: '',
@@ -22,7 +20,6 @@ const initialState = {
   loadingProjectIndex: null
 };
 
-// Action types
 const ACTION_TYPES = {
   SET_CREDENTIALS: 'SET_CREDENTIALS',
   SET_PROJECTS: 'SET_PROJECTS',
@@ -37,7 +34,6 @@ const ACTION_TYPES = {
   SET_LOADING_PROJECT_INDEX: 'SET_LOADING_PROJECT_INDEX'
 };
 
-// Reducer function
 function jiraReducer(state, action) {
   switch (action.type) {
     case ACTION_TYPES.SET_CREDENTIALS:
@@ -63,7 +59,7 @@ function jiraReducer(state, action) {
           {
             projectId: "",
             enableBiDirIntegration: false,
-            aktoToJiraStatusMap: JSON.parse(JSON.stringify(intialEmptyMapping)),
+            aktoToJiraStatusMap: JSON.parse(JSON.stringify(initialEmptyMapping)),
             statuses: [],
             jiraStatusLabel: []
           }
@@ -142,11 +138,9 @@ function jiraReducer(state, action) {
   }
 }
 
-// Custom hook that provides state and actions
 export function useJiraReducer() {
   const [state, dispatch] = useReducer(jiraReducer, initialState);
 
-  // Action functions
   const actions = {
     setCredentials: (field, value) => {
       dispatch({

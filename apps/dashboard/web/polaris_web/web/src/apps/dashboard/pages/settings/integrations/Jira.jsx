@@ -21,12 +21,11 @@ import api from '../api';
 import Dropdown from "../../../components/layouts/Dropdown";
 import {
   useJiraReducer,
-  intialEmptyMapping,
+  initialEmptyMapping,
   aktoStatusForJira
 } from './reducers/useJiraReducer';
 
 function Jira() {
-    // Use our custom hook that provides both state and actions
     const { state, actions } = useJiraReducer();
 
     const {
@@ -44,15 +43,12 @@ function Jira() {
         if (jiraInteg !== null) {
             actions.setIsAlreadyIntegrated(true);
 
-            // Update credentials
             actions.setCredentials('baseUrl', jiraInteg.baseUrl);
             actions.setCredentials('apiToken', jiraInteg.apiToken);
             actions.setCredentials('userEmail', jiraInteg.userEmail);
 
-            // Update projects
             updateProjectMap(jiraInteg);
 
-            // Store initial form data for change detection
             actions.setInitialFormData({
                 baseUrl: jiraInteg.baseUrl,
                 apiToken: jiraInteg.apiToken,
@@ -60,7 +56,6 @@ function Jira() {
                 projectMappings: jiraInteg.projectMappings || {}
             });
         } else {
-            // If integration is not present, add a default empty project
             actions.addProject();
         }
     }
@@ -74,20 +69,16 @@ function Jira() {
         Object.entries(projectMappings).forEach(([projectId, projectMapping], index) => {
             projectIds.add(projectId);
 
-            // Use status names directly for the UI
-            const aktoToJiraStatusMap = JSON.parse(JSON.stringify(intialEmptyMapping));
+            const aktoToJiraStatusMap = JSON.parse(JSON.stringify(initialEmptyMapping));
             const statuses = projectMapping.statuses || [];
             const jiraStatusLabel = statuses.map(x => { return { "label": x?.name ?? "", "value": x?.name ?? "" } });
 
-            // If bidirectional integration is enabled, use names directly
             if (projectMapping?.biDirectionalSyncSettings?.enabled) {
                 const aktoStatusMappings = projectMapping?.biDirectionalSyncSettings?.aktoStatusMappings || {};
 
                 if (aktoStatusMappings) {
                     Object.entries(aktoStatusMappings).forEach(([status, nameList]) => {
                         if (!nameList || !Array.isArray(nameList)) return;
-
-                        // Use the names directly
                         aktoToJiraStatusMap[status] = nameList;
                     });
                 }
@@ -109,7 +100,7 @@ function Jira() {
                 newProjects.push({
                     projectId,
                     enableBiDirIntegration: false,
-                    aktoToJiraStatusMap: JSON.parse(JSON.stringify(intialEmptyMapping)),
+                    aktoToJiraStatusMap: JSON.parse(JSON.stringify(initialEmptyMapping)),
                     statuses: [],
                     jiraStatusLabel: []
                 });
@@ -126,7 +117,7 @@ function Jira() {
       if (projects[index]?.enableBiDirIntegration) {
         actions.updateProject(index, {
           enableBiDirIntegration: false,
-          aktoToJiraStatusMap: JSON.parse(JSON.stringify(intialEmptyMapping)),
+          aktoToJiraStatusMap: JSON.parse(JSON.stringify(initialEmptyMapping)),
         });
         return;
       }
@@ -139,7 +130,7 @@ function Jira() {
 
       if (projects[index]?.statuses?.length > 0) {
         const aktoToJiraStatusMap = projects[index]?.aktoToJiraStatusMap
-            || JSON.parse(JSON.stringify(intialEmptyMapping));
+            || JSON.parse(JSON.stringify(initialEmptyMapping));
         const jiraStatusLabel = projects[index]?.jiraStatusLabel ||
             projects[index]?.statuses?.map(x => {
               return {"label": x?.name ?? "", "value": x?.name ?? ""}
@@ -173,7 +164,7 @@ function Jira() {
               return {"label": x?.name ?? "", "value": x?.name ?? ""}
             });
             const aktoToJiraStatusMap = JSON.parse(
-                JSON.stringify(intialEmptyMapping));
+                JSON.stringify(initialEmptyMapping));
 
             if (jiraStatusLabel.length > 0) {
               aktoStatusForJira.forEach((status, index) => {
@@ -316,7 +307,6 @@ function Jira() {
             }
         }
 
-        // Check for duplicate status assignments
         const usedStatuses = new Set();
         let hasDuplicates = false;
         let duplicateStatus = '';
@@ -349,7 +339,6 @@ function Jira() {
 
         const disabledOptions = [];
 
-        // Collect all selected statuses from other dropdowns
         for (const aktoStatus in project.aktoToJiraStatusMap) {
             if (aktoStatus !== currentStatus) {
                 const selectedStatuses = project.aktoToJiraStatusMap[aktoStatus] || [];
@@ -362,18 +351,13 @@ function Jira() {
 
     function handleStatusSelection(index, project, aktoStatus, newValues) {
         const upperStatus = aktoStatus.toUpperCase();
-
-        // Create a new copy of the project to ensure React detects the change
         const updatedProject = JSON.parse(JSON.stringify(project));
 
-        // Update the status mapping for this Akto status
         updatedProject.aktoToJiraStatusMap[upperStatus] = newValues;
 
-        // Replace the entire project to ensure React re-renders all dropdowns
         const newProjects = [...projects];
         newProjects[index] = updatedProject;
 
-        // Update the state with the new projects array
         actions.setProjects(newProjects);
     }
 
@@ -440,7 +424,7 @@ function Jira() {
         projectId: val,
         statuses: [],
         jiraStatusLabel: [],
-        aktoToJiraStatusMap: JSON.parse(JSON.stringify(intialEmptyMapping)),
+        aktoToJiraStatusMap: JSON.parse(JSON.stringify(initialEmptyMapping)),
         enableBiDirIntegration: false
       });
     }
