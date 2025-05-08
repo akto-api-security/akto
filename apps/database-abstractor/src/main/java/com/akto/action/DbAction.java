@@ -144,6 +144,7 @@ public class DbAction extends ActionSupport {
     String currentInstanceIp;
     List<ApiInfo.ApiInfoKey> endpoints;
     List<ApiCollection> apiCollections;
+    private String miniTestingName;
     String host;
     int colId;
     int accountId;
@@ -1338,7 +1339,7 @@ public class DbAction extends ActionSupport {
 
     public String findPendingTestingRun() {
         try {
-            testingRun = DbLayer.findPendingTestingRun(delta);
+            testingRun = DbLayer.findPendingTestingRun(delta, miniTestingName);
             updateTestingRunApisList(testingRun);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error in findPendingTestingRun " + e.toString());
@@ -1349,7 +1350,7 @@ public class DbAction extends ActionSupport {
 
     public String findPendingTestingRunResultSummary() {
         try {
-            trrs = DbLayer.findPendingTestingRunResultSummary(now, delta);
+            trrs = DbLayer.findPendingTestingRunResultSummary(now, delta, miniTestingName);
             if (trrs != null) {
                 trrs.setTestingRunHexId(trrs.getTestingRunId().toHexString());
             }
@@ -3605,5 +3606,13 @@ public class DbAction extends ActionSupport {
 
     public void setOriginalHttpResponse(OriginalHttpResponse originalHttpResponse) {
         this.originalHttpResponse = originalHttpResponse;
+    }
+
+    public String getMiniTestingName() {
+        return miniTestingName;
+    }
+
+    public void setMiniTestingName(String miniTestingName) {
+        this.miniTestingName = miniTestingName;
     }
 }

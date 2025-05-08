@@ -30,6 +30,7 @@ import com.akto.dto.monitoring.ModuleInfo;
 import com.akto.dto.settings.DataControlSettings;
 import com.mongodb.BasicDBList;
 import com.mongodb.client.model.*;
+import org.apache.commons.lang3.StringUtils;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 
@@ -560,7 +561,7 @@ public class DbLayer {
         );
     }
 
-    public static TestingRun findPendingTestingRun(int delta) {
+    public static TestingRun findPendingTestingRun(int delta, String miniTestingName) {
 
         Bson filter1 = Filters.and(Filters.eq(TestingRun.STATE, TestingRun.State.SCHEDULED),
                 Filters.lte(TestingRun.SCHEDULE_TIMESTAMP, Context.now())
@@ -575,30 +576,51 @@ public class DbLayer {
                 Updates.set(TestingRun.STATE, TestingRun.State.RUNNING)
         );
 
+        Bson filter3 = Filters.or(
+                Filters.eq(TestingRun.MINI_TESTING_SERVICE_NAME, miniTestingName),
+                Filters.exists(TestingRun.MINI_TESTING_SERVICE_NAME, false)
+        );
+
         // returns the previous state of testing run before the update
         return TestingRunDao.instance.getMCollection().findOneAndUpdate(
-                Filters.or(filter1,filter2), update);
+                Filters.and(filter3,Filters.or(filter1,filter2)), update);
     }
 
-    public static TestingRunResultSummary findPendingTestingRunResultSummary(int now, int delta) {
-
+    public static TestingRunResultSummary findPendingTestingRunResultSummary(int now, int delta, String miniTestingName) {
+        // Compose filters for SCHEDULED and RUNNING states
         Bson filter1 = Filters.and(
             Filters.eq(TestingRun.STATE, TestingRun.State.SCHEDULED),
             Filters.lte(TestingRunResultSummary.START_TIMESTAMP, now),
             Filters.gt(TestingRunResultSummary.START_TIMESTAMP, delta)
         );
-
         Bson filter2 = Filters.and(
             Filters.eq(TestingRun.STATE, TestingRun.State.RUNNING),
             Filters.lte(TestingRunResultSummary.START_TIMESTAMP, now - 5*60),
             Filters.gt(TestingRunResultSummary.START_TIMESTAMP, delta)
         );
 
+        // Only fetch the fields we need, including the miniTestingServiceName from TestingRun
+        TestingRunResultSummary trrs = TestingRunResultSummariesDao.instance.findOne(
+            Filters.or(filter1, filter2),
+            Projections.include(TestingRunResultSummary.TESTING_RUN_ID, ID)
+        );
+        if (trrs == null) return null;
+
+        // Fetch only the miniTestingServiceName field from TestingRun
+        TestingRun testingRun = TestingRunDao.instance.findOne(
+            Filters.eq(ID, trrs.getTestingRunId()),
+            Projections.include(TestingRun.MINI_TESTING_SERVICE_NAME)
+        );
+
+        String serviceName = testingRun.getMiniTestingServiceName();
+        if (!StringUtils.isEmpty(serviceName) && !serviceName.equals(miniTestingName)) {
+            return null;
+        }
+
+        // Only now do the update and return the updated summary
         Bson update = Updates.set(TestingRun.STATE, TestingRun.State.RUNNING);
-
-        TestingRunResultSummary trrs = TestingRunResultSummariesDao.instance.getMCollection().findOneAndUpdate(Filters.or(filter1,filter2), update);
-
-        return trrs;
+        return TestingRunResultSummariesDao.instance.getMCollection()
+            .findOneAndUpdate(Filters.eq(ID, trrs.getId()), update);
     }
 
     public static TestingRunConfig findTestingRunConfig(int testIdConfig) {
