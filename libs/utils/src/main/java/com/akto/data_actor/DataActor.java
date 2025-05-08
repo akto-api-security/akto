@@ -113,9 +113,9 @@ public abstract class DataActor {
 
     public abstract TestingRunResultSummary createTRRSummaryIfAbsent(String testingRunHexId, int start);
 
-    public abstract TestingRun findPendingTestingRun(int delta);
+    public abstract TestingRun findPendingTestingRun(int delta, String miniTestingName);
 
-    public abstract TestingRunResultSummary findPendingTestingRunResultSummary(int now, int delta);
+    public abstract TestingRunResultSummary findPendingTestingRunResultSummary(int now, int delta, String miniTestingName);
 
     public abstract TestingRun findTestingRun(String testingRunId);
 

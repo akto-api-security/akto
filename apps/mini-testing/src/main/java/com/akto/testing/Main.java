@@ -391,13 +391,13 @@ public class Main {
             long startDetailed = System.currentTimeMillis();
             int delta = start - 20*60;
 
-            TestingRunResultSummary trrs = dataActor.findPendingTestingRunResultSummary(start, delta);
+            TestingRunResultSummary trrs = dataActor.findPendingTestingRunResultSummary(start, delta, customMiniTestingServiceName);
             boolean isSummaryRunning = trrs != null && trrs.getState().equals(State.RUNNING);
             TestingRun testingRun;
             ObjectId summaryId = null;
             if (trrs == null) {
                 delta = Context.now() - 20*60;
-                testingRun = dataActor.findPendingTestingRun(delta);
+                testingRun = dataActor.findPendingTestingRun(delta, customMiniTestingServiceName);
             } else {
                 summaryId = trrs.getId();
                 loggerMaker.infoAndAddToDb("Found trrs " + trrs.getHexId() +  " for account: " + accountId);
