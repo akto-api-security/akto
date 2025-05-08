@@ -128,10 +128,10 @@ public class OriginalHttpRequest {
 
     public static final String JSON_CONTENT_TYPE = "application/json";
 
-    public boolean isJsonRequest() {
-        String acceptableContentType = HttpRequestResponseUtils.getAcceptableContentType(this.headers);
-        return acceptableContentType != null && acceptableContentType.equals(JSON_CONTENT_TYPE);
-    }
+//    public boolean isJsonRequest() {
+//        String acceptableContentType = HttpRequestResponseUtils.getAcceptableContentType(this.headers);
+//        return acceptableContentType != null && acceptableContentType.equals(JSON_CONTENT_TYPE);
+//    }
 
     public void buildFromApiSampleMessage(String message) {
         BasicDBObject ob = BasicDBObject.parse(message);
@@ -412,29 +412,29 @@ public class OriginalHttpRequest {
         this.destinationIp = destinationIp;
     }
 
-    public boolean setMethodAndQP(String line) {
-        String[] tokens = line.split(" ");
-        if (tokens.length != 3) {
-            return false;
-        }
-
-        this.method = tokens[0];
-        String fullUrl = tokens[1];
-
-        int qpIndex = fullUrl.indexOf("?");
-        if (qpIndex > -1 && qpIndex <= fullUrl.length()) {
-            this.url = fullUrl.substring(0, qpIndex);
-            this.queryParams = fullUrl.substring(qpIndex+1);
-        } else {
-            this.url = fullUrl;
-            this.queryParams = "";
-        }
-
-        this.type = tokens[2];
-
-        return true;
-    }
-
+//    public boolean setMethodAndQP(String line) {
+//        String[] tokens = line.split(" ");
+//        if (tokens.length != 3) {
+//            return false;
+//        }
+//
+//        this.method = tokens[0];
+//        String fullUrl = tokens[1];
+//
+//        int qpIndex = fullUrl.indexOf("?");
+//        if (qpIndex > -1 && qpIndex <= fullUrl.length()) {
+//            this.url = fullUrl.substring(0, qpIndex);
+//            this.queryParams = fullUrl.substring(qpIndex+1);
+//        } else {
+//            this.url = fullUrl;
+//            this.queryParams = "";
+//        }
+//
+//        this.type = tokens[2];
+//
+//        return true;
+//    }
+//
     public String getPath(){
        try {
             String path = URI.create(this.url).getPath();
