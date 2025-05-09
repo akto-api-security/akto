@@ -179,7 +179,7 @@ public class LoginAction implements Action, ServletResponseAware, ServletRequest
             pipeLine.add(
                 Aggregates.match(Filters.and(
                     Filters.size(TestingRunResult.TEST_RESULTS + "." + TestResult.ERRORS, 0),
-                    Filters.gte(TestingRunResult.END_TIMESTAMP, Context.now() - (2 * Constants.ONE_MONTH_TIMESTAMP))
+                    Filters.gte(TestingRunResult.END_TIMESTAMP, Context.now() - (Constants.ONE_MONTH_TIMESTAMP))
                 ))
             );
 
