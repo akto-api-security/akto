@@ -31,6 +31,7 @@ import com.akto.dto.testing.BidirectionalSyncSettings;
 import com.akto.dto.testing.TestResult;
 import com.akto.dto.testing.TestingRunResult;
 import com.akto.jobs.JobScheduler;
+import com.akto.jobs.utils.JobConstants;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.test_editor.Utils;
@@ -45,7 +46,9 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.FindOneAndUpdateOptions;
 import com.mongodb.client.model.Projections;
+import com.mongodb.client.model.ReturnDocument;
 import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.Updates;
 import com.opensymphony.xwork2.Action;
@@ -104,7 +107,6 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
     private static final LoggerMaker loggerMaker = new LoggerMaker(ApiExecutor.class, LogDb.DASHBOARD);
 
     private static final int TICKET_SYNC_JOB_RECURRING_INTERVAL_SECONDS = 3600;
-    private static final int TICKET_SYNC_JOB_INITIAL_LAST_SYNC_SECONDS = 3600 * 2; // 2 hours
     private static final OkHttpClient client = CoreHTTPClient.client.newBuilder()
             .connectTimeout(60, TimeUnit.SECONDS)
             .readTimeout(60, TimeUnit.SECONDS)
@@ -361,6 +363,13 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
             existingProjectMappings = new HashMap<>();
         }
 
+        for (Map.Entry<String, ProjectMapping> entry : projectMappings.entrySet()) {
+            ProjectMapping mapping = entry.getValue();
+            if (!mapping.getBiDirectionalSyncSettings().isEnabled()) {
+                mapping.setStatuses(null);
+            }
+        }
+
         existingProjectMappings.putAll(projectMappings);
 
         UpdateOptions updateOptions = new UpdateOptions();
@@ -409,17 +418,19 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
         Map<String, List<BasicDBObject>> existingProjectIdsMap = jira.getProjectIdsMap();
         Map<String, ProjectMapping> existingProjectMappings = jira.getProjectMappings();
 
-        List<BasicDBObject> removedProject = existingProjectIdsMap.remove(this.projId);
-        ProjectMapping removedProjectMap = existingProjectMappings.remove(this.projId);
-
-        if (removedProject == null && removedProjectMap == null) {
-            loggerMaker.debug("Preject Key not found in Jira Integration: projId: {}", this.projId);
-            return Action.SUCCESS.toUpperCase();
-        }
-
-        if (existingProjectIdsMap.isEmpty() || existingProjectMappings.isEmpty()) {
+        if (existingProjectIdsMap.isEmpty() || (existingProjectMappings != null && existingProjectMappings.isEmpty())) {
             addActionError("Atleast one project is required for Jira Integration");
             return Action.ERROR.toUpperCase();
+        }
+
+        List<BasicDBObject> removedProjectIdMap = existingProjectIdsMap.remove(this.projId);
+
+        // null check for backward compatibility - users who already have jira integration before this change.
+        ProjectMapping removedProjectMapping = existingProjectMappings == null ? null : existingProjectMappings.remove(this.projId);
+
+        if (removedProjectIdMap == null && removedProjectMapping == null) {
+            loggerMaker.debug("Project Key not found in Jira Integration: projId: {}", this.projId);
+            return Action.SUCCESS.toUpperCase();
         }
 
         UpdateOptions updateOptions = new UpdateOptions();
@@ -427,9 +438,12 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
 
         Bson integrationUpdate = Updates.combine(
             Updates.set("updatedTs", Context.now()),
-            Updates.set("projectMappings", existingProjectMappings),
             Updates.set("projectIdsMap", existingProjectIdsMap)
         );
+
+        if (existingProjectMappings != null) {
+            integrationUpdate = Updates.combine(integrationUpdate, Updates.set("projectMappings", existingProjectMappings));
+        }
 
         JiraIntegrationDao.instance.getMCollection().updateOne(
             new BasicDBObject(),
@@ -437,16 +451,20 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
             updateOptions
         );
 
-        BidirectionalSyncSettings deletedSettings = BidirectionalSyncSettingsDao.instance.getMCollection()
-            .findOneAndDelete(
+        BidirectionalSyncSettings disabledSettings = BidirectionalSyncSettingsDao.instance.getMCollection()
+            .findOneAndUpdate(
                 Filters.and(
                     Filters.eq(BidirectionalSyncSettings.SOURCE, TicketSource.JIRA.name()),
                     Filters.eq(BidirectionalSyncSettings.PROJECT_KEY, this.projId)
-                )
+                ),
+                Updates.combine(
+                    Updates.set(BidirectionalSyncSettings.ACTIVE, false),
+                    Updates.set(BidirectionalSyncSettings.LAST_SYNCED_AT, Context.now())
+                ),
+                new FindOneAndUpdateOptions().returnDocument(ReturnDocument.AFTER)
             );
-
-        if (deletedSettings != null) {
-            JobScheduler.deleteJob(deletedSettings.getJobId());
+        if (disabledSettings != null) {
+            JobScheduler.deleteJob(disabledSettings.getJobId());
         }
         return Action.SUCCESS.toUpperCase();
     }
@@ -895,6 +913,8 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
         BasicDBObject issueTypeObj = new BasicDBObject();
         issueTypeObj.put("id", this.issueType);
         fields.put("issuetype", issueTypeObj);
+        fields.put("labels", new String[] {JobConstants.TICKET_LABEL_AKTO_SYNC});
+
 
         // Project ID
         BasicDBObject project = new BasicDBObject();
@@ -1091,11 +1111,12 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
                         // Check if we need to restart the job (if previously inactive)
                         ObjectId jobId = existingSettings.getJobId();
                         if (!existingSettings.isActive()) {
-                            Job job = createRecurringJob(projectKey);
+                            Job job = JobScheduler.restartJob(jobId);
                             if (job == null) {
-                                loggerMaker.error("Error while creating recurring job for project key: {}", projectKey);
+                                loggerMaker.error("Error while restarting recurring job for project key: {}", projectKey);
                                 continue;
                             }
+                            loggerMaker.info("Restarted recurring job for project key: {}", projectKey);
                             jobId = job.getId();
                         }
                         BidirectionalSyncSettingsDao.instance.updateOne(
@@ -1113,6 +1134,9 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
                             loggerMaker.error("Error while creating recurring job for project key: {}", projectKey);
                             continue;
                         }
+
+                        loggerMaker.info("Created recurring job for project key: {}", projectKey);
+
                         BidirectionalSyncSettings bidirectionalSyncSettings = new BidirectionalSyncSettings();
                         bidirectionalSyncSettings.setSource(TicketSource.JIRA);
                         bidirectionalSyncSettings.setProjectKey(projectKey);
@@ -1162,7 +1186,7 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
             new TicketSyncJobParams(
                 TicketSource.JIRA.name(),
                 projectKey,
-                Context.now() - TICKET_SYNC_JOB_INITIAL_LAST_SYNC_SECONDS
+                Context.now()
             ),
             JobExecutorType.DASHBOARD,
             TICKET_SYNC_JOB_RECURRING_INTERVAL_SECONDS
