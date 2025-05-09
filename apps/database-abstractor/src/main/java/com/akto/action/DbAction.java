@@ -2115,7 +2115,9 @@ public class DbAction extends ActionSupport {
                 totalCountIssues = TestExecutor.calcTotalCountIssues(summaryObjectId);
             }
             trrs = DbLayer.updateIssueCountAndStateInSummary(summaryId, totalCountIssues, state);
-            trrs.setTestingRunHexId(trrs.getTestingRunId().toHexString());
+            if (trrs != null && trrs.getTestingRunId() != null) {
+                trrs.setTestingRunHexId(trrs.getTestingRunId().toHexString());
+            }
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error in updateIssueCountAndStateInSummary " + e.toString());
             return Action.ERROR.toUpperCase();
