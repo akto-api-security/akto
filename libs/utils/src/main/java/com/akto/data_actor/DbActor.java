@@ -230,4 +230,8 @@ public class DbActor extends DataActor {
         return;
     }
 
+    public String fetchOpenApiSchema(int apiCollectionId) {
+        return DbLayer.fetchOpenApiSchema(apiCollectionId);
+    }
+
 }
