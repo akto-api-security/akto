@@ -237,15 +237,12 @@ import com.mongodb.ReadPreference;
 import com.mongodb.WriteConcern;
 import com.mongodb.bulk.BulkWriteResult;
 import com.mongodb.client.MongoCursor;
-import com.mongodb.client.model.Accumulators;
-import com.mongodb.client.model.Aggregates;
 import com.mongodb.client.model.BulkWriteOptions;
 import com.mongodb.client.model.DeleteOneModel;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.FindOneAndUpdateOptions;
 import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.Sorts;
-import com.mongodb.client.model.UpdateManyModel;
 import com.mongodb.client.model.UpdateOneModel;
 import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.Updates;
@@ -258,7 +255,6 @@ import com.slack.api.webhook.WebhookResponse;
 
 import io.intercom.api.Intercom;
 import okhttp3.OkHttpClient;
-import software.amazon.awssdk.profiles.ProfileFile.Aggregator;
 
 public class InitializerListener implements ServletContextListener {
 
@@ -3278,68 +3274,6 @@ public class InitializerListener implements ServletContextListener {
         }
     }
 
-    private static void fillLastTestedField(BackwardCompatibility backwardCompatibility){
-        if(backwardCompatibility.getFillLastTestedField() == 0){
-            
-            // get successful test results which are executed in last month
-            // group by apiinfokey
-            int timeNow = Context.now();
-            
-            logger.infoAndAddToDb("Started back filling last tested field for account: " + Context.accountId.get(), LogDb.DASHBOARD);
-
-            List<Bson> pipeLine = new ArrayList<>();
-            pipeLine.add(Aggregates.sort(Sorts.descending(TestingRunResult.END_TIMESTAMP)));
-            pipeLine.add(
-                Aggregates.match(Filters.and(
-                    Filters.size(TestingRunResult.TEST_RESULTS + "." + TestResult.ERRORS, 0),
-                    Filters.gte(TestingRunResult.END_TIMESTAMP, Context.now() - (2 * Constants.ONE_MONTH_TIMESTAMP))
-                ))
-            );
-
-            pipeLine.add(
-                Aggregates.group(
-                    "$" + TestingRunResult.API_INFO_KEY, Accumulators.max(TestingRunResult.END_TIMESTAMP, "$" + TestingRunResult.END_TIMESTAMP)
-                )
-            );
-
-            MongoCursor<BasicDBObject> cursor = TestingRunResultDao.instance.getMCollection().aggregate(pipeLine, BasicDBObject.class).cursor();
-            Bson filter;
-            List<WriteModel<ApiInfo>> bulkUpdates = new ArrayList<>();
-            while(cursor.hasNext()) {
-                BasicDBObject basicDBObject = cursor.next();
-                BasicDBObject idObj = (BasicDBObject) basicDBObject.get(Constants.ID);
-                ApiInfo.ApiInfoKey id = new ApiInfoKey(
-                    idObj.getInt(SingleTypeInfo._API_COLLECTION_ID),
-                    idObj.getString(SingleTypeInfo._URL),
-                    Method.fromString(idObj.getString(SingleTypeInfo._METHOD))
-                );
-                filter = ApiInfoDao.getFilter(id);
-                int lastTestedField = basicDBObject.getInt(TestingRunResult.END_TIMESTAMP);
-                bulkUpdates.add(new UpdateOneModel<>(filter, Updates.set(ApiInfo.LAST_TESTED, lastTestedField), new UpdateOptions().upsert(false)));
-
-                if(bulkUpdates.size() >= 200){
-                    try {
-                        ApiInfoDao.instance.getMCollection().bulkWrite(bulkUpdates);
-                        bulkUpdates.clear();
-                    } catch (Exception e) {
-                        e.printStackTrace();
-                    }
-                    
-                }
-            }
-
-            if(!bulkUpdates.isEmpty()){
-                ApiInfoDao.instance.getMCollection().bulkWrite(bulkUpdates);
-            }  
-            
-            logger.infoAndAddToDb("Finished back filling last tested field for account: " + Context.accountId.get() + " time taken: " + (Context.now() - timeNow), LogDb.DASHBOARD);
-
-            BackwardCompatibilityDao.instance.updateOne(
-                Filters.eq("_id", backwardCompatibility.getId()),
-                Updates.set(BackwardCompatibility.FILL_LAST_TESTED_FIELD, Context.now())
-            );
-        }
-    }
 
     public static void setBackwardCompatibilities(BackwardCompatibility backwardCompatibility){
         if (DashboardMode.isMetered()) {
@@ -3348,7 +3282,6 @@ public class InitializerListener implements ServletContextListener {
         }
         setAktoDefaultNewUI(backwardCompatibility);
         updateCustomDataTypeOperator(backwardCompatibility);
-        fillLastTestedField(backwardCompatibility);
         markSummariesAsVulnerable(backwardCompatibility);
         dropLastCronRunInfoField(backwardCompatibility);
         cleanupRbacEntriesForDeveloperRole(backwardCompatibility);
