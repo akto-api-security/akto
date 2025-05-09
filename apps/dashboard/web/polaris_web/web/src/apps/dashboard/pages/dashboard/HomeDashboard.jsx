@@ -150,7 +150,9 @@ function HomeDashboard() {
 
         setShowBannerComponent(!userEndpoints)
 
-        buildMetrics(apisStatsResp.apiStatsEnd)
+        // for now we are actually using the apis from stis instead of the total apis in the response
+        // TODO: Fix apiStats API to return the correct total apis
+        buildMetrics(apisStatsResp.apiStatsEnd, fetchEndpointsCountResp)
         testSummaryData()
         mapAccessTypes(apisStatsResp)
         mapAuthTypes(apisStatsResp)
@@ -203,12 +205,16 @@ function HomeDashboard() {
         }
     }
 
-    function buildMetrics(apiStats) {
+    function buildMetrics(apiStats, fetchEndpointsCount) {
         if (!apiStats) return;
 
         const totalRiskScore = apiStats.totalRiskScore
-        const totalAPIs = apiStats.totalAPIs
 
+        // For now we are taking the new count from the fetchEndpointsCount API
+        let totalAPIs = fetchEndpointsCount?.newCount
+        if(totalAPIs === undefined || totalAPIs === null){
+            totalAPIs = apiStats.totalAPIs
+        }
         const apisTestedInLookBackPeriod = apiStats.apisTestedInLookBackPeriod
 
         if (totalAPIs && totalAPIs > 0 && totalRiskScore) {
