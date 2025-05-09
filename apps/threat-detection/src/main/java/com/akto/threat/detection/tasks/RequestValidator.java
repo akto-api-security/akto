@@ -2,6 +2,7 @@ package com.akto.threat.detection.tasks;
 
 import com.akto.dto.HttpResponseParams;
 import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import com.akto.proto.generated.threat_detection.message.sample_request.v1.SchemaConformanceError;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -29,7 +30,7 @@ public class RequestValidator {
   private static SchemaConformanceError.Builder errorBuilder = SchemaConformanceError.newBuilder();
 
   private static ObjectMapper objectMapper = new ObjectMapper();
-  private static final LoggerMaker logger = new LoggerMaker(MaliciousTrafficDetectorTask.class);
+  private static final LoggerMaker logger = new LoggerMaker(MaliciousTrafficDetectorTask.class, LogDb.THREAT_DETECTION);
   private static JsonSchemaFactory factory = JsonSchemaFactory.getInstance(VersionFlag.V202012,
       builder -> builder.metaSchema(OpenApi31.getInstance())
           .defaultMetaSchemaIri(OpenApi31.getInstance().getIri()));
@@ -173,6 +174,12 @@ public class RequestValidator {
 
   private static JsonNode getContentSchemaNode(JsonNode requestBodyNode, HttpResponseParams responseParam) {
     String contentType = responseParam.getRequestParams().getHeaders().get("content-type").get(0);
+
+    if(!contentType.equalsIgnoreCase("application/json")) {
+      // validate only json content type
+      return null;
+    }
+
     JsonNode schemaNode = requestBodyNode.path("content").path(contentType).path("schema");
 
     if (schemaNode.isMissingNode()) {
@@ -180,7 +187,7 @@ public class RequestValidator {
       addError(
           "#/paths" + responseParam.getRequestParams().getURL() + "/" + method + "/requestBody/content/" + contentType,
           "", "requestBody",
-          String.format("Request body not available for method %s for path %s for content-type %s in schema",
+          String.format("Schema not available for method %s for path %s for content-type %s in schema",
               responseParam.getRequestParams().getMethod(), responseParam.getRequestParams().getURL(), contentType));
       return null;
     }
@@ -255,14 +262,13 @@ public class RequestValidator {
       JsonNode rootSchemaNode = objectMapper.readTree(apiSchema);
 
       if (rootSchemaNode == null || rootSchemaNode.isEmpty()) {
-        logger.error("Unable to parse schema for api info key", apiInfoKey);
+        logger.errorAndAddToDb(String.format("Unable to parse schema for api info key: %s", apiInfoKey));
         return errors;
       }
 
       return validateRequestBody(responseParam, rootSchemaNode);
     } catch (Exception e) {
-      logger.error("Error conforming to schema for api info key  {}",
-          apiInfoKey, e);
+      logger.errorAndAddToDb(e, "Error conforming to schema for api info key" + apiInfoKey);
       return errors;
     }
   }

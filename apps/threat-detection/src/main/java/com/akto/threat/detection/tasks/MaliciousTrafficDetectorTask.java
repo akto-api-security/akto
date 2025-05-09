@@ -52,15 +52,14 @@ import com.akto.threat.detection.actor.SourceIPActorGenerator;
 import com.akto.threat.detection.cache.RedisBackedCounterCache;
 import com.akto.threat.detection.constants.KafkaTopic;
 import com.akto.threat.detection.kafka.KafkaProtoProducer;
-import com.akto.threat.detection.scripts.KafkaBenchmark;
 import com.akto.threat.detection.smart_event_detector.window_based.WindowBasedThresholdNotifier;
+import com.akto.util.Constants;
 import com.akto.util.HttpRequestResponseUtils;
 import com.akto.utils.GzipUtils;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import io.lettuce.core.RedisClient;
 import io.lettuce.core.api.StatefulRedisConnection;
-import io.lettuce.core.codec.StringCodec;
 
 
 
@@ -115,7 +114,7 @@ public class MaliciousTrafficDetectorTask implements Task {
     this.kafkaConsumer = new KafkaConsumer<>(properties);
 
     this.httpCallParser = new HttpCallParser(120, 1000);
-    this.apiCache = redisClient.connect(new StringCodec());
+    this.apiCache = redisClient.connect();
     
 
     this.windowBasedThresholdNotifier =
@@ -190,7 +189,7 @@ public class MaliciousTrafficDetectorTask implements Task {
   private String getApiSchema(int apiCollectionId) {
     String apiSchema = null;
     try {
-      apiSchema = this.apiCache.sync().get("akto:threat:schema:" + apiCollectionId);
+      apiSchema = this.apiCache.sync().get(Constants.AKTO_THREAT_DETECTION_CACHE_PREFIX + apiCollectionId);
 
       if (apiSchema != null && !apiSchema.isEmpty()) {
         apiSchema = GzipUtils.unzipString(apiSchema);
@@ -201,15 +200,15 @@ public class MaliciousTrafficDetectorTask implements Task {
       apiSchema = dataActor.fetchOpenApiSchema(apiCollectionId);
 
       if (apiSchema == null || apiSchema.isEmpty()) {
-        logger.warn("No schema found for api collection id {}", apiCollectionId);
+        logger.warnAndAddToDb("No schema found for api collection id: "+ apiCollectionId);
 
         return null;
       }
-      this.apiCache.sync().setex("akto:threat:schema:" + apiCollectionId, 24 * 60 * 60, apiSchema);
+      this.apiCache.sync().setex(Constants.AKTO_THREAT_DETECTION_CACHE_PREFIX + apiCollectionId, Constants.ONE_DAY_TIMESTAMP, apiSchema);
       // unzip this schema using gzip
       apiSchema = GzipUtils.unzipString(apiSchema);
     } catch (Exception e) {
-      logger.error("Error while fetching api schema for id {}", apiCollectionId, e);
+      logger.errorAndAddToDb(e, "Error while fetching api schema for collectionId: "+ apiCollectionId);
     }
     return apiSchema;
   }
@@ -250,7 +249,7 @@ public class MaliciousTrafficDetectorTask implements Task {
     for (FilterConfig apiFilter : apiFilters.values()) {
       boolean hasPassedFilter = false; 
 
-      logger.debugAndAddToDb("Evaluating filter condition for url " + apiInfoKey.getUrl() + " filterId " + apiFilter.getId());
+      logger.debug("Evaluating filter condition for url " + apiInfoKey.getUrl() + " filterId " + apiFilter.getId());
 
       if(apiFilter.getInfo().getCategory().getName().equalsIgnoreCase("SchemaConform")) {
         logger.debug("SchemaConform filter found for url {} filterId {}", apiInfoKey.getUrl(), apiFilter.getId());

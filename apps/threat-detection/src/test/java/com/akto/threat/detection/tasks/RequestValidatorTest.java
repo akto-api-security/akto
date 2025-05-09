@@ -201,4 +201,24 @@ class RequestValidatorTest {
         assertEquals("requestBody", errors.get(0).getAttribute());
         assertTrue(errors.get(0).getMessage().contains("Request body not available for method"));
     }
+
+    @Test
+    void testValidate_XMLContentType() throws Exception {
+
+        // Create the HttpResponseParams with XML content type
+        HttpResponseParams responseParam = new HttpResponseParams();
+        responseParam.setRequestParams(new HttpRequestParams());
+        responseParam.getRequestParams().setUrl("/api/v3/pet");
+        responseParam.getRequestParams().setMethod("PUT");
+        responseParam.getRequestParams()
+                .setHeaders(Collections.singletonMap("content-type", Collections.singletonList("application/xml")));
+        String requestPayload = "<pet><id>10</id><name>doggie</name></pet>";
+        responseParam.getRequestParams().setPayload(requestPayload);
+
+        // Validate the request
+        List<SchemaConformanceError> errors = RequestValidator.validate(responseParam, apiSchema, "testApiInfoKey");
+
+        // Assertions
+        assertTrue(errors.isEmpty(), "Expected no schema conformance errors for valid XML payload");
+    }
 }
