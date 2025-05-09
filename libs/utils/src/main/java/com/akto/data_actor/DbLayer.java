@@ -31,6 +31,10 @@ import com.akto.dao.SuspectSampleDataDao;
 import com.akto.dao.TrafficInfoDao;
 import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.context.Context;
+import com.akto.dao.file.FilesDao;
+import com.akto.dao.upload.FileUploadsDao;
+import com.akto.dto.files.File;
+import com.akto.dto.upload.SwaggerFileUpload;
 import com.akto.dao.monitoring.FilterYamlTemplateDao;
 import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dao.traffic_metrics.TrafficMetricsDao;
@@ -402,5 +406,23 @@ public class DbLayer {
 
     public static Set<MergedUrls> fetchMergedUrls() {
         return MergedUrlsDao.instance.getMergedUrls();
+    }
+
+    public static String fetchOpenApiSchema(int apiCollectionId) {
+
+        Bson sort = Sorts.descending("uploadTs");
+        SwaggerFileUpload fileUpload = FileUploadsDao.instance.getSwaggerMCollection().find(Filters.eq("collectionId", apiCollectionId)).sort(sort).limit(1).projection(Projections.fields(Projections.include("swaggerFileId"))).first();
+        if (fileUpload == null) {
+            return null;
+        }
+
+        ObjectId objectId = new ObjectId(fileUpload.getSwaggerFileId());
+
+        File file = FilesDao.instance.findOne(Filters.eq("_id", objectId));
+        if (file == null) {
+            return null;
+        }
+
+        return file.getCompressedContent();
     }
 }

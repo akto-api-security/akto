@@ -1,6 +1,7 @@
 package com.akto.threat.backend.db;
 
 import com.akto.dto.type.URLMethods;
+
 import java.util.UUID;
 
 public class MaliciousEventModel {
@@ -21,6 +22,8 @@ public class MaliciousEventModel {
   private String type;
   private String refId;
   private String severity;
+  private String metadata;
+
 
   public enum EventType {
     SINGLE,
@@ -46,6 +49,7 @@ public class MaliciousEventModel {
     this.severity = builder.severity;
     this.type = builder.type;
     this.refId = builder.refId;
+    this.metadata = builder.metadata; 
   }
 
   public static class Builder {
@@ -64,6 +68,7 @@ public class MaliciousEventModel {
     private String refId;
     private String type;
     private String severity;
+    private String metadata; 
 
     public Builder setFilterId(String filterId) {
       this.filterId = filterId;
@@ -140,11 +145,22 @@ public class MaliciousEventModel {
       return this;
     }
 
+    public Builder setMetadata(String metadata) { 
+      this.metadata = metadata;
+      return this;
+    }
+
     public MaliciousEventModel build() {
       return new MaliciousEventModel(this);
     }
+  }
 
-    
+  public String getMetadata() {
+    return metadata;
+  }
+
+  public void setMetadata(String metadata) {
+    this.metadata = metadata;
   }
 
   public String getId() {

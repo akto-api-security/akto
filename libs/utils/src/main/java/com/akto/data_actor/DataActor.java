@@ -96,4 +96,6 @@ public abstract class DataActor {
     public abstract Set<MergedUrls> fetchMergedUrls();
 
     public abstract void updateModuleInfo(ModuleInfo moduleInfo);
+
+    public abstract String fetchOpenApiSchema(int apiCollectionId);
 }
