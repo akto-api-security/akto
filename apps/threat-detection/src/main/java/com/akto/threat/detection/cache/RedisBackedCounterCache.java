@@ -7,6 +7,7 @@ import io.lettuce.core.api.StatefulRedisConnection;
 
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.*;
@@ -104,6 +105,36 @@ public class RedisBackedCounterCache implements CounterCache {
     val.forEach((k, v) -> this.redis.async().expire(k, 3 * 60 * 60));
 
     this.pendingOps.clear();
+  }
+
+  @Override
+  public void addToSortedSet(String sortedSetKey, String member, long score) {
+    // TODO Auto-generated method stub
+    throw new UnsupportedOperationException("Unimplemented method 'addToSortedSet'");
+  }
+
+  @Override
+  public Map<String, Long> mget(String[] keys) {
+    // TODO Auto-generated method stub
+    throw new UnsupportedOperationException("Unimplemented method 'queryTotalCount'");
+  }
+
+  @Override
+  public List<String> fetchMembersFromSortedSet(String sortedSet, long startRange, long endRange) {
+    // TODO Auto-generated method stub
+    throw new UnsupportedOperationException("Unimplemented method 'fetchMembersFromSortedSet'");
+  }
+
+  @Override
+  public void set(String key, long val) {
+    // TODO Auto-generated method stub
+    throw new UnsupportedOperationException("Unimplemented method 'set'");
+  }
+
+  @Override
+  public void removeMembersFromSortedSet(String sortedSet, long startRange, long endRange) {
+    // TODO Auto-generated method stub
+    throw new UnsupportedOperationException("Unimplemented method 'removeMembersFromSortedSet'");
   }
 
 }

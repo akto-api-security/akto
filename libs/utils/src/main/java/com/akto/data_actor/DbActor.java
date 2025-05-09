@@ -6,6 +6,7 @@ import com.akto.dto.monitoring.ModuleInfo;
 import com.akto.dto.filter.MergedUrls;
 import com.akto.dto.runtime_filters.RuntimeFilter;
 import com.akto.dto.test_editor.YamlTemplate;
+import com.akto.dto.threat_detection.ApiHitCountInfo;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.traffic.SuspectSampleData;
 import com.akto.dto.traffic.TrafficInfo;
@@ -226,6 +227,9 @@ public class DbActor extends DataActor {
         return DbLayer.fetchMergedUrls();
     }
 
+    public void bulkInsertApiHitCount(List<ApiHitCountInfo> apiHitCountInfoList) throws Exception {
+        DbLayer.bulkinsertApiHitCount(apiHitCountInfoList);
+    }
     public void updateModuleInfo(ModuleInfo moduleInfo) {
         return;
     }

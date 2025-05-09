@@ -8,10 +8,12 @@ import com.akto.dto.billing.Organization;
 import com.akto.dto.bulk_updates.BulkUpdates;
 import com.akto.dto.bulk_updates.UpdatePayload;
 import com.akto.dto.runtime_filters.RuntimeFilter;
+import com.akto.dto.threat_detection.ApiHitCountInfo;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.traffic.TrafficInfo;
 import com.akto.dto.traffic_metrics.TrafficMetrics;
 import com.akto.dto.type.SingleTypeInfo;
+import com.akto.log.LoggerMaker;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.opensymphony.xwork2.Action;
 import com.opensymphony.xwork2.ActionSupport;
@@ -67,9 +69,11 @@ public class DbAction extends ActionSupport {
     boolean isHybridSaas;
     Setup setup;
     Organization organization;
+    List<BasicDBObject> apiHitCountInfoList;
 
     private static final Gson gson = new Gson();
     ObjectMapper objectMapper = new ObjectMapper();
+    private static final LoggerMaker logger = new LoggerMaker(DbAction.class);
 
     public String fetchCustomDataTypes() {
         try {
@@ -671,6 +675,23 @@ public class DbAction extends ActionSupport {
         return Action.SUCCESS.toUpperCase();
     }
 
+    public String bulkinsertApiHitCount() {
+
+        try {
+            List<ApiHitCountInfo> apiHitCountInfos = new ArrayList<>();
+            for (BasicDBObject obj: apiHitCountInfoList) {
+                ApiHitCountInfo apiHitCountInfo = objectMapper.readValue(obj.toJson(), ApiHitCountInfo.class);
+                apiHitCountInfos.add(apiHitCountInfo);
+            }
+            DbLayer.bulkinsertApiHitCount(apiHitCountInfos);
+        } catch (Exception e) {
+            logger.error("error in bulkinsertApiHitCount " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+
+        return Action.SUCCESS.toUpperCase();
+    }
+
     public List<CustomDataTypeMapper> getCustomDataTypes() {
         return customDataTypes;
     }
@@ -982,6 +1003,14 @@ public class DbAction extends ActionSupport {
 
     public void setOrganization(Organization organization) {
         this.organization = organization;
+    }
+
+    public List<BasicDBObject> getApiHitCountInfoList() {
+        return apiHitCountInfoList;
+    }
+
+    public void setApiHitCountInfoList(List<BasicDBObject> apiHitCountInfoList) {
+        this.apiHitCountInfoList = apiHitCountInfoList;
     }
 
 }
