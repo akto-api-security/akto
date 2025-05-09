@@ -329,7 +329,7 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
         try {
             String ruleId = getCloudFlareIPAccessRuleByActorIP(actorIp, cloudflareWafConfig);
 
-            if(ruleId == null) {
+            if(ruleId == null || ruleId.isEmpty()) {
                 addActionError("The IP is already unblocked or does not exist.");
                 return false;
             }
@@ -381,7 +381,7 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
             BasicDBObject respPayloadObj = BasicDBObject.parse(responsePayload);
             BasicDBList result = (BasicDBList) respPayloadObj.get("result");
             BasicDBObject resultObj = (BasicDBObject) result.get(0);
-            return resultObj.getString("id");
+            return resultObj.getString("id") == null ? "" : resultObj.getString("id");
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error while fetching ip access rule id: " + e.getMessage());
             return null;

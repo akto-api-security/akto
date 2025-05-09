@@ -1119,7 +1119,7 @@ public class InventoryAction extends UserAction {
 
     private String description;
     public String saveEndpointDescription() {
-        if(description == null || description.isEmpty()) {
+        if(description == null) {
             addActionError("No description provided");
             return Action.ERROR.toUpperCase();
         }
@@ -1130,6 +1130,24 @@ public class InventoryAction extends UserAction {
                 Filters.eq(ApiInfo.ID_URL, url)
         ), Updates.set(ApiInfo.DESCRIPTION, description));
 
+        return SUCCESS.toUpperCase();
+    }
+
+    private Set<MergedUrls> mergedUrls;
+    public String getDeMergedApis() {
+        mergedUrls = MergedUrlsDao.instance.getMergedUrls();
+        return SUCCESS.toUpperCase();
+    }
+
+    public String undoDemergedApis() {
+        for(MergedUrls mergedUrl : mergedUrls) {
+            Bson filters = Filters.and(
+                    Filters.eq(MergedUrls.API_COLLECTION_ID, mergedUrl.getApiCollectionId()),
+                    Filters.eq(MergedUrls.URL, mergedUrl.getUrl()),
+                    Filters.eq(MergedUrls.METHOD, mergedUrl.getMethod())
+            );
+            MergedUrlsDao.instance.getMCollection().deleteOne(filters);
+        }
         return SUCCESS.toUpperCase();
     }
 
@@ -1275,5 +1293,14 @@ public class InventoryAction extends UserAction {
 
     public void setDescription(String description) {
         this.description = description;
+    }
+
+
+    public Set<MergedUrls> getMergedUrls() {
+        return mergedUrls;
+    }
+
+    public void setMergedUrls(Set<MergedUrls> mergedUrls) {
+        this.mergedUrls = mergedUrls;
     }
 }

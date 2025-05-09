@@ -261,6 +261,31 @@ const settingRequests = {
         })
     },
 
+    fetchJiraStatusMapping(projId, baseUrl, userEmail, apiToken){
+        return request({
+            url: '/api/jira/fetchProjectStatuses',
+            method: 'post',
+            data: {projId, baseUrl, userEmail, apiToken}
+        })
+    },
+
+    addJiraIntegrationV2(data) {
+        return request({
+            url: '/api/jira/add',
+            method: 'post',
+            data: {...data}
+        })
+    },
+
+
+    deleteJiraIntegratedProject(projId) {
+        return request({
+            url: '/api/jira/delete',
+            method: 'post',
+            data: {projId}
+        })
+    },
+
     addOktaSso(clientId, clientSecret, authorisationServerId, oktaDomain, redirectUri) {
         return request({
             url: '/api/addOktaSso',
@@ -593,6 +618,20 @@ const settingRequests = {
             data: {accountOrZoneId, apiKey, email, integrationType}
         })
     },
+    async getDeMergedApis() {
+        return await request({
+            url: '/api/getDeMergedApis',
+            method: 'post',
+            data: {}
+        })
+    },
+    async undoDemergedApis(mergedApis) {
+        return await request({
+            url: '/api/undoDemergedApis',
+            method: 'post',
+            data: {mergedUrls: mergedApis}
+        })
+    }
 }
 
 export default settingRequests
