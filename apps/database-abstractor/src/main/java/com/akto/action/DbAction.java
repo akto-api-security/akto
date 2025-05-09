@@ -1866,10 +1866,9 @@ public class DbAction extends ActionSupport {
             }else{
                 trrs = DbLayer.updateIssueCountInSummary(summaryId, totalCountIssues, operator);
             }
-            if (trrs != null) {
+            if (trrs != null && trrs.getTestingRunId() != null) {
                 trrs.setTestingRunHexId(trrs.getTestingRunId().toHexString());
             }
-            
         } catch (Exception e) {
             e.printStackTrace();
             loggerMaker.errorAndAddToDb(e, "Error in updateIssueCountInSummary " + e.toString());
