@@ -112,6 +112,10 @@ public class BackwardCompatibility {
     public static final String CLEANUP_RBAC_ENTRIES = "cleanupRbacEntries";
     private int cleanupRbacEntries;
 
+    private int fillLastTestedField;
+
+    public static final String FILL_LAST_TESTED_FIELD = "fillLastTestedField";
+
     public BackwardCompatibility(int id, int dropFilterSampleData, int resetSingleTypeInfoCount, int dropWorkflowTestResult,
                                  int readyForNewTestingFramework,int addAktoDataTypes, boolean deploymentStatusUpdated,
                                  int authMechanismData, boolean mirroringLambdaTriggered, int deleteAccessListFromApiToken,
@@ -122,7 +126,7 @@ public class BackwardCompatibility {
                                  int deactivateCollections, int disableAwsSecretPii, int apiCollectionAutomatedField, 
                                  int automatedApiGroups, int addAdminRoleIfAbsent, int dropSpecialCharacterApiCollections, int fixApiAccessType,
                                  int addDefaultFilters, int moveAzureSamlToNormalSaml, int deleteOptionsAPIs, int moveOktaOidcSSO, int markSummariesVulnerable,
-                                 int changeOperatorConditionInCDT, int cleanupRbacEntries) {
+                                 int changeOperatorConditionInCDT, int cleanupRbacEntries, int fillLastTestedField) {
         this.id = id;
         this.dropFilterSampleData = dropFilterSampleData;
         this.resetSingleTypeInfoCount = resetSingleTypeInfoCount;
@@ -158,6 +162,7 @@ public class BackwardCompatibility {
         this.markSummariesVulnerable = markSummariesVulnerable;
         this.changeOperatorConditionInCDT = changeOperatorConditionInCDT;
         this.cleanupRbacEntries = cleanupRbacEntries;
+        this.fillLastTestedField = fillLastTestedField;
     }
 
     public BackwardCompatibility() {
@@ -473,5 +478,13 @@ public class BackwardCompatibility {
 
     public void setCleanupRbacEntries(int cleanupRbacEntries) {
         this.cleanupRbacEntries = cleanupRbacEntries;
+    }
+
+    public int getFillLastTestedField() {
+        return fillLastTestedField;
+    }
+
+    public void setFillLastTestedField(int fillLastTestedField) {
+        this.fillLastTestedField = fillLastTestedField;
     }
 }
