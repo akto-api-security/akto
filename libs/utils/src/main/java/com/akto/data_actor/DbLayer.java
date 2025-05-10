@@ -1,56 +1,27 @@
 package com.akto.data_actor;
 
-import java.util.*;
-
 import com.akto.bulk_update_util.ApiInfoBulkUpdate;
-import com.akto.dao.filter.MergedUrlsDao;
-import com.akto.dto.filter.MergedUrls;
 import com.akto.dao.*;
+import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.billing.TokensDao;
+import com.akto.dao.context.Context;
+import com.akto.dao.filter.MergedUrlsDao;
+import com.akto.dao.monitoring.FilterYamlTemplateDao;
+import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dao.testing.*;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dao.traffic_metrics.RuntimeMetricsDao;
-import com.akto.dto.*;
-import com.akto.dto.billing.Tokens;
-import com.akto.dto.test_run_findings.TestingIssuesId;
-import com.akto.dto.test_run_findings.TestingRunIssues;
-import com.akto.dto.testing.*;
-import com.akto.util.Constants;
-import com.mongodb.BasicDBList;
-import com.mongodb.client.model.*;
-import org.bson.conversions.Bson;
-import org.bson.types.ObjectId;
-
-import com.akto.dao.APIConfigsDao;
-import com.akto.dao.AccountSettingsDao;
-import com.akto.dao.AccountsDao;
-import com.akto.dao.AktoDataTypeDao;
-import com.akto.dao.AnalyserLogsDao;
-import com.akto.dao.ApiCollectionsDao;
-import com.akto.dao.ApiInfoDao;
-import com.akto.dao.CustomAuthTypeDao;
-import com.akto.dao.CustomDataTypeDao;
-import com.akto.dao.LogsDao;
-import com.akto.dao.PupeteerLogsDao;
-import com.akto.dao.ProtectionLogsDao;
-import com.akto.dao.RuntimeFilterDao;
-import com.akto.dao.RuntimeLogsDao;
-import com.akto.dao.SampleDataDao;
-import com.akto.dao.SensitiveParamInfoDao;
-import com.akto.dao.SensitiveSampleDataDao;
-import com.akto.dao.SetupDao;
-import com.akto.dao.SingleTypeInfoDao;
-import com.akto.dao.SuspectSampleDataDao;
-import com.akto.dao.TrafficInfoDao;
-import com.akto.dao.billing.OrganizationsDao;
-import com.akto.dao.context.Context;
-import com.akto.dao.monitoring.FilterYamlTemplateDao;
-import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dao.traffic_metrics.TrafficMetricsDao;
+import com.akto.dto.*;
 import com.akto.dto.billing.Organization;
+import com.akto.dto.billing.Tokens;
+import com.akto.dto.filter.MergedUrls;
 import com.akto.dto.rbac.UsersCollectionsList;
 import com.akto.dto.runtime_filters.RuntimeFilter;
 import com.akto.dto.test_editor.YamlTemplate;
+import com.akto.dto.test_run_findings.TestingIssuesId;
+import com.akto.dto.test_run_findings.TestingRunIssues;
+import com.akto.dto.testing.*;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.traffic.SuspectSampleData;
 import com.akto.dto.traffic.TrafficInfo;
@@ -59,9 +30,16 @@ import com.akto.dto.traffic_metrics.TrafficMetrics;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods;
 import com.akto.log.LoggerMaker;
+import com.akto.util.Constants;
+import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import com.mongodb.bulk.BulkWriteResult;
 import com.mongodb.client.MongoCursor;
+import com.mongodb.client.model.*;
+import org.bson.conversions.Bson;
+import org.bson.types.ObjectId;
+
+import java.util.*;
 
 public class DbLayer {
 
@@ -554,14 +532,15 @@ public class DbLayer {
 
     public static List<TestingRunResult> fetchLatestTestingRunResultBySummaryId(String summaryId, int limit, int skip) {
         ObjectId summaryObjectId = new ObjectId(summaryId);
+        List<Bson> list = new ArrayList<>();
+        list.add(Projections.exclude("testResults.originalMessage", "testResults.nodeResultMap"));
         return TestingRunResultDao.instance
                     .fetchLatestTestingRunResult(
                             Filters.and(
                                     Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, summaryObjectId),
                                     Filters.eq(TestingRunResult.VULNERABLE, true)),
                             limit,
-                            skip,
-                            Projections.exclude("testResults.originalMessage", "testResults.nodeResultMap"));
+                            skip, list);
     }
 
     public static List<TestRoles> fetchTestRoles() {
