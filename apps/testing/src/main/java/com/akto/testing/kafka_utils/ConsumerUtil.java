@@ -104,7 +104,7 @@ public class ConsumerUtil {
             executor.insertResultsAndMakeIssues(Collections.singletonList(runResult), singleTestPayload.getTestingRunResultSummaryId());
             
             // update the last tested field in the api info
-            ApiInfoDao.instance.updateManyNoUpsert(Filters.eq(Constants.ID, apiInfoKey),
+            ApiInfoDao.instance.updateManyNoUpsert(ApiInfoDao.getFilter(apiInfoKey),
                 Updates.set(ApiInfo.LAST_TESTED, Context.now())
             );
         }
