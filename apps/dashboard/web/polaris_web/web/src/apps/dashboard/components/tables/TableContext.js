@@ -13,6 +13,14 @@ export const TableContextProvider = ({ children }) => {
       }
     });
   };
+  const tableSelectedTab = (items) => {
+    dispatch({
+      type: "TABLE_SELECTED_TAB",
+      payload: {
+        tableSelectedTab: items
+      }
+    })
+  }
 
   const selectItems = (items) => {
     dispatch({
@@ -38,7 +46,8 @@ export const TableContextProvider = ({ children }) => {
     selectItems,
     selectedItems: state.selectedItems,
     openedRows: state.openedRows,
-    modifyOpenedLevels
+    modifyOpenedLevels,
+    tableSelectedTab
   };
   return <TableContext.Provider value={value}>{children}</TableContext.Provider>;
 };

@@ -5,14 +5,12 @@ import com.akto.dto.AktoDataType;
 import com.akto.dto.CustomDataType;
 import com.akto.dto.IgnoreData;
 import com.akto.dto.SensitiveParamInfo;
-import com.akto.dto.data_types.Conditions;
-import com.akto.dto.data_types.StartsWithPredicate;
+import com.akto.dto.data_types.*;
 import org.junit.Test;
 
 import java.util.*;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.*;
 
 public class TestKeyTypes {
 
@@ -117,5 +115,91 @@ public class TestKeyTypes {
         assertEquals(keyTypes.occurrences.get(SingleTypeInfo.GENERIC).getExamples().size(), 1);
         assertTrue(sensitiveParamInfoBooleanMap.get(sensitiveParamInfo1));
 
+    }
+
+    @Test
+    public void testCustomAktoDataTypeEmail() {
+        testInitializer();
+        String url = "url";
+        String method = "GET";
+        int responseCode = 200;
+        Map<SensitiveParamInfo, Boolean> sensitiveParamInfoBooleanMap = new HashMap<>();
+
+        KeyTypes keyTypes = new KeyTypes(new HashMap<>(), false);
+        keyTypes.process(url, method, responseCode, false, "email", "user@akto.io",
+                "u1" ,0 ,"rawMessage1" , sensitiveParamInfoBooleanMap, false, Context.now());
+
+        // this is a valid email according to default akto condtions
+        assertTrue(keyTypes.occurrences.containsKey(SingleTypeInfo.EMAIL));
+
+        Map<String, AktoDataType> aktoDataTypeMap = SingleTypeInfo.getAktoDataTypeMap(ACCOUNT_ID);
+
+        List<Predicate> emailKeyPredicateList = Arrays.asList(new StartsWithPredicate("email"), new EndsWithPredicate("id"));
+        Conditions emailKeyConditions = new Conditions(emailKeyPredicateList, Conditions.Operator.AND);
+        aktoDataTypeMap.get("EMAIL").setKeyConditions(emailKeyConditions);
+
+        List<Predicate> emailValuePredicateList = Arrays.asList(new ContainsPredicate("@"), new ContainsPredicate(".io"));
+        Conditions emailValueConditions = new Conditions(emailValuePredicateList, Conditions.Operator.AND);
+        aktoDataTypeMap.get("EMAIL").setValueConditions(emailValueConditions);
+
+        aktoDataTypeMap.get("EMAIL").setOperator(Conditions.Operator.AND);
+
+        keyTypes = new KeyTypes(new HashMap<>(), false);
+        keyTypes.process(url, method, responseCode, false, "email", "user@akto.io",
+                "u1" ,0 ,"rawMessage1" , sensitiveParamInfoBooleanMap, false, Context.now());
+
+
+        // this is an invalid email according to user provided conditions
+        assertFalse(keyTypes.occurrences.containsKey(SingleTypeInfo.EMAIL));
+
+        keyTypes = new KeyTypes(new HashMap<>(), false);
+        keyTypes.process(url, method, responseCode, false, "email_id", "user@akto.io",
+                "u1" ,0 ,"rawMessage1" , sensitiveParamInfoBooleanMap, false, Context.now());
+
+        // this is an valid email according to user provided conditions
+        assertTrue(keyTypes.occurrences.containsKey(SingleTypeInfo.EMAIL));
+    }
+
+    @Test
+    public void testCustomAktoDataTypeCreditCard() {
+        testInitializer();
+        String url = "url";
+        String method = "GET";
+        int responseCode = 200;
+        Map<SensitiveParamInfo, Boolean> sensitiveParamInfoBooleanMap = new HashMap<>();
+
+        KeyTypes keyTypes = new KeyTypes(new HashMap<>(), false);
+        keyTypes.process(url, method, responseCode, false, "credit_card", "378282246310005",
+                "u1" ,0 ,"rawMessage1" , sensitiveParamInfoBooleanMap, false, Context.now());
+
+        // this is a valid credit card according to default akto condtions
+        assertTrue(keyTypes.occurrences.containsKey(SingleTypeInfo.CREDIT_CARD));
+
+        Map<String, AktoDataType> aktoDataTypeMap = SingleTypeInfo.getAktoDataTypeMap(ACCOUNT_ID);
+
+        List<Predicate> creditCardKeyPredicateList = Arrays.asList(new ContainsPredicate("credit"), new ContainsPredicate("card"));
+        Conditions creditCardKeyConditions = new Conditions(creditCardKeyPredicateList, Conditions.Operator.OR);
+        aktoDataTypeMap.get("CREDIT_CARD").setKeyConditions(creditCardKeyConditions);
+
+        List<Predicate> creditCardValuePredicateList = Arrays.asList(new StartsWithPredicate("card_"), new EndsWithPredicate("_amex"));
+        Conditions creditCardValueConditions = new Conditions(creditCardValuePredicateList, Conditions.Operator.AND);
+        aktoDataTypeMap.get("CREDIT_CARD").setValueConditions(creditCardValueConditions);
+
+        aktoDataTypeMap.get("CREDIT_CARD").setOperator(Conditions.Operator.AND);
+
+        keyTypes = new KeyTypes(new HashMap<>(), false);
+        keyTypes.process(url, method, responseCode, false, "credit_card", "378282246310005",
+                "u1" ,0 ,"rawMessage1" , sensitiveParamInfoBooleanMap, false, Context.now());
+
+
+        // this is an invalid credit card according to user provided conditions
+        assertFalse(keyTypes.occurrences.containsKey(SingleTypeInfo.CREDIT_CARD));
+
+        keyTypes = new KeyTypes(new HashMap<>(), false);
+        keyTypes.process(url, method, responseCode, false, "credit_card", "card_378282246310005_amex",
+                "u1" ,0 ,"rawMessage1" , sensitiveParamInfoBooleanMap, false, Context.now());
+
+        // this is an valid email according to user provided conditions
+        assertTrue(keyTypes.occurrences.containsKey(SingleTypeInfo.CREDIT_CARD));
     }
 }

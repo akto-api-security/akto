@@ -9,12 +9,13 @@ import com.akto.test_editor.Utils;
 
 public class RegexFilter extends DataOperandsImpl {
     
+    List<String> querySet;
+
     @Override
     public ValidationResult isValid(DataOperandFilterRequest dataOperandFilterRequest) {
         
         Boolean result = false;
         Boolean res;
-        List<String> querySet = new ArrayList<>();
         String data;
         try {
             querySet = (List<String>) dataOperandFilterRequest.getQueryset();
@@ -30,13 +31,7 @@ public class RegexFilter extends DataOperandsImpl {
             }
             result = result || res;
         }
-        String validationString = null;
-        if (result) {
-            validationString = TestEditorEnums.DataOperands.REGEX.name().toLowerCase() + " filter passed";
-        } else {
-            validationString = TestEditorEnums.DataOperands.REGEX.name().toLowerCase() + " filter failed due to '" + data + "' not matching for - " + querySet;;
-        }
-        return new ValidationResult(result, validationString);
+        return new ValidationResult(result, "");
     }
 
 }

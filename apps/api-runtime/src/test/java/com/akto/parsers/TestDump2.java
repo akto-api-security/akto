@@ -16,6 +16,7 @@ import com.akto.dto.type.SingleTypeInfo.SuperType;
 import com.akto.dto.type.URLMethods.Method;
 import com.akto.runtime.APICatalogSync;
 import com.akto.runtime.URLAggregator;
+import com.akto.dto.HttpResponseParams.Source;
 import com.akto.types.CappedSet;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
@@ -124,8 +125,8 @@ public class TestDump2 extends MongoBasedTest {
         APICatalogSync sync = new APICatalogSync("access-token", 5, true);
 
         aggr.addURL(httpResponseParams);
-        sync.computeDelta(aggr, false, 0);
-        APICatalogSync.DbUpdateReturn dbUpdateReturn = sync.getDBUpdatesForParams(sync.getDelta(0), sync.getDbState(0), false, false);
+        sync.computeDelta(aggr, false, 0, false);
+        APICatalogSync.DbUpdateReturn dbUpdateReturn = sync.getDBUpdatesForParams(sync.getDelta(0), sync.getDbState(0), false, false, Source.HAR);
         assertEquals(15, dbUpdateReturn.bulkUpdatesForSingleTypeInfo.size());
         assertEquals(2, sync.getDBUpdatesForTraffic(0, sync.getDelta(0)).size());        
         assertEquals(1, sync.getDBUpdatesForSampleData(0, sync.getDelta(0), sync.getDbState(0),true, false, false).size());
@@ -140,7 +141,7 @@ public class TestDump2 extends MongoBasedTest {
             URLAggregator aggr = new URLAggregator();
 
             aggr.addURL(resp);
-            sync.computeDelta(aggr, false, collectionId);
+            sync.computeDelta(aggr, false, collectionId, false);
 
             Map<URLStatic, RequestTemplate> urlMethodsMap = sync.getDelta(collectionId).getStrictURLToMethods();
             assertEquals(1, urlMethodsMap.size());
@@ -154,7 +155,7 @@ public class TestDump2 extends MongoBasedTest {
             RequestTemplate respTemplate = reqTemplate.getResponseTemplates().get(resp.statusCode);
             assertEquals(1, respTemplate.getUserIds().size());
             assertEquals(3, respTemplate.getParameters().size());
-            APICatalogSync.DbUpdateReturn dbUpdateReturn = sync.getDBUpdatesForParams(sync.getDelta(collectionId), sync.getDbState(collectionId), false, false);
+            APICatalogSync.DbUpdateReturn dbUpdateReturn = sync.getDBUpdatesForParams(sync.getDelta(collectionId), sync.getDbState(collectionId), false, false, Source.HAR);
             assertEquals(24, dbUpdateReturn.bulkUpdatesForSingleTypeInfo.size());
             assertEquals(2, sync.getDBUpdatesForTraffic(collectionId, sync.getDelta(collectionId)).size());
         }
@@ -167,9 +168,9 @@ public class TestDump2 extends MongoBasedTest {
         simpleTestForSingleCollection(0, sync);
         simpleTestForSingleCollection(1, sync);
         simpleTestForSingleCollection(2, sync);
-        assertEquals(24, sync.getDBUpdatesForParams(sync.getDelta(0), sync.getDbState(0),false, false).bulkUpdatesForSingleTypeInfo.size());
-        assertEquals(24, sync.getDBUpdatesForParams(sync.getDelta(1), sync.getDbState(1),false, false).bulkUpdatesForSingleTypeInfo.size());
-        assertEquals(24, sync.getDBUpdatesForParams(sync.getDelta(2), sync.getDbState(2),false, false).bulkUpdatesForSingleTypeInfo.size());
+        assertEquals(24, sync.getDBUpdatesForParams(sync.getDelta(0), sync.getDbState(0),false, false, Source.HAR).bulkUpdatesForSingleTypeInfo.size());
+        assertEquals(24, sync.getDBUpdatesForParams(sync.getDelta(1), sync.getDbState(1),false, false, Source.HAR).bulkUpdatesForSingleTypeInfo.size());
+        assertEquals(24, sync.getDBUpdatesForParams(sync.getDelta(2), sync.getDbState(2),false, false, Source.HAR).bulkUpdatesForSingleTypeInfo.size());
     }
 
     @Test
@@ -288,7 +289,7 @@ public class TestDump2 extends MongoBasedTest {
         APICatalogSync sync = new APICatalogSync("access-token", 5, true);
 
         aggr.addURL(resp);
-        sync.computeDelta(aggr, false, 0);
+        sync.computeDelta(aggr, false, 0, false);
 
         Map<URLStatic, RequestTemplate> urlMethodsMap = sync.getDelta(0).getStrictURLToMethods();
         assertEquals(1, urlMethodsMap.size());
@@ -318,7 +319,7 @@ public class TestDump2 extends MongoBasedTest {
         APICatalogSync sync = new APICatalogSync("access-token", 5, true);
         Method method = Method.fromString(resp.getRequestParams().getMethod());
         aggr.addURL(responses, new URLStatic(resp.getRequestParams().getURL(), method));
-        sync.computeDelta(aggr, false, 0);
+        sync.computeDelta(aggr, false, 0, false);
 
         Map<URLStatic, RequestTemplate> urlMethodsMap = sync.getDelta(0).getStrictURLToMethods();
         assertEquals(1, urlMethodsMap.size());
@@ -366,7 +367,7 @@ public class TestDump2 extends MongoBasedTest {
         APICatalogSync sync = new APICatalogSync("access-token", 5, true);
 
         aggr.addURL(responseParams, new URLStatic(url, method));
-        sync.computeDelta(aggr, false, 0);
+        sync.computeDelta(aggr, false, 0, false);
 
         Map<URLStatic, RequestTemplate> urlMethodsMap = sync.getDelta(0).getStrictURLToMethods();
         assertEquals(1, urlMethodsMap.size());
@@ -383,7 +384,7 @@ public class TestDump2 extends MongoBasedTest {
         // TODO: investigate and fix this
         // assertEquals(1, respTemplate.getParameters().size());
 
-        List updates = sync.getDBUpdatesForParams(sync.getDelta(0), sync.getDbState(0), false, false).bulkUpdatesForSingleTypeInfo;
+        List updates = sync.getDBUpdatesForParams(sync.getDelta(0), sync.getDbState(0), false, false, Source.HAR).bulkUpdatesForSingleTypeInfo;
     }
 
     @Test

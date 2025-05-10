@@ -1,19 +1,24 @@
 package com.akto.dao.testing_run_findings;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 import org.bson.conversions.Bson;
 
-import com.akto.dao.AccountsContextDao;
+import com.akto.dao.AccountsContextDaoWithRbac;
 import com.akto.dao.MCollection;
 import com.akto.dao.context.Context;
+import com.akto.dto.ApiCollectionUsers;
+import com.akto.dto.ApiInfo;
+import com.akto.dto.ApiInfo.ApiInfoKey;
+import com.akto.dto.rbac.UsersCollectionsList;
+import com.akto.dto.test_run_findings.TestingRunIssues;
+import com.akto.dto.testing.TestingEndpoints;
+import com.akto.dto.type.SingleTypeInfo;
+import com.akto.dto.type.URLMethods.Method;
 import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.test_run_findings.TestingIssuesId;
-import com.akto.dto.test_run_findings.TestingRunIssues;
+import com.akto.util.Constants;
 import com.akto.util.enums.GlobalEnums;
 import com.akto.util.enums.MongoDBEnums;
 import com.mongodb.BasicDBObject;
@@ -24,7 +29,7 @@ import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.UnwindOptions;
 
-public class TestingRunIssuesDao extends AccountsContextDao<TestingRunIssues> {
+public class TestingRunIssuesDao extends AccountsContextDaoWithRbac<TestingRunIssues> {
 
     public static final TestingRunIssuesDao instance = new TestingRunIssuesDao();
 
@@ -55,29 +60,62 @@ public class TestingRunIssuesDao extends AccountsContextDao<TestingRunIssues> {
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, true);
         fieldNames = new String[] {TestingRunIssues.LATEST_TESTING_RUN_SUMMARY_ID};
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, true);
-    
+
+        fieldNames =  new String[] {Constants.ID, TestingRunIssues.TEST_RUN_ISSUES_STATUS};
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, true);
+
+        fieldNames = new String[]{TestingRunIssues.TICKET_PROJECT_KEY, TestingRunIssues.TICKET_SOURCE,
+            TestingRunIssues.LAST_UPDATED};
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, true);
+
+        fieldNames = new String[]{TestingRunIssues.TICKET_PROJECT_KEY, TestingRunIssues.TICKET_SOURCE,
+            TestingRunIssues.TICKET_ID};
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, true);
     }
 
-    public Map<Integer,Map<String,Integer>> getSeveritiesMapForCollections(){
-        Map<Integer,Map<String,Integer>> resultMap = new HashMap<>() ;
+    private List<Bson> getPipelineForSeverityCount(Bson filter, boolean expandApiGroups, BasicDBObject groupedId) {
         List<Bson> pipeline = new ArrayList<>();
         pipeline.add(Aggregates.match(Filters.eq(TestingRunIssues.TEST_RUN_ISSUES_STATUS, "OPEN")));
 
-        UnwindOptions unwindOptions = new UnwindOptions();
-        unwindOptions.preserveNullAndEmptyArrays(false);  
-        pipeline.add(Aggregates.unwind("$collectionIds", unwindOptions));
+        if(filter!=null){
+            pipeline.add(Aggregates.match(filter));
+        }
 
-        BasicDBObject groupedId = new BasicDBObject("apiCollectionId", "$collectionIds")
-                                                .append("severity", "$severity") ;
+        try {
+            List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
+            if(collectionIds != null) {
+                pipeline.add(Aggregates.match(Filters.in(SingleTypeInfo._COLLECTION_IDS, collectionIds)));
+            }
+        } catch(Exception e){
+        }
+
+        if (expandApiGroups) {
+            UnwindOptions unwindOptions = new UnwindOptions();
+            unwindOptions.preserveNullAndEmptyArrays(false);
+            pipeline.add(Aggregates.unwind("$" + SingleTypeInfo._COLLECTION_IDS, unwindOptions));
+            groupedId = new BasicDBObject(SingleTypeInfo._API_COLLECTION_ID, "$" + SingleTypeInfo._COLLECTION_IDS)
+                        .append(TestingRunIssues.KEY_SEVERITY, "$" + TestingRunIssues.KEY_SEVERITY);
+        }
 
         pipeline.add(Aggregates.group(groupedId, Accumulators.sum("count", 1)));
+        return pipeline;
+    }
 
+    public Map<Integer,Map<String,Integer>> getSeveritiesMapForCollections(){
+        BasicDBObject groupedId = new BasicDBObject(SingleTypeInfo._API_COLLECTION_ID, "$" + TestingRunIssues.ID_API_COLLECTION_ID)
+                .append(TestingRunIssues.KEY_SEVERITY, "$" + TestingRunIssues.KEY_SEVERITY);
+        return getSeveritiesMapForCollections(null, true, groupedId);
+    }
+
+    public Map<Integer,Map<String,Integer>> getSeveritiesMapForCollections(Bson filter, boolean expandApiGroups, BasicDBObject groupedId){
+        Map<Integer,Map<String,Integer>> resultMap = new HashMap<>() ;
+        List<Bson> pipeline = getPipelineForSeverityCount(filter, expandApiGroups, groupedId);
         MongoCursor<BasicDBObject> severitiesCursor = TestingRunIssuesDao.instance.getMCollection().aggregate(pipeline, BasicDBObject.class).cursor();
         while(severitiesCursor.hasNext()) {
             try {
                 BasicDBObject basicDBObject = severitiesCursor.next();
-                String severity = ((BasicDBObject) basicDBObject.get("_id")).getString("severity");
-                int apiCollectionId = ((BasicDBObject) basicDBObject.get("_id")).getInt("apiCollectionId");
+                String severity = ((BasicDBObject) basicDBObject.get(Constants.ID)).getString(TestingRunIssues.KEY_SEVERITY);
+                int apiCollectionId = ((BasicDBObject) basicDBObject.get(Constants.ID)).getInt(SingleTypeInfo._API_COLLECTION_ID);
                 int count = basicDBObject.getInt("count");
                 if(resultMap.containsKey(apiCollectionId)){
                     Map<String,Integer> severityMap = resultMap.get(apiCollectionId);
@@ -94,16 +132,68 @@ public class TestingRunIssuesDao extends AccountsContextDao<TestingRunIssues> {
         }
         return resultMap;
     }
+
+    public Map<ApiInfoKey, Map<String, Integer>> getSeveritiesMapForApiInfoKeys(Bson filter, boolean expandApiGroups) {
+        Map<ApiInfoKey, Map<String, Integer>> resultMap = new HashMap<>();
+        BasicDBObject groupedId = new BasicDBObject(SingleTypeInfo._API_COLLECTION_ID, "$" + TestingRunIssues.ID_API_COLLECTION_ID)
+                .append(SingleTypeInfo._URL, "$" + TestingRunIssues.ID_URL)
+                .append(SingleTypeInfo._METHOD, "$" + TestingRunIssues.ID_METHOD)
+                .append(TestingRunIssues.KEY_SEVERITY, "$" + TestingRunIssues.KEY_SEVERITY);
+        List<Bson> pipeline = getPipelineForSeverityCount(filter, expandApiGroups, groupedId);
+        if(pipeline.isEmpty()){
+            return resultMap;
+        }
+        MongoCursor<BasicDBObject> severitiesCursor = TestingRunIssuesDao.instance.getMCollection().aggregate(pipeline, BasicDBObject.class).cursor();
+
+        while(severitiesCursor.hasNext()) {
+            try {
+                BasicDBObject basicDBObject = severitiesCursor.next();
+                BasicDBObject id = (BasicDBObject) basicDBObject.get(Constants.ID);
+
+                String severity = id.getString(TestingRunIssues.KEY_SEVERITY);
+                int apiCollectionId = id.getInt(SingleTypeInfo._API_COLLECTION_ID);
+                String url = id.getString(SingleTypeInfo._URL);
+                String method = id.getString(SingleTypeInfo._METHOD);
+
+                int count = basicDBObject.getInt("count");
+                ApiInfoKey apiInfoKey = new ApiInfoKey(apiCollectionId, url, Method.valueOf(method));
+                if(resultMap.containsKey(apiInfoKey)){
+                    Map<String,Integer> severityMap = resultMap.get(apiInfoKey);
+                    severityMap.put(severity, count);
+                }else{
+                    Map<String,Integer> severityMap = new HashMap<>();
+                    severityMap.put(severity, count);
+                    resultMap.put(apiInfoKey, severityMap);
+                }
+
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+        return resultMap;
+
+    }
   
-    public Map<String, Integer> getTotalSubcategoriesCountMap(int startTimeStamp, int endTimeStamp){
+    public Map<String, Integer> getTotalSubcategoriesCountMap(int startTimeStamp, int endTimeStamp, Set<Integer> deactivatedCollections){
         List<Bson> pipeline = new ArrayList<>();
+        if(deactivatedCollections == null) deactivatedCollections = new HashSet<>();
 
         pipeline.add(Aggregates.match(Filters.and(
                 Filters.eq(TestingRunIssues.TEST_RUN_ISSUES_STATUS, "OPEN"),
                 Filters.lte(TestingRunIssues.LAST_SEEN, endTimeStamp),
-                Filters.gte(TestingRunIssues.LAST_SEEN, startTimeStamp)
+                Filters.gte(TestingRunIssues.LAST_SEEN, startTimeStamp),
+                Filters.nin("_id.apiInfoKey.apiCollectionId", deactivatedCollections)
             )
         ));
+
+        try {
+            List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
+            if(collectionIds != null) {
+                pipeline.add(Aggregates.match(Filters.in(SingleTypeInfo._COLLECTION_IDS, collectionIds)));
+            }
+        } catch(Exception e){
+        }
+
         BasicDBObject groupedId = new BasicDBObject("subCategory", "$_id.testSubCategory");
         pipeline.add(Aggregates.group(groupedId, Accumulators.sum("count", 1)));
 
@@ -128,6 +218,13 @@ public class TestingRunIssuesDao extends AccountsContextDao<TestingRunIssues> {
         List<Bson> pipeline = new ArrayList<>();
         pipeline.add(Aggregates.match(Filters.gte(TestingRunIssues.LAST_SEEN, startTimestamp)));
         pipeline.add(Aggregates.match(Filters.lte(TestingRunIssues.LAST_SEEN, endTimestamp)));
+        try {
+            List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
+            if(collectionIds != null) {
+                pipeline.add(Aggregates.match(Filters.in(SingleTypeInfo._COLLECTION_IDS, collectionIds)));
+            }
+        } catch(Exception e){
+        }
         pipeline.add(Aggregates.project(Projections.computed("dayOfYearFloat", new BasicDBObject("$divide", new Object[]{"$lastSeen", 86400}))));
         pipeline.add(Aggregates.project(Projections.computed("dayOfYear", new BasicDBObject("$floor", new Object[]{"$dayOfYearFloat"}))));
 
@@ -201,5 +298,10 @@ public class TestingRunIssuesDao extends AccountsContextDao<TestingRunIssues> {
     @Override
     public Class<TestingRunIssues> getClassT() {
         return TestingRunIssues.class;
+    }
+
+    @Override
+    public String getFilterKeyString(){
+        return TestingEndpoints.getFilterPrefix(ApiCollectionUsers.CollectionType.Id_ApiInfoKey_ApiCollectionId) + ApiInfoKey.API_COLLECTION_ID;
     }
 }

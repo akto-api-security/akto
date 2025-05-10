@@ -1,6 +1,6 @@
 import { Spinner } from "@shopify/polaris"
 
-const SpinnerCentered = ({ height }) => {
+const SpinnerCentered = () => {
 
     return (
         <div style={{width: "100%", height: "50vh", display: "flex", alignItems: "center", justifyContent: "center"}}>

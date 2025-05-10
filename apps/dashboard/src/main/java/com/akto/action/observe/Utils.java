@@ -44,4 +44,30 @@ public class Utils {
         }
         return escaped.toString();
     }
+
+    public static boolean isInputSanitized(String value, StringBuilder error, int maxValueLength){
+        if (value == null || value.isEmpty()) {
+            error.append("Value cannot be null or empty");
+            return false;
+        }
+
+        if (value.length() > maxValueLength) {
+            error.append("Value cannot be greater than ").append(maxValueLength).append(" characters");
+            return false;
+        }
+
+        for (char c : value.toCharArray()) {
+            boolean alphabets = (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z');
+            boolean numbers = c >= '0' && c <= '9';
+            boolean specialChars = c == '-' || c == '.' || c == '_' || c == '/' || c == '+';
+            boolean spaces = c == ' ';
+
+            if (!(alphabets || numbers || specialChars || spaces)) {
+                error.append("Value names can only be alphanumeric and contain '-','.','_','/' and '_'");
+                return false;
+
+            }
+        }
+        return true;
+    }
 }

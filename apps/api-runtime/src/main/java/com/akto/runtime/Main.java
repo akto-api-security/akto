@@ -4,7 +4,6 @@ import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
 
 import com.akto.DaoInit;
@@ -16,6 +15,7 @@ import com.akto.kafka.Kafka;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.parsers.HttpCallParser;
+import com.akto.util.filter.DictionaryFilter;
 import com.akto.runtime.utils.Utils;
 import com.akto.util.AccountTask;
 import com.akto.util.DashboardMode;
@@ -149,6 +149,8 @@ public class Main {
             fetchAllSTI = false;
         }
         int maxPollRecordsConfig = Integer.parseInt(System.getenv("AKTO_KAFKA_MAX_POLL_RECORDS_CONFIG"));
+
+        DictionaryFilter.readDictionaryBinary();
 
         if (topicName == null) topicName = "akto.api.logs";
 

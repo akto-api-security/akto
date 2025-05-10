@@ -10,6 +10,7 @@ import Store from '../../../store';
 import InformationBannerComponent from "./shared/InformationBannerComponent";
 import SpinnerCentered from "../../../components/progress/SpinnerCentered"
 import { QuestionMarkMinor } from "@shopify/polaris-icons"
+import testingApi from '../../testing/api';
 
 
 function PostmanSource() {
@@ -23,6 +24,8 @@ function PostmanSource() {
     const [importType, setImportType] = useState('ONLY_SUCCESSFUL_APIS');
     const [uploadId, setUploadId] = useState('');
     const [intervalId, setIntervalId] = useState(null);
+    const [miniTestingServiceNames, setMiniTestingServiceNames] = useState([]);
+    const [selectedMiniTestingService, setSelectedMiniTestingService] = useState('');
 
     const setToastConfig = Store(state => state.setToastConfig)
     const setToast = (isActive, isError, message) => {
@@ -33,9 +36,10 @@ function PostmanSource() {
         })
     }
 
-    const handleSelectChange = (id) =>{
-        setSelected(id)
-    }
+    const handleSelectChange = (value) => {
+        setSelected(value);
+    };
+
     const handleChange = (val) => {
         setType(val)
     }
@@ -75,6 +79,22 @@ function PostmanSource() {
         }
     }, [postmanKey]);
 
+    useEffect(() => {
+        // Fetch mini testing service names when component mounts
+        testingApi.fetchMiniTestingServiceNames().then(({miniTestingServiceNames}) => {
+            const miniTestingServiceNamesOptions = (miniTestingServiceNames || []).map(name => {
+                return {
+                    label: name,
+                    value: name
+                }
+            });
+            setMiniTestingServiceNames(miniTestingServiceNamesOptions);
+            if (miniTestingServiceNamesOptions.length > 0) {
+                setSelectedMiniTestingService(miniTestingServiceNamesOptions[0].value);
+            }
+        });
+    }, []);
+
     const ApiKeySteps = [
         {
             text: "Open Postman. Click on Profile in the top-right corner of the screen."
@@ -105,6 +125,10 @@ function PostmanSource() {
 
     const toggleResponse = useCallback(newChecked => setAllowResponses(newChecked),[],);
 
+    const handleMiniTestingServiceChange = (value) => {
+        setSelectedMiniTestingService(value);
+    };
+
     const apiActionComponent = (
         <div>
             <VerticalStack gap="1" >
@@ -115,6 +139,16 @@ function PostmanSource() {
                 <span>5. Select workspace you wish to import:  </span>
                 <Dropdown menuItems={workspaces} selected={handleSelectChange} initial={selected}/>
             </VerticalStack>
+            {miniTestingServiceNames.length > 0 && (
+                <VerticalStack gap="1">
+                    <span>6. Select testing module: </span>
+                    <Dropdown 
+                        menuItems={miniTestingServiceNames} 
+                        selected={handleMiniTestingServiceChange} 
+                        initial={selectedMiniTestingService}
+                    />
+                </VerticalStack>
+            )}
         </div>
     )
 
@@ -128,8 +162,18 @@ function PostmanSource() {
 
     const collectionComponent = (
         <div>
+            {miniTestingServiceNames.length > 0 && (
+                <VerticalStack gap="1">
+                    <span>4. Select testing module: </span>
+                    <Dropdown 
+                        menuItems={miniTestingServiceNames} 
+                        selected={handleMiniTestingServiceChange} 
+                        initial={selectedMiniTestingService}
+                    />
+                </VerticalStack>
+            )}
             <VerticalStack gap="1">
-                <span>4. Upload postman collection:</span>
+                <span>5. Upload postman collection:</span>
                 
                 <HorizontalStack gap="2" >
                     {files ? 
@@ -146,7 +190,7 @@ function PostmanSource() {
 
     const importCollection = async() => {
         setLoading(true)
-        await api.importPostmanWorkspace(selected,allowResponses,postmanKey).then((resp)=> {
+        await api.importPostmanWorkspace(selected,allowResponses,postmanKey, selectedMiniTestingService).then((resp)=> {
             let uploadId = resp.uploadId;
             setLoading(false)
             setToast(true, false, "Workspace imported successfully")
@@ -170,7 +214,7 @@ function PostmanSource() {
 
     const uploadCollection = async() => {
         setLoading(true)
-        await api.importDataFromPostmanFile(files.content, allowResponses).then((resp)=> {
+        await api.importDataFromPostmanFile(files.content, allowResponses, selectedMiniTestingService).then((resp)=> {
             let uploadId = resp.uploadId;
             setLoading(false)
             setToast(true, false, "File uploaded successfully.")

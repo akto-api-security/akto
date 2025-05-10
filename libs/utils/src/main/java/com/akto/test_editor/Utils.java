@@ -1,6 +1,5 @@
 package com.akto.test_editor;
 
-import java.util.*;
 import java.io.IOException;
 import java.net.URI;
 import java.util.ArrayList;
@@ -17,10 +16,13 @@ import java.util.regex.Pattern;
 
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.RawApi;
+import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.ApiInfo.ApiAccessType;
+import com.akto.dto.ApiInfo;
 import com.akto.dto.test_editor.ExecutorSingleOperationResp;
 import com.akto.dto.testing.UrlModifierPayload;
+import com.akto.test_editor.execution.Operations;
 import com.akto.util.Constants;
 import com.akto.util.DashboardMode;
 import com.akto.util.JSONUtils;
@@ -46,21 +48,19 @@ public class Utils {
 
     public static boolean SKIP_SSRF_CHECK = ("true".equalsIgnoreCase(System.getenv("SKIP_SSRF_CHECK")) || !DashboardMode.isSaasDeployment());
 
-    private static final OkHttpClient client = CoreHTTPClient.client.newBuilder()
-        .writeTimeout(5, TimeUnit.SECONDS)
-        .readTimeout(5, TimeUnit.SECONDS)
-        .callTimeout(5, TimeUnit.SECONDS)
-        .build();
+    private static final OkHttpClient client = createHttpClient();
+
+    private static OkHttpClient createHttpClient() {
+        return CoreHTTPClient.client.newBuilder()
+            .writeTimeout(5, TimeUnit.SECONDS)
+            .readTimeout(5, TimeUnit.SECONDS)
+            .callTimeout(5, TimeUnit.SECONDS)
+            .build();
+    }
 
     public static Boolean checkIfContainsMatch(String text, String keyword) {
         Pattern pattern = Pattern.compile(keyword);
-        Matcher matcher = pattern.matcher(text);
-        String match = null;
-        if (matcher.find()) {
-            match = matcher.group(0);
-        }
-
-        return match != null;
+        return pattern.matcher(text).find();
     }
 
     public static boolean deleteKeyFromPayload(Object obj, String parentKey, String queryKey) {
@@ -75,6 +75,10 @@ public class Utils {
                     continue;
                 }
                 Object value = basicDBObject.get(key);
+                if (key.equalsIgnoreCase(queryKey)) {
+                    basicDBObject.remove(key);
+                    return true;
+                }
                 if (!( (value instanceof BasicDBObject) || (value instanceof BasicDBList) )) {
                     if (key.equalsIgnoreCase(queryKey)) {
                         basicDBObject.remove(key);
@@ -99,56 +103,7 @@ public class Utils {
     }
 
     public static boolean modifyValueInPayload(Object obj, String parentKey, String queryKey, Object queryVal) {
-        boolean res = false;
-        if (obj instanceof BasicDBObject) {
-            BasicDBObject basicDBObject = (BasicDBObject) obj;
-
-            Set<String> keySet = basicDBObject.keySet();
-
-            for(String key: keySet) {
-                if (key == null) {
-                    continue;
-                }
-                Object value = basicDBObject.get(key);
-
-                if (!( (value instanceof BasicDBObject) || (value instanceof BasicDBList) )) {
-                    if (key.equalsIgnoreCase(queryKey)) {
-                        basicDBObject.remove(key);
-                        basicDBObject.put(queryKey, queryVal);
-                        return true;
-                    }
-                }
-
-                if (value instanceof BasicDBList) {
-                    BasicDBList valList = (BasicDBList) value;
-                    if (valList.size() == 0 && key.equalsIgnoreCase(queryKey)) {
-                        List<Object> queryList = Collections.singletonList(queryVal);
-                        basicDBObject.remove(key);
-                        basicDBObject.put(queryKey, queryList);
-                        return true;
-                    } else if (valList.size() > 0 && !( (valList.get(0) instanceof BasicDBObject) || (valList.get(0) instanceof BasicDBList) ) && key.equalsIgnoreCase(queryKey)) {
-                        List<Object> queryList = Collections.singletonList(queryVal);
-                        basicDBObject.remove(key);
-                        basicDBObject.put(queryKey, queryList);
-                        return true;
-                    }
-                }
-
-                res = modifyValueInPayload(value, key, queryKey, queryVal);
-                if (res) {
-                    break;
-                }
-            }
-        } else if (obj instanceof BasicDBList) {
-            for(Object elem: (BasicDBList) obj) {
-                res = modifyValueInPayload(elem, parentKey, queryKey, queryVal);
-                if (res) {
-                    break;
-                }
-            }
-        }
-
-        return res;
+        return com.akto.dto.test_editor.Util.modifyValueInPayload(obj, parentKey, queryKey, queryVal);
     }
 
     public static String applyRegexModifier(String data, String regex, String replaceWith) {
@@ -449,8 +404,8 @@ public class Utils {
 
     public static double calcStructureMatchPercentage(String payload, String compareWithPayload) {
 
-        boolean isOrigPAyloadJson = isJsonPayload(payload);
-        boolean isCurPAyloadJson = isJsonPayload(compareWithPayload);
+        boolean isOrigPAyloadJson = isValidJson(payload);
+        boolean isCurPAyloadJson = isValidJson(compareWithPayload);
         if (!isOrigPAyloadJson && !isCurPAyloadJson) {
             return 100;
         }
@@ -519,6 +474,18 @@ public class Utils {
             return false;
         }
         return true;
+    }
+
+    public static boolean isValidJson(String payload) {
+        try {
+            if (payload.length() == 0) {
+                return false;
+            }
+            mapper.readTree(payload);
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
     }
 
     public static UrlModifierPayload fetchUrlModifyPayload(String payload) {
@@ -875,5 +842,135 @@ public class Utils {
         }
         return escaped.toString();
     }
+
+    public static ExecutorSingleOperationResp modifySampleDataUtil(String operationType, RawApi rawApi, Object key, Object value, Map<String, Object> varMap, ApiInfo.ApiInfoKey apiInfoKey){
+        switch (operationType.toLowerCase()) {
+            case "add_body_param":
+                Object epochVal = Utils.getEpochTime(value);
+                if (epochVal != null) {
+                    value = epochVal;
+                }
+                return Operations.addBody(rawApi, key.toString(), value);
+            case "modify_body_param":
+                epochVal = Utils.getEpochTime(value);
+                if (epochVal != null) {
+                    value = epochVal;
+                }
+                return Operations.modifyBodyParam(rawApi, key.toString(), value);
+            case "delete_graphql_field":
+                return Operations.deleteGraphqlField(rawApi, key == null ? "": key.toString());
+            case "add_graphql_field":
+                return Operations.addGraphqlField(rawApi, key == null ? "": key.toString(), value == null ? "" : value.toString());
+            case "add_unique_graphql_field":
+                return Operations.addUniqueGraphqlField(rawApi, key == null ? "": key.toString(), value == null ? "" : value.toString());
+            case "modify_graphql_field":
+                return Operations.modifyGraphqlField(rawApi, key == null ? "": key.toString(), value == null ? "" : value.toString());
+            case "delete_body_param":
+                return Operations.deleteBodyParam(rawApi, key.toString());
+            case "replace_body":
+                String newPayload = rawApi.getRequest().getBody();
+                if (key instanceof Map) {
+                    Map<String, Map<String, String>> regexReplace = (Map) key;
+                    String payload = rawApi.getRequest().getBody();
+                    Map<String, String> regexInfo = regexReplace.get("regex_replace");
+                    String regex = regexInfo.get("regex");
+                    String replaceWith = regexInfo.get("replace_with");
+                    newPayload = Utils.applyRegexModifier(payload, regex, replaceWith);
+                } else if (key instanceof String && key != "" && ((String) key).contains("regex_replace")) {
+                    Map<String, Map<String, String>> regexReplace = parseStringToMap((String) key);
+                    String payload = rawApi.getRequest().getBody();
+                    Map<String, String> regexInfo = regexReplace.get("regex_replace");
+                    String regex = regexInfo.get("regex");
+                    String replaceWith = regexInfo.get("replace_with");
+                    newPayload = Utils.applyRegexModifier(payload, regex, replaceWith);
+                } else {
+                    newPayload = key.toString();
+                }
+                return Operations.replaceBody(rawApi, newPayload);
+            case "add_header":
+                if (value.equals("${akto_header}")) {
+                    BasicDBObject tokenResponse = OrganizationsDao.getBillingTokenForAuth();
+                    if(tokenResponse.getString("token") != null){
+                        value = tokenResponse.getString("token");
+                    }else{
+                        return new ExecutorSingleOperationResp(false, tokenResponse.getString("error"));
+                    }
+                }
+                epochVal = Utils.getEpochTime(value);
+                if (epochVal != null) {
+                    value = epochVal;
+                }
+
+                return Operations.addHeader(rawApi, key.toString(), value.toString());
+            case "modify_header":
+                String keyStr = key.toString();
+                String valStr = value.toString();
+                epochVal = Utils.getEpochTime(valStr);
+                if (epochVal != null) {
+                    valStr = epochVal.toString();
+                }
+                return Operations.modifyHeader(rawApi, keyStr, valStr);
+            case "delete_header":
+                return Operations.deleteHeader(rawApi, key.toString());
+            case "add_query_param":
+                epochVal = Utils.getEpochTime(value);
+                if (epochVal != null) {
+                    value = epochVal;
+                }
+                return Operations.addQueryParam(rawApi, key.toString(), value);
+            case "modify_query_param":
+                epochVal = Utils.getEpochTime(value);
+                if (epochVal != null) {
+                    value = epochVal;
+                }
+                return Operations.modifyQueryParam(rawApi, key.toString(), value);
+            case "delete_query_param":
+                return Operations.deleteQueryParam(rawApi, key.toString());
+            case "modify_url":
+                String newUrl = null;
+                UrlModifierPayload urlModifierPayload = Utils.fetchUrlModifyPayload(key.toString());
+                if (urlModifierPayload != null) {
+                    newUrl = Utils.buildNewUrl(urlModifierPayload, rawApi.getRequest().getUrl());
+                } else {
+                    newUrl = key.toString();
+                }
+                return Operations.modifyUrl(rawApi, newUrl);
+            case "modify_method":
+                return Operations.modifyMethod(rawApi, key.toString());
+            default:
+                return new ExecutorSingleOperationResp(false, "invalid operationType");
+        }
+            
+    }
+
+    public static Map<String, Map<String, String>> parseStringToMap(String mapString) {
+
+        mapString = mapString.trim();
+        if (mapString.startsWith("{") && mapString.endsWith("}")) {
+            mapString = mapString.substring(1, mapString.length() - 1);
+        }
+
+        Map<String, Map<String, String>> resultMap = new HashMap<>();
+        String[] entries = mapString.split("=", 2);
+
+        String outerKey = entries[0].trim();
+        String innerMapString = entries[1].trim();
+
+        innerMapString = innerMapString.substring(1, innerMapString.length() - 1);
+
+        Map<String, String> innerMap = new HashMap<>();
+        String[] innerEntries = innerMapString.split(", ");
+
+        for (String innerEntry : innerEntries) {
+            String[] innerKeyValue = innerEntry.split("=", 2);
+            String innerKey = innerKeyValue[0].trim();
+            String innerValue = innerKeyValue[1].trim();
+            innerMap.put(innerKey, innerValue);
+        }
+
+        resultMap.put(outerKey, innerMap);
+        return resultMap;
+    }
+
 
 }

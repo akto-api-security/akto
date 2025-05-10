@@ -1,7 +1,5 @@
 package com.akto.test_editor.filter.data_operands_impl;
 
-import static org.mockito.Answers.valueOf;
-
 import java.util.List;
 
 import com.akto.dao.test_editor.TestEditorEnums;
@@ -23,6 +21,11 @@ public class EqFilter extends DataOperandsImpl {
                     return new ValidationResult(false, TestEditorEnums.DataOperands.EQ.name().toLowerCase() + " validation failed because of empty query");
                 }
                 result = data.toString().trim().toLowerCase().equals(queryList.get(0).trim().toLowerCase());
+                if (result) {
+                    return new ValidationResult(result, TestEditorEnums.DataOperands.EQ.name().toLowerCase() + " validation passed ");
+                } else {
+                    return new ValidationResult(result, TestEditorEnums.DataOperands.EQ.name().toLowerCase() + " validation failed because: string query do not match");
+                }
             }
 
             if (data instanceof Integer) {

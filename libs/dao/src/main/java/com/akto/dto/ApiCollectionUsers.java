@@ -10,6 +10,7 @@ import java.util.concurrent.TimeUnit;
 
 import org.bson.conversions.Bson;
 import java.util.Collections;
+
 import org.bson.types.ObjectId;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -26,6 +27,7 @@ import com.akto.dao.TrafficInfoDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.demo.VulnerableRequestForTemplateDao;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
+import com.akto.dto.rbac.UsersCollectionsList;
 import com.akto.dto.testing.CustomTestingEndpoints;
 import com.akto.dto.testing.SensitiveDataEndpoints;
 import com.akto.dto.testing.TestingEndpoints;
@@ -34,6 +36,7 @@ import com.akto.dto.type.SingleTypeInfo;
 import com.akto.util.Constants;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.MongoCursor;
+import com.mongodb.client.model.Accumulators;
 import com.mongodb.client.model.Aggregates;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
@@ -68,14 +71,17 @@ public class ApiCollectionUsers {
             });
         }});
 
-    public static List<BasicDBObject> getSingleTypeInfoListFromConditions(List<TestingEndpoints> conditions, int skip, int limit, int deltaPeriodValue) {
+    public static List<BasicDBObject> getSingleTypeInfoListFromConditions(List<TestingEndpoints> conditions, int skip, int limit, int deltaPeriodValue, List<Integer> deactivatedCollections) {
         if(conditions == null || conditions.isEmpty()){
             return new ArrayList<>();
         }
         Bson singleTypeInfoFilters = getFilters(conditions, CollectionType.ApiCollectionId);
+        if (deactivatedCollections != null && !deactivatedCollections.isEmpty()) {
+            singleTypeInfoFilters = Filters.and(singleTypeInfoFilters, Filters.nin(SingleTypeInfo._API_COLLECTION_ID, deactivatedCollections));
+        }
         return ApiCollectionsDao.fetchEndpointsInCollection(singleTypeInfoFilters, skip, limit, deltaPeriodValue);
     }
-    public static int getApisCountFromConditions(List<TestingEndpoints> conditions) {
+    public static int getApisCountFromConditions(List<TestingEndpoints> conditions, List<Integer> deactivatedCollections) {
 
         if(conditions == null || conditions.isEmpty()){
             return 0;
@@ -83,7 +89,47 @@ public class ApiCollectionUsers {
 
         Bson apiInfoFilters = getFilters(conditions, CollectionType.Id_ApiCollectionId);
 
+        if ( deactivatedCollections != null && !deactivatedCollections.isEmpty()) {
+            apiInfoFilters = Filters.and(apiInfoFilters, Filters.nin("_id.apiCollectionId", deactivatedCollections));
+        }
+
         return (int) ApiInfoDao.instance.count(apiInfoFilters);
+    }
+
+    public static int getApisCountFromConditionsWithStis(List<TestingEndpoints> conditions, List<Integer> deactivatedCollections){
+        if(conditions == null || conditions.isEmpty()){
+            return 0;
+        }
+
+        Bson stiFiltes = getFilters(conditions, CollectionType.ApiCollectionId);
+        List<Bson> pipeLine = new ArrayList<>();
+        pipeLine.add(Aggregates.match(stiFiltes));
+
+        try {
+            List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
+            if(collectionIds != null) {
+                pipeLine.add(Aggregates.match(Filters.in(SingleTypeInfo._COLLECTION_IDS, collectionIds)));
+            }
+        } catch(Exception e){
+        }
+
+        pipeLine.add(Aggregates.match(Filters.and(
+            Filters.eq(SingleTypeInfo._RESPONSE_CODE, -1),
+            Filters.eq(SingleTypeInfo._IS_HEADER, true)
+        )));
+        BasicDBObject groupedId = SingleTypeInfoDao.getApiInfoGroupedId();
+        pipeLine.add(Aggregates.group(groupedId, Accumulators.sum("count", 1)));
+        pipeLine.add(Aggregates.count("finalCount"));
+
+        int ansCount = 0;
+
+        MongoCursor<BasicDBObject> countCursor = SingleTypeInfoDao.instance.getMCollection().aggregate(pipeLine, BasicDBObject.class).cursor();
+        while(countCursor.hasNext()){
+            BasicDBObject dbObject = countCursor.next();
+            ansCount = dbObject.getInt("finalCount");
+        }
+
+        return ansCount;
     }
 
     public static void updateApiCollection(List<TestingEndpoints> conditions, int id) {
@@ -195,7 +241,7 @@ public class ApiCollectionUsers {
 
     private static void updateCollections(MCollection<?>[] collections, Bson filter, Bson update) {
         for (MCollection<?> collection : collections) {
-            collection.getMCollection().updateMany(filter, update);
+            UpdateResult res = collection.getMCollection().updateMany(filter, update);
         }
     }
 

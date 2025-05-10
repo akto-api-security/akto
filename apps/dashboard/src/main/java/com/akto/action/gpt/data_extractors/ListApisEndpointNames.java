@@ -2,16 +2,14 @@ package com.akto.action.gpt.data_extractors;
 
 import com.akto.action.gpt.data_extractors.filters.Filter;
 import com.akto.action.observe.Utils;
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import com.mongodb.BasicDBObject;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.util.ArrayList;
 import java.util.List;
 
 public class ListApisEndpointNames implements DataExtractor<String>{
-
-    private static final Logger logger = LoggerFactory.getLogger(ListApisEndpointNames.class);
+    private static final LoggerMaker logger = new LoggerMaker(ListApisEndpointNames.class, LogDb.DASHBOARD);
 
     private final List<Filter<String>> filters;
 
@@ -22,6 +20,7 @@ public class ListApisEndpointNames implements DataExtractor<String>{
     public ListApisEndpointNames(List<Filter<String>> filters){
         this.filters = filters;
     }
+
     @Override
     public List<String> extractData(BasicDBObject meta) {
         int apiCollectionId = meta.getInt("apiCollectionId", -1);
@@ -52,7 +51,7 @@ public class ListApisEndpointNames implements DataExtractor<String>{
                 result = filter.filterData(result);
                 int newSize = result.size();
                 if(originalSize > newSize){
-                    logger.info("Filtered " + (originalSize - newSize) + " endpoints");
+                    logger.debug("Filtered " + (originalSize - newSize) + " endpoints");
                 }
             }
         }

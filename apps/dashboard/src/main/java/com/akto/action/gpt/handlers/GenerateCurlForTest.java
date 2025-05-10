@@ -4,20 +4,14 @@ import com.akto.action.ExportSampleDataAction;
 import com.akto.action.gpt.GptAction;
 import com.akto.action.gpt.result_fetchers.ResultFetcherStrategy;
 import com.akto.action.gpt.utils.HeadersUtils;
-import com.akto.dto.OriginalHttpRequest;
-import com.google.gson.Gson;
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import com.mongodb.BasicDBObject;
-
 import java.util.List;
-import java.util.Map;
-
-import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 public class GenerateCurlForTest implements QueryHandler{
-    private static final Logger logger = LoggerFactory.getLogger(GenerateCurlForTest.class);
+    private static final LoggerMaker logger = new LoggerMaker(GenerateCurlForTest.class, LogDb.DASHBOARD);
     private final ResultFetcherStrategy<BasicDBObject> resultFetcherStrategy;
 
     public GenerateCurlForTest(ResultFetcherStrategy<BasicDBObject> resultFetcherStrategy) {
@@ -33,7 +27,7 @@ public class GenerateCurlForTest implements QueryHandler{
         String modifiedSampleData = modifiedHeaders.getLeft();
         try {
             curl = ExportSampleDataAction.getCurl(modifiedSampleData);
-            logger.info("curl: " + curl);
+            logger.debug("curl: " + curl);
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -42,7 +36,7 @@ public class GenerateCurlForTest implements QueryHandler{
         request.put("test_type", meta.getString("test_type"));
         request.put("response_details", meta.getString("response_details"));
         request.put(GptAction.USER_EMAIL, meta.getString(GptAction.USER_EMAIL));
-        logger.info("request: " + request.toJson());
+        logger.debug("request: " + request.toJson());
         BasicDBObject resp =  this.resultFetcherStrategy.fetchResult(request);
         String respStr = resp.toJson();
         respStr = HeadersUtils.replaceHeadersWithValues(Pair.of(respStr, modifiedHeaders.getRight()));

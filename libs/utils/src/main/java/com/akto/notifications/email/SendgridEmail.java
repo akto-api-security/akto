@@ -106,6 +106,33 @@ public class SendgridEmail {
         return mail;
     }
 
+    public Mail buildPasswordResetEmail(String email, String passwordResetTokenUrl) {
+        Mail mail = new Mail();
+
+        Email fromEmail = new Email();
+        fromEmail.setName("Ankita");
+        fromEmail.setEmail("ankita.gupta@akto.io");
+        mail.setFrom(fromEmail);
+
+        Personalization personalization = new Personalization();
+        Email to = new Email();
+        to.setEmail(email);
+        personalization.addTo(to);
+        mail.addPersonalization(personalization);
+
+        Content content = new Content();
+        content.setType("text/html");
+        content.setValue("Hello,");
+        mail.addContent(content);
+
+        mail.setTemplateId("d-266210cb361b4b659289a72aef04edfa");
+
+        personalization.addDynamicTemplateData("aktoUrl", passwordResetTokenUrl);
+        personalization.addDynamicTemplateData("supportEmail", "support@akto.io");
+
+        return mail;
+    }
+
     private Object extractOrgName(String inviteFrom) {
         if (inviteFrom.indexOf('@')<0){
             return ("akto.io");

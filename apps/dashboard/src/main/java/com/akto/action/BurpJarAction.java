@@ -41,7 +41,7 @@ import java.util.jar.JarOutputStream;
 
 public class BurpJarAction extends UserAction implements ServletResponseAware, ServletRequestAware {
 
-    private static final LoggerMaker loggerMaker = new LoggerMaker(BurpJarAction.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(BurpJarAction.class, LogDb.DASHBOARD);;
 
     private ApiToken apiToken;
     private String host;

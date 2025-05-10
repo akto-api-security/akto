@@ -6,7 +6,7 @@ import { IndexTable, useIndexResourceState, LegacyCard, HorizontalStack, Paginat
 import { GithubRow } from '../../../components/tables/rows/GithubRow'
 import observeFunc from "../../observe/transform"
 
-function SummaryTable({testingRunResultSummaries}) {
+function SummaryTable({testingRunResultSummaries, setSummary}) {
 
     const [data, setData] = useState([])
 
@@ -57,6 +57,9 @@ function SummaryTable({testingRunResultSummaries}) {
     useIndexResourceState(data, {
       resourceIDResolver,
     });
+    const handleRowClick = (x) => {
+        setSummary(x)
+    }
 
     let tmp = data && data.length <= pageLimit ? data :
     data.slice(page * pageLimit, Math.min((page + 1) * pageLimit, data.length))
@@ -76,6 +79,7 @@ function SummaryTable({testingRunResultSummaries}) {
                 newRow={true}
                 headings={headers}
                 selectedResources={selectedResources}
+                onRowClick={handleRowClick}
             />
         ),
     );

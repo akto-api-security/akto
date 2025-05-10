@@ -2,31 +2,34 @@ package com.akto.action.testing;
 
 import com.akto.action.UserAction;
 import com.akto.dao.AuthMechanismsDao;
-import com.akto.dao.testing.LoginFlowStepsDao;
 import com.akto.dao.testing.TestRolesDao;
 import com.akto.dao.testing.TestingRunDao;
 import com.akto.dao.testing.WorkflowTestResultsDao;
-import com.akto.dto.testing.*;
+import com.akto.dto.testing.AuthMechanism;
+import com.akto.dto.testing.AuthParam;
+import com.akto.dto.testing.AuthParamData;
+import com.akto.dto.testing.HardcodedAuthParam;
+import com.akto.dto.testing.LoginFlowParams;
+import com.akto.dto.testing.LoginFlowResponse;
+import com.akto.dto.testing.LoginRequestAuthParam;
+import com.akto.dto.testing.RequestData;
+import com.akto.dto.testing.TestingRun;
+import com.akto.dto.testing.WorkflowTestResult;
+import com.akto.dto.testing.WorkflowTestingEndpoints;
 import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import com.akto.testing.TestExecutor;
 import com.akto.util.Constants;
 import com.akto.util.enums.LoginFlowEnums;
-import com.google.gson.Gson;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
-import org.bson.conversions.Bson;
-import org.bson.types.ObjectId;
-import org.json.JSONObject;
-
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 
 public class AuthMechanismAction extends UserAction {
+
+    private static final LoggerMaker loggerMaker = new LoggerMaker(AuthMechanismAction.class, LogDb.DASHBOARD);;
 
     //todo: rename requestData, also add len check
     private ArrayList<RequestData> requestData;
@@ -45,7 +48,6 @@ public class AuthMechanismAction extends UserAction {
 
     private BasicDBObject authMechanismDoc;
 
-    private static final LoggerMaker loggerMaker = new LoggerMaker(AuthMechanismAction.class);
 
     public String addAuthMechanism() {
         // todo: add more validations
@@ -65,7 +67,7 @@ public class AuthMechanismAction extends UserAction {
                     authParamData.get(0).getValue(), true));
             }
             
-        } else {
+        } else if (type.equals(LoginFlowEnums.AuthMechanismTypes.LOGIN_REQUEST.toString())) {
 
             for (AuthParamData param: authParamData) {
                 if (!param.validate()) {
@@ -85,7 +87,8 @@ public class AuthMechanismAction extends UserAction {
     public String triggerLoginFlowSteps() {
         List<AuthParam> authParams = new ArrayList<>();
 
-        if (type.equals(LoginFlowEnums.AuthMechanismTypes.HARDCODED.toString())) {
+        if (type.equals(LoginFlowEnums.AuthMechanismTypes.HARDCODED.toString()) ||
+                type.equals(LoginFlowEnums.AuthMechanismTypes.TLS_AUTH.toString())) {
             addActionError("Invalid Type Value");
             return ERROR.toUpperCase();
         }
@@ -102,7 +105,7 @@ public class AuthMechanismAction extends UserAction {
 
         TestExecutor testExecutor = new TestExecutor();
         try {
-            LoginFlowResponse loginFlowResponse = testExecutor.executeLoginFlow(authMechanism, null);
+            LoginFlowResponse loginFlowResponse = testExecutor.executeLoginFlow(authMechanism, null, null);
             responses = loginFlowResponse.getResponses();
             if (!loginFlowResponse.getSuccess()) {
                 throw new Exception(loginFlowResponse.getError());
@@ -117,7 +120,8 @@ public class AuthMechanismAction extends UserAction {
     public String triggerSingleLoginFlowStep() {
         List<AuthParam> authParams = new ArrayList<>();
 
-        if (type.equals(LoginFlowEnums.AuthMechanismTypes.HARDCODED.toString())) {
+        if (type.equals(LoginFlowEnums.AuthMechanismTypes.HARDCODED.toString()) ||
+                type.equals(LoginFlowEnums.AuthMechanismTypes.TLS_AUTH.toString())) {
             addActionError("Invalid Type Value");
             return ERROR.toUpperCase();
         }
@@ -127,7 +131,7 @@ public class AuthMechanismAction extends UserAction {
         TestExecutor testExecutor = new TestExecutor();
         try {
             LoginFlowParams loginFlowParams = new LoginFlowParams(getSUser().getId(), true, nodeId);
-            LoginFlowResponse loginFlowResponse = testExecutor.executeLoginFlow(authMechanism, loginFlowParams);
+            LoginFlowResponse loginFlowResponse = testExecutor.executeLoginFlow(authMechanism, loginFlowParams, null);
             responses = loginFlowResponse.getResponses();
             if (!loginFlowResponse.getSuccess()) {
                 throw new Exception(loginFlowResponse.getError());
@@ -141,7 +145,7 @@ public class AuthMechanismAction extends UserAction {
 
     public String fetchAuthMechanismData() {
 
-        authMechanism = TestRolesDao.instance.fetchAttackerToken(0);
+        authMechanism = TestRolesDao.instance.fetchAttackerToken(null);
         return SUCCESS.toUpperCase();
     }
 

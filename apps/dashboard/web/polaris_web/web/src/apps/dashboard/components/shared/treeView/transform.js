@@ -201,9 +201,14 @@ const treeViewFunc = {
             return{
                 ...c,
                 id: c.apiCollectionIds || c.id,
-                displayNameComp: c?.isTerminal ? c.displayName: (
+                displayNameComp: c?.isTerminal ? (
+                    <Box maxWidth="180px">
+                        <TooltipText tooltip={c.displayName} text={c.displayName} />
+                    </Box>
+                )
+                : (
                         <HorizontalStack gap={"1"} align="space-between" wrap={false}>
-                            <Box maxWidth="180px">
+                            <Box maxWidth="200px">
                                 <TooltipText tooltip={c.level} text={c.level} textProps={{variant: 'headingSm'}} />
                             </Box>
                             <Badge size="small" status="new">{c?.apiCollectionIds?.length}</Badge>

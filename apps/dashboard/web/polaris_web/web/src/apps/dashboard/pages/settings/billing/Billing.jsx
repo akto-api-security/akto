@@ -45,6 +45,20 @@ function Billing() {
 
             default:
         }
+
+        if (window.PLAN_TYPE && window.PLAN_TYPE.length > 0) {
+            const checkForElement = () => {
+                const elements = document.querySelectorAll('.stigg-subscription-plan-name');
+                if (elements.length > 0) {
+                    elements.forEach(element => {
+                        element.textContent = window.PLAN_TYPE;
+                    });
+                } else {
+                    setTimeout(() => checkForElement(), 500);
+                }
+            };
+            checkForElement();
+        }
     })
 
     async function refreshUsageData(){

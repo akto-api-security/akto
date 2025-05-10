@@ -11,8 +11,6 @@ import org.jetbrains.annotations.NotNull;
 
 import javax.net.ssl.X509TrustManager;
 import java.io.IOException;
-import java.lang.reflect.Array;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;

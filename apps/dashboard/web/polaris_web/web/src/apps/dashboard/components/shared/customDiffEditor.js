@@ -1,5 +1,3 @@
-import func from "@/util/func"
-
 const transform = {
     formatJson(data){
         let allKeys = [];
@@ -136,6 +134,9 @@ const transform = {
                         case 'E':
                             let data2 = this.formatJson(diff.lhs) + "->" + this.formatJson(diff.rhs);
                             res.headersMap[searchKey] = { className: 'updated-content', keyLength: key.length + 2, data: data2 }
+                            break;
+                        default:
+                            break;
                     }
                 }
             }
@@ -256,9 +257,11 @@ const transform = {
                 })
             }
             finalData = finalData.split("\n").sort().join("\n");
-            return (localFirstLine + "\n\n" + finalData + "\n\n" + this.formatJson(payLoad))
+            const isPayloadEmpty = payLoad === null || Object.keys(payLoad).length === 0
+            const isMultiformData = data?.json?.requestHeaders?.['content-type']?.includes('multipart/form-data') && (payLoad == null || Object.keys(payLoad).length === 0)
+            return (localFirstLine + "\n" + finalData + (finalData.trim().length === 0 || isPayloadEmpty ? "\n" : "\n\n") + (!isPayloadEmpty ? (isMultiformData ? payLoad : this.formatJson(payLoad)) : ''))
         }
-        return (data?.firstLine ? data?.firstLine + "\n\n" : "") + (data?.json ? this.formatJson(data.json) : "");
+        return (data?.firstLine ? data?.firstLine + "\n" : "") + (data?.json && Object.keys(data?.json).length > 0 ? this.formatJson(data.json) : "");
       }  
       
 }

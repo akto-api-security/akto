@@ -1,7 +1,8 @@
 import axios from 'axios'
-import PersistStore from '../apps/main/PersistStore';
 import func from "./func"
 import { history } from './history';
+import SessionStore from '../apps/main/SessionStore';
+import LocalStore from '../apps/main/LocalStorageStore';
 
 const accessTokenUrl = "/dashboard/accessToken"
 
@@ -13,7 +14,16 @@ const service = axios.create({
 })
 
 const err = async (error) => {
-  const { status, data } = error.response
+  let status
+  let data
+  if(error.response) {
+    status = error.response.status
+    data = error.response.data
+  } else {
+    status = -1
+    data = {}
+  }
+
   const { errors } = data
   const { actionErrors } = data
   const standardMessage = "OOPS! Something went wrong"
@@ -23,6 +33,9 @@ const err = async (error) => {
   }
 
   switch (status) {
+    case -1:
+      func.setToast(true, true, "Connection error. Please try again later.")
+      break;
     case 400:
       func.setToast(true, true, 'Bad Request ' + data.message);
       break;
@@ -85,7 +98,7 @@ const err = async (error) => {
 service.interceptors.request.use((config) => {
   config.headers['Access-Control-Allow-Origin'] = '*'
   config.headers['Content-Type'] = 'application/json'
-  config.headers["access-token"] = PersistStore.getState().accessToken
+  config.headers["access-token"] = SessionStore.getState().accessToken
 
 
   if (window.ACTIVE_ACCOUNT) {
@@ -99,7 +112,7 @@ service.interceptors.request.use((config) => {
 // For every response that is sent to the vue app, look for access token in header and set it if not null
 service.interceptors.response.use((response) => {
   if (response.headers["access-token"] != null) {
-    PersistStore.getState().storeAccessToken(response.headers["access-token"])
+    SessionStore.getState().storeAccessToken(response.headers["access-token"])
   }
 
   if (['put', 'post', 'delete', 'patch'].includes(response.method) && response.data.meta) {
@@ -109,15 +122,15 @@ service.interceptors.response.use((response) => {
     func.setToast(true, true, response.data.error )
   } else {
     if ( window?.mixpanel?.track && response?.config?.url) {
-      raiseMixpanelEvent(response.config.url);
+      raiseMixpanelEvent(response.config.url, response.data)
     }
   }
 
   return response.data
 }, err)
 
-const black_list_apis = ['dashboard/accessToken', 'api/fetchBurpPluginInfo', 'api/fetchActiveLoaders', 'api/fetchAllSubCategories']
-async function raiseMixpanelEvent(api) {
+const black_list_apis = ['dashboard/accessToken', 'api/fetchBurpPluginInfo', 'api/fetchActiveLoaders', 'api/fetchAllSubCategories', 'api/fetchVulnerableRequests', 'api/fetchActiveTestRunsStatus']
+async function raiseMixpanelEvent(api, data) {
   if (window?.Intercom) {
     if (api?.startsWith("/api/ingestPostman")) {
         window.Intercom("trackEvent", "created-api-collection", {"type": "Postman"})
@@ -144,7 +157,23 @@ async function raiseMixpanelEvent(api) {
     }
   }
   if (api && !black_list_apis.some(black_list_api => api.includes(black_list_api))) {
-    window.mixpanel.track(api)
+    const lastEpoch = Number(LocalStore.getState().lastEndpointEpoch) || 0
+    const now = Date.now()/1000
+    const timeElapsed = now - lastEpoch
+
+    // Check if we should track (first time or more than an hour has passed)
+    const shouldTrack = lastEpoch === 0 || timeElapsed > 3600
+
+    if (shouldTrack) {
+      // Store the timestamp before tracking
+      LocalStore.getState().setLastEndpointEpoch(now)
+
+      if (api?.startsWith('/api/fetchEndpointsCount')) {
+        window.mixpanel.track('endpoints_count', { newCount: data.newCount, version: (window.RELEASE_VERSION || "na") })
+      } else {
+        window.mixpanel.track(api)
+      }
+    }
   }
 }
 

@@ -1,2 +1,0 @@
-${akto-image-tag}
-${akto-build-time}

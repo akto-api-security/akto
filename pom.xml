@@ -16,7 +16,7 @@
         <maven.compiler.target>1.8</maven.compiler.target>
         <sonar.organization>akto-api-security</sonar.organization>
         <sonar.host.url>https://sonarcloud.io</sonar.host.url>
-        <jacoco.version>0.8.5</jacoco.version>     
+        <jacoco.version>0.8.5</jacoco.version>
         <jacoco.reportPath>${project.basedir}/../../target/jacoco.exec</jacoco.reportPath>
     </properties>
 
@@ -24,6 +24,21 @@
         <module>apps</module>
         <module>libs</module>
     </modules>
+
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>org.slf4j</groupId>
+                <artifactId>slf4j-api</artifactId>
+                <version>2.0.17</version>
+            </dependency>
+            <dependency>
+                <groupId>org.slf4j</groupId>
+                <artifactId>slf4j-simple</artifactId>
+                <version>2.0.17</version>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
 
     <build>
         <plugins>
@@ -57,7 +72,7 @@
             <plugin>
                 <groupId>org.eclipse.jetty</groupId>
                 <artifactId>jetty-maven-plugin</artifactId>
-                <version>9.4.36.v20210114</version>
+                <version>9.4.55.v20240627</version>
                 <configuration>
                     <webAppSourceDirectory>web</webAppSourceDirectory>
                     <webApp>
@@ -97,7 +112,30 @@
                     <dataFile>${jacoco.reportPath}</dataFile>
                     <append>true</append>
 				</configuration>
-            </plugin>                 
+            </plugin>
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>exec-maven-plugin</artifactId>
+                <version>3.1.0</version>
+                <executions>
+                    <execution>
+                        <id>run-make-root-only</id>
+                        <phase>compile</phase>
+                        <goals>
+                            <goal>exec</goal>
+                        </goals>
+                        <configuration>
+                            <executable>make</executable>
+                            <arguments>
+                                <argument>proto-gen</argument>
+                                <argument>BUF_TEMPLATE=buf.gen.yaml</argument>
+                            </arguments>
+                            <failOnError>true</failOnError>
+                        </configuration>
+                        <inherited>false</inherited>
+                    </execution>
+                </executions>
+            </plugin>
         </plugins>
     </build>
 
@@ -124,6 +162,11 @@
             <artifactId>jackson-annotations</artifactId>
             <version>2.16.1</version>
         </dependency>
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <version>1.18.38</version>
+            <scope>provided</scope>
+        </dependency>
     </dependencies>
 </project>
-

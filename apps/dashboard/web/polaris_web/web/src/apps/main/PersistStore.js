@@ -1,60 +1,229 @@
-import {create} from "zustand"
-import {devtools, persist, createJSONStorage} from "zustand/middleware"
+import { create } from "zustand";
+import { devtools, persist } from "zustand/middleware";
+
+import pako from "pako"; // Gzip Compression
+
+// Custom Storage with Gzip Compression
+const gzipStorage = {
+    getItem: (name) => {
+        const compressedData = sessionStorage.getItem(name);
+        if (!compressedData) return null;
+
+        try {
+            // Decode base64 & Gunzip (decompress)
+            const binaryData = atob(compressedData);
+            const uint8Array = new Uint8Array(binaryData.length);
+            for (let i = 0; i < binaryData.length; i++) {
+                uint8Array[i] = binaryData.charCodeAt(i);
+            }
+            const decompressed = pako.inflate(uint8Array, { to: "string" });
+            return JSON.parse(decompressed);
+        } catch (error) {
+            console.error("Error decompressing state:", error);
+            return null;
+        }
+    },
+    setItem: (name, value) => {
+        try {
+            // Stringify, Gzip compress, then convert to Base64
+            const jsonString = JSON.stringify(value);
+            const compressed = pako.deflate(jsonString, { level: 9 });
+            const binaryString = Array.from(compressed)
+                .map((byte) => String.fromCharCode(byte))
+                .join("");
+            const base64Encoded = btoa(binaryString);
+            sessionStorage.setItem(name, base64Encoded);
+        } catch (error) {
+            console.error("Error compressing state:", error);
+        }
+    },
+    removeItem: (name) => sessionStorage.removeItem(name),
+};
 
 const initialState = {
     quickstartTasksCompleted: 0,
     subCategoryFromSourceConfigMap: {},
     active: '',
-    collectionsMap: {},
-    allCollections: [],
-    hostNameMap: {},
-    lastFetchedInfo: {
-      lastRiskScoreInfo: 0,
-      lastSensitiveInfo: 0,
-    },
-    lastFetchedResp: {
-      criticalUrls: 0,
-      riskScoreMap: {},
-    },
+    allCollections: [], // Persist only this
+    collectionsMap: {}, // Keep in memory (not persisted)
+    hostNameMap: {}, // Keep in memory (not persisted)
+    lastFetchedInfo: { lastRiskScoreInfo: 0, lastSensitiveInfo: 0 },
+    lastFetchedResp: { criticalUrls: 0, riskScoreMap: {} },
     lastFetchedSeverityResp: {},
     lastCalledSensitiveInfo: 0,
     lastFetchedSensitiveResp: [],
     selectedSampleApi: {},
-    coverageMap:{},
-    filtersMap:{},
+    coverageMap: {},
+    filtersMap: {},
     tableInitialState: {},
     trafficAlerts: [],
-    sendEventOnLogin: false
+    sendEventOnLogin: false,
+    tableSelectedTab: {},
 };
 
-let persistStore = (set) => ({
+let persistStore = (set, get) => ({
     ...initialState,
-    accessToken: null,
-    storeAccessToken: (accessToken) => set({ accessToken: accessToken }),
-    setQuickstartTasksCompleted: (quickstartTasksCompleted) => set({ quickstartTasksCompleted }),
-    setSubCategoryFromSourceConfigMap: (subCategoryFromSourceConfigMap) => set({ subCategoryFromSourceConfigMap }),
-    setActive: (selected) => set({ active: selected }),
-    setCollectionsMap: (collectionsMap) => set({ collectionsMap }),
-    setAllCollections: (allCollections) => set({ allCollections }),
-    setHostNameMap: (hostNameMap) => set({ hostNameMap }),
-    setLastFetchedInfo: (lastFetchedInfo) => set({ lastFetchedInfo }),
-    setLastFetchedResp: (lastFetchedResp) => set({ lastFetchedResp }),
-    setLastFetchedSeverityResp: (lastFetchedSeverityResp) => set({ lastFetchedSeverityResp }),
-    setLastCalledSensitiveInfo: (lastCalledSensitiveInfo) => set({ lastCalledSensitiveInfo }),
-    setLastFetchedSensitiveResp: (lastFetchedSensitiveResp) => set({ lastFetchedSensitiveResp }),
-    setSelectedSampleApi: (selectedSampleApi) => set({selectedSampleApi: selectedSampleApi}),
-    setCoverageMap:(coverageMap)=>{set({coverageMap: coverageMap})},
-    setFiltersMap: (filtersMap) => set({ filtersMap }),
-    setTableInitialState: (tableInitialState) => set({ tableInitialState }),
-    setTrafficAlerts: (trafficAlerts) =>set ({trafficAlerts}),
+    setQuickstartTasksCompleted: (quickstartTasksCompleted) => {
+        try {
+            set({ quickstartTasksCompleted });
+        } catch (error) {
+            console.error("Error setting quickstartTasksCompleted:", error);
+        }
+    },
+    setSubCategoryFromSourceConfigMap: (subCategoryFromSourceConfigMap) => {
+        try {
+            set({ subCategoryFromSourceConfigMap });
+        } catch (error) {
+            console.error("Error setting subCategoryFromSourceConfigMap:", error);
+        }
+    },
+    setActive: (selected) => {
+        try {
+            set({ active: selected });
+        } catch (error) {
+            console.error("Error setting active:", error);
+        }
+    },
+    setAllCollections: (allCollections) => {
+        try {
+            const optimizedCollections = allCollections.map(({ id, displayName, urlsCount, deactivated, type, automated, startTs, hostName, name, description }) => ({
+                id,
+                displayName,
+                urlsCount,
+                deactivated,
+                type,
+                automated,
+                startTs,
+                hostName,
+                name,
+                description
+            }));
+            set({ allCollections: optimizedCollections });
+        } catch (error) {
+            console.error("Error setting allCollections:", error);
+        }
+    },
+    setCollectionsMap: (collectionsMap) => {
+        try {
+            set({ collectionsMap });
+        } catch (error) {
+            console.error("Error setting collectionsMap:", error);
+        }
+    },
+    setHostNameMap: (hostNameMap) => {
+        try {
+            set({ hostNameMap });
+        } catch (error) {
+            console.error("Error setting hostNameMap:", error);
+        }
+    },
+    setLastFetchedInfo: (lastFetchedInfo) => {
+        try {
+            set({ lastFetchedInfo });
+        } catch (error) {
+            console.error("Error setting lastFetchedInfo:", error);
+        }
+    },
+    setLastFetchedResp: (lastFetchedResp) => {
+        try {
+            set({ lastFetchedResp });
+        } catch (error) {
+            console.error("Error setting lastFetchedResp:", error);
+        }
+    },
+    setLastFetchedSeverityResp: (lastFetchedSeverityResp) => {
+        try {
+            set({ lastFetchedSeverityResp });
+        } catch (error) {
+            console.error("Error setting lastFetchedSeverityResp:", error);
+        }
+    },
+    setLastCalledSensitiveInfo: (lastCalledSensitiveInfo) => {
+        try {
+            set({ lastCalledSensitiveInfo });
+        } catch (error) {
+            console.error("Error setting lastCalledSensitiveInfo:", error);
+        }
+    },
+    setLastFetchedSensitiveResp: (lastFetchedSensitiveResp) => {
+        try {
+            set({ lastFetchedSensitiveResp });
+        } catch (error) {
+            console.error("Error setting lastFetchedSensitiveResp:", error);
+        }
+    },
+    setSelectedSampleApi: (selectedSampleApi) => {
+        try {
+            set({ selectedSampleApi });
+        } catch (error) {
+            console.error("Error setting selectedSampleApi:", error);
+        }
+    },
+    setCoverageMap: (coverageMap) => {
+        try {
+            set({ coverageMap });
+        } catch (error) {
+            console.error("Error setting coverageMap:", error);
+        }
+    },
+    setFiltersMap: (filtersMap) => {
+        try {
+            set({ filtersMap });
+        } catch (error) {
+            console.error("Error setting filtersMap:", error);
+        }
+    },
+    setTableInitialState: (tableInitialState) => {
+        try {
+            set({ tableInitialState });
+        } catch (error) {
+            console.error("Error setting tableInitialState:", error);
+        }
+    },
+    setTrafficAlerts: (trafficAlerts) => {
+        try {
+            set({ trafficAlerts });
+        } catch (error) {
+            console.error("Error setting trafficAlerts:", error);
+        }
+    },
+    setTableSelectedTab: (tableSelectedTab) => {
+        try {
+            set({ tableSelectedTab });
+        } catch (error) {
+            console.error("Error setting tableSelectedTab:", error);
+        }
+    },
+    resetAll: () => {
+        try {
+            set(initialState);
+        } catch (error) {
+            console.error("Error resetting store:", error);
+        }
+    },
+});
 
-    resetAll: () => set(initialState), // Reset function
-})
-
-persistStore = devtools(persistStore)
-persistStore = persist(persistStore,{storage: createJSONStorage(() => sessionStorage)})
+persistStore = devtools(persistStore);
+persistStore = persist(persistStore, { 
+    name: "Akto-data",
+    storage: gzipStorage,
+    partialize: (state) => ({
+        allCollections: state.allCollections, // Persist only allCollections
+        lastFetchedInfo: state.lastFetchedInfo,
+        lastFetchedResp: state.lastFetchedResp,
+        lastFetchedSeverityResp: state.lastFetchedSeverityResp,
+        lastCalledSensitiveInfo: state.lastCalledSensitiveInfo,
+        lastFetchedSensitiveResp: state.lastFetchedSensitiveResp,
+        selectedSampleApi: state.selectedSampleApi,
+        coverageMap: state.coverageMap,
+        filtersMap: state.filtersMap,
+        tableInitialState: state.tableInitialState,
+        trafficAlerts: state.trafficAlerts,
+        sendEventOnLogin: state.sendEventOnLogin,
+        tableSelectedTab: state.tableSelectedTab
+    }) 
+});
 
 const PersistStore = create(persistStore);
 
-export default PersistStore
-
+export default PersistStore;

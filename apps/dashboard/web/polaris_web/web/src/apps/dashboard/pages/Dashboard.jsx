@@ -13,6 +13,10 @@ import ConfirmationModal from "../components/shared/ConfirmationModal";
 import AlertsBanner from "./AlertsBanner";
 import dashboardFunc from "./transform";
 import homeRequests from "./home/api";
+import WelcomeBackDetailsModal from "../components/WelcomeBackDetailsModal";
+import useTable from "../components/tables/TableContext";
+import threatDetectionRequests from "./threat_detection/api";
+import SessionStore from "../../main/SessionStore";
 
 function Dashboard() {
 
@@ -22,6 +26,10 @@ function Dashboard() {
     const setAllCollections = PersistStore(state => state.setAllCollections)
     const setCollectionsMap = PersistStore(state => state.setCollectionsMap)
     const setHostNameMap = PersistStore(state => state.setHostNameMap)
+    const threatFiltersMap = SessionStore(state => state.threatFiltersMap);
+    const setThreatFiltersMap = SessionStore(state => state.setThreatFiltersMap);
+
+    const { selectItems } = useTable()
 
     const navigate = useNavigate();
 
@@ -34,12 +42,18 @@ function Dashboard() {
     const sendEventOnLogin = LocalStore(state => state.sendEventOnLogin)
     const setSendEventOnLogin = LocalStore(state => state.setSendEventOnLogin)
     const fetchAllCollections = async () => {
-        let apiCollections = await homeFunctions.getAllCollections()
+        let apiCollections = []
+        if(allCollections && allCollections.length > 0){
+            apiCollections = allCollections
+        }else{
+            apiCollections = await homeFunctions.getAllCollections()
+            setAllCollections(apiCollections)
+        }
+        apiCollections = apiCollections.filter((x) => x?.deactivated !== true)
         const allCollectionsMap = func.mapCollectionIdToName(apiCollections)
         const allHostNameMap = func.mapCollectionIdToHostName(apiCollections)
         setHostNameMap(allHostNameMap)
         setCollectionsMap(allCollectionsMap)
-        setAllCollections(apiCollections)
     }
     const trafficAlerts = PersistStore(state => state.trafficAlerts)
     const setTrafficAlerts = PersistStore(state => state.setTrafficAlerts)
@@ -57,6 +71,18 @@ function Dashboard() {
         if(resp !== null){
             setEventForUser(resp)
         }
+    }
+
+    const fetchFilterYamlTemplates = () => {
+        threatDetectionRequests.fetchFilterYamlTemplate().then((res) => {
+            let finalMap = {}
+            res.templates.forEach((x) => {
+                let trimmed = {...x, content: '', ...x.info}
+                delete trimmed['info']
+                finalMap[x.id] = trimmed;
+            })
+            setThreatFiltersMap(finalMap)
+        })
     }
 
     useEffect(() => {
@@ -79,6 +105,9 @@ function Dashboard() {
         if (!subCategoryMap || (Object.keys(subCategoryMap).length === 0)) {
             fetchMetadata();
         }
+        if(Object.keys(threatFiltersMap).length === 0 && window?.STIGG_FEATURE_WISE_ALLOWED?.THREAT_DETECTION?.isGranted){
+            fetchFilterYamlTemplates()
+        }
         if(window.Beamer){
             window.Beamer.init();
         }
@@ -91,7 +120,22 @@ function Dashboard() {
                 }
             }
         }
+
+        Object.keys(sessionStorage).forEach((key) => {
+            if (key === "undefined" || key === "persistedStore") {
+                sessionStorage.removeItem(key);
+            }
+        });
+        Object.keys(localStorage).forEach((key) => {
+            if (key === "undefined") {
+                localStorage.removeItem(key);
+            }
+        });
     }, [])
+
+    useEffect(() => {
+        selectItems([])
+    },[location.pathname])
 
     const toastConfig = Store(state => state.toastConfig)
     const setToastConfig = Store(state => state.setToastConfig)
@@ -164,10 +208,13 @@ function Dashboard() {
 
     },[])
 
+    const shouldShowWelcomeBackModal = window.IS_SAAS === "true" && window?.USER_NAME?.length > 0 && (window?.USER_FULL_NAME?.length === 0 || (window?.USER_ROLE === 'ADMIN' && window?.ORGANIZATION_NAME?.length === 0))
+
     return (
         <div className="dashboard">
         <Frame>
             <Outlet />
+            {shouldShowWelcomeBackModal && <WelcomeBackDetailsModal isAdmin={window.USER_ROLE === 'ADMIN'} />}
             {toastMarkup}
             {ConfirmationModalMarkup}
             {displayItems.length > 0 ? <div className="alerts-banner">
@@ -185,12 +232,17 @@ function Dashboard() {
                         })}
                     </VerticalStack>
             </div> : null}
-            {func.checkLocal() && !(location.pathname.includes("test-editor") || location.pathname.includes("settings")) ?<div className="call-banner">
-                <Banner hideIcon={true}> 
+            {func.checkLocal() && !(location.pathname.includes("test-editor") || location.pathname.includes("settings") || location.pathname.includes("onboarding") || location.pathname.includes("summary")) ?<div className="call-banner" style={{marginBottom: "1rem"}}>
+                <Banner hideIcon={true}>
                     <Text variant="headingMd">Need a 1:1 experience?</Text>
                     <Button plain monochrome onClick={() => {
                         window.open("https://akto.io/api-security-demo", "_blank")
                     }}><Text variant="bodyMd">Book a call</Text></Button>
+                </Banner>
+            </div> : null}
+            {window.TRIAL_MSG && !(location.pathname.includes("test-editor") || location.pathname.includes("settings") || location.pathname.includes("onboarding") || location.pathname.includes("summary")) ?<div className="call-banner">
+                <Banner hideIcon={true}>
+                    <Text variant="bodyMd">{window.TRIAL_MSG}</Text>
                 </Banner>
             </div> : null}
         </Frame>

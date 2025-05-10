@@ -1,11 +1,13 @@
 package com.akto.dto.testing;
 
 import com.akto.dao.testing.EndpointLogicalGroupDao;
+import com.akto.dto.RawApi;
 import com.akto.dto.testing.sources.AuthWithCond;
 import com.mongodb.client.model.Filters;
 import org.bson.codecs.pojo.annotations.BsonIgnore;
 import org.bson.types.ObjectId;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import static com.akto.util.Constants.ID;
@@ -22,12 +24,18 @@ public class TestRoles {
     @BsonIgnore
     private EndpointLogicalGroup endpointLogicalGroup;
 
+    public static final String CREATED_BY = "createdBy";
     private String createdBy;
     private int createdTs;
     public static final String LAST_UPDATED_TS = "lastUpdatedTs";
     private int lastUpdatedTs;
     private List<Integer> apiCollectionIds;
+
+    public static final String SCOPE_ROLES = "scopeRoles";
+    private List<String> scopeRoles;     
+    
     public TestRoles(){}
+    
     public TestRoles(ObjectId id, String name, ObjectId endpointLogicalGroupId, List<AuthWithCond> authWithCondList, String createdBy, int createdTs, int lastUpdatedTs, List<Integer> apiCollectionIds) {
         this.id = id;
         this.name = name;
@@ -45,6 +53,64 @@ public class TestRoles {
         }
         return this.endpointLogicalGroup;
     }
+
+    public AuthMechanism findDefaultAuthMechanism() {
+        try {
+            for(AuthWithCond authWithCond: this.getAuthWithCondList()) {
+                if (authWithCond.getHeaderKVPairs().isEmpty()) {
+                    AuthMechanism ret = authWithCond.getAuthMechanism();
+                    if(authWithCond.getRecordedLoginFlowInput()!=null){
+                        ret.setRecordedLoginFlowInput(authWithCond.getRecordedLoginFlowInput());
+                    }
+
+                    return ret;
+                }
+            }
+        } catch (Exception e) {
+            return null;
+        }
+
+        return null;
+    }
+
+    public AuthMechanism findMatchingAuthMechanism(RawApi rawApi) {
+        if (rawApi == null) {
+            return findDefaultAuthMechanism();
+        }
+
+        for(AuthWithCond authWithCond: this.getAuthWithCondList()) {
+
+            try {
+                boolean allSatisfied = true;
+
+                if (authWithCond.getHeaderKVPairs().isEmpty()) {
+                    continue;
+                }
+
+                for(String headerKey: authWithCond.getHeaderKVPairs().keySet()) {
+                    String headerVal = authWithCond.getHeaderKVPairs().get(headerKey);
+                    List<String> rawHeaderValue = rawApi.getRequest().getHeaders().getOrDefault(headerKey.toLowerCase(), new ArrayList<>());
+                    if (!rawHeaderValue.contains(headerVal)) {
+                        allSatisfied = false;
+                        break;
+                    }
+                }
+
+                if (allSatisfied) {
+                    AuthMechanism ret = authWithCond.getAuthMechanism();
+                    if(authWithCond.getRecordedLoginFlowInput()!=null){
+                        ret.setRecordedLoginFlowInput(authWithCond.getRecordedLoginFlowInput());
+                    }
+                    return ret;
+                }
+            } catch (Exception e) {
+                // Handle exception if needed
+            }
+        }
+        
+        return findDefaultAuthMechanism();
+    }
+
     public ObjectId getId() {
         return id;
     }
@@ -125,14 +191,12 @@ public class TestRoles {
         this.apiCollectionIds = apiCollectionIds;
     }
 
-    public AuthMechanism getDefaultAuthMechanism(){
-        if(this.getAuthWithCondList() != null && !this.getAuthWithCondList().isEmpty()){
-            for (AuthWithCond authWithCond : this.getAuthWithCondList()) {
-                if(authWithCond.getHeaderKVPairs() != null && authWithCond.getHeaderKVPairs().isEmpty()){
-                    return authWithCond.getAuthMechanism();
-                }
-            }
-        }
-        return null;
+    public List<String> getScopeRoles() {
+        return scopeRoles;
+    }   
+
+    public void setScopeRoles(List<String> scopeRoles) {
+        this.scopeRoles = scopeRoles;
     }
+
 }

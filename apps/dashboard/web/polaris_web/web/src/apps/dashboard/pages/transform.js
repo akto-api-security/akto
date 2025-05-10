@@ -165,6 +165,20 @@ const dashboardFunc = {
         return tempArr
     },
 
+    getApiPrompts: function(apiCollectionId, url, method){ 
+        return [{
+            prepareQuery: () => { return {
+                type: "analyze_request_response_headers",
+                label: "Analyze request/response headers for the protocols and api gateways",
+                meta: {
+                    "url": url,
+                    "method": method,
+                    "apiCollectionId": apiCollectionId
+                }                        
+            }}}
+        ]
+    },
+
     getPrompts: function(requestObj) {
         switch(requestObj.key){
             case "DATA_TYPES":
@@ -175,6 +189,9 @@ const dashboardFunc = {
 
             case "PARAMETER":
                 return this.getParameterPrompts(requestObj.jsonStr, requestObj.apiCollectionId)
+
+            case "API":
+                return this.getApiPrompts(requestObj.apiCollectionId, requestObj.url, requestObj.method)
 
             default :
                 return []
@@ -200,7 +217,7 @@ const dashboardFunc = {
         if (match && match[1]) {
             const epochTime = Number(match[1]);
             const date = new Date(epochTime * 1000);
-            const formattedDate = date.toLocaleString();
+            const formattedDate = date.toLocaleString('en-US',{timeZone: window.TIME_ZONE === 'Us/Pacific' ? 'America/Los_Angeles' : window.TIME_ZONE});
             const result = input.replace(match[0], formattedDate);
             return result;
         } else {
@@ -218,7 +235,7 @@ const dashboardFunc = {
         }
     },
     sortAndFilterAlerts(alerts) {
-        const severityOrder = { 'HIGH': 3, 'MEDIUM': 2, 'LOW': 1 };
+        const severityOrder = { 'CRITICAL': 4, 'HIGH': 3, 'MEDIUM': 2, 'LOW': 1 };
         const dismissLimit =  60 * 60;
         const currentTime = func.timeNow()
     

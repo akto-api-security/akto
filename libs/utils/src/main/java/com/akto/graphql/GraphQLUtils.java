@@ -20,16 +20,9 @@ public class GraphQLUtils {//Singleton class
     private static final Gson gson = new Gson();
     LanguageTraversal traversal = new LanguageTraversal();
     public static final String __ARGS = "__args";
-    public static final String QUERY = "query";
 
     private static final GraphQLUtils utils = new GraphQLUtils();
 
-    private static final Set<String> allowedPath = new HashSet<>();
-
-    static {
-        allowedPath.add("graphql");
-        allowedPath.add("graph");
-    }
 
     private GraphQLUtils() {
     }
@@ -86,16 +79,9 @@ public class GraphQLUtils {//Singleton class
     public List<HttpResponseParams> parseGraphqlResponseParam(HttpResponseParams responseParams) {
         List<HttpResponseParams> responseParamsList = new ArrayList<>();
         String path = responseParams.getRequestParams().getURL();
-
-        boolean isAllowedForParse = false;
-
-        for (String graphqlPath : allowedPath) {
-            if (path != null && path.contains(graphqlPath)) {
-                isAllowedForParse = true;
-            }
-        }
         String requestPayload = responseParams.getRequestParams().getPayload();
-        if (!isAllowedForParse || !requestPayload.contains(QUERY)) {
+
+        if (! HttpResponseParams.isGraphql(responseParams)) {
             // DO NOT PARSE as it's not graphql query
             return responseParamsList;
         }
@@ -302,9 +288,9 @@ public class GraphQLUtils {//Singleton class
                             Map<String, Object> map = fieldTraversal(field);
                             HashMap hashMap = new HashMap(mapOfRequestPayload);
                             for (String key : map.keySet()) {
-                                hashMap.put(GraphQLUtils.QUERY + key, map.get(key));
+                                hashMap.put(HttpResponseParams.QUERY + key, map.get(key));
                             }
-                            hashMap.remove(GraphQLUtils.QUERY);
+                            hashMap.remove(HttpResponseParams.QUERY);
                             httpResponseParamsCopy.requestParams.setPayload(JSON.toString(hashMap));
                             responseParamsList.add(httpResponseParamsCopy);
                         } catch (Exception e) {
@@ -319,7 +305,7 @@ public class GraphQLUtils {//Singleton class
     public List<OperationDefinition> parseGraphQLRequest(Map requestPayload) {
         List<OperationDefinition> result = new ArrayList<>();
         try {
-            String query = (String) requestPayload.get(QUERY);
+            String query = (String) requestPayload.get(HttpResponseParams.QUERY);
             Document document = parser.parseDocument(query);
             List<Definition> definitionList = document.getDefinitions();
             for (Definition definition : definitionList) {

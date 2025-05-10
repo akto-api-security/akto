@@ -6,6 +6,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Random;
 import java.util.Set;
 import java.util.UUID;
 import java.util.regex.Matcher;
@@ -443,6 +444,7 @@ public class VariableResolver {
 
         List<String> result = new ArrayList<>();
         for (Object word: wordList) {
+            // TODO: handle case to use numbers as well.
             result.add(expression.replace(wordListKey, word.toString()));
         }
 
@@ -470,6 +472,18 @@ public class VariableResolver {
                 } catch (Exception er) {
                     continue;
                 }
+            }
+
+            if (m.containsKey("count")) {
+                int count;
+                if (m.get("count") instanceof String) {
+                    count = Integer.valueOf(m.get("count"));
+                } else {
+                    count = Integer.valueOf((String.valueOf(m.get("count"))));
+                }
+                List<String> vals = generateUniqueTenDigitNumbers(count);
+                wordListsMap.put(k, vals);
+                continue;
             }
 
             keyObj = m.get("key");
@@ -522,6 +536,24 @@ public class VariableResolver {
         return wordListsMap;
 
     }
+
+    public static List<String> generateUniqueTenDigitNumbers(int count) {
+        if (count > 1_000_000_000) {
+            throw new IllegalArgumentException("Cannot generate more than 1 billion unique 10-digit numbers.");
+        }
+
+        List<String> uniqueNumbers = new ArrayList<>();
+        Random random = new Random();
+
+        while (uniqueNumbers.size() < count) {
+            // Generate a 10-digit number starting with 1
+            int number = 1_000_000_000 + random.nextInt(1_000_000_000); // Ensures the number starts with 1
+            uniqueNumbers.add(String.valueOf(number));
+        }
+
+        return uniqueNumbers;
+    }
+
 
     public static Map<String, Object> resolveDynamicWordList(Map<String, Object> varMap, ApiInfo.ApiInfoKey apiInfoKey, Map<ApiInfo.ApiInfoKey, List<String>> newSampleDataMap) {
 
@@ -621,6 +653,17 @@ public class VariableResolver {
                 } catch (Exception er) {
                     continue;
                 }
+            }
+            if (m.containsKey("count")) {
+                int count;
+                if (m.get("count") instanceof String) {
+                    count = Integer.valueOf(m.get("count"));
+                } else {
+                    count = Integer.valueOf((String.valueOf(m.get("count"))));
+                }
+                List<String> vals = generateUniqueTenDigitNumbers(count);
+                varMap.put(k, vals);
+                continue;
             }
             keyObj = m.get("key");
             if (keyObj instanceof Map) {

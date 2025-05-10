@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import PageWithMultipleCards from '../../../components/layouts/PageWithMultipleCards'
-import { Box, Button, HorizontalStack, Icon, LegacyCard, Text, Tooltip, VerticalStack } from '@shopify/polaris'
+import { Box, Button, Checkbox, HorizontalStack, Icon, LegacyCard, Modal, Popover, Text, Tooltip, VerticalStack } from '@shopify/polaris'
 import trafficFiltersRequest from './api'
 import func from "@/util/func"
 import TitleWithInfo from "@/apps/dashboard/components/shared/TitleWithInfo"
@@ -15,6 +15,9 @@ function AdvancedTrafficFilters() {
         const [templateList, setTemplateList] = useState([])
         const [currentId, setCurrentId] = useState("")
         const [currentState, setCurrentState] = useState(false)
+        const [modalActive, setModalActive] = useState(false);
+        const [popoverActive, setPopoverActive] = useState(false);
+        const [permissionsMap,setPermissionsMap] = useState({})
 
         const fetchData = async () => {
             await trafficFiltersRequest.getAdvancedFiltersForTraffic().then((resp) => {
@@ -28,6 +31,9 @@ function AdvancedTrafficFilters() {
                     setOgData(template)
                 }
                 
+            })
+            await trafficFiltersRequest.getAdvancedFiltersPermissions().then((resp) => {
+                setPermissionsMap(resp)
             })
         }
 
@@ -45,6 +51,14 @@ function AdvancedTrafficFilters() {
                 }
             })
         
+        }
+
+        const handleDryRun = async(content, shouldDelete) => {
+            if(window.IS_SAAS !== "true" ||  window.USER_NAME.includes("akto")){
+                await trafficFiltersRequest.dryRunAdvancedFilters(content, shouldDelete).then((res)=> {
+                    window.open("/dashboard/settings/logs", "_blank")
+                })
+            }
         }
 
         const resetFunc = () => {
@@ -81,13 +95,50 @@ function AdvancedTrafficFilters() {
             setCurrentState(state)
         }
 
+        const handleCheckboxClicked = async(permission, value) => {
+            await trafficFiltersRequest.updateAdvancedFiltersPermissions(value, permission).then((res) => {
+                setPermissionsMap((prev) => {
+                    prev[permission] = value
+                    return {...prev}
+                })
+            })
+        }
+
         const tooltipText= currentState ? "Mark as Active" : "Mark as Deactive"
 
+        const titleComp = (
+            <HorizontalStack align="space-between">
+                <Text variant="headingSm">Add or modify filters</Text>
+                <Popover
+                    activator={<Button disclosure size="slim" onClick={() => setPopoverActive(!popoverActive)}>Actions</Button>}
+                    active={popoverActive}
+                    onClose={() => setPopoverActive(false)}
+                    autofocusTarget="container"
+                >
+                    <Popover.Section>
+                        <VerticalStack gap={"2"}>
+                            <Checkbox
+                                checked={permissionsMap['allowFilterLogs']}
+                                label="Allow filtered urls in logs"
+                                onChange={() => handleCheckboxClicked('allowFilterLogs', !permissionsMap['allowFilterLogs'])}
+                            />
+                            <Checkbox
+                                label="Allow retrospective deletion"
+                                checked={permissionsMap['allowDeletionOfUrls']}
+                                onChange={() => handleCheckboxClicked('allowDeletionOfUrls', !permissionsMap['allowDeletionOfUrls'])}
+                            />
+                        </VerticalStack>
+                    </Popover.Section>
+                </Popover>
+            </HorizontalStack>
+        )
+
         return(
+            <>
             <LegacyCard 
-                title={(<Text variant="headingSm">Add or modify filters</Text>)} 
+                title={titleComp} 
                 footerActionAlignment="right"
-                primaryFooterAction={{content: 'Save', onAction: () => handleSave(currentTemplate), 
+                primaryFooterAction={{content: 'Save', onAction: () => setModalActive(true), 
                     disabled: (currentTemplate?.message !== undefined && currentTemplate.message.length === 0) || (typeof (currentTemplate) === 'string' && currentTemplate.length === 0)
                 }}
                 secondaryFooterActions={[{content: 'Add new', onAction: () => resetFunc()}]}
@@ -97,14 +148,14 @@ function AdvancedTrafficFilters() {
                         placeholder={"Search existing filters"}
                         optionsList={templateList && templateList.map(x => {
                             return {
-                                label: x.id,
+                                label: x.id === "DEFAULT_BLOCK_FILTER" ? "DEFAULT_IGNORE_FILTER" : x.id,
                                 value: x.id
                             }
                         })}
                         setSelected={(value) => {
                             handleSelection(value)
                         }}
-                        value={currentId}
+                        value={currentId === "DEFAULT_BLOCK_FILTER" ? "DEFAULT_IGNORE_FILTER" : currentId }
                     />
                 </LegacyCard.Section>
                 <LegacyCard.Section flush>
@@ -129,6 +180,21 @@ function AdvancedTrafficFilters() {
                     </Box>
                 </LegacyCard.Section>
             </LegacyCard>
+            <Modal
+                open={modalActive}
+                onClose={() => setModalActive(false)}
+                primaryAction={{content: 'Save', onAction: () => {handleSave(currentTemplate); setModalActive(false)}}}
+                secondaryActions={(window.IS_SAAS !== "true" ||  window.USER_NAME.includes("akto"))? [{content: 'Dry run', onAction: () => handleDryRun(currentTemplate, false)},{content: 'Delete APIs matched', onAction: ()=> handleDryRun(currentTemplate, true) }]: []}
+                title={"Add advanced filters"}
+            >
+                <Modal.Section>
+                    <Text variant="bodyMd" color="subdued">
+                        Adding an filter will stop/modify traffic ingestion in the dashboard.
+                        Are you sure you want to add the filter?
+                    </Text>
+                </Modal.Section>
+            </Modal>
+            </>
         )
     }
 

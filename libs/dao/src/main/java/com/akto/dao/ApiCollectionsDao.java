@@ -1,13 +1,12 @@
 package com.akto.dao;
 
-import com.akto.DaoInit;
 import com.akto.dao.context.Context;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.ApiInfo.ApiInfoKey;
+import com.akto.dto.rbac.UsersCollectionsList;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.util.Constants;
 import com.mongodb.BasicDBObject;
-import com.mongodb.ConnectionString;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.MongoDatabase;
 import com.mongodb.client.model.*;
@@ -19,7 +18,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-public class ApiCollectionsDao extends AccountsContextDao<ApiCollection> {
+public class ApiCollectionsDao extends AccountsContextDaoWithRbac<ApiCollection> {
 
     public static final ApiCollectionsDao instance = new ApiCollectionsDao();
 
@@ -33,6 +32,11 @@ public class ApiCollectionsDao extends AccountsContextDao<ApiCollection> {
     @Override
     public Class<ApiCollection> getClassT() {
         return ApiCollection.class;
+    }
+
+    @Override
+    public String getFilterKeyString(){
+        return ApiCollection.ID;
     }
 
     public void createIndicesIfAbsent() {
@@ -137,11 +141,23 @@ public class ApiCollectionsDao extends AccountsContextDao<ApiCollection> {
         return apiCollectionIds;
     }
 
-    public Map<Integer, Integer> buildEndpointsCountToApiCollectionMap() {
+    public Map<Integer, Integer> buildEndpointsCountToApiCollectionMap(Bson filter) {
         Map<Integer, Integer> countMap = new HashMap<>();
         List<Bson> pipeline = new ArrayList<>();
 
-        pipeline.add(Aggregates.match(SingleTypeInfoDao.filterForHostHeader(0, false)));
+        pipeline.add(Aggregates.match(Filters.and(
+                SingleTypeInfoDao.filterForHostHeader(0, false),
+                filter
+            )
+        ));
+        try {
+            List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
+            if(collectionIds != null) {
+                pipeline.add(Aggregates.match(Filters.in(SingleTypeInfo._COLLECTION_IDS, collectionIds)));
+            }
+        } catch(Exception e){
+        }
+
         BasicDBObject groupedId = new BasicDBObject(SingleTypeInfo._COLLECTION_IDS, "$" + SingleTypeInfo._COLLECTION_IDS);
         pipeline.add(Aggregates.unwind("$" + SingleTypeInfo._COLLECTION_IDS));
         pipeline.add(Aggregates.group(groupedId, Accumulators.sum("count",1)));
@@ -158,6 +174,22 @@ public class ApiCollectionsDao extends AccountsContextDao<ApiCollection> {
             }
         }
 
+        Map<String, Integer> codeAnalysisUrlsCountMap = CodeAnalysisApiInfoDao.instance.getUrlsCount();
+        if (codeAnalysisUrlsCountMap.isEmpty()) return countMap;
+
+        Map<String, Integer> idToCollectionNameMap = CodeAnalysisCollectionDao.instance.findIdToCollectionNameMap();
+        for (String codeAnalysisId: codeAnalysisUrlsCountMap.keySet()) {
+            int count = codeAnalysisUrlsCountMap.getOrDefault(codeAnalysisId, 0);
+            Integer apiCollectionId = idToCollectionNameMap.get(codeAnalysisId);
+            if (apiCollectionId == null) continue;
+
+            int currentCount = countMap.getOrDefault(apiCollectionId, 0);
+            currentCount += count;
+
+            countMap.put(apiCollectionId, currentCount);
+        }
+
+
         return countMap;
     }
 
@@ -169,6 +201,14 @@ public class ApiCollectionsDao extends AccountsContextDao<ApiCollection> {
                         .append(ApiInfoKey.METHOD, "$method");
 
         pipeline.add(Aggregates.match(filter));
+
+        try {
+            List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
+            if(collectionIds != null) {
+                pipeline.add(Aggregates.match(Filters.in(SingleTypeInfo._COLLECTION_IDS, collectionIds)));
+            }
+        } catch(Exception e){
+        }
 
         int recentEpoch = Context.now() - deltaPeriodValue;
 

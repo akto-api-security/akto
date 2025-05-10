@@ -49,7 +49,7 @@ public class TestDependencyAnalyser extends MongoBasedTest {
 
         HttpCallParser httpCallParser = new HttpCallParser("", 0, 0, 0, false);
         httpCallParser.syncFunction(httpResponseParamsList, true,true, null);
-        APICatalogSync.mergeUrlsAndSave(1000, true, true, httpCallParser.apiCatalogSync.existingAPIsInDb);
+        APICatalogSync.mergeUrlsAndSave(1000, true, true, httpCallParser.apiCatalogSync.existingAPIsInDb, false);
 
         List<DependencyNode> nodes = DependencyNodeDao.instance.findAll(new BasicDBObject());
         assertEquals(expectedNodes, nodes.size());
@@ -204,11 +204,11 @@ public class TestDependencyAnalyser extends MongoBasedTest {
         dependencyFlow.syncWithDb();
 
         TreeHelper treeHelper = new TreeHelper();
-        treeHelper.buildTree("1000", "api/cars/INTEGER", "POST");
+        treeHelper.buildTree("1000", "/api/cars/INTEGER", "POST");
         Map<Integer, Node> result = treeHelper.result;
         assertEquals(2, result.size()); // this is because /api/m6 has 2 parameters getting data
 
-        Map<String, Connection> connections = result.get(Objects.hash("1000", "api/cars/INTEGER", "POST")).getConnections();
+        Map<String, Connection> connections = result.get(Objects.hash("1000", "/api/cars/INTEGER", "POST")).getConnections();
         assertEquals(1, connections.size());
     }
 
@@ -235,7 +235,7 @@ public class TestDependencyAnalyser extends MongoBasedTest {
 
         List<DependencyNode.ParamInfo> paramInfos4 = new ArrayList<>();
         paramInfos4.add(new DependencyNode.ParamInfo("param_req_2", "param_resp_2", 1, false, false));
-        DependencyNode dependencyNode4 = new DependencyNode("1000", "api/toys/INTEGER", "GET","1000", "/api/bus", "POST", paramInfos4, now);
+        DependencyNode dependencyNode4 = new DependencyNode("1000", "/api/toys/INTEGER", "GET","1000", "/api/bus", "POST", paramInfos4, now);
         nodes.put(dependencyNode4.hashCode(), dependencyNode4);
 
         List<DependencyNode.ParamInfo> paramInfos5 = new ArrayList<>();
@@ -251,10 +251,10 @@ public class TestDependencyAnalyser extends MongoBasedTest {
         Map<Integer, APICatalog> dbState = new HashMap<>();
         APICatalog apiCatalog = new APICatalog();
         Map<URLTemplate, RequestTemplate> templateURLToMethods = new HashMap<>();
-        templateURLToMethods.put(APICatalogSync.createUrlTemplate("api/books/INTEGER", URLMethods.Method.GET), null);
-        templateURLToMethods.put(APICatalogSync.createUrlTemplate("api/toys/INTEGER", URLMethods.Method.GET), null);
-        templateURLToMethods.put(APICatalogSync.createUrlTemplate("api/food/INTEGER", URLMethods.Method.GET), null);
-        templateURLToMethods.put(APICatalogSync.createUrlTemplate("api/hotel/INTEGER", URLMethods.Method.POST), null);
+        templateURLToMethods.put(APICatalogSync.createUrlTemplate("/api/books/INTEGER", URLMethods.Method.GET), null);
+        templateURLToMethods.put(APICatalogSync.createUrlTemplate("/api/toys/INTEGER", URLMethods.Method.GET), null);
+        templateURLToMethods.put(APICatalogSync.createUrlTemplate("/api/food/INTEGER", URLMethods.Method.GET), null);
+        templateURLToMethods.put(APICatalogSync.createUrlTemplate("/api/hotel/INTEGER", URLMethods.Method.POST), null);
         apiCatalog.setTemplateURLToMethods(templateURLToMethods);
         dbState.put(1000, apiCatalog);
         DependencyAnalyser dependencyAnalyser = new DependencyAnalyser(dbState, false);
@@ -265,15 +265,15 @@ public class TestDependencyAnalyser extends MongoBasedTest {
         assertEquals(3, dependencyAnalyser.nodes.size());
 
 
-        DependencyNode dependencyNode1New = dependencyAnalyser.nodes.get(Objects.hash("1000", "api/books/INTEGER", "GET","1000", "/api/cars", "POST"));
+        DependencyNode dependencyNode1New = dependencyAnalyser.nodes.get(Objects.hash("1000", "/api/books/INTEGER", "GET","1000", "/api/cars", "POST"));
         assertEquals(1, dependencyNode1New.getParamInfos().size());
         assertEquals(3, dependencyNode1New.getParamInfos().get(0).getCount());
 
-        DependencyNode dependencyNode2New = dependencyAnalyser.nodes.get(Objects.hash("1000", "api/toys/INTEGER", "GET","1000", "/api/bus", "POST"));
+        DependencyNode dependencyNode2New = dependencyAnalyser.nodes.get(Objects.hash("1000", "/api/toys/INTEGER", "GET","1000", "/api/bus", "POST"));
         assertEquals(1, dependencyNode2New.getParamInfos().size());
         assertEquals(2, dependencyNode2New.getParamInfos().get(0).getCount());
 
-        DependencyNode dependencyNode3New = dependencyAnalyser.nodes.get(Objects.hash("1000", "api/food/INTEGER", "GET","1000", "api/hotel/INTEGER", "POST"));
+        DependencyNode dependencyNode3New = dependencyAnalyser.nodes.get(Objects.hash("1000", "/api/food/INTEGER", "GET","1000", "/api/hotel/INTEGER", "POST"));
         assertEquals(1, dependencyNode3New.getParamInfos().size());
         assertEquals(4, dependencyNode3New.getParamInfos().get(0).getCount());
     }

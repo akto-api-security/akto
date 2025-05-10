@@ -14,7 +14,9 @@ public class RbacEnums {
         SETTINGS,
         ADMIN,
         DEBUG_INFO,
-        USER;
+        USER,
+        AI,
+        THREAT_PROTECTION;
     
         public static AccessGroups[] getAccessGroups() {
             return values();
@@ -36,14 +38,18 @@ public class RbacEnums {
         AUTH_TYPE(AccessGroups.TESTING),
         ISSUES(AccessGroups.TESTING),
         TEST_EDITOR(AccessGroups.TEST_LIBRARY),
+        TEST_SUITE(AccessGroups.TEST_LIBRARY),
         EXTERNAL_TEST_LIBRARY(AccessGroups.TEST_LIBRARY),
         INTEGRATIONS(AccessGroups.SETTINGS),
         METRICS(AccessGroups.DEBUG_INFO),
         LOGS(AccessGroups.DEBUG_INFO),
         BILLING(AccessGroups.SETTINGS),
-        INVITE_MEMBERS(AccessGroups.SETTINGS),
+        INVITE_MEMBERS(AccessGroups.DEBUG_INFO),
         ADMIN_ACTIONS(AccessGroups.ADMIN),
-        USER_ACTIONS(AccessGroups.USER);
+        USER_ACTIONS(AccessGroups.USER),
+        AI_AGENTS(AccessGroups.AI),
+        THREAT_PROTECTION(AccessGroups.THREAT_PROTECTION);
+
         private final AccessGroups accessGroup;
 
         Feature(AccessGroups accessGroup) {

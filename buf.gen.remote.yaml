@@ -1,0 +1,15 @@
+version: v2
+
+managed:
+  enabled: true
+
+  override:
+    - file_option: java_multiple_files
+      value: true
+
+    - file_option: java_package_prefix
+      value: com.akto.proto.generated
+
+plugins:
+  - remote: buf.build/protocolbuffers/java:v28.3
+    out: libs/protobuf/src/main/java

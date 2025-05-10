@@ -1,11 +1,21 @@
 package com.akto.dto;
 
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.Set;
+
+import lombok.Getter;
+import lombok.Setter;
 import org.bson.codecs.pojo.annotations.BsonDiscriminator;
+
+import com.akto.dao.ConfigsDao;
+import com.mongodb.client.model.Filters;
 
 @BsonDiscriminator
 public abstract class Config {
 
     public static final String CONFIG_SALT = "-ankush";
+    private static final Set<ConfigType> ssoConfigTypes = new HashSet(Arrays.asList( ConfigType.OKTA, ConfigType.AZURE, ConfigType.GOOGLE_SAML));
 
     public ConfigType getConfigType() {
         return configType;
@@ -23,13 +33,13 @@ public abstract class Config {
         this.id = id;
     }
 
-    String id;
+    public String id;
 
     public enum ConfigType {
-        SLACK, GOOGLE, WEBPUSH, PASSWORD, SALESFORCE, SENDGRID, AUTH0, GITHUB, STIGG, MIXPANEL, SLACK_ALERT, OKTA, AZURE, HYBRID_SAAS, SLACK_ALERT_USAGE;
+        SLACK, GOOGLE, WEBPUSH, PASSWORD, SALESFORCE, SENDGRID, AUTH0, GITHUB, STIGG, MIXPANEL, SLACK_ALERT, OKTA, AZURE, HYBRID_SAAS, SLACK_ALERT_USAGE, GOOGLE_SAML, AWS_WAF, SPLUNK_SIEM, AKTO_DASHBOARD_HOST_URL, CLOUDFLARE_WAF;
     }
 
-    ConfigType configType;
+    public ConfigType configType;
 
     @BsonDiscriminator
     public static class SlackConfig extends Config {
@@ -351,12 +361,24 @@ public abstract class Config {
         private String oktaDomainUrl;
         private String authorisationServerId;
         private String redirectUri;
-        
+        public static final String ORGANIZATION_DOMAIN = "organizationDomain";
+        private String organizationDomain;
+        public static final String ACCOUNT_ID = "accountId";
+        private int accountId;
+
         public static final String CONFIG_ID = ConfigType.OKTA.name() + CONFIG_SALT;
 
-        public OktaConfig() {
+        public OktaConfig(){
             this.configType = ConfigType.OKTA;
-            this.id = CONFIG_ID;
+        }
+
+        public static String getOktaId(int accountId){
+            return CONFIG_ID + "_" + accountId;
+        }
+
+        public OktaConfig(int id) {
+            this.configType = ConfigType.OKTA;
+            this.id = CONFIG_ID + "_" + id;
         }
         
         public String getClientId() {
@@ -393,6 +415,20 @@ public abstract class Config {
 
         public void setRedirectUri(String redirectUri) {
             this.redirectUri = redirectUri;
+        }
+
+        public String getOrganizationDomain() {
+            return organizationDomain;
+        }
+        public void setOrganizationDomain(String organizationDomain) {
+            this.organizationDomain = organizationDomain;
+        }
+
+        public int getAccountId() {
+            return accountId;
+        }
+        public void setAccountId(int accountId) {
+            this.accountId = accountId;
         }
     }
 
@@ -490,7 +526,6 @@ public abstract class Config {
             this.activeAccountsLabel = activeAccountsLabel;
         }
     }
-
     @BsonDiscriminator
     public static class AzureConfig extends Config{
         
@@ -547,6 +582,7 @@ public abstract class Config {
             this.applicationIdentifier = applicationIdentifier;
         }
     }
+
     @BsonDiscriminator
     public static class MixpanelConfig extends Config {
         private String projectToken;
@@ -653,4 +689,246 @@ public abstract class Config {
         }
     }
 
+    @BsonDiscriminator
+    public static class CloudflareWafConfig extends Config {
+        public static final String API_KEY = "apiKey";
+        private String apiKey;
+        public static final String EMAIL = "email";
+        private String email;
+        public static final String INTEGRATION_TYPE = "integrationType";
+        private String integrationType;
+        public static final String ACCOUNT_OR_ZONE_ID = "accountOrZoneId";
+        private String accountOrZoneId;
+        public static final String ACCOUNT_ID = "accountId";
+        private int accountId;
+
+        public static final String _CONFIG_ID = "configId";
+        public static final String CONFIG_ID = ConfigType.CLOUDFLARE_WAF.name();
+
+        public CloudflareWafConfig() {
+            this.configType = ConfigType.CLOUDFLARE_WAF;
+            this.id = CONFIG_ID;
+        }
+
+        public CloudflareWafConfig(String apiKey, String email, String integrationType, String accountOrZoneId, int accountId) {
+            this.apiKey = apiKey;
+            this.email = email;
+            this.integrationType = integrationType;
+            this.accountOrZoneId = accountOrZoneId;
+            this.accountId = accountId;
+            this.id = accountId + "_" + CONFIG_ID;
+        }
+
+        public String getApiKey() {
+            return apiKey;
+        }
+
+        public void setApiKey(String apiKey) {
+            this.apiKey = apiKey;
+        }
+
+        public String getEmail() {
+            return email;
+        }
+
+        public void setEmail(String email) {
+            this.email = email;
+        }
+
+        public String getIntegrationType() {
+            return integrationType;
+        }
+
+        public void setIntegrationType(String integrationType) {
+            this.integrationType = integrationType;
+        }
+
+        public String getAccountOrZoneId() {
+            return accountOrZoneId;
+        }
+
+        public void setAccountOrZoneId(String accountOrZoneId) {
+            this.accountOrZoneId = accountOrZoneId;
+        }
+
+        public int getAccountId() {
+            return accountId;
+        }
+
+        public void setAccountId(int accountId) {
+            this.accountId = accountId;
+        }
+
+        public static String getConfigId() {
+            return CONFIG_ID;
+        }
+    }
+
+    @BsonDiscriminator
+    public static class AwsWafConfig extends Config {
+        private String awsAccessKey;
+        private String awsSecretKey;
+        private String region;
+        private String ruleSetId;
+        private String ruleSetName;
+        private int accountId;
+
+        public static final String CONFIG_ID = ConfigType.AWS_WAF.name();
+
+        public AwsWafConfig() {
+            this.configType = ConfigType.AWS_WAF;
+            this.id = CONFIG_ID;
+        }
+
+        public AwsWafConfig(String awsAccessKey, String awsSecretKey, String region, String ruleSetId,
+                String ruleSetName, int accountId) {
+            this.awsAccessKey = awsAccessKey;
+            this.awsSecretKey = awsSecretKey;
+            this.region = region;
+            this.ruleSetId = ruleSetId;
+            this.ruleSetName = ruleSetName;
+            this.accountId = accountId;
+            this.id = accountId + "_" + CONFIG_ID;
+        }
+
+        public String getAwsAccessKey() {
+            return awsAccessKey;
+        }
+
+        public void setAwsAccessKey(String awsAccessKey) {
+            this.awsAccessKey = awsAccessKey;
+        }
+
+        public String getAwsSecretKey() {
+            return awsSecretKey;
+        }
+
+        public void setAwsSecretKey(String awsSecretKey) {
+            this.awsSecretKey = awsSecretKey;
+        }
+
+        public String getRegion() {
+            return region;
+        }
+
+        public void setRegion(String region) {
+            this.region = region;
+        }
+
+        public String getRuleSetId() {
+            return ruleSetId;
+        }
+
+        public void setRuleSetId(String ruleSetId) {
+            this.ruleSetId = ruleSetId;
+        }
+
+        public String getRuleSetName() {
+            return ruleSetName;
+        }
+
+        public void setRuleSetName(String ruleSetName) {
+            this.ruleSetName = ruleSetName;
+        }
+
+        public static String getConfigId() {
+            return CONFIG_ID;
+        }
+
+        public int getAccountId() {
+            return accountId;
+        }
+
+        public void setAccountId(int accountId) {
+            this.accountId = accountId;
+        }
+       
+    }
+
+    @BsonDiscriminator
+    public static class SplunkSiemConfig extends Config {
+        private String splunkUrl;
+        private String splunkToken;
+
+        public static final String CONFIG_ID = ConfigType.SPLUNK_SIEM.name();
+
+        public SplunkSiemConfig() {
+            this.configType = ConfigType.SPLUNK_SIEM;
+            this.id = CONFIG_ID;
+        }
+
+        public SplunkSiemConfig(String splunkUrl, String splunkToken, int accountId) {
+            this.splunkUrl = splunkUrl;
+            this.splunkToken = splunkToken;
+            this.id = accountId + "_" + CONFIG_ID;
+        }
+
+        public String getSplunkUrl() {
+            return splunkUrl;
+        }
+
+        public void setSplunkUrl(String splunkUrl) {
+            this.splunkUrl = splunkUrl;
+        }
+
+        public String getSplunkToken() {
+            return splunkToken;
+        }
+
+        public void setSplunkToken(String splunkToken) {
+            this.splunkToken = splunkToken;
+        }
+       
+    }
+
+    @Getter
+    @Setter
+    @BsonDiscriminator
+    public static class AktoHostUrlConfig extends Config {
+
+        public static final String HOST_URL = "hostUrl";
+        public static final String LAST_SYNCED_AT = "lastSyncedAt";
+
+        private String hostUrl;
+        private int lastSyncedAt;
+
+        public AktoHostUrlConfig() {
+            this.configType = ConfigType.AKTO_DASHBOARD_HOST_URL;
+            this.id = ConfigType.AKTO_DASHBOARD_HOST_URL.name();
+        }
+    }
+
+    public static boolean isConfigSSOType(ConfigType configType){
+        if(configType == null){
+            return false;
+        }
+        return ssoConfigTypes.contains(configType);
+    }
+
+    public static OktaConfig getOktaConfig(int accountId) {
+        String id =  OktaConfig.getOktaId(accountId);
+        OktaConfig config = (OktaConfig) ConfigsDao.instance.findOne(
+                Filters.and(
+                    Filters.eq("_id", id),
+                    Filters.eq(OktaConfig.ACCOUNT_ID, accountId)
+                )
+        );
+        return config;
+    }
+
+    public static OktaConfig getOktaConfig(String userEmail){
+        if (userEmail == null || userEmail.trim().isEmpty()) {
+            return null;
+        }
+        String[] companyKeyArr = userEmail.split("@");
+        if(companyKeyArr == null || companyKeyArr.length < 2){
+            return null;
+        }
+
+        String domain = companyKeyArr[1];
+        OktaConfig config = (OktaConfig) ConfigsDao.instance.findOne(
+                Filters.eq(OktaConfig.ORGANIZATION_DOMAIN, domain)
+        );
+        return config;
+    }
 }

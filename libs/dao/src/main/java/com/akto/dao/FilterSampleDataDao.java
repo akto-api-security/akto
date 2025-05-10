@@ -1,7 +1,9 @@
 package com.akto.dao;
 
+import com.akto.dto.ApiCollectionUsers;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.FilterSampleData;
+import com.akto.dto.testing.TestingEndpoints;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
@@ -11,9 +13,9 @@ import java.util.ArrayList;
 import java.util.List;
 
 
-public class FilterSampleDataDao extends AccountsContextDao<FilterSampleData>{
+public class FilterSampleDataDao extends AccountsContextDaoWithRbac<FilterSampleData>{
 
-    public static FilterSampleDataDao instance = new FilterSampleDataDao();
+    public static final FilterSampleDataDao instance = new FilterSampleDataDao();
 
     public List<ApiInfo.ApiInfoKey> getApiInfoKeys() {
         Bson projection = Projections.fields(Projections.include());
@@ -54,5 +56,10 @@ public class FilterSampleDataDao extends AccountsContextDao<FilterSampleData>{
     @Override
     public Class<FilterSampleData> getClassT() {
         return FilterSampleData.class;
+    }
+
+    @Override
+    public String getFilterKeyString() {
+        return TestingEndpoints.getFilterPrefix(ApiCollectionUsers.CollectionType.Id_ApiInfoKey_ApiCollectionId) + ApiInfo.ApiInfoKey.API_COLLECTION_ID;
     }
 }

@@ -10,8 +10,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.opensymphony.xwork2.Action;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -27,20 +25,19 @@ import java.util.regex.Pattern;
 
 public class OtpAction extends UserAction {
 
-    private static final Logger logger = LoggerFactory.getLogger(OtpAction.class);
-    private static final LoggerMaker loggerMaker = new LoggerMaker(OtpAction.class);
+    private static final LoggerMaker logger = new LoggerMaker(OtpAction.class, LogDb.DASHBOARD);;
 
     private String from;
     private String text;
     @Override
     public String execute() {
-        loggerMaker.infoAndAddToDb(text, LogDb.DASHBOARD);
+        logger.debugAndAddToDb(text, LogDb.DASHBOARD);
         if (text == null || !text.contains("OTP")) {
-            loggerMaker.infoAndAddToDb("But doesn't contain the word 'OTP' ", LogDb.DASHBOARD);
+            logger.debugAndAddToDb("But doesn't contain the word 'OTP' ", LogDb.DASHBOARD);
             return SUCCESS.toUpperCase();
         }
 
-        loggerMaker.infoAndAddToDb("And contains OTP", LogDb.DASHBOARD);
+        logger.debugAndAddToDb("And contains OTP", LogDb.DASHBOARD);
         OTPMessage otpMessage = new OTPMessage(Context.now(), from, text, Context.now());
         OtpMessagesDao.instance.insertOne(otpMessage);
         return SUCCESS.toUpperCase();
@@ -56,7 +53,7 @@ public class OtpAction extends UserAction {
         if (val == null || val.isEmpty()) return ERROR.toUpperCase();
 
         otp = val;
-        loggerMaker.infoAndAddToDb("found otp: " + otp, LogDb.DASHBOARD);
+        logger.debugAndAddToDb("found otp: " + otp, LogDb.DASHBOARD);
 
         return SUCCESS.toUpperCase();
     }
@@ -77,15 +74,15 @@ public class OtpAction extends UserAction {
 
     private Integer latestMessageId = null;
     public String fetchLatestMessageId() {
-        loggerMaker.infoAndAddToDb(apiKey, LogDb.DASHBOARD);
-        loggerMaker.infoAndAddToDb(authToken, LogDb.DASHBOARD);
-        loggerMaker.infoAndAddToDb(address, LogDb.DASHBOARD);
+        logger.debugAndAddToDb(apiKey, LogDb.DASHBOARD);
+        logger.debugAndAddToDb(authToken, LogDb.DASHBOARD);
+        logger.debugAndAddToDb(address, LogDb.DASHBOARD);
         BasicDBObject result;
         try {
             result = makeRequestToMySms();
-            logger.info("****");
-            logger.info(String.valueOf(result));
-            logger.info("****");
+            logger.debug("****");
+            logger.debug(String.valueOf(result));
+            logger.debug("****");
 
             List<Map> messages = (List<Map>) result.get("messages");
             if (messages.size() == 0) return SUCCESS.toUpperCase();
@@ -103,9 +100,9 @@ public class OtpAction extends UserAction {
         try {
             BasicDBObject result = makeRequestToMySms();
 
-            logger.info("((((");
-            logger.info(String.valueOf(result));
-            logger.info("((((");
+            logger.debug("((((");
+            logger.debug(String.valueOf(result));
+            logger.debug("((((");
 
             List<Map> messages = (List<Map>) result.get("messages");
 
@@ -118,7 +115,7 @@ public class OtpAction extends UserAction {
             if (val == null || val.isEmpty()) return ERROR.toUpperCase();
 
             otp = val;
-            loggerMaker.infoAndAddToDb("found otp: " + otp, LogDb.DASHBOARD);
+            logger.debugAndAddToDb("found otp: " + otp, LogDb.DASHBOARD);
 
         } catch (Exception e) {
             return ERROR.toUpperCase();
@@ -152,7 +149,7 @@ public class OtpAction extends UserAction {
             os.write(json.getBytes(StandardCharsets.UTF_8));
         }
 
-        logger.info(String.valueOf(http.getResponseCode()));
+        logger.debug(String.valueOf(http.getResponseCode()));
         InputStream inputStream = http.getInputStream();
 
 

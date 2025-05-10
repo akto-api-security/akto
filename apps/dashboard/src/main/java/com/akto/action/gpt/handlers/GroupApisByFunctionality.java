@@ -31,7 +31,7 @@ public class GroupApisByFunctionality implements QueryHandler {
             }
         }
         List<String> urls = this.dataExtractor.extractData(meta);
-        logger.info("Found " + urls.size() + " endpoints");
+        logger.debug("Found " + urls.size() + " endpoints");
         BasicDBObject data = new BasicDBObject();
         data.put("query_type", GptQuery.GROUP_APIS_BY_FUNCTIONALITY.getName());
         data.put(GptAction.USER_EMAIL, meta.getString(GptAction.USER_EMAIL));

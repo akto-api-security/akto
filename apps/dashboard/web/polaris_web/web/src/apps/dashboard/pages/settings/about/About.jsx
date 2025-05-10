@@ -1,10 +1,10 @@
-import { Box, Button, ButtonGroup, Divider, LegacyCard, Text, VerticalStack, HorizontalGrid, HorizontalStack, Icon, Scrollable, TextField, Tooltip, Tag, Form } from '@shopify/polaris'
+import { Box, Button, ButtonGroup, Divider, LegacyCard, Text, VerticalStack, HorizontalGrid, HorizontalStack, Scrollable, TextField, Tag, Form, Tooltip, Checkbox } from '@shopify/polaris'
 import React, { useEffect, useState } from 'react'
 import settingFunctions from '../module'
 import Dropdown from '../../../components/layouts/Dropdown'
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards"
 import settingRequests from '../api'
-import { DeleteMajor } from "@shopify/polaris-icons"
+import { DeleteMajor, FileFilledMinor } from "@shopify/polaris-icons"
 import TooltipText from "../../../components/shared/TooltipText"
 import { isIP } from "is-ip"
 import isCidr from "is-cidr"
@@ -37,16 +37,29 @@ function About() {
     const [enableTelemetry, setEnableTelemetry] = useState(false)
     const [privateCidrList, setPrivateCidrList] = useState([])
     const [partnerIpsList, setPartnerIpsList] = useState([])
+    const [accountName, setAccountName] = useState('')
+    const [currentTimeZone, setCurrentTimeZone] = useState('')
+    const [toggleCaseSensitiveApis, setToggleCaseSensitiveApis] = useState(false)
+    const [isSubscribed, setIsSubscribed] = useState(() => {
+        return localStorage.getItem('isSubscribed') === 'true'
+    })
 
     const initialUrlsList = settingFunctions.getRedundantUrlOptions()
     const [selectedUrlList, setSelectedUrlsList] = useState([])
+    const [miniTesting, setMiniTesting] = useState(false)
 
     const setupOptions = settingFunctions.getSetupOptions()
 
     const isOnPrem = window.DASHBOARD_MODE && window.DASHBOARD_MODE.toLowerCase() === 'on_prem'
 
     async function fetchDetails(){
-        const {arr, resp} = await settingFunctions.fetchAdminInfo()
+        const {arr, resp, accountSettingsDetails} = await settingFunctions.fetchAdminInfo()
+        if(accountSettingsDetails?.timezone === 'Us/Pacific'){
+            accountSettingsDetails.timezone = 'America/Los_Angeles';
+        }
+        setCurrentTimeZone(accountSettingsDetails?.timezone)
+        setAccountName(accountSettingsDetails?.name)
+        setMiniTesting(!accountSettingsDetails?.hybridTestingEnabled)
         setSetuptype(resp.setupType)
         setRedactPayload(resp.redactPayload)
         setNewMerging(resp.urlRegexMatchingEnabled)
@@ -62,10 +75,13 @@ function About() {
         setPrivateCidrList(resp.privateCidrList || [])
         setPartnerIpsList(resp.partnerIpList || [])
         setSelectedUrlsList(resp.allowRedundantEndpointsList || [])
+        setToggleCaseSensitiveApis(resp.handleApisCaseInsensitive || false)
     }
 
     useEffect(()=>{
-        fetchDetails()
+        if(window.USER_ROLE === 'ADMIN') {
+            fetchDetails()
+        }
     },[])
 
     function TitleComponent ({title,description}) {
@@ -79,8 +95,77 @@ function About() {
         )
     }
 
+    const handleSaveSettings = async(type, value) =>{
+        await settingRequests.updateAccountSettings(type, value).then((res) => {
+            func.setToast(true, false, `${func.toSentenceCase(type)} updated successfully.`)
+        })
+    }
+
+    const timezonesAvailable = [
+        { label: "Baker Island Time (BIT) UTC-12:00", value: "Etc/GMT+12" },
+        { label: "Niue Time (NUT) UTC-11:00", value: "Pacific/Niue" },
+        { label: "Marquesas Islands Time (MART) UTC-09:30", value: "Pacific/Marquesas" },
+        { label: "Hawaii-Aleutian Standard Time (HST) UTC-10:00", value: "Pacific/Honolulu" },
+        { label: "Alaska Standard Time (AKST) UTC-09:00", value: "America/Anchorage" },
+        { label: "Pacific Standard Time (PST) UTC-08:00", value: "America/Los_Angeles" },
+        { label: "Mountain Standard Time (MST) UTC-07:00", value: "America/Denver" },
+        { label: "Central Standard Time (CST) UTC-06:00", value: "America/Chicago" },
+        { label: "Eastern Standard Time (EST) UTC-05:00", value: "America/New_York" },
+        { label: "Venezuelan Standard Time (VET) UTC-04:30", value: "America/Caracas" },
+        { label: "Atlantic Standard Time (AST) UTC-04:00", value: "America/Halifax" },
+        { label: "Newfoundland Standard Time (NST) UTC-03:30", value: "America/St_Johns" },
+        { label: "Argentina Time (ART) UTC-03:00", value: "America/Argentina/Buenos_Aires" },
+        { label: "South Georgia Time (GST) UTC-02:00", value: "Etc/GMT+2" },
+        { label: "Cape Verde Time (CVT) UTC-01:00", value: "Atlantic/Cape_Verde" },
+        { label: "Greenwich Mean Time (GMT) UTC+00:00", value: "Etc/GMT" },
+        { label: "Central European Time (CET) UTC+01:00", value: "Europe/Berlin" },
+        { label: "Eastern European Time (EET) UTC+02:00", value: "Europe/Kiev" },
+        { label: "Moscow Standard Time (MSK) UTC+03:00", value: "Europe/Moscow" },
+        { label: "Iran Standard Time (IRST) UTC+03:30", value: "Asia/Tehran" },
+        { label: "Gulf Standard Time (GST) UTC+04:00", value: "Asia/Dubai" },
+        { label: "Afghanistan Time (AFT) UTC+04:30", value: "Asia/Kabul" },
+        { label: "Pakistan Standard Time (PKT) UTC+05:00", value: "Asia/Karachi" },
+        { label: "Indian Standard Time (IST) UTC+05:30", value: "Asia/Kolkata" },
+        { label: "Nepal Time (NPT) UTC+05:45", value: "Asia/Kathmandu" },
+        { label: "Bangladesh Standard Time (BST) UTC+06:00", value: "Asia/Dhaka" },
+        { label: "Cocos Islands Time (CCT) UTC+06:30", value: "Indian/Cocos" },
+        { label: "Indochina Time (ICT) UTC+07:00", value: "Asia/Bangkok" },
+        { label: "China Standard Time (CST) UTC+08:00", value: "Asia/Shanghai" },
+        { label: "Australian Western Standard Time (AWST) UTC+08:00", value: "Australia/Perth" },
+        { label: "Australian Central Standard Time (ACST) UTC+09:30", value: "Australia/Darwin" },
+        { label: "Japan Standard Time (JST) UTC+09:00", value: "Asia/Tokyo" },
+        { label: "Australian Eastern Standard Time (AEST) UTC+10:00", value: "Australia/Sydney" },
+        { label: "Lord Howe Standard Time (LHST) UTC+10:30", value: "Australia/Lord_Howe" },
+        { label: "Solomon Islands Time (SBT) UTC+11:00", value: "Pacific/Guadalcanal" },
+        { label: "Norfolk Island Time (NFT) UTC+11:30", value: "Pacific/Norfolk" },
+        { label: "Fiji Time (FJT) UTC+12:00", value: "Pacific/Fiji" },
+        { label: "New Zealand Standard Time (NZST) UTC+12:00", value: "Pacific/Auckland" }
+    ];
+    
+
     const infoComponent = (
-        <VerticalStack gap={5}>
+        <VerticalStack gap={4}>
+            <HorizontalGrid columns={"2"} gap={"3"}>
+                <TextField 
+                    disabled={window.USER_ROLE !== 'ADMIN'} 
+                    connectedRight={(
+                        <Tooltip content="Save account name" dismissOnMouseOut>
+                            <Button disabled={window.USER_ROLE !== 'ADMIN'} icon={FileFilledMinor} onClick={() => handleSaveSettings("name", accountName)} />
+                        </Tooltip>
+                    )} 
+                    onChange={setAccountName} 
+                    value={accountName}
+                    label={"Account name"}
+                />
+                <DropdownSearch
+                    placeholder="Select timezone"
+                    label="Select timezone"
+                    optionsList={timezonesAvailable}
+                    setSelected={(val) => {handleSaveSettings("timezone", val); setCurrentTimeZone(val)}}
+                    value={currentTimeZone}
+                    sliceMaxVal={40}
+                />
+            </HorizontalGrid>
             {objArr.map((item)=>(
                 <Box key={item.title} >
                     <VerticalStack gap={1}>
@@ -89,6 +174,28 @@ function About() {
                     </VerticalStack>
                 </Box>
             ))}
+            <Checkbox
+                label="Subscribe to updates"
+                checked={isSubscribed}
+                onChange={() => {
+                    const userProps = {}
+                    let subsKey = window.DASHBOARD_MODE === 'ON_PREM' ? "mono_subscribed" : "akto_subscribed"
+                    userProps[subsKey] = "yes"
+                    if  (window.Intercom) {
+                        window.Intercom("update", userProps)
+                        window.Intercom("trackEvent", subsKey)
+                    }
+            
+                    if (window.mixpanel) {
+                        window.mixpanel.people.set(userProps);
+                    }
+                    setIsSubscribed(!isSubscribed)
+                    localStorage.setItem('isSubscribed', (!isSubscribed).toString())
+                    if (!isSubscribed) {
+                        func.setToast(true, false, "Successfully subscribed to updates")
+                    }
+                }}
+            />
         </VerticalStack>
     )
 
@@ -116,6 +223,18 @@ function About() {
         setTrafficThreshold(val) ;
         await settingRequests.updateTrafficAlertThresholdSeconds(val);
     }
+
+    const handleApisCaseInsensitive = async(val) => {
+        setToggleCaseSensitiveApis(val) ;
+        await settingRequests.updateApisCaseInsensitive(val);
+    }
+
+    const toggleMiniTesting = async(val) => {
+        setMiniTesting(val) ;
+        await settingRequests.switchTestingModule(!val);
+    }
+
+    
     const handleIpsChange = async(ip, isAdded, type) => {
         let ipList = ip.split(",")
         ipList = ipList.map((x) => x.replace(/\s+/g, '') )
@@ -233,19 +352,23 @@ function About() {
     }
 
     const redundantUrlComp = (
-        <Box width='220px'>
-            <DropdownSearch
-                label="Select redundant url types"
-                placeholder="Select url types"
-                optionsList={initialUrlsList.options}
-                setSelected={handleSelectedUrls}
-                preSelected={selectedUrlList}
-                itemName={"url type"}
-                value={`${selectedUrlList.length} url type selected`}
-                allowMultiple
-                isNested={true}
-            />
-        </Box>
+        <VerticalStack gap={"4"}>
+            <Box width='220px'>
+                <DropdownSearch
+                    label="Select redundant url types"
+                    placeholder="Select url types"
+                    optionsList={initialUrlsList.options}
+                    setSelected={handleSelectedUrls}
+                    preSelected={selectedUrlList}
+                    itemName={"url type"}
+                    value={`${selectedUrlList.length} url type selected`}
+                    allowMultiple
+                    isNested={true}
+                />
+            </Box>
+            <ToggleComponent text={"Treat URLs as case insensitive"} onToggle={handleApisCaseInsensitive} initial={toggleCaseSensitiveApis} />
+            <ToggleComponent text={"Use akto's testing module"} onToggle={toggleMiniTesting} initial={miniTesting}/>
+        </VerticalStack>
     )
     
     const filterHeaderComponent = (

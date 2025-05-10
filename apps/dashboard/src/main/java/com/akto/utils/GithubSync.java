@@ -17,7 +17,7 @@ import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.http_util.CoreHTTPClient;
 
 public class GithubSync {
-    private static final LoggerMaker loggerMaker = new LoggerMaker(GithubSync.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(GithubSync.class, LogDb.DASHBOARD);;
     private static final OkHttpClient client = CoreHTTPClient.client.newBuilder().build();
 
     public GithubFile syncFile(String repo, String filePath, String latestSha, Map<String, String> githubFileShaMap) {
@@ -134,7 +134,7 @@ public class GithubSync {
                     throw new Exception("Repo size is too large, max allowed size is 10 MB");
                 }
 
-                loggerMaker.infoAndAddToDb(String.format("Downloaded github repo archive: %s", url), LogDb.DASHBOARD);
+                loggerMaker.debugAndAddToDb(String.format("Downloaded github repo archive: %s", url), LogDb.DASHBOARD);
                 repoZip = response.body().bytes();
             } else {
                 loggerMaker.errorAndAddToDb(String.format("Failed to download the zip archive from url %s. Status code: %d", url, response.code()), LogDb.DASHBOARD);

@@ -1,9 +1,8 @@
 package com.akto.test_editor.execution;
 
-import com.akto.billing.UsageMetricUtils;
 import com.akto.dao.billing.OrganizationsDao;
-import com.akto.dao.billing.TokensDao;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -13,16 +12,10 @@ import com.akto.dto.ApiInfo;
 import com.akto.dto.CustomAuthType;
 import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.RawApi;
-import com.akto.dto.RecordedLoginFlowInput;
 import com.akto.dto.testing.*;
-import com.akto.dto.testing.sources.AuthWithCond;
 import com.akto.testing.*;
-import com.akto.util.enums.LoginFlowEnums;
 import com.akto.util.enums.LoginFlowEnums.AuthMechanismTypes;
-import com.akto.util.enums.LoginFlowEnums.LoginStepTypesEnums;
 import com.akto.dto.api_workflow.Graph;
-import com.akto.dto.billing.Organization;
-import com.akto.dto.billing.Tokens;
 import com.akto.dto.test_editor.*;
 import com.akto.dto.testing.TestResult.Confidence;
 import com.akto.dto.testing.TestResult.TestError;
@@ -32,6 +25,7 @@ import com.akto.log.LoggerMaker.LogDb;
 import com.akto.rules.TestPlugin;
 import com.akto.test_editor.Utils;
 import com.akto.util.Constants;
+import com.akto.util.HttpRequestResponseUtils;
 import com.akto.util.modifier.JWTPayloadReplacer;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -45,16 +39,14 @@ import static com.akto.test_editor.Utils.headerValuesUnchanged;
 import static com.akto.runtime.utils.Utils.convertOriginalReqRespToString;
 import static com.akto.testing.Utils.compareWithOriginalResponse;
 
-import com.mongodb.client.model.Filters;
 
 import org.apache.commons.lang3.StringUtils;
-import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 
 
 public class Executor {
 
-    private static final LoggerMaker loggerMaker = new LoggerMaker(Executor.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(Executor.class, LogDb.TESTING);
 
     public final String _HOST = "host";
 
@@ -76,6 +68,10 @@ public class Executor {
         if (node.getChildNodes().size() < 2) {
             testLogs.add(new TestingRunResult.TestLog(TestingRunResult.TestLogType.ERROR, "executor child nodes is less than 2, returning empty execution result"));
             loggerMaker.errorAndAddToDb("executor child nodes is less than 2, returning empty execution result " + logId, LogDb.TESTING);
+            /*
+             * Do not store messages in case the execution block is invalid.
+             */
+            invalidExecutionResult.setOriginalMessage(null);
             result.add(invalidExecutionResult);
             yamlTestResult = new YamlTestResult(result, workflowTest);
             return yamlTestResult;
@@ -107,27 +103,33 @@ public class Executor {
             yamlTestResult = new YamlTestResult(result, workflowTest);
             return yamlTestResult;
         }
+
+        // new role being updated here without using modify_header {normal role replace here}
+
         if (testingRunConfig != null && StringUtils.isNotBlank(testingRunConfig.getTestRoleId())) {
-            TestRoles role = TestRolesDao.instance.findOne(Filters.eq("_id", new ObjectId(testingRunConfig.getTestRoleId())));
+            TestRoles role = fetchOrFindTestRole(testingRunConfig.getTestRoleId(), true);
             if (role != null) {
                 EndpointLogicalGroup endpointLogicalGroup = role.fetchEndpointLogicalGroup();
                 if (endpointLogicalGroup != null && endpointLogicalGroup.getTestingEndpoints() != null  && endpointLogicalGroup.getTestingEndpoints().containsApi(apiInfoKey)) {
-                    if (role.getDefaultAuthMechanism() != null) {
-                        loggerMaker.infoAndAddToDb("attempting to override auth " + logId, LogDb.TESTING);
-                        modifyAuthTokenInRawApi(role, sampleRawApi);
-                    } else {
-                        loggerMaker.infoAndAddToDb("Default auth mechanism absent: " + logId, LogDb.TESTING);
+                    synchronized(role) {
+                        loggerMaker.debugAndAddToDb("attempting to override auth " + logId, LogDb.TESTING);
+                        if (modifyAuthTokenInRawApi(role, sampleRawApi) == null) {
+                            loggerMaker.debugAndAddToDb("Default auth mechanism absent: " + logId, LogDb.TESTING);
+                        }
                     }
                 } else {
-                    loggerMaker.infoAndAddToDb("Endpoint didn't satisfy endpoint condition for testRole" + logId, LogDb.TESTING);
+                    loggerMaker.debugAndAddToDb("Endpoint didn't satisfy endpoint condition for testRole" + logId, LogDb.TESTING);
                 }
             } else {
                 String reason = "Test role has been deleted";
-                loggerMaker.infoAndAddToDb(reason + ", going ahead with sample auth", LogDb.TESTING);
+                loggerMaker.debugAndAddToDb(reason + ", going ahead with sample auth", LogDb.TESTING);
             }
         }
+        origRawApi = sampleRawApi.copy();
 
         boolean requestSent = false;
+
+        boolean allowAllCombinations = executionListBuilder.isAllowAllCombinations();
 
         String executionType = node.getChildNodes().get(0).getValues().toString();
         if (executionType.equals("multiple") || executionType.equals("graph")) {
@@ -136,16 +138,31 @@ public class Executor {
                 apiInfoKeys.add(apiInfoKey);
                 memory = new Memory(apiInfoKeys, new HashMap<>());
             }
-            workflowTest = buildWorkflowGraph(reqNodes, rawApi, authMechanism, customAuthTypes, apiInfoKey, varMap, validatorNode);
-            result.add(triggerMultiExecution(workflowTest, reqNodes, rawApi, authMechanism, customAuthTypes, apiInfoKey, varMap, validatorNode, debug, testLogs, memory));
+            workflowTest = buildWorkflowGraph(reqNodes, sampleRawApi, authMechanism, customAuthTypes, apiInfoKey, varMap, validatorNode);
+            result.add(triggerMultiExecution(workflowTest, reqNodes, sampleRawApi, authMechanism, customAuthTypes, apiInfoKey, varMap, validatorNode, debug, testLogs, memory));
             yamlTestResult = new YamlTestResult(result, workflowTest);
             
             return yamlTestResult;
         }
 
+        if (executionType.equals("passive")) {
+            ExecutionResult attempt = new ExecutionResult(true, "", rawApi.getRequest(), rawApi.getResponse());
+            TestResult res = validate(attempt, sampleRawApi, varMap, logId, validatorNode, apiInfoKey);
+            if (res != null) {
+                /*
+                 * Since the original message and test message are same, saving only one.
+                 * Being set as message in the getter later.
+                 */
+                res.setOriginalMessage("");
+                result.add(res);
+            }
+            yamlTestResult = new YamlTestResult(result, workflowTest);
+            return yamlTestResult;
+        }
+
         List<RawApi> testRawApis = new ArrayList<>();
         testRawApis.add(sampleRawApi.copy());
-        ExecutorAlgorithm executorAlgorithm = new ExecutorAlgorithm(sampleRawApi, varMap, authMechanism, customAuthTypes);
+        ExecutorAlgorithm executorAlgorithm = new ExecutorAlgorithm(sampleRawApi, varMap, authMechanism, customAuthTypes, allowAllCombinations);
         Map<Integer, ExecuteAlgoObj> algoMap = new HashMap<>();
         ExecutorSingleRequest singleReq = executorAlgorithm.execute(executorNodes, 0, algoMap, testRawApis, false, 0, apiInfoKey);
         
@@ -174,7 +191,19 @@ public class Executor {
                         // TODO: handle exception
                     }
                 }
-                testResponse = ApiExecutor.sendRequest(testReq.getRequest(), followRedirect, testingRunConfig, debug, testLogs, Utils.SKIP_SSRF_CHECK);
+                List<String> contentType = origRawApi.getRequest().getHeaders().getOrDefault("content-type", new ArrayList<>());
+                String contentTypeString = "";
+                if(!contentType.isEmpty()){
+                    contentTypeString = contentType.get(0);
+                }
+                if(!contentTypeString.isEmpty() && (contentTypeString.contains(HttpRequestResponseUtils.SOAP) || contentTypeString.contains(HttpRequestResponseUtils.XML))){
+                    // since we are storing a map for original raw payload, we need original raw url and method to float to api executor
+                    // we are adding custom header here and when sending request we will remove them
+                    testReq.getRequest().getHeaders().put("x-akto-original-url", Collections.singletonList(origRawApi.getRequest().getUrl()));
+                    testReq.getRequest().getHeaders().put("x-akto-original-method", Collections.singletonList(origRawApi.getRequest().getMethod()));   
+                }
+
+                testResponse = ApiExecutor.sendRequest(testReq.getRequest(), followRedirect, testingRunConfig, debug, testLogs, Utils.SKIP_SSRF_CHECK, false);
                 requestSent = true;
                 ExecutionResult attempt = new ExecutionResult(singleReq.getSuccess(), singleReq.getErrMsg(), testReq.getRequest(), testResponse);
                 TestResult res = validate(attempt, sampleRawApi, varMap, logId, validatorNode, apiInfoKey);
@@ -190,12 +219,18 @@ public class Executor {
         }
         
         if(result.isEmpty()){
+            String message = rawApi.getOriginalMessage();
             if(requestSent){
                 error_messages.add(TestError.API_REQUEST_FAILED.getMessage());
             } else {
                 error_messages.add(TestError.NO_API_REQUEST.getMessage());
+                /*
+                 * In case no API requests are created,
+                 * do not store the original message
+                 */
+                message = "";
             }
-            result.add(new TestResult(null, rawApi.getOriginalMessage(), error_messages, 0, false, TestResult.Confidence.HIGH, null));
+            result.add(new TestResult(null, message, error_messages, 0, false, TestResult.Confidence.HIGH, null));
         }
 
         yamlTestResult = new YamlTestResult(result, workflowTest);
@@ -254,26 +289,6 @@ public class Executor {
         String key = params[params.length - 1];
         String val = rawApi.getRequest().getHeaders().get(key).get(0);
         return val;
-    }
-
-    private void overrideAuth(RawApi rawApi, AuthMechanism authMechanism) {
-        List<AuthParam> authParams = authMechanism.getAuthParams();
-        if (authParams == null || authParams.isEmpty()) {
-            return;
-        }
-        AuthParam authParam = authParams.get(0);
-        String authHeader = authParam.getKey();
-        String authVal = authParam.getValue();
-        Map<String, List<String>> headersMap= rawApi.fetchReqHeaders();
-        for (Map.Entry<String, List<String>> headerKeyVal : headersMap.entrySet()) {
-            if (headerKeyVal.getKey().equalsIgnoreCase(authHeader)) {
-                headerKeyVal.setValue(Collections.singletonList(authVal));
-                rawApi.modifyReqHeaders(headersMap);
-                loggerMaker.infoAndAddToDb("overriding auth header " + authHeader, LogDb.TESTING);
-                return;
-            }
-        }
-        loggerMaker.infoAndAddToDb("auth header not found " + authHeader, LogDb.TESTING);
     }
 
     public WorkflowTest buildWorkflowGraph(ExecutorNode reqNodes, RawApi rawApi, AuthMechanism authMechanism,
@@ -382,7 +397,7 @@ public class Executor {
         RawApi testRawApi = new RawApi(attempt.getRequest(), attempt.getResponse(), msg);
         boolean vulnerable = TestPlugin.validateValidator(validatorNode, rawApi, testRawApi , apiInfoKey, varMap, logId);
         if (vulnerable) {
-            loggerMaker.infoAndAddToDb("found vulnerable " + logId, LogDb.TESTING);
+            loggerMaker.debugAndAddToDb("found vulnerable " + logId, LogDb.TESTING);
         }
         double percentageMatch = 0;
         if (rawApi.getResponse() != null && testRawApi.getResponse() != null) {
@@ -463,111 +478,67 @@ public class Executor {
         return removed;
     }
 
-    private ExecutorSingleOperationResp modifyAuthTokenInRawApi(TestRoles testRole, RawApi rawApi) {
-        Map<String, List<String>> rawHeaders = rawApi.fetchReqHeaders();
-        for(AuthWithCond authWithCond: testRole.getAuthWithCondList()) {
+    public synchronized static ExecutorSingleOperationResp modifyAuthTokenInRawApi(TestRoles testRole, RawApi rawApi) {
+        AuthMechanism authMechanismForRole = testRole.findMatchingAuthMechanism(rawApi);
 
-            boolean allSatisfied = true;
-            for(String headerKey: authWithCond.getHeaderKVPairs().keySet()) {
-                String headerVal = authWithCond.getHeaderKVPairs().get(headerKey);
-
-                List<String> rawHeaderValue = rawHeaders.getOrDefault(headerKey.toLowerCase(), new ArrayList<>());
-                if (!rawHeaderValue.contains(headerVal)) {
-                    allSatisfied = false;
-                    break;
-                }
-            }
-
-            if (allSatisfied) {
-                AuthMechanism authMechanismForRole = authWithCond.getAuthMechanism();
-
-                if (authWithCond.getRecordedLoginFlowInput() != null) {
-                    // handle json recording
-                    RecordedLoginFlowInput recordedLoginFlowInput = authWithCond.getRecordedLoginFlowInput();
-
-                    String token = com.akto.testing.workflow_node_executor.Utils.fetchToken(recordedLoginFlowInput, 5);
-                    if (token == null) {
-                        return new ExecutorSingleOperationResp(false, "Failed to replace roles_access_context: ");
-                    }
-
-                    Map<String, Object> valuesMap = new HashMap<>();
-                    valuesMap.put("x1.response.body.token", token);
+        if (authMechanismForRole == null) {
+            return null;
+        }
         
-                    for (AuthParam param : authMechanismForRole.getAuthParams()) {
-                        try {
-                            String value = com.akto.testing.workflow_node_executor.Utils.executeCode(param.getValue(), valuesMap);
-                            if (!param.getValue().equals(value) && value == null) {
-                                return new ExecutorSingleOperationResp(false, "auth param not found at specified path");
-                            }
-                            param.setValue(value);
-                        } catch(Exception e) {
-                            return new ExecutorSingleOperationResp(false, "auth param not found at specified path" + e.getMessage());
-                        }
-                    }
+        List<AuthParam> authParamList = authMechanismForRole.getAuthParams();
+        
+        if (authParamList.isEmpty()) {
+            return null;
+        }
+        
+        boolean eligibleForCachedToken = AuthMechanismTypes.LOGIN_REQUEST.toString().equalsIgnoreCase(authMechanismForRole.getType());
+        boolean shouldCalculateNewToken = eligibleForCachedToken && authMechanismForRole.isCacheExpired();
 
-                    authMechanismForRole.setType(LoginFlowEnums.AuthMechanismTypes.HARDCODED.name());
-                } else {
-                    if (AuthMechanismTypes.LOGIN_REQUEST.toString().equalsIgnoreCase(authMechanismForRole.getType())) {
-                        try {
-                            LoginFlowResponse loginFlowResponse = TestExecutor.executeLoginFlow(authMechanismForRole, null);
-                            if (!loginFlowResponse.getSuccess())
-                                throw new Exception(loginFlowResponse.getError());
-    
-                            authMechanismForRole.setType(LoginFlowEnums.AuthMechanismTypes.HARDCODED.name());
-                        } catch (Exception e) {
-                            return new ExecutorSingleOperationResp(false, "Failed to replace roles_access_context: " + e.getMessage());
-                        }
-                    }
-                }
-         
-                if (!authMechanismForRole.getType().equalsIgnoreCase(AuthMechanismTypes.HARDCODED.toString())) {
-                    return new ExecutorSingleOperationResp(false, "Auth type is not HARDCODED");
-                }
-
-                List<AuthParam> authParamList = authMechanismForRole.getAuthParams();
-                if (!authParamList.isEmpty()) {
-                    ExecutorSingleOperationResp ret = null;
-                    for (AuthParam authParam1: authParamList) {
-                        ret = Operations.modifyHeader(rawApi, authParam1.getKey().toLowerCase(), authParam1.getValue());
-                    }
-
-                    return ret;
-                }
+        if (shouldCalculateNewToken) {
+            try {
+                LoginFlowResponse loginFlowResponse= new LoginFlowResponse();
+                loggerMaker.debugAndAddToDb("trying to fetch token of step builder type for role " + testRole.getName(), LogDb.TESTING);
+                loginFlowResponse = TestExecutor.executeLoginFlow(authMechanismForRole, null, testRole.getName());
+                if (!loginFlowResponse.getSuccess())
+                    throw new Exception(loginFlowResponse.getError());
+            } catch (Exception e) {
+                return new ExecutorSingleOperationResp(false, "Failed to replace roles_access_context: " + e.getMessage());
             }
         }
+    
+        ExecutorSingleOperationResp ret = authMechanismForRole.addAuthToRequest(rawApi.getRequest(), eligibleForCachedToken);
 
-        return null;
+        return ret;
     }
 
-    private static BasicDBObject getBillingTokenForAuth() {
-        BasicDBObject bDObject;
-        int accountId = Context.accountId.get();
-        Organization organization = OrganizationsDao.instance.findOne(
-                Filters.in(Organization.ACCOUNTS, accountId)
-        );
-        if (organization == null) {
-            return new BasicDBObject("error", "organization not found");
-        }
+    private static ConcurrentHashMap<String, TestRoles> roleCache = new ConcurrentHashMap<>();
 
-        Tokens tokens;
-        Bson filters = Filters.and(
-                Filters.eq(Tokens.ORG_ID, organization.getId()),
-                Filters.eq(Tokens.ACCOUNT_ID, accountId)
-        );
-        String errMessage = "";
-        tokens = TokensDao.instance.findOne(filters);
-        if (tokens == null) {
-            errMessage = "error extracting ${akto_header}, token is missing";
+    public static void clearRoleCache() {
+        if (roleCache != null) {
+            roleCache.clear();
         }
-        if (tokens.isOldToken()) {
-            errMessage = "error extracting ${akto_header}, token is old";
+    }
+
+    public static TestRoles fetchOrFindAttackerRole() {
+        return fetchOrFindTestRole("ATTACKER_TOKEN_ALL", false);
+    }
+
+    public synchronized static TestRoles fetchOrFindTestRole(String name, boolean isId) {
+        if (roleCache == null) {
+            roleCache = new ConcurrentHashMap<>();
         }
-        if(errMessage.length() > 0){
-            bDObject = new BasicDBObject("error", errMessage);
+        if (roleCache.containsKey(name)) {
+            return roleCache.get(name);
+        }
+        if(!isId){
+            TestRoles testRole = TestRolesDao.instance.findOne(TestRoles.NAME, name);
+            roleCache.put(name, testRole);
+            return roleCache.get(name);
         }else{
-            bDObject = new BasicDBObject("token", tokens.getToken());
+            TestRoles testRole = TestRolesDao.instance.findOne(Constants.ID, new ObjectId(name));
+            roleCache.put(name, testRole);
+            return roleCache.get(name);
         }
-        return bDObject;
     }
 
     public ExecutorSingleOperationResp runOperation(String operationType, RawApi rawApi, Object key, Object value, Map<String, Object> varMap, AuthMechanism authMechanism, List<CustomAuthType> customAuthTypes, ApiInfo.ApiInfoKey apiInfoKey) {
@@ -581,7 +552,7 @@ public class Executor {
                 uuidList.add(generatedUUID);
                 varMap.put("random_uuid", uuidList);
 
-                BasicDBObject response = getBillingTokenForAuth();
+                BasicDBObject response = OrganizationsDao.getBillingTokenForAuth();
                 if(response.getString("token") != null){
                     String tokenVal = response.getString("token");
                     return Utils.sendRequestToSsrfServer(url + generatedUUID, redirectUrl, tokenVal);
@@ -590,71 +561,25 @@ public class Executor {
                 }
             case "attach_file":
                 return Operations.addHeader(rawApi, Constants.AKTO_ATTACH_FILE , key.toString());
-            case "add_body_param":
-                Object epochVal = Utils.getEpochTime(value);
-                if (epochVal != null) {
-                    value = epochVal;
-                }
-                return Operations.addBody(rawApi, key.toString(), value);
-            case "modify_body_param":
-                epochVal = Utils.getEpochTime(value);
-                if (epochVal != null) {
-                    value = epochVal;
-                }
-                return Operations.modifyBodyParam(rawApi, key.toString(), value);
-            case "delete_graphql_field":
-                return Operations.deleteGraphqlField(rawApi, key == null ? "": key.toString());
-            case "add_graphql_field":
-                return Operations.addGraphqlField(rawApi, key == null ? "": key.toString(), value == null ? "" : value.toString());
-            case "add_unique_graphql_field":
-                return Operations.addUniqueGraphqlField(rawApi, key == null ? "": key.toString(), value == null ? "" : value.toString());
-            case "modify_graphql_field":
-                return Operations.modifyGraphqlField(rawApi, key == null ? "": key.toString(), value == null ? "" : value.toString());
-            case "delete_body_param":
-                return Operations.deleteBodyParam(rawApi, key.toString());
-            case "replace_body":
-                String newPayload = rawApi.getRequest().getBody();
-                if (key instanceof Map) {
-                    Map<String, Map<String, String>> regexReplace = (Map) key;
-                    String payload = rawApi.getRequest().getBody();
-                    Map<String, String> regexInfo = regexReplace.get("regex_replace");
-                    String regex = regexInfo.get("regex");
-                    String replaceWith = regexInfo.get("replace_with");
-                    newPayload = Utils.applyRegexModifier(payload, regex, replaceWith);
-                } else {
-                    newPayload = key.toString();
-                }
-                return Operations.replaceBody(rawApi, newPayload);
-            case "add_header":
-                if (value.equals("${akto_header}")) {
-                    BasicDBObject tokenResponse = getBillingTokenForAuth();
-                    if(tokenResponse.getString("token") != null){
-                        value = tokenResponse.getString("token");
-                    }else{
-                        return new ExecutorSingleOperationResp(false, tokenResponse.getString("error"));
-                    }
-                }
-                epochVal = Utils.getEpochTime(value);
-                if (epochVal != null) {
-                    value = epochVal;
-                }
 
-                return Operations.addHeader(rawApi, key.toString(), value.toString());
             case "modify_header":
+                Object epochVal = Utils.getEpochTime(value);
                 String keyStr = key.toString();
                 String valStr = value.toString();
 
                 String ACCESS_ROLES_CONTEXT = "${roles_access_context.";
                 if (keyStr.startsWith(ACCESS_ROLES_CONTEXT)) {
-
+                    // role being updated here for without
                     keyStr = keyStr.replace(ACCESS_ROLES_CONTEXT, "");
                     keyStr = keyStr.substring(0,keyStr.length()-1).trim();
-                    TestRoles testRole = TestRolesDao.instance.findOne(TestRoles.NAME, keyStr);
+                    TestRoles testRole = fetchOrFindTestRole(keyStr, false);
                     if (testRole == null) {
                         return new ExecutorSingleOperationResp(false, "Test Role " + keyStr +  " Doesn't Exist ");
                     }
-
-                    ExecutorSingleOperationResp insertedAuthResp = modifyAuthTokenInRawApi(testRole, rawApi);
+                    ExecutorSingleOperationResp insertedAuthResp = new ExecutorSingleOperationResp(true, "");
+                    synchronized (testRole) {
+                        insertedAuthResp = modifyAuthTokenInRawApi(testRole, rawApi);
+                    }
                     if (insertedAuthResp != null) {
                         return insertedAuthResp;
                     }
@@ -667,33 +592,6 @@ public class Executor {
                     }
                     return Operations.modifyHeader(rawApi, keyStr, valStr);
                 }
-            case "delete_header":
-                return Operations.deleteHeader(rawApi, key.toString());
-            case "add_query_param":
-                epochVal = Utils.getEpochTime(value);
-                if (epochVal != null) {
-                    value = epochVal;
-                }
-                return Operations.addQueryParam(rawApi, key.toString(), value);
-            case "modify_query_param":
-                epochVal = Utils.getEpochTime(value);
-                if (epochVal != null) {
-                    value = epochVal;
-                }
-                return Operations.modifyQueryParam(rawApi, key.toString(), value);
-            case "delete_query_param":
-                return Operations.deleteQueryParam(rawApi, key.toString());
-            case "modify_url":
-                String newUrl = null;
-                UrlModifierPayload urlModifierPayload = Utils.fetchUrlModifyPayload(key.toString());
-                if (urlModifierPayload != null) {
-                    newUrl = Utils.buildNewUrl(urlModifierPayload, rawApi.getRequest().getUrl());
-                } else {
-                    newUrl = key.toString();
-                }
-                return Operations.modifyUrl(rawApi, newUrl);
-            case "modify_method":
-                return Operations.modifyMethod(rawApi, key.toString());
             case "remove_auth_header":
                 List<String> authHeaders = (List<String>) varMap.get("auth_headers");
                 boolean removed = false;
@@ -766,11 +664,12 @@ public class Executor {
                         return new ExecutorSingleOperationResp(false, "auth headers missing");
                     }
 
-                    for (AuthParam authParam: authMechanism.getAuthParams()) {
-                        authVal = authParam.getValue();
-                        ExecutorSingleOperationResp result = Operations.modifyHeader(rawApi, authParam.getKey(), authVal, true);
-                        modifiedAtLeastOne = modifiedAtLeastOne || result.getSuccess();
+                    ExecutorSingleOperationResp opResponse = modifyAuthTokenInRawApi(Executor.fetchOrFindAttackerRole(), rawApi);
+                    if (opResponse == null) {
+                        return new ExecutorSingleOperationResp(false, "auth headers missing");
                     }
+                    
+                    modifiedAtLeastOne = modifiedAtLeastOne || opResponse.getSuccess();
                 }
 
                 // once all the replacement has been done.. .remove all the auth keys that were not impacted by the change by comparing it with initial request
@@ -824,7 +723,7 @@ public class Executor {
                     return new ExecutorSingleOperationResp(true, "");
                 }
             default:
-                return new ExecutorSingleOperationResp(false, "invalid operationType");
+                return Utils.modifySampleDataUtil(operationType, rawApi, key, value, varMap, apiInfoKey);
 
         }
     }

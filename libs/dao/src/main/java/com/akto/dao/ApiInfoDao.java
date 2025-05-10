@@ -1,10 +1,15 @@
 package com.akto.dao;
 
 import com.akto.dao.context.Context;
+import com.akto.dto.ApiCollectionUsers;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.ApiInfo.ApiAccessType;
 import com.akto.dto.ApiInfo.ApiInfoKey;
+import com.akto.dto.rbac.UsersCollectionsList;
+import com.akto.dto.testing.TestingEndpoints;
+import com.akto.dto.ApiStats;
 import com.akto.util.Constants;
+import com.akto.util.Pair;
 import com.mongodb.BasicDBObject;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods.Method;
@@ -27,9 +32,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-public class ApiInfoDao extends AccountsContextDao<ApiInfo>{
+public class ApiInfoDao extends AccountsContextDaoWithRbac<ApiInfo>{
 
-    public static ApiInfoDao instance = new ApiInfoDao();
+    public static final ApiInfoDao instance = new ApiInfoDao();
 
     public static final String ID = "_id.";
     public static final int AKTO_DISCOVERED_APIS_COLLECTION_ID = 1333333333;
@@ -77,6 +82,9 @@ public class ApiInfoDao extends AccountsContextDao<ApiInfo>{
 
         MCollection.createIndexIfAbsent(getDBName(), getCollName(),
                 new String[] { ApiInfo.RISK_SCORE, ApiInfo.ID_API_COLLECTION_ID }, false);
+
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(),
+            new String[] {ApiInfo.DISCOVERED_TIMESTAMP }, false);
     }
     
 
@@ -92,6 +100,14 @@ public class ApiInfoDao extends AccountsContextDao<ApiInfo>{
         List<Bson> pipeline = new ArrayList<>();
         int oneMonthAgo = Context.now() - Constants.ONE_MONTH_TIMESTAMP ;
         pipeline.add(Aggregates.match(Filters.gte("lastTested", oneMonthAgo)));
+
+        try {
+            List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
+            if(collectionIds != null) {
+                pipeline.add(Aggregates.match(Filters.in(SingleTypeInfo._COLLECTION_IDS, collectionIds)));
+            }
+        } catch(Exception e){
+        }
 
         UnwindOptions unwindOptions = new UnwindOptions();
         unwindOptions.preserveNullAndEmptyArrays(false);  
@@ -121,6 +137,14 @@ public class ApiInfoDao extends AccountsContextDao<ApiInfo>{
     public Map<Integer,Integer> getLastTrafficSeen(){
         Map<Integer,Integer> result = new HashMap<>();
         List<Bson> pipeline = new ArrayList<>();
+
+        try {
+            List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
+            if(collectionIds != null) {
+                pipeline.add(Aggregates.match(Filters.in(SingleTypeInfo._COLLECTION_IDS, collectionIds)));
+            }
+        } catch(Exception e){
+        }
 
         UnwindOptions unwindOptions = new UnwindOptions();
         unwindOptions.preserveNullAndEmptyArrays(false);  
@@ -196,6 +220,49 @@ public class ApiInfoDao extends AccountsContextDao<ApiInfo>{
         return apiInfoList;
     }
 
+    public Pair<ApiStats,ApiStats> fetchApiInfoStats(Bson collectionFilter, int startTimestamp, int endTimestamp) {
+        ApiStats apiStatsStart = new ApiStats(startTimestamp);
+        ApiStats apiStatsEnd = new ApiStats(endTimestamp);
+
+        int totalApis = 0;
+        int apisTestedInLookBackPeriod = 0;
+        float totalRiskScore = 0;
+
+        // we need only end timestamp filter because data needs to be till end timestamp while start timestamp is for calculating delta
+        Bson filter = Filters.and(collectionFilter, Filters.lte(ApiInfo.DISCOVERED_TIMESTAMP, endTimestamp));
+        try {
+            List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(),Context.accountId.get());
+            if (collectionIds != null) {
+                filter = Filters.and(Filters.in("collectionIds", collectionIds));
+            }
+        } catch (Exception e){
+        }
+        MongoCursor<ApiInfo> cursor = instance.getMCollection().find(filter).cursor();
+
+        while(cursor.hasNext()) {
+            ApiInfo apiInfo = cursor.next();
+            if (apiInfo.getDiscoveredTimestamp() <= startTimestamp) {
+                apiInfo.addStats(apiStatsStart);
+                apiStatsStart.setTotalAPIs(apiStatsStart.getTotalAPIs()+1);
+                apiStatsStart.setTotalRiskScore(apiStatsStart.getTotalRiskScore() + apiInfo.getRiskScore());
+            }
+
+            apiInfo.addStats(apiStatsEnd);
+            totalApis += 1;
+            totalRiskScore += apiInfo.getRiskScore();
+            if (apiInfo.getLastTested() > (Context.now() - 30 * 24 * 60 * 60)) apisTestedInLookBackPeriod += 1;
+            String severity = apiInfo.findSeverity();
+            apiStatsEnd.addSeverityCount(severity);
+        }
+        cursor.close();
+
+        apiStatsEnd.setTotalAPIs(totalApis);
+        apiStatsEnd.setApisTestedInLookBackPeriod(apisTestedInLookBackPeriod);
+        apiStatsEnd.setTotalRiskScore(totalRiskScore);
+
+        return new Pair<>(apiStatsStart, apiStatsEnd);
+    }
+
     @Override
     public String getCollName() {
         return "api_info";
@@ -218,4 +285,8 @@ public class ApiInfoDao extends AccountsContextDao<ApiInfo>{
         );
     }
 
+    @Override
+    public String getFilterKeyString() {
+        return TestingEndpoints.getFilterPrefix(ApiCollectionUsers.CollectionType.Id_ApiCollectionId) + ApiInfo.ApiInfoKey.API_COLLECTION_ID;
+    }
 }

@@ -29,6 +29,13 @@ const homeRequests = {
             method: 'post',
             data: {}
         })
+    },
+    updateUsernameAndOrganization: async(username, organization) => {
+        return await request({
+            url: 'api/updateUsernameAndOrganization',
+            method: 'post',
+            data: { username, organization}
+        })
     }
 }
 

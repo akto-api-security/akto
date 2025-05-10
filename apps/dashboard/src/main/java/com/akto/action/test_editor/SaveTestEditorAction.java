@@ -1,27 +1,31 @@
 package com.akto.action.test_editor;
 
-import com.akto.DaoInit;
 import com.akto.action.UserAction;
 import com.akto.action.testing_issues.IssuesAction;
 import com.akto.dao.AccountSettingsDao;
-import com.akto.dao.AuthMechanismsDao;
+import com.akto.dao.AccountsDao;
 import com.akto.dao.CustomAuthTypeDao;
 import com.akto.dao.SampleDataDao;
-import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dao.context.Context;
+import com.akto.dao.monitoring.ModuleInfoDao;
 import com.akto.dao.test_editor.TestConfigYamlParser;
+import com.akto.dao.test_editor.TestingRunPlaygroundDao;
 import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dao.test_editor.info.InfoParser;
+import com.akto.dao.testing.DefaultTestSuitesDao;
 import com.akto.dao.testing.TestRolesDao;
 import com.akto.dao.testing.TestingRunResultDao;
+import com.akto.dto.Account;
 import com.akto.dto.AccountSettings;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.CustomAuthType;
-import com.akto.dto.User;
+import com.akto.dto.RawApi;
+import com.akto.dto.monitoring.ModuleInfo;
 import com.akto.dto.test_editor.Category;
 import com.akto.dto.test_editor.Info;
 import com.akto.dto.test_editor.TestConfig;
 import com.akto.dto.test_editor.TestLibrary;
+import com.akto.dto.test_editor.TestingRunPlayground;
 import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.test_run_findings.TestingRunIssues;
@@ -29,13 +33,11 @@ import com.akto.dto.testing.AuthMechanism;
 import com.akto.dto.testing.GenericTestResult;
 import com.akto.dto.testing.MultiExecTestResult;
 import com.akto.dto.testing.TestResult;
+import com.akto.dto.testing.TestRoles;
 import com.akto.dto.testing.TestingRunConfig;
-import com.akto.dto.testing.TestResult.Confidence;
 import com.akto.dto.testing.TestingRunResult;
-import com.akto.dto.testing.WorkflowNodeDetails;
-import com.akto.dto.testing.WorkflowTestResult.NodeResult;
+import com.akto.dto.testing.TestingRun.State;
 import com.akto.dto.traffic.SampleData;
-import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods;
 import com.akto.listener.InitializerListener;
 import com.akto.log.LoggerMaker;
@@ -45,28 +47,23 @@ import com.akto.store.SampleMessageStore;
 import com.akto.store.TestingUtil;
 import com.akto.test_editor.execution.VariableResolver;
 import com.akto.testing.TestExecutor;
+import com.akto.testing.Utils;
 import com.akto.util.Constants;
 import com.akto.util.enums.GlobalEnums;
+import com.akto.util.enums.GlobalEnums.Severity;
 import com.akto.util.enums.GlobalEnums.YamlTemplateSource;
 import com.akto.utils.GithubSync;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import com.fasterxml.jackson.dataformat.yaml.YAMLGenerator;
 import com.mongodb.BasicDBObject;
-import com.mongodb.ConnectionString;
-import com.mongodb.client.model.Filters;
-import com.mongodb.client.model.Projections;
-import com.mongodb.client.model.Updates;
+import com.mongodb.client.model.*;
+import com.mongodb.client.result.InsertOneResult;
 
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.io.File;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.*;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -77,8 +74,7 @@ import static com.akto.util.enums.GlobalEnums.YamlTemplateSource;
 public class SaveTestEditorAction extends UserAction {
 
     private static final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
-    private static final LoggerMaker loggerMaker = new LoggerMaker(SaveTestEditorAction.class);
-    private static final Logger logger = LoggerFactory.getLogger(SaveTestEditorAction.class);
+    private static final LoggerMaker logger = new LoggerMaker(SaveTestEditorAction.class, LogDb.DASHBOARD);;
 
     @Override
     public String execute() throws Exception {
@@ -97,6 +93,8 @@ public class SaveTestEditorAction extends UserAction {
     private boolean inactive;
     private String repositoryUrl;
     private HashMap<String, Integer> testCountMap;
+    private String testingRunPlaygroundHexId;
+    private State testingRunPlaygroundStatus;
 
     public String fetchTestingRunResultFromTestingRun() {
         if (testingRunHexId == null) {
@@ -255,11 +253,33 @@ public class SaveTestEditorAction extends UserAction {
                     Filters.eq(Constants.ID, id),
                     Updates.combine(updates));
 
+            DefaultTestSuitesDao.instance.saveYamlTestTemplateInDefaultSuite(testConfig.getInfo(), author);
+
         } else {
             addActionError("Cannot save template, specify a different test id");
             return ERROR.toUpperCase();
         }
         return SUCCESS.toUpperCase();
+    }
+
+    public static int compareVersions(String v1, String v2) {
+        try {
+            String[] parts1 = v1.split("\\.");
+            String[] parts2 = v2.split("\\.");
+
+            int length = Math.max(parts1.length, parts2.length);
+            for (int i = 0; i < length; i++) {
+                int num1 = i < parts1.length ? Integer.parseInt(parts1[i]) : 0;
+                int num2 = i < parts2.length ? Integer.parseInt(parts2[i]) : 0;
+                if (num1 != num2) {
+                    return Integer.compare(num1, num2);
+                }
+            }
+            return 0;
+        } catch (Exception e) {
+            //ignore
+        }
+        return 1;
     }
 
     public String runTestForGivenTemplate() {
@@ -288,8 +308,39 @@ public class SaveTestEditorAction extends UserAction {
             return ERROR.toUpperCase();
         }
 
+        Account account = AccountsDao.instance.findOne(Filters.eq(Constants.ID, Context.accountId.get()));
+        ApiInfo.ApiInfoKey infoKey = new ApiInfo.ApiInfoKey(apiInfoKey.getInt(ApiInfo.ApiInfoKey.API_COLLECTION_ID),
+                apiInfoKey.getString(ApiInfo.ApiInfoKey.URL),
+                URLMethods.Method.valueOf(apiInfoKey.getString(ApiInfo.ApiInfoKey.METHOD)));
+
+        if (account.getHybridTestingEnabled()) {
+            ModuleInfo moduleInfo = ModuleInfoDao.instance.getMCollection().find(Filters.eq(ModuleInfo.MODULE_TYPE, ModuleInfo.ModuleType.MINI_TESTING)).sort(Sorts.descending(ModuleInfo.LAST_HEARTBEAT_RECEIVED)).limit(1).first();
+            if (moduleInfo != null) {
+                String version = moduleInfo.getCurrentVersion().split(" - ")[0];
+                if (compareVersions("1.44.9", version) <= 0) {//latest version
+                    TestingRunPlayground testingRunPlayground = new TestingRunPlayground();
+                    testingRunPlayground.setTestTemplate(content);
+                    testingRunPlayground.setState(State.SCHEDULED);
+                    testingRunPlayground.setSamples(sampleDataList.get(0).getSamples());
+                    testingRunPlayground.setApiInfoKey(infoKey);
+                    testingRunPlayground.setCreatedAt(Context.now());
+
+                    InsertOneResult insertOne = TestingRunPlaygroundDao.instance.insertOne(testingRunPlayground);
+                    if (insertOne.wasAcknowledged()) {
+                        testingRunPlaygroundHexId = Objects.requireNonNull(insertOne.getInsertedId()).asObjectId().getValue().toHexString();
+                        return SUCCESS.toUpperCase();
+                    } else {
+                        addActionError("Failed to create TestingRunPlayground");
+                        return ERROR.toUpperCase();
+                    }
+                }
+            }
+        }
+
         try {
-            GlobalEnums.Severity.valueOf(testConfig.getInfo().getSeverity());
+            if (!TestConfig.DYNAMIC_SEVERITY.equals(testConfig.getInfo().getSeverity())) {
+                GlobalEnums.Severity.valueOf(testConfig.getInfo().getSeverity());
+            }
         } catch (Exception e) {
             addActionError("invalid severity, please choose from " + Arrays.toString(GlobalEnums.Severity.values()));
             return ERROR.toUpperCase();
@@ -297,12 +348,6 @@ public class SaveTestEditorAction extends UserAction {
 
         // initiating map creation for storing required
         RequiredConfigs.initiate();
-
-        ApiInfo.ApiInfoKey infoKey = new ApiInfo.ApiInfoKey(apiInfoKey.getInt(ApiInfo.ApiInfoKey.API_COLLECTION_ID),
-                apiInfoKey.getString(ApiInfo.ApiInfoKey.URL),
-                URLMethods.Method.valueOf(apiInfoKey.getString(ApiInfo.ApiInfoKey.METHOD)));
-
-        AuthMechanism authMechanism = TestRolesDao.instance.fetchAttackerToken(0);
         Map<ApiInfo.ApiInfoKey, List<String>> sampleDataMap = new HashMap<>();
         Map<ApiInfo.ApiInfoKey, List<String>> newSampleDataMap = new HashMap<>();
         
@@ -321,17 +366,22 @@ public class SaveTestEditorAction extends UserAction {
         if (wordListsMap == null) {
             wordListsMap = new HashMap<String, List<String>>();
         }
-        
+
         wordListsMap = VariableResolver.resolveWordList(wordListsMap, infoKey, newSampleDataMap);
 
         SampleMessageStore messageStore = SampleMessageStore.create(sampleDataMap);
         List<CustomAuthType> customAuthTypes = CustomAuthTypeDao.instance.findAll(CustomAuthType.ACTIVE,true);
-        TestingUtil testingUtil = new TestingUtil(authMechanism, messageStore, null, null, customAuthTypes);
+        TestingUtil testingUtil = new TestingUtil(messageStore, null, null, customAuthTypes);
         List<TestingRunResult.TestLog> testLogs = new ArrayList<>();
         int lastSampleIndex = sampleDataList.get(0).getSamples().size() - 1;
         
         TestingRunConfig testingRunConfig = new TestingRunConfig();
-        testingRunResult = executor.runTestNew(infoKey, null, testingUtil, null, testConfig, testingRunConfig, true, testLogs);
+        List<String> samples = testingUtil.getSampleMessages().get(infoKey);
+        TestingRunResult testingRunResult = Utils.generateFailedRunResultForMessage(null, infoKey, testConfig.getInfo().getCategory().getName(), testConfig.getInfo().getSubCategory(), null,samples , null);
+        if(testingRunResult == null){
+            String sample = samples.get(samples.size() - 1);
+            testingRunResult = executor.runTestNew(infoKey, null, testingUtil, null, testConfig, testingRunConfig, true, testLogs, sample);
+        }
         if (testingRunResult == null) {
             testingRunResult = new TestingRunResult(
                     new ObjectId(), infoKey, testConfig.getInfo().getCategory().getName(), testConfig.getInfo().getSubCategory() ,Collections.singletonList(new TestResult(null, sampleDataList.get(0).getSamples().get(lastSampleIndex),
@@ -341,16 +391,76 @@ public class SaveTestEditorAction extends UserAction {
                     Context.now(), new ObjectId(), null, testLogs
             );
         }
+        generateTestingRunResultAndIssue(testConfig, infoKey, testingRunResult);
+
+        return SUCCESS.toUpperCase();
+    }
+
+    public String fetchTestingRunPlaygroundStatus() {
+        if (testingRunPlaygroundHexId == null || testingRunPlaygroundHexId.trim().isEmpty()) {
+            addActionError("Testing run id cannot be empty");
+            return ERROR.toUpperCase();
+        }
+        TestingRunPlayground testingRunPlayGround = null;
+        try {
+            ObjectId testRunId = new ObjectId(testingRunPlaygroundHexId);
+            testingRunPlayGround = (TestingRunPlaygroundDao.instance.findOne(Filters.eq(Constants.ID, testRunId)));
+        } catch (Exception e) {
+            addActionError("Invalid test run id");
+            return ERROR.toUpperCase();
+        }
+        
+        if (testingRunPlayGround == null) {
+            addActionError("testingRunPlayGround not found");
+            return ERROR.toUpperCase();
+        }
+        this.testingRunPlaygroundStatus = testingRunPlayGround.getState();
+        List<String> samples = testingRunPlayGround.getSamples();
+        ApiInfo.ApiInfoKey infoKey = testingRunPlayGround.getApiInfoKey();TestConfig testConfig;
+        try {
+            testConfig = TestConfigYamlParser.parseTemplate(testingRunPlayGround.getTestTemplate());
+        } catch (Exception e) {
+            e.printStackTrace();
+            addActionError(e.getMessage());
+            return ERROR.toUpperCase();
+        }
+        int lastSampleIndex = samples.size()-1;
+        List<TestingRunResult.TestLog> testLogs = new ArrayList<>();
+        TestingRunResult failedResult = new TestingRunResult(
+                new ObjectId(), infoKey, testConfig.getInfo().getCategory().getName(), testConfig.getInfo().getSubCategory() ,Collections.singletonList(new TestResult(null, samples.get(lastSampleIndex),
+                Collections.singletonList("failed to execute test"),
+                0, false, TestResult.Confidence.HIGH, null)),
+                false,null,0,Context.now(),
+                Context.now(), new ObjectId(), null, testLogs
+        );
+        failedResult.setId(failedResult.getTestRunId());
+
+        if(testingRunPlayGround.getState().equals(State.SCHEDULED)){
+            this.testingRunResult = failedResult;
+        }else {
+            if(testingRunPlayGround.getTestingRunResult() != null) {
+                this.testingRunResult = testingRunPlayGround.getTestingRunResult();
+                generateTestingRunResultAndIssue(testConfig, infoKey, testingRunResult);
+            } else {
+                this.testingRunResult = failedResult;
+            }
+        }
+        return SUCCESS.toUpperCase();
+    }
+
+    public void generateTestingRunResultAndIssue(TestConfig testConfig, ApiInfo.ApiInfoKey infoKey, TestingRunResult testingRunResult) {
         testingRunResult.setId(new ObjectId());
         if (testingRunResult.isVulnerable()) {
             TestingIssuesId issuesId = new TestingIssuesId(infoKey, GlobalEnums.TestErrorSource.TEST_EDITOR, testConfig.getId(), null);
-            testingRunIssues = new TestingRunIssues(issuesId, GlobalEnums.Severity.valueOf(testConfig.getInfo().getSeverity()), GlobalEnums.TestRunIssueStatus.OPEN, Context.now(), Context.now(),null, null, Context.now());
+            Severity severity = TestExecutor.getSeverityFromTestingRunResult(testingRunResult);
+            this.testingRunIssues = new TestingRunIssues(issuesId, severity, GlobalEnums.TestRunIssueStatus.OPEN, Context.now(), Context.now(),null, null, Context.now());
         }
         BasicDBObject infoObj = IssuesAction.createSubcategoriesInfoObj(testConfig);
         subCategoryMap = new HashMap<>();
         subCategoryMap.put(testConfig.getId(), infoObj);
 
         List<GenericTestResult> runResults = new ArrayList<>();
+        this.testingRunResult = testingRunResult;
 
         for (GenericTestResult testResult: this.testingRunResult.getTestResults()) {
             if (testResult instanceof TestResult) {
@@ -362,8 +472,6 @@ public class SaveTestEditorAction extends UserAction {
         }
 
         this.testingRunResult.setTestResults(runResults);
-
-        return SUCCESS.toUpperCase();
     }
 
     public static void showFile(File file, List<String> files) {
@@ -401,10 +509,10 @@ public class SaveTestEditorAction extends UserAction {
                 try {
                     GithubSync githubSync = new GithubSync();
                     byte[] repoZip = githubSync.syncRepo(repositoryUrl);
-                    loggerMaker.infoAndAddToDb(String.format("Adding test templates from %s for account: %d", repositoryUrl, accountId), LogDb.DASHBOARD);
+                    logger.debugAndAddToDb(String.format("Adding test templates from %s for account: %d", repositoryUrl, accountId), LogDb.DASHBOARD);
                     InitializerListener.processTemplateFilesZip(repoZip, author, YamlTemplateSource.CUSTOM.toString(), repositoryUrl);
                 } catch (Exception e) {
-                    loggerMaker.errorAndAddToDb(String.format("Error while adding test editor templates from %s for account %d, Error: %s", repositoryUrl, accountId, e.getMessage()), LogDb.DASHBOARD);
+                    logger.errorAndAddToDb(String.format("Error while adding test editor templates from %s for account %d, Error: %s", repositoryUrl, accountId, e.getMessage()), LogDb.DASHBOARD);
                 }
             }
         }, 0, TimeUnit.SECONDS);
@@ -524,31 +632,28 @@ public class SaveTestEditorAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
-    public static void main(String[] args) throws Exception {
-        DaoInit.init(new ConnectionString("mongodb://localhost:27017/admini"));
-        Context.accountId.set(1_000_000);
-        String folderPath = "/Users/shivamrawat/akto_code_openSource/akto/libs/dao/src/main/java/com/akto/dao/test_editor/inbuilt_test_yaml_files";
-        Path dir = Paths.get(folderPath);
-        List<String> files = new ArrayList<>();
-        Files.walk(dir).forEach(path -> showFile(path.toFile(), files));
-        for (String filePath : files) {
-            logger.info(filePath);
-            List<String> lines = Files.readAllLines(Paths.get(filePath));
-            String content  = String.join("\n", lines);
-            SaveTestEditorAction saveTestEditorAction = new SaveTestEditorAction();
-            saveTestEditorAction.setContent(content);
-            Map<String,Object> session = new HashMap<>();
-            User user = new User();
-            user.setLogin("AKTO");
-            session.put("user",user);
-            saveTestEditorAction.setSession(session);
-            String success = SUCCESS.toUpperCase();
-            logger.info(success);
+    public String fetchTestContent(){
+        if (originalTestId == null || originalTestId.trim().isEmpty()) {
+            addActionError("TestId cannot be null or empty");
+            return ERROR.toUpperCase();
         }
+
+        YamlTemplate template =  YamlTemplateDao.instance.findOne(Filters.eq(Constants.ID, originalTestId), Projections.include(YamlTemplate.CONTENT));
+        if (template == null) {
+            addActionError("test not found");
+            return ERROR.toUpperCase();
+        }
+
+        this.content = template.getContent();
+        return SUCCESS.toUpperCase();
     }
 
     public void setContent(String content) {
         this.content = content;
+    }
+
+    public String getContent() {
+        return content;
     }
 
     public String getTestingRunHexId() {
@@ -637,6 +742,22 @@ public class SaveTestEditorAction extends UserAction {
 
     public void setTestCountMap(HashMap<String, Integer> testCountMap) {
         this.testCountMap = testCountMap;
+    }
+
+    public void setTestingRunPlaygroundHexId(String testingRunPlayGroundHexId) {
+        this.testingRunPlaygroundHexId = testingRunPlayGroundHexId;
+    }
+
+    public State getTestingRunPlaygroundStatus() {
+        return testingRunPlaygroundStatus;
+    }
+
+    public void setTestingRunPlaygroundStatus(State testingRunPlaygroundStatus) {
+        this.testingRunPlaygroundStatus = testingRunPlaygroundStatus;
+    }
+
+    public String getTestingRunPlaygroundHexId() {
+        return testingRunPlaygroundHexId;
     }
 
 }

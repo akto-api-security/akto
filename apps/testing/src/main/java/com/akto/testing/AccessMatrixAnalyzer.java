@@ -22,9 +22,9 @@ import com.akto.dto.type.URLMethods.Method;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.rules.BFLATest;
-import com.akto.store.AuthMechanismStore;
 import com.akto.store.SampleMessageStore;
 import com.akto.store.TestingUtil;
+import com.akto.test_editor.execution.Executor;
 import com.akto.util.Constants;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
@@ -78,35 +78,37 @@ public class AccessMatrixAnalyzer {
     public void run() throws Exception {
         Bson pendingTasks = Filters.lt(AccessMatrixTaskInfo.NEXT_SCHEDULED_TIMESTAMP, Context.now());
         for(AccessMatrixTaskInfo task: AccessMatrixTaskInfosDao.instance.findAll(pendingTasks)) {
-            loggerMaker.infoAndAddToDb("Running task: " + task.toString(),LogDb.TESTING);
+            loggerMaker.debugAndAddToDb("Running task: " + task.toString(),LogDb.TESTING);
 
             List<ApiInfoKey> endpoints = getEndpointsToAnalyze(task);
-            loggerMaker.infoAndAddToDb("Number of endpoints: " + (endpoints == null ? 0 : endpoints.size()),LogDb.TESTING);
+            loggerMaker.debugAndAddToDb("Number of endpoints: " + (endpoints == null ? 0 : endpoints.size()),LogDb.TESTING);
             SampleMessageStore sampleMessageStore = SampleMessageStore.create();
             CustomTestingEndpoints tempTestingEndpoints = new CustomTestingEndpoints(endpoints);
 
 
             List<ApiInfo.ApiInfoKey> apiInfoKeyList = tempTestingEndpoints.returnApis();
             if (apiInfoKeyList == null || apiInfoKeyList.isEmpty()) return;
-            loggerMaker.infoAndAddToDb("APIs found: " + apiInfoKeyList.size(), LogDb.TESTING);
+            loggerMaker.debugAndAddToDb("APIs found: " + apiInfoKeyList.size(), LogDb.TESTING);
 
 
             Set<Integer> apiCollectionIds = Main.extractApiCollectionIds(apiInfoKeyList);
             sampleMessageStore.fetchSampleMessages(apiCollectionIds);
             String roleFromTask = task.getEndpointLogicalGroupName().substring(0, task.getEndpointLogicalGroupName().length()-EndpointLogicalGroup.GROUP_NAME_SUFFIX.length());
-            loggerMaker.infoAndAddToDb("Role found: " + roleFromTask, LogDb.TESTING);
-            List<TestRoles> testRoles = TestRolesDao.instance.findAll(TestRoles.NAME, roleFromTask);
+            loggerMaker.debugAndAddToDb("Role found: " + roleFromTask, LogDb.TESTING);
+            List<TestRoles> testRoles = new ArrayList<>();
+            TestRoles testRoleForTask = Executor.fetchOrFindTestRole(roleFromTask, false);
+            if (testRoleForTask != null) {
+                testRoles.add(testRoleForTask);
+            }
 
-            AuthMechanismStore authMechanismStore = AuthMechanismStore.create();
-            AuthMechanism authMechanism = authMechanismStore.getAuthMechanism();
             List<CustomAuthType> customAuthTypes = CustomAuthTypeDao.instance.findAll(CustomAuthType.ACTIVE,true);
-            TestingUtil testingUtil = new TestingUtil(authMechanism,sampleMessageStore, testRoles,"", customAuthTypes);
+            TestingUtil testingUtil = new TestingUtil(sampleMessageStore, testRoles,"", customAuthTypes);
 
             BFLATest bflaTest = new BFLATest();
 
             if(endpoints!=null && !endpoints.isEmpty()){
                 for(ApiInfoKey endpoint: endpoints){
-                    loggerMaker.infoAndAddToDb("Started checking for " + task.getId() + " " + endpoint.getMethod() + " " + endpoint.getUrl(), LogDb.TESTING);
+                    loggerMaker.debugAndAddToDb("Started checking for " + task.getId() + " " + endpoint.getMethod() + " " + endpoint.getUrl(), LogDb.TESTING);
 
                     List<RawApi> messages = sampleMessageStore.fetchAllOriginalMessages(endpoint);
                     if (messages!=null){
@@ -115,7 +117,7 @@ public class AccessMatrixAnalyzer {
                             bflaTest.updateAllowedRoles(rawApi, endpoint, testingUtil);
                         }
                     }
-                    loggerMaker.infoAndAddToDb("Finished checking for " + task.getId() + " " + endpoint.getMethod() + " " + endpoint.getUrl(), LogDb.TESTING);
+                    loggerMaker.debugAndAddToDb("Finished checking for " + task.getId() + " " + endpoint.getMethod() + " " + endpoint.getUrl(), LogDb.TESTING);
                 }
             }
             Bson q = Filters.eq(Constants.ID, task.getId());
@@ -124,7 +126,7 @@ public class AccessMatrixAnalyzer {
                 Updates.set(AccessMatrixTaskInfo.NEXT_SCHEDULED_TIMESTAMP, Context.now() + task.getFrequencyInSeconds())
             );
             AccessMatrixTaskInfosDao.instance.updateOne(q, update);
-            loggerMaker.infoAndAddToDb("Matrix analyzer task " + task.getId() + "  completed successfully", LogDb.TESTING);
+            loggerMaker.debugAndAddToDb("Matrix analyzer task " + task.getId() + "  completed successfully", LogDb.TESTING);
         }
     }
 }

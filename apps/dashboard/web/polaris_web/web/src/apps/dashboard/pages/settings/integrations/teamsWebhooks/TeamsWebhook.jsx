@@ -1,0 +1,12 @@
+
+import WebhookCore from "../webhookLayout/WebhookCore"
+
+function TeamsWebhook(){
+    const teamsMessagePayload = "{\r\n    \"type\": \"message\",\r\n    \"attachments\": [\r\n        {\r\n            \"contentType\": \"application\/vnd.microsoft.card.adaptive\",\r\n            \"content\": {\r\n                \"type\": \"AdaptiveCard\",\r\n                \"$schema\": \"http:\/\/adaptivecards.io\/schemas\/adaptive-card.json\",\r\n                \"version\": \"1.5\",\r\n                \"body\": [\r\n                    {\r\n                        \"type\": \"TextBlock\",\r\n                        \"text\": \"New Endpoint: ${AKTO.changes_info.newEndpoints}\",\r\n                        \"wrap\": true\r\n                    },\r\n                    {\r\n                        \"type\": \"TextBlock\",\r\n                        \"text\": \"New Endpoint Count: ${AKTO.changes_info.newEndpointsCount}\",\r\n                        \"wrap\": true\r\n                    },\r\n                    {\r\n                        \"type\": \"TextBlock\",\r\n                        \"text\": \"New Sensitive Endpoint: ${AKTO.changes_info.newSensitiveEndpoints}\",\r\n                        \"wrap\": true\r\n                    },\r\n                    {\r\n                        \"type\": \"TextBlock\",\r\n                        \"text\": \"New Sensitive Endpoint Count: ${AKTO.changes_info.newSensitiveEndpointsCount}\",\r\n                        \"wrap\": true\r\n                    },\r\n                    {\r\n                        \"type\": \"TextBlock\",\r\n                        \"text\": \"New Parameter Count: ${AKTO.changes_info.newParametersCount}\",\r\n                        \"wrap\": true\r\n                    },\r\n                    {\r\n                        \"type\": \"TextBlock\",\r\n                        \"text\": \"API Threat payloads: ${AKTO.changes_info.apiThreatPayloads}\",\r\n                        \"wrap\": true\r\n                    }\r\n                ]\r\n            }\r\n        }\r\n    ]\r\n}"
+
+    return (
+        <WebhookCore defaultPayload={teamsMessagePayload} webhookType={"MICROSOFT_TEAMS"}/>
+    )
+}
+
+export default TeamsWebhook

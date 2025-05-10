@@ -9,15 +9,19 @@ public class PIIType extends SubType {
     private boolean isSensitive;
     private String regexPattern;
     private boolean onKey;
+    private String regexPatternOnValue;
+    private boolean onKeyAndPayload;
 
     public PIIType() {
     }
 
-    public PIIType(String name, boolean isSensitive, String regexPattern, boolean onKey) {
+    public PIIType(String name, boolean isSensitive, String regexPattern, boolean onKey, String regexPatternOnValue, boolean onKeyAndPayload) {
         this.name = name;
         this.isSensitive = isSensitive;
         this.regexPattern = regexPattern;
         this.onKey = onKey;
+        this.regexPatternOnValue = regexPatternOnValue;
+        this.onKeyAndPayload = onKeyAndPayload;
     }
 
     public String getName() {
@@ -56,6 +60,22 @@ public class PIIType extends SubType {
         this.onKey = onKey;
     }
 
+    public String getRegexPatternOnValue() {
+        return regexPatternOnValue;
+    }
+
+    public void setRegexPatternOnValue(String regexPatternOnValue) {
+        this.regexPatternOnValue = regexPatternOnValue;
+    }
+
+    public boolean getOnKeyAndPayload() {
+        return onKeyAndPayload;
+    }
+
+    public void setOnKeyAndPayload(boolean onKeyAndPayload) {
+        this.onKeyAndPayload = onKeyAndPayload;
+    }
+
     @Override
     public boolean equals(Object o) {
         if (o == this)
@@ -64,7 +84,7 @@ public class PIIType extends SubType {
             return false;
         }
         PIIType pIIType = (PIIType) o;
-        return Objects.equals(name, pIIType.name) && isSensitive == pIIType.isSensitive && Objects.equals(regexPattern, pIIType.regexPattern) && onKey == pIIType.onKey;
+        return Objects.equals(name, pIIType.name) && isSensitive == pIIType.isSensitive && Objects.equals(regexPattern, pIIType.regexPattern) && onKey == pIIType.onKey && Objects.equals(regexPatternOnValue, pIIType.regexPatternOnValue) &&  onKeyAndPayload == pIIType.onKeyAndPayload;
     }
 
     @Override
@@ -79,6 +99,8 @@ public class PIIType extends SubType {
             ", isSensitive='" + getIsSensitive() + "'" +
             ", regexPattern='" + getRegexPattern() + "'" +
             ", onKey='" + isOnKey() + "'" +
+            ", regexPatternOnValue='" + getRegexPatternOnValue() + "'" +
+            ", onKeyAndPayload='" + getOnKeyAndPayload() + "'" +
             "}";
     }
 

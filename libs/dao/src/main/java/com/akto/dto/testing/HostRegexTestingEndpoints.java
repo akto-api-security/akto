@@ -6,6 +6,7 @@ import com.akto.dto.ApiCollectionUsers;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.type.SingleTypeInfo;
 import com.mongodb.client.model.Filters;
+
 import org.apache.commons.lang3.NotImplementedException;
 import org.apache.commons.lang3.StringUtils;
 import org.bson.codecs.pojo.annotations.BsonIgnore;
@@ -33,6 +34,18 @@ public class HostRegexTestingEndpoints extends TestingEndpoints {
 
     public HostRegexTestingEndpoints() {
         super(Type.REGEX, Operator.OR);
+    }
+
+
+    @BsonIgnore
+    Type actualType;
+
+    public Type getActualType() {
+        return Type.HOST_REGEX;
+    }
+
+    public void setActualType(Type actualType) {
+        this.actualType = Type.HOST_REGEX;
     }
 
     @Override

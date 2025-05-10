@@ -1,9 +1,11 @@
 package com.akto.data_actor;
 
+import com.akto.dto.filter.MergedUrls;
 import com.akto.testing.ApiExecutor;
 import com.auth0.jwt.JWT;
 import com.auth0.jwt.interfaces.DecodedJWT;
 import com.akto.dto.*;
+import com.akto.dto.monitoring.ModuleInfo;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.bulk_updates.BulkUpdates;
 import com.akto.dto.data_types.BelongsToPredicate;
@@ -52,6 +54,7 @@ public class ClientActor extends DataActor {
     private static final Gson gson = new Gson();
     public static final String CYBORG_URL = "https://cyborg.akto.io";
     private static ExecutorService threadPool = Executors.newFixedThreadPool(maxConcurrentBatchWrites);
+    private static ExecutorService logThreadPool = Executors.newFixedThreadPool(50);
     private static AccountSettings accSettings;
     
     ObjectMapper objectMapper = new ObjectMapper().configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false).configure(DeserializationFeature.FAIL_ON_INVALID_SUBTYPE, false).configure(DeserializationFeature.FAIL_ON_IGNORED_PROPERTIES, false);
@@ -1071,12 +1074,9 @@ public class ClientActor extends DataActor {
         obj.put("log", logObj);
         OriginalHttpRequest request = new OriginalHttpRequest(url + "/insertProtectionLog", "", "POST", obj.toString(), headers, "");
         try {
-            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
-            String responsePayload = response.getBody();
-            if (response.getStatusCode() != 200 || responsePayload == null) {
-                System.out.println("non 2xx response in insertProtectionLog");
-                return;
-            }
+            logThreadPool.submit(
+                () -> ApiExecutor.sendRequest(request, true, null, false, null)
+            );
         } catch (Exception e) {
             System.out.println("error in insertProtectionLog" + e);
             return;
@@ -1207,6 +1207,32 @@ public class ClientActor extends DataActor {
 
     }
 
+    public void updateRepoLastRun( CodeAnalysisRepo codeAnalysisRepo) {
+        Map<String, List<String>> headers = buildHeaders();
+
+        Map<String, Object> m = new HashMap<>();
+        m.put("projectName", codeAnalysisRepo.getProjectName());
+        m.put("repoName", codeAnalysisRepo.getRepoName());
+        m.put("codeAnalysisRepo",codeAnalysisRepo);
+
+        String json = gson.toJson(m);
+
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/updateRepoLastRun", "", "POST", json , headers, "");
+
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+            if (response.getStatusCode() != 200) {
+                loggerMaker.errorAndAddToDb("non 2xx response in syncExtractedAPIs", LoggerMaker.LogDb.RUNTIME);
+                return;
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("non 2xx response in syncExtractedAPIs", LoggerMaker.LogDb.RUNTIME);
+            return;
+        }
+
+
+    }
+
     public List<CodeAnalysisRepo> findReposToRun()  {
         List<CodeAnalysisRepo> codeAnalysisRepos = new ArrayList<>();
 
@@ -1280,5 +1306,56 @@ public class ClientActor extends DataActor {
             return null;
         }
         return templates;
+    }
+
+    public Set<MergedUrls> fetchMergedUrls() {
+        Map<String, List<String>> headers = buildHeaders();
+
+        List<MergedUrls> respList = new ArrayList<>();
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/fetchMergedUrls", "", "POST", "", headers, "");
+
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb("non 2xx response in fetchMergedUrls", LoggerMaker.LogDb.RUNTIME);
+                return null;
+            }
+            BasicDBObject payloadObj;
+
+            try {
+                payloadObj = BasicDBObject.parse(responsePayload);
+                BasicDBList newUrls = (BasicDBList) payloadObj.get("mergedUrls");
+                for (Object url: newUrls) {
+                    BasicDBObject urlObj = (BasicDBObject) url;
+                    MergedUrls mergedUrl = objectMapper.readValue(urlObj.toJson(), MergedUrls.class);
+                    respList.add(mergedUrl);
+                }
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb("error extracting response in fetchMergedUrls" + e, LoggerMaker.LogDb.RUNTIME);
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in fetching merged urls: " + e, LoggerMaker.LogDb.RUNTIME);
+            return null;
+        }
+
+        return new HashSet<>(respList);
+    }
+
+    public void updateModuleInfo(ModuleInfo moduleInfo) {
+        Map<String, List<String>> headers = buildHeaders();
+        BasicDBObject obj = new BasicDBObject();
+        obj.put("moduleInfo", moduleInfo);
+
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/updateModuleInfoForHeartbeat", "", "POST", gson.toJson(obj), headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
+            if (response.getStatusCode() != 200) {
+                loggerMaker.errorAndAddToDb("non 2xx response in updateModuleInfoForHeartbeat", LoggerMaker.LogDb.RUNTIME);
+                return;
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error updating heartbeat for :" + moduleInfo.getModuleType().name(), LoggerMaker.LogDb.RUNTIME);
+        }
     }
 }

@@ -214,8 +214,8 @@ public class TestRedactSampleData {
 
         assertEquals(2, redactedHttpResponseParams.requestParams.getHeaders().size());
         assertEquals(1, redactedHttpResponseParams.getHeaders().size());
-        assertEquals("{}", redactedHttpResponseParams.requestParams.getPayload());
-        assertEquals("{}", redactedHttpResponseParams.getPayload());
+        assertEquals("something random", redactedHttpResponseParams.requestParams.getPayload());
+        assertEquals("random response payload", redactedHttpResponseParams.getPayload());
         assertEquals(200, redactedHttpResponseParams.statusCode);
 
     }
@@ -288,5 +288,46 @@ public class TestRedactSampleData {
             Assertions.fail();
         }
 
+    }
+
+    @Test
+    public void testRedactSampleDataForXMLPayload() throws Exception{
+        String messageString = "{\"akto_account_id\":\"1111\",\"contentType\":\"application/json;charset=utf-8\",\"ip\":\"127.0.0.1:48940\",\"method\":\"GET\",\"path\":\"/api/books\",\"requestHeaders\":\"{\\\"Accept\\\":[\\\"text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8\\\"],\\\"Accept-Encoding\\\":[\\\"gzip, deflate\\\"],\\\"Accept-Language\\\":[\\\"en-US,en;q=0.5\\\"],\\\"Cache-Control\\\":[\\\"no-cache\\\"],\\\"Connection\\\":[\\\"keep-alive\\\"],\\\"Cookie\\\":[\\\"G_ENABLED_IDPS=google\\\"],\\\"Pragma\\\":[\\\"no-cache\\\"],\\\"Sec-Fetch-Dest\\\":[\\\"document\\\"],\\\"Sec-Fetch-Mode\\\":[\\\"navigate\\\"],\\\"Sec-Fetch-Site\\\":[\\\"cross-site\\\"],\\\"Upgrade-Insecure-Requests\\\":[\\\"1\\\"],\\\"User-Agent\\\":[\\\"Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:94.0) Gecko/20100101 Firefox/94.0\\\"]}\",\"requestPayload\":\"\",\"responseHeaders\":\"{\\\"Content-Type\\\":[\\\"text/xml;charset=utf-8\\\"]}\",\"responsePayload\":\"<?xml version='1.0' Encoding='UTF-8' ?>\\r\\n" + //
+        "<env:Envelope xmlns:env=\\\"http:\\/\\/www.w3.org\\/2003\\/05\\/soap-envelope\\\"> \\r\\n" + //
+        " <env:Header>\\r\\n" + //
+        "  <m:reservation xmlns:m=\\\"http:\\/\\/travelcompany.example.org\\/reservation\\\" \\r\\n" + //
+        "\\t\\tenv:role=\\\"http:\\/\\/www.w3.org\\/2003\\/05\\/soap-envelope\\/role\\/next\\\">\\r\\n" + //
+        "   <m:reference>uuid:093a2da1-q345-739r-ba5d-pqff98fe8j7d<\\/m:reference>\\r\\n" + //
+        "   <m:dateAndTime>2007-11-29T13:20:00.000-05:00<\\/m:dateAndTime>\\r\\n" + //
+        "  <\\/m:reservation>\\r\\n" + //
+        "  <n:passenger xmlns:n=\\\"http:\\/\\/mycompany.example.com\\/employees\\\" \\r\\n" + //
+        "\\t\\tenv:role=\\\"http:\\/\\/www.w3.org\\/2003\\/05\\/soap-envelope\\/role\\/next\\\">\\r\\n" + //
+        "   <n:name>Fred Bloggs<\\/n:name>\\r\\n" + //
+        "  <\\/n:passenger>\\r\\n" + //
+        " <\\/env:Header>\\r\\n" + //
+        " <env:Body>\\r\\n" + //
+        "  <p:itinerary xmlns:p=\\\"http:\\/\\/travelcompany.example.org\\/reservation\\/travel\\\">\\r\\n" + //
+        "   <p:departure>\\r\\n" + //
+        "     <p:departing>New York<\\/p:departing>\\r\\n" + //
+        "     <p:arriving>Los Angeles<\\/p:arriving>\\r\\n" + //
+        "     <p:departureDate>2007-12-14<\\/p:departureDate>\\r\\n" + //
+        "     <p:departureTime>late afternoon<\\/p:departureTime>\\r\\n" + //
+        "     <p:seatPreference>aisle<\\/p:seatPreference>\\r\\n" + //
+        "   <\\/p:departure>\\r\\n" + //
+        "   <p:return>\\r\\n" + //
+        "     <p:departing>Los Angeles<\\/p:departing>\\r\\n" + //
+        "     <p:arriving>New York<\\/p:arriving>\\r\\n" + //
+        "     <p:departureDate>2007-12-20<\\/p:departureDate>\\r\\n" + //
+        "     <p:departureTime>mid-morning<\\/p:departureTime>\\r\\n" + //
+        "     <p:seatPreference><\\/p:seatPreference>\\r\\n" + //
+        "   <\\/p:return>\\r\\n" + //
+        "  <\\/p:itinerary>\\r\\n" + //
+        " <\\/env:Body>\\r\\n" + //
+        "<\\/env:Envelope>\n" + //
+        "\",\"status\":\"null\",\"statusCode\":\"201\",\"time\":\"1638223603\",\"type\":\"HTTP/1.1\"}";
+
+        HttpResponseParams httpResponseParams = HttpCallParser.parseKafkaMessage(messageString);
+        String redactedValue = RedactSampleData.redact(httpResponseParams, true);
+        assertEquals(true, redactedValue.contains("<?xml version='1.0' Encoding='UTF-8' ?>"));
     }
 }

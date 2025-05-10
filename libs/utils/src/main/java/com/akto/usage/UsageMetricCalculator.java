@@ -1,9 +1,7 @@
 package com.akto.usage;
 
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 import com.akto.dao.ApiCollectionsDao;
@@ -14,15 +12,16 @@ import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dao.testing.TestingRunResultDao;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.ApiInfo;
+import com.akto.dto.billing.FeatureAccess;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.testing.TestResult;
 import com.akto.dto.testing.TestingRunResult;
-import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.usage.MetricTypes;
 import com.akto.dto.usage.UsageMetric;
 import com.akto.dto.usage.metadata.ActiveAccounts;
 import com.akto.log.LoggerMaker;
+import com.akto.util.Pair;
 import com.akto.util.enums.GlobalEnums.YamlTemplateSource;
 import com.google.gson.Gson;
 import com.mongodb.client.model.Filters;
@@ -43,19 +42,57 @@ public class UsageMetricCalculator {
         return demos;
     }
 
-    private static int lastDeactivatedFetched = 0;
+    /*
+     * to handle multiple accounts using static maps.
+     */
+    /*
+     * RBAC_FEATURE is advanced RBAC, for collection based RBAC and custom roles.
+     * RBAC_BASIC is basic RBAC for inviting with multiple roles.
+     */
+    private final static String FEATURE_LABEL_STRING = "RBAC_FEATURE";
+    private final static String BASIC_RBAC_FEATURE = "RBAC_BASIC";
+    private static Map<Integer, Integer> lastDeactivatedFetchedMap = new HashMap<>();
     private static final int REFRESH_INTERVAL = 60 * 2; // 2 minutes.
-    private static Set<Integer> deactivatedCollections = new HashSet<>();
+    private static final int REFRESH_INTERVAL_RBAC = 60 * 60; // 1 hour.
+    private static Map<Integer, Set<Integer>> deactivatedCollectionsMap = new HashMap<>();
+
+    private static final ConcurrentHashMap<Integer, Pair<Boolean, Integer>> hasRbacFeatureEnabledMap = new ConcurrentHashMap<>();
 
     public static Set<Integer> getDeactivated() {
-
-        if ((lastDeactivatedFetched + REFRESH_INTERVAL) >= Context.now()) {
-            return deactivatedCollections;
+        int accountId = Context.accountId.get();
+        if (lastDeactivatedFetchedMap.containsKey(accountId)
+                && (lastDeactivatedFetchedMap.get(accountId) + REFRESH_INTERVAL) >= Context.now()
+                && deactivatedCollectionsMap.containsKey(accountId)) {
+            return deactivatedCollectionsMap.get(accountId);
         }
 
-        deactivatedCollections = getDeactivatedLatest();
-        lastDeactivatedFetched = Context.now();
-        return deactivatedCollections;
+        deactivatedCollectionsMap.put(accountId, getDeactivatedLatest());
+        lastDeactivatedFetchedMap.put(accountId, Context.now());
+        return deactivatedCollectionsMap.get(accountId);
+    }
+
+    private static boolean checkForPaidFeature(int accountId){
+        Organization organization = OrganizationsDao.instance.findOne(Filters.in(Organization.ACCOUNTS, accountId));
+        if(organization == null || organization.getFeatureWiseAllowed() == null || organization.getFeatureWiseAllowed().isEmpty()){
+            return true;
+        }
+
+        HashMap<String, FeatureAccess> featureWiseAllowed = organization.getFeatureWiseAllowed();
+        FeatureAccess featureAccess = featureWiseAllowed.getOrDefault(FEATURE_LABEL_STRING, FeatureAccess.noAccess);
+        FeatureAccess basicAccess = featureWiseAllowed.getOrDefault(BASIC_RBAC_FEATURE, FeatureAccess.noAccess);
+        return featureAccess.getIsGranted() || basicAccess.getIsGranted();
+    }
+
+    public static boolean isRbacFeatureAvailable(int accountId){
+        int timeNow = Context.now();
+        Pair<Boolean, Integer> prevVal = hasRbacFeatureEnabledMap.getOrDefault(accountId, new Pair<>(false, timeNow));
+        boolean ans = prevVal.getFirst();
+        int lastCalTime = prevVal.getSecond();
+        if(!hasRbacFeatureEnabledMap.contains(accountId) || (lastCalTime + REFRESH_INTERVAL_RBAC < timeNow)){
+            ans = checkForPaidFeature(accountId);
+            hasRbacFeatureEnabledMap.put(accountId, new Pair<>(ans, timeNow));
+        }
+        return ans;
     }
 
     public static Set<Integer> getDeactivatedLatest(){
@@ -89,15 +126,12 @@ public class UsageMetricCalculator {
         return invalidErrors;
     }
 
-    public static int calculateActiveEndpoints(UsageMetric usageMetric) {
-        int measureEpoch = usageMetric.getMeasureEpoch();
-        int activeEndpoints = SingleTypeInfoDao.instance.countEndpoints(
-                Filters.and(Filters.or(
-                        Filters.gt(SingleTypeInfo.LAST_SEEN, measureEpoch),
-                        Filters.gt(SingleTypeInfo._TIMESTAMP, measureEpoch)),
-                excludeDemosAndDeactivated(SingleTypeInfo._API_COLLECTION_ID)));
-        
-        return activeEndpoints;
+    public static int calculateActiveEndpoints() {
+        /*
+         * Count all endpoints.
+         * Same query being used on dashboard.
+         */
+        return (int)SingleTypeInfoDao.instance.fetchEndpointsCount(0, Context.now(), getDemosAndDeactivated(), false);
     }
 
     public static int calculateCustomTests(UsageMetric usageMetric) {
@@ -116,6 +150,9 @@ public class UsageMetricCalculator {
             add(Filters.gt(TestingRunResult.END_TIMESTAMP, measureEpoch));
             add(demoAndDeactivatedCollFilter);
         }};
+
+        // TODO: When we shift vulnerable test results into new collection completely {without making copy}, fix count here then.
+
         int testRuns = (int) TestingRunResultDao.instance.count(Filters.and(filters));
 
         /*
@@ -189,7 +226,7 @@ public class UsageMetricCalculator {
         if (metricType != null) {
             switch (metricType) {
                 case ACTIVE_ENDPOINTS:
-                    usage = calculateActiveEndpoints(usageMetric);
+                    usage = calculateActiveEndpoints();
                     break;
                 case CUSTOM_TESTS:
                     usage = calculateCustomTests(usageMetric);

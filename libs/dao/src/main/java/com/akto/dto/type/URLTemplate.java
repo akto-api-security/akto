@@ -1,11 +1,14 @@
 package com.akto.dto.type;
 
+import java.util.Arrays;
 import java.util.UUID;
 
 import com.akto.dao.context.Context;
+import com.akto.dto.HttpResponseParams;
 import com.akto.dto.type.SingleTypeInfo.SuperType;
 import com.akto.dto.type.URLMethods.Method;
 
+import com.akto.util.filter.DictionaryFilter;
 import org.bson.codecs.pojo.annotations.BsonDiscriminator;
 import org.bson.codecs.pojo.annotations.BsonId;
 import org.apache.commons.lang3.math.NumberUtils;
@@ -64,13 +67,17 @@ public class URLTemplate {
         String[] thatTokens = url;
         if (thatTokens.length != this.tokens.length) return false;
 
+        if(HttpResponseParams.isGraphQLEndpoint(Arrays.toString(url))) {
+            return false;
+        }
+
         for (int i = 0; i < thatTokens.length; i++) {
             String thatToken = thatTokens[i];
             String thisToken = this.tokens[i];
 
             if (thisToken == null) {
                 SuperType type = types[i];
-
+                if (DictionaryFilter.isEnglishWord(thatToken)) return false;
                 switch(type) {
                     case BOOLEAN:
                         if (!"true".equals(thatToken.toLowerCase()) && !"false".equals(thatToken.toLowerCase())) return false;
@@ -106,6 +113,8 @@ public class URLTemplate {
         String str = "";
         for(int i = 0;i < tokens.length; i++) {
             if (i > 0) {
+                str += "/";
+            } else if (i == 0 && tokens[i] != null && !tokens[i].startsWith("http")) {
                 str += "/";
             }
             if (tokens[i] == null) {

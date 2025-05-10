@@ -2,33 +2,45 @@ import { useEffect, useState } from "react"
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards"
 import GithubSimpleTable from "../../../components/tables/GithubSimpleTable"
 import api from "../api"
-import { Button } from "@shopify/polaris"
+import { Box, Button, IndexFiltersMode } from "@shopify/polaris"
 import { useNavigate } from "react-router-dom"
 import func from "@/util/func"
-import {
-    ProfileMinor,
-    CalendarMinor
-  } from '@shopify/polaris-icons';
 import EmptyScreensLayout from "../../../components/banners/EmptyScreensLayout"
 import { ROLES_PAGE_DOCS_URL } from "../../../../main/onboardingData"
+import { CellType } from "../../../components/tables/rows/GithubRow"
+import TitleWithInfo from "../../../components/shared/TitleWithInfo"
+import useTable from "../../../components/tables/TableContext"
+import TooltipText from "../../../components/shared/TooltipText"
+
+
+const sortOptions = [
+    { label: 'Created at', value: 'created asc', directionLabel: 'Highest', sortKey: 'createdTs', columnIndex: 2 },
+    { label: 'Created at', value: 'created desc', directionLabel: 'Lowest', sortKey: 'createdTs', columnIndex: 2 },
+];
 
 const headers = [
     {
+        title:"Test Role",
         text:"Name",
-        value:"name",
-        itemOrder:1
+        value:"nameComp",
     },
     {
-        text:"Last updated",
-        value:"timestamp",
-        itemOrder: 3,
-        icon:CalendarMinor
+        title:"Created",
+        text:"Created at",
+        value:"createdAt",
+        sortKey:"createdTs",
+        sortActive:true,
     },
     {
+        title:"Author",
         text:"Created by",
         value:"createdBy",
-        itemOrder: 3,
-        icon:ProfileMinor
+        showFilter:true,
+        filterKey:"createdBy",
+    },
+    {
+        title: '',
+        type: CellType.ACTION,
     }
 ]
 
@@ -39,10 +51,11 @@ const resourceName = {
 
 function TestRolesPage(){
 
-    const [testRoles, setTestRoles] = useState([]);
     const [loading, setLoading] = useState(false);
     const [showEmptyScreen, setShowEmptyScreen] = useState(false)
     const navigate = useNavigate()
+
+    const [data, setData] = useState({ 'all': [], 'system': [], 'custom': []})
 
     const handleRedirect = () => {
         navigate("details")
@@ -51,48 +64,88 @@ function TestRolesPage(){
 
     const getActions = (item) => {
 
-        return [{
+        const actionItems = [{
             items: [
-                {
-                    content: 'Edit',
-                    onAction: () => navigate("details", {state: {
-                        name: item.name,
-                        endpoints: item.endpointLogicalGroup.testingEndpoints,
-                        authWithCondList: item.authWithCondList
-                    }})
-                },
                 {
                     content: 'Access matrix',
                     onAction: () => navigate("access-matrix", {state: {
                         name: item.name,
+                        scopeRoles: item?.scopeRoles || [],
                         endpoints: item.endpointLogicalGroup.testingEndpoints,
                         authWithCondList: item.authWithCondList
                     }})
                 }
             ]
         }]
+
+        // if(item.name !== 'ATTACKER_TOKEN_ALL') {
+        if(item.createdBy !== 'System') {
+            const removeActionItem = {
+                content: 'Remove',
+                onAction: async () => {
+                    await api.deleteTestRole(item.name)
+                    setLoading(true)
+                    fetchData()
+                    func.setToast(true, false, "Test role has been deleted successfully.")
+                },
+                destructive: true
+            }
+            actionItems[0].items.push(removeActionItem)
+        }
+
+        return actionItems
     }
+
+    async function fetchData(){
+        await api.fetchTestRoles().then((res) => {
+            setShowEmptyScreen(res.testRoles.length === 0)
+            const all = [], system = [], custom = []
+            res.testRoles.forEach((testRole) => {
+                testRole.timestamp = func.prettifyEpoch(testRole.lastUpdatedTs)
+                testRole.id=testRole.name;
+                testRole.createdAt = func.prettifyEpoch(testRole.createdTs)
+                testRole.nameComp = (<Box maxWidth="40vw"><TooltipText tooltip={testRole.name} text={testRole.name} textProps={{fontWeight: 'medium'}}/></Box>)
+                all.push(testRole)
+                if(testRole.createdBy === 'System') {
+                    system.push(testRole)
+                } else {
+                    custom.push(testRole)
+                }
+            })
+            setData({ 'all': all, 'system': system, 'custom': custom})
+            setLoading(false);
+        })
+    }
+    const [selected, setSelected] = useState(0)
+    const [selectedTab, setSelectedTab] = useState('all')
+    const { tabsInfo } = useTable()
+    const definedTableTabs = ['All', 'System', 'Custom'];
+    const tableCountObj = func.getTabsCount(definedTableTabs, data)
+    const tableTabs = func.getTableTabsContent(definedTableTabs, tableCountObj, setSelectedTab, selectedTab, tabsInfo)
+
 
     useEffect(() => {
         setLoading(true);
-        
-        async function fetchData(){
-            await api.fetchTestRoles().then((res) => {
-                setShowEmptyScreen(res.testRoles.length === 0)
-                setTestRoles(res.testRoles.map((testRole) => {
-                    testRole.timestamp = func.prettifyEpoch(testRole.lastUpdatedTs)
-                    testRole.id=testRole.name;
-                    return testRole;
-                }));
-                setLoading(false);
-            })
-        }
         fetchData();
     }, [])
 
+    const onTestRoleClick = (item) => navigate("details", {state: {
+        name: item.name,
+        scopeRoles: item?.scopeRoles || [],
+        endpoints: item?.endpointLogicalGroup?.testingEndpoints || [],
+        authWithCondList: item?.authWithCondList || []
+    }})
+
+    const handleSelectedTab = (selectedIndex) => {
+        setSelected(selectedIndex)
+    }
+
     return (
         <PageWithMultipleCards
-        title={"Test roles"}
+            title={<TitleWithInfo
+                titleText={"Test roles"}
+                tooltipContent={"Test roles define specific access permissions and authentication methods for API security testing scenarios."}
+            />}
         primaryAction = {<Button primary onClick={handleRedirect}><div data-testid="new_test_role_button">Create new test role</div></Button>}
         isFirstPage={true}
         components={[
@@ -110,12 +163,21 @@ function TestRolesPage(){
             
             :    <GithubSimpleTable
                     key="table"
-                    data={testRoles} 
+                    selected={selected}
+                    data={data[selectedTab]}
+                    disambiguateLabel={(key,value) => func.convertToDisambiguateLabelObj(value, null, 2)}
+                    onSelect={handleSelectedTab}
+                    mode={IndexFiltersMode.Default}
+                    tableTabs={tableTabs}
                     resourceName={resourceName} 
                     headers={headers}
+                    headings={headers}
                     loading={loading}
+                    onRowClick={onTestRoleClick}
                     getActions={getActions}
                     hasRowActions={true}
+                    useNewRow={true}
+                    sortOptions={sortOptions}
                 />
         ]}
         />

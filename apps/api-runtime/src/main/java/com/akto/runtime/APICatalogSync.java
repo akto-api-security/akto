@@ -4,14 +4,15 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
 
-import com.akto.DaoInit;
 import com.akto.dao.*;
 import com.akto.dao.context.Context;
-import com.akto.dao.monitoring.FilterYamlTemplateDao;
-import com.akto.dao.runtime_filters.AdvancedTrafficFiltersDao;
+import com.akto.dao.filter.MergedUrlsDao;
 import com.akto.dto.*;
 import com.akto.dto.billing.SyncLimit;
 import com.akto.dto.dependency_flow.DependencyFlow;
+import com.akto.dto.filter.MergedUrls;
+import com.akto.dao.monitoring.FilterYamlTemplateDao;
+import com.akto.dao.runtime_filters.AdvancedTrafficFiltersDao;
 import com.akto.dto.monitoring.FilterConfig;
 import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.traffic.Key;
@@ -23,8 +24,10 @@ import com.akto.dto.type.SingleTypeInfo.SubType;
 import com.akto.dto.type.SingleTypeInfo.SuperType;
 import com.akto.dto.type.URLMethods.Method;
 import com.akto.dto.usage.MetricTypes;
+import com.akto.graphql.GraphQLUtils;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.util.filter.DictionaryFilter;
 import com.akto.runtime.merge.MergeOnHostOnly;
 import com.akto.runtime.policies.AktoPolicyNew;
 import com.akto.task.Cluster;
@@ -39,7 +42,6 @@ import com.google.api.client.util.Charsets;
 import com.google.common.hash.BloomFilter;
 import com.google.common.hash.Funnels;
 import com.mongodb.BasicDBObject;
-import com.mongodb.ConnectionString;
 import com.mongodb.bulk.BulkWriteResult;
 import com.mongodb.client.model.*;
 import com.mongodb.client.result.UpdateResult;
@@ -52,7 +54,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-import java.util.*;
 import java.util.Map.Entry;
 
 import static com.akto.dto.type.KeyTypes.patternToSubType;
@@ -72,6 +73,9 @@ public class APICatalogSync {
     public Map<SensitiveParamInfo, Boolean> sensitiveParamInfoBooleanMap;
     public static boolean mergeAsyncOutside = true;
     public BloomFilter<CharSequence> existingAPIsInDb = BloomFilter.create(Funnels.stringFunnel(Charsets.UTF_8), 1_000_000, 0.001 );
+
+    public static Set<MergedUrls> mergedUrls;
+
     public Map<String, FilterConfig> advancedFilterMap =  new HashMap<>();
 
     public APICatalogSync(String userIdentifier,int thresh, boolean fetchAllSTI) {
@@ -86,6 +90,7 @@ public class APICatalogSync {
         this.delta = new HashMap<>();
         this.sensitiveParamInfoBooleanMap = new HashMap<>();
         this.aktoPolicyNew = new AktoPolicyNew();
+        mergedUrls = new HashSet<>();
         if (buildFromDb) {
             buildFromDB(false, fetchAllSTI);
             AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
@@ -192,7 +197,7 @@ public class APICatalogSync {
         return users.size();
     }
 
-    public void computeDelta(URLAggregator origAggregator, boolean triggerTemplateGeneration, int apiCollectionId) {
+    public void computeDelta(URLAggregator origAggregator, boolean triggerTemplateGeneration, int apiCollectionId, boolean makeApisCaseInsensitive) {
         long start = System.currentTimeMillis();
 
         APICatalog deltaCatalog = this.delta.get(apiCollectionId);
@@ -225,7 +230,7 @@ public class APICatalogSync {
         }
 
         start = System.currentTimeMillis();
-        processKnownStaticURLs(aggregator, deltaCatalog, dbCatalog);
+        processKnownStaticURLs(aggregator, deltaCatalog, dbCatalog, makeApisCaseInsensitive);
         logger.info("processKnownStaticURLs: " +  (System.currentTimeMillis() - start));
 
         start = System.currentTimeMillis();
@@ -278,7 +283,7 @@ public class APICatalogSync {
     }
 
 
-    public static ApiMergerResult tryMergeURLsInCollection(int apiCollectionId, Boolean urlRegexMatchingEnabled, boolean mergeUrlsBasic, BloomFilter<CharSequence> existingAPIsInDb) {
+    public static ApiMergerResult tryMergeURLsInCollection(int apiCollectionId, Boolean urlRegexMatchingEnabled, boolean mergeUrlsBasic, BloomFilter<CharSequence> existingAPIsInDb, boolean ignoreCaseInsensitiveApis) {
         ApiCollection apiCollection = ApiCollectionsDao.instance.getMeta(apiCollectionId);
 
         Bson filterQ = null;
@@ -334,11 +339,23 @@ public class APICatalogSync {
                 templateUrls.add(s);
             }
 
+            // handle case sensitive apis in here only
+            Set<String> seenStaticUrls = new HashSet<>();
+
             Iterator<String> iterator = staticUrlToSti.keySet().iterator();
             while (iterator.hasNext()) {
                 String staticURL = iterator.next();
                 Method staticMethod = Method.fromString(staticURL.split(" ")[0]);
                 String staticEndpoint = staticURL.split(" ")[1];
+                String tempEndpoint = staticEndpoint.toLowerCase();
+
+                if(ignoreCaseInsensitiveApis){
+                    if(!seenStaticUrls.isEmpty() && seenStaticUrls.contains(tempEndpoint)){
+                        finalResult.deleteStaticUrls.add(staticURL);
+                        iterator.remove();
+                        continue;
+                    }
+                }
 
                 for (String templateURL: templateUrls) {
                     Method templateMethod = Method.fromString(templateURL.split(" ")[0]);
@@ -350,6 +367,9 @@ public class APICatalogSync {
                         iterator.remove();
                         break;
                     }
+                }
+                if(ignoreCaseInsensitiveApis){
+                    seenStaticUrls.add(tempEndpoint);
                 }
             }
 
@@ -718,8 +738,14 @@ public class APICatalogSync {
         SuperType[] newTypes = new SuperType[tokens.length];
 
         int start = newUrl.getUrl().startsWith("http") ? 3 : 0;
+
+        if(HttpResponseParams.isGraphQLEndpoint(newUrl.getUrl())) {
+            return null; // Don't merge GraphQL endpoints
+        }
+
         for(int i = start; i < tokens.length; i ++) {
             String tempToken = tokens[i];
+            if(DictionaryFilter.isEnglishWord(tempToken)) continue;
 
             if (NumberUtils.isParsable(tempToken)) {
                 newTypes[i] = isNumber(tempToken) ? SuperType.INTEGER : SuperType.FLOAT;
@@ -749,7 +775,21 @@ public class APICatalogSync {
         }
 
         if (allNull) return null;
-        return new URLTemplate(tokens, newTypes, newUrl.getMethod());
+
+        URLTemplate urlTemplate = new URLTemplate(tokens, newTypes, newUrl.getMethod());
+
+        try {
+            for(MergedUrls mergedUrl : mergedUrls) {
+                if(mergedUrl.getUrl().equals(urlTemplate.getTemplateString()) &&
+                   mergedUrl.getMethod().equals(urlTemplate.getMethod().name())) {
+                    return null;
+                }
+            }
+        } catch(Exception e) {
+            loggerMaker.errorAndAddToDb("Error while creating a new URL object: " + e.getMessage(), LogDb.RUNTIME);
+        }
+
+        return urlTemplate;
     }
 
 
@@ -768,9 +808,15 @@ public class APICatalogSync {
 
         SuperType[] newTypes = new SuperType[newTokens.length];
         int templatizedStrTokens = 0;
+
+        if(HttpResponseParams.isGraphQLEndpoint(dbUrl.getUrl()) || HttpResponseParams.isGraphQLEndpoint(newUrl.getUrl())) {
+            return null; // Don't merge GraphQL endpoints
+        }
+
         for(int i = 0; i < newTokens.length; i ++) {
             String tempToken = newTokens[i];
             String dbToken = dbTokens[i];
+            if (DictionaryFilter.isEnglishWord(tempToken) || DictionaryFilter.isEnglishWord(dbToken)) continue;
 
             int minCount = dbUrl.getUrl().startsWith("http") && newUrl.getUrl().startsWith("http") ? 3 : 0;
             if (tempToken.equalsIgnoreCase(dbToken) || i < minCount) {
@@ -804,17 +850,30 @@ public class APICatalogSync {
         if (allNull) return null;
 
         if (templatizedStrTokens <= 1) {
-            return new URLTemplate(newTokens, newTypes, newUrl.getMethod());
+            URLTemplate urlTemplate = new URLTemplate(newTokens, newTypes, newUrl.getMethod());
+
+            try {
+                for(MergedUrls mergedUrl : mergedUrls) {
+                    if(mergedUrl.getUrl().equals(urlTemplate.getTemplateString()) &&
+                            mergedUrl.getMethod().equals(urlTemplate.getMethod().name())) {
+                        return null;
+                    }
+                }
+            } catch(Exception e) {
+                loggerMaker.errorAndAddToDb("Error while creating a new URL object: " + e.getMessage(), LogDb.RUNTIME);
+            }
+
+            return urlTemplate;
         }
 
         return null;
 
     }
 
-    public static void mergeUrlsAndSave(int apiCollectionId, Boolean urlRegexMatchingEnabled, boolean mergeUrlsBasic, BloomFilter<CharSequence> existingAPIsInDb) {
+    public static void mergeUrlsAndSave(int apiCollectionId, Boolean urlRegexMatchingEnabled, boolean mergeUrlsBasic, BloomFilter<CharSequence> existingAPIsInDb,boolean ignoreCaseInsensitiveApis) {
         if (apiCollectionId == LLM_API_COLLECTION_ID || apiCollectionId == VULNERABLE_API_COLLECTION_ID) return;
 
-        ApiMergerResult result = tryMergeURLsInCollection(apiCollectionId, urlRegexMatchingEnabled, mergeUrlsBasic, existingAPIsInDb);
+        ApiMergerResult result = tryMergeURLsInCollection(apiCollectionId, urlRegexMatchingEnabled, mergeUrlsBasic, existingAPIsInDb, ignoreCaseInsensitiveApis);
 
         String deletedStaticUrlsString = "";
         int counter = 0;
@@ -1056,14 +1115,27 @@ public class APICatalogSync {
         return ret;
     }
 
-    private void processKnownStaticURLs(URLAggregator aggregator, APICatalog deltaCatalog, APICatalog dbCatalog) {
+    private void processKnownStaticURLs(URLAggregator aggregator, APICatalog deltaCatalog, APICatalog dbCatalog, boolean makeApisCaseInsensitive) {
         Iterator<Map.Entry<URLStatic, Set<HttpResponseParams>>> iterator = aggregator.urls.entrySet().iterator();
         List<SingleTypeInfo> deletedInfo = deltaCatalog.getDeletedInfo();
+
+        // handle case insensitive apis here in the same aggregator
+        Set<String> lowerCaseApisSet = new HashSet<>();
+
         try {
             while (iterator.hasNext()) {
                 Map.Entry<URLStatic, Set<HttpResponseParams>> entry = iterator.next();
                 URLStatic url = entry.getKey();
                 Set<HttpResponseParams> responseParamsList = entry.getValue();
+
+                String endpoint = url.getUrl();
+                if(makeApisCaseInsensitive){
+                    if(lowerCaseApisSet.contains(endpoint.toLowerCase())){
+                        iterator.remove();
+                        continue;
+                    }
+                    lowerCaseApisSet.add(endpoint.toLowerCase());
+                }
 
                 RequestTemplate strictMatch = dbCatalog.getStrictURLToMethods().get(url);
                 if (strictMatch != null) {
@@ -1124,9 +1196,12 @@ public class APICatalogSync {
     }
 
     Map<String, SingleTypeInfo> convertToMap(List<SingleTypeInfo> l) {
+        Set<MergedUrls> mergedUrls = MergedUrlsDao.instance.getMergedUrls();
         Map<String, SingleTypeInfo> ret = new HashMap<>();
         for(SingleTypeInfo e: l) {
-            ret.put(e.composeKey(), e);
+            if(!mergedUrls.contains(new MergedUrls(e.getUrl(), e.getMethod(), e.getApiCollectionId()))) {
+                ret.put(e.composeKey(), e);
+            }
         }
 
         return ret;
@@ -1213,7 +1288,7 @@ public class APICatalogSync {
         return bulkUpdates;
     }
 
-    public DbUpdateReturn getDBUpdatesForParams(APICatalog currentDelta, APICatalog currentState, boolean redactSampleData, boolean collectionLevelRedact) {
+    public DbUpdateReturn getDBUpdatesForParams(APICatalog currentDelta, APICatalog currentState, boolean redactSampleData, boolean collectionLevelRedact, HttpResponseParams.Source source) {
         Map<String, SingleTypeInfo> dbInfoMap = convertToMap(currentState.getAllTypeInfo());
         Map<String, SingleTypeInfo> deltaInfoMap = convertToMap(currentDelta.getAllTypeInfo());
 
@@ -1246,6 +1321,10 @@ public class APICatalogSync {
             update = Updates.combine(update, Updates.max(SingleTypeInfo.LAST_SEEN, deltaInfo.getLastSeen()));
             update = Updates.combine(update, Updates.max(SingleTypeInfo.MAX_VALUE, deltaInfo.getMaxValue()));
             update = Updates.combine(update, Updates.min(SingleTypeInfo.MIN_VALUE, deltaInfo.getMinValue()));
+            if (source != null) {
+                Bson updateSourceMap = Updates.set(SingleTypeInfo.SOURCES + "." + source.name(), new Document("timestamp", timestamp) );
+                update = Updates.combine(update, updateSourceMap);
+            }
 
             if (!Main.isOnprem) {
                 if (dbInfo != null) {
@@ -1463,20 +1542,25 @@ public class APICatalogSync {
                     try {
                         List<ApiCollection> allCollections = ApiCollectionsDao.instance.getMetaAll();
                         AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
+                        boolean makeApisCaseInsensitive = false;
+                        if(accountSettings != null){
+                            makeApisCaseInsensitive = accountSettings.getHandleApisCaseInsensitive();
+                        }
+                        
                         Boolean urlRegexMatchingEnabled = accountSettings == null || accountSettings.getUrlRegexMatchingEnabled();
                         loggerMaker.infoAndAddToDb("url regex matching enabled status is " + urlRegexMatchingEnabled, LogDb.RUNTIME);
                         for(ApiCollection apiCollection: allCollections) {
                             int start = Context.now();
                             loggerMaker.infoAndAddToDb("Started merging API collection " + apiCollection.getId(), LogDb.RUNTIME);
                             try {
-                                mergeUrlsAndSave(apiCollection.getId(), true, true, existingAPIsInDb);
+                                mergeUrlsAndSave(apiCollection.getId(), true, true, existingAPIsInDb, makeApisCaseInsensitive);
                                 loggerMaker.infoAndAddToDb("Finished merging API collection basic " + apiCollection.getId() + " in " + (Context.now() - start) + " seconds", LogDb.RUNTIME);
                             } catch (Exception e) {
                                 loggerMaker.errorAndAddToDb(e.getMessage(),LogDb.RUNTIME);
                             }
 
                             try {
-                                mergeUrlsAndSave(apiCollection.getId(), true, false, existingAPIsInDb);
+                                mergeUrlsAndSave(apiCollection.getId(), true, false, existingAPIsInDb, makeApisCaseInsensitive);
                                 loggerMaker.infoAndAddToDb("Finished merging API collection all" + apiCollection.getId() + " in " + (Context.now() - start) + " seconds", LogDb.RUNTIME);
                             } catch (Exception e) {
                                 loggerMaker.errorAndAddToDb(e.getMessage(),LogDb.RUNTIME);
@@ -1543,7 +1627,7 @@ public class APICatalogSync {
         }
 
         List<YamlTemplate> advancedFilterTemplates = AdvancedTrafficFiltersDao.instance.findAll(Filters.ne(YamlTemplate.INACTIVE, true));
-        advancedFilterMap = FilterYamlTemplateDao.instance.fetchFilterConfig(false, advancedFilterTemplates, false);
+        advancedFilterMap = FilterYamlTemplateDao.instance.fetchFilterConfig(false, advancedFilterTemplates, true);
         try {
             // fetchAllSTI check added to make sure only runs in dashboard
             if (!fetchAllSTI) {
@@ -1557,6 +1641,8 @@ public class APICatalogSync {
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error while filling urls in apiCollection: " + e.getMessage(), LogDb.RUNTIME);
         }
+
+        mergedUrls = MergedUrlsDao.instance.getMergedUrls();
 
         loggerMaker.infoAndAddToDb("Building from db completed", LogDb.RUNTIME);
         aktoPolicyNew.buildFromDb(fetchAllSTI);
@@ -1722,7 +1808,7 @@ public class APICatalogSync {
     int counter = 0;
     List<String> partnerIpsList = new ArrayList<>();
     
-    public void syncWithDB(boolean syncImmediately, boolean fetchAllSTI, SyncLimit syncLimit) {
+    public void syncWithDB(boolean syncImmediately, boolean fetchAllSTI, SyncLimit syncLimit, HttpResponseParams.Source source) {
         loggerMaker.infoAndAddToDb("Started sync with db! syncImmediately="+syncImmediately + " fetchAllSTI="+fetchAllSTI, LogDb.RUNTIME);
         List<WriteModel<SingleTypeInfo>> writesForParams = new ArrayList<>();
         List<WriteModel<SensitiveSampleData>> writesForSensitiveSampleData = new ArrayList<>();
@@ -1800,7 +1886,7 @@ public class APICatalogSync {
 
             APICatalog dbCatalog = this.dbState.getOrDefault(apiCollectionId, new APICatalog(apiCollectionId, new HashMap<>(), new HashMap<>()));
             boolean redactCollectionLevel = apiCollectionToRedactPayload.getOrDefault(apiCollectionId, false);
-            DbUpdateReturn dbUpdateReturn = getDBUpdatesForParams(deltaCatalog, dbCatalog, redact, redactCollectionLevel);
+            DbUpdateReturn dbUpdateReturn = getDBUpdatesForParams(deltaCatalog, dbCatalog, redact, redactCollectionLevel, source);
             writesForParams.addAll(dbUpdateReturn.bulkUpdatesForSingleTypeInfo);
             writesForSensitiveSampleData.addAll(dbUpdateReturn.bulkUpdatesForSampleData);
             writesForSensitiveParamInfo.addAll(dbUpdateReturn.bulkUpdatesForSensitiveParamInfo);
@@ -1831,7 +1917,7 @@ public class APICatalogSync {
             } while (from < writesForParams.size());
         }
 
-        aktoPolicyNew.syncWithDb();
+        aktoPolicyNew.syncWithDb(source);
 
         loggerMaker.infoAndAddToDb("adding " + writesForTraffic.size() + " updates for traffic", LogDb.RUNTIME);
         if(writesForTraffic.size() > 0) {
@@ -1840,7 +1926,7 @@ public class APICatalogSync {
             loggerMaker.infoAndAddToDb(res.getInserts().size() + " " +res.getUpserts().size(), LogDb.RUNTIME);
 
         }
-        
+
 
         loggerMaker.infoAndAddToDb("adding " + writesForSampleData.size() + " updates for samples", LogDb.RUNTIME);
         if(writesForSampleData.size() > 0) {

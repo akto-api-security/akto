@@ -2,8 +2,10 @@ package com.akto.hybrid_runtime.policies;
 
 import com.akto.dao.*;
 import com.akto.dao.context.Context;
+import com.akto.dao.filter.MergedUrlsDao;
 import com.akto.dto.*;
 import com.akto.dto.ApiInfo.ApiInfoKey;
+import com.akto.dto.filter.MergedUrls;
 import com.akto.dto.runtime_filters.RuntimeFilter;
 import com.akto.dto.type.APICatalog;
 import com.akto.dto.type.SingleTypeInfo;
@@ -206,8 +208,17 @@ public class AktoPolicyNew {
             }
         }
 
+        if (apiInfo.getDiscoveredTimestamp() == 0) {
+            apiInfo.setDiscoveredTimestamp(httpResponseParams.getTimeOrNow());
+        }
+
         apiInfo.setLastSeen(httpResponseParams.getTimeOrNow());
 
+        if (apiInfo.getResponseCodes() == null) apiInfo.setResponseCodes(new ArrayList<>());
+        if (!apiInfo.getResponseCodes().contains(statusCode)) apiInfo.getResponseCodes().add(statusCode);
+
+        ApiInfo.ApiType apiType = ApiInfo.findApiTypeFromResponseParams(httpResponseParams);
+        if (apiType != null) apiInfo.setApiType(apiType);
     }
 
     public PolicyCatalog getApiInfoFromMap(ApiInfo.ApiInfoKey apiInfoKey) {
@@ -260,7 +271,15 @@ public class AktoPolicyNew {
         for (ApiInfoCatalog apiInfoCatalog: apiInfoCatalogMap.values()) {
 
             Map<URLStatic, PolicyCatalog> strictURLToMethods = apiInfoCatalog.getStrictURLToMethods();
-            Map<URLTemplate, PolicyCatalog> templateURLToMethods = apiInfoCatalog.getTemplateURLToMethods();
+            Map<URLTemplate, PolicyCatalog> templateURLToMethods = new HashMap<>();
+
+            Set<MergedUrls> mergedUrls = MergedUrlsDao.instance.getMergedUrls();
+            for(Map.Entry<URLTemplate, PolicyCatalog> templateURLToMethodEntry : apiInfoCatalog.getTemplateURLToMethods().entrySet()) {
+                ApiInfoKey apiInfoKey = templateURLToMethodEntry.getValue().getApiInfo().getId();
+                if(!mergedUrls.contains(new MergedUrls(apiInfoKey.getUrl(), apiInfoKey.getMethod().name(), apiInfoKey.getApiCollectionId()))) {
+                    templateURLToMethods.put(templateURLToMethodEntry.getKey(), templateURLToMethodEntry.getValue());
+                }
+            }
 
             List<PolicyCatalog> policyCatalogList = new ArrayList<>();
             policyCatalogList.addAll(strictURLToMethods.values());

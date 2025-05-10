@@ -3,11 +3,12 @@ package com.akto.dto;
 import com.akto.dao.context.Context;
 import com.akto.dto.data_types.Conditions;
 import com.akto.dto.type.SingleTypeInfo;
+import com.akto.util.enums.GlobalEnums.Severity;
+
 import io.swagger.v3.oas.models.media.StringSchema;
 import org.bson.types.ObjectId;
 
 import java.util.List;
-import java.util.Objects;
 
 public class CustomDataType {
     private ObjectId id;
@@ -35,6 +36,17 @@ public class CustomDataType {
     public static final String REDACTED = "redacted";
     private boolean sampleDataFixed;
     public static final String SAMPLE_DATA_FIXED = "sampleDataFixed";
+
+    public static final String SKIP_DATA_TYPE_TEST_TEMPLATE_MAPPING = "skipDataTypeTestTemplateMapping";
+    private boolean skipDataTypeTestTemplateMapping;
+    private Severity dataTypePriority;
+    private List<String> categoriesList;
+
+    public static final String ICON_STRING = "iconString";
+    private String iconString;
+
+    public static final String  USER_MODIFIED_TIMESTAMP = "userModifiedTimestamp";
+    private int userModifiedTimestamp;
 
     public CustomDataType() { }
 
@@ -69,21 +81,26 @@ public class CustomDataType {
     }
 
     public boolean validateRaw(Object value, Object key) throws Exception {
-        if (this.keyConditions == null && this.valueConditions==null) return false;
+        return validateRawUtility(value, key, this.keyConditions, this.valueConditions, this.operator);
+    }
+
+
+    public static boolean validateRawUtility(Object value, Object key, Conditions keyConditions, Conditions valueConditions, Conditions.Operator operator) {
+        if (keyConditions == null && valueConditions==null) return false;
         boolean keyResult = true;
-        if (this.keyConditions != null) {
-            keyResult = this.keyConditions.validate(key);
+        if (keyConditions != null) {
+            keyResult = keyConditions.validate(key);
         }
 
         boolean valueResult = true;
-        if (this.valueConditions != null) {
-            valueResult = this.valueConditions.validate(value);
+        if (valueConditions != null) {
+            valueResult = valueConditions.validate(value);
         }
 
-        if (this.valueConditions ==null || this.keyConditions == null) {
+        if (valueConditions ==null || keyConditions == null) {
             return keyResult && valueResult;
         } else {
-            switch (this.operator) {
+            switch (operator) {
                 case AND:
                     return keyResult && valueResult;
                 case OR:
@@ -93,9 +110,8 @@ public class CustomDataType {
                     return false;
             }
         }
-
     }
-        
+
     public ObjectId getId() {
         return id;
     }
@@ -218,4 +234,60 @@ public class CustomDataType {
     public void setSampleDataFixed(boolean sampleDataFixed) {
         this.sampleDataFixed = sampleDataFixed;
     }
+
+    public boolean isSkipDataTypeTestTemplateMapping() {
+        return skipDataTypeTestTemplateMapping;
+    }
+
+    public void setSkipDataTypeTestTemplateMapping(boolean skipDataTypeTestTemplateMapping) {
+        this.skipDataTypeTestTemplateMapping = skipDataTypeTestTemplateMapping;
+    }
+    public Severity getDataTypePriority() {
+        return dataTypePriority;
+    }
+
+    public void setDataTypePriority(Severity dataTypePriority) {
+        this.dataTypePriority = dataTypePriority;
+    }
+
+    public List<String> getCategoriesList() {
+        return categoriesList;
+    }
+
+    public void setCategoriesList(List<String> categoriesList) {
+        this.categoriesList = categoriesList;
+    }
+
+    public String getIconString() {
+        return iconString;
+    }
+
+    public void setIconString(String iconString) {
+        this.iconString = iconString;
+    }
+
+    public int getUserModifiedTimestamp() {
+        return userModifiedTimestamp;
+    }
+
+    public void setUserModifiedTimestamp(int userModifiedTimestamp) {
+        this.userModifiedTimestamp = userModifiedTimestamp;
+    }
+
+    public boolean systemFieldsCompare(Object obj){
+        if (this == obj) {
+            return true;
+        }
+        if (obj == null || getClass() != obj.getClass()) {
+            return false;
+        }
+
+        CustomDataType that = (CustomDataType) obj;
+
+        return sensitiveAlways == that.sensitiveAlways &&
+                (keyConditions != null ? keyConditions.equals(that.keyConditions) : that.keyConditions == null) &&
+                (valueConditions != null ? valueConditions.equals(that.valueConditions) : that.valueConditions == null)
+                &&
+                (operator != null ? operator.equals(that.operator) : that.operator == null);
+    }    
 }

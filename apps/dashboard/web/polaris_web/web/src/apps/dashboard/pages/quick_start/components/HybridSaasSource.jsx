@@ -12,9 +12,11 @@ function HybridSaasSource() {
     const ref = useRef(null)
     const dbSvcCommand = "helm install aktodbsvc ~/akto_code/helm-charts/charts/akto-setup-database-abstractor -n dev --set mongo.aktoMongoConn=\"mongodb://<mongo_ip>/admini\"";
     const copyCommand = ()=>{func.copyToClipboard(dbSvcCommand, ref, null)}
-    const runtimeSvcCommand = "helm install aktoruntime ~/akto_code/helm-charts/charts/mini-runtime -n dev \
-        --set mini_runtime.aktoApiSecurityRuntime.env.databaseAbstractorToken=\"" + apiToken + "\"";
+    const runtimeSvcCommand = "helm install akto-mini-runtime akto/akto-mini-runtime -n dev --set mini_runtime.aktoApiSecurityRuntime.env.databaseAbstractorToken=\"" + apiToken + "\"";
     const rcopyCommand = ()=>{func.copyToClipboard(runtimeSvcCommand, ref, null)}
+    const helmAddCommand = "helm repo add akto https://akto-api-security.github.io/helm-charts/";
+    const copyCommandUtil = (data)=>{func.copyToClipboard(data, ref, null)}
+
     //const [burpCollectionURL, setBurpCollectionURL] = useState("")
 
     // const getGithubLink = async() => {
@@ -67,10 +69,16 @@ function HybridSaasSource() {
         <VerticalStack gap="2">
           <div ref = {ref}/>
 
-          <span>1. Run the below command to setup Akto Runtime service: </span>
+          <span>1. Run the below command to add akto helm repo. </span>
 
           <VerticalStack gap="1">
-            <JsonComponent title="Runtime Service Command" toolTipContent="Copy command" onClickFunc={()=> rcopyCommand()} dataString={runtimeSvcCommand} language="text" minHeight="150px" />
+            <JsonComponent title="Add akto helm repo" toolTipContent="Copy command" onClickFunc={()=> copyCommandUtil(helmAddCommand)} dataString={helmAddCommand} language="text" minHeight="60px" />
+          </VerticalStack>
+
+          <span>2. Run the below command to setup Akto Runtime service. Change the namespace according to your requirements. </span>
+
+          <VerticalStack gap="1">
+            <JsonComponent title="Runtime Service Command" toolTipContent="Copy command" onClickFunc={()=> rcopyCommand()} dataString={runtimeSvcCommand} language="text" minHeight="450px" />
           </VerticalStack>
 
           {/* <VerticalStack gap="1">
@@ -139,7 +147,7 @@ function HybridSaasSource() {
     return (
         <div className='card-items'>
             <Text variant='bodyMd'>
-                Use our hybrid saas setup, add more text.
+                Seamlessly deploy Akto with our hybrid setup and start viewing your API traffic in few minutes.
             </Text>
             {hybridSaasComponent}
 
