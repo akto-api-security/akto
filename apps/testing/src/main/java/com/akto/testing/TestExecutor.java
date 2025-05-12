@@ -393,7 +393,7 @@ public class TestExecutor {
                         for (Future<Void> future : testingRecords) {
                             future.cancel(true);
                         }
-                        loggerMaker.debugAndAddToDb("Canceled all running future tasks due to timeout.", LogDb.TESTING);
+                        loggerMaker.infoAndAddToDb("Canceled all running future tasks due to timeout.", LogDb.TESTING);
                     }
                 }
 
@@ -404,7 +404,7 @@ public class TestExecutor {
                 dbObject.put("PRODUCER_RUNNING", false);
                 dbObject.put("CONSUMER_RUNNING", true);
                 writeJsonContentInFile(Constants.TESTING_STATE_FOLDER_PATH, Constants.TESTING_STATE_FILE_NAME, dbObject);
-                loggerMaker.debugAndAddToDb("Finished inserting records in kafka: " + totalRecordsInsertedInKafka.get() + " skipping records: " + skippedRecordsForKafka.get(), LogDb.TESTING);
+                loggerMaker.infoAndAddToDb("Finished inserting records in kafka: " + totalRecordsInsertedInKafka.get() + " skipping records: " + skippedRecordsForKafka.get(), LogDb.TESTING);
             }
         }
         
@@ -425,7 +425,7 @@ public class TestExecutor {
                                 apiInfoKeyToHostMap, subCategoryEndpointMap, testConfigMap, testLogs, testingRun,
                                 isApiInfoTested, new AtomicInteger(), new AtomicInteger(), new AtomicInteger());
                     }else{
-                        loggerMaker.debug("Test stopped for id: " + testingRun.getHexId());
+                        loggerMaker.info("Test stopped for id: " + testingRun.getHexId());
                         break;
                     }
                 }

@@ -313,19 +313,18 @@ public class LoginAction implements Action, ServletResponseAware, ServletRequest
                 }
 
                 if ((tempUser.getLastLoginTs() + REFRESH_INTERVAL) < Context.now()) {
-                    service.submit(() -> {
-                        try {
-                            for (String accountIdStr : user.getAccounts().keySet()) {
-                                int accountId = Integer.parseInt(accountIdStr);
-                                if(accountId == 1729478227){
-                                    Context.accountId.set(accountId);
-                                    backFillLastTested();
-                                }
-                            }
-                        } catch (Exception e) {
-                            e.printStackTrace();
-                        }
-                    });
+                    // No longer needed for , TODO: heavy job, need to optimize
+                    // service.submit(() -> {
+                    //     try {
+                    //         for (String accountIdStr : user.getAccounts().keySet()) {
+                    //             int accountId = Integer.parseInt(accountIdStr);
+                    //             Context.accountId.set(accountId);
+                    //             backFillLastTested();
+                    //         }
+                    //     } catch (Exception e) {
+                    //         e.printStackTrace();
+                    //     }
+                    // });
                     service.submit(() -> {
                         try {
                             for (String accountIdStr : user.getAccounts().keySet()) {

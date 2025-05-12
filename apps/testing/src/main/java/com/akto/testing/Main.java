@@ -546,7 +546,6 @@ public class Main {
                     loggerMaker.debugAndAddToDb("Found trrs " + trrs.getHexId() + (isTestingRunResultRerunCase ? " (rerun case) " : " ") + "for account: " + accountId);
                     testingRun = TestingRunDao.instance.findOne("_id", trrs.getTestingRunId());
                 }
-
                 if (testingRun == null) {
                     return;
                 }
@@ -558,7 +557,7 @@ public class Main {
                 if (!TestingInstanceHeartBeatDao.instance.isTestEligibleForInstance(testingRun.getHexId())) {
                     return;
                 }
-
+                loggerMaker.info("Testing run eligible for instance: " + testingRun.getHexId() + " for account: " + accountId + " at:" + Context.now() + " on: " + testingInstanceId);
                 TestingInstanceHeartBeatDao.instance.setTestingRunId(testingInstanceId, testingRun.getHexId());
 
                 if (testingRun.getState().equals(State.STOPPED)) {
@@ -642,7 +641,7 @@ public class Main {
                     setTestingRunConfig(testingRun, trrs);
                     boolean maxRetriesReached = false;
                     if (isSummaryRunning || isTestingRunRunning) {
-                        loggerMaker.debugAndAddToDb("TRRS or TR is in running state, checking if it should run it or not");
+                        loggerMaker.infoAndAddToDb("TRRS or TR is in running state, checking if it should run it or not");
                         TestingRunResultSummary testingRunResultSummary;
                         if (trrs != null) {
                             testingRunResultSummary = trrs;
@@ -680,7 +679,7 @@ public class Main {
                                             + " TR_ID:" + testingRun.getHexId(), LogDb.TESTING);
                                     return;
                                 } else {
-                                    loggerMaker.debugAndAddToDb("Test run was executed long ago, TRR_ID:"
+                                    loggerMaker.infoAndAddToDb("Test run was executed long ago, TRR_ID:"
                                             + testingRunResult.getHexId() + ", TRRS_ID:" + testingRunResultSummary.getHexId() 
                                             + (isTestingRunResultRerunCase ? " (rerun case) " : " ")
                                             + " TR_ID:" + testingRun.getHexId(), LogDb.TESTING);
@@ -713,7 +712,7 @@ public class Main {
                                             Updates.set(TestingRunResultSummary.COUNT_ISSUES, finalCountMap),
                                             Updates.set(TestingRunResultSummary.END_TIMESTAMP, Context.now())
                                         );
-                                        loggerMaker.debugAndAddToDb("Max retries level reached for TRR_ID: " + testingRun.getHexId(), LogDb.TESTING);
+                                        loggerMaker.infoAndAddToDb("Max retries level reached for TRR_ID: " + testingRun.getHexId(), LogDb.TESTING);
                                         maxRetriesReached = true;
                                     }
 
@@ -735,7 +734,7 @@ public class Main {
                                     GithubUtils.publishGithubComments(runResultSummary);
                                 }
                             } else {
-                                loggerMaker.debugAndAddToDb("No executions made for this test, will need to restart it, TRRS_ID:"
+                                loggerMaker.infoAndAddToDb("No executions made for this test, will need to restart it, TRRS_ID:"
                                     + testingRunResultSummary.getHexId() 
                                     + (isTestingRunResultRerunCase ? " (rerun case) " : " ")
                                     + " TR_ID:" + testingRun.getHexId(), LogDb.TESTING);
@@ -758,7 +757,7 @@ public class Main {
                                         Updates.set(TestingRunResultSummary.STATE, State.COMPLETED),
                                         Updates.set(TestingRunResultSummary.END_TIMESTAMP, Context.now())
                                     );
-                                    loggerMaker.debugAndAddToDb("Max retries level reached for TRR_ID: " + testingRun.getHexId(), LogDb.TESTING);
+                                    loggerMaker.infoAndAddToDb("Max retries level reached for TRR_ID: " + testingRun.getHexId(), LogDb.TESTING);
                                     maxRetriesReached = true;
                                 }
                                 TestingRunResultSummary summary = TestingRunResultSummariesDao.instance.updateOneNoUpsert(
