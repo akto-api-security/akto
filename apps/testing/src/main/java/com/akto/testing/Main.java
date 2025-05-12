@@ -550,8 +550,6 @@ public class Main {
                     return;
                 }
 
-                loggerMaker.infoAndAddToDb("Testing run found: " + testingRun.getHexId() + " for account: " + accountId + " with TR-State: " + testingRun.getState() + " instanceId: " + testingInstanceId);
-
                 if (handleRerunTestingRunResult(trrs)) {
                     return;
                 }
@@ -559,7 +557,7 @@ public class Main {
                 if (!TestingInstanceHeartBeatDao.instance.isTestEligibleForInstance(testingRun.getHexId())) {
                     return;
                 }
-                loggerMaker.info("Testing run eligible for instance: " + testingRun.getHexId() + " for account: " + accountId + " at:" + Context.now());
+                loggerMaker.info("Testing run eligible for instance: " + testingRun.getHexId() + " for account: " + accountId + " at:" + Context.now() + " on: " + testingInstanceId);
                 TestingInstanceHeartBeatDao.instance.setTestingRunId(testingInstanceId, testingRun.getHexId());
 
                 if (testingRun.getState().equals(State.STOPPED)) {
