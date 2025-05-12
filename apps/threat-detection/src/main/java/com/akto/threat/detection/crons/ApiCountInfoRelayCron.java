@@ -23,7 +23,7 @@ public class ApiCountInfoRelayCron {
     private static final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
     List<String> apiCountKeys;
     Map<String, Long> keyValData;
-    CounterCache cache;
+    private static CounterCache cache;
     private static final LoggerMaker logger = new LoggerMaker(ApiCountInfoRelayCron.class);
     private static final DataActor dataActor = DataActorFactory.fetchInstance();
 
@@ -47,6 +47,7 @@ public class ApiCountInfoRelayCron {
                     if (apiCountKeys.size() == 0) {
                         return;
                     }
+                    logger.info("relayApiCountInfo cron fetched {} keys for startBinId {} and endBinId {}", apiCountKeys.size(), startBinId, endBinId);
                     keyValData = cache.mget(apiCountKeys.toArray(new String[0])); // get data for thsoe keys
 
                     // build api hit count payload and call cyborg
@@ -64,7 +65,7 @@ public class ApiCountInfoRelayCron {
                     logger.error("Error executing relayApiCountInfoCron : {} ", e);
                 }
             }
-        }, 0 , 30, TimeUnit.SECONDS);
+        }, 0 , 1, TimeUnit.MINUTES);
     }
 
 }

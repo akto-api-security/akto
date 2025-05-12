@@ -116,10 +116,13 @@ public class MaliciousTrafficDetectorTask implements Task {
             new RedisBackedCounterCache(redisClient, "wbt"),
             new WindowBasedThresholdNotifier.Config(100, 10 * 60));
     
-    this.apiCountWindowBasedThresholdNotifier =
-      new WindowBasedThresholdNotifier(
+    if (redisClient == null) {
+        this.apiCountWindowBasedThresholdNotifier = null;
+    } else {
+        this.apiCountWindowBasedThresholdNotifier = new WindowBasedThresholdNotifier(
           new ApiCountCacheLayer(redisClient),
           new WindowBasedThresholdNotifier.Config(100, 10 * 60));
+    }
 
     this.internalKafka = new KafkaProtoProducer(internalConfig);
     this.rawApiFactory = new RawApiMetadataFactory(new IPLookupClient());
@@ -216,8 +219,10 @@ public class MaliciousTrafficDetectorTask implements Task {
     ApiInfo.ApiInfoKey apiInfoKey = new ApiInfo.ApiInfoKey(apiCollectionId, url, method);
 
     String apiHitCountKey = Utils.buildApiHitCountKey(apiCollectionId, url, method.toString());
-    this.apiCountWindowBasedThresholdNotifier.incrementApiHitcount(apiHitCountKey, responseParam.getTime(), RedisKeyInfo.API_COUNTER_SORTED_SET);
-
+    if (this.apiCountWindowBasedThresholdNotifier != null) {
+        this.apiCountWindowBasedThresholdNotifier.incrementApiHitcount(apiHitCountKey, responseParam.getTime(), RedisKeyInfo.API_COUNTER_SORTED_SET);
+    }
+    
     for (FilterConfig apiFilter : apiFilters.values()) {
       logger.debugAndAddToDb("Evaluating filter condition for url " + apiInfoKey.getUrl() + " filterId " + apiFilter.getId());
       boolean hasPassedFilter = validateFilterForRequest(apiFilter, rawApi, apiInfoKey);
@@ -243,23 +248,19 @@ public class MaliciousTrafficDetectorTask implements Task {
         String groupKey = apiFilter.getId();
         String aggKey = actor + "|" + groupKey;
 
-        SampleMaliciousRequest maliciousReq = SampleMaliciousRequest.newBuilder()
-            .setUrl(responseParam.getRequestParams().getURL())
-            .setMethod(responseParam.getRequestParams().getMethod())
-            .setPayload(responseParam.getOriginalMsg().get())
-            .setIp(actor) // For now using actor as IP
-            .setApiCollectionId(responseParam.getRequestParams().getApiCollectionId())
-            .setTimestamp(responseParam.getTime())
-            .setFilterId(apiFilter.getId())
-            .setMetadata(Metadata.newBuilder().setCountryCode(metadata.getCountryCode()))
-            .build();
+        SampleMaliciousRequest maliciousReq = null;
+        if (!isAggFilter || !apiFilter.getInfo().getSubCategory().equalsIgnoreCase("API_LEVEL_RATE_LIMITING")) {
+          maliciousReq = Utils.buildSampleMaliciousRequest(actor, responseParam, apiFilter, metadata);
+        }
 
-        maliciousMessages.add(
-            SampleRequestKafkaEnvelope.newBuilder()
-                .setActor(actor)
-                .setAccountId(responseParam.getAccountId())
-                .setMaliciousRequest(maliciousReq)
-                .build());
+        if (maliciousReq != null) {
+          maliciousMessages.add(
+              SampleRequestKafkaEnvelope.newBuilder()
+                  .setActor(actor)
+                  .setAccountId(responseParam.getAccountId())
+                  .setMaliciousRequest(maliciousReq)
+                  .build());
+        }
 
         if (!isAggFilter) {
           generateAndPushMaliciousEventRequest(
@@ -268,15 +269,27 @@ public class MaliciousTrafficDetectorTask implements Task {
         }
 
         // Aggregation rules
-        WindowBasedThresholdNotifier.Result result;
+        boolean shouldNotify = false;
         for (Rule rule : aggRules.getRule()) {
           if (apiFilter.getInfo().getSubCategory().equalsIgnoreCase("API_LEVEL_RATE_LIMITING")) {
-              result = this.apiCountWindowBasedThresholdNotifier.calcApiCount(apiHitCountKey, maliciousReq, rule);
+              if (this.apiCountWindowBasedThresholdNotifier == null) {
+                continue;
+              }
+              shouldNotify = this.apiCountWindowBasedThresholdNotifier.calcApiCount(apiHitCountKey, responseParam.getTime(), rule);
+              if (shouldNotify) {
+                maliciousReq = Utils.buildSampleMaliciousRequest(actor, responseParam, apiFilter, metadata);
+                maliciousMessages.add(
+                  SampleRequestKafkaEnvelope.newBuilder()
+                      .setActor(actor)
+                      .setAccountId(responseParam.getAccountId())
+                      .setMaliciousRequest(maliciousReq)
+                      .build());
+              }
           } else {
-              result = this.windowBasedThresholdNotifier.shouldNotify(aggKey, maliciousReq, rule);
+              shouldNotify = this.windowBasedThresholdNotifier.shouldNotify(aggKey, maliciousReq, rule);
           }
 
-          if (result.shouldNotify()) {
+          if (shouldNotify) {
             logger.debugAndAddToDb("aggregate condition satisfied for url " + apiInfoKey.getUrl() + " filterId " + apiFilter.getId());
             generateAndPushMaliciousEventRequest(
                 apiFilter,
@@ -287,7 +300,7 @@ public class MaliciousTrafficDetectorTask implements Task {
           }
         }
       }
-    }
+    } 
 
     // Should we push all the messages in one go
     // or call kafka.send for each HttpRequestParams

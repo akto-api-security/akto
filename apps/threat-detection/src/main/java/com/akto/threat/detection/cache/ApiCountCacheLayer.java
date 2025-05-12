@@ -88,10 +88,8 @@ public class ApiCountCacheLayer implements CounterCache {
             keys.add(op.getKey());
         }
 
-        Map<String, Long> val = new HashMap<>();
         for (String key : keys) {
             long cv = this.localCache.asMap().getOrDefault(key, 0L);
-            val.put(key, cv);
             this.redis.async().setex(key, 1 * 60 * 60, cv);
         }
 

@@ -1,6 +1,7 @@
 package com.akto.threat.detection;
 
 import com.akto.DaoInit;
+import com.akto.dao.context.Context;
 import com.akto.data_actor.DataActor;
 import com.akto.data_actor.DataActorFactory;
 import com.akto.dto.monitoring.ModuleInfo;
@@ -43,9 +44,8 @@ public class Main {
         runMigrations();
         sessionFactory = SessionFactoryUtils.createFactory();
         localRedis = createLocalRedisClient();
+        triggerApiInfoRelayCron(localRedis);
     }
-
-    triggerApiInfoRelayCron(localRedis);
 
     KafkaConfig trafficKafka =
         KafkaConfig.newBuilder()
@@ -99,8 +99,10 @@ public class Main {
     }
     ApiCountInfoRelayCron apiCountInfoRelayCron = new ApiCountInfoRelayCron(localRedis);
     try {
+        logger.info("Scheduling relayApiCountInfoCron at " + Context.now());
         apiCountInfoRelayCron.relayApiCountInfo();
     } catch (Exception e) {
+        logger.error("Error scheduling relayApiCountInfoCron : {} ", e);
         System.out.println(e);
     }
   }
