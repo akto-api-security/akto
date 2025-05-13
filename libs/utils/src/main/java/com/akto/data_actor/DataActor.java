@@ -7,6 +7,7 @@ import com.akto.dto.dependency_flow.Node;
 import com.akto.dto.filter.MergedUrls;
 import com.akto.dto.jobs.JobExecutorType;
 import com.akto.dto.jobs.JobParams;
+import com.akto.dto.metrics.MetricData;
 import com.akto.dto.monitoring.ModuleInfo;
 import com.akto.dto.runtime_filters.RuntimeFilter;
 import com.akto.dto.settings.DataControlSettings;
@@ -113,6 +114,7 @@ public abstract class DataActor {
 
     public abstract TestingRunResultSummary createTRRSummaryIfAbsent(String testingRunHexId, int start);
 
+    public abstract void ingestMetricData(List<MetricData> metricData);
     public abstract TestingRun findPendingTestingRun(int delta, String miniTestingName);
 
     public abstract TestingRunResultSummary findPendingTestingRunResultSummary(int now, int delta, String miniTestingName);

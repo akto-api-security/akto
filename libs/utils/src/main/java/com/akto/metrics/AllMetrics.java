@@ -1,8 +1,12 @@
 package com.akto.metrics;
 
 import com.akto.dao.context.Context;
+import com.akto.dao.metrics.MetricDataDao;
+import com.akto.data_actor.ClientActor;
+import com.akto.data_actor.DataActor;
 import com.akto.data_actor.DataActorFactory;
 import com.akto.dto.billing.Organization;
+import com.akto.dto.metrics.MetricData;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.http_util.CoreHTTPClient;
@@ -11,16 +15,15 @@ import com.mongodb.BasicDBObject;
 import okhttp3.*;
 
 import java.io.IOException;
-import java.util.Arrays;
-import java.util.List;
-import java.util.UUID;
+import java.util.*;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
 public class AllMetrics {
 
-    public void init(LogDb module, boolean pgMetrics){
+    public void init(LogDb module, boolean pgMetrics, DataActor dataActor){
+        this.dataActor = dataActor;
         int accountId = Context.accountId.get();
 
         Organization organization = DataActorFactory.fetchInstance().fetchOrganization(accountId);
@@ -75,8 +78,10 @@ public class AllMetrics {
                 kafkaBytesConsumedRate, cyborgNewApiCount, cyborgTotalApiCount, deltaCatalogNewCount, deltaCatalogTotalCount,
                 cyborgApiPayloadSize, multipleSampleDataFetchLatency);
 
-        executorService.scheduleAtFixedRate(() -> {
+        AllMetrics _this = this;
+        executorService.scheduleWithFixedDelay(() -> {
             try {
+                Context.accountId.set(accountId);
                 BasicDBList list = new BasicDBList();
                 for (Metric m : metrics) {
                     if (m == null) {
@@ -94,7 +99,7 @@ public class AllMetrics {
 
                 }
                 if(!list.isEmpty()) {
-                    sendDataToAkto(list);
+                    _this.sendDataToAkto(list);
                 }
             } catch (Exception e){
                 loggerMaker.errorAndAddToDb("Error while sending metrics to akto: " + e.getMessage(), LoggerMaker.LogDb.RUNTIME);
@@ -112,7 +117,7 @@ public class AllMetrics {
     private static final OkHttpClient client = CoreHTTPClient.client.newBuilder().build();
 
     private final static LoggerMaker loggerMaker = new LoggerMaker(AllMetrics.class, LogDb.RUNTIME);
-
+    private DataActor dataActor;
     private static final String instance_id = UUID.randomUUID().toString();
     private Metric runtimeKafkaRecordCount;
     private Metric runtimeKafkaRecordSize;
@@ -410,7 +415,7 @@ public class AllMetrics {
         }
     }
 
-    public static void sendDataToAkto(BasicDBList list){
+    public void sendDataToAkto(BasicDBList list){
         MediaType mediaType = MediaType.parse("application/json");
         RequestBody body = RequestBody.create(new BasicDBObject("data", list).toJson(), mediaType);
         Request request = new Request.Builder()
@@ -421,6 +426,20 @@ public class AllMetrics {
         Response response = null;
         try {
             response =  client.newCall(request).execute();
+            List<MetricData> metricDataList = new ArrayList<>();
+            // Store metrics in MongoDB
+            for (Object obj : list) {
+                BasicDBObject metricsData = (BasicDBObject) obj;
+                MetricData metricData = new MetricData(
+                    metricsData.getString("metric_id"),
+                    (float) metricsData.get("val"),
+                    metricsData.getString("org_id"),
+                    metricsData.getString("instance_id")
+                );
+                metricDataList.add(metricData);
+            }
+            //Ingesting metrics in
+            dataActor.ingestMetricData(metricDataList);
         } catch (IOException e) {
             loggerMaker.errorAndAddToDb("Error while executing request " + request.url() + ": " + e.getMessage(), LoggerMaker.LogDb.RUNTIME);
         } finally {
