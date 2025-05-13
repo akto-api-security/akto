@@ -123,6 +123,19 @@
             <version>2.15.0</version>
         </dependency>
 
+        <dependency>
+            <groupId>com.networknt</groupId>
+            <artifactId>json-schema-validator</artifactId>
+            <version>1.5.6</version>
+            <exclusions>
+                <exclusion>
+                    <groupId>com.fasterxml.jackson.dataformat</groupId>
+                    <artifactId>jackson-dataformat-yaml</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+
+
     </dependencies>
     <build>
         <plugins>
