@@ -3,6 +3,7 @@ package com.akto.data_actor;
 import static com.akto.util.Constants.ID;
 
 import com.akto.dao.jobs.JobsDao;
+import com.akto.dao.metrics.MetricDataDao;
 import com.akto.dto.jobs.Job;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -26,6 +27,7 @@ import com.akto.dto.*;
 import com.akto.dto.filter.MergedUrls;
 import com.akto.dto.graph.SvcToSvcGraphEdge;
 import com.akto.dto.graph.SvcToSvcGraphNode;
+import com.akto.dto.metrics.MetricData;
 import com.akto.dto.monitoring.ModuleInfo;
 import com.akto.dto.settings.DataControlSettings;
 import com.mongodb.BasicDBList;
@@ -1097,6 +1099,9 @@ public class DbLayer {
         return SampleDataDao.instance.findOne(filterQSampleData);
     }
 
+    public static void ingestMetricsData(List<MetricData> metricData) {
+        MetricDataDao.instance.insertMany(metricData);
+    }
     public static void modifyHybridTestingSetting(boolean hybridTestingEnabled) {
         Integer accountId = Context.accountId.get();
         AccountsDao.instance.updateOne(Filters.eq("_id", accountId), Updates.set(Account.HYBRID_TESTING_ENABLED, hybridTestingEnabled));
