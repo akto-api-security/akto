@@ -5,6 +5,7 @@ import com.akto.dao.audit_logs.ApiAuditLogsDao;
 import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.jobs.JobsDao;
 import com.akto.dao.loaders.LoadersDao;
+import com.akto.dao.metrics.MetricDataDao;
 import com.akto.dao.test_editor.TestingRunPlaygroundDao;
 import com.akto.dao.testing.TestRolesDao;
 import com.akto.dao.testing.TestingRunDao;
@@ -460,5 +461,6 @@ public class DaoInit {
         SourceCodeVulnerabilitiesDao.instance.createIndicesIfAbsent();
         JobsDao.instance.createIndicesIfAbsent();
         BidirectionalSyncSettingsDao.instance.createIndicesIfAbsent();
+        MetricDataDao.instance.createIndicesIfAbsent();
     }
 }
