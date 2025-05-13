@@ -5,11 +5,11 @@ import static com.akto.testing.Utils.writeJsonContentInFile;
 
 import com.akto.DaoInit;
 import com.akto.crons.GetRunningTestsStatus;
+import com.akto.dao.ApiInfoDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.testing.TestingRunResultDao;
 import com.akto.dao.testing.TestingRunResultSummariesDao;
 import com.akto.dto.ApiInfo;
-import com.akto.dto.RawApi;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.test_editor.TestConfig;
 import com.akto.dto.testing.TestResult.TestError;
@@ -98,10 +98,15 @@ public class ConsumerUtil {
         List<String> messagesList = instance.getTestingUtil().getSampleMessages().get(apiInfoKey);
         if(messagesList == null || messagesList.isEmpty()){}
         else{
-            logger.debug("Running test for: " + apiInfoKey + " with subcategory: " + subCategory);
+            logger.info("Running test for: " + apiInfoKey + " with subcategory: " + subCategory);
             String sample = messagesList.get(messagesList.size() - 1);
             TestingRunResult runResult = executor.runTestNew(apiInfoKey, singleTestPayload.getTestingRunId(), instance.getTestingUtil(), singleTestPayload.getTestingRunResultSummaryId(),testConfig , instance.getTestingRunConfig(), instance.isDebug(), singleTestPayload.getTestLogs(), sample);
             executor.insertResultsAndMakeIssues(Collections.singletonList(runResult), singleTestPayload.getTestingRunResultSummaryId());
+            
+            // update the last tested field in the api info
+            ApiInfoDao.instance.updateManyNoUpsert(ApiInfoDao.getFilter(apiInfoKey),
+                Updates.set(ApiInfo.LAST_TESTED, Context.now())
+            );
         }
     }
 
@@ -196,18 +201,18 @@ public class ConsumerUtil {
 
             while (parallelConsumer != null) {
                 if(!GetRunningTestsStatus.getRunningTests().isTestRunning(summaryObjectId, true)){
-                    logger.debug("Tests have been marked stopped.");
+                    logger.info("Tests have been marked stopped.");
                     executor.shutdownNow();
                     break;
                 }
                 else if ((Context.now() - startTime > maxRunTimeInSeconds)) {
-                    logger.debug("Max run time reached. Stopping consumer.");
+                    logger.info("Max run time reached. Stopping consumer.");
                     executor.shutdownNow();
                     break;
                 }else if(firstRecordRead.get() && parallelConsumer.workRemaining() == 0){
                     int timeConsumed = Context.now() - startTime;
                     int timeLeft = Math.min(Math.abs(maxRunTimeInSeconds - timeConsumed), maxRunTimeForTests);
-                    logger.debug("Records are empty now, thus executing final tests");
+                    logger.info("Records are empty now, thus executing final tests");
                     executor.shutdown();
                     executor.awaitTermination(timeLeft, TimeUnit.SECONDS);
                     break;
@@ -216,9 +221,9 @@ public class ConsumerUtil {
             }
 
         } catch (Exception e) {
-            logger.debug("Error in polling records");
+            logger.error("Error in polling records");
         }finally{
-            logger.debug("Closing consumer as all results have been executed.");
+            logger.info("Closing consumer as all results have been executed.");
             parallelConsumer.closeDrainFirst();
             parallelConsumer = null;
             consumer.close();

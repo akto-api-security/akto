@@ -162,6 +162,7 @@ function RepositoryInitializer({ agentType }: { agentType: string }) {
         await agentApi.createAgentRun({ 
             agent: agentType, 
             data,
+            githubAccessToken: accessToken,
             modelName: selectedModel?.id
          });
         func.setToast(true, false, "Starting agent");

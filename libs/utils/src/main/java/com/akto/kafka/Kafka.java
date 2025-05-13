@@ -71,7 +71,7 @@ public class Kafka {
       if (e != null) {
         logger.error("onCompletion error: " + e.getMessage());
       } else {
-        logger.info(message + " sent to topic " + topic + " with offset " + recordMetadata.offset());
+        logger.debug(message + " sent to topic " + topic + " with offset " + recordMetadata.offset());
         // decrement the counter if message sent successfully
         counter.decrementAndGet();
       }

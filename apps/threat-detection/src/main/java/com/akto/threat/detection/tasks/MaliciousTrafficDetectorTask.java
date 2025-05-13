@@ -44,6 +44,7 @@ import com.akto.proto.generated.threat_detection.message.malicious_event.v1.Mali
 import com.akto.proto.generated.threat_detection.message.sample_request.v1.Metadata;
 import com.akto.proto.generated.threat_detection.message.sample_request.v1.SampleMaliciousRequest;
 import com.akto.proto.generated.threat_detection.message.sample_request.v1.SampleRequestKafkaEnvelope;
+import com.akto.proto.generated.threat_detection.message.sample_request.v1.SchemaConformanceError;
 import com.akto.proto.http_response_param.v1.HttpResponseParam;
 import com.akto.rules.TestPlugin;
 import com.akto.test_editor.filter.data_operands_impl.ValidationResult;
@@ -55,10 +56,15 @@ import com.akto.threat.detection.constants.RedisKeyInfo;
 import com.akto.threat.detection.kafka.KafkaProtoProducer;
 import com.akto.threat.detection.smart_event_detector.window_based.WindowBasedThresholdNotifier;
 import com.akto.threat.detection.utils.Utils;
+import com.akto.util.Constants;
 import com.akto.util.HttpRequestResponseUtils;
+import com.akto.utils.GzipUtils;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import io.lettuce.core.RedisClient;
+import io.lettuce.core.api.StatefulRedisConnection;
+
+
 
 /*
 Class is responsible for consuming traffic data from the Kafka topic.
@@ -88,6 +94,8 @@ public class MaliciousTrafficDetectorTask implements Task {
   private static Map<String, Object> varMap = new HashMap<>();
   private static Supplier<String> lazyToString;
 
+  private final StatefulRedisConnection<String, String> apiCache;
+
   public MaliciousTrafficDetectorTask(
       KafkaConfig trafficConfig, KafkaConfig internalConfig, RedisClient redisClient) throws Exception {
     this.kafkaConfig = trafficConfig;
@@ -110,6 +118,8 @@ public class MaliciousTrafficDetectorTask implements Task {
     this.kafkaConsumer = new KafkaConsumer<>(properties);
 
     this.httpCallParser = new HttpCallParser(120, 1000);
+    this.apiCache = redisClient.connect();
+    
 
     this.windowBasedThresholdNotifier =
         new WindowBasedThresholdNotifier(
@@ -188,6 +198,35 @@ public class MaliciousTrafficDetectorTask implements Task {
     return false;
   }
 
+  private String getApiSchema(int apiCollectionId) {
+    String apiSchema = null;
+    try {
+      apiSchema = this.apiCache.sync().get(Constants.AKTO_THREAT_DETECTION_CACHE_PREFIX + apiCollectionId);
+
+      if (apiSchema != null && !apiSchema.isEmpty()) {
+        apiSchema = GzipUtils.unzipString(apiSchema);
+
+        return apiSchema;
+      }
+
+      apiSchema = dataActor.fetchOpenApiSchema(apiCollectionId);
+
+      if (apiSchema == null || apiSchema.isEmpty()) {
+        logger.warnAndAddToDb("No schema found for api collection id: "+ apiCollectionId);
+
+        return null;
+      }
+      this.apiCache.sync().setex(Constants.AKTO_THREAT_DETECTION_CACHE_PREFIX + apiCollectionId, Constants.ONE_DAY_TIMESTAMP, apiSchema);
+      // unzip this schema using gzip
+      apiSchema = GzipUtils.unzipString(apiSchema);
+    } catch (Exception e) {
+      logger.errorAndAddToDb(e, "Error while fetching api schema for collectionId: "+ apiCollectionId);
+    }
+    return apiSchema;
+  }
+
+
+
   private void processRecord(HttpResponseParam record) throws Exception {
     HttpResponseParams responseParam = buildHttpResponseParam(record);
     String actor = SourceIPActorGenerator.instance.generate(responseParam).orElse("");
@@ -223,9 +262,29 @@ public class MaliciousTrafficDetectorTask implements Task {
         this.apiCountWindowBasedThresholdNotifier.incrementApiHitcount(apiHitCountKey, responseParam.getTime(), RedisKeyInfo.API_COUNTER_SORTED_SET);
     }
     
+    List<SchemaConformanceError> errors = null; 
     for (FilterConfig apiFilter : apiFilters.values()) {
-      logger.debugAndAddToDb("Evaluating filter condition for url " + apiInfoKey.getUrl() + " filterId " + apiFilter.getId());
-      boolean hasPassedFilter = validateFilterForRequest(apiFilter, rawApi, apiInfoKey);
+      boolean hasPassedFilter = false; 
+
+      logger.debug("Evaluating filter condition for url " + apiInfoKey.getUrl() + " filterId " + apiFilter.getId());
+
+      if(apiFilter.getInfo().getCategory().getName().equalsIgnoreCase("SchemaConform")) {
+        logger.debug("SchemaConform filter found for url {} filterId {}", apiInfoKey.getUrl(), apiFilter.getId());
+        String apiSchema = getApiSchema(apiCollectionId);
+        
+        if (apiSchema == null || apiSchema.isEmpty()) {
+
+          continue;
+
+        }
+
+        errors = RequestValidator.validate(responseParam, apiSchema, apiInfoKey.toString());
+        hasPassedFilter = errors != null && !errors.isEmpty();
+
+      }else {
+
+        hasPassedFilter = validateFilterForRequest(apiFilter, rawApi, apiInfoKey);
+      }
 
       // If a request passes any of the filter, then it's a malicious request,
       // and so we push it to kafka
@@ -250,7 +309,7 @@ public class MaliciousTrafficDetectorTask implements Task {
 
         SampleMaliciousRequest maliciousReq = null;
         if (!isAggFilter || !apiFilter.getInfo().getSubCategory().equalsIgnoreCase("API_LEVEL_RATE_LIMITING")) {
-          maliciousReq = Utils.buildSampleMaliciousRequest(actor, responseParam, apiFilter, metadata);
+          maliciousReq = Utils.buildSampleMaliciousRequest(actor, responseParam, apiFilter, metadata, errors);
         }
 
         if (maliciousReq != null) {
@@ -277,7 +336,7 @@ public class MaliciousTrafficDetectorTask implements Task {
               }
               shouldNotify = this.apiCountWindowBasedThresholdNotifier.calcApiCount(apiHitCountKey, responseParam.getTime(), rule);
               if (shouldNotify) {
-                maliciousReq = Utils.buildSampleMaliciousRequest(actor, responseParam, apiFilter, metadata);
+                maliciousReq = Utils.buildSampleMaliciousRequest(actor, responseParam, apiFilter, metadata, errors);
                 maliciousMessages.add(
                   SampleRequestKafkaEnvelope.newBuilder()
                       .setActor(actor)

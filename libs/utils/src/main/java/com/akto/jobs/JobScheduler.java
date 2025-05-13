@@ -9,6 +9,8 @@ import com.akto.dto.jobs.JobStatus;
 import com.akto.dto.jobs.ScheduleType;
 import com.akto.log.LoggerMaker;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.FindOneAndUpdateOptions;
+import com.mongodb.client.model.ReturnDocument;
 import com.mongodb.client.model.Updates;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
@@ -49,7 +51,7 @@ public final class JobScheduler {
                 JobStatus.SCHEDULED,
                 params,
                 jobExecutorType,
-                now,
+                now + recurringIntervalSeconds,
                 0,
                 0,
                 0,
@@ -72,18 +74,18 @@ public final class JobScheduler {
             Updates.set(Job.JOB_STATUS, JobStatus.STOPPED.name()),
             Updates.set(Job.LAST_UPDATED_AT, Context.now())
         );
-        JobsDao.instance.updateOne(query, update);
+        JobsDao.instance.getMCollection().updateOne(query, update);
     }
 
-    public static void restartJob(ObjectId jobId) {
+    public static Job restartJob(ObjectId jobId) {
         int now = Context.now();
         Bson query = Filters.eq(Job.ID, jobId);
         Bson update = Updates.combine(
             Updates.set(Job.JOB_STATUS, JobStatus.SCHEDULED.name()),
-            Updates.set(Job.SCHEDULED_AT, now),
             Updates.set(Job.LAST_UPDATED_AT, now)
         );
 
-        JobsDao.instance.updateOne(query, update);
+        return JobsDao.instance.getMCollection().findOneAndUpdate(query, update,
+            new FindOneAndUpdateOptions().returnDocument(ReturnDocument.AFTER));
     }
 }

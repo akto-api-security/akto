@@ -1379,4 +1379,30 @@ public class ClientActor extends DataActor {
             loggerMaker.errorAndAddToDb("error updating heartbeat for :" + moduleInfo.getModuleType().name(), LoggerMaker.LogDb.RUNTIME);
         }
     }
+
+    public String fetchOpenApiSchema(int apiCollectionId) {
+        Map<String, List<String>> headers = buildHeaders();
+        BasicDBObject obj = new BasicDBObject();
+        obj.put("apiCollectionId", apiCollectionId);
+        String openApiSchema = null;
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/fetchOpenApiSchema", "", "POST", obj.toString(), headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb("non 2xx response in fetchOpenApiSchema", LoggerMaker.LogDb.RUNTIME);
+                return null;
+            }
+            BasicDBObject payloadObj;
+            try {
+                payloadObj =  BasicDBObject.parse(responsePayload);
+                openApiSchema = payloadObj.get("openApiSchema").toString();
+            } catch(Exception e) {
+                return openApiSchema;
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in fetchOpenApiSchema" + e, LoggerMaker.LogDb.RUNTIME);
+        }
+        return openApiSchema;
+    }
 }

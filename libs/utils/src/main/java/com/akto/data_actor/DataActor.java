@@ -98,4 +98,6 @@ public abstract class DataActor {
 
     public abstract void bulkInsertApiHitCount(List<ApiHitCountInfo> apiHitCountInfoList) throws Exception;
     public abstract void updateModuleInfo(ModuleInfo moduleInfo);
+
+    public abstract String fetchOpenApiSchema(int apiCollectionId);
 }

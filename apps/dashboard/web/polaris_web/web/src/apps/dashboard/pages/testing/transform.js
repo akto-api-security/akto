@@ -1123,9 +1123,7 @@ getActions(item){
   if(item.orderPriority === 1){
     actionsList[1].disabled = true
   }
-  if(item['run_type'] === 'One-time' || item['run_type'] === 'CI/CD'){
-    section1.items.push(actionsList[1])
-  }
+  section1.items.push(actionsList[1])
   if(item['run_type'] !== 'CI/CD'){
     section1.items.push(actionsList[2])
   }

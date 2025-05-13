@@ -103,7 +103,6 @@ public class Main {
         apiCountInfoRelayCron.relayApiCountInfo();
     } catch (Exception e) {
         logger.error("Error scheduling relayApiCountInfoCron : {} ", e);
-        System.out.println(e);
     }
   }
 

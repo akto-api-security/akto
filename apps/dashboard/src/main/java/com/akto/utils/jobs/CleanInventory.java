@@ -1,8 +1,5 @@
 package com.akto.utils.jobs;
 
-import java.io.BufferedWriter;
-import java.io.File;
-import java.io.FileWriter;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -19,12 +16,8 @@ import java.util.function.Function;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
-import com.akto.dto.CodeAnalysisRepo;
 import com.mongodb.client.model.Updates;
 import org.bson.conversions.Bson;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import com.akto.dao.ApiInfoDao;
 import com.akto.dao.SampleDataDao;
 import com.akto.dao.SensitiveSampleDataDao;
@@ -124,7 +117,7 @@ public class CleanInventory {
         int diff = now2 - now;
 
         if (diff >= 2) {
-            logger.debugAndAddToDb(String.format("cleanInventoryJob finished, time taken: %d ", diff));
+            logger.infoAndAddToDb(String.format("cleanInventoryJob finished, time taken: %d ", diff));
         }
 
     }
@@ -143,7 +136,7 @@ public class CleanInventory {
 
             try {
                 Utils.pushDataToKafka(allSamples.get(0).getId().getApiCollectionId(), "", messages, new ArrayList<>(), true, false);
-                logger.debugAndAddToDb("Successfully moved APIs.");
+                logger.infoAndAddToDb("Successfully moved APIs.");
             } catch (Exception e) {
                 logger.errorAndAddToDb("Error during move APIs: " + e.getMessage());
                 e.printStackTrace();
@@ -227,7 +220,7 @@ public class CleanInventory {
                         // any 1 of the sample is modifiable, we print this block
                         toMove.add(sampleData.getId());
                         if(saveLogsToDB){
-                            logger.debugAndAddToDb("Filter passed, modify sample data of API: " + sampleData.getId(), LogDb.DASHBOARD);
+                            logger.infoAndAddToDb("Filter passed, modify sample data of API: " + sampleData.getId(), LogDb.DASHBOARD);
                         }else{
                             logger.debug("[BadApisUpdater] Updating bad from template API: " + sampleData.getId(), LogDb.DASHBOARD);
                         }
@@ -239,7 +232,7 @@ public class CleanInventory {
                             collectionWiseDeletionCountMap.put(sampleData.getId().getApiCollectionId(),initialCount + 1);
                             toBeDeleted.add(sampleData.getId());
                             if(saveLogsToDB){
-                                logger.debugAndAddToDb(
+                                logger.infoAndAddToDb(
                                         "Filter passed, deleting bad api found from filter: " + sampleData.getId(), LogDb.DASHBOARD
                                 );
                             }else{
@@ -252,7 +245,7 @@ public class CleanInventory {
                                     SampleDataDao.instance.updateOneNoUpsert(Filters.eq("_id",sampleData.getId()), Updates.set(SampleData.SAMPLES,remainingSamples));
                                 }
                                 if(saveLogsToDB){
-                                    logger.debugAndAddToDb(
+                                    logger.infoAndAddToDb(
                                             "Deleting bad samples from sample data " + sampleData.getId(), LogDb.DASHBOARD
                                     );
                                 }else{
@@ -263,7 +256,7 @@ public class CleanInventory {
                     } else {
                         // other cases like: => filter from advanced filter is passed || filter from block filter fails
                         if(saveLogsToDB){
-                            logger.debugAndAddToDb(
+                            logger.infoAndAddToDb(
                                 "Filter did not pass, keeping api found from filter: " + sampleData.getId(), LogDb.DASHBOARD
                             );
                         }else{
@@ -295,7 +288,7 @@ public class CleanInventory {
             String name = apiCollectionMap.get(collId).getDisplayName();
 
             if(saveLogsToDB){
-                logger.debugAndAddToDb("Total apis deleted from collection: " + name + " are: " + deletionCount, LogDb.DASHBOARD);
+                logger.infoAndAddToDb("Total apis deleted from collection: " + name + " are: " + deletionCount, LogDb.DASHBOARD);
             }
         }
 
