@@ -10,7 +10,6 @@ public class MetricData {
     private float value;
     private String orgId;
     private String instanceId;
-    private int accountId;
     private int timestamp;
 
     public MetricData() {
@@ -62,14 +61,6 @@ public class MetricData {
 
     public void setInstanceId(String instanceId) {
         this.instanceId = instanceId;
-    }
-
-    public int getAccountId() {
-        return accountId;
-    }
-
-    public void setAccountId(int accountId) {
-        this.accountId = accountId;
     }
 
     public int getTimestamp() {
