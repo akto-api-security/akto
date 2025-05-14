@@ -79,6 +79,8 @@ public class TelemetryJob {
         switch (dbName){
             case DASHBOARD:
                 return DashboardLogsDao.instance;
+            case DATA_INGESTION:
+                return DataInjectionLogsDao.instance;
             case RUNTIME:
                 return RuntimeLogsDao.instance;
             case ANALYSER:

@@ -3,32 +3,12 @@ package com.akto.data_actor;
 import java.util.*;
 
 import com.akto.bulk_update_util.ApiInfoBulkUpdate;
+import com.akto.dao.*;
 import com.akto.dao.filter.MergedUrlsDao;
 import com.akto.dto.filter.MergedUrls;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 
-import com.akto.dao.APIConfigsDao;
-import com.akto.dao.AccountSettingsDao;
-import com.akto.dao.AccountsDao;
-import com.akto.dao.AktoDataTypeDao;
-import com.akto.dao.AnalyserLogsDao;
-import com.akto.dao.ApiCollectionsDao;
-import com.akto.dao.ApiInfoDao;
-import com.akto.dao.CustomAuthTypeDao;
-import com.akto.dao.CustomDataTypeDao;
-import com.akto.dao.LogsDao;
-import com.akto.dao.PupeteerLogsDao;
-import com.akto.dao.ProtectionLogsDao;
-import com.akto.dao.RuntimeFilterDao;
-import com.akto.dao.RuntimeLogsDao;
-import com.akto.dao.SampleDataDao;
-import com.akto.dao.SensitiveParamInfoDao;
-import com.akto.dao.SensitiveSampleDataDao;
-import com.akto.dao.SetupDao;
-import com.akto.dao.SingleTypeInfoDao;
-import com.akto.dao.SuspectSampleDataDao;
-import com.akto.dao.TrafficInfoDao;
 import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.file.FilesDao;
@@ -459,5 +439,9 @@ public class DbLayer {
         }
 
         return file.getCompressedContent();
+    }
+
+    public static void insertDataInjectionLog(Log log) {
+        DataInjectionLogsDao.instance.insertOne(log);
     }
 }

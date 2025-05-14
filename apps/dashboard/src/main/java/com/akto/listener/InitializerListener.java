@@ -76,6 +76,7 @@ import com.akto.dao.BillingLogsDao;
 import com.akto.dao.ConfigsDao;
 import com.akto.dao.CustomDataTypeDao;
 import com.akto.dao.DashboardLogsDao;
+import com.akto.dao.DataInjectionLogsDao;
 import com.akto.dao.DependencyFlowNodesDao;
 import com.akto.dao.DependencyNodeDao;
 import com.akto.dao.FilterSampleDataDao;
@@ -2574,6 +2575,7 @@ public class InitializerListener implements ServletContextListener {
         clear(LogsDao.instance, LogsDao.maxDocuments);
         clear(PupeteerLogsDao.instance, PupeteerLogsDao.maxDocuments);
         clear(DashboardLogsDao.instance, DashboardLogsDao.maxDocuments);
+        clear(DataInjectionLogsDao.instance, DataInjectionLogsDao.maxDocuments);
         clear(TrafficMetricsDao.instance, TrafficMetricsDao.maxDocuments);
         clear(AnalyserLogsDao.instance, AnalyserLogsDao.maxDocuments);
         clear(ActivitiesDao.instance, ActivitiesDao.maxDocuments);
