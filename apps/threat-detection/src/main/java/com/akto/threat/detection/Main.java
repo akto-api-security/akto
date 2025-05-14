@@ -1,6 +1,7 @@
 package com.akto.threat.detection;
 
 import com.akto.DaoInit;
+import com.akto.dao.context.Context;
 import com.akto.data_actor.DataActor;
 import com.akto.data_actor.DataActorFactory;
 import com.akto.dto.monitoring.ModuleInfo;
@@ -12,6 +13,7 @@ import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.metrics.ModuleInfoWorker;
 import com.akto.threat.detection.constants.KafkaTopic;
+import com.akto.threat.detection.crons.ApiCountInfoRelayCron;
 import com.akto.threat.detection.session_factory.SessionFactoryUtils;
 import com.akto.threat.detection.tasks.CleanupTask;
 import com.akto.threat.detection.tasks.FlushSampleDataTask;
@@ -42,6 +44,7 @@ public class Main {
         runMigrations();
         sessionFactory = SessionFactoryUtils.createFactory();
         localRedis = createLocalRedisClient();
+        triggerApiInfoRelayCron(localRedis);
     }
 
     KafkaConfig trafficKafka =
@@ -87,6 +90,20 @@ public class Main {
     new SendMaliciousEventsToBackend(
             sessionFactory, internalKafka, KafkaTopic.ThreatDetection.ALERTS)
         .run();
+
+  }
+
+  public static void triggerApiInfoRelayCron(RedisClient localRedis) {
+    if (localRedis == null) {
+        return;
+    }
+    ApiCountInfoRelayCron apiCountInfoRelayCron = new ApiCountInfoRelayCron(localRedis);
+    try {
+        logger.info("Scheduling relayApiCountInfoCron at " + Context.now());
+        apiCountInfoRelayCron.relayApiCountInfo();
+    } catch (Exception e) {
+        logger.error("Error scheduling relayApiCountInfoCron : {} ", e);
+    }
   }
 
   public static RedisClient createLocalRedisClient() {

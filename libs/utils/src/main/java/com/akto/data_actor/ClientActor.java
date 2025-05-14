@@ -23,6 +23,7 @@ import com.akto.dto.runtime_filters.FieldExistsFilter;
 import com.akto.dto.runtime_filters.ResponseCodeRuntimeFilter;
 import com.akto.dto.runtime_filters.RuntimeFilter;
 import com.akto.dto.test_editor.YamlTemplate;
+import com.akto.dto.threat_detection.ApiHitCountInfo;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
@@ -56,6 +57,7 @@ public class ClientActor extends DataActor {
     private static ExecutorService threadPool = Executors.newFixedThreadPool(maxConcurrentBatchWrites);
     private static ExecutorService logThreadPool = Executors.newFixedThreadPool(50);
     private static AccountSettings accSettings;
+    private static final LoggerMaker logger = new LoggerMaker(ClientActor.class);
     
     ObjectMapper objectMapper = new ObjectMapper().configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false).configure(DeserializationFeature.FAIL_ON_INVALID_SUBTYPE, false).configure(DeserializationFeature.FAIL_ON_IGNORED_PROPERTIES, false);
 
@@ -1340,6 +1342,25 @@ public class ClientActor extends DataActor {
         }
 
         return new HashSet<>(respList);
+    }
+
+    public void bulkInsertApiHitCount(List<ApiHitCountInfo> payload) throws Exception {
+        BasicDBObject obj = new BasicDBObject();
+        obj.put("apiHitCountInfoList", payload);
+        String objString = gson.toJson(obj);
+        Map<String, List<String>> headers = buildHeaders();
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/bulkinsertApiHitCount", "", "POST", objString, headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+            if (response.getStatusCode() != 200) {
+                logger.error("non 2xx response in bulkInsertApiHitCount");
+                return;
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+            logger.error("error in bulkInsertApiHitCount {}", e.getMessage());
+            throw e;
+        }
     }
 
     public void updateModuleInfo(ModuleInfo moduleInfo) {

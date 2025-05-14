@@ -5,10 +5,12 @@ import com.akto.proto.generated.threat_detection.message.sample_request.v1.Sampl
 import com.akto.threat.detection.cache.CounterCache;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 public class WindowBasedThresholdNotifier {
 
   private final Config config;
+  private static List<String> keys = new ArrayList<>();
 
   public static class Config {
     private final int threshold;
@@ -56,7 +58,7 @@ public class WindowBasedThresholdNotifier {
     this.config = config;
   }
 
-  public Result shouldNotify(String aggKey, SampleMaliciousRequest maliciousEvent, Rule rule) {
+  public boolean shouldNotify(String aggKey, SampleMaliciousRequest maliciousEvent, Rule rule) {
     int binId = (int) maliciousEvent.getTimestamp() / 60;
     String cacheKey = aggKey + "|" + binId;
     this.cache.increment(cacheKey);
@@ -73,7 +75,7 @@ public class WindowBasedThresholdNotifier {
       this.cache.reset(cacheKey);
     }
 
-    return new Result(thresholdBreached);
+    return thresholdBreached;
   }
 
   public List<Bin> getBins(String aggKey, int binStart, int binEnd) {
@@ -87,4 +89,32 @@ public class WindowBasedThresholdNotifier {
     }
     return binData;
   }
+
+  public void incrementApiHitcount(String key, int ts, String sortedSetKey) {
+    if (this.cache == null) {
+        return;
+    }
+    int binId = (int) ts / 60;
+    String cachekey = key + "|" + binId;
+    this.cache.increment(cachekey);
+    this.cache.addToSortedSet(sortedSetKey, cachekey, binId);
+  }
+
+
+  public boolean calcApiCount(String aggKey, int timestamp, Rule rule) {
+      int binId = timestamp/60;
+      int startBinId = binId - rule.getCondition().getWindowThreshold() + 1;
+      String cacheKey;
+      keys.clear();
+      for (int i = startBinId; i <= binId; i++) {
+        cacheKey = aggKey + "|" + i;
+        keys.add(cacheKey);
+      }
+      Map<String, Long> keyValData = this.cache.mget(keys.toArray(new String[0]));
+      long windowCount = keyValData.values().stream().mapToLong(Long::longValue).sum();
+
+      boolean thresholdBreached = windowCount >= rule.getCondition().getMatchCount();
+      return thresholdBreached;
+  }
+
 }

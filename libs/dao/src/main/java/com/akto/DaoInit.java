@@ -51,6 +51,7 @@ import com.akto.dto.testing.info.TestInfo;
 import com.akto.dto.testing.sources.TestSourceConfig;
 import com.akto.dto.third_party_access.Credential;
 import com.akto.dto.third_party_access.ThirdPartyAccess;
+import com.akto.dto.threat_detection.ApiHitCountInfo;
 import com.akto.dto.traffic_metrics.TrafficAlerts;
 import com.akto.dto.traffic_metrics.RuntimeMetrics;
 import com.akto.dto.traffic_metrics.TrafficMetrics;
@@ -294,6 +295,7 @@ public class DaoInit {
         ClassModel<Model> agentModel = ClassModel.builder(Model.class).enableDiscriminator(true).build();
         ClassModel<ModuleInfo> ModuleInfoClassModel = ClassModel.builder(ModuleInfo.class).enableDiscriminator(true).build();
         ClassModel<TLSAuthParam> tlsAuthClassModel = ClassModel.builder(TLSAuthParam.class).enableDiscriminator(true).build();
+        ClassModel<ApiHitCountInfo> apiHitCountInfoClassModel = ClassModel.builder(ApiHitCountInfo.class).enableDiscriminator(true).build();
         ClassModel<BidirectionalSyncSettings> testingIssueTicketsModel = ClassModel.builder(BidirectionalSyncSettings.class).enableDiscriminator(true).build();
         ClassModel<TicketSyncJobParams> ticketSyncJobParamsClassModel = ClassModel.builder(TicketSyncJobParams.class).enableDiscriminator(true).build();
 
@@ -338,7 +340,7 @@ public class DaoInit {
                 RuntimeMetricsClassModel, codeAnalysisRepoModel, codeAnalysisApiModel, historicalDataClassModel,
                 configSettingClassModel, configSettingsConditionTypeClassModel, roleClassModel, testingInstanceHeartBeat,
                 jobParams, autoTicketParams, agentModel, ModuleInfoClassModel, testingIssueTicketsModel, tlsAuthClassModel,
-                ticketSyncJobParamsClassModel)
+                ticketSyncJobParamsClassModel, apiHitCountInfoClassModel)
             .automatic(true).build());
 
         final CodecRegistry customEnumCodecs = CodecRegistries.fromCodecs(
