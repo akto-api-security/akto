@@ -16,6 +16,8 @@ import com.akto.testing_db_layer_client.ClientLayer;
 
 import java.util.*;
 
+import org.checkerframework.checker.units.qual.s;
+
 public class SampleMessageStore {
 
 
@@ -72,17 +74,13 @@ public class SampleMessageStore {
 
     public void fetchSampleMessages(List<ApiInfo.ApiInfoKey> apiInfoKeyList){
         List<SampleData> sampleDataList = new ArrayList<>();
-        List<ApiInfo.ApiInfoKey> subList =  new ArrayList<>();
-        List<SampleData> sampleDataBatch = new ArrayList<>();
         for(int i = 0 ; i < apiInfoKeyList.size(); i += DbLayer.SAMPLE_DATA_LIMIT){
-            subList = apiInfoKeyList.subList(i, Math.min(i + DbLayer.SAMPLE_DATA_LIMIT, apiInfoKeyList.size()));  
-            sampleDataBatch = dataActor.fetchSampleDataForEndpoints(subList);
+            List<ApiInfoKey> subList = new ArrayList<>(apiInfoKeyList.subList(i, Math.min(i + DbLayer.SAMPLE_DATA_LIMIT, apiInfoKeyList.size())));  
+            List<SampleData> sampleDataBatch = dataActor.fetchSampleDataForEndpoints(subList);
             if (sampleDataBatch == null || sampleDataBatch.isEmpty()) {
                 break;
             }
             sampleDataList.addAll(sampleDataBatch);
-            sampleDataBatch.clear();
-            subList.clear();
         }
         fillSampleDataMap(sampleDataList);
     }

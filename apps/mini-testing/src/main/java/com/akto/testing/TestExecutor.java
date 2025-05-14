@@ -84,7 +84,7 @@ public class TestExecutor {
         } else {
             workflowInit(testingRun, summaryId, false, new ArrayList<>());
         }
-    }
+    } 
 
     public void workflowInit (TestingRun testingRun, ObjectId summaryId, boolean debug, List<TestingRunResult.TestLog> testLogs) {
         TestingEndpoints testingEndpoints = testingRun.getTestingEndpoints();
@@ -168,18 +168,14 @@ public class TestExecutor {
         
         List<YamlTemplate> yamlTemplates = new ArrayList<>();
         final int TEST_LIMIT = 50;
-        // fetch only those active templates which are used in the test run
-        List<String> subCategories = new ArrayList<>();
-        List<YamlTemplate> yamlTemplatesTemp = new ArrayList<>();
+        List<YamlTemplate> yamlTemplatesTemp;
         for(int i = 0; i < testingRunSubCategories.size(); i += TEST_LIMIT) {
             int end = Math.min(i + TEST_LIMIT, testingRunSubCategories.size());
-            subCategories = testingRunSubCategories.subList(i, end);
+            List<String> subCategories = new ArrayList<>(testingRunSubCategories.subList(i, end)); // Make a copy
             yamlTemplatesTemp = dataActor.fetchYamlTemplatesWithIds(subCategories, true);
             if (yamlTemplatesTemp != null) {
                 yamlTemplates.addAll(yamlTemplatesTemp);
-                yamlTemplatesTemp.clear();
             }
-            subCategories.clear();
         }
 
         Map<String, TestConfig> testConfigMap = YamlTemplateDao.instance.fetchTestConfigMap(false, false, yamlTemplates);
@@ -227,7 +223,7 @@ public class TestExecutor {
         VariableResolver.clearSampleDataCache();
 
         if(!shouldInitOnly){
-            int maxThreads = Math.min(testingRunSubCategories.size(), 1000);
+            int maxThreads = Math.min(yamlTemplates.size(), 1000);
             if(maxThreads == 0){
                 loggerMaker.infoAndAddToDb("Subcategories list are empty");
                 return;
@@ -274,6 +270,10 @@ public class TestExecutor {
                         String key = apiInfoKey.getMethod() + "_" + apiInfoKey.getUrl();
                         OriginalReqResPayloadInformation.getInstance().getOriginalReqPayloadMap().put(key, originalRequestPayload);
                     }
+                }
+                RawApi rawApi = RawApi.buildFromMessage(sample);
+                if(rawApi != null){
+                    TestingConfigurations.getInstance().getRawApiMap().put(apiInfoKey, rawApi);
                 }
                 if(Constants.IS_NEW_TESTING_ENABLED){
                     for (String testSubCategory: testingRunSubCategories) {
@@ -351,13 +351,20 @@ public class TestExecutor {
     public static OriginalHttpRequest findOriginalHttpRequest(ApiInfo.ApiInfoKey apiInfoKey, Map<ApiInfo.ApiInfoKey, List<String>> sampleMessagesMap, SampleMessageStore sampleMessageStore){
         List<String> sampleMessages = sampleMessagesMap.get(apiInfoKey);
         if (sampleMessages == null || sampleMessagesMap.isEmpty()) return null;
-
-        loggerMaker.infoAndAddToDb("Starting to find host for apiInfoKey: " + apiInfoKey.toString());
-
-        List<RawApi> messages = sampleMessageStore.fetchAllOriginalMessages(apiInfoKey);
-        if (messages.isEmpty()) return null;
-
-        return messages.get(0).getRequest();
+        String message = sampleMessages.get(sampleMessages.size() - 1);
+        if(shouldCallClientLayerForSampleData){
+            try {
+                message = clientLayer.fetchLatestSample(apiInfoKey);
+            } catch (Exception e) {
+                return null;
+            }
+            if (message == null) {
+                return null;
+            }
+        }
+        OriginalHttpRequest originalHttpRequest = new OriginalHttpRequest();
+        originalHttpRequest.buildFromSampleMessage(message);
+        return originalHttpRequest;
     }
 
     public static String findHostFromOriginalHttpRequest(OriginalHttpRequest originalHttpRequest)
@@ -705,20 +712,23 @@ public class TestExecutor {
             return true;
         }
 
-        String host;
-        host = apiInfoKeyToHostMap.get(apiInfoKey);
-        if (host != null) {
-            String val = subCategoryEndpointMap.remove(apiInfoKey.getApiCollectionId() + "_" + testSubCategory);
-            return val != null;
+        String val = subCategoryEndpointMap.get(apiInfoKey.getApiCollectionId() + "_" + testSubCategory);
+        if (val == null) {
+            subCategoryEndpointMap.put(apiInfoKey.getApiCollectionId() + "_" + testSubCategory, "true");
+            return true;
         }
-        return true;
+        return false;
     }
 
     //Set<Integer> deactivatedCollections = UsageMetricCalculator.getDeactivated();
 
     public TestingRunResult runTestNew(ApiInfo.ApiInfoKey apiInfoKey, ObjectId testRunId, TestingUtil testingUtil,
         ObjectId testRunResultSummaryId, TestConfig testConfig, TestingRunConfig testingRunConfig, boolean debug, List<TestingRunResult.TestLog> testLogs, String message) {
-            RawApi rawApi = RawApi.buildFromMessage(message);
+            RawApi rawApi = TestingConfigurations.getInstance().getRawApiMap().get(apiInfoKey);
+            if (rawApi == null) {
+                rawApi = RawApi.buildFromMessage(message);
+                TestingConfigurations.getInstance().getRawApiMap().put(apiInfoKey, rawApi);
+            }
             TestRoles attackerTestRole = Executor.fetchOrFindAttackerRole();
             AuthMechanism attackerAuthMechanism = null;
             if (attackerTestRole == null) {

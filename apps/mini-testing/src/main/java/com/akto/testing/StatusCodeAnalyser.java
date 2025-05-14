@@ -18,6 +18,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.util.*;
 
+
 import static com.akto.runtime.RelationshipSync.extractAllValuesFromPayload;
 
 public class StatusCodeAnalyser {
@@ -66,9 +67,9 @@ public class StatusCodeAnalyser {
             String host;
             String contentType;
             try {
-                loggerMaker.infoAndAddToDb("Finding host for apiInfoKey: " + apiInfoKey.toString());
                 OriginalHttpRequest request = TestExecutor.findOriginalHttpRequest(apiInfoKey, sampleDataMap, sampleMessageStore);
                 host = TestExecutor.findHostFromOriginalHttpRequest(request);
+                if(hostAndContentType.containsKey(host)) continue;
                 contentType = TestExecutor.findContentTypeFromOriginalHttpRequest(request);
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb("Error while finding host in status code analyser: " + e, LogDb.TESTING);
@@ -84,7 +85,7 @@ public class StatusCodeAnalyser {
     public static void calculateDefaultPayloads(SampleMessageStore sampleMessageStore, Map<ApiInfo.ApiInfoKey, List<String>> sampleDataMap, TestingRunConfig testingRunConfig, Map<String, String> hostAndContentType) {
         for (String host: hostAndContentType.keySet()) {
             loggerMaker.infoAndAddToDb("calc default payload for host: " + host, LogDb.TESTING);
-            for (int idx=0; idx<11;idx++) {
+            for (int idx=0; idx<5;idx++) {
                 try {
                     String url = host;
                     if (!url.endsWith("/")) url += "/";
