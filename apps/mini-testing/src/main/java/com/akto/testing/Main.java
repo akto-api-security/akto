@@ -68,6 +68,11 @@ public class Main {
 
     public static boolean SKIP_SSRF_CHECK = ("true".equalsIgnoreCase(System.getenv("SKIP_SSRF_CHECK")) || !DashboardMode.isSaasDeployment());
     public static final boolean IS_SAAS = "true".equalsIgnoreCase(System.getenv("IS_SAAS"));
+    
+    public static final String customMiniTestingServiceName;
+    static {
+        customMiniTestingServiceName = System.getenv("MINI_TESTING_NAME") == null? "Default_" + UUID.randomUUID().toString().substring(0, 4) : System.getenv("MINI_TESTING_NAME");
+    }
 
     private static void setupRateLimitWatcher (AccountSettings settings) {
         
@@ -87,56 +92,89 @@ public class Main {
 
     public static void checkForPlaygroundTest(){
         scheduler.scheduleWithFixedDelay(new Runnable() {
-            private final int timestamp = Context.now()-5*60;
             public void run() {
-                TestExecutor executor = new TestExecutor();
+                int timestamp = Context.now()-5*60;
                 TestingRunPlayground testingRunPlayground =  dataActor.getCurrentTestingRunDetailsFromEditor(timestamp); // fetch from Db
-                TestConfig testConfig = null;
-                try {
-                    testConfig = TestConfigYamlParser.parseTemplate(testingRunPlayground.getTestTemplate());
-                } catch (Exception e) {
-                    return ;
+                
+                if (testingRunPlayground == null) {
+                    return;
                 }
-                ApiInfo.ApiInfoKey infoKey = testingRunPlayground.getApiInfoKey();
 
-                List<String> sampleData = testingRunPlayground.getSamples(); // get sample data from DB
-
-                List<TestingRunResult.TestLog> testLogs = new ArrayList<>();
-                Map<ApiInfo.ApiInfoKey, List<String>> sampleDataMap = new HashMap<>();
-                sampleDataMap.put(infoKey, sampleData); // get sample list from DB
-                SampleMessageStore messageStore = SampleMessageStore.create(sampleDataMap);
-
-                List<CustomAuthType> customAuthTypes = dataActor.fetchCustomAuthTypes();
-
-                TestingUtil testingUtil = new TestingUtil(messageStore, null, null, customAuthTypes);
-                String message = messageStore.getSampleDataMap().get(infoKey).get(messageStore.getSampleDataMap().get(infoKey).size() - 1);
-                TestingRunResult testingRunResult = executor.runTestNew(infoKey, null, testingUtil, null, testConfig, null, true, testLogs, message);
-                testingRunResult.setId(testingRunPlayground.getId());
-                testingRunResult.setTestRunId(testingRunPlayground.getId());
-                testingRunResult.setTestRunResultSummaryId(testingRunPlayground.getId());
-
-                GenericTestResult testRes = testingRunResult.getTestResults().get(0);
-                if (testRes instanceof TestResult) {
-                    List<TestResult> list = new ArrayList<>();
-                    for(GenericTestResult testResult: testingRunResult.getTestResults()){
-                        list.add((TestResult) testResult);
-                    }
-                    testingRunResult.setSingleTestResults(list);
-                } else {
-                    List<MultiExecTestResult> list = new ArrayList<>();
-                    for(GenericTestResult testResult: testingRunResult.getTestResults()){
-                        list.add((MultiExecTestResult) testResult);
-                    }
-                    testingRunResult.setMultiExecTestResults(list);
+                switch (testingRunPlayground.getTestingRunPlaygroundType()) {
+                    case TEST_EDITOR_PLAYGROUND:
+                        handleTestEditorPlayground(testingRunPlayground);
+                        break;
+                    case POSTMAN_IMPORTS:
+                        handlePostmanImports(testingRunPlayground);
+                        break;
                 }
-                testingRunResult.setTestResults(null);
-                testingRunResult.setTestLogs(null);
-                testingRunPlayground.setTestingRunResult(testingRunResult);
-                // update testingRunPlayground in DB
-                dataActor.updateTestingRunPlayground(testingRunPlayground);
             }
         }, 0, 2, TimeUnit.SECONDS);
+    }
 
+    private static void handleTestEditorPlayground(TestingRunPlayground testingRunPlayground) {
+        TestExecutor executor = new TestExecutor();
+        TestConfig testConfig = null;
+        try {
+            testConfig = TestConfigYamlParser.parseTemplate(testingRunPlayground.getTestTemplate());
+        } catch (Exception e) {
+            return;
+        }
+        ApiInfo.ApiInfoKey infoKey = testingRunPlayground.getApiInfoKey();
+
+        List<String> sampleData = testingRunPlayground.getSamples(); // get sample data from DB
+
+        List<TestingRunResult.TestLog> testLogs = new ArrayList<>();
+        Map<ApiInfo.ApiInfoKey, List<String>> sampleDataMap = new HashMap<>();
+        sampleDataMap.put(infoKey, sampleData); // get sample list from DB
+        SampleMessageStore messageStore = SampleMessageStore.create(sampleDataMap);
+
+        List<CustomAuthType> customAuthTypes = dataActor.fetchCustomAuthTypes();
+
+        TestingUtil testingUtil = new TestingUtil(messageStore, null, null, customAuthTypes);
+        String message = messageStore.getSampleDataMap().get(infoKey).get(messageStore.getSampleDataMap().get(infoKey).size() - 1);
+        TestingRunResult testingRunResult = executor.runTestNew(infoKey, null, testingUtil, null, testConfig, null, true, testLogs, message);
+        testingRunResult.setId(testingRunPlayground.getId());
+        testingRunResult.setTestRunId(testingRunPlayground.getId());
+        testingRunResult.setTestRunResultSummaryId(testingRunPlayground.getId());
+
+        GenericTestResult testRes = testingRunResult.getTestResults().get(0);
+        if (testRes instanceof TestResult) {
+            List<TestResult> list = new ArrayList<>();
+            for(GenericTestResult testResult: testingRunResult.getTestResults()){
+                list.add((TestResult) testResult);
+            }
+            testingRunResult.setSingleTestResults(list);
+        } else {
+            List<MultiExecTestResult> list = new ArrayList<>();
+            for(GenericTestResult testResult: testingRunResult.getTestResults()){
+                list.add((MultiExecTestResult) testResult);
+            }
+            testingRunResult.setMultiExecTestResults(list);
+        }
+        testingRunResult.setTestResults(null);
+        testingRunResult.setTestLogs(null);
+        testingRunPlayground.setTestingRunResult(testingRunResult);
+        // update testingRunPlayground in DB
+        dataActor.updateTestingRunPlayground(testingRunPlayground);
+    }
+
+    private static void handlePostmanImports(TestingRunPlayground testingRunPlayground) {
+        // For Postman imports, we use the original request/response directly
+        OriginalHttpRequest originalRequest = testingRunPlayground.getOriginalHttpRequest();
+
+        if (originalRequest == null) {
+            return;
+        }
+        OriginalHttpResponse res;
+        try {
+            res = ApiExecutor.sendRequest(originalRequest, true, null, false, new ArrayList<>());
+        } catch (Exception e) {
+            res = new OriginalHttpResponse();
+        }
+        testingRunPlayground.setOriginalHttpResponse(res);
+        // update testingRunPlayground in DB
+        dataActor.updateTestingRunPlayground(testingRunPlayground);
     }
 
     public static Set<Integer> extractApiCollectionIds(List<ApiInfo.ApiInfoKey> apiInfoKeyList) {
@@ -263,7 +301,7 @@ public class Main {
         Producer testingProducer = new Producer();
         ConsumerUtil testingConsumer = new ConsumerUtil();
         TestCompletion testCompletion = new TestCompletion();
-        ModuleInfoWorker.init(ModuleInfo.ModuleType.MINI_TESTING, dataActor);
+        ModuleInfoWorker.init(ModuleInfo.ModuleType.MINI_TESTING, dataActor, customMiniTestingServiceName);
         loggerMaker.infoAndAddToDb("Starting.......", LogDb.TESTING);
 
         if(Constants.IS_NEW_TESTING_ENABLED){
@@ -353,20 +391,22 @@ public class Main {
             long startDetailed = System.currentTimeMillis();
             int delta = start - 20*60;
 
-            TestingRunResultSummary trrs = dataActor.findPendingTestingRunResultSummary(start, delta);
+            TestingRunResultSummary trrs = dataActor.findPendingTestingRunResultSummary(start, delta, customMiniTestingServiceName);
             boolean isSummaryRunning = trrs != null && trrs.getState().equals(State.RUNNING);
             TestingRun testingRun;
             ObjectId summaryId = null;
             if (trrs == null) {
                 delta = Context.now() - 20*60;
-                testingRun = dataActor.findPendingTestingRun(delta);
+                testingRun = dataActor.findPendingTestingRun(delta, customMiniTestingServiceName);
             } else {
                 summaryId = trrs.getId();
                 loggerMaker.infoAndAddToDb("Found trrs " + trrs.getHexId() +  " for account: " + accountId);
                 testingRun = dataActor.findTestingRun(trrs.getTestingRunId().toHexString());
             }
 
-            if (testingRun == null) {
+            if (testingRun == null ||
+                    (testingRun.getMiniTestingServiceName() != null &&
+                            !testingRun.getMiniTestingServiceName().equalsIgnoreCase(customMiniTestingServiceName))) {
                 Thread.sleep(1000);
                 continue;
             }
