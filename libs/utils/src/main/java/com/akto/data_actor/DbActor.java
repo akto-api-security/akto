@@ -218,6 +218,10 @@ public class DbActor extends DataActor {
         DbLayer.insertAnalyserLog(log);
     }
 
+    public void insertDataInjectionLog(Log log) {
+        DbLayer.insertDataInjectionLog(log);
+    }
+
     public void modifyHybridSaasSetting(boolean isHybridSaas) {
         DbLayer.modifyHybridSaasSetting(isHybridSaas);
     }

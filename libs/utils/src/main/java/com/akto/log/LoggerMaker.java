@@ -95,7 +95,7 @@ public class LoggerMaker  {
     private LogDb db;
 
     public enum LogDb {
-        TESTING,RUNTIME,DASHBOARD,BILLING, ANALYSER, DB_ABS, THREAT_DETECTION
+        TESTING,RUNTIME,DASHBOARD,BILLING, ANALYSER, DB_ABS, THREAT_DETECTION, DATA_INGESTION
     }
 
     private static AccountSettings accountSettings = null;
@@ -267,6 +267,9 @@ public class LoggerMaker  {
                 case DASHBOARD: 
                     DashboardLogsDao.instance.insertOne(log);
                     break;
+                case DATA_INGESTION:
+                    dataActor.insertDataInjectionLog(log);
+                    break;
                 case ANALYSER:
                     dataActor.insertAnalyserLog(log);
                     break;
@@ -305,6 +308,9 @@ public class LoggerMaker  {
                 break;
             case DASHBOARD: 
                 logs = DashboardLogsDao.instance.findAll(filters, Projections.include("log", Log.TIMESTAMP));
+                break;
+            case DATA_INGESTION:
+                logs = DataInjectionLogsDao.instance.findAll(filters, Projections.include("log", Log.TIMESTAMP));
                 break;
             case ANALYSER:
                 logs = AnalyserLogsDao.instance.findAll(filters, Projections.include("log", Log.TIMESTAMP));

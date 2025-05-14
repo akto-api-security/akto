@@ -3897,4 +3897,23 @@ public class ClientActor extends DataActor {
         return openApiSchema;
     }
 
+    public void insertDataInjectionLog(Log log) {
+        Map<String, List<String>> headers = buildHeaders();
+        BasicDBObject obj = new BasicDBObject();
+        obj.put("log", log);
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/insertAnalyserLog", "", "POST", obj.toString(), headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb("non 2xx response in insertDataInjectionLog", LogDb.DATA_INGESTION);
+                return;
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in insertDataInjectionLog" + e, LogDb.DATA_INGESTION);
+            return;
+        }
+    }
+
+
 }
