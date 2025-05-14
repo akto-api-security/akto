@@ -542,6 +542,9 @@ const transform = {
     },
 
     isNewEndpoint(lastSeen){
+        if(lastSeen === undefined || lastSeen <= 0){
+            return false
+        }
         let lastMonthEpoch = func.timeNow() - (30 * 24 * 60 * 60);
         return lastSeen > lastMonthEpoch
     },
@@ -549,6 +552,12 @@ const transform = {
     prettifyEndpointsData(inventoryData){
         const hostNameMap = PersistStore.getState().hostNameMap
         const prettifyData = inventoryData.map((url) => {
+            let lastTestedText = "";
+            if(url?.lastTested === undefined || url?.lastTested <= 0){
+                lastTestedText = "Never"
+            }else{
+                lastTestedText = func.prettifyEpoch(url?.lastTested)
+            }
             return{
                 ...url,
                 last_seen: url.last_seen,
@@ -563,7 +572,8 @@ const transform = {
                 codeAnalysisEndpoint: false,
                 issuesComp: url.severityObj? this.getIssuesList(url.severityObj):'-',
                 severity: url.severityObj? Object.keys(url.severityObj):[],
-                description: url.description
+                description: url.description,
+                lastTestedComp: <Text variant="bodyMd" fontWeight={this.isNewEndpoint(url?.lastTested) ? "regular" : "semibold"} color={this.isNewEndpoint(url?.lastTested) ? "" : "subdued"}>{lastTestedText}</Text>,
             }
         })
 
