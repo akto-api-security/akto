@@ -1435,7 +1435,7 @@ public class DbLayer {
         return file.getCompressedContent();
     }
 
-    public static void insertDataInjectionLog(Log log) {
-        DataInjectionLogsDao.instance.insertOne(log);
+    public static void insertDataIngestionLog(Log log) {
+        DataIngestionLogsDao.instance.insertOne(log);
     }
 }

@@ -6,12 +6,12 @@ import com.akto.util.DbMode;
 import com.mongodb.client.MongoDatabase;
 import com.mongodb.client.model.CreateCollectionOptions;
 
-public class DataInjectionLogsDao extends AccountsContextDao<Log> {
+public class DataIngestionLogsDao extends AccountsContextDao<Log> {
 
     public static final int maxDocuments = 100_000;
     public static final int sizeInBytes = 100_000_000;
 
-    public static final DataInjectionLogsDao instance = new DataInjectionLogsDao();
+    public static final DataIngestionLogsDao instance = new DataIngestionLogsDao();
 
     public void createIndicesIfAbsent() {
         boolean exists = false;

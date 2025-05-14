@@ -2481,13 +2481,13 @@ public class DbAction extends ActionSupport {
         return Action.SUCCESS.toUpperCase();
     }
 
-    public String insertDataInjectionLog() {
+    public String insertDataIngestionLog() {
         try {
             Log dbLog = new Log(log.getString("log"), log.getString("key"), log.getInt("timestamp"));
-            DbLayer.insertDataInjectionLog(dbLog);
+            DbLayer.insertDataIngestionLog(dbLog);
         } catch (Exception e) {
             e.printStackTrace();
-            loggerMaker.errorAndAddToDb(e, "Error insertDataInjectionLog " + e.toString());
+            loggerMaker.errorAndAddToDb(e, "Error insertDataIngestionLog " + e.toString());
             return Action.ERROR.toUpperCase();
         }
         return Action.SUCCESS.toUpperCase();
