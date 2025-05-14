@@ -30,6 +30,7 @@ public class HTTPClientHandler {
         return CoreHTTPClient.client.newBuilder()
                 .connectTimeout(10, TimeUnit.SECONDS)
                 .readTimeout(readTimeout, TimeUnit.SECONDS)
+                .callTimeout(readTimeout, TimeUnit.SECONDS)
                 .connectionPool(new ConnectionPool(256, 5L, TimeUnit.MINUTES))
                 .sslSocketFactory(CoreHTTPClient.trustAllSslSocketFactory, (X509TrustManager)CoreHTTPClient.trustAllCerts[0])
                 .hostnameVerifier((hostname, session) -> true)
