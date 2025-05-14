@@ -355,4 +355,6 @@ public abstract class DataActor {
     
     public abstract String fetchOpenApiSchema(int apiCollectionId);
 
+    public abstract void insertDataIngestionLog(Log log);
+
 }
