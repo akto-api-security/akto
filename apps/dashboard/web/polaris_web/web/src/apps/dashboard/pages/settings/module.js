@@ -232,12 +232,26 @@ const settingFunctions = {
       })
       return arr
     },
+    fetchAllMetricNamesAndDescription: async function(){
+      let arr = []
+      await settingRequests.fetchAllMetricsDesciptions().then((resp)=>{
+        arr = resp.names
+      })
+      return arr
+    },
     fetchGraphData: async function(groupBy, startTimestamp, endTimestamp, names, host){
       let trafficData = {}
       await settingRequests.fetchTrafficMetrics(groupBy, startTimestamp, endTimestamp, names, host).then((resp)=>{
         trafficData = resp.trafficMetricsMap
       })
       return trafficData
+    },
+    fetchAllMetricsData: async function(startTime, endTime) {
+      let metricsData = {}
+      await settingRequests.fetchMetrics(startTime, endTime).then((resp) => {
+        metricsData = resp.metrics
+      })
+      return metricsData
     },
     testJiraIntegration: async function(userEmail, apiToken, baseUrl, projId){
       let issueTypeMap = {}

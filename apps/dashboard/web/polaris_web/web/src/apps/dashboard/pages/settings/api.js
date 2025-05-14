@@ -137,11 +137,25 @@ const settingRequests = {
             data: {}
         })
     },
+    fetchAllMetricsDesciptions() {
+        return request({
+            url: '/api/allMetricsDescription',
+            method: 'post',
+            data: {}
+        })
+    },
     fetchTrafficMetrics(groupBy, startTimestamp, endTimestamp, names, host) {
         return request({
             url: '/api/fetchTrafficMetrics',
             method: 'post',
             data: {groupBy, startTimestamp, endTimestamp, names, host}
+        })
+    },
+    fetchMetrics(startTimestamp, endTimestamp) {
+        return request({
+            url: '/api/fetchNewMetrics',
+            method: 'post',
+            data: {startTime:startTimestamp, endTime:endTimestamp}
         })
     },
 
