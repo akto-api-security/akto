@@ -86,7 +86,7 @@ public class Kafka {
 
   public void sendWithCounter(String message, String topic, AtomicInteger counter) {
     if (!this.producerReady) {
-      logger.error("Producer not ready. Cannot send message.");
+      logger.errorAndAddToDb("Producer not ready. Cannot send message.");
       return;
     };
 
@@ -156,7 +156,7 @@ public class Kafka {
       producer.send(record).get();
       producerReady = true;
     } catch (Exception ignored) {
-      logger.error("Producer not ready. Cannot send message.");
+      logger.errorAndAddToDb("Producer not ready. Cannot send message.");
       close();
     }
   }
