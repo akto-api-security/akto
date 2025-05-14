@@ -259,6 +259,22 @@ public class TestExecutor {
             AtomicInteger throttleNumber = new AtomicInteger(0);
             for (ApiInfo.ApiInfoKey apiInfoKey: apiInfoKeyList) {
                 List<String> messages = testingUtil.getSampleMessages().get(apiInfoKey);
+                if (messages == null || messages.isEmpty()) {
+                    continue;
+                }
+                String sample = messages.get(messages.size() - 1);
+                if(sample == null || sample.isEmpty()){
+                    continue;
+                }
+                if(sample.contains("originalRequestPayload")){
+                    // make map of original request payload if this key is present
+                    Map<String, Object> json = gson.fromJson(sample, Map.class);
+                    String originalRequestPayload = (String) json.get("originalRequestPayload");
+                    if(originalRequestPayload != null && !originalRequestPayload.isEmpty()){
+                        String key = apiInfoKey.getMethod() + "_" + apiInfoKey.getUrl();
+                        OriginalReqResPayloadInformation.getInstance().getOriginalReqPayloadMap().put(key, originalRequestPayload);
+                    }
+                }
                 if(Constants.IS_NEW_TESTING_ENABLED){
                     for (String testSubCategory: testingRunSubCategories) {
                         insertRecordInKafka(accountId, testSubCategory, apiInfoKey, messages, summaryId, syncLimit, apiInfoKeyToHostMap, subCategoryEndpointMap, testConfigMap, testLogs, testingRun, new AtomicBoolean(false), totalRecords, throttleNumber);
