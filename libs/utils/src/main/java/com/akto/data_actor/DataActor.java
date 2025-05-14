@@ -100,4 +100,6 @@ public abstract class DataActor {
     public abstract void updateModuleInfo(ModuleInfo moduleInfo);
 
     public abstract String fetchOpenApiSchema(int apiCollectionId);
+
+    public abstract void insertDataIngestionLog(Log log);
 }

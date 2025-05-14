@@ -3,32 +3,12 @@ package com.akto.data_actor;
 import java.util.*;
 
 import com.akto.bulk_update_util.ApiInfoBulkUpdate;
+import com.akto.dao.*;
 import com.akto.dao.filter.MergedUrlsDao;
 import com.akto.dto.filter.MergedUrls;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 
-import com.akto.dao.APIConfigsDao;
-import com.akto.dao.AccountSettingsDao;
-import com.akto.dao.AccountsDao;
-import com.akto.dao.AktoDataTypeDao;
-import com.akto.dao.AnalyserLogsDao;
-import com.akto.dao.ApiCollectionsDao;
-import com.akto.dao.ApiInfoDao;
-import com.akto.dao.CustomAuthTypeDao;
-import com.akto.dao.CustomDataTypeDao;
-import com.akto.dao.LogsDao;
-import com.akto.dao.PupeteerLogsDao;
-import com.akto.dao.ProtectionLogsDao;
-import com.akto.dao.RuntimeFilterDao;
-import com.akto.dao.RuntimeLogsDao;
-import com.akto.dao.SampleDataDao;
-import com.akto.dao.SensitiveParamInfoDao;
-import com.akto.dao.SensitiveSampleDataDao;
-import com.akto.dao.SetupDao;
-import com.akto.dao.SingleTypeInfoDao;
-import com.akto.dao.SuspectSampleDataDao;
-import com.akto.dao.TrafficInfoDao;
 import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.file.FilesDao;
@@ -36,7 +16,6 @@ import com.akto.dao.upload.FileUploadsDao;
 import com.akto.dto.files.File;
 import com.akto.dto.upload.SwaggerFileUpload;
 import com.akto.dao.monitoring.FilterYamlTemplateDao;
-import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dao.threat_detection.ApiHitCountInfoDao;
 import com.akto.dao.traffic_metrics.TrafficMetricsDao;
 import com.akto.dto.APIConfig;
@@ -59,7 +38,6 @@ import com.akto.dto.threat_detection.ApiHitCountInfo;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.traffic.SuspectSampleData;
 import com.akto.dto.traffic.TrafficInfo;
-import com.akto.dto.traffic_metrics.RuntimeMetrics;
 import com.akto.dto.traffic_metrics.TrafficMetrics;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods;
@@ -68,7 +46,6 @@ import com.mongodb.BasicDBObject;
 import com.mongodb.bulk.BulkWriteResult;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.Aggregates;
-import com.mongodb.client.model.BulkWriteOptions;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.FindOneAndUpdateOptions;
 import com.mongodb.client.model.Projections;
@@ -459,5 +436,9 @@ public class DbLayer {
         }
 
         return file.getCompressedContent();
+    }
+
+    public static void insertDataIngestionLog(Log log) {
+        DataIngestionLogsDao.instance.insertOne(log);
     }
 }

@@ -1405,4 +1405,26 @@ public class ClientActor extends DataActor {
         }
         return openApiSchema;
     }
+
+    public void insertDataIngestionLog(Log log) {
+        Map<String, List<String>> headers = buildHeaders();
+        BasicDBObject obj = new BasicDBObject();
+        obj.put("log", log.getLog());
+        obj.put("key", log.getKey());
+        obj.put("timestamp", log.getTimestamp());
+        BasicDBObject logObj = new BasicDBObject();
+        logObj.put("log", obj);
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/insertDataIngestionLog", "", "POST", logObj.toString(), headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb("non 2xx response in insertDataIngestionLog", LogDb.DATA_INGESTION);
+                return;
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in insertDataIngestionLog" + e, LogDb.DATA_INGESTION);
+            return;
+        }
+    }
 }

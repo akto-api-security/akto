@@ -26,6 +26,7 @@ const Logs = () => {
         { label: "Testing", value: "TESTING" },
         { label: "Puppeteer", value: "PUPPETEER" },
         { label: "Threat", value: "THREAT_DETECTION" },
+        { label: "Data Ingestion", value: "DATA_INGESTION" },
     ];
   
     const handleSelectLogGroup = (logGroup) => {

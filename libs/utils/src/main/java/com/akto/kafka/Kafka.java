@@ -9,7 +9,7 @@ import java.util.Properties;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class Kafka {
-  private static final LoggerMaker logger = new LoggerMaker(Kafka.class, LogDb.TESTING);
+  private static LoggerMaker logger = new LoggerMaker(Kafka.class, LogDb.TESTING);
   private KafkaProducer<String, String> producer;
   public boolean producerReady;
 
@@ -32,9 +32,29 @@ public class Kafka {
     try {
       setProducer(brokerIP, lingerMS, batchSize, keySerializer, valueSerializer, 5000, 0);
     } catch (Exception e) {
+      logger.errorAndAddToDb("Error while creating producer: " + e.getMessage());
       e.printStackTrace();
     }
   }
+
+  public Kafka(
+      String brokerIP,
+      int lingerMS,
+      int batchSize,
+      Serializer keySerializer,
+      Serializer valueSerializer,
+      LogDb logDb) {
+    producerReady = false;
+    try {
+      logger = new LoggerMaker(Kafka.class, logDb);
+      setProducer(brokerIP, lingerMS, batchSize, keySerializer, valueSerializer, 5000, 0);
+    } catch (Exception e) {
+      logger.errorAndAddToDb("Error while creating producer: " + e.getMessage());
+      e.printStackTrace();
+    }
+  }
+
+
 
   public Kafka(
       String brokerIP,
@@ -54,6 +74,10 @@ public class Kafka {
 
   public Kafka(String brokerIP, int lingerMS, int batchSize) {
     this(brokerIP, lingerMS, batchSize, Serializer.STRING, Serializer.STRING);
+  }
+
+  public Kafka(String brokerIP, int lingerMS, int batchSize, LogDb logDb) {
+    this(brokerIP, lingerMS, batchSize, Serializer.STRING, Serializer.STRING, logDb);
   }
 
   public Kafka(String brokerIP, int lingerMS, int batchSize, int maxRequestTimeout, int retriesConfig) {
@@ -80,7 +104,7 @@ public class Kafka {
 
   public void send(String message, String topic) {
     if (!this.producerReady) {
-      logger.error("Producer not ready. Cannot send message.");
+      logger.errorAndAddToDb("Producer not ready. Cannot send message.");
       return;
     };
 
@@ -116,7 +140,13 @@ public class Kafka {
     if(retriesConfig > 0){
       kafkaProps.put(ProducerConfig.RETRY_BACKOFF_MS_CONFIG, 100);
     }
-    producer = new KafkaProducer<String, String>(kafkaProps);
+
+    try {
+      producer = new KafkaProducer<String, String>(kafkaProps);
+    } catch (Exception e) {
+      logger.errorAndAddToDb("Error while creating kafka producer: " + e.getMessage());
+      return;
+    }
 
     // test if connection successful by sending a test message in a blocking way
     // calling .get() blocks the thread till we receive a message
@@ -126,6 +156,7 @@ public class Kafka {
       producer.send(record).get();
       producerReady = true;
     } catch (Exception ignored) {
+      logger.error("Producer not ready. Cannot send message.");
       close();
     }
   }
