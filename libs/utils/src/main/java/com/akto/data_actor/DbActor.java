@@ -238,7 +238,7 @@ public class DbActor extends DataActor {
         return DbLayer.fetchOpenApiSchema(apiCollectionId);
     }
 
-    public void insertDataInjectionLog(Log log) {
-        DbLayer.insertDataInjectionLog(log);
+    public void insertDataIngestionLog(Log log) {
+        DbLayer.insertDataIngestionLog(log);
     }
 }

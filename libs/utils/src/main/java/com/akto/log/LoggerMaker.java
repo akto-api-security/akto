@@ -267,7 +267,7 @@ public class LoggerMaker  {
                     
                     break;
                 case DATA_INGESTION:
-                    dataActor.insertDataInjectionLog(log);
+                    dataActor.insertDataIngestionLog(log);
                     break;
                 case ANALYSER:
                     dataActor.insertAnalyserLog(log);
@@ -308,7 +308,7 @@ public class LoggerMaker  {
                 logs = DashboardLogsDao.instance.findAll(filters, Projections.include("log", Log.TIMESTAMP));
                 break;
             case DATA_INGESTION:
-                logs = DataInjectionLogsDao.instance.findAll(filters, Projections.include("log", Log.TIMESTAMP));
+                logs = DataIngestionLogsDao.instance.findAll(filters, Projections.include("log", Log.TIMESTAMP));
                 break;
             case ANALYSER:
                 logs = AnalyserLogsDao.instance.findAll(filters, Projections.include("log", Log.TIMESTAMP));

@@ -38,7 +38,8 @@ public class IngestionAction extends ActionSupport {
     }
 
     private static void printLogs(String msg) {
-        if(MAX_INFO_PRINT-- > 0) {
+        MAX_INFO_PRINT--;
+        if(MAX_INFO_PRINT > 0) {
             loggerMaker.infoAndAddToDb(msg, LoggerMaker.LogDb.DATA_INGESTION);
         }
 

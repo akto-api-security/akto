@@ -80,7 +80,7 @@ public class TelemetryJob {
             case DASHBOARD:
                 return DashboardLogsDao.instance;
             case DATA_INGESTION:
-                return DataInjectionLogsDao.instance;
+                return DataIngestionLogsDao.instance;
             case RUNTIME:
                 return RuntimeLogsDao.instance;
             case ANALYSER:
