@@ -114,6 +114,17 @@ const headings = [
         
     },
     {
+        text: 'Last Tested',
+        title: <HeadingWithTooltip 
+                title={"Last Tested"}
+                content={"Time when API was last tested successfully."}
+            />,
+        value: 'lastTestedComp',
+        sortActive: true,
+        sortKey: 'lastTested',
+        textValue: 'lastTested',
+    },
+    {
         text: "Source location",
         value: "sourceLocationComp",
         textValue: "sourceLocation",
@@ -170,6 +181,8 @@ const sortOptions = [
     { label: 'Last seen', value: 'lastSeenTs desc', directionLabel: 'Oldest', sortKey: 'lastSeenTs', columnIndex: 8 },
     { label: 'Discovered at', value: 'detectedTs asc', directionLabel: 'Newest', sortKey: 'detectedTs', columnIndex: 9 },
     { label: 'Discovered at', value: 'detectedTs desc', directionLabel: 'Oldest', sortKey: 'detectedTs', columnIndex: 9 },
+    { label: 'Last tested', value: 'lastTested asc', directionLabel: 'Newest', sortKey: 'lastTested', columnIndex: 10 },
+    { label: 'Last tested', value: 'lastTested desc', directionLabel: 'Oldest', sortKey: 'lastTested', columnIndex: 10 },
 ];
 
 

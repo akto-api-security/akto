@@ -79,6 +79,7 @@ public class MaliciousEventService {
             .setRefId(refId)
             .setSeverity(evt.getSeverity())
             .setType(evt.getType())
+            .setMetadata(evt.getMetadata().toString())
             .build();
 
     if (MaliciousEventModel.EventType.AGGREGATED.equals(maliciousEventType)) {
@@ -96,6 +97,7 @@ public class MaliciousEventService {
                 .setFilterId(filterId)
                 .setRefId(refId)
                 .setSeverity(evt.getSeverity())
+                .setMetadata(evt.getMetadata().toString())
                 .build());
       }
 

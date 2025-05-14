@@ -6,7 +6,6 @@ import java.util.List;
 import java.util.Map;
 
 import com.akto.dao.context.Context;
-import com.akto.dto.ApiInfo;
 import com.akto.dto.api_workflow.Node;
 import com.akto.dto.testing.GraphExecutorRequest;
 import com.akto.dto.testing.GraphExecutorResult;
@@ -24,7 +23,7 @@ public class LinearGraphExecutor extends GraphExecutor {
         Map<String, WorkflowTestResult.NodeResult> testResultMap = workflowTestResult.getNodeResultMap();
         for (Node node: nodes) {
             WorkflowTestResult.NodeResult nodeResult;
-            nodeResult = Utils.executeNode(node, graphExecutorRequest.getValuesMap(), debug, testLogs, memory);
+            nodeResult = Utils.executeNode(node, graphExecutorRequest.getValuesMap(), debug, testLogs, memory, false);
             testResultMap.put(node.getId(), nodeResult);
             if (nodeResult.getErrors().size() > 0) break;
             if (graphExecutorRequest.getSkipIfNotVulnerable() && !nodeResult.isVulnerable()) {

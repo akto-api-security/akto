@@ -1,5 +1,7 @@
 package com.akto.utils;
 
+import com.akto.action.IngestionAction;
+import com.akto.log.LoggerMaker;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -9,16 +11,16 @@ import com.akto.kafka.Kafka;
 import com.mongodb.BasicDBObject;
 
 public class KafkaUtils {
-    
-    private static final Logger logger = LoggerFactory.getLogger(KafkaUtils.class);
+
+    private static final LoggerMaker logger = new LoggerMaker(KafkaUtils.class, LoggerMaker.LogDb.DATA_INGESTION);
     private static Kafka kafkaProducer;
 
     public void initKafkaProducer() {
         String kafkaBrokerUrl = System.getenv("AKTO_KAFKA_BROKER_URL");
         int batchSize = Integer.parseInt(System.getenv("AKTO_KAFKA_PRODUCER_BATCH_SIZE"));
         int kafkaLingerMS = Integer.parseInt(System.getenv("AKTO_KAFKA_PRODUCER_LINGER_MS"));
-        kafkaProducer = new Kafka(kafkaBrokerUrl, kafkaLingerMS, batchSize);
-        logger.info("Kafka Producer Init " + Context.now());
+        kafkaProducer = new Kafka(kafkaBrokerUrl, kafkaLingerMS, batchSize, LoggerMaker.LogDb.DATA_INGESTION);
+        logger.infoAndAddToDb("Kafka Producer Init " + Context.now(), LoggerMaker.LogDb.DATA_INGESTION);
     }
 
     public static void insertData(IngestDataBatch payload) {
