@@ -1,5 +1,6 @@
 package com.akto.data_actor;
 
+import com.akto.dao.metrics.MetricDataDao;
 import com.akto.dto.*;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.billing.Organization;
@@ -8,6 +9,7 @@ import com.akto.dto.dependency_flow.Node;
 import com.akto.dto.filter.MergedUrls;
 import com.akto.dto.jobs.JobExecutorType;
 import com.akto.dto.jobs.JobParams;
+import com.akto.dto.metrics.MetricData;
 import com.akto.dto.monitoring.ModuleInfo;
 import com.akto.dto.runtime_filters.RuntimeFilter;
 import com.akto.dto.settings.DataControlSettings;
@@ -233,6 +235,11 @@ public class DbActor extends DataActor {
 
     public TestingRunResultSummary createTRRSummaryIfAbsent(String testingRunHexId, int start) {
         return DbLayer.createTRRSummaryIfAbsent(testingRunHexId, start);
+    }
+
+    @Override
+    public void ingestMetricData(List<MetricData> metricData) {
+        DbLayer.ingestMetric(metricData);
     }
 
     public TestingRun findPendingTestingRun(int delta, String miniTestingName) {

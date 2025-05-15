@@ -31,6 +31,17 @@
         <action name="metrics" class="com.akto.action.InfraMetricsAction">
         </action>
 
+        <action name="api/metrics" class="com.akto.action.metrics.MetricsAction" method="getMetrics">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json">
+                <param name="root">result</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="root">result</param>
+            </result>
+        </action>
+
         <action name="detailedMetrics" class="com.akto.action.InfraMetricsAction" method="detailedMetrics">
         </action>
 
