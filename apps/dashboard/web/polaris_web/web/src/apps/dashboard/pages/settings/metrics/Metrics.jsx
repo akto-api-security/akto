@@ -10,6 +10,68 @@ import GraphMetric from '../../../components/GraphMetric'
 import values from '@/util/values'
 import PersistStore from '../../../../main/PersistStore'
 
+// Define the new MetricsSection component here
+function MetricsSection({ sectionTitle, metricsToDisplay, orderedResult, nameMap, defaultChartOptionsFn, showLegendForSection = false }) {
+    // Filter for elements that belong to this section AND have data
+    const relevantElementsWithData = orderedResult.filter(element =>
+        metricsToDisplay.includes(element.key) && element.value && element.value.length > 0
+    );
+
+    // Filter for all elements that belong to this section (for mapping, to show EmptyState if no data for a specific metric)
+    const allRelevantElements = orderedResult.filter(element =>
+        metricsToDisplay.includes(element.key)
+    );
+    
+    if (allRelevantElements.length === 0 && sectionTitle) { // Don't render a titled section if no relevant metrics at all
+        return null;
+    }
+
+    // For the "Original metrics" (no sectionTitle), if no elements, render nothing.
+    if (!sectionTitle && relevantElementsWithData.length === 0) {
+        return null;
+    }
+
+    return (
+        <>
+            {sectionTitle && relevantElementsWithData.length > 0 && ( // Only show title if there's data in this section
+                <LegacyCard.Section>
+                    <h2 style={{ fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '1rem', color: '#202223' }}>
+                        {sectionTitle}
+                    </h2>
+                </LegacyCard.Section>
+            )}
+            {relevantElementsWithData.map((element) => (
+                element.value && element.value.length > 0 ? (
+                    <LegacyCard.Section key={element.key}>
+                        <GraphMetric 
+                            data={element.value} 
+                            type='spline' 
+                            color='#6200EA' 
+                            areaFillHex="true" 
+                            height="330"
+                            title={nameMap.get(element.key)?.descriptionName} 
+                            subtitle={nameMap.get(element.key)?.description}
+                            defaultChartOptions={defaultChartOptionsFn(showLegendForSection)}
+                            background-color="#000000"
+                            text="true"
+                            inputMetrics={[]}
+                        />
+                    </LegacyCard.Section>
+                ) : (
+                    <LegacyCard.Section key={element.key}>
+                        <EmptyState 
+                            heading={nameMap.get(element.key)?.descriptionName} 
+                            footerContent="No Graph Data exist !"
+                        >
+                            <p>{nameMap.get(element.key)?.description}</p>
+                        </EmptyState>
+                    </LegacyCard.Section>
+                )
+            ))}
+        </>
+    );
+}
+
 function Metrics() {
     
     const [hosts, setHosts] = useState([])
@@ -212,145 +274,48 @@ function Metrics() {
         return options
     }
 
+    const runtimeMetricsKeys = newMetrics.slice(0, 12);
+    const postgresqlMetricsKeys = newMetrics.slice(12, 21);
+    const testingMetricsKeys = newMetrics.slice(21, 25);
+    const cyborgMetricsKeys = newMetrics.slice(25);
+
     const graphContainer = (
         <>
-            {/* Original Metrics */}
-            {orderedResult && orderedResult.length > 0 && orderedResult
-                .filter(element => {
-                    return element.value && element.value.length > 0 && oldMetrics.includes(element.key)
-                }
-                    )
-                .map((element) => (
-                    element.value && element.value.length > 0 ?
-                    <LegacyCard.Section key={element.key}>
-                        <GraphMetric data={element.value} type='spline' color='#6200EA' areaFillHex="true" height="330"
-                            title={nameMap.get(element.key)?.descriptionName} subtitle={nameMap.get(element.key)?.description}
-                            defaultChartOptions={defaultChartOptions(true)}
-                            background-color="#000000"
-                            text="true"
-                            inputMetrics={[]}
-                        />
-                    </LegacyCard.Section>
-                    :
-                    <LegacyCard.Section key={element.key}>
-                        <EmptyState heading={nameMap.get(element.key)?.descriptionName} footerContent="No Graph Data exist !">
-                            <p>{nameMap.get(element.key)?.description}</p>
-                        </EmptyState>
-                    </LegacyCard.Section>
-                ))}
-            {/* Runtime Metrics Section */}
-            {orderedResult && orderedResult.length > 0 && orderedResult
-                .filter(element => newMetrics.slice(0, 12).includes(element.key) && element.value && element.value.length > 0).length > 0 ?
-                <LegacyCard.Section>
-                    <h2 style={{ fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '1rem', color: '#202223' }}>Runtime Metrics</h2>
-                </LegacyCard.Section> : <div/>
-            }
-            {orderedResult && orderedResult.length > 0 && orderedResult
-                .filter(element => newMetrics.slice(0, 12).includes(element.key) && element.value && element.value.length > 0)
-                .map((element) => (
-                    element.value && element.value.length > 0 ?
-                    <LegacyCard.Section key={element.key}>
-                        <GraphMetric data={element.value} type='spline' color='#6200EA' areaFillHex="true" height="330"
-                            title={nameMap.get(element.key)?.descriptionName} subtitle={nameMap.get(element.key)?.description}
-                            defaultChartOptions={defaultChartOptions()}
-                            background-color="#000000"
-                            text="true"
-                            inputMetrics={[]}
-                        />
-                    </LegacyCard.Section>
-                    :
-                    <LegacyCard.Section key={element.key}>
-                        <EmptyState heading={nameMap.get(element.key)?.descriptionName} footerContent="No Graph Data exist !">
-                            <p>{nameMap.get(element.key)?.description}</p>
-                        </EmptyState>
-                    </LegacyCard.Section>
-                ))}
-
-            {/* PostgreSQL Metrics Section */}
-            {orderedResult && orderedResult.length > 0 && orderedResult
-                .filter(element => newMetrics.slice(12, 21).includes(element.key) && element.value && element.value.length > 0).length > 0 ?
-                <LegacyCard.Section>
-                    <h2 style={{ fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '1rem', color: '#202223' }}>PostgreSQL Metrics</h2>
-                </LegacyCard.Section>
-                : <div/>
-            }
-            {orderedResult && orderedResult.length > 0 && orderedResult
-                .filter(element => newMetrics.slice(12, 21).includes(element.key) && element.value && element.value.length > 0)
-                .map((element) => (
-                    element.value && element.value.length > 0 ?
-                    <LegacyCard.Section key={element.key}>
-                        <GraphMetric data={element.value} type='spline' color='#6200EA' areaFillHex="true" height="330"
-                            title={nameMap.get(element.key)?.descriptionName} subtitle={nameMap.get(element.key)?.description}
-                            defaultChartOptions={defaultChartOptions()}
-                            background-color="#000000"
-                            text="true"
-                            inputMetrics={[]}
-                        />
-                    </LegacyCard.Section>
-                    :
-                    <LegacyCard.Section key={element.key}>
-                        <EmptyState heading={nameMap.get(element.key)?.descriptionName} footerContent="No Graph Data exist !">
-                            <p>{nameMap.get(element.key)?.description}</p>
-                        </EmptyState>
-                    </LegacyCard.Section>
-                ))}
-
-            {/* Testing Metrics Section */}
-            {orderedResult && orderedResult.length > 0 && orderedResult
-                .filter(element => newMetrics.slice(21, 25).includes(element.key) && element.value && element.value.length > 0).length > 0 ?
-                <LegacyCard.Section>
-                    <h2 style={{ fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '1rem', color: '#202223' }}>Testing Metrics</h2>
-                </LegacyCard.Section>
-                : <div/>
-            }
-            {orderedResult && orderedResult.length > 0 && orderedResult
-                .filter(element => newMetrics.slice(21, 25).includes(element.key) && element.value && element.value.length > 0)
-                .map((element) => (
-                    element.value && element.value.length > 0 ?
-                    <LegacyCard.Section key={element.key}>
-                        <GraphMetric data={element.value} type='spline' color='#6200EA' areaFillHex="true" height="330"
-                            title={nameMap.get(element.key)?.descriptionName} subtitle={nameMap.get(element.key)?.description}
-                            defaultChartOptions={defaultChartOptions()}
-                            background-color="#000000"
-                            text="true"
-                            inputMetrics={[]}
-                        />
-                    </LegacyCard.Section>
-                    :
-                    <LegacyCard.Section key={element.key}>
-                        <EmptyState heading={nameMap.get(element.key)?.descriptionName} footerContent="No Graph Data exist !">
-                            <p>{nameMap.get(element.key)?.description}</p>
-                        </EmptyState>
-                    </LegacyCard.Section>
-                ))}
-            {/* Cyborg Metrics Section */}
-            {orderedResult && orderedResult.length > 0 && orderedResult
-                .filter(element =>  newMetrics.slice(25).includes(element.key) && element.value && element.value.length > 0).length > 0 ?
-                <LegacyCard.Section>
-                    <h2 style={{ fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '1rem', color: '#202223' }}>Cyborg Metrics</h2>
-                </LegacyCard.Section>
-                : <div/>
-            }
-            {orderedResult && orderedResult.length > 0 && orderedResult
-                .filter(element =>  newMetrics.slice(25).includes(element.key) && element.value && element.value.length > 0)
-                .map((element) => (
-                    element.value && element.value.length > 0 ?
-                    <LegacyCard.Section key={element.key}>
-                        <GraphMetric data={element.value} type='spline' color='#6200EA' areaFillHex="true" height="330"
-                            title={nameMap.get(element.key)?.descriptionName} subtitle={nameMap.get(element.key)?.description}
-                            defaultChartOptions={defaultChartOptions()}
-                            background-color="#000000"
-                            text="true"
-                            inputMetrics={[]}
-                        />
-                    </LegacyCard.Section>
-                    :
-                    <LegacyCard.Section key={element.key}>
-                        <EmptyState heading={nameMap.get(element.key)?.descriptionName} footerContent="No Graph Data exist !">
-                            <p>{nameMap.get(element.key)?.description}</p>
-                        </EmptyState>
-                    </LegacyCard.Section>
-                ))}
+            <MetricsSection
+                metricsToDisplay={oldMetrics}
+                orderedResult={orderedResult}
+                nameMap={nameMap}
+                defaultChartOptionsFn={defaultChartOptions}
+                showLegendForSection={true}
+            />
+            <MetricsSection
+                sectionTitle="Runtime Metrics"
+                metricsToDisplay={runtimeMetricsKeys}
+                orderedResult={orderedResult}
+                nameMap={nameMap}
+                defaultChartOptionsFn={defaultChartOptions}
+            />
+            <MetricsSection
+                sectionTitle="PostgreSQL Metrics"
+                metricsToDisplay={postgresqlMetricsKeys}
+                orderedResult={orderedResult}
+                nameMap={nameMap}
+                defaultChartOptionsFn={defaultChartOptions}
+            />
+            <MetricsSection
+                sectionTitle="Testing Metrics"
+                metricsToDisplay={testingMetricsKeys}
+                orderedResult={orderedResult}
+                nameMap={nameMap}
+                defaultChartOptionsFn={defaultChartOptions}
+            />
+            <MetricsSection
+                sectionTitle="Cyborg Metrics"
+                metricsToDisplay={cyborgMetricsKeys}
+                orderedResult={orderedResult}
+                nameMap={nameMap}
+                defaultChartOptionsFn={defaultChartOptions}
+            />
         </>
     )
 
