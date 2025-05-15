@@ -143,6 +143,13 @@ const settingRequests = {
             data: {groupBy, startTimestamp, endTimestamp, names, host}
         })
     },
+    fetchNewMetrics(groupBy, startTimestamp, endTimestamp, names, host) {
+        return request({
+            url: '/api/fetchNewMetrics',
+            method: 'post',
+            data: {groupBy, startTimestamp, endTimestamp, names, host}
+        })
+    },
 
     addCustomWebhook(webhookName, url, queryParams, method, headerString, body, frequencyInSeconds, selectedWebhookOptions, newEndpointCollections, newSensitiveEndpointCollections) {
         return request({
