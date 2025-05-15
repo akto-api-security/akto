@@ -300,6 +300,7 @@ function Integrations() {
             media={media}
             shortcutActions={sourceActions(id)}
             persistActions
+            onClick={() => handleTab(id, link)}
           >
             <Text fontWeight="bold" as="h3">
               {name}
