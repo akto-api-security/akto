@@ -45,8 +45,6 @@ function Metrics() {
                 const allMetrics = await settingFunctions.fetchAllMetricNamesAndDescription()
                 const trafficMetrics = await settingFunctions.fetchMetricData()
                 arr = [...new Set([...trafficMetrics, ...allMetrics])]
-            } else {
-                arr = allMetrics
             }
         } catch (error) {
         }
