@@ -39,17 +39,19 @@ function Metrics() {
 
     const getMetricsList = async() =>{
         let arr = []
-        // Always fetch all metrics
-        const allMetrics = await settingFunctions.fetchAllMetricNamesAndDescription()
-        
-        // Only fetch traffic metrics if user has access
-        if(hasAccess){
-            const trafficMetrics = await settingFunctions.fetchMetricData()
-            arr = [...new Set([...trafficMetrics, ...allMetrics])]
-        } else {
-            arr = allMetrics
+        try {
+            // Only fetch traffic metrics if user has access
+            if(hasAccess){
+                const allMetrics = await settingFunctions.fetchAllMetricNamesAndDescription()
+                const trafficMetrics = await settingFunctions.fetchMetricData()
+                arr = [...new Set([...trafficMetrics, ...allMetrics])]
+            } else {
+                arr = allMetrics
+            }
+        } catch (error) {
         }
         setMetricList(arr)
+        return arr;
     }
     const oldMetrics = [
         'INCOMING_PACKETS_MIRRORING',
@@ -103,43 +105,46 @@ function Metrics() {
         
 
     const getOldMetricsData = async(startTime, endTime) => {
-        const metricData = await settingFunctions.fetchGraphData(groupBy, startTime, endTime, oldMetrics, currentHost);
         let result = {};
-        for (const [key, countMap] of Object.entries(metricData)) {
-            let val = func.convertTrafficMetricsToTrend(countMap);
-            result[key] = val;
+        try {
+            const metricData = await settingFunctions.fetchGraphData(groupBy, startTime, endTime, oldMetrics, currentHost);
+            for (const [key, countMap] of Object.entries(metricData)) {
+                let val = func.convertTrafficMetricsToTrend(countMap);
+                result[key] = val;
+            }
+        } catch (error) {
         }
         return result;
     };
 
-    const getAllMetricsData = async(startTime, endTime) => {
+    const getAllMetricsData = async(startTime, endTime, list) => {
         const metricsData = {};
+        const currentNameMap = new Map(list.map(obj => [obj._name, { description: obj.description, descriptionName: obj.descriptionName }]));
         const data = await settingFunctions.fetchAllMetricsData(startTime, endTime);
         if (!data) {
             return metricsData;
         }
-        
         for (const metricId of newMetrics) {
             // Filter data for current metricId
+            let result = [];    
             const metricData = data.filter(item => item.metricId === metricId);
+
             if (metricData && metricData.length > 0) {
-                const trend = metricData.map(item => ({
-                    timestamp: item.timestamp,
-                    value: item.value
-                }));
-                metricsData[metricId] = [{
-                    name: nameMap.get(metricId)?.descriptionName || metricId,
-                    data: trend
-                }];
+                const trend = metricData.map(item => ([item.timestamp * 1000,item.value]));
+                result.push(
+                    { "data": trend, "color": null, "name": currentNameMap.get(metricId)?.descriptionName },
+                )
+
+                metricsData[metricId] = result;
             }
         }
         return metricsData;
     };
 
-    const getGraphData = async(startTime, endTime) => {
+    const getGraphData = async(startTime, endTime, list) => {
         const [oldMetricsResult, metricsData] = await Promise.all([
             getOldMetricsData(startTime, endTime),
-            getAllMetricsData(startTime, endTime)
+            getAllMetricsData(startTime, endTime, list)
         ]);
 
         const result = { ...oldMetricsResult, ...metricsData };
@@ -152,14 +157,18 @@ function Metrics() {
             setOrderedResult(arr);
         }, 0);
     }
-    useEffect(()=>{
-        getMetricsList()
-        setHosts(func.getListOfHosts(apiCollections))
-    },[])
 
-    useEffect(()=>{
-        getGraphData(startTime,endTime)
-    },[currDateRange,groupBy])
+    useEffect(() => {
+        const fetchData = async () => {
+            const list = await getMetricsList(); // Sourced from state and returns the list
+            // Create an up-to-date nameMap for this specific fetch operation            
+            setHosts(func.getListOfHosts(apiCollections));            
+            // Pass currentNameMap along with startTime and endTime
+            await getGraphData(startTime, endTime, list);
+        };
+
+        fetchData();
+    }, [currDateRange,groupBy]); // Added more dependencies
 
     function changeItems(){
         setMenuItems(hosts)
@@ -177,42 +186,48 @@ function Metrics() {
         setHostsActive(false)
     }
 
-    const defaultChartOptions = {
-        "legend": {
-            layout: 'vertical', align: 'right', verticalAlign: 'middle'
-        },
-        "plotOptions": {
-            series: {
-                events: {
-                    // Add legend item click event
-                    legendItemClick: function() {
-                        var seriesIndex = this.index;
-                        var chart = this.chart;
-                        var series = chart.series[seriesIndex]; 
+    const defaultChartOptions = function (enableLegends) {
+        const options = {
+            "plotOptions": {
+                series: {
+                    events: {
+                        // Add legend item click event
+                        legendItemClick: function () {
+                            var seriesIndex = this.index;
+                            var chart = this.chart;
+                            var series = chart.series[seriesIndex];
 
-                        chart.series.forEach(function(s) {
-                            s.hide(); // Hide all series
-                        });
-                        series.show(); // Show the selected series
+                            chart.series.forEach(function (s) {
+                                s.hide(); // Hide all series
+                            });
+                            series.show(); // Show the selected series
 
-                        return false; // Prevent default legend click behavior
+                            return false; // Prevent default legend click behavior
+                        }
                     }
                 }
             }
         }
+        if (enableLegends) {
+            options["legend"] = { layout: 'vertical', align: 'right', verticalAlign: 'middle' }
+        }
+        return options
     }
 
     const graphContainer = (
         <>
             {/* Original Metrics */}
             {orderedResult && orderedResult.length > 0 && orderedResult
-                .filter(element => oldMetrics.includes(element.key))
+                .filter(element => {
+                    return element.value && element.value.length > 0 && oldMetrics.includes(element.key)
+                }
+                    )
                 .map((element) => (
                     element.value && element.value.length > 0 ?
                     <LegacyCard.Section key={element.key}>
                         <GraphMetric data={element.value} type='spline' color='#6200EA' areaFillHex="true" height="330"
                             title={nameMap.get(element.key)?.descriptionName} subtitle={nameMap.get(element.key)?.description}
-                            defaultChartOptions={defaultChartOptions}
+                            defaultChartOptions={defaultChartOptions(true)}
                             background-color="#000000"
                             text="true"
                             inputMetrics={[]}
@@ -225,21 +240,21 @@ function Metrics() {
                         </EmptyState>
                     </LegacyCard.Section>
                 ))}
-
-            <div style={{ marginTop: '2rem' }} />
-
             {/* Runtime Metrics Section */}
-            <LegacyCard.Section>
-                <h2 style={{ fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '1rem', color: '#202223' }}>Runtime Metrics</h2>
-            </LegacyCard.Section>
             {orderedResult && orderedResult.length > 0 && orderedResult
-                .filter(element => newMetrics.slice(0, 4).includes(element.key))
+                .filter(element => newMetrics.slice(0, 12).includes(element.key) && element.value && element.value.length > 0).length > 0 ?
+                <LegacyCard.Section>
+                    <h2 style={{ fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '1rem', color: '#202223' }}>Runtime Metrics</h2>
+                </LegacyCard.Section> : <div/>
+            }
+            {orderedResult && orderedResult.length > 0 && orderedResult
+                .filter(element => newMetrics.slice(0, 12).includes(element.key) && element.value && element.value.length > 0)
                 .map((element) => (
                     element.value && element.value.length > 0 ?
                     <LegacyCard.Section key={element.key}>
                         <GraphMetric data={element.value} type='spline' color='#6200EA' areaFillHex="true" height="330"
                             title={nameMap.get(element.key)?.descriptionName} subtitle={nameMap.get(element.key)?.description}
-                            defaultChartOptions={defaultChartOptions}
+                            defaultChartOptions={defaultChartOptions()}
                             background-color="#000000"
                             text="true"
                             inputMetrics={[]}
@@ -252,21 +267,23 @@ function Metrics() {
                         </EmptyState>
                     </LegacyCard.Section>
                 ))}
-
-            <div style={{ marginTop: '2rem' }} />
 
             {/* PostgreSQL Metrics Section */}
-            <LegacyCard.Section>
-                <h2 style={{ fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '1rem', color: '#202223' }}>PostgreSQL Metrics</h2>
-            </LegacyCard.Section>
             {orderedResult && orderedResult.length > 0 && orderedResult
-                .filter(element => newMetrics.slice(4, 8).includes(element.key))
+                .filter(element => newMetrics.slice(12, 21).includes(element.key) && element.value && element.value.length > 0).length > 0 ?
+                <LegacyCard.Section>
+                    <h2 style={{ fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '1rem', color: '#202223' }}>PostgreSQL Metrics</h2>
+                </LegacyCard.Section>
+                : <div/>
+            }
+            {orderedResult && orderedResult.length > 0 && orderedResult
+                .filter(element => newMetrics.slice(12, 21).includes(element.key) && element.value && element.value.length > 0)
                 .map((element) => (
                     element.value && element.value.length > 0 ?
                     <LegacyCard.Section key={element.key}>
                         <GraphMetric data={element.value} type='spline' color='#6200EA' areaFillHex="true" height="330"
                             title={nameMap.get(element.key)?.descriptionName} subtitle={nameMap.get(element.key)?.description}
-                            defaultChartOptions={defaultChartOptions}
+                            defaultChartOptions={defaultChartOptions()}
                             background-color="#000000"
                             text="true"
                             inputMetrics={[]}
@@ -280,20 +297,50 @@ function Metrics() {
                     </LegacyCard.Section>
                 ))}
 
-            <div style={{ marginTop: '2rem' }} />
-
             {/* Testing Metrics Section */}
-            <LegacyCard.Section>
-                <h2 style={{ fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '1rem', color: '#202223' }}>Testing Metrics</h2>
-            </LegacyCard.Section>
             {orderedResult && orderedResult.length > 0 && orderedResult
-                .filter(element => newMetrics.slice(8, 12).includes(element.key))
+                .filter(element => newMetrics.slice(21, 25).includes(element.key) && element.value && element.value.length > 0).length > 0 ?
+                <LegacyCard.Section>
+                    <h2 style={{ fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '1rem', color: '#202223' }}>Testing Metrics</h2>
+                </LegacyCard.Section>
+                : <div/>
+            }
+            {orderedResult && orderedResult.length > 0 && orderedResult
+                .filter(element => newMetrics.slice(21, 25).includes(element.key) && element.value && element.value.length > 0)
                 .map((element) => (
                     element.value && element.value.length > 0 ?
                     <LegacyCard.Section key={element.key}>
                         <GraphMetric data={element.value} type='spline' color='#6200EA' areaFillHex="true" height="330"
                             title={nameMap.get(element.key)?.descriptionName} subtitle={nameMap.get(element.key)?.description}
-                            defaultChartOptions={defaultChartOptions}
+                            defaultChartOptions={defaultChartOptions()}
+                            background-color="#000000"
+                            text="true"
+                            inputMetrics={[]}
+                        />
+                    </LegacyCard.Section>
+                    :
+                    <LegacyCard.Section key={element.key}>
+                        <EmptyState heading={nameMap.get(element.key)?.descriptionName} footerContent="No Graph Data exist !">
+                            <p>{nameMap.get(element.key)?.description}</p>
+                        </EmptyState>
+                    </LegacyCard.Section>
+                ))}
+            {/* Cyborg Metrics Section */}
+            {orderedResult && orderedResult.length > 0 && orderedResult
+                .filter(element =>  newMetrics.slice(25).includes(element.key) && element.value && element.value.length > 0).length > 0 ?
+                <LegacyCard.Section>
+                    <h2 style={{ fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '1rem', color: '#202223' }}>Cyborg Metrics</h2>
+                </LegacyCard.Section>
+                : <div/>
+            }
+            {orderedResult && orderedResult.length > 0 && orderedResult
+                .filter(element =>  newMetrics.slice(25).includes(element.key) && element.value && element.value.length > 0)
+                .map((element) => (
+                    element.value && element.value.length > 0 ?
+                    <LegacyCard.Section key={element.key}>
+                        <GraphMetric data={element.value} type='spline' color='#6200EA' areaFillHex="true" height="330"
+                            title={nameMap.get(element.key)?.descriptionName} subtitle={nameMap.get(element.key)?.description}
+                            defaultChartOptions={defaultChartOptions()}
                             background-color="#000000"
                             text="true"
                             inputMetrics={[]}

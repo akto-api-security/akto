@@ -249,7 +249,8 @@ const settingFunctions = {
     fetchAllMetricsData: async function(startTime, endTime) {
       let metricsData = {}
       await settingRequests.fetchMetrics(startTime, endTime).then((resp) => {
-        metricsData = resp.metrics
+        console.log("resp", resp)
+        metricsData = resp?.result?.metrics
       })
       return metricsData
     },

@@ -153,7 +153,7 @@ const settingRequests = {
     },
     fetchMetrics(startTimestamp, endTimestamp) {
         return request({
-            url: '/api/fetchNewMetrics',
+            url: '/api/metrics',
             method: 'post',
             data: {startTime:startTimestamp, endTime:endTimestamp}
         })
