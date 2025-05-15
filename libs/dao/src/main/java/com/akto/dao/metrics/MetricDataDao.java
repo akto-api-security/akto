@@ -53,43 +53,4 @@ public class MetricDataDao extends AccountsContextDao<MetricData> {
     public Class<MetricData> getClassT() {
         return MetricData.class;
     }
-
-    public List<MetricData> getMetricsForTimeRange(String metricId, int accountId, long startTime, long endTime) {
-        List<Bson> filters = new ArrayList<>();
-        filters.add(Filters.eq("metricId", metricId));
-        filters.add(Filters.eq("accountId", accountId));
-        filters.add(Filters.gte("timestamp", startTime));
-        filters.add(Filters.lte("timestamp", endTime));
-
-        MongoCursor<MetricData> cursor = getMCollection().find(Filters.and(filters))
-                .sort(Sorts.ascending("timestamp"))
-                .iterator();
-
-        List<MetricData> metrics = new ArrayList<>();
-        while (cursor.hasNext()) {
-            metrics.add(cursor.next());
-        }
-        cursor.close();
-        return metrics;
-    }
-
-    public List<MetricData> getMetricsForTimeRangeByHost(String metricId, int accountId, String host, long startTime, long endTime) {
-        List<Bson> filters = new ArrayList<>();
-        filters.add(Filters.eq("metricId", metricId));
-        filters.add(Filters.eq("accountId", accountId));
-        filters.add(Filters.eq("instanceId", host));
-        filters.add(Filters.gte("timestamp", startTime));
-        filters.add(Filters.lte("timestamp", endTime));
-
-        MongoCursor<MetricData> cursor = getMCollection().find(Filters.and(filters))
-                .sort(Sorts.ascending("timestamp"))
-                .iterator();
-
-        List<MetricData> metrics = new ArrayList<>();
-        while (cursor.hasNext()) {
-            metrics.add(cursor.next());
-        }
-        cursor.close();
-        return metrics;
-    }
-} 
+}
