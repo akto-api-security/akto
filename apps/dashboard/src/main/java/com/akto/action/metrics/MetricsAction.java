@@ -21,7 +21,7 @@ public class MetricsAction extends UserAction {
     public String getMetrics() {
         try {
             List<MetricData> metrics;
-            metrics = MetricDataDao.instance.getMetricsForTimeRange(metricId, startTime, endTime);
+            metrics = MetricDataDao.instance.getMetricsForTimeRange(startTime, endTime);
             List<Map<String, Object>> metricsData = new ArrayList<>();
             for (MetricData metric : metrics) {
                 Map<String, Object> metricMap = new HashMap<>();

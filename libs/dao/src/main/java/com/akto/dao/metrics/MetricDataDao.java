@@ -54,9 +54,8 @@ public class MetricDataDao extends AccountsContextDao<MetricData> {
         return MetricData.class;
     }
 
-    public List<MetricData> getMetricsForTimeRange(String metricId, long startTime, long endTime) {
+    public List<MetricData> getMetricsForTimeRange(long startTime, long endTime) {
         List<Bson> filters = new ArrayList<>();
-        filters.add(Filters.eq("metricId", metricId));
         filters.add(Filters.gte("timestamp", startTime));
         filters.add(Filters.lte("timestamp", endTime));
 
