@@ -18,6 +18,12 @@ export type RepoPayload = {
     accessToken: string | null;
 }
 
+export type RepoNodeType = {
+    name: string;
+    nameWithOwner: string;
+    isPrivate: boolean;
+}
+
 export type Agent = {
     id: string;
     name: string;
