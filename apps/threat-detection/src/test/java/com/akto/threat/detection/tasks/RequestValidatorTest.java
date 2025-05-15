@@ -42,6 +42,32 @@ class RequestValidatorTest {
         return jsonString;
     }
 
+    void testBenchmark(){
+        HttpResponseParams responseParam = new HttpResponseParams();
+        responseParam.setRequestParams(new HttpRequestParams());
+        responseParam.getRequestParams().setUrl("/api/v3/pet");
+        responseParam.getRequestParams().setMethod("PUT");
+        responseParam.getRequestParams()
+                .setHeaders(Collections.singletonMap("content-type", Collections.singletonList("application/json")));
+        
+        String requestPayload = "{\"id\":10,\"category\":{\"id\":1,\"name\":\"Dogs\"},\"name\":\"doggie\",\"photoUrls\":[\"string\"],\"tags\":[{\"id\":0,\"name\":\"string\"}],\"status\":\"available\"}";
+        responseParam.getRequestParams().setPayload(requestPayload);
+
+        long startTime = System.nanoTime();
+        for (int i = 0; i < 1_00_000; i++){
+            List<SchemaConformanceError> errors = RequestValidator.validate(responseParam, apiSchema, "testApiInfoKey");
+        }
+        long endTime = System.nanoTime();
+        long totalTime = endTime - startTime;
+        double totalTimeInSeconds = totalTime / 1_000_000_000.0;
+        double avgTimePerIteration = totalTime / 1_00_000.0 / 1_000_000.0;
+        double iterationsPerSecond = 1_00_000 / totalTimeInSeconds;
+
+        System.out.println("Total time (seconds): " + totalTimeInSeconds);
+        System.out.println("Average time per iteration (ms): " + avgTimePerIteration);
+        System.out.println("Iterations per second: " + iterationsPerSecond);
+    }
+
     @Test
     void testTransformTrafficUrlToSchemaUrl_NoServers() throws Exception {
         String schemaJson = "{ \"paths\": { \"/example\": {} } }";
