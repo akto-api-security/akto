@@ -44,7 +44,9 @@ public class Main {
         runMigrations();
         sessionFactory = SessionFactoryUtils.createFactory();
         localRedis = createLocalRedisClient();
-        triggerApiInfoRelayCron(localRedis);
+        if (localRedis != null) {
+            triggerApiInfoRelayCron(localRedis);
+        }
     }
 
     KafkaConfig trafficKafka =
@@ -107,7 +109,15 @@ public class Main {
   }
 
   public static RedisClient createLocalRedisClient() {
-    return RedisClient.create(System.getenv("AKTO_THREAT_DETECTION_LOCAL_REDIS_URI"));
+    RedisClient redisClient = RedisClient.create(System.getenv("AKTO_THREAT_DETECTION_LOCAL_REDIS_URI"));
+    try {
+      redisClient.connect().sync();
+    } catch (Exception e) {
+      logger.errorAndAddToDb("Error connecting to local redis: " + e.getMessage());
+      return null;
+    }
+    logger.infoAndAddToDb("Connected to local redis");
+    return redisClient;
   }
 
   public static void runMigrations() {

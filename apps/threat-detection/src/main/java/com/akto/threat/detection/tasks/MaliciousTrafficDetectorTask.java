@@ -76,7 +76,11 @@ public class MaliciousTrafficDetectorTask implements Task {
   private final KafkaConfig kafkaConfig;
   private final HttpCallParser httpCallParser;
   private final WindowBasedThresholdNotifier windowBasedThresholdNotifier;
-  private final WindowBasedThresholdNotifier apiCountWindowBasedThresholdNotifier;
+
+  // Used for schema conformance and API level rate limiting
+  private WindowBasedThresholdNotifier apiCountWindowBasedThresholdNotifier = null;
+  private StatefulRedisConnection<String, String> apiCache = null;
+
   private final RawApiMetadataFactory rawApiFactory;
 
   private Map<String, FilterConfig> apiFilters;
@@ -94,7 +98,6 @@ public class MaliciousTrafficDetectorTask implements Task {
   private static Map<String, Object> varMap = new HashMap<>();
   private static Supplier<String> lazyToString;
 
-  private final StatefulRedisConnection<String, String> apiCache;
 
   public MaliciousTrafficDetectorTask(
       KafkaConfig trafficConfig, KafkaConfig internalConfig, RedisClient redisClient) throws Exception {
@@ -118,7 +121,6 @@ public class MaliciousTrafficDetectorTask implements Task {
     this.kafkaConsumer = new KafkaConsumer<>(properties);
 
     this.httpCallParser = new HttpCallParser(120, 1000);
-    this.apiCache = redisClient.connect();
     
 
     this.windowBasedThresholdNotifier =
@@ -126,9 +128,8 @@ public class MaliciousTrafficDetectorTask implements Task {
             new RedisBackedCounterCache(redisClient, "wbt"),
             new WindowBasedThresholdNotifier.Config(100, 10 * 60));
     
-    if (redisClient == null) {
-        this.apiCountWindowBasedThresholdNotifier = null;
-    } else {
+    if (redisClient != null) {
+        this.apiCache = redisClient.connect();
         this.apiCountWindowBasedThresholdNotifier = new WindowBasedThresholdNotifier(
           new ApiCountCacheLayer(redisClient),
           new WindowBasedThresholdNotifier.Config(100, 10 * 60));
