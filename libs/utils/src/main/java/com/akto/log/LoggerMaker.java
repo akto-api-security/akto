@@ -37,6 +37,8 @@ public class LoggerMaker  {
         System.setProperty(SimpleLogger.DEFAULT_LOG_LEVEL_KEY, System.getenv().getOrDefault("AKTO_LOG_LEVEL", "WARN"));
         System.setProperty("org.slf4j.simpleLogger.log.org.apache.kafka", "ERROR");
         System.setProperty("org.slf4j.simpleLogger.log.io.lettuce", "ERROR");
+        System.setProperty("org.slf4j.simpleLogger.log.io.netty", "ERROR");
+        System.setProperty("org.slf4j.simpleLogger.log.org.flywaydb", "ERROR");
         System.out.printf("AKTO_LOG_LEVEL is set to: %s \n", System.getProperty(SimpleLogger.DEFAULT_LOG_LEVEL_KEY));
     }
 

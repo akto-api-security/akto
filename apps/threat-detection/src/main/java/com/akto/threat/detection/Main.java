@@ -21,6 +21,8 @@ import com.akto.threat.detection.tasks.MaliciousTrafficDetectorTask;
 import com.akto.threat.detection.tasks.SendMaliciousEventsToBackend;
 import com.mongodb.ConnectionString;
 import io.lettuce.core.RedisClient;
+import io.lettuce.core.api.StatefulRedisConnection;
+
 import org.flywaydb.core.Flyway;
 import org.hibernate.SessionFactory;
 
@@ -44,7 +46,9 @@ public class Main {
         runMigrations();
         sessionFactory = SessionFactoryUtils.createFactory();
         localRedis = createLocalRedisClient();
-        triggerApiInfoRelayCron(localRedis);
+        if (localRedis != null) {
+            triggerApiInfoRelayCron(localRedis);
+        }
     }
 
     KafkaConfig trafficKafka =
@@ -107,7 +111,19 @@ public class Main {
   }
 
   public static RedisClient createLocalRedisClient() {
-    return RedisClient.create(System.getenv("AKTO_THREAT_DETECTION_LOCAL_REDIS_URI"));
+    RedisClient redisClient = RedisClient.create(System.getenv("AKTO_THREAT_DETECTION_LOCAL_REDIS_URI"));
+    try {
+      logger.infoAndAddToDb("Connecting to local redis");
+      StatefulRedisConnection<String, String> connection = redisClient.connect();
+      connection.sync().set("test", "test");
+      connection.sync().get("test");
+      connection.close();
+    } catch (Exception e) {
+      logger.errorAndAddToDb("Error connecting to local redis: " + e.getMessage());
+      return null;
+    }
+    logger.infoAndAddToDb("Connected to local redis");
+    return redisClient;
   }
 
   public static void runMigrations() {
