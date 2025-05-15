@@ -18,6 +18,7 @@ import com.akto.dto.filter.MergedUrls;
 import com.akto.dto.graph.SvcToSvcGraph;
 import com.akto.dto.graph.SvcToSvcGraphEdge;
 import com.akto.dto.graph.SvcToSvcGraphNode;
+import com.akto.dto.metrics.MetricData;
 import com.akto.dto.monitoring.ModuleInfo;
 import com.akto.dto.runtime_filters.RuntimeFilter;
 import com.akto.dto.settings.DataControlSettings;
@@ -281,6 +282,7 @@ public class DbAction extends ActionSupport {
     Node node;
     List<Node> nodes;
     boolean removeZeroLevel;
+    private List<MetricData> metricData;
 
     public String fetchDataControlSettings() {
         try {
@@ -1977,6 +1979,16 @@ public class DbAction extends ActionSupport {
         return Action.SUCCESS.toUpperCase();
     }
 
+    public String ingestMetricsData() {
+        try {
+            DbLayer.ingestMetricsData(metricData);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in modifyHybridTestingSetting " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
     public String insertTestingLog() {
         try {
             int accId = Context.accountId.get();
@@ -3630,5 +3642,13 @@ public class DbAction extends ActionSupport {
 
     public void setMiniTestingName(String miniTestingName) {
         this.miniTestingName = miniTestingName;
+    }
+
+    public List<MetricData> getMetricData() {
+        return metricData;
+    }
+
+    public void setMetricData(List<MetricData> metricData) {
+        this.metricData = metricData;
     }
 }
