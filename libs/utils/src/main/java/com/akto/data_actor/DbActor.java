@@ -239,7 +239,7 @@ public class DbActor extends DataActor {
 
     @Override
     public void ingestMetricData(List<MetricData> metricData) {
-        MetricDataDao.instance.insertMany(metricData);
+        DbLayer.ingestMetric(metricData);
     }
 
     public TestingRun findPendingTestingRun(int delta, String miniTestingName) {
