@@ -97,12 +97,20 @@ public class AllMetrics {
                     metricsData.put("instance_id", instance_id);
                     metricsData.put("account_id", m.accountId);
                     list.add(metricsData);
+                    MetricData.MetricType type = MetricData.MetricType.SUM;
+                    switch (m.getMetricType()) {
+                        case SUM:
+                            type = MetricData.MetricType.SUM;
+                            break;
+                        case LATENCY:
+                            type = MetricData.MetricType.LATENCY;
+                    }
                     MetricData metricData = new MetricData(
                             m.metricId,
                             metric,
                             m.orgId,
                             instance_id,
-                            MetricData.MetricType.valueOf(m.getMetricType().name())
+                            type
                     );
                     metricDataList.add(metricData);
                 }
