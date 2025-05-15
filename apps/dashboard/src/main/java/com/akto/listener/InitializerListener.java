@@ -7,6 +7,7 @@ import static com.akto.utils.Utils.deleteApis;
 import static com.akto.utils.billing.OrganizationUtils.syncOrganizationWithAkto;
 import static com.mongodb.client.model.Filters.eq;
 
+import com.akto.dao.metrics.MetricDataDao;
 import com.akto.dto.jobs.JobExecutorType;
 import com.akto.utils.crons.JobsCron;
 import java.io.BufferedReader;
@@ -2585,6 +2586,7 @@ public class InitializerListener implements ServletContextListener {
         clear(SuspectSampleDataDao.instance, SuspectSampleDataDao.maxDocuments);
         clear(RuntimeMetricsDao.instance, RuntimeMetricsDao.maxDocuments);
         clear(ProtectionLogsDao.instance, ProtectionLogsDao.maxDocuments);
+        clear(MetricDataDao.instance, MetricDataDao.maxDocuments);
     }
 
     public static void clear(AccountsContextDao mCollection, int maxDocuments) {
