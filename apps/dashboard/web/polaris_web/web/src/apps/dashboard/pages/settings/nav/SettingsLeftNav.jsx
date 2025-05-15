@@ -35,7 +35,7 @@ const SettingsLeftNav = () => {
             selected: page === "logs",
             onClick: () => navigate("/dashboard/settings/logs")
         }] : []
-    const metricsArr = window.IS_SAAS === 'true' ? [] : [{
+    const metricsArr = [{
         label: 'Metrics',
         icon: ReportFilledMinor,
         selected: page === "metrics",
