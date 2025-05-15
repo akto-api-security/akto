@@ -83,6 +83,7 @@ public class AllMetrics {
             try {
                 Context.accountId.set(accountId);
                 BasicDBList list = new BasicDBList();
+                List<MetricData> metricDataList = new ArrayList<>();
                 for (Metric m : metrics) {
                     if (m == null) {
                         continue;
@@ -96,10 +97,17 @@ public class AllMetrics {
                     metricsData.put("instance_id", instance_id);
                     metricsData.put("account_id", m.accountId);
                     list.add(metricsData);
-
+                    MetricData metricData = new MetricData(
+                            m.metricId,
+                            metric,
+                            m.orgId,
+                            instance_id,
+                            MetricData.MetricType.valueOf(m.getMetricType().name())
+                    );
+                    metricDataList.add(metricData);
                 }
                 if(!list.isEmpty()) {
-                    _this.sendDataToAkto(list);
+                    _this.sendDataToAkto(list, metricDataList);
                 }
             } catch (Exception e){
                 loggerMaker.errorAndAddToDb("Error while sending metrics to akto: " + e.getMessage(), LoggerMaker.LogDb.RUNTIME);
@@ -305,7 +313,7 @@ public class AllMetrics {
 
     private static final ScheduledExecutorService executorService = Executors.newScheduledThreadPool(1);
 
-    enum MetricType{
+    public enum MetricType{
         LATENCY, SUM
     }
 
@@ -415,7 +423,7 @@ public class AllMetrics {
         }
     }
 
-    public void sendDataToAkto(BasicDBList list){
+    public void sendDataToAkto(BasicDBList list,List<MetricData> metricDataList){
         MediaType mediaType = MediaType.parse("application/json");
         RequestBody body = RequestBody.create(new BasicDBObject("data", list).toJson(), mediaType);
         Request request = new Request.Builder()
@@ -426,19 +434,7 @@ public class AllMetrics {
         Response response = null;
         try {
             response =  client.newCall(request).execute();
-            List<MetricData> metricDataList = new ArrayList<>();
-            // Store metrics in MongoDB
-            for (Object obj : list) {
-                BasicDBObject metricsData = (BasicDBObject) obj;
-                MetricData metricData = new MetricData(
-                    metricsData.getString("metric_id"),
-                    (float) metricsData.get("val"),
-                    metricsData.getString("org_id"),
-                    metricsData.getString("instance_id")
-                );
-                metricDataList.add(metricData);
-            }
-            //Ingesting metrics in
+            //Ingesting metrics in mongodb
             dataActor.ingestMetricData(metricDataList);
         } catch (IOException e) {
             loggerMaker.errorAndAddToDb("Error while executing request " + request.url() + ": " + e.getMessage(), LoggerMaker.LogDb.RUNTIME);
