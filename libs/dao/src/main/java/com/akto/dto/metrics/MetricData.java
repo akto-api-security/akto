@@ -2,6 +2,7 @@ package com.akto.dto.metrics;
 
 import com.akto.dao.context.Context;
 import com.akto.dto.data_types.Conditions;
+import com.akto.dto.usage.MetricTypes;
 import org.bson.types.ObjectId;
 
 public class MetricData {
@@ -12,6 +13,19 @@ public class MetricData {
     private String instanceId;
     private int timestamp;
 
+    public MetricType getMetricType() {
+        return metricType;
+    }
+
+    public void setMetricType(MetricType metricType) {
+        this.metricType = metricType;
+    }
+
+    public enum MetricType {
+        LATENCY, SUM
+    }
+
+    private MetricType metricType;
     public enum Name {
         // Runtime metrics
         RT_KAFKA_RECORD_COUNT("Kafka Records Count", "Number of records processed by runtime module"),
@@ -69,12 +83,13 @@ public class MetricData {
     public MetricData() {
     }
 
-    public MetricData(String metricId, float value, String orgId, String instanceId) {
+    public MetricData(String metricId, float value, String orgId, String instanceId, MetricType metricType) {
         this.metricId = metricId;
         this.value = value;
         this.orgId = orgId;
         this.instanceId = instanceId;
         this.timestamp = Context.now();
+        this.metricType = metricType;
     }
 
     public ObjectId getId() {
