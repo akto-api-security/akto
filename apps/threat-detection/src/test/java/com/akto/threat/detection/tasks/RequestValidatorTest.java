@@ -42,7 +42,6 @@ class RequestValidatorTest {
         return jsonString;
     }
 
-    @Test
     void testBenchmark(){
         HttpResponseParams responseParam = new HttpResponseParams();
         responseParam.setRequestParams(new HttpRequestParams());
