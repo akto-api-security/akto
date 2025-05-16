@@ -3,6 +3,7 @@ package com.akto.action.gpt.handlers;
 import com.akto.action.gpt.data_extractors.ListApisEndpointNames;
 import com.akto.action.gpt.data_extractors.filters.FilterJunkEndpoints;
 import com.akto.action.gpt.result_fetchers.AsyncResultFetcherStrategy;
+import com.akto.action.gpt.result_fetchers.SelfHostedLlmResultFetcherStrategy;
 import com.akto.action.gpt.validators.ApiCollectionAllowedValidation;
 import com.akto.action.gpt.validators.ValidateQuery;
 
@@ -28,7 +29,7 @@ public class QueryHandlerFactory {
             case FIND_AUTH_RELATED_TOKENS:
                 return new FindAuthRelatedTokens(new AsyncResultFetcherStrategy());
             case ANALYZE_REQUEST_RESPONSE_HEADERS:
-                return new FindRequestResponseHeaders(new AsyncResultFetcherStrategy());
+                return new FindRequestResponseHeaders(new SelfHostedLlmResultFetcherStrategy());
             default:
                 throw new IllegalArgumentException("Unexpected value: " + query);
         }
