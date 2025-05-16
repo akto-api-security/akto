@@ -163,6 +163,8 @@ public abstract class DataActor {
 
     public abstract List<YamlTemplate> fetchYamlTemplates(boolean fetchOnlyActive, int skip);
 
+    public abstract List<YamlTemplate> fetchYamlTemplatesWithIds(List<String> ids, boolean fetchOnlyActive);
+
     public abstract void updateTestResultsCountInTestSummary(String summaryId, int testResultsCount);
 
     public abstract void updateLastTestedField(int apiCollectionId, String url, String method);
