@@ -646,6 +646,19 @@ public class DbLayer {
         return YamlTemplateDao.instance.findAll(Filters.or(filters), skip, 50, null);
     }
 
+    public static List<YamlTemplate> fetchYamlTemplatesWithIds(List<String> ids, boolean fetchOnlyActive) {
+        Bson filter = Filters.in(Constants.ID, ids);
+        if(fetchOnlyActive) {
+            filter = Filters.and(
+                Filters.or(
+                    Filters.exists(YamlTemplate.INACTIVE, false),
+                    Filters.eq(YamlTemplate.INACTIVE, false)
+                )
+            );
+        }
+        return YamlTemplateDao.instance.findAll(filter);
+    }
+
     public static void updateTestResultsCountInTestSummary(String summaryId, int testResultsCount) {
         ObjectId summaryObjectId = new ObjectId(summaryId);
         TestingRunResultSummariesDao.instance.updateOneNoUpsert(Filters.eq(Constants.ID, summaryObjectId),

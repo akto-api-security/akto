@@ -1947,6 +1947,40 @@ public class ClientActor extends DataActor {
         return templates;
     }
 
+    public List<YamlTemplate> fetchYamlTemplatesWithIds(List<String> ids, boolean fetchOnlyActive){
+        Map<String, List<String>> headers = buildHeaders();
+        List<YamlTemplate> templates = new ArrayList<>();
+        BasicDBObject obj = new BasicDBObject();
+
+        obj.put("fetchOnlyActive", fetchOnlyActive);
+        obj.put("ids", ids);
+
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/fetchYamlTemplatesWithIds", "", "POST", obj.toString(), headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb("non 2xx response in fetchYamlTemplatesWithIds", LoggerMaker.LogDb.RUNTIME);
+                return null;
+            }
+            BasicDBObject payloadObj;
+            try {
+                payloadObj =  BasicDBObject.parse(responsePayload);
+                BasicDBList yamlTemplates = (BasicDBList) payloadObj.get("yamlTemplates");
+                for (Object template: yamlTemplates) {
+                    BasicDBObject obj2 = (BasicDBObject) template;
+                    templates.add(objectMapper.readValue(obj2.toJson(), YamlTemplate.class));
+                }
+            } catch(Exception e) {
+                loggerMaker.errorAndAddToDb("error extracting response in fetchYamlTemplatesWithIds" + e, LoggerMaker.LogDb.RUNTIME);
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in fetchYamlTemplatesWithIds" + e, LoggerMaker.LogDb.RUNTIME);
+            return null;
+        }
+        return templates;
+    }
+
     public void updateTestResultsCountInTestSummary(String summaryId, int testResultsCount) {
         Map<String, List<String>> headers = buildHeaders();
         BasicDBObject obj = new BasicDBObject();
@@ -1991,7 +2025,6 @@ public class ClientActor extends DataActor {
         BasicDBObject obj = new BasicDBObject();
         obj.put("testingRunResult", testingRunResult);
         String objString = gson.toJson(obj);
-        loggerMaker.info(objString);
         OriginalHttpRequest request = new OriginalHttpRequest(url + "/insertTestingRunResults", "", "POST", objString, headers, "");
         try {
             OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
