@@ -51,6 +51,7 @@ import org.apache.commons.lang3.EnumUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
+import org.checkerframework.common.returnsreceiver.qual.This;
 import org.json.JSONObject;
 
 import com.akto.DaoInit;
@@ -2429,8 +2430,10 @@ public class InitializerListener implements ServletContextListener {
                 if (runJobFunctions || runJobFunctionsAnyway) {
 
                     logger.debug("Starting init functions and scheduling jobs at " + now);
-
                     JobsCron.instance.jobsScheduler(JobExecutorType.DASHBOARD);
+                    if (DashboardMode.isMetered()) {
+                        setupUsageScheduler();
+                    }
 
                     AccountTask.instance.executeTask(new Consumer<Account>() {
                         @Override
@@ -2439,40 +2442,41 @@ public class InitializerListener implements ServletContextListener {
                         }
                     }, "context-initializer-secondary");
 
-                    /*crons.trafficAlertsScheduler();
-                    // crons.insertHistoricalDataJob();
-                    // if(DashboardMode.isOnPremDeployment()){
-                    //     crons.insertHistoricalDataJobForOnPrem();
-                    // }
-                    if (DashboardMode.isMetered()) {
-                        setupUsageScheduler();
-                    }
-                    // trimCappedCollectionsJob();
-                    setUpPiiAndTestSourcesScheduler();
-                    setUpTrafficAlertScheduler();
-                    // setUpAktoMixpanelEndpointsScheduler();
-                    setUpDailyScheduler();
-                    setUpWebhookScheduler();
-                    cleanInventoryJobRunner();
-                    setUpDefaultPayloadRemover();
-                    setUpTestEditorTemplatesScheduler();
-                    setUpDependencyFlowScheduler();
-                    tokenGeneratorCron.tokenGeneratorScheduler();
-                    crons.deleteTestRunsScheduler();
-                    updateSensitiveInfoInApiInfo.setUpSensitiveMapInApiInfoScheduler();
-                    syncCronInfo.setUpUpdateCronScheduler();
-                    updateApiGroupsForAccounts();
-                    setUpUpdateCustomCollections();
-                    setUpFillCollectionIdArrayJob();
-                    setupAutomatedApiGroupsScheduler();
-                    *//*
-                     * This is a temporary job.
-                     * TODO: Remove this once traffic pipeline is cleaned.
-                     *//*
-                    CleanInventory.cleanInventoryJobRunner();
-                    // CleanTestingJob.cleanTestingJobRunner();
+                    if(runJobFunctionsAnyway) {
+                        crons.trafficAlertsScheduler();
+                        // crons.insertHistoricalDataJob();
+                        // if(DashboardMode.isOnPremDeployment()){
+                        //     crons.insertHistoricalDataJobForOnPrem();
+                        // }
 
-                    MatchingJob.MatchingJobRunner();*/
+                        // trimCappedCollectionsJob();
+                        setUpPiiAndTestSourcesScheduler();
+                        setUpTrafficAlertScheduler();
+                        // setUpAktoMixpanelEndpointsScheduler();
+                        setUpDailyScheduler();
+                        setUpWebhookScheduler();
+                        cleanInventoryJobRunner();
+                        setUpDefaultPayloadRemover();
+                        setUpTestEditorTemplatesScheduler();
+                        setUpDependencyFlowScheduler();
+                        tokenGeneratorCron.tokenGeneratorScheduler();
+                        crons.deleteTestRunsScheduler();
+                        updateSensitiveInfoInApiInfo.setUpSensitiveMapInApiInfoScheduler();
+                        syncCronInfo.setUpUpdateCronScheduler();
+                        updateApiGroupsForAccounts();
+                        setUpUpdateCustomCollections();
+                        setUpFillCollectionIdArrayJob();
+                        setupAutomatedApiGroupsScheduler();
+
+//                     * This is a temporary job.
+//                            * TODO: Remove this once traffic pipeline is cleaned.
+
+                        CleanInventory.cleanInventoryJobRunner();
+                        // CleanTestingJob.cleanTestingJobRunner();
+
+                        MatchingJob.MatchingJobRunner();
+                    }
+
                     int now2 = Context.now();
                     int diffNow = now2 - now;
                     logger.debug(String.format("Completed init functions and scheduling jobs at %d , time taken : %d", now2, diffNow));
