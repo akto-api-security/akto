@@ -201,15 +201,15 @@ public class TestExecutor {
         } catch (Exception e){
             loggerMaker.errorAndAddToDb("Error while running findAllHosts " + e.getMessage(), LogDb.TESTING);
         }
-
+        currentTime = Context.now();
+        loggerMaker.infoAndAddToDb("Starting status code analyser", LogDb.TESTING);
         try {
             StatusCodeAnalyser.run(sampleDataMapForStatusCodeAnalyser, sampleMessageStore ,  attackerTestRole.findMatchingAuthMechanism(null), testingRun.getTestingRunConfig(), hostAndContentType);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error while running status code analyser " + e.getMessage(), LogDb.TESTING);
         }
 
-        loggerMaker.infoAndAddToDb("StatusCodeAnalyser result = " + StatusCodeAnalyser.result, LogDb.TESTING);
-        loggerMaker.infoAndAddToDb("StatusCodeAnalyser defaultPayloadsMap = " + StatusCodeAnalyser.defaultPayloadsMap, LogDb.TESTING);
+        loggerMaker.infoAndAddToDb("StatusCodeAnalyser result = " + StatusCodeAnalyser.result + " defaultPayloadMap: " + StatusCodeAnalyser.defaultPayloadsMap + " calculated in: " + (Context.now() - currentTime), LogDb.TESTING);
 
         dataActor.updateTotalApiCountInTestSummary(summaryId.toHexString(), apiInfoKeyList.size());
 

@@ -1,6 +1,7 @@
 package com.akto.testing;
 
 import com.akto.dao.ApiCollectionsDao;
+import com.akto.dao.context.Context;
 import com.akto.data_actor.DataActor;
 import com.akto.data_actor.DataActorFactory;
 import com.akto.dto.*;
@@ -20,6 +21,8 @@ import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 import static com.akto.runtime.RelationshipSync.extractAllValuesFromPayload;
 
@@ -83,11 +86,13 @@ public class StatusCodeAnalyser {
 
     public static void calculateDefaultPayloads(SampleMessageStore sampleMessageStore, Map<ApiInfo.ApiInfoKey, List<String>> sampleDataMap, TestingRunConfig testingRunConfig, Map<String, String> hostAndContentType) {
         for (String host: hostAndContentType.keySet()) {
-            List<Future<?>> futures = new ArrayList<>();
+            List<Future<Void>> futures = new ArrayList<>();
+            int accountId = Context.accountId.get();
             for (int idx=0; idx<10;idx++) {
                 final int index = idx;
                 futures.add(executor.submit(() -> {
                     try {
+                        Context.accountId.set(accountId);
                         String url = host;
                         if (!url.endsWith("/")) url += "/";
                         if (index > 0) url += "akto-" + index; // we want to hit host url once too
@@ -105,14 +110,26 @@ public class StatusCodeAnalyser {
                         OriginalHttpRequest request = new OriginalHttpRequest(url, null, URLMethods.Method.GET.name(), null, headers, "");
                         OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, testingRunConfig, false, new ArrayList<>(), Main.SKIP_SSRF_CHECK);
                         boolean isStatusGood = TestPlugin.isStatusGood(response.getStatusCode());
-                        if (!isStatusGood) return;
+                        if (!isStatusGood) return null;
 
                         String body = response.getBody();
                         fillDefaultPayloadsMap(body);
                     } catch (Exception e) {
                         loggerMaker.errorAndAddToDb(e, "Error in calculateDefaultPayloads " + e.getMessage(), LogDb.TESTING);
                     }
+                    return null;
                 }));
+            }
+
+            for (Future<Void> future : futures) {
+                try {
+                    future.get(1, TimeUnit.MINUTES);
+                } catch (InterruptedException | TimeoutException e) {
+                    future.cancel(true); // Cancel the task
+                    loggerMaker.errorAndAddToDb(e, "Timeout in calculateDefaultPayloads", LogDb.TESTING);
+                } catch (Exception e) {
+                    loggerMaker.errorAndAddToDb(e, "Error while waiting for task completion", LogDb.TESTING);
+                }
             }
         }
     }
