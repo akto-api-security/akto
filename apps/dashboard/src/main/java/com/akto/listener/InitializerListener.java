@@ -2430,6 +2430,8 @@ public class InitializerListener implements ServletContextListener {
 
                     logger.debug("Starting init functions and scheduling jobs at " + now);
 
+                    JobsCron.instance.jobsScheduler(JobExecutorType.DASHBOARD);
+
                     AccountTask.instance.executeTask(new Consumer<Account>() {
                         @Override
                         public void accept(Account account) {
@@ -2437,7 +2439,7 @@ public class InitializerListener implements ServletContextListener {
                         }
                     }, "context-initializer-secondary");
 
-                    crons.trafficAlertsScheduler();
+                    /*crons.trafficAlertsScheduler();
                     // crons.insertHistoricalDataJob();
                     // if(DashboardMode.isOnPremDeployment()){
                     //     crons.insertHistoricalDataJobForOnPrem();
@@ -2463,16 +2465,14 @@ public class InitializerListener implements ServletContextListener {
                     setUpUpdateCustomCollections();
                     setUpFillCollectionIdArrayJob();
                     setupAutomatedApiGroupsScheduler();
-                    /*
+                    *//*
                      * This is a temporary job.
                      * TODO: Remove this once traffic pipeline is cleaned.
-                     */
+                     *//*
                     CleanInventory.cleanInventoryJobRunner();
                     // CleanTestingJob.cleanTestingJobRunner();
 
-                    MatchingJob.MatchingJobRunner();
-                    JobsCron.instance.jobsScheduler(JobExecutorType.DASHBOARD);
-
+                    MatchingJob.MatchingJobRunner();*/
                     int now2 = Context.now();
                     int diffNow = now2 - now;
                     logger.debug(String.format("Completed init functions and scheduling jobs at %d , time taken : %d", now2, diffNow));
