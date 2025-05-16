@@ -77,8 +77,10 @@ public class TestExecutor {
     public static final String COUNT = "count";
     public static final int ALLOWED_REQUEST_PER_HOUR = 100;
     private static final ClientLayer clientLayer = new ClientLayer();
+    private static final AtomicInteger totalTestsCount = new AtomicInteger(0);
     private static final boolean shouldCallClientLayerForSampleData = System.getenv("TESTING_DB_LAYER_SERVICE_URL") != null && !System.getenv("TESTING_DB_LAYER_SERVICE_URL").isEmpty();
     public void init(TestingRun testingRun, ObjectId summaryId, SyncLimit syncLimit, boolean shouldInitOnly) {
+        totalTestsCount.set(0);
         if (testingRun.getTestIdConfig() != 1) {
             apiWiseInit(testingRun, summaryId, false, new ArrayList<>(), syncLimit, shouldInitOnly);
         } else {
@@ -221,6 +223,9 @@ public class TestExecutor {
         TestingConfigurations.getInstance().init(testingUtil, testingRun.getTestingRunConfig(), debug, testConfigMap, testingRun.getMaxConcurrentRequests());
         //Clear the cache for sample data
         VariableResolver.clearSampleDataCache();
+        totalTestsCount.set(
+            testingRunSubCategories.size() * apiInfoKeyList.size()
+        );
 
         if(!shouldInitOnly){
             int maxThreads = Math.min(yamlTemplates.size(), 1000);
@@ -285,13 +290,26 @@ public class TestExecutor {
                     testingRecords.add(future);
                 }
             }
-            
             try {
                 if(!Constants.IS_NEW_TESTING_ENABLED){
                     int waitTs = Context.now();
+                    int prevCalcTime = Context.now();
+                    int lastCheckedCount = 0;
                     while(latch.getCount() > 0 && GetRunningTestsStatus.getRunningTests().isTestRunning(summaryId) 
                         && (Context.now() - waitTs < maxRunTime)) {
-                            loggerMaker.infoAndAddToDb("waiting for tests to finish", LogDb.TESTING);
+                            loggerMaker.infoAndAddToDb("waiting for tests to finish, count left: " + totalTestsCount.get(), LogDb.TESTING);
+
+                            if(lastCheckedCount != totalTestsCount.get()){
+                                lastCheckedCount = totalTestsCount.get();
+                                loggerMaker.debugInfoAddToDb("Total tests left to be executed :" + totalTestsCount.get(), LogDb.TESTING);
+                                prevCalcTime = Context.now();
+                            }else{
+                                if((Context.now() - prevCalcTime) > 20 * 60){
+                                    loggerMaker.debugInfoAddToDb("No new tests are being executed in the last 20 minutes, stopping the test run", LogDb.TESTING);
+                                    break;
+                                }
+                            }
+
                             Thread.sleep(10000);
                     }
     
@@ -649,8 +667,8 @@ public class TestExecutor {
             List<TestingRunResult.TestLog> testLogs, TestingRun testingRun, AtomicBoolean isApiInfoTested, AtomicInteger totalRecords, AtomicInteger throttleNumber) {
         Context.accountId.set(accountId);
         TestConfig testConfig = testConfigMap.get(testSubCategory);
-
         if (testConfig == null) {
+            totalTestsCount.decrementAndGet();
             if(Constants.KAFKA_DEBUG_MODE){
                 loggerMaker.infoAndAddToDb("Found testing config null: " + apiInfoKey.toString() + " : " + testSubCategory);
             }
@@ -658,6 +676,7 @@ public class TestExecutor {
         }
 
         if (!applyRunOnceCheck(apiInfoKey, testConfig, subCategoryEndpointMap, apiInfoKeyToHostMap, testSubCategory)) {
+            totalTestsCount.decrementAndGet();
             return null;
         }
 
@@ -671,7 +690,7 @@ public class TestExecutor {
             if(Constants.KAFKA_DEBUG_MODE){
                 loggerMaker.infoAndAddToDb("Skipping test from producers because: " + failMessage + " apiinfo: " + apiInfoKey.toString(), LogDb.TESTING);
             }
-            
+            totalTestsCount.decrementAndGet();
         }else if (Constants.IS_NEW_TESTING_ENABLED){
             // push data to kafka here and inside that call run test new function
             // create an object of TestMessage
@@ -701,7 +720,7 @@ public class TestExecutor {
                 }
                 insertResultsAndMakeIssues(Collections.singletonList(testingRunResult), summaryId);
             }
-
+            totalTestsCount.decrementAndGet();
         }
         return null;
     }
