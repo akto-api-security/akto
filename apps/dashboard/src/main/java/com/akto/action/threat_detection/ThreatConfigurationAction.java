@@ -11,10 +11,8 @@ import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
 import org.apache.http.util.EntityUtils;
 
-import com.akto.ProtoMessageUtils;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
-import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatActorByCountryResponse;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 public class ThreatConfigurationAction extends AbstractThreatDetectionAction {
@@ -26,7 +24,6 @@ public ThreatConfiguration getThreatConfiguration() {
 }
 
 public void setThreatConfiguration(ThreatConfiguration threatConfiguration) {
-    loggerMaker.warn("Setting threat configuration **************");
     this.threatConfiguration = threatConfiguration;
 }
   private final CloseableHttpClient httpClient;

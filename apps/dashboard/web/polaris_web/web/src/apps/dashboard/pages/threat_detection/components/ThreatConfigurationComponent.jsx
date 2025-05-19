@@ -16,7 +16,7 @@ function ThreatConfigurationComponent() {
         const response = await api.fetchThreatConfiguration();
         const actor = response?.threatConfiguration?.actor?.actorId || {};
         setSelectedActor(actor.type === "header" ? "header" : "ip");
-        setHeaderName(actor.key || "");
+        setHeaderName(actor.type === "header" ? actor.key : "");
         setIsSaveEnabled(actor.type === "ip" || (actor.type === "header" && actor.key?.trim() !== ""));
     };
 
