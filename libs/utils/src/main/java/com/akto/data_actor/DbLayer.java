@@ -613,7 +613,7 @@ public class DbLayer {
             Filters.eq(ID, trrs.getTestingRunId()),
             Projections.include(TestingRun.MINI_TESTING_SERVICE_NAME)
         );
-
+        if(testingRun == null) return null;
         String serviceName = testingRun.getMiniTestingServiceName();
         if (!StringUtils.isEmpty(serviceName) && !serviceName.equals(miniTestingName)) {
             return null;
