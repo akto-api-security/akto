@@ -22,14 +22,15 @@ function AgentTeam() {
 
     const [Agents, setAgents] = useState([])
     const {agentsStore, setCurrentAgentState} = useAgentsStateStore();
+    const [showConfigCTA, setShowConfigCTA] = useState(true)
 
     useEffect(() => {
         api.getMemberAgents().then((res: { agents: any; }) => {
             if(res && res.agents){
-                let agents = res.agents.map((x: { _name: string; agentFunctionalName: string; description: string; },i: number) => {
+                let agents = res.agents.map((x: { _name: string; agentEnglishName: string; agentFunctionalName: string; description: string; },i: number) => {
                     return {
                         id: x._name,
-                        name: x.agentFunctionalName,
+                        name: x.agentEnglishName + " | " +x.agentFunctionalName,
                         description: x.description,
                         image: AGENT_IMAGES[(i%(AGENT_IMAGES.length))],
                     }
@@ -40,12 +41,15 @@ function AgentTeam() {
 
         api.getAgentModels().then((res: { models: any; }) => {
             if(res && res.models){
-                let models = res.models.map((x: { _name: string; modelName: string; }) =>{
+                let models = res.models.map((x: { name: string; }) =>{
                     return {
-                        id: x._name,
-                        name: x.modelName
+                        id: x.name,
+                        name: x.name
                     }
                 })
+                if(models?.length > 0){
+                    setShowConfigCTA(false)
+                }
                 setAvailableModels(models);
             }
         })
@@ -129,7 +133,7 @@ function AgentTeam() {
                     <TitleWithInfo
                         tooltipContent={"These are AI agents that can be used to provide insights"}
                         titleText={"AI Agents"}
-                        // TODO: implement docsUrl functionality
+                        // TODO: Add docs page for agents
                         docsUrl={"https://docs.akto.io"}
                     />
                 }
@@ -138,7 +142,7 @@ function AgentTeam() {
                 //     <Button id={"Knowledge-base"} onClick={() => {}}>Knowledge base</Button>
                 // ]}
             />
-            <AgentWindow onClose={closeAction} open={showAgentWindow} />
+            <AgentWindow onClose={closeAction} open={showAgentWindow} showConfigCTA={showConfigCTA}/>
         </>
     )
 }

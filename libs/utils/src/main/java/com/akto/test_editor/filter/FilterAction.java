@@ -11,6 +11,8 @@ import com.akto.dao.testing.AccessMatrixUrlToRolesDao;
 import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.testing.AccessMatrixUrlToRole;
 
+import com.alibaba.fastjson2.JSON;
+import com.alibaba.fastjson2.JSONObject;
 import org.bson.conversions.Bson;
 
 import com.akto.dao.ApiInfoDao;
@@ -52,6 +54,8 @@ public final class FilterAction {
     public final Map<String, DataOperandsImpl> filters = new HashMap<String, DataOperandsImpl>() {{
         put("contains_all", new ContainsAllFilter());
         put("contains_either", new ContainsEitherFilter());
+        put("contains_either_cidr", new ContainsEitherIpFilter());
+        put("not_contains_cidr", new NotContainsIpFilter());
         put("not_contains", new NotContainsFilter());
         put("regex", new RegexFilter());
         put("eq", new EqFilter());
@@ -115,6 +119,12 @@ public final class FilterAction {
                 return applyFilterOnQueryParams(filterActionRequest);
             case "response_code":
                 return applyFilterOnResponseCode(filterActionRequest);
+            case "source_ip":
+                return applyFilterOnSourceIps(filterActionRequest);
+            case "destination_ip":
+                return applyFilterOnDestinationIps(filterActionRequest);
+            case "country_code":
+                return applyFilterOnCountryCode(filterActionRequest);
             default:
                 return new DataOperandsFilterResponse(false, null, null, null);
 
@@ -253,6 +263,49 @@ public final class FilterAction {
         varMap.put(querySet.get(0), respCode);
     }
 
+    public DataOperandsFilterResponse applyFilterOnSourceIps(FilterActionRequest filterActionRequest) {
+
+        RawApi rawApi = filterActionRequest.fetchRawApiBasedOnContext();
+        if (rawApi == null || rawApi.getRequest() == null) {
+            return new DataOperandsFilterResponse(false, null, null, null);
+        }
+
+        String sourceIp = rawApi.getRequest().getSourceIp();
+        DataOperandFilterRequest dataOperandFilterRequest = new DataOperandFilterRequest(sourceIp, filterActionRequest.getQuerySet(), filterActionRequest.getOperand());
+        ValidationResult res = invokeFilter(dataOperandFilterRequest);
+        return new DataOperandsFilterResponse(res.getIsValid(), null, null, null, res.getValidationReason());
+    }
+
+    public DataOperandsFilterResponse applyFilterOnDestinationIps(FilterActionRequest filterActionRequest) {
+
+        RawApi rawApi = filterActionRequest.fetchRawApiBasedOnContext();
+        if (rawApi == null || rawApi.getRequest() == null) {
+            return new DataOperandsFilterResponse(false, null, null, null);
+        }
+
+        String destinationIp = rawApi.getRequest().getDestinationIp();
+        DataOperandFilterRequest dataOperandFilterRequest = new DataOperandFilterRequest(destinationIp, filterActionRequest.getQuerySet(), filterActionRequest.getOperand());
+        ValidationResult res = invokeFilter(dataOperandFilterRequest);
+        return new DataOperandsFilterResponse(res.getIsValid(), null, null, null, res.getValidationReason());
+    }
+
+    public DataOperandsFilterResponse applyFilterOnCountryCode(FilterActionRequest filterActionRequest) {
+
+        RawApi rawApi = filterActionRequest.fetchRawApiBasedOnContext();
+        if (rawApi == null || rawApi.getRequest() == null) {
+            return new DataOperandsFilterResponse(false, null, null, null);
+        }
+
+        String countryCode = rawApi.getRawApiMetadata().getCountryCode();
+        if (countryCode.isEmpty()){
+            return new DataOperandsFilterResponse(false, null, null, null);
+        }
+
+        DataOperandFilterRequest dataOperandFilterRequest = new DataOperandFilterRequest(countryCode, filterActionRequest.getQuerySet(), filterActionRequest.getOperand());
+        ValidationResult res = invokeFilter(dataOperandFilterRequest);
+        return new DataOperandsFilterResponse(res.getIsValid(), null, null, null, res.getValidationReason());
+    }
+
     public DataOperandsFilterResponse applyFilterOnRequestPayload(FilterActionRequest filterActionRequest) {
 
         RawApi rawApi = filterActionRequest.fetchRawApiBasedOnContext();
@@ -287,11 +340,14 @@ public final class FilterAction {
 
         String origPayload = payload;
         BasicDBObject payloadObj = new BasicDBObject();
-        try {
-            payload = Utils.jsonifyIfArray(payload);
-            payloadObj =  BasicDBObject.parse(payload);
-        } catch(Exception e) {
-            // add log
+        if (!filterActionRequest.getOperand().equals(TestEditorEnums.DataOperands.REGEX.toString()) || (filterActionRequest.getCollectionProperty() != null && filterActionRequest.getCollectionProperty().equals(TestEditorEnums.CollectionOperands.FOR_ONE.toString())) ) {
+            try {
+                payload = Utils.jsonifyIfArray(payload);
+                JSONObject jsonObj = JSON.parseObject(payload);
+                payloadObj = new BasicDBObject(jsonObj);
+            } catch(Exception e) {
+                // add log
+            }
         }
 
         Set<String> matchingKeySet = new HashSet<>();
@@ -672,6 +728,8 @@ public final class FilterAction {
             result = queryParamObj.size() > 0;
         }
 
+        Object val = queryParams;
+
         if (filterActionRequest.getConcernedSubProperty() != null && filterActionRequest.getConcernedSubProperty().toLowerCase().equals("key")) {
             for (String key: queryParamObj.keySet()) {
                 DataOperandFilterRequest dataOperandFilterRequest = new DataOperandFilterRequest(key, filterActionRequest.getQuerySet(), filterActionRequest.getOperand());
@@ -711,12 +769,19 @@ public final class FilterAction {
             //     matchingValueKeySet = new ArrayList<>();
             // }
             return new DataOperandsFilterResponse(result, matchingValueKeySet, null, null, validationErrorString.toString());
-        } else {
-            DataOperandFilterRequest dataOperandFilterRequest = new DataOperandFilterRequest(queryParams, filterActionRequest.getQuerySet(), filterActionRequest.getOperand());
-            ValidationResult validationResult = invokeFilter(dataOperandFilterRequest);
-            res = validationResult.getIsValid();
-            return new DataOperandsFilterResponse(res, null, null, null, validationResult.getValidationReason());
+        } else if (filterActionRequest.getConcernedSubProperty() == null &&
+                filterActionRequest.getBodyOperand() != null &&
+                filterActionRequest.getBodyOperand().equalsIgnoreCase(BodyOperator.LENGTH.toString())) {
+            if(queryParams == null) {
+                val = 0;
+            } else {
+                val = queryParams.length();
+            }
         }
+        DataOperandFilterRequest dataOperandFilterRequest = new DataOperandFilterRequest(val, filterActionRequest.getQuerySet(), filterActionRequest.getOperand());
+        ValidationResult validationResult = invokeFilter(dataOperandFilterRequest);
+        res = validationResult.getIsValid();
+        return new DataOperandsFilterResponse(res, null, null, null, validationResult.getValidationReason());
     }
 
     public void extractQueryParams(FilterActionRequest filterActionRequest, Map<String, Object> varMap, boolean extractMultiple) {
@@ -857,7 +922,23 @@ public final class FilterAction {
 
     public boolean getMatchingKeysForPayload(Object obj, String parentKey, Object querySet, String operand, Set<String> matchingKeys, boolean doAllSatisfy) {
         Boolean res = false;
-        if (obj instanceof BasicDBObject) {
+        if (obj instanceof JSONObject) {
+            JSONObject basicDBObject = (JSONObject) obj;
+
+            Set<String> keySet = basicDBObject.keySet();
+
+            for(String key: keySet) {
+                if (key == null) {
+                    continue;
+                }
+                Object value = basicDBObject.get(key);
+                doAllSatisfy = getMatchingKeysForPayload(value, key, querySet, operand, matchingKeys, doAllSatisfy);
+                if (parentKey != null && TestEditorEnums.DataOperands.VALUETYPE.toString().equals(operand)) {
+                    matchingKeys.add(parentKey);
+                }
+                
+            }
+        } else if (obj instanceof BasicDBObject) {
             BasicDBObject basicDBObject = (BasicDBObject) obj;
 
             Set<String> keySet = basicDBObject.keySet();

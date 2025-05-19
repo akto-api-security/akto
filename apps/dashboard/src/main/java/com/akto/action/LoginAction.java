@@ -1,51 +1,71 @@
 package com.akto.action;
 
+import static com.akto.util.Constants.TWO_HOURS_TIMESTAMP;
+
+import com.akto.dao.ApiInfoDao;
 import com.akto.dao.BackwardCompatibilityDao;
 import com.akto.dao.SignupDao;
 import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dao.UsersDao;
 import com.akto.dao.context.Context;
+import com.akto.dao.testing.DefaultTestSuitesDao;
+import com.akto.dao.testing.TestingRunResultDao;
+import com.akto.dto.ApiInfo;
+import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.BackwardCompatibility;
 import com.akto.dto.Config;
 import com.akto.dto.SignupInfo;
 import com.akto.dto.SignupUserInfo;
 import com.akto.dto.User;
+import com.akto.dto.testing.TestResult;
+import com.akto.dto.testing.TestingRunResult;
 import com.akto.dto.type.SingleTypeInfo;
+import com.akto.dto.type.URLMethods.Method;
 import com.akto.listener.InitializerListener;
 import com.akto.listener.RuntimeListener;
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import com.akto.notifications.email.SendgridEmail;
 import com.akto.password_reset.PasswordResetUtils;
+import com.akto.util.Constants;
 import com.akto.util.DashboardMode;
-import com.akto.utils.Token;
 import com.akto.utils.JWT;
+import com.akto.utils.Token;
 import com.mongodb.BasicDBObject;
+import com.mongodb.client.MongoCursor;
+import com.mongodb.client.model.Accumulators;
+import com.mongodb.client.model.Aggregates;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.FindOneAndUpdateOptions;
 import com.mongodb.client.model.PushOptions;
 import com.mongodb.client.model.ReturnDocument;
+import com.mongodb.client.model.Sorts;
+import com.mongodb.client.model.UpdateOneModel;
+import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.Updates;
+import com.mongodb.client.model.WriteModel;
 import com.opensymphony.xwork2.Action;
-
 import com.sendgrid.helpers.mail.Mail;
-import org.apache.commons.lang3.StringUtils;
-import org.apache.struts2.interceptor.ServletRequestAware;
-import org.apache.struts2.interceptor.ServletResponseAware;
-import org.bson.conversions.Bson;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
+import java.io.IOException;
+import java.security.NoSuchAlgorithmException;
+import java.security.spec.InvalidKeySpecException;
+import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import javax.servlet.http.Cookie;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.servlet.http.HttpSession;
-import java.io.IOException;
-import java.security.NoSuchAlgorithmException;
-import java.security.spec.InvalidKeySpecException;
-import java.util.*;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-
-import static com.akto.util.Constants.TWO_HOURS_TIMESTAMP;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.struts2.interceptor.ServletRequestAware;
+import org.apache.struts2.interceptor.ServletResponseAware;
+import org.bson.conversions.Bson;
 
 // Validates user from the supplied username and password
 // Generates refresh token jwt using the username if valid user
@@ -54,7 +74,8 @@ import static com.akto.util.Constants.TWO_HOURS_TIMESTAMP;
 // Adds the refresh token to http-only cookie
 // Adds the access token to header
 public class LoginAction implements Action, ServletResponseAware, ServletRequestAware {
-    private static final Logger logger = LoggerFactory.getLogger(LoginAction.class);
+
+    private static final LoggerMaker logger = new LoggerMaker(LoginAction.class, LogDb.DASHBOARD);
     
     public static final String REFRESH_TOKEN_COOKIE_NAME = "refreshToken";
     private static final ExecutorService service = Executors.newFixedThreadPool(1);
@@ -69,7 +90,7 @@ public class LoginAction implements Action, ServletResponseAware, ServletRequest
     BasicDBObject loginResult = new BasicDBObject();
     @Override
     public String execute() throws IOException {
-        logger.info("LoginAction Hit");
+        logger.debug("LoginAction Hit");
 
         if (username == null) {
             return Action.ERROR.toUpperCase();
@@ -102,7 +123,7 @@ public class LoginAction implements Action, ServletResponseAware, ServletRequest
                 }
             }
 
-            logger.info("Auth Failed");
+            logger.debug("Auth Failed");
             return "ERROR";
         }
         String result = loginUser(user, servletResponse, true, servletRequest);
@@ -124,7 +145,7 @@ public class LoginAction implements Action, ServletResponseAware, ServletRequest
         for (String accountIdStr: user.getAccounts().keySet()) {
             int accountId = Integer.parseInt(accountIdStr);
             Context.accountId.set(accountId);
-            logger.info("updating vulnerable api's collection for account " + accountId);
+            logger.debug("updating vulnerable api's collection for account " + accountId);
             try {
                 BackwardCompatibility backwardCompatibility = BackwardCompatibilityDao.instance.findOne(new BasicDBObject());
                 if (backwardCompatibility == null || backwardCompatibility.getVulnerableApiUpdationVersionV1() == 0) {
@@ -144,11 +165,61 @@ public class LoginAction implements Action, ServletResponseAware, ServletRequest
         Context.accountId.set(accountId);
         long count = SingleTypeInfoDao.instance.getEstimatedCount();
         if(count == 0){
-            logger.info("New user, showing quick start page");
+            logger.debug("New user, showing quick start page");
             loginResult.put("redirect", "dashboard/quick-start");
         } else {
-            logger.info("Existing user, not redirecting to quick start page");
+            logger.debug("Existing user, not redirecting to quick start page");
         }
+    }
+
+    private static void backFillLastTested(){
+        List<Bson> pipeLine = new ArrayList<>();
+        int timeNow = (int) Context.now();
+        pipeLine.add(Aggregates.sort(Sorts.descending(TestingRunResult.END_TIMESTAMP)));
+            pipeLine.add(
+                Aggregates.match(Filters.and(
+                    Filters.size(TestingRunResult.TEST_RESULTS + "." + TestResult.ERRORS, 0),
+                    Filters.gte(TestingRunResult.END_TIMESTAMP, Context.now() - (Constants.ONE_MONTH_TIMESTAMP))
+                ))
+            );
+
+            pipeLine.add(
+                Aggregates.group(
+                    "$" + TestingRunResult.API_INFO_KEY, Accumulators.max(TestingRunResult.END_TIMESTAMP, "$" + TestingRunResult.END_TIMESTAMP)
+                )
+            );
+
+            MongoCursor<BasicDBObject> cursor = TestingRunResultDao.instance.getMCollection().aggregate(pipeLine, BasicDBObject.class).cursor();
+            Bson filter;
+            List<WriteModel<ApiInfo>> bulkUpdates = new ArrayList<>();
+            while(cursor.hasNext()) {
+                BasicDBObject basicDBObject = cursor.next();
+                BasicDBObject idObj = (BasicDBObject) basicDBObject.get(Constants.ID);
+                ApiInfo.ApiInfoKey id = new ApiInfoKey(
+                    idObj.getInt(SingleTypeInfo._API_COLLECTION_ID),
+                    idObj.getString(SingleTypeInfo._URL),
+                    Method.fromString(idObj.getString(SingleTypeInfo._METHOD))
+                );
+                filter = ApiInfoDao.getFilter(id);
+                int lastTestedField = basicDBObject.getInt(TestingRunResult.END_TIMESTAMP);
+                bulkUpdates.add(new UpdateOneModel<>(filter, Updates.set(ApiInfo.LAST_TESTED, lastTestedField), new UpdateOptions().upsert(false)));
+
+                if(bulkUpdates.size() >= 200){
+                    try {
+                        ApiInfoDao.instance.getMCollection().bulkWrite(bulkUpdates);
+                        bulkUpdates.clear();
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+                    
+                }
+            }
+
+            if(!bulkUpdates.isEmpty()){
+                ApiInfoDao.instance.getMCollection().bulkWrite(bulkUpdates);
+            }  
+            
+            logger.infoAndAddToDb("Finished back filling last tested field for account: " + Context.accountId.get() + " time taken: " + (Context.now() - timeNow), LogDb.DASHBOARD);
     }
 
     private final static int REFRESH_INTERVAL = 24 * 60 * 60; // one day.
@@ -202,18 +273,65 @@ public class LoginAction implements Action, ServletResponseAware, ServletRequest
                         ),
                         new FindOneAndUpdateOptions().returnDocument(ReturnDocument.BEFORE)
                 );
+
+                if(tempUser == null) {
+                    return Action.ERROR.toUpperCase();
+                }
+
                 /*
                  * Creating datatype to template on user login.
                  * TODO: Remove this job once templates for majority users are created.
                  */
+
+                // update default test suites list on login instead of initializing
+                try {
+                    // need this loop for default insertion of test suites upon login
+                    Map<Integer, Boolean> accountToIsFirstTimeMap = new HashMap<>();
+                    for(String accountIdStr : user.getAccounts().keySet()) {
+                        int accountId = Integer.parseInt(accountIdStr);
+                        Context.accountId.set(accountId);
+                        int count = (int) DefaultTestSuitesDao.instance.estimatedDocumentCount();
+                        if (count == 0) {
+                            accountToIsFirstTimeMap.put(accountId, true);
+                        }
+                    }
+                    if(!accountToIsFirstTimeMap.isEmpty() || (tempUser.getLastLoginTs() + REFRESH_INTERVAL) < Context.now()){
+                        service.submit(() -> {
+                            try {
+                                for(String accountIdStr : user.getAccounts().keySet()) {
+                                    int accountId = Integer.parseInt(accountIdStr);
+                                    Context.accountId.set(accountId);
+                                    DefaultTestSuitesDao.insertDefaultTestSuites(accountToIsFirstTimeMap.getOrDefault(accountId, false));
+                                }
+                            } catch (Exception e) {
+                                e.printStackTrace();
+                            }
+                        });
+                    }
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+
                 if ((tempUser.getLastLoginTs() + REFRESH_INTERVAL) < Context.now()) {
+                    // No longer needed for , TODO: heavy job, need to optimize
+                    // service.submit(() -> {
+                    //     try {
+                    //         for (String accountIdStr : user.getAccounts().keySet()) {
+                    //             int accountId = Integer.parseInt(accountIdStr);
+                    //             Context.accountId.set(accountId);
+                    //             backFillLastTested();
+                    //         }
+                    //     } catch (Exception e) {
+                    //         e.printStackTrace();
+                    //     }
+                    // });
                     service.submit(() -> {
                         try {
                             for (String accountIdStr : user.getAccounts().keySet()) {
                                 int accountId = Integer.parseInt(accountIdStr);
                                 Context.accountId.set(accountId);
                                 SingleTypeInfo.fetchCustomDataTypes(accountId);
-                                logger.info("updating data type test templates for account " + accountId);
+                                logger.debug("updating data type test templates for account " + accountId);
                                 InitializerListener.executeDataTypeToTemplate();
                             }
                         } catch (Exception e) {
@@ -268,7 +386,7 @@ public class LoginAction implements Action, ServletResponseAware, ServletRequest
         User user = UsersDao.instance.findOne(filters);
 
         if(user == null) {
-            logger.info("user not found while sending password reset link");
+            logger.debug("user not found while sending password reset link");
             return Action.SUCCESS.toUpperCase();
         }
 

@@ -62,7 +62,7 @@ public class PostmanAction extends UserAction {
     private static final OkHttpClient client = CoreHTTPClient.client.newBuilder().build();
 
     static{
-        loggerMaker.infoAndAddToDb("Initializing http client for postman operations");
+        loggerMaker.debugAndAddToDb("Initializing http client for postman operations");
         ApiRequest.initCommonHttpClient(client);
     }
 
@@ -119,7 +119,7 @@ public class PostmanAction extends UserAction {
         int accountId = Context.accountId.get();
 
         Runnable r = () -> {
-            loggerMaker.infoAndAddToDb("Starting thread to create postman api", LogDb.DASHBOARD);
+            loggerMaker.debugAndAddToDb("Starting thread to create postman api", LogDb.DASHBOARD);
             Context.accountId.set(accountId);
             ApiCollection apiCollection = ApiCollectionsDao.instance.findOne(Filters.eq("_id", apiCollectionId));
             if (apiCollection == null) {
@@ -164,7 +164,7 @@ public class PostmanAction extends UserAction {
             } catch (Exception e){
                 loggerMaker.errorAndAddToDb(e,"Error while creating api in postman: " + e.getMessage(), LogDb.DASHBOARD);
             }
-            loggerMaker.infoAndAddToDb("Successfully created api in postman", LogDb.DASHBOARD);
+            loggerMaker.debugAndAddToDb("Successfully created api in postman", LogDb.DASHBOARD);
         };
 
         executorService.submit(r);
@@ -304,7 +304,7 @@ public class PostmanAction extends UserAction {
 
         PostmanCredential postmanCredential = fetchPostmanCredential();
 
-        loggerMaker.infoAndAddToDb("Fetched postman creds", LogDb.DASHBOARD);
+        loggerMaker.debugAndAddToDb("Fetched postman creds", LogDb.DASHBOARD);
 
         PostmanWorkspaceUpload upload = new PostmanWorkspaceUpload(FileUpload.UploadType.POSTMAN_WORKSPACE, FileUpload.UploadStatus.IN_PROGRESS);
         upload.setPostmanWorkspaceId(workspace_id);
@@ -315,7 +315,7 @@ public class PostmanAction extends UserAction {
         executorService.schedule( new Runnable() {
             public void run() {
                 try {
-                    loggerMaker.infoAndAddToDb("Starting postman thread", LogDb.DASHBOARD);
+                    loggerMaker.debugAndAddToDb("Starting postman thread", LogDb.DASHBOARD);
                     Context.accountId.set(accountId);
                     importDataFromPostmanMain(workspace_id, postmanCredential.getApiKey(), allowReplay, uploadId);
                 } catch (Exception e){
@@ -337,17 +337,17 @@ public class PostmanAction extends UserAction {
         return postmanUploadLoader.getId();
     }
 
-    private static void importDataFromPostmanMain(String workspaceId, String apiKey, boolean allowReplay, ObjectId uploadId) {
+    private void importDataFromPostmanMain(String workspaceId, String apiKey, boolean allowReplay, ObjectId uploadId) {
         PostmanWorkspaceUpload upload = FileUploadsDao.instance.getPostmanMCollection().find(Filters.eq("_id", uploadId)).first();
         if(upload == null){
-            loggerMaker.infoAndAddToDb("No upload found with id: " + uploadId, LogDb.DASHBOARD);
+            loggerMaker.debugAndAddToDb("No upload found with id: " + uploadId, LogDb.DASHBOARD);
             return;
         }
         Main main = new Main(apiKey);
-        loggerMaker.infoAndAddToDb("Fetching details for workspace_id:" + workspaceId, LogDb.DASHBOARD);
+        loggerMaker.debugAndAddToDb("Fetching details for workspace_id:" + workspaceId, LogDb.DASHBOARD);
         JsonNode workspaceDetails = main.fetchWorkspace(workspaceId);
         if(workspaceDetails == null || workspaceDetails.get("workspace") == null){
-            loggerMaker.infoAndAddToDb("No workspace found", LogDb.DASHBOARD);
+            loggerMaker.debugAndAddToDb("No workspace found", LogDb.DASHBOARD);
             upload.setFatalError("No workspace found");
             upload.setUploadStatus(FileUpload.UploadStatus.FAILED);
             FileUploadsDao.instance.replaceOne(Filters.eq("_id", uploadId), upload);
@@ -356,7 +356,7 @@ public class PostmanAction extends UserAction {
         JsonNode workspaceObj = workspaceDetails.get("workspace");
         ArrayNode collectionsObj = (ArrayNode) workspaceObj.get("collections");
         if(collectionsObj == null){
-            loggerMaker.infoAndAddToDb("No collections found in workspace", LogDb.DASHBOARD);
+            loggerMaker.debugAndAddToDb("No collections found in workspace", LogDb.DASHBOARD);
             upload.setFatalError("No collections found in workspace");
             upload.setUploadStatus(FileUpload.UploadStatus.FAILED);
             FileUploadsDao.instance.replaceOne(Filters.eq("_id", uploadId), upload);
@@ -376,7 +376,7 @@ public class PostmanAction extends UserAction {
                 continue;
             }
 
-            loggerMaker.infoAndAddToDb("Successfully fetched postman collection: " + collectionId, LogDb.DASHBOARD);
+            loggerMaker.debugAndAddToDb("Successfully fetched postman collection: " + collectionId, LogDb.DASHBOARD);
 
             JsonNode collectionDetailsObj = collectionDetails.get("collection");
             String collectionName = collectionDetailsObj.get("info").get("name").asText();
@@ -389,7 +389,7 @@ public class PostmanAction extends UserAction {
 
             int count = apiCount(collectionDetailsObj);
 
-            loggerMaker.infoAndAddToDb("Api count for collection " + collectionId + ": " + count, LogDb.DASHBOARD);
+            loggerMaker.debugAndAddToDb("Api count for collection " + collectionId + ": " + count, LogDb.DASHBOARD);
 
             collectionDetailsToIdMap.put(collectionId, collectionDetailsObj);
             countMap.put(collectionId, count);
@@ -407,12 +407,12 @@ public class PostmanAction extends UserAction {
 
             String collectionName = collectionDetailsObj.get("info").get("name").asText();
 
-            loggerMaker.infoAndAddToDb("Processing collection " + collectionName, LogDb.DASHBOARD);
+            loggerMaker.debugAndAddToDb("Processing collection " + collectionName, LogDb.DASHBOARD);
             List<FileUploadError> collectionErrors = generateMessages(collectionDetailsObj, workspaceId, aktoCollectionId, collectionName, collectionId, allowReplay, upload);
             if(!collectionErrors.isEmpty()){
                 upload.addError(collectionId, collectionErrors);
             }
-            loggerMaker.infoAndAddToDb("Finished processing collection " + collectionName, LogDb.DASHBOARD);
+            loggerMaker.debugAndAddToDb("Finished processing collection " + collectionName, LogDb.DASHBOARD);
         }
         upload.setUploadStatus(FileUpload.UploadStatus.SUCCEEDED);
         FileUploadsDao.instance.replaceOne(Filters.eq("_id", uploadId), upload);
@@ -455,7 +455,7 @@ public class PostmanAction extends UserAction {
         this.uploadId = uploadId.toString();
         executorService.schedule(new Runnable() {
             public void run() {
-                loggerMaker.infoAndAddToDb("Starting thread to process postman file", LogDb.DASHBOARD);
+                loggerMaker.debugAndAddToDb("Starting thread to process postman file", LogDb.DASHBOARD);
                 Context.accountId.set(accountId);
                 try {
                     importDataFromPostmanFileMain(collectionDetailsObj, postmanAktoCollectionId, collectionId, collectionName, allowReplay, uploadId);
@@ -470,6 +470,7 @@ public class PostmanAction extends UserAction {
     }
     private List<PostmanUploadLog> postmanUploadLogs;
     private FileUpload.UploadStatus uploadStatus;
+    private String miniTestingName;
 
     private BasicDBObject uploadDetails;
     public String fetchImportLogs(){
@@ -550,6 +551,15 @@ public class PostmanAction extends UserAction {
 
     public String uploadId;
     public ImportType importType;
+
+    public String getMiniTestingName() {
+        return miniTestingName;
+    }
+
+    public void setMiniTestingName(String miniTestingName) {
+        this.miniTestingName = miniTestingName;
+    }
+
     public enum ImportType{
         ONLY_SUCCESSFUL_APIS,
         ALL_APIS
@@ -579,7 +589,7 @@ public class PostmanAction extends UserAction {
 
         new Thread(()-> {
             Context.accountId.set(accountId);
-            loggerMaker.infoAndAddToDb(String.format("Starting thread to import %d postman apis, import type: %s", uploads.size(), importType), LogDb.DASHBOARD);
+            loggerMaker.debugAndAddToDb(String.format("Starting thread to import %d postman apis, import type: %s", uploads.size(), importType), LogDb.DASHBOARD);
             String topic = System.getenv("AKTO_KAFKA_TOPIC_NAME");
             Map<String, List<PostmanUploadLog>> collectionToUploadsMap = new HashMap<>();
             for(PostmanUploadLog upload: uploads){
@@ -597,22 +607,22 @@ public class PostmanAction extends UserAction {
                     int aktoCollectionId = collectionId.hashCode();
                     aktoCollectionId = aktoCollectionId < 0 ? aktoCollectionId * -1: aktoCollectionId;
                     List<String> msgs = new ArrayList<>();
-                    loggerMaker.infoAndAddToDb(String.format("Processing postman collection %s, aktoCollectionId: %s", postmanCollectionToApis.getKey(), aktoCollectionId), LogDb.DASHBOARD);
+                    loggerMaker.debugAndAddToDb(String.format("Processing postman collection %s, aktoCollectionId: %s", postmanCollectionToApis.getKey(), aktoCollectionId), LogDb.DASHBOARD);
                     for(PostmanUploadLog upload: postmanCollectionToApis.getValue()){
                         String aktoFormat = upload.getAktoFormat();
                         msgs.add(aktoFormat);
                     }
                     if(ApiCollectionsDao.instance.findOne(Filters.eq("_id", aktoCollectionId)) == null){
                         String collectionName = postmanWorkspaceUpload.getPostmanCollectionIds().getOrDefault(collectionId, "Postman " + collectionId);
-                        loggerMaker.infoAndAddToDb(String.format("Creating manual collection for aktoCollectionId: %s and name: %s", aktoCollectionId, collectionName), LogDb.DASHBOARD);
+                        loggerMaker.debugAndAddToDb(String.format("Creating manual collection for aktoCollectionId: %s and name: %s", aktoCollectionId, collectionName), LogDb.DASHBOARD);
                         ApiCollectionsDao.instance.insertOne(ApiCollection.createManualCollection(aktoCollectionId, collectionName));
                     }
-                    loggerMaker.infoAndAddToDb(String.format("Pushing data in akto collection id %s", aktoCollectionId), LogDb.DASHBOARD);
-                    Utils.pushDataToKafka(aktoCollectionId, topic, msgs, new ArrayList<>(), skipKafka, true);
-                    loggerMaker.infoAndAddToDb(String.format("Pushed data in akto collection id %s", aktoCollectionId), LogDb.DASHBOARD);
+                    loggerMaker.debugAndAddToDb(String.format("Pushing data in akto collection id %s", aktoCollectionId), LogDb.DASHBOARD);
+                    Utils.pushDataToKafka(aktoCollectionId, topic, msgs, new ArrayList<>(), skipKafka, true, true);
+                    loggerMaker.debugAndAddToDb(String.format("Pushed data in akto collection id %s", aktoCollectionId), LogDb.DASHBOARD);
                 }
                 FileUploadsDao.instance.getPostmanMCollection().updateOne(Filters.eq("_id", new ObjectId(uploadId)), new BasicDBObject("$set", new BasicDBObject("ingestionComplete", true).append("markedForDeletion", true)), new UpdateOptions().upsert(false));
-                loggerMaker.infoAndAddToDb("Ingestion complete for " + postmanWorkspaceUpload.getId().toString(), LogDb.DASHBOARD);
+                loggerMaker.debugAndAddToDb("Ingestion complete for " + postmanWorkspaceUpload.getId().toString(), LogDb.DASHBOARD);
 
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb(e,"Error pushing data to kafka", LogDb.DASHBOARD);
@@ -623,15 +633,15 @@ public class PostmanAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
-    private static void importDataFromPostmanFileMain(JsonNode collectionDetailsObj, int aktoCollectionId, String collectionId, String collectionName, boolean allowReplay, ObjectId uploadId) {
+    private void importDataFromPostmanFileMain(JsonNode collectionDetailsObj, int aktoCollectionId, String collectionId, String collectionName, boolean allowReplay, ObjectId uploadId) {
         PostmanWorkspaceUpload postmanWorkspaceUpload = FileUploadsDao.instance.getPostmanMCollection().find(Filters.eq("_id", uploadId)).first();
         if(postmanWorkspaceUpload == null){
-            loggerMaker.infoAndAddToDb("No upload found with id: " + uploadId, LogDb.DASHBOARD);
+            loggerMaker.debugAndAddToDb("No upload found with id: " + uploadId, LogDb.DASHBOARD);
             return;
         }
         int count = apiCount(collectionDetailsObj);
         postmanWorkspaceUpload.setCount(count);
-        loggerMaker.infoAndAddToDb("API count in postman.json: " + count, LogDb.DASHBOARD);
+        loggerMaker.debugAndAddToDb("API count in postman.json: " + count, LogDb.DASHBOARD);
 
         List<FileUploadError> fileUploadErrors = generateMessages(collectionDetailsObj, null, aktoCollectionId, collectionName, collectionId, allowReplay, postmanWorkspaceUpload);
 
@@ -651,7 +661,7 @@ public class PostmanAction extends UserAction {
         return jsonNodes.size();
     }
 
-    private static List<FileUploadError> generateMessages(JsonNode collectionDetailsObj, String workspaceId, int aktoCollectionId, String collectionName, String postmanCollectionId, boolean allowReplay, PostmanWorkspaceUpload fileUpload) {
+    private List<FileUploadError> generateMessages(JsonNode collectionDetailsObj, String workspaceId, int aktoCollectionId, String collectionName, String postmanCollectionId, boolean allowReplay, PostmanWorkspaceUpload fileUpload) {
         int accountId = Context.accountId.get();
         int noUrls = 0;
         List<FileUploadError> collectionErrors = new ArrayList<>();
@@ -665,11 +675,11 @@ public class PostmanAction extends UserAction {
         ArrayList<JsonNode> jsonNodes = new ArrayList<>();
         Utils.fetchApisRecursively((ArrayNode) collectionDetailsObj.get("item"), jsonNodes);
         if(jsonNodes.isEmpty()) {
-            loggerMaker.infoAndAddToDb("Collection "+ collectionName + " has no requests, skipping it", LogDb.DASHBOARD);
+            loggerMaker.debugAndAddToDb("Collection "+ collectionName + " has no requests, skipping it", LogDb.DASHBOARD);
             collectionErrors.add(new FileUploadError("Collection has no requests", FileUploadError.ErrorType.ERROR));
             return collectionErrors;
         }
-        loggerMaker.infoAndAddToDb(String.format("Found %s apis in collection %s", jsonNodes.size(), collectionName), LogDb.DASHBOARD);
+        loggerMaker.debugAndAddToDb(String.format("Found %s apis in collection %s", jsonNodes.size(), collectionName), LogDb.DASHBOARD);
         for(JsonNode item: jsonNodes){
             PostmanUploadLog uploadLog = new PostmanUploadLog();
             uploadLog.setUploadId(fileUpload.getId().toString());
@@ -678,7 +688,7 @@ public class PostmanAction extends UserAction {
                 uploadLog.setPostmanWorkspaceId(workspaceId);
             }
             String apiName = item.get("name").asText();
-            loggerMaker.infoAndAddToDb(String.format("Processing api %s in collection %s", apiName, collectionName), LogDb.DASHBOARD);
+            loggerMaker.debugAndAddToDb(String.format("Processing api %s in collection %s", apiName, collectionName), LogDb.DASHBOARD);
 
             JsonNode request = item.get("request");
             String path;
@@ -689,7 +699,7 @@ public class PostmanAction extends UserAction {
                 continue;
             }
             uploadLog.setUrl(path);
-            Pair<Map<String, String>,List<FileUploadError>> result = Utils.convertApiInAktoFormat(item, variablesMap, String.valueOf(accountId), allowReplay, authMap);
+            Pair<Map<String, String>,List<FileUploadError>> result = Utils.convertApiInAktoFormat(item, variablesMap, String.valueOf(accountId), allowReplay, authMap, this.miniTestingName);
             List<FileUploadError> errors = result.getRight();
             if(result.getLeft() != null){
                 Map<String, String> apiInAktoFormat = result.getLeft();

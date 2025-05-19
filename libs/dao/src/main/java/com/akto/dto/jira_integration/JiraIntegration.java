@@ -6,15 +6,16 @@ import java.util.Map;
 import com.mongodb.BasicDBObject;
 
 public class JiraIntegration {
-    
+
     private String baseUrl;
     private String projId;
     private String userEmail;
     private String apiToken;
     private String issueType;
-    private int createdTs; 
+    private int createdTs;
     private int updatedTs;
     private Map<String,List<BasicDBObject>> projectIdsMap;
+    private Map<String, ProjectMapping> projectMappings;
 
     public String getBaseUrl() {
         return baseUrl;
@@ -39,7 +40,7 @@ public class JiraIntegration {
     public void setUserEmail(String userEmail) {
         this.userEmail = userEmail;
     }
-    
+
     public String getApiToken() {
         return apiToken;
     }
@@ -78,6 +79,14 @@ public class JiraIntegration {
 
     public void setProjectIdsMap(Map<String, List<BasicDBObject>> projectIdsMap) {
         this.projectIdsMap = projectIdsMap;
+    }
+
+    public Map<String, ProjectMapping> getProjectMappings() {
+        return projectMappings;
+    }
+
+    public void setProjectMappings(Map<String, ProjectMapping> projectMappings) {
+        this.projectMappings = projectMappings;
     }
 
 }

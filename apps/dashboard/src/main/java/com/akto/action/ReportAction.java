@@ -34,13 +34,14 @@ public class ReportAction extends UserAction {
 
     private String reportId;
     private String organizationName;
+    private String username;
     private String reportDate;
     private String reportUrl;
     private String pdf;
     private String status;
     private boolean firstPollRequest;
 
-    private static final LoggerMaker loggerMaker = new LoggerMaker(ReportAction.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(ReportAction.class, LogDb.DASHBOARD);
 
     public String downloadReportPDF() {
         if(reportUrl == null || reportUrl.isEmpty()) {
@@ -81,7 +82,7 @@ public class ReportAction extends UserAction {
             // Initiate PDF generation
 
             reportId = new ObjectId().toHexString();
-            loggerMaker.infoAndAddToDb("Triggering pdf download for report id - " + reportId, LogDb.DASHBOARD);
+            loggerMaker.debugAndAddToDb("Triggering pdf download for report id - " + reportId, LogDb.DASHBOARD);
 
             // Make call to puppeteer service
             try {
@@ -101,7 +102,7 @@ public class ReportAction extends UserAction {
                 String url = System.getenv("PUPPETEER_REPLAY_SERVICE_URL") + "/downloadReportPDF";
                 JSONObject requestBody = new JSONObject();
                 requestBody.put("reportId", reportId);
-                requestBody.put("username", user.getName());
+                requestBody.put("username", username);
                 requestBody.put("accessToken", accessToken);
                 requestBody.put("jsessionId", jsessionId);
                 requestBody.put("organizationName", organizationName);
@@ -116,7 +117,7 @@ public class ReportAction extends UserAction {
             }
         } else {
             // Check for report completion
-            loggerMaker.infoAndAddToDb("Polling pdf download status for report id - " + reportId, LogDb.DASHBOARD);
+            loggerMaker.debugAndAddToDb("Polling pdf download status for report id - " + reportId, LogDb.DASHBOARD);
 
             try {
                 String url = System.getenv("PUPPETEER_REPLAY_SERVICE_URL") + "/downloadReportPDF";
@@ -130,10 +131,10 @@ public class ReportAction extends UserAction {
                     return ERROR.toUpperCase();
                 }
                 status = (String) node.get("status").textValue();
-                loggerMaker.infoAndAddToDb("Pdf download status for report id - " + reportId + " - " + status, LogDb.DASHBOARD);
+                loggerMaker.debugAndAddToDb("Pdf download status for report id - " + reportId + " - " + status, LogDb.DASHBOARD);
 
                 if (status.equals("COMPLETED")) {
-                    loggerMaker.infoAndAddToDb("Pdf download status for report id - " + reportId + " completed. Attaching pdf in response ", LogDb.DASHBOARD);
+                    loggerMaker.debugAndAddToDb("Pdf download status for report id - " + reportId + " completed. Attaching pdf in response ", LogDb.DASHBOARD);
                     pdf = node.get("base64PDF").textValue();
                     try {
                         TestReportsDao.instance.updateOne(Filters.eq("_id", reportUrlIdObj), Updates.set(TestReports.PDF_REPORT_STRING, pdf));
@@ -211,5 +212,9 @@ public class ReportAction extends UserAction {
 
     public void setFirstPollRequest(boolean firstPollRequest) {
         this.firstPollRequest = firstPollRequest;
+    }
+
+    public void setUsername(String username) {
+        this.username = username;
     }
 }

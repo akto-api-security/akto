@@ -34,6 +34,10 @@ export const outputKeys = {
     "FIND_VULNERABILITIES_FROM_SOURCE_CODE": vulnerableKeys
 }
 
+export const showSummaryOutput = {
+    "FIND_VULNERABILITIES_FROM_SOURCE_CODE": true
+}
+
 
 function toJson(input: string):any {
     const result = {};

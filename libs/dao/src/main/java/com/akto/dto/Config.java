@@ -4,6 +4,8 @@ import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
 
+import lombok.Getter;
+import lombok.Setter;
 import org.bson.codecs.pojo.annotations.BsonDiscriminator;
 
 import com.akto.dao.ConfigsDao;
@@ -34,7 +36,7 @@ public abstract class Config {
     public String id;
 
     public enum ConfigType {
-        SLACK, GOOGLE, WEBPUSH, PASSWORD, SALESFORCE, SENDGRID, AUTH0, GITHUB, STIGG, MIXPANEL, SLACK_ALERT, OKTA, AZURE, HYBRID_SAAS, SLACK_ALERT_USAGE, GOOGLE_SAML, AWS_WAF, SPLUNK_SIEM;
+        SLACK, GOOGLE, WEBPUSH, PASSWORD, SALESFORCE, SENDGRID, AUTH0, GITHUB, STIGG, MIXPANEL, SLACK_ALERT, OKTA, AZURE, HYBRID_SAAS, SLACK_ALERT_USAGE, GOOGLE_SAML, AWS_WAF, SPLUNK_SIEM, AKTO_DASHBOARD_HOST_URL, CLOUDFLARE_WAF;
     }
 
     public ConfigType configType;
@@ -688,6 +690,81 @@ public abstract class Config {
     }
 
     @BsonDiscriminator
+    public static class CloudflareWafConfig extends Config {
+        public static final String API_KEY = "apiKey";
+        private String apiKey;
+        public static final String EMAIL = "email";
+        private String email;
+        public static final String INTEGRATION_TYPE = "integrationType";
+        private String integrationType;
+        public static final String ACCOUNT_OR_ZONE_ID = "accountOrZoneId";
+        private String accountOrZoneId;
+        public static final String ACCOUNT_ID = "accountId";
+        private int accountId;
+
+        public static final String _CONFIG_ID = "configId";
+        public static final String CONFIG_ID = ConfigType.CLOUDFLARE_WAF.name();
+
+        public CloudflareWafConfig() {
+            this.configType = ConfigType.CLOUDFLARE_WAF;
+            this.id = CONFIG_ID;
+        }
+
+        public CloudflareWafConfig(String apiKey, String email, String integrationType, String accountOrZoneId, int accountId) {
+            this.apiKey = apiKey;
+            this.email = email;
+            this.integrationType = integrationType;
+            this.accountOrZoneId = accountOrZoneId;
+            this.accountId = accountId;
+            this.id = accountId + "_" + CONFIG_ID;
+        }
+
+        public String getApiKey() {
+            return apiKey;
+        }
+
+        public void setApiKey(String apiKey) {
+            this.apiKey = apiKey;
+        }
+
+        public String getEmail() {
+            return email;
+        }
+
+        public void setEmail(String email) {
+            this.email = email;
+        }
+
+        public String getIntegrationType() {
+            return integrationType;
+        }
+
+        public void setIntegrationType(String integrationType) {
+            this.integrationType = integrationType;
+        }
+
+        public String getAccountOrZoneId() {
+            return accountOrZoneId;
+        }
+
+        public void setAccountOrZoneId(String accountOrZoneId) {
+            this.accountOrZoneId = accountOrZoneId;
+        }
+
+        public int getAccountId() {
+            return accountId;
+        }
+
+        public void setAccountId(int accountId) {
+            this.accountId = accountId;
+        }
+
+        public static String getConfigId() {
+            return CONFIG_ID;
+        }
+    }
+
+    @BsonDiscriminator
     public static class AwsWafConfig extends Config {
         private String awsAccessKey;
         private String awsSecretKey;
@@ -802,6 +879,23 @@ public abstract class Config {
             this.splunkToken = splunkToken;
         }
        
+    }
+
+    @Getter
+    @Setter
+    @BsonDiscriminator
+    public static class AktoHostUrlConfig extends Config {
+
+        public static final String HOST_URL = "hostUrl";
+        public static final String LAST_SYNCED_AT = "lastSyncedAt";
+
+        private String hostUrl;
+        private int lastSyncedAt;
+
+        public AktoHostUrlConfig() {
+            this.configType = ConfigType.AKTO_DASHBOARD_HOST_URL;
+            this.id = ConfigType.AKTO_DASHBOARD_HOST_URL.name();
+        }
     }
 
     public static boolean isConfigSSOType(ConfigType configType){

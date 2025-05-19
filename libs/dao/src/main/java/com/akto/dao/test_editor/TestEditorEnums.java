@@ -4,9 +4,12 @@ public class TestEditorEnums {
     
     public enum DataOperands {
         CONTAINS_EITHER,
+        CONTAINS_EITHER_CIDR,
         CONTAINS_ALL,
         NOT_CONTAINS,
         NOT_CONTAINS_EITHER,
+        NOT_CONTAINS_CIDR,
+        CONFORM_SCHEMA,
         REGEX,
         EQ,
         EQ_OBJ,
@@ -38,7 +41,10 @@ public class TestEditorEnums {
         REQUEST_PAYLOAD,
         RESPONSE_HEADERS,
         RESPONSE_PAYLOAD,
-        RESPONSE_CODE
+        RESPONSE_CODE,
+        SOURCE_IP,
+        DESTINATION_IP,
+        COUNTRY_CODE
     }
 
     public enum PredicateOperator {
@@ -216,6 +222,7 @@ public class TestEditorEnums {
         JWT_REPLACE_BODY,
         ATTACH_FILE,
         SEND_SSRF_REQ,
+        FOR_EACH_COMBINATION
     }
 
     public enum NonTerminalExecutorDataOperands {

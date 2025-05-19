@@ -39,17 +39,17 @@ public class InternalAction extends UserAction {
         int time = Context.now();
         Bson filter = Filters.and(Filters.eq(SingleTypeInfo._PARAM, headerKey),
                 UsageMetricCalculator.excludeDemosAndDeactivated(SingleTypeInfo._API_COLLECTION_ID));
-        loggerMaker.infoAndAddToDb("Executing deleteApisBasedOnHeader find query");
+        loggerMaker.debugAndAddToDb("Executing deleteApisBasedOnHeader find query");
         List<ApiInfoKey> apiList = SingleTypeInfoDao.instance.fetchEndpointsInCollection(filter);
 
         int delta = Context.now() - time;
-        loggerMaker.infoAndAddToDb("Finished deleteApisBasedOnHeader find query " + delta);
+        loggerMaker.debugAndAddToDb("Finished deleteApisBasedOnHeader find query " + delta);
 
         if (apiList != null && !apiList.isEmpty()) {
 
             List<Key> keys = new ArrayList<>();
             for (ApiInfoKey apiInfoKey : apiList) {
-                loggerMaker.infoAndAddToDb("deleteApisBasedOnHeader " + apiInfoKey.toString());
+                loggerMaker.debugAndAddToDb("deleteApisBasedOnHeader " + apiInfoKey.toString());
                 keys.add(new Key(apiInfoKey.getApiCollectionId(), apiInfoKey.getUrl(), apiInfoKey.getMethod(), -1, 0,
                         0));
             }
@@ -58,10 +58,10 @@ public class InternalAction extends UserAction {
             if (actuallyDelete) {
                 try {
                     time = Context.now();
-                    loggerMaker.infoAndAddToDb("deleteApisBasedOnHeader deleting APIs");
+                    loggerMaker.debugAndAddToDb("deleteApisBasedOnHeader deleting APIs");
                     com.akto.utils.Utils.deleteApis(keys);
                     delta = Context.now() - time;
-                    loggerMaker.infoAndAddToDb("deleteApisBasedOnHeader deleted APIs " + delta);
+                    loggerMaker.debugAndAddToDb("deleteApisBasedOnHeader deleted APIs " + delta);
                 } catch (Exception e) {
                     e.printStackTrace();
                     addActionError("Error deleting APIs");

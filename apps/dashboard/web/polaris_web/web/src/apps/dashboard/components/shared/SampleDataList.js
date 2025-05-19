@@ -10,7 +10,7 @@ import func from '../../../../util/func';
 
 function SampleDataList(props) {
 
-    const {showDiff, sampleData, heading, minHeight, vertical, isVulnerable, isNewDiff} = props;
+    const {showDiff, sampleData, heading, minHeight, vertical, isVulnerable, isNewDiff, metadata} = props;
 
     const [page, setPage] = useState(0);
 
@@ -71,6 +71,7 @@ function SampleDataList(props) {
                       minHeight={minHeight}
                       showDiff={showDiff}
                       isNewDiff={isNewDiff}
+                      metadata={metadata}
                     />
                   </LegacyCard>
                 </Box>

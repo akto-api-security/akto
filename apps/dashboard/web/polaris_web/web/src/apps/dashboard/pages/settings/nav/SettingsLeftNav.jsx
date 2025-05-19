@@ -1,7 +1,7 @@
 import { Navigation } from "@shopify/polaris"
 import { StoreDetailsFilledMinor, IdentityCardFilledMajor, AutomationFilledMajor, AppsFilledMajor, ComposeMajor, ProfileMajor} from "@shopify/polaris-icons"
 import { ListFilledMajor, ReportFilledMinor, LockFilledMajor, CollectionsFilledMajor, PlanMajor, ChatMajor} from "@shopify/polaris-icons"
-import { VariantMajor, VocabularyMajor, AdjustMinor } from "@shopify/polaris-icons"
+import { VariantMajor, VocabularyMajor, AdjustMinor, UndoMajor } from "@shopify/polaris-icons"
 import { useLocation, useNavigate } from "react-router-dom"
 import func from "@/util/func"
 
@@ -35,7 +35,7 @@ const SettingsLeftNav = () => {
             selected: page === "logs",
             onClick: () => navigate("/dashboard/settings/logs")
         }] : []
-    const metricsArr = window.IS_SAAS === 'true' ? [] : [{
+    const metricsArr = [{
         label: 'Metrics',
         icon: ReportFilledMinor,
         selected: page === "metrics",
@@ -86,6 +86,12 @@ const SettingsLeftNav = () => {
                     //     selected: page === "alerts",
                     //     onClick: () => navigate("/dashboard/settings")
                     // },
+                    {
+                        label: 'Undo Demerged APIs',
+                        icon: UndoMajor,
+                        selected: page === 'undo-demerge-apis',
+                        onClick: () => navigate("/dashboard/settings/undo-demerge-apis")
+                    },
                     ...cicdArr,
                     {
                         label: 'Integrations',

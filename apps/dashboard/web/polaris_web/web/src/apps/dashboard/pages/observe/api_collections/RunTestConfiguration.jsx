@@ -1,10 +1,11 @@
-import React, { useReducer } from 'react';
-import { VerticalStack, HorizontalGrid, Checkbox, TextField } from '@shopify/polaris';
+import React, { useEffect, useReducer, useState } from 'react';
+import { VerticalStack, HorizontalGrid, Checkbox, TextField, HorizontalStack } from '@shopify/polaris';
 import Dropdown from "../../../components/layouts/Dropdown";
 import SingleDate from "../../../components/layouts/SingleDate";
 import func from "@/util/func"
+import DropdownSearch from '../../../components/shared/DropdownSearch';
 
-const RunTestConfiguration = ({ testRun, setTestRun, runTypeOptions, hourlyTimes, testRunTimeOptions, testRolesArr, maxConcurrentRequestsOptions, slackIntegrated, generateLabelForSlackIntegration,getLabel, timeFieldsDisabled, teamsTestingWebhookIntegrated, generateLabelForTeamsIntegration}) => {
+const RunTestConfiguration = ({ testRun, setTestRun, runTypeOptions, hourlyTimes, testRunTimeOptions, testRolesArr, maxConcurrentRequestsOptions, slackIntegrated, generateLabelForSlackIntegration,getLabel, timeFieldsDisabled, teamsTestingWebhookIntegrated, generateLabelForTeamsIntegration, miniTestingServiceNames, jiraProjectMap, generateLabelForJiraIntegration}) => {
     const reducer = (state, action) => {
         switch (action.type) {
           case "update":
@@ -12,7 +13,7 @@ const RunTestConfiguration = ({ testRun, setTestRun, runTypeOptions, hourlyTimes
             let hourlyLabel = testRun.hourlyLabel;
             if(hourlyLabel !== "Now"){
                 const val = hourlyTimes.filter((item) => item.label === hourlyLabel)[0].value;
-                scheduledEpoch += parseInt(val) * 60 * 60;  
+                scheduledEpoch += parseInt(val) * 60 * 60;
             }
             const timeNow = new Date().getTime() / 1000;
             if(Math.abs(timeNow - scheduledEpoch) < 86400){
@@ -30,6 +31,57 @@ const RunTestConfiguration = ({ testRun, setTestRun, runTypeOptions, hourlyTimes
     const initialState = {data: new Date()};
     const startDayToday = func.getStartOfTodayEpoch()
     const [state, dispatch] = useReducer(reducer, initialState);
+
+
+    const allProjects = Object.keys(jiraProjectMap||{}).map((key) => {
+        return {label:key, value: key}
+    })
+
+    const allIssuesType = Array.isArray(jiraProjectMap?.[testRun?.autoTicketingDetails?.projectId])
+        ? jiraProjectMap[testRun.autoTicketingDetails.projectId].map((ele) => ({
+            label: ele.issueType,
+            value: ele.issueType
+        }))
+        : [];
+
+    const severitiesArr = func.getAktoSeverities()
+    const allSeverity = severitiesArr.map((x) => {return{value: x, label: func.toSentenceCase(x), id: func.toSentenceCase(x)}})
+
+    function toggleCreateTicketCheckbox() {
+        const firstProject = allProjects[0]?.value || "";
+        const firstIssueType =
+            Array.isArray(jiraProjectMap?.[firstProject]) &&
+            jiraProjectMap[firstProject]?.[0]?.issueType
+                ? jiraProjectMap[firstProject][0].issueType
+                : "";
+
+        const checkPrevToggle = !testRun?.autoTicketingDetails?.shouldCreateTickets;
+
+        if (checkPrevToggle) {
+            setTestRun((prev) => ({
+                ...prev,
+                autoTicketingDetails: {
+                    ...prev.autoTicketingDetails,
+                    shouldCreateTickets: true,
+                    projectId: firstProject,
+                    severities: ["CRITICAL", "HIGH"],
+                    issueType: firstIssueType,
+                },
+            }));
+        } else {
+            setTestRun((prev) => ({
+                ...prev,
+                autoTicketingDetails: {
+                    ...prev.autoTicketingDetails,
+                    shouldCreateTickets: false,
+                    projectId: "",
+                    severities: [],
+                    issueType: "",
+                },
+            }));
+        }
+    }
+
     return (
         <VerticalStack gap={"4"}>
             <HorizontalGrid gap={"4"} columns={"3"}>
@@ -52,7 +104,7 @@ const RunTestConfiguration = ({ testRun, setTestRun, runTypeOptions, hourlyTimes
                             recurringWeekly = true;
                         } else if (runType === 'Monthly') {
                             recurringMonthly = true;
-                        } 
+                        }
                         setTestRun(prev => ({
                             ...prev,
                             recurringDaily,
@@ -63,7 +115,7 @@ const RunTestConfiguration = ({ testRun, setTestRun, runTypeOptions, hourlyTimes
                         }));
                     }} />
                 <div style={{ width: "100%" }}>
-                    <SingleDate 
+                    <SingleDate
                         dispatch={dispatch}
                         data={state.data}
                         dataKey="selectedDate"
@@ -88,7 +140,8 @@ const RunTestConfiguration = ({ testRun, setTestRun, runTypeOptions, hourlyTimes
                     selected={(hour) => {
                         let scheduledEpoch = new Date().getTime() / 1000;
                         if (hour !== "Now"){
-                            scheduledEpoch += parseInt(hour) * 60 * 60;
+                            let initialTime = func.isSameDateAsToday(state.data) ? startDayToday : testRun.startTimestamp;
+                            scheduledEpoch = initialTime + parseInt(hour) * 60 * 60;
                         }else{
                             scheduledEpoch = testRun.startTimestamp
                         }
@@ -151,6 +204,21 @@ const RunTestConfiguration = ({ testRun, setTestRun, runTypeOptions, hourlyTimes
                             }));
                         }} />
             </HorizontalGrid>
+            {
+                miniTestingServiceNames?.length > 0 ?
+                <Dropdown
+                    label="Select Testing Module"
+                    menuItems={miniTestingServiceNames}
+                    initial={miniTestingServiceNames?.[0]?.value}
+                    selected={(requests) => {
+                        const miniTestingServiceNameOption = getLabel(miniTestingServiceNames, requests)
+                        setTestRun(prev => ({
+                            ...prev,
+                            miniTestingServiceName: miniTestingServiceNameOption.value
+                        }))
+                    }}
+                /> : <></>
+            }
             <Checkbox
                 label={slackIntegrated ? "Send slack alert post test completion" : generateLabelForSlackIntegration()}
                 checked={testRun.sendSlackAlert}
@@ -163,6 +231,46 @@ const RunTestConfiguration = ({ testRun, setTestRun, runTypeOptions, hourlyTimes
                 onChange={() => setTestRun(prev => ({ ...prev, sendMsTeamsAlert: !prev.sendMsTeamsAlert }))}
                 disabled={!teamsTestingWebhookIntegrated}
             />
+            <HorizontalStack gap={4}>
+            <Checkbox
+                    disabled={!jiraProjectMap}
+                    label={generateLabelForJiraIntegration()}
+                    checked={testRun.autoTicketingDetails.shouldCreateTickets}
+                    onChange={() => { toggleCreateTicketCheckbox()}}
+                />
+                {testRun.autoTicketingDetails.shouldCreateTickets &&
+                    <>
+                        <Dropdown
+                            menuItems={allProjects}
+                            selected={(val) => {
+                                setTestRun(prev => ({ ...prev, autoTicketingDetails: { ...prev.autoTicketingDetails, projectId: val } }))
+                            }}
+                            disabled={!testRun.autoTicketingDetails.shouldCreateTickets}
+                            placeHolder={"Select Project"}
+                            initial={testRun.autoTicketingDetails.projectId}
+                        />
+                        <Dropdown
+                            disabled={!testRun.autoTicketingDetails.shouldCreateTickets}
+                            menuItems={allIssuesType}
+                            selected={(val) => { setTestRun(prev => ({ ...prev, autoTicketingDetails: { ...prev.autoTicketingDetails, issueType: val } })) }}
+                            placeHolder={"Select Issue Type"}
+                            initial={testRun.autoTicketingDetails.issueType}
+                        />
+                        <DropdownSearch
+                            optionsList={allSeverity}
+                            placeholder={"Select Severity"}
+                            setSelected={(val) => {setTestRun(prev => ({ ...prev, autoTicketingDetails: { ...prev.autoTicketingDetails, severities: val } })) }}
+                            allowMultiple={true}
+                            value={(severitiesArr?.length === testRun?.autoTicketingDetails?.severities?.length)? "All items selected" : func.getSelectedItemsText(testRun?.autoTicketingDetails?.severities?.map((item) => func.toSentenceCase(item)))}
+                            preSelected={testRun.autoTicketingDetails.severities}
+                            showSelectedItemLabels={true}
+                            searchDisable={true}
+                            disabled={!testRun.autoTicketingDetails.shouldCreateTickets}
+                        />
+                    </>}
+
+
+            </HorizontalStack>
             <HorizontalGrid columns={2}>
                 <Checkbox
                     label="Use different target for testing"

@@ -31,7 +31,7 @@ function GraphMetric(props) {
 
     const series = [
         ...dataForChart,
-        inputMetrics.length > 0 && inputMetrics.map((x, i) => {
+        ...(inputMetrics.length > 0 ? inputMetrics.map((x, i) => {
             return {
                 data: x.data,
                 color: '#FF4DCA',
@@ -49,7 +49,7 @@ function GraphMetric(props) {
                 },
                 yAxis: i + 1,
             };
-        }),
+        }) : []),
     ];
 
     const chartOptions = {

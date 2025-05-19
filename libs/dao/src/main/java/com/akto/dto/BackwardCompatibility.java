@@ -109,6 +109,13 @@ public class BackwardCompatibility {
     public static final String CHANGE_OPERATOR_CONDITION_IN_CDT = "changeOperatorConditionInCDT";
     private int changeOperatorConditionInCDT;
 
+    public static final String CLEANUP_RBAC_ENTRIES = "cleanupRbacEntries";
+    private int cleanupRbacEntries;
+
+    private int fillLastTestedField;
+
+    public static final String FILL_LAST_TESTED_FIELD = "fillLastTestedField";
+
     public BackwardCompatibility(int id, int dropFilterSampleData, int resetSingleTypeInfoCount, int dropWorkflowTestResult,
                                  int readyForNewTestingFramework,int addAktoDataTypes, boolean deploymentStatusUpdated,
                                  int authMechanismData, boolean mirroringLambdaTriggered, int deleteAccessListFromApiToken,
@@ -119,7 +126,7 @@ public class BackwardCompatibility {
                                  int deactivateCollections, int disableAwsSecretPii, int apiCollectionAutomatedField, 
                                  int automatedApiGroups, int addAdminRoleIfAbsent, int dropSpecialCharacterApiCollections, int fixApiAccessType,
                                  int addDefaultFilters, int moveAzureSamlToNormalSaml, int deleteOptionsAPIs, int moveOktaOidcSSO, int markSummariesVulnerable,
-                                 int changeOperatorConditionInCDT) {
+                                 int changeOperatorConditionInCDT, int cleanupRbacEntries, int fillLastTestedField) {
         this.id = id;
         this.dropFilterSampleData = dropFilterSampleData;
         this.resetSingleTypeInfoCount = resetSingleTypeInfoCount;
@@ -154,6 +161,8 @@ public class BackwardCompatibility {
         this.moveOktaOidcSSO = moveOktaOidcSSO;
         this.markSummariesVulnerable = markSummariesVulnerable;
         this.changeOperatorConditionInCDT = changeOperatorConditionInCDT;
+        this.cleanupRbacEntries = cleanupRbacEntries;
+        this.fillLastTestedField = fillLastTestedField;
     }
 
     public BackwardCompatibility() {
@@ -461,5 +470,21 @@ public class BackwardCompatibility {
 
     public void setChangeOperatorConditionInCDT(int changeOperatorConditionInCDT) {
         this.changeOperatorConditionInCDT = changeOperatorConditionInCDT;
+    }
+
+    public int getCleanupRbacEntries() {
+        return cleanupRbacEntries;
+    }
+
+    public void setCleanupRbacEntries(int cleanupRbacEntries) {
+        this.cleanupRbacEntries = cleanupRbacEntries;
+    }
+
+    public int getFillLastTestedField() {
+        return fillLastTestedField;
+    }
+
+    public void setFillLastTestedField(int fillLastTestedField) {
+        this.fillLastTestedField = fillLastTestedField;
     }
 }

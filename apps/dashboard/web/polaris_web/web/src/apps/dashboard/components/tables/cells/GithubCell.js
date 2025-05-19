@@ -69,7 +69,7 @@ function GithubCell(props){
             }
             {
                 headers?.filter((header) => {
-                    return header.itemOrder==2
+                    return header.itemOrder===2 && header?.alignVertical !== "bottom"
                 }).filter((header) => {
                     return data[header.value]!=undefined && data[header.value]!="";
                 }).map((header) => {
@@ -93,6 +93,26 @@ function GithubCell(props){
                 )}) 
             }
         </HorizontalStack>
+        <Box maxWidth={width}>
+            {
+                headers?.filter((header) => {
+                    return header.itemOrder===2 && header?.alignVertical === "bottom"
+                }).map((header) => {
+                    
+                    if(!data?.[header?.value]) {
+                        return header.component({action: header?.action})
+                    }
+                    return (
+                            <Button plain removeUnderline onClick={header?.action} textAlign="left">
+                                <Text as="span" variant="bodyMd" color="subdued" alignment="start">
+                                    {data?.[header?.value]}
+                                </Text>
+                            </Button>
+                        )
+                    }
+                )
+            }  
+        </Box>
         <Box maxWidth={width}>
         <HorizontalStack gap='2' align="start">
             {

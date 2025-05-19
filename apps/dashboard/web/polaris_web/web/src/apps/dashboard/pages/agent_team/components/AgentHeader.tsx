@@ -1,5 +1,5 @@
 import React from 'react';
-import { Box, Text } from '@shopify/polaris';
+import { Text } from '@shopify/polaris';
 import { AgentImage } from './AgentImage';
 import { useAgentsStore } from '../agents.store';
 

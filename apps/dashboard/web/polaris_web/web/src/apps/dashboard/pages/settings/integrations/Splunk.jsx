@@ -31,7 +31,7 @@ function Splunk() {
 
     async function addSplunkIntegration(){
       await settingRequests.addSplunkIntegration(splunkUrl, splunkToken)
-      func.setToast(true, false, "Successfully added Aws Waf Integration")
+      func.setToast(true, false, "Successfully added splunk Integration")
     }
 
     async function fetchIntegration() {
@@ -49,7 +49,7 @@ function Splunk() {
 
     let cardContent = "Seamlessly enhance your web application security with Splunk integration, empowering you to efficiently detect vulnerabilities, analyze and intercept web traffic, and fortify your digital defenses. "
     return (
-        <IntegrationsLayout title= "Splunk SEIM" cardContent={cardContent} component={PostmanCard} docsUrl=""/> 
+        <IntegrationsLayout title= "Splunk SIEM" cardContent={cardContent} component={PostmanCard} docsUrl=""/> 
     )
 }
 

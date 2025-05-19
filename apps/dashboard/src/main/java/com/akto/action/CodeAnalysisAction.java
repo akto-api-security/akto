@@ -52,7 +52,7 @@ public class CodeAnalysisAction extends UserAction {
     private CodeAnalysisRepo.SourceCodeType sourceCodeType;
     public static final int MAX_BATCH_SIZE = 100;
 
-    private static final LoggerMaker loggerMaker = new LoggerMaker(CodeAnalysisAction.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(CodeAnalysisAction.class, LogDb.DASHBOARD);;
     private static final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
 
     public void sendMixpanelEvent() {
@@ -101,7 +101,7 @@ public class CodeAnalysisAction extends UserAction {
     }
     
     public String syncExtractedAPIs() {
-        loggerMaker.infoAndAddToDb("Syncing code analysis endpoints for collection: " + apiCollectionName, LogDb.DASHBOARD);
+        loggerMaker.debugAndAddToDb("Syncing code analysis endpoints for collection: " + apiCollectionName, LogDb.DASHBOARD);
 
         if (codeAnalysisApisList == null) {
             loggerMaker.errorAndAddToDb("Code analysis api's list is null", LogDb.DASHBOARD);
@@ -336,8 +336,8 @@ public class CodeAnalysisAction extends UserAction {
             }
         }
 
-        loggerMaker.infoAndAddToDb("Updated code analysis collection: " + apiCollectionName, LogDb.DASHBOARD);
-        loggerMaker.infoAndAddToDb("Source code endpoints count: " + codeAnalysisApisMap.size(), LogDb.DASHBOARD);
+        loggerMaker.debugAndAddToDb("Updated code analysis collection: " + apiCollectionName, LogDb.DASHBOARD);
+        loggerMaker.debugAndAddToDb("Source code endpoints count: " + codeAnalysisApisMap.size(), LogDb.DASHBOARD);
 
         // Send mixpanel event
         int accountId = Context.accountId.get();

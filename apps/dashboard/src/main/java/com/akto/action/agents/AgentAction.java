@@ -2,6 +2,7 @@ package com.akto.action.agents;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -9,10 +10,12 @@ import org.bson.conversions.Bson;
 
 import com.akto.action.UserAction;
 import com.akto.dao.agents.AgentHealthCheckDao;
+import com.akto.dao.agents.AgentModelDao;
 import com.akto.dao.agents.AgentRunDao;
 import com.akto.dao.agents.AgentSubProcessSingleAttemptDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.agents.*;
+import com.akto.util.Constants;
 import com.amazonaws.util.StringUtils;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
@@ -27,12 +30,15 @@ public class AgentAction extends UserAction {
 
     List<AgentRun> agentRuns;
 
+    String modelName;
+    String githubAccessToken;
+
     public String getAllAgentRuns() {
         Bson filter = Filters.eq(AgentRun._STATE, State.RUNNING);
         if(!StringUtils.isNullOrEmpty(this.agent)){
             filter = Filters.and(filter, Filters.eq("agent", agent));
         }
-        agentRuns = AgentRunDao.instance.findAll(filter);
+        agentRuns = AgentRunDao.instance.findAll(filter, Projections.exclude(AgentRun._AGENT_MODEL, AgentRun._PRIVATE_DATA));
         return Action.SUCCESS.toUpperCase();
     }
 
@@ -77,8 +83,29 @@ public class AgentAction extends UserAction {
 
         String processId = UUID.randomUUID().toString();
 
+        Model model = null;
+        if (modelName != null && !modelName.isEmpty()) {
+            model = AgentModelDao.instance.findOne(Filters.eq(Model._NAME, modelName));
+        }
+
+        if (model == null) {
+            // if model is not found, then check if it is using default akto model
+            if(modelName.trim().equalsIgnoreCase(Constants.AKTO_AGENT_NAME)){
+                model = Constants.AKTO_AGENT_MODEL;
+            }else{
+                addActionError("Model not found");
+                return Action.ERROR.toUpperCase();
+            }
+        }
+
+        // add github access token to the data when saving
+        Map<String, String> privateData = new HashMap<>();
+        if((agentModule.equals(Agent.FIND_VULNERABILITIES_FROM_SOURCE_CODE) || agentModule.equals(Agent.FIND_APIS_FROM_SOURCE_CODE)) && !StringUtils.isNullOrEmpty(githubAccessToken)){
+            privateData.put("githubAccessToken", githubAccessToken);
+        }
+
         agentRun = new AgentRun(processId, data, agentModule,
-                Context.now(), 0, 0, State.SCHEDULED);
+                Context.now(), 0, 0, State.SCHEDULED, model, privateData);
         AgentRunDao.instance.insertOne(agentRun);
 
         return Action.SUCCESS.toUpperCase();
@@ -141,10 +168,12 @@ public class AgentAction extends UserAction {
         return Action.SUCCESS.toUpperCase();
     }
 
-    Model[] models;
+    List<Model> models;
 
     public String getAgentModels() {
-        models = Model.values();
+        // Do not send the api key etc params, once saved.
+        models = AgentModelDao.instance.findAll(Filters.empty(), Projections.exclude(Model._PARAMS));
+        models.add(Constants.AKTO_AGENT_MODEL);
         return Action.SUCCESS.toUpperCase();
     }
 
@@ -541,11 +570,11 @@ public class AgentAction extends UserAction {
         this.subProcesses = subProcesses;
     }
 
-    public Model[] getModels() {
+    public List<Model> getModels() {
         return models;
     }
 
-    public void setModels(Model[] models) {
+    public void setModels(List<Model> models) {
         this.models = models;
     }
     
@@ -575,6 +604,18 @@ public class AgentAction extends UserAction {
 
     public void setAgentRunningOnModule(boolean agentRunningOnModule) {
         this.agentRunningOnModule = agentRunningOnModule;
+    }
+
+    public String getModelName() {
+        return modelName;
+    }
+
+    public void setModelName(String modelName) {
+        this.modelName = modelName;
+    }
+
+    public void setGithubAccessToken(String githubAccessToken) {
+        this.githubAccessToken = githubAccessToken;
     }
 
 }

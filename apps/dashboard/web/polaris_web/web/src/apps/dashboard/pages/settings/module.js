@@ -232,12 +232,27 @@ const settingFunctions = {
       })
       return arr
     },
+    fetchAllMetricNamesAndDescription: async function(){
+      let arr = []
+      await settingRequests.fetchAllMetricsDesciptions().then((resp)=>{
+        arr = resp.names
+      })
+      return arr
+    },
     fetchGraphData: async function(groupBy, startTimestamp, endTimestamp, names, host){
       let trafficData = {}
       await settingRequests.fetchTrafficMetrics(groupBy, startTimestamp, endTimestamp, names, host).then((resp)=>{
         trafficData = resp.trafficMetricsMap
       })
       return trafficData
+    },
+    fetchAllMetricsData: async function(startTime, endTime) {
+      let metricsData = {}
+      await settingRequests.fetchMetrics(startTime, endTime).then((resp) => {
+        console.log("resp", resp)
+        metricsData = resp?.result?.metrics
+      })
+      return metricsData
     },
     testJiraIntegration: async function(userEmail, apiToken, baseUrl, projId){
       let issueTypeMap = {}
@@ -249,7 +264,7 @@ const settingFunctions = {
     fetchJiraIntegration: async function(){
       let jiraInteg = {}
       await settingRequests.fetchJiraIntegration().then((resp)=>{
-        jiraInteg = resp.jiraIntegration
+        jiraInteg = resp
       })
       return jiraInteg
     },
@@ -259,7 +274,27 @@ const settingFunctions = {
       })
       return trafficData
     },
-
+    fetchAzureBoardsIntegration: async function(){
+      let azureBoardsInteg = {}
+      await settingRequests.fetchAzureBoardsIntegration().then((resp)=>{
+        azureBoardsInteg = resp.azureBoardsIntegration
+      })
+      return azureBoardsInteg
+    },
+    addAzureBoardsIntegration: async function(azureBoardsBaseUrl, organization, projectList, personalAuthToken) {
+      let trafficData = {}
+      await settingRequests.addAzureBoardsIntegration(azureBoardsBaseUrl, organization, projectList, personalAuthToken).then((resp)=>{
+        trafficData = resp
+      })
+      return trafficData
+    },
+    removeAzureBoardsIntegration: async function() {
+      let trafficData = {}
+      await settingRequests.removeAzureBoardsIntegration().then((resp)=>{
+        trafficData = resp
+      })
+      return trafficData
+    },
     getSetupOptions: function(){
       return setupOptions;
     },

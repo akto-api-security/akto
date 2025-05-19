@@ -1,38 +1,23 @@
 package com.akto.testing.kafka_utils;
+
 import static com.akto.testing.Utils.readJsonContentFromFile;
 import static com.akto.testing.Utils.writeJsonContentInFile;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
-import java.util.Properties;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
-import java.util.concurrent.RejectedExecutionException;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
-import java.util.concurrent.atomic.AtomicBoolean;
-
-import org.apache.kafka.clients.consumer.*;
-import org.bson.types.ObjectId;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.util.StringUtils;
-
 import com.akto.DaoInit;
 import com.akto.crons.GetRunningTestsStatus;
+import com.akto.dao.ApiInfoDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.testing.TestingRunResultDao;
 import com.akto.dao.testing.TestingRunResultSummariesDao;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.test_editor.TestConfig;
+import com.akto.dto.testing.TestResult.TestError;
 import com.akto.dto.testing.TestingRunResult;
 import com.akto.dto.testing.TestingRunResultSummary;
-import com.akto.dto.testing.TestResult.TestError;
 import com.akto.dto.testing.info.SingleTestPayload;
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import com.akto.notifications.slack.CustomTextAlert;
 import com.akto.testing.Main;
 import com.akto.testing.TestExecutor;
@@ -47,9 +32,25 @@ import com.mongodb.ReadPreference;
 import com.mongodb.WriteConcern;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
-
 import io.confluent.parallelconsumer.ParallelConsumerOptions;
 import io.confluent.parallelconsumer.ParallelStreamProcessor;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+import java.util.Properties;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicBoolean;
+import org.apache.kafka.clients.consumer.Consumer;
+import org.apache.kafka.clients.consumer.ConsumerConfig;
+import org.apache.kafka.clients.consumer.KafkaConsumer;
+import org.bson.types.ObjectId;
+import org.springframework.util.StringUtils;
 
 public class ConsumerUtil {
 
@@ -58,8 +59,10 @@ public class ConsumerUtil {
         properties.put(ConsumerConfig.MAX_POLL_INTERVAL_MS_CONFIG, 10000); 
     }
     private static Consumer<String, String> consumer = Constants.IS_NEW_TESTING_ENABLED ? new KafkaConsumer<>(properties) : null; 
-    private static final Logger logger = LoggerFactory.getLogger(ConsumerUtil.class);
+    private static final LoggerMaker logger = new LoggerMaker(ConsumerUtil.class, LogDb.TESTING);
     public static ExecutorService executor = Executors.newFixedThreadPool(100);
+
+    private final int maxRunTimeForTests = 5 * 60;
 
     public void initializeConsumer() {
         String mongoURI = System.getenv("AKTO_MONGO_CONN");
@@ -95,10 +98,15 @@ public class ConsumerUtil {
         List<String> messagesList = instance.getTestingUtil().getSampleMessages().get(apiInfoKey);
         if(messagesList == null || messagesList.isEmpty()){}
         else{
-            String sample = messagesList.get(messagesList.size() - 1);
             logger.info("Running test for: " + apiInfoKey + " with subcategory: " + subCategory);
+            String sample = messagesList.get(messagesList.size() - 1);
             TestingRunResult runResult = executor.runTestNew(apiInfoKey, singleTestPayload.getTestingRunId(), instance.getTestingUtil(), singleTestPayload.getTestingRunResultSummaryId(),testConfig , instance.getTestingRunConfig(), instance.isDebug(), singleTestPayload.getTestLogs(), sample);
             executor.insertResultsAndMakeIssues(Collections.singletonList(runResult), singleTestPayload.getTestingRunResultSummaryId());
+            
+            // update the last tested field in the api info
+            ApiInfoDao.instance.updateManyNoUpsert(ApiInfoDao.getFilter(apiInfoKey),
+                Updates.set(ApiInfo.LAST_TESTED, Context.now())
+            );
         }
     }
 
@@ -143,7 +151,7 @@ public class ConsumerUtil {
             ParallelConsumerOptions<String, String> options = ParallelConsumerOptions.<String, String>builder()
                 .consumer(consumer)
                 .ordering(ParallelConsumerOptions.ProcessingOrder.UNORDERED) // Use unordered for parallelism
-                .maxConcurrency(100) // Number of threads for parallel processing
+                .maxConcurrency(instance.getMaxConcurrentRequest()) // Number of threads for parallel processing
                 .commitMode(ParallelConsumerOptions.CommitMode.PERIODIC_CONSUMER_SYNC) // Commit offsets synchronously
                 .batchSize(1) // Number of records to process in each poll
                 .maxFailureHistory(3)
@@ -166,31 +174,28 @@ public class ConsumerUtil {
             parallelConsumer.poll(record -> {
                 String threadName = Thread.currentThread().getName();
                 String message = record.value();
-                logger.info("Thread [" + threadName + "] picked up record: " + message);
+                logger.debug("Thread [" + threadName + "] picked up record: " + message);
                 try {
                     if(!executor.isShutdown()){
                         Future<?> future = executor.submit(() -> runTestFromMessage(message));
                         firstRecordRead.set(true);
                         try {
-                            future.get(5, TimeUnit.MINUTES); 
-                        } catch (InterruptedException e) {
-                            logger.error("Task timed out");
+                            future.get(maxRunTimeForTests, TimeUnit.SECONDS); 
+                        } catch (InterruptedException | TimeoutException f) {
+                            logger.error("Task timed out: "+  message);
                             future.cancel(true);
                             createTimedOutResultFromMessage(message);
-                        } catch(TimeoutException e){
-                            logger.error("Task timed out");
-                            future.cancel(true);
-                            createTimedOutResultFromMessage(message);
-                        } catch(RejectedExecutionException e){
+                        }catch(RejectedExecutionException e){
                             future.cancel(true);
                         } 
                         catch (Exception e) {
+                            future.cancel(true);
                             logger.error("Error in task execution: " + message, e);
                         }
                     }
                     
                 } finally {
-                    logger.info("Thread [" + threadName + "] finished processing record: " + message);
+                    logger.debug("Thread [" + threadName + "] finished processing record: " + message);
                 }
             });
 
@@ -205,16 +210,18 @@ public class ConsumerUtil {
                     executor.shutdownNow();
                     break;
                 }else if(firstRecordRead.get() && parallelConsumer.workRemaining() == 0){
+                    int timeConsumed = Context.now() - startTime;
+                    int timeLeft = Math.min(Math.abs(maxRunTimeInSeconds - timeConsumed), maxRunTimeForTests);
                     logger.info("Records are empty now, thus executing final tests");
                     executor.shutdown();
-                    executor.awaitTermination(maxRunTimeInSeconds, TimeUnit.SECONDS);
+                    executor.awaitTermination(timeLeft, TimeUnit.SECONDS);
                     break;
                 }
                 Thread.sleep(100);
             }
 
         } catch (Exception e) {
-            logger.info("Error in polling records");
+            logger.error("Error in polling records");
         }finally{
             logger.info("Closing consumer as all results have been executed.");
             parallelConsumer.closeDrainFirst();

@@ -1,11 +1,11 @@
-import React, { useCallback, useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import FlyLayout from '../../../components/layouts/FlyLayout'
 import func from '@/util/func'
 import transform from '../transform'
 import SampleDataList from '../../../components/shared/SampleDataList'
 import SampleData from '../../../components/shared/SampleData'
 import LayoutWithTabs from '../../../components/layouts/LayoutWithTabs'
-import { Badge, Box, Button, Divider, HorizontalStack, Icon, Popover, Text, VerticalStack, Link, Modal } from '@shopify/polaris'
+import { Badge, Box, Button, Divider, HorizontalStack, Icon, Popover, Text, VerticalStack, Link, Modal, InlineCode } from '@shopify/polaris'
 import api from '../../observe/api'
 import issuesApi from "../../issues/api"
 import testingApi from "../api"
@@ -18,11 +18,12 @@ import observeFunc from "../../observe/transform.js"
 import settingFunctions from '../../settings/module.js'
 import JiraTicketCreationModal from '../../../components/shared/JiraTicketCreationModal.jsx'
 import MarkdownViewer from '../../../components/shared/MarkdownViewer.jsx'
+import InlineEditableText from '../../../components/shared/InlineEditableText.jsx'
 
 function TestRunResultFlyout(props) {
 
 
-    const { selectedTestRunResult, loading, issueDetails ,getDescriptionText, infoState, createJiraTicket, jiraIssueUrl, showDetails, setShowDetails, isIssuePage, remediationSrc} = props
+    const { selectedTestRunResult, loading, issueDetails ,getDescriptionText, infoState, createJiraTicket, jiraIssueUrl, showDetails, setShowDetails, isIssuePage, remediationSrc, azureBoardsWorkItemUrl} = props
     const [remediationText, setRemediationText] = useState("")
     const [fullDescription, setFullDescription] = useState(false)
     const [rowItems, setRowItems] = useState([])
@@ -31,6 +32,16 @@ function TestRunResultFlyout(props) {
     const [jiraProjectMaps,setJiraProjectMap] = useState({})
     const [issueType, setIssueType] = useState('');
     const [projId, setProjId] = useState('')
+
+    const [boardsModalActive, setBoardsModalActive] = useState(false)
+    const [projectToWorkItemsMap, setProjectToWorkItemsMap] = useState({})
+    const [projectId, setProjectId] = useState('')
+    const [workItemType, setWorkItemType] = useState('')
+
+    const [description, setDescription] = useState("")
+    const [editDescription, setEditDescription] = useState(description)
+    const [isEditingDescription, setIsEditingDescription] = useState(false)
+
     // modify testing run result and headers
     const infoStateFlyout = infoState && infoState.length > 0 ? infoState.filter((item) => item.title !== 'Jira') : []
     const fetchRemediationInfo = useCallback (async (testId) => {
@@ -65,7 +76,7 @@ function TestRunResultFlyout(props) {
                     index++
                 })
             })
-            setRowItems(transform.getRowInfo(issueDetails.severity,apiInfo,issueDetails.jiraIssueUrl,sensitiveParam,issueDetails.testRunIssueStatus === 'IGNORED'))
+            setRowItems(transform.getRowInfo(issueDetails.severity,apiInfo,issueDetails.jiraIssueUrl,sensitiveParam,issueDetails.testRunIssueStatus === 'IGNORED', issueDetails.azureBoardsWorkItemUrl))
         }
     },[issueDetails])
 
@@ -75,7 +86,28 @@ function TestRunResultFlyout(props) {
        if(issueDetails && Object.keys(issueDetails).length > 0){       
             fetchApiInfo(issueDetails.id.apiInfoKey)
        }
+       setTimeout(() => {
+            setDescription(issueDetails?.description || "")
+            setEditDescription(issueDetails?.description || "")
+       }, [100])
     },[issueDetails?.id?.apiInfoKey])
+
+    const handleSaveDescription = async () => {
+        setIsEditingDescription(false);
+        
+        if(editDescription === description) {
+            return
+        }
+        await testingApi.updateIssueDescription(issueDetails.id, editDescription)
+            .then(() => {
+                setDescription(editDescription);
+                func.setToast(true, false, "Description saved successfully");
+            })
+            .catch((err) => {
+                console.error("Failed to save description:", err);
+                func.setToast(true, true, "Failed to save description");
+            })
+    }
 
     useEffect(() => {
         if (!remediationSrc) {
@@ -125,6 +157,36 @@ function TestRunResultFlyout(props) {
         }else{
             func.setToast(true, true, "Invalid project id or issue type")
         }
+    }
+
+    const handleAzureBoardClick = async() => {
+        if(!boardsModalActive){
+            const azureBoardsIntegration = await settingFunctions.fetchAzureBoardsIntegration()
+            if(azureBoardsIntegration.projectToWorkItemsMap != null && Object.keys(azureBoardsIntegration.projectToWorkItemsMap).length > 0){
+                setProjectToWorkItemsMap(azureBoardsIntegration.projectToWorkItemsMap)
+                if(Object.keys(azureBoardsIntegration.projectToWorkItemsMap).length > 0){
+                    setProjectId(Object.keys(azureBoardsIntegration.projectToWorkItemsMap)[0])
+                    setWorkItemType(Object.values(azureBoardsIntegration.projectToWorkItemsMap)[0]?.[0])
+                }
+            }else{
+                setProjectId(azureBoardsIntegration?.projectId)
+                setWorkItemType(azureBoardsIntegration?.workItemType)
+            }
+        }
+        setBoardsModalActive(!boardsModalActive)
+    }
+
+    const handleAzureBoardWorkitemCreation = async(id) => {
+        if(projectId.length > 0 && workItemType.length > 0){
+            await issuesApi.createAzureBoardsWorkItem(issueDetails.id, projectId, workItemType, window.location.origin).then((res) => {
+                func.setToast(true, false, "Work item created")
+            }).catch((err) => {
+                func.setToast(true, true, err?.response?.data?.errorMessage || "Error creating work item")
+            })
+        }else{
+            func.setToast(true, true, "Invalid project id or work item type")
+        }
+        setBoardsModalActive(false)
     }
     
     const issues = [{
@@ -185,15 +247,40 @@ function TestRunResultFlyout(props) {
     function TitleComponent() {
         const severity = (selectedTestRunResult && selectedTestRunResult.vulnerable) ? issueDetails.severity : ""
         return(
-            <div style={{display: 'flex', justifyContent: "space-between", gap:"24px", padding: "16px", paddingTop: '0px'}}>
+            <div style={{display: 'flex', justifyContent: "space-between", alignItems: "flex-start", gap:"24px", padding: "16px", paddingTop: '0px'}}>
                 <VerticalStack gap={"2"}>
                     <Box width="100%">
-                        <div style={{display: 'flex', gap: '4px'}} className='test-title'>
+                        <div style={{display: 'flex', gap: '4px', marginBottom: '4px'}} className='test-title'>
                             <Button removeUnderline plain monochrome onClick={() => openTest()}>
                                 <Text variant="headingSm" alignment="start" breakWord>{selectedTestRunResult?.name}</Text>
                             </Button>
                             {(severity && severity?.length > 0) ? (issueDetails?.testRunIssueStatus === 'IGNORED' ? <Badge size='small'>Ignored</Badge> : <Box className={`badge-wrapper-${severity.toUpperCase()}`}><Badge size="small" status={observeFunc.getColor(severity)}>{severity}</Badge></Box>) : null}
                         </div>
+
+                        {
+                            isEditingDescription ? (
+                                <InlineEditableText
+                                    textValue={editDescription}
+                                    setTextValue={setEditDescription}
+                                    handleSaveClick={handleSaveDescription}
+                                    setIsEditing={setIsEditingDescription}
+                                    placeholder={"Add a brief description"}
+                                    maxLength={64}
+                                />
+                            ) : (
+                                !description ? (
+                                    <Button plain removeUnderline onClick={() => setIsEditingDescription(true)}>
+                                        Add description
+                                    </Button>
+                                ) : (
+                                    <Button plain removeUnderline onClick={() => setIsEditingDescription(true)}>
+                                        <Text as="span" variant="bodyMd" color="subdued" alignment="start">
+                                            {description}
+                                        </Text>
+                                    </Button>
+                                    )
+                            )
+                        }
                     </Box>
                     <HorizontalStack gap={"2"}>
                         <Text color="subdued" variant="bodySm">{transform.getTestingRunResultUrl(selectedTestRunResult)}</Text>
@@ -205,18 +292,33 @@ function TestRunResultFlyout(props) {
                     <ActionsComp />
 
                     {selectedTestRunResult && selectedTestRunResult.vulnerable && 
-                        <JiraTicketCreationModal
-                            activator={<Button id={"create-jira-ticket-button"} primary onClick={handleJiraClick} disabled={jiraIssueUrl !== "" || window.JIRA_INTEGRATED !== "true"}>Create Jira Ticket</Button>}
-                            modalActive={modalActive}
-                            setModalActive={setModalActive}
-                            handleSaveAction={handleSaveAction}
-                            jiraProjectMaps={jiraProjectMaps}
-                            setProjId={setProjId}
-                            setIssueType={setIssueType}
-                            projId={projId}
-                            issueType={issueType}
-                            issueId={issueDetails.id}
-                        />
+                        <HorizontalStack gap={2} wrap={false}>
+                            <JiraTicketCreationModal
+                                activator={<Button id={"create-jira-ticket-button"} primary onClick={handleJiraClick} disabled={jiraIssueUrl !== "" || window.JIRA_INTEGRATED !== "true"}>Create Jira Ticket</Button>}
+                                modalActive={modalActive}
+                                setModalActive={setModalActive}
+                                handleSaveAction={handleSaveAction}
+                                jiraProjectMaps={jiraProjectMaps}
+                                setProjId={setProjId}
+                                setIssueType={setIssueType}
+                                projId={projId}
+                                issueType={issueType}
+                                issueId={issueDetails.id}
+                            />
+                            <JiraTicketCreationModal
+                                activator={window.AZURE_BOARDS_INTEGRATED === 'true' ? <Button id={"create-azure-boards-ticket-button"} primary onClick={handleAzureBoardClick} disabled={azureBoardsWorkItemUrl !== "" || window.AZURE_BOARDS_INTEGRATED !== "true"}>Create Work Item</Button> : <></>}
+                                modalActive={boardsModalActive}
+                                setModalActive={setBoardsModalActive}
+                                handleSaveAction={handleAzureBoardWorkitemCreation}
+                                jiraProjectMaps={projectToWorkItemsMap}
+                                projId={projectId}
+                                setProjId={setProjectId}
+                                issueType={workItemType}
+                                setIssueType={setWorkItemType}
+                                issueId={issueDetails.id}
+                                isAzureModal={true}
+                            />
+                        </HorizontalStack>
                     }
                 </HorizontalStack>
             </div>
@@ -234,33 +336,36 @@ function TestRunResultFlyout(props) {
     const dataStoreTime = 2 * 30 * 24 * 60 * 60;
     const dataExpired = func.timeNow() - (selectedTestRunResult?.endTimestamp || func.timeNow()) > dataStoreTime
 
-    const ValuesTab = {
-        id: 'values',
-        content: "Values",
-        component: (dataExpired && !selectedTestRunResult?.vulnerable)
-            ? dataExpiredComponent :
-            (selectedTestRunResult.testResults &&
-        <Box paddingBlockStart={3} paddingInlineEnd={4} paddingInlineStart={4}><SampleDataList
-            key="Sample values"
-            heading={"Attempt"}
-            minHeight={"30vh"}
-            vertical={true}
-            sampleData={selectedTestRunResult?.testResults.map((result) => {
-                if (result.errors && result.errors.length > 0) {
-                    let errorList = result.errors.join(", ");
-                    return { errorList: errorList }
-                }
-                if (result.originalMessage || result.message) {
-                    return { originalMessage: result.originalMessage, message: result.message, highlightPaths: [] }
-                }
-                return { errorList: "No data found" }
-            })}
-            isNewDiff={true}
-            vulnerable={selectedTestRunResult?.vulnerable}
-            isVulnerable={selectedTestRunResult.vulnerable}
-        />
-        </Box>)
-    }
+    const ValuesTab = typeof selectedTestRunResult === "object" ? useMemo(() => {
+        return {
+            id: 'values',
+            content: "Values",
+            component: (dataExpired && !selectedTestRunResult?.vulnerable)
+                ? dataExpiredComponent :
+                (selectedTestRunResult.testResults &&
+                    <Box paddingBlockStart={3} paddingInlineEnd={4} paddingInlineStart={4}><SampleDataList
+                        key="Sample values"
+                        heading={"Attempt"}
+                        minHeight={"30vh"}
+                        vertical={true}
+                        sampleData={selectedTestRunResult?.testResults.map((result) => {
+                            if (result.errors && result.errors.length > 0) {
+                                let errorList = result.errors.join(", ");
+                                return { errorList: errorList }
+                            }
+                            if (result.originalMessage || result.message) {
+                                return { originalMessage: result.originalMessage, message: result.message, highlightPaths: [] }
+                            }
+                            return { errorList: "No data found" }
+                        })}
+                        isNewDiff={true}
+                        vulnerable={selectedTestRunResult?.vulnerable}
+                        isVulnerable={selectedTestRunResult.vulnerable}
+                    />
+                    </Box>)
+        }
+    }, [JSON.stringify(selectedTestRunResult)]) : <></>
+
     const moreInfoComponent = (
         infoStateFlyout.length > 0 ?
         <VerticalStack gap={"5"}>

@@ -1,7 +1,7 @@
 import {
   CalendarMinor,ClockMinor,CircleAlertMajor,DynamicSourceMinor,DynamicSourceMajor, LockMinor, KeyMajor, ProfileMinor, PasskeyMinor,
   EmailMajor, CreditCardMajor, IdentityCardMajor, LocationsMinor,PhoneMajor, FileMinor, ImageMajor, BankMajor, HashtagMinor, 
-  ReceiptMajor, MobileMajor, CalendarTimeMinor, LocationMajor,  IdentityCardFilledMajor, CalendarMajor, PageMajor, AffiliateMajor
+  ReceiptMajor, MobileMajor, CalendarTimeMinor, LocationMajor,  IdentityCardFilledMajor, CalendarMajor, AffiliateMajor
 } from '@shopify/polaris-icons';
 import { saveAs } from 'file-saver'
 import inventoryApi from "../apps/dashboard/pages/observe/api"
@@ -14,6 +14,8 @@ import PersistStore from '../apps/main/PersistStore';
 
 import { circle_cancel, circle_tick_minor } from "@/apps/dashboard/components/icons";
 import quickStartFunc from '../apps/dashboard/pages/quick_start/transform';
+import { Box } from '@shopify/polaris';
+import TooltipText from '../apps/dashboard/components/shared/TooltipText';
 
 const iconsUsedMap = {
   CalendarMinor,ClockMinor,CircleAlertMajor,DynamicSourceMinor, LockMinor, KeyMajor, ProfileMinor, PasskeyMinor,
@@ -522,13 +524,14 @@ prettifyEpoch(epoch) {
       return acc;
     }, {});
   },
-  requestJson: function (message, highlightPaths) {
-
+  requestJson: function (message, highlightPaths, metadata = []) {
     if(!message || typeof message !== "object" || Object.keys(message).length === 0){
       return {}
     }
     let result = {}
     let requestHeaders = {}
+
+    const metaDataSet = new Set(metadata.map((x) => x.toLowerCase()))
 
     let requestHeadersString = "{}"
     let requestPayloadString = "{}"
@@ -560,6 +563,22 @@ prettifyEpoch(epoch) {
       // eat it
     }
 
+    Object.keys(requestHeaders).forEach((key) => {
+      if(metaDataSet.has(key)){
+        highlightPaths.push({
+            "highlightValue": {
+                "value": key,
+                "wholeRow": true,
+                "className": "akto-decoded",
+                "highlight": true,
+            },
+            "responseCode": -1,
+            "header": key,
+            "param": key,
+        })
+      }
+    })
+
     let requestPayload = {}
     try {
       requestPayload = JSON.parse(requestPayloadString)
@@ -588,7 +607,7 @@ prettifyEpoch(epoch) {
     }
     return result
   },
-  responseJson: function (message, highlightPaths) {
+  responseJson: function (message, highlightPaths, metadata = []) {
 
     if(!message || typeof message !== "object" || Object.keys(message).length === 0){
       return {}
@@ -597,6 +616,7 @@ prettifyEpoch(epoch) {
 
     let responseHeadersString = "{}"
     let responsePayloadString = "{}"
+    const metaDataSet = new Set(metadata.map((x) => x.toLowerCase()))
     if (message["request"]) {
       responseHeadersString = message["response"]["headers"] || "{}"
       responsePayloadString = message["response"]["body"] || "{}"
@@ -616,7 +636,23 @@ prettifyEpoch(epoch) {
       responsePayload = JSON.parse(responsePayloadString)
     } catch (e) {
       responsePayload = responsePayloadString
-    }
+    }    
+
+    Object.keys(responseHeaders).forEach((key) => {
+      if(metaDataSet.has(key)){
+        highlightPaths.push({
+            "highlightValue": {
+                "value": key,
+                "wholeRow": true,
+                "className": "akto-decoded",
+                "highlight": true,
+            },
+            "header": key,
+            "param": key,
+        })
+      }
+    })
+
     result["json"] = { "responseHeaders": responseHeaders, "responsePayload": responsePayload }
     result["highlightPaths"] = {}
     result['firstLine'] = func.responseFirstLine(message)
@@ -935,7 +971,7 @@ parameterizeUrl(x) {
   });
   return newStr
 },
-mergeApiInfoAndApiCollection(listEndpoints, apiInfoList, idToName) {
+mergeApiInfoAndApiCollection(listEndpoints, apiInfoList, idToName,apiInfoSeverityMap) {
   const allCollections = PersistStore.getState().allCollections
   const apiGroupsMap = func.mapCollectionIdToName(allCollections.filter(x => x.type === "API_GROUP"))
 
@@ -951,7 +987,6 @@ mergeApiInfoAndApiCollection(listEndpoints, apiInfoList, idToName) {
           apiInfoMap[x["id"]["apiCollectionId"] + "-" + x["id"]["url"] + "-" + x["id"]["method"]] = x
       })
   }
-
   listEndpoints.forEach(x => {
       let key = x.apiCollectionId + "-" + x.url + "-" + x.method
       if (!ret[key]) {
@@ -976,7 +1011,7 @@ mergeApiInfoAndApiCollection(listEndpoints, apiInfoList, idToName) {
           let riskScore = apiInfoMap[key] ? apiInfoMap[key]?.riskScore : 0
           let responseCodesArr = apiInfoMap[key] ? apiInfoMap[key]?.responseCodes : [] 
           let discoveredTimestamp = apiInfoMap[key] ? (apiInfoMap[key].discoveredTimestamp || apiInfoMap[key].startTs) : 0
-
+          let description = apiInfoMap[key] ? apiInfoMap[key]['description'] : ""
           ret[key] = {
               id: x.method + "###" + x.url + "###" + x.apiCollectionId + "###" + Math.random(),
               shadow: x.shadow ? x.shadow : false,
@@ -991,10 +1026,10 @@ mergeApiInfoAndApiCollection(listEndpoints, apiInfoList, idToName) {
               apiCollectionId: x.apiCollectionId,
               last_seen: apiInfoMap[key] ? (this.prettifyEpoch(apiInfoMap[key]["lastSeen"])) : this.prettifyEpoch(x.startTs),
               lastSeenTs: apiInfoMap[key] ? apiInfoMap[key]["lastSeen"] : x.startTs,
-              detectedTs: (x.startTs || discoveredTimestamp),
+              detectedTs: discoveredTimestamp === 0 ? x.startTs : discoveredTimestamp,
               changesCount: x.changesCount,
               changes: x.changesCount && x.changesCount > 0 ? (x.changesCount +" new parameter"+(x.changesCount > 1? "s": "")) : 'No new changes',
-              added: "Discovered " + this.prettifyEpoch(x.startTs || discoveredTimestamp),
+              added: this.prettifyEpoch(discoveredTimestamp),
               violations: apiInfoMap[key] ? apiInfoMap[key]["violations"] : {},
               apiCollectionName: idToName ? (idToName[x.apiCollectionId] || '-') : '-',
               auth_type: (authType || "no auth type found").toLowerCase(),
@@ -1008,13 +1043,27 @@ mergeApiInfoAndApiCollection(listEndpoints, apiInfoList, idToName) {
               riskScore: riskScore,
               sensitiveInReq: [...this.convertSensitiveTags(x.sensitiveInReq)],
               sensitiveInResp: [...this.convertSensitiveTags(x.sensitiveInResp)],
-              responseCodes: responseCodesArr
+              responseCodes: responseCodesArr,
+              ...(apiInfoSeverityMap?.hasOwnProperty(key) ? { severityObj: apiInfoSeverityMap[key] } : {}),
+              sources: apiInfoMap[key]?apiInfoMap[key]['sources']:{},
+              description: description,
+              descriptionComp: (<Box maxWidth="300px"><TooltipText tooltip={description} text={description}/></Box>),
+              lastTested: apiInfoMap[key] ? apiInfoMap[key]["lastTested"] : 0,
           }
 
       }
   })
-  
   return Object.values(ret) 
+},
+getSeverityCountPerEndpointList(apiInfoSeverityMap){
+  if(!apiInfoSeverityMap) return {}
+  let apiInfoIdSeverityMap = {}
+  Object.entries(apiInfoSeverityMap).forEach(([key, value]) => {
+    let keyId = key.split(" ").join("-");
+    apiInfoIdSeverityMap[keyId] = value;
+
+  });
+  return apiInfoIdSeverityMap;
 },
 
 convertSensitiveTags(subTypeList) {
@@ -1463,6 +1512,13 @@ mapCollectionIdToHostName(apiCollections){
 
     return collectionsObj
 },
+joinWordsWithUnderscores(input) {
+    if (!input ) return "";
+    const words = input.trim().split(/\s+/);
+    const result = words.map(word => word).join('_');
+
+    return result.toUpperCase();
+  },
   getTimeTakenByTest(startTimestamp, endTimestamp){
     const timeDiff = Math.abs(endTimestamp - startTimestamp);
     const hours = Math.floor(timeDiff / 3600);
@@ -1839,9 +1895,8 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
   checkForFeatureSaas(featureLabel) {
     const stiggFeatures = window.STIGG_FEATURE_WISE_ALLOWED
     let access = false;
-    if (!stiggFeatures || Object.keys(stiggFeatures).length === 0) {
-      // for feature map not present, no access. For saas only.
-      access = false;
+    if (!stiggFeatures || Object.keys(stiggFeatures).length === 0 ) {
+      access = this.checkOnPrem()
     } else if (stiggFeatures && stiggFeatures[featureLabel]) {
       access = stiggFeatures[featureLabel].isGranted
     }
@@ -1882,6 +1937,16 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
   getAktoSeverities(){
     return ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW']
   },
+
+  getSelectedItemsText(selectedItem) {
+    if (!Array.isArray(selectedItem) || selectedItem?.length === 0) return "";
+  
+    if (selectedItem.length === 1) return selectedItem[0];
+  
+    const allButLast = selectedItem.slice(0, -1).join(", ");
+    const last = selectedItem[selectedItem.length - 1];
+    return `${allButLast} & ${last}`;
+  },  
 
   getIconFromString(iconString){
     if(iconsUsedMap[iconString] !== undefined){

@@ -3,6 +3,8 @@ package com.akto.dto.testing;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.CollectionConditions.TestConfigsAdvancedSettings;
 
+import lombok.Getter;
+import lombok.Setter;
 import org.bson.codecs.pojo.annotations.BsonId;
 import org.bson.types.ObjectId;
 
@@ -26,16 +28,27 @@ public class TestingRunConfig {
     private List<TestConfigsAdvancedSettings> configsAdvancedSettings;
     private boolean cleanUp;
 
+    private List<String> testSuiteIds;
+    public static final String TEST_SUITE_IDS = "testSuiteIds";
+
+    public static final String AUTO_TICKETING_DETAILS = "autoTicketingDetails";
+
+    @Getter
+    @Setter
+    private AutoTicketingDetails autoTicketingDetails;
+
     public TestingRunConfig() {}
 
     public TestingRunConfig(int id, Map<Integer, List<ApiInfo.ApiInfoKey>> collectionWiseApiInfoKey,
     List<String> testSubCategoryList,
     ObjectId authMechanismId, String overriddenTestAppUrl, String testRoleId) {
-        this(id, collectionWiseApiInfoKey, testSubCategoryList, authMechanismId, overriddenTestAppUrl, testRoleId, false);
-    }    
+        this(id, collectionWiseApiInfoKey, testSubCategoryList, authMechanismId, overriddenTestAppUrl, testRoleId,
+            false, null);
+    }
+
     public TestingRunConfig(int id, Map<Integer, List<ApiInfo.ApiInfoKey>> collectionWiseApiInfoKey,
-                            List<String> testSubCategoryList,
-                            ObjectId authMechanismId, String overriddenTestAppUrl, String testRoleId, boolean cleanUp) {
+        List<String> testSubCategoryList, ObjectId authMechanismId, String overriddenTestAppUrl, String testRoleId,
+        boolean cleanUp, AutoTicketingDetails autoTicketingDetails) {
         this.id = id;
         this.collectionWiseApiInfoKey = collectionWiseApiInfoKey;
         this.testSubCategoryList = testSubCategoryList;
@@ -43,6 +56,7 @@ public class TestingRunConfig {
         this.overriddenTestAppUrl = overriddenTestAppUrl;
         this.testRoleId = testRoleId;
         this.cleanUp = cleanUp;
+        this.autoTicketingDetails = autoTicketingDetails;
     }
 
     public List<String> getTestSubCategoryList() {
@@ -137,4 +151,11 @@ public class TestingRunConfig {
         this.cleanUp = cleanUp;
     }
 
+    public List<String> getTestSuiteIds() {
+        return testSuiteIds;
+    }
+
+    public void setTestSuiteIds(List<String> testSuiteIds) {
+        this.testSuiteIds = testSuiteIds;
+    }
 }

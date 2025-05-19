@@ -4,6 +4,7 @@ import testingApi from "../../../pages/testing/api"
 import testingTransform from "../../../pages/testing/transform"
 import DropDownAgentInitializer from "./DropDownAgentInitializer"
 import agentApi from "../api"
+import { useAgentsStore } from "../agents.store"
 
 function TestFalsePositiveInitializer(props) {
     const { agentType } = props
@@ -16,6 +17,7 @@ function TestFalsePositiveInitializer(props) {
 
     const [allTestingRuns, setAllTestingRuns] = useState([])
     const [testingRuns, setTestingRuns] = useState([])
+    const {selectedModel} = useAgentsStore(state => state)
 
     const optionsList = allTestingRuns.map((x) => {
         return {
@@ -70,7 +72,8 @@ function TestFalsePositiveInitializer(props) {
             agent: agentType,
             data: {
                 testingRunSummaries: testingRuns
-            }
+            },
+            modelName: selectedModel.id
         })
         func.setToast(true, false, "Agent run scheduled")
     }

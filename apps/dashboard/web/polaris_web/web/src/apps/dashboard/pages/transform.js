@@ -165,6 +165,20 @@ const dashboardFunc = {
         return tempArr
     },
 
+    getApiPrompts: function(apiCollectionId, url, method){ 
+        return [{
+            prepareQuery: () => { return {
+                type: "analyze_request_response_headers",
+                label: "Analyze request/response headers for the protocols and api gateways",
+                meta: {
+                    "url": url,
+                    "method": method,
+                    "apiCollectionId": apiCollectionId
+                }                        
+            }}}
+        ]
+    },
+
     getPrompts: function(requestObj) {
         switch(requestObj.key){
             case "DATA_TYPES":
@@ -175,6 +189,9 @@ const dashboardFunc = {
 
             case "PARAMETER":
                 return this.getParameterPrompts(requestObj.jsonStr, requestObj.apiCollectionId)
+
+            case "API":
+                return this.getApiPrompts(requestObj.apiCollectionId, requestObj.url, requestObj.method)
 
             default :
                 return []

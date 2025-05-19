@@ -15,6 +15,13 @@ export type RepoPayload = {
     project: string;
     lastRun: number;
     scheduleTime: number;
+    accessToken: string | null;
+}
+
+export type RepoNodeType = {
+    name: string;
+    nameWithOwner: string;
+    isPrivate: boolean;
 }
 
 export type Agent = {

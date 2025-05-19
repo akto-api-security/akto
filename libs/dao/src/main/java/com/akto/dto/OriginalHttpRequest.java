@@ -1,12 +1,15 @@
 package com.akto.dto;
 
+import com.akto.dto.testing.TLSAuthParam;
 import com.akto.dto.type.RequestTemplate;
 import com.akto.util.HttpRequestResponseUtils;
 import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONObject;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.Gson;
 import com.mongodb.BasicDBObject;
+
+import lombok.Getter;
+import lombok.Setter;
 import okhttp3.HttpUrl;
 
 import java.net.URI;
@@ -15,17 +18,22 @@ import java.util.*;
 public class OriginalHttpRequest {
 
     private static final Gson gson = new Gson();
-    private final static ObjectMapper mapper = new ObjectMapper();
     private String url;
     private String type;
     private String queryParams;
     private String method;
     private String body;
+    private String sourceIp;
+    private String destinationIp;
     private Map<String, List<String>> headers;
+
+    @Getter
+    @Setter
+    private TLSAuthParam tlsAuthParam;
 
     public OriginalHttpRequest() { }
 
-    // before adding any fields make sure to add them to copy function as wel
+    // before adding any fields make sure to add them to copy function as well
     public OriginalHttpRequest(String url, String queryParams, String method, String body, Map<String, List<String>> headers, String type) {
         this.url = url;
         this.queryParams = queryParams;
@@ -33,6 +41,13 @@ public class OriginalHttpRequest {
         this.body = body;
         this.headers = headers;
         this.type = type;
+    }
+
+    public OriginalHttpRequest(String url, String queryParams, String method, String body, String sourceIp, String destinationIp, Map<String, List<String>> headers, String type, TLSAuthParam tlsAuthParam) {
+        this(url, queryParams, method, body, headers, type);
+        this.sourceIp = sourceIp;
+        this.destinationIp = destinationIp;
+        this.tlsAuthParam = tlsAuthParam;
     }
 
     public OriginalHttpRequest copy() {
@@ -43,7 +58,8 @@ public class OriginalHttpRequest {
             headersCopy.put(headerKV.getKey(), headerValues);
         }
         return new OriginalHttpRequest(
-                this.url, this.queryParams, this.method, this.body, headersCopy, this.type
+                this.url, this.queryParams, this.method, this.body, this.sourceIp, this.destinationIp, headersCopy, this.type, 
+                this.tlsAuthParam
         );
     }
 
@@ -79,6 +95,8 @@ public class OriginalHttpRequest {
 
         String requestPayload = (String) json.get("requestPayload");
         this.body = requestPayload.trim();
+        this.sourceIp = (String) json.get("ip");
+        this.destinationIp = (String) json.get("destIp");
 
         this.headers = buildHeadersMap(json, "requestHeaders");
     }
@@ -98,6 +116,9 @@ public class OriginalHttpRequest {
         String requestPayload = responseParam.getRequestParams().getPayload();
         this.body = requestPayload.trim();
 
+        this.sourceIp = responseParam.getSourceIP();
+        this.destinationIp = responseParam.getDestIP();
+
         this.headers = responseParam.getRequestParams().getHeaders();
     }
 
@@ -107,10 +128,10 @@ public class OriginalHttpRequest {
 
     public static final String JSON_CONTENT_TYPE = "application/json";
 
-    public boolean isJsonRequest() {
-        String acceptableContentType = HttpRequestResponseUtils.getAcceptableContentType(this.headers);
-        return acceptableContentType != null && acceptableContentType.equals(JSON_CONTENT_TYPE);
-    }
+//    public boolean isJsonRequest() {
+//        String acceptableContentType = HttpRequestResponseUtils.getAcceptableContentType(this.headers);
+//        return acceptableContentType != null && acceptableContentType.equals(JSON_CONTENT_TYPE);
+//    }
 
     public void buildFromApiSampleMessage(String message) {
         BasicDBObject ob = BasicDBObject.parse(message);
@@ -127,6 +148,8 @@ public class OriginalHttpRequest {
         this.method = reqObj.getString("method");
         this.body = reqObj.getString("body");
         this.type = reqObj.getString("type");
+        this.sourceIp = reqObj.getString("ip");
+        this.destinationIp = reqObj.getString("destIp");
 
     }
 
@@ -373,29 +396,45 @@ public class OriginalHttpRequest {
         this.type = type;
     }
 
-    public boolean setMethodAndQP(String line) {
-        String[] tokens = line.split(" ");
-        if (tokens.length != 3) {
-            return false;
-        }
-
-        this.method = tokens[0];
-        String fullUrl = tokens[1];
-
-        int qpIndex = fullUrl.indexOf("?");
-        if (qpIndex > -1 && qpIndex <= fullUrl.length()) {
-            this.url = fullUrl.substring(0, qpIndex);
-            this.queryParams = fullUrl.substring(qpIndex+1);
-        } else {
-            this.url = fullUrl;
-            this.queryParams = "";
-        }
-
-        this.type = tokens[2];
-
-        return true;
+    public String getSourceIp() {
+        return this.sourceIp;
     }
 
+    public void setSourceIp(String sourceIp) {
+        this.sourceIp = sourceIp;
+    }
+    
+    public String getDestinationIp() {
+        return this.destinationIp;
+    }
+
+    public void setDestinationIp(String destinationIp) {
+        this.destinationIp = destinationIp;
+    }
+
+//    public boolean setMethodAndQP(String line) {
+//        String[] tokens = line.split(" ");
+//        if (tokens.length != 3) {
+//            return false;
+//        }
+//
+//        this.method = tokens[0];
+//        String fullUrl = tokens[1];
+//
+//        int qpIndex = fullUrl.indexOf("?");
+//        if (qpIndex > -1 && qpIndex <= fullUrl.length()) {
+//            this.url = fullUrl.substring(0, qpIndex);
+//            this.queryParams = fullUrl.substring(qpIndex+1);
+//        } else {
+//            this.url = fullUrl;
+//            this.queryParams = "";
+//        }
+//
+//        this.type = tokens[2];
+//
+//        return true;
+//    }
+//
     public String getPath(){
        try {
             String path = URI.create(this.url).getPath();
@@ -418,6 +457,8 @@ public class OriginalHttpRequest {
                 ", method='" + method + '\'' +
                 ", body='" + body + '\'' +
                 ", headers=" + headers +
+                ", sourceIp=" + sourceIp +
+                ", destinationIp=" + destinationIp +
                 '}';
     }
 }

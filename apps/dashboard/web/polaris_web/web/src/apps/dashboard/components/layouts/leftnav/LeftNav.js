@@ -18,6 +18,7 @@ import api from "../../../../signup/api";
 import {useState} from "react";
 import func from "@/util/func";
 import Dropdown from "../Dropdown";
+import SessionStore from "../../../../main/SessionStore";
 
 export default function LeftNav() {
     const navigate = useNavigate();
@@ -32,16 +33,18 @@ export default function LeftNav() {
     const activeAccount = Store(state => state.activeAccount);
     const resetAll = PersistStore(state => state.resetAll);
     const resetStore = LocalStore(state => state.resetStore);
+    const resetSession = SessionStore(state => state.resetStore);
 
     const handleSelect = (selectedId) => {
         setLeftNavSelected(selectedId);
     };
 
     const handleAccountChange = async (selected) => {
-        await api.goToAccount(selected);
-        func.setToast(true, false, `Switched to account ${accounts[selected]}`);
         resetAll();
         resetStore();
+        resetSession();
+        await api.goToAccount(selected);
+        func.setToast(true, false, `Switched to account ${accounts[selected]}`);
         window.location.href = '/dashboard/observe/inventory';
     };
 

@@ -173,10 +173,18 @@ public class UsageMetricUtils {
             for (UsageMetric metric : usageMetrics) {
                 JSONObject jo = new JSONObject(props);
                 jo.put("Metric Type", metric.getMetricType());
-                jo.put("Usage", metric.getUsage());
+                int metricData = metric.getUsage();
+                if(metricData == 0){
+                    continue;
+                }
+                jo.put("Usage", metricData);
                 String eventName = String.valueOf(metric.getMetricType());
                 map.put(eventName, jo);
                 logger.info("Sending event to mixpanel: " + eventName);
+            }
+
+            if(map.size() == 0){
+                return;
             }
 
             AktoMixpanel aktoMixpanel = new AktoMixpanel();
@@ -260,7 +268,7 @@ public class UsageMetricUtils {
             }
             HashMap<String, FeatureAccess> featureWiseAllowed = organization.getFeatureWiseAllowed();
             if (featureWiseAllowed == null || featureWiseAllowed.isEmpty()) {
-                return featureAccess;
+                return DashboardMode.isOnPremDeployment() ? FeatureAccess.fullAccess : FeatureAccess.noAccess; // case of on-prem customers without internet access
             }
             featureAccess = featureWiseAllowed.getOrDefault(featureLabel, FeatureAccess.noAccess);
         } catch (Exception e) {

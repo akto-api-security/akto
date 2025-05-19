@@ -1,18 +1,59 @@
 package com.akto.dto.agents;
 
-public enum Model {
+import java.util.Map;
 
-    // TODO: use this enum in agent code.
-    OPEN_AI_GPT_4o_mini("OpenAI GPT-4o mini");
+public class Model {
 
-    private final String modelName;
+    String name;
+    public final static String _NAME = "name";
+    ModelType type;
 
-    Model(String modelName) {
-        this.modelName = modelName;
+    /*
+     * Params contain details like
+     * modelName: "gpt-3.5-turbo", ...
+     * apiKey: "sk-...",
+     * In case of self hosted Azure
+     * azureOpenAIEndpoint: "https://<your-resource-name>.openai.azure.com/",
+     */
+
+    public final static String PARAM_MODEL = "model";
+    public final static String PARAM_API_KEY = "apiKey";
+    public final static String PARAM_AZURE_OPENAI_ENDPOINT = "azureOpenAIEndpoint";
+
+    public final static String _PARAMS = "params";
+    Map<String, String> params;
+
+    public Model(String name, ModelType type, Map<String, String> params) {
+        this.name = name;
+        this.type = type;
+        this.params = params;
     }
 
-    public String getModelName() {
-        return modelName;
+    public Model() {
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public Map<String, String> getParams() {
+        return params;
+    }
+
+    public void setParams(Map<String, String> params) {
+        this.params = params;
+    }
+
+    public ModelType getType() {
+        return type;
+    }
+
+    public void setType(ModelType type) {
+        this.type = type;
     }
 
 }

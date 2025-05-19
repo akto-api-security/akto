@@ -19,9 +19,8 @@ import com.akto.runtime.APICatalogSync;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.*;
 import org.apache.commons.lang3.StringUtils;
+import org.bson.Document;
 import org.bson.conversions.Bson;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 import java.util.*;
@@ -92,9 +91,9 @@ public class AktoPolicyNew {
         loggerMaker.infoAndAddToDb("Built AktoPolicyNew", LogDb.RUNTIME);
     }
 
-    public void syncWithDb() {
+    public void syncWithDb(HttpResponseParams.Source source) {
         loggerMaker.infoAndAddToDb("Syncing with db", LogDb.RUNTIME);
-        UpdateReturn updateReturn = getUpdates(apiInfoCatalogMap);
+        UpdateReturn updateReturn = getUpdates(apiInfoCatalogMap, source);
         List<WriteModel<ApiInfo>> writesForApiInfo = updateReturn.updatesForApiInfo;
         List<WriteModel<FilterSampleData>> writesForSampleData = updateReturn.updatesForSampleData;
         loggerMaker.infoAndAddToDb("Writing to db: " + "writesForApiInfoSize="+writesForApiInfo.size() + " writesForSampleData="+ writesForSampleData.size(), LogDb.RUNTIME);
@@ -264,7 +263,7 @@ public class AktoPolicyNew {
         return newPolicyCatalog;
     }
 
-    public static UpdateReturn getUpdates(Map<Integer, ApiInfoCatalog> apiInfoCatalogMap) {
+    public static UpdateReturn getUpdates(Map<Integer, ApiInfoCatalog> apiInfoCatalogMap, HttpResponseParams.Source source) {
         List<ApiInfo> apiInfoList = new ArrayList<>();
         List<FilterSampleData> filterSampleDataList = new ArrayList<>();
         for (ApiInfoCatalog apiInfoCatalog: apiInfoCatalogMap.values()) {
@@ -297,7 +296,7 @@ public class AktoPolicyNew {
             }
         }
 
-        List<WriteModel<ApiInfo>> updatesForApiInfo = getUpdatesForApiInfo(apiInfoList);
+        List<WriteModel<ApiInfo>> updatesForApiInfo = getUpdatesForApiInfo(apiInfoList, source);
         List<WriteModel<FilterSampleData>> updatesForSampleData = getUpdatesForSampleData(filterSampleDataList);
         Map<ApiInfoKey, List<Integer>> updatesForApiGroups = getUpdatesForApiGroups(apiInfoList);
 
@@ -381,7 +380,7 @@ public class AktoPolicyNew {
         }
     }
 
-    public static List<WriteModel<ApiInfo>> getUpdatesForApiInfo(List<ApiInfo> apiInfoList) {
+    public static List<WriteModel<ApiInfo>> getUpdatesForApiInfo(List<ApiInfo> apiInfoList, HttpResponseParams.Source source) {
 
         List<WriteModel<ApiInfo>> updates = new ArrayList<>();
         for (ApiInfo apiInfo: apiInfoList) {
@@ -419,6 +418,11 @@ public class AktoPolicyNew {
 
             // discovered timestamp
             subUpdates.add(Updates.setOnInsert(ApiInfo.DISCOVERED_TIMESTAMP, apiInfo.getDiscoveredTimestamp()));
+
+            // sources
+            if (source != null) {
+                subUpdates.add(Updates.set(SingleTypeInfo.SOURCES + "." + source.name(), new Document("timestamp", Context.now())));
+            }
 
             // last seen
             subUpdates.add(Updates.set(ApiInfo.LAST_SEEN, apiInfo.getLastSeen()));

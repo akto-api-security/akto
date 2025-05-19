@@ -210,7 +210,18 @@ export default {
         const resp = await request({
             url: '/api/updateTestRoles',
             method: 'post',
-            data: { roleName, andConditions, orConditions }
+            data: { roleName, andConditions, orConditions}
+        })
+        return resp        
+    },
+    async saveTestRoleMeta(roleName, scopeRoles) {
+        if(scopeRoles && scopeRoles.length === 0){
+            return;
+        }
+        const resp = await request({
+            url: '/api/saveTestRoleMeta',
+            method: 'post',
+            data: { roleName, scopeRoles}
         })
         return resp        
     },
@@ -443,11 +454,11 @@ export default {
             data: {}
         })
     },
-    downloadReportPDF(reportId, organizationName, reportDate, reportUrl, firstPollRequest) {
+    downloadReportPDF(reportId, organizationName, reportDate, reportUrl, username, firstPollRequest) {
         return request({
             url: '/api/downloadReportPDF',
             method: 'post',
-            data: {reportId, organizationName, reportDate, reportUrl, firstPollRequest}
+            data: {reportId, organizationName, reportDate, reportUrl, username, firstPollRequest}
         })
     },
     fetchScript() {
@@ -557,6 +568,20 @@ export default {
             url: '/api/deleteTestSuite',
             method: 'post',
             data: {testSuiteHexId}
+        })
+    },
+    fetchMiniTestingServiceNames() {
+        return request({
+            url: '/api/fetchMiniTestingServiceNames',
+            method: 'post',
+            data: {}
+        })
+    },
+    updateIssueDescription(issueId, description) {
+        return request({
+            url: '/api/updateIssueDescription',
+            method: 'post',
+            data: {issueId, description}
         })
     }
 }

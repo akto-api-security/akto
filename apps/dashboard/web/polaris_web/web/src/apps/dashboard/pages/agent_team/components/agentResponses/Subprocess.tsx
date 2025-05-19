@@ -4,7 +4,7 @@ import {  AgentRun, AgentState, AgentSubprocess, State } from "../../types";
 import { CaretDownMinor } from "@shopify/polaris-icons";
 import api from "../../api";
 import { useAgentsStore } from "../../agents.store";
-import STEPS_PER_AGENT_ID, { outputKeys, preRequisitesMap } from "../../constants";
+import STEPS_PER_AGENT_ID, { outputKeys, preRequisitesMap, showSummaryOutput } from "../../constants";
 import { VerticalStack, Text, HorizontalStack, Button } from "@shopify/polaris";
 import OutputSelector from "./OutputSelector";
 import { intermediateStore } from "../../intermediate.store";
@@ -24,10 +24,11 @@ interface SubProcessProps {
 
 export const Subprocess = ({ agentId, processId, subProcessFromProp, triggerCallForSubProcesses, setCurrentAgentRun }: SubProcessProps) => {
     const [subprocess, setSubprocess] = useState<AgentSubprocess | null>(subProcessFromProp);
-    const [expanded, setExpanded] = useState(true);
+    const [expanded, setExpanded] = useState((subProcessFromProp?.state == "SCHEDULED" || subProcessFromProp?.state == "RUNNING") ? true : false);
 
     const { finalCTAShow, setFinalCTAShow, setCurrentAttempt, 
-        setCurrentSubprocess, currentSubprocess, currentAttempt, setAgentState, setPRState, PRstate } = useAgentsStore(state => ({
+        setCurrentSubprocess, currentSubprocess, currentAttempt, setAgentState, setPRState, PRstate,
+        selectedModel } = useAgentsStore(state => ({
         finalCTAShow: state.finalCTAShow,
         setFinalCTAShow: state.setFinalCTAShow,
         setCurrentAttempt: state.setCurrentAttempt,
@@ -36,7 +37,8 @@ export const Subprocess = ({ agentId, processId, subProcessFromProp, triggerCall
         currentAttempt: state.currentAttempt,
         setAgentState: state.setAgentState,
         setPRState: state.setPRState,
-        PRstate: state.PRstate
+        PRstate: state.PRstate,
+        selectedModel: state.selectedModel
     }));  // Only subscribe to necessary store values
 
     const { setFilteredUserInput, setOutputOptions } = intermediateStore(state => ({ setFilteredUserInput: state.setFilteredUserInput, setOutputOptions: state.setOutputOptions })); 
@@ -140,9 +142,10 @@ export const Subprocess = ({ agentId, processId, subProcessFromProp, triggerCall
         return () => clearInterval(interval);
     }, [currentSubprocess, finalCTAShow, processId, currentAttempt, subProcessFromProp, createNewSubprocess]);
 
+    const showSummary = STEPS_PER_AGENT_ID[agentId] === parseInt(subprocess?.subProcessId || '0') && showSummaryOutput[agentId];
     const groupedOutput = useMemo(() => {
-        const rawData = subprocess?.processOutput?.selectionType === "batched" ? subprocess?.processOutput?.outputOptions : [];
-        if(rawData.length === 0) return {};
+        const rawData = showSummary ? subprocess?.processOutput?.outputOptions : [];
+        if(rawData === null || rawData === undefined) return {};
         let finalMap = {};
         rawData.forEach((data: any) => {
             const {id, output} = data;
@@ -205,7 +208,8 @@ export const Subprocess = ({ agentId, processId, subProcessFromProp, triggerCall
             const previousAgentRun = res.agentRun
             let data = await api.createAgentRun({
                 agent: previousAgentRun.agent,
-                data: previousAgentRun.agentInitDocument
+                data: previousAgentRun.agentInitDocument,
+                modelName: selectedModel?.id
             })
             if(data.agentRun){
                 setCurrentAgentRun(data?.agentRun)
@@ -249,7 +253,7 @@ export const Subprocess = ({ agentId, processId, subProcessFromProp, triggerCall
                     </motion.div>
                 </AnimatePresence>
             </div>
-            {subprocess.processOutput?.selectionType === 'batched' ?<BatchedOutput 
+            {showSummary && Object.keys(groupedOutput).length > 0 ?<BatchedOutput 
                 data={groupedOutput} 
                 buttonText="Analyzing APIs for the collection: " 
                 isCollectionBased={true}

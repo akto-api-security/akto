@@ -195,14 +195,6 @@ export default {
             data: {}
         })
     },
-
-    askAi(data) {
-        return request({
-            url: '/api/ask_ai',
-            method: 'post',
-            data: data
-        })
-    },
     saveContent(apiSpec) {
         return request({
             url: '/api/saveContent',
@@ -226,6 +218,13 @@ export default {
     uploadHarFile(formData) {
         return request({
             url: '/api/uploadHar',
+            method: 'post',
+            data: formData,
+        })
+    },
+    uploadOpenApiFile(formData) {
+        return request({
+            url: '/api/importDataFromOpenApiSpec',
             method: 'post',
             data: formData,
         })
@@ -580,20 +579,20 @@ export default {
             data: {}
         })
     },
-    scheduleTestForCollection(apiCollectionId, startTimestamp, recurringDaily, recurringWeekly, recurringMonthly, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, testConfigsAdvancedSettings, cleanUpTestingResources) {
+    scheduleTestForCollection(apiCollectionId, startTimestamp, recurringDaily, recurringWeekly, recurringMonthly, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, testConfigsAdvancedSettings, cleanUpTestingResources, testSuiteIds = [], selectedMiniTestingServiceName, autoTicketingDetails) {
         return request({
             url: '/api/startTest',
             method: 'post',
-            data: { apiCollectionId, type: "COLLECTION_WISE", startTimestamp, recurringDaily,  recurringWeekly, recurringMonthly,selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, testConfigsAdvancedSettings, cleanUpTestingResources}
+            data: { apiCollectionId, type: "COLLECTION_WISE", startTimestamp, recurringDaily,  recurringWeekly, recurringMonthly,selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, testConfigsAdvancedSettings, cleanUpTestingResources, testSuiteIds, selectedMiniTestingServiceName, autoTicketingDetails}
         }).then((resp) => {
             return resp
         })
     },
-    scheduleTestForCustomEndpoints(apiInfoKeyList, startTimestamp, recurringDaily, recurringWeekly, recurringMonthly, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, source, testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, testConfigsAdvancedSettings, cleanUpTestingResources) {
+    scheduleTestForCustomEndpoints(apiInfoKeyList, startTimestamp, recurringDaily, recurringWeekly, recurringMonthly, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, source, testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, testConfigsAdvancedSettings, cleanUpTestingResources, testSuiteIds = [], selectedMiniTestingServiceName, autoTicketingDetails) {
         return request({
             url: '/api/startTest',
             method: 'post',
-            data: {apiInfoKeyList, type: "CUSTOM", startTimestamp, recurringDaily,  recurringWeekly, recurringMonthly,selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, source, testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, testConfigsAdvancedSettings, cleanUpTestingResources}
+            data: {apiInfoKeyList, type: "CUSTOM", startTimestamp, recurringDaily,  recurringWeekly, recurringMonthly,selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, source, testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, testConfigsAdvancedSettings, cleanUpTestingResources, testSuiteIds, selectedMiniTestingServiceName, autoTicketingDetails}
         }).then((resp) => {
             return resp
         })        
@@ -833,10 +832,17 @@ export default {
         return request({
             url: '/api/resetDataTypeRetro',
             method: 'post',
-            data: {
-                name: name,
-            }
+            data: { name }
         })
+    },
+
+    async saveEndpointDescription(apiCollectionId, url, method, description) {
+        const resp = await request({
+            url: '/api/saveEndpointDescription',
+            method: 'post',
+            data: { apiCollectionId, url, method, description }
+        })
+        return resp
     },
 
     async checkIfDependencyGraphAvailable(apiCollectionId, url, method) {
@@ -858,5 +864,51 @@ export default {
             }
         })
     },
+
+    async getSeveritiesCountPerCollection(apiCollectionId) {
+        return await request({
+            url: '/api/getSeveritiesCountPerCollection',
+            method: 'post',
+            data: {
+                apiCollectionId
+            }
+        })
+    },
+    
+    async saveCollectionDescription(apiCollectionId, description) {
+        return await request({
+            url: '/api/saveCollectionDescription',
+            method: 'post',
+            data: {
+                apiCollectionId, description
+            }
+        })
+    },
+
+    async findSvcToSvcGraphEdges() {
+        return await request({
+            url: '/api/findSvcToSvcGraphEdges',
+            method: 'post',
+            data: {
+                startTimestamp: 0,
+                endTimestamp: 0,
+                skip: 0,
+                limit: 1000
+            }
+        })
+    },
+
+    async findSvcToSvcGraphNodes() {
+        return await request({
+            url: '/api/findSvcToSvcGraphNodes',
+            method: 'post',
+            data: {
+                startTimestamp: 0,
+                endTimestamp: 0,
+                skip: 0,
+                limit: 1000
+            }
+        })
+    }
 
 }

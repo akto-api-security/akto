@@ -28,7 +28,7 @@ import com.mongodb.client.model.Updates;
 import static com.akto.task.Cluster.callDibs;
 
 public class SyncCron {
-    private static final LoggerMaker loggerMaker = new LoggerMaker(SyncCron.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(SyncCron.class, LogDb.DASHBOARD);
     ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
 
     public void setUpUpdateCronScheduler() {
@@ -38,7 +38,7 @@ public class SyncCron {
                 Context.accountId.set(1000_000);
                 boolean dibs = callDibs(Cluster.SYNC_CRON_INFO, 300, 60);
                 if(!dibs){
-                    loggerMaker.infoAndAddToDb("Cron for updating new parameters, new endpoints and severity score dibs not acquired, thus skipping cron", LogDb.DASHBOARD);
+                    loggerMaker.debugAndAddToDb("Cron for updating new parameters, new endpoints and severity score dibs not acquired, thus skipping cron", LogDb.DASHBOARD);
                     return;
                 }
                 AccountTask.instance.executeTask(new Consumer<Account>() {
@@ -46,7 +46,7 @@ public class SyncCron {
                     public void accept(Account t) {
                         AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
                         LastCronRunInfo lastRunTimerInfo = accountSettings.getLastUpdatedCronInfo();
-                        loggerMaker.infoAndAddToDb("Cron for updating new parameters, new endpoints and severity score picked up " + accountSettings.getId(), LogDb.DASHBOARD);
+                        loggerMaker.debugAndAddToDb("Cron for updating new parameters, new endpoints and severity score picked up " + accountSettings.getId(), LogDb.DASHBOARD);
                         try {
                             int endTs = Context.now();
                             int startTs = endTs - 600 ;

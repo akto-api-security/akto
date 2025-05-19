@@ -19,7 +19,7 @@ import java.util.stream.Collectors;
 
 public class Utils {
 
-    private static final LoggerMaker loggerMaker = new LoggerMaker(Utils.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(Utils.class, LogDb.DASHBOARD);
     public static CloudType getCloudType() {
         if (System.getenv("AWS_REGION") != null) {
             return CloudType.AWS;
@@ -49,13 +49,13 @@ public class Utils {
 
     public static void rebootInstance(String instanceId){
         final AmazonEC2 ec2 = AmazonEC2ClientBuilder.defaultClient();
-        loggerMaker.infoAndAddToDb("Initiating request to reboot instance", LogDb.TESTING);
+        loggerMaker.debugAndAddToDb("Initiating request to reboot instance", LogDb.TESTING);
         RebootInstancesRequest request = new RebootInstancesRequest()
                 .withInstanceIds(instanceId);
         String requestString = request.toString();
-        loggerMaker.infoAndAddToDb("Request for rebooting instance fired: " + ( requestString!=null ? requestString : "no request" ), LogDb.TESTING);
+        loggerMaker.debugAndAddToDb("Request for rebooting instance fired: " + ( requestString!=null ? requestString : "no request" ), LogDb.TESTING);
         RebootInstancesResult response = ec2.rebootInstances(request);
         String responseString = response.toString();
-        loggerMaker.infoAndAddToDb("Response for instance reboot: " + ( responseString!=null ? responseString : "no response" ), LogDb.TESTING);
+        loggerMaker.debugAndAddToDb("Response for instance reboot: " + ( responseString!=null ? responseString : "no response" ), LogDb.TESTING);
     }
 }

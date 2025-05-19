@@ -275,6 +275,24 @@ const openApiObj = {
     key: "OPENAPI"
 }
 
+const wsdlApiObj = {
+    icon: '/public/xml_api.svg',
+    label: 'SOAP API',
+    text: 'Upload WSDL file using Postman to Akto to create an API inventory.',
+    docsUrl: 'https://docs.akto.io/traffic-connector/manual/wsdl',
+    component: <PostmanSource/>,
+    key: "SOAPAPI"
+}
+
+const graphqlApiIObj = {
+    icon: '/public/graphql_api.svg',
+    label: 'GraphQL Schema',
+    text: 'Upload GraphQL Schema file using Postman to Akto to create an API inventory.',
+    docsUrl: 'https://docs.akto.io/traffic-connector/manual/graphql',
+    component: <PostmanSource/>,
+    key: "GRAPHQLAPI"
+}
+
 const tcpObj = {
     icon: '/public/TCP.svg',
     label: 'TCP Agent',
@@ -1039,7 +1057,7 @@ const quickStartFunc = {
 
         // Manual
         const manual = [
-            burpObj, postmanObj, harFileUploadObj, openApiObj
+            burpObj, postmanObj, harFileUploadObj, openApiObj, wsdlApiObj, graphqlApiIObj
         ];
 
         // Akto SDK

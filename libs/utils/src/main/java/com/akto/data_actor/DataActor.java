@@ -1,10 +1,12 @@
 package com.akto.data_actor;
 
 import com.akto.dto.*;
+import com.akto.dto.monitoring.ModuleInfo;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.filter.MergedUrls;
 import com.akto.dto.runtime_filters.RuntimeFilter;
 import com.akto.dto.test_editor.YamlTemplate;
+import com.akto.dto.threat_detection.ApiHitCountInfo;
 import com.akto.dto.type.SingleTypeInfo;
 
 import java.util.List;
@@ -93,4 +95,11 @@ public abstract class DataActor {
     public abstract void updateRepoLastRun( CodeAnalysisRepo codeAnalysisRepo);
 
     public abstract Set<MergedUrls> fetchMergedUrls();
+
+    public abstract void bulkInsertApiHitCount(List<ApiHitCountInfo> apiHitCountInfoList) throws Exception;
+    public abstract void updateModuleInfo(ModuleInfo moduleInfo);
+
+    public abstract String fetchOpenApiSchema(int apiCollectionId);
+
+    public abstract void insertDataIngestionLog(Log log);
 }

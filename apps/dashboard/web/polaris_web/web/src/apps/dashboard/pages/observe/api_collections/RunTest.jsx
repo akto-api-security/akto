@@ -14,7 +14,15 @@ import AdvancedSettingsComponent from "./component/AdvancedSettingsComponent";
 import { produce } from "immer"
 import RunTestSuites from "./RunTestSuites";
 import RunTestConfiguration from "./RunTestConfiguration";
-import createTestName from "./Utils"
+import {createTestName,convertToLowerCaseWithUnderscores} from "./Utils"
+import settingsApi from "../../settings/api";
+
+const initialAutoTicketingDetails = {
+    shouldCreateTickets: false,
+    projectId: "",
+    severities: [],
+    issueType: "",
+}
 
 function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOutside, closeRunTest, selectedResourcesForPrimaryAction, useLocalSubCategoryData, preActivator, testIdConfig, activeFromTesting, setActiveFromTesting, showEditableSettings, setShowEditableSettings, parentAdvanceSettingsConfig, testRunType, shouldDisable }) {
 
@@ -40,7 +48,9 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
         testRoleId: "",
         sendSlackAlert: false,
         sendMsTeamsAlert: false,
-        cleanUpTestingResources: false
+        cleanUpTestingResources: false,
+        autoTicketingDetails: initialAutoTicketingDetails,
+        miniTestingServiceName: ""
     }
     const navigate = useNavigate()
 
@@ -74,6 +84,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
     const [slackIntegrated, setSlackIntegrated] = useState(false)
     const [teamsTestingWebhookIntegrated, setTeamsTestingWebhookIntegrated] = useState(false)
 
+    const [miniTestingServiceNames, setMiniTestingServiceNames] = useState([])
     const emptyCondition = { data: { key: '', value: '' }, operator: { 'type': 'ADD_HEADER' } }
     const [conditions, dispatchConditions] = useReducer(produce((draft, action) => func.conditionsReducer(draft, action)), []);
 
@@ -83,6 +94,11 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
     const [shouldRuntestConfig, setShouldRuntestConfig] = useState(false)
 
     const [openConfigurations, openConfigurationsToggle] = useState(false);
+
+    const [testSuiteIds, setTestSuiteIds] = useState([])
+
+    const [testNameSuiteModal, setTestNameSuiteModal] = useState("")
+    const [jiraProjectMap, setJiraProjectMap] = useState(null);
 
     useEffect(() => {
         if (preActivator) {
@@ -96,18 +112,20 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
     async function fetchData() {
         setLoading(true)
 
-        observeApi.fetchSlackWebhooks().then((resp) => {
-            const apiTokenList = resp.apiTokenList
-            setSlackIntegrated(apiTokenList && apiTokenList.length > 0)
-        })
+        Promise.all([
+            observeApi.fetchSlackWebhooks(),
+            observeApi.checkWebhook("MICROSOFT_TEAMS", "TESTING_RUN_RESULTS"),
+            settingsApi.fetchJiraIntegration()]).then(([slackResp, teamsResp, jiraResp]) => {
+                const apiTokenList = slackResp.apiTokenList
+                setSlackIntegrated(apiTokenList && apiTokenList.length > 0)
 
-        observeApi.checkWebhook("MICROSOFT_TEAMS", "TESTING_RUN_RESULTS").then((resp) => {
-            // console.log(resp.webhookPresent, resp)
-            const webhookPresent = resp.webhookPresent
-            if(webhookPresent){
-                setTeamsTestingWebhookIntegrated(true)
-            }
-        })
+                const webhookPresent = teamsResp.webhookPresent
+                if (webhookPresent) {
+                    setTeamsTestingWebhookIntegrated(true)
+                }
+
+                setJiraProjectMap(jiraResp?.projectIdsMap || null);
+            })
 
         let metaDataObj = {
             categories: [],
@@ -159,6 +177,16 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
         const authMechanismDataResponse = await testingApi.fetchAuthMechanismData()
         if (authMechanismDataResponse.authMechanism)
             authMechanismPresent = true
+        testingApi.fetchMiniTestingServiceNames().then(({miniTestingServiceNames}) => {
+            const miniTestingServiceNamesOptions = (miniTestingServiceNames || []).map(name => {
+                return {
+                    label: name,
+                    value: name
+                }
+            })
+            setMiniTestingServiceNames(miniTestingServiceNamesOptions)
+        })
+
         setTestRun(prev => {
             const state = {
                 ...prev,
@@ -172,6 +200,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
         });
         setLoading(false)
         setShouldRuntestConfig(true);
+        setTestNameSuiteModal(convertToLowerCaseWithUnderscores(apiCollectionName))
     }
 
     useEffect(() => {
@@ -185,7 +214,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
 
     useEffect(() => {
         if (shouldRuntestConfig === false) return;
-        if (testIdConfig?.testingRunConfig?.testSubCategoryList?.length > 0) {
+        if (testIdConfig?.testingRunConfig?.testSubCategoryList?.length >= 0) {
             const testSubCategoryList = [...testIdConfig.testingRunConfig.testSubCategoryList];
 
             const updatedTests = { ...testRun.tests };
@@ -220,7 +249,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                     testRunTime: testIdConfig.testRunTime,
                     testRoleId: testIdConfig.testingRunConfig.testRoleId,
                     testRunTimeLabel: (testIdConfig.testRunTime === -1) ? "30 minutes" : getLabel(testRunTimeOptions, testIdConfig.testRunTime.toString())?.label,
-                    testRoleLabel: getLabel(testRolesArr, testIdConfig?.testingRunConfig?.testRoleId).label,
+                    testRoleLabel: getLabel(testRolesArr, testIdConfig?.testingRunConfig?.testRoleId)?.label,
                     runTypeLabel: getRunTypeLabel(testRunType),
                     testName: testIdConfig.name,
                     sendSlackAlert: testIdConfig?.sendSlackAlert,
@@ -228,8 +257,11 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                     recurringDaily: testIdConfig?.periodInSeconds === 86400,
                     recurringMonthly: testIdConfig?.periodInSeconds === (86400 * 30), // 30 days
                     recurringWeekly: testIdConfig?.periodInSeconds === (86400 * 7),  // one week
-                    continuousTesting: testIdConfig?.periodInSeconds === -1
+                    continuousTesting: testIdConfig?.periodInSeconds === -1,
+                    autoTicketingDetails: testIdConfig?.testingRunConfig?.autoTicketingDetails || initialAutoTicketingDetails,
                 }));
+                setTestSuiteIds(testIdConfig?.testingRunConfig?.testSuiteIds || [])
+                setTestNameSuiteModal(testIdConfig?.name||"")
         }
         setShouldRuntestConfig(false);
     }, [shouldRuntestConfig])
@@ -451,7 +483,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
         if (testRun.hourlyLabel === "Now") {
             if (testRun.recurringDaily) {
                 return <div data-testid="schedule_run_button">Run daily at this time</div>
-            } else if (testRun.recurringWeekly) { 
+            } else if (testRun.recurringWeekly) {
                 return <div data-testid="schedule_run_button">Run weekly at this time</div>
             } else if (testRun.recurringMonthly) {
                 return <div data-testid="schedule_run_button">Run monthly at this time</div>
@@ -464,7 +496,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
         } else {
             if (testRun.recurringDaily) {
                 return <div data-testid="schedule_run_button">Run daily at {testRun.hourlyLabel}</div>
-            } else if (testRun.recurringWeekly) { 
+            } else if (testRun.recurringWeekly) {
                 return <div data-testid="schedule_run_button">Run weekly on every {func.getDayOfWeek(testRun.startTimestamp)} at {testRun.hourlyLabel}</div>
             } else if (testRun.recurringMonthly) {
                 return <div data-testid="schedule_run_button">Run monthly on every {new Date(testRun.startTimestamp * 1000).getDate()} at {testRun.hourlyLabel}</div>
@@ -500,17 +532,24 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
     }
 
     async function handleRun() {
-        const { startTimestamp, recurringDaily, recurringMonthly, recurringWeekly,  testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, cleanUpTestingResources } = testRun
+        const { startTimestamp, recurringDaily, recurringMonthly, recurringWeekly, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, cleanUpTestingResources, miniTestingServiceName } = testRun
+        let {testName} = testRun;
+        const autoTicketingDetails = jiraProjectMap ? testRun.autoTicketingDetails : null;
         const collectionId = parseInt(apiCollectionId)
 
         const tests = testRun.tests
 
-        const selectedTests = []
-        Object.keys(tests).forEach(category => {
-            tests[category].forEach(test => {
-                if (test.selected) selectedTests.push(test.value)
+        let selectedTests = []
+        if (testMode) {
+            Object.keys(tests).forEach(category => {
+                tests[category].forEach(test => {
+                    if (test.selected) selectedTests.push(test.value)
+                })
             })
-        })
+        }
+        else {
+            testName = testNameSuiteModal
+        }
 
         let apiInfoKeyList;
         if (!selectedResourcesForPrimaryAction || selectedResourcesForPrimaryAction.length === 0) {
@@ -541,9 +580,9 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
         }
 
         if (filtered || selectedResourcesForPrimaryAction?.length > 0) {
-            await observeApi.scheduleTestForCustomEndpoints(apiInfoKeyList, startTimestamp, recurringDaily, recurringWeekly, recurringMonthly, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, "TESTING_UI", testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, finalAdvancedConditions, cleanUpTestingResources)
+            await observeApi.scheduleTestForCustomEndpoints(apiInfoKeyList, startTimestamp, recurringDaily, recurringWeekly, recurringMonthly, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, "TESTING_UI", testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, finalAdvancedConditions, cleanUpTestingResources, testMode? []: testSuiteIds, (miniTestingServiceName || miniTestingServiceNames?.[0]?.value), autoTicketingDetails)
         } else {
-            await observeApi.scheduleTestForCollection(collectionId, startTimestamp, recurringDaily, recurringWeekly, recurringMonthly, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, finalAdvancedConditions, cleanUpTestingResources)
+            await observeApi.scheduleTestForCollection(collectionId, startTimestamp, recurringDaily, recurringWeekly, recurringMonthly, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, finalAdvancedConditions, cleanUpTestingResources, testMode? []: testSuiteIds, (miniTestingServiceName || miniTestingServiceNames?.[0]?.value), autoTicketingDetails)
         }
 
         setActive(false)
@@ -633,17 +672,32 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
         );
     }
 
+    function generateLabelForJiraIntegration() {
+        return (
+            <HorizontalStack gap={1}>
+                {!jiraProjectMap && <Link url='/dashboard/settings/integrations/jira' target="_blank" rel="noopener noreferrer" style={{ color: "#3385ff", textDecoration: 'none' }}>
+                    Enable
+                </Link>}
+                <Text>
+                    Auto-create tickets
+                </Text>
+            </HorizontalStack>
+        )
+    }
+
     const handleButtonClick = (check) => {
         setTestMode(check);
     }
 
-    // only for configurations 
+    // only for configurations
     const handleModifyConfig = async () => {
         const settings = transform.prepareConditionsForTesting(conditions)
-        const editableConfigObject = transform.prepareEditableConfigObject(testRun, settings, testIdConfig.hexId)
+        let autoTicketingDetails = jiraProjectMap? testRun.autoTicketingDetails : null;
+        const editableConfigObject = transform.prepareEditableConfigObject(testRun, settings, testIdConfig.hexId,testSuiteIds,testMode,autoTicketingDetails)
         await testingApi.modifyTestingRunConfig(testIdConfig?.testingRunConfig?.id, editableConfigObject).then(() => {
             func.setToast(true, false, "Modified testing run config successfully")
             setShowEditableSettings(false)
+            window.location.reload()
         })
         if(activeFromTesting){
             toggleRunTest();
@@ -693,6 +747,9 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                         generateLabelForSlackIntegration={generateLabelForSlackIntegration}
                         generateLabelForTeamsIntegration={generateLabelForTeamsIntegration}
                         getLabel={getLabel}
+                        jiraProjectMap={jiraProjectMap}
+                        generateLabelForJiraIntegration={generateLabelForJiraIntegration}
+                        miniTestingServiceNames={miniTestingServiceNames}
                     />
                     <AdvancedSettingsComponent dispatchConditions={dispatchConditions} conditions={conditions} />
                 </>
@@ -718,11 +775,11 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                 primaryAction={{
                     content: activeFromTesting ? "Save" : scheduleString(),
                     onAction: activeFromTesting ? handleModifyConfig : handleRun,
-                    disabled: (countAllSelectedTests() === 0) || !testRun.authMechanismPresent
+                    disabled: (testMode && activeFromTesting && (testSuiteIds.length !== 0)) || (countAllSelectedTests() === 0 && testSuiteIds.length === 0  ) || !testRun.authMechanismPresent
                 }}
                 secondaryActions={[
-                    countAllSelectedTests() ? {
-                        content: `${countAllSelectedTests()} tests selected`,
+                    countAllSelectedTests() && testMode ? {
+                        content: `${countAllSelectedTests()} tests selected` ,
                         disabled: true,
                         plain: true,
                     } : null,
@@ -867,6 +924,9 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                                     generateLabelForSlackIntegration={generateLabelForSlackIntegration}
                                     generateLabelForTeamsIntegration={generateLabelForTeamsIntegration}
                                     getLabel={getLabel}
+                                    jiraProjectMap={jiraProjectMap}
+                                    generateLabelForJiraIntegration={generateLabelForJiraIntegration}
+                                    miniTestingServiceNames={miniTestingServiceNames}
                                 />
 
                             </VerticalStack>
@@ -881,7 +941,10 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                                 apiCollectionName={apiCollectionName}
                                 setTestMode={setTestMode}
                                 activeFromTesting={activeFromTesting}
-                                checkRemoveAll={checkRemoveAll} handleModifyConfig={handleModifyConfig} /> :
+                                checkRemoveAll={checkRemoveAll} handleModifyConfig={handleModifyConfig}
+                                setTestSuiteIds={setTestSuiteIds} testSuiteIds={testSuiteIds}
+                                testNameSuiteModal={testNameSuiteModal}
+                                setTestNameSuiteModal={setTestNameSuiteModal}/> :
                                 <>
                                     <RunTestConfiguration
                                         timeFieldsDisabled={shouldDisable}
@@ -897,6 +960,9 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                                         generateLabelForSlackIntegration={generateLabelForSlackIntegration}
                                         generateLabelForTeamsIntegration={generateLabelForTeamsIntegration}
                                         getLabel={getLabel}
+                                        jiraProjectMap={jiraProjectMap}
+                                        generateLabelForJiraIntegration={generateLabelForJiraIntegration}
+                                        miniTestingServiceNames={miniTestingServiceNames}
                                     />
                                     <AdvancedSettingsComponent dispatchConditions={dispatchConditions} conditions={conditions} />
                                 </>

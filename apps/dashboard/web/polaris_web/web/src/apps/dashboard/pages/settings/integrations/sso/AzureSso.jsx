@@ -19,6 +19,8 @@ function AzureSso() {
 
     const cardContent = "Enable Login via Azure AD on your Akto dashboard";
 
+    const orgName = window.USER_NAME?.split('@')?.[1]
+
     const integrationSteps = [
         {
             text: "Go to your Azure AD home page. Go inside 'Enterprise Applications' click on 'Create your own Application' button.",
@@ -41,8 +43,8 @@ function AzureSso() {
             component: <CopyCommand command={AcsUrl} />
         },
         {
-            text: "In 'Sign on URL', fill the below text and then click on save.",
-            component: <CopyCommand command={signonUrl} />
+            text: "In 'Relay State', fill the below text and then click on save.",
+            component: <CopyCommand command={orgName} />
         },
         {
             text: "Download the Federation Metadata XML file."

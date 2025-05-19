@@ -69,6 +69,7 @@
                     window.STIGG_CUSTOMER_TOKEN='${requestScope.stiggCustomerToken}'
                     window.STIGG_CLIENT_KEY='${requestScope.stiggClientKey}'
                     window.JIRA_INTEGRATED ='${requestScope.jiraIntegrated}'
+                    window.AZURE_BOARDS_INTEGRATED ='${requestScope.azureBoardsIntegrated}'
                     window.USER_ROLE ='${requestScope.userRole}'
                     window.TIME_ZONE = '${requestScope.currentTimeZone}'
                     window.USER_FULL_NAME = '${requestScope.userFullName}'
@@ -78,6 +79,9 @@
                     window.AZURE_AUTH_URL = '${requestScope.azureAuthUrl}'
                     window.GITHUB_AUTH_URL = '${requestScope.githubAuthUrl}'
                     window.ACTIVE_SSO = '${requestScope.activeSso}'
+
+                    window.IS_AWS_WAF_INTEGRATED = '${requestScope.isAwsWafIntegrated}'
+                    window.IS_CLOUDFLARE_WAF_INTEGRATED = '${requestScope.isCloudflareWafIntegrated}'
 
                     window.STIGG_IS_OVERAGE='${requestScope.stiggIsOverage}'
                     window.USAGE_PAUSED=JSON.parse('${requestScope.usagePaused}' || '{}');

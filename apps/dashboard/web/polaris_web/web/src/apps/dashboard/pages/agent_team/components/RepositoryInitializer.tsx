@@ -1,93 +1,247 @@
 import { Box, Button, HorizontalStack, Text, TextField, VerticalStack } from '@shopify/polaris'
 import React, { useState } from 'react'
 import SSOTextfield from '../../../../signup/components/SSOTextfield'
-import { RepoPayload, RepoType } from '../types'
+import {  RepoType } from '../types'
 import func from "../../../../../util/func"
-import DropdownSearch from '../../../components/shared/DropdownSearch'
 import agentApi from '../api'
+import { useAgentsStore } from '../agents.store'
+import DropdownSearch from '../../../components/shared/DropdownSearch'
 
-function RepoSelector({ handleClickRepo, selectedRepo, selectedProject, selectedConnection }) {
-    const [reposList, setReposList] = useState<RepoPayload[]>([])
-    const [newRepoName, setNewRepoName] = React.useState<string>('');
-    const [newProjectName, setNewProjectName] = React.useState<string>('');
+const getProjectObj = (connection: string) => {
+    switch (connection) {
+        case 'GITLAB':
+            return {
+                "1": {
+                    label: "Repository Name",
+                    placeholder: "Enter repository name",
+                },
+                "2" : {
+                    label: "Project Name",
+                    placeholder: "Enter project name",
+                },
+            }
+        
+        case 'GITHUB':
+        case 'BIT_BUCKET':
+            return {
+                "1": {
+                    label: "Project Name",
+                    placeholder: "Enter project name",
+                },
+                "2" : {
+                    label: 'Repository Name',
+                    placeholder: "Enter repository name",
+                }
 
-    const handleAddRepository = async () => {
-        if (newRepoName && newProjectName) {
-            // Add the new repository to the list
-            const newRepo: RepoPayload = {
-                repo: newRepoName,
-                project: newProjectName,
-                lastRun: 0,  // Default value for new repo
-                scheduleTime: 0  // Default value for new repo
-            };
-            setReposList(prev => [...prev, newRepo]);
+            }
+    }   
+}
 
-            // Trigger the analysis for the new repository
-            await handleClickRepo(newRepoName, newProjectName, null);
+async function checkRepoReadAccess({ platform, projectName, repoName, privateToken }): Promise<{ success: boolean; reason?: string }> {
+    try {
+      let url = '';
+      let headers = {};
+  
+      switch (platform.toLowerCase()) {
+        case 'github':
+          url = `https://api.github.com/repos/${projectName}/${repoName}`;
+          headers = privateToken ? { Authorization: `Bearer ${privateToken}` } : {};
+          break;
+  
+        case 'gitlab':
+          const fullPath = encodeURIComponent(`${projectName}/${repoName}`);
+          url = `https://gitlab.com/api/v4/projects/${fullPath}`;
+          headers = privateToken ? { 'PRIVATE-TOKEN': privateToken } : {};
+          break;
+  
+        case 'bit_bucket':
+          url = `https://api.bitbucket.org/2.0/repositories/${projectName}/${repoName}`;
+          headers = privateToken
+            ? {
+                Authorization: `Bearer ${privateToken}`,
+              }
+            : {};
+          break;
+  
+        default:
+          throw new Error('Unsupported platform');
+      }
+  
+      const response = await fetch(url, { headers });
+  
+      if (response.status === 200) {
+        return { success: true };
+      } else if (response.status === 404 || response.status === 403) {
+        return { success: false, reason: `Access denied or repository not found.` };
+      } else {
+        const text = await response.text();
+        return { success: false, reason: `Unexpected response: ${response.status} - ${text}` };
+      }
+    } catch (err) {
+      return { success: false, reason: err.message };
+    }
+  }
+  
 
-            // Clear the input fields
-            setNewRepoName('');
-            setNewProjectName('');
+function RepoSelector({ handleClickRepo, selectedConnection }) {
+    const [newRepoName, setNewRepoName] = useState<string>('');
+    const [newProjectName, setNewProjectName] = useState<string>('');
+    const [githubAccessToken, setGithubAccessToken] = useState<string | null>(null);
+    const [allRepos, setAllRepos] = useState<any[]>([]);
+    const [manualType, setManualType] = useState<boolean>(selectedConnection !== 'GITHUB');
+    const [invalidInput, setInvalidInput] = useState<boolean>(false);
+    const [loading, setLoading] = useState<boolean>(false);
+
+    const getAllReposForProject = async(accessToken: string | null, project: string) => {
+        setLoading(true);
+        const GITHUB_API_URL = 'https://api.github.com/graphql';
+        const query = `
+        query {
+            organization(login: "${project}") {
+                repositories(first: 100) {
+                    nodes {
+                        name
+                        nameWithOwner
+                        isPrivate
+                    }
+                }
+            }
+        }
+    `;
+      try {
+        const response = await fetch(GITHUB_API_URL, {
+            method: 'POST',
+            headers: accessToken && accessToken.length > 0 ? {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${accessToken}`,
+            }: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ query }),
+            });
+
+            const result = await response.json();
+
+            if (result.errors) {
+                func.setToast(true, true, result.errors[0].message);
+                setInvalidInput(true);
+            } else {
+                const nodes = result.data.organization?.repositories?.nodes ?? [];
+                setInvalidInput(nodes.length === 0);
+                setLoading(false);
+                setTimeout(() => {
+                    setAllRepos(nodes);
+                },200)
+            }
+            setLoading(false);
+           
+        } catch (err: any) {
+            setInvalidInput(true);
+            setLoading(false);
         }
     };
 
+    const handleAddRepository = async (projectName: string | null) => {
+        const project = projectName || newProjectName;
+        if (newRepoName && project) {
+            setLoading(true);
+            await checkRepoReadAccess({
+                platform: selectedConnection.toLowerCase(),
+                projectName: newRepoName,
+                repoName: project,
+                privateToken: githubAccessToken
+            }).then(async (res) => {
+                if (res.success) {
+                    setInvalidInput(false);
+                    await handleClickRepo(newRepoName, project, null, githubAccessToken);
+                    setNewRepoName('');
+                    setNewProjectName('');
+                    setGithubAccessToken('');
+                } else {
+                    setInvalidInput(true);
+                    func.setToast(true, true, res.reason || "Error checking repository access");
+                }
+            }).catch((err) => {
+                setInvalidInput(true);
+                func.setToast(true, true, err.message || "Error checking repository access");
+            });
+            setLoading(false);
+        }
+    };
+
+    const projectObj = getProjectObj(selectedConnection);
+
     return (
-        <Box as='div' paddingBlockStart={"5"}>
+        <Box paddingInlineEnd={"2"} paddingInlineStart={"2"}>
             <VerticalStack gap={"4"}>
+                {selectedConnection === 'GITHUB' ? <Box paddingBlockStart={"5"} width='250px'>
+                    <Button onClick={() => setManualType(!manualType)} monochrome disclosure>
+                        {manualType ? "Hide Manual Input" : "Show Manual Input"}
+                    </Button>
+                </Box>: null}
                 {/* New repository input section */}
                 <VerticalStack gap={"2"}>
                     <Text variant="bodyMd" as='span'>
                         Add a new repository:
                     </Text>
+                    <HorizontalStack gap={"4"} align='space-between'>
                     <HorizontalStack gap={"2"} align="start">
                         <Box width='200px'>
                             <TextField
-                                label="Repository Name"
+                                label={projectObj?.[1]?.label || "Project Name"}
                                 autoComplete="off"
                                 value={newRepoName}
                                 onChange={(value) => setNewRepoName(value)}
-                                placeholder="Enter repository name"
+                                placeholder={projectObj?.[1]?.placeholder || "Enter project Name"}
+                                requiredIndicator
+                                error={invalidInput}
                             />
                         </Box>
-                        <Box width='200px'>
+                        {manualType ? <Box width='200px'>
                             <TextField
-                                label="Project Name"
+                                label={projectObj?.[2]?.label || "Repository Name"}
                                 autoComplete="off"
                                 value={newProjectName}
                                 onChange={(value) => setNewProjectName(value)}
-                                placeholder="Enter project name"
+                                placeholder={projectObj?.[2]?.placeholder || "Enter repository Name"}
+                                requiredIndicator
+                                error={invalidInput}
+                            />
+                        </Box> : null}
+                        <Box width='200px'>
+                            <TextField
+                                label="Access Token"
+                                autoComplete="off"
+                                value={githubAccessToken || ""}
+                                onChange={(value) => setGithubAccessToken(value)}
+                                placeholder="Enter access token in case of private repo"
+                                error={invalidInput}
                             />
                         </Box>
                     </HorizontalStack>
-                    <Button
-                            onClick={handleAddRepository}
-                            disabled={!newRepoName || !newProjectName}
-                            primary
-                        >
-                            Add Repository
-                        </Button>
+                        <Box width='200px' paddingBlockStart={"6"} paddingInlineStart={"4"}>
+                            <Button loading={loading} onClick={() => manualType ? handleAddRepository(null) : getAllReposForProject(githubAccessToken, newRepoName)} disabled={manualType ? (!newRepoName || !newProjectName): (!newRepoName)} primary>
+                                {manualType ? "Add Repository" : "Add Project"}
+                            </Button>
+                        </Box>
+                    </HorizontalStack>
                 </VerticalStack>
-
-                {/* Recently added section */}
-                {/* <VerticalStack gap={"2"}>
-                    <Text variant="bodySm" as='span' color='subdued'>Recently added:</Text>
-                    <GridRows
-                        items={reposList.slice(0, 5).map((x) => {
-                            return {
-                                ...x,
-                                icon: getIcon(selectedConnection)
-                            }
-                        })}
-                        CardComponent={SelectRepoComp}
-                        horizontalGap={"3"}
-                        verticalGap={"3"}
-                        columns={3}
-                        onButtonClick={(repo: string, project: string) => {
-                            handleClickRepo(repo, project, null)
-                        }}
+                {allRepos.length > 0 ?
+                    <Box width='300px'>
+                        <DropdownSearch
+                            optionsList={allRepos?.map((repo: any) => {
+                                // TODO: optionally take this function for transformation.
+                                return {
+                                    label: `${repo.nameWithOwner} (${repo.isPrivate ? "Private" : "Public"})`, 
+                                    value: repo?.name,
+                                }
+                            })}
+                            placeHolder={"Edit choice(s)"}
+                            setSelected={(selectedChoices: any) => {setNewProjectName(selectedChoices); handleAddRepository(selectedChoices)}}
+                            value={newProjectName}
                     />
-                </VerticalStack> */}
+                    </Box>: null
+                }
             </VerticalStack>
+            
         </Box>
     )
 }
@@ -97,37 +251,17 @@ function RepositoryInitializer({ agentType }: { agentType: string }) {
     const [selectedRepo, setSelectedRepo] = React.useState<string>('')
     const [selectedProject, setSelectedProject] = React.useState<string>('')
     const [temp, setTemp] = React.useState<string>('')
-    const getIcon = (id: string) => {
-        switch (id) {
-            case 'GITHUB':
-                return '/public/github.svg';
-            case 'GITLAB':
-                return '/public/gitlab.svg';
-            case 'BIT_BUCKET':
-                return '/public/bitbucket.svg';
-            default:
-                return '';
-        }
-    }
+    const {selectedModel} = useAgentsStore(state => state)
+
     const handleClick = async (id: string) => {
         try {
             setSelectedConnection(id)
-            // setReposList(formattedRepos.sort((a, b) => b.lastRun - a.lastRun));
-            // const resp: any = await api.fetchCodeAnalysisRepos(id);
-            // if(resp?.codeAnalysisRepos.length !== 0) {
-            //     const formattedRepos: RepoPayload[] = resp?.codeAnalysisRepos.map((x: any) => ({
-            //         repo: x.repoName,
-            //         project: x.projectName,
-            //         lastRun: x.lastRun,
-            //         scheduleTime: x.scheduleTime,
-            //     }));
-            // }
         } catch (error) {
             window.open("/dashboard/quick-start?connect=" + id.toLowerCase(), "_blank");
         }
     }
 
-    const handleClickRepo = async (repo: string, project: string, localString: string | null) => {
+    const handleClickRepo = async (repo: string, project: string, localString: string | null, accessToken: string|null) => {
         setSelectedProject(project);
         setSelectedRepo(repo);
 
@@ -142,8 +276,16 @@ function RepositoryInitializer({ agentType }: { agentType: string }) {
                 : {};
 
         if (Object.keys(data).length === 0) return;
+        if(accessToken !== null) {
+            data['accessToken'] = accessToken;
+        }
 
-        await agentApi.createAgentRun({ agent: agentType, data });
+        await agentApi.createAgentRun({ 
+            agent: agentType, 
+            data,
+            githubAccessToken: accessToken,
+            modelName: selectedModel?.id
+         });
         func.setToast(true, false, "Starting agent");
     };
 
@@ -189,7 +331,7 @@ function RepositoryInitializer({ agentType }: { agentType: string }) {
                                     value={temp}
                                     focused={true}
                                     onChange={(x: string) => setTemp(x)}
-                                    connectedRight={<Button onClick={() => handleClickRepo("", "", temp)}>Start</Button>}
+                                    connectedRight={<Button onClick={() => handleClickRepo("", "", temp, null)}>Start</Button>}
                                 /> : null}
                             </VerticalStack>
                         </VerticalStack>
@@ -202,8 +344,6 @@ function RepositoryInitializer({ agentType }: { agentType: string }) {
     return (
         selectedConnection.length === 0 ? <RepoInitializer /> : <RepoSelector 
             handleClickRepo={handleClickRepo}
-            selectedRepo={selectedRepo}
-            selectedProject={selectedProject}
             selectedConnection={selectedConnection}
         />
     )

@@ -569,8 +569,8 @@ const learnMoreObject = {
     dashboard_settings_integrations_jira:{
         docsLink: [
             {
-                content:"Alerts guide",
-                value:"https://docs.akto.io/api-inventory/concepts/alerts"
+                content:"Jira Integration guide",
+                value:"https://docs.akto.io/issues/how-to/jira-integration"
             }
         ],
         videoLink: [

@@ -1,27 +1,20 @@
 package com.akto.action.testing;
 
-import java.util.*;
-
-import com.akto.dao.SampleDataDao;
-import com.akto.dto.HttpResponseParams;
-import com.akto.dto.testing.EndpointLogicalGroup;
-import com.akto.dto.traffic.Key;
-import com.akto.dto.traffic.SampleData;
-import com.akto.log.LoggerMaker;
-import com.akto.parsers.HttpCallParser;
-import com.mongodb.client.result.DeleteResult;
-import com.mongodb.client.result.UpdateResult;
-import org.bson.conversions.Bson;
-import org.bson.types.ObjectId;
-
 import com.akto.action.UserAction;
-import com.akto.dao.ApiCollectionsDao;
+import com.akto.dao.SampleDataDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.testing.AccessMatrixTaskInfosDao;
 import com.akto.dao.testing.AccessMatrixUrlToRolesDao;
 import com.akto.dto.ApiInfo.ApiInfoKey;
+import com.akto.dto.HttpResponseParams;
 import com.akto.dto.testing.AccessMatrixTaskInfo;
 import com.akto.dto.testing.AccessMatrixUrlToRole;
+import com.akto.dto.testing.EndpointLogicalGroup;
+import com.akto.dto.traffic.Key;
+import com.akto.dto.traffic.SampleData;
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
+import com.akto.parsers.HttpCallParser;
 import com.akto.util.Constants;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
@@ -29,12 +22,19 @@ import com.mongodb.client.model.UpdateOneModel;
 import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.Updates;
 import com.mongodb.client.model.WriteModel;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import com.mongodb.client.result.DeleteResult;
+import com.mongodb.client.result.UpdateResult;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import org.bson.conversions.Bson;
+import org.bson.types.ObjectId;
 
 public class AccessMatrixTaskAction extends UserAction{
-    private static final LoggerMaker loggerMaker = new LoggerMaker(AccessMatrixTaskAction.class);
-    private static final Logger logger = LoggerFactory.getLogger(AccessMatrixTaskAction.class);
+
+    private static final LoggerMaker logger = new LoggerMaker(AccessMatrixTaskAction.class, LogDb.DASHBOARD);;
 
     private List<AccessMatrixTaskInfo> accessMatrixTaskInfos;
     private List<AccessMatrixUrlToRole> accessMatrixUrlToRoles;
@@ -70,16 +70,16 @@ public class AccessMatrixTaskAction extends UserAction{
     }
 
     public String deleteAccessMatrix() {
-        loggerMaker.infoAndAddToDb("started deleting access details for: " + roleName, LoggerMaker.LogDb.DASHBOARD);
+        logger.debugAndAddToDb("started deleting access details for: " + roleName, LoggerMaker.LogDb.DASHBOARD);
 
         String endpointLogicalGroupName = roleName + EndpointLogicalGroup.GROUP_NAME_SUFFIX;
         Bson taskInfoFilterQ = Filters.eq(AccessMatrixTaskInfo.ENDPOINT_LOGICAL_GROUP_NAME, endpointLogicalGroupName);
         DeleteResult deleteResult = AccessMatrixTaskInfosDao.instance.deleteAll(taskInfoFilterQ);
-        loggerMaker.infoAndAddToDb("Deleted AccessMatrixTaskInfo for: " + roleName + " : " + deleteResult, LoggerMaker.LogDb.DASHBOARD);
+        logger.debugAndAddToDb("Deleted AccessMatrixTaskInfo for: " + roleName + " : " + deleteResult, LoggerMaker.LogDb.DASHBOARD);
 
         Bson urlToRolesUpdateQ = Updates.pull(AccessMatrixUrlToRole.ROLES, roleName);
         UpdateResult updateResult = AccessMatrixUrlToRolesDao.instance.updateMany(Filters.empty(), urlToRolesUpdateQ);
-        loggerMaker.infoAndAddToDb("Deleted AccessMatrixUrlToRoles for: " + roleName + " : " +  updateResult, LoggerMaker.LogDb.DASHBOARD);
+        logger.debugAndAddToDb("Deleted AccessMatrixUrlToRoles for: " + roleName + " : " +  updateResult, LoggerMaker.LogDb.DASHBOARD);
 
         return SUCCESS.toUpperCase();
     }
@@ -163,7 +163,7 @@ public class AccessMatrixTaskAction extends UserAction{
             } while (!isListEmpty && numSamples < 50_000);
 
         }
-        logger.info("numSamples= " + numSamples);
+        logger.debug("numSamples= " + numSamples);
         return SUCCESS.toUpperCase();
     }
 

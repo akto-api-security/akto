@@ -1,5 +1,4 @@
 import { Button, Tooltip } from "@shopify/polaris"
-import { UploadMajor } from '@shopify/polaris-icons';
 import { useRef } from "react"
 
 
@@ -23,23 +22,21 @@ function UploadFile({ fileFormat, fileChanged, tooltipText, label, primary, plai
 
 
     return (
-        <Tooltip content={tooltipText}>
-            <Button 
-                // icon={UploadMajor} 
-                primary={primary !== undefined ? primary : true}
-                plain={plain === undefined ? true: plain}
-                monochrome removeUnderline
-                onClick={onPickFile}>
-                {label}
-                <input
-                    type="file"
-                    style={{display: "none"}}
-                    ref={fileUploadRef}
-                    accept={fileFormat}
-                    onChange={onFilePicked} 
-                />
-            </Button>
-        </Tooltip>
+        <Button 
+            // icon={UploadMajor} 
+            primary={primary !== undefined ? primary : true}
+            plain={plain === undefined ? true: plain}
+            monochrome removeUnderline
+            onClick={onPickFile}>
+            <Tooltip content={tooltipText} dismissOnMouseOut width="wide">{label}</Tooltip>
+            <input
+                type="file"
+                style={{display: "none"}}
+                ref={fileUploadRef}
+                accept={fileFormat}
+                onChange={onFilePicked} 
+            />
+        </Button>
     )
 }
 

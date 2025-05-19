@@ -18,7 +18,7 @@ import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 
 public class RiskScoreTestingEndpointsUtils {
-    private static final LoggerMaker loggerMaker = new LoggerMaker(RiskScoreTestingEndpointsUtils.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(RiskScoreTestingEndpointsUtils.class, LogDb.DASHBOARD);;
 
     private Map<RiskScoreTestingEndpoints.RiskScoreGroupType, List<ApiInfo>> removeApisFromRiskScoreGroupMap = new HashMap<RiskScoreTestingEndpoints.RiskScoreGroupType, List<ApiInfo>>() {{
         put(RiskScoreTestingEndpoints.RiskScoreGroupType.LOW, new ArrayList<>());
@@ -59,7 +59,7 @@ public class RiskScoreTestingEndpointsUtils {
     
                 // Remove APIs from the original risk score group
                 List<ApiInfo> removeApisFromRiskScoreGroupList = removeApisFromRiskScoreGroupMap.get(riskScoreGroupType);
-                loggerMaker.infoAndAddToDb("Removing " + removeApisFromRiskScoreGroupList.size() + " APIs from risk score group - " + riskScoreGroupType, LogDb.DASHBOARD);
+                loggerMaker.debugAndAddToDb("Removing " + removeApisFromRiskScoreGroupList.size() + " APIs from risk score group - " + riskScoreGroupType, LogDb.DASHBOARD);
                 for (int start = 0; start < removeApisFromRiskScoreGroupList.size(); start += RiskScoreTestingEndpoints.BATCH_SIZE) {
                     int end = Math.min(start + RiskScoreTestingEndpoints.BATCH_SIZE, removeApisFromRiskScoreGroupList.size());
     
@@ -71,7 +71,7 @@ public class RiskScoreTestingEndpointsUtils {
     
                 // Add APIs to the new risk score group
                 List<ApiInfo> addApisToRiskScoreGroupList = addApisToRiskScoreGroupMap.get(riskScoreGroupType);
-                loggerMaker.infoAndAddToDb("Adding " + addApisToRiskScoreGroupList.size() + " APIs to risk score group - " + riskScoreGroupType, LogDb.DASHBOARD);
+                loggerMaker.debugAndAddToDb("Adding " + addApisToRiskScoreGroupList.size() + " APIs to risk score group - " + riskScoreGroupType, LogDb.DASHBOARD);
                 for (int start = 0; start < addApisToRiskScoreGroupList.size(); start += RiskScoreTestingEndpoints.BATCH_SIZE) {
                     int end = Math.min(start + RiskScoreTestingEndpoints.BATCH_SIZE, addApisToRiskScoreGroupList.size());
     
@@ -92,7 +92,7 @@ public class RiskScoreTestingEndpointsUtils {
         try {
             executorService.submit(() -> {
                 Context.accountId.set(accountId);
-                loggerMaker.infoAndAddToDb("Updating risk score API groups", LogDb.DASHBOARD);
+                loggerMaker.debugAndAddToDb("Updating risk score API groups", LogDb.DASHBOARD);
                 updateRiskScoreApiGroups();
             });
         } catch (Exception e) {

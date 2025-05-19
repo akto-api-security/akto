@@ -47,6 +47,13 @@ jobs:
         working-directory: ./apps/threat-detection-backend/src/main/resources/maxmind
         run: |
           wget -O Geo-Country.mmdb https://raw.githubusercontent.com/akto-api-security/tests-library/refs/heads/master/resources/Geo-Country.mmdb
+      
+      - name: Create maxmind directory
+        run: mkdir -p ./libs/utils/src/main/resources/maxmind
+      - name: Download Maxmind Country database
+        working-directory: ./libs/utils/src/main/resources/maxmind
+        run: |
+          wget -O Geo-Country.mmdb https://raw.githubusercontent.com/akto-api-security/tests-library/refs/heads/master/resources/Geo-Country.mmdb
 
       - name: Prepare Dashboard polaris UI
         working-directory: ./apps/dashboard/web/polaris_web

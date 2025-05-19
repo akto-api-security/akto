@@ -17,6 +17,9 @@ public class File {
 
     private String compressedContent;
 
+    public File() {
+    }
+
     public File(String fileType, String compressedContent) {
         this.type = fileType;
         this.compressedContent = compressedContent;

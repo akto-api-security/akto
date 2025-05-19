@@ -2,19 +2,23 @@ package com.akto.filter;
 
 import com.akto.dao.context.Context;
 import com.akto.dto.User;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import javax.servlet.*;
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
+import java.io.IOException;
+import java.util.concurrent.atomic.AtomicInteger;
+import javax.servlet.Filter;
+import javax.servlet.FilterChain;
+import javax.servlet.FilterConfig;
+import javax.servlet.ServletException;
+import javax.servlet.ServletRequest;
+import javax.servlet.ServletResponse;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.servlet.http.HttpSession;
-import java.io.IOException;
-import java.util.concurrent.atomic.AtomicInteger;
 
 public class LoggingFilter implements Filter {
 
-    private static final Logger logger = LoggerFactory.getLogger(LoggingFilter.class);
+    private static final LoggerMaker logger = new LoggerMaker(LoggingFilter.class, LogDb.DASHBOARD);
     private static AtomicInteger apiCounter = new AtomicInteger();
 
     @Override
@@ -53,7 +57,7 @@ public class LoggingFilter implements Filter {
 
             int endTs = Context.now();
             String result = "url="+uri + ";method="+method + ";statusCode="+statusCode + ";username="+username + ";ip="+ ip + ";totalTime=" + (endTs - startTs) + ";apiCounterVal=" + apiCounter.get();
-            logger.info(result);
+            logger.debug(result);
 
         } catch (Exception e) {
             logger.error("Error: ", e);

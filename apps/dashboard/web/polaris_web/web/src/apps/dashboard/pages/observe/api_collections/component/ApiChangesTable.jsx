@@ -39,15 +39,11 @@ function ApiChangesTable(props) {
   }
 
   function disambiguateLabel(key, value) {
-    if(selectedTab.includes('param')){
-      switch (key) {
-          case "apiCollectionId": 
-              return func.convertToDisambiguateLabelObj(value, apiCollectionMap, 3)
-          default:
-              return value;
-      }
-    }else{
-      return func.convertToDisambiguateLabelObj(value, null, 2);
+    switch (key) {
+        case "apiCollectionId":
+            return func.convertToDisambiguateLabelObj(value, apiCollectionMap, 3)
+        default:
+            return func.convertToDisambiguateLabelObj(value, null, 2)
     }
   }
 
@@ -70,7 +66,7 @@ function ApiChangesTable(props) {
           await api.fetchSensitiveParamsForEndpoints(apiInfos.map((x) => {return x.id.url})).then(allSensitiveFields => {
               const sensitiveParams = allSensitiveFields.data.endpoints
               const mappedData = transform.fillSensitiveParams(sensitiveParams, apiInfos.map((x)=> {return x.id}));
-              const normalData = func.mergeApiInfoAndApiCollection(mappedData, apiInfos, apiCollectionMap);
+              const normalData = func.mergeApiInfoAndApiCollection(mappedData, apiInfos, apiCollectionMap,{});
               ret = transform.prettifyEndpointsData(normalData);
         })
         setLoading(false)

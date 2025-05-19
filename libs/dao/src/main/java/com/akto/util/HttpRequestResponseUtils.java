@@ -3,20 +3,33 @@ package com.akto.util;
 import com.akto.dao.context.Context;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.types.CappedSet;
-import com.fasterxml.jackson.core.JsonProcessingException;
+import com.akto.util.enums.GlobalEnums;
 import com.akto.util.grpc.ProtoBufUtils;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.dataformat.xml.XmlMapper;
 import com.mongodb.BasicDBObject;
-import org.json.JSONObject;
 
+import org.apache.commons.lang3.StringUtils;
+import org.json.JSONObject;
+import org.xml.sax.InputSource;
+
+import java.io.StringReader;
+import java.io.StringWriter;
 import java.io.UnsupportedEncodingException;
 import java.net.URLDecoder;
 import java.net.URLEncoder;
 import java.util.*;
 
+import javax.xml.parsers.DocumentBuilder;
+import javax.xml.parsers.DocumentBuilderFactory;
+import javax.xml.transform.dom.DOMSource;
+import javax.xml.transform.stream.StreamResult;
+
+import org.w3c.dom.*;
+import javax.xml.transform.*;
+
 import static com.akto.dto.OriginalHttpRequest.*;
-import static com.akto.util.grpc.ProtoBufUtils.DECODED_QUERY;
-import static com.akto.util.grpc.ProtoBufUtils.RAW_QUERY;
 
 public class HttpRequestResponseUtils {
 
@@ -54,6 +67,8 @@ public class HttpRequestResponseUtils {
 
         return SingleTypeInfo.GENERIC;
     }
+    public static final String SOAP = "soap";
+    public static final String XML = "xml";
 
     public static Map<String, Set<Object>> extractValuesFromPayload(String body) {
         if (body == null) return new HashMap<>();
@@ -77,6 +92,8 @@ public class HttpRequestResponseUtils {
                 return convertFormUrlEncodedToJson(rawRequest);
             } else if (acceptableContentType.equals(GRPC_CONTENT_TYPE)) {
                 return convertGRPCEncodedToJson(rawRequest);
+            } else if (acceptableContentType.contains(XML) || acceptableContentType.contains(SOAP) ) {
+                return convertXmlToJson(rawRequest);
             }
         }
 
@@ -102,6 +119,101 @@ public class HttpRequestResponseUtils {
         }
     }
 
+    private static ObjectMapper objectMapper = new ObjectMapper();
+    private static XmlMapper xmlMapper = new XmlMapper();
+
+    public static String convertXmlToJson(String rawRequest) {
+        try {
+            String removeXmlLine = rawRequest.replaceFirst("<\\?xml.*?\\?>", "").replaceAll("<(/?)(\\w+):(\\w+)([^>]*)>", "<$1$3$4>").trim();
+            JsonNode rootNode = xmlMapper.readTree(removeXmlLine);
+            JsonNode bodyNode = rootNode.get("Body");
+            if (bodyNode == null) {
+                bodyNode = rootNode.get("body");
+            }
+
+            if (bodyNode == null) {
+                bodyNode = rootNode;
+            }
+            return objectMapper.writeValueAsString(bodyNode);
+        } catch (Exception e) {
+            return rawRequest;
+        }
+    }
+
+    public static String updateXmlWithModifiedJson(String originalXml, String modifiedJson) throws Exception {
+        originalXml = originalXml.replaceFirst("<\\?xml.*?\\?>", "").replaceAll("<(/?)(\\w+):(\\w+)([^>]*)>", "<$1$3$4>").trim();
+        ObjectMapper objectMapper = new ObjectMapper();
+
+        DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+        factory.setNamespaceAware(true);
+        DocumentBuilder builder = factory.newDocumentBuilder();
+        Document doc = builder.parse(new InputSource(new StringReader(originalXml)));
+
+        NodeList bodyNodes = doc.getElementsByTagNameNS("*", "Body");
+        boolean hasBody = bodyNodes.getLength() > 0;
+        Element targetElement;
+
+        if (hasBody) {
+            targetElement = (Element) bodyNodes.item(0);
+
+            // Clear existing content inside Body
+            while (targetElement.hasChildNodes()) {
+                targetElement.removeChild(targetElement.getFirstChild());
+            }
+        } else {
+            // No Body, target the document root itself
+            targetElement = doc.getDocumentElement();
+
+            // Clear existing content under root
+            while (targetElement.hasChildNodes()) {
+                targetElement.removeChild(targetElement.getFirstChild());
+            }
+        }
+
+        if (modifiedJson != null && modifiedJson.startsWith("<")) {
+            return modifiedJson;
+        }
+
+        JsonNode modifiedBody = objectMapper.readTree(modifiedJson);
+
+        if (modifiedBody.isTextual()) {
+            String xmlContent = modifiedBody.asText();
+            Document tempDoc = builder.parse(new InputSource(new StringReader(xmlContent)));
+            Node importedNode = doc.importNode(tempDoc.getDocumentElement(), true);
+            targetElement.appendChild(importedNode);
+        } else {
+            appendJsonToXml(modifiedBody, doc, targetElement);
+        }
+
+        TransformerFactory tf = TransformerFactory.newInstance();
+        Transformer transformer = tf.newTransformer();
+        transformer.setOutputProperty(OutputKeys.OMIT_XML_DECLARATION, "no");
+        transformer.setOutputProperty(OutputKeys.INDENT, "yes");
+
+        StringWriter writer = new StringWriter();
+        transformer.transform(new DOMSource(doc), new StreamResult(writer));
+        return writer.toString();
+    }
+
+    private static void appendJsonToXml(JsonNode jsonNode, Document doc, Element parent) {
+        if (jsonNode.isObject()) {
+            jsonNode.fields().forEachRemaining(field -> {
+                Element child = doc.createElement(field.getKey());
+                appendJsonToXml(field.getValue(), doc, child);
+                parent.appendChild(child);
+            });
+        } else if (jsonNode.isArray()) {
+            jsonNode.forEach(item -> {
+                Element itemElement = doc.createElement("item");
+                appendJsonToXml(item, doc, itemElement);
+                parent.appendChild(itemElement);
+            });
+        } else {
+            parent.setTextContent(jsonNode.asText());
+        }
+    }
+
+
     public static String convertGRPCEncodedToJson(String rawRequest) {
         try {
             Map<Object, Object> map = ProtoBufUtils.getInstance().decodeProto(rawRequest);
@@ -115,17 +227,15 @@ public class HttpRequestResponseUtils {
     }
     
     public static String getAcceptableContentType(Map<String,List<String>> headers) {
-        List<String> acceptableContentTypes = Arrays.asList(JSON_CONTENT_TYPE, FORM_URL_ENCODED_CONTENT_TYPE, GRPC_CONTENT_TYPE);
+        List<String> acceptableContentTypes = Arrays.asList(JSON_CONTENT_TYPE, FORM_URL_ENCODED_CONTENT_TYPE, GRPC_CONTENT_TYPE, XML, SOAP);
         List<String> contentTypeValues;
         if (headers == null) return null;
-        for (String k: headers.keySet()) {
-            if (k.equalsIgnoreCase("content-type")) {
-                contentTypeValues = headers.get(k);
-                for (String value: contentTypeValues) {
-                    for (String acceptableContentType: acceptableContentTypes) {
-                        if (value.contains(acceptableContentType)) {
-                            return acceptableContentType;
-                        }
+        contentTypeValues = headers.get("content-type");
+        if (contentTypeValues != null) {
+            for (String value: contentTypeValues) {
+                for (String acceptableContentType: acceptableContentTypes) {
+                    if (value.contains(acceptableContentType)) {
+                        return acceptableContentType;
                     }
                 }
             }
@@ -197,4 +307,26 @@ public class HttpRequestResponseUtils {
                 // .replaceAll("\\%5D", "]");
     }
 
+    public static Map<String, String> decryptRequestPayload(String rawRequest){
+        Map<String, String> decryptedMap = new HashMap<>();
+        if(!StringUtils.isEmpty(rawRequest)){
+            rawRequest = rawRequest.trim();
+            String decodedString = rawRequest;
+            if(rawRequest.startsWith("ey", 0)){ // since jwt starts with ey as base64 encoded string of '{' is needed to be proper json
+                try {
+                    String[] jwtParts = rawRequest.split("\\.");
+                    if(jwtParts.length == 3) {
+                        String payload = jwtParts[1];
+                        byte[] decodedBytes = Base64.getDecoder().decode(payload);
+                        decodedString = new String(decodedBytes);
+                        decryptedMap.put("type", GlobalEnums.ENCODING_TYPE.JWT.name());
+                    }
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            }
+            decryptedMap.put("payload", decodedString);
+        }
+        return decryptedMap;
+    } 
 }

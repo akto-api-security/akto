@@ -78,11 +78,11 @@ const threatDetectionRequests = {
             data: {startTs, endTs}
         })
     },
-    fetchMaliciousRequest(refId){
+    fetchMaliciousRequest(refId, eventType){
         return request({
             url: '/api/fetchAggregateMaliciousRequests',
             method: 'post',
-            data: {refId}
+            data: {refId, eventType}
         })
     },
     fetchCountBySeverity(startTs, endTs) {
@@ -132,6 +132,13 @@ const threatDetectionRequests = {
     modifyThreatActorStatus(actorIp, status) {
         return request({
             url: '/api/modifyThreatActorStatus',
+            method: 'post',
+            data: {actorIp, status}
+        })
+    },
+    modifyThreatActorStatusCloudflare(actorIp, status) {
+        return request({
+            url: '/api/modifyThreatActorStatusCloudflare',
             method: 'post',
             data: {actorIp, status}
         })

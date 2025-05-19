@@ -1,38 +1,36 @@
 package com.akto.action.testing;
 
-import com.akto.action.AccountAction;
 import com.akto.action.UserAction;
-import com.akto.dao.ApiCollectionsDao;
-import com.akto.dao.RBACDao;
+import com.akto.billing.UsageMetricUtils;
 import com.akto.dao.context.Context;
+import com.akto.dao.monitoring.ModuleInfoDao;
 import com.akto.dao.test_editor.YamlTemplateDao;
+import com.akto.dao.testing.*;
 import com.akto.dao.testing.sources.TestSourceConfigsDao;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
-import com.akto.dao.testing.*;
-import com.akto.dto.ApiCollection;
-import com.akto.dto.testing.config.EditableTestingRunConfig;
 import com.akto.dto.ApiInfo;
-import com.akto.dto.User;
 import com.akto.dto.ApiToken.Utility;
-import com.akto.dto.RBAC;
 import com.akto.dto.CollectionConditions.TestConfigsAdvancedSettings;
+import com.akto.dto.User;
+import com.akto.dto.billing.FeatureAccess;
+import com.akto.dto.monitoring.ModuleInfo;
 import com.akto.dto.test_editor.Info;
 import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.testing.*;
+import com.akto.dto.testing.TestResult.TestError;
 import com.akto.dto.testing.TestingRun.State;
 import com.akto.dto.testing.TestingRun.TestingRunType;
-import com.akto.dto.testing.TestResult.TestError;
+import com.akto.dto.testing.config.EditableTestingRunConfig;
 import com.akto.dto.testing.info.CurrentTestsStatus;
 import com.akto.dto.testing.info.CurrentTestsStatus.StatusForIndividualTest;
 import com.akto.dto.testing.sources.TestSourceConfig;
-import com.akto.listener.RuntimeListener;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.usage.UsageMetricCalculator;
 import com.akto.util.Constants;
-import com.akto.util.DashboardMode;
 import com.akto.util.enums.GlobalEnums;
+import com.akto.util.enums.GlobalEnums.Severity;
 import com.akto.util.enums.GlobalEnums.TestErrorSource;
 import com.akto.utils.DeleteTestRunUtils;
 import com.akto.utils.Utils;
@@ -40,19 +38,13 @@ import com.google.gson.Gson;
 import com.mongodb.client.model.*;
 import com.mongodb.client.result.InsertOneResult;
 import com.opensymphony.xwork2.Action;
-
 import org.apache.commons.lang3.StringUtils;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 
 import java.time.Instant;
 import java.util.*;
-import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
@@ -84,12 +76,15 @@ public class StartTestAction extends UserAction {
     private String searchString;
     private boolean continuousTesting;
     private int testingRunConfigId;
+    private List<String> testSuiteIds;
 
     private Map<String,Long> allTestsCountMap = new HashMap<>();
     private Map<String,Integer> issuesSummaryInfoMap = new HashMap<>();
 
     private String testRoleId;
     private boolean cleanUpTestingResources;
+
+    private AutoTicketingDetails autoTicketingDetails;
 
     private static final Gson gson = new Gson();
 
@@ -122,7 +117,7 @@ public class StartTestAction extends UserAction {
     private boolean sendSlackAlert = false;
     private boolean sendMsTeamsAlert = false;
 
-    private TestingRun createTestingRun(int scheduleTimestamp, int periodInSeconds) {
+    private TestingRun createTestingRun(int scheduleTimestamp, int periodInSeconds, String miniTestingServiceName) {
         User user = getSUser();
 
         if (!StringUtils.isEmpty(this.overriddenTestAppUrl)) {
@@ -134,7 +129,7 @@ public class StartTestAction extends UserAction {
             }
         }
 
-        AuthMechanism authMechanism = TestRolesDao.instance.fetchAttackerToken(0, null);
+        AuthMechanism authMechanism = TestRolesDao.instance.fetchAttackerToken(null);
         if (authMechanism == null && testIdConfig == 0) {
             addActionError("Please set authentication mechanism before you test any APIs");
             return null;
@@ -167,20 +162,25 @@ public class StartTestAction extends UserAction {
         }
         if (this.selectedTests != null) {
             int id = UUID.randomUUID().hashCode() & 0xfffffff;
-            TestingRunConfig testingRunConfig = new TestingRunConfig(id, null, this.selectedTests, authMechanism.getId(), this.overriddenTestAppUrl, this.testRoleId, this.cleanUpTestingResources);
+            TestingRunConfig testingRunConfig = new TestingRunConfig(id, null, this.selectedTests,
+                authMechanism.getId(), this.overriddenTestAppUrl, this.testRoleId, this.cleanUpTestingResources,
+                this.autoTicketingDetails);
             // add advanced setting here
             if(this.testConfigsAdvancedSettings != null && !this.testConfigsAdvancedSettings.isEmpty()){
                 testingRunConfig.setConfigsAdvancedSettings(this.testConfigsAdvancedSettings);
             }
+            List<String> testSuiteIdsObj = new ArrayList<>(testSuiteIds);
+            testingRunConfig.setTestSuiteIds(testSuiteIdsObj);
             this.testIdConfig = testingRunConfig.getId();
             TestingRunConfigDao.instance.insertOne(testingRunConfig);
         }
 
         return new TestingRun(scheduleTimestamp, user.getLogin(),
                 testingEndpoints, testIdConfig, State.SCHEDULED, periodInSeconds, testName, this.testRunTime,
-                this.maxConcurrentRequests, this.sendSlackAlert, this.sendMsTeamsAlert);
+                this.maxConcurrentRequests, this.sendSlackAlert, this.sendMsTeamsAlert, miniTestingServiceName);
     }
 
+    String selectedMiniTestingServiceName;
     private List<String> selectedTests;
     private List<TestConfigsAdvancedSettings> testConfigsAdvancedSettings;
 
@@ -197,11 +197,16 @@ public class StartTestAction extends UserAction {
             return 0;
         }
     }
+
     public String startTest() {
 
         if (this.startTimestamp != 0 && this.startTimestamp + 86400 < Context.now()) {
             addActionError("Cannot schedule a test run in the past.");
             return ERROR.toUpperCase();
+        }
+
+        if (!validateAutoTicketingDetails(this.autoTicketingDetails)) {
+            return Action.ERROR.toUpperCase();
         }
 
         int scheduleTimestamp = this.startTimestamp == 0 ? Context.now() : this.startTimestamp;
@@ -220,7 +225,7 @@ public class StartTestAction extends UserAction {
         }
         if (localTestingRun == null) {
             try {
-                localTestingRun = createTestingRun(scheduleTimestamp, getPeriodInSeconds(recurringDaily, recurringWeekly, recurringMonthly));
+                localTestingRun = createTestingRun(scheduleTimestamp, getPeriodInSeconds(recurringDaily, recurringWeekly, recurringMonthly), selectedMiniTestingServiceName);
                 // pass boolean from ui, which will tell if testing is coniinuous on new endpoints
                 if (this.continuousTesting) {
                     localTestingRun.setPeriodInSeconds(-1);
@@ -263,7 +268,7 @@ public class StartTestAction extends UserAction {
                                 0, localTestingRun.getId(), localTestingRun.getId().toHexString(), 0, localTestingRun.getTestIdConfig(),0 );
                         summary.setState(TestingRun.State.SCHEDULED);
                         summary.setOriginalTestingRunResultSummaryId(new ObjectId(testingRunResultSummaryHexId));
-                        loggerMaker.infoAndAddToDb("Rerun test triggered at " + Context.now(), LogDb.DASHBOARD);
+                        loggerMaker.debugAndAddToDb("Rerun test triggered at " + Context.now(), LogDb.DASHBOARD);
 
                         InsertOneResult result = TestingRunResultSummariesDao.instance.insertOne(summary);
                         this.testingRunResultSummaryHexId = result.getInsertedId().asObjectId().getValue().toHexString();
@@ -283,15 +288,18 @@ public class StartTestAction extends UserAction {
                             Updates.set(TestingRun.STATE, TestingRun.State.COMPLETED),
                             Updates.set(TestingRun.END_TIMESTAMP, Context.now())));
                 }
-                 
+
             }
 
             if (this.overriddenTestAppUrl != null || this.selectedTests != null) {
                 int id = UUID.randomUUID().hashCode() & 0xfffffff;
                 TestingRunConfig testingRunConfig = new TestingRunConfig(id, null, this.selectedTests, null, this.overriddenTestAppUrl, this.testRoleId);
+
+                List<String> testSuiteIdsObj = new ArrayList<>(testSuiteIds);
+                testingRunConfig.setTestSuiteIds(testSuiteIdsObj);
                 this.testIdConfig = testingRunConfig.getId();
                 TestingRunConfigDao.instance.insertOne(testingRunConfig);
-            } 
+            }
 
         }
 
@@ -305,7 +313,7 @@ public class StartTestAction extends UserAction {
                     0, localTestingRun.getId(), localTestingRun.getId().toHexString(), 0, this.testIdConfig,testsCounts );
             summary.setState(TestingRun.State.SCHEDULED);
             if (metadata != null) {
-                loggerMaker.infoAndAddToDb("CICD test triggered at " + Context.now(), LogDb.DASHBOARD);
+                loggerMaker.debugAndAddToDb("CICD test triggered at " + Context.now(), LogDb.DASHBOARD);
                 summary.setMetadata(metadata);
             }
             InsertOneResult result = TestingRunResultSummariesDao.instance.insertOne(summary);
@@ -314,14 +322,24 @@ public class StartTestAction extends UserAction {
         }
 
         try {
-            if (DashboardMode.isSaasDeployment() && !com.akto.testing.Utils.isTestingRunForDemoCollection(localTestingRun)) {
-                int accountId = Context.accountId.get();
-                User user = AccountAction.addUserToExistingAccount("arjun@akto.io", accountId);
-                if (user != null) {
-                    RBACDao.instance.insertOne(
-                            new RBAC(user.getId(), RBAC.Role.DEVELOPER.getName(), accountId));
-                }
-            }
+            // if (DashboardMode.isSaasDeployment() && !com.akto.testing.Utils.isTestingRunForDemoCollection(localTestingRun)) {
+            //     int accountId = Context.accountId.get();
+            //     User user = AccountAction.addUserToExistingAccount("arjun@akto.io", accountId);
+            //     if (user != null) {
+
+            //         RBACDao.instance.updateOneNoUpsert(
+            //             Filters.and(
+            //                 Filters.eq(RBAC.USER_ID, user.getId()),
+            //                 Filters.eq(RBAC.ACCOUNT_ID, accountId)
+            //             ),
+            //             Updates.combine(
+            //                 Updates.set(RBAC.USER_ID, user.getId()),
+            //                 Updates.set(RBAC.ACCOUNT_ID, accountId),
+            //                 Updates.set(RBAC.ROLE, Role.DEVELOPER)
+            //             )
+            //         );
+            //     }
+            // }
         } catch (Exception e) {
             e.printStackTrace();
             loggerMaker.errorAndAddToDb(e, "error in adding user startTest " + e.getMessage());
@@ -335,11 +353,11 @@ public class StartTestAction extends UserAction {
 
     private void handleCallFromAktoGpt() {
         if (this.source == null) {
-            loggerMaker.infoAndAddToDb("Call from testing UI, skipping", LoggerMaker.LogDb.DASHBOARD);
+            loggerMaker.debugAndAddToDb("Call from testing UI, skipping", LoggerMaker.LogDb.DASHBOARD);
             return;
         }
         if (this.source.isCallFromAktoGpt() && !this.selectedTests.isEmpty()) {
-            loggerMaker.infoAndAddToDb("Call from Akto GPT, " + this.selectedTests, LoggerMaker.LogDb.DASHBOARD);
+            loggerMaker.debugAndAddToDb("Call from Akto GPT, " + this.selectedTests, LoggerMaker.LogDb.DASHBOARD);
             Map<String, Info> testInfoMap = YamlTemplateDao.instance.fetchTestInfoMap();
             List<String> tests = new ArrayList<>();
             for (String selectedTest : this.selectedTests) {
@@ -352,7 +370,7 @@ public class StartTestAction extends UserAction {
                 if (testSubCategories.isEmpty()) {
                     loggerMaker.errorAndAddToDb("Test not found for " + selectedTest, LoggerMaker.LogDb.DASHBOARD);
                 } else {
-                    loggerMaker.infoAndAddToDb(
+                    loggerMaker.debugAndAddToDb(
                             String.format("Category: %s, tests: %s", selectedTest, testSubCategories),
                             LoggerMaker.LogDb.DASHBOARD);
                     tests.addAll(testSubCategories);
@@ -360,7 +378,7 @@ public class StartTestAction extends UserAction {
             }
             if (!tests.isEmpty()) {
                 this.selectedTests = tests;
-                loggerMaker.infoAndAddToDb("Tests found for " + this.selectedTests, LoggerMaker.LogDb.DASHBOARD);
+                loggerMaker.debugAndAddToDb("Tests found for " + this.selectedTests, LoggerMaker.LogDb.DASHBOARD);
             } else {
                 loggerMaker.errorAndAddToDb("No tests found for " + this.selectedTests, LoggerMaker.LogDb.DASHBOARD);
             }
@@ -480,7 +498,7 @@ public class StartTestAction extends UserAction {
 
     public String retrieveAllCollectionTests() {
 
-        this.authMechanism = TestRolesDao.instance.fetchAttackerToken(0, null);
+        this.authMechanism = TestRolesDao.instance.fetchAttackerToken(null);
 
         ArrayList<Bson> testingRunFilters = new ArrayList<>();
         Bson testingRunTypeFilter = getTestingRunTypeFilter(testingRunType);
@@ -699,7 +717,7 @@ public class StartTestAction extends UserAction {
             return ERROR.toUpperCase();
         }
 
-        
+
         int accountId = Context.accountId.get();
 
         testCountMap = new HashMap<>();
@@ -726,9 +744,9 @@ public class StartTestAction extends UserAction {
                 } catch (Exception e) {
                     e.printStackTrace();
                 }
-                
+
             }
-            
+
         } catch (Exception e) {
             e.printStackTrace();
             return ERROR.toUpperCase();
@@ -771,8 +789,8 @@ public class StartTestAction extends UserAction {
         }
 
 
-        if (testingRunResultSummaryHexId != null) loggerMaker.infoAndAddToDb("fetchTestingRunResults called for hexId=" + testingRunResultSummaryHexId);
-        if (queryMode != null) loggerMaker.infoAndAddToDb("fetchTestingRunResults called for queryMode="+queryMode);
+        if (testingRunResultSummaryHexId != null) loggerMaker.debugAndAddToDb("fetchTestingRunResults called for hexId=" + testingRunResultSummaryHexId);
+        if (queryMode != null) loggerMaker.debugAndAddToDb("fetchTestingRunResults called for queryMode="+queryMode);
 
         int timeNow = Context.now();
         Bson ignoredIssuesFilters = Filters.and(
@@ -781,7 +799,7 @@ public class StartTestAction extends UserAction {
         );
         List<TestingRunIssues> issueslist = TestingRunIssuesDao.instance.findAll(ignoredIssuesFilters, Projections.include("_id"));
         this.issueslistCount = issueslist.size();
-        loggerMaker.infoAndAddToDb("[" + (Context.now() - timeNow) + "] Fetched testing run issues of size: " + issueslist.size(), LogDb.DASHBOARD);
+        loggerMaker.debugAndAddToDb("[" + (Context.now() - timeNow) + "] Fetched testing run issues of size: " + issueslist.size(), LogDb.DASHBOARD);
 
         List<Bson> testingRunResultFilters = prepareTestRunResultsFilters(testingRunResultSummaryId, queryMode);
 
@@ -803,17 +821,17 @@ public class StartTestAction extends UserAction {
             Bson filters = testingRunResultFilters.isEmpty() ? Filters.empty() : Filters.and(testingRunResultFilters);
             this.testingRunResults = VulnerableTestingRunResultDao.instance
                     .fetchLatestTestingRunResultWithCustomAggregations(filters, pageLimit, skip, sortStage, testingRunResultSummaryId, queryMode.equals(QueryMode.VULNERABLE));
-            loggerMaker.infoAndAddToDb("[" + (Context.now() - timeNow) + "] Fetched testing run results of size: " + testingRunResults.size(), LogDb.DASHBOARD);
+            loggerMaker.debugAndAddToDb("[" + (Context.now() - timeNow) + "] Fetched testing run results of size: " + testingRunResults.size(), LogDb.DASHBOARD);
 
             timeNow = Context.now();
             removeTestingRunResultsByIssues(testingRunResults, issueslist, false);
-            loggerMaker.infoAndAddToDb("[" + (Context.now() - timeNow) + "] Removed ignored issues from testing run results. Current size of testing run results: " + testingRunResults.size(), LogDb.DASHBOARD);
+            loggerMaker.debugAndAddToDb("[" + (Context.now() - timeNow) + "] Removed ignored issues from testing run results. Current size of testing run results: " + testingRunResults.size(), LogDb.DASHBOARD);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "error in fetchLatestTestingRunResult: " + e);
         }
 
         timeNow = Context.now();
-        loggerMaker.infoAndAddToDb("fetchTestingRunResults completed in: " + (Context.now() - timeNow), LogDb.DASHBOARD);
+        loggerMaker.debugAndAddToDb("fetchTestingRunResults completed in: " + (Context.now() - timeNow), LogDb.DASHBOARD);
 
         return SUCCESS.toUpperCase();
     }
@@ -829,7 +847,7 @@ public class StartTestAction extends UserAction {
             String key = apiInfoKeyString + "|" + issue.getId().getTestSubCategory();
             issuesSet.add(key);
         }
-        loggerMaker.infoAndAddToDb("Total issues to be removed from TestingRunResults list: " + issuesSet.size(), LogDb.DASHBOARD);
+        loggerMaker.debugAndAddToDb("Total issues to be removed from TestingRunResults list: " + issuesSet.size(), LogDb.DASHBOARD);
 
         Iterator<TestingRunResult> resultIterator = testingRunResults.iterator();
 
@@ -851,7 +869,7 @@ public class StartTestAction extends UserAction {
 
         long endTime = System.currentTimeMillis();
         long duration = endTime - startTime;
-        loggerMaker.infoAndAddToDb("[" + Instant.now() + "] Removed elements from TestingRunResults list in " + duration + " ms", LogDb.DASHBOARD);
+        loggerMaker.debugAndAddToDb("[" + Instant.now() + "] Removed elements from TestingRunResults list in " + duration + " ms", LogDb.DASHBOARD);
     }
 
     private Map<String, List<String>> reportFilterList;
@@ -877,9 +895,9 @@ public class StartTestAction extends UserAction {
             }else{
                 testingRunResultList = TestingRunResultDao.instance.findAll(filters, skip, 50, null);
             }
-            
 
-            
+
+
             // Map<String, String> sampleDataVsCurlMap = new HashMap<>();
             // for (TestingRunResult runResult: testingRunResultList) {
             //     WorkflowTest workflowTest = runResult.getWorkflowTest();
@@ -1077,8 +1095,6 @@ public class StartTestAction extends UserAction {
 
         long continuousTestsCount = TestingRunDao.instance.getMCollection().countDocuments(Filters.and(continuousTestsFilter));
 
-        System.out.println("cont count" + continuousTestsCount);
-
         long scheduleCount = totalCount - oneTimeCount - cicdCount - continuousTestsCount;
 
         
@@ -1219,6 +1235,7 @@ public class StartTestAction extends UserAction {
             addActionError("Invalid editableTestingRunConfig");
             return Action.ERROR.toUpperCase();
         }
+
         try {
             if (this.testingRunConfigId == 0) {
                 addActionError("Invalid testing run config id");
@@ -1236,31 +1253,39 @@ public class StartTestAction extends UserAction {
                 if (editableTestingRunConfig.getConfigsAdvancedSettings() != null && !editableTestingRunConfig.getConfigsAdvancedSettings().equals(existingTestingRunConfig.getConfigsAdvancedSettings())) {
                     updates.add(Updates.set(TestingRunConfig.TEST_CONFIGS_ADVANCED_SETTINGS, editableTestingRunConfig.getConfigsAdvancedSettings()));
                 }
-                
-                if (editableTestingRunConfig.getTestSubCategoryList() != null &&
-                    !editableTestingRunConfig.getTestSubCategoryList().equals(existingTestingRunConfig.getTestSubCategoryList())) {
+
+                if(editableTestingRunConfig.getTestSuiteIds() != null && !editableTestingRunConfig.getTestSuiteIds().equals(existingTestingRunConfig.getTestSuiteIds())){
+                    updates.add(Updates.set(TestingRunConfig.TEST_SUITE_IDS, editableTestingRunConfig.getTestSuiteIds()));
+                }
+
+                if (editableTestingRunConfig.getTestSubCategoryList() != null && !editableTestingRunConfig.getTestSubCategoryList().equals(existingTestingRunConfig.getTestSubCategoryList())) {
                     updates.add(Updates.set(TestingRunConfig.TEST_SUBCATEGORY_LIST, editableTestingRunConfig.getTestSubCategoryList()));
                 }
-                
+
                 if (editableTestingRunConfig.getTestRoleId() != null && !editableTestingRunConfig.getTestRoleId().equals(existingTestingRunConfig.getTestRoleId())) {
                     updates.add(Updates.set(TestingRunConfig.TEST_ROLE_ID, editableTestingRunConfig.getTestRoleId()));
                 }
-                
+
                 if (editableTestingRunConfig.getOverriddenTestAppUrl() != null && !editableTestingRunConfig.getOverriddenTestAppUrl().equals(existingTestingRunConfig.getOverriddenTestAppUrl())) {
                     updates.add(Updates.set(TestingRunConfig.OVERRIDDEN_TEST_APP_URL, editableTestingRunConfig.getOverriddenTestAppUrl()));
                 }
-                
+
+                if (editableTestingRunConfig.getAutoTicketingDetails() != null && validateAutoTicketingDetails(
+                    editableTestingRunConfig.getAutoTicketingDetails())) {
+                    updates.add(Updates.set(TestingRunConfig.AUTO_TICKETING_DETAILS,
+                        editableTestingRunConfig.getAutoTicketingDetails()));
+                }
+
                 if (!updates.isEmpty()) {
                     TestingRunConfigDao.instance.updateOne(
                         Filters.eq(Constants.ID, this.testingRunConfigId),
-                        Updates.combine(updates) 
+                        Updates.combine(updates)
                     );
                 }
-
             }
 
             if (editableTestingRunConfig.getTestingRunHexId() != null) {
-            
+
                 TestingRun existingTestingRun = TestingRunDao.instance.findOne(Filters.eq(Constants.ID, new ObjectId(editableTestingRunConfig.getTestingRunHexId())));
 
                 if (existingTestingRun != null) {
@@ -1305,15 +1330,15 @@ public class StartTestAction extends UserAction {
                             )
                         );
                     }
-                
+
                     if (!updates.isEmpty()) {
                         TestingRunDao.instance.updateOne(
                             Filters.eq(Constants.ID,new ObjectId(editableTestingRunConfig.getTestingRunHexId())),
-                            Updates.combine(updates) 
+                            Updates.combine(updates)
                         );
                     }
                 }
-                
+
             }
 
 
@@ -1398,13 +1423,62 @@ public class StartTestAction extends UserAction {
                             Updates.set(TestingRunResult.IS_IGNORED_RESULT, true)
                         );
                     }
-                    
+
                 } catch (Exception e) {
                     e.printStackTrace();
                 }
             }
         }, 0 , TimeUnit.SECONDS);
 
+        return SUCCESS.toUpperCase();
+    }
+
+    private boolean validateAutoTicketingDetails(AutoTicketingDetails autoTicketingDetails) {
+        if (autoTicketingDetails != null && autoTicketingDetails.isShouldCreateTickets()) {
+
+            FeatureAccess featureAccess = UsageMetricUtils.getFeatureAccessSaas(Context.accountId.get(),
+                "JIRA_INTEGRATION");
+            if (!featureAccess.getIsGranted()) {
+                addActionError("Auto Create Tickets plan is not activated for this account.");
+                return false;
+            }
+
+            if (autoTicketingDetails.getProjectId() == null) {
+                addActionError("Project Id is required.");
+                return false;
+            }
+
+            if (autoTicketingDetails.getSeverities() == null
+                || autoTicketingDetails.getSeverities().isEmpty()) {
+                addActionError("Severities cannot be empty.");
+                return false;
+            }
+
+            try {
+                for (String s : autoTicketingDetails.getSeverities()) {
+                    Severity.valueOf(s);
+                }
+            } catch (IllegalArgumentException e) {
+                addActionError("Invalid parameter: severities.");
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private Set<String> miniTestingServiceNames;
+    public String fetchMiniTestingServiceNames() {
+        List<ModuleInfo> moduleInfos = ModuleInfoDao.instance.findAll(Filters.and(
+                        Filters.eq(ModuleInfo.MODULE_TYPE, ModuleInfo.ModuleType.MINI_TESTING),
+                        Filters.gt(ModuleInfo.LAST_HEARTBEAT_RECEIVED, Context.now() - 20 * 60)));
+        if (this.miniTestingServiceNames == null) {
+            this.miniTestingServiceNames = new HashSet<>();
+        }
+        for (ModuleInfo moduleInfo : moduleInfos) {
+            if (moduleInfo.getName() != null) {
+                this.miniTestingServiceNames.add(moduleInfo.getName());
+            }
+        }
         return SUCCESS.toUpperCase();
     }
 
@@ -1791,9 +1865,27 @@ public class StartTestAction extends UserAction {
         this.recurringWeekly = recurringWeekly;
     }
 
-    
     public void setRecurringMonthly(boolean recurringMonthly) {
         this.recurringMonthly = recurringMonthly;
     }
 
+    public void setTestSuiteIds(List<String> testSuiteIds) {
+        this.testSuiteIds = testSuiteIds;
+    }
+
+    public void setAutoTicketingDetails(AutoTicketingDetails autoTicketingDetails) {
+        this.autoTicketingDetails = autoTicketingDetails;
+    }
+
+    public Set<String> getMiniTestingServiceNames() {
+        return miniTestingServiceNames;
+    }
+
+    public void setMiniTestingServiceNames(Set<String> miniTestingServiceNames) {
+        this.miniTestingServiceNames = miniTestingServiceNames;
+    }
+
+    public void setSelectedMiniTestingServiceName(String selectedMiniTestingServiceName) {
+        this.selectedMiniTestingServiceName = selectedMiniTestingServiceName;
+    }
 }

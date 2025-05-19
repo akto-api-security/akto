@@ -1,12 +1,12 @@
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards"
-import { Text, HorizontalStack, Button, Popover, Modal, IndexFiltersMode, VerticalStack, Box, Checkbox, TextField } from "@shopify/polaris"
+import { Text, HorizontalStack, Button, Popover, Modal, IndexFiltersMode, VerticalStack, Box, Checkbox, TextField, ActionList, Icon } from "@shopify/polaris"
 import api from "../api"
 import { useEffect, useState } from "react"
 import func from "@/util/func"
 import GithubSimpleTable from "../../../components/tables/GithubSimpleTable";
 import {useLocation, useNavigate, useParams } from "react-router-dom"
 import { saveAs } from 'file-saver'
-
+import {FileMinor} from '@shopify/polaris-icons';
 import "./api_inventory.css"
 import ApiDetails from "./ApiDetails"
 import UploadFile from "../../../components/shared/UploadFile"
@@ -29,6 +29,8 @@ import GetPrettifyEndpoint from "../GetPrettifyEndpoint"
 import SourceLocation from "./component/SourceLocation"
 import useTable from "../../../components/tables/TableContext"
 import HeadingWithTooltip from "../../../components/shared/HeadingWithTooltip"
+import { SelectSource } from "./SelectSource"
+import InlineEditableText from "../../../components/shared/InlineEditableText"
 
 const headings = [
     {
@@ -48,6 +50,13 @@ const headings = [
         textValue: "riskScore",
         sortActive: true,
         
+    },{
+        text:"Issues",
+        title: "Issues",
+        value: "issuesComp",
+        textValue: "issues",
+        showFilter:true,
+        filterKey:"severity"
     },
     {
         text: "Hostname",
@@ -93,6 +102,29 @@ const headings = [
         
     },
     {
+        text: 'Discovered At',
+        title: <HeadingWithTooltip 
+                title={"Discovered At"}
+                content={"Time when API was first discovered in traffic."}
+            />,
+        value: 'added',
+        isText: true,
+        type: CellType.TEXT,
+        sortActive: true,
+        
+    },
+    {
+        text: 'Last Tested',
+        title: <HeadingWithTooltip 
+                title={"Last Tested"}
+                content={"Time when API was last tested successfully."}
+            />,
+        value: 'lastTestedComp',
+        sortActive: true,
+        sortKey: 'lastTested',
+        textValue: 'lastTested',
+    },
+    {
         text: "Source location",
         value: "sourceLocationComp",
         textValue: "sourceLocation",
@@ -105,6 +137,14 @@ const headings = [
         title: "Collection",
         showFilter: true,
         filterKey: "apiCollectionName",
+    },
+    {
+        text: "Description",
+        value: "descriptionComp",
+        textValue: "description",
+        title: "Description",
+        filterKey: "description",
+        tooltipContent: "Description of the API",
     }
 ]
 
@@ -135,13 +175,17 @@ headers.push({
 const sortOptions = [
     { label: 'Risk Score', value: 'riskScore asc', directionLabel: 'Highest', sortKey: 'riskScore', columnIndex: 2},
     { label: 'Risk Score', value: 'riskScore desc', directionLabel: 'Lowest', sortKey: 'riskScore', columnIndex: 2},
-    { label: 'Method', value: 'method asc', directionLabel: 'A-Z', sortKey: 'method', columnIndex: 8 },
-    { label: 'Method', value: 'method desc', directionLabel: 'Z-A', sortKey: 'method', columnIndex: 8 },
     { label: 'Endpoint', value: 'endpoint asc', directionLabel: 'A-Z', sortKey: 'endpoint', columnIndex: 1 },
     { label: 'Endpoint', value: 'endpoint desc', directionLabel: 'Z-A', sortKey: 'endpoint', columnIndex: 1 },
-    { label: 'Last seen', value: 'lastSeenTs asc', directionLabel: 'Newest', sortKey: 'lastSeenTs', columnIndex: 7 },
-    { label: 'Last seen', value: 'lastSeenTs desc', directionLabel: 'Oldest', sortKey: 'lastSeenTs', columnIndex: 7 }
+    { label: 'Last seen', value: 'lastSeenTs asc', directionLabel: 'Newest', sortKey: 'lastSeenTs', columnIndex: 8 },
+    { label: 'Last seen', value: 'lastSeenTs desc', directionLabel: 'Oldest', sortKey: 'lastSeenTs', columnIndex: 8 },
+    { label: 'Discovered at', value: 'detectedTs asc', directionLabel: 'Newest', sortKey: 'detectedTs', columnIndex: 9 },
+    { label: 'Discovered at', value: 'detectedTs desc', directionLabel: 'Oldest', sortKey: 'detectedTs', columnIndex: 9 },
+    { label: 'Last tested', value: 'lastTested asc', directionLabel: 'Newest', sortKey: 'lastTested', columnIndex: 10 },
+    { label: 'Last tested', value: 'lastTested desc', directionLabel: 'Oldest', sortKey: 'lastTested', columnIndex: 10 },
 ];
+
+
 
 function ApiEndpoints(props) {
     const { endpointListFromConditions, sensitiveParamsForQuery, isQueryPage } = props
@@ -164,8 +208,11 @@ function ApiEndpoints(props) {
     const [unusedEndpoints, setUnusedEndpoints] = useState([])
     const [showEmptyScreen, setShowEmptyScreen] = useState(false)
     const [runTests, setRunTests ] = useState(false)
+    const [showSourceDialog,  setShowSourceDialog] = useState(false)
+    const [openAPIfile, setOpenAPIfile] = useState(null)
+    const [sourcesBackfilled, setSourcesBackfilled] = useState(false)
 
-    const [endpointData, setEndpointData] = useState({"all":[], 'sensitive': [], 'new': [], 'high_risk': [], 'no_auth': [], 'shadow': []})
+    const [endpointData, setEndpointData] = useState({"all":[], 'sensitive': [], 'new': [], 'high_risk': [], 'no_auth': [], 'shadow': [], 'zombie': []})
     const [selectedTab, setSelectedTab] = useState("all")
     const [selected, setSelected] = useState(0)
     const [selectedResourcesForPrimaryAction, setSelectedResourcesForPrimaryAction] = useState([])
@@ -189,10 +236,13 @@ function ApiEndpoints(props) {
     const selectedMethod = queryParams.get('selected_method')
     const [isEditing, setIsEditing] = useState(false);
     const [editableTitle, setEditableTitle] = useState(pageTitle);
+    const [description, setDescription] = useState("");
+    const [isEditingDescription, setIsEditingDescription] = useState(false)
+    const [editableDescription, setEditableDescription] = useState(description)
 
 
     // the values used here are defined at the server.
-    const definedTableTabs = apiCollectionId === 111111999 ? ['All', 'New', 'High risk', 'No auth', 'Shadow'] : ( apiCollectionId === 111111120 ? ['All', 'New', 'Sensitive', 'High risk', 'Shadow'] : ['All', 'New', 'Sensitive', 'High risk', 'No auth', 'Shadow'] )
+    const definedTableTabs = apiCollectionId === 111111999 ? ['All', 'New', 'High risk', 'No auth', 'Shadow'] : ( apiCollectionId === 111111120 ? ['All', 'New', 'Sensitive', 'High risk', 'Shadow'] : ['All', 'New', 'Sensitive', 'High risk', 'No auth', 'Shadow', 'Zombie'] )
 
 
     const { tabsInfo } = useTable()
@@ -205,6 +255,7 @@ function ApiEndpoints(props) {
         let unusedEndpointsInCollection;
         let sensitiveParamsResp;
         let sourceCodeData = {};
+        let apiInfoSeverityMap ;
         if (isQueryPage) {
             let apiCollectionData = endpointListFromConditions
             if (Object.keys(endpointListFromConditions).length === 0) {
@@ -234,13 +285,15 @@ function ApiEndpoints(props) {
                 api.fetchApisFromStis(apiCollectionId),
                 api.fetchApiInfosForCollection(apiCollectionId),
                 api.fetchAPIsFromSourceCode(apiCollectionId),
-                api.loadSensitiveParameters(apiCollectionId)
+                api.loadSensitiveParameters(apiCollectionId),
+                api.getSeveritiesCountPerCollection(apiCollectionId)
             ];
             let results = await Promise.allSettled(apiPromises);
             let stisEndpoints =  results[0].status === 'fulfilled' ? results[0].value : {};
             let apiInfosData = results[1].status === 'fulfilled' ? results[1].value : {};
             sourceCodeData = results[2].status === 'fulfilled' ? results[2].value : {};
             sensitiveParamsResp =  results[3].status === 'fulfilled' ? results[3].value : {};
+            apiInfoSeverityMap = results[4].status === 'fulfilled' ? results[4].value : {};
             setShowEmptyScreen(stisEndpoints?.list !== undefined && stisEndpoints?.list?.length === 0)
             apiEndpointsInCollection = stisEndpoints?.list !== undefined && stisEndpoints.list.map(x => { return { ...x._id, startTs: x.startTs, changesCount: x.changesCount, shadow: x.shadow ? x.shadow : false } })
             apiInfoListInCollection = apiInfosData.apiInfoList
@@ -278,9 +331,11 @@ function ApiEndpoints(props) {
                 sensitiveInResp
             });
         })
+        apiInfoSeverityMap = func.getSeverityCountPerEndpointList(apiInfoSeverityMap)
+
 
         let data = {}
-        let allEndpoints = func.mergeApiInfoAndApiCollection(apiEndpointsInCollection, apiInfoListInCollection, collectionsMap)
+        let allEndpoints = func.mergeApiInfoAndApiCollection(apiEndpointsInCollection, apiInfoListInCollection, collectionsMap,apiInfoSeverityMap)
 
         // handle code analysis endpoints
         const codeAnalysisCollectionInfo = sourceCodeData.codeAnalysisCollectionInfo
@@ -332,12 +387,35 @@ function ApiEndpoints(props) {
                     parameterisedEndpoint: method + " " + endpoint,
                     apiCollectionName: collectionsMap[apiCollectionId],
                     last_seen: func.prettifyEpoch(lastSeenTs),
-                    added: func.prettifyEpoch(discoveredTs)
+                    added: func.prettifyEpoch(discoveredTs),
+                    descriptionComp: (<Box maxWidth="300px"><TooltipText tooltip={codeAnalysisApi.description} text={codeAnalysisApi.description}/></Box>),
                 }
             })
         }
-
+        
         const prettifyData = transform.prettifyEndpointsData(allEndpoints)
+
+        const zombie = prettifyData.filter(
+            obj => obj.sources && // Check that obj.sources is not null or undefined
+                   Object.keys(obj.sources).length === 1 &&
+                   obj.sources.hasOwnProperty("OPEN_API")
+        );
+
+        var hasOpenAPI = false
+        prettifyData.forEach((obj) => {
+            if (obj.sources && obj.sources.hasOwnProperty("OPEN_API")) {
+                hasOpenAPI = true
+            }
+
+            if (obj.sources && !sourcesBackfilled) {
+                setSourcesBackfilled(true)
+            }
+        })
+
+        // check if openAPI file has been uploaded or not.. else show there no shadow APIs
+        const undocumented = hasOpenAPI ? prettifyData.filter(
+            obj => obj.sources && !obj.sources.hasOwnProperty("OPEN_API")
+        ) : [];
 
         // append shadow endpoints to all endpoints
         data['all'] = [ ...prettifyData, ...shadowApis ]
@@ -345,7 +423,8 @@ function ApiEndpoints(props) {
         data['high_risk'] = prettifyData.filter(x=> x.riskScore >= 4)
         data['new'] = prettifyData.filter(x=> x.isNew)
         data['no_auth'] = prettifyData.filter(x => x.open)
-        data['shadow'] = [ ...shadowApis ]
+        data['shadow'] = [ ...shadowApis, ...undocumented ]
+        data['zombie'] = zombie
         setEndpointData(data)
         setSelectedTab("all")
         setSelected(0)
@@ -390,6 +469,9 @@ function ApiEndpoints(props) {
         if (pageTitle !== collectionsMap[apiCollectionId]) { 
             setPageTitle(collectionsMap[apiCollectionId])
         }
+
+        setDescription(collectionsObj?.description || "")
+        setEditableDescription(collectionsObj?.description || "")
     }, [collectionsMap[apiCollectionId]])
 
     const resourceName = {
@@ -583,6 +665,51 @@ function ApiEndpoints(props) {
           }          
     }
 
+    function uploadOpenApiFile(file) {
+        setOpenAPIfile(file)
+        if (!isApiGroup && !(collectionsObj?.hostName && collectionsObj?.hostName?.length > 0) && !sourcesBackfilled) {
+            setShowSourceDialog(true)
+        } else {
+            uploadOpenFileWithSource(null, file)
+        }
+    }
+
+    function uploadOpenFileWithSource(source, file) {
+        const reader = new FileReader();
+        if (!file) {
+            file = openAPIfile
+        }
+        reader.readAsText(file)
+
+        reader.onload = async () => {
+            const formData = new FormData();
+            formData.append("openAPIString", reader.result)
+            formData.append("apiCollectionId", apiCollectionId);
+            if (source) {
+                formData.append("source", source)
+            }
+            func.setToast(true, false, "We are uploading your openapi file, please dont refresh the page!")
+
+            api.uploadOpenApiFile(formData).then(resp => {
+                if (file.size > 2097152) {
+                    func.setToast(true, false, "We have successfully read your file")
+                }
+                else {
+                    func.setToast(true, false, "Your Openapi file has been successfully processed")
+                }
+                fetchData()
+            }).catch(err => {
+                console.log(err);
+                if (err.message.includes(404)) {
+                    func.setToast(true, true, "Please limit the file size to less than 50 MB")
+                } else {
+                    let message = err?.response?.data?.actionErrors?.[0] || "Something went wrong while processing the file"
+                    func.setToast(true, true, message)
+                }
+            })
+        }
+    }
+
     function handleFileChange(file) {
         if (file) {
             const reader = new FileReader();
@@ -593,8 +720,9 @@ function ApiEndpoints(props) {
                 return
             }
             let isJson = file.name.endsWith(".json")
+            let isYaml = file.name.endsWith(".yaml") || file.name.endsWith(".yml")
             let isPcap = file.name.endsWith(".pcap")
-            if (isHar || isJson) {
+            if (isHar || isJson || isYaml) {
                 reader.readAsText(file)
             } else if (isPcap) {
                 reader.readAsArrayBuffer(new Blob([file]))
@@ -660,68 +788,103 @@ function ApiEndpoints(props) {
                 onClose={() => { setExportOpen(false) }}
                 preferredAlignment="right"
             >
-                <Popover.Pane fixed>
-                    <Popover.Section>
-                        <VerticalStack gap={2}>
-                            <div onClick={handleRefresh} style={{cursor: 'pointer'}}>
-                                <Text fontWeight="regular" variant="bodyMd">Refresh</Text>
-                            </div>
-                            {
-                                isApiGroup ?
-                                    <div onClick={computeApiGroup} style={{ cursor: 'pointer' }}>
-                                        <Text fontWeight="regular" variant="bodyMd">Re-compute api group</Text>
-                                    </div> :
-                                    null
-                            }
-                            { !isApiGroup && !(isHostnameCollection) ?
-                                <UploadFile
-                                fileFormat=".har"
-                                fileChanged={file => handleFileChange(file)}
-                                tooltipText="Upload traffic(.har)"
-                                label={<Text fontWeight="regular" variant="bodyMd">Upload traffic</Text>}
-                                primary={false} 
-                                /> : null
-                            }
-                        </VerticalStack>
-                    </Popover.Section>
-                    <Popover.Section>
-                        <VerticalStack gap={2}>
-                            <Text>Export as</Text>
-                                <VerticalStack gap={1}>
-                                <div data-testid="openapi_spec_option" onClick={(selectedResourcesForPrimaryAction && selectedResourcesForPrimaryAction.length > 0) ? exportOpenApiForSelectedApi : exportOpenApi} style={{cursor: 'pointer'}}>
-                                    <Text fontWeight="regular" variant="bodyMd">OpenAPI spec</Text>
-                                </div>
-                                <div data-testid="postman_option" onClick={exportPostman} style={{cursor: 'pointer'}}>
-                                    <Text fontWeight="regular" variant="bodyMd">Postman</Text>
-                                </div>
-                                <div data-testid="csv_option" onClick={() =>exportCsv()} style={{cursor: 'pointer'}}>
-                                    <Text fontWeight="regular" variant="bodyMd">CSV</Text>
-                                </div>
-                            </VerticalStack>
-                        </VerticalStack>
-                    </Popover.Section>
-                    <Popover.Section>
-                        <VerticalStack gap={2}>
-                            <Text>Others</Text>
-                                <VerticalStack gap={1}>
-                                <Checkbox
-                                    label='Redact'
-                                    checked={redacted}
-                                    onChange={() => redactCheckBoxClicked()}
-                                />
-                            </VerticalStack>
-                        </VerticalStack>
-                    </Popover.Section>
-                    <Popover.Section>
-                        <VerticalStack gap={2}>
-                            <div onClick={toggleWorkflowTests} style={{ cursor: 'pointer' }}>
-                                <Text fontWeight="regular" variant="bodyMd">
-                                    {`${showWorkflowTests ? "Hide" : "Show"} workflow tests`}
-                                </Text>
-                            </div>
-                        </VerticalStack>
-                    </Popover.Section>
-                </Popover.Pane>
+                <div className="inventory-list">
+                <ActionList
+                    sections={[
+                        {
+                            title:'Re-Compute',
+                            items: [
+                                {
+                                    content: 'Refresh',
+                                    onAction: () => { handleRefresh(); setExportOpen(false) },
+                                },
+                                isApiGroup ? {
+                                    content: 'Re-compute API Group',
+                                    onAction: () => { computeApiGroup(); setExportOpen(false) },
+                                }: {}
+                            ]
+                        },
+                        {
+                            title: 'Upload',
+                            items: [
+                                !isApiGroup &&{
+                                    content: '',
+                                    prefix: (<Box width="160px" >
+                                                <UploadFile
+                                                    fileFormat=".json,.yaml,.yml"
+                                                    fileChanged={file => {uploadOpenApiFile(file); setExportOpen(false)}}
+                                                    tooltipText="Upload openapi file"
+                                                    label={(
+                                                        <div style={{ display: "flex", gap:'6px' }}>
+                                                            <Box>
+                                                                <Icon source={FileMinor} />
+                                                            </Box>
+                                                            <Text>Upload OpenAPI file</Text>
+                                                        </div>
+                                                    )}
+                                                    primary={false} 
+                                                />
+                                            </Box>)
+                                },
+                                !isApiGroup && !(isHostnameCollection)  && {
+                                    content: '',
+                                    prefix:  (<Box width="160px" >
+                                        <UploadFile
+                                            fileFormat=".har"
+                                            fileChanged={file => {handleFileChange(file); setExportOpen(false)}}
+                                            tooltipText="Upload traffic(.har)"
+                                            label={(
+                                                <div style={{ display: "flex", gap:'6px' }}>
+                                                    <Box>
+                                                        <Icon source={FileMinor} />
+                                                    </Box>
+                                                    <Text>Upload har file</Text>
+                                                </div>
+                                            )}
+                                            primary={false} 
+                                        />
+                                    </Box>)
+                                }
+                            ]
+                        },
+                        {
+                            title: 'Export as',
+                            items: [
+                                {
+                                    content: 'OpenAPI spec',
+                                    onAction: () => { (selectedResourcesForPrimaryAction && selectedResourcesForPrimaryAction.length > 0) ? exportOpenApiForSelectedApi() : exportOpenApi()},
+                                },
+                                {
+                                    content: 'Postman',
+                                    onAction: () => { exportPostman(); setExportOpen(false) },
+                                },
+                                {
+                                    content: 'CSV',
+                                    onAction: () => { exportCsv(); setExportOpen(false) },
+                                }
+                            ]
+                        },
+                        {
+                            title: 'Others',
+                            items: [
+                                {
+                                    content: `${showWorkflowTests ? "Hide" : "Show"} workflow tests`,
+                                    onAction: () => { toggleWorkflowTests(); setExportOpen(false) },
+                                },
+                                {
+                                    content: '',
+                                    prefix: <Box paddingInlineStart={"2"}><Checkbox
+                                                label='Redact'
+                                                checked={redacted}
+                                                onChange={() => redactCheckBoxClicked()}
+                                            /></Box>,
+                                    onAction: () => { redactCheckBoxClicked() },
+                                }
+                            ]
+                        }
+                    ]}
+                />
+                </div>
             </Popover>
 
             {isApiGroup &&collectionsObj?.automated !== true ? <Button onClick={() => navigate("/dashboard/observe/query_mode?collectionId=" + apiCollectionId)}>Edit conditions</Button> : null}
@@ -737,6 +900,11 @@ function ApiEndpoints(props) {
                 disabled={showEmptyScreen || window.USER_ROLE === "GUEST"}
                 selectedResourcesForPrimaryAction={selectedResourcesForPrimaryAction}
                 preActivator={false}
+            />
+            <SelectSource
+                show={showSourceDialog}
+                setShow={(val) => setShowSourceDialog(val)}
+                primaryAction={(val) => uploadOpenFileWithSource(val)}
             />
         </HorizontalStack>
     )
@@ -927,8 +1095,20 @@ function ApiEndpoints(props) {
         });
     }
 
+    function updateCollectionDescription(list, apiCollectionId, newDescription) {
+        list.forEach(item => {
+            if (item.id === apiCollectionId) {
+                item.description = newDescription;
+            }
+        });
+    }
+
     
       const handleSaveClick = async () => {
+        if(editableTitle === pageTitle) {
+            setIsEditing(false);
+            return;
+        }
         api.editCollectionName(apiCollectionId, editableTitle).then((resp) => {
             func.setToast(true, false, 'Collection name updated successfully!')
             setPageTitle(editableTitle)
@@ -956,40 +1136,69 @@ function ApiEndpoints(props) {
         }
       }
 
+    const handleSaveDescription = () => {
+        // Check for special characters
+        const specialChars = /[!@#$%^&*()\-_=+\[\]{}\\|;:'",.<>/?~]/;
+        if (specialChars.test(editableDescription)) {
+            func.setToast(true, true, "Description contains special characters that are not allowed.");
+            return;
+        }
+        
+        setIsEditingDescription(false);
+        if(editableDescription === description) return;
+        api.saveCollectionDescription(apiCollectionId, editableDescription)
+            .then(() => {
+                updateCollectionDescription(allCollections, apiCollectionId, editableDescription);
+                func.setToast(true, false, "Description saved successfully");
+                setDescription(editableDescription);
+            })
+            .catch((err) => {
+                console.error("Failed to save description:", err);
+                func.setToast(true, true, "Failed to save description. Please try again.");
+            });
+    };
+
     return (
         <div>
             {isQueryPage ? (
                 apiEndpointTable
             ) : (
                 <PageWithMultipleCards
-                    title={
-                        isEditing ? (
-                            <Box maxWidth="20vw">
-                                <div onKeyDown={(e) => handleKeyDown(e)}>
-                                    <TextField
-                                        value={editableTitle}
-                                        onChange={handleTitleChange}
-                                        autoFocus
-                                        autoComplete="off"
-                                        maxLength="24"
-                                        suffix={(
-                                            <Text>{editableTitle.length}/24</Text>
+                        title={(
+                            <Box maxWidth="35vw">
+                                <VerticalStack gap={2}>
+                                    {isEditing ? (
+                                        <InlineEditableText textValue={editableTitle} setTextValue={handleTitleChange} handleSaveClick={handleSaveClick} setIsEditing={setIsEditing} maxLength={24} />
+                                    ) :
+                                        <div style={{ cursor: isApiGroup ? 'pointer' : 'default' }} onClick={isApiGroup ? () => { setIsEditing(true); } : undefined}>
+                                            <TooltipText tooltip={pageTitle} text={pageTitle} textProps={{ variant: 'headingLg' }} />
+                                        </div>}
+                                    <HorizontalStack gap={2}>
+                                        {isEditingDescription ? (
+                                            <InlineEditableText textValue={editableDescription} setTextValue={setEditableDescription} handleSaveClick={handleSaveDescription} setIsEditing={setIsEditingDescription} placeholder={"Add a brief description"} maxLength={64} />
+                                        ) : (
+                                            !description ? (
+                                                <Button plain removeUnderline onClick={() => setIsEditingDescription(true)}>
+                                                    Add description
+                                                </Button>
+                                            ) : (
+                                                <Button plain removeUnderline onClick={() => setIsEditingDescription(true)}>
+                                                    <Text as="span" variant="bodyMd" color="subdued" alignment="start">
+                                                        {description}
+                                                    </Text>
+                                                </Button>
+                                            )
                                         )}
-                                        onKeyDown={handleKeyDown}
-                                    />
-                                </div>
+                                    </HorizontalStack>
+                                </VerticalStack>
                             </Box>
-                        ) : (
-                            <div style={{ cursor: isApiGroup ? 'pointer' : 'default' }} onClick={isApiGroup ?  () => {setIsEditing(true);} : undefined}>
-                                <Box maxWidth="35vw">
-                                    <TooltipText tooltip={pageTitle} text={pageTitle} textProps={{ variant: 'headingLg' }} />
-                                </Box>
-                            </div>
                         )
                     }
                     backUrl="/dashboard/observe/inventory"
                     secondaryActions={secondaryActionsComponent}
-                    components={components}
+                    components={[
+                        ...components
+                    ]}
                 />
             )}
         </div>
