@@ -2,6 +2,7 @@ package com.akto.dto.testing;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import lombok.Getter;
 import lombok.Setter;
@@ -15,4 +16,6 @@ public class AutoTicketingDetails {
     private List<String> severities;
     private String projectId;
     private String issueType;
+    private Map<String, String> customFields;
+    private Set<String> labels;
 }

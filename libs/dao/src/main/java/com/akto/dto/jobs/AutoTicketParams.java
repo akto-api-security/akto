@@ -1,6 +1,8 @@
 package com.akto.dto.jobs;
 
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -26,6 +28,8 @@ public class AutoTicketParams extends JobParams {
     private String issueType;
     private List<String> severities;
     private String integrationType;
+    private Map<String, String> customFields;
+    private Set<String> labels;
 
     @Override
     public JobType getJobType() {

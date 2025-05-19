@@ -15,7 +15,7 @@ public class KafkaListener implements ServletContextListener {
     private static final LoggerMaker loggerMaker = new LoggerMaker(KafkaListener.class, LogDb.DASHBOARD);
     @Override
     public void contextInitialized(javax.servlet.ServletContextEvent sce) {
-        String brokerIP = "kafka1:19092"; //System.getenv("AKTO_KAFKA_BROKER_URL");
+        String brokerIP = System.getenv("AKTO_KAFKA_BROKER_URL");
         
         if (DashboardMode.isKubernetes()) {
             loggerMaker.debugAndAddToDb("is_kubernetes: true", LogDb.DASHBOARD);

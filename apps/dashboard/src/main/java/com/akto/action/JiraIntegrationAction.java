@@ -767,6 +767,8 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
                         aktoDashboardHost+"/dashboard/issues?result="+testingRunResult.getId().toHexString(),
                         info.getDescription(),
                         testingIssuesId,
+                        null,
+                        null,
                         null
                 );
 

@@ -135,7 +135,9 @@ public class JiraTicketJobExecutor extends JobExecutor<AutoTicketParams> {
                     dashboardUrl + "/dashboard/issues?result=" + testingRunResult.getId().toHexString(),
                     info.getDescription(),
                     id,
-                    summaryId
+                    summaryId,
+                    jobParams.getCustomFields(),
+                    jobParams.getLabels()
                 );
             } catch (Exception e) {
                 logger.error("Error parsing URL for issue {}: {}", id, e.getMessage(), e);
@@ -356,7 +358,18 @@ public class JiraTicketJobExecutor extends JobExecutor<AutoTicketParams> {
 
         fields.put("issuetype", new BasicDBObject("id", issueType));
         fields.put("project", new BasicDBObject("key", projId));
-        fields.put("labels", new String[] {JobConstants.TICKET_LABEL_AKTO_SYNC});
+
+        Set<String> labels = meta.getLabels();
+
+        if (labels == null) {
+            labels = new HashSet<>();
+        }
+        labels.add(JobConstants.TICKET_LABEL_AKTO_SYNC);
+        fields.put("labels", labels.toArray(new String[0]));
+
+        if (meta.getCustomFields() != null && !meta.getCustomFields().isEmpty()) {
+            fields.putAll(meta.getCustomFields());
+        }
 
         BasicDBList contentList = new BasicDBList();
         contentList.add(buildContentDetails(meta.getHostStr(), null));

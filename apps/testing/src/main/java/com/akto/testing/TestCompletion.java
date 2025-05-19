@@ -119,7 +119,10 @@ public class TestCompletion {
             AutoTicketParams params = new AutoTicketParams(testingRun.getId(), summaryId,
                 testRunConfig.getAutoTicketingDetails().getProjectId(),
                 testRunConfig.getAutoTicketingDetails().getIssueType(),
-                testRunConfig.getAutoTicketingDetails().getSeverities(), "JIRA");
+                testRunConfig.getAutoTicketingDetails().getSeverities(),
+                "JIRA",
+                testRunConfig.getAutoTicketingDetails().getCustomFields(),
+                testRunConfig.getAutoTicketingDetails().getLabels());
             JobScheduler.scheduleRunOnceJob(accountId, params, JobExecutorType.DASHBOARD);
         } catch (Exception e) {
             logger.error("Error scheduling auto ticket creation job: {}", e.getMessage(), e);
