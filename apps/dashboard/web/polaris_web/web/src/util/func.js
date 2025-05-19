@@ -157,28 +157,29 @@ prettifyEpoch(epoch) {
     let plural = count <= 1 ? '' : 's'
     return count + ' ' + unit + plural + ' ago'
   },
-  prettifyEpochDuration(seconds) {
-    if (isNaN(seconds) || seconds < 0) return "Invalid duration";
-
+  prettifyEpochDuration(diffSeconds) {
+    if(diffSeconds <= 0){
+      return "Error occurred while fetching the time"
+    }
     const units = [
-      { label: "week", seconds: 604800 },
-      { label: "day", seconds: 86400 },
-      { label: "hour", seconds: 3600 },
-      { label: "minute", seconds: 60 },
-      { label: "second", seconds: 1 }
+      { label: "week", duration: 604800 },
+      { label: "day", duration: 86400 },
+      { label: "hour", duration: 3600 },
+      { label: "minute", duration: 60 },
+      { label: "second", duration: 1 }
     ];
 
     let result = [];
 
     for (let unit of units) {
-      if (seconds >= unit.seconds) {
-        let value = Math.floor(seconds / unit.seconds);
-        seconds %= unit.seconds;
+      if (diffSeconds >= unit.duration) {
+        let value = Math.floor(diffSeconds / unit.duration);
+        diffSeconds %= unit.seconds;
         result.push(`${value} ${unit.label}${value > 1 ? "s" : ""}`);
       }
     }
 
-    return result.length ? result.join(", ") : "0 seconds";
+    return result.join(", ")
   },
 
   toSentenceCase(str) {

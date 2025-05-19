@@ -43,22 +43,28 @@ function AgentWindow({ onClose, open, showConfigCTA }: AgentWindowProps) {
     const chatTab = {
         id: 'chat',
         content: 'Chat',
-        component:<div>
-        <div className="h-[calc(100vh-172px)] flex flex-col overflow-y-auto px-4 pb-5">
-            <div className="flex-1 min-h-0">
-                <Scrollable className="h-full">
-                    <div className="pt-2 flex flex-col gap-2">
-                        <Box paddingBlockEnd={"8"}>
-                            <AgentWindowCore />
-                            <AgentFinalCTA />
-                        </Box>
-                    </div>
-                </Scrollable>
-            </div>
-            <br/>
-            <PromptComposer onSend={console.log} />
-        </div>
-    </div >
+        component:(
+            <div>
+                 {
+                    showConfigCTA ? <ConfigureAgentCTA /> :
+                        <div className="h-[calc(100vh-252px)] flex flex-col overflow-y-auto px-4 pb-5">
+                            <div className="flex-1 min-h-0">
+                                <Scrollable className="h-full">
+                                    <div className="pt-2 flex flex-col gap-2">
+                                        <Box paddingBlockEnd={"8"}>
+                                            <AgentWindowCore />
+                                            <AgentFinalCTA />
+                                        </Box>
+                                    </div>
+                                </Scrollable>
+                            </div>
+                            <br />
+                            <div style={{ height: '24px' }} />
+                            <PromptComposer onSend={console.log} />
+                        </div>
+                }
+            </div >
+        )
     }
     const activityTab = {
         id: 'activity',
@@ -88,29 +94,6 @@ function AgentWindow({ onClose, open, showConfigCTA }: AgentWindowProps) {
             newComp={true}
             variant={"agentVariant"}
             title={"Agent Details"}
-            // components={[
-            //     <div>
-            //         <AgentHeader />
-            //         {
-            //             showConfigCTA ? <ConfigureAgentCTA /> :
-            //                 <div className="h-[calc(100vh-172px)] flex flex-col overflow-y-auto px-4 pb-5">
-            //                     <div className="flex-1 min-h-0">
-            //                         <Scrollable className="h-full">
-            //                             <div className="pt-2 flex flex-col gap-2">
-            //                                 <Box paddingBlockEnd={"8"}>
-            //                                     <AgentWindowCore />
-            //                                     <AgentFinalCTA />
-            //                                 </Box>
-            //                             </div>
-            //                         </Scrollable>
-            //                     </div>
-            //                     <br />
-            //                     <div style={{ height: '24px' }} />
-            //                     <PromptComposer onSend={console.log} />
-            //                 </div>
-            //         }
-            //     </div >
-            // ]}
         />
     )
 }

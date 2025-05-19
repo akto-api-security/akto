@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Placeholder from '@tiptap/extension-placeholder';
@@ -7,7 +7,7 @@ import OrderedList from '@tiptap/extension-ordered-list';
 import BulletList from '@tiptap/extension-bullet-list';
 import './composer.styles.css';
 
-import { Box, Button, Tooltip } from '@shopify/polaris';
+import { Button, Tooltip } from '@shopify/polaris';
 
 import { SendMajor } from '@shopify/polaris-icons';
 
@@ -69,19 +69,8 @@ export const PromptComposer = ({ onSend }: PromptComposerProps) => {
     }
   });
 
-  const parentRef = useRef<HTMLDivElement | null>(null); 
-  const [width, setWidth] = useState(0);
-
   useEffect(() => {
     editor?.setEditable(!isInBlockedState);
-    const handleResize = () => {
-      if (parentRef.current) {
-        setWidth(parentRef.current.offsetWidth);
-      }
-    };
-    handleResize();
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
   }, [isInBlockedState]);
 
   if (!editor) return null;
@@ -134,10 +123,8 @@ export const PromptComposer = ({ onSend }: PromptComposerProps) => {
   }
 
   return (
-    <Box ref={parentRef}>
-      <Box position='fixed' width={width + "px"} insetBlockEnd={"4"}>
     <div className={`flex flex-col gap-4 border border-1 border-[var(--borderShadow-box-shadow)] py-2 px-4 rounded-sm relative z-[500] bg-white ${isFocused ? 'ring ring-violet-200' : ''}`}>
-      <BlockedState  onResume={onResume} onDiscard={onDiscard} />
+      <BlockedState onResume={onResume} onDiscard={onDiscard} />
       <div className="flex flex-col gap-2 justify-start">
         <div className="w-full" onClick={() => isInBlockedState && setAttemptedInBlockedState(true)}>
           {/* <Button 
@@ -169,7 +156,5 @@ export const PromptComposer = ({ onSend }: PromptComposerProps) => {
         </Tooltip>
       </div>
     </div>
-      </Box>
-    </Box>
   );
 };

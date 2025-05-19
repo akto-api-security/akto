@@ -1,12 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { Box, EmptySearchResult, Text } from '@shopify/polaris';
+import { Box, EmptySearchResult } from '@shopify/polaris';
 import GithubSimpleTable from "../../../components/tables/GithubSimpleTable";
 import api from '../api';
-import { useAgentsStore } from '../agents.store';
-import { AgentRun, AgentSubprocess, State } from '../types';
-import { useAgentsStateStore } from '../agents.state.store';
+import { AgentRun, State } from '../types';
 import func from '../../../../../util/func';
-import testEditorRequests from '../../test_editor/api';
 import ShowListInBadge from '../../../components/shared/ShowListInBadge';
 import transform from '../transform';
 import { CellType } from '../../../components/tables/rows/GithubRow';
@@ -29,10 +26,6 @@ const sortOptions = [
 function ActivityTable({ agentId }) {
 
     const [data, setData] = useState<TableData[]>([]);
-    const {currentAgent} = useAgentsStore();
-
-
-
     const headings = [
         {
             title: "Start time",
@@ -65,21 +58,16 @@ function ActivityTable({ agentId }) {
         plural: 'agent activities',
     };
 
-    const { setCurrentProcessId, resetStore } = useAgentsStore();
-    const { setCurrentAgentProcessId, resetAgentState } = useAgentsStateStore();
-
 
     const getDetails = async (runData: AgentRun) => {
         let details = "";
-
         if (runData.state === State.SCHEDULED) {
             details = "Agent is scheduled";
-        } else if ([State.RUNNING, State.COMPLETED].includes(runData.state)) {
+        } else if ([State.RUNNING, State.COMPLETED, State.STOPPED].includes(runData.state)) {
             const subprocesses = await transform.getAllSubProcesses(runData.processId);
             // extracting subProcessHeading and subProcess.processOutput, if it exists for running and completed state of agentRun
-            let lastSubprocess = subprocesses.find(subprocess => ["ACCEPTED"].includes(subprocess.state));
-
-            details = `${lastSubprocess?.subProcessHeading ?? ""} ${lastSubprocess?.userInput?.length > 0
+            let lastSubprocess = subprocesses.find(subprocess => subprocess.state === State.ACCEPTED);
+            details = `${lastSubprocess?.subProcessHeading || ""} => ${lastSubprocess?.userInput?.length > 0
                     ? lastSubprocess?.userInput
                     : lastSubprocess?.processOutput?.outputMessage ?? ""
                 }`;
@@ -117,41 +105,38 @@ function ActivityTable({ agentId }) {
         try {
             const response = (await api.getAllAgentRunsObject(agentId));
             agentRuns = response as AgentRun[];
-            if (agentRuns.length > 0 && agentRuns[0]?.processId) {
-                setCurrentProcessId(agentRuns[0]?.processId)
-                setCurrentAgentProcessId(agentId, agentRuns[0]?.processId)
-            } else {
-                // TODO: handle cases here, because the above API only gets "RUNNING" Agents.
-                // setCurrentProcessId("")
-                resetStore();
-                resetAgentState(agentId);
-            }
         } catch (error) {
-            resetStore();
-            resetAgentState(agentId);
         }
-        if (agentRuns.length === 0) {
-            setData([]);
-            return;
-        }
-        const fetchedData: TableData[] = await Promise.all(
-            agentRuns.map(async (runData) => {
-                const duration = (runData.endTimestamp === 0)
-                    ? func.prettifyEpoch(runData.startTimestamp)
-                    : func.prettifyEpochDuration(runData.endTimestamp - runData.startTimestamp);
-                
-                return {
-                    start_time: new Date(runData.startTimestamp * 1000).toUTCString(),
-                    targetName:getTargetNames(runData),
-                    action: func.capitalizeFirstLetter(runData.state.toLowerCase()),
-                    duration: duration,
-                    details: await getDetails(runData),
-                    createdTimeStamp: runData.startTimestamp,
-                } as TableData;
-            })
-        );
+        const allPromises = agentRuns.map(async (runData) => {
+            let duration = "";
+            if(runData.state !== State.COMPLETED && (runData.endTimestamp === undefined || runData.endTimestamp === 0)){
+                switch(runData.state){
+                    case State.SCHEDULED:
+                        duration = "Agent is scheduled";
+                        break;
+                    case State.STOPPED:
+                        duration = "Agent is stopped";
+                        break;
+                    case State.FAILED:
+                        duration = "Agent failed";
+                        break;
+                }   
+            }else{
+                duration = func.prettifyEpochDuration(runData.endTimestamp - runData.startTimestamp);
+            }
+            return {
+                start_time: new Date(runData.startTimestamp * 1000).toUTCString(),
+                targetName: getTargetNames(runData),
+                action: func.capitalizeFirstLetter(runData.state.toLowerCase()),
+                duration: duration,
+                details: await getDetails(runData),
+                createdTimeStamp: runData.startTimestamp,
+            };
+        });
         
-        setData(fetchedData);
+        const subprocesses = await Promise.allSettled(allPromises);
+        const successfulResults = subprocesses.filter((res) => res.status === "fulfilled").map(res => res.value);
+        setData(successfulResults);
     }
 
 
@@ -174,7 +159,7 @@ function ActivityTable({ agentId }) {
 
     const table = (
         <GithubSimpleTable
-            key={"agent-activity-table"}
+            key={data.length}
             resourceName={resourceName}
             useNewRow={true}
             headers={headings}
