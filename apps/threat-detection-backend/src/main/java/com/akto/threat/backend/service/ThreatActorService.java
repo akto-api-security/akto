@@ -8,6 +8,8 @@ import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.Li
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ListThreatActorsRequest;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ModifyThreatActorStatusRequest;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ModifyThreatActorStatusResponse;
+import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.GetThreatConfigurationRequest;
+import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.GetThreatConfigurationResponse;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.SplunkIntegrationRequest;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.SplunkIntegrationRespone;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatActivityTimelineResponse;
@@ -40,6 +42,35 @@ public class ThreatActorService {
   public ThreatActorService(MongoClient mongoClient) {
     this.mongoClient = mongoClient;
   }
+
+  public GetThreatConfigurationResponse fetchThreatConfiguration(String accountId) {
+    GetThreatConfigurationResponse.Builder builder =
+        GetThreatConfigurationResponse.newBuilder();
+    MongoCollection<Document> coll =
+        this.mongoClient
+            .getDatabase(accountId)
+            .getCollection(MongoDBCollection.ThreatDetection.THREAT_CONFIGURATION, Document.class);
+    Document doc = coll.find().first();
+    if (doc != null) {
+        Document actorDoc = (Document) doc.get("actor");
+        if (actorDoc != null) {
+            Document actorIdDoc = (Document) actorDoc.get("actorId");
+            if (actorIdDoc != null) {
+                builder.setActor(
+                    GetThreatConfigurationResponse.Actor.newBuilder()
+                        .setActorId(
+                            GetThreatConfigurationResponse.ActorId.newBuilder()
+                                .setType(actorIdDoc.getString("type"))
+                                .setKey(actorIdDoc.getString("key"))
+                        )
+                );
+            }
+        }
+    }
+    return builder.build();
+  }
+
+  public void modifyThreatConfiguration(String accountId) {}
 
   public ListThreatActorResponse listThreatActors(
       String accountId, ListThreatActorsRequest request) {
