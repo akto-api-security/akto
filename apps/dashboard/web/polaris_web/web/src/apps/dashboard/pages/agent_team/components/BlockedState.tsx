@@ -5,7 +5,6 @@ import { motion, AnimatePresence } from 'motion/react';
 import { useAgentsStore } from '../agents.store';
 
 import './BlockedState.css';
-import { useAgentsStateStore } from '../agents.state.store';
 import transform from '../transform';
 
 interface BlockedStateProps {
@@ -15,7 +14,7 @@ interface BlockedStateProps {
 
 export const BlockedState = ({ onResume, onDiscard }: BlockedStateProps) => {
     const { agentState, setAttemptedInBlockedState, attemptedInBlockedState, setAgentState, currentAgent, PRstate } = useAgentsStore();
-    const {setCurrentAgentState} = useAgentsStateStore()
+    const setCurrentAgentState = {}
 
     const handleResume = () => {
         transform.updateAgentState("idle", currentAgent?.id??"", setAgentState, setCurrentAgentState);
