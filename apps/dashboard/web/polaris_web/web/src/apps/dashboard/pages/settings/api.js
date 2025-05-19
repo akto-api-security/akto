@@ -504,6 +504,15 @@ const settingRequests = {
             }
         })
     },
+    enableMergingOnVersions(enableMergingOnVersions){
+        return request({
+            url: '/api/enableMergingOnVersionsInApis',
+            method: "post",
+            data: {
+                enableMergingOnVersions
+            }
+        })
+    },
     resetUserPassword(userEmail) {
         return request({
             url: '/api/resetUserPassword',

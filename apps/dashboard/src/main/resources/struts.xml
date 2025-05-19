@@ -3408,6 +3408,27 @@
             </result>
         </action>
 
+        <action name="api/enableMergingOnVersionsInApis" class="com.akto.action.AdminSettingsAction" method="enableMergingOnVersionsInApis">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">ADMIN_ACTIONS</param>
+                <param name="accessType">READ_WRITE</param>
+            </interceptor-ref>
+
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="SUCCESS"  type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
         <action name="api/updateMergeAsyncOutside" class="com.akto.action.AdminSettingsAction" method="updateMergeAsyncOutside">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />

@@ -85,6 +85,8 @@ public class AdminSettingsAction extends UserAction {
 
     @Setter
     private boolean miniTestingEnabled;
+    @Setter
+    private boolean enableMergingOnVersions;
 
     public String updateSetupType() {
         AccountSettingsDao.instance.getMCollection().updateOne(
@@ -472,6 +474,14 @@ public class AdminSettingsAction extends UserAction {
             Updates.set(Account.HYBRID_TESTING_ENABLED, this.miniTestingEnabled)
         );
         return SUCCESS.toUpperCase();   
+    }
+
+    public String enableMergingOnVersionsInApis(){
+        AccountSettingsDao.instance.updateOne(
+            AccountSettingsDao.generateFilter(),
+            Updates.set(AccountSettings.ALLOW_MERGING_ON_VERSIONS, this.enableMergingOnVersions)
+        );
+        return SUCCESS.toUpperCase();
     }
 
     public void setAccountPermission(String accountPermission) {

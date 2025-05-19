@@ -43,10 +43,12 @@ function About() {
     const [isSubscribed, setIsSubscribed] = useState(() => {
         return localStorage.getItem('isSubscribed') === 'true'
     })
+    const [modalOpen, setModalOpen] = useState(false)
 
     const initialUrlsList = settingFunctions.getRedundantUrlOptions()
     const [selectedUrlList, setSelectedUrlsList] = useState([])
     const [miniTesting, setMiniTesting] = useState(false)
+    const [mergingOnVersions, setMergingOnVersions] = useState(false)
 
     const setupOptions = settingFunctions.getSetupOptions()
 
@@ -76,6 +78,7 @@ function About() {
         setPartnerIpsList(resp.partnerIpList || [])
         setSelectedUrlsList(resp.allowRedundantEndpointsList || [])
         setToggleCaseSensitiveApis(resp.handleApisCaseInsensitive || false)
+        setMergingOnVersions(resp.allowMergingOnVersions || false)
     }
 
     useEffect(()=>{
@@ -234,6 +237,11 @@ function About() {
         await settingRequests.switchTestingModule(!val);
     }
 
+    const handleMergingOnVersions = async(val) => {
+        setMergingOnVersions(val) ;
+        await settingRequests.enableMergingOnVersions(val);
+    }
+
     
     const handleIpsChange = async(ip, isAdded, type) => {
         let ipList = ip.split(",")
@@ -270,12 +278,12 @@ function About() {
         func.setToast(true, false, "Access type configuration is being applied. Please wait for some time for the results to be reflected.")
     }
 
-    function ToggleComponent({text,onToggle,initial}){
+    function ToggleComponent({text,onToggle,initial, disabled}){
         return(
             <VerticalStack gap={1}>
                 <Text color="subdued">{text}</Text>
                 <ButtonGroup segmented>
-                    <Button size="slim" onClick={() => onToggle(true)} pressed={initial === true}>
+                    <Button size="slim" onClick={() => onToggle(true)} pressed={initial === true} disabled={disabled}>
                         True
                     </Button>
                     <Button size="slim" onClick={() => onToggle(false)} pressed={initial === false}>
@@ -366,8 +374,8 @@ function About() {
                     isNested={true}
                 />
             </Box>
-            <ToggleComponent text={"Treat URLs as case insensitive"} onToggle={handleApisCaseInsensitive} initial={toggleCaseSensitiveApis} />
-            <ToggleComponent text={"Use akto's testing module"} onToggle={toggleMiniTesting} initial={miniTesting}/>
+            <ToggleComponent text={"Treat URLs as case insensitive"} onToggle={handleApisCaseInsensitive} initial={toggleCaseSensitiveApis} disabled={window.USER_ROLE !== "ADMIN"}/>
+            <ToggleComponent text={"Use akto's testing module"} onToggle={toggleMiniTesting} initial={miniTesting} disabled={window.USER_ROLE !== "ADMIN"}/>
         </VerticalStack>
     )
     
