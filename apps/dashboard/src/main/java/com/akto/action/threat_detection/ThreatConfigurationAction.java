@@ -51,9 +51,6 @@ public void setThreatConfiguration(ThreatConfiguration threatConfiguration) {
 
     try (CloseableHttpResponse resp = this.httpClient.execute(get)) {
       String responseBody = EntityUtils.toString(resp.getEntity());
-      loggerMaker.warn("Response body: " + responseBody);
-
-      // Parse JSON to ThreatConfiguration and set the field
       this.threatConfiguration = objectMapper.readValue(responseBody, ThreatConfiguration.class);
 
     } catch (Exception e) {
@@ -81,12 +78,8 @@ public void setThreatConfiguration(ThreatConfiguration threatConfiguration) {
     }
     try (CloseableHttpResponse resp = this.httpClient.execute(post)) {
       String responseBody = EntityUtils.toString(resp.getEntity());
-    //   ProtoMessageUtils.<ThreatConfigurationResponse>toProtoMessage(
-    //           ThreatConfigurationResponse.class, responseBody)
-    //       .ifPresent(
-    //           m -> {
-    //             this.threatConfiguration = m;
-    //           });
+      this.threatConfiguration = objectMapper.readValue(responseBody, ThreatConfiguration.class);
+
       return SUCCESS.toUpperCase();
     } catch (Exception e) {
       e.printStackTrace();
