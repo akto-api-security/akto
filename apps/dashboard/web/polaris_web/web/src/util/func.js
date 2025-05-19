@@ -157,6 +157,30 @@ prettifyEpoch(epoch) {
     let plural = count <= 1 ? '' : 's'
     return count + ' ' + unit + plural + ' ago'
   },
+  prettifyEpochDuration(diffSeconds) {
+    if(diffSeconds <= 0){
+      return "Error occurred while fetching the time"
+    }
+    const units = [
+      { label: "week", duration: 604800 },
+      { label: "day", duration: 86400 },
+      { label: "hour", duration: 3600 },
+      { label: "minute", duration: 60 },
+      { label: "second", duration: 1 }
+    ];
+
+    let result = [];
+
+    for (let unit of units) {
+      if (diffSeconds >= unit.duration) {
+        let value = Math.floor(diffSeconds / unit.duration);
+        diffSeconds %= unit.seconds;
+        result.push(`${value} ${unit.label}${value > 1 ? "s" : ""}`);
+      }
+    }
+
+    return result.join(", ")
+  },
 
   toSentenceCase(str) {
     if (str == null) return ""
