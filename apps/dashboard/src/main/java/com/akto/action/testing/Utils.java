@@ -44,6 +44,8 @@ public class Utils {
                 case "testFilter":
                     filterList.add(Filters.in(TestingRunResult.TEST_SUB_TYPE, value));
                     break;
+                case "apiFilter":
+                    filterList.add(Filters.in(TestingRunResult.API_INFO_KEY + "." + ApiInfoKey.URL, value));
                 default:
                     break;
             }
