@@ -51,4 +51,8 @@ public class Constants {
     public final static String _AKTO = "AKTO";
 
     public final static String DEFAULT_AKTO_DASHBOARD_URL = "https://app.akto.io";
+
+    public final static String AKTO_LLM_URL = "http://jarvis.internal.akto.io";
+    public final static String AKTO_LLM_MODEL = "llama3.2";
+
 }

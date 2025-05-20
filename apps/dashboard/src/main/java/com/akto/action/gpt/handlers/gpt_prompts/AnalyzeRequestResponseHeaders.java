@@ -15,6 +15,8 @@ import okhttp3.Request;
 import okhttp3.RequestBody;
 import okhttp3.Response;
 import okhttp3.ResponseBody;
+import com.akto.util.Constants;
+
 
 
 public class AnalyzeRequestResponseHeaders extends PromptHandler {
@@ -26,8 +28,8 @@ public class AnalyzeRequestResponseHeaders extends PromptHandler {
         .build();
 
     private static final LoggerMaker logger = new LoggerMaker(AnalyzeRequestResponseHeaders.class, LogDb.DASHBOARD);
-    private static final String OLLAMA_SERVER_ENDPOINT = "http://jarvis.internal.akto.io/api/generate";
-    private static final String OLLAMA_MODEL = "llama3.2";
+    private static final String OLLAMA_SERVER_ENDPOINT = Constants.AKTO_LLM_URL + "/api/generate";
+    private static final String OLLAMA_MODEL = Constants.AKTO_LLM_MODEL;
     private static final double temperature = 0.0;
     private static final int max_tokens = 4000;
 
