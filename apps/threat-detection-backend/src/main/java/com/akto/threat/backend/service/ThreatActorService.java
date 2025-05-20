@@ -1,6 +1,7 @@
 package com.akto.threat.backend.service;
 
 import com.akto.dto.HttpResponseParams;
+import com.akto.proto.generated.threat_detection.message.sample_request.v1.Metadata;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.DailyActorsCountResponse;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchMaliciousEventsRequest;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchMaliciousEventsResponse;
@@ -14,9 +15,11 @@ import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.Th
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatActorByCountryRequest;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatActorByCountryResponse;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ListThreatActorResponse.ActivityData;
+import com.akto.proto.utils.ProtoMessageUtils;
 import com.akto.threat.backend.constants.MongoDBCollection;
 import com.akto.threat.backend.db.ActorInfoModel;
 import com.akto.threat.backend.db.SplunkIntegrationModel;
+import com.google.protobuf.TextFormat;
 import com.mongodb.client.FindIterable;
 import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoCollection;
@@ -310,6 +313,19 @@ public class ThreatActorService {
         return ThreatActivityTimelineResponse.newBuilder().addAllThreatActivityTimeline(timeline).build();
   }
 
+  private String fetchMetadataString(Document doc){
+    String metadataStr = doc.getString("metadata");
+    Metadata.Builder metadataBuilder = Metadata.newBuilder();
+    try {
+      TextFormat.getParser().merge(metadataStr, metadataBuilder);
+    } catch (Exception e) {
+      return metadataStr;
+    }
+    Metadata metadataProto = metadataBuilder.build();
+    metadataStr = ProtoMessageUtils.toString(metadataProto).orElse("");
+    return metadataStr;
+  }
+
   public FetchMaliciousEventsResponse fetchAggregateMaliciousRequests(
       String accountId, FetchMaliciousEventsRequest request) {
 
@@ -324,6 +340,7 @@ public class ThreatActorService {
             maliciousPayloadsResponse.add(
                 FetchMaliciousEventsResponse.MaliciousPayloadsResponse.newBuilder().
                 setOrig(HttpResponseParams.getSampleStringFromProtoString(doc.getString("latestApiOrig"))).
+                setMetadata(fetchMetadataString(doc)).
                 setTs(doc.getLong("detectedAt")).build());
         }
     } else {
@@ -333,6 +350,7 @@ public class ThreatActorService {
             maliciousPayloadsResponse.add(
                 FetchMaliciousEventsResponse.MaliciousPayloadsResponse.newBuilder().
                 setOrig(HttpResponseParams.getSampleStringFromProtoString(doc.getString("orig"))).
+                setMetadata(fetchMetadataString(doc)).
                 setTs(doc.getLong("requestTime")).build());
         }
     }
