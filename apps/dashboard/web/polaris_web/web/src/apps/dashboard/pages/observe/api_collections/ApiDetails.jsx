@@ -21,6 +21,18 @@ import { HorizontalDotsMinor, FileMinor } from "@shopify/polaris-icons"
 import LocalStore from "../../../../main/LocalStorageStore";
 import InlineEditableText from "../../../components/shared/InlineEditableText";
 import GridRows from "../../../components/shared/GridRows";
+import Dropdown from "../../../components/layouts/Dropdown";
+
+const statsOptions = [
+    {label: "15 minutes", value: 15*60},
+    {label: "30 minutes", value: 30*60},
+    {label: "1 hour", value: 60*60},
+    {label: "3 hours", value: 3*60*60},
+    {label: "6 hours", value: 6*60*60},
+    {label: "12 hours", value: 12*60*60},
+    {label: "1 day", value: 24*60*60},
+    {label: "7 days", value: 7*24*60*60}
+]
 
 function TechCard(props){
     const {cardObj} = props;
@@ -55,10 +67,8 @@ function ApiDetails(props) {
 
     const [useLocalSubCategoryData, setUseLocalSubCategoryData] = useState(false)
     const [apiCallStats, setApiCallStats] = useState([]); 
-
-    // useEffect(() => {
-    //     console.log('apiCallStats updated:', apiCallStats);
-    //   }, [apiCallStats]);
+    const endTs = func.timeNow();
+    const [startTime, setStartTime] = useState(endTs - statsOptions[0].value)
 
     const statusFunc = getStatus ? getStatus : (x) => {
         try {
@@ -73,37 +83,18 @@ function ApiDetails(props) {
     }
 
     const standardHeaders = new Set(transform.getStandardHeaderList())
-
-    const fetchApiCallStatsData = async () => {
-        try {
-          const { apiCollectionId, endpoint, method } = apiDetail;
-          const now = Math.floor(Date.now() / 1000); // Current time in epoch seconds
-          const thirtyMinutesAgo = now - 30 * 60; // 30 minutes ago in epoch seconds
-          const startTs = thirtyMinutesAgo;
-          const endTs = now;
-          const response = await api.fetchApiCallStats(apiCollectionId, endpoint, method, startTs, endTs);
-          const transformedData = [
-            {
-                data: response.result.apiCallStats.map((item) => [item.ts * 60 * 1000, item.count]), // Access apiCallStats and convert seconds to milliseconds
-                color: null,
-                name: 'API Calls',
-            },
-          ];
-          console.log('Transformed apiCallStats:', transformedData);
-          setApiCallStats(transformedData);
-          func.setToast(true, false, 'API call stats loaded successfully');
-        } catch (error) {
-          console.error('Failed to fetch API call stats:', error);
-          setApiCallStats([]); // Set empty data on error
-          func.setToast(true, true, 'Failed to fetch API call stats. Please try again.');
-        }
-      };
-
-    //   useEffect(() => {
-    //     if (showDetails && apiDetail) {
-    //       fetchApiCallStatsData();
-    //     }
-    //   }, [showDetails, apiDetail]);
+    const fetchStats = async(apiCollectionId, endpoint, method) => {
+        await api.fetchApiCallStats(apiCollectionId, endpoint, method, startTime, endTs).then((res) => {
+            const transformedData = [
+                {
+                    data: res.result.apiCallStats.map((item) => [item.ts * 60 * 1000, item.count]), // Access apiCallStats and convert seconds to milliseconds
+                    color: "",
+                    name: 'API Calls',
+                },
+              ];
+              setApiCallStats(transformedData);
+        })
+    }
 
     const fetchData = async () => {
         if (showDetails) {
@@ -184,8 +175,7 @@ function ApiDetails(props) {
                     setParamList(resp.data.params)
                 })
             })
-
-            await fetchApiCallStatsData();
+            fetchStats(apiCollectionId, endpoint, method)
             // const queryPayload = dashboardFunc.getApiPrompts(apiCollectionId, endpoint, method)[0].prepareQuery();
             // try{
             //     if(isGptActive && window.STIGG_FEATURE_WISE_ALLOWED["AKTO_GPT_AI"] && window.STIGG_FEATURE_WISE_ALLOWED["AKTO_GPT_AI"]?.isGranted === true){
@@ -249,6 +239,11 @@ function ApiDetails(props) {
 
         fetchData();
     }, [apiDetail])
+
+    useEffect(() => {
+        const { apiCollectionId, endpoint, method } = apiDetail;
+        fetchStats(apiCollectionId,endpoint, method)
+    },[startTime])
 
     function displayGPT() {
         setIsGptScreenActive(true)
@@ -356,33 +351,50 @@ function ApiDetails(props) {
     const ApiCallStatsTab = {
         id: 'api-call-stats',
         content: 'API Call Stats',
-        component: (
+        component: 
           <Box paddingBlockStart={'4'}>
-            {apiCallStats.length > 0 ? (
-              <GraphMetric
-                data={apiCallStats}
-                type='spline'
-                color='#6200EA'
-                areaFillHex='true'
-                height='330'
-                title='API Call Count'
-                subtitle='Number of API calls over time'
-                defaultChartOptions={defaultChartOptions(false)}
-                backgroundColor='#000000'
-                text='true'
-                inputMetrics={[]}
-              />
+            <HorizontalStack align="end">
+                <Dropdown
+                    menuItems={statsOptions}
+                    initial={statsOptions[0].label}
+                    selected={(timeInSeconds) => {
+                        setStartTime((prev) => {
+                            if((endTs - timeInSeconds) === prev){
+                                return prev
+                            }else{
+                                return endTs - timeInSeconds
+                            }
+                        })
+                    }} />
+                </HorizontalStack>
+            {apiCallStats != undefined && apiCallStats.length > 0 && apiCallStats[0]?.data !== undefined && apiCallStats[0]?.data?.length > 0 ? (
+                <VerticalStack gap={"2"}>
+                    
+                <GraphMetric
+                    key={apiCallStats.length}
+                    data={apiCallStats}
+                    type='spline'
+                    color='#6200EA'
+                    areaFillHex='true'
+                    height='330'
+                    title='API Call Count'
+                    subtitle='Number of API calls over time'
+                    defaultChartOptions={defaultChartOptions(false)}
+                    backgroundColor='#ffffff'
+                    text='true'
+                    inputMetrics={[]}
+                />
+                </VerticalStack>
             ) : (
-              <Text variant='bodyMd' as='p'>
-                No API call data available.
-              </Text>
-            )}
+                <Text alignment="center" variant='bodyMd' as='p'>
+                  No API call data available in the given time range.
+                </Text>
+              )}
           </Box>
-        ),
+        
       };
 
     const deMergeApis = () => {
-        const { apiCollectionId, endpoint, method } = apiDetail
         api.deMergeApi(apiCollectionId, endpoint, method).then((resp) => {
             func.setToast(true, false, "De-merging successful!!.")
             window.location.reload()
@@ -484,7 +496,7 @@ function ApiDetails(props) {
         headingComp,
         <LayoutWithTabs
             key="tabs"
-            tabs={[ValuesTab, SchemaTab, DependencyTab, ApiCallStatsTab]}
+            tabs={[ValuesTab, SchemaTab, ApiCallStatsTab, DependencyTab]}
             currTab={() => { }}
             disabledTabs={disabledTabs}
         />
