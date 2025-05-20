@@ -283,6 +283,8 @@ function SingleTestRunPage() {
             const urlObj = new URL(url);
             return urlObj.pathname + urlObj.search;
           } catch (e) {
+            // return url in case where hostname is not present
+            return url;
           }
         };
         
