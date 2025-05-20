@@ -326,15 +326,13 @@ function SingleTestRunPage() {
 
   const fetchTestingRunResultSummaries = async () => {
     let tempTestingRunResultSummaries = [];
-    let tempTestingRun = [];
     await api.fetchTestingRunResultSummaries(hexId).then(async ({ testingRun, testingRunResultSummaries, workflowTest, testingRunType }) => {
       tempTestingRunResultSummaries = testingRunResultSummaries
-      tempTestingRun = testingRun
       setTestingRunResultSummariesObj({
         testingRun, workflowTest, testingRunType
       })
-      if (tempTestingRun) {
-        await populateApiNameFilterChoices(tempTestingRun)
+      if (testingRun) {
+        await populateApiNameFilterChoices(testingRun)
       }
     })
     const timeNow = func.timeNow()
