@@ -15,6 +15,7 @@ import RunTest from "./RunTest";
 import PersistStore from "../../../../main/PersistStore";
 import values from "@/util/values";
 import gptApi from "../../../components/aktoGpt/api";
+import GraphMetric from '../../../components/GraphMetric'
 
 import { HorizontalDotsMinor, FileMinor } from "@shopify/polaris-icons"
 import LocalStore from "../../../../main/LocalStorageStore";
@@ -53,6 +54,11 @@ function ApiDetails(props) {
     const [editableDescription, setEditableDescription] = useState(description)
 
     const [useLocalSubCategoryData, setUseLocalSubCategoryData] = useState(false)
+    const [apiCallStats, setApiCallStats] = useState([]); 
+
+    // useEffect(() => {
+    //     console.log('apiCallStats updated:', apiCallStats);
+    //   }, [apiCallStats]);
 
     const statusFunc = getStatus ? getStatus : (x) => {
         try {
@@ -67,6 +73,37 @@ function ApiDetails(props) {
     }
 
     const standardHeaders = new Set(transform.getStandardHeaderList())
+
+    const fetchApiCallStatsData = async () => {
+        try {
+          const { apiCollectionId, endpoint, method } = apiDetail;
+          const now = Math.floor(Date.now() / 1000); // Current time in epoch seconds
+          const thirtyMinutesAgo = now - 30 * 60; // 30 minutes ago in epoch seconds
+          const startTs = thirtyMinutesAgo;
+          const endTs = now;
+          const response = await api.fetchApiCallStats(apiCollectionId, endpoint, method, startTs, endTs);
+          const transformedData = [
+            {
+                data: response.result.apiCallStats.map((item) => [item.ts * 60 * 1000, item.count]), // Access apiCallStats and convert seconds to milliseconds
+                color: null,
+                name: 'API Calls',
+            },
+          ];
+          console.log('Transformed apiCallStats:', transformedData);
+          setApiCallStats(transformedData);
+          func.setToast(true, false, 'API call stats loaded successfully');
+        } catch (error) {
+          console.error('Failed to fetch API call stats:', error);
+          setApiCallStats([]); // Set empty data on error
+          func.setToast(true, true, 'Failed to fetch API call stats. Please try again.');
+        }
+      };
+
+    //   useEffect(() => {
+    //     if (showDetails && apiDetail) {
+    //       fetchApiCallStatsData();
+    //     }
+    //   }, [showDetails, apiDetail]);
 
     const fetchData = async () => {
         if (showDetails) {
@@ -148,6 +185,7 @@ function ApiDetails(props) {
                 })
             })
 
+            await fetchApiCallStatsData();
             // const queryPayload = dashboardFunc.getApiPrompts(apiCollectionId, endpoint, method)[0].prepareQuery();
             // try{
             //     if(isGptActive && window.STIGG_FEATURE_WISE_ALLOWED["AKTO_GPT_AI"] && window.STIGG_FEATURE_WISE_ALLOWED["AKTO_GPT_AI"]?.isGranted === true){
@@ -243,6 +281,33 @@ function ApiDetails(props) {
 
     const isDemergingActive = isDeMergeAllowed();
 
+    const defaultChartOptions = (enableLegends) => {
+        const options = {
+          plotOptions: {
+            series: {
+              events: {
+                legendItemClick: function () {
+                  var seriesIndex = this.index;
+                  var chart = this.chart;
+                  var series = chart.series[seriesIndex];
+    
+                  chart.series.forEach(function (s) {
+                    s.hide();
+                  });
+                  series.show();
+    
+                  return false;
+                },
+              },
+            },
+          },
+        };
+        if (enableLegends) {
+          options['legend'] = { layout: 'vertical', align: 'right', verticalAlign: 'middle' };
+        }
+        return options;
+      };
+
     const SchemaTab = {
         id: 'schema',
         content: "Schema",
@@ -287,6 +352,34 @@ function ApiDetails(props) {
             />
         </Box>,
     }
+
+    const ApiCallStatsTab = {
+        id: 'api-call-stats',
+        content: 'API Call Stats',
+        component: (
+          <Box paddingBlockStart={'4'}>
+            {apiCallStats.length > 0 ? (
+              <GraphMetric
+                data={apiCallStats}
+                type='spline'
+                color='#6200EA'
+                areaFillHex='true'
+                height='330'
+                title='API Call Count'
+                subtitle='Number of API calls over time'
+                defaultChartOptions={defaultChartOptions(false)}
+                backgroundColor='#000000'
+                text='true'
+                inputMetrics={[]}
+              />
+            ) : (
+              <Text variant='bodyMd' as='p'>
+                No API call data available.
+              </Text>
+            )}
+          </Box>
+        ),
+      };
 
     const deMergeApis = () => {
         const { apiCollectionId, endpoint, method } = apiDetail
@@ -391,7 +484,7 @@ function ApiDetails(props) {
         headingComp,
         <LayoutWithTabs
             key="tabs"
-            tabs={[ValuesTab, SchemaTab, DependencyTab]}
+            tabs={[ValuesTab, SchemaTab, DependencyTab, ApiCallStatsTab]}
             currTab={() => { }}
             disabledTabs={disabledTabs}
         />
