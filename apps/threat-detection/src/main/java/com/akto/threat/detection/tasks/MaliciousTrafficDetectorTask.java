@@ -1,5 +1,6 @@
 package com.akto.threat.detection.tasks;
 
+import java.io.IOException;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -12,6 +13,12 @@ import java.util.concurrent.Executors;
 import java.util.function.Supplier;
 
 import org.apache.commons.lang3.math.NumberUtils;
+import org.apache.http.client.methods.CloseableHttpResponse;
+import org.apache.http.client.methods.HttpGet;
+import org.apache.http.client.methods.HttpPost;
+import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.client.HttpClients;
+import org.apache.http.util.EntityUtils;
 import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
@@ -19,6 +26,7 @@ import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
 
 import com.akto.IPLookupClient;
+import com.akto.ProtoMessageUtils;
 import com.akto.RawApiMetadataFactory;
 import com.akto.dao.context.Context;
 import com.akto.dao.monitoring.FilterYamlTemplateDao;
@@ -41,10 +49,10 @@ import com.akto.log.LoggerMaker.LogDb;
 import com.akto.proto.generated.threat_detection.message.malicious_event.event_type.v1.EventType;
 import com.akto.proto.generated.threat_detection.message.malicious_event.v1.MaliciousEventKafkaEnvelope;
 import com.akto.proto.generated.threat_detection.message.malicious_event.v1.MaliciousEventMessage;
-import com.akto.proto.generated.threat_detection.message.sample_request.v1.Metadata;
 import com.akto.proto.generated.threat_detection.message.sample_request.v1.SampleMaliciousRequest;
 import com.akto.proto.generated.threat_detection.message.sample_request.v1.SampleRequestKafkaEnvelope;
 import com.akto.proto.generated.threat_detection.message.sample_request.v1.SchemaConformanceError;
+import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.GetThreatConfigurationResponse;
 import com.akto.proto.http_response_param.v1.HttpResponseParam;
 import com.akto.rules.TestPlugin;
 import com.akto.test_editor.filter.data_operands_impl.ValidationResult;
@@ -60,6 +68,7 @@ import com.akto.util.Constants;
 import com.akto.util.HttpRequestResponseUtils;
 import com.akto.utils.GzipUtils;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.api.services.drive.Drive.About.Get;
 
 import io.lettuce.core.RedisClient;
 import io.lettuce.core.api.StatefulRedisConnection;
@@ -72,6 +81,8 @@ Pass data through filters and identify malicious traffic.
  */
 public class MaliciousTrafficDetectorTask implements Task {
 
+  private final CloseableHttpClient httpClient;
+  private GetThreatConfigurationResponse threatConfiguration;
   private final Consumer<String, byte[]> kafkaConsumer;
   private final KafkaConfig kafkaConfig;
   private final HttpCallParser httpCallParser;
@@ -122,6 +133,8 @@ public class MaliciousTrafficDetectorTask implements Task {
 
     this.httpCallParser = new HttpCallParser(120, 1000);
     
+    this.httpClient = HttpClients.createDefault();
+    this.threatConfiguration = this.getThreatConfiguration();
 
     this.windowBasedThresholdNotifier =
         new WindowBasedThresholdNotifier(
@@ -226,12 +239,74 @@ public class MaliciousTrafficDetectorTask implements Task {
     return apiSchema;
   }
 
+  private GetThreatConfigurationResponse getThreatConfiguration() {
 
+    String url = System.getenv("AKTO_THREAT_PROTECTION_BACKEND_URL");
+    String token = System.getenv("AKTO_THREAT_PROTECTION_BACKEND_TOKEN");
+
+    HttpGet get = new HttpGet(
+        String.format("%s/api/dashboard/get_threat_configuration", url));
+    get.addHeader("Authorization", "Bearer " + token);
+    get.addHeader("Content-Type", "application/json");
+
+    GetThreatConfigurationResponse threatConfiguration = null;
+
+    try (CloseableHttpResponse resp = this.httpClient.execute(get)) {
+      String responseBody = EntityUtils.toString(resp.getEntity());
+      threatConfiguration = ProtoMessageUtils
+          .<GetThreatConfigurationResponse>toProtoMessage(
+              GetThreatConfigurationResponse.class, responseBody)
+          .orElse(null);
+
+      logger.debugAndAddToDb("Fetched threat configuration" + threatConfiguration.toString());
+    } catch (Exception e) {
+      e.printStackTrace();
+      logger.errorAndAddToDb("Error while getting threat configuration" + e.getStackTrace());
+    }
+    return threatConfiguration;
+  }
+
+  private String getActorId(HttpResponseParams responseParam) {
+    int now = (int) (System.currentTimeMillis() / 1000);
+    if (now - filterLastUpdatedAt > filterUpdateIntervalSec) {
+      this.threatConfiguration = getThreatConfiguration();
+    }
+
+    String actor;
+    String sourceIp = SourceIPActorGenerator.instance.generate(responseParam).orElse("");
+    responseParam.setSourceIP(sourceIp);
+
+    if (this.threatConfiguration == null) {
+      actor = sourceIp;
+      return actor;
+    }
+
+    String actorIdType = this.threatConfiguration.getActor().getActorId().getType().toLowerCase();
+    switch (actorIdType) {
+      case "ip":
+        actor = sourceIp;
+        break;
+
+      case "header":
+        List<String> header = responseParam.getRequestParams().getHeaders()
+            .get(this.threatConfiguration.getActor().getActorId().getKey().toLowerCase());
+        if (header != null && !header.isEmpty()) {
+          actor = header.get(0);
+        } else {
+          logger.warnAndAddToDb("No header found for actor id " + this.threatConfiguration.getActor().getActorId().getKey());
+          actor = sourceIp;
+        }
+        break;
+      default:
+        actor = sourceIp;
+        break;
+    }
+    return actor;
+  }
 
   private void processRecord(HttpResponseParam record) throws Exception {
     HttpResponseParams responseParam = buildHttpResponseParam(record);
-    String actor = SourceIPActorGenerator.instance.generate(responseParam).orElse("");
-    responseParam.setSourceIP(actor);
+    String actor = this.getActorId(responseParam);
 
     if (actor == null || actor.isEmpty()) {
       logger.warnAndAddToDb("Dropping processing of record with no actor IP, account: " + responseParam.getAccountId());
