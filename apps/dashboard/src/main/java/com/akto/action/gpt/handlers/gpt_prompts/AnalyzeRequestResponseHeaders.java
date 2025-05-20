@@ -28,9 +28,10 @@ public class AnalyzeRequestResponseHeaders extends PromptHandler {
         .build();
 
     private static final LoggerMaker logger = new LoggerMaker(AnalyzeRequestResponseHeaders.class, LogDb.DASHBOARD);
-    private static final String OLLAMA_SERVER_ENDPOINT = Constants.AKTO_LLM_URL + "/api/generate";
-    private static final String OLLAMA_MODEL = Constants.AKTO_LLM_MODEL;
-    private static final double temperature = 0.0;
+    private static final String OLLAMA_SERVER_ENDPOINT = "http://jarvis.internal.akto.io/api/generate";
+    //private static final String OLLAMA_SERVER_ENDPOINT = "http://35.226.83.20/api/generate";
+    private static final String OLLAMA_MODEL =  "llama3.2:3b";
+    private static final Double temperature = 0.0;
     private static final int max_tokens = 4000;
 
     @Override
@@ -94,7 +95,7 @@ public class AnalyzeRequestResponseHeaders extends PromptHandler {
         "- Azure: key contains \"azure\"\n" +
         "- Apigee: key contains \"apigee\"\n" +
         "- Akamai: key contains \"akamai\"\n" +
-        "- Fastly: key contains \"fastly\" or \"x-timer\"\n" +
+        "- Fastly: key contains \"fastly\"\n" +
         "- Google Cloud: key contains \"gcp\" or \"x-goog\"\n" +
         "- Vercel: key contains \"vercel\"\n" +
         "- Netlify: key contains \"netlify\"\n" +
