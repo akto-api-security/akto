@@ -303,7 +303,7 @@ export default function LeftNav() {
                             subNavigationItems: reportsSubNavigationItems,
                             key: "6",
                         },
-                        ...(window?.STIGG_FEATURE_WISE_ALLOWED?.THREAT_DETECTION?.isGranted ? [{
+                        ...(window?.STIGG_FEATURE_WISE_ALLOWED?.THREAT_DETECTION?.isGranted || true ? [{
                                 label: (
                                     <Text variant="bodyMd" fontWeight="medium">
                                         API Protection
@@ -319,6 +319,15 @@ export default function LeftNav() {
                                 url: "#",
                                 key: "7",
                                 subNavigationItems: [
+                                    {
+                                        label: "Configuration",
+                                        onClick: () => {
+                                            navigate("/dashboard/protection/threat-configuration");
+                                            handleSelect("dashboard_threat_configuration");
+                                            setActive("active");
+                                        },
+                                        selected: leftNavSelected === "dashboard_threat_configuration",
+                                    },
                                     {
                                         label: "Threat Actors",
                                         onClick: () => {
