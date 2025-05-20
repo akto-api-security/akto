@@ -28,6 +28,7 @@ import {
   SettingsMinor
 } from '@shopify/polaris-icons';
 import api from "../api";
+import observeApi from "../../observe/api";
 import func from '@/util/func';
 import { useParams } from 'react-router';
 import { useState, useEffect, useRef, useMemo, useReducer } from 'react';
@@ -281,10 +282,11 @@ function SingleTestRunPage() {
         const collectionId = testingEndpoints.apiCollectionId;
         if (collectionId) {
           try {
-            const response = await api.fetchCollectionWiseApiEndpoints(
+            const response = await observeApi.fetchApiInfosForCollection(
                 collectionId);
-            if (response?.listOfEndpointsInCollection) {
-              const limitedEndpoints = response.listOfEndpointsInCollection.slice(
+            console.log(response);
+            if (response?.apiInfoList) {
+              const limitedEndpoints = response.apiInfoList.slice(
                   0, 5000);
               apiEndpoints = getApiEndpointsMap(limitedEndpoints);
             }
@@ -307,13 +309,16 @@ function SingleTestRunPage() {
         }
         return filter;
       });
+      setUpdateTable(Date.now().toString());
     }
   }
 
   const getApiEndpointsMap = (endpoints) => {
     return Array.from(
         new Map(
-            endpoints.map(e => [e.url,
+            endpoints
+            .map(e => e.id)
+            .map(e => [e.url,
               {label: func.convertToRelativePath(e.url), value: e.url}])
         ).values()
     );
@@ -322,12 +327,15 @@ function SingleTestRunPage() {
   const fetchTestingRunResultSummaries = async () => {
     let tempTestingRunResultSummaries = [];
     let tempTestingRun = [];
-    await api.fetchTestingRunResultSummaries(hexId).then(({ testingRun, testingRunResultSummaries, workflowTest, testingRunType }) => {
+    await api.fetchTestingRunResultSummaries(hexId).then(async ({ testingRun, testingRunResultSummaries, workflowTest, testingRunType }) => {
       tempTestingRunResultSummaries = testingRunResultSummaries
       tempTestingRun = testingRun
       setTestingRunResultSummariesObj({
         testingRun, workflowTest, testingRunType
       })
+      if (tempTestingRun) {
+        await populateApiNameFilterChoices(tempTestingRun)
+      }
     })
     const timeNow = func.timeNow()
     const defaultIgnoreTime = LocalStore.getState().defaultIgnoreSummaryTime
@@ -342,10 +350,6 @@ function SingleTestRunPage() {
       if (isBWithinTimeAndRunning) return 1;
       return b.startTimestamp - a.startTimestamp;
     })
-
-    if (tempTestingRun) {
-      await populateApiNameFilterChoices(tempTestingRun);
-    }
 
     if (tempTestingRunResultSummaries && tempTestingRunResultSummaries.length > 0) {
       setSummary(tempTestingRunResultSummaries[0], true)
