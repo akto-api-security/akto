@@ -109,7 +109,7 @@ let filterOptions = [
     choices: [],
   },
   {
-    key: 'apiFilter',
+    key: 'apiNameFilter',
     label: 'API Name',
     title: 'API name',
     choices: [],
@@ -191,7 +191,7 @@ function SingleTestRunPage() {
       case 'categoryFilter':
       case 'testFilter':
         return func.convertToDisambiguateLabelObj(value, null, 2)
-      case 'apiFilter':
+      case 'apiNameFilter':
         return func.convertToDisambiguateLabelObj(value, null, 1)
       default:
         return value;
@@ -242,13 +242,13 @@ function SingleTestRunPage() {
   }
 
   useEffect(() => {
-    setUpdateTable(Date.now().toString())
     if (
       (localCategoryMap && Object.keys(localCategoryMap).length > 0) &&
       (localSubCategoryMap && Object.keys(localSubCategoryMap).length > 0)
     ) {
       setUseLocalSubCategoryData(true)
     }
+    setUpdateTable(Date.now().toString())
   }, [testingRunResultSummariesObj])
 
   filterOptions = func.getCollectionFilters(filterOptions)
@@ -272,66 +272,59 @@ function SingleTestRunPage() {
     }
   })
 
-  useEffect(() => {
-    (async () => {
-      if (testingRunResultSummariesObj?.testingRun?.testingEndpoints) {
-        const { testingEndpoints } = testingRunResultSummariesObj.testingRun;
-        let apiEndpoints = [];
-        
-        const getUrlPath = (url) => {
+  const populateApiNameFilterChoices = async (testingRun) => {
+    if (testingRun?.testingEndpoints) {
+      const {testingEndpoints} = testingRun;
+      let apiEndpoints = [];
+
+      if (testingEndpoints.type === "COLLECTION_WISE") {
+        const collectionId = testingEndpoints.apiCollectionId;
+        if (collectionId) {
           try {
-            const urlObj = new URL(url);
-            return urlObj.pathname + urlObj.search;
-          } catch (e) {
-            // return url in case where hostname is not present
-            return url;
-          }
-        };
-        
-        if (testingEndpoints.type === "COLLECTION_WISE") {
-          const collectionId = testingEndpoints.apiCollectionId;
-          if (collectionId) {
-            try {
-              const response = await api.fetchCollectionWiseApiEndpoints(collectionId);
-              if (response?.listOfEndpointsInCollection) {
-                const limitedEndpoints = response.listOfEndpointsInCollection.slice(0, 5000);
-                apiEndpoints = Array.from(
-                    new Map(
-                        limitedEndpoints.map(e => [e.url, {label: getUrlPath(e.url), value: e.url}])
-                    ).values()
-                );
-              }
-            } catch (error) {
-              console.error("Error fetching collection endpoints:", error);
+            const response = await api.fetchCollectionWiseApiEndpoints(
+                collectionId);
+            if (response?.listOfEndpointsInCollection) {
+              const limitedEndpoints = response.listOfEndpointsInCollection.slice(
+                  0, 5000);
+              apiEndpoints = getApiEndpointsMap(limitedEndpoints);
             }
+          } catch (error) {
+            console.error("Error fetching collection endpoints:", error);
           }
-        } else if (testingEndpoints.type === "CUSTOM" && testingEndpoints.apisList) {
-          const limitedApis = testingEndpoints.apisList.slice(0, 5000);
-          apiEndpoints = limitedApis.map(api => ({
-            label: getUrlPath(api.url),
-            value: api.url
-          }));
         }
-
-        filterOptions = filterOptions.map(filter => {
-          if (filter.key === 'apiFilter') {
-            return {
-              ...filter,
-              choices: apiEndpoints
-            };
-          }
-          return filter;
-        });
-
-        setUpdateTable(Date.now().toString());
+      } else if (testingEndpoints.type === "CUSTOM"
+          && testingEndpoints.apisList) {
+        const limitedApis = testingEndpoints.apisList.slice(0, 5000);
+        apiEndpoints = getApiEndpointsMap(limitedApis);
       }
-    })();
-  }, [testingRunResultSummariesObj]);
+
+      filterOptions = filterOptions.map(filter => {
+        if (filter.key === 'apiNameFilter') {
+          return {
+            ...filter,
+            choices: apiEndpoints
+          };
+        }
+        return filter;
+      });
+    }
+  }
+
+  const getApiEndpointsMap = (endpoints) => {
+    return Array.from(
+        new Map(
+            endpoints.map(e => [e.url,
+              {label: func.convertToRelativePath(e.url), value: e.url}])
+        ).values()
+    );
+  }
 
   const fetchTestingRunResultSummaries = async () => {
     let tempTestingRunResultSummaries = [];
+    let tempTestingRun = [];
     await api.fetchTestingRunResultSummaries(hexId).then(({ testingRun, testingRunResultSummaries, workflowTest, testingRunType }) => {
       tempTestingRunResultSummaries = testingRunResultSummaries
+      tempTestingRun = testingRun
       setTestingRunResultSummariesObj({
         testingRun, workflowTest, testingRunType
       })
@@ -349,6 +342,11 @@ function SingleTestRunPage() {
       if (isBWithinTimeAndRunning) return 1;
       return b.startTimestamp - a.startTimestamp;
     })
+
+    if (tempTestingRun) {
+      await populateApiNameFilterChoices(tempTestingRun);
+    }
+
     if (tempTestingRunResultSummaries && tempTestingRunResultSummaries.length > 0) {
       setSummary(tempTestingRunResultSummaries[0], true)
     }
