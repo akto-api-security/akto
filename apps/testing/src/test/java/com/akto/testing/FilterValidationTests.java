@@ -22,12 +22,25 @@ import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.RawApi;
 import com.akto.dto.test_editor.ConfigParserResult;
 import com.akto.dto.test_editor.DataOperandsFilterResponse;
+import com.akto.dto.test_editor.ExecutorSingleOperationResp;
+import com.akto.dto.test_editor.Util;
 import com.akto.dto.testing.TestingRunConfig;
 import com.akto.dto.type.URLMethods.Method;
 import com.akto.test_editor.execution.Executor;
 import com.akto.test_editor.filter.Filter;
+import com.fasterxml.jackson.core.JsonPointer;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
+import com.jayway.jsonpath.Configuration;
+import com.jayway.jsonpath.DocumentContext;
+import com.jayway.jsonpath.JsonPath;
+import com.jayway.jsonpath.Option;
+import com.mongodb.BasicDBList;
+import com.mongodb.BasicDBObject;
 
 public class FilterValidationTests {
     
@@ -342,6 +355,224 @@ public class FilterValidationTests {
         assertEquals(true, dataOperandsFilterResponse.getResult());
         assertEquals(1, varMap.size());
         assertEquals(4, ((List) varMap.get("keyName")).size());
+    }
+
+    @Test
+    public void testPayloadModificationCases() {
+        
+        Map<String, Object> config = initconfig();
+        ApiInfo.ApiInfoKey apiInfoKey = new ApiInfo.ApiInfoKey(123, "https://epsilon.6sense.com:443/v3/company/details", Method.PUT);
+        RawApi rawApi = initRawapi(apiInfoKey);
+        ObjectMapper mapper = new ObjectMapper();
+
+        // add key at root
+        String keyPath = "newKey";
+        Object value = "xyz";
+    
+        String payload = "{\"id\": 101, \"name\": \"Stud-101\", \"email\": \"stude_101@example.com\", \"details\": {\"course\": \"MECH\"}}";
+        rawApi.getRequest().setBody(payload);
+        rawApi = com.akto.test_editor.Utils.modifyRawApiPayload(rawApi, keyPath, value);
+        assertEquals(rawApi.getRequest().getBody(), "{\"id\":101,\"name\":\"Stud-101\",\"email\":\"stude_101@example.com\",\"details\":{\"course\":\"MECH\"},\"newKey\":\"xyz\"}");
+
+
+        // add key inside existing object
+        keyPath = "details.newKey";
+        value = "xyz";
+    
+        payload = "{\"id\": 101, \"name\": \"Stud-101\", \"email\": \"stude_101@example.com\", \"details\": {\"course\": \"MECH\"}}";
+        rawApi.getRequest().setBody(payload);
+        rawApi = com.akto.test_editor.Utils.modifyRawApiPayload(rawApi, keyPath, value);
+        assertEquals(rawApi.getRequest().getBody(), "{\"id\":101,\"name\":\"Stud-101\",\"email\":\"stude_101@example.com\",\"details\":{\"course\":\"MECH\",\"newKey\":\"xyz\"}}");
+        
+        // add key at nonexisting path
+        keyPath = "nonexistent.newKey";
+        value = "xyz";
+    
+        payload = "{\"id\": 101, \"name\": \"Stud-101\", \"email\": \"stude_101@example.com\", \"details\": {\"course\": \"MECH\"}}";
+        rawApi.getRequest().setBody(payload);
+        rawApi = com.akto.test_editor.Utils.modifyRawApiPayload(rawApi, keyPath, value);
+        assertEquals(rawApi.getRequest().getBody(), "{\"id\":101,\"name\":\"Stud-101\",\"email\":\"stude_101@example.com\",\"details\":{\"course\":\"MECH\"},\"nonexistent\":{\"newKey\":\"xyz\"}}");
+
+        // add key to list
+        keyPath = "details[0].newKey";
+        value = "xyz";
+    
+        payload = "{\"id\": 101, \"name\": \"Stud-101\", \"email\": \"stude_101@example.com\", \"details\": [{\"course\": \"MECH\"}]}";
+        rawApi.getRequest().setBody(payload);
+        rawApi = com.akto.test_editor.Utils.modifyRawApiPayload(rawApi, keyPath, value);
+        assertEquals(rawApi.getRequest().getBody(), "{\"id\":101,\"name\":\"Stud-101\",\"email\":\"stude_101@example.com\",\"details\":[{\"course\":\"MECH\",\"newKey\":\"xyz\"}]}");
+
+        // create new list
+        keyPath = "newList[0].newKey";
+        value = "xyz";
+    
+        payload = "{\"id\": 101, \"name\": \"Stud-101\", \"email\": \"stude_101@example.com\", \"details\": [{\"course\": \"MECH\"}]}";
+        rawApi.getRequest().setBody(payload);
+        rawApi = com.akto.test_editor.Utils.modifyRawApiPayload(rawApi, keyPath, value);
+        System.out.println(rawApi.getRequest().getBody());
+        assertEquals(rawApi.getRequest().getBody(), "{\"id\":101,\"name\":\"Stud-101\",\"email\":\"stude_101@example.com\",\"details\":[{\"course\":\"MECH\"}],\"newList\":[{\"newKey\":\"xyz\"}]}");
+
+        // create list inside list
+        keyPath = "newList[0].sublist[0].newKeyy";
+        value = "xyz";
+    
+        payload = "{\"id\": 101, \"name\": \"Stud-101\", \"email\": \"stude_101@example.com\", \"details\": [{\"course\": \"MECH\"}]}";
+        rawApi.getRequest().setBody(payload);
+        rawApi = com.akto.test_editor.Utils.modifyRawApiPayload(rawApi, keyPath, value);
+        System.out.println(rawApi.getRequest().getBody());
+        assertEquals(rawApi.getRequest().getBody(), "{\"id\":101,\"name\":\"Stud-101\",\"email\":\"stude_101@example.com\",\"details\":[{\"course\":\"MECH\"}],\"newList\":[{\"sublist\":[{\"newKeyy\":\"xyz\"}]}]}");
+
+    }
+
+    @Test
+    public void testInsertPayload() {
+        try {
+            Map<String, Object> config = initconfig();
+            ApiInfo.ApiInfoKey apiInfoKey = new ApiInfo.ApiInfoKey(123, "https://epsilon.6sense.com:443/v3/company/details", Method.PUT);
+            RawApi rawApi = initRawapi(apiInfoKey);
+            ObjectMapper mapper = new ObjectMapper();
+            String keyPath = "abc.sdf[1].sadf"; // Or test with "user.addresses[0].city"
+            Object value = "xyz";
+
+            // Print before modification
+            System.out.println("Before modification payload:");
+            System.out.println(rawApi.getRequest().getBody());
+
+            JsonNode payload = mapper.convertValue(rawApi.fetchReqPayload(), JsonNode.class);
+
+            boolean isWrappedJsonArray = payload.isObject() && payload.has("json") && payload.get("json").isArray();
+
+            //payload = isWrappedJsonArray ? payload.get("json").deepCopy() : payload.deepCopy();
+
+            String[] keys = keyPath.split("\\.");
+            JsonNode current = payload;
+
+            // Create intermediate nodes for all but the last key
+            for (int i = 0; i < keys.length - 1; i++) {
+                String key = keys[i];
+                if (key.matches(".*\\[\\d+\\]")) {
+                    // Handle array index (e.g., addresses[0])
+                    String arrayKey = key.substring(0, key.indexOf('['));
+                    int index = Integer.parseInt(key.substring(key.indexOf('[') + 1, key.indexOf(']')));
+                    if (!current.has(arrayKey) || !current.get(arrayKey).isArray()) {
+                        ((ObjectNode) current).putArray(arrayKey);
+                    }
+                    ArrayNode array = (ArrayNode) current.get(arrayKey);
+                    while (array.size() <= index) {
+                        array.addObject();
+                    }
+                    current = array.get(index);
+                } else {
+                    // Handle object key
+                    if (!current.has(key) || !current.get(key).isObject()) {
+                        ((ObjectNode) current).putObject(key);
+                    }
+                    current = current.get(key);
+                }
+            }
+
+            // Set the final value
+            String finalKey = keys[keys.length - 1];
+            if (finalKey.matches(".*\\[\\d+\\]")) {
+                String arrayKey = finalKey.substring(0, finalKey.indexOf('['));
+                int index = Integer.parseInt(finalKey.substring(finalKey.indexOf('[') + 1, finalKey.indexOf(']')));
+                if (!current.has(arrayKey) || !current.get(arrayKey).isArray()) {
+                    ((ObjectNode) current).putArray(arrayKey);
+                }
+                ArrayNode array = (ArrayNode) current.get(arrayKey);
+                while (array.size() <= index) {
+                    array.addNull();
+                }
+                array.set(index, mapper.valueToTree(value));
+            } else {
+                ((ObjectNode) current).put(finalKey, mapper.valueToTree(value));
+            }
+
+            // Update the payload in rawApi
+            rawApi.modifyReqPayload(mapper.convertValue(payload, BasicDBObject.class));
+
+
+            // if (isWrappedJsonArray) {
+            //     JsonNode unwrappedArray = payload.get("json");
+            
+            //     // Convert array to string manually
+            //     //String arrayStr = mapper.writeValueAsString(unwrappedArray);
+            
+            //     // Wrap it in a dummy BasicDBObject to satisfy method signature
+            //     BasicDBObject dummyWrapper = new BasicDBObject();
+            //     BasicDBList dbList = mapper.convertValue(unwrappedArray, BasicDBList.class);
+            //     dummyWrapper.put("json", dbList);
+            //     // Call modifyReqPayload — it will detect the 'json' key and set body to just the array string
+            //     rawApi.modifyReqPayload(dummyWrapper);
+            
+            //     System.out.println("Removed 'json' key and saved raw array in rawApi.");
+            // }
+
+            if (isWrappedJsonArray) {
+                JsonNode unwrappedArray = payload.get("json");
+
+                try {
+                    // Serialize the array node directly into a proper JSON string
+                    String arrayStr = mapper.writeValueAsString(unwrappedArray);
+
+                    // Set this JSON string as the new body
+                    OriginalHttpRequest req = rawApi.getRequest();
+                    req.setBody(arrayStr);
+                    rawApi.setRequest(req);
+
+                    System.out.println("✅ Removed 'json' key and saved raw array in rawApi.");
+                } catch (JsonProcessingException e) {
+                    e.printStackTrace();
+                }
+            }
+
+            // Print after modification
+            System.out.println("Post modification payload:");
+            System.out.println(rawApi.getRequest().getBody());
+        } catch (Exception e) {
+            e.printStackTrace();
+            System.out.println("Error: " + e.getMessage());
+        }
+    }
+
+    @Test
+    public void testBodyInsertion() {
+
+        // ApiInfo.ApiInfoKey apiInfoKey = new ApiInfo.ApiInfoKey(123, "https://epsilon.6sense.com:443/v3/company/details", Method.PUT);
+        // RawApi rawApi = initRawapi(apiInfoKey);
+        // ObjectMapper mapper = new ObjectMapper();
+        // String keyPath = "newKey.abc";
+        // Object value = "xyz";
+
+        // System.out.println(rawApi.getRequest().getBody());
+        // JsonNode payload = mapper.convertValue(rawApi.fetchReqPayload(), JsonNode.class);
+        // JsonPointer ptr = JsonPointer.compile("/" + keyPath.replace(".", "/").replace("[", "/").replace("]", ""));
+        // ((ObjectNode) payload.at(ptr.head())).put(ptr.last().getMatchingProperty(), mapper.valueToTree(value));
+        // System.out.println(rawApi.getRequest().getBody());
+        // rawApi.modifyReqPayload(mapper.convertValue(payload, BasicDBObject.class));
+        // System.out.println(rawApi.getRequest().getBody());
+
+        // try {
+        //     Map<String, Object> config = initconfig();
+        //     ApiInfo.ApiInfoKey apiInfoKey = new ApiInfo.ApiInfoKey(123, "https://epsilon.6sense.com:443/v3/company/details", Method.PUT);
+        //     RawApi rawApi = initRawapi(apiInfoKey);
+        //     Configuration jsonPathConfig = Configuration.defaultConfiguration().addOptions();
+        //     BasicDBObject payload = rawApi.fetchReqPayload();
+            
+        //     String keyPath = "newKey";
+        //     Object value = "xyz";
+        //     DocumentContext doc = JsonPath.using(jsonPathConfig).parse(payload.toJson());
+        //     doc.set(keyPath, value);
+
+        //     System.out.println("Before modification payload");
+        //     System.out.println(rawApi.getRequest().getBody());
+        //     rawApi.modifyReqPayload(BasicDBObject.parse(doc.jsonString()));
+        //     System.out.println("Post modification payload");
+        //     System.out.println(rawApi.getRequest().getBody());
+        // } catch (Exception e) {
+        //     e.printStackTrace();
+        //     System.out.print(e.getMessage());
+        // }
     }
 
     public Map<String, Object> initconfig() {

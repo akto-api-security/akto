@@ -109,9 +109,7 @@ public class Operations {
     }
 
     public static ExecutorSingleOperationResp addBody(RawApi rawApi, String key, Object value) {
-        BasicDBObject payload = rawApi.fetchReqPayload();
-        payload.put(key, value);
-        rawApi.modifyReqPayload(payload);
+        Utils.modifyRawApiPayload(rawApi, key, value);
         return new ExecutorSingleOperationResp(true, "");
     }
 
