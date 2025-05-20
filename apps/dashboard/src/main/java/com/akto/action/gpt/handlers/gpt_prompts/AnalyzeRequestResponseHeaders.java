@@ -26,7 +26,7 @@ public class AnalyzeRequestResponseHeaders extends PromptHandler {
         .build();
 
     private static final LoggerMaker logger = new LoggerMaker(AnalyzeRequestResponseHeaders.class, LogDb.DASHBOARD);
-    private static final String OLLAMA_SERVER_ENDPOINT = "http://35.226.83.20/api/generate";
+    private static final String OLLAMA_SERVER_ENDPOINT = "http://jarvis.internal.akto.io/api/generate";
     private static final String OLLAMA_MODEL = "llama3.2";
     private static final double temperature = 0.0;
     private static final int max_tokens = 4000;
@@ -38,8 +38,6 @@ public class AnalyzeRequestResponseHeaders extends PromptHandler {
             String prompt = getPrompt(queryData);
             String rawResponse = call(prompt, OLLAMA_MODEL, temperature, max_tokens);
             BasicDBObject resp =  processResponse(rawResponse);
-            resp.put("prompt", prompt);
-            resp.put("raw_response", rawResponse);
             return resp;
         } catch(ValidationException exception) {
             logger.error("Validation error: " + exception.getMessage());
@@ -104,9 +102,10 @@ public class AnalyzeRequestResponseHeaders extends PromptHandler {
         "- DO NOT map headers like `x-recruiting`, `sec-ch-ua-platform`, `x-forwarded-for`, `x-forwarded-proto`, `accept`, or `user-agent` to any technology\n" +
         "- DO NOT infer based on common HTTP behavior (e.g., HTTPS ≠ Cloudflare)\n" +
         "- IGNORE headers with very long values (likely tokens, auth, cookies, etc.)\n" +
-        "- DO NOT add any header not explicitly matched by known patterns listed above\n" +
+        "- DO NOT add any header in response not matched by technology patterns listed above\n" +
+        "- DO NOT return response with \"none\" response. Ignore those headers\n" +
         "- DO NOT append previous results\n" +
-        "- DO NOT add header with **None** response. Ignore these headers\n" +
+        "- DO NOT include content which can be false positive\n" +
         "\n" +
         "Expected Output Format:\n" +
         "- Return ONLY a JSON object with matched headers as keys and the technology as values\n" +
