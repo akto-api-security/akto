@@ -279,6 +279,15 @@ public class OrganizationUtils {
         return additionalMetaData.getString("TRIAL_MSG", "");
     }
 
+    public static String fetchprotectMsg(BasicDBObject additionalMetaData) {
+        return additionalMetaData.getString("PROTECT_MSG", "");
+    }
+
+
+    public static String fetchagentMsg(BasicDBObject additionalMetaData) {
+        return additionalMetaData.getString("AGENT_MSG", "");
+    }
+
     public static boolean fetchTelemetryEnabled(BasicDBObject additionalMetaData) {
         return additionalMetaData.getString("ENABLE_TELEMETRY", "NA").equalsIgnoreCase("ENABLED");
     }
