@@ -822,7 +822,7 @@ getUrlComp(url){
   )
 },
 
-getCollapsibleRow(urls, severity) {
+getCollapsibleRow(urls, severity, statusCode) {
     const borderStyle = '4px solid ' + func.getHexColorForSeverity(severity?.toUpperCase());
     return(
       <tr style={{background: "#FAFBFB", borderLeft: borderStyle, padding: '0px !important', borderTop: '1px solid #dde0e4'}}>
@@ -830,18 +830,27 @@ getCollapsibleRow(urls, severity) {
           {urls.map((ele,index)=>{
             const borderStyle = index < (urls.length - 1) ? {borderBlockEndWidth : 1} : {}
             return(
-              <Box padding={"2"} paddingInlineStart={"4"} key={index}
-                  borderColor="border-subdued" {...borderStyle}
-                  width="100%"
+              <Box
+                padding={"2"}
+                paddingInlineStart={"4"}
+                key={index}
+                borderColor="border-subdued"
+                {...borderStyle}
+                width="100%"
               >
-                <HorizontalStack gap="2" align="start" blockAlign="center">
-                  <IssuesCheckbox
-                    id={ele.testRunResultsId}
-                  />
-                  <Link monochrome onClick={() => history.navigate(ele.nextUrl)} removeUnderline >
-                    {transform.getUrlComp(ele.url)}
-                  </Link>
-                </HorizontalStack>
+                <div style={{ display: "flex", alignItems: "center", width: "100%" }}>
+                  <HorizontalStack gap="2" align="start" blockAlign="center">
+                    <IssuesCheckbox id={ele.testRunResultsId} />
+                    <Link monochrome onClick={() => history.navigate(ele.nextUrl)} removeUnderline>
+                      {transform.getUrlComp(ele.url)}
+                    </Link>
+                  </HorizontalStack>
+                  <div style={{ marginLeft: "auto" }}>
+                    <Text color="subdued" fontWeight="semibold">
+                      {ele.responseStatusCode || statusCode || "-"}
+                    </Text>
+                  </div>
+                </div>
               </Box>
             )
           })}
@@ -935,7 +944,7 @@ getPrettifiedTestRunResults(testRunResults){
       </HorizontalStack> : <Text>-</Text>,
       totalUrls: obj.urls.length,
       scanned_time_comp: <Text variant="bodyMd">{func.prettifyEpoch(obj?.endTimestamp)}</Text>,
-      collapsibleRow: this.getCollapsibleRow(obj.urls, obj?.severity[0]),
+      collapsibleRow: this.getCollapsibleRow(obj.urls, obj?.severity[0], 200),
       urlFilters: obj.urls.map((ele) => ele.url)
     }
     prettifiedResults.push(prettifiedObj)

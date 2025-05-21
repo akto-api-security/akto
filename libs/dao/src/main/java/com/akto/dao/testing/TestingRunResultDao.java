@@ -84,7 +84,8 @@ public class TestingRunResultDao extends AccountsContextDaoWithRbac<TestingRunRe
                 TestingRunResult.END_TIMESTAMP,
                 TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID,
                 TestingRunResult.TEST_RESULTS + "." + GenericTestResult._CONFIDENCE,
-                TestingRunResult.TEST_RESULTS + "." + TestResult._ERRORS
+                TestingRunResult.TEST_RESULTS + "." + TestResult._ERRORS,
+                TestingRunResult.TEST_RESULTS + "." + TestResult._MESSAGE
         );
     }
 
@@ -164,14 +165,18 @@ public class TestingRunResultDao extends AccountsContextDaoWithRbac<TestingRunRe
                 if (testResultsList != null && !testResultsList.isEmpty()) {
                     BasicDBObject genericTestResult = (BasicDBObject)testResultsList.get(0);
                     String confidence = "";
+                    String message;
                     if (genericTestResult.get(GenericTestResult._CONFIDENCE)!=null) {
                         TestResult testResult = new TestResult();
                         confidence = genericTestResult.getString(GenericTestResult._CONFIDENCE);
+
                         try {
                             testResult.setConfidence(Confidence.valueOf(confidence));
-                            testResults.add(testResult);
+                            message = genericTestResult.getString(TestResult._MESSAGE, null);
+                            testResult.setMessage(message);
                         } catch(Exception e){
                         }
+                        testResults.add(testResult);
                     }
                     if (genericTestResult.get(TestResult._ERRORS)!=null) {
                         try {
