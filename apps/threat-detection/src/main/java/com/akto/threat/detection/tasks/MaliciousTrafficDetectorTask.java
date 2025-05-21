@@ -96,6 +96,7 @@ public class MaliciousTrafficDetectorTask implements Task {
 
   private Map<String, FilterConfig> apiFilters;
   private int filterLastUpdatedAt = 0;
+  private int threatConfigLastUpdatedAt = 0;
   private int filterUpdateIntervalSec = 900;
 
   private final KafkaProtoProducer internalKafka;
@@ -258,18 +259,19 @@ public class MaliciousTrafficDetectorTask implements Task {
               GetThreatConfigurationResponse.class, responseBody)
           .orElse(null);
 
-      logger.debugAndAddToDb("Fetched threat configuration" + threatConfiguration.toString());
+      logger.debug("Fetched threat configuration" + threatConfiguration.toString());
     } catch (Exception e) {
       e.printStackTrace();
-      logger.errorAndAddToDb("Error while getting threat configuration" + e.getStackTrace());
+      logger.error("Error while getting threat configuration" + e.getStackTrace());
     }
     return threatConfiguration;
   }
 
   private String getActorId(HttpResponseParams responseParam) {
     int now = (int) (System.currentTimeMillis() / 1000);
-    if (now - filterLastUpdatedAt > filterUpdateIntervalSec) {
+    if (now - threatConfigLastUpdatedAt> filterUpdateIntervalSec) {
       this.threatConfiguration = getThreatConfiguration();
+      this.threatConfigLastUpdatedAt= now;
     }
 
     String actor;
@@ -293,7 +295,7 @@ public class MaliciousTrafficDetectorTask implements Task {
         if (header != null && !header.isEmpty()) {
           actor = header.get(0);
         } else {
-          logger.warnAndAddToDb("No header found for actor id " + this.threatConfiguration.getActor().getActorId().getKey());
+          logger.warn("No header found for actor id " + this.threatConfiguration.getActor().getActorId().getKey());
           actor = sourceIp;
         }
         break;
