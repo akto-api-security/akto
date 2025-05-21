@@ -1,4 +1,4 @@
-package com.akto.proto.utils;
+package com.akto;
 
 import com.google.protobuf.Message;
 import com.google.protobuf.util.JsonFormat;

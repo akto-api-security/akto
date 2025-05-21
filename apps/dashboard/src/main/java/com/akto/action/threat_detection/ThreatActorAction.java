@@ -1,5 +1,6 @@
 package com.akto.action.threat_detection;
 
+import com.akto.ProtoMessageUtils;
 import com.akto.dao.ConfigsDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.Config;
@@ -13,7 +14,6 @@ import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.Fe
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ListThreatActorResponse;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatActorByCountryResponse;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatActorFilterResponse;
-import com.akto.proto.utils.ProtoMessageUtils;
 import com.akto.testing.ApiExecutor;
 import com.akto.util.Constants;
 import com.fasterxml.jackson.databind.ObjectMapper;

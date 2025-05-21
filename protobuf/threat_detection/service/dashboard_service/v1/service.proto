@@ -241,3 +241,19 @@ message ModifyThreatActorStatusRequest {
 
 message ModifyThreatActorStatusResponse {  
 }
+
+message GetThreatConfigurationRequest {
+}
+
+message GetThreatConfigurationResponse {
+  message ActorId {
+    string type = 1; // "IP" or "Header"
+    string key = 2;  // "ip" or "headername"
+  }
+
+  message Actor {
+    ActorId actor_id = 1;
+  }
+
+  Actor actor = 1;
+}
