@@ -42,11 +42,11 @@ public class Organization {
     public static final String TRIAL_MSG = "trialMsg";
     public String trialMsg = "trialMsg";
 
-    public static final String PROTECT_MSG = "protectMsg";
-    public String protectMsg = "protectMsg";
+    public static final String PROTECTIONTRIAL_MSG = "protectiontrialMsg";
+    public String protectiontrialMsg = "protectiontrialMsg";
 
-    public static final String AGENT_MSG = "agentMsg";
-    public String agentMsg = "agentMsg";
+    public static final String AGENTTRIAL_MSG = "agenttrialMsg";
+    public String agenttrialMsg = "agenttrialMsg";
 
     public static final String TEST_TELEMETRY_ENABLED = "testTelemetryEnabled";
     private boolean testTelemetryEnabled;
@@ -159,20 +159,20 @@ public class Organization {
         this.trialMsg = trialMsg;
     }
 
-    public  String getprotectMsg() {
-        return protectMsg;
+    public  String getprotectiontrialMsg() {
+        return protectiontrialMsg;
     }
 
-    public  void setprotectMsg(String protectMsg) {
-        this.protectMsg = protectMsg;
+    public  void setprotectiontrialMsg(String protectiontrialMsg) {
+        this.protectiontrialMsg = protectiontrialMsg;
     }
 
-    public  String getagentMsg() {
-        return agentMsg;
+    public  String getagenttrialMsg() {
+        return agenttrialMsg;
     }
 
-    public  void setagentMsg(String agentMsg) {
-        this.agentMsg = agentMsg;
+    public  void setagenttrialMsg(String agenttrialMsg) {
+        this.agenttrialMsg = agenttrialMsg;
     }
 
     public int getLastFeatureMapUpdate() {

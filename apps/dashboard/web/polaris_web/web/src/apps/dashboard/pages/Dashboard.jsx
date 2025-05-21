@@ -245,17 +245,17 @@ function Dashboard() {
                     <Text variant="bodyMd">{window.TRIAL_MSG}</Text>
                 </Banner>
             </div> : null}
-            {location.pathname.includes("agent-team") && window.AGENT_MSG ? (
+            {location.pathname.includes("agent-team") && window.AGENTTRIAL_MSG ? (
                 <div className="call-banner">
                     <Banner hideIcon={true}>
-                        <Text variant="bodyMd">{window.AGENT_MSG}</Text>
+                        <Text variant="bodyMd">{window.AGENTTRIAL_MSG}</Text>
                     </Banner>
                 </div>
             ) : null}
-            {location.pathname.startsWith("/dashboard/protection/") && window.PROTECT_MSG ? (
+            {location.pathname.startsWith("/dashboard/protection/") && window.PROTECTIONTRIAL_MSG ? (
                 <div className="call-banner">
                     <Banner hideIcon={true}>
-                        <Text variant="bodyMd">{window.PROTECT_MSG}</Text>
+                        <Text variant="bodyMd">{window.PROTECTIONTRIAL_MSG}</Text>
                     </Banner>
                 </div>
             ) : null}

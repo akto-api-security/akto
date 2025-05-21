@@ -2741,8 +2741,8 @@ public class InitializerListener implements ServletContextListener {
             String hotjarSiteId = organization.getHotjarSiteId();
             String planType = organization.getplanType();
             String trialMsg = organization.gettrialMsg();
-            String protectMsg = organization.getprotectMsg();
-            String agentMsg = organization.getagentMsg();
+            String protectiontrialMsg = organization.getprotectiontrialMsg();
+            String agenttrialMsg = organization.getagenttrialMsg();
             String organizationId = organization.getId();
             /*
              * This ensures, we don't fetch feature wise allowed from akto too often.
@@ -2809,8 +2809,8 @@ public class InitializerListener implements ServletContextListener {
             hotjarSiteId = OrganizationUtils.fetchHotjarSiteId(metaData);
             planType = OrganizationUtils.fetchplanType(metaData);
             trialMsg = OrganizationUtils.fetchtrialMsg(metaData);
-            protectMsg = OrganizationUtils.fetchprotectMsg(metaData);
-            agentMsg = OrganizationUtils.fetchagentMsg(metaData);
+            protectiontrialMsg = OrganizationUtils.fetchprotectiontrialMsg(metaData);
+            agenttrialMsg = OrganizationUtils.fetchagenttrialMsg(metaData);
             boolean expired = OrganizationUtils.fetchExpired(metaData);
             if (DashboardMode.isOnPremDeployment()) {
                 boolean telemetryEnabled = OrganizationUtils.fetchTelemetryEnabled(metaData);
@@ -2827,9 +2827,9 @@ public class InitializerListener implements ServletContextListener {
 
             organization.settrialMsg(trialMsg);
 
-            organization.setprotectMsg(protectMsg);
+            organization.setprotectiontrialMsg(protectiontrialMsg);
 
-            organization.setagentMsg(agentMsg);
+            organization.setagenttrialMsg(agenttrialMsg);
 
             organization.setGracePeriod(gracePeriod);
             organization.setFeatureWiseAllowed(featureWiseAllowed);
@@ -2854,8 +2854,8 @@ public class InitializerListener implements ServletContextListener {
                             Updates.set(Organization.HOTJAR_SITE_ID, hotjarSiteId),
                             Updates.set(Organization.PLAN_TYPE, planType),
                             Updates.set(Organization.TRIAL_MSG, trialMsg),
-                            Updates.set(Organization.AGENT_MSG, agentMsg),
-                            Updates.set(Organization.PROTECT_MSG, protectMsg),
+                            Updates.set(Organization.AGENTTRIAL_MSG, agenttrialMsg),
+                            Updates.set(Organization.PROTECTIONTRIAL_MSG, protectiontrialMsg),
                             Updates.set(Organization.TEST_TELEMETRY_ENABLED, testTelemetryEnabled),
                             Updates.set(Organization.LAST_FEATURE_MAP_UPDATE, lastFeatureMapUpdate)));
 
