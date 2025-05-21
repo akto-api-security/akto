@@ -42,6 +42,12 @@ public class Organization {
     public static final String TRIAL_MSG = "trialMsg";
     public String trialMsg = "trialMsg";
 
+    public static final String PROTECT_MSG = "protectMsg";
+    public String protectMsg = "protectMsg";
+
+    public static final String AGENT_MSG = "agentMsg";
+    public String agentMsg = "agentMsg";
+
     public static final String TEST_TELEMETRY_ENABLED = "testTelemetryEnabled";
     private boolean testTelemetryEnabled;
     private int gracePeriod;
@@ -151,6 +157,22 @@ public class Organization {
 
     public  void settrialMsg(String trialMsg) {
         this.trialMsg = trialMsg;
+    }
+
+    public  String getprotectMsg() {
+        return protectMsg;
+    }
+
+    public  void setprotectMsg(String protectMsg) {
+        this.protectMsg = protectMsg;
+    }
+
+    public  String getagentMsg() {
+        return agentMsg;
+    }
+
+    public  void setagentMsg(String agentMsg) {
+        this.agentMsg = agentMsg;
     }
 
     public int getLastFeatureMapUpdate() {

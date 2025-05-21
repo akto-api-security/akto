@@ -108,6 +108,10 @@
                     window.PLAN_TYPE = '${requestScope.planType}'
 
                     window.TRIAL_MSG = '${requestScope.trialMsg}'
+                    
+                    window.PROTECT_MSG = '${requestScope.protectMsg}'
+
+                    window.AGENT_MSG = '${requestScope.agentMsg}'
 
                     // Enabling the debug mode flag is useful during implementation,
                     // but it's recommended you remove it for production

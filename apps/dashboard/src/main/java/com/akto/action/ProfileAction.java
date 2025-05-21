@@ -239,6 +239,8 @@ public class ProfileAction extends UserAction {
             userDetails.append("hotjarSiteId", organization.getHotjarSiteId());
             userDetails.append("planType", organization.getplanType());
             userDetails.append("trialMsg", organization.gettrialMsg());
+            userDetails.append("protectMsg", organization.getprotectMsg());
+            userDetails.append("agentMsg", organization.getagentMsg());
         }
 
         if (versions.length > 2) {
