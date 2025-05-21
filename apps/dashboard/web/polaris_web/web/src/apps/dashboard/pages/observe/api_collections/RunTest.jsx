@@ -104,7 +104,6 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
         if (preActivator) {
             setParentActivator(true);
         }
-
     }, [testMode])
 
     const apiCollectionName = collectionsMap[apiCollectionId]
@@ -210,8 +209,6 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
         }
     }, [apiCollectionName, runTestFromOutside])
 
-
-
     useEffect(() => {
         if (shouldRuntestConfig === false) return;
         if (testIdConfig?.testingRunConfig?.testSubCategoryList?.length >= 0) {
@@ -248,6 +245,10 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                     else if (runType === "RECURRING") return getRecurringContext(periodInSeconds)
                     else if (runType === "CONTINUOUS_TESTING") return "Continuously";
                 }
+
+                const hourOfTest = func.getHourFromEpoch(testIdConfig.scheduleTimestamp)
+                const hourLabel = func.getFormattedHoursUsingLabel(hourOfTest, hourlyTimes, nowLabel)
+
                 setTestRun(prev => ({
                     ...testRun,
                     tests: updatedTests,
@@ -267,6 +268,10 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                     recurringWeekly: getRecurringContext(testIdConfig?.periodInSeconds) === "Weekly",
                     continuousTesting: getRecurringContext(testIdConfig?.periodInSeconds) === "Continuously",
                     autoTicketingDetails: testIdConfig?.testingRunConfig?.autoTicketingDetails || initialAutoTicketingDetails,
+                    hourlyLabel: hourLabel.label,
+                    scheduleTimestamp: testIdConfig?.scheduleTimestamp,
+                    startTimestamp: testIdConfig?.scheduleTimestamp,
+                    runTypeParentLabel: testRunType
                 }));
                 setTestSuiteIds(testIdConfig?.testingRunConfig?.testSuiteIds || [])
                 setTestNameSuiteModal(testIdConfig?.name||"")
@@ -453,7 +458,8 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
         return { label: hourStr, value: `${hour + 12}` }
     })
 
-    const hourlyTimes = [{ label: "Now", value: "Now" }, ...amTimes, ...pmTimes]
+    const nowLabel = { label: "Now", value: "Now" }
+    const hourlyTimes = [nowLabel, ...amTimes, ...pmTimes]
 
     const runTimeMinutes = hours.reduce((abc, x) => {
         if (x < 6) {
