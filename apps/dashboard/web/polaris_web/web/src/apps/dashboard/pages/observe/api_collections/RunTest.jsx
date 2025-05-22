@@ -271,7 +271,8 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                     hourlyLabel: hourLabel.label,
                     scheduleTimestamp: testIdConfig?.scheduleTimestamp,
                     startTimestamp: testIdConfig?.scheduleTimestamp,
-                    runTypeParentLabel: testRunType
+                    runTypeParentLabel: testRunType,
+                    miniTestingServiceName: testIdConfig?.miniTestingServiceName || "",
                 }));
                 setTestSuiteIds(testIdConfig?.testingRunConfig?.testSuiteIds || [])
                 setTestNameSuiteModal(testIdConfig?.name||"")
