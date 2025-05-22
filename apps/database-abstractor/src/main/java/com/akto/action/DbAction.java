@@ -3657,8 +3657,9 @@ public class DbAction extends ActionSupport {
             DbLayer.deleteTestRunResultSummary(testingRunResultSummaryId);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error in deleteTestRunResultSummary: " + e, LogDb.DB_ABS);
+            return ERROR.toUpperCase();
         }
-        return SUCCESS;
+        return SUCCESS.toUpperCase();
     }
 
     public String deleteTestingRunResults() {
@@ -3666,8 +3667,9 @@ public class DbAction extends ActionSupport {
             DbLayer.deleteTestingRunResults(testingRunResultId);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error in deleteTestingRunResults: " + e, LogDb.DB_ABS);
+            return ERROR.toUpperCase();
         }
-        return SUCCESS;
+        return SUCCESS.toUpperCase();
     }
 
     public String updateStartTsTestRunResultSummary() {
@@ -3675,8 +3677,9 @@ public class DbAction extends ActionSupport {
             DbLayer.updateStartTsTestRunResultSummary(testingRunResultSummaryId);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error in updateStartTsTestRunResultSummary: " + e, LogDb.DB_ABS);
+            return ERROR.toUpperCase();
         }
-        return SUCCESS;
+        return SUCCESS.toUpperCase();
     }
 
     public String fetchRerunTestingRunResult() {
@@ -3684,21 +3687,22 @@ public class DbAction extends ActionSupport {
             this.testingRunResults = DbLayer.fetchRerunTestingRunResult(testingRunResultSummaryId);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error in fetchRerunTestingRunResult: " + e, LogDb.DB_ABS);
+            return ERROR.toUpperCase();
         }
-        return SUCCESS;
+        return SUCCESS.toUpperCase();
     }
 
     public String fetchRerunTestingRunResultSummary() {
         try {
-            TestingRunResultSummary trrs = DbLayer.fetchRerunTestingRunResultSummary(testingRunResultSummaryId);
-            Map<String, Object> response = new HashMap<>();
-            response.put("trrs", trrs);
-            result = gson.toJson(response);
+            trrs = DbLayer.fetchRerunTestingRunResultSummary(testingRunResultSummaryId);
+            if (trrs != null) {
+                trrs.setTestingRunHexId(trrs.getTestingRunId().toHexString());
+            }
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error in fetchRerunTestingRunResultSummary: " + e, LogDb.DB_ABS);
-            result = "error";
+            return ERROR.toUpperCase();
         }
-        return SUCCESS;
+        return SUCCESS.toUpperCase();
     }
 
     private String result;
