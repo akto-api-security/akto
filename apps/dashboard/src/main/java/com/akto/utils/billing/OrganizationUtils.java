@@ -279,12 +279,12 @@ public class OrganizationUtils {
         return additionalMetaData.getString("TRIAL_MSG", "");
     }
 
-    public static String fetchprotectiontrialMsg(BasicDBObject additionalMetaData) {
+    public static String fetchProtectionTrialMsg(BasicDBObject additionalMetaData) {
         return additionalMetaData.getString("PROTECTIONTRIAL_MSG", "");
     }
 
 
-    public static String fetchagenttrialMsg(BasicDBObject additionalMetaData) {
+    public static String fetchAgentTrialMsg(BasicDBObject additionalMetaData) {
         return additionalMetaData.getString("AGENTTRIAL_MSG", "");
     }
 

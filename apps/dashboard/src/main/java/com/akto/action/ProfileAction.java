@@ -239,8 +239,8 @@ public class ProfileAction extends UserAction {
             userDetails.append("hotjarSiteId", organization.getHotjarSiteId());
             userDetails.append("planType", organization.getplanType());
             userDetails.append("trialMsg", organization.gettrialMsg());
-            userDetails.append("protectiontrialMsg", organization.getprotectiontrialMsg());
-            userDetails.append("agenttrialMsg", organization.getagenttrialMsg());
+            userDetails.append("ProtectionTrialMsg", organization.getProtectionTrialMsg());
+            userDetails.append("AgentTrialMsg", organization.getAgentTrialMsg());
         }
 
         if (versions.length > 2) {

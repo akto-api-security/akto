@@ -109,9 +109,9 @@
 
                     window.TRIAL_MSG = '${requestScope.trialMsg}'
                     
-                    window.PROTECTIONTRIAL_MSG = '${requestScope.protectiontrialMsg}'
+                    window.PROTECTIONTRIAL_MSG = '${requestScope.ProtectionTrialMsg}'
 
-                    window.AGENTTRIAL_MSG = '${requestScope.agenttrialMsg}'
+                    window.AGENTTRIAL_MSG = '${requestScope.AgentTrialMsg}'
 
                     // Enabling the debug mode flag is useful during implementation,
                     // but it's recommended you remove it for production
