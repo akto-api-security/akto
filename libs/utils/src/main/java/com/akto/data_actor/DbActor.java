@@ -295,6 +295,11 @@ public class DbActor extends DataActor {
         return DbLayer.fetchLatestTestingRunResult(testingRunResultSummaryId);
     }
 
+    @Override
+    public List<TestingRunResult> fetchRerunTestingRunResult(String testingRunResultSummaryId) {
+        return DbLayer.fetchRerunTestingRunResult(testingRunResultSummaryId);
+    }
+
     public List<TestingRunResult> fetchLatestTestingRunResultBySummaryId(String summaryId, int limit, int skip) {
         return DbLayer.fetchLatestTestingRunResultBySummaryId(summaryId, limit, skip);
     }
@@ -341,6 +346,11 @@ public class DbActor extends DataActor {
 
     public TestingRunResultSummary fetchTestingRunResultSummary(String testingRunResultSummaryId) {
         return DbLayer.fetchTestingRunResultSummary(testingRunResultSummaryId);
+    }
+
+    @Override
+    public TestingRunResultSummary fetchRerunTestingRunResultSummary(String originalTestingRunResultSummaryId) {
+        return DbLayer.fetchRerunTestingRunResultSummary(originalTestingRunResultSummaryId);
     }
 
     public Map<ObjectId, TestingRunResultSummary> fetchTestingRunResultSummaryMap(String testingRunId) {
@@ -464,6 +474,21 @@ public class DbActor extends DataActor {
         DbLayer.updateTestRunResultSummary(summaryId);
     }
 
+    @Override
+    public void deleteTestRunResultSummary(String summaryId) {
+        DbLayer.deleteTestRunResultSummary(summaryId);
+    }
+
+    @Override
+    public void deleteTestingRunResults(String testingRunResultId) {
+        DbLayer.deleteTestingRunResults(testingRunResultId);
+    }
+
+    @Override
+    public void updateStartTsTestRunResultSummary(String summaryId) {
+        DbLayer.updateStartTsTestRunResultSummary(summaryId);
+    }
+
     public void updateTestRunResultSummaryNoUpsert(String testingRunResultSummaryId) {
         DbLayer.updateTestRunResultSummaryNoUpsert(testingRunResultSummaryId);
     }
@@ -516,7 +541,7 @@ public class DbActor extends DataActor {
     public List<YamlTemplate> fetchFilterYamlTemplates() {
         return DbLayer.fetchFilterYamlTemplates();
     }
-    
+
     public List<YamlTemplate> fetchActiveAdvancedFilters(){
         return DbLayer.fetchActiveFilterTemplates();
     }
@@ -584,7 +609,7 @@ public class DbActor extends DataActor {
     public TestingRunResultSummary findLatestTestingRunResultSummary(Bson filter){
         return DbLayer.findLatestTestingRunResultSummary(filter);
     }
-    
+
     public TestingRunPlayground getCurrentTestingRunDetailsFromEditor(int timestamp){
         return DbLayer.getCurrentTestingRunDetailsFromEditor(timestamp);
     }

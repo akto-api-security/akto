@@ -3651,4 +3651,72 @@ public class DbAction extends ActionSupport {
     public void setMetricData(List<MetricData> metricData) {
         this.metricData = metricData;
     }
+
+    public String deleteTestRunResultSummary() {
+        try {
+            DbLayer.deleteTestRunResultSummary(testingRunResultSummaryId);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error in deleteTestRunResultSummary: " + e, LogDb.DB_ABS);
+        }
+        return SUCCESS;
+    }
+
+    public String deleteTestingRunResults() {
+        try {
+            DbLayer.deleteTestingRunResults(testingRunResultId);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error in deleteTestingRunResults: " + e, LogDb.DB_ABS);
+        }
+        return SUCCESS;
+    }
+
+    public String updateStartTsTestRunResultSummary() {
+        try {
+            DbLayer.updateStartTsTestRunResultSummary(testingRunResultSummaryId);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error in updateStartTsTestRunResultSummary: " + e, LogDb.DB_ABS);
+        }
+        return SUCCESS;
+    }
+
+    public String fetchRerunTestingRunResult() {
+        try {
+            this.testingRunResults = DbLayer.fetchRerunTestingRunResult(testingRunResultSummaryId);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error in fetchRerunTestingRunResult: " + e, LogDb.DB_ABS);
+        }
+        return SUCCESS;
+    }
+
+    public String fetchRerunTestingRunResultSummary() {
+        try {
+            TestingRunResultSummary trrs = DbLayer.fetchRerunTestingRunResultSummary(testingRunResultSummaryId);
+            Map<String, Object> response = new HashMap<>();
+            response.put("trrs", trrs);
+            result = gson.toJson(response);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error in fetchRerunTestingRunResultSummary: " + e, LogDb.DB_ABS);
+            result = "error";
+        }
+        return SUCCESS;
+    }
+
+    private String result;
+    private String testingRunResultId;
+
+    public String getResult() {
+        return result;
+    }
+
+    public void setResult(String result) {
+        this.result = result;
+    }
+
+    public String getTestingRunResultId() {
+        return testingRunResultId;
+    }
+
+    public void setTestingRunResultId(String testingRunResultId) {
+        this.testingRunResultId = testingRunResultId;
+    }
 }
