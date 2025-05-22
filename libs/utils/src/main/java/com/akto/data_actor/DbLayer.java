@@ -99,6 +99,22 @@ public class DbLayer {
         return CustomDataTypeDao.instance.findAll(new BasicDBObject());
     }
 
+    public static List<TestingRunResult> fetchRerunTestingRunResult(String summaryId) {
+        return TestingRunResultDao.instance.findAll(
+                Filters.and(
+                        Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, new ObjectId(summaryId)),
+                        Filters.eq(TestingRunResult.RERUN, true)
+                ),
+                Projections.include(
+                        TestingRunResult.TEST_RUN_ID,
+                        TestingRunResult.API_INFO_KEY,
+                        TestingRunResult.TEST_SUB_TYPE,
+                        TestingRunResult.VULNERABLE,
+                        TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID
+                )
+        );
+    }
+
     public static List<AktoDataType> fetchAktoDataTypes() {
         return AktoDataTypeDao.instance.findAll(new BasicDBObject());
     }
@@ -515,6 +531,27 @@ public class DbLayer {
         return TestingRunDao.instance.findOne("_id", testingRunObjId);
     }
 
+    public static void deleteTestRunResultSummary(String summaryId) {
+        TestingRunResultSummariesDao.instance.deleteAll(Filters.eq(TestingRunResultSummary.ID, new ObjectId(summaryId)));
+    }
+
+    public static void deleteTestingRunResults(String testingRunResultId) {
+        TestingRunResult trr = TestingRunResultDao.instance.getMCollection().findOneAndDelete(Filters.eq(ID, new ObjectId(testingRunResultId)));
+        if (trr.isVulnerable()) {
+            Bson filters = Filters.and(
+                    Filters.eq(TestingRunResult.API_INFO_KEY, trr.getApiInfoKey()),
+                    Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, trr.getTestRunResultSummaryId()),
+                    Filters.eq(TestingRunResult.TEST_SUB_TYPE, trr.getTestSubType())
+            );
+            //VulnerableTestingRunResultDao.instance.deleteAll(filters);
+        }
+    }
+
+    public static void updateStartTsTestRunResultSummary(String summaryId) {
+        TestingRunResultSummariesDao.instance.updateOneNoUpsert(Filters.eq(TestingRunResultSummary.ID, new ObjectId(summaryId)),
+                Updates.set(TestingRunResultSummary.START_TIMESTAMP, Context.now()));
+    }
+
     public static void updateTestRunResultSummaryNoUpsert(String testingRunResultSummaryId) {
         ObjectId summaryObjectId = new ObjectId(testingRunResultSummaryId);
         TestingRunResultSummariesDao.instance.updateOneNoUpsert(
@@ -551,6 +588,12 @@ public class DbLayer {
         ObjectId summaryObjectId = new ObjectId(testingRunResultSummaryId);
         return TestingRunResultSummariesDao.instance.findOne(Filters.eq(TestingRunResultSummary.ID, summaryObjectId));
     }
+
+    public static TestingRunResultSummary fetchRerunTestingRunResultSummary(String testingRunResultSummaryId) {
+        ObjectId summaryObjectId = new ObjectId(testingRunResultSummaryId);
+        return TestingRunResultSummariesDao.instance.findOne(Filters.eq(TestingRunResultSummary.ORIGINAL_TESTING_RUN_SUMMARY_ID, summaryObjectId));
+    }
+
 
     public static TestingRunResultSummary markTestRunResultSummaryFailed(String testingRunResultSummaryId) {
         ObjectId summaryObjectId = new ObjectId(testingRunResultSummaryId);

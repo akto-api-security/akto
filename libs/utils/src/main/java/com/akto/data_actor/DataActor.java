@@ -126,8 +126,12 @@ public abstract class DataActor {
     public abstract void updateTestingRun(String testingRunId);
 
     public abstract void updateTestRunResultSummary(String summaryId);
+    public abstract void deleteTestRunResultSummary(String summaryId);
+    public abstract void deleteTestingRunResults(String testingRunResultId);
+    public abstract void updateStartTsTestRunResultSummary(String summaryId);
 
     public abstract List<TestingRunResult> fetchLatestTestingRunResult(String testingRunResultSummaryId);
+    public abstract List<TestingRunResult> fetchRerunTestingRunResult(String testingRunResultSummaryId);
 
     public abstract TestingRunResultSummary markTestRunResultSummaryFailed(String testingRunResultSummaryId);
 
@@ -150,6 +154,7 @@ public abstract class DataActor {
     public abstract ApiCollection fetchApiCollectionMeta(int apiCollectionId);
 
     public abstract TestingRunResultSummary fetchTestingRunResultSummary(String testingRunResultSummaryId);
+    public abstract TestingRunResultSummary fetchRerunTestingRunResultSummary(String originalTestingRunResultSummaryId);
 
     public abstract List<ApiCollection> fetchAllApiCollectionsMeta();
 

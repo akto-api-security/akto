@@ -120,7 +120,7 @@ public class AllMetrics {
             } catch (Exception e){
                 loggerMaker.errorAndAddToDb("Error while sending metrics to akto: " + e.getMessage(), LoggerMaker.LogDb.RUNTIME);
             }
-        }, 0, 60, TimeUnit.SECONDS);
+        }, 0, 120, TimeUnit.SECONDS);
     }
 
     private AllMetrics(){}

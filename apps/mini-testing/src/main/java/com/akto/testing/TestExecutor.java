@@ -141,25 +141,52 @@ public class TestExecutor {
 
         TestingEndpoints testingEndpoints = testingRun.getTestingEndpoints();
 
-        List<String> testingRunSubCategories;
-        if(testingRun.getTestingRunConfig().getTestSuiteIds() != null && !testingRun.getTestingRunConfig().getTestSuiteIds().isEmpty()){
-            testingRunSubCategories = dataActor.findTestSubCategoriesByTestSuiteId(testingRun.getTestingRunConfig().getTestSuiteIds());
-        }else{
-            testingRunSubCategories = testingRun.getTestingRunConfig().getTestSubCategoryList();
+        List<ApiInfoKey> apiInfoKeyList;
+        Map<ApiInfoKey, List<String>> apiInfoKeySubcategoryMap = null;
+        Set<String> testingSubCategorySet = new HashSet<>();
+        if (TestingConfigurations.getInstance().getTestingRunResultList() != null) {
+
+            Set<ApiInfoKey> apiInfoKeySet = new HashSet<>();
+            apiInfoKeySubcategoryMap = new HashMap<>();
+
+            for (TestingRunResult testingRunResult: TestingConfigurations.getInstance().getTestingRunResultList()) {
+                apiInfoKeySubcategoryMap
+                        .computeIfAbsent(testingRunResult.getApiInfoKey(), k -> new ArrayList<>())
+                        .add(testingRunResult.getTestSubType());
+                apiInfoKeySet.add(testingRunResult.getApiInfoKey());
+
+                testingSubCategorySet.add(testingRunResult.getTestSubType());
+            }
+
+            apiInfoKeyList = new ArrayList<>(apiInfoKeySet);
+        } else {
+            apiInfoKeyList = testingEndpoints.returnApis();
         }
-        
+
+        final Map<ApiInfoKey, List<String>> finalApiInfoKeySubcategoryMap = apiInfoKeySubcategoryMap;
+        List<String> testingRunSubCategories;
+        if (!testingSubCategorySet.isEmpty()) {
+            testingRunSubCategories = new ArrayList<>(testingSubCategorySet);
+        } else {
+            if(testingRun.getTestingRunConfig().getTestSuiteIds() != null && !testingRun.getTestingRunConfig().getTestSuiteIds().isEmpty()){
+                testingRunSubCategories = dataActor.findTestSubCategoriesByTestSuiteId(testingRun.getTestingRunConfig().getTestSuiteIds());
+            }else{
+                testingRunSubCategories = testingRun.getTestingRunConfig().getTestSubCategoryList();
+            }
+        }
+
         if (testingRun.getTestingRunConfig() != null) {
             dataActor.updateTestInitiatedCountInTestSummary(summaryId.toHexString(), testingRunSubCategories.size());
         }
 
-        List<ApiInfo.ApiInfoKey> apiInfoKeyList = testingEndpoints.returnApis();
+
         if (apiInfoKeyList == null || apiInfoKeyList.isEmpty()) return;
         loggerMaker.infoAndAddToDb("APIs found: " + apiInfoKeyList.size(), LogDb.TESTING);
         boolean collectionWise = testingEndpoints.getType().equals(TestingEndpoints.Type.COLLECTION_WISE);
 
         SampleMessageStore sampleMessageStore = SampleMessageStore.create();
         if(collectionWise || apiInfoKeyList.size() > 500){
-            sampleMessageStore.fetchSampleMessages(Main.extractApiCollectionIds(testingRun.getTestingEndpoints().returnApis()));
+            sampleMessageStore.fetchSampleMessages(Main.extractApiCollectionIds(apiInfoKeyList));
         }else{
             sampleMessageStore.fetchSampleMessages(apiInfoKeyList);
         }
@@ -282,11 +309,13 @@ public class TestExecutor {
                 }
                 if(Constants.IS_NEW_TESTING_ENABLED){
                     for (String testSubCategory: testingRunSubCategories) {
-                        insertRecordInKafka(accountId, testSubCategory, apiInfoKey, messages, summaryId, syncLimit, apiInfoKeyToHostMap, subCategoryEndpointMap, testConfigMap, testLogs, testingRun, new AtomicBoolean(false), totalRecords, throttleNumber);
+                        if (apiInfoKeySubcategoryMap == null || apiInfoKeySubcategoryMap.get(apiInfoKey).contains(testSubCategory)) {
+                            insertRecordInKafka(accountId, testSubCategory, apiInfoKey, messages, summaryId, syncLimit, apiInfoKeyToHostMap, subCategoryEndpointMap, testConfigMap, testLogs, testingRun, new AtomicBoolean(false), totalRecords, throttleNumber);
+                        }
                     }
                 }
                 else{
-                    Future<Void> future = threadPool.submit(() -> startWithLatch(testingRunSubCategories, accountId, apiInfoKey, messages, summaryId, syncLimit, apiInfoKeyToHostMap, subCategoryEndpointMap, testConfigMap, testLogs, testingRun, latch));
+                    Future<Void> future = threadPool.submit(() -> startWithLatch(testingRunSubCategories, accountId, apiInfoKey, messages, summaryId, syncLimit, apiInfoKeyToHostMap, subCategoryEndpointMap, testConfigMap, testLogs, testingRun, latch, finalApiInfoKeySubcategoryMap));
                     testingRecords.add(future);
                 }
             }
@@ -353,6 +382,11 @@ public class TestExecutor {
         } while (fetchMore);
 
         TestingRunResultSummary testingRunResultSummary = dataActor.updateIssueCountAndStateInSummary(summaryId.toHexString(), new HashMap<>(), updatedState.toString());
+        if (TestingConfigurations.getInstance().getRerunTestingRunResultSummary() != null) {
+            dataActor.deleteTestRunResultSummary(TestingConfigurations.getInstance().getRerunTestingRunResultSummary().getId().toHexString());
+            loggerMaker.infoAndAddToDb("Deleting rerun testing result summary after completion of test: TRRS_ID:" + TestingConfigurations.getInstance().getRerunTestingRunResultSummary().getHexId(), LogDb.TESTING);
+            TestingConfigurations.getInstance().setRerunTestingRunResultSummary(null);
+        }
         // GithubUtils.publishGithubComments(testingRunResultSummary);
     }
 
@@ -555,18 +589,20 @@ public class TestExecutor {
         List<String> testingRunSubCategories,int accountId,ApiInfo.ApiInfoKey apiInfoKey,
         List<String> messages, ObjectId summaryId, SyncLimit syncLimit, Map<ApiInfoKey, String> apiInfoKeyToHostMap,
         ConcurrentHashMap<String, String> subCategoryEndpointMap, Map<String, TestConfig> testConfigMap,
-        List<TestingRunResult.TestLog> testLogs, TestingRun testingRun, CountDownLatch latch) {
+        List<TestingRunResult.TestLog> testLogs, TestingRun testingRun, CountDownLatch latch, Map<ApiInfoKey, List<String>> apiInfoKeySubcategoryMap) {
 
         Context.accountId.set(accountId);
         loggerMaker.infoAndAddToDb("Starting test for " + apiInfoKey, LogDb.TESTING);   
         AtomicBoolean isApiInfoTested = new AtomicBoolean(false);
         try {
             for (String testSubCategory: testingRunSubCategories) {
-                if(GetRunningTestsStatus.getRunningTests().isTestRunning(summaryId)){
-                    insertRecordInKafka(accountId, testSubCategory, apiInfoKey, messages, summaryId, syncLimit, apiInfoKeyToHostMap, subCategoryEndpointMap, testConfigMap, testLogs, testingRun, isApiInfoTested, new AtomicInteger(0), new AtomicInteger(0));
-                }else{
-                    loggerMaker.info("Test stopped for id: " + testingRun.getHexId());
-                    break;
+                if (apiInfoKeySubcategoryMap == null || apiInfoKeySubcategoryMap.get(apiInfoKey).contains(testSubCategory)) {
+                    if(GetRunningTestsStatus.getRunningTests().isTestRunning(summaryId)){
+                        insertRecordInKafka(accountId, testSubCategory, apiInfoKey, messages, summaryId, syncLimit, apiInfoKeyToHostMap, subCategoryEndpointMap, testConfigMap, testLogs, testingRun, isApiInfoTested, new AtomicInteger(0), new AtomicInteger(0));
+                    }else{
+                        loggerMaker.info("Test stopped for id: " + testingRun.getHexId());
+                        break;
+                    }
                 }
             }
         } catch (Exception e) {
@@ -624,6 +660,17 @@ public class TestExecutor {
         if (resultSize > 0) {
             loggerMaker.infoAndAddToDb("testingRunResults size: " + resultSize, LogDb.TESTING);
             trim(testingRunResults);
+            TestingRunResult originalTestingRunResultForRerun = TestingConfigurations.getInstance().getTestingRunResultForApiKeyInfo(testingRunResults.get(0).getApiInfoKey(), testingRunResults.get(0).getTestSubType());
+            if (originalTestingRunResultForRerun != null) {
+                loggerMaker.infoAndAddToDb("Deleting original testingRunResults for rerun after replaced with run TRR_ID: " + originalTestingRunResultForRerun.getHexId());
+                dataActor.deleteTestingRunResults(originalTestingRunResultForRerun.getId().toHexString());
+                /*
+                 * delete from vulnerableTestResults as well.
+                 * assuming if original was vulnerable, entry will be in VulnerableTestingRunResultDao
+                 * for API_INFO_KEY, TEST_RUN_RESULT_SUMMARY_ID, TEST_SUB_TYPE, VulnerableTestingRunResultDao will have
+                 * single entry
+                 * */
+            }
             TestingRunResult trr = testingRunResults.get(0);
             trr.setTestRunHexId(trr.getTestRunHexId());
             trr.setTestRunResultSummaryHexId(trr.getTestRunResultSummaryHexId());
