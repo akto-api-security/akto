@@ -36,6 +36,7 @@ import com.akto.notifications.slack.SlackSender;
 import com.akto.test_editor.execution.Executor;
 import com.akto.testing.kafka_utils.ConsumerUtil;
 import com.akto.testing.kafka_utils.Producer;
+import com.akto.testing.kafka_utils.TestingConfigurations;
 import com.akto.util.Constants;
 import com.akto.store.SampleMessageStore;
 import com.akto.store.TestingUtil;
@@ -283,6 +284,31 @@ public class Main {
         }, 0, 5, TimeUnit.MINUTES);
     }
 
+    //returns true if test is not supposed to run
+    private static boolean handleRerunTestingRunResult(TestingRunResultSummary originalSummary) {
+        TestingConfigurations config = TestingConfigurations.getInstance();
+        config.setRerunTestingRunResultSummary(null);
+
+        if (originalSummary == null || originalSummary.getOriginalTestingRunResultSummaryId() == null) {
+            config.setTestingRunResultList(null);
+            return false;
+        }
+
+        ObjectId summaryId = originalSummary.getOriginalTestingRunResultSummaryId();
+        List<TestingRunResult> testingRunResultList = dataActor.fetchRerunTestingRunResult(originalSummary.getOriginalTestingRunResultSummaryId().toHexString());
+        if (testingRunResultList == null) {
+            dataActor.deleteTestRunResultSummary(originalSummary.getId().toHexString());
+            loggerMaker.infoAndAddToDb("Deleting TRRS for rerun case, no testing run result found, TRRS_ID: " + originalSummary.getId().toHexString(), LogDb.TESTING);
+            return true;
+        }
+
+        //Updating start time stamp as current time stamp in case of rerun
+        dataActor.updateStartTsTestRunResultSummary(summaryId.toHexString());
+        config.setRerunTestingRunResultSummary(originalSummary);
+        config.setTestingRunResultList(testingRunResultList);
+        return false;
+    }
+
     public static void main(String[] args) throws InterruptedException {
         AccountSettings accountSettings = dataActor.fetchAccountSettings();
         dataActor.modifyHybridTestingSetting(RuntimeMode.isHybridDeployment());
@@ -349,36 +375,42 @@ public class Main {
                 FeatureAccess featureAccess = UsageMetricUtils.getFeatureAccess(organization, MetricTypes.TEST_RUNS);
                 SyncLimit syncLimit = featureAccess.fetchSyncLimit();
                 String testingRunSummaryId = currentTestInfo.getString("summaryId");
-                TestingRun testingRun = dataActor.findTestingRun(testingRunSummaryId);
-                TestingRunConfig baseConfig = dataActor.findTestingRunConfig(testingRun.getTestIdConfig());
-                testingRun.setTestingRunConfig(baseConfig);
+                //check if currently running testrun is part of rerun
                 ObjectId summaryId = new ObjectId(testingRunSummaryId);
-                testingProducer.initProducer(testingRun, summaryId, true, syncLimit);
-                int maxRunTime = testingRun.getTestRunTime() <= 0 ? 30*60 : testingRun.getTestRunTime();
-                testingConsumer.init(maxRunTime);
 
-                // mark the test completed here
-                testCompletion.markTestAsCompleteAndRunFunctions(testingRun, summaryId, System.currentTimeMillis());
+                TestingRunResultSummary rerunTestingRunResultSummary = dataActor.fetchRerunTestingRunResultSummary(testingRunSummaryId);
+                //fill testingRunResult in TestingConfigurations
+                if(!handleRerunTestingRunResult(rerunTestingRunResultSummary)) {
+                    TestingRun testingRun = dataActor.findTestingRun(testingRunSummaryId);
+                    TestingRunConfig baseConfig = dataActor.findTestingRunConfig(testingRun.getTestIdConfig());
+                    testingRun.setTestingRunConfig(baseConfig);
+                    testingProducer.initProducer(testingRun, summaryId, true, syncLimit);
+                    int maxRunTime = testingRun.getTestRunTime() <= 0 ? 30*60 : testingRun.getTestRunTime();
+                    testingConsumer.init(maxRunTime);
 
-                // if (StringUtils.hasLength(AKTO_SLACK_WEBHOOK) ) {
-                //     try {
-                //         CustomTextAlert customTextAlert = new CustomTextAlert("Test completed for accountId=" + accountId + " testingRun=" + testingRun.getHexId() + " summaryId=" + summaryId.toHexString() + " : @Arjun you are up now. Make your time worth it. :)");
-                //         SLACK_INSTANCE.send(AKTO_SLACK_WEBHOOK, customTextAlert.toJson());
-                //     } catch (Exception e) {
-                //         loggerMaker.error("Error sending slack alert for completion of test", e);
-                //     }
+                    // mark the test completed here
+                    testCompletion.markTestAsCompleteAndRunFunctions(testingRun, summaryId, System.currentTimeMillis());
 
-                // }
+                    // if (StringUtils.hasLength(AKTO_SLACK_WEBHOOK) ) {
+                    //     try {
+                    //         CustomTextAlert customTextAlert = new CustomTextAlert("Test completed for accountId=" + accountId + " testingRun=" + testingRun.getHexId() + " summaryId=" + summaryId.toHexString() + " : @Arjun you are up now. Make your time worth it. :)");
+                    //         SLACK_INSTANCE.send(AKTO_SLACK_WEBHOOK, customTextAlert.toJson());
+                    //     } catch (Exception e) {
+                    //         loggerMaker.error("Error sending slack alert for completion of test", e);
+                    //     }
 
-                // deleteScheduler.execute(() -> {
-                //     Context.accountId.set(accountId);
-                //     try {
-                //         deleteNonVulnerableResults();
+                    // }
 
-                //     } catch (Exception e) {
-                //         loggerMaker.errorAndAddToDb(e, "Error in deleting testing run results");
-                //     }
-                // });
+                    // deleteScheduler.execute(() -> {
+                    //     Context.accountId.set(accountId);
+                    //     try {
+                    //         deleteNonVulnerableResults();
+
+                    //     } catch (Exception e) {
+                    //         loggerMaker.errorAndAddToDb(e, "Error in deleting testing run results");
+                    //     }
+                    // });
+                }
             } catch (Exception e) {
                 loggerMaker.error("Error in running failed tests from file.", e);
             }
@@ -391,16 +423,18 @@ public class Main {
             long startDetailed = System.currentTimeMillis();
             int delta = start - 20*60;
 
+            TestingConfigurations config = TestingConfigurations.getInstance();
             TestingRunResultSummary trrs = dataActor.findPendingTestingRunResultSummary(start, delta, customMiniTestingServiceName);
             boolean isSummaryRunning = trrs != null && trrs.getState().equals(State.RUNNING);
+            boolean isTestingRunResultRerunCase = trrs != null && trrs.getOriginalTestingRunResultSummaryId() != null;
             TestingRun testingRun;
             ObjectId summaryId = null;
             if (trrs == null) {
                 delta = Context.now() - 20*60;
                 testingRun = dataActor.findPendingTestingRun(delta, customMiniTestingServiceName);
             } else {
-                summaryId = trrs.getId();
-                loggerMaker.infoAndAddToDb("Found trrs " + trrs.getHexId() +  " for account: " + accountId);
+                summaryId = isTestingRunResultRerunCase ? trrs.getOriginalTestingRunResultSummaryId() : trrs.getId();
+                loggerMaker.infoAndAddToDb("Found trrs " + trrs.getHexId() + (isTestingRunResultRerunCase ? " (rerun case) " : " ") + "for account: " + accountId);
                 testingRun = dataActor.findTestingRun(trrs.getTestingRunId().toHexString());
             }
 
@@ -411,12 +445,24 @@ public class Main {
                 continue;
             }
 
+            if (handleRerunTestingRunResult(trrs)) {
+                return;
+            }
+
             if (testingRun.getState().equals(State.STOPPED)) {
                 loggerMaker.infoAndAddToDb("Testing run stopped");
                 if (trrs != null) {
-                    loggerMaker.infoAndAddToDb("Stopping TRRS: " + trrs.getId());
-                    dataActor.updateTestRunResultSummaryNoUpsert(trrs.getId().toHexString());
-                    loggerMaker.infoAndAddToDb("Stopped TRRS: " + trrs.getId());
+                    if (isTestingRunResultRerunCase) {
+                        // For TRR-rerun case, delete the rerun summary and clean up configurations
+                        dataActor.deleteTestRunResultSummary(trrs.getId().toHexString());
+                        config.setTestingRunResultList(null);
+                        config.setRerunTestingRunResultSummary(null);
+                        loggerMaker.infoAndAddToDb("Deleted for TestingRunResult rerun case for stopped testrun TRRS: " + trrs.getId());
+                    } else {
+                        loggerMaker.infoAndAddToDb("Stopping TRRS: " + trrs.getId());
+                        dataActor.updateTestRunResultSummaryNoUpsert(trrs.getId().toHexString());
+                        loggerMaker.infoAndAddToDb("Stopped TRRS: " + trrs.getId());
+                    }
                 }
                 continue;
             }
@@ -426,14 +472,22 @@ public class Main {
             boolean isTestingRunRunning = testingRun.getState().equals(State.RUNNING);
 
             if (UsageMetricUtils.checkTestRunsOverage(accountId)) {
-                int lastSent = logSentMap.getOrDefault(accountId, 0);
-                if (start - lastSent > LoggerMaker.LOG_SAVE_INTERVAL) {
-                    logSentMap.put(accountId, start);
-                    loggerMaker.infoAndAddToDb("Test runs overage detected for account: " + accountId
-                            + " . Failing test run : " + start, LogDb.TESTING);
+                if (isTestingRunResultRerunCase) {
+                    // For TRR-rerun case, delete the rerun summary and clean up configurations
+                    dataActor.deleteTestRunResultSummary(trrs.getId().toHexString());
+                    config.setTestingRunResultList(null);
+                    config.setRerunTestingRunResultSummary(null);
+                    loggerMaker.infoAndAddToDb("Deleted for TestingRunResult rerun case for failed testrun TRRS: " + trrs.getId());
+                } else {
+                    int lastSent = logSentMap.getOrDefault(accountId, 0);
+                    if (start - lastSent > LoggerMaker.LOG_SAVE_INTERVAL) {
+                        logSentMap.put(accountId, start);
+                        loggerMaker.infoAndAddToDb("Test runs overage detected for account: " + accountId
+                                + " . Failing test run : " + start, LogDb.TESTING);
+                    }
+                    dataActor.updateTestingRun(testingRun.getId().toHexString());
+                    dataActor.updateTestRunResultSummary(summaryId.toHexString());
                 }
-                dataActor.updateTestingRun(testingRun.getId().toHexString());
-                dataActor.updateTestRunResultSummary(summaryId.toHexString());
                 return;
             }
 
@@ -460,18 +514,29 @@ public class Main {
                         Map<ObjectId, TestingRunResultSummary> objectIdTestingRunResultSummaryMap = dataActor.fetchTestingRunResultSummaryMap(testingRun.getId().toHexString());
                         testingRunResultSummary = objectIdTestingRunResultSummaryMap.get(testingRun.getId());
                     }
+                    // For rerun case, we need to check the original test results
+                    List<TestingRunResult> testingRunResults;
                     if (testingRunResultSummary != null) {
-                        List<TestingRunResult> testingRunResults = dataActor.fetchLatestTestingRunResult(testingRunResultSummary.getId().toHexString());
+                        if (isTestingRunResultRerunCase) {
+                            testingRunResults = dataActor.fetchLatestTestingRunResult(testingRunResultSummary.getOriginalTestingRunResultSummaryId().toHexString());
+                        } else {
+                            testingRunResults = dataActor.fetchLatestTestingRunResult(testingRunResultSummary.getId().toHexString());
+                        }
+
                         if (testingRunResults != null && !testingRunResults.isEmpty()) {
                             TestingRunResult testingRunResult = testingRunResults.get(0);
                             if (Context.now() - testingRunResult.getEndTimestamp() < LAST_TEST_RUN_EXECUTION_DELTA) {
                                 loggerMaker.infoAndAddToDb("Skipping test run as it was executed recently, TRR_ID:"
-                                        + testingRunResult.getHexId() + ", TRRS_ID:" + testingRunResultSummary.getHexId() + " TR_ID:" + testingRun.getHexId(), LogDb.TESTING);
+                                        + testingRunResult.getHexId() + ", TRRS_ID:" + testingRunResultSummary.getHexId()
+                                        + (isTestingRunResultRerunCase ? " (rerun case) " : " ")
+                                        + " TR_ID:" + testingRun.getHexId(), LogDb.TESTING);
                                 return;
                             } else {
                                 loggerMaker.infoAndAddToDb("Test run was executed long ago, TRR_ID:"
-                                        + testingRunResult.getHexId() + ", TRRS_ID:" + testingRunResultSummary.getHexId() + " TR_ID:" + testingRun.getHexId(), LogDb.TESTING);
-                                int maxRunTime = testingRun.getTestRunTime() <= 0 ? 30*60 : testingRun.getTestRunTime(); 
+                                        + testingRunResult.getHexId() + ", TRRS_ID:" + testingRunResultSummary.getHexId()
+                                        + (isTestingRunResultRerunCase ? " (rerun case) " : " ")
+                                        + " TR_ID:" + testingRun.getHexId(), LogDb.TESTING);
+                                int maxRunTime = testingRun.getTestRunTime() <= 0 ? 30*60 : testingRun.getTestRunTime();
                                 Bson filterQ = Filters.and(
                                     Filters.gte(TestingRunResultSummary.START_TIMESTAMP, (Context.now() - ((MAX_RETRIES_FOR_FAILED_SUMMARIES + 1) * maxRunTime))),
                                     Filters.eq(TestingRunResultSummary.TESTING_RUN_ID, testingRun.getId()),
@@ -497,7 +562,19 @@ public class Main {
                                 GithubUtils.publishGithubComments(runResultSummary);
                             }
                         } else {
-                            loggerMaker.infoAndAddToDb("No executions made for this test, will need to restart it, TRRS_ID:" + testingRunResultSummary.getHexId() + " TR_ID:" + testingRun.getHexId(), LogDb.TESTING);
+                            loggerMaker.infoAndAddToDb("No executions made for this test, will need to restart it, TRRS_ID:"
+                                    + testingRunResultSummary.getHexId()
+                                    + (isTestingRunResultRerunCase ? " (rerun case) " : " ")
+                                    + " TR_ID:" + testingRun.getHexId(), LogDb.TESTING);
+                            //won't reach here for testing run result rerun case, as there will be a minimum of 1 TRR
+                            //for safety delete run result.
+                            if (isTestingRunResultRerunCase) {
+                                dataActor.deleteTestRunResultSummary(testingRunResultSummary.getId().toHexString());
+                                config.setTestingRunResultList(null);
+                                config.setRerunTestingRunResultSummary(null);
+                                loggerMaker.infoAndAddToDb("Deleted for TestingRunResult rerun case for failed testrun TRRS: " + testingRunResultSummary.getId(), LogDb.TESTING);
+                                return;
+                            }
                             TestingRunResultSummary summary = dataActor.markTestRunResultSummaryFailed(testingRunResultSummary.getId().toHexString());
                             if (summary == null) {
                                 loggerMaker.infoAndAddToDb("Skipping because some other thread picked it up, TRRS_ID:" + testingRunResultSummary.getHexId() + " TR_ID:" + testingRun.getHexId(), LogDb.TESTING);
