@@ -41,6 +41,9 @@ public class TestingRunResultSummary {
      *
      * */
     private ObjectId originalTestingRunResultSummaryId;
+    @BsonIgnore
+    private String originalTestingRunResultSummaryHexId;
+
     public static final String ORIGINAL_TESTING_RUN_SUMMARY_ID = "originalTestingRunResultSummaryId";
     @BsonIgnore
     private String hexId;
@@ -195,5 +198,16 @@ public class TestingRunResultSummary {
 
     public void setOriginalTestingRunResultSummaryId(ObjectId originalTestingRunResultSummaryId) {
         this.originalTestingRunResultSummaryId = originalTestingRunResultSummaryId;
+    }
+
+    public String getOriginalTestingRunResultSummaryHexId() {
+        if (originalTestingRunResultSummaryHexId == null && this.originalTestingRunResultSummaryId != null) {
+            return this.originalTestingRunResultSummaryId.toHexString();
+        }
+        return originalTestingRunResultSummaryHexId;
+    }
+
+    public void setOriginalTestingRunResultSummaryHexId(String originalTestingRunResultSummaryHexId) {
+        this.originalTestingRunResultSummaryHexId = originalTestingRunResultSummaryHexId;
     }
 }
