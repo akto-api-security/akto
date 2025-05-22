@@ -68,6 +68,8 @@ import java.util.*;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import static com.akto.util.enums.GlobalEnums.YamlTemplateSource;
 
@@ -134,6 +136,7 @@ public class SaveTestEditorAction extends UserAction {
     public String saveTestEditorFile() {
         TestConfig testConfig;
         try {
+            this.content = (escapeUnicodeLiterals(content));
             ObjectMapper mapper = new ObjectMapper(YAMLFactory.builder()
             .enable(YAMLGenerator.Feature.MINIMIZE_QUOTES)
             .disable(YAMLGenerator.Feature.SPLIT_LINES)
@@ -212,7 +215,7 @@ public class SaveTestEditorAction extends UserAction {
             config.replace("id", finalTestId);
             infoMap.put("name", finalTestName);
             
-            this.content = mapper.writeValueAsString(config);
+            this.content = unescapeUnicodeLiterals(mapper.writeValueAsString(config));
             testConfig = TestConfigYamlParser.parseTemplate(content);
         } catch (Exception e) {
             e.printStackTrace();
@@ -260,6 +263,22 @@ public class SaveTestEditorAction extends UserAction {
             return ERROR.toUpperCase();
         }
         return SUCCESS.toUpperCase();
+    }
+
+    private static String escapeUnicodeLiterals(String yamlContent) {
+        Pattern pattern = Pattern.compile("(?<!\\\\)\\\\u[0-9a-fA-F]{4}");
+        Matcher matcher = pattern.matcher(yamlContent);
+        StringBuffer sb = new StringBuffer();
+        while (matcher.find()) {
+            String match = matcher.group();
+            matcher.appendReplacement(sb, Matcher.quoteReplacement("\\" + match));
+        }
+        matcher.appendTail(sb);
+        return sb.toString();
+    }
+
+    private static String unescapeUnicodeLiterals(String yaml) {
+        return yaml.replaceAll("\\\\\\\\u([0-9a-fA-F]{4})", "\\\\u$1");
     }
 
     public static int compareVersions(String v1, String v2) {
