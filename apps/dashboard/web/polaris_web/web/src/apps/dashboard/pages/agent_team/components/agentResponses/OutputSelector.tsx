@@ -90,7 +90,7 @@ function OutputSelector({onHandleSelect, processOutput} : OutputSelectorProps) {
                             })}
                             placeholder={"Edit choice(s)"}
                             setSelected={(selectedChoices: any) => handleSelected(selectedChoices)}
-                            preSelected={[filteredChoices]}
+                            preSelected={allowMultiple? filteredChoices: [filteredChoices]}
                             value={allowMultiple ? undefined : filteredChoices}
                             sliceMaxVal={80}
                         />
