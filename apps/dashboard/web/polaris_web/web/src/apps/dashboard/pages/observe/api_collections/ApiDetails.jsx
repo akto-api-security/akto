@@ -15,11 +15,24 @@ import RunTest from "./RunTest";
 import PersistStore from "../../../../main/PersistStore";
 import values from "@/util/values";
 import gptApi from "../../../components/aktoGpt/api";
+import GraphMetric from '../../../components/GraphMetric'
 
 import { HorizontalDotsMinor, FileMinor } from "@shopify/polaris-icons"
 import LocalStore from "../../../../main/LocalStorageStore";
 import InlineEditableText from "../../../components/shared/InlineEditableText";
 import GridRows from "../../../components/shared/GridRows";
+import Dropdown from "../../../components/layouts/Dropdown";
+
+const statsOptions = [
+    {label: "15 minutes", value: 15*60},
+    {label: "30 minutes", value: 30*60},
+    {label: "1 hour", value: 60*60},
+    {label: "3 hours", value: 3*60*60},
+    {label: "6 hours", value: 6*60*60},
+    {label: "12 hours", value: 12*60*60},
+    {label: "1 day", value: 24*60*60},
+    {label: "7 days", value: 7*24*60*60}
+]
 
 function TechCard(props){
     const {cardObj} = props;
@@ -53,6 +66,9 @@ function ApiDetails(props) {
     const [editableDescription, setEditableDescription] = useState(description)
 
     const [useLocalSubCategoryData, setUseLocalSubCategoryData] = useState(false)
+    const [apiCallStats, setApiCallStats] = useState([]); 
+    const endTs = func.timeNow();
+    const [startTime, setStartTime] = useState(endTs - statsOptions[0].value)
 
     const statusFunc = getStatus ? getStatus : (x) => {
         try {
@@ -67,6 +83,18 @@ function ApiDetails(props) {
     }
 
     const standardHeaders = new Set(transform.getStandardHeaderList())
+    const fetchStats = async(apiCollectionId, endpoint, method) => {
+        await api.fetchApiCallStats(apiCollectionId, endpoint, method, startTime, endTs).then((res) => {
+            const transformedData = [
+                {
+                    data: res.result.apiCallStats.map((item) => [item.ts * 60 * 1000, item.count]), // Access apiCallStats and convert seconds to milliseconds
+                    color: "",
+                    name: 'API Calls',
+                },
+              ];
+              setApiCallStats(transformedData);
+        })
+    }
 
     const fetchData = async () => {
         if (showDetails) {
@@ -147,23 +175,22 @@ function ApiDetails(props) {
                     setParamList(resp.data.params)
                 })
             })
-            /*
-            const queryPayload = dashboardFunc.getApiPrompts(apiCollectionId, endpoint, method)[0].prepareQuery();
-            try{
-                if(isGptActive && window.STIGG_FEATURE_WISE_ALLOWED["AKTO_GPT_AI"] && window.STIGG_FEATURE_WISE_ALLOWED["AKTO_GPT_AI"]?.isGranted === true){
-                    await gptApi.ask_ai(queryPayload).then((res) => {
-                        if (res.response.responses && res.response.responses.length > 0) {
-                            const metaHeaderResp = res.response.responses.filter(x => !standardHeaders.has(x.split(" ")[0]))
-                            setHeadersWithData(metaHeaderResp)
-                        }
-                    }
-                    ).catch((err) => {
-                        console.error("Failed to fetch prompts:", err);
-                    })
-                }
-            }catch (e) {
-            }
-            */
+            fetchStats(apiCollectionId, endpoint, method)
+            // const queryPayload = dashboardFunc.getApiPrompts(apiCollectionId, endpoint, method)[0].prepareQuery();
+            // try{
+            //     if(isGptActive && window.STIGG_FEATURE_WISE_ALLOWED["AKTO_GPT_AI"] && window.STIGG_FEATURE_WISE_ALLOWED["AKTO_GPT_AI"]?.isGranted === true){
+            //         await gptApi.ask_ai(queryPayload).then((res) => {
+            //             if (res.response.responses && res.response.responses.length > 0) {
+            //                 const metaHeaderResp = res.response.responses.filter(x => !standardHeaders.has(x.split(" ")[0]))
+            //                 setHeadersWithData(metaHeaderResp)
+            //             }
+            //         }
+            //         ).catch((err) => {
+            //             console.error("Failed to fetch prompts:", err);
+            //         })
+            //     }
+            // }catch (e) {
+            // }
 
         }
     }
@@ -213,6 +240,11 @@ function ApiDetails(props) {
         fetchData();
     }, [apiDetail])
 
+    useEffect(() => {
+        const { apiCollectionId, endpoint, method } = apiDetail;
+        fetchStats(apiCollectionId,endpoint, method)
+    },[startTime])
+
     function displayGPT() {
         setIsGptScreenActive(true)
         let requestObj = { key: "PARAMETER", jsonStr: sampleData[0]?.message, apiCollectionId: Number(apiDetail.apiCollectionId) }
@@ -243,6 +275,33 @@ function ApiDetails(props) {
     }
 
     const isDemergingActive = isDeMergeAllowed();
+
+    const defaultChartOptions = (enableLegends) => {
+        const options = {
+          plotOptions: {
+            series: {
+              events: {
+                legendItemClick: function () {
+                  var seriesIndex = this.index;
+                  var chart = this.chart;
+                  var series = chart.series[seriesIndex];
+    
+                  chart.series.forEach(function (s) {
+                    s.hide();
+                  });
+                  series.show();
+    
+                  return false;
+                },
+              },
+            },
+          },
+        };
+        if (enableLegends) {
+          options['legend'] = { layout: 'vertical', align: 'right', verticalAlign: 'middle' };
+        }
+        return options;
+      };
 
     const SchemaTab = {
         id: 'schema',
@@ -289,8 +348,53 @@ function ApiDetails(props) {
         </Box>,
     }
 
+    const ApiCallStatsTab = {
+        id: 'api-call-stats',
+        content: 'API Call Stats',
+        component: 
+          <Box paddingBlockStart={'4'}>
+            <HorizontalStack align="end">
+                <Dropdown
+                    menuItems={statsOptions}
+                    initial={statsOptions[0].label}
+                    selected={(timeInSeconds) => {
+                        setStartTime((prev) => {
+                            if((endTs - timeInSeconds) === prev){
+                                return prev
+                            }else{
+                                return endTs - timeInSeconds
+                            }
+                        })
+                    }} />
+                </HorizontalStack>
+            {apiCallStats != undefined && apiCallStats.length > 0 && apiCallStats[0]?.data !== undefined && apiCallStats[0]?.data?.length > 0 ? (
+                <VerticalStack gap={"2"}>
+                    
+                <GraphMetric
+                    key={apiCallStats.length}
+                    data={apiCallStats}
+                    type='spline'
+                    color='#6200EA'
+                    areaFillHex='true'
+                    height='330'
+                    title='API Call Count'
+                    subtitle='Number of API calls over time'
+                    defaultChartOptions={defaultChartOptions(false)}
+                    backgroundColor='#ffffff'
+                    text='true'
+                    inputMetrics={[]}
+                />
+                </VerticalStack>
+            ) : (
+                <Text alignment="center" variant='bodyMd' as='p'>
+                  No API call data available in the given time range.
+                </Text>
+              )}
+          </Box>
+        
+      };
+
     const deMergeApis = () => {
-        const { apiCollectionId, endpoint, method } = apiDetail
         api.deMergeApi(apiCollectionId, endpoint, method).then((resp) => {
             func.setToast(true, false, "De-merging successful!!.")
             window.location.reload()
@@ -392,7 +496,7 @@ function ApiDetails(props) {
         headingComp,
         <LayoutWithTabs
             key="tabs"
-            tabs={[ValuesTab, SchemaTab, DependencyTab]}
+            tabs={[ValuesTab, SchemaTab, ApiCallStatsTab, DependencyTab]}
             currTab={() => { }}
             disabledTabs={disabledTabs}
         />
