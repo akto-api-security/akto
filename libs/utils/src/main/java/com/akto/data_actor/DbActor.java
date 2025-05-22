@@ -1,6 +1,9 @@
 package com.akto.data_actor;
 
+import com.akto.dao.context.Context;
 import com.akto.dao.metrics.MetricDataDao;
+import com.akto.dao.testing.TestingRunResultDao;
+import com.akto.dao.testing.TestingRunResultSummariesDao;
 import com.akto.dto.*;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.billing.Organization;
@@ -39,6 +42,9 @@ import com.akto.dto.type.URLMethods.Method;
 import com.akto.dto.usage.MetricTypes;
 import com.akto.jobs.JobScheduler;
 import com.mongodb.BasicDBObject;
+import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Projections;
+import com.mongodb.client.model.Updates;
 import com.mongodb.client.model.WriteModel;
 
 import java.util.ArrayList;
@@ -297,6 +303,11 @@ public class DbActor extends DataActor {
         return DbLayer.fetchLatestTestingRunResult(testingRunResultSummaryId);
     }
 
+    @Override
+    public List<TestingRunResult> fetchRerunTestingRunResult(String testingRunResultSummaryId) {
+        return DbLayer.fetchRerunTestingRunResult(testingRunResultSummaryId);
+    }
+
     public List<TestingRunResult> fetchLatestTestingRunResultBySummaryId(String summaryId, int limit, int skip) {
         return DbLayer.fetchLatestTestingRunResultBySummaryId(summaryId, limit, skip);
     }
@@ -343,6 +354,11 @@ public class DbActor extends DataActor {
 
     public TestingRunResultSummary fetchTestingRunResultSummary(String testingRunResultSummaryId) {
         return DbLayer.fetchTestingRunResultSummary(testingRunResultSummaryId);
+    }
+
+    @Override
+    public TestingRunResultSummary fetchRerunTestingRunResultSummary(String originalTestingRunResultSummaryId) {
+        return DbLayer.fetchRerunTestingRunResultSummary(originalTestingRunResultSummaryId);
     }
 
     public Map<ObjectId, TestingRunResultSummary> fetchTestingRunResultSummaryMap(String testingRunId) {
@@ -464,6 +480,21 @@ public class DbActor extends DataActor {
 
     public void updateTestRunResultSummary(String summaryId) {
         DbLayer.updateTestRunResultSummary(summaryId);
+    }
+
+    @Override
+    public void deleteTestRunResultSummary(String summaryId) {
+        DbLayer.deleteTestRunResultSummary(summaryId);
+    }
+
+    @Override
+    public void deleteTestingRunResults(String testingRunResultId) {
+        DbLayer.deleteTestingRunResults(testingRunResultId);
+    }
+
+    @Override
+    public void updateStartTsTestRunResultSummary(String summaryId) {
+        DbLayer.updateStartTsTestRunResultSummary(summaryId);
     }
 
     public void updateTestRunResultSummaryNoUpsert(String testingRunResultSummaryId) {
