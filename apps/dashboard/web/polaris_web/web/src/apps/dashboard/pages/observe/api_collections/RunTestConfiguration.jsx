@@ -208,7 +208,7 @@ const RunTestConfiguration = ({ testRun, setTestRun, runTypeOptions, hourlyTimes
                 <Dropdown
                     label="Select Testing Module"
                     menuItems={miniTestingServiceNames}
-                    initial={miniTestingServiceNames?.[0]?.value}
+                    initial={testRun?.miniTestingServiceName || miniTestingServiceNames?.[0]?.value}
                     selected={(requests) => {
                         const miniTestingServiceNameOption = getLabel(miniTestingServiceNames, requests)
                         setTestRun(prev => ({
