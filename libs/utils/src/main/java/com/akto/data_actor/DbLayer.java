@@ -480,13 +480,24 @@ public class DbLayer {
         UpdateOptions updateOptions = new UpdateOptions();
         updateOptions.upsert(true);
 
+        Bson filters = Filters.eq("_id", vxlanId);
+
+        ApiCollection apiCollection = ApiCollectionsDao.instance.findOne(filters);
+        String userEnv = vpcId;
+        if (apiCollection != null && apiCollection.getUserSetEnvType() != null) {
+            userEnv = apiCollection.getUserSetEnvType();
+            if (!userEnv.contains(vpcId)) {
+                userEnv += ", " + vpcId;
+            }
+        }
+
         ApiCollectionsDao.instance.getMCollection().updateOne(
-                Filters.eq("_id", vxlanId),
+                filters,
                 Updates.combine(
                         Updates.set(ApiCollection.VXLAN_ID, vxlanId),
                         Updates.setOnInsert("startTs", Context.now()),
                         Updates.setOnInsert("urls", new HashSet<>()),
-                        Updates.setOnInsert("userSetEnvType", vpcId)
+                        Updates.set(ApiCollection.USER_ENV_TYPE, userEnv)
                 ),
                 updateOptions
         );
@@ -511,11 +522,20 @@ public class DbLayer {
         FindOneAndUpdateOptions updateOptions = new FindOneAndUpdateOptions();
         updateOptions.upsert(true);
 
+        ApiCollection apiCollection = ApiCollectionsDao.instance.findOne(Filters.eq(ApiCollection.HOST_NAME, host));
+        String userEnv = vpcId;
+        if (apiCollection != null && apiCollection.getUserSetEnvType() != null) {
+            userEnv = apiCollection.getUserSetEnvType();
+            if (!userEnv.contains(vpcId)) {
+                userEnv += ", " + vpcId;
+            }
+        }
+
         Bson updates = Updates.combine(
             Updates.setOnInsert("_id", id),
             Updates.setOnInsert("startTs", Context.now()),
             Updates.setOnInsert("urls", new HashSet<>()),
-            Updates.setOnInsert("userSetEnvType", vpcId)
+            Updates.set(ApiCollection.USER_ENV_TYPE, userEnv)
         );
 
         ApiCollectionsDao.instance.getMCollection().findOneAndUpdate(Filters.eq(ApiCollection.HOST_NAME, host), updates, updateOptions);
