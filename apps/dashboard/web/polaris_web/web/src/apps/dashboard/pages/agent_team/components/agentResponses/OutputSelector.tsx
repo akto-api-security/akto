@@ -76,10 +76,10 @@ function OutputSelector({onHandleSelect, processOutput} : OutputSelectorProps) {
             <HorizontalStack gap={"3"}>
             <Text variant="bodyMd" as="span">{auxMessage}</Text>
             {
-                noOptionsReturned ? <></> :
+                noOptionsReturned ? <TextField labelHidden={true} label="" autoComplete="off" value={filteredChoices as string} onChange={(val: string) => setFilteredChoices(val)} /> :
                     <HorizontalStack gap={"2"}>
-                        {processOutput?.outputOptions.length > 0 ? <DropdownSearch
-                            key = "dropdown-search"
+                         <DropdownSearch
+                            id={"dropdown-search"}
                             allowMultiple={allowMultiple}
                             optionsList={processOutput?.outputOptions.map((option: any) => {
                                 // TODO: optionally take this function for transformation.
@@ -88,12 +88,12 @@ function OutputSelector({onHandleSelect, processOutput} : OutputSelectorProps) {
                                     value: option?.value !== undefined ? option?.value : (option?.textValue !== undefined ? option?.textValue : option),
                                 }
                             })}
-                            placeHolder={"Edit choice(s)"}
+                            placeholder={"Edit choice(s)"}
                             setSelected={(selectedChoices: any) => handleSelected(selectedChoices)}
-                            preSelected={filteredChoices}
+                            preSelected={[filteredChoices]}
                             value={allowMultiple ? undefined : filteredChoices}
                             sliceMaxVal={80}
-                        /> : <TextField labelHidden={true} label="" autoComplete="off" value={filteredChoices as string} onChange={(val: string) => setFilteredChoices(val)} />}
+                        />
                     </HorizontalStack>
             }
             </HorizontalStack>
