@@ -1538,6 +1538,91 @@ public class ClientActor extends DataActor {
         }
     }
 
+    @Override
+    public void deleteTestRunResultSummary(String summaryId) {
+        Map<String, List<String>> headers = buildHeaders();
+        BasicDBObject obj = new BasicDBObject();
+        obj.put("testingRunResultSummaryId", summaryId);
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/deleteTestRunResultSummary", "", "POST", obj.toString(), headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb("non 2xx response in fetchTestingRunResultSummary", LoggerMaker.LogDb.RUNTIME);
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in fetchTestingRunResultSummary" + e, LoggerMaker.LogDb.RUNTIME);
+        }
+    }
+
+    @Override
+    public void deleteTestingRunResults(String testingRunResultId) {
+        Map<String, List<String>> headers = buildHeaders();
+        BasicDBObject obj = new BasicDBObject();
+        obj.put("testingRunResultId", testingRunResultId);
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/deleteTestingRunResults", "", "POST", obj.toString(), headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb("non 2xx response in fetchTestingRunResultSummary", LoggerMaker.LogDb.RUNTIME);
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in fetchTestingRunResultSummary" + e, LoggerMaker.LogDb.RUNTIME);
+        }
+    }
+
+    @Override
+    public void updateStartTsTestRunResultSummary(String summaryId) {
+        Map<String, List<String>> headers = buildHeaders();
+        BasicDBObject obj = new BasicDBObject();
+        obj.put("testingRunResultSummaryId", summaryId);
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/updateStartTsTestRunResultSummary", "", "POST", obj.toString(), headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb("non 2xx response in fetchTestingRunResultSummary", LoggerMaker.LogDb.RUNTIME);
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in fetchTestingRunResultSummary" + e, LoggerMaker.LogDb.RUNTIME);
+        }
+    }
+
+
+    @Override
+    public List<TestingRunResult> fetchRerunTestingRunResult(String testingRunResultSummaryId) {
+        Map<String, List<String>> headers = buildHeaders();
+        List<TestingRunResult> results = new ArrayList<>();
+        BasicDBObject obj = new BasicDBObject();
+        obj.put("testingRunResultSummaryId", testingRunResultSummaryId);
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/fetchRerunTestingRunResult", "", "POST", obj.toString(), headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb("non 2xx response in fetchLatestTestingRunResult", LoggerMaker.LogDb.RUNTIME);
+                return null;
+            }
+            BasicDBObject payloadObj;
+            try {
+                payloadObj =  BasicDBObject.parse(responsePayload);
+                BasicDBList testingRunResults = (BasicDBList) payloadObj.get("testingRunResults");
+                for (Object testingRunResult: testingRunResults) {
+                    BasicDBObject obj2 = (BasicDBObject) testingRunResult;
+                    TestingRunResult s = objectMapper.readValue(obj2.toJson(), TestingRunResult.class);
+                    results.add(s);
+                }
+            } catch(Exception e) {
+                loggerMaker.errorAndAddToDb("error extracting response in fetchLatestTestingRunResult" + e, LoggerMaker.LogDb.RUNTIME);
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in fetchLatestTestingRunResult" + e, LoggerMaker.LogDb.RUNTIME);
+            return null;
+        }
+        return results;
+    }
+
     public void updateTestingRun(String testingRunId) {
         Map<String, List<String>> headers = buildHeaders();
         BasicDBObject obj = new BasicDBObject();
@@ -1619,6 +1704,37 @@ public class ClientActor extends DataActor {
         BasicDBObject obj = new BasicDBObject();
         obj.put("testingRunResultSummaryId", testingRunResultSummaryId);
         OriginalHttpRequest request = new OriginalHttpRequest(url + "/fetchTestingRunResultSummary", "", "POST", obj.toString(), headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb("non 2xx response in fetchTestingRunResultSummary", LoggerMaker.LogDb.RUNTIME);
+                return null;
+            }
+            BasicDBObject payloadObj;
+            try {
+                payloadObj =  BasicDBObject.parse(responsePayload);
+                BasicDBObject testingRunResultSummary = (BasicDBObject) payloadObj.get("trrs");
+                testingRunResultSummary.remove("id");
+                testingRunResultSummary.remove("testingRunId");
+                TestingRunResultSummary res = objectMapper.readValue(testingRunResultSummary.toJson(), TestingRunResultSummary.class);
+                res.setId(new ObjectId(testingRunResultSummary.getString("hexId")));
+                res.setTestingRunId(new ObjectId(testingRunResultSummary.getString("testingRunHexId")));
+                return res;
+            } catch(Exception e) {
+                return null;
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in fetchTestingRunResultSummary" + e, LoggerMaker.LogDb.RUNTIME);
+            return null;
+        }
+    }
+
+    public TestingRunResultSummary fetchRerunTestingRunResultSummary(String testingRunResultSummaryId) {
+        Map<String, List<String>> headers = buildHeaders();
+        BasicDBObject obj = new BasicDBObject();
+        obj.put("testingRunResultSummaryId", testingRunResultSummaryId);
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/fetchRerunTestingRunResultSummary", "", "POST", obj.toString(), headers, "");
         try {
             OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
             String responsePayload = response.getBody();
