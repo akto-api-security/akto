@@ -22,12 +22,21 @@ import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.RawApi;
 import com.akto.dto.test_editor.ConfigParserResult;
 import com.akto.dto.test_editor.DataOperandsFilterResponse;
+import com.akto.dto.test_editor.ExecutorSingleOperationResp;
+import com.akto.dto.test_editor.Util;
 import com.akto.dto.testing.TestingRunConfig;
 import com.akto.dto.type.URLMethods.Method;
 import com.akto.test_editor.execution.Executor;
 import com.akto.test_editor.filter.Filter;
+import com.fasterxml.jackson.core.JsonPointer;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
+import com.mongodb.BasicDBList;
+import com.mongodb.BasicDBObject;
 
 public class FilterValidationTests {
     
@@ -342,6 +351,73 @@ public class FilterValidationTests {
         assertEquals(true, dataOperandsFilterResponse.getResult());
         assertEquals(1, varMap.size());
         assertEquals(4, ((List) varMap.get("keyName")).size());
+    }
+
+    @Test
+    public void testPayloadModificationCases() {
+        
+        Map<String, Object> config = initconfig();
+        ApiInfo.ApiInfoKey apiInfoKey = new ApiInfo.ApiInfoKey(123, "https://epsilon.6sense.com:443/v3/company/details", Method.PUT);
+        RawApi rawApi = initRawapi(apiInfoKey);
+        ObjectMapper mapper = new ObjectMapper();
+
+        // add key at root
+        String keyPath = "newKey";
+        Object value = "xyz";
+    
+        String payload = "{\"id\": 101, \"name\": \"Stud-101\", \"email\": \"stude_101@example.com\", \"details\": {\"course\": \"MECH\"}}";
+        rawApi.getRequest().setBody(payload);
+        rawApi = com.akto.test_editor.Utils.modifyRawApiPayload(rawApi, keyPath, value);
+        assertEquals(rawApi.getRequest().getBody(), "{\"id\":101,\"name\":\"Stud-101\",\"email\":\"stude_101@example.com\",\"details\":{\"course\":\"MECH\"},\"newKey\":\"xyz\"}");
+
+
+        // add key inside existing object
+        keyPath = "details.newKey";
+        value = "xyz";
+    
+        payload = "{\"id\": 101, \"name\": \"Stud-101\", \"email\": \"stude_101@example.com\", \"details\": {\"course\": \"MECH\"}}";
+        rawApi.getRequest().setBody(payload);
+        rawApi = com.akto.test_editor.Utils.modifyRawApiPayload(rawApi, keyPath, value);
+        assertEquals(rawApi.getRequest().getBody(), "{\"id\":101,\"name\":\"Stud-101\",\"email\":\"stude_101@example.com\",\"details\":{\"course\":\"MECH\",\"newKey\":\"xyz\"}}");
+        
+        // add key at nonexisting path
+        keyPath = "nonexistent.newKey";
+        value = "xyz";
+    
+        payload = "{\"id\": 101, \"name\": \"Stud-101\", \"email\": \"stude_101@example.com\", \"details\": {\"course\": \"MECH\"}}";
+        rawApi.getRequest().setBody(payload);
+        rawApi = com.akto.test_editor.Utils.modifyRawApiPayload(rawApi, keyPath, value);
+        assertEquals(rawApi.getRequest().getBody(), "{\"id\":101,\"name\":\"Stud-101\",\"email\":\"stude_101@example.com\",\"details\":{\"course\":\"MECH\"},\"nonexistent\":{\"newKey\":\"xyz\"}}");
+
+        // add key to list
+        keyPath = "details[0].newKey";
+        value = "xyz";
+    
+        payload = "{\"id\": 101, \"name\": \"Stud-101\", \"email\": \"stude_101@example.com\", \"details\": [{\"course\": \"MECH\"}]}";
+        rawApi.getRequest().setBody(payload);
+        rawApi = com.akto.test_editor.Utils.modifyRawApiPayload(rawApi, keyPath, value);
+        assertEquals(rawApi.getRequest().getBody(), "{\"id\":101,\"name\":\"Stud-101\",\"email\":\"stude_101@example.com\",\"details\":[{\"course\":\"MECH\",\"newKey\":\"xyz\"}]}");
+
+        // create new list
+        keyPath = "newList[0].newKey";
+        value = "xyz";
+    
+        payload = "{\"id\": 101, \"name\": \"Stud-101\", \"email\": \"stude_101@example.com\", \"details\": [{\"course\": \"MECH\"}]}";
+        rawApi.getRequest().setBody(payload);
+        rawApi = com.akto.test_editor.Utils.modifyRawApiPayload(rawApi, keyPath, value);
+        System.out.println(rawApi.getRequest().getBody());
+        assertEquals(rawApi.getRequest().getBody(), "{\"id\":101,\"name\":\"Stud-101\",\"email\":\"stude_101@example.com\",\"details\":[{\"course\":\"MECH\"}],\"newList\":[{\"newKey\":\"xyz\"}]}");
+
+        // create list inside list
+        keyPath = "newList[0].sublist[0].newKeyy";
+        value = "xyz";
+    
+        payload = "{\"id\": 101, \"name\": \"Stud-101\", \"email\": \"stude_101@example.com\", \"details\": [{\"course\": \"MECH\"}]}";
+        rawApi.getRequest().setBody(payload);
+        rawApi = com.akto.test_editor.Utils.modifyRawApiPayload(rawApi, keyPath, value);
+        System.out.println(rawApi.getRequest().getBody());
+        assertEquals(rawApi.getRequest().getBody(), "{\"id\":101,\"name\":\"Stud-101\",\"email\":\"stude_101@example.com\",\"details\":[{\"course\":\"MECH\"}],\"newList\":[{\"sublist\":[{\"newKeyy\":\"xyz\"}]}]}");
+
     }
 
     public Map<String, Object> initconfig() {

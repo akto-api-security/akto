@@ -1,7 +1,7 @@
 package com.akto.threat.backend.router;
 
+import com.akto.ProtoMessageUtils;
 import com.akto.proto.generated.threat_detection.service.malicious_alert_service.v1.RecordMaliciousEventRequest;
-import com.akto.proto.utils.ProtoMessageUtils;
 import com.akto.threat.backend.service.MaliciousEventService;
 import io.vertx.core.Vertx;
 import io.vertx.ext.web.RequestBody;
