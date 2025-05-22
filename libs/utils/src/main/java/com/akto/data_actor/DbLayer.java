@@ -620,7 +620,7 @@ public class DbLayer {
         // Only fetch the fields we need, including the miniTestingServiceName from TestingRun
         TestingRunResultSummary trrs = TestingRunResultSummariesDao.instance.findOne(
             Filters.or(filter1, filter2),
-            Projections.include(TestingRunResultSummary.TESTING_RUN_ID, ID)
+            Projections.include(TestingRunResultSummary.TESTING_RUN_ID, ID, TestingRunResultSummary.ORIGINAL_TESTING_RUN_SUMMARY_ID)
         );
         if (trrs == null) return null;
 
