@@ -532,8 +532,7 @@ public class DbLayer {
     }
 
     public static void deleteTestRunResultSummary(String summaryId) {
-        TestingRunResultSummariesDao.instance.updateOneNoUpsert(Filters.eq(TestingRunResultSummary.ID, new ObjectId(summaryId)),
-                Updates.set(TestingRunResultSummary.START_TIMESTAMP, Context.now()));
+        TestingRunResultSummariesDao.instance.deleteAll(Filters.eq(TestingRunResultSummary.ID, new ObjectId(summaryId)));
     }
 
     public static void deleteTestingRunResults(String testingRunResultId) {
