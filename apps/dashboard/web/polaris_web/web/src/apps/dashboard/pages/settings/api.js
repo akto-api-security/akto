@@ -504,12 +504,12 @@ const settingRequests = {
             }
         })
     },
-    enableMergingOnVersions(enableMergingOnVersions){
+    enableMergingOnVersions(enableMergingOnVersions, allowRetrospectiveMerging) {
         return request({
             url: '/api/enableMergingOnVersionsInApis',
             method: "post",
             data: {
-                enableMergingOnVersions
+                enableMergingOnVersions, allowRetrospectiveMerging
             }
         })
     },

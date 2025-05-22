@@ -555,12 +555,14 @@ public class Utils {
             responses = com.akto.runtime.Main.filterBasedOnHeaders(responses, accountSettings);
 
             boolean makeApisCaseInsensitive = false;
+            boolean mergeUrlsOnVersions = false;
             if(accountSettings != null){
                 makeApisCaseInsensitive = accountSettings.getHandleApisCaseInsensitive();
+                mergeUrlsOnVersions = accountSettings.isAllowMergingOnVersions();
             }
 
             info.getHttpCallParser().syncFunction(responses, true, false, accountSettings, skipAdvancedFilters);
-            APICatalogSync.mergeUrlsAndSave(apiCollectionId, true, false, info.getHttpCallParser().apiCatalogSync.existingAPIsInDb, makeApisCaseInsensitive);
+            APICatalogSync.mergeUrlsAndSave(apiCollectionId, true, false, info.getHttpCallParser().apiCatalogSync.existingAPIsInDb, makeApisCaseInsensitive, mergeUrlsOnVersions);
             info.getHttpCallParser().apiCatalogSync.buildFromDB(false, false);
             APICatalogSync.updateApiCollectionCount(info.getHttpCallParser().apiCatalogSync.getDbState(apiCollectionId), apiCollectionId);
 //            for (HttpResponseParams responseParams: responses)  {

@@ -1,4 +1,4 @@
-import { Box, Button, ButtonGroup, Divider, LegacyCard, Text, VerticalStack, HorizontalGrid, HorizontalStack, Scrollable, TextField, Tag, Form, Tooltip, Checkbox } from '@shopify/polaris'
+import { Box, Button, ButtonGroup, Divider, LegacyCard, Text, VerticalStack, HorizontalGrid, HorizontalStack, Scrollable, TextField, Tag, Form, Tooltip, Checkbox, Modal } from '@shopify/polaris'
 import React, { useEffect, useState } from 'react'
 import settingFunctions from '../module'
 import Dropdown from '../../../components/layouts/Dropdown'
@@ -49,6 +49,7 @@ function About() {
     const [selectedUrlList, setSelectedUrlsList] = useState([])
     const [miniTesting, setMiniTesting] = useState(false)
     const [mergingOnVersions, setMergingOnVersions] = useState(false)
+    const [retrospective, setRetrospective] = useState(false)
 
     const setupOptions = settingFunctions.getSetupOptions()
 
@@ -239,7 +240,7 @@ function About() {
 
     const handleMergingOnVersions = async(val) => {
         setMergingOnVersions(val) ;
-        await settingRequests.enableMergingOnVersions(val);
+        await settingRequests.enableMergingOnVersions(val, retrospective);
     }
 
     
@@ -376,6 +377,7 @@ function About() {
             </Box>
             <ToggleComponent text={"Treat URLs as case insensitive"} onToggle={handleApisCaseInsensitive} initial={toggleCaseSensitiveApis} disabled={window.USER_ROLE !== "ADMIN"}/>
             <ToggleComponent text={"Use akto's testing module"} onToggle={toggleMiniTesting} initial={miniTesting} disabled={window.USER_ROLE !== "ADMIN"}/>
+            <ToggleComponent text={"Allow merging on versions"} onToggle={() => setModalOpen(true)} initial={mergingOnVersions} disabled={window.USER_ROLE !== "ADMIN"}/>
         </VerticalStack>
     )
     
@@ -603,7 +605,35 @@ function About() {
                             onRemove={(val) => handleIpsChange(val, false, "partner")}
                             onApply={() => applyIps()}
                             type={"partner"}
-                        /> : null
+                        /> : null,
+                        <Modal
+                            open={modalOpen}
+                            onClose={() => setModalOpen(false)}
+                            title={mergingOnVersions ? "Do not merge on versions" : "Allow merging on versions"}
+                            primaryAction={{
+                                content: 'Save',
+                                onAction: () => {
+                                    handleMergingOnVersions(!mergingOnVersions)
+                                    setModalOpen(false)
+                                },
+                            }}
+                            secondaryActions={[
+                                {
+                                    content: 'Cancel',
+                                    onAction: () => setModalOpen(false),
+                                },
+                            ]}
+                        >
+                            <Modal.Section>
+                                <Text variant="bodyMd" color="subdued">Allow merging on versions will allow you to merge the endpoints with different versions. This will help you to reduce the number of endpoints in your application. Note this job runs in the background and result might get reflected with slight delay.</Text>
+                                {!mergingOnVersions ? <Checkbox
+                                    label="Allow retrospective merging on versions"
+                                    checked={retrospective}
+                                    onChange={() => setRetrospective(!retrospective)}
+                                    disabled={window.USER_ROLE !== "ADMIN"}
+                                /> : null}
+                            </Modal.Section>
+                        </Modal>
         ]
 
     return (

@@ -22,6 +22,7 @@ import com.akto.runtime.Main;
 import com.akto.runtime.policies.ApiAccessTypePolicy;
 import com.akto.util.Constants;
 import com.akto.util.DashboardMode;
+import com.akto.utils.jobs.CleanInventory;
 import com.akto.utils.libs.utils.src.main.java.com.akto.runtime.policies.ApiAccessTypePolicyUtil;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
@@ -87,6 +88,8 @@ public class AdminSettingsAction extends UserAction {
     private boolean miniTestingEnabled;
     @Setter
     private boolean enableMergingOnVersions;
+    @Setter
+    private boolean allowRetrospectiveMerging;
 
     public String updateSetupType() {
         AccountSettingsDao.instance.getMCollection().updateOne(
@@ -481,6 +484,19 @@ public class AdminSettingsAction extends UserAction {
             AccountSettingsDao.generateFilter(),
             Updates.set(AccountSettings.ALLOW_MERGING_ON_VERSIONS, this.enableMergingOnVersions)
         );
+        int accountId = Context.accountId.get();
+        if(this.allowRetrospectiveMerging){
+            executorService.schedule( new Runnable() {
+                public void run() {
+                    Context.accountId.set(accountId);
+                    try {
+                        CleanInventory.removeVersionedAPIs();
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+                }
+            }, 0 , TimeUnit.SECONDS);
+        }
         return SUCCESS.toUpperCase();
     }
 
