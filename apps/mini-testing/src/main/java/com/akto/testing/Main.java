@@ -294,8 +294,8 @@ public class Main {
             return false;
         }
 
-        ObjectId summaryId = originalSummary.getOriginalTestingRunResultSummaryId();
-        List<TestingRunResult> testingRunResultList = dataActor.fetchRerunTestingRunResult(originalSummary.getOriginalTestingRunResultSummaryId().toHexString());
+        String summaryIdHexId = originalSummary.getOriginalTestingRunResultSummaryHexId();
+        List<TestingRunResult> testingRunResultList = dataActor.fetchRerunTestingRunResult(summaryIdHexId);
         if (testingRunResultList == null) {
             dataActor.deleteTestRunResultSummary(originalSummary.getId().toHexString());
             loggerMaker.infoAndAddToDb("Deleting TRRS for rerun case, no testing run result found, TRRS_ID: " + originalSummary.getId().toHexString(), LogDb.TESTING);
@@ -303,7 +303,7 @@ public class Main {
         }
 
         //Updating start time stamp as current time stamp in case of rerun
-        dataActor.updateStartTsTestRunResultSummary(summaryId.toHexString());
+        dataActor.updateStartTsTestRunResultSummary(summaryIdHexId);
         config.setRerunTestingRunResultSummary(originalSummary);
         config.setTestingRunResultList(testingRunResultList);
         return false;
@@ -427,6 +427,9 @@ public class Main {
             TestingRunResultSummary trrs = dataActor.findPendingTestingRunResultSummary(start, delta, customMiniTestingServiceName);
             boolean isSummaryRunning = trrs != null && trrs.getState().equals(State.RUNNING);
             boolean isTestingRunResultRerunCase = trrs != null && trrs.getOriginalTestingRunResultSummaryId() != null;
+            if (isTestingRunResultRerunCase) {
+                trrs.setOriginalTestingRunResultSummaryId(new ObjectId(trrs.getOriginalTestingRunResultSummaryHexId()));
+            }
             TestingRun testingRun;
             ObjectId summaryId = null;
             if (trrs == null) {
