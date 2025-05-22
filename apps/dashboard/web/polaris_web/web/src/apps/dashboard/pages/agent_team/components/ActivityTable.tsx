@@ -125,7 +125,7 @@ function ActivityTable({ agentId }) {
                 duration = func.prettifyEpochDuration(runData.endTimestamp - runData.startTimestamp);
             }
             return {
-                start_time: new Date(runData.startTimestamp * 1000).toUTCString(),
+                start_time: runData?.startTimestamp ? new Date(runData?.startTimestamp * 1000).toUTCString() : "-",
                 targetName: getTargetNames(runData),
                 action: func.capitalizeFirstLetter(runData.state.toLowerCase()),
                 duration: duration,
