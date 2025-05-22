@@ -663,7 +663,7 @@ public class TestExecutor {
             TestingRunResult originalTestingRunResultForRerun = TestingConfigurations.getInstance().getTestingRunResultForApiKeyInfo(testingRunResults.get(0).getApiInfoKey(), testingRunResults.get(0).getTestSubType());
             if (originalTestingRunResultForRerun != null) {
                 loggerMaker.infoAndAddToDb("Deleting original testingRunResults for rerun after replaced with run TRR_ID: " + originalTestingRunResultForRerun.getHexId());
-                dataActor.deleteTestingRunResults(originalTestingRunResultForRerun.getId().toHexString());
+                dataActor.deleteTestingRunResults(originalTestingRunResultForRerun.getHexId());
                 /*
                  * delete from vulnerableTestResults as well.
                  * assuming if original was vulnerable, entry will be in VulnerableTestingRunResultDao
