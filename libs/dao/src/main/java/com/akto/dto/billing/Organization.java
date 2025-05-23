@@ -42,11 +42,11 @@ public class Organization {
     public static final String TRIAL_MSG = "trialMsg";
     public String trialMsg = "trialMsg";
 
-    public static final String PROTECTIONTRIAL_MSG = "ProtectionTrialMsg";
-    public String ProtectionTrialMsg = "ProtectionTrialMsg";
+    public static final String PROTECTIONTRIAL_MSG = "protectionTrialMsg";
+    public String protectionTrialMsg = "protectionTrialMsg";
 
-    public static final String AGENTTRIAL_MSG = "AgentTrialMsg";
-    public String AgentTrialMsg = "AgentTrialMsg";
+    public static final String AGENTTRIAL_MSG = "agentTrialMsg";
+    public String agentTrialMsg = "agentTrialMsg";
 
     public static final String TEST_TELEMETRY_ENABLED = "testTelemetryEnabled";
     private boolean testTelemetryEnabled;
@@ -159,20 +159,20 @@ public class Organization {
         this.trialMsg = trialMsg;
     }
 
-    public  String getProtectionTrialMsg() {
-        return ProtectionTrialMsg;
+    public  String getprotectionTrialMsg() {
+        return protectionTrialMsg;
     }
 
-    public  void setProtectionTrialMsg(String ProtectionTrialMsg) {
-        this.ProtectionTrialMsg = ProtectionTrialMsg;
+    public  void setprotectionTrialMsg(String protectionTrialMsg) {
+        this.protectionTrialMsg = protectionTrialMsg;
     }
 
-    public  String getAgentTrialMsg() {
-        return AgentTrialMsg;
+    public  String getagentTrialMsg() {
+        return agentTrialMsg;
     }
 
-    public  void setAgentTrialMsg(String AgentTrialMsg) {
-        this.AgentTrialMsg = AgentTrialMsg;
+    public  void setagentTrialMsg(String agentTrialMsg) {
+        this.agentTrialMsg = agentTrialMsg;
     }
 
     public int getLastFeatureMapUpdate() {
