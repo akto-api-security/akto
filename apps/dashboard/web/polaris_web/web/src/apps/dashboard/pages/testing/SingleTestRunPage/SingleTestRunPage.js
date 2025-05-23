@@ -284,7 +284,6 @@ function SingleTestRunPage() {
           try {
             const response = await observeApi.fetchApiInfosForCollection(
                 collectionId);
-            console.log(response);
             if (response?.apiInfoList) {
               const limitedEndpoints = response.apiInfoList.slice(
                   0, 5000);
