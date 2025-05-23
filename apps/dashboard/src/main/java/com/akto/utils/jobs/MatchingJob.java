@@ -11,8 +11,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
 import org.bson.conversions.Bson;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.SingleTypeInfoDao;
