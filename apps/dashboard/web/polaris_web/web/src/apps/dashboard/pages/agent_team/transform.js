@@ -75,9 +75,8 @@ const transform = {
         );
         return subprocesses;
     },
-    updateAgentState: (state,agentId="",setAgentState,setCurrentAgentState) => {
+    updateAgentState: (state,agentId="",setAgentState) => {
         setAgentState(state)
-        if(agentId !== "")setCurrentAgentState(agentId,state)
     },
 
 }

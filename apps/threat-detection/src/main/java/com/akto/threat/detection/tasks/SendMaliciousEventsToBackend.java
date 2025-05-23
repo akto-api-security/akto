@@ -1,5 +1,6 @@
 package com.akto.threat.detection.tasks;
 
+import com.akto.ProtoMessageUtils;
 import com.akto.kafka.KafkaConfig;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
@@ -8,7 +9,6 @@ import com.akto.proto.generated.threat_detection.message.malicious_event.v1.Mali
 import com.akto.proto.generated.threat_detection.message.malicious_event.v1.MaliciousEventMessage;
 import com.akto.proto.generated.threat_detection.message.sample_request.v1.SampleMaliciousRequest;
 import com.akto.proto.generated.threat_detection.service.malicious_alert_service.v1.RecordMaliciousEventRequest;
-import com.akto.proto.utils.ProtoMessageUtils;
 import com.akto.threat.detection.db.entity.MaliciousEventEntity;
 import com.google.protobuf.InvalidProtocolBufferException;
 import java.io.IOException;

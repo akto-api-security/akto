@@ -2,23 +2,34 @@ package com.akto.action;
 
 import java.util.*;
 
+import org.bson.conversions.Bson;
+
+import com.akto.action.metrics.MetricsAction;
 import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.SampleDataDao;
 import com.akto.dao.SensitiveSampleDataDao;
 import com.akto.dao.TrafficInfoDao;
 import com.akto.dao.context.Context;
+import com.akto.dao.threat_detection.ApiHitCountInfoDao;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.SensitiveSampleData;
+import com.akto.dto.threat_detection.ApiHitCountInfo;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.traffic.TrafficInfo;
 import com.akto.dto.type.SingleTypeInfo;
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.Constants;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Projections;
 import com.opensymphony.xwork2.Action;
+import lombok.Getter;
+import lombok.Setter;
 
 public class TrafficAction {
     
+    private static final LoggerMaker loggerMaker = new LoggerMaker(TrafficAction.class);
     int apiCollectionId;
     String url;
     String method;
@@ -26,6 +37,12 @@ public class TrafficAction {
     int endEpoch;
     int skip;
     int limit;
+    int startTs;
+    int endTs;
+    
+    @Getter
+    @Setter
+    Map<String, Object> result = new HashMap<>();
 
     Map<Integer, Integer> traffic = new HashMap<>();
 
@@ -95,6 +112,35 @@ public class TrafficAction {
 
 
         return Action.SUCCESS.toUpperCase();
+    }
+
+    public String fetchApiCallStats() {
+        try {
+            int startTs = startEpoch/60;
+            int endTs = endEpoch/60;
+            Bson filters = Filters.and(
+                Filters.eq("apiCollectionId", apiCollectionId),
+                Filters.eq("method", method),
+                Filters.eq("url", url),
+                Filters.gte("ts", startTs),
+                Filters.lte("ts", endTs)
+            );
+            Bson projection = Projections.include("ts", "count");
+            List<ApiHitCountInfo> apiHitCountInfos = ApiHitCountInfoDao.instance.findAll(filters, projection);
+            if (apiHitCountInfos == null || apiHitCountInfos.size() == 0) {
+                loggerMaker.infoAndAddToDb("No api call metrics found for apicollection " + apiCollectionId + " url " + url + " method " + method, LogDb.DASHBOARD);
+                result.put("apiCallStats", new ArrayList<>());
+                return Action.SUCCESS.toUpperCase();
+            }
+            result.put("apiCallStats", apiHitCountInfos);
+            return Action.SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            e.printStackTrace();
+            String errMsg = "Error fetching api call stats: apicollection " + apiCollectionId + " url " + url + " method " + method + " error " + e.getMessage();
+            loggerMaker.errorAndAddToDb(errMsg, LogDb.DASHBOARD);
+            result.put("error", errMsg);
+            return Action.ERROR.toUpperCase();
+        }
     }
 
     public int getApiCollectionId() {

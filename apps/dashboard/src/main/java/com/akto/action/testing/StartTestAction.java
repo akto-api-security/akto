@@ -1331,6 +1331,10 @@ public class StartTestAction extends UserAction {
                         );
                     }
 
+                    if(editableTestingRunConfig.getMiniTestingServiceName() != null && !editableTestingRunConfig.getMiniTestingServiceName().isEmpty()){
+                        updates.add(Updates.set(TestingRun.MINI_TESTING_SERVICE_NAME, editableTestingRunConfig.getMiniTestingServiceName()));
+                    }
+
                     if (!updates.isEmpty()) {
                         TestingRunDao.instance.updateOne(
                             Filters.eq(Constants.ID,new ObjectId(editableTestingRunConfig.getTestingRunHexId())),

@@ -2112,7 +2112,21 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
   },
   getStartOfTodayEpoch() {
     const now = new Date();
-    return Math.floor(new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime() / 1000);
+    return Math.floor(this.getStartOfTodayDate().getTime() / 1000);
+  },
+  getStartOfTodayDate(){
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  },
+  getStartOfDay(now) {
+    try {
+      return new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    } catch(e){
+      return this.getStartOfTodayDate();
+    }
+  },
+  getStartOfDayEpoch(now) {
+    return Math.floor(this.getStartOfDay(now).getTime() / 1000);
   },
   getDayOfWeek(time){
     const temp = new Date(time * 1000);
@@ -2132,6 +2146,32 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
       default:
         return "Sunday"
     }
+  },
+  getHourFromEpoch(time) {
+    try {
+      let date = new Date(time * 1000);
+      let hours = date.getHours();
+      return hours;
+    } catch (e) {
+      return 0;
+    }
+  },
+  getFormattedHoursUsingLabel(hour, labels, defaultLabel) {
+    let hourLabel = hour === 12 ? "noon" : (
+      hour === 0 ? "midnight" : (
+        hour < 13 ? "am" : "pm"
+      )
+    )
+    let hourValue = hour == 0 ? 24 : hour
+
+    let filtered = labels.filter((x) => {
+      return x.value == hourValue && x.label.includes(hourLabel)
+    })
+
+    if (filtered.length == 1) {
+      return filtered[0]
+    }
+    return defaultLabel
   }
 }
 
