@@ -256,6 +256,7 @@ function ApiDetails(props) {
     useEffect(() => {
         const { apiCollectionId, endpoint, method } = apiDetail;
         fetchStats(apiCollectionId,endpoint, method)
+        setApiCallStats([]);
     },[startTime])
 
     function displayGPT() {
