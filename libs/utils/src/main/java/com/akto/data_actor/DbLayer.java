@@ -484,7 +484,7 @@ public class DbLayer {
 
         ApiCollection apiCollection = ApiCollectionsDao.instance.findOne(filters);
         String userEnv = vpcId;
-        if (apiCollection != null && apiCollection.getUserSetEnvType() != null) {
+        if (userEnv != null && apiCollection != null && apiCollection.getUserSetEnvType() != null) {
             userEnv = apiCollection.getUserSetEnvType();
             if (!userEnv.contains(vpcId)) {
                 userEnv += ", " + vpcId;
@@ -524,7 +524,7 @@ public class DbLayer {
 
         ApiCollection apiCollection = ApiCollectionsDao.instance.findOne(Filters.eq(ApiCollection.HOST_NAME, host));
         String userEnv = vpcId;
-        if (apiCollection != null && apiCollection.getUserSetEnvType() != null) {
+        if (userEnv != null && apiCollection != null && apiCollection.getUserSetEnvType() != null) {
             userEnv = apiCollection.getUserSetEnvType();
             if (!userEnv.contains(vpcId)) {
                 userEnv += ", " + vpcId;
