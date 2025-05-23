@@ -266,19 +266,19 @@ public class SaveTestEditorAction extends UserAction {
     }
 
     private static String escapeUnicodeLiterals(String yamlContent) {
-        Pattern pattern = Pattern.compile("(?<!\\\\)\\\\u[0-9a-fA-F]{4}");
+        Pattern pattern = Pattern.compile("(?<!\\\\)\\\\u([0-9a-fA-F]{4})");
         Matcher matcher = pattern.matcher(yamlContent);
         StringBuffer sb = new StringBuffer();
         while (matcher.find()) {
-            String match = matcher.group();
-            matcher.appendReplacement(sb, Matcher.quoteReplacement("\\" + match));
+            String unicode = matcher.group(1);
+            matcher.appendReplacement(sb, Matcher.quoteReplacement("__AKTO_ESC__u" + unicode));
         }
         matcher.appendTail(sb);
         return sb.toString();
     }
 
     private static String unescapeUnicodeLiterals(String yaml) {
-        return yaml.replaceAll("\\\\\\\\u([0-9a-fA-F]{4})", "\\\\u$1");
+        return yaml.replaceAll("__AKTO_ESC__u([0-9a-fA-F]{4})", "\\\\u$1");
     }
 
     public static int compareVersions(String v1, String v2) {
