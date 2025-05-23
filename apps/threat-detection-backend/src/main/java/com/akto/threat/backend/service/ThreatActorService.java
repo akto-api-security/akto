@@ -17,7 +17,7 @@ import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.Th
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatActorByCountryRequest;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatActorByCountryResponse;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ListThreatActorResponse.ActivityData;
-import com.akto.proto.utils.ProtoMessageUtils;
+import com.akto.ProtoMessageUtils;
 import com.akto.threat.backend.constants.MongoDBCollection;
 import com.akto.threat.backend.db.ActorInfoModel;
 import com.akto.threat.backend.db.SplunkIntegrationModel;
