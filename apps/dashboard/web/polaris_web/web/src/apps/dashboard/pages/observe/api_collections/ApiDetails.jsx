@@ -84,16 +84,29 @@ function ApiDetails(props) {
 
     const standardHeaders = new Set(transform.getStandardHeaderList())
     const fetchStats = async(apiCollectionId, endpoint, method) => {
-        await api.fetchApiCallStats(apiCollectionId, endpoint, method, startTime, endTs).then((res) => {
-            const transformedData = [
-                {
-                    data: res.result.apiCallStats.map((item) => [item.ts * 60 * 1000, item.count]), // Access apiCallStats and convert seconds to milliseconds
-                    color: "",
-                    name: 'API Calls',
-                },
-              ];
-              setApiCallStats(transformedData);
-        })
+        try {
+            await api.fetchApiCallStats(apiCollectionId, endpoint, method, startTime, endTs).then((res) => {
+                const transformedData = [
+                    {
+                        data: res.result.apiCallStats.map((item) => [item.ts * 60 * 1000, item.count]), // Access apiCallStats and convert seconds to milliseconds
+                        color: "",
+                        name: 'API Calls',
+                    },
+                ];
+                setApiCallStats(transformedData);
+                setDisabledTabs(prev => {
+                    const newDisabledTabs = [...prev.filter(tab => tab !== "api-call-stats")];
+                    if (!transformedData || transformedData.length === 0 || !transformedData[0]?.data || transformedData[0].data.length === 0) {
+                        newDisabledTabs.push("api-call-stats");
+                    }
+                    return newDisabledTabs;
+                });
+            })
+        } catch (error) {
+          console.error("Error fetching API call stats:", error);
+          setApiCallStats([]);
+          setDisabledTabs(prev => [...prev.filter(tab => tab !== "api-call-stats"), "api-call-stats"]);
+        }
     }
 
     const fetchData = async () => {
