@@ -4,7 +4,7 @@ import com.akto.ProtoMessageUtils;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.DailyActorsCountRequest;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchAlertFiltersRequest;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchMaliciousEventsRequest;
-import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.GetThreatConfigurationResponse;
+import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatConfiguration;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ListMaliciousRequestsRequest;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ListThreatActorsRequest;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ListThreatApiRequest;
@@ -144,10 +144,10 @@ public class DashboardRouter implements ARouter {
             .post("/modify_threat_configuration")
             .blockingHandler(ctx -> {
                 RequestBody reqBody = ctx.body();
-                GetThreatConfigurationResponse req = ProtoMessageUtils.<
-                    GetThreatConfigurationResponse
+                ThreatConfiguration req = ProtoMessageUtils.<
+                    ThreatConfiguration
                 >toProtoMessage(
-                    GetThreatConfigurationResponse.class,
+                    ThreatConfiguration.class,
                     reqBody.asString()
                 ).orElse(null);
 
