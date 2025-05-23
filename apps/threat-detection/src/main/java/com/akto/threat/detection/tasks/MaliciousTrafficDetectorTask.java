@@ -130,7 +130,7 @@ public class MaliciousTrafficDetectorTask implements Task {
 
     this.httpCallParser = new HttpCallParser(120, 1000);
     
-    this.threatConfigEvaluator = new ThreatConfigurationEvaluator();
+    this.threatConfigEvaluator = new ThreatConfigurationEvaluator(null);
 
     this.windowBasedThresholdNotifier =
         new WindowBasedThresholdNotifier(

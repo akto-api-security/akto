@@ -100,7 +100,7 @@ const ThreatActorConfigComponent = ({ title, description }) => {
                             <Dropdown
                                 menuItems={dropdownOptions}
                                 selected={(val) => handleInputChange(index, "kind", val)}
-                                label="Actor Type"
+                                label="Select Type"
                                 initial={() => actor.kind}
                             />
                             <TextField
