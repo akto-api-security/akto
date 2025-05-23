@@ -1,6 +1,9 @@
 package com.akto.dto.testing.config;
 import com.akto.dto.testing.TestingRunConfig;
 
+import lombok.Getter;
+import lombok.Setter;
+
 public class EditableTestingRunConfig extends TestingRunConfig {
     private int maxConcurrentRequests;
     private String testingRunHexId;
@@ -12,6 +15,10 @@ public class EditableTestingRunConfig extends TestingRunConfig {
     private boolean continuousTesting;
     private boolean sendMsTeamsAlert;
     private int scheduleTimestamp;
+
+    @Getter
+    @Setter
+    private String miniTestingServiceName;
     public EditableTestingRunConfig() {
 
     }

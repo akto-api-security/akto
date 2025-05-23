@@ -9,7 +9,7 @@ const RunTestConfiguration = ({ testRun, setTestRun, runTypeOptions, hourlyTimes
     const reducer = (state, action) => {
         switch (action.type) {
           case "update":
-            let scheduledEpoch = new Date(action.obj['selectedDate']).getTime() / 1000;
+            let scheduledEpoch =  func.getStartOfDayEpoch(new Date(action.obj['selectedDate']));
             let hourlyLabel = testRun.hourlyLabel;
             if(hourlyLabel !== "Now"){
                 const val = hourlyTimes.filter((item) => item.label === hourlyLabel)[0].value;
@@ -28,10 +28,9 @@ const RunTestConfiguration = ({ testRun, setTestRun, runTypeOptions, hourlyTimes
             return state;
         }
     };
-    const initialState = {data: new Date()};
+    const initialState = { data: (testRun?.runTypeParentLabel === "RECURRING" ? new Date(testRun?.scheduleTimestamp * 1000) : new Date(testRun?.startTimestamp * 1000)) };
     const startDayToday = func.getStartOfTodayEpoch()
     const [state, dispatch] = useReducer(reducer, initialState);
-
 
     const allProjects = Object.keys(jiraProjectMap||{}).map((key) => {
         return {label:key, value: key}
@@ -127,7 +126,7 @@ const RunTestConfiguration = ({ testRun, setTestRun, runTypeOptions, hourlyTimes
                     />
                 </div>
                 <Dropdown
-                    label="Select Time:"
+                    label="Select Time"
                     disabled={testRun.continuousTesting === true || timeFieldsDisabled}
                     menuItems={hourlyTimes.filter((item) => {
                         if(func.isSameDateAsToday(state.data)){
@@ -140,7 +139,7 @@ const RunTestConfiguration = ({ testRun, setTestRun, runTypeOptions, hourlyTimes
                     selected={(hour) => {
                         let scheduledEpoch = new Date().getTime() / 1000;
                         if (hour !== "Now"){
-                            let initialTime = func.isSameDateAsToday(state.data) ? startDayToday : testRun.startTimestamp;
+                            let initialTime = func.getStartOfDayEpoch(state.data);
                             scheduledEpoch = initialTime + parseInt(hour) * 60 * 60;
                         }else{
                             scheduledEpoch = testRun.startTimestamp
@@ -155,7 +154,7 @@ const RunTestConfiguration = ({ testRun, setTestRun, runTypeOptions, hourlyTimes
             </HorizontalGrid>
             <HorizontalGrid gap={"4"} columns={"3"}>
                 <Dropdown
-                    label="Test run time:"
+                    label="Test run time"
                     menuItems={testRunTimeOptions}
                     initial={testRun.testRunTimeLabel}
                     selected={(timeInSeconds) => {
@@ -209,7 +208,7 @@ const RunTestConfiguration = ({ testRun, setTestRun, runTypeOptions, hourlyTimes
                 <Dropdown
                     label="Select Testing Module"
                     menuItems={miniTestingServiceNames}
-                    initial={miniTestingServiceNames?.[0]?.value}
+                    initial={testRun?.miniTestingServiceName || miniTestingServiceNames?.[0]?.value}
                     selected={(requests) => {
                         const miniTestingServiceNameOption = getLabel(miniTestingServiceNames, requests)
                         setTestRun(prev => ({

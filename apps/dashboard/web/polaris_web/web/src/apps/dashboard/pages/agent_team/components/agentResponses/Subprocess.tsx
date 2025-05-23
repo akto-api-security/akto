@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {  AgentRun, AgentState, AgentSubprocess, State } from "../../types";
 import { CaretDownMinor } from "@shopify/polaris-icons";
@@ -25,7 +25,7 @@ export const Subprocess = ({ agentId, processId, subProcessFromProp, triggerCall
     const [expanded, setExpanded] = useState((subProcessFromProp?.state == "SCHEDULED" || subProcessFromProp?.state == "RUNNING") ? true : false);
 
     const { finalCTAShow, setFinalCTAShow, setCurrentAttempt, 
-        setCurrentSubprocess, currentSubprocess, currentAttempt, setAgentState, setPRState, PRstate,
+        setCurrentSubprocess, currentSubprocess, currentAttempt, agentState, setAgentState, setPRState, PRstate,
         selectedModel } = useAgentsStore(state => ({
         finalCTAShow: state.finalCTAShow,
         setFinalCTAShow: state.setFinalCTAShow,
@@ -33,6 +33,7 @@ export const Subprocess = ({ agentId, processId, subProcessFromProp, triggerCall
         setCurrentSubprocess: state.setCurrentSubprocess,
         currentSubprocess: state.currentSubprocess,
         currentAttempt: state.currentAttempt,
+        agentState: state.agentState,
         setAgentState: state.setAgentState,
         setPRState: state.setPRState,
         PRstate: state.PRstate,
@@ -100,7 +101,9 @@ export const Subprocess = ({ agentId, processId, subProcessFromProp, triggerCall
                         
                     }
                 }
-                setAgentState("paused");
+                if (agentState != "paused") {
+                    setAgentState("paused");
+                }
             }
 
             if (newSubProcess.state === State.DISCARDED) {
@@ -110,7 +113,6 @@ export const Subprocess = ({ agentId, processId, subProcessFromProp, triggerCall
             if (newSubProcess.state === State.AGENT_ACKNOWLEDGED) {
                 const newSub = await createNewSubprocess(Number(currentSubprocess) + 1);
                 setFilteredUserInput(null);
-               
                 setSubprocess(newSub);
                 triggerCallForSubProcesses();
             }
@@ -123,7 +125,7 @@ export const Subprocess = ({ agentId, processId, subProcessFromProp, triggerCall
                 setAgentState("idle");
             }
 
-            if (JSON.stringify(newSubProcess) !== JSON.stringify(subprocess)) {
+            if (!func.deepComparison(newSubProcess, subprocess)) {
                 setSubprocess(newSubProcess);
             }
         };
@@ -229,7 +231,7 @@ export const Subprocess = ({ agentId, processId, subProcessFromProp, triggerCall
                     <motion.div animate={{ rotate: expanded ? 0 : 270 }} transition={{ duration: 0.2 }}>
                         <CaretDownMinor height={20} width={20} />
                     </motion.div>
-                    <Text as={"dd"}>{`${subprocess.subProcessHeading} ${currentAttempt > 1 ? `(Attempt ${currentAttempt})` : ""} `}</Text>
+                    <Text as={"dd"}>{`${subprocess.subProcessHeading} ${subprocess.attemptId > 1 ? `(Attempt ${subprocess.attemptId})` : ""} `}</Text>
                 </button>
 
                 <AnimatePresence>
