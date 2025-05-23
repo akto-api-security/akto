@@ -225,7 +225,7 @@ function ApiDetails(props) {
         if (!endpoint || endpoint === undefined) {
             return false;
         }
-        return (endpoint.includes("STRING") || endpoint.includes("INTEGER") || endpoint.includes("OBJECT_ID"))
+        return (endpoint.includes("STRING") || endpoint.includes("INTEGER") || endpoint.includes("OBJECT_ID") || endpoint.includes("VERSIONED"))
     }
 
     const openTest = () => {

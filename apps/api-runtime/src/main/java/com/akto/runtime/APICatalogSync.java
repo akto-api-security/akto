@@ -72,6 +72,10 @@ public class APICatalogSync {
     public Map<SensitiveParamInfo, Boolean> sensitiveParamInfoBooleanMap;
     public static boolean mergeAsyncOutside = true;
     public BloomFilter<CharSequence> existingAPIsInDb = BloomFilter.create(Funnels.stringFunnel(Charsets.UTF_8), 1_000_000, 0.001 );
+    private boolean skipMergingOnKnownStaticURLsForVersionedApis = false;
+
+    public static final Pattern VERSION_PATTERN = Pattern.compile("\\bv([1-9][0-9]?|100)\\b");
+
 
     public static Set<MergedUrls> mergedUrls;
 
@@ -1154,6 +1158,10 @@ public class APICatalogSync {
                 Set<HttpResponseParams> responseParamsList = entry.getValue();
 
                 String endpoint = url.getUrl();
+                if(this.skipMergingOnKnownStaticURLsForVersionedApis && VERSION_PATTERN.matcher(endpoint).find()){
+                    continue;
+                }
+
                 if(makeApisCaseInsensitive){
                     if(lowerCaseApisSet.contains(endpoint.toLowerCase())){
                         iterator.remove();
@@ -2012,6 +2020,14 @@ public class APICatalogSync {
 
     public void setMergeUrlsOnVersions(boolean mergeUrlsOnVersions) {
         this.mergeUrlsOnVersions = mergeUrlsOnVersions;
+    }
+
+    public boolean isSkipMergingOnKnownStaticURLsForVersionedApis() {
+        return skipMergingOnKnownStaticURLsForVersionedApis;
+    }
+
+    public void setSkipMergingOnKnownStaticURLsForVersionedApis(boolean skipMergingOnKnownStaticURLs) {
+        this.skipMergingOnKnownStaticURLsForVersionedApis = skipMergingOnKnownStaticURLs;
     }
 
 }

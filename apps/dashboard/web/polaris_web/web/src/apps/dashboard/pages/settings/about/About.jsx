@@ -240,6 +240,7 @@ function About() {
 
     const handleMergingOnVersions = async(val) => {
         setMergingOnVersions(val) ;
+        console.log("val", retrospective)
         await settingRequests.enableMergingOnVersions(val, retrospective);
     }
 
@@ -629,7 +630,7 @@ function About() {
                                 {!mergingOnVersions ? <Checkbox
                                     label="Allow retrospective merging on versions"
                                     checked={retrospective}
-                                    onChange={() => setRetrospective(!retrospective)}
+                                    onChange={() => setTimeout(()=> setRetrospective(!retrospective),[])}
                                     disabled={window.USER_ROLE !== "ADMIN"}
                                 /> : null}
                             </Modal.Section>

@@ -499,15 +499,18 @@ public class Utils {
     }
 
     public static void pushDataToKafka(int apiCollectionId, String topic, List<String> messages, List<String> errors, boolean skipKafka, boolean takeFromMsg) throws Exception {
-        pushDataToKafka(apiCollectionId, topic, messages, errors, skipKafka, takeFromMsg, false);
+        pushDataToKafka(apiCollectionId, topic, messages, errors, skipKafka, takeFromMsg, false, false);
     }
-    
     /*
     * this function is used primarily for non-automated traffic collection, like
     * postman, har and openAPI.
     * Thus, we can skip advanced traffic filters for these cases.
     */
+
     public static void pushDataToKafka(int apiCollectionId, String topic, List<String> messages, List<String> errors, boolean skipKafka, boolean takeFromMsg, boolean skipAdvancedFilters) throws Exception {
+        pushDataToKafka(apiCollectionId, topic, messages, errors, skipKafka, takeFromMsg, skipAdvancedFilters, false);
+    }
+    public static void pushDataToKafka(int apiCollectionId, String topic, List<String> messages, List<String> errors, boolean skipKafka, boolean takeFromMsg, boolean skipAdvancedFilters, boolean skipMergingOnKnownStaticURLsForVersionedApis) throws Exception {
         List<HttpResponseParams> responses = new ArrayList<>();
         for (String message: messages){
             int messageLimit = (int) Math.round(0.8 * KafkaListener.BATCH_SIZE_CONFIG);
@@ -545,7 +548,7 @@ public class Utils {
             AccountHTTPCallParserAktoPolicyInfo info = RuntimeListener.accountHTTPParserMap.get(accountId);
             if (info == null) { // account created after docker run
                 info = new AccountHTTPCallParserAktoPolicyInfo();
-                HttpCallParser callParser = new HttpCallParser("userIdentifier", 1, 1, 1, false);
+                HttpCallParser callParser = new HttpCallParser("userIdentifier", 1, 1, 1, false, skipMergingOnKnownStaticURLsForVersionedApis);
                 info.setHttpCallParser(callParser);
                 // info.setResourceAnalyser(new ResourceAnalyser(300_000, 0.01, 100_000, 0.01));
                 RuntimeListener.accountHTTPParserMap.put(accountId, info);

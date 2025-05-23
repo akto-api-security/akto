@@ -17,7 +17,9 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import com.mongodb.client.model.Updates;
+
 import org.bson.conversions.Bson;
+
 import com.akto.dao.ApiInfoDao;
 import com.akto.dao.SampleDataDao;
 import com.akto.dao.SensitiveSampleDataDao;
@@ -26,6 +28,7 @@ import com.akto.dao.context.Context;
 import com.akto.dao.monitoring.FilterYamlTemplateDao;
 import com.akto.dto.Account;
 import com.akto.dto.ApiCollection;
+import com.akto.dto.ApiInfo;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.monitoring.FilterConfig;
 import com.akto.dto.monitoring.FilterConfig.FILTER_TYPE;
@@ -54,6 +57,8 @@ import static com.akto.runtime.utils.Utils.createRegexPatternFromList;
 public class CleanInventory {
 
     private static final LoggerMaker logger = new LoggerMaker(CleanInventory.class, LogDb.DASHBOARD);
+    private static final int limit = 500;
+    private static final Bson sort = Sorts.ascending(ApiInfo.ID_API_COLLECTION_ID, ApiInfo.ID_URL, ApiInfo.ID_METHOD);
 
     final static ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
 
@@ -122,7 +127,7 @@ public class CleanInventory {
 
     }
 
-    private static void moveApisFromSampleData(List<Key> sampleDataIds) {
+    public static void moveApisFromSampleData(List<Key> sampleDataIds, boolean skipMergingOnKnownStaticURLsForVersionedApis) {
         if (sampleDataIds.isEmpty()) return;
         
         List<SampleData> allSamples = SampleDataDao.instance.findAll(Filters.or(SampleDataDao.filterForMultipleSampleData(sampleDataIds)));
@@ -135,7 +140,7 @@ public class CleanInventory {
         
 
             try {
-                Utils.pushDataToKafka(allSamples.get(0).getId().getApiCollectionId(), "", messages, new ArrayList<>(), true, false);
+                Utils.pushDataToKafka(allSamples.get(0).getId().getApiCollectionId(), "", messages, new ArrayList<>(), true, false, false, skipMergingOnKnownStaticURLsForVersionedApis);
                 logger.infoAndAddToDb("Successfully moved APIs.");
             } catch (Exception e) {
                 logger.errorAndAddToDb("Error during move APIs: " + e.getMessage());
@@ -150,11 +155,9 @@ public class CleanInventory {
         List<SampleData> sampleDataList = new ArrayList<>();
         Bson filters = Filters.empty();
         int skip = 0;
-        int limit = 100;
-        Bson sort = Sorts.ascending("_id.apiCollectionId", "_id.url", "_id.method");
         Map<Integer,Integer> collectionWiseDeletionCountMap = new HashMap<>();
 
-        Map<String,FilterConfig> filterMap = FilterYamlTemplateDao.instance.fetchFilterConfig(false, yamlTemplates, true);
+        Map<String,FilterConfig> filterMap = FilterYamlTemplateDao.fetchFilterConfig(false, yamlTemplates, true);
         Pattern pattern = createRegexPatternFromList(redundantUrlList);
         do {
             sampleDataList = SampleDataDao.instance.findAll(filters, skip, limit, sort);
@@ -275,7 +278,7 @@ public class CleanInventory {
 
             if (shouldDeleteRequest && toMove.size() > 0) {
                 logger.debug("starting moving APIs");
-                moveApisFromSampleData(toMove);
+                moveApisFromSampleData(toMove, false);
             }
 
             // String shouldMove = System.getenv("MOVE_REDUNDANT_APIS");
@@ -392,9 +395,5 @@ public class CleanInventory {
             }
             deleteApis(toBeDeleted);
         }
-    }
-
-    public static void removeVersionedAPIs(){
-        
     }
 }
