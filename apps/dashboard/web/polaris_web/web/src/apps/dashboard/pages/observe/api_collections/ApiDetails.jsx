@@ -88,7 +88,7 @@ function ApiDetails(props) {
             await api.fetchApiCallStats(apiCollectionId, endpoint, method, startTime, endTs).then((res) => {
                 const transformedData = [
                     {
-                        data: res.result.apiCallStats.map((item) => [item.ts * 60 * 1000, item.count]), // Access apiCallStats and convert seconds to milliseconds
+                        data: res.result.apiCallStats.sort((a,b) => b.ts - a.ts).map((item) => [item.ts * 60 * 1000, item.count]), // Access apiCallStats and convert seconds to milliseconds
                         color: "",
                         name: 'API Calls',
                     },
