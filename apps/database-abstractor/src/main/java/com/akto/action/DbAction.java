@@ -67,6 +67,7 @@ import com.mongodb.client.model.*;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 import com.google.gson.Gson;
+import com.akto.dao.metrics.MetricDataDao;
 
 import java.util.*;
 import java.util.concurrent.Executors;
@@ -1981,9 +1982,10 @@ public class DbAction extends ActionSupport {
 
     public String ingestMetricsData() {
         try {
+            // Then ingest the new metrics
             DbLayer.ingestMetricsData(metricData);
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(e, "Error in modifyHybridTestingSetting " + e.toString());
+            loggerMaker.errorAndAddToDb(e, "Error in ingestMetricsData: " + e.getMessage());
             return Action.ERROR.toUpperCase();
         }
         return Action.SUCCESS.toUpperCase();

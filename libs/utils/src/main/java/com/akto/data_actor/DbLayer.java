@@ -1163,6 +1163,11 @@ public class DbLayer {
     }
 
     public static void ingestMetricsData(List<MetricData> metricData) {
+        // First check if cleanup should be performed
+        if (MetricDataDao.instance.shouldPerformCleanup()) {
+            long deletedCount = MetricDataDao.instance.deleteOldMetrics();
+            loggerMaker.infoAndAddToDb("Deleted " + deletedCount + " old metrics records", LogDb.DASHBOARD);
+        }
         MetricDataDao.instance.insertMany(metricData);
     }
     public static void modifyHybridTestingSetting(boolean hybridTestingEnabled) {
