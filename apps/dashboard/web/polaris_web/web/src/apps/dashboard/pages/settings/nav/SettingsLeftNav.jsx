@@ -68,6 +68,13 @@ const SettingsLeftNav = () => {
         onClick: () => navigate("/dashboard/settings/integrations/ci-cd")
     }] : [];
 
+    const threatConfigArr = window?.STIGG_FEATURE_WISE_ALLOWED?.THREAT_DETECTION?.isGranted ? [{
+        label: 'Threat Configuration',
+        icon: AutomationFilledMajor,
+        selected: page === "threat-configuration",
+        onClick: () => navigate("/dashboard/settings/threat-configuration")
+    }] : [];
+
     return (
         <Navigation>
             <Navigation.Section
@@ -80,6 +87,7 @@ const SettingsLeftNav = () => {
                     },
                     ...usersArr,
                     ...roleArr,
+                    ...threatConfigArr,
                     // {
                     //     label: 'Alerts',
                     //     icon: DiamondAlertMinor,

@@ -320,15 +320,6 @@ export default function LeftNav() {
                                 key: "7",
                                 subNavigationItems: [
                                     {
-                                        label: "Threat Configuration",
-                                        onClick: () => {
-                                            navigate("/dashboard/protection/threat-configuration");
-                                            handleSelect("dashboard_threat_configuration");
-                                            setActive("active");
-                                        },
-                                        selected: leftNavSelected === "dashboard_threat_configuration",
-                                    },
-                                    {
                                         label: "Threat Actors",
                                         onClick: () => {
                                             navigate("/dashboard/protection/threat-actor");
