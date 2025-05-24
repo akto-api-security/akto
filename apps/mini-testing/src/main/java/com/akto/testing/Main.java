@@ -91,9 +91,10 @@ public class Main {
         }, 0, 1, TimeUnit.MINUTES);
     }
 
-    public static void checkForPlaygroundTest(){
+    public static void checkForPlaygroundTest(AccountSettings accountSettings){
         scheduler.scheduleWithFixedDelay(new Runnable() {
             public void run() {
+                Context.accountId.set(accountSettings.getId());
                 int timestamp = Context.now()-5*60;
                 TestingRunPlayground testingRunPlayground =  dataActor.getCurrentTestingRunDetailsFromEditor(timestamp); // fetch from Db
                 
@@ -313,7 +314,7 @@ public class Main {
         AccountSettings accountSettings = dataActor.fetchAccountSettings();
         dataActor.modifyHybridTestingSetting(RuntimeMode.isHybridDeployment());
         setupRateLimitWatcher(accountSettings);
-        checkForPlaygroundTest();
+        checkForPlaygroundTest(accountSettings);
 
         if (!SKIP_SSRF_CHECK) {
             Setup setup = dataActor.fetchSetup();
