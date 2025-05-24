@@ -225,6 +225,7 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
                             smr ->
                                 new MaliciousPayloadsResponse(
                                     smr.getOrig(),
+                                    smr.getMetadata(),
                                     smr.getTs()))
                         .collect(Collectors.toList());
               });

@@ -108,7 +108,8 @@ message FetchMaliciousEventsRequest {
 message FetchMaliciousEventsResponse {
   message MaliciousPayloadsResponse {
     string orig = 1;
-    uint64 ts = 2; 
+    uint64 ts = 2;
+    string metadata = 3;
   }
   repeated MaliciousPayloadsResponse malicious_payloads_response = 1;
 }
