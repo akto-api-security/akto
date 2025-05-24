@@ -2463,6 +2463,23 @@ public class DbAction extends ActionSupport {
         try {
             switch (this.getTestingRunPlaygroundType()) {
                 case TEST_EDITOR_PLAYGROUND:
+                    Map<String, WorkflowNodeDetails> data = new HashMap<>();
+                    try {
+                        if (this.testingRunResult != null && this.testingRunResult.get("workflowTest") != null) {
+                            Map<String, BasicDBObject> x = (Map) (((Map) this.testingRunResult.get("workflowTest"))
+                                    .get("mapNodeIdToWorkflowNodeDetails"));
+                            if (x != null) {
+                                for (String tmp : x.keySet()) {
+                                    ((Map) x.get(tmp)).remove("authMechanism");
+                                    ((Map) x.get(tmp)).remove("customAuthTypes");
+                                    data.put(tmp, objectMapper.convertValue(x.get(tmp), YamlNodeDetails.class));
+                                }
+                            }
+                        }
+                    } catch (Exception e) {
+                        loggerMaker.errorAndAddToDb(e, "Error in insertTestingRunResults in testingRunPlayground mapNodeIdToWorkflowNodeDetails" + e.toString());
+                        e.printStackTrace();
+                    }
                     TestingRunResult testingRunResult = objectMapper.readValue(this.testingRunResult.toJson(), TestingRunResult.class);
                     if(testingRunResult.getSingleTestResults()!=null){
                         testingRunResult.setTestResults(new ArrayList<>(testingRunResult.getSingleTestResults()));
@@ -2470,6 +2487,14 @@ public class DbAction extends ActionSupport {
                         testingRunResult.setTestResults(new ArrayList<>(testingRunResult.getMultiExecTestResults()));
                     }
 
+                    try {
+                        if (!data.isEmpty()) {
+                            testingRunResult.getWorkflowTest().setMapNodeIdToWorkflowNodeDetails(data);
+                        }
+                    } catch (Exception e) {
+                        loggerMaker.errorAndAddToDb(e, "Error in insertTestingRunResults testingRunPlayground mapNodeIdToWorkflowNodeDetails2" + e.toString());
+                        e.printStackTrace();
+                    }
                     DbLayer.updateTestingRunPlayground(new ObjectId(this.testingRunPlaygroundId), testingRunResult);
                     break;
                 case POSTMAN_IMPORTS:
