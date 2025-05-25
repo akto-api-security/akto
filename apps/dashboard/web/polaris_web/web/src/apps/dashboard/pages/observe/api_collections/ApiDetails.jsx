@@ -34,6 +34,17 @@ const statsOptions = [
     {label: "7 days", value: 7*24*60*60}
 ]
 
+const statsOptionsDistribution = [
+    {label: "15 minutes", value: 15*60},
+    {label: "30 minutes", value: 30*60},
+    {label: "1 hour", value: 60*60},
+    {label: "3 hours", value: 3*60*60},
+    {label: "6 hours", value: 6*60*60},
+    {label: "12 hours", value: 12*60*60},
+    {label: "1 day", value: 24*60*60},
+    {label: "7 days", value: 7*24*60*60}
+]
+
 function TechCard(props){
     const {cardObj} = props;
     return(
@@ -44,7 +55,6 @@ function TechCard(props){
 }
 
 function ApiDetails(props) {
-
     const { showDetails, setShowDetails, apiDetail, headers, getStatus, isGptActive } = props
 
     const localCategoryMap = LocalStore.getState().categoryMap
@@ -64,11 +74,12 @@ function ApiDetails(props) {
     const [headersWithData, setHeadersWithData] = useState([])
     const [isEditingDescription, setIsEditingDescription] = useState(false)
     const [editableDescription, setEditableDescription] = useState(description)
-
     const [useLocalSubCategoryData, setUseLocalSubCategoryData] = useState(false)
     const [apiCallStats, setApiCallStats] = useState([]); 
+    const [apiCallDistribution, setApiCallDistribution] = useState([]); // New state for distribution data
     const endTs = func.timeNow();
     const [startTime, setStartTime] = useState(endTs - statsOptions[0].value)
+    const [startTimeDistribution, setStartTimeDistribution] = useState(endTs - statsOptionsDistribution[6].value)
 
     const statusFunc = getStatus ? getStatus : (x) => {
         try {
@@ -77,18 +88,107 @@ function ApiDetails(props) {
                 return "info"
             }
         } catch (e) {
-
+            return "warning"
         }
         return "warning"
     }
 
     const standardHeaders = new Set(transform.getStandardHeaderList())
+
+    const getNiceBinSize = (rawSize) => {
+        const magnitude = Math.pow(10, Math.floor(Math.log10(rawSize)));
+        const leading = rawSize / magnitude;
+        if (leading <= 1) return 1 * magnitude;
+        if (leading <= 2) return 2 * magnitude;
+        if (leading <= 5) return 5 * magnitude;
+        return 10 * magnitude;
+    };
+
+    // Function to bin data
+    const binData = (rawData, targetBins = 10) => {
+        if (rawData.length === 0) return [];
+    
+        const sortedData = rawData.sort((a, b) => a[0] - b[0]);
+        const calls = sortedData.map(point => point[0]);
+    
+        const minCalls = Math.max(0, Math.min(...calls));
+        const maxCalls = Math.max(...calls);
+        const range = maxCalls - minCalls;
+    
+        // ✅ Smart bin size
+        const rawBinSize = Math.ceil(range / targetBins);
+        const binSize = getNiceBinSize(rawBinSize);
+    
+        const start = Math.floor(minCalls / binSize) * binSize;
+        const end = Math.ceil(maxCalls / binSize) * binSize;
+    
+        const bins = [];
+
+        for (let i = start; i < end; i += binSize) {
+            bins.push({ range: [i, i + binSize], count: 0 });
+        }
+        // for (let i = start; i <= end; i += binSize) {
+        //     bins.push({ range: [i, i + binSize], count: 0 });
+        // }
+    
+        rawData.forEach(([calls, users]) => {
+            const binIndex = Math.floor((calls - start) / binSize);
+            if (binIndex >= 0 && binIndex < bins.length) {
+                bins[binIndex].count += users;
+            }
+        });
+    
+        return {
+            data: bins.map(bin => ({
+                x: (bin.range[0] + bin.range[1]) / 2,
+                y: bin.count,
+                binRange: [bin.range[0], bin.range[1]]
+            })).filter(bin => bin.y > 0),
+            binSize
+        };
+    };
+
+    // Updated fetchDistributionData with binning
+    const fetchDistributionData = async () => {
+        try {
+            const { apiCollectionId, endpoint, method } = apiDetail;
+            const res = await api.fetchIpLevelApiCallStats(apiCollectionId, endpoint, method, startTimeDistribution, endTs);
+            const rawData = res?.result?.apiCallStats || [];
+    
+            const formattedData = rawData.map(({ count, users }) => [count, users]);
+            const { data: binnedData, binSize } = binData(formattedData, 10);
+    
+            const chartData = [
+                {
+                    name: `${apiDetail.method} ${apiDetail.endpoint}`,
+                    data: binnedData,
+                    color: '#6200EA',
+                    binSize
+                }
+            ];
+    
+            setApiCallDistribution(chartData);
+    
+            setDisabledTabs(prev => {
+                const newDisabledTabs = [...prev.filter(tab => tab !== "api-call-distribution")];
+                if (!chartData || chartData.length === 0 || !chartData[0]?.data || chartData[0].data.length === 0) {
+                    newDisabledTabs.push("api-call-distribution");
+                }
+                return newDisabledTabs;
+            });
+        } catch (error) {
+            console.error("Error fetching API call distribution data:", error);
+            setApiCallDistribution([]);
+            setDisabledTabs(prev => [...prev.filter(tab => tab !== "api-call-distribution"), "api-call-distribution"]);
+        }
+    };    
+
     const fetchStats = async(apiCollectionId, endpoint, method) => {
         try {
             await api.fetchApiCallStats(apiCollectionId, endpoint, method, startTime, endTs).then((res) => {
                 const transformedData = [
                     {
-                        data: res.result.apiCallStats.sort((a,b) => b.ts - a.ts).map((item) => [item.ts * 60 * 1000, item.count]), // Access apiCallStats and convert seconds to milliseconds
+                        data: res.result.apiCallStats.sort((a,b) => b.ts - a.ts).map((item) => [item.ts * 60 * 1000, item.count]),
                         color: "",
                         name: 'API Calls',
                     },
@@ -103,9 +203,9 @@ function ApiDetails(props) {
                 });
             })
         } catch (error) {
-          console.error("Error fetching API call stats:", error);
-          setApiCallStats([]);
-          setDisabledTabs(prev => [...prev.filter(tab => tab !== "api-call-stats"), "api-call-stats"]);
+            console.error("Error fetching API call stats:", error);
+            setApiCallStats([]);
+            setDisabledTabs(prev => [...prev.filter(tab => tab !== "api-call-stats"), "api-call-stats"]);
         }
     }
 
@@ -189,22 +289,7 @@ function ApiDetails(props) {
                 })
             })
             fetchStats(apiCollectionId, endpoint, method)
-            // const queryPayload = dashboardFunc.getApiPrompts(apiCollectionId, endpoint, method)[0].prepareQuery();
-            // try{
-            //     if(isGptActive && window.STIGG_FEATURE_WISE_ALLOWED["AKTO_GPT_AI"] && window.STIGG_FEATURE_WISE_ALLOWED["AKTO_GPT_AI"]?.isGranted === true){
-            //         await gptApi.ask_ai(queryPayload).then((res) => {
-            //             if (res.response.responses && res.response.responses.length > 0) {
-            //                 const metaHeaderResp = res.response.responses.filter(x => !standardHeaders.has(x.split(" ")[0]))
-            //                 setHeadersWithData(metaHeaderResp)
-            //             }
-            //         }
-            //         ).catch((err) => {
-            //             console.error("Failed to fetch prompts:", err);
-            //         })
-            //     }
-            // }catch (e) {
-            // }
-
+            fetchDistributionData(); // Fetch distribution data
         }
     }
 
@@ -254,10 +339,16 @@ function ApiDetails(props) {
     }, [apiDetail])
 
     useEffect(() => {
+        fetchDistributionData();
+        setApiCallDistribution([]);
+    }, [startTimeDistribution, apiDetail]);
+
+    useEffect(() => {
         const { apiCollectionId, endpoint, method } = apiDetail;
-        fetchStats(apiCollectionId,endpoint, method)
+        fetchStats(apiCollectionId, endpoint, method)
         setApiCallStats([]);
-    },[startTime])
+        fetchDistributionData(); // Refresh distribution data on time range change
+    }, [startTime])
 
     function displayGPT() {
         setIsGptScreenActive(true)
@@ -281,7 +372,6 @@ function ApiDetails(props) {
             method: {
                 "_name": selectedUrl.method
             }
-
         }
         setSelectedSampleApi(apiKeyInfo)
         const navUrl = window.location.origin + "/dashboard/test-editor/REMOVE_TOKENS"
@@ -315,24 +405,57 @@ function ApiDetails(props) {
           options['legend'] = { layout: 'vertical', align: 'right', verticalAlign: 'middle' };
         }
         return options;
-      };
+    };
+
+    const distributionChartOptions = {
+        chart: {
+            type: 'column'
+        },
+        xAxis: {
+            title: { text: 'Number of API Calls (Binned)' },
+            gridLineWidth: 0,
+            labels: {
+                formatter: function () {
+                    const bin = this.series?.userOptions?.data?.find(d => d.x === this.value);
+                    if (!bin?.binRange) return '';
+                    const [start, end] = bin.binRange;
+                    return `${start}-${end - 1}`;
+                }
+            }
+        },
+        yAxis: {
+            title: { text: 'Number of Users' },
+            gridLineWidth: 0
+        },
+        plotOptions: {
+            column: {
+                pointPadding: 0.05,
+                groupPadding: 0.1,
+                borderWidth: 0
+            }
+        },
+        tooltip: {
+            formatter: function () {
+                const binRange = this.point?.binRange || [Math.floor(this.x) - 15, Math.floor(this.x) + 15];
+                return `<b>${this.y}</b> users made calls in range <b>${binRange[0]} to ${binRange[1] - 1}</b>`;
+            }
+        }
+    };
 
     const SchemaTab = {
         id: 'schema',
         content: "Schema",
         component: paramList.length > 0 && <Box paddingBlockStart={"4"}> 
-        <ApiSchema
-            data={paramList} 
-            badgeActive={badgeActive}
-            setBadgeActive={setBadgeActive}
-            apiInfo={
-                {
+            <ApiSchema
+                data={paramList} 
+                badgeActive={badgeActive}
+                setBadgeActive={setBadgeActive}
+                apiInfo={{
                     apiCollectionId: apiDetail.apiCollectionId,
                     url: apiDetail.endpoint,
                     method: apiDetail.method
-                }
-            }
-        />
+                }}
+            />
         </Box>
     }
     const ValuesTab = {
@@ -361,52 +484,92 @@ function ApiDetails(props) {
             />
         </Box>,
     }
-
     const ApiCallStatsTab = {
         id: 'api-call-stats',
         content: 'API Call Stats',
         component: 
-          <Box paddingBlockStart={'4'}>
-            <HorizontalStack align="end">
-                <Dropdown
-                    menuItems={statsOptions}
-                    initial={statsOptions[0].label}
-                    selected={(timeInSeconds) => {
-                        setStartTime((prev) => {
-                            if((endTs - timeInSeconds) === prev){
-                                return prev
-                            }else{
-                                return endTs - timeInSeconds
-                            }
-                        })
-                    }} />
+            <Box paddingBlockStart={'4'}>
+                <HorizontalStack align="end">
+                    <Dropdown
+                        menuItems={statsOptions}
+                        initial={statsOptions[0].label}
+                        selected={(timeInSeconds) => {
+                            setStartTime((prev) => {
+                                if((endTs - timeInSeconds) === prev){
+                                    return prev
+                                }else{
+                                    return endTs - timeInSeconds
+                                }
+                            })
+                        }} />
                 </HorizontalStack>
-            {apiCallStats != undefined && apiCallStats.length > 0 && apiCallStats[0]?.data !== undefined && apiCallStats[0]?.data?.length > 0 ? (
-                <VerticalStack gap={"2"}>
-                    
-                <GraphMetric
-                    key={apiCallStats.length}
-                    data={apiCallStats}
-                    type='spline'
-                    color='#6200EA'
-                    areaFillHex='true'
-                    height='330'
-                    title='API Call Count'
-                    subtitle='Number of API calls over time'
-                    defaultChartOptions={defaultChartOptions(false)}
-                    backgroundColor='#ffffff'
-                    text='true'
-                    inputMetrics={[]}
-                />
-                </VerticalStack>
-            ) : (
-                <Text alignment="center" variant='bodyMd' as='p'>
-                  No API call data available in the given time range.
-                </Text>
-              )}
-          </Box>
-        
-      };
+                {apiCallStats != undefined && apiCallStats.length > 0 && apiCallStats[0]?.data !== undefined && apiCallStats[0]?.data?.length > 0 ? (
+                    <VerticalStack gap={"2"}>
+                        <GraphMetric
+                            key={apiCallStats.length}
+                            data={apiCallStats}
+                            type='spline'
+                            color='#6200EA'
+                            areaFillHex='true'
+                            height='330'
+                            title='API Call Count'
+                            subtitle='Number of API calls over time'
+                            defaultChartOptions={defaultChartOptions(false)}
+                            backgroundColor='#ffffff'
+                            text='true'
+                            inputMetrics={[]}
+                        />
+                    </VerticalStack>
+                ) : (
+                    <Text alignment="center" variant='bodyMd' as='p'>
+                        No API call data available in the given time range.
+                    </Text>
+                )}
+            </Box>
+    };
+
+    const ApiCallsDistributionTab = {
+        id: 'api-call-distribution',
+        content: 'API Call Distribution',
+        component: 
+            <Box paddingBlockStart={'4'}>
+                <HorizontalStack align="end">
+                    <Dropdown
+                        menuItems={statsOptionsDistribution}
+                        initial={statsOptions[6].label}
+                        selected={(timeInSeconds) => {
+                            setStartTimeDistribution((prev) => {
+                                if((endTs - timeInSeconds) === prev){
+                                    return prev
+                                }else{
+                                    return endTs - timeInSeconds
+                                }
+                            })
+                        }} />
+                </HorizontalStack>
+                {apiCallDistribution != undefined && apiCallDistribution.length > 0 && apiCallDistribution[0]?.data !== undefined && apiCallDistribution[0]?.data?.length > 0 ? (
+                    <VerticalStack gap={"2"}>
+                        <GraphMetric
+                            key={apiCallDistribution.length}
+                            data={apiCallDistribution}
+                            type='column'
+                            color='#6200EA'
+                            height='330'
+                            title='API Call Distribution'
+                            subtitle='Number of users vs. number of API calls (binned)'
+                            defaultChartOptions={{ ...defaultChartOptions(true), ...distributionChartOptions }}
+                            backgroundColor='#ffffff'
+                            text='true'
+                            inputMetrics={[]}
+                        />
+                    </VerticalStack>
+                ) : (
+                    <Text alignment="center" variant='bodyMd' as='p'>
+                        No API call distribution data available.
+                    </Text>
+                )}
+            </Box>
+    };
 
     const deMergeApis = () => {
         api.deMergeApi(apiCollectionId, endpoint, method).then((resp) => {
@@ -461,47 +624,46 @@ function ApiDetails(props) {
                 </HorizontalStack>
             </VerticalStack>
             <VerticalStack gap="3" align="space-between">
-            <HorizontalStack gap={"1"} wrap={false} >
-                <RunTest
-                    apiCollectionId={apiDetail["apiCollectionId"]}
-                    endpoints={[apiDetail]}
-                    filtered={true}
-                    useLocalSubCategoryData={useLocalSubCategoryData}
-                    preActivator={false}
-                    disabled={window.USER_ROLE === "GUEST"}
-                />
-                <Box>
-                    <Tooltip content="Open URL in test editor" dismissOnMouseOut>
-                        <Button monochrome onClick={() => openTest()} icon={FileMinor} />
-                    </Tooltip>
-                </Box>
-                {
-                    isGptActive || isDemergingActive ? <Popover
-                        active={showMoreActions}
-                        activator={
-                            <Tooltip content="More actions" dismissOnMouseOut ><Button plain monochrome icon={HorizontalDotsMinor} onClick={() => setShowMoreActions(!showMoreActions)} /></Tooltip>
-                        }
-                        autofocusTarget="first-node"
-                        onClose={() => setShowMoreActions(false)}
-                    >
-                        <Popover.Pane fixed>
-                            <ActionList
-                                items={[
-                                    isGptActive ? { content: "Ask AktoGPT", onAction: displayGPT } : {},
-                                    isDemergingActive ? { content: "De-merge", onAction: deMergeApis } : {},
-                                ]}
-                            />
-                        </Popover.Pane>
-                    </Popover> : null
+                <HorizontalStack gap={"1"} wrap={false} >
+                    <RunTest
+                        apiCollectionId={apiDetail["apiCollectionId"]}
+                        endpoints={[apiDetail]}
+                        filtered={true}
+                        useLocalSubCategoryData={useLocalSubCategoryData}
+                        preActivator={false}
+                        disabled={window.USER_ROLE === "GUEST"}
+                    />
+                    <Box>
+                        <Tooltip content="Open URL in test editor" dismissOnMouseOut>
+                            <Button monochrome onClick={() => openTest()} icon={FileMinor} />
+                        </Tooltip>
+                    </Box>
+                    {
+                        isGptActive || isDemergingActive ? <Popover
+                            active={showMoreActions}
+                            activator={
+                                <Tooltip content="More actions" dismissOnMouseOut ><Button plain monochrome icon={HorizontalDotsMinor} onClick={() => setShowMoreActions(!showMoreActions)} /></Tooltip>
+                            }
+                            autofocusTarget="first-node"
+                            onClose={() => setShowMoreActions(false)}
+                        >
+                            <Popover.Pane fixed>
+                                <ActionList
+                                    items={[
+                                        isGptActive ? { content: "Ask AktoGPT", onAction: displayGPT } : {},
+                                        isDemergingActive ? { content: "De-merge", onAction: deMergeApis } : {},
+                                    ]}
+                                />
+                            </Popover.Pane>
+                        </Popover> : null
+                    }
+                </HorizontalStack>
+                {headersWithData.length > 0 && 
+                    <VerticalStack gap={"1"}>
+                        <Text variant="headingSm" color="subdued">Technologies used</Text>
+                        <GridRows verticalGap={"2"} horizontalGap={"1"} columns={3} items={gridData.slice(0,Math.min(gridData.length ,12))} CardComponent={TechCard} />
+                    </VerticalStack>
                 }
-
-            </HorizontalStack>
-            {headersWithData.length > 0 && 
-                <VerticalStack gap={"1"}>
-                    <Text variant="headingSm" color="subdued">Technologies used</Text>
-                    <GridRows verticalGap={"2"}horizontalGap={"1"} columns={3} items={gridData.slice(0,Math.min(gridData.length ,12))} CardComponent={TechCard} />
-                </VerticalStack>
-            }
             </VerticalStack>
         </HorizontalStack>
     )
@@ -510,7 +672,7 @@ function ApiDetails(props) {
         headingComp,
         <LayoutWithTabs
             key="tabs"
-            tabs={[ValuesTab, SchemaTab, ApiCallStatsTab, DependencyTab]}
+            tabs={[ValuesTab, SchemaTab, ApiCallsDistributionTab, ApiCallStatsTab, DependencyTab]}
             currTab={() => { }}
             disabledTabs={disabledTabs}
         />
