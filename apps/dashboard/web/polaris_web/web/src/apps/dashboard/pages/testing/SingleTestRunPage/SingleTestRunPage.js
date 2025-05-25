@@ -287,7 +287,7 @@ function SingleTestRunPage() {
             if (response?.apiInfoList) {
               const limitedEndpoints = response.apiInfoList.slice(
                   0, 5000);
-              apiEndpoints = getApiEndpointsMap(limitedEndpoints);
+              apiEndpoints = getApiEndpointsMap(limitedEndpoints, testingEndpoints.type);
             }
           } catch (error) {
             console.error("Error fetching collection endpoints:", error);
@@ -296,7 +296,7 @@ function SingleTestRunPage() {
       } else if (testingEndpoints.type === "CUSTOM"
           && testingEndpoints.apisList) {
         const limitedApis = testingEndpoints.apisList.slice(0, 5000);
-        apiEndpoints = getApiEndpointsMap(limitedApis);
+        apiEndpoints = getApiEndpointsMap(limitedApis, testingEndpoints.type);
       }
 
       filterOptions = filterOptions.map(filter => {
@@ -312,15 +312,18 @@ function SingleTestRunPage() {
     }
   }
 
-  const getApiEndpointsMap = (endpoints) => {
-    return Array.from(
-        new Map(
-            endpoints
-            .map(e => e.id)
-            .map(e => [e.url,
-              {label: func.convertToRelativePath(e.url), value: e.url}])
-        ).values()
-    );
+  const getApiEndpointsMap = (endpoints, type) => {
+    if(type == null || type === undefined || type === "COLLECTION_WISE"){
+      return endpoints.map(endpoint => ({
+        label: endpoint.id.url,
+        value: endpoint.id.url
+      }));
+    }else{
+      return endpoints.map(endpoint => ({
+        label: endpoint.url,
+        value: endpoint.url
+      }));
+    }
   }
 
   const fetchTestingRunResultSummaries = async () => {
