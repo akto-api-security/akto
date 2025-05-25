@@ -409,10 +409,13 @@ function ApiDetails(props) {
 
     const distributionChartOptions = {
         chart: {
-            type: 'column'
+            type: 'column',
+            marginTop: 10,
+            marginBottom: 40,
+            marginRight: 10 // Minimize right margin since legend is removed
         },
         xAxis: {
-            title: { text: 'Number of API Calls (Binned)' },
+            title: { text: null },
             gridLineWidth: 0,
             labels: {
                 formatter: function () {
@@ -424,7 +427,7 @@ function ApiDetails(props) {
             }
         },
         yAxis: {
-            title: { text: 'Number of Users' },
+            title: { text: null },
             gridLineWidth: 0
         },
         plotOptions: {
@@ -439,7 +442,10 @@ function ApiDetails(props) {
                 const binRange = this.point?.binRange || [Math.floor(this.x) - 15, Math.floor(this.x) + 15];
                 return `<b>${this.y}</b> users made calls in range <b>${binRange[0]} to ${binRange[1] - 1}</b>`;
             }
-        }
+        },
+        title: { text: null },
+        subtitle: { text: null },
+        legend: { enabled: false } // Explicitly disable legend
     };
 
     const SchemaTab = {
@@ -532,8 +538,8 @@ function ApiDetails(props) {
         id: 'api-call-distribution',
         content: 'API Call Distribution',
         component: 
-            <Box paddingBlockStart={'4'}>
-                <HorizontalStack align="end">
+            <Box paddingBlockStart={'2'} paddingBlockEnd={'2'} paddingInline={'2'}>
+                <HorizontalStack align="end" blockAlign="center" wrap={false}>
                     <Dropdown
                         menuItems={statsOptionsDistribution}
                         initial={statsOptions[6].label}
@@ -547,26 +553,20 @@ function ApiDetails(props) {
                             })
                         }} />
                 </HorizontalStack>
-                {apiCallDistribution != undefined && apiCallDistribution.length > 0 && apiCallDistribution[0]?.data !== undefined && apiCallDistribution[0]?.data?.length > 0 ? (
-                    <VerticalStack gap={"2"}>
-                        <GraphMetric
-                            key={apiCallDistribution.length}
-                            data={apiCallDistribution}
-                            type='column'
-                            color='#6200EA'
-                            height='330'
-                            title='API Call Distribution'
-                            subtitle='Number of users vs. number of API calls (binned)'
-                            defaultChartOptions={{ ...defaultChartOptions(true), ...distributionChartOptions }}
-                            backgroundColor='#ffffff'
-                            text='true'
-                            inputMetrics={[]}
-                        />
-                    </VerticalStack>
-                ) : (
-                    <Text alignment="center" variant='bodyMd' as='p'>
-                        No API call distribution data available.
-                    </Text>
+                {apiCallDistribution != undefined && apiCallDistribution.length > 0 && apiCallDistribution[0]?.data !== undefined && apiCallDistribution[0]?.data?.length > 0 && (
+                    <GraphMetric
+                        key={apiCallDistribution.length}
+                        data={apiCallDistribution}
+                        type='column'
+                        color='#6200EA'
+                        height={undefined}
+                        title={undefined}
+                        subtitle={undefined}
+                        defaultChartOptions={{ ...defaultChartOptions(false), ...distributionChartOptions }}
+                        backgroundColor='#ffffff'
+                        text={false}
+                        inputMetrics={[]}
+                    />
                 )}
             </Box>
     };
