@@ -707,7 +707,7 @@ public class DbLayer {
 
             TestingRun testingRun = TestingRunDao.instance.findOne(
                 Filters.eq(ID, trrs.getTestingRunId()),
-                Projections.include(TestingRun.MINI_TESTING_SERVICE_NAME)
+                Projections.include(ID,TestingRun.MINI_TESTING_SERVICE_NAME)
             );
 
             if (testingRun == null) return null;
