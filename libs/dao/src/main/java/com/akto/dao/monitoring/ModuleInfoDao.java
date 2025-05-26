@@ -19,7 +19,7 @@ public class ModuleInfoDao extends AccountsContextDao<ModuleInfo> {
     private ModuleInfoDao() {
     }
 
-    private static final int INACTIVE_THRESHOLD = 10 * 60; // 20 minutes
+    private static final int INACTIVE_THRESHOLD = 5 * 60; // 5 minutes
 
     public List<ModuleInfo> getActiveModules(ModuleType moduleType) {
         List<ModuleInfo> moduleInfos = instance.findAll(Filters.and(
