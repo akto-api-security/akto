@@ -55,7 +55,6 @@ function ApiDetails(props) {
     const [prompts, setPrompts] = useState([])
     const [isGptScreenActive, setIsGptScreenActive] = useState(false)
     const [loading, setLoading] = useState(false)
-    const [badgeActive, setBadgeActive] = useState(false)
     const [showMoreActions, setShowMoreActions] = useState(false)
     const setSelectedSampleApi = PersistStore(state => state.setSelectedSampleApi)
     const [disabledTabs, setDisabledTabs] = useState([])
@@ -257,36 +256,6 @@ function ApiDetails(props) {
             setTimeout(() => {
                 setLoading(false)
             }, 100)
-            await api.loadParamsOfEndpoint(apiCollectionId, endpoint, method).then(resp => {
-                api.loadSensitiveParameters(apiCollectionId, endpoint, method).then(allSensitiveFields => {
-                    allSensitiveFields.data.endpoints.filter(x => x.sensitive).forEach(sensitive => {
-                        let index = resp.data.params.findIndex(x =>
-                            x.param === sensitive.param &&
-                            x.isHeader === sensitive.isHeader &&
-                            x.responseCode === sensitive.responseCode
-                        )
-
-                        if (index > -1 && !sensitive.subType) {
-                            resp.data.params[index].savedAsSensitive = true
-                            if (!resp.data.params[index].subType) {
-                                resp.data.params[index].subType = { "name": "CUSTOM" }
-                            } else {
-                                resp.data.params[index].subType = JSON.parse(JSON.stringify(resp.data.params[index].subType))
-                            }
-                        }
-                    })
-
-                    try {
-                        resp.data.params?.forEach(x => {
-                            if (!values?.skipList.includes(x.subTypeString) && !x?.savedAsSensitive && !x?.sensitive) {
-                                x.nonSensitiveDataType = true
-                            }
-                        })
-                    } catch (e){
-                    }
-                    setParamList(resp.data.params)
-                })
-            })
             fetchStats(apiCollectionId, endpoint, method)
             fetchDistributionData(); // Fetch distribution data
         }
@@ -320,10 +289,6 @@ function ApiDetails(props) {
         }
         await api.scheduleTestForCustomEndpoints(apiKeyInfo, func.timNow(), false, testsList, "akto_gpt_test", -1, -1)
         func.setToast(true, false, "Triggered tests successfully!")
-    }
-
-    const badgeClicked = () => {
-        setBadgeActive(true)
     }
 
     useEffect(() => {
@@ -456,11 +421,8 @@ function ApiDetails(props) {
     const SchemaTab = {
         id: 'schema',
         content: "Schema",
-        component: paramList.length > 0 && <Box paddingBlockStart={"4"}> 
+        component:  <Box paddingBlockStart={"4"}> 
             <ApiSchema
-                data={paramList} 
-                badgeActive={badgeActive}
-                setBadgeActive={setBadgeActive}
                 apiInfo={{
                     apiCollectionId: apiDetail.apiCollectionId,
                     url: apiDetail.endpoint,
@@ -611,8 +573,6 @@ function ApiDetails(props) {
                         data={newData}
                         headers={headers}
                         getStatus={statusFunc}
-                        isBadgeClickable={true}
-                        badgeClicked={badgeClicked}
                     />
                 </HorizontalStack>
             </VerticalStack>
