@@ -34,17 +34,6 @@ const statsOptions = [
     {label: "7 days", value: 7*24*60*60}
 ]
 
-const statsOptionsDistribution = [
-    {label: "15 minutes", value: 15*60},
-    {label: "30 minutes", value: 30*60},
-    {label: "1 hour", value: 60*60},
-    {label: "3 hours", value: 3*60*60},
-    {label: "6 hours", value: 6*60*60},
-    {label: "12 hours", value: 12*60*60},
-    {label: "1 day", value: 24*60*60},
-    {label: "7 days", value: 7*24*60*60}
-]
-
 function TechCard(props){
     const {cardObj} = props;
     return(
@@ -79,7 +68,6 @@ function ApiDetails(props) {
     const [apiCallDistribution, setApiCallDistribution] = useState([]); // New state for distribution data
     const endTs = func.timeNow();
     const [startTime, setStartTime] = useState(endTs - statsOptions[0].value)
-    const [startTimeDistribution, setStartTimeDistribution] = useState(endTs - statsOptionsDistribution[6].value)
 
     const statusFunc = getStatus ? getStatus : (x) => {
         try {
@@ -152,7 +140,7 @@ function ApiDetails(props) {
     const fetchDistributionData = async () => {
         try {
             const { apiCollectionId, endpoint, method } = apiDetail;
-            const res = await api.fetchIpLevelApiCallStats(apiCollectionId, endpoint, method, startTimeDistribution, endTs);
+            const res = await api.fetchIpLevelApiCallStats(apiCollectionId, endpoint, method, startTime, endTs); // Use startTime
             const rawData = res?.result?.apiCallStats || [];
     
             const formattedData = rawData.map(({ count, users }) => [count, users]);
@@ -160,7 +148,7 @@ function ApiDetails(props) {
     
             const chartData = [
                 {
-                    name: `${apiDetail.method} ${apiDetail.endpoint}`,
+                    name: '', // Empty name since legend is disabled
                     data: binnedData,
                     color: '#6200EA',
                     binSize
@@ -169,45 +157,56 @@ function ApiDetails(props) {
     
             setApiCallDistribution(chartData);
     
+            // Update disabledTabs logic to consider both stats and distribution data in ApiCallStatsTab
             setDisabledTabs(prev => {
-                const newDisabledTabs = [...prev.filter(tab => tab !== "api-call-distribution")];
-                if (!chartData || chartData.length === 0 || !chartData[0]?.data || chartData[0].data.length === 0) {
-                    newDisabledTabs.push("api-call-distribution");
+                const newDisabledTabs = [...prev.filter(tab => tab !== "api-call-stats")];
+                if (
+                    (!chartData || chartData.length === 0 || !chartData[0]?.data || chartData[0].data.length === 0) &&
+                    (!apiCallStats || apiCallStats.length === 0 || !apiCallStats[0]?.data || apiCallStats[0].data.length === 0)
+                ) {
+                    newDisabledTabs.push("api-call-stats");
                 }
                 return newDisabledTabs;
             });
         } catch (error) {
             console.error("Error fetching API call distribution data:", error);
             setApiCallDistribution([]);
-            setDisabledTabs(prev => [...prev.filter(tab => tab !== "api-call-distribution"), "api-call-distribution"]);
+            // Update disabledTabs logic
+            setDisabledTabs(prev => {
+                const newDisabledTabs = [...prev.filter(tab => tab !== "api-call-stats")];
+                if (!apiCallStats || apiCallStats.length === 0 || !apiCallStats[0]?.data || apiCallStats[0].data.length === 0) {
+                    newDisabledTabs.push("api-call-stats");
+                }
+                return newDisabledTabs;
+            });
         }
-    };    
+    };
 
-    const fetchStats = async(apiCollectionId, endpoint, method) => {
+    const fetchStats = async (apiCollectionId, endpoint, method) => {
         try {
-            await api.fetchApiCallStats(apiCollectionId, endpoint, method, startTime, endTs).then((res) => {
-                const transformedData = [
-                    {
-                        data: res.result.apiCallStats.sort((a,b) => b.ts - a.ts).map((item) => [item.ts * 60 * 1000, item.count]),
-                        color: "",
-                        name: 'API Calls',
-                    },
-                ];
-                setApiCallStats(transformedData);
-                setDisabledTabs(prev => {
-                    const newDisabledTabs = [...prev.filter(tab => tab !== "api-call-stats")];
-                    if (!transformedData || transformedData.length === 0 || !transformedData[0]?.data || transformedData[0].data.length === 0) {
-                        newDisabledTabs.push("api-call-stats");
-                    }
-                    return newDisabledTabs;
-                });
-            })
+            setApiCallStats([]); // Clear state before fetching new data
+            const res = await api.fetchApiCallStats(apiCollectionId, endpoint, method, startTime, endTs);
+            const transformedData = [
+                {
+                    data: res.result.apiCallStats.sort((a, b) => b.ts - a.ts).map((item) => [item.ts * 60 * 1000, item.count]),
+                    color: "",
+                    name: 'API Calls',
+                },
+            ];
+            setApiCallStats(transformedData);
+            setDisabledTabs(prev => {
+                const newDisabledTabs = [...prev.filter(tab => tab !== "api-call-stats")];
+                if (!transformedData || transformedData.length === 0 || !transformedData[0]?.data || transformedData[0].data.length === 0) {
+                    newDisabledTabs.push("api-call-stats");
+                }
+                return newDisabledTabs;
+            });
         } catch (error) {
             console.error("Error fetching API call stats:", error);
             setApiCallStats([]);
             setDisabledTabs(prev => [...prev.filter(tab => tab !== "api-call-stats"), "api-call-stats"]);
         }
-    }
+    };
 
     const fetchData = async () => {
         if (showDetails) {
@@ -339,16 +338,11 @@ function ApiDetails(props) {
     }, [apiDetail])
 
     useEffect(() => {
+        const { apiCollectionId, endpoint, method } = apiDetail;
+        fetchStats(apiCollectionId, endpoint, method);
         fetchDistributionData();
         setApiCallDistribution([]);
-    }, [startTimeDistribution, apiDetail]);
-
-    useEffect(() => {
-        const { apiCollectionId, endpoint, method } = apiDetail;
-        fetchStats(apiCollectionId, endpoint, method)
-        setApiCallStats([]);
-        fetchDistributionData(); // Refresh distribution data on time range change
-    }, [startTime])
+    }, [startTime, apiDetail]);
 
     function displayGPT() {
         setIsGptScreenActive(true)
@@ -501,18 +495,20 @@ function ApiDetails(props) {
                         initial={statsOptions[0].label}
                         selected={(timeInSeconds) => {
                             setStartTime((prev) => {
-                                if((endTs - timeInSeconds) === prev){
-                                    return prev
-                                }else{
-                                    return endTs - timeInSeconds
+                                if ((endTs - timeInSeconds) === prev) {
+                                    return prev;
+                                } else {
+                                    return endTs - timeInSeconds;
                                 }
-                            })
-                        }} />
+                            });
+                        }}
+                    />
                 </HorizontalStack>
-                {apiCallStats != undefined && apiCallStats.length > 0 && apiCallStats[0]?.data !== undefined && apiCallStats[0]?.data?.length > 0 ? (
-                    <VerticalStack gap={"2"}>
+                <VerticalStack gap={"4"}>
+                    {/* API Call Stats Graph */}
+                    {apiCallStats != undefined && apiCallStats.length > 0 && apiCallStats[0]?.data !== undefined && apiCallStats[0]?.data?.length > 0 ? (
                         <GraphMetric
-                            key={apiCallStats.length}
+                            key={`stats-${startTime}`} // Use startTime in key to force re-render
                             data={apiCallStats}
                             type='spline'
                             color='#6200EA'
@@ -525,52 +521,31 @@ function ApiDetails(props) {
                             text='true'
                             inputMetrics={[]}
                         />
-                    </VerticalStack>
-                ) : (
-                    <Text alignment="center" variant='bodyMd' as='p'>
-                        No API call data available in the given time range.
-                    </Text>
-                )}
+                    ) : (
+                        <Box minHeight="330px" /> // Reserve space for consistency
+                    )}
+                    {/* API Call Distribution Graph */}
+                    {apiCallDistribution != undefined && apiCallDistribution.length > 0 && apiCallDistribution[0]?.data !== undefined && apiCallDistribution[0]?.data?.length > 0 ? (
+                        <GraphMetric
+                            key={`distribution-${startTime}`} // Use startTime in key to force re-render
+                            data={apiCallDistribution}
+                            type='column'
+                            color='#6200EA'
+                            height='330'
+                            title={undefined}
+                            subtitle={undefined}
+                            defaultChartOptions={{ ...defaultChartOptions(false), ...distributionChartOptions }}
+                            backgroundColor='#ffffff'
+                            text={false}
+                            inputMetrics={[]}
+                        />
+                    ) : (
+                        <Box minHeight="330px" /> // Reserve space for consistency
+                    )}
+                </VerticalStack>
             </Box>
     };
-
-    const ApiCallsDistributionTab = {
-        id: 'api-call-distribution',
-        content: 'API Call Distribution',
-        component: 
-            <Box paddingBlockStart={'2'} paddingBlockEnd={'2'} paddingInline={'2'}>
-                <HorizontalStack align="end" blockAlign="center" wrap={false}>
-                    <Dropdown
-                        menuItems={statsOptionsDistribution}
-                        initial={statsOptions[6].label}
-                        selected={(timeInSeconds) => {
-                            setStartTimeDistribution((prev) => {
-                                if((endTs - timeInSeconds) === prev){
-                                    return prev
-                                }else{
-                                    return endTs - timeInSeconds
-                                }
-                            })
-                        }} />
-                </HorizontalStack>
-                {apiCallDistribution != undefined && apiCallDistribution.length > 0 && apiCallDistribution[0]?.data !== undefined && apiCallDistribution[0]?.data?.length > 0 && (
-                    <GraphMetric
-                        key={apiCallDistribution.length}
-                        data={apiCallDistribution}
-                        type='column'
-                        color='#6200EA'
-                        height={undefined}
-                        title={undefined}
-                        subtitle={undefined}
-                        defaultChartOptions={{ ...defaultChartOptions(false), ...distributionChartOptions }}
-                        backgroundColor='#ffffff'
-                        text={false}
-                        inputMetrics={[]}
-                    />
-                )}
-            </Box>
-    };
-
+    
     const deMergeApis = () => {
         api.deMergeApi(apiCollectionId, endpoint, method).then((resp) => {
             func.setToast(true, false, "De-merging successful!!.")
@@ -672,7 +647,7 @@ function ApiDetails(props) {
         headingComp,
         <LayoutWithTabs
             key="tabs"
-            tabs={[ValuesTab, SchemaTab, ApiCallsDistributionTab, ApiCallStatsTab, DependencyTab]}
+            tabs={[ValuesTab, SchemaTab, ApiCallStatsTab, DependencyTab]}
             currTab={() => { }}
             disabledTabs={disabledTabs}
         />
