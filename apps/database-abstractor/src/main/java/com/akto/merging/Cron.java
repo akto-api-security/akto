@@ -3,6 +3,7 @@ package com.akto.merging;
 import com.akto.dao.context.Context;
 import com.akto.data_actor.DbLayer;
 import com.akto.dto.Account;
+import com.akto.dto.AccountSettings;
 import com.akto.dto.dependency_flow.DependencyFlow;
 import com.akto.log.LoggerMaker;
 import com.akto.util.AccountTask;
@@ -48,13 +49,14 @@ public class Cron {
         }
         loggerMaker.infoAndAddToDb("Acquired lock, starting merging process for account " + accountId, LoggerMaker.LogDb.RUNTIME);
         List<Integer> apiCollectionIds = DbLayer.fetchApiCollectionIds();
+        AccountSettings accountSettings = DbLayer.fetchAccountSettings(accountId);
         try {
             for (int apiCollectionId : apiCollectionIds) {
                 int start = Context.now();
                 loggerMaker.infoAndAddToDb("Started merging API collection " + apiCollectionId +
                         " accountId " + accountId, LoggerMaker.LogDb.RUNTIME);
                 try {
-                    MergingLogic.mergeUrlsAndSave(apiCollectionId, true);
+                    MergingLogic.mergeUrlsAndSave(apiCollectionId, true, accountSettings.isAllowMergingOnVersions());
                     loggerMaker.infoAndAddToDb("Finished merging API collection " +
                             apiCollectionId + " accountId " + accountId + " in " + (Context.now() - start)
                             + " seconds", LoggerMaker.LogDb.RUNTIME);

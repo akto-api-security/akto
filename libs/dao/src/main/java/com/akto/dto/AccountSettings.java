@@ -15,6 +15,9 @@ import com.akto.dto.type.CollectionReplaceDetails;
 import com.akto.util.ConnectionInfo;
 import com.akto.util.LastCronRunInfo;
 
+import lombok.Getter;
+import lombok.Setter;
+
 import com.akto.dto.test_editor.TestLibrary;
 
 public class AccountSettings {
@@ -101,6 +104,10 @@ public class AccountSettings {
     private static final List<String> defaultCidrRangesList = Arrays.asList("10.0.0.0/8", "172.16.0.0/12",
             "192.168.0.0/16", "127.0.0.0/8", "169.254.0.0/16", "224.0.0.0/4", "192.0.2.0/24", "198.51.100.0/24",
             "203.0.113.0/24", "255.255.255.255/32", "100.64.0.0/10", "192.88.99.0/24", "240.0.0.0/4");
+    public static final String ALLOW_MERGING_ON_VERSIONS = "allowMergingOnVersions";
+    @Getter
+    @Setter
+    private boolean allowMergingOnVersions;
 
     public AccountSettings() {
     }
