@@ -545,7 +545,7 @@ public class APICatalogSync {
                 // TODO: handle exception
                 return false;
             }
-            return true;
+            return false;
         }
         return false;
     }
