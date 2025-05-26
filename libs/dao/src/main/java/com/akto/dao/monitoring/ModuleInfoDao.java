@@ -21,13 +21,6 @@ public class ModuleInfoDao extends AccountsContextDao<ModuleInfo> {
 
     private static final int INACTIVE_THRESHOLD = 5 * 60; // 5 minutes
 
-    public List<ModuleInfo> getActiveModules(ModuleType moduleType) {
-        List<ModuleInfo> moduleInfos = instance.findAll(Filters.and(
-                Filters.eq(ModuleInfo.MODULE_TYPE, moduleType),
-                Filters.gt(ModuleInfo.LAST_HEARTBEAT_RECEIVED, Context.now() - INACTIVE_THRESHOLD)));
-        return moduleInfos;
-    }
-
     public boolean checkIsModuleActiveUsingName(ModuleType moduleType, String moduleName) {
         ModuleInfo moduleInfo = instance.findOne(Filters.and(
                 Filters.eq(ModuleInfo.MODULE_TYPE, moduleType),
