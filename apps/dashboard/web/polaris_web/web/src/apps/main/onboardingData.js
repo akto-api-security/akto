@@ -401,8 +401,8 @@ const learnMoreObject = {
     dashboard_settings_threat_configuration:{
         docsLink: [
             {
-                content:"How to choose Threat Actor",
-                value:"https://docs.akto.io/api-protection/overview"
+                content:"How to configure Threat Actor",
+                value:"https://docs.akto.io/api-protection/concepts/threat-actors"
             },
         ],
     },
