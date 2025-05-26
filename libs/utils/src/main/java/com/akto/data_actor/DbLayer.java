@@ -614,6 +614,8 @@ public class DbLayer {
                 Updates.set(TestingRun.STATE, TestingRun.State.RUNNING)
         );
 
+        // If miniTestingName is null or empty, we don't need to check for it
+
         Bson filter3 = Filters.or(
                 Filters.eq(TestingRun.MINI_TESTING_SERVICE_NAME, miniTestingName),
                 Filters.exists(TestingRun.MINI_TESTING_SERVICE_NAME, false)
@@ -651,9 +653,30 @@ public class DbLayer {
         );
         if(testingRun == null) return null;
         String serviceName = testingRun.getMiniTestingServiceName();
-        if (!StringUtils.isEmpty(serviceName) && !serviceName.equals(miniTestingName)) {
-            return null;
+        // check for miniTestingAlive
+        if (!StringUtils.isEmpty(serviceName) &&
+                miniTestingName != null && !miniTestingName.isEmpty()) {
+
+            boolean isCurrentMiniTestingAlive = ModuleInfoDao.instance.checkIsModuleActiveUsingName(
+                    ModuleInfo.ModuleType.MINI_TESTING, serviceName);
+
+            if (!isCurrentMiniTestingAlive) {
+                loggerMaker.infoAndAddToDb("Current mini-testing service is not alive: " + serviceName);
+                
+                List<ModuleInfo> moduleInfos = ModuleInfoDao.instance.getActiveModules(ModuleInfo.ModuleType.MINI_TESTING);
+
+                if(moduleInfos !=null && moduleInfos.size() == 1){
+                    loggerMaker.infoAndAddToDb("Singe mini testing service found: " + moduleInfos.get(0).getName());
+                    String newMiniTestingName = moduleInfos.get(0).getName();
+                    TestingRunDao.instance.updateOne(
+                            Filters.and(Filters.eq(ID, trrs.getTestingRunId()), Filters.eq(TestingRun.MINI_TESTING_SERVICE_NAME, serviceName)),
+                            Updates.set(TestingRun.MINI_TESTING_SERVICE_NAME, newMiniTestingName)
+                    );
+                    miniTestingName = newMiniTestingName;
+                }
+            }
         }
+
 
         // Might result in race condition under extreme case when multiple mini-testing has same name, also one query is slower than other
         Bson update = Updates.set(TestingRun.STATE, TestingRun.State.RUNNING);
