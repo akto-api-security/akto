@@ -1,7 +1,10 @@
 package com.akto.dao.monitoring;
 
 import com.akto.dao.AccountsContextDao;
+import com.akto.dao.context.Context;
 import com.akto.dto.monitoring.ModuleInfo;
+import com.akto.dto.monitoring.ModuleInfo.ModuleType;
+import com.mongodb.client.model.Filters;
 
 public class ModuleInfoDao extends AccountsContextDao<ModuleInfo> {
     @Override
@@ -10,7 +13,19 @@ public class ModuleInfoDao extends AccountsContextDao<ModuleInfo> {
     }
 
     public static final ModuleInfoDao instance = new ModuleInfoDao();
-    private ModuleInfoDao(){}
+
+    private ModuleInfoDao() {
+    }
+
+    private static final int INACTIVE_THRESHOLD = 5 * 60; // 5 minutes
+
+    public boolean checkIsModuleActiveUsingName(ModuleType moduleType, String moduleName) {
+        ModuleInfo moduleInfo = instance.findOne(Filters.and(
+                Filters.eq(ModuleInfo.MODULE_TYPE, moduleType),
+                Filters.eq(ModuleInfo.NAME, moduleName),
+                Filters.gt(ModuleInfo.LAST_HEARTBEAT_RECEIVED, Context.now() - INACTIVE_THRESHOLD)));
+        return moduleInfo != null;
+    }
 
     @Override
     public Class<ModuleInfo> getClassT() {
