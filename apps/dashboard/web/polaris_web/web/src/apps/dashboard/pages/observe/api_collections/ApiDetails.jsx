@@ -150,7 +150,7 @@ function ApiDetails(props) {
                 {
                     name: '', // Empty name since legend is disabled
                     data: binnedData,
-                    color: '#6200EA',
+                    color: '#1E90FF',
                     binSize
                 }
             ];
@@ -405,41 +405,52 @@ function ApiDetails(props) {
         chart: {
             type: 'column',
             marginTop: 10,
-            marginBottom: 40,
-            marginRight: 10 // Minimize right margin since legend is removed
+            marginBottom: 70,
+            marginRight: 10,
         },
         xAxis: {
-            title: { text: null },
+            title: {
+                text: 'API Call Frequency',
+                style: {
+                    fontSize: '12px',
+                },
+            },
             gridLineWidth: 0,
             labels: {
-                formatter: function () {
-                    const bin = this.series?.userOptions?.data?.find(d => d.x === this.value);
-                    if (!bin?.binRange) return '';
-                    const [start, end] = bin.binRange;
-                    return `${start}-${end - 1}`;
-                }
-            }
+                style: {
+                    fontSize: '12px',
+                },
+                enabled: true,
+            },
+            tickmarkPlacement: 'on',
+            tickWidth: 1,
+            tickLength: 5,
         },
         yAxis: {
-            title: { text: null },
-            gridLineWidth: 0
+            title: {
+                text: 'Number of Users',
+                style: {
+                    fontSize: '12px',
+                },
+            },
+            gridLineWidth: 0,
         },
         plotOptions: {
             column: {
                 pointPadding: 0.05,
                 groupPadding: 0.1,
-                borderWidth: 0
-            }
+                borderWidth: 0,
+            },
         },
         tooltip: {
             formatter: function () {
                 const binRange = this.point?.binRange || [Math.floor(this.x) - 15, Math.floor(this.x) + 15];
                 return `<b>${this.y}</b> users made calls in range <b>${binRange[0]} to ${binRange[1] - 1}</b>`;
-            }
+            },
         },
         title: { text: null },
         subtitle: { text: null },
-        legend: { enabled: false } // Explicitly disable legend
+        legend: { enabled: false },
     };
 
     const SchemaTab = {
@@ -508,7 +519,7 @@ function ApiDetails(props) {
                     {/* API Call Stats Graph */}
                     {apiCallStats != undefined && apiCallStats.length > 0 && apiCallStats[0]?.data !== undefined && apiCallStats[0]?.data?.length > 0 ? (
                         <GraphMetric
-                            key={`stats-${startTime}`} // Use startTime in key to force re-render
+                            key={`stats-${startTime}`}
                             data={apiCallStats}
                             type='spline'
                             color='#6200EA'
@@ -522,28 +533,35 @@ function ApiDetails(props) {
                             inputMetrics={[]}
                         />
                     ) : (
-                        <Box minHeight="330px" /> // Reserve space for consistency
+                        <Box minHeight="330px" />
                     )}
                     {/* API Call Distribution Graph */}
                     {apiCallDistribution != undefined && apiCallDistribution.length > 0 && apiCallDistribution[0]?.data !== undefined && apiCallDistribution[0]?.data?.length > 0 ? (
                         <GraphMetric
-                            key={`distribution-${startTime}`} // Use startTime in key to force re-render
+                            key={`distribution-${startTime}`}
                             data={apiCallDistribution}
                             type='column'
-                            color='#6200EA'
+                            color='#1E90FF'
                             height='330'
                             title={undefined}
                             subtitle={undefined}
-                            defaultChartOptions={{ ...defaultChartOptions(false), ...distributionChartOptions }}
+                            defaultChartOptions={{
+                                ...defaultChartOptions(false),
+                                ...distributionChartOptions,
+                                xAxis: {
+                                    ...distributionChartOptions.xAxis,
+                                    tickPositions: apiCallDistribution[0]?.data?.map(point => point.binRange[0]) || [],
+                                },
+                            }}
                             backgroundColor='#ffffff'
                             text={false}
                             inputMetrics={[]}
                         />
                     ) : (
-                        <Box minHeight="330px" /> // Reserve space for consistency
+                        <Box minHeight="330px" />
                     )}
                 </VerticalStack>
-            </Box>
+            </Box>,
     };
     
     const deMergeApis = () => {
