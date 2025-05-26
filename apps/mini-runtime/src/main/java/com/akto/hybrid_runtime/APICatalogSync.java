@@ -63,10 +63,13 @@ public class APICatalogSync {
 
     private DataActor dataActor = DataActorFactory.fetchInstance();
     public static Set<MergedUrls> mergedUrls;
+    public static final Pattern VERSION_PATTERN = Pattern.compile("\\bv([1-9][0-9]?|100)\\b");
 
     public APICatalogSync(String userIdentifier,int thresh, boolean fetchAllSTI) {
         this(userIdentifier, thresh, fetchAllSTI, true);
     }
+
+    private boolean mergeUrlsOnVersions = false;
 
     // New overloaded constructor
     public APICatalogSync(String userIdentifier, int thresh, boolean fetchAllSTI, boolean buildFromDb) {
@@ -239,7 +242,7 @@ public class APICatalogSync {
 
                 URLTemplate parameterisedTemplate = null;
                 if((apiCollectionId != VULNERABLE_API_COLLECTION_ID) && (apiCollectionId != LLM_API_COLLECTION_ID)){
-                    parameterisedTemplate = tryParamteresingUrl(pending);
+                    parameterisedTemplate = tryParamteresingUrl(pending, this.mergeUrlsOnVersions);
                 }
 
                 if(parameterisedTemplate != null){
@@ -522,7 +525,26 @@ public class APICatalogSync {
         }
     }
 
-    public static URLTemplate tryParamteresingUrl(URLStatic newUrl){
+    private static boolean isValidVersionToken(String token){
+        if(token == null || token.isEmpty()) return false;
+        token = token.trim().toLowerCase();
+        if(token.startsWith("v") && token.length() > 1 && token.length() < 4) {
+            String versionString = token.substring(1, token.length());
+            try {
+                int version = Integer.parseInt(versionString);
+                if (version > 0) {
+                    return true;
+                } 
+            } catch (Exception e) {
+                // TODO: handle exception
+                return false;
+            }
+            return true;
+        }
+        return false;
+    }
+
+    public static URLTemplate tryParamteresingUrl(URLStatic newUrl, boolean mergeUrlsOnVersions){
         String[] tokens = tokenize(newUrl.getUrl());
         if(tokens.length < 2){
             return null;
@@ -544,6 +566,9 @@ public class APICatalogSync {
                 tokens[i] = null;
             }else if(pattern.matcher(tempToken).matches()){
                 newTypes[i] = SuperType.STRING;
+                tokens[i] = null;
+            }else if(mergeUrlsOnVersions && isValidVersionToken(tempToken)){
+                newTypes[i] = SuperType.VERSIONED;
                 tokens[i] = null;
             }
 
@@ -1614,5 +1639,13 @@ public class APICatalogSync {
 
     public APICatalog getDbState(int apiCollectionId) {
         return this.dbState.get(apiCollectionId);
+    }
+
+    public boolean isMergeUrlsOnVersions() {
+        return mergeUrlsOnVersions;
+    }
+
+    public void setMergeUrlsOnVersions(boolean mergeUrlsOnVersions) {
+        this.mergeUrlsOnVersions = mergeUrlsOnVersions;
     }
 }
