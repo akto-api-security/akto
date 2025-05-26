@@ -70,10 +70,11 @@ public class APICatalogSync {
     private static DataActor dataActor = DataActorFactory.fetchInstance();
     public static Set<MergedUrls> mergedUrls;
     private static final ClientLayer clientLayer = new ClientLayer();
-
     public APICatalogSync(String userIdentifier,int thresh, boolean fetchAllSTI) {
         this(userIdentifier, thresh, fetchAllSTI, true);
     }
+
+    private boolean mergeUrlsOnVersions;
 
     // New overloaded constructor
     public APICatalogSync(String userIdentifier, int thresh, boolean fetchAllSTI, boolean buildFromDb) {
@@ -246,7 +247,7 @@ public class APICatalogSync {
 
                 URLTemplate parameterisedTemplate = null;
                 if((apiCollectionId != VULNERABLE_API_COLLECTION_ID) && (apiCollectionId != LLM_API_COLLECTION_ID)){
-                    parameterisedTemplate = tryParamteresingUrl(pending);
+                    parameterisedTemplate = tryParamteresingUrl(pending, this.mergeUrlsOnVersions);
                 }
 
                 if(parameterisedTemplate != null){
@@ -366,7 +367,7 @@ public class APICatalogSync {
                 Map<URLTemplate, Set<RequestTemplate>> potentialMerges = new HashMap<>();
                 for(URLStatic dbUrl: dbTemplates.keySet()) {
                     RequestTemplate dbTemplate = dbTemplates.get(dbUrl);
-                    URLTemplate mergedTemplate = tryMergeUrls(dbUrl, newUrl);
+                    URLTemplate mergedTemplate = tryMergeUrls(dbUrl, newUrl, this.mergeUrlsOnVersions);
                     if (mergedTemplate == null) {
                         continue;
                     }
@@ -416,7 +417,7 @@ public class APICatalogSync {
 
             for (URLStatic deltaUrl: deltaCatalog.getStrictURLToMethods().keySet()) {
                 RequestTemplate deltaTemplate = deltaTemplates.get(deltaUrl);
-                URLTemplate mergedTemplate = tryMergeUrls(deltaUrl, newUrl);
+                URLTemplate mergedTemplate = tryMergeUrls(deltaUrl, newUrl, this.mergeUrlsOnVersions);
                 if (mergedTemplate == null || (RequestTemplate.isMergedOnStr(mergedTemplate) && !areBothUuidUrls(newUrl,deltaUrl,mergedTemplate))) {
                     continue;
                 }
@@ -529,7 +530,26 @@ public class APICatalogSync {
         }
     }
 
-    public static URLTemplate tryParamteresingUrl(URLStatic newUrl){
+    private static boolean isValidVersionToken(String token){
+        if(token == null || token.isEmpty()) return false;
+        token = token.trim().toLowerCase();
+        if(token.startsWith("v") && token.length() > 1 && token.length() < 4) {
+            String versionString = token.substring(1, token.length());
+            try {
+                int version = Integer.parseInt(versionString);
+                if (version > 0) {
+                    return true;
+                } 
+            } catch (Exception e) {
+                // TODO: handle exception
+                return false;
+            }
+            return false;
+        }
+        return false;
+    }
+
+    public static URLTemplate tryParamteresingUrl(URLStatic newUrl, boolean mergeUrlsOnVersions){
         String[] tokens = tokenize(newUrl.getUrl());
         if(tokens.length < 2){
             return null;
@@ -551,6 +571,9 @@ public class APICatalogSync {
                 tokens[i] = null;
             }else if(pattern.matcher(tempToken).matches()){
                 newTypes[i] = SuperType.STRING;
+                tokens[i] = null;
+            }else if(mergeUrlsOnVersions && isValidVersionToken(tempToken)){
+                newTypes[i] = SuperType.VERSIONED;
                 tokens[i] = null;
             }
 
@@ -589,7 +612,7 @@ public class APICatalogSync {
     }
 
 
-    public static URLTemplate tryMergeUrls(URLStatic dbUrl, URLStatic newUrl) {
+    public static URLTemplate tryMergeUrls(URLStatic dbUrl, URLStatic newUrl, boolean mergeUrlsOnVersions) {
         if (dbUrl.getMethod() != newUrl.getMethod()) {
             return null;
         }
@@ -620,7 +643,11 @@ public class APICatalogSync {
             } else if(ObjectId.isValid(tempToken) && ObjectId.isValid(dbToken)){
                 newTypes[i] = SuperType.OBJECT_ID;
                 newTokens[i] = null;
-            } else if(pattern.matcher(tempToken).matches() && pattern.matcher(dbToken).matches()){
+            }else if(isValidVersionToken(tempToken) && isValidVersionToken(dbToken)){
+                newTypes[i] = SuperType.VERSIONED;
+                newTokens[i] = null;
+            } 
+            else if(pattern.matcher(tempToken).matches() && pattern.matcher(dbToken).matches()){
                 newTypes[i] = SuperType.STRING;
                 newTokens[i] = null;
             }else if(isAlphanumericString(tempToken) && isAlphanumericString(dbToken)){
@@ -1796,5 +1823,13 @@ public class APICatalogSync {
 
     public APICatalog getDbState(int apiCollectionId) {
         return this.dbState.get(apiCollectionId);
+    }
+
+    public boolean isMergeUrlsOnVersions() {
+        return mergeUrlsOnVersions;
+    }
+
+    public void setMergeUrlsOnVersions(boolean mergeUrlsOnVersions) {
+        this.mergeUrlsOnVersions = mergeUrlsOnVersions;
     }
 }
