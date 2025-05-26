@@ -1,7 +1,5 @@
 package com.akto.dao.monitoring;
 
-import java.util.List;
-
 import com.akto.dao.AccountsContextDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.monitoring.ModuleInfo;
