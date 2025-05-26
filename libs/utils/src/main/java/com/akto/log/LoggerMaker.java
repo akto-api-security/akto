@@ -253,9 +253,6 @@ public class LoggerMaker  {
     private void insert(String info, String key, LogDb db) {
         String text = aClass + " : " + info;
         Log log = new Log(text, key, Context.now());
-        if(DashboardMode.isSaasDeployment()) {
-            return;
-        }
         if(checkUpdate() && db!=null){
             switch(db){
                 case TESTING: 
