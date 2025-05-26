@@ -13,6 +13,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ThreadLocalRandom;
 
 import com.akto.bulk_update_util.ApiInfoBulkUpdate;
 import com.akto.dao.*;
@@ -599,39 +600,75 @@ public class DbLayer {
         );
     }
 
-    public static TestingRun findPendingTestingRun(int delta, String miniTestingName) {
+    private static String validateAndGetMiniTestingService(String serviceName, String miniTestingName) {
+        if (StringUtils.isEmpty(serviceName) || StringUtils.isEmpty(miniTestingName)) {
+            return miniTestingName;
+        }
 
-        Bson filter1 = Filters.and(Filters.eq(TestingRun.STATE, TestingRun.State.SCHEDULED),
-                Filters.lte(TestingRun.SCHEDULE_TIMESTAMP, Context.now())
+        if (!serviceName.startsWith("Default_")) {
+            return serviceName.equals(miniTestingName) ? miniTestingName : null;
+        }
+
+        boolean isCurrentMiniTestingAlive = ModuleInfoDao.instance.checkIsModuleActiveUsingName(
+                ModuleInfo.ModuleType.MINI_TESTING, serviceName);
+
+        if (!isCurrentMiniTestingAlive) {
+            loggerMaker.infoAndAddToDb("Current mini-testing service is not alive: " + serviceName);
+            List<ModuleInfo> moduleInfos = ModuleInfoDao.instance.getActiveModules(ModuleInfo.ModuleType.MINI_TESTING);
+
+            if (moduleInfos != null && !moduleInfos.isEmpty()) {
+                // Use ThreadLocalRandom for better performance in concurrent scenarios
+                int randomInt = ThreadLocalRandom.current().nextInt(moduleInfos.size());
+                String newServiceName = moduleInfos.get(randomInt).getName();
+                loggerMaker.infoAndAddToDb("mini testing service found: " + newServiceName);
+                return newServiceName;
+            }
+            return null;
+        }
+
+        return serviceName.equals(miniTestingName) ? miniTestingName : null;
+    }
+
+    public static TestingRun findPendingTestingRun(int delta, String miniTestingName) {
+        Bson filter1 = Filters.and(
+            Filters.eq(TestingRun.STATE, TestingRun.State.SCHEDULED),
+            Filters.lte(TestingRun.SCHEDULE_TIMESTAMP, Context.now())
         );
         Bson filter2 = Filters.and(
-                Filters.eq(TestingRun.STATE, TestingRun.State.RUNNING),
-                Filters.lte(TestingRun.PICKED_UP_TIMESTAMP, delta)
+            Filters.eq(TestingRun.STATE, TestingRun.State.RUNNING),
+            Filters.lte(TestingRun.PICKED_UP_TIMESTAMP, delta)
         );
+
+        TestingRun testingRun = TestingRunDao.instance.findOne(
+            Filters.or(filter1, filter2),
+            Projections.include(TestingRun.MINI_TESTING_SERVICE_NAME, ID)
+        );
+
+        if (testingRun == null) return null;
+
+        String validatedMiniTestingName = validateAndGetMiniTestingService(
+            testingRun.getMiniTestingServiceName(), 
+            miniTestingName
+        );
+
+        if (validatedMiniTestingName == null) return null;
 
         Bson update = Updates.combine(
-                Updates.set(TestingRun.PICKED_UP_TIMESTAMP, Context.now()),
-                Updates.set(TestingRun.STATE, TestingRun.State.RUNNING)
+            Updates.set(TestingRun.PICKED_UP_TIMESTAMP, Context.now()),
+            Updates.set(TestingRun.STATE, TestingRun.State.RUNNING),
+            Updates.set(TestingRun.MINI_TESTING_SERVICE_NAME, validatedMiniTestingName)
         );
 
-        // If miniTestingName is null or empty, we don't need to check for it
-
-        Bson filter3 = Filters.or(
-                Filters.eq(TestingRun.MINI_TESTING_SERVICE_NAME, miniTestingName),
-                Filters.exists(TestingRun.MINI_TESTING_SERVICE_NAME, false)
-        );
-
-        // returns the previous state of testing run before the update
         return TestingRunDao.instance.getMCollection().findOneAndUpdate(
-                Filters.and(filter3,Filters.or(filter1,filter2)), update);
+            Filters.eq(ID, testingRun.getId()), 
+            update
+        );
     }
 
     public static TestingRunResultSummary findPendingTestingRunResultSummary(int now, int delta, String miniTestingName) {
-        // Compose filters for SCHEDULED and RUNNING states
         Bson filter1 = Filters.and(
             Filters.eq(TestingRun.STATE, TestingRun.State.SCHEDULED),
-            Filters.lte(TestingRunResultSummary.START_TIMESTAMP, now),
-            Filters.gt(TestingRunResultSummary.START_TIMESTAMP, delta)
+            Filters.lte(TestingRunResultSummary.START_TIMESTAMP, now)
         );
         Bson filter2 = Filters.and(
             Filters.eq(TestingRun.STATE, TestingRun.State.RUNNING),
@@ -639,49 +676,46 @@ public class DbLayer {
             Filters.gt(TestingRunResultSummary.START_TIMESTAMP, delta)
         );
 
-        // Only fetch the fields we need, including the miniTestingServiceName from TestingRun
         TestingRunResultSummary trrs = TestingRunResultSummariesDao.instance.findOne(
             Filters.or(filter1, filter2),
-            Projections.include(TestingRunResultSummary.TESTING_RUN_ID, ID, TestingRunResultSummary.ORIGINAL_TESTING_RUN_SUMMARY_ID)
+            Projections.include(
+                TestingRunResultSummary.TESTING_RUN_ID, 
+                ID, 
+                TestingRunResultSummary.ORIGINAL_TESTING_RUN_SUMMARY_ID
+            )
         );
+
         if (trrs == null) return null;
 
-        // Fetch only the miniTestingServiceName field from TestingRun
         TestingRun testingRun = TestingRunDao.instance.findOne(
             Filters.eq(ID, trrs.getTestingRunId()),
             Projections.include(TestingRun.MINI_TESTING_SERVICE_NAME)
         );
-        if(testingRun == null) return null;
-        String serviceName = testingRun.getMiniTestingServiceName();
-        // check for miniTestingAlive
-        if (!StringUtils.isEmpty(serviceName) &&
-                miniTestingName != null && !miniTestingName.isEmpty()) {
 
-            boolean isCurrentMiniTestingAlive = ModuleInfoDao.instance.checkIsModuleActiveUsingName(
-                    ModuleInfo.ModuleType.MINI_TESTING, serviceName);
+        if (testingRun == null) return null;
 
-            if (!isCurrentMiniTestingAlive) {
-                loggerMaker.infoAndAddToDb("Current mini-testing service is not alive: " + serviceName);
-                
-                List<ModuleInfo> moduleInfos = ModuleInfoDao.instance.getActiveModules(ModuleInfo.ModuleType.MINI_TESTING);
+        String validatedMiniTestingName = validateAndGetMiniTestingService(
+            testingRun.getMiniTestingServiceName(), 
+            miniTestingName
+        );
 
-                if(moduleInfos !=null && moduleInfos.size() == 1){
-                    loggerMaker.infoAndAddToDb("Singe mini testing service found: " + moduleInfos.get(0).getName());
-                    String newMiniTestingName = moduleInfos.get(0).getName();
-                    TestingRunDao.instance.updateOne(
-                            Filters.and(Filters.eq(ID, trrs.getTestingRunId()), Filters.eq(TestingRun.MINI_TESTING_SERVICE_NAME, serviceName)),
-                            Updates.set(TestingRun.MINI_TESTING_SERVICE_NAME, newMiniTestingName)
-                    );
-                    miniTestingName = newMiniTestingName;
-                }
-            }
+        if (validatedMiniTestingName == null) return null;
+
+        if (!validatedMiniTestingName.equals(testingRun.getMiniTestingServiceName())) {
+            TestingRunDao.instance.updateOne(
+                Filters.and(
+                    Filters.eq(ID, trrs.getTestingRunId()),
+                    Filters.eq(TestingRun.MINI_TESTING_SERVICE_NAME, testingRun.getMiniTestingServiceName())
+                ),
+                Updates.set(TestingRun.MINI_TESTING_SERVICE_NAME, validatedMiniTestingName)
+            );
         }
 
-
-        // Might result in race condition under extreme case when multiple mini-testing has same name, also one query is slower than other
-        Bson update = Updates.set(TestingRun.STATE, TestingRun.State.RUNNING);
         return TestingRunResultSummariesDao.instance.getMCollection()
-            .findOneAndUpdate(Filters.eq(ID, trrs.getId()), update);
+            .findOneAndUpdate(
+                Filters.eq(ID, trrs.getId()),
+                Updates.set(TestingRun.STATE, TestingRun.State.RUNNING)
+            );
     }
 
     public static TestingRunConfig findTestingRunConfig(int testIdConfig) {
