@@ -71,12 +71,11 @@ public class APICatalogSync {
     public static Set<MergedUrls> mergedUrls;
     private static final ClientLayer clientLayer = new ClientLayer();
     public static final Pattern VERSION_PATTERN = Pattern.compile("\\bv([1-9][0-9]?|100)\\b");
-
     public APICatalogSync(String userIdentifier,int thresh, boolean fetchAllSTI) {
         this(userIdentifier, thresh, fetchAllSTI, true);
     }
 
-    private boolean mergeUrlsOnVersions = false;
+    private boolean mergeUrlsOnVersions;
 
     // New overloaded constructor
     public APICatalogSync(String userIdentifier, int thresh, boolean fetchAllSTI, boolean buildFromDb) {
@@ -369,7 +368,7 @@ public class APICatalogSync {
                 Map<URLTemplate, Set<RequestTemplate>> potentialMerges = new HashMap<>();
                 for(URLStatic dbUrl: dbTemplates.keySet()) {
                     RequestTemplate dbTemplate = dbTemplates.get(dbUrl);
-                    URLTemplate mergedTemplate = tryMergeUrls(dbUrl, newUrl);
+                    URLTemplate mergedTemplate = tryMergeUrls(dbUrl, newUrl, this.mergeUrlsOnVersions);
                     if (mergedTemplate == null) {
                         continue;
                     }
@@ -419,7 +418,7 @@ public class APICatalogSync {
 
             for (URLStatic deltaUrl: deltaCatalog.getStrictURLToMethods().keySet()) {
                 RequestTemplate deltaTemplate = deltaTemplates.get(deltaUrl);
-                URLTemplate mergedTemplate = tryMergeUrls(deltaUrl, newUrl);
+                URLTemplate mergedTemplate = tryMergeUrls(deltaUrl, newUrl, this.mergeUrlsOnVersions);
                 if (mergedTemplate == null || (RequestTemplate.isMergedOnStr(mergedTemplate) && !areBothUuidUrls(newUrl,deltaUrl,mergedTemplate))) {
                     continue;
                 }
@@ -614,7 +613,7 @@ public class APICatalogSync {
     }
 
 
-    public static URLTemplate tryMergeUrls(URLStatic dbUrl, URLStatic newUrl) {
+    public static URLTemplate tryMergeUrls(URLStatic dbUrl, URLStatic newUrl, boolean mergeUrlsOnVersions) {
         if (dbUrl.getMethod() != newUrl.getMethod()) {
             return null;
         }
@@ -645,7 +644,11 @@ public class APICatalogSync {
             } else if(ObjectId.isValid(tempToken) && ObjectId.isValid(dbToken)){
                 newTypes[i] = SuperType.OBJECT_ID;
                 newTokens[i] = null;
-            } else if(pattern.matcher(tempToken).matches() && pattern.matcher(dbToken).matches()){
+            }else if(isValidVersionToken(tempToken) && isValidVersionToken(dbToken)){
+                newTypes[i] = SuperType.VERSIONED;
+                newTokens[i] = null;
+            } 
+            else if(pattern.matcher(tempToken).matches() && pattern.matcher(dbToken).matches()){
                 newTypes[i] = SuperType.STRING;
                 newTokens[i] = null;
             }else if(isAlphanumericString(tempToken) && isAlphanumericString(dbToken)){
