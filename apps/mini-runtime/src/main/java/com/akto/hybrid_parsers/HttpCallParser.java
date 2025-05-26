@@ -164,6 +164,7 @@ public class HttpCallParser {
         }
         filteredResponseParams = filterHttpResponseParams(filteredResponseParams);
         boolean isHarOrPcap = aggregate(filteredResponseParams, aggregatorMap);
+        apiCatalogSync.setMergeUrlsOnVersions(accountSettings.isAllowMergingOnVersions());
 
         for (int apiCollectionId: aggregatorMap.keySet()) {
             URLAggregator aggregator = aggregatorMap.get(apiCollectionId);

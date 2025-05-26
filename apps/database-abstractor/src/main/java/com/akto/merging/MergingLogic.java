@@ -19,14 +19,16 @@ import java.util.*;
 import java.util.regex.Pattern;
 
 import static com.akto.dto.type.KeyTypes.patternToSubType;
+import static com.akto.runtime.RuntimeUtil.isAlphanumericString;
+import static com.akto.runtime.RuntimeUtil.isValidVersionToken;
 
 public class MergingLogic {
 
     public static final int STRING_MERGING_THRESHOLD = 10;
     private static final LoggerMaker loggerMaker = new LoggerMaker(MergingLogic.class);
 
-    public static void mergeUrlsAndSave(int apiCollectionId, boolean mergeUrlsBasic) {
-        ApiMergerResult result = tryMergeURLsInCollection(apiCollectionId, mergeUrlsBasic);
+    public static void mergeUrlsAndSave(int apiCollectionId, boolean mergeUrlsBasic, boolean allowMergingOnVersions) {
+        ApiMergerResult result = tryMergeURLsInCollection(apiCollectionId, mergeUrlsBasic, allowMergingOnVersions);
 
         String deletedStaticUrlsString = "";
         int counter = 0;
@@ -185,7 +187,7 @@ public class MergingLogic {
         }
     }
 
-    public static ApiMergerResult tryMergeURLsInCollection(int apiCollectionId, boolean mergeUrlsBasic) {
+    public static ApiMergerResult tryMergeURLsInCollection(int apiCollectionId, boolean mergeUrlsBasic, boolean allowMergingOnVersions) {
         ApiCollection apiCollection = ApiCollectionsDao.instance.getMeta(apiCollectionId);
 
         Bson filterQ = null;
@@ -214,7 +216,7 @@ public class MergingLogic {
             List<String> templateUrls = new ArrayList<>();
             for(SingleTypeInfo sti: singleTypeInfos) {
                 String key = sti.getMethod() + " " + sti.getUrl();
-                if (key.contains("INTEGER") || key.contains("STRING") || key.contains("UUID")) {
+                if (key.contains("INTEGER") || key.contains("STRING") || key.contains("UUID") || key.contains("OBJECT_ID") || key.contains("FLOAT") || key.contains("VERSIONED")) {
                     templateUrlSet.add(key);
                     continue;
                 };
@@ -265,7 +267,7 @@ public class MergingLogic {
 
 
             for(int size: sizeToUrlToSti.keySet()) {
-                ApiMergerResult result = tryMergingWithKnownStrictURLs(sizeToUrlToSti.get(size), !mergeUrlsBasic);
+                ApiMergerResult result = tryMergingWithKnownStrictURLs(sizeToUrlToSti.get(size), !mergeUrlsBasic, allowMergingOnVersions);
                 finalResult.templateToStaticURLs.putAll(result.templateToStaticURLs);
             }
 
@@ -296,7 +298,7 @@ public class MergingLogic {
         return sizeToURL;
     }
 
-    private static ApiMergerResult tryMergingWithKnownStrictURLs(Map<String, Set<String>> pendingRequests, boolean doBodyMatch) {
+    private static ApiMergerResult tryMergingWithKnownStrictURLs(Map<String, Set<String>> pendingRequests, boolean doBodyMatch, boolean allowMergingOnVersions) {
         Map<URLTemplate, Set<String>> templateToStaticURLs = new HashMap<>();
 
         Iterator<Map.Entry<String, Set<String>>> iterator = pendingRequests.entrySet().iterator();
@@ -330,13 +332,13 @@ public class MergingLogic {
                 String aEndpoint = aUrl.split(" ")[1];
                 URLStatic aStatic = new URLStatic(aEndpoint, aMethod);
                 URLStatic newStatic = new URLStatic(newEndpoint, newMethod);
-                URLTemplate mergedTemplate = tryMergeUrls(aStatic, newStatic);
+                URLTemplate mergedTemplate = tryMergeUrls(aStatic, newStatic, allowMergingOnVersions);
                 if (mergedTemplate == null) {
                     continue;
                 }
 
                 boolean compareKeys = doBodyMatch && RequestTemplate.compareKeys(aTemplate, newTemplate, mergedTemplate);
-                if (areBothMatchingUrls(newStatic,aStatic,mergedTemplate) || areBothUuidUrls(newStatic,aStatic,mergedTemplate) || RequestTemplate.compareKeys(aTemplate, newTemplate, mergedTemplate) || compareKeys) {
+                if (areBothMatchingUrls(newStatic,aStatic,mergedTemplate) || areBothUuidUrls(newStatic,aStatic,mergedTemplate) || RequestTemplate.compareKeys(aTemplate, newTemplate, mergedTemplate) || compareKeys || (allowMergingOnVersions && areBothVersionUrls(newStatic, aStatic, mergedTemplate))) {
                     Map<String, Set<String>> similarTemplates = potentialMerges.get(mergedTemplate);
                     if (similarTemplates == null) {
                         similarTemplates = new HashMap<>();
@@ -391,6 +393,23 @@ public class MergingLogic {
         return true;
     }
 
+    private static boolean areBothVersionUrls(URLStatic newUrl, URLStatic deltaUrl, URLTemplate mergedTemplate) {
+        String[] n = tokenize(newUrl.getUrl());
+        String[] o = tokenize(deltaUrl.getUrl());
+        SingleTypeInfo.SuperType[] b = mergedTemplate.getTypes();
+        for (int idx =0 ; idx < b.length; idx++) {
+            SingleTypeInfo.SuperType c = b[idx];
+            if (Objects.equals(c, SingleTypeInfo.SuperType.VERSIONED) && o.length > idx) {
+                String val = n[idx];
+                if(!isValidVersionToken(val) || !isValidVersionToken(o[idx])) {
+                    return false;
+                }
+            }
+        }
+
+        return true;
+    }
+
     public static boolean areBothMatchingUrls(URLStatic newUrl, URLStatic deltaUrl, URLTemplate mergedTemplate) {
 
         String[] n = tokenize(newUrl.getUrl());
@@ -425,27 +444,9 @@ public class MergingLogic {
     public static String[] tokenize(String url) {
         return trim(url).split("/");
     }
-    public static boolean isAlphanumericString(String s) {
-
-        int intCount = 0;
-        int charCount = 0;
-        if (s.length() < 6) {
-            return false;
-        }
-        for (int i = 0; i < s.length(); i++) {
-
-            char c = s.charAt(i);
-            if (Character.isDigit(c)) {
-                intCount++;
-            } else if (Character.isLetter(c)) {
-                charCount++;
-            }
-        }
-        return (intCount >= 3 && charCount >= 1);
-    }
 
 
-    public static URLTemplate tryMergeUrls(URLStatic dbUrl, URLStatic newUrl) {
+    public static URLTemplate tryMergeUrls(URLStatic dbUrl, URLStatic newUrl, boolean allowMergingOnVersions) {
         if (dbUrl.getMethod() != newUrl.getMethod()) {
             return null;
         }
@@ -474,7 +475,10 @@ public class MergingLogic {
             } else if(pattern.matcher(tempToken).matches() && pattern.matcher(dbToken).matches()){
                 newTypes[i] = SingleTypeInfo.SuperType.STRING;
                 newTokens[i] = null;
-            } else {
+            }else if(allowMergingOnVersions && isValidVersionToken(tempToken) && isValidVersionToken(dbToken)) {
+                newTypes[i] = SingleTypeInfo.SuperType.VERSIONED;
+                newTokens[i] = null;
+            }else {
                 newTypes[i] = SingleTypeInfo.SuperType.STRING;
                 newTokens[i] = null;
                 templatizedStrTokens++;
