@@ -398,6 +398,14 @@ const learnMoreObject = {
             }
         ],
     },
+    dashboard_settings_threat_configuration:{
+        docsLink: [
+            {
+                content:"How to configure Threat Actor",
+                value:"https://docs.akto.io/api-protection/concepts/threat-actors"
+            },
+        ],
+    },
     dashboard_settings_tags:{
         docsLink: [
             {

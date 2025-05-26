@@ -245,15 +245,15 @@ message ModifyThreatActorStatusResponse {
 message GetThreatConfigurationRequest {
 }
 
-message GetThreatConfigurationResponse {
-  message ActorId {
-    string type = 1; // "IP" or "Header"
+message ActorId {
+    string type = 1; // "ip" or "header"
     string key = 2;  // "ip" or "headername"
-  }
-
-  message Actor {
-    ActorId actor_id = 1;
-  }
-
+    string kind = 3; // hostname or endpoint or collection
+    string pattern = 4; // regex pattern or collection id
+}
+message Actor {
+    repeated ActorId actor_id = 1;
+}
+message ThreatConfiguration {
   Actor actor = 1;
 }

@@ -291,4 +291,9 @@ public class ApiCollectionsDao extends AccountsContextDaoWithRbac<ApiCollection>
         return ApiCollectionsDao.instance.findAll(filters, Projections.include("hostName", "_id"));
     }
 
+    public static List<ApiCollection> fetchAllActiveHosts() {
+        Bson filters = Filters.and(Filters.exists("hostName", true), Filters.ne(ApiCollection._DEACTIVATED, true));
+        return ApiCollectionsDao.instance.findAll(filters, Projections.include("hostName", "_id"));
+    }
+
 }

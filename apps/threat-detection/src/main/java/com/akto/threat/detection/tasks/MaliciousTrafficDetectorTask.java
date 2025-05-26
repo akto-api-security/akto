@@ -52,11 +52,9 @@ import com.akto.proto.generated.threat_detection.message.malicious_event.v1.Mali
 import com.akto.proto.generated.threat_detection.message.sample_request.v1.SampleMaliciousRequest;
 import com.akto.proto.generated.threat_detection.message.sample_request.v1.SampleRequestKafkaEnvelope;
 import com.akto.proto.generated.threat_detection.message.sample_request.v1.SchemaConformanceError;
-import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.GetThreatConfigurationResponse;
 import com.akto.proto.http_response_param.v1.HttpResponseParam;
 import com.akto.rules.TestPlugin;
 import com.akto.test_editor.filter.data_operands_impl.ValidationResult;
-import com.akto.threat.detection.actor.SourceIPActorGenerator;
 import com.akto.threat.detection.cache.ApiCountCacheLayer;
 import com.akto.threat.detection.cache.RedisBackedCounterCache;
 import com.akto.threat.detection.constants.KafkaTopic;
@@ -81,8 +79,7 @@ Pass data through filters and identify malicious traffic.
  */
 public class MaliciousTrafficDetectorTask implements Task {
 
-  private final CloseableHttpClient httpClient;
-  private GetThreatConfigurationResponse threatConfiguration;
+  private ThreatConfigurationEvaluator threatConfigEvaluator;
   private final Consumer<String, byte[]> kafkaConsumer;
   private final KafkaConfig kafkaConfig;
   private final HttpCallParser httpCallParser;
@@ -96,7 +93,6 @@ public class MaliciousTrafficDetectorTask implements Task {
 
   private Map<String, FilterConfig> apiFilters;
   private int filterLastUpdatedAt = 0;
-  private int threatConfigLastUpdatedAt = 0;
   private int filterUpdateIntervalSec = 900;
 
   private final KafkaProtoProducer internalKafka;
@@ -134,8 +130,7 @@ public class MaliciousTrafficDetectorTask implements Task {
 
     this.httpCallParser = new HttpCallParser(120, 1000);
     
-    this.httpClient = HttpClients.createDefault();
-    this.threatConfiguration = this.getThreatConfiguration();
+    this.threatConfigEvaluator = new ThreatConfigurationEvaluator(null);
 
     this.windowBasedThresholdNotifier =
         new WindowBasedThresholdNotifier(
@@ -240,75 +235,10 @@ public class MaliciousTrafficDetectorTask implements Task {
     return apiSchema;
   }
 
-  private GetThreatConfigurationResponse getThreatConfiguration() {
-
-    String url = System.getenv("AKTO_THREAT_PROTECTION_BACKEND_URL");
-    String token = System.getenv("AKTO_THREAT_PROTECTION_BACKEND_TOKEN");
-
-    HttpGet get = new HttpGet(
-        String.format("%s/api/dashboard/get_threat_configuration", url));
-    get.addHeader("Authorization", "Bearer " + token);
-    get.addHeader("Content-Type", "application/json");
-
-    GetThreatConfigurationResponse threatConfiguration = null;
-
-    try (CloseableHttpResponse resp = this.httpClient.execute(get)) {
-      String responseBody = EntityUtils.toString(resp.getEntity());
-      threatConfiguration = ProtoMessageUtils
-          .<GetThreatConfigurationResponse>toProtoMessage(
-              GetThreatConfigurationResponse.class, responseBody)
-          .orElse(null);
-
-      logger.debug("Fetched threat configuration" + threatConfiguration.toString());
-    } catch (Exception e) {
-      e.printStackTrace();
-      logger.error("Error while getting threat configuration" + e.getStackTrace());
-    }
-    return threatConfiguration;
-  }
-
-  private String getActorId(HttpResponseParams responseParam) {
-    int now = (int) (System.currentTimeMillis() / 1000);
-    if (now - threatConfigLastUpdatedAt> filterUpdateIntervalSec) {
-      this.threatConfiguration = getThreatConfiguration();
-      this.threatConfigLastUpdatedAt= now;
-    }
-
-    String actor;
-    String sourceIp = SourceIPActorGenerator.instance.generate(responseParam).orElse("");
-    responseParam.setSourceIP(sourceIp);
-
-    if (this.threatConfiguration == null) {
-      actor = sourceIp;
-      return actor;
-    }
-
-    String actorIdType = this.threatConfiguration.getActor().getActorId().getType().toLowerCase();
-    switch (actorIdType) {
-      case "ip":
-        actor = sourceIp;
-        break;
-
-      case "header":
-        List<String> header = responseParam.getRequestParams().getHeaders()
-            .get(this.threatConfiguration.getActor().getActorId().getKey().toLowerCase());
-        if (header != null && !header.isEmpty()) {
-          actor = header.get(0);
-        } else {
-          logger.warn("No header found for actor id " + this.threatConfiguration.getActor().getActorId().getKey());
-          actor = sourceIp;
-        }
-        break;
-      default:
-        actor = sourceIp;
-        break;
-    }
-    return actor;
-  }
 
   private void processRecord(HttpResponseParam record) throws Exception {
     HttpResponseParams responseParam = buildHttpResponseParam(record);
-    String actor = this.getActorId(responseParam);
+    String actor = this.threatConfigEvaluator.getActorId(responseParam);
 
     if (actor == null || actor.isEmpty()) {
       logger.warnAndAddToDb("Dropping processing of record with no actor IP, account: " + responseParam.getAccountId());
