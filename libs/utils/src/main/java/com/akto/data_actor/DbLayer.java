@@ -670,7 +670,7 @@ public class DbLayer {
             );
 
             return TestingRunDao.instance.getMCollection().findOneAndUpdate(
-                Filters.eq(ID, testingRun.getId()), 
+                Filters.and(Filters.eq(ID, testingRun.getId()), filter),
                 update
             );
         } catch (Exception e) {
@@ -734,13 +734,20 @@ public class DbLayer {
 
             // Update service name if needed
             if (!validatedMiniTestingName.equals(testingRun.getMiniTestingServiceName())) {
-                TestingRunDao.instance.updateOne(
+                FindOneAndUpdateOptions findOneAndUpdateOptions = new FindOneAndUpdateOptions();
+                findOneAndUpdateOptions.returnDocument(ReturnDocument.AFTER);
+                findOneAndUpdateOptions.upsert(false);
+                TestingRun testingRun1 = TestingRunDao.instance.getMCollection().findOneAndUpdate(
                     Filters.and(
                         Filters.eq(ID, trrs.getTestingRunId()),
                         Filters.eq(TestingRun.MINI_TESTING_SERVICE_NAME, testingRun.getMiniTestingServiceName())
                     ),
-                    Updates.set(TestingRun.MINI_TESTING_SERVICE_NAME, validatedMiniTestingName)
+                    Updates.set(TestingRun.MINI_TESTING_SERVICE_NAME, validatedMiniTestingName),
+                        findOneAndUpdateOptions
                 );
+                if (testingRun1 == null || !validatedMiniTestingName.equals(testingRun1.getMiniTestingServiceName())) {
+                    return null;
+                }
             }
 
             return TestingRunResultSummariesDao.instance.getMCollection()
