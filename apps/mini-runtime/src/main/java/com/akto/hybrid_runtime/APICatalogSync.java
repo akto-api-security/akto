@@ -44,6 +44,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import static com.akto.dto.type.KeyTypes.patternToSubType;
+import static com.akto.runtime.RuntimeUtil.isAlphanumericString;
+import static com.akto.runtime.RuntimeUtil.isValidVersionToken;
 
 public class APICatalogSync {
 
@@ -486,26 +488,6 @@ public class APICatalogSync {
         return true;
     }
 
-    public static boolean isAlphanumericString(String s) {
-
-        int intCount = 0;
-        int charCount = 0;
-        if (s.length() < 6) {
-            return false;
-        }
-        for (int i = 0; i < s.length(); i++) {
-
-            char c = s.charAt(i);
-            if (Character.isDigit(c)) {
-                intCount++;
-            } else if (Character.isLetter(c)) {
-                charCount++;
-            }
-        }
-        return (intCount >= 3 && charCount >= 1);
-    }
-
-
     private static boolean isValidSubtype(SubType subType){
         return !(subType.getName().equals(SingleTypeInfo.GENERIC.getName()) || subType.getName().equals(SingleTypeInfo.OTHER.getName()));
     }
@@ -524,26 +506,7 @@ public class APICatalogSync {
         }
     }
 
-    private static boolean isValidVersionToken(String token){
-        if(token == null || token.isEmpty()) return false;
-        token = token.trim().toLowerCase();
-        if(token.startsWith("v") && token.length() > 1 && token.length() < 4) {
-            String versionString = token.substring(1, token.length());
-            try {
-                int version = Integer.parseInt(versionString);
-                if (version > 0) {
-                    return true;
-                } 
-            } catch (Exception e) {
-                // TODO: handle exception
-                return false;
-            }
-            return false;
-        }
-        return false;
-    }
-
-    public static URLTemplate tryParamteresingUrl(URLStatic newUrl, boolean mergeUrlsOnVersions){
+        public static URLTemplate tryParamteresingUrl(URLStatic newUrl, boolean mergeUrlsOnVersions){
         String[] tokens = tokenize(newUrl.getUrl());
         if(tokens.length < 2){
             return null;
