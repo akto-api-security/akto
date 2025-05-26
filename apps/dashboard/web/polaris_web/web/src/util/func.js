@@ -966,7 +966,7 @@ prepareValuesTooltip(x) {
 },
 
 parameterizeUrl(x) {
-  let re = /INTEGER|STRING|UUID/gi;
+  let re = /INTEGER|STRING|UUID|VERSIONED/gi;
   let newStr = x.replace(re, (match) => { 
       return "{param_" + match + "}";
   });

@@ -73,7 +73,6 @@ public class HttpCallParser {
             .build();
 
     private static final ConcurrentLinkedQueue<BasicDBObject> queue = new ConcurrentLinkedQueue<>();
-    private static final int MAX_ALLOWED_HTML_CONTENT = 1024 * 1024 ;
 
     public static void init() {
         trafficMetricsExecutor.scheduleAtFixedRate(new Runnable() {
@@ -90,6 +89,12 @@ public class HttpCallParser {
             }
         },0,5,TimeUnit.MINUTES);
     }
+
+    public HttpCallParser(String userIdentifier, int thresh, int sync_threshold_count, int sync_threshold_time, boolean fetchAllSTI, boolean skipMergingOnKnownStaticURLsForVersionedApis){
+        this(userIdentifier, thresh, sync_threshold_count, sync_threshold_time, fetchAllSTI);
+        apiCatalogSync.setSkipMergingOnKnownStaticURLsForVersionedApis(skipMergingOnKnownStaticURLsForVersionedApis);
+    }
+
     public HttpCallParser(String userIdentifier, int thresh, int sync_threshold_count, int sync_threshold_time, boolean fetchAllSTI) {
         last_synced = 0;
         this.sync_threshold_count = sync_threshold_count;
