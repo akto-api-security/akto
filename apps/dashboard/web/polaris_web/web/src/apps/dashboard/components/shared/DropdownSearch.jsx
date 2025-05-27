@@ -120,7 +120,8 @@ function DropdownSearch(props) {
     const updateSelection = useCallback(
         (selected) => {
             const selectedText = selected.map((selectedItem) => {
-                const matchedOption = options.find((option) => {  
+                let optionsArr = Array.isArray(options?.[0]?.options) ? options?.[0]?.options : options
+                const matchedOption = optionsArr.find((option) => {  
                     if (typeof option.value === "string")
                         return option.value.match(selectedItem);
                     else 

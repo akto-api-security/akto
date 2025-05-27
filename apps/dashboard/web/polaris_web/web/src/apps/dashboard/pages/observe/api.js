@@ -845,6 +845,24 @@ export default {
         return resp
     },
 
+    async fetchApiCallStats(apiCollectionId, url, method, startEpoch, endEpoch) {
+        const resp = await request({
+            url: '/api/fetchApiCallStats',
+            method: 'post',
+            data: { apiCollectionId, url, method, startEpoch, endEpoch }
+        })
+        return resp
+    },
+
+    async fetchIpLevelApiCallStats(apiCollectionId, url, method, startEpoch, endEpoch) {
+        const resp = await request({
+            url: '/api/fetchIpLevelApiCallStats',
+            method: 'post',
+            data: { apiCollectionId, url, method, startEpoch, endEpoch }
+        })
+        return resp
+    },
+
     async checkIfDependencyGraphAvailable(apiCollectionId, url, method) {
         return await request({
             url: '/api/checkIfDependencyGraphAvailable',

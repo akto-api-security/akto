@@ -108,6 +108,8 @@ function ThreatDetectionPage() {
                 setShowDetails(true)
                 setMoreInfoData({
                     url: data.url,
+                    method: data.method,
+                    apiCollectionId: data.apiCollectionId,
                     templateId: data.filterId,
                 })
             } else {

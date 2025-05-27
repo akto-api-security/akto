@@ -9,30 +9,27 @@ import DropdownSearch from '../../../components/shared/DropdownSearch'
 
 const getProjectObj = (connection: string) => {
     switch (connection) {
-        case 'GITLAB':
-            return {
-                "1": {
-                    label: "Repository Name",
-                    placeholder: "Enter repository name",
-                },
-                "2" : {
-                    label: "Project Name",
-                    placeholder: "Enter project name",
-                },
-            }
-        
         case 'GITHUB':
-        case 'BIT_BUCKET':
             return {
                 "1": {
-                    label: "Project Name",
-                    placeholder: "Enter project name",
+                    label: "Organization/User Name",
+                    placeholder: "Enter organization/user name",
                 },
                 "2" : {
                     label: 'Repository Name',
                     placeholder: "Enter repository name",
                 }
-
+            }
+        case 'BIT_BUCKET':
+            return {
+                "1": {
+                    label: "Team Name",
+                    placeholder: "Enter team name",
+                },
+                "2" : {
+                    label: 'Repository Name',
+                    placeholder: "Enter repository name",
+                }
             }
     }   
 }
@@ -47,13 +44,6 @@ async function checkRepoReadAccess({ platform, projectName, repoName, privateTok
           url = `https://api.github.com/repos/${projectName}/${repoName}`;
           headers = privateToken ? { Authorization: `Bearer ${privateToken}` } : {};
           break;
-  
-        case 'gitlab':
-          const fullPath = encodeURIComponent(`${projectName}/${repoName}`);
-          url = `https://gitlab.com/api/v4/projects/${fullPath}`;
-          headers = privateToken ? { 'PRIVATE-TOKEN': privateToken } : {};
-          break;
-  
         case 'bit_bucket':
           url = `https://api.bitbucket.org/2.0/repositories/${projectName}/${repoName}`;
           headers = privateToken
@@ -236,7 +226,6 @@ function RepoSelector({ handleClickRepo, selectedConnection }) {
                             })}
                             placeHolder={"Edit choice(s)"}
                             setSelected={(selectedChoices: any) => {setNewProjectName(selectedChoices); handleAddRepository(selectedChoices)}}
-                            value={newProjectName}
                     />
                     </Box>: null
                 }
@@ -295,12 +284,6 @@ function RepositoryInitializer({ agentType }: { agentType: string }) {
             logo: '/public/github.svg',
             text: 'Continue with GitHub',
             onClickFunc: () => handleClick('GITHUB')
-        },
-        {
-            id: 'GITLAB',
-            logo: '/public/gitlab.svg',
-            text: 'Continue with GitLab',
-            onClickFunc: () => handleClick('GITLAB')
         },
         {
             id: 'BIT_BUCKET',

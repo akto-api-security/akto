@@ -28,6 +28,7 @@ import {
   SettingsMinor
 } from '@shopify/polaris-icons';
 import api from "../api";
+import observeApi from "../../observe/api";
 import func from '@/util/func';
 import { useParams } from 'react-router';
 import { useState, useEffect, useRef, useMemo, useReducer } from 'react';
@@ -107,6 +108,12 @@ let filterOptions = [
     label: 'API groups',
     title: 'API groups',
     choices: [],
+  },
+  {
+    key: 'apiNameFilter',
+    label: 'API Name',
+    title: 'API name',
+    choices: [],
   }
 ]
 
@@ -185,6 +192,8 @@ function SingleTestRunPage() {
       case 'categoryFilter':
       case 'testFilter':
         return func.convertToDisambiguateLabelObj(value, null, 2)
+      case 'apiNameFilter':
+        return func.convertToDisambiguateLabelObj(value, null, 1)
       default:
         return value;
     }
@@ -234,13 +243,13 @@ function SingleTestRunPage() {
   }
 
   useEffect(() => {
-    setUpdateTable(Date.now().toString())
     if (
       (localCategoryMap && Object.keys(localCategoryMap).length > 0) &&
       (localSubCategoryMap && Object.keys(localSubCategoryMap).length > 0)
     ) {
       setUseLocalSubCategoryData(true)
     }
+    setUpdateTable(Date.now().toString())
   }, [testingRunResultSummariesObj])
 
   filterOptions = func.getCollectionFilters(filterOptions)
@@ -264,13 +273,69 @@ function SingleTestRunPage() {
     }
   })
 
+  const populateApiNameFilterChoices = async (testingRun) => {
+    if (testingRun?.testingEndpoints) {
+      const {testingEndpoints} = testingRun;
+      let apiEndpoints = [];
+
+      if (testingEndpoints.type === "COLLECTION_WISE") {
+        const collectionId = testingEndpoints.apiCollectionId;
+        if (collectionId) {
+          try {
+            const response = await observeApi.fetchApiInfosForCollection(
+                collectionId);
+            if (response?.apiInfoList) {
+              const limitedEndpoints = response.apiInfoList.slice(
+                  0, 5000);
+              apiEndpoints = getApiEndpointsMap(limitedEndpoints, testingEndpoints.type);
+            }
+          } catch (error) {
+            console.error("Error fetching collection endpoints:", error);
+          }
+        }
+      } else if (testingEndpoints.type === "CUSTOM"
+          && testingEndpoints.apisList) {
+        const limitedApis = testingEndpoints.apisList.slice(0, 5000);
+        apiEndpoints = getApiEndpointsMap(limitedApis, testingEndpoints.type);
+      }
+
+      filterOptions = filterOptions.map(filter => {
+        if (filter.key === 'apiNameFilter') {
+          return {
+            ...filter,
+            choices: apiEndpoints
+          };
+        }
+        return filter;
+      });
+      setUpdateTable(Date.now().toString());
+    }
+  }
+
+  const getApiEndpointsMap = (endpoints, type) => {
+    if(type == null || type === undefined || type === "COLLECTION_WISE"){
+      return endpoints.map(endpoint => ({
+        label: endpoint.id.url,
+        value: endpoint.id.url
+      }));
+    }else{
+      return endpoints.map(endpoint => ({
+        label: endpoint.url,
+        value: endpoint.url
+      }));
+    }
+  }
+
   const fetchTestingRunResultSummaries = async () => {
     let tempTestingRunResultSummaries = [];
-    await api.fetchTestingRunResultSummaries(hexId).then(({ testingRun, testingRunResultSummaries, workflowTest, testingRunType }) => {
+    await api.fetchTestingRunResultSummaries(hexId).then(async ({ testingRun, testingRunResultSummaries, workflowTest, testingRunType }) => {
       tempTestingRunResultSummaries = testingRunResultSummaries
       setTestingRunResultSummariesObj({
         testingRun, workflowTest, testingRunType
       })
+      if (testingRun) {
+        await populateApiNameFilterChoices(testingRun)
+      }
     })
     const timeNow = func.timeNow()
     const defaultIgnoreTime = LocalStore.getState().defaultIgnoreSummaryTime
@@ -285,6 +350,7 @@ function SingleTestRunPage() {
       if (isBWithinTimeAndRunning) return 1;
       return b.startTimestamp - a.startTimestamp;
     })
+
     if (tempTestingRunResultSummaries && tempTestingRunResultSummaries.length > 0) {
       setSummary(tempTestingRunResultSummaries[0], true)
     }

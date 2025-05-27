@@ -2442,6 +2442,8 @@ public class InitializerListener implements ServletContextListener {
                         }
                     }, "context-initializer-secondary");
 
+                    setUpTestEditorTemplatesScheduler();
+
                     if(runJobFunctionsAnyway) {
                         crons.trafficAlertsScheduler();
                         // crons.insertHistoricalDataJob();
@@ -2457,7 +2459,6 @@ public class InitializerListener implements ServletContextListener {
                         setUpWebhookScheduler();
                         cleanInventoryJobRunner();
                         setUpDefaultPayloadRemover();
-                        setUpTestEditorTemplatesScheduler();
                         setUpDependencyFlowScheduler();
                         tokenGeneratorCron.tokenGeneratorScheduler();
                         crons.deleteTestRunsScheduler();
@@ -2741,6 +2742,8 @@ public class InitializerListener implements ServletContextListener {
             String hotjarSiteId = organization.getHotjarSiteId();
             String planType = organization.getplanType();
             String trialMsg = organization.gettrialMsg();
+            String protectionTrialMsg = organization.getprotectionTrialMsg();
+            String agentTrialMsg = organization.getagentTrialMsg();
             String organizationId = organization.getId();
             /*
              * This ensures, we don't fetch feature wise allowed from akto too often.
@@ -2807,6 +2810,8 @@ public class InitializerListener implements ServletContextListener {
             hotjarSiteId = OrganizationUtils.fetchHotjarSiteId(metaData);
             planType = OrganizationUtils.fetchplanType(metaData);
             trialMsg = OrganizationUtils.fetchtrialMsg(metaData);
+            protectionTrialMsg = OrganizationUtils.fetchprotectionTrialMsg(metaData);
+            agentTrialMsg = OrganizationUtils.fetchagentTrialMsg(metaData);
             boolean expired = OrganizationUtils.fetchExpired(metaData);
             if (DashboardMode.isOnPremDeployment()) {
                 boolean telemetryEnabled = OrganizationUtils.fetchTelemetryEnabled(metaData);
@@ -2822,6 +2827,10 @@ public class InitializerListener implements ServletContextListener {
             organization.setplanType(planType);
 
             organization.settrialMsg(trialMsg);
+
+            organization.setprotectionTrialMsg(protectionTrialMsg);
+
+            organization.setagentTrialMsg(agentTrialMsg);
 
             organization.setGracePeriod(gracePeriod);
             organization.setFeatureWiseAllowed(featureWiseAllowed);
@@ -2846,6 +2855,8 @@ public class InitializerListener implements ServletContextListener {
                             Updates.set(Organization.HOTJAR_SITE_ID, hotjarSiteId),
                             Updates.set(Organization.PLAN_TYPE, planType),
                             Updates.set(Organization.TRIAL_MSG, trialMsg),
+                            Updates.set(Organization.AGENTTRIAL_MSG, agentTrialMsg),
+                            Updates.set(Organization.PROTECTIONTRIAL_MSG, protectionTrialMsg),
                             Updates.set(Organization.TEST_TELEMETRY_ENABLED, testTelemetryEnabled),
                             Updates.set(Organization.LAST_FEATURE_MAP_UPDATE, lastFeatureMapUpdate)));
 

@@ -27,6 +27,7 @@ import GithubSso from "../dashboard/pages/settings/integrations/GithubSso";
 import GithubAppIntegration from "../dashboard/pages/settings/integrations/GithubAppIntegration";
 import HealthLogs from "../dashboard/pages/settings/health_logs/HealthLogs";
 import About from "../dashboard/pages/settings/about/About";
+import ThreatConfiguration from "../dashboard/pages/settings/threat_configuration/ThreatConfiguration";
 import Metrics from "../dashboard/pages/settings/metrics/Metrics";
 import TestEditor from "../dashboard/pages/test_editor/TestEditor";
 import DataTypes from "../dashboard/pages/observe/data_types/DataTypes";
@@ -84,7 +85,6 @@ import AuditLogs from "../dashboard/pages/settings/audit_logs/AuditLogs";
 import ThreatApiPage from "../dashboard/pages/threat_detection/ThreatApiPage";
 import ThreatActorPage from "../dashboard/pages/threat_detection/ThreatActorPage";
 import ThreatPolicyPage from "../dashboard/pages/threat_detection/ThreatPolicyPage";
-import ThreatConfigurationPage from "../dashboard/pages/threat_detection/ThreatConfigurationPage";
 import TestSuite from "../dashboard/pages/testing/testSuite/TestSuite";
 import TestsTablePage from "../dashboard/pages/test_editor/tests_table/TestsTablePage";
 import Splunk from "../dashboard/pages/settings/integrations/Splunk";
@@ -227,10 +227,6 @@ const router = createBrowserRouter([
                             {
                                 path: "threat-policy",
                                 element: <ThreatPolicyPage/>
-                            },
-                            {
-                                path: "threat-configuration",
-                                element: <ThreatConfigurationPage/>
                             }
                         ]
                     },
@@ -260,6 +256,10 @@ const router = createBrowserRouter([
                     {
                         path: "roles",
                         element: <Roles/>
+                    },
+                    {
+                        path: "threat-configuration",
+                        element: <ThreatConfiguration/>
                     },
                     {
                         path: "Help",

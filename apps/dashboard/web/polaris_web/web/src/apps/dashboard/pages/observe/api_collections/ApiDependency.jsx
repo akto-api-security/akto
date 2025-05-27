@@ -8,8 +8,6 @@ import api from "../api";
 import ApiDependencyEdge from "./ApiDependencyEdge";
 import func from "../../../../../util/func";
 
-
-
 const initialNodes = [];
 
 const initialEdges = [];

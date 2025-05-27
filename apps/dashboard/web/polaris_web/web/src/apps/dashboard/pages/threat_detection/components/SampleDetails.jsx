@@ -8,6 +8,7 @@ import testingApi from "../../testing/api"
 import MarkdownViewer from "../../../components/shared/MarkdownViewer";
 import TooltipText from "../../../components/shared/TooltipText";
 import ActivityTracker from "../../dashboard/components/ActivityTracker";
+import ApiSchema from "../../observe/api_collections/ApiSchema";
 
 function SampleDetails(props) {
     const { showDetails, setShowDetails, data, title, moreInfoData, threatFiltersMap } = props
@@ -80,21 +81,36 @@ function SampleDetails(props) {
         component: <ActivityTracker latestActivity={latestActivity} />
     }
 
+
+    const SchemaTab = {
+        id: 'schema',
+        content: "Schema",
+        component:  <Box paddingBlockStart={"4"}> 
+            <ApiSchema
+                apiInfo={{
+                    apiCollectionId: moreInfoData?.apiCollectionId,
+                    url: moreInfoData?.url,
+                    method: moreInfoData?.method
+                }}
+            />
+        </Box>
+    }
+
     const ValuesTab = {
         id: 'values',
         content: "Values",
         component: (
-        <Box paddingBlockStart={3} paddingInlineEnd={4} paddingInlineStart={4}>
-            <SampleDataList
-                key="Sample values"
-                heading={"Attempt"}
-                minHeight={"30vh"}
-                vertical={true}
-                sampleData={data?.map((result) => {
-                    return {message:result.orig, highlightPaths:[]}
-                })}
-            />
-        </Box>)
+            <Box paddingBlockStart={3} paddingInlineEnd={4} paddingInlineStart={4}>
+                <SampleDataList
+                    key="Sample values"
+                    heading={"Attempt"}
+                    minHeight={"30vh"}
+                    vertical={true}
+                    sampleData={data?.map((result) => {
+                        return { message: result.orig, highlightPaths: [], metadata: result.metadata }
+                    })}
+                />
+            </Box>)
     }
 
     const remediationTab = remediationText.length > 0 && {
