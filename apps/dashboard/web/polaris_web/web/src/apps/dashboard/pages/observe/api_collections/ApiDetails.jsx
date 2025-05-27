@@ -147,7 +147,7 @@ function ApiDetails(props) {
                     setParamList(resp.data.params)
                 })
             })
-
+            
             const queryPayload = dashboardFunc.getApiPrompts(apiCollectionId, endpoint, method)[0].prepareQuery();
             try{
                 if(isGptActive && window.STIGG_FEATURE_WISE_ALLOWED["AKTO_GPT_AI"] && window.STIGG_FEATURE_WISE_ALLOWED["AKTO_GPT_AI"]?.isGranted === true){
@@ -162,7 +162,7 @@ function ApiDetails(props) {
                     })
                 }
             }catch (e) {
-            }
+            }          
 
         }
     }
@@ -210,6 +210,7 @@ function ApiDetails(props) {
         }
 
         fetchData();
+        setHeadersWithData([])
     }, [apiDetail])
 
     function displayGPT() {

@@ -30,8 +30,8 @@ public class AnalyzeRequestResponseHeaders extends PromptHandler {
     private static final LoggerMaker logger = new LoggerMaker(AnalyzeRequestResponseHeaders.class, LogDb.DASHBOARD);
     private static final String OLLAMA_SERVER_ENDPOINT = "http://jarvis.internal.akto.io/api/generate";
     //private static final String OLLAMA_SERVER_ENDPOINT = "http://35.226.83.20/api/generate";
-    private static final String OLLAMA_MODEL =  "llama3.2:3b";
-    private static final Double temperature = 0.0;
+    private static final String OLLAMA_MODEL =  "llama3:8b";
+    private static final Double temperature = 0.1;
     private static final int max_tokens = 4000;
 
     @Override
@@ -81,49 +81,39 @@ public class AnalyzeRequestResponseHeaders extends PromptHandler {
 
     @Override
     protected String getPrompt(BasicDBObject queryData) {
-        String prompt = 
-        "You are an expert security engineer and developer.\n" +
-        "Below is a list of HTTP headers and their values captured from an API request or response:\n" +
-        "----------------------------------------\n" +
-        queryData.get("headers_with_values") + "\n" +
-        "----------------------------------------\n" +
-        "Your task is to identify ONLY those headers which reveal information about the protocol or gateway technology used (e.g., apigee, cloudfront, aws, azure, etc.).\n" +
-        "\n" +
-        "Match headers using known technology patterns ONLY:\n" +
-        "- AWS: key contains \"amzn\"\n" +
-        "- Cloudflare/CloudFront: key contains \"cf\"\n" +
-        "- Azure: key contains \"azure\"\n" +
-        "- Apigee: key contains \"apigee\"\n" +
-        "- Akamai: key contains \"akamai\"\n" +
-        "- Fastly: key contains \"fastly\"\n" +
-        "- Google Cloud: key contains \"gcp\" or \"x-goog\"\n" +
-        "- Vercel: key contains \"vercel\"\n" +
-        "- Netlify: key contains \"netlify\"\n" +
-        "\n" +
-        "Strict rules:\n" +
-        "- DO NOT guess technologies based on unknown or generic headers\n" +
-        "- DO NOT map headers like `x-recruiting`, `sec-ch-ua-platform`, `x-forwarded-for`, `x-forwarded-proto`, `accept`, or `user-agent` to any technology\n" +
-        "- DO NOT infer based on common HTTP behavior (e.g., HTTPS ≠ Cloudflare)\n" +
-        "- IGNORE headers with very long values (likely tokens, auth, cookies, etc.)\n" +
-        "- DO NOT add any header in response not matched by technology patterns listed above\n" +
-        "- DO NOT return response with \"none\" response. Ignore those headers\n" +
-        "- DO NOT append previous results\n" +
-        "- DO NOT include content which can be false positive\n" +
-        "\n" +
-        "Expected Output Format:\n" +
-        "- Return ONLY a JSON object with matched headers as keys and the technology as values\n" +
-        "- If no valid headers are found, return only this exact word: NOT_FOUND\n" +
-        "- DO NOT include explanations, tags, metadata, or anything other than the final JSON or NOT_FOUND\n" +
-        "- Be 100% precise — hallucinated or speculative outputs will be treated as incorrect\n" +
-        "\n" +
-        "Examples:\n" +
-        "Input header: x-amzn-requestid: abc → Output: {\"x-amzn-requestid\": \"aws\"}\n" +
-        "Input header: cf-ray: 3252 → Output: {\"cf-ray\": \"cloudfront\"}\n" +
-        "\n" +
-        "Respond now using only the JSON format or NOT_FOUND. Do not return model info or guesses.";
-    
-        return prompt;
+        String headers = queryData.getString("headers_with_values");
+        StringBuilder promptBuilder = new StringBuilder();
+        promptBuilder.append("You are a precise pattern-matching assistant.\n\n")
+            .append("Below is a list of HTTP headers captured from an API request or response:\n")
+            .append("----------------------------------------\n")
+            .append(headers)
+            .append("\n----------------------------------------\n\n")
+            .append("Your task:\n")
+            .append("- Identify headers that reveal the use of gateway or infrastructure technologies using strict pattern matching.\n")
+            .append("- Only match based on header **names**, not values.\n")
+            .append("- Known patterns:\n")
+            .append("    - 'amzn' → AWS\n")
+            .append("    - 'cf' → Cloudflare or CloudFront\n")
+            .append("    - 'azure' → Azure\n")
+            .append("    - 'akamai' → Akamai\n")
+            .append("    - 'x-goog', 'gcp' → Google Cloud\n")
+            .append("    - 'apigee' → Apigee\n")
+            .append("    - 'fastly' → Fastly\n")
+            .append("    - 'vercel' → Vercel\n")
+            .append("    - 'netlify' → Netlify\n\n")
+            .append("Strict rules:\n")
+            .append("- DO NOT guess or infer based on generic headers like `x-forwarded-for`, `user-agent`, etc.\n")
+            .append("- DO NOT match based on values.\n")
+            .append("- DO NOT include tokens, auth keys, or headers with very long values.\n")
+            .append("- Return only headers that match a known pattern exactly.\n")
+            .append("- If no match is found, return only this word: NOT_FOUND\n\n")
+            .append("Expected Output:\n")
+            .append("- A JSON object with matched headers and technology names.\n")
+            .append("- Example: { \"x-amzn-requestid\": \"aws\", \"cf-ray\": \"cloudflare\" }\n")
+            .append("- Return ONLY the JSON or NOT_FOUND — nothing else.");
+        return promptBuilder.toString();
     }
+    
 
     @Override
     protected String call(String prompt, String model, Double temperature, int maxTokens) {
@@ -134,6 +124,11 @@ public class AnalyzeRequestResponseHeaders extends PromptHandler {
             payload.put("prompt", prompt);
             payload.put("temperature", temperature);
             payload.put("max_tokens", maxTokens);
+            payload.put("top_p", 0.9);                 // Added top_p
+            payload.put("top_k", 50);                  // Added top_k
+            payload.put("repeat_penalty", 1.1);        // Penalize repetitions
+            payload.put("presence_penalty", 0.6);      // Discourage new topic jumps
+            payload.put("frequency_penalty", 0.0);     // Don't punish frequency
             payload.put("stream", false);
 
         RequestBody body = RequestBody.create(payload.toString(), mediaType);
@@ -142,22 +137,19 @@ public class AnalyzeRequestResponseHeaders extends PromptHandler {
                 .method("POST", body)
                 .addHeader("Content-Type", "application/json")
                 .build();
-        Response response = null;
-        String resp_body = "";
-        try {
-            response =  client.newCall(request).execute();
+
+        try (
+            Response response = client.newCall(request).execute()) {
+            if (!response.isSuccessful()) {
+                logger.error("Unexpected response code: " + response.code());
+                return null;
+            }
             ResponseBody responseBody = response.body();
-            if(responseBody != null) {
-                resp_body = responseBody.string();
-            }
+            return responseBody != null ? responseBody.string() : null;
         } catch (IOException e) {
-            logger.error("Error while executing request " + request.url() + ": " + e);
-        } finally {
-            if (response != null) {
-                response.close();
-            }
+            logger.error("Error while executing request: " + e.getMessage());
+            return null;
         }
-        return resp_body;
     }
 
     @Override
@@ -165,31 +157,62 @@ public class AnalyzeRequestResponseHeaders extends PromptHandler {
         BasicDBObject resp = new BasicDBObject();
         List<String> responses = new ArrayList<>();
         resp.put("responses", responses);
-
-        rawResponse = processOutput(rawResponse); 
-
-        String[] splits = rawResponse.split(",");
-        for (String split : splits) {
-            split = split.trim();
-            if (!split.contains("NOT_FOUND")) {
-                responses.add(split);
-            }
+    
+        String processed = processOutput(rawResponse).trim();
+        if (processed.equalsIgnoreCase("NOT_FOUND")) {
+            responses = new ArrayList<>();
+            return resp;
         }
+    
+        try {
+            JSONObject json = new JSONObject(processed);
+    
+            boolean hasValid = false;
+    
+            for (String key : json.keySet()) {
+                String value = json.optString(key, "").trim();
+    
+                if (key.equalsIgnoreCase("not_found") || value.equalsIgnoreCase("not_found") || value.equalsIgnoreCase("none") || value.isEmpty()) {
+                    continue;
+                }
+    
+                responses.add(key + ": " + value);
+                hasValid = true;
+            }
+    
+            if (!hasValid) {
+                responses = new ArrayList<>();
+            }
+    
+        } catch (Exception e) {
+            logger.error("Malformed JSON from model: " + processed, e);
+            responses = new ArrayList<>();
+        }
+    
         return resp;
     }
-
+    
     private String processOutput(String rawResponse) {
-        // Implement your logic to process the output here
-        // For example, you can clean up the response or format it as needed
-        JSONObject jsonResponse = new JSONObject(rawResponse);
-        String cleanResponse = jsonResponse.getString("response");
-
-        // Optional: remove <think> tags if they exist
-        cleanResponse = cleanResponse.replaceAll("(?s)<think>.*?</think>", "");
-        cleanResponse = cleanResponse.replaceAll("^\\{", "").replaceAll("}$", "");
-
-
-        return cleanResponse;
+        try {
+            JSONObject jsonResponse = new JSONObject(rawResponse);
+            String cleanResponse = jsonResponse.getString("response");
+    
+            // Remove <think> tags
+            cleanResponse = cleanResponse.replaceAll("(?s)<think>.*?</think>", "").trim();
+    
+            // If wrapped in escaped quotes, unescape it
+            if (cleanResponse.startsWith("\"") && cleanResponse.endsWith("\"")) {
+                cleanResponse = cleanResponse.substring(1, cleanResponse.length() - 1)
+                                             .replace("\\\"", "");
+            }
+    
+            return cleanResponse.trim();
+        } catch (Exception e) {
+            logger.error("Failed to clean LLM response: " + rawResponse, e);
+            return "NOT_FOUND";
+        }
     }
 }
+
+    
 
