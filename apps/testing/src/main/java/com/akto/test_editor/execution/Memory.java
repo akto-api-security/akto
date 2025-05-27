@@ -14,6 +14,10 @@ import com.akto.dto.type.SingleTypeInfo;
 import com.akto.testing.ApiExecutor;
 import com.akto.util.Constants;
 import com.mongodb.client.model.Filters;
+
+import lombok.Getter;
+import lombok.Setter;
+
 import org.bson.conversions.Bson;
 
 import java.util.*;
@@ -29,7 +33,6 @@ public class Memory {
 
     Map<Integer, SampleData> sampleDataMap = new HashMap<>();
     private Map<ApiInfo.ApiInfoKey, SingleTypeInfo.ParamId> assetsMap = new HashMap<>();
-
 
     private Map<Integer, ReplaceDetail> replaceDetailsMap = new HashMap<>();
 
@@ -60,8 +63,15 @@ public class Memory {
             SingleTypeInfo.ParamId paramId = results.get(0);
             assetsMap.put(apiInfoKey, paramId);
         }
-
     }
+
+    @Getter
+    @Setter
+    private String logId;
+
+    @Getter
+    @Setter
+    private TestingRunConfig testingRunConfig;
 
     public Memory(List<ApiInfo.ApiInfoKey> apiInfoKeys, Map<Integer, ReplaceDetail> replaceDetailsMap) {
         if (apiInfoKeys == null || apiInfoKeys.isEmpty()) return;
@@ -100,7 +110,7 @@ public class Memory {
         int hash = Objects.hash(apiCollectionId+"", url, method);
         if (resultMap.get(hash) != null) return resultMap.get(hash).getRequest();
 
-        // todo: optimise this.. no need to make db calls everytime
+        // todo: optimize this.. no need to make db calls every time
         TreeHelper treeHelper = new TreeHelper();
         treeHelper.buildTree(apiCollectionId+"", url, method);
         List<Node> nodes = new ArrayList<>(treeHelper.result.values());
@@ -180,10 +190,14 @@ public class Memory {
                 OriginalHttpRequest request = new OriginalHttpRequest();
                 request.buildFromSampleMessage(sample);
                 // todo: String newHost = findNewHost(request, modifyHostDetailMap);
-                String newHost = null;
 
                 OriginalHttpResponse originalHttpResponse = new OriginalHttpResponse();
                 originalHttpResponse.buildFromSampleMessage(sample);
+
+                RawApi rawApi = new RawApi(request, originalHttpResponse, sample);
+                ApiInfo.ApiInfoKey apiInfoKey = new ApiInfo.ApiInfoKey(id.getApiCollectionId(), id.getUrl(), id.getMethod());
+                Executor.modifyRawApiUsingTestRole(logId, testingRunConfig, rawApi, apiInfoKey);
+                request = rawApi.getRequest();
 
                 // do modifications
                 Node node = nodesMap.get(hash);
@@ -192,13 +206,11 @@ public class Memory {
 
                 if (isFinal) return request;
 
-                TestingRunConfig testingRunConfig = new TestingRunConfig(0, new HashMap<>(), new ArrayList<>(), null,newHost, null);
-
                 OriginalHttpResponse response = null;
                 try {
                     response = ApiExecutor.sendRequest(request,false, testingRunConfig, false, new ArrayList<>());
                     request.getHeaders().remove(Constants.AKTO_IGNORE_FLAG);
-                    RawApi rawApi = new RawApi(request, response, "");
+                    rawApi = new RawApi(request, response, "");
                     resultMap.put(hash, rawApi);
                 } catch (Exception e) {
                     e.printStackTrace();
@@ -206,12 +218,9 @@ public class Memory {
             } catch (Exception e) {
                 e.printStackTrace();
             }
-
         }
-
         return null;
     }
-
 
     public void fillResponse(OriginalHttpRequest request, OriginalHttpResponse response, int apiCollectionId, String url, String method) {
         int hash = Objects.hash(apiCollectionId+"", url, method);

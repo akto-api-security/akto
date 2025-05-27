@@ -125,6 +125,10 @@ public class YamlNodeExecutor extends NodeExecutor {
         //List<RawApi> testRawApis = singleReq.getRawApis();
         TestingRunConfig testingRunConfig = new TestingRunConfig();
         String logId = "";
+        if(memory != null) {
+            testingRunConfig = memory.getTestingRunConfig();
+            logId = memory.getLogId();
+        }
         List<TestResult> result = new ArrayList<>();
         boolean vulnerable = false;
 
