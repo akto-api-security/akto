@@ -2442,6 +2442,8 @@ public class InitializerListener implements ServletContextListener {
                         }
                     }, "context-initializer-secondary");
 
+                    setUpTestEditorTemplatesScheduler();
+
                     if(runJobFunctionsAnyway) {
                         crons.trafficAlertsScheduler();
                         // crons.insertHistoricalDataJob();
@@ -2457,7 +2459,6 @@ public class InitializerListener implements ServletContextListener {
                         setUpWebhookScheduler();
                         cleanInventoryJobRunner();
                         setUpDefaultPayloadRemover();
-                        setUpTestEditorTemplatesScheduler();
                         setUpDependencyFlowScheduler();
                         tokenGeneratorCron.tokenGeneratorScheduler();
                         crons.deleteTestRunsScheduler();
