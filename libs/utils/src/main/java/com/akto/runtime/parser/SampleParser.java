@@ -63,8 +63,8 @@ public class SampleParser {
 
         // JSON string of K8 POD tags
         String tags = (String) json.getOrDefault("tag", "");
-        loggerMaker.infoAndAddToDb(tags);
-        
+        loggerMaker.infoAndAddToDb("K8 POD tags: " + tags);
+
         return new HttpResponseParams(
                 type,statusCode, status, responseHeaders, payload, requestParams, time, accountId, isPending, source, message, sourceIP, destIP, direction
         );
