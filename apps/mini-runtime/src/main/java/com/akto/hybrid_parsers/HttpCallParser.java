@@ -67,6 +67,7 @@ public class HttpCallParser {
     private Map<TrafficMetrics.Key, TrafficMetrics> trafficMetricsMap = new HashMap<>();
     public static final ScheduledExecutorService trafficMetricsExecutor = Executors.newScheduledThreadPool(1);
     private static final String trafficMetricsUrl = "https://logs.akto.io/traffic-metrics";
+    private static final String NON_HOSTNAME_KEY = "null" + " "; // used for collections created without hostnames
 
     // Using default timeouts [10 seconds], as this is a slow API.
     private static final OkHttpClient client = CoreHTTPClient.client.newBuilder().build();
@@ -477,6 +478,37 @@ public class HttpCallParser {
         return res;
     }
 
+    /**
+     * Updates API collection tags if any new tags are detected.
+     * 
+     * @param hostNameMapKey     key for the host name map, which is used to create
+     *                           collections based on host names.
+     * @param httpResponseParams
+     */
+    public void updateApiCollectionTags(String hostNameMapKey, HttpResponseParams httpResponseParams) {
+
+        boolean shouldUpdate = false;
+        if (!shouldUpdate) {
+            return;
+        }
+        
+        // Detects if collections were created based on hostName
+        if (hostNameMapKey.contains(NON_HOSTNAME_KEY)) {
+            String vpcId = System.getenv("VPC_ID");
+            createCollectionSimpleForVpc(
+                    httpResponseParams.requestParams.getApiCollectionId(), vpcId, httpResponseParams.getTags());
+        } else {
+            try {
+                createCollectionBasedOnHostName(hostNameMapKey.hashCode(), hostNameMapKey,
+                        httpResponseParams.getTags());
+            } catch (Exception e) {
+                loggerMaker.error(
+                        "Error while updating api collection tags for host: " + hostNameMapKey + " " + e.getMessage());
+                e.printStackTrace();
+            }
+        }
+    }
+
     public int createApiCollectionId(HttpResponseParams httpResponseParam){
         int apiCollectionId;
         String hostName = getHeaderValue(httpResponseParam.getRequestParams().getHeaders(), "host");
@@ -496,6 +528,7 @@ public class HttpCallParser {
 
             if (hostNameToIdMap.containsKey(key)) {
                 apiCollectionId = hostNameToIdMap.get(key);
+                updateApiCollectionTags(key, httpResponseParam);
 
             } else {
                 int id = hostName.hashCode();
@@ -507,19 +540,20 @@ public class HttpCallParser {
                 } catch (Exception e) {
                     loggerMaker.errorAndAddToDb("Failed to create collection for host : " + hostName, LogDb.RUNTIME);
                     createCollectionSimpleForVpc(vxlanId, vpcId, httpResponseParam.getTags());
-                    hostNameToIdMap.put("null " + vxlanId, vxlanId);
+                    hostNameToIdMap.put(NON_HOSTNAME_KEY + vxlanId, vxlanId);
                     apiCollectionId = httpResponseParam.requestParams.getApiCollectionId();
                 }
             }
 
         } else {
-            String key = "null" + " " + vxlanId;
+            String key = NON_HOSTNAME_KEY + vxlanId;
             if (!hostNameToIdMap.containsKey(key)) {
                 createCollectionSimpleForVpc(vxlanId, vpcId, httpResponseParam.getTags());
                 hostNameToIdMap.put(key, vxlanId);
             }
 
             apiCollectionId = vxlanId;
+            updateApiCollectionTags(key, httpResponseParam);
         }
         return apiCollectionId;
     }
