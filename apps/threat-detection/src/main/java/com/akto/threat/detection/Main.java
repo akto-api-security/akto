@@ -1,6 +1,7 @@
 package com.akto.threat.detection;
 
 import com.akto.DaoInit;
+import com.akto.RuntimeMode;
 import com.akto.dao.context.Context;
 import com.akto.data_actor.DataActor;
 import com.akto.data_actor.DataActorFactory;
@@ -41,6 +42,11 @@ public class Main {
 
     logger.warnAndAddToDb("aggregation rules enabled " + aggregationRulesEnabled);
     ModuleInfoWorker.init(ModuleInfo.ModuleType.THREAT_DETECTION, dataActor);
+
+    boolean isHybridDeployment = RuntimeMode.isHybridDeployment();
+    if (!isHybridDeployment) {
+        DaoInit.init(new ConnectionString(System.getenv("AKTO_MONGO_CONN")));
+    }
 
     if (aggregationRulesEnabled) {
         runMigrations();
