@@ -488,6 +488,10 @@ public class HttpCallParser {
     public void updateApiCollectionTags(String hostNameMapKey, HttpResponseParams httpResponseParams) {
 
         boolean shouldUpdate = false;
+        int apiCollectionId = httpResponseParams.requestParams.getApiCollectionId();
+        ApiCollection apiCollection = apiCollectionsMap.get(apiCollectionId);
+
+        // TODO: Calculate diff of api collection tags and httpResponseParams.getTags()
         if (!shouldUpdate) {
             return;
         }
