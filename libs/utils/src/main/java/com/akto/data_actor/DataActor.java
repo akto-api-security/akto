@@ -255,9 +255,9 @@ public abstract class DataActor {
 
     public abstract Set<MergedUrls> fetchMergedUrls();
 
-    public abstract void createCollectionSimpleForVpc(int vxlanId, String vpcId);
+    public abstract void createCollectionSimpleForVpc(int vxlanId, String vpcId, String tags);
 
-    public abstract void createCollectionForHostAndVpc(String host, int colId, String vpcId);
+    public abstract void createCollectionForHostAndVpc(String host, int colId, String vpcId, String tags);
 
     public abstract List<BasicDBObject> fetchEndpointsInCollectionUsingHost(int apiCollectionId, int skip, int deltaPeriodValue);
 

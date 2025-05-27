@@ -541,12 +541,12 @@ public class DbActor extends DataActor {
         return DbLayer.fetchMergedUrls();
     }
 
-    public void createCollectionSimpleForVpc(int vxlanId, String vpcId) {
-        DbLayer.createCollectionSimpleForVpc(vxlanId, vpcId);
+    public void createCollectionSimpleForVpc(int vxlanId, String vpcId, String tags) {
+        DbLayer.createCollectionSimpleForVpc(vxlanId, vpcId, tags);
     }
 
-    public void createCollectionForHostAndVpc(String host, int colId, String vpcId) {
-        DbLayer.createCollectionForHostAndVpc(host, colId, vpcId);
+    public void createCollectionForHostAndVpc(String host, int colId, String vpcId, String tags) {
+        DbLayer.createCollectionForHostAndVpc(host, colId, vpcId, tags);
     }
 
     public List<BasicDBObject> fetchEndpointsInCollectionUsingHost(int apiCollectionId, int skip, int deltaPeriodValue) {
