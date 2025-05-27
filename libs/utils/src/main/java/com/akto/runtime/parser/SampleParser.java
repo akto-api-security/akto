@@ -1,5 +1,7 @@
 package com.akto.runtime.parser;
 
+import static com.akto.runtime.utils.Utils.printL;
+
 import java.util.List;
 import java.util.Map;
 
@@ -63,10 +65,12 @@ public class SampleParser {
 
         // JSON string of K8 POD tags
         String tags = (String) json.getOrDefault("tag", "");
-        loggerMaker.infoAndAddToDb("K8 POD tags: " + tags);
+        if(!tags.isEmpty()){
+            printL("K8 Pod Tags" + tags);
+        }
 
         return new HttpResponseParams(
-                type,statusCode, status, responseHeaders, payload, requestParams, time, accountId, isPending, source, message, sourceIP, destIP, direction
+                type,statusCode, status, responseHeaders, payload, requestParams, time, accountId, isPending, source, message, sourceIP, destIP, direction, tags
         );
 
     }

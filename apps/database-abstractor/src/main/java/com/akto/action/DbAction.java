@@ -215,6 +215,7 @@ public class DbAction extends ActionSupport {
     KafkaUtils kafkaUtils = new KafkaUtils();
     String endpointLogicalGroupId;
     String vpcId;
+    String tags;
 
     String metricType;
 
@@ -1678,7 +1679,7 @@ public class DbAction extends ActionSupport {
     public String createCollectionSimpleForVpc() {
         try {
             System.out.println("called1 vpcId" + vpcId);
-            DbLayer.createCollectionSimpleForVpc(vxlanId, vpcId);
+            DbLayer.createCollectionSimpleForVpc(vxlanId, vpcId, tags);
         } catch (Exception e) {
             return Action.ERROR.toUpperCase();
         }
@@ -1688,7 +1689,7 @@ public class DbAction extends ActionSupport {
     public String createCollectionForHostAndVpc() {
         try {
             System.out.println("called2 vpcId" + vpcId);
-            DbLayer.createCollectionForHostAndVpc(host, colId, vpcId);
+            DbLayer.createCollectionForHostAndVpc(host, colId, vpcId, tags);
         } catch (Exception e) {
             return Action.ERROR.toUpperCase();
         }

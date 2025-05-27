@@ -130,13 +130,13 @@ public class HttpCallParser {
         return vxlanId;
     }
 
-    public int createCollectionSimpleForVpc(int vxlanId, String vpcId) {
-        dataActor.createCollectionSimpleForVpc(vxlanId, vpcId);
+    public int createCollectionSimpleForVpc(int vxlanId, String vpcId, String tags) {
+        dataActor.createCollectionSimpleForVpc(vxlanId, vpcId, tags);
         return vxlanId;
     }
 
 
-    public int createCollectionBasedOnHostName(int id, String host)  throws Exception {
+    public int createCollectionBasedOnHostName(int id, String host, String tags)  throws Exception {
         FindOneAndUpdateOptions updateOptions = new FindOneAndUpdateOptions();
         updateOptions.upsert(true);
         String vpcId = System.getenv("VPC_ID");
@@ -148,7 +148,7 @@ public class HttpCallParser {
         for (int i=0;i < 100; i++) {
             id += i;
             try {
-                dataActor.createCollectionForHostAndVpc(host, id, vpcId);
+                dataActor.createCollectionForHostAndVpc(host, id, vpcId, tags);
                 flag = true;
                 break;
             } catch (Exception e) {
@@ -501,12 +501,12 @@ public class HttpCallParser {
                 int id = hostName.hashCode();
                 try {
 
-                    apiCollectionId = createCollectionBasedOnHostName(id, hostName);
+                    apiCollectionId = createCollectionBasedOnHostName(id, hostName, httpResponseParam.getTags());
 
                     hostNameToIdMap.put(key, apiCollectionId);
                 } catch (Exception e) {
                     loggerMaker.errorAndAddToDb("Failed to create collection for host : " + hostName, LogDb.RUNTIME);
-                    createCollectionSimpleForVpc(vxlanId, vpcId);
+                    createCollectionSimpleForVpc(vxlanId, vpcId, httpResponseParam.getTags());
                     hostNameToIdMap.put("null " + vxlanId, vxlanId);
                     apiCollectionId = httpResponseParam.requestParams.getApiCollectionId();
                 }
@@ -515,7 +515,7 @@ public class HttpCallParser {
         } else {
             String key = "null" + " " + vxlanId;
             if (!hostNameToIdMap.containsKey(key)) {
-                createCollectionSimpleForVpc(vxlanId, vpcId);
+                createCollectionSimpleForVpc(vxlanId, vpcId, httpResponseParam.getTags());
                 hostNameToIdMap.put(key, vxlanId);
             }
 
