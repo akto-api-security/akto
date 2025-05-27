@@ -8,6 +8,8 @@ import org.apache.commons.lang3.math.NumberUtils;
 import com.akto.dto.HttpRequestParams;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.OriginalHttpRequest;
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.HttpRequestResponseUtils;
 import com.akto.util.JSONUtils;
 import com.google.gson.Gson;
@@ -15,6 +17,7 @@ import com.google.gson.Gson;
 public class SampleParser {
     
     private static final Gson gson = new Gson();
+    private static final LoggerMaker loggerMaker = new LoggerMaker(SampleParser.class, LogDb.RUNTIME);
 
 
     public static HttpResponseParams parseSampleMessage(String message) throws Exception {
@@ -57,7 +60,11 @@ public class SampleParser {
         boolean isPending = !isPendingStr.toLowerCase().equals("false");
         String sourceStr = (String) json.getOrDefault("source", HttpResponseParams.Source.OTHER.name());
         HttpResponseParams.Source source = HttpResponseParams.Source.valueOf(sourceStr);
-        
+
+        // JSON string of K8 POD tags
+        String tags = (String) json.getOrDefault("tag", "");
+        loggerMaker.infoAndAddToDb("K8 POD tags: " + tags);
+
         return new HttpResponseParams(
                 type,statusCode, status, responseHeaders, payload, requestParams, time, accountId, isPending, source, message, sourceIP, destIP, direction
         );
