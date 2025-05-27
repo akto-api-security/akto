@@ -585,8 +585,14 @@ public class Utils {
         return url;
     }
 
-    private static String fetchActualUrl(URI uri, String url) {
+   private static String fetchActualUrl(URI uri, String url) {
         if (uri != null && uri.getHost() != null) {
+            if(uri.getPort() != -1){
+                if (uri.getPort() == 80 || uri.getPort() == 443) {
+                    return uri.getScheme() + "://" + uri.getHost() + url;
+                }
+                return uri.getScheme() + "://" + uri.getHost() + ":" + uri.getPort() + url;
+            }
             return uri.getScheme() + "://" + uri.getHost() + url;
         } else {
             return url;
