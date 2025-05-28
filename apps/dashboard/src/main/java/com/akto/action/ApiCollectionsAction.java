@@ -760,6 +760,7 @@ public class ApiCollectionsAction extends UserAction {
             } catch(Exception e){
             }
 
+            loggerMaker.infoAndAddToDb("Updating envType:" + envType + " for collections:"+ apiCollectionIds + " for userId:" + Context.userId.get());
             UpdateResult result = ApiCollectionsDao.instance.getMCollection().updateMany(filter,
                                             Updates.set(ApiCollection.USER_ENV_TYPE,envType)
                                     );
