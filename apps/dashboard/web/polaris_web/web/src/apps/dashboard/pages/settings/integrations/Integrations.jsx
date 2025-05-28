@@ -58,7 +58,13 @@ function Integrations() {
       id: 'teamsWebhooks',
       name:'Microsoft Teams Webhooks',
       source: '/public/ms_teams.svg'
-  }
+    }
+
+    let gmailWebhooksObj={
+      id: 'gmailWebhooks',
+      name:'Gmail Webhooks',
+      source: '/public/ms_teams.svg'
+    }
     let githubSsoObj={
       id: 'github_sso',
       name:'Github SSO',
@@ -212,7 +218,7 @@ function Integrations() {
     const reportingItems = [githubAppObj];
     const cicdItems = [jenkinsObj, azuredevopsObj, gitlabObj, githubactionsObj, ciCdObj];
     const aiItems = [aktoGptObj, agentConfigObj];
-    const alertsItems = [slackObj, webhooksObj, teamsWebhooksObj];
+    const alertsItems = [slackObj, webhooksObj, teamsWebhooksObj, gmailWebhooksObj];
     const automationItems = [aktoApiObj, ciCdObj, jiraObj, azureBoardsObj];
     const wafItems = [awsWafObj, f5WafObj, cloudflareWafObj];
     const siemItems = [splunkObj];
@@ -237,7 +243,7 @@ function Integrations() {
         }
         return ssoItems;
       case 'alerts':
-        if (func.checkLocal()) {
+        if (!func.checkLocal()) {
           return emptyItem;
         }
         return alertsItems;
