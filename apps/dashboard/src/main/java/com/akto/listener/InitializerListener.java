@@ -2429,7 +2429,7 @@ public class InitializerListener implements ServletContextListener {
                 int now = Context.now();
                 if (runJobFunctions || runJobFunctionsAnyway) {
 
-                    logger.debug("Starting init functions and scheduling jobs at " + now);
+                    logger.info("Starting init functions and scheduling jobs at " + now);
                     JobsCron.instance.jobsScheduler(JobExecutorType.DASHBOARD);
                     if (DashboardMode.isMetered()) {
                         setupUsageScheduler();
@@ -3391,7 +3391,7 @@ public class InitializerListener implements ServletContextListener {
 
     private static void setDashboardVersionForAccount(){
         try {
-            logger.debugAndAddToDb("Updating account version for " + Context.accountId.get(), LogDb.DASHBOARD);
+            logger.infoAndAddToDb("Updating account version for " + Context.accountId.get(), LogDb.DASHBOARD);
             AccountSettingsDao.instance.updateVersion(AccountSettings.DASHBOARD_VERSION);
         } catch (Exception e) {
             logger.errorAndAddToDb(e,"error while updating dashboard version: " + e.toString(), LogDb.DASHBOARD);
@@ -4156,7 +4156,7 @@ public class InitializerListener implements ServletContextListener {
                 Context.accountId.set(1000_000);
                 boolean dibs = callDibs("usage-scheduler", 60*60, 60);
                 if (!dibs) {
-                    logger.debugAndAddToDb("Usage cron dibs not acquired, skipping usage cron", LoggerMaker.LogDb.DASHBOARD);
+                    logger.infoAndAddToDb("Usage cron dibs not acquired, skipping usage cron", LoggerMaker.LogDb.DASHBOARD);
                     return;
                 }
                 /*
