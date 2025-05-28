@@ -728,6 +728,8 @@ public final class FilterAction {
             result = queryParamObj.size() > 0;
         }
 
+        Object val = queryParams;
+
         if (filterActionRequest.getConcernedSubProperty() != null && filterActionRequest.getConcernedSubProperty().toLowerCase().equals("key")) {
             for (String key: queryParamObj.keySet()) {
                 DataOperandFilterRequest dataOperandFilterRequest = new DataOperandFilterRequest(key, filterActionRequest.getQuerySet(), filterActionRequest.getOperand());
@@ -767,12 +769,19 @@ public final class FilterAction {
             //     matchingValueKeySet = new ArrayList<>();
             // }
             return new DataOperandsFilterResponse(result, matchingValueKeySet, null, null, validationErrorString.toString());
-        } else {
-            DataOperandFilterRequest dataOperandFilterRequest = new DataOperandFilterRequest(queryParams, filterActionRequest.getQuerySet(), filterActionRequest.getOperand());
-            ValidationResult validationResult = invokeFilter(dataOperandFilterRequest);
-            res = validationResult.getIsValid();
-            return new DataOperandsFilterResponse(res, null, null, null, validationResult.getValidationReason());
+        } else if (filterActionRequest.getConcernedSubProperty() == null &&
+                filterActionRequest.getBodyOperand() != null &&
+                filterActionRequest.getBodyOperand().equalsIgnoreCase(BodyOperator.LENGTH.toString())) {
+            if(queryParams == null) {
+                val = 0;
+            } else {
+                val = queryParams.length();
+            }
         }
+        DataOperandFilterRequest dataOperandFilterRequest = new DataOperandFilterRequest(val, filterActionRequest.getQuerySet(), filterActionRequest.getOperand());
+        ValidationResult validationResult = invokeFilter(dataOperandFilterRequest);
+        res = validationResult.getIsValid();
+        return new DataOperandsFilterResponse(res, null, null, null, validationResult.getValidationReason());
     }
 
     public void extractQueryParams(FilterActionRequest filterActionRequest, Map<String, Object> varMap, boolean extractMultiple) {
@@ -913,7 +922,23 @@ public final class FilterAction {
 
     public boolean getMatchingKeysForPayload(Object obj, String parentKey, Object querySet, String operand, Set<String> matchingKeys, boolean doAllSatisfy) {
         Boolean res = false;
-        if (obj instanceof BasicDBObject) {
+        if (obj instanceof JSONObject) {
+            JSONObject basicDBObject = (JSONObject) obj;
+
+            Set<String> keySet = basicDBObject.keySet();
+
+            for(String key: keySet) {
+                if (key == null) {
+                    continue;
+                }
+                Object value = basicDBObject.get(key);
+                doAllSatisfy = getMatchingKeysForPayload(value, key, querySet, operand, matchingKeys, doAllSatisfy);
+                if (parentKey != null && TestEditorEnums.DataOperands.VALUETYPE.toString().equals(operand)) {
+                    matchingKeys.add(parentKey);
+                }
+                
+            }
+        } else if (obj instanceof BasicDBObject) {
             BasicDBObject basicDBObject = (BasicDBObject) obj;
 
             Set<String> keySet = basicDBObject.keySet();
@@ -953,7 +978,19 @@ public final class FilterAction {
 
     public void valueExists(Object obj, String parentKey, Object querySet, String operand, List<String> matchingKeys, Boolean keyOperandSeen, List<String> matchingValueKeySet, boolean doAllSatisfy, StringBuilder validationReason) {
         Boolean res = false;
-        if (obj instanceof BasicDBObject) {
+        if (obj instanceof JSONObject) {
+            JSONObject basicDBObject = (JSONObject) obj;
+
+            Set<String> keySet = basicDBObject.keySet();
+
+            for(String key: keySet) {
+                if (key == null) {
+                    continue;
+                }
+                Object value = basicDBObject.get(key);
+                valueExists(value, key, querySet, operand, matchingKeys, keyOperandSeen, matchingValueKeySet, doAllSatisfy, validationReason);
+            }
+        } else if (obj instanceof BasicDBObject) {
             BasicDBObject basicDBObject = (BasicDBObject) obj;
 
             Set<String> keySet = basicDBObject.keySet();

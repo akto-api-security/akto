@@ -73,7 +73,6 @@ public class HttpCallParser {
             .build();
 
     private static final ConcurrentLinkedQueue<BasicDBObject> queue = new ConcurrentLinkedQueue<>();
-    private static final int MAX_ALLOWED_HTML_CONTENT = 1024 * 1024 ;
 
     public static void init() {
         trafficMetricsExecutor.scheduleAtFixedRate(new Runnable() {
@@ -90,6 +89,12 @@ public class HttpCallParser {
             }
         },0,5,TimeUnit.MINUTES);
     }
+
+    public HttpCallParser(String userIdentifier, int thresh, int sync_threshold_count, int sync_threshold_time, boolean fetchAllSTI, boolean skipMergingOnKnownStaticURLsForVersionedApis){
+        this(userIdentifier, thresh, sync_threshold_count, sync_threshold_time, fetchAllSTI);
+        apiCatalogSync.setSkipMergingOnKnownStaticURLsForVersionedApis(skipMergingOnKnownStaticURLsForVersionedApis);
+    }
+
     public HttpCallParser(String userIdentifier, int thresh, int sync_threshold_count, int sync_threshold_time, boolean fetchAllSTI) {
         last_synced = 0;
         this.sync_threshold_count = sync_threshold_count;
@@ -235,6 +240,10 @@ public class HttpCallParser {
     }
 
     public void syncFunction(List<HttpResponseParams> responseParams, boolean syncImmediately, boolean fetchAllSTI, AccountSettings accountSettings)  {
+        syncFunction(responseParams, syncImmediately, fetchAllSTI, accountSettings, false);
+    }
+
+    public void syncFunction(List<HttpResponseParams> responseParams, boolean syncImmediately, boolean fetchAllSTI, AccountSettings accountSettings, boolean skipAdvancedFilters)  {
         // USE ONLY filteredResponseParams and not responseParams
         List<HttpResponseParams> filteredResponseParams = responseParams;
         if (accountSettings != null && accountSettings.getDefaultPayloads() != null) {
@@ -249,7 +258,7 @@ public class HttpCallParser {
         if(accountSettings != null){
             shouldIgnoreOptionsApi = !accountSettings.getAllowOptionsAPIs();
         }
-        filteredResponseParams = filterHttpResponseParams(filteredResponseParams, redundantList, regexPattern, shouldIgnoreOptionsApi);
+        filteredResponseParams = filterHttpResponseParams(filteredResponseParams, redundantList, regexPattern, shouldIgnoreOptionsApi, skipAdvancedFilters);
         
         boolean makeApisCaseInsensitive = false;
         if(accountSettings != null){
@@ -521,6 +530,11 @@ public class HttpCallParser {
     }
 
     public List<HttpResponseParams> filterHttpResponseParams(List<HttpResponseParams> httpResponseParamsList, List<String> redundantUrlsList, Pattern pattern, Boolean shouldIgnoreOptionsApi) {
+        return filterHttpResponseParams(httpResponseParamsList, redundantUrlsList, pattern, shouldIgnoreOptionsApi,
+                false);
+    }
+
+    public List<HttpResponseParams> filterHttpResponseParams(List<HttpResponseParams> httpResponseParamsList, List<String> redundantUrlsList, Pattern pattern, Boolean shouldIgnoreOptionsApi, boolean skipAdvancedFilters) {
         List<HttpResponseParams> filteredResponseParams = new ArrayList<>();
         int originalSize = httpResponseParamsList.size();
 
@@ -588,12 +602,14 @@ public class HttpCallParser {
 
             }
 
-            Pair<HttpResponseParams,FILTER_TYPE> temp = applyAdvancedFilters(httpResponseParam, executorNodesMap, apiCatalogSync.advancedFilterMap);
-            HttpResponseParams param = temp.getFirst();
-            if(param == null || temp.getSecond().equals(FILTER_TYPE.UNCHANGED)){
-                continue;
-            }else{
-                httpResponseParam = param;
+            if (!skipAdvancedFilters) {
+                Pair<HttpResponseParams, FILTER_TYPE> temp = applyAdvancedFilters(httpResponseParam, executorNodesMap, apiCatalogSync.advancedFilterMap);
+                HttpResponseParams param = temp.getFirst();
+                if (param == null || temp.getSecond().equals(FILTER_TYPE.UNCHANGED)) {
+                    continue;
+                } else {
+                    httpResponseParam = param;
+                }
             }
 
             int apiCollectionId = createApiCollectionId(httpResponseParam);
@@ -605,7 +621,7 @@ public class HttpCallParser {
                 filteredResponseParams.add(httpResponseParam);
             } else {
                 filteredResponseParams.addAll(responseParamsList);
-                loggerMaker.infoAndAddToDb("Adding " + responseParamsList.size() + "new graphql endpoints in invetory",LogDb.RUNTIME);
+                loggerMaker.infoAndAddToDb("Adding " + responseParamsList.size() + "new graphql endpoints in inventory",LogDb.RUNTIME);
             }
 
             if (httpResponseParam.getSource().equals(HttpResponseParams.Source.MIRRORING)) {

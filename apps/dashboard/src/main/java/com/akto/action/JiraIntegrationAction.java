@@ -1,54 +1,71 @@
 package com.akto.action;
 
+import static com.akto.utils.Utils.createRequestFile;
+import static com.akto.utils.Utils.getTestResultFromTestingRunResult;
+
 import com.akto.dao.ConfigsDao;
+import com.akto.dao.JiraIntegrationDao;
+import com.akto.dao.context.Context;
+import com.akto.dao.test_editor.YamlTemplateDao;
+import com.akto.dao.testing.BidirectionalSyncSettingsDao;
+import com.akto.dao.testing.TestingRunResultDao;
+import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dto.Config.AktoHostUrlConfig;
 import com.akto.dto.Config.ConfigType;
+import com.akto.dto.OriginalHttpRequest;
+import com.akto.dto.OriginalHttpResponse;
+import com.akto.dto.jira_integration.BiDirectionalSyncSettings;
+import com.akto.dto.jira_integration.JiraIntegration;
+import com.akto.dto.jira_integration.JiraMetaData;
 import com.akto.dto.jira_integration.JiraStatus;
 import com.akto.dto.jira_integration.JiraStatusApiResponse;
 import com.akto.dto.jira_integration.ProjectMapping;
-import com.akto.util.DashboardMode;
-import com.akto.utils.JsonUtils;
-import com.fasterxml.jackson.core.type.TypeReference;
-import java.io.File;
-import java.net.URL;
-import java.util.*;
-import java.util.concurrent.TimeUnit;
-
-import com.akto.dao.test_editor.YamlTemplateDao;
-import com.akto.dao.testing.TestingRunResultDao;
+import com.akto.dto.jobs.Job;
+import com.akto.dto.jobs.JobExecutorType;
+import com.akto.dto.jobs.TicketSyncJobParams;
 import com.akto.dto.test_editor.Info;
 import com.akto.dto.test_editor.YamlTemplate;
+import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.test_run_findings.TestingRunIssues;
+import com.akto.dto.testing.BidirectionalSyncSettings;
 import com.akto.dto.testing.TestResult;
 import com.akto.dto.testing.TestingRunResult;
-import com.mongodb.client.model.Projections;
-import java.util.stream.Collectors;
-import javax.servlet.http.HttpServletRequest;
-import org.apache.struts2.interceptor.ServletRequestAware;
-import org.bson.Document;
-import org.bson.conversions.Bson;
-
-import com.akto.dao.JiraIntegrationDao;
-import com.akto.dao.context.Context;
-import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
-import com.akto.dto.OriginalHttpRequest;
-import com.akto.dto.OriginalHttpResponse;
-import com.akto.dto.jira_integration.JiraIntegration;
-import com.akto.dto.jira_integration.JiraMetaData;
-import com.akto.dto.test_run_findings.TestingIssuesId;
+import com.akto.jobs.JobScheduler;
+import com.akto.jobs.utils.JobConstants;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.test_editor.Utils;
 import com.akto.testing.ApiExecutor;
 import com.akto.util.Constants;
+import com.akto.util.DashboardMode;
+import com.akto.util.enums.GlobalEnums;
+import com.akto.util.enums.GlobalEnums.TicketSource;
 import com.akto.util.http_util.CoreHTTPClient;
+import com.akto.utils.JsonUtils;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.FindOneAndUpdateOptions;
+import com.mongodb.client.model.Projections;
+import com.mongodb.client.model.ReturnDocument;
 import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.Updates;
 import com.opensymphony.xwork2.Action;
-
+import java.io.File;
+import java.net.URL;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Base64;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
+import javax.servlet.http.HttpServletRequest;
 import okhttp3.Call;
 import okhttp3.MediaType;
 import okhttp3.MultipartBody;
@@ -56,9 +73,10 @@ import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.RequestBody;
 import okhttp3.Response;
-
-import static com.akto.utils.Utils.createRequestFile;
-import static com.akto.utils.Utils.getTestResultFromTestingRunResult;
+import org.apache.struts2.interceptor.ServletRequestAware;
+import org.bson.Document;
+import org.bson.conversions.Bson;
+import org.bson.types.ObjectId;
 
 public class JiraIntegrationAction extends UserAction implements ServletRequestAware {
 
@@ -87,6 +105,8 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
     private static final String ATTACH_FILE_ENDPOINT = "/attachments";
     private static final String ISSUE_STATUS_ENDPOINT = "/rest/api/3/project/%s/statuses";
     private static final LoggerMaker loggerMaker = new LoggerMaker(ApiExecutor.class, LogDb.DASHBOARD);
+
+    private static final int TICKET_SYNC_JOB_RECURRING_INTERVAL_SECONDS = 3600;
     private static final OkHttpClient client = CoreHTTPClient.client.newBuilder()
             .connectTimeout(60, TimeUnit.SECONDS)
             .readTimeout(60, TimeUnit.SECONDS)
@@ -309,31 +329,33 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
 
     public String addIntegrationV2() {
 
+        addAktoHostUrl();
+
         if (projectMappings == null || projectMappings.isEmpty()) {
             addActionError("Project mappings cannot be empty");
+            return Action.ERROR.toUpperCase();
+        }
+
+        this.projectAndIssueMap = new HashMap<>();
+        try {
+            for (Map.Entry<String, ProjectMapping> entry : projectMappings.entrySet()) {
+                List<BasicDBObject> issueTypes = getProjectMetadata(entry.getKey());
+                this.projectAndIssueMap.put(entry.getKey(), issueTypes);
+            }
+        } catch (Exception ex) {
+            loggerMaker.error("Error while fetching project metadata", ex);
+            addActionError("Error while fetching project metadata");
             return Action.ERROR.toUpperCase();
         }
 
         JiraIntegration existingIntegration = JiraIntegrationDao.instance.findOne(new BasicDBObject());
 
         if (existingIntegration == null) {
-            this.projectAndIssueMap = new HashMap<>();
-            try {
-                for (Map.Entry<String, ProjectMapping> entry : projectMappings.entrySet()) {
-                    List<BasicDBObject> issueTypes = getProjectMetadata(entry.getKey());
-                    this.projectAndIssueMap.put(entry.getKey(), issueTypes);
-                }
-            } catch (Exception ex) {
-                loggerMaker.error("Error while fetching project metadata", ex);
-                addActionError("Error while fetching project metadata");
-                return Action.ERROR.toUpperCase();
-            }
             String response = addIntegration();
             this.jiraIntegration = JiraIntegrationDao.instance.findOne(new BasicDBObject());
+            syncBidirectionalSettings(jiraIntegration);
             return response;
         }
-
-        addAktoHostUrl();
 
         Map<String, ProjectMapping> existingProjectMappings = existingIntegration.getProjectMappings();
 
@@ -342,10 +364,9 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
         }
 
         for (Map.Entry<String, ProjectMapping> entry : projectMappings.entrySet()) {
-            if (existingProjectMappings.containsKey(entry.getKey())) {
-                loggerMaker.error("Project Key: {} is already mapped", entry.getKey());
-                addActionError("Project Key: " + entry.getKey() + " is already mapped");
-                return Action.ERROR.toUpperCase();
+            ProjectMapping mapping = entry.getValue();
+            if (!mapping.getBiDirectionalSyncSettings().isEnabled()) {
+                mapping.setStatuses(null);
             }
         }
 
@@ -365,16 +386,7 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
             existingProjectIdMap = new HashMap<>();
         }
 
-        try {
-            for (Map.Entry<String, ProjectMapping> entry : projectMappings.entrySet()) {
-                List<BasicDBObject> issueTypes = getProjectMetadata(entry.getKey());
-                existingProjectIdMap.put(entry.getKey(), issueTypes);
-            }
-        } catch (Exception ex) {
-            loggerMaker.error("Error while fetching project metadata", ex);
-            addActionError("Error while fetching project metadata");
-            return Action.ERROR.toUpperCase();
-        }
+        existingProjectIdMap.putAll(this.projectAndIssueMap);
 
         integrationUpdate = Updates.combine(integrationUpdate, Updates.set("projectIdsMap", existingProjectIdMap));
 
@@ -386,6 +398,74 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
 
         this.jiraIntegration = JiraIntegrationDao.instance.findOne(new BasicDBObject());
 
+        syncBidirectionalSettings(jiraIntegration);
+
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String deleteProject() {
+        if (this.projId == null || this.projId.isEmpty()) {
+            addActionError("Project Id cannot be null");
+            return Action.ERROR.toUpperCase();
+        }
+
+        JiraIntegration jira = JiraIntegrationDao.instance.findOne(new BasicDBObject());
+        if (jira == null) {
+            addActionError("Jira Integration not found. AccountId: " + Context.accountId.get());
+            return Action.ERROR.toUpperCase();
+        }
+
+        Map<String, List<BasicDBObject>> existingProjectIdsMap = jira.getProjectIdsMap();
+        Map<String, ProjectMapping> existingProjectMappings = jira.getProjectMappings();
+
+        if (existingProjectIdsMap.isEmpty() || (existingProjectMappings != null && existingProjectMappings.isEmpty())) {
+            addActionError("Atleast one project is required for Jira Integration");
+            return Action.ERROR.toUpperCase();
+        }
+
+        List<BasicDBObject> removedProjectIdMap = existingProjectIdsMap.remove(this.projId);
+
+        // null check for backward compatibility - users who already have jira integration before this change.
+        ProjectMapping removedProjectMapping = existingProjectMappings == null ? null : existingProjectMappings.remove(this.projId);
+
+        if (removedProjectIdMap == null && removedProjectMapping == null) {
+            loggerMaker.debug("Project Key not found in Jira Integration: projId: {}", this.projId);
+            return Action.SUCCESS.toUpperCase();
+        }
+
+        UpdateOptions updateOptions = new UpdateOptions();
+        updateOptions.upsert(false);
+
+        Bson integrationUpdate = Updates.combine(
+            Updates.set("updatedTs", Context.now()),
+            Updates.set("projectIdsMap", existingProjectIdsMap)
+        );
+
+        if (existingProjectMappings != null) {
+            integrationUpdate = Updates.combine(integrationUpdate, Updates.set("projectMappings", existingProjectMappings));
+        }
+
+        JiraIntegrationDao.instance.getMCollection().updateOne(
+            new BasicDBObject(),
+            integrationUpdate,
+            updateOptions
+        );
+
+        BidirectionalSyncSettings disabledSettings = BidirectionalSyncSettingsDao.instance.getMCollection()
+            .findOneAndUpdate(
+                Filters.and(
+                    Filters.eq(BidirectionalSyncSettings.SOURCE, TicketSource.JIRA.name()),
+                    Filters.eq(BidirectionalSyncSettings.PROJECT_KEY, this.projId)
+                ),
+                Updates.combine(
+                    Updates.set(BidirectionalSyncSettings.ACTIVE, false),
+                    Updates.set(BidirectionalSyncSettings.LAST_SYNCED_AT, Context.now())
+                ),
+                new FindOneAndUpdateOptions().returnDocument(ReturnDocument.AFTER)
+            );
+        if (disabledSettings != null) {
+            JobScheduler.deleteJob(disabledSettings.getJobId());
+        }
         return Action.SUCCESS.toUpperCase();
     }
 
@@ -518,7 +598,11 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
             TestingRunIssuesDao.instance.getMCollection().updateOne(
                 Filters.eq(Constants.ID, jiraMetaData.getTestingIssueId()),
                 Updates.combine(
-                        Updates.set("jiraIssueUrl", jiraTicketUrl)
+                    Updates.set("jiraIssueUrl", jiraTicketUrl),
+                    Updates.set(TestingRunIssues.TICKET_SOURCE, GlobalEnums.TicketSource.JIRA.name()),
+                    Updates.set(TestingRunIssues.TICKET_PROJECT_KEY, projId),
+                    Updates.set(TestingRunIssues.TICKET_ID, this.jiraTicketKey),
+                    Updates.set(TestingRunIssues.TICKET_LAST_UPDATED_AT, Context.now())
                 ),
                 updateOptions
             );
@@ -770,7 +854,13 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
                     JiraMetaData metaData = jiraMetaDataList.get(i);
                     TestingRunIssuesDao.instance.getMCollection().updateOne(
                             Filters.eq(Constants.ID, metaData.getTestingIssueId()),
-                            Updates.combine(Updates.set("jiraIssueUrl", jiraTicketUrl)),
+                            Updates.combine(
+                                Updates.set("jiraIssueUrl", jiraTicketUrl),
+                                Updates.set(TestingRunIssues.TICKET_SOURCE, GlobalEnums.TicketSource.JIRA.name()),
+                                Updates.set(TestingRunIssues.TICKET_PROJECT_KEY, projId),
+                                Updates.set(TestingRunIssues.TICKET_ID, issueKey),
+                                Updates.set(TestingRunIssues.TICKET_LAST_UPDATED_AT, Context.now())
+                            ),
                             new UpdateOptions().upsert(false)
                     );
                 }
@@ -823,6 +913,8 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
         BasicDBObject issueTypeObj = new BasicDBObject();
         issueTypeObj.put("id", this.issueType);
         fields.put("issuetype", issueTypeObj);
+        fields.put("labels", new String[] {JobConstants.TICKET_LABEL_AKTO_SYNC});
+
 
         // Project ID
         BasicDBObject project = new BasicDBObject();
@@ -979,5 +1071,125 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
                 );
             }
         }
+    }
+
+    private void syncBidirectionalSettings(JiraIntegration jiraIntegration) {
+        try {
+
+            Map<String, ProjectMapping> projectMappings = jiraIntegration.getProjectMappings();
+
+            if (projectMappings == null || projectMappings.isEmpty()) {
+                loggerMaker.info("No project mappings found in Jira integration");
+                return;
+            }
+
+            int syncedCount = 0;
+
+            for (Map.Entry<String, ProjectMapping> entry : projectMappings.entrySet()) {
+                String projectKey = entry.getKey();
+                ProjectMapping projectMapping = entry.getValue();
+
+                if (projectMapping == null) {
+                    continue;
+                }
+
+                BiDirectionalSyncSettings biDirectionalSettings = projectMapping.getBiDirectionalSyncSettings();
+
+                // Check if entry already exists
+                BidirectionalSyncSettings existingSettings = BidirectionalSyncSettingsDao.instance.findOne(
+                    Filters.and(
+                        Filters.eq(BidirectionalSyncSettings.SOURCE, TicketSource.JIRA.name()),
+                        Filters.eq(BidirectionalSyncSettings.PROJECT_KEY, projectKey)
+                    )
+                );
+
+                boolean isEnabled = biDirectionalSettings != null && biDirectionalSettings.isEnabled();
+
+                if (isEnabled) {
+                    if (existingSettings != null) {
+                        // Update existing entry
+                        // Check if we need to restart the job (if previously inactive)
+                        ObjectId jobId = existingSettings.getJobId();
+                        if (!existingSettings.isActive()) {
+                            Job job = JobScheduler.restartJob(jobId);
+                            if (job == null) {
+                                loggerMaker.error("Error while restarting recurring job for project key: {}", projectKey);
+                                continue;
+                            }
+                            loggerMaker.info("Restarted recurring job for project key: {}", projectKey);
+                            jobId = job.getId();
+                        }
+                        BidirectionalSyncSettingsDao.instance.updateOne(
+                            Filters.eq(BidirectionalSyncSettings.ID, existingSettings.getId()),
+                            Updates.combine(
+                                Updates.set(BidirectionalSyncSettings.ACTIVE, true),
+                                Updates.set(BidirectionalSyncSettings.LAST_SYNCED_AT, Context.now()),
+                                Updates.set(BidirectionalSyncSettings.JOB_ID, jobId)
+                            )
+                        );
+                    } else {
+                        Job job = createRecurringJob(projectKey);
+
+                        if (job == null) {
+                            loggerMaker.error("Error while creating recurring job for project key: {}", projectKey);
+                            continue;
+                        }
+
+                        loggerMaker.info("Created recurring job for project key: {}", projectKey);
+
+                        BidirectionalSyncSettings bidirectionalSyncSettings = new BidirectionalSyncSettings();
+                        bidirectionalSyncSettings.setSource(TicketSource.JIRA);
+                        bidirectionalSyncSettings.setProjectKey(projectKey);
+                        bidirectionalSyncSettings.setActive(true);
+                        bidirectionalSyncSettings.setLastSyncedAt(Context.now());
+                        bidirectionalSyncSettings.setJobId(job.getId());
+                        BidirectionalSyncSettingsDao.instance.insertOne(bidirectionalSyncSettings);
+                    }
+                    syncedCount++;
+                } else if (existingSettings != null) {
+                    // Update existing entry to set active=false
+                    BidirectionalSyncSettingsDao.instance.updateOne(
+                        Filters.eq(BidirectionalSyncSettings.ID, existingSettings.getId()),
+                        Updates.combine(
+                            Updates.set(BidirectionalSyncSettings.ACTIVE, false),
+                            Updates.set(BidirectionalSyncSettings.LAST_SYNCED_AT, Context.now())
+                        )
+                    );
+
+                    // Cancel the recurring job if it exists
+                    ObjectId jobId = existingSettings.getJobId();
+                    if (jobId != null) {
+                        try {
+                            JobScheduler.deleteJob(jobId);
+                            loggerMaker.info("Cancelled recurring job for project key: {}", projectKey);
+                        } catch (Exception e) {
+                            loggerMaker.error("Error cancelling recurring job for project key: {}", projectKey, e);
+                        }
+                    }
+
+                    loggerMaker.info("Disabled bidirectional sync for project key: {}", projectKey);
+                    syncedCount++;
+                }
+            }
+
+            loggerMaker.info("Synced {} bidirectional settings", syncedCount);
+
+        } catch (Exception e) {
+            loggerMaker.error("Error syncing bidirectional settings: {}", e.getMessage(), e);
+            addActionError("Error syncing bidirectional settings: " + e.getMessage());
+        }
+    }
+
+    private Job createRecurringJob(String projectKey) {
+        return JobScheduler.scheduleRecurringJob(
+            Context.accountId.get(),
+            new TicketSyncJobParams(
+                TicketSource.JIRA.name(),
+                projectKey,
+                Context.now()
+            ),
+            JobExecutorType.DASHBOARD,
+            TICKET_SYNC_JOB_RECURRING_INTERVAL_SECONDS
+        );
     }
 }

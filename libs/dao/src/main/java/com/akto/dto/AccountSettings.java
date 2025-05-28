@@ -15,6 +15,9 @@ import com.akto.dto.type.CollectionReplaceDetails;
 import com.akto.util.ConnectionInfo;
 import com.akto.util.LastCronRunInfo;
 
+import lombok.Getter;
+import lombok.Setter;
+
 import com.akto.dto.test_editor.TestLibrary;
 
 public class AccountSettings {
@@ -125,6 +128,11 @@ public class AccountSettings {
 
     public static final String THREAT_POLICIES = "threatPolicies";
     private List<TestLibrary> threatPolicies;
+
+    public static final String ALLOW_MERGING_ON_VERSIONS = "allowMergingOnVersions";
+    @Getter
+    @Setter
+    private boolean allowMergingOnVersions;
 
     public AccountSettings() {
     }

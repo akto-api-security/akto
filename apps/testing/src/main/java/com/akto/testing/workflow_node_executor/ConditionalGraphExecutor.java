@@ -5,7 +5,6 @@ import java.util.List;
 import java.util.Map;
 
 import com.akto.dao.test_editor.TestEditorEnums;
-import com.akto.dto.ApiInfo;
 import com.akto.dto.api_workflow.Node;
 import com.akto.dto.test_editor.DataOperandsFilterResponse;
 import com.akto.dto.test_editor.ExecutorNode;
@@ -14,7 +13,16 @@ import com.akto.dto.testing.*;
 import com.akto.test_editor.execution.Memory;
 import com.akto.test_editor.filter.Filter;
 
+import lombok.Getter;
+import lombok.Setter;
+
+@Getter
+@Setter
 public class ConditionalGraphExecutor extends GraphExecutor {
+    boolean allowAllCombinations;
+    public ConditionalGraphExecutor(boolean allowAllCombinations) {
+        this.allowAllCombinations = allowAllCombinations;
+    }
     
     public GraphExecutorResult executeGraph(GraphExecutorRequest graphExecutorRequest, boolean debug, List<TestingRunResult.TestLog> testLogs, Memory memory) {
 
@@ -32,7 +40,7 @@ public class ConditionalGraphExecutor extends GraphExecutor {
         boolean success = false;
 
         WorkflowTestResult.NodeResult nodeResult;
-        nodeResult = Utils.executeNode(node, graphExecutorRequest.getValuesMap(), debug, testLogs, memory);
+        nodeResult = Utils.executeNode(node, graphExecutorRequest.getValuesMap(), debug, testLogs, memory, this.allowAllCombinations);
 
         graphExecutorRequest.getWorkflowTestResult().getNodeResultMap().put(node.getId(), nodeResult);
         graphExecutorRequest.getExecutionOrder().add(node.getId());

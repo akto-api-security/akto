@@ -311,6 +311,7 @@ const transform = {
       obj['userEmail'] = data.userEmail
       obj['scan_frequency'] = getScanFrequency(data.periodInSeconds)
       obj['total_apis'] = testingRunResultSummary.totalApis
+      obj['miniTestingServiceName'] = data?.miniTestingServiceName
       if(prettified){
         
         const prettifiedTest={
@@ -1123,9 +1124,7 @@ getActions(item){
   if(item.orderPriority === 1){
     actionsList[1].disabled = true
   }
-  if(item['run_type'] === 'One-time' || item['run_type'] === 'CI/CD'){
-    section1.items.push(actionsList[1])
-  }
+  section1.items.push(actionsList[1])
   if(item['run_type'] !== 'CI/CD'){
     section1.items.push(actionsList[2])
   }
@@ -1226,6 +1225,7 @@ getMissingConfigs(testResults){
       scheduleTimestamp: testRun?.hourlyLabel === 'Now' && ((testRun.startTimestamp - func.getStartOfTodayEpoch()) < 86400) ? 0 : testRun.startTimestamp,
       recurringWeekly: testRun.recurringWeekly,
       recurringMonthly: testRun.recurringMonthly,
+      miniTestingServiceName: testRun.miniTestingServiceName,
       testSuiteIds:testMode? [] : testSuiteIds,
       autoTicketingDetails: autoTicketingDetails,
     }

@@ -6,6 +6,7 @@ export default function LayoutWithTabs(props){
 
     const [current, setCurrent] = useState(0)
     const [loading, setLoading] = useState(false)
+    const tabs = !props.disabledTabs ? props.tabs : props.tabs.filter(obj => !props.disabledTabs.includes(obj.id))
     const setCurrentTab = (selected) => {
         if(!props.noLoading){
             setLoading(true)
@@ -14,16 +15,16 @@ export default function LayoutWithTabs(props){
         setTimeout(() => {
             setLoading(false);
         }, 500)
-        props.currTab(props.tabs[selected])
+        props.currTab(tabs[selected])
     }
 
     return(
         <LegacyTabs
             selected={current}
             onSelect={setCurrentTab}
-            tabs={!props.disabledTabs ? props.tabs : props.tabs.filter(obj => !props.disabledTabs.includes(obj.id))}
+            tabs={tabs}
         >
-            {loading ? <SpinnerCentered/> : (props.tabs[current]?.component || null) }
+            {loading ? <SpinnerCentered/> : (tabs[current]?.component || null) }
         </LegacyTabs>
     )
 }

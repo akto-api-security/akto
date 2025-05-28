@@ -71,6 +71,19 @@ const threatDetectionRequests = {
             data: {}
         })
     },
+    fetchThreatConfiguration() {
+        return request({
+            url: '/api/fetchThreatConfiguration',
+            method: 'get',
+        })
+    },
+    modifyThreatConfiguration(data) {
+        return request({
+            url: '/api/modifyThreatConfiguration',
+            method: 'post',
+            data: { threatConfiguration: data}
+        })
+    },
     fetchThreatCategoryCount(startTs, endTs) {
         return request({
             url: '/api/fetchThreatCategoryCount',
@@ -132,6 +145,13 @@ const threatDetectionRequests = {
     modifyThreatActorStatus(actorIp, status) {
         return request({
             url: '/api/modifyThreatActorStatus',
+            method: 'post',
+            data: {actorIp, status}
+        })
+    },
+    modifyThreatActorStatusCloudflare(actorIp, status) {
+        return request({
+            url: '/api/modifyThreatActorStatusCloudflare',
             method: 'post',
             data: {actorIp, status}
         })

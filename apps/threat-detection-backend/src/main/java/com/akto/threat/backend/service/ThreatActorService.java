@@ -1,6 +1,7 @@
 package com.akto.threat.backend.service;
 
 import com.akto.dto.HttpResponseParams;
+import com.akto.proto.generated.threat_detection.message.sample_request.v1.Metadata;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.DailyActorsCountResponse;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchMaliciousEventsRequest;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchMaliciousEventsResponse;
@@ -8,15 +9,20 @@ import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.Li
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ListThreatActorsRequest;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ModifyThreatActorStatusRequest;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ModifyThreatActorStatusResponse;
+import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatConfiguration;
+import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.Actor;
+import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ActorId;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.SplunkIntegrationRequest;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.SplunkIntegrationRespone;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatActivityTimelineResponse;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatActorByCountryRequest;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatActorByCountryResponse;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ListThreatActorResponse.ActivityData;
+import com.akto.ProtoMessageUtils;
 import com.akto.threat.backend.constants.MongoDBCollection;
 import com.akto.threat.backend.db.ActorInfoModel;
 import com.akto.threat.backend.db.SplunkIntegrationModel;
+import com.google.protobuf.TextFormat;
 import com.mongodb.client.FindIterable;
 import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoCollection;
@@ -40,6 +46,71 @@ public class ThreatActorService {
   public ThreatActorService(MongoClient mongoClient) {
     this.mongoClient = mongoClient;
   }
+
+  public ThreatConfiguration fetchThreatConfiguration(String accountId) {
+    ThreatConfiguration.Builder builder = ThreatConfiguration.newBuilder();
+    MongoCollection<Document> coll = this.mongoClient
+        .getDatabase(accountId)
+        .getCollection(MongoDBCollection.ThreatDetection.THREAT_CONFIGURATION, Document.class);
+    Document doc = coll.find().first();
+    if (doc != null) {
+        Object actorIdObj = doc.get("actor");
+        if (actorIdObj instanceof List) {
+            List<?> actorIdList = (List<?>) actorIdObj;
+            Actor.Builder actorBuilder = Actor.newBuilder();
+            for (Object idObj : actorIdList) {
+                if (idObj instanceof Document) {
+                    Document actorIdDoc = (Document) idObj;
+                    ActorId.Builder actorIdBuilder = ActorId.newBuilder();
+                    if (actorIdDoc.getString("type") != null) actorIdBuilder.setType(actorIdDoc.getString("type"));
+                    if (actorIdDoc.getString("key") != null) actorIdBuilder.setKey(actorIdDoc.getString("key"));
+                    if (actorIdDoc.getString("kind") != null) actorIdBuilder.setKind(actorIdDoc.getString("kind"));
+                    if (actorIdDoc.getString("pattern") != null) actorIdBuilder.setPattern(actorIdDoc.getString("pattern"));
+                    actorBuilder.addActorId(actorIdBuilder);
+                }
+            }
+            builder.setActor(actorBuilder);
+        }
+    }
+    return builder.build();
+}
+
+  public ThreatConfiguration modifyThreatConfiguration(String accountId, ThreatConfiguration updatedConfig) {
+    ThreatConfiguration.Builder builder = ThreatConfiguration.newBuilder();
+    MongoCollection<Document> coll =
+        this.mongoClient
+            .getDatabase(accountId)
+            .getCollection(MongoDBCollection.ThreatDetection.THREAT_CONFIGURATION, Document.class);
+
+    // Prepare a list of actorId documents
+    List<Document> actorIdDocs = new ArrayList<>();
+    if (updatedConfig.hasActor()) {
+        Actor actor = updatedConfig.getActor();
+        for (ActorId actorId : actor.getActorIdList()) {
+            Document actorIdDoc = new Document();
+            if (!actorId.getType().isEmpty()) actorIdDoc.append("type", actorId.getType());
+            if (!actorId.getKey().isEmpty()) actorIdDoc.append("key", actorId.getKey());
+            if (!actorId.getKind().isEmpty()) actorIdDoc.append("kind", actorId.getKind());
+            if (!actorId.getPattern().isEmpty()) actorIdDoc.append("pattern", actorId.getPattern());
+            actorIdDocs.add(actorIdDoc);
+        }
+    }
+    Document newDoc = new Document("actor", actorIdDocs);
+    Document existingDoc = coll.find().first();
+
+    if (existingDoc != null) {
+        Document updateDoc = new Document("$set", newDoc);
+        coll.updateOne(new Document("_id", existingDoc.getObjectId("_id")), updateDoc);
+    } else {
+        coll.insertOne(newDoc);
+    }
+
+    // Set the actor in the returned proto
+    if (updatedConfig.hasActor()) {
+        builder.setActor(updatedConfig.getActor());
+    }
+    return builder.build();
+}
 
   public ListThreatActorResponse listThreatActors(
       String accountId, ListThreatActorsRequest request) {
@@ -310,6 +381,19 @@ public class ThreatActorService {
         return ThreatActivityTimelineResponse.newBuilder().addAllThreatActivityTimeline(timeline).build();
   }
 
+  private String fetchMetadataString(Document doc){
+    String metadataStr = doc.getString("metadata");
+    Metadata.Builder metadataBuilder = Metadata.newBuilder();
+    try {
+      TextFormat.getParser().merge(metadataStr, metadataBuilder);
+    } catch (Exception e) {
+      return metadataStr;
+    }
+    Metadata metadataProto = metadataBuilder.build();
+    metadataStr = ProtoMessageUtils.toString(metadataProto).orElse("");
+    return metadataStr;
+  }
+
   public FetchMaliciousEventsResponse fetchAggregateMaliciousRequests(
       String accountId, FetchMaliciousEventsRequest request) {
 
@@ -324,6 +408,7 @@ public class ThreatActorService {
             maliciousPayloadsResponse.add(
                 FetchMaliciousEventsResponse.MaliciousPayloadsResponse.newBuilder().
                 setOrig(HttpResponseParams.getSampleStringFromProtoString(doc.getString("latestApiOrig"))).
+                setMetadata(fetchMetadataString(doc)).
                 setTs(doc.getLong("detectedAt")).build());
         }
     } else {
@@ -333,6 +418,7 @@ public class ThreatActorService {
             maliciousPayloadsResponse.add(
                 FetchMaliciousEventsResponse.MaliciousPayloadsResponse.newBuilder().
                 setOrig(HttpResponseParams.getSampleStringFromProtoString(doc.getString("orig"))).
+                setMetadata(fetchMetadataString(doc)).
                 setTs(doc.getLong("requestTime")).build());
         }
     }

@@ -24,10 +24,10 @@ function AgentTeam() {
     useEffect(() => {
         api.getMemberAgents().then((res: { agents: any; }) => {
             if(res && res.agents){
-                let agents = res.agents.map((x: { _name: string; agentFunctionalName: string; description: string; },i: number) => {
+                let agents = res.agents.map((x: { _name: string; agentEnglishName: string; agentFunctionalName: string; description: string; },i: number) => {
                     return {
                         id: x._name,
-                        name: x.agentFunctionalName,
+                        name: x.agentEnglishName + " | " +x.agentFunctionalName,
                         description: x.description,
                         image: AGENT_IMAGES[(i%(AGENT_IMAGES.length))],
                     }

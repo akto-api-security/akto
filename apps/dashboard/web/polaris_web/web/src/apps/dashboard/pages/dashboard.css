@@ -126,8 +126,8 @@
     --p-color-icon-primary: var(--akto-primary) !important;
     --p-color-bg-interactive-selected: #F6F6F7 !important;
 
-    --p-color-bg-critical-subdued: #FED3D1 !important;
-    --p-color-bg-caution-subdued: #FFD79D !important;
+    --p-color-bg-critical-subdued: #FFF4F4 !important;
+    --p-color-bg-caution-subdued: #FFF5EA !important;
     --p-color-bg-info-subdued: #A4E8F2 !important;
 }
 

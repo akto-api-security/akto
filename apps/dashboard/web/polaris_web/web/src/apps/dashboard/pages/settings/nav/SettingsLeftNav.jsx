@@ -1,7 +1,7 @@
 import { Navigation } from "@shopify/polaris"
 import { StoreDetailsFilledMinor, IdentityCardFilledMajor, AutomationFilledMajor, AppsFilledMajor, ComposeMajor, ProfileMajor} from "@shopify/polaris-icons"
 import { ListFilledMajor, ReportFilledMinor, LockFilledMajor, CollectionsFilledMajor, PlanMajor, ChatMajor} from "@shopify/polaris-icons"
-import { VariantMajor, VocabularyMajor, AdjustMinor } from "@shopify/polaris-icons"
+import { VariantMajor, VocabularyMajor, AdjustMinor, UndoMajor } from "@shopify/polaris-icons"
 import { useLocation, useNavigate } from "react-router-dom"
 import func from "@/util/func"
 
@@ -35,7 +35,7 @@ const SettingsLeftNav = () => {
             selected: page === "logs",
             onClick: () => navigate("/dashboard/settings/logs")
         }] : []
-    const metricsArr = window.IS_SAAS === 'true' ? [] : [{
+    const metricsArr = [{
         label: 'Metrics',
         icon: ReportFilledMinor,
         selected: page === "metrics",
@@ -68,6 +68,13 @@ const SettingsLeftNav = () => {
         onClick: () => navigate("/dashboard/settings/integrations/ci-cd")
     }] : [];
 
+    const threatConfigArr = window?.STIGG_FEATURE_WISE_ALLOWED?.THREAT_DETECTION?.isGranted ? [{
+        label: 'Threat Configuration',
+        icon: AutomationFilledMajor,
+        selected: page === "threat-configuration",
+        onClick: () => navigate("/dashboard/settings/threat-configuration")
+    }] : [];
+
     return (
         <Navigation>
             <Navigation.Section
@@ -80,12 +87,19 @@ const SettingsLeftNav = () => {
                     },
                     ...usersArr,
                     ...roleArr,
+                    ...threatConfigArr,
                     // {
                     //     label: 'Alerts',
                     //     icon: DiamondAlertMinor,
                     //     selected: page === "alerts",
                     //     onClick: () => navigate("/dashboard/settings")
                     // },
+                    {
+                        label: 'Undo Demerged APIs',
+                        icon: UndoMajor,
+                        selected: page === 'undo-demerge-apis',
+                        onClick: () => navigate("/dashboard/settings/undo-demerge-apis")
+                    },
                     ...cicdArr,
                     {
                         label: 'Integrations',

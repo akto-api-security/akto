@@ -22,6 +22,8 @@ import com.akto.runtime.Main;
 import com.akto.runtime.policies.ApiAccessTypePolicy;
 import com.akto.util.Constants;
 import com.akto.util.DashboardMode;
+import com.akto.utils.jobs.CleanInventory;
+import com.akto.utils.jobs.JobUtils;
 import com.akto.utils.libs.utils.src.main.java.com.akto.runtime.policies.ApiAccessTypePolicyUtil;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
@@ -51,6 +53,7 @@ public class AdminSettingsAction extends UserAction {
     private int globalRateLimit = 0;
     private Organization organization;
     private static final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
+    private static final ScheduledExecutorService newExecutor = Executors.newSingleThreadScheduledExecutor();
 
     private static final String IP_REGEX = "^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$";
     private static final Pattern IP_PATTERN = Pattern.compile(IP_REGEX);
@@ -85,6 +88,10 @@ public class AdminSettingsAction extends UserAction {
 
     @Setter
     private boolean miniTestingEnabled;
+    @Setter
+    private boolean enableMergingOnVersions;
+    @Setter
+    private boolean allowRetrospectiveMerging;
 
     public String updateSetupType() {
         AccountSettingsDao.instance.getMCollection().updateOne(
@@ -472,6 +479,25 @@ public class AdminSettingsAction extends UserAction {
             Updates.set(Account.HYBRID_TESTING_ENABLED, this.miniTestingEnabled)
         );
         return SUCCESS.toUpperCase();   
+    }
+
+    public String enableMergingOnVersionsInApis(){
+        AccountSettingsDao.instance.updateOne(
+            AccountSettingsDao.generateFilter(),
+            Updates.set(AccountSettings.ALLOW_MERGING_ON_VERSIONS, this.enableMergingOnVersions)
+        );
+        int accountId = Context.accountId.get();
+        if(this.allowRetrospectiveMerging && this.enableMergingOnVersions){
+            newExecutor.schedule(() -> {
+                try {
+                    Context.accountId.set(accountId);
+                    JobUtils.removeVersionedAPIs();
+                } catch (Exception e){
+                    logger.error("Error in applyAccessType", e);
+                }
+            }, 0, TimeUnit.SECONDS);
+        }
+        return SUCCESS.toUpperCase();
     }
 
     public void setAccountPermission(String accountPermission) {

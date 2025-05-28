@@ -27,6 +27,7 @@ import GithubSso from "../dashboard/pages/settings/integrations/GithubSso";
 import GithubAppIntegration from "../dashboard/pages/settings/integrations/GithubAppIntegration";
 import HealthLogs from "../dashboard/pages/settings/health_logs/HealthLogs";
 import About from "../dashboard/pages/settings/about/About";
+import ThreatConfiguration from "../dashboard/pages/settings/threat_configuration/ThreatConfiguration";
 import Metrics from "../dashboard/pages/settings/metrics/Metrics";
 import TestEditor from "../dashboard/pages/test_editor/TestEditor";
 import DataTypes from "../dashboard/pages/observe/data_types/DataTypes";
@@ -91,6 +92,8 @@ import F5Waf from "../dashboard/pages/settings/integrations/F5Waf";
 import AWSWaf from "../dashboard/pages/settings/integrations/AWSWaf";
 import AgentConfig from "../dashboard/pages/settings/integrations/AgentConfig";
 import AzureBoards from "../dashboard/pages/settings/integrations/AzureBoards";
+import CloudflareWaf from "../dashboard/pages/settings/integrations/CloudflareWaf";
+import UndoDemergedApis from "../dashboard/pages/settings/undo_demerged_apis/UndoDemergedApis";
 
 // if you add a component in a new path, please verify the search implementation in function -> 'getSearchItemsArr' in func.js
 
@@ -255,6 +258,10 @@ const router = createBrowserRouter([
                         element: <Roles/>
                     },
                     {
+                        path: "threat-configuration",
+                        element: <ThreatConfiguration/>
+                    },
+                    {
                         path: "Help",
                         element: <Help/>
                     },
@@ -293,6 +300,10 @@ const router = createBrowserRouter([
                     {
                         path: "integrations/aws_waf",
                         element: <AWSWaf/>,
+                    },
+                    {
+                        path: "integrations/cloudflare_waf",
+                        element: <CloudflareWaf/>,
                     },
                     {
                         path: "integrations/agents",
@@ -406,6 +417,10 @@ const router = createBrowserRouter([
                     {
                         path: 'audit-logs',
                         element: <AuditLogs/>
+                    },
+                    {
+                        path: 'undo-demerge-apis',
+                        element: <UndoDemergedApis/>
                     }
                 ]
             },

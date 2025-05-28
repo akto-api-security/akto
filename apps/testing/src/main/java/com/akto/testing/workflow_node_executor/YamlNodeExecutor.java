@@ -52,6 +52,9 @@ public class YamlNodeExecutor extends NodeExecutor {
     
     private static final Gson gson = new Gson();
 
+    public YamlNodeExecutor(boolean allowAllCombinations) {
+        super(allowAllCombinations);
+    }
 
     public NodeResult processNode(Node node, Map<String, Object> varMap, Boolean allowAllStatusCodes, boolean debug, List<TestingRunResult.TestLog> testLogs, Memory memory) {
         List<String> testErrors = new ArrayList<>();
@@ -110,7 +113,7 @@ public class YamlNodeExecutor extends NodeExecutor {
         List<ExecutorNode> executorNodes = new ArrayList<>();
         boolean followRedirect = executionListBuilder.buildExecuteOrder(executorNode, executorNodes);
 
-        ExecutorAlgorithm executorAlgorithm = new ExecutorAlgorithm(sampleRawApi, varMap, authMechanism, customAuthTypes);
+        ExecutorAlgorithm executorAlgorithm = new ExecutorAlgorithm(sampleRawApi, varMap, authMechanism, customAuthTypes, this.allowAllCombinations);
         Map<Integer, ExecuteAlgoObj> algoMap = new HashMap<>();
         ExecutorSingleRequest singleReq = executorAlgorithm.execute(executorNodes, 0, algoMap, rawApis, false, 0, yamlNodeDetails.getApiInfoKey());
 
@@ -122,6 +125,10 @@ public class YamlNodeExecutor extends NodeExecutor {
         //List<RawApi> testRawApis = singleReq.getRawApis();
         TestingRunConfig testingRunConfig = new TestingRunConfig();
         String logId = "";
+        if(memory != null) {
+            testingRunConfig = memory.getTestingRunConfig();
+            logId = memory.getLogId();
+        }
         List<TestResult> result = new ArrayList<>();
         boolean vulnerable = false;
 

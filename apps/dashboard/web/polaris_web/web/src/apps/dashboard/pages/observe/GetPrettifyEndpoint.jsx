@@ -3,7 +3,7 @@ import React, { useRef, useState } from 'react'
 import func from '@/util/func'
 import transform from '../onboarding/transform'
 import observeFunc from "./transform"
-function GetPrettifyEndpoint({method,url, isNew, maxWidth}){
+function GetPrettifyEndpoint({method,url, isNew, maxWidth, methodBoxWidth}){
     const ref = useRef(null)
     const localUrl = url || "/"
     const [copyActive, setCopyActive] = useState(false)
@@ -14,7 +14,7 @@ function GetPrettifyEndpoint({method,url, isNew, maxWidth}){
         onMouseEnter={() => setCopyActive(true)}
         onMouseLeave={() => setCopyActive(false)}
       >
-        <Box width="54px">
+        <Box width={methodBoxWidth || "54px"}>
           <HorizontalStack align="end">
             <span
               style={{

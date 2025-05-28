@@ -2,6 +2,8 @@ package com.akto.dto.test_editor;
 
 import java.util.List;
 
+import com.akto.dto.OriginalHttpRequest;
+import com.akto.dto.OriginalHttpResponse;
 import org.bson.codecs.pojo.annotations.BsonIgnore;
 import org.bson.types.ObjectId;
 
@@ -38,10 +40,28 @@ public class TestingRunPlayground {
     private int createdAt;
 
     private TestingRunResult testingRunResult;
-
+    private String miniTestingName;
+    private OriginalHttpRequest originalHttpRequest;
+    private OriginalHttpResponse originalHttpResponse;
     @BsonIgnore
     private String hexId;
+    private TestingRunPlaygroundType testingRunPlaygroundType;
 
+    public TestingRunPlaygroundType getTestingRunPlaygroundType() {
+        if (testingRunPlaygroundType == null) {
+            return TestingRunPlaygroundType.TEST_EDITOR_PLAYGROUND;
+        }
+        return testingRunPlaygroundType;
+    }
+
+    public void setTestingRunPlaygroundType(TestingRunPlaygroundType testingRunPlaygroundType) {
+        this.testingRunPlaygroundType = testingRunPlaygroundType;
+    }
+
+    public enum TestingRunPlaygroundType {
+        TEST_EDITOR_PLAYGROUND,
+        POSTMAN_IMPORTS
+    }
 
     public TestingRunPlayground(String testTemplate, State state, List<String> samples, ApiInfoKey apiInfoKey, int createdAt) {
         this.testTemplate = testTemplate;
@@ -116,5 +136,29 @@ public class TestingRunPlayground {
 
     public void setTestingRunResult(TestingRunResult testingRunResult) {
         this.testingRunResult = testingRunResult;
+    }
+
+    public String getMiniTestingName() {
+        return miniTestingName;
+    }
+
+    public void setMiniTestingName(String miniTestingName) {
+        this.miniTestingName = miniTestingName;
+    }
+
+    public OriginalHttpRequest getOriginalHttpRequest() {
+        return originalHttpRequest;
+    }
+
+    public void setOriginalHttpRequest(OriginalHttpRequest originalHttpRequest) {
+        this.originalHttpRequest = originalHttpRequest;
+    }
+
+    public OriginalHttpResponse getOriginalHttpResponse() {
+        return originalHttpResponse;
+    }
+
+    public void setOriginalHttpResponse(OriginalHttpResponse originalHttpResponse) {
+        this.originalHttpResponse = originalHttpResponse;
     }
 }

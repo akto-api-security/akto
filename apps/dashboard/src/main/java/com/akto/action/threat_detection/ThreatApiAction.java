@@ -1,5 +1,6 @@
 package com.akto.action.threat_detection;
 
+import com.akto.ProtoMessageUtils;
 import com.akto.dao.monitoring.FilterYamlTemplateDao;
 import com.akto.dto.monitoring.FilterConfig;
 import com.akto.dto.test_editor.Category;
@@ -12,7 +13,6 @@ import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.Th
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatCategoryWiseCountResponse;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatSeverityWiseCountResponse;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.DailyActorsCountResponse.ActorsCount;
-import com.akto.proto.utils.ProtoMessageUtils;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.HashMap;
 import java.util.List;

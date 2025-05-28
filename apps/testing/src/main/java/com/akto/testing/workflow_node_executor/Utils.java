@@ -1,10 +1,8 @@
 package com.akto.testing.workflow_node_executor;
 
-import static com.akto.runtime.utils.Utils.parseCookie;
 
 import java.io.File;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Base64;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -16,8 +14,6 @@ import java.util.regex.Pattern;
 
 import com.akto.dto.testing.*;
 import com.akto.test_editor.execution.Memory;
-import com.akto.test_editor.filter.data_operands_impl.CookieExpireFilter;
-import com.akto.testing.TestExecutor;
 
 import org.apache.commons.lang3.StringUtils;
 import org.bson.conversions.Bson;
@@ -35,7 +31,6 @@ import com.akto.dto.type.KeyTypes;
 import com.akto.dto.type.RequestTemplate;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
-import com.akto.store.TestRolesCache;
 import com.akto.util.JSONUtils;
 import com.akto.util.RecordedLoginFlowUtil;
 import com.google.gson.Gson;
@@ -204,16 +199,16 @@ public class Utils {
         return token;
     }
 
-    public static WorkflowTestResult.NodeResult processNode(Node node, Map<String, Object> valuesMap, Boolean allowAllStatusCodes, boolean debug, List<TestingRunResult.TestLog> testLogs, Memory memory) {
+    public static WorkflowTestResult.NodeResult processNode(Node node, Map<String, Object> valuesMap, Boolean allowAllStatusCodes, boolean debug, List<TestingRunResult.TestLog> testLogs, Memory memory, boolean allowAllCombinations) {
         RecordedLoginFlowInput recordedLoginFlowInput = RecordedLoginInputDao.instance.findOne(new BasicDBObject());
-        return processNode(node, valuesMap, allowAllStatusCodes, debug, testLogs, memory, recordedLoginFlowInput);
+        return processNode(node, valuesMap, allowAllStatusCodes, debug, testLogs, memory, recordedLoginFlowInput, allowAllCombinations);
     }
 
     public static WorkflowTestResult.NodeResult processNode(Node node, Map<String, Object> valuesMap, Boolean allowAllStatusCodes, boolean debug, List<TestingRunResult.TestLog> testLogs, Memory memory, AuthMechanism authMechanism) {
-        return processNode(node, valuesMap, allowAllStatusCodes, debug, testLogs, memory, authMechanism.getRecordedLoginFlowInput());
+        return processNode(node, valuesMap, allowAllStatusCodes, debug, testLogs, memory, authMechanism.getRecordedLoginFlowInput(), false);
     }
 
-    public static WorkflowTestResult.NodeResult processNode(Node node, Map<String, Object> valuesMap, Boolean allowAllStatusCodes, boolean debug, List<TestingRunResult.TestLog> testLogs, Memory memory, RecordedLoginFlowInput recordedLoginFlowInput) {
+    public static WorkflowTestResult.NodeResult processNode(Node node, Map<String, Object> valuesMap, Boolean allowAllStatusCodes, boolean debug, List<TestingRunResult.TestLog> testLogs, Memory memory, RecordedLoginFlowInput recordedLoginFlowInput, boolean allowAllCombinations) {
         if (node.getWorkflowNodeDetails().getType() == WorkflowNodeDetails.Type.RECORDED) {
             return processRecorderNode(node, valuesMap, recordedLoginFlowInput);
         }
@@ -221,21 +216,21 @@ public class Utils {
             return processOtpNode(node, valuesMap);
         }
         else {
-            return processApiNode(node, valuesMap, allowAllStatusCodes, debug, testLogs, memory);
+            return processApiNode(node, valuesMap, allowAllStatusCodes, debug, testLogs, memory, allowAllCombinations);
         }
     }
 
-    public static WorkflowTestResult.NodeResult processApiNode(Node node, Map<String, Object> valuesMap, Boolean allowAllStatusCodes, boolean debug, List<TestingRunResult.TestLog> testLogs, Memory memory) {
+    public static WorkflowTestResult.NodeResult processApiNode(Node node, Map<String, Object> valuesMap, Boolean allowAllStatusCodes, boolean debug, List<TestingRunResult.TestLog> testLogs, Memory memory, boolean allowAllCombinations) {
         
-        NodeExecutorFactory nodeExecutorFactory = new NodeExecutorFactory();
+        NodeExecutorFactory nodeExecutorFactory = new NodeExecutorFactory(allowAllCombinations);
         NodeExecutor nodeExecutor = nodeExecutorFactory.getExecutor(node);
         return nodeExecutor.processNode(node, valuesMap, allowAllStatusCodes, debug, testLogs, memory);
     }
 
-    public static WorkflowTestResult.NodeResult executeNode(Node node, Map<String, Object> valuesMap,boolean debug, List<TestingRunResult.TestLog> testLogs, Memory memory) {
+    public static WorkflowTestResult.NodeResult executeNode(Node node, Map<String, Object> valuesMap,boolean debug, List<TestingRunResult.TestLog> testLogs, Memory memory, boolean allowAllCombinations) {
         WorkflowTestResult.NodeResult nodeResult;
         try {
-            nodeResult = Utils.processNode(node, valuesMap, true, debug, testLogs, memory);
+            nodeResult = Utils.processNode(node, valuesMap, true, debug, testLogs, memory, allowAllCombinations);
         } catch (Exception e) {
             ;
             List<String> testErrors = new ArrayList<>();

@@ -1,8 +1,10 @@
 package com.akto.threat.backend.router;
 
+import com.akto.ProtoMessageUtils;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.DailyActorsCountRequest;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchAlertFiltersRequest;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchMaliciousEventsRequest;
+import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatConfiguration;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ListMaliciousRequestsRequest;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ListThreatActorsRequest;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ListThreatApiRequest;
@@ -13,7 +15,6 @@ import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.Th
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatActorFilterRequest;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatCategoryWiseCountRequest;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatSeverityWiseCountRequest;
-import com.akto.proto.utils.ProtoMessageUtils;
 import com.akto.threat.backend.service.MaliciousEventService;
 import com.akto.threat.backend.service.ThreatActorService;
 import com.akto.threat.backend.service.ThreatApiService;
@@ -129,6 +130,38 @@ public class DashboardRouter implements ARouter {
                 ).ifPresent(s -> ctx.response().setStatusCode(200).end(s));
             });
 
+        router
+            .get("/get_threat_configuration")
+            .blockingHandler(ctx -> {
+                ProtoMessageUtils.toString(
+                    threatActorService.fetchThreatConfiguration(
+                        ctx.get("accountId")
+                    )
+                ).ifPresent(s -> ctx.response().setStatusCode(200).end(s));
+            });
+
+        router
+            .post("/modify_threat_configuration")
+            .blockingHandler(ctx -> {
+                RequestBody reqBody = ctx.body();
+                ThreatConfiguration req = ProtoMessageUtils.<
+                    ThreatConfiguration
+                >toProtoMessage(
+                    ThreatConfiguration.class,
+                    reqBody.asString()
+                ).orElse(null);
+
+                if (req == null) {
+                    ctx.response().setStatusCode(400).end("Invalid request");
+                    return;
+                }
+                ProtoMessageUtils.toString(
+                    threatActorService.modifyThreatConfiguration(
+                        ctx.get("accountId"),
+                        req
+                    )
+                ).ifPresent(s -> ctx.response().setStatusCode(200).end(s));
+            });
         router
             .get("/fetch_filters_for_threat_actors")
             .blockingHandler(ctx -> {

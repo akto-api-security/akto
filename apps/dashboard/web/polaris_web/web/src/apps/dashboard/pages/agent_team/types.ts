@@ -15,6 +15,13 @@ export type RepoPayload = {
     project: string;
     lastRun: number;
     scheduleTime: number;
+    accessToken: string | null;
+}
+
+export type RepoNodeType = {
+    name: string;
+    nameWithOwner: string;
+    isPrivate: boolean;
 }
 
 export type Agent = {
@@ -34,7 +41,7 @@ export type PromptPayload = {
     prompt: PromptContent;
 }
 
-export type AgentState = 'paused' | 'idle' | 'thinking' | 'error';
+export type AgentState = 'paused' | 'idle' | 'thinking' | 'error' | 'stopped' | 'completed';
 
 export enum State {
     STOPPED = 'STOPPED',

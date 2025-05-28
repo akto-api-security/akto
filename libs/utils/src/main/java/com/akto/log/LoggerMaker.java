@@ -35,6 +35,11 @@ public class LoggerMaker  {
 
     static {
         System.setProperty(SimpleLogger.DEFAULT_LOG_LEVEL_KEY, System.getenv().getOrDefault("AKTO_LOG_LEVEL", "WARN"));
+        System.setProperty("org.slf4j.simpleLogger.log.org.apache.kafka", "ERROR");
+        System.setProperty("org.slf4j.simpleLogger.log.io.lettuce", "ERROR");
+        System.setProperty("org.slf4j.simpleLogger.log.org.mongodb", "ERROR");
+        System.setProperty("org.slf4j.simpleLogger.log.io.netty", "ERROR");
+        System.setProperty("org.slf4j.simpleLogger.log.org.flywaydb", "ERROR");
         System.out.printf("AKTO_LOG_LEVEL is set to: %s \n", System.getProperty(SimpleLogger.DEFAULT_LOG_LEVEL_KEY));
     }
 
@@ -86,7 +91,7 @@ public class LoggerMaker  {
     }
 
     public enum LogDb {
-        TESTING,RUNTIME,DASHBOARD,BILLING, ANALYSER, THREAT_DETECTION, PUPPETEER
+        TESTING,RUNTIME,DASHBOARD,BILLING, ANALYSER, THREAT_DETECTION, PUPPETEER, DATA_INGESTION
     }
 
     private static AccountSettings accountSettings = null;
@@ -211,12 +216,27 @@ public class LoggerMaker  {
         }
     }
 
+    public void warnAndAddToDb(String info, LogDb db) {
+        String accountId = Context.accountId.get() != null ? Context.accountId.get().toString() : "NA";
+        String infoMessage = "acc: " + accountId + ", " + info;
+        logger.info(infoMessage);
+        try{
+            insert(infoMessage, "warn",db);
+        } catch (Exception e){
+
+        }
+    }
+
     public void errorAndAddToDb(String err) {
         errorAndAddToDb(err, this.db);
     }
 
     public void infoAndAddToDb(String info) {
         infoAndAddToDb(info, this.db);
+    }
+
+    public void warnAndAddToDb(String info) {
+        warnAndAddToDb(info, this.db);
     }
 
     private Boolean checkUpdate(){
@@ -234,9 +254,6 @@ public class LoggerMaker  {
     private void insert(String info, String key, LogDb db) {
         String text = aClass + " : " + info;
         Log log = new Log(text, key, Context.now());
-        if(DashboardMode.isSaasDeployment()) {
-            return;
-        }
         if(checkUpdate() && db!=null){
             switch(db){
                 case TESTING: 
@@ -247,6 +264,10 @@ public class LoggerMaker  {
                     break;
                 case DASHBOARD: 
                     DashboardLogsDao.instance.insertOne(log);
+                    
+                    break;
+                case DATA_INGESTION:
+                    dataActor.insertDataIngestionLog(log);
                     break;
                 case ANALYSER:
                     dataActor.insertAnalyserLog(log);
@@ -286,6 +307,9 @@ public class LoggerMaker  {
             case DASHBOARD: 
                 logs = DashboardLogsDao.instance.findAll(filters, Projections.include("log", Log.TIMESTAMP));
                 break;
+            case DATA_INGESTION:
+                logs = DataIngestionLogsDao.instance.findAll(filters, Projections.include("log", Log.TIMESTAMP));
+                break;
             case ANALYSER:
                 logs = AnalyserLogsDao.instance.findAll(filters, Projections.include("log", Log.TIMESTAMP));
                 break;
@@ -294,6 +318,9 @@ public class LoggerMaker  {
                 break;
             case PUPPETEER:
                 logs = PupeteerLogsDao.instance.findAll(filters, Projections.include("log", Log.TIMESTAMP));
+                break;
+            case THREAT_DETECTION:
+                logs = ProtectionLogsDao.instance.findAll(filters, Projections.include("log", Log.TIMESTAMP));
                 break;
             default:
                 break;

@@ -80,6 +80,9 @@
                     window.GITHUB_AUTH_URL = '${requestScope.githubAuthUrl}'
                     window.ACTIVE_SSO = '${requestScope.activeSso}'
 
+                    window.IS_AWS_WAF_INTEGRATED = '${requestScope.isAwsWafIntegrated}'
+                    window.IS_CLOUDFLARE_WAF_INTEGRATED = '${requestScope.isCloudflareWafIntegrated}'
+
                     window.STIGG_IS_OVERAGE='${requestScope.stiggIsOverage}'
                     window.USAGE_PAUSED=JSON.parse('${requestScope.usagePaused}' || '{}');
                     window.STIGG_FEATURE_WISE_ALLOWED = JSON.parse('${requestScope.stiggFeatureWiseAllowed}' || '{}');
@@ -105,6 +108,10 @@
                     window.PLAN_TYPE = '${requestScope.planType}'
 
                     window.TRIAL_MSG = '${requestScope.trialMsg}'
+                    
+                    window.PROTECTIONTRIAL_MSG = '${requestScope.protectionTrialMsg}'
+
+                    window.AGENTTRIAL_MSG = '${requestScope.agentTrialMsg}'
 
                     // Enabling the debug mode flag is useful during implementation,
                     // but it's recommended you remove it for production

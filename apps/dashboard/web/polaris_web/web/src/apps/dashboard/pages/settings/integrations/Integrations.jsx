@@ -145,6 +145,12 @@ function Integrations() {
       source: '/public/F5.svg'
     }
 
+    let cloudflareWafObj ={
+      id: 'cloudflare_waf',
+      name:'Cloudflare WAF',
+      source: '/public/cloudflareWaf.png'
+    }
+
     let ssoItems = [githubSsoObj, oktaSsoObj, azureAdSsoObj, googleWorkSpaceObj]
     const [currItems , setCurrentItems] = useState(getTabItems('all'))
     const tabs = [
@@ -208,7 +214,7 @@ function Integrations() {
     const aiItems = [aktoGptObj, agentConfigObj];
     const alertsItems = [slackObj, webhooksObj, teamsWebhooksObj];
     const automationItems = [aktoApiObj, ciCdObj, jiraObj, azureBoardsObj];
-    const wafItems = [awsWafObj, f5WafObj];
+    const wafItems = [awsWafObj, f5WafObj, cloudflareWafObj];
     const siemItems = [splunkObj];
     switch (tabId) {
       case 'traffic':
@@ -294,6 +300,7 @@ function Integrations() {
             media={media}
             shortcutActions={sourceActions(id)}
             persistActions
+            onClick={() => handleTab(id, link)}
           >
             <Text fontWeight="bold" as="h3">
               {name}

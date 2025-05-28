@@ -1,8 +1,5 @@
 package com.akto.utils.jobs;
 
-import java.io.BufferedWriter;
-import java.io.File;
-import java.io.FileWriter;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -19,11 +16,9 @@ import java.util.function.Function;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
-import com.akto.dto.CodeAnalysisRepo;
 import com.mongodb.client.model.Updates;
+
 import org.bson.conversions.Bson;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import com.akto.dao.ApiInfoDao;
 import com.akto.dao.SampleDataDao;
@@ -33,6 +28,7 @@ import com.akto.dao.context.Context;
 import com.akto.dao.monitoring.FilterYamlTemplateDao;
 import com.akto.dto.Account;
 import com.akto.dto.ApiCollection;
+import com.akto.dto.ApiInfo;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.monitoring.FilterConfig;
 import com.akto.dto.monitoring.FilterConfig.FILTER_TYPE;
@@ -61,6 +57,8 @@ import static com.akto.runtime.utils.Utils.createRegexPatternFromList;
 public class CleanInventory {
 
     private static final LoggerMaker logger = new LoggerMaker(CleanInventory.class, LogDb.DASHBOARD);
+    private static final int limit = 500;
+    private static final Bson sort = Sorts.ascending(ApiInfo.ID_API_COLLECTION_ID, ApiInfo.ID_URL, ApiInfo.ID_METHOD);
 
     final static ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
 
@@ -124,12 +122,12 @@ public class CleanInventory {
         int diff = now2 - now;
 
         if (diff >= 2) {
-            logger.debugAndAddToDb(String.format("cleanInventoryJob finished, time taken: %d ", diff));
+            logger.infoAndAddToDb(String.format("cleanInventoryJob finished, time taken: %d ", diff));
         }
 
     }
 
-    private static void moveApisFromSampleData(List<Key> sampleDataIds) {
+    public static void moveApisFromSampleData(List<Key> sampleDataIds, boolean skipMergingOnKnownStaticURLsForVersionedApis) {
         if (sampleDataIds.isEmpty()) return;
         
         List<SampleData> allSamples = SampleDataDao.instance.findAll(Filters.or(SampleDataDao.filterForMultipleSampleData(sampleDataIds)));
@@ -142,8 +140,8 @@ public class CleanInventory {
         
 
             try {
-                Utils.pushDataToKafka(allSamples.get(0).getId().getApiCollectionId(), "", messages, new ArrayList<>(), true, false);
-                logger.debugAndAddToDb("Successfully moved APIs.");
+                Utils.pushDataToKafka(allSamples.get(0).getId().getApiCollectionId(), "", messages, new ArrayList<>(), true, false, false, skipMergingOnKnownStaticURLsForVersionedApis);
+                logger.infoAndAddToDb("Successfully moved APIs.");
             } catch (Exception e) {
                 logger.errorAndAddToDb("Error during move APIs: " + e.getMessage());
                 e.printStackTrace();
@@ -157,11 +155,9 @@ public class CleanInventory {
         List<SampleData> sampleDataList = new ArrayList<>();
         Bson filters = Filters.empty();
         int skip = 0;
-        int limit = 100;
-        Bson sort = Sorts.ascending("_id.apiCollectionId", "_id.url", "_id.method");
         Map<Integer,Integer> collectionWiseDeletionCountMap = new HashMap<>();
 
-        Map<String,FilterConfig> filterMap = FilterYamlTemplateDao.instance.fetchFilterConfig(false, yamlTemplates, true);
+        Map<String,FilterConfig> filterMap = FilterYamlTemplateDao.fetchFilterConfig(false, yamlTemplates, true);
         Pattern pattern = createRegexPatternFromList(redundantUrlList);
         do {
             sampleDataList = SampleDataDao.instance.findAll(filters, skip, limit, sort);
@@ -227,7 +223,7 @@ public class CleanInventory {
                         // any 1 of the sample is modifiable, we print this block
                         toMove.add(sampleData.getId());
                         if(saveLogsToDB){
-                            logger.debugAndAddToDb("Filter passed, modify sample data of API: " + sampleData.getId(), LogDb.DASHBOARD);
+                            logger.infoAndAddToDb("Filter passed, modify sample data of API: " + sampleData.getId(), LogDb.DASHBOARD);
                         }else{
                             logger.debug("[BadApisUpdater] Updating bad from template API: " + sampleData.getId(), LogDb.DASHBOARD);
                         }
@@ -239,7 +235,7 @@ public class CleanInventory {
                             collectionWiseDeletionCountMap.put(sampleData.getId().getApiCollectionId(),initialCount + 1);
                             toBeDeleted.add(sampleData.getId());
                             if(saveLogsToDB){
-                                logger.debugAndAddToDb(
+                                logger.infoAndAddToDb(
                                         "Filter passed, deleting bad api found from filter: " + sampleData.getId(), LogDb.DASHBOARD
                                 );
                             }else{
@@ -252,7 +248,7 @@ public class CleanInventory {
                                     SampleDataDao.instance.updateOneNoUpsert(Filters.eq("_id",sampleData.getId()), Updates.set(SampleData.SAMPLES,remainingSamples));
                                 }
                                 if(saveLogsToDB){
-                                    logger.debugAndAddToDb(
+                                    logger.infoAndAddToDb(
                                             "Deleting bad samples from sample data " + sampleData.getId(), LogDb.DASHBOARD
                                     );
                                 }else{
@@ -263,7 +259,7 @@ public class CleanInventory {
                     } else {
                         // other cases like: => filter from advanced filter is passed || filter from block filter fails
                         if(saveLogsToDB){
-                            logger.debugAndAddToDb(
+                            logger.infoAndAddToDb(
                                 "Filter did not pass, keeping api found from filter: " + sampleData.getId(), LogDb.DASHBOARD
                             );
                         }else{
@@ -282,7 +278,7 @@ public class CleanInventory {
 
             if (shouldDeleteRequest && toMove.size() > 0) {
                 logger.debug("starting moving APIs");
-                moveApisFromSampleData(toMove);
+                moveApisFromSampleData(toMove, false);
             }
 
             // String shouldMove = System.getenv("MOVE_REDUNDANT_APIS");
@@ -295,7 +291,7 @@ public class CleanInventory {
             String name = apiCollectionMap.get(collId).getDisplayName();
 
             if(saveLogsToDB){
-                logger.debugAndAddToDb("Total apis deleted from collection: " + name + " are: " + deletionCount, LogDb.DASHBOARD);
+                logger.infoAndAddToDb("Total apis deleted from collection: " + name + " are: " + deletionCount, LogDb.DASHBOARD);
             }
         }
 
@@ -400,5 +396,4 @@ public class CleanInventory {
             deleteApis(toBeDeleted);
         }
     }
-
 }

@@ -1,13 +1,14 @@
 package com.akto.threat.detection.tasks;
 
+import com.akto.ProtoMessageUtils;
 import com.akto.kafka.KafkaConfig;
 import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import com.akto.proto.generated.threat_detection.message.malicious_event.event_type.v1.EventType;
 import com.akto.proto.generated.threat_detection.message.malicious_event.v1.MaliciousEventKafkaEnvelope;
 import com.akto.proto.generated.threat_detection.message.malicious_event.v1.MaliciousEventMessage;
 import com.akto.proto.generated.threat_detection.message.sample_request.v1.SampleMaliciousRequest;
 import com.akto.proto.generated.threat_detection.service.malicious_alert_service.v1.RecordMaliciousEventRequest;
-import com.akto.proto.utils.ProtoMessageUtils;
 import com.akto.threat.detection.db.entity.MaliciousEventEntity;
 import com.google.protobuf.InvalidProtocolBufferException;
 import java.io.IOException;
@@ -33,7 +34,7 @@ public class SendMaliciousEventsToBackend extends AbstractKafkaConsumerTask<byte
 
   private final SessionFactory sessionFactory;
   private final CloseableHttpClient httpClient;
-  private static final LoggerMaker logger = new LoggerMaker(SendMaliciousEventsToBackend.class);
+  private static final LoggerMaker logger = new LoggerMaker(SendMaliciousEventsToBackend.class, LogDb.THREAT_DETECTION);
 
   public SendMaliciousEventsToBackend(
       SessionFactory sessionFactory, KafkaConfig trafficConfig, String topic) {
@@ -148,7 +149,7 @@ public class SendMaliciousEventsToBackend extends AbstractKafkaConsumerTask<byte
                       req.addHeader("Authorization", "Bearer " + token);
                       req.setEntity(requestEntity);
                       try {
-                        logger.debug("sending malicious event to threat backend for url {} filterId {} eventType {}", evt.getLatestApiEndpoint(), evt.getFilterId(), evt.getEventType().toString());
+                        logger.debugAndAddToDb("sending malicious event to threat backend for url " + evt.getLatestApiEndpoint() + " filterId " + evt.getFilterId() + " eventType " + evt.getEventType().toString());
                         this.httpClient.execute(req);
                       } catch (IOException e) {
                         e.printStackTrace();

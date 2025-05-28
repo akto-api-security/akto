@@ -49,7 +49,7 @@ function OktaIntegration() {
     ]
 
     const handleSubmit = async() => {
-        if(clientId.length > 0 && clientSecret.length > 0 && oktaDomain.length > 0 && authorizationServerId.length > 0){
+        if(clientId.length > 0 && clientSecret.length > 0 && oktaDomain.length > 0){
             await settingRequests.addOktaSso(clientId,clientSecret, authorizationServerId, oktaDomain, redirectUri)
             func.setToast(true, false, "Okta SSO fields saved successfully!")
             setComponentType(2)

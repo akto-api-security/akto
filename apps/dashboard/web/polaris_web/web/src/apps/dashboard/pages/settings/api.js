@@ -137,11 +137,25 @@ const settingRequests = {
             data: {}
         })
     },
+    fetchAllMetricsDesciptions() {
+        return request({
+            url: '/api/allMetricsDescription',
+            method: 'post',
+            data: {}
+        })
+    },
     fetchTrafficMetrics(groupBy, startTimestamp, endTimestamp, names, host) {
         return request({
             url: '/api/fetchTrafficMetrics',
             method: 'post',
             data: {groupBy, startTimestamp, endTimestamp, names, host}
+        })
+    },
+    fetchMetrics(startTimestamp, endTimestamp) {
+        return request({
+            url: '/api/metrics',
+            method: 'post',
+            data: {startTime:startTimestamp, endTime:endTimestamp}
         })
     },
 
@@ -258,6 +272,31 @@ const settingRequests = {
             url: '/api/addIntegration',
             method: 'post',
             data: {userEmail, apiToken, baseUrl, projId, projectAndIssueMap}
+        })
+    },
+
+    fetchJiraStatusMapping(projId, baseUrl, userEmail, apiToken){
+        return request({
+            url: '/api/jira/fetchProjectStatuses',
+            method: 'post',
+            data: {projId, baseUrl, userEmail, apiToken}
+        })
+    },
+
+    addJiraIntegrationV2(data) {
+        return request({
+            url: '/api/jira/add',
+            method: 'post',
+            data: {...data}
+        })
+    },
+
+
+    deleteJiraIntegratedProject(projId) {
+        return request({
+            url: '/api/jira/delete',
+            method: 'post',
+            data: {projId}
         })
     },
 
@@ -465,6 +504,15 @@ const settingRequests = {
             }
         })
     },
+    enableMergingOnVersions(enableMergingOnVersions, allowRetrospectiveMerging) {
+        return request({
+            url: '/api/enableMergingOnVersionsInApis',
+            method: "post",
+            data: {
+                enableMergingOnVersions, allowRetrospectiveMerging
+            }
+        })
+    },
     resetUserPassword(userEmail) {
         return request({
             url: '/api/resetUserPassword',
@@ -570,6 +618,41 @@ const settingRequests = {
             url: '/api/fetchModuleInfo',
             method: 'post',
             data: {}
+        })
+    },
+    async fetchCloudflareWafIntegration() {
+        return await request({
+            url: '/api/fetchCloudflareWafIntegration',
+            method: 'post',
+            data: {}
+        })
+    },
+    async deleteCloudflareWafIntegration() {
+        return await request({
+            url: '/api/deleteCloudflareWafIntegration',
+            method: 'post',
+            data: {}
+        })
+    },
+    async addCloudflareWafIntegration(accountOrZoneId, apiKey, email, integrationType) {
+        return await request({
+            url: '/api/addCloudflareWafIntegration',
+            method: 'post',
+            data: {accountOrZoneId, apiKey, email, integrationType}
+        })
+    },
+    async getDeMergedApis() {
+        return await request({
+            url: '/api/getDeMergedApis',
+            method: 'post',
+            data: {}
+        })
+    },
+    async undoDemergedApis(mergedApis) {
+        return await request({
+            url: '/api/undoDemergedApis',
+            method: 'post',
+            data: {mergedUrls: mergedApis}
         })
     }
 }
