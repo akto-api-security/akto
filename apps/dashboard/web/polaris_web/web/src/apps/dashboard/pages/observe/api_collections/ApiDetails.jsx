@@ -256,6 +256,21 @@ function ApiDetails(props) {
             setTimeout(() => {
                 setLoading(false)
             }, 100)
+            const queryPayload = dashboardFunc.getApiPrompts(apiCollectionId, endpoint, method)[0].prepareQuery();
+            try{
+                if(isGptActive && window.STIGG_FEATURE_WISE_ALLOWED["AKTO_GPT_AI"] && window.STIGG_FEATURE_WISE_ALLOWED["AKTO_GPT_AI"]?.isGranted === true){
+                    await gptApi.ask_ai(queryPayload).then((res) => {
+                        if (res.response.responses && res.response.responses.length > 0) {
+                            const metaHeaderResp = res.response.responses.filter(x => !standardHeaders.has(x.split(" ")[0]))
+                            setHeadersWithData(metaHeaderResp)
+                        }
+                    }
+                    ).catch((err) => {
+                        console.error("Failed to fetch prompts:", err);
+                    })
+                }
+            }catch (e) {
+            }   
             fetchStats(apiCollectionId, endpoint, method)
             fetchDistributionData(); // Fetch distribution data
         }
@@ -300,6 +315,7 @@ function ApiDetails(props) {
         }
 
         fetchData();
+        setHeadersWithData([])
     }, [apiDetail])
 
     useEffect(() => {
