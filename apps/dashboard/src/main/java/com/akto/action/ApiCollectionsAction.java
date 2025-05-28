@@ -8,6 +8,7 @@ import com.akto.dao.filter.MergedUrlsDao;
 import com.akto.dto.*;
 import com.akto.dto.filter.MergedUrls;
 import com.akto.util.Pair;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.bson.conversions.Bson;
 
 import com.akto.action.observe.Utils;
@@ -17,6 +18,7 @@ import com.akto.dao.context.Context;
 import com.akto.dto.billing.FeatureAccess;
 import com.akto.dto.usage.MetricTypes;
 import com.akto.dto.testing.TestingEndpoints;
+import com.akto.dto.traffic.CollectionTags;
 import com.akto.dto.traffic.Key;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.Aggregates;
@@ -170,7 +172,7 @@ public class ApiCollectionsAction extends UserAction {
         List<Bson> pipeLine = new ArrayList<>();
         pipeLine.add(Aggregates.project(Projections.fields(
             Projections.computed(ApiCollection.URLS_COUNT, new BasicDBObject("$size", new BasicDBObject("$ifNull", Arrays.asList("$urls", Collections.emptyList())))),
-            Projections.include(ApiCollection.ID, ApiCollection.NAME, ApiCollection.HOST_NAME, ApiCollection._TYPE, ApiCollection.USER_ENV_TYPES, ApiCollection._DEACTIVATED,ApiCollection.START_TS, ApiCollection.AUTOMATED, ApiCollection.DESCRIPTION)
+            Projections.include(ApiCollection.ID, ApiCollection.NAME, ApiCollection.HOST_NAME, ApiCollection._TYPE, ApiCollection.TAGS_STRING, ApiCollection._DEACTIVATED,ApiCollection.START_TS, ApiCollection.AUTOMATED, ApiCollection.DESCRIPTION)
         )));
 
         try {
@@ -199,16 +201,19 @@ public class ApiCollectionsAction extends UserAction {
                     ApiCollection.Type typeEnum = ApiCollection.Type.valueOf(type);
                     apiCollection.setType(typeEnum);
                 }
-                List<String> userEnvTypes = new ArrayList<>();
-                Object value = collection.get(ApiCollection.USER_ENV_TYPES);
+                List<CollectionTags> tagsList = new ArrayList<>();
+                Object value = collection.get(ApiCollection.TAGS_STRING);
                 if (value instanceof List) {
                     List<?> list = (List<?>) value;
-                    if (list.stream().allMatch(e -> e instanceof String)) {
-                        userEnvTypes = (List<String>) list;
+                    for(Object obj : list) {
+                        BasicDBObject tag = (BasicDBObject) obj;
+                        CollectionTags collectionTags = new CollectionTags(tag.getInt(CollectionTags.LAST_UPDATED_TS), tag.getString(CollectionTags.KEY_NAME), tag.getString(CollectionTags.VALUE));
+
+                        tagsList.add(collectionTags);
                     }
                 }
-                if(!userEnvTypes.isEmpty()){
-                    apiCollection.setUserEnvTypes(userEnvTypes);
+                if(!tagsList.isEmpty()){
+                    apiCollection.setTagsList(tagsList);
                 }
                 this.apiCollections.add(apiCollection);
             } catch (Exception e) {
@@ -746,7 +751,7 @@ public class ApiCollectionsAction extends UserAction {
 
     List<Integer> apiCollectionIds;
 
-    private List<String> envType;
+    private List<CollectionTags> envType;
     private boolean resetEnvTypes;
 
 	public String updateEnvType(){
@@ -773,23 +778,24 @@ public class ApiCollectionsAction extends UserAction {
             }
 
             if(resetEnvTypes) {
-                UpdateResult updateResult = ApiCollectionsDao.instance.getMCollection().updateOne(filter, Updates.unset(ApiCollection.USER_ENV_TYPES));
+                UpdateResult updateResult = ApiCollectionsDao.instance.getMCollection().updateOne(filter, Updates.unset(ApiCollection.TAGS_STRING));
                 if(updateResult == null) {
                     return Action.ERROR.toUpperCase();
                 }
                 return Action.SUCCESS.toUpperCase();
             }
 
-            List<String> userEnvTypes = ApiCollectionsDao.instance.findOne(filter, Projections.include(ApiCollection.USER_ENV_TYPES)).getUserEnvTypes();
+            List<CollectionTags> tagsList = ApiCollectionsDao.instance.findOne(filter, Projections.include(ApiCollection.TAGS_STRING)).getTagsList();
 
-            List<String> toPull = new ArrayList<>();
-            List<String> toAdd = new ArrayList<>();
-            if(userEnvTypes == null || userEnvTypes.isEmpty()) {
+            List<CollectionTags> toPull = new ArrayList<>();
+            List<CollectionTags> toAdd = new ArrayList<>();
+            if(tagsList == null || tagsList.isEmpty()) {
                 toAdd.addAll(envType);
             }
             else {
-                for (String env : envType) {
-                    if (userEnvTypes.contains(env)) {
+                Set<CollectionTags> tagsSet = new HashSet<>(envType);
+                for (CollectionTags env : envType) {
+                    if (tagsSet.contains(env)) {
                         toPull.add(env);
                     } else {
                         toAdd.add(env);
@@ -800,13 +806,13 @@ public class ApiCollectionsAction extends UserAction {
             UpdateResult result = null;
             if(!toPull.isEmpty()) {
                 result = ApiCollectionsDao.instance.getMCollection().updateOne(filter,
-                        Updates.pullAll(ApiCollection.USER_ENV_TYPES, toPull)
+                        Updates.pullAll(ApiCollection.TAGS_STRING, toPull)
                 );
             }
 
             if(!toAdd.isEmpty()) {
                 result = ApiCollectionsDao.instance.getMCollection().updateOne(filter,
-                        Updates.addEachToSet(ApiCollection.USER_ENV_TYPES, toAdd)
+                        Updates.addEachToSet(ApiCollection.TAGS_STRING, toAdd)
                 );
             }
 
@@ -993,7 +999,7 @@ public class ApiCollectionsAction extends UserAction {
         this.redacted = redacted;
     }
 
-    public void setEnvType(List<String> envType) {
+    public void setEnvType(List<CollectionTags> envType) {
 		this.envType = envType;
 	}
 

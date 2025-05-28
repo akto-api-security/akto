@@ -12,6 +12,10 @@ import org.bson.codecs.pojo.annotations.BsonIgnore;
 import com.akto.dao.context.Context;
 import com.akto.dto.testing.CustomTestingEndpoints;
 import com.akto.dto.testing.TestingEndpoints;
+import com.akto.dto.traffic.CollectionTags;
+
+import lombok.Getter;
+import lombok.Setter;
 
 public class ApiCollection {
 
@@ -87,8 +91,10 @@ public class ApiCollection {
     List<TestingEndpoints> conditions;
     public static final String CONDITIONS_STRING = "conditions";
 
-    List<String> userEnvTypes;
-    public static final String USER_ENV_TYPES = "userEnvTypes";
+    @Getter
+    @Setter
+    List<CollectionTags> tagsList;
+    public static final String TAGS_STRING = "tagsList";
 
     public ApiCollection() {
     }
@@ -146,25 +152,31 @@ public class ApiCollection {
         this.urls = urls;
     }
 
-    public List<String> getEnvType(){
+    public List<CollectionTags> getEnvType(){
         if(this.type != null && this.type == Type.API_GROUP) return null;
         
-        if(this.userEnvTypes == null || this.userEnvTypes.isEmpty()){
+        if(this.tagsList == null || this.tagsList.isEmpty()){
+            CollectionTags envTypeTag = new CollectionTags();
+            envTypeTag.setKeyName("envType");
             if (this.hostName != null) {
                 for (String keyword : ENV_KEYWORDS_WITH_DOT) {
                     if (this.hostName.contains("." + keyword)) {
-                        return Arrays.asList("STAGING");
+                        envTypeTag.setValue("STAGING");
                     }
                 }
                 for (String keyword : ENV_KEYWORDS_WITHOUT_DOT) {
                     if (this.hostName.contains(keyword)) {
-                        return Arrays.asList("STAGING");
+                        envTypeTag.setValue("STAGING");
                     }
+                }
+
+                if(envTypeTag.getValue() != null) {
+                    return Arrays.asList(envTypeTag);
                 }
             }
             return null;
         }else{
-            return this.userEnvTypes;
+            return this.tagsList;
         }
     }
 
@@ -348,13 +360,5 @@ public class ApiCollection {
 
     public void setDescription(String description) {
         this.description = description;
-    }
-
-    public List<String> getUserEnvTypes() {
-        return userEnvTypes;
-    }
-
-    public void setUserEnvTypes(List<String> userEnvTypes) {
-        this.userEnvTypes = userEnvTypes;
     }
 }
