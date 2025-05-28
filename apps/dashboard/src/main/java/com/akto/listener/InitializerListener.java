@@ -170,6 +170,7 @@ import com.akto.dto.testing.TestingRunResultSummary;
 import com.akto.dto.testing.custom_groups.AllAPIsGroup;
 import com.akto.dto.testing.custom_groups.UnauthenticatedEndpoint;
 import com.akto.dto.testing.sources.AuthWithCond;
+import com.akto.dto.traffic.CollectionTags;
 import com.akto.dto.traffic.Key;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.traffic.SuspectSampleData;
@@ -3331,16 +3332,26 @@ public class InitializerListener implements ServletContextListener {
 
     private static void addSupportForMultipleUserEnvTypes(BackwardCompatibility backwardCompatibility) {
         if(backwardCompatibility.getMultipleUserEnvTypesSupport() == 0) {
-            List<ApiCollection> apiCollectionList = ApiCollectionsDao.instance.findAll(Filters.exists(ApiCollection.USER_ENV_TYPE, true), Projections.include(Constants.ID, ApiCollection.USER_ENV_TYPE, ApiCollection.USER_ENV_TYPES));
+            List<ApiCollection> apiCollectionList = ApiCollectionsDao.instance.findAll(Filters.exists(ApiCollection.USER_ENV_TYPE, true), Projections.include(Constants.ID, ApiCollection.USER_ENV_TYPE, ApiCollection.TAGS_STRING));
 
             for(ApiCollection apiCollection : apiCollectionList) {
-                List<String> userEnvTypes = Arrays.asList(apiCollection.getUserSetEnvType());
-                if(apiCollection.getUserEnvTypes() != null) {
-                    userEnvTypes.addAll(apiCollection.getUserEnvTypes());
+                List<CollectionTags> tagsList = new ArrayList<>();
+                if(apiCollection.getUserSetEnvType() != null && !apiCollection.getUserSetEnvType().isEmpty()) {
+                    String[] parts = apiCollection.getUserSetEnvType().split(", ");
+                    for(String part : parts) {
+                        if(part.isEmpty()) continue;
+                        if(part.equalsIgnoreCase(ApiCollection.ENV_TYPE.STAGING.name()) || part.equalsIgnoreCase(ApiCollection.ENV_TYPE.PRODUCTION.name())) {
+                            CollectionTags collectionTags = new CollectionTags(Context.now(), "envType", part);
+                            tagsList.add(collectionTags);
+                        } else {
+                            CollectionTags collectionTags = new CollectionTags(Context.now(), "vpcId", part);
+                            tagsList.add(collectionTags);
+                        }
+                    }
                 }
                 ApiCollectionsDao.instance.updateOne(Filters.eq(Constants.ID, apiCollection.getId()), Updates.combine(
                         Updates.unset(ApiCollection.USER_ENV_TYPE),
-                        Updates.set(ApiCollection.USER_ENV_TYPES, userEnvTypes)
+                        Updates.set(ApiCollection.TAGS_STRING, tagsList)
                 ));
             }
 
