@@ -560,6 +560,16 @@ public class VariableResolver {
         if (str == null || str.trim().isEmpty()) {
             throw new IllegalArgumentException("Input string cannot be null or empty");
         }
+        
+        try {
+            // Check if the string is a valid integer or long
+            // 2^64 => ~ 1e19, so if length is more than 30, it can be a long or double
+            if (str.length() > 30) {
+                throw new IllegalArgumentException("Cannot convert to a valid number: " + str);
+            }
+        } catch (NumberFormatException e) {
+            // Ignore and try parsing as long or double
+        }
 
         try {
             // Try parsing as Integer
