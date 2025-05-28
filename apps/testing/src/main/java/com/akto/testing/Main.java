@@ -13,6 +13,7 @@ import com.akto.dao.SetupDao;
 import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dao.TestingInstanceHeartBeatDao;
 import com.akto.dao.context.Context;
+import com.akto.dao.notifications.CustomWebhooksDao;
 import com.akto.dao.testing.TestingRunConfigDao;
 import com.akto.dao.testing.TestingRunDao;
 import com.akto.dao.testing.TestingRunResultDao;
@@ -26,6 +27,7 @@ import com.akto.dto.ApiInfo;
 import com.akto.dto.Setup;
 import com.akto.dto.billing.FeatureAccess;
 import com.akto.dto.billing.SyncLimit;
+import com.akto.dto.notifications.CustomWebhook;
 import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.testing.CollectionWiseTestingEndpoints;
 import com.akto.dto.testing.CustomTestingEndpoints;
@@ -46,6 +48,7 @@ import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.mixpanel.AktoMixpanel;
 import com.akto.notifications.data.TestingAlertData;
+import com.akto.notifications.email.SendgridEmail;
 import com.akto.notifications.slack.APITestStatusAlert;
 import com.akto.notifications.slack.CustomTextAlert;
 import com.akto.notifications.slack.NewIssuesModel;
@@ -78,6 +81,7 @@ import com.mongodb.client.model.Sorts;
 import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.Updates;
 import com.mongodb.client.result.DeleteResult;
+import com.sendgrid.helpers.mail.Mail;
 import com.slack.api.Slack;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -1045,6 +1049,22 @@ public class Main {
 
         if(testingRun.getSendMsTeamsAlert() ){
             TeamsSender.sendAlert(accountId, alertData);
+        }
+
+        // check for webhooks here 
+        CustomWebhook customWebhook = CustomWebhooksDao.instance.findOne(
+            Filters.eq(CustomWebhook.WEBHOOK_TYPE, CustomWebhook.WebhookType.GMAIL.toString())
+        );
+
+        if(customWebhook != null && customWebhook.getActiveStatus().equals(CustomWebhook.ActiveStatus.ACTIVE)) {
+            try {
+                Mail mail = SendgridEmail.getInstance().buildTestingRunResultsEmail(alertData, customWebhook.getUrl(),customWebhook.getDashboardUrl() + "/dashboard/testing/"
+                + alertData.getViewOnAktoURL() + "#vulnerable" , customWebhook.getQueryParams());
+                loggerMaker.infoAndAddToDb("Sending Gmail alert for TestingRunResultSummary: " + summaryId + " to: " + customWebhook.getUrl());
+                SendgridEmail.getInstance().send(mail);
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb(e, "Error sending Gmail alert for TestingRunResultSummary: " + summaryId);
+            }
         }
 
         AktoMixpanel aktoMixpanel = new AktoMixpanel();

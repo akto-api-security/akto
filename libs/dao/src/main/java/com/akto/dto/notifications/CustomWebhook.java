@@ -40,7 +40,7 @@ public class CustomWebhook {
     public static final String WEBHOOK_TYPE = "webhookType";
 
     public enum WebhookType {
-        DEFAULT, MICROSOFT_TEAMS
+        DEFAULT, MICROSOFT_TEAMS, GMAIL
     }
 
     public enum ActiveStatus{
