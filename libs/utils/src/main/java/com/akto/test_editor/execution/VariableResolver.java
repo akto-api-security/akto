@@ -71,7 +71,12 @@ public class VariableResolver {
             varList = (List) VariableResolver.resolveWordListVar(key.toString(), varMap);
             for (int i = 0; i < varList.size(); i++) {
                 List<Object> vals = VariableResolver.resolveExpression(varMap, varList.get(i).toString());
-                varList.set(i, vals.get(0).toString());
+                Object wordObject = vals.get(0).toString();
+                try {
+                    wordObject = convertStringToNumber(wordObject.toString());
+                } catch (Exception e) {
+                }
+                varList.set(i, wordObject);
             }
             return varList;
         }
@@ -512,7 +517,7 @@ public class VariableResolver {
         return false;
     }
 
-    public static List<String> resolveWordListVar(String key, Map<String, Object> varMap) {
+    public static List<Object> resolveWordListVar(String key, Map<String, Object> varMap) {
         String expression = key.toString();
 
         List<String> wordList = new ArrayList<>();
@@ -538,12 +543,54 @@ public class VariableResolver {
             }
         }
 
-        List<String> result = new ArrayList<>();
-        for (Object word: wordList) {
-            result.add(expression.replace(wordListKey, word.toString()));
+        List<Object> result = new ArrayList<>();
+        for (Object word : wordList) {
+            String replaced = expression.replace(wordListKey, word.toString());
+            Object finalWord = replaced;
+            try {
+                finalWord = convertStringToNumber(replaced);
+            } catch (Exception e) {
+            }
+            result.add(finalWord);
+        }
+        return result;
+    }
+
+    private static Number convertStringToNumber(String str) {
+        if (str == null || str.trim().isEmpty()) {
+            throw new IllegalArgumentException("Input string cannot be null or empty");
+        }
+        
+        try {
+            // Check if the string is a valid integer or long
+            // 2^64 => ~ 1e19, so if length is more than 30, it can be a long or double
+            if (str.length() > 30) {
+                throw new IllegalArgumentException("Cannot convert to a valid number: " + str);
+            }
+        } catch (NumberFormatException e) {
+            // Ignore and try parsing as long or double
         }
 
-        return result;
+        try {
+            // Try parsing as Integer
+            return Integer.parseInt(str);
+        } catch (NumberFormatException ignored) {}
+
+        try {
+            // Try parsing as Long
+            return Long.parseLong(str);
+        } catch (NumberFormatException ignored) {}
+
+        try {
+            // Try parsing as Double
+            Double temp = Double.parseDouble(str);
+            // Edge cases for double.
+            if (str.length() <= 23) {
+                return temp;
+            }
+        } catch (NumberFormatException ignored) {}
+
+        throw new IllegalArgumentException("Cannot convert to a valid number: " + str);
     }
 
     public static Map<String, List<String>> resolveWordList(Map<String, List<String>> wordListsMap, ApiInfo.ApiInfoKey infoKey, Map<ApiInfo.ApiInfoKey, List<String>> newSampleDataMap) {
