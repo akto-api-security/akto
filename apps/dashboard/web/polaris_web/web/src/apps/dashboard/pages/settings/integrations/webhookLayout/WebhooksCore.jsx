@@ -46,8 +46,6 @@ function WebhooksCore(props) {
                 })
             }
 
-            console.log("filterCustomWebhooks", filterCustomWebhooks)
-
             // prettify custom webhook data
             const mapCustomWebhooks = filterCustomWebhooks.map(customWebhook => ({
                 ...customWebhook,

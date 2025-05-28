@@ -63,7 +63,7 @@ function Integrations() {
     let gmailWebhooksObj={
       id: 'gmailWebhooks',
       name:'Gmail Webhooks',
-      source: '/public/ms_teams.svg'
+      source: '/public/gmail.svg'
     }
     let githubSsoObj={
       id: 'github_sso',
@@ -243,7 +243,7 @@ function Integrations() {
         }
         return ssoItems;
       case 'alerts':
-        if (!func.checkLocal()) {
+        if (func.checkLocal()) {
           return emptyItem;
         }
         return alertsItems;
