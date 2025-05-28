@@ -624,7 +624,8 @@ public class Main {
            
             System.exit(0);
         } 
-        //else {
+        else 
+        {
         loggerMaker.info("Starting testing run job scheduler.");
 
         /*
@@ -1016,8 +1017,8 @@ public class Main {
 
             }, "testing");
             Thread.sleep(1000);
+            }
         }
-        //}
     }
 
     private static void fillTestingEndpoints(TestingRun tr) {
