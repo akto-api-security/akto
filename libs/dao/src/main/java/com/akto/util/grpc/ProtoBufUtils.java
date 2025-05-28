@@ -126,6 +126,7 @@ public class ProtoBufUtils {
             map = ProtoBufUtils.getInstance().mapper.readValue(payload, Map.class);
             map = decodeBase64ValuesIfAny(map);
         } catch (Exception e) {
+            e.printStackTrace();
             throw new InvalidObjectException("Unable to parse payload");
         }
         return base64EncodedJsonToProtobuf(map);
@@ -140,6 +141,7 @@ public class ProtoBufUtils {
             String encodedAgain = encodeBase64String(decodedBytes).trim();
             return encodedAgain.equals(value.trim()) || (encodedAgain + "=").equals(value.trim()) || (encodedAgain + "==").equals(value.trim());
         } catch (Exception e) {
+            e.printStackTrace();
             return false;
         }
     }

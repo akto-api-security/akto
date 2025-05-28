@@ -4,10 +4,16 @@ import com.akto.RuntimeMode;
 import com.akto.billing.UsageMetricUtils;
 import com.akto.crons.GetRunningTestsStatus;
 import com.akto.dao.context.Context;
+import com.akto.dao.test_editor.TestConfigYamlParser;
 import com.akto.data_actor.DataActor;
 import com.akto.data_actor.DataActorFactory;
 import com.akto.dto.*;
+import com.akto.dto.billing.FeatureAccess;
 import com.akto.dto.billing.Organization;
+import com.akto.dto.billing.SyncLimit;
+import com.akto.dto.test_editor.TestConfig;
+import com.akto.dto.test_editor.TestingRunPlayground;
+import com.akto.dto.monitoring.ModuleInfo;
 import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.testing.*;
 import com.akto.dto.testing.TestingEndpoints.Operator;
@@ -16,24 +22,34 @@ import com.akto.dto.testing.rate_limit.ApiRateLimit;
 import com.akto.dto.testing.rate_limit.GlobalApiRateLimit;
 import com.akto.dto.testing.rate_limit.RateLimitHandler;
 import com.akto.dto.type.SingleTypeInfo;
+import com.akto.dto.usage.MetricTypes;
 import com.akto.github.GithubUtils;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.metrics.AllMetrics;
+import com.akto.metrics.ModuleInfoWorker;
 import com.akto.mixpanel.AktoMixpanel;
 import com.akto.notifications.slack.APITestStatusAlert;
 import com.akto.notifications.slack.NewIssuesModel;
 import com.akto.notifications.slack.SlackAlerts;
 import com.akto.notifications.slack.SlackSender;
+import com.akto.test_editor.execution.Executor;
+import com.akto.testing.kafka_utils.ConsumerUtil;
+import com.akto.testing.kafka_utils.Producer;
+import com.akto.testing.kafka_utils.TestingConfigurations;
+import com.akto.util.Constants;
+import com.akto.store.SampleMessageStore;
+import com.akto.store.TestingUtil;
 import com.akto.util.DashboardMode;
 import com.akto.util.EmailAccountName;
 import com.akto.util.enums.GlobalEnums;
+import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.*;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 import org.json.JSONObject;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+
+import static com.akto.testing.Utils.readJsonContentFromFile;
 
 import java.util.*;
 import java.util.concurrent.Executors;
@@ -43,11 +59,9 @@ import java.util.concurrent.TimeUnit;
 public class Main {
     private static final LoggerMaker loggerMaker = new LoggerMaker(Main.class);
 
-    private static final Logger logger = LoggerFactory.getLogger(Main.class);
-
     private static final DataActor dataActor = DataActorFactory.fetchInstance();
 
-    public static final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(2);
+    public static final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
 
     public static final ScheduledExecutorService testTelemetryScheduler = Executors.newScheduledThreadPool(2);
 
@@ -55,6 +69,11 @@ public class Main {
 
     public static boolean SKIP_SSRF_CHECK = ("true".equalsIgnoreCase(System.getenv("SKIP_SSRF_CHECK")) || !DashboardMode.isSaasDeployment());
     public static final boolean IS_SAAS = "true".equalsIgnoreCase(System.getenv("IS_SAAS"));
+    
+    public static final String customMiniTestingServiceName;
+    static {
+        customMiniTestingServiceName = System.getenv("MINI_TESTING_NAME") == null? "Default_" + UUID.randomUUID().toString().substring(0, 4) : System.getenv("MINI_TESTING_NAME");
+    }
 
     private static void setupRateLimitWatcher (AccountSettings settings) {
         
@@ -72,6 +91,94 @@ public class Main {
         }, 0, 1, TimeUnit.MINUTES);
     }
 
+    public static void checkForPlaygroundTest(AccountSettings accountSettings){
+        scheduler.scheduleWithFixedDelay(new Runnable() {
+            public void run() {
+                Context.accountId.set(accountSettings.getId());
+                int timestamp = Context.now()-5*60;
+                TestingRunPlayground testingRunPlayground =  dataActor.getCurrentTestingRunDetailsFromEditor(timestamp); // fetch from Db
+                
+                if (testingRunPlayground == null) {
+                    return;
+                }
+
+                switch (testingRunPlayground.getTestingRunPlaygroundType()) {
+                    case TEST_EDITOR_PLAYGROUND:
+                        handleTestEditorPlayground(testingRunPlayground);
+                        break;
+                    case POSTMAN_IMPORTS:
+                        handlePostmanImports(testingRunPlayground);
+                        break;
+                }
+            }
+        }, 0, 2, TimeUnit.SECONDS);
+    }
+
+    private static void handleTestEditorPlayground(TestingRunPlayground testingRunPlayground) {
+        TestExecutor executor = new TestExecutor();
+        TestConfig testConfig = null;
+        try {
+            testConfig = TestConfigYamlParser.parseTemplate(testingRunPlayground.getTestTemplate());
+        } catch (Exception e) {
+            return;
+        }
+        ApiInfo.ApiInfoKey infoKey = testingRunPlayground.getApiInfoKey();
+
+        List<String> sampleData = testingRunPlayground.getSamples(); // get sample data from DB
+
+        List<TestingRunResult.TestLog> testLogs = new ArrayList<>();
+        Map<ApiInfo.ApiInfoKey, List<String>> sampleDataMap = new HashMap<>();
+        sampleDataMap.put(infoKey, sampleData); // get sample list from DB
+        SampleMessageStore messageStore = SampleMessageStore.create(sampleDataMap);
+
+        List<CustomAuthType> customAuthTypes = dataActor.fetchCustomAuthTypes();
+
+        TestingUtil testingUtil = new TestingUtil(messageStore, null, null, customAuthTypes);
+        String message = messageStore.getSampleDataMap().get(infoKey).get(messageStore.getSampleDataMap().get(infoKey).size() - 1);
+        TestingRunResult testingRunResult = executor.runTestNew(infoKey, null, testingUtil, null, testConfig, null, true, testLogs, message);
+        testingRunResult.setId(testingRunPlayground.getId());
+        testingRunResult.setTestRunId(testingRunPlayground.getId());
+        testingRunResult.setTestRunResultSummaryId(testingRunPlayground.getId());
+
+        GenericTestResult testRes = testingRunResult.getTestResults().get(0);
+        if (testRes instanceof TestResult) {
+            List<TestResult> list = new ArrayList<>();
+            for(GenericTestResult testResult: testingRunResult.getTestResults()){
+                list.add((TestResult) testResult);
+            }
+            testingRunResult.setSingleTestResults(list);
+        } else {
+            List<MultiExecTestResult> list = new ArrayList<>();
+            for(GenericTestResult testResult: testingRunResult.getTestResults()){
+                list.add((MultiExecTestResult) testResult);
+            }
+            testingRunResult.setMultiExecTestResults(list);
+        }
+        testingRunResult.setTestResults(null);
+        testingRunResult.setTestLogs(null);
+        testingRunPlayground.setTestingRunResult(testingRunResult);
+        // update testingRunPlayground in DB
+        dataActor.updateTestingRunPlayground(testingRunPlayground);
+    }
+
+    private static void handlePostmanImports(TestingRunPlayground testingRunPlayground) {
+        // For Postman imports, we use the original request/response directly
+        OriginalHttpRequest originalRequest = testingRunPlayground.getOriginalHttpRequest();
+
+        if (originalRequest == null) {
+            return;
+        }
+        OriginalHttpResponse res;
+        try {
+            res = ApiExecutor.sendRequest(originalRequest, true, null, false, new ArrayList<>());
+        } catch (Exception e) {
+            res = new OriginalHttpResponse();
+        }
+        testingRunPlayground.setOriginalHttpResponse(res);
+        // update testingRunPlayground in DB
+        dataActor.updateTestingRunPlayground(testingRunPlayground);
+    }
+
     public static Set<Integer> extractApiCollectionIds(List<ApiInfo.ApiInfoKey> apiInfoKeyList) {
         Set<Integer> ret = new HashSet<>();
         for(ApiInfo.ApiInfoKey apiInfoKey: apiInfoKeyList) {
@@ -82,6 +189,41 @@ public class Main {
     }
     private static final int LAST_TEST_RUN_EXECUTION_DELTA = 5 * 60;
     private static final int MAX_RETRIES_FOR_FAILED_SUMMARIES = 3;
+
+     private static BasicDBObject checkIfAlreadyTestIsRunningOnMachine(){
+        // this will return true if consumer is running and this the latest summary of the testing run
+        // and also the summary should be in running state
+        try {
+            BasicDBObject currentTestInfo = readJsonContentFromFile(Constants.TESTING_STATE_FOLDER_PATH, Constants.TESTING_STATE_FILE_NAME, BasicDBObject.class);
+            if(currentTestInfo == null){
+                return null;
+            }
+            if(!currentTestInfo.getBoolean("CONSUMER_RUNNING", false)){
+                return null;
+            }
+            String testingRunId = currentTestInfo.getString("testingRunId");
+            String testingRunSummaryId = currentTestInfo.getString("summaryId");
+
+            int accountID = currentTestInfo.getInt("accountId");
+            Context.accountId.set(accountID);
+
+            TestingRunResultSummary testingRunResultSummary = dataActor.fetchTestingRunResultSummary(testingRunSummaryId);
+            if(testingRunResultSummary == null || testingRunResultSummary.getState() == null ||  testingRunResultSummary.getState() != State.RUNNING){
+                return null;
+            }
+            Bson filterQ = Filters.eq(TestingRunResultSummary.TESTING_RUN_ID, new ObjectId(testingRunId));
+            TestingRunResultSummary latestSummary = dataActor.findLatestTestingRunResultSummary(filterQ);
+            if(latestSummary.getHexId().equals(testingRunSummaryId)){
+                return currentTestInfo;
+            }else{
+                return null;
+            }
+        } catch (Exception e) {
+            loggerMaker.error("Error in reading the testing state file: " + e.getMessage());
+            return null;
+        }
+    }
+
 
     private static void setTestingRunConfig(TestingRun testingRun, TestingRunResultSummary trrs) {
         long timestamp = testingRun.getId().getTimestamp();
@@ -122,9 +264,9 @@ public class Main {
             testingRun.setTestingRunConfig(configFromTrrs);
         }
         if(testingRun.getTestingRunConfig() != null){
-            logger.info(testingRun.getTestingRunConfig().toString());
+            loggerMaker.info(testingRun.getTestingRunConfig().toString());
         }else{
-            logger.info("Testing run config is null.");
+            loggerMaker.info("Testing run config is null.");
         }
     }
 
@@ -143,10 +285,36 @@ public class Main {
         }, 0, 5, TimeUnit.MINUTES);
     }
 
+    //returns true if test is not supposed to run
+    private static boolean handleRerunTestingRunResult(TestingRunResultSummary originalSummary) {
+        TestingConfigurations config = TestingConfigurations.getInstance();
+        config.setRerunTestingRunResultSummary(null);
+
+        if (originalSummary == null || originalSummary.getOriginalTestingRunResultSummaryId() == null) {
+            config.setTestingRunResultList(null);
+            return false;
+        }
+
+        String summaryIdHexId = originalSummary.getOriginalTestingRunResultSummaryHexId();
+        List<TestingRunResult> testingRunResultList = dataActor.fetchRerunTestingRunResult(summaryIdHexId);
+        if (testingRunResultList == null) {
+            dataActor.deleteTestRunResultSummary(originalSummary.getId().toHexString());
+            loggerMaker.infoAndAddToDb("Deleting TRRS for rerun case, no testing run result found, TRRS_ID: " + originalSummary.getId().toHexString(), LogDb.TESTING);
+            return true;
+        }
+
+        //Updating start time stamp as current time stamp in case of rerun
+        dataActor.updateStartTsTestRunResultSummary(summaryIdHexId);
+        config.setRerunTestingRunResultSummary(originalSummary);
+        config.setTestingRunResultList(testingRunResultList);
+        return false;
+    }
+
     public static void main(String[] args) throws InterruptedException {
         AccountSettings accountSettings = dataActor.fetchAccountSettings();
         dataActor.modifyHybridTestingSetting(RuntimeMode.isHybridDeployment());
         setupRateLimitWatcher(accountSettings);
+        checkForPlaygroundTest(accountSettings);
 
         if (!SKIP_SSRF_CHECK) {
             Setup setup = dataActor.fetchSetup();
@@ -157,7 +325,16 @@ public class Main {
             }
         }
 
+        Producer testingProducer = new Producer();
+        ConsumerUtil testingConsumer = new ConsumerUtil();
+        TestCompletion testCompletion = new TestCompletion();
+        ModuleInfoWorker.init(ModuleInfo.ModuleType.MINI_TESTING, dataActor, customMiniTestingServiceName);
         loggerMaker.infoAndAddToDb("Starting.......", LogDb.TESTING);
+
+        if(Constants.IS_NEW_TESTING_ENABLED){
+            boolean val = Utils.createFolder(Constants.TESTING_STATE_FOLDER_PATH);
+            loggerMaker.info("Testing info folder status: " + val);
+        }
 
         schedulerAccessMatrix.scheduleAtFixedRate(new Runnable() {
             public void run() {
@@ -187,6 +364,59 @@ public class Main {
         Context.accountId.set(accountId);
         GetRunningTestsStatus.getRunningTests().getStatusOfRunningTests();
 
+          BasicDBObject currentTestInfo = null;
+        if(Constants.IS_NEW_TESTING_ENABLED){
+            currentTestInfo = checkIfAlreadyTestIsRunningOnMachine();
+        }
+
+        if(currentTestInfo != null){
+            try {
+                loggerMaker.infoAndAddToDb("Tests were already running on this machine, thus resuming the test for account: "+ accountId, LogDb.TESTING);
+                Organization organization = dataActor.fetchOrganization(accountId);
+                FeatureAccess featureAccess = UsageMetricUtils.getFeatureAccess(organization, MetricTypes.TEST_RUNS);
+                SyncLimit syncLimit = featureAccess.fetchSyncLimit();
+                String testingRunSummaryId = currentTestInfo.getString("summaryId");
+                //check if currently running testrun is part of rerun
+                ObjectId summaryId = new ObjectId(testingRunSummaryId);
+
+                TestingRunResultSummary rerunTestingRunResultSummary = dataActor.fetchRerunTestingRunResultSummary(testingRunSummaryId);
+                //fill testingRunResult in TestingConfigurations
+                if(!handleRerunTestingRunResult(rerunTestingRunResultSummary)) {
+                    TestingRun testingRun = dataActor.findTestingRun(testingRunSummaryId);
+                    TestingRunConfig baseConfig = dataActor.findTestingRunConfig(testingRun.getTestIdConfig());
+                    testingRun.setTestingRunConfig(baseConfig);
+                    testingProducer.initProducer(testingRun, summaryId, true, syncLimit);
+                    int maxRunTime = testingRun.getTestRunTime() <= 0 ? 30*60 : testingRun.getTestRunTime();
+                    testingConsumer.init(maxRunTime);
+
+                    // mark the test completed here
+                    testCompletion.markTestAsCompleteAndRunFunctions(testingRun, summaryId, System.currentTimeMillis());
+
+                    // if (StringUtils.hasLength(AKTO_SLACK_WEBHOOK) ) {
+                    //     try {
+                    //         CustomTextAlert customTextAlert = new CustomTextAlert("Test completed for accountId=" + accountId + " testingRun=" + testingRun.getHexId() + " summaryId=" + summaryId.toHexString() + " : @Arjun you are up now. Make your time worth it. :)");
+                    //         SLACK_INSTANCE.send(AKTO_SLACK_WEBHOOK, customTextAlert.toJson());
+                    //     } catch (Exception e) {
+                    //         loggerMaker.error("Error sending slack alert for completion of test", e);
+                    //     }
+
+                    // }
+
+                    // deleteScheduler.execute(() -> {
+                    //     Context.accountId.set(accountId);
+                    //     try {
+                    //         deleteNonVulnerableResults();
+
+                    //     } catch (Exception e) {
+                    //         loggerMaker.errorAndAddToDb(e, "Error in deleting testing run results");
+                    //     }
+                    // });
+                }
+            } catch (Exception e) {
+                loggerMaker.error("Error in running failed tests from file.", e);
+            }
+        }
+
         singleTypeInfoInit(accountId);
 
         while (true) {
@@ -194,30 +424,49 @@ public class Main {
             long startDetailed = System.currentTimeMillis();
             int delta = start - 20*60;
 
-            TestingRunResultSummary trrs = dataActor.findPendingTestingRunResultSummary(start, delta);
+            TestingConfigurations config = TestingConfigurations.getInstance();
+            TestingRunResultSummary trrs = dataActor.findPendingTestingRunResultSummary(start, delta, customMiniTestingServiceName);
             boolean isSummaryRunning = trrs != null && trrs.getState().equals(State.RUNNING);
+            boolean isTestingRunResultRerunCase = trrs != null && trrs.getOriginalTestingRunResultSummaryId() != null;
+            if (isTestingRunResultRerunCase) {
+                trrs.setOriginalTestingRunResultSummaryId(new ObjectId(trrs.getOriginalTestingRunResultSummaryHexId()));
+            }
             TestingRun testingRun;
             ObjectId summaryId = null;
             if (trrs == null) {
                 delta = Context.now() - 20*60;
-                testingRun = dataActor.findPendingTestingRun(delta);
+                testingRun = dataActor.findPendingTestingRun(delta, customMiniTestingServiceName);
             } else {
-                summaryId = trrs.getId();
-                loggerMaker.infoAndAddToDb("Found trrs " + trrs.getHexId() +  " for account: " + accountId);
+                summaryId = isTestingRunResultRerunCase ? trrs.getOriginalTestingRunResultSummaryId() : trrs.getId();
+                loggerMaker.infoAndAddToDb("Found trrs " + trrs.getHexId() + (isTestingRunResultRerunCase ? " (rerun case) " : " ") + "for account: " + accountId);
                 testingRun = dataActor.findTestingRun(trrs.getTestingRunId().toHexString());
             }
 
-            if (testingRun == null) {
+            if (testingRun == null ||
+                    (testingRun.getMiniTestingServiceName() != null &&
+                            !testingRun.getMiniTestingServiceName().equalsIgnoreCase(customMiniTestingServiceName))) {
                 Thread.sleep(1000);
                 continue;
+            }
+
+            if (handleRerunTestingRunResult(trrs)) {
+                return;
             }
 
             if (testingRun.getState().equals(State.STOPPED)) {
                 loggerMaker.infoAndAddToDb("Testing run stopped");
                 if (trrs != null) {
-                    loggerMaker.infoAndAddToDb("Stopping TRRS: " + trrs.getId());
-                    dataActor.updateTestRunResultSummaryNoUpsert(trrs.getId().toHexString());
-                    loggerMaker.infoAndAddToDb("Stopped TRRS: " + trrs.getId());
+                    if (isTestingRunResultRerunCase) {
+                        // For TRR-rerun case, delete the rerun summary and clean up configurations
+                        dataActor.deleteTestRunResultSummary(trrs.getId().toHexString());
+                        config.setTestingRunResultList(null);
+                        config.setRerunTestingRunResultSummary(null);
+                        loggerMaker.infoAndAddToDb("Deleted for TestingRunResult rerun case for stopped testrun TRRS: " + trrs.getId());
+                    } else {
+                        loggerMaker.infoAndAddToDb("Stopping TRRS: " + trrs.getId());
+                        dataActor.updateTestRunResultSummaryNoUpsert(trrs.getId().toHexString());
+                        loggerMaker.infoAndAddToDb("Stopped TRRS: " + trrs.getId());
+                    }
                 }
                 continue;
             }
@@ -227,14 +476,22 @@ public class Main {
             boolean isTestingRunRunning = testingRun.getState().equals(State.RUNNING);
 
             if (UsageMetricUtils.checkTestRunsOverage(accountId)) {
-                int lastSent = logSentMap.getOrDefault(accountId, 0);
-                if (start - lastSent > LoggerMaker.LOG_SAVE_INTERVAL) {
-                    logSentMap.put(accountId, start);
-                    loggerMaker.infoAndAddToDb("Test runs overage detected for account: " + accountId
-                            + " . Failing test run : " + start, LogDb.TESTING);
+                if (isTestingRunResultRerunCase) {
+                    // For TRR-rerun case, delete the rerun summary and clean up configurations
+                    dataActor.deleteTestRunResultSummary(trrs.getId().toHexString());
+                    config.setTestingRunResultList(null);
+                    config.setRerunTestingRunResultSummary(null);
+                    loggerMaker.infoAndAddToDb("Deleted for TestingRunResult rerun case for failed testrun TRRS: " + trrs.getId());
+                } else {
+                    int lastSent = logSentMap.getOrDefault(accountId, 0);
+                    if (start - lastSent > LoggerMaker.LOG_SAVE_INTERVAL) {
+                        logSentMap.put(accountId, start);
+                        loggerMaker.infoAndAddToDb("Test runs overage detected for account: " + accountId
+                                + " . Failing test run : " + start, LogDb.TESTING);
+                    }
+                    dataActor.updateTestingRun(testingRun.getId().toHexString());
+                    dataActor.updateTestRunResultSummary(summaryId.toHexString());
                 }
-                dataActor.updateTestingRun(testingRun.getId().toHexString());
-                dataActor.updateTestRunResultSummary(summaryId.toHexString());
                 return;
             }
 
@@ -261,18 +518,29 @@ public class Main {
                         Map<ObjectId, TestingRunResultSummary> objectIdTestingRunResultSummaryMap = dataActor.fetchTestingRunResultSummaryMap(testingRun.getId().toHexString());
                         testingRunResultSummary = objectIdTestingRunResultSummaryMap.get(testingRun.getId());
                     }
+                    // For rerun case, we need to check the original test results
+                    List<TestingRunResult> testingRunResults;
                     if (testingRunResultSummary != null) {
-                        List<TestingRunResult> testingRunResults = dataActor.fetchLatestTestingRunResult(testingRunResultSummary.getId().toHexString());
+                        if (isTestingRunResultRerunCase) {
+                            testingRunResults = dataActor.fetchLatestTestingRunResult(testingRunResultSummary.getOriginalTestingRunResultSummaryId().toHexString());
+                        } else {
+                            testingRunResults = dataActor.fetchLatestTestingRunResult(testingRunResultSummary.getId().toHexString());
+                        }
+
                         if (testingRunResults != null && !testingRunResults.isEmpty()) {
                             TestingRunResult testingRunResult = testingRunResults.get(0);
                             if (Context.now() - testingRunResult.getEndTimestamp() < LAST_TEST_RUN_EXECUTION_DELTA) {
                                 loggerMaker.infoAndAddToDb("Skipping test run as it was executed recently, TRR_ID:"
-                                        + testingRunResult.getHexId() + ", TRRS_ID:" + testingRunResultSummary.getHexId() + " TR_ID:" + testingRun.getHexId(), LogDb.TESTING);
+                                        + testingRunResult.getHexId() + ", TRRS_ID:" + testingRunResultSummary.getHexId()
+                                        + (isTestingRunResultRerunCase ? " (rerun case) " : " ")
+                                        + " TR_ID:" + testingRun.getHexId(), LogDb.TESTING);
                                 return;
                             } else {
                                 loggerMaker.infoAndAddToDb("Test run was executed long ago, TRR_ID:"
-                                        + testingRunResult.getHexId() + ", TRRS_ID:" + testingRunResultSummary.getHexId() + " TR_ID:" + testingRun.getHexId(), LogDb.TESTING);
-                                int maxRunTime = testingRun.getTestRunTime() <= 0 ? 30*60 : testingRun.getTestRunTime(); 
+                                        + testingRunResult.getHexId() + ", TRRS_ID:" + testingRunResultSummary.getHexId()
+                                        + (isTestingRunResultRerunCase ? " (rerun case) " : " ")
+                                        + " TR_ID:" + testingRun.getHexId(), LogDb.TESTING);
+                                int maxRunTime = testingRun.getTestRunTime() <= 0 ? 30*60 : testingRun.getTestRunTime();
                                 Bson filterQ = Filters.and(
                                     Filters.gte(TestingRunResultSummary.START_TIMESTAMP, (Context.now() - ((MAX_RETRIES_FOR_FAILED_SUMMARIES + 1) * maxRunTime))),
                                     Filters.eq(TestingRunResultSummary.TESTING_RUN_ID, testingRun.getId()),
@@ -298,7 +566,19 @@ public class Main {
                                 GithubUtils.publishGithubComments(runResultSummary);
                             }
                         } else {
-                            loggerMaker.infoAndAddToDb("No executions made for this test, will need to restart it, TRRS_ID:" + testingRunResultSummary.getHexId() + " TR_ID:" + testingRun.getHexId(), LogDb.TESTING);
+                            loggerMaker.infoAndAddToDb("No executions made for this test, will need to restart it, TRRS_ID:"
+                                    + testingRunResultSummary.getHexId()
+                                    + (isTestingRunResultRerunCase ? " (rerun case) " : " ")
+                                    + " TR_ID:" + testingRun.getHexId(), LogDb.TESTING);
+                            //won't reach here for testing run result rerun case, as there will be a minimum of 1 TRR
+                            //for safety delete run result.
+                            if (isTestingRunResultRerunCase) {
+                                dataActor.deleteTestRunResultSummary(testingRunResultSummary.getId().toHexString());
+                                config.setTestingRunResultList(null);
+                                config.setRerunTestingRunResultSummary(null);
+                                loggerMaker.infoAndAddToDb("Deleted for TestingRunResult rerun case for failed testrun TRRS: " + testingRunResultSummary.getId(), LogDb.TESTING);
+                                return;
+                            }
                             TestingRunResultSummary summary = dataActor.markTestRunResultSummaryFailed(testingRunResultSummary.getId().toHexString());
                             if (summary == null) {
                                 loggerMaker.infoAndAddToDb("Skipping because some other thread picked it up, TRRS_ID:" + testingRunResultSummary.getHexId() + " TR_ID:" + testingRun.getHexId(), LogDb.TESTING);
@@ -339,52 +619,29 @@ public class Main {
 
                     }
                 }
+
+                Organization organization = dataActor.fetchOrganization(accountId);
+                FeatureAccess featureAccess = UsageMetricUtils.getFeatureAccess(organization, MetricTypes.TEST_RUNS);
+                SyncLimit syncLimit = featureAccess.fetchSyncLimit();
+                Executor.clearRoleCache();
+
                 if(!maxRetriesReached){
-                    testExecutor.init(testingRun, summaryId);
+                    if(Constants.IS_NEW_TESTING_ENABLED){
+                        int maxRunTime = testingRun.getTestRunTime() <= 0 ? 30*60 : testingRun.getTestRunTime();
+                        testingProducer.initProducer(testingRun, summaryId, false, syncLimit);
+                        testingConsumer.init(maxRunTime);
+                    }else{
+                        testExecutor.init(testingRun, summaryId, syncLimit, false);
+                    }
                     AllMetrics.instance.setTestingRunCount(1);
                 }
-                //raiseMixpanelEvent(summaryId, testingRun, accountId);
+                // raiseMixpanelEvent(summaryId, testingRun, accountId);
             } catch (Exception e) {
                 e.printStackTrace();
                 loggerMaker.errorAndAddToDb(e, "Error in init " + e);
             }
-            int scheduleTs = 0;
 
-            if (testingRun.getPeriodInSeconds() > 0 ) {
-                scheduleTs = testingRun.getScheduleTimestamp() + testingRun.getPeriodInSeconds();
-            } else if (testingRun.getPeriodInSeconds() == -1) {
-                scheduleTs = testingRun.getScheduleTimestamp() + 5 * 60;
-            }
-
-            if(testingRun!=null && testingRun.getId()!=null){
-                dataActor.updateTestingRunAndMarkCompleted(testingRun.getId().toHexString(), scheduleTs);
-            }
-
-            if(summaryId != null && testingRun.getTestIdConfig() != 1){
-                TestExecutor.updateTestSummary(summaryId);
-            }
-
-            loggerMaker.infoAndAddToDb("Tests completed in " + (Context.now() - start) + " seconds for account: " + accountId, LogDb.TESTING);
-            AllMetrics.instance.setTestingRunLatency(System.currentTimeMillis() - startDetailed);
-
-            Organization organization = dataActor.fetchOrganization(accountId);
-
-            if(organization != null && organization.getTestTelemetryEnabled()){
-                loggerMaker.infoAndAddToDb("Test telemetry enabled for account: " + accountId + ", sending results", LogDb.TESTING);
-                ObjectId finalSummaryId = summaryId;
-                testTelemetryScheduler.execute(() -> {
-                    Context.accountId.set(accountId);
-                    try {
-                        com.akto.onprem.Constants.sendTestResults(finalSummaryId, organization);
-                        loggerMaker.infoAndAddToDb("Test telemetry sent for account: " + accountId, LogDb.TESTING);
-                    } catch (Exception e) {
-                        loggerMaker.errorAndAddToDb(e, "Error in sending test telemetry for account: " + accountId);
-                    }
-                });
-
-            } else {
-                loggerMaker.infoAndAddToDb("Test telemetry disabled for account: " + accountId, LogDb.TESTING);
-            }
+            testCompletion.markTestAsCompleteAndRunFunctions(testingRun, summaryId, startDetailed);
 
             Thread.sleep(1000);
         }

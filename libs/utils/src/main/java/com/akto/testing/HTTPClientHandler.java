@@ -23,11 +23,14 @@ public class HTTPClientHandler {
     private final OkHttpClient http2ClientWithoutFollowRedirect;
     private final OkHttpClient http2ClientWithFollowRedirect;
     private final OkHttpClient clientWithFollowRedirect;
+    private final OkHttpClient http2httpsClientWithoutFollowRedirect;
+    private final OkHttpClient http2httpsClientWithFollowRedirect;
 
     private static OkHttpClient.Builder builder(boolean followRedirects, int readTimeout) {
         return CoreHTTPClient.client.newBuilder()
                 .connectTimeout(10, TimeUnit.SECONDS)
                 .readTimeout(readTimeout, TimeUnit.SECONDS)
+                .callTimeout(readTimeout, TimeUnit.SECONDS)
                 .connectionPool(new ConnectionPool(256, 5L, TimeUnit.MINUTES))
                 .sslSocketFactory(CoreHTTPClient.trustAllSslSocketFactory, (X509TrustManager)CoreHTTPClient.trustAllCerts[0])
                 .hostnameVerifier((hostname, session) -> true)
@@ -40,8 +43,13 @@ public class HTTPClientHandler {
 
         clientWithoutFollowRedirect = builder(false, readTimeout).build();
         clientWithFollowRedirect = builder(true, readTimeout).build();
+        // gRPC over HTTP/2 -> --plaintext --http2
         http2ClientWithoutFollowRedirect = builder(false, readTimeout).protocols(Collections.singletonList(Protocol.H2_PRIOR_KNOWLEDGE)).build();
-        http2ClientWithFollowRedirect = builder(false, readTimeout).protocols(Collections.singletonList(Protocol.H2_PRIOR_KNOWLEDGE)).build();
+        http2ClientWithFollowRedirect = builder(true, readTimeout).protocols(Collections.singletonList(Protocol.H2_PRIOR_KNOWLEDGE)).build();
+        // gRPC over HTTP/2 -> --https 
+        // http2 , http1.1 => try http2 first, if not supported, fallback to http1.1
+        http2httpsClientWithoutFollowRedirect = builder(false, readTimeout).protocols(Arrays.asList(Protocol.HTTP_2, Protocol.HTTP_1_1)).build();
+        http2httpsClientWithFollowRedirect = builder(true, readTimeout).protocols(Arrays.asList(Protocol.HTTP_2, Protocol.HTTP_1_1)).build();
     }
 
     public OkHttpClient getNewDebugClient(boolean isSaas, boolean followRedirects, List<TestingRunResult.TestLog> testLogs, String contentType) {
@@ -142,10 +150,16 @@ public class HTTPClientHandler {
         }
     }
 
-    public OkHttpClient getHTTPClient (boolean followRedirect, String contentType) {
+    public OkHttpClient getHTTPClient (boolean isHttps, boolean followRedirect, String contentType) {
         if (contentType != null && contentType.contains(HttpRequestResponseUtils.GRPC_CONTENT_TYPE)) {
             if (followRedirect) {
+                if (isHttps) {
+                    return http2httpsClientWithFollowRedirect;
+                }
                 return http2ClientWithFollowRedirect;
+            }
+            if (isHttps) {
+                return http2httpsClientWithoutFollowRedirect;
             }
             return http2ClientWithoutFollowRedirect;
         }

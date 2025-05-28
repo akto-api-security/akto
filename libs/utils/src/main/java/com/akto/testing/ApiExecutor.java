@@ -6,6 +6,7 @@ import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.CollectionConditions.ConditionsType;
 import com.akto.dto.CollectionConditions.TestConfigsAdvancedSettings;
+import com.akto.dto.testing.TLSAuthParam;
 import com.akto.dto.testing.TestingRunConfig;
 import com.akto.dto.testing.TestingRunResult;
 import com.akto.dto.testing.rate_limit.RateLimitHandler;
@@ -22,8 +23,6 @@ import okhttp3.*;
 import okio.BufferedSink;
 
 import org.apache.commons.lang3.StringUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -33,13 +32,12 @@ import java.net.URL;
 import java.util.*;
 
 public class ApiExecutor {
-    private static final LoggerMaker loggerMaker = new LoggerMaker(ApiExecutor.class);
-    private static final Logger logger = LoggerFactory.getLogger(ApiExecutor.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(ApiExecutor.class, LogDb.TESTING);
 
     // Load only first 1 MiB of response body into memory.
     private static final int MAX_RESPONSE_SIZE = 1024*1024;
     
-    private static OriginalHttpResponse common(Request request, boolean followRedirects, boolean debug, List<TestingRunResult.TestLog> testLogs, boolean skipSSRFCheck, boolean nonTestingContext, String requestProtocol) throws Exception {
+    private static OriginalHttpResponse common(Request request, boolean followRedirects, boolean debug, List<TestingRunResult.TestLog> testLogs, boolean skipSSRFCheck, boolean nonTestingContext, String requestProtocol, TLSAuthParam authParam) throws Exception {
 
         Integer accountId = Context.accountId.get();
         if (accountId != null) {
@@ -50,7 +48,7 @@ public class ApiExecutor {
                     if (!(request.url().toString().contains("insertRuntimeLog") || request.url().toString().contains("insertTestingLog") || request.url().toString().contains("insertProtectionLog"))) {
                         loggerMaker.infoAndAddToDb("Rate limit hit, sleeping", LogDb.TESTING);
                     }else {
-                        System.out.println("Rate limit hit, sleeping");
+                       loggerMaker.info("Rate limit hit, sleeping");
                     }
                 }
                 rateLimitHit = false;
@@ -61,7 +59,7 @@ public class ApiExecutor {
                     if (!(request.url().toString().contains("insertRuntimeLog") || request.url().toString().contains("insertTestingLog") || request.url().toString().contains("insertProtectionLog"))) {
                         loggerMaker.infoAndAddToDb("waiting for rate limit availability", LogDb.TESTING);
                     }else{
-                        System.out.println("waiting for rate limit availability");
+                        loggerMaker.info("waiting for rate limit availability");
                     }
                 }
             }
@@ -75,13 +73,17 @@ public class ApiExecutor {
 
         OkHttpClient client = debug ?
                 HTTPClientHandler.instance.getNewDebugClient(isSaasDeployment, followRedirects, testLogs, requestProtocol) :
-                HTTPClientHandler.instance.getHTTPClient(followRedirects, requestProtocol);
+                HTTPClientHandler.instance.getHTTPClient(request.isHttps(), followRedirects, requestProtocol);
 
         if (!skipSSRFCheck && !HostDNSLookup.isRequestValid(request.url().host())) {
             throw new IllegalArgumentException("SSRF attack attempt");
         }
         boolean isCyborgCall = request.url().toString().contains("cyborg.akto.io");
         long start = System.currentTimeMillis();
+
+        if (authParam != null) {
+            client = CustomHTTPClientHandler.instance.getClient(authParam, request.isHttps(), followRedirects, requestProtocol);
+        }
 
         Call call = client.newCall(request);
         Response response = null;
@@ -126,7 +128,7 @@ public class ApiExecutor {
                 if (!(request.url().toString().contains("insertRuntimeLog") || request.url().toString().contains("insertTestingLog") || request.url().toString().contains("insertProtectionLog"))) {
                     loggerMaker.errorAndAddToDb("Error while parsing response body: " + e, LogDb.TESTING);
                 } else {
-                    System.out.println("Error while parsing response body: " + e);
+                    loggerMaker.error("Error while parsing response body: " + e);
                 }
                 body = "{}";
             }
@@ -139,7 +141,7 @@ public class ApiExecutor {
             if (!(request.url().toString().contains("insertRuntimeLog") || request.url().toString().contains("insertTestingLog") || request.url().toString().contains("insertProtectionLog"))) {
                 loggerMaker.errorAndAddToDb("Error while executing request " + request.url() + ": " + e, LogDb.TESTING);
             } else {
-                System.out.println("Error while executing request " + request.url() + ": " + e);
+                loggerMaker.error("Error while executing request " + request.url() + ": " + e);
             }
             throw new Exception("Api Call failed");
         } finally {
@@ -277,6 +279,11 @@ public class ApiExecutor {
             loggerMaker.infoAndAddToDb("Final url is: " + url, LogDb.TESTING);
         }
 
+        // todo: remove this
+        if (url.contains("api.uat.be.edenred.io/api.uat.be.edenred.io")) {
+            url = url.replace("api.uat.be.edenred.io/api.uat.be.edenred.io", "api.uat.be.edenred.io");
+        }
+
         if (url.contains("login_submit")) {
             loggerMaker.infoAndAddToDb("Request Payload " + request.getBody(), LogDb.TESTING);
         }
@@ -357,12 +364,14 @@ public class ApiExecutor {
                 }
                 break;
             } catch (Exception e) {
-                logger.error("Error in sending request for api : {} , will retry after {} seconds : {}", request.getUrl(),
+                String message = String.format("Error in sending request for api : %s , will retry after %d seconds : %s", request.getUrl(),
                         limit, e.toString());
+                loggerMaker.error(message);
                 try {
                     Thread.sleep(1000 * limit);
                 } catch (Exception f) {
-                    logger.error("Error in exponential backoff at limit {} : {}", limit, f.toString());
+                    String backoffMessage = String.format("Error in exponential backoff at limit %d  : %s", limit, f.toString());
+                    loggerMaker.error(backoffMessage);
                 }
             }
         }
@@ -371,7 +380,7 @@ public class ApiExecutor {
 
     private static OriginalHttpResponse getRequest(OriginalHttpRequest request, Request.Builder builder, boolean followRedirects, boolean debug, List<TestingRunResult.TestLog> testLogs, boolean skipSSRFCheck, boolean nonTestingContext)  throws Exception{
         Request okHttpRequest = builder.build();
-        return common(okHttpRequest, followRedirects, debug, testLogs, skipSSRFCheck, nonTestingContext, "application/json");
+        return common(okHttpRequest, followRedirects, debug, testLogs, skipSSRFCheck, nonTestingContext, "application/json", request.getTlsAuthParam());
     }
 
     public static RequestBody getFileRequestBody(String fileUrl){
@@ -463,7 +472,7 @@ public class ApiExecutor {
             builder.removeHeader(Constants.AKTO_ATTACH_FILE);
             Request updatedRequest = builder.build();
 
-            return common(updatedRequest, followRedirects, debug, testLogs, skipSSRFCheck, nonTestingContext, requestProtocol);
+            return common(updatedRequest, followRedirects, debug, testLogs, skipSSRFCheck, nonTestingContext, requestProtocol, request.getTlsAuthParam());
         }
 
         String contentType = request.findContentType();
@@ -484,7 +493,7 @@ public class ApiExecutor {
                 loggerMaker.infoAndAddToDb("encoding to grpc payload:" + payload, LogDb.TESTING);
                 payload = ProtoBufUtils.base64EncodedJsonToProtobuf(payload);
             } catch (Exception e) {
-                loggerMaker.errorAndAddToDb("Unable to encode grpc payload:" + payload, LogDb.TESTING);
+                loggerMaker.errorAndAddToDb(e, "Unable to encode grpc payload:" + payload, LogDb.TESTING);
                 payload = request.getBody();
             }
             try {// trying decoding payload
@@ -492,9 +501,26 @@ public class ApiExecutor {
                 loggerMaker.infoAndAddToDb("Final base64 encoded payload:"+ payload, LogDb.TESTING);
                 body = RequestBody.create(payloadByteArray, MediaType.parse(contentType));
             } catch (Exception e) {
-                loggerMaker.errorAndAddToDb("Unable to decode grpc payload:" + payload, LogDb.TESTING);
+                loggerMaker.errorAndAddToDb(e, "Unable to decode grpc payload:" + payload, LogDb.TESTING);
             }
-        }
+        }else if(contentType.contains(HttpRequestResponseUtils.SOAP) || contentType.contains(HttpRequestResponseUtils.XML)){
+            // here we are assuming that the request is in xml format
+            // now convert this into valid json body string
+
+            // get the url and method from temp headers
+            if(request.getHeaders().containsKey("x-akto-original-url") && request.getHeaders().containsKey("x-akto-original-method")){
+                String url = request.getHeaders().get("x-akto-original-url").get(0);
+                String method = request.getHeaders().get("x-akto-original-method").get(0);
+                String originalXmlPayload = OriginalReqResPayloadInformation.getInstance().getOriginalReqPayloadMap().get(method + "_" + url); // get original payload
+                if(originalXmlPayload != null && !originalXmlPayload.isEmpty()){
+                    String modifiedXmlPayload = HttpRequestResponseUtils.updateXmlWithModifiedJson(originalXmlPayload, payload);
+                    payload = modifiedXmlPayload;
+                }
+                // remove the temp headers
+                request.getHeaders().remove("x-akto-original-url");
+                request.getHeaders().remove("x-akto-original-method");
+            }  
+        } 
 
         if (payload == null) payload = "";
         if (body == null) {// body not created by GRPC block yet
@@ -507,6 +533,6 @@ public class ApiExecutor {
         }
         builder = builder.method(request.getMethod(), body);
         Request okHttpRequest = builder.build();
-        return common(okHttpRequest, followRedirects, debug, testLogs, skipSSRFCheck, nonTestingContext, requestProtocol);
+        return common(okHttpRequest, followRedirects, debug, testLogs, skipSSRFCheck, nonTestingContext, requestProtocol, request.getTlsAuthParam());
     }
 }

@@ -22,11 +22,13 @@ import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.metrics.AllMetrics;
 import com.akto.sql.SampleDataAltDb;
+import com.akto.testing_db_layer_client.ClientLayer;
 import com.mongodb.ConnectionString;
 
 public class MergeLogicLocal {
     final static ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
     private static final LoggerMaker loggerMaker = new LoggerMaker(MergeLogicLocal.class, LogDb.RUNTIME);
+    private static final ClientLayer clientLayer = new ClientLayer();
 
     public static void sendTestSampleDataCron(Map<Integer, APICatalog> dbState) {
 
@@ -87,7 +89,11 @@ public class MergeLogicLocal {
                 Map<String, List<String>> updates = new HashMap<>();
                 List<SampleDataAlt> data = new ArrayList<>();
                 try {
-                    data = SampleDataAltDb.iterateAndGetAll(apiCollectionId, LIMIT, skip);
+                    data = clientLayer.fetchSampleData(apiCollectionId, skip);
+                    if (data == null) {
+                        loggerMaker.infoAndAddToDb(String.format("didn't find any sample data for collection", apiCollectionId));
+                        break;
+                    }
                     loggerMaker.infoAndAddToDb(String.format("data size: %d template urls: %d", data.size(), templateUrls.size()));
                     for (SampleDataAlt sampleDataAlt : data) {
                         for (URLTemplate urlTemplate : templateUrls) {
@@ -114,7 +120,7 @@ public class MergeLogicLocal {
                         loggerMaker.infoAndAddToDb(String.format("%d updates found, updating sql db", updates.size()));
                         for (String url : updates.keySet()) {
                             long updateStart = System.currentTimeMillis();
-                            SampleDataAltDb.updateUrl(updates.get(url), url);
+                            clientLayer.updateUrl(updates.get(url), url);
                             AllMetrics.instance.setMergingJobUrlUpdateLatency(System.currentTimeMillis() - updateStart);
                         }
                         AllMetrics.instance.setMergingJobUrlsUpdatedCount(updates.size());

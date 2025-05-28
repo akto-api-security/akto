@@ -19,6 +19,7 @@ import com.akto.dto.HttpResponseParams;
 import com.akto.dto.type.*;
 import com.akto.hybrid_parsers.HttpCallParser;
 import com.akto.hybrid_runtime.APICatalogSync;
+import com.akto.hybrid_runtime.Main;
 import com.akto.hybrid_runtime.URLAggregator;
 import com.akto.hybrid_runtime.policies.AuthPolicy;
 import com.akto.log.LoggerMaker;
@@ -88,7 +89,7 @@ public class DependencyAnalyser {
         ApiCollection apiCollection = apiCollectionsMap.get(finalApiCollectionId);
         // for on prem customers always run dependency graph
         // for saas customers, run if flag is set true
-        boolean runDependencyAnalyser = apiCollection == null || apiCollection.isRunDependencyAnalyser();
+        boolean runDependencyAnalyser = apiCollection == null || apiCollection.isRunDependencyAnalyser() || Main.actualAccountId == 1745303931;
         if (!isOnPrem && (isHybrid && !runDependencyAnalyser)) {
             return;
         }

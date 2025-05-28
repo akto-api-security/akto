@@ -1,5 +1,7 @@
 package com.akto.testing;
 
+import java.io.File;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -14,20 +16,32 @@ import javax.script.ScriptEngine;
 import javax.script.ScriptEngineManager;
 import javax.script.ScriptException;
 
+import org.bson.types.ObjectId;
+import org.springframework.util.StringUtils;
+
 import com.akto.dto.ApiInfo.ApiInfoKey;
+import com.akto.dao.context.Context;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.RawApi;
 import com.akto.dto.CollectionConditions.ConditionsType;
 import com.akto.dto.test_editor.DataOperandsFilterResponse;
 import com.akto.dto.test_editor.FilterNode;
 import com.akto.dto.test_editor.Util;
+import com.akto.dto.testing.GenericTestResult;
+import com.akto.dto.testing.TestResult;
+import com.akto.dto.testing.TestResult.Confidence;
+import com.akto.dto.testing.TestResult.TestError;
+import com.akto.dto.testing.TestingRunResult;
 import com.akto.dto.testing.WorkflowUpdatedSampleData;
 import com.akto.dto.type.RequestTemplate;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.sql.SampleDataAltDb;
 import com.akto.test_editor.filter.Filter;
 import com.akto.test_editor.filter.data_operands_impl.ValidationResult;
+import com.akto.testing_db_layer_client.ClientLayer;
 import com.akto.util.JSONUtils;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 
@@ -41,6 +55,8 @@ import static com.akto.test_editor.execution.Operations.modifyCookie;
 public class Utils {
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(Utils.class);
+    private static final ClientLayer clientLayer = new ClientLayer();
+    private static final boolean shouldCallClientLayerForSampleData = System.getenv("TESTING_DB_LAYER_SERVICE_URL") != null && !System.getenv("TESTING_DB_LAYER_SERVICE_URL").isEmpty();
 
     public static void populateValuesMap(Map<String, Object> valuesMap, String payloadStr, String nodeId, Map<String,
             List<String>> headers, boolean isRequest, String queryParams) {
@@ -501,5 +517,71 @@ public class Utils {
         }
 
         httpRequest.setQueryParams(queryParams);
+    }
+
+    public static void writeJsonContentInFile(String folderName, String fileName, Object content){
+        try {
+            File file = new File(folderName, fileName);
+            ObjectMapper objectMapper = new ObjectMapper();
+            objectMapper.writerWithDefaultPrettyPrinter().writeValue(file, content);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    public static <T> T readJsonContentFromFile(String folderName, String fileName, Class<T> valueType) {
+        T result = null;
+        try {
+            File file = new File(folderName, fileName);
+            ObjectMapper objectMapper = new ObjectMapper();
+            result = objectMapper.readValue(file, valueType);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return result;
+    }
+
+    public static TestingRunResult generateFailedRunResultForMessage(ObjectId testingRunId,ApiInfoKey apiInfoKey, String testSuperType, 
+        String testSubType, ObjectId testRunResultSummaryId, List<String> messages, String errorMessage) {
+
+        TestingRunResult testingRunResult = null;       
+        // Set<Integer> deactivatedCollections = UsageMetricCalculator.getDeactivated();
+        List<GenericTestResult> testResults = new ArrayList<>();
+        String failMessage = errorMessage;
+        String msg = null;
+        if(shouldCallClientLayerForSampleData){
+            try {
+                msg = clientLayer.fetchLatestSample(apiInfoKey);
+            } catch (Exception e) {
+            }   
+        }
+        
+        if(!StringUtils.hasLength(failMessage) && (messages == null || messages.isEmpty()) && msg == null){
+            failMessage = TestError.NO_PATH.getMessage();
+        }
+            
+        if(failMessage != null){
+            testResults.add(new TestResult(null, null, Collections.singletonList(failMessage),0, false, Confidence.HIGH, null));
+            testingRunResult = new TestingRunResult(
+                testingRunId, apiInfoKey, testSuperType, testSubType, testResults,
+                false, new ArrayList<>(), 100, Context.now(),
+                Context.now(), testRunResultSummaryId, null, Collections
+                        .singletonList(new TestingRunResult.TestLog(TestingRunResult.TestLogType.INFO, failMessage)));
+        }       
+        return testingRunResult;
+    }
+
+    public static boolean createFolder(String folderName){
+        File statusDir = new File(folderName);
+        
+        if (!statusDir.exists()) {
+            boolean created = statusDir.mkdirs();
+            if (!created) {
+                System.err.println("Failed to create directory: " + folderName);
+                return false;
+            }
+            return true;
+        }
+        return false;
     }
 }

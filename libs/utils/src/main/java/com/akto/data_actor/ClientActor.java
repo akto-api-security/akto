@@ -1,7 +1,15 @@
 package com.akto.data_actor;
 
 import com.akto.DaoInit;
+import com.akto.dao.context.Context;
 import com.akto.dto.filter.MergedUrls;
+import com.akto.dto.jobs.Job;
+import com.akto.dto.jobs.JobExecutorType;
+import com.akto.dto.jobs.JobParams;
+import com.akto.dto.jobs.JobStatus;
+import com.akto.dto.jobs.ScheduleType;
+import com.akto.dto.metrics.MetricData;
+import com.akto.dto.monitoring.ModuleInfo;
 import com.akto.dto.settings.DataControlSettings;
 import com.akto.testing.ApiExecutor;
 import com.auth0.jwt.JWT;
@@ -26,6 +34,7 @@ import com.akto.dto.data_types.Conditions.Operator;
 import com.akto.dto.runtime_filters.FieldExistsFilter;
 import com.akto.dto.runtime_filters.ResponseCodeRuntimeFilter;
 import com.akto.dto.runtime_filters.RuntimeFilter;
+import com.akto.dto.test_editor.TestingRunPlayground;
 import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.test_run_findings.TestingRunIssues;
@@ -61,8 +70,6 @@ import org.bson.codecs.DecoderContext;
 import org.bson.codecs.configuration.CodecRegistry;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.Base64;
@@ -80,8 +87,8 @@ import com.google.gson.Gson;
 public class ClientActor extends DataActor {
 
     private static final int batchWriteLimit = 8;
-    private static final String url = buildDbAbstractorUrl();
     private static final LoggerMaker loggerMaker = new LoggerMaker(ClientActor.class);
+    private static final String url = buildDbAbstractorUrl();
     private static final int maxConcurrentBatchWrites = 150;
     private static final Gson gson = new Gson();
     private static final CodecRegistry codecRegistry = DaoInit.createCodecRegistry();
@@ -96,7 +103,7 @@ public class ClientActor extends DataActor {
         if (checkAccount()) {
             dbAbsHost = System.getenv("DATABASE_ABSTRACTOR_SERVICE_URL");
         }
-        System.out.println("dbHost value " + dbAbsHost);
+        loggerMaker.info("dbHost value " + dbAbsHost);
         if (dbAbsHost.endsWith("/")) {
             dbAbsHost = dbAbsHost.substring(0, dbAbsHost.length() - 1);
         }
@@ -204,6 +211,24 @@ public class ClientActor extends DataActor {
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("error updating api collection name for vxlan" + e + " vxlanId " + vxlanId
                     + " name" + name, LoggerMaker.LogDb.RUNTIME);
+        }
+    }
+
+    @Override
+    public void updateModuleInfo(ModuleInfo moduleInfo) {
+        Map<String, List<String>> headers = buildHeaders();
+        BasicDBObject obj = new BasicDBObject();
+        obj.put("moduleInfo", moduleInfo);
+
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/updateModuleInfoForHeartbeat", "", "POST", gson.toJson(obj), headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
+            if (response.getStatusCode() != 200) {
+                loggerMaker.errorAndAddToDb("non 2xx response in updateModuleInfoForHeartbeat", LoggerMaker.LogDb.RUNTIME);
+                return;
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error updating heartbeat for :" + moduleInfo.getModuleType().name(), LoggerMaker.LogDb.RUNTIME);
         }
     }
 
@@ -331,6 +356,25 @@ public class ClientActor extends DataActor {
         obj.put("metricType", metricType.name());
         obj.put("deltaUsage", deltaUsage);
         OriginalHttpRequest request = new OriginalHttpRequest(url + "/updateUsage", "", "POST", obj.toString(), headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb("invalid response in updateUsage", LoggerMaker.LogDb.RUNTIME);
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in updateUsage" + e, LoggerMaker.LogDb.RUNTIME);
+        }
+        return;
+    };
+
+    @Override
+    public void ingestMetricData(List<MetricData> metricData){
+        Map<String, List<String>> headers = buildHeaders();
+        BasicDBObject obj = new BasicDBObject();
+        obj.put("metricData", metricData);
+        String objString = gson.toJson(obj);
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/ingestMetricsData", "", "POST", objString, headers, "");
         try {
             OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
             String responsePayload = response.getBody();
@@ -590,7 +634,6 @@ public class ClientActor extends DataActor {
     //                 BasicDBObject kConditions = (BasicDBObject) obj2.get("keyConditions");
     //                 BasicDBList predicates = (BasicDBList) kConditions.get("predicates");
     //                 RegexPredicate regexPredicate = objectMapper.readValue(((BasicDBObject) predicates.get(0)).toJson(), RegexPredicate.class);
-    //                 System.out.println("hi");
     //                 //customDataTypes.add(objectMapper.readValue(obj2.toJson(), CustomDataType.class));
     //             }
     //         } catch(Exception e) {
@@ -868,7 +911,7 @@ public class ClientActor extends DataActor {
         obj.put("apiInfoList", writesForApiInfo);
 
         String objString = gson.toJson(obj);
-        System.out.println("api info batch" + objString);
+        loggerMaker.info("api info batch" + objString);
 
         Map<String, List<String>> headers = buildHeaders();
         OriginalHttpRequest request = new OriginalHttpRequest(url + "/bulkWriteApiInfo", "", "POST", objString, headers, "");
@@ -1143,11 +1186,11 @@ public class ClientActor extends DataActor {
             OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
             String responsePayload = response.getBody();
             if (response.getStatusCode() != 200 || responsePayload == null) {
-                System.out.println("non 2xx response in insertRuntimeLog");
+                loggerMaker.info("non 2xx response in insertRuntimeLog");
                 return;
             }
         } catch (Exception e) {
-            System.out.println("error in insertRuntimeLog" + e);
+            loggerMaker.error("error in insertRuntimeLog" + e);
             return;
         }
     }
@@ -1300,10 +1343,33 @@ public class ClientActor extends DataActor {
         }
     }
 
-    public TestingRun findPendingTestingRun(int delta) {
+    private void fillTestingEndpointsType(String type, Document testingRun) {
+        switch (type) {
+            case "CUSTOM":
+                ((Document) testingRun.get("testingEndpoints")).put("_t", "com.akto.dto.testing.CustomTestingEndpoints");
+                break;
+            case "COLLECTION_WISE":
+                ((Document) testingRun.get("testingEndpoints")).put("_t", "com.akto.dto.testing.CollectionWiseTestingEndpoints");
+                break;
+            case "WORKFLOW":
+                ((Document) testingRun.get("testingEndpoints")).put("_t", "com.akto.dto.testing.WorkflowTestingEndpoints");
+                break;
+            case "ALL":
+                ((Document) testingRun.get("testingEndpoints")).put("_t", "com.akto.dto.testing.AllTestingEndpoints");
+                break;
+            case "LOGICAL_GROUP":
+                ((Document) testingRun.get("testingEndpoints")).put("_t", "com.akto.dto.testing.LogicalGroupTestingEndpoint");
+                break;
+            default:
+                break;
+        }
+    }
+
+    public TestingRun findPendingTestingRun(int delta, String miniTestingName) {
         Map<String, List<String>> headers = buildHeaders();
         BasicDBObject obj = new BasicDBObject();
         obj.put("delta", delta);
+        obj.put("miniTestingName", miniTestingName);
         OriginalHttpRequest request = new OriginalHttpRequest(url + "/findPendingTestingRun", "", "POST", obj.toString(), headers, "");
         try {
             OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
@@ -1317,25 +1383,7 @@ public class ClientActor extends DataActor {
                 Document testingRun = (Document) doc.get("testingRun");
                 Codec<TestingRun> apiInfoKeyCodec = codecRegistry.get(TestingRun.class);
                 String type = ((Document) testingRun.get("testingEndpoints")).getString("type");
-                switch (type) {
-                    case "CUSTOM":
-                        ((Document) testingRun.get("testingEndpoints")).put("_t", "com.akto.dto.testing.CustomTestingEndpoints");
-                        break;
-                    case "COLLECTION_WISE":
-                        ((Document) testingRun.get("testingEndpoints")).put("_t", "com.akto.dto.testing.CollectionWiseTestingEndpoints");
-                        break;
-                    case "WORKFLOW":
-                        ((Document) testingRun.get("testingEndpoints")).put("_t", "com.akto.dto.testing.WorkflowTestingEndpoints");
-                        break;
-                    case "ALL":
-                        ((Document) testingRun.get("testingEndpoints")).put("_t", "com.akto.dto.testing.AllTestingEndpoints");
-                        break;
-                    case "LOGICAL_GROUP":
-                        ((Document) testingRun.get("testingEndpoints")).put("_t", "com.akto.dto.testing.LogicalGroupTestingEndpoint");
-                        break;
-                    default:
-                        break;
-                }
+                fillTestingEndpointsType(type, testingRun);
                 String hexId = testingRun.getString("hexId");
                 testingRun.put("id", hexId);
                 TestingRun res = decode(apiInfoKeyCodec, testingRun);
@@ -1355,11 +1403,12 @@ public class ClientActor extends DataActor {
         return codec.decode(bsonReader, DecoderContext.builder().build());
     }
 
-    public TestingRunResultSummary findPendingTestingRunResultSummary(int now, int delta) {
+    public TestingRunResultSummary findPendingTestingRunResultSummary(int now, int delta, String miniTestingName) {
         Map<String, List<String>> headers = buildHeaders();
         BasicDBObject obj = new BasicDBObject();
         obj.put("now", now);
         obj.put("delta", delta);
+        obj.put("miniTestingName", miniTestingName);
         OriginalHttpRequest request = new OriginalHttpRequest(url + "/findPendingTestingRunResultSummary", "", "POST", obj.toString(), headers, "");
         try {
             OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
@@ -1438,19 +1487,7 @@ public class ClientActor extends DataActor {
                 Document testingRun = (Document) doc.get("testingRun");
                 Codec<TestingRun> apiInfoKeyCodec = codecRegistry.get(TestingRun.class);
                 String type = ((Document) testingRun.get("testingEndpoints")).getString("type");
-                switch (type) {
-                    case "CUSTOM":
-                        ((Document) testingRun.get("testingEndpoints")).put("_t", "com.akto.dto.testing.CustomTestingEndpoints");
-                        break;
-                    case "COLLECTION_WISE":
-                        ((Document) testingRun.get("testingEndpoints")).put("_t", "com.akto.dto.testing.CollectionWiseTestingEndpoints");
-                        break;
-                    case "WORKFLOW":
-                        ((Document) testingRun.get("testingEndpoints")).put("_t", "com.akto.dto.testing.WorkflowTestingEndpoints");
-                        break;
-                    default:
-                        break;
-                }
+                fillTestingEndpointsType(type, testingRun);
                 String hexId = testingRun.getString("hexId");
                 testingRun.put("id", hexId);
                 TestingRun res = decode(apiInfoKeyCodec, testingRun);
@@ -1499,6 +1536,91 @@ public class ClientActor extends DataActor {
             loggerMaker.errorAndAddToDb("error in updateTestRunResultSummary" + e, LoggerMaker.LogDb.RUNTIME);
             return;
         }
+    }
+
+    @Override
+    public void deleteTestRunResultSummary(String summaryId) {
+        Map<String, List<String>> headers = buildHeaders();
+        BasicDBObject obj = new BasicDBObject();
+        obj.put("testingRunResultSummaryId", summaryId);
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/deleteTestRunResultSummary", "", "POST", obj.toString(), headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb("non 2xx response in deleteTestRunResultSummary", LoggerMaker.LogDb.RUNTIME);
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in deleteTestRunResultSummary" + e, LoggerMaker.LogDb.RUNTIME);
+        }
+    }
+
+    @Override
+    public void deleteTestingRunResults(String testingRunResultId) {
+        Map<String, List<String>> headers = buildHeaders();
+        BasicDBObject obj = new BasicDBObject();
+        obj.put("testingRunResultId", testingRunResultId);
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/deleteTestingRunResults", "", "POST", obj.toString(), headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb("non 2xx response in deleteTestingRunResults", LoggerMaker.LogDb.RUNTIME);
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in deleteTestingRunResults" + e, LoggerMaker.LogDb.RUNTIME);
+        }
+    }
+
+    @Override
+    public void updateStartTsTestRunResultSummary(String summaryId) {
+        Map<String, List<String>> headers = buildHeaders();
+        BasicDBObject obj = new BasicDBObject();
+        obj.put("testingRunResultSummaryId", summaryId);
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/updateStartTsTestRunResultSummary", "", "POST", obj.toString(), headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb("non 2xx response in updateStartTsTestRunResultSummary", LoggerMaker.LogDb.RUNTIME);
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in updateStartTsTestRunResultSummary" + e, LoggerMaker.LogDb.RUNTIME);
+        }
+    }
+
+
+    @Override
+    public List<TestingRunResult> fetchRerunTestingRunResult(String testingRunResultSummaryId) {
+        Map<String, List<String>> headers = buildHeaders();
+        List<TestingRunResult> results = new ArrayList<>();
+        BasicDBObject obj = new BasicDBObject();
+        obj.put("testingRunResultSummaryId", testingRunResultSummaryId);
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/fetchRerunTestingRunResult", "", "POST", obj.toString(), headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb("non 2xx response in fetchRerunTestingRunResult", LoggerMaker.LogDb.RUNTIME);
+                return null;
+            }
+            BasicDBObject payloadObj;
+            try {
+                payloadObj =  BasicDBObject.parse(responsePayload);
+                BasicDBList testingRunResults = (BasicDBList) payloadObj.get("testingRunResults");
+                for (Object testingRunResult: testingRunResults) {
+                    BasicDBObject obj2 = (BasicDBObject) testingRunResult;
+                    TestingRunResult s = objectMapper.readValue(obj2.toJson(), TestingRunResult.class);
+                    results.add(s);
+                }
+            } catch(Exception e) {
+                loggerMaker.errorAndAddToDb("error extracting response in fetchRerunTestingRunResult" + e, LoggerMaker.LogDb.RUNTIME);
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in fetchRerunTestingRunResult" + e, LoggerMaker.LogDb.RUNTIME);
+            return null;
+        }
+        return results;
     }
 
     public void updateTestingRun(String testingRunId) {
@@ -1582,6 +1704,37 @@ public class ClientActor extends DataActor {
         BasicDBObject obj = new BasicDBObject();
         obj.put("testingRunResultSummaryId", testingRunResultSummaryId);
         OriginalHttpRequest request = new OriginalHttpRequest(url + "/fetchTestingRunResultSummary", "", "POST", obj.toString(), headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb("non 2xx response in fetchTestingRunResultSummary", LoggerMaker.LogDb.RUNTIME);
+                return null;
+            }
+            BasicDBObject payloadObj;
+            try {
+                payloadObj =  BasicDBObject.parse(responsePayload);
+                BasicDBObject testingRunResultSummary = (BasicDBObject) payloadObj.get("trrs");
+                testingRunResultSummary.remove("id");
+                testingRunResultSummary.remove("testingRunId");
+                TestingRunResultSummary res = objectMapper.readValue(testingRunResultSummary.toJson(), TestingRunResultSummary.class);
+                res.setId(new ObjectId(testingRunResultSummary.getString("hexId")));
+                res.setTestingRunId(new ObjectId(testingRunResultSummary.getString("testingRunHexId")));
+                return res;
+            } catch(Exception e) {
+                return null;
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in fetchTestingRunResultSummary" + e, LoggerMaker.LogDb.RUNTIME);
+            return null;
+        }
+    }
+
+    public TestingRunResultSummary fetchRerunTestingRunResultSummary(String testingRunResultSummaryId) {
+        Map<String, List<String>> headers = buildHeaders();
+        BasicDBObject obj = new BasicDBObject();
+        obj.put("testingRunResultSummaryId", testingRunResultSummaryId);
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/fetchRerunTestingRunResultSummary", "", "POST", obj.toString(), headers, "");
         try {
             OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
             String responsePayload = response.getBody();
@@ -1910,6 +2063,40 @@ public class ClientActor extends DataActor {
         return templates;
     }
 
+    public List<YamlTemplate> fetchYamlTemplatesWithIds(List<String> ids, boolean fetchOnlyActive){
+        Map<String, List<String>> headers = buildHeaders();
+        List<YamlTemplate> templates = new ArrayList<>();
+        BasicDBObject obj = new BasicDBObject();
+
+        obj.put("fetchOnlyActive", fetchOnlyActive);
+        obj.put("ids", ids);
+
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/fetchYamlTemplatesWithIds", "", "POST", obj.toString(), headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb("non 2xx response in fetchYamlTemplatesWithIds", LoggerMaker.LogDb.RUNTIME);
+                return null;
+            }
+            BasicDBObject payloadObj;
+            try {
+                payloadObj =  BasicDBObject.parse(responsePayload);
+                BasicDBList yamlTemplates = (BasicDBList) payloadObj.get("yamlTemplates");
+                for (Object template: yamlTemplates) {
+                    BasicDBObject obj2 = (BasicDBObject) template;
+                    templates.add(objectMapper.readValue(obj2.toJson(), YamlTemplate.class));
+                }
+            } catch(Exception e) {
+                loggerMaker.errorAndAddToDb("error extracting response in fetchYamlTemplatesWithIds" + e, LoggerMaker.LogDb.RUNTIME);
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in fetchYamlTemplatesWithIds" + e, LoggerMaker.LogDb.RUNTIME);
+            return null;
+        }
+        return templates;
+    }
+
     public void updateTestResultsCountInTestSummary(String summaryId, int testResultsCount) {
         Map<String, List<String>> headers = buildHeaders();
         BasicDBObject obj = new BasicDBObject();
@@ -1954,7 +2141,6 @@ public class ClientActor extends DataActor {
         BasicDBObject obj = new BasicDBObject();
         obj.put("testingRunResult", testingRunResult);
         String objString = gson.toJson(obj);
-        System.out.println(objString);
         OriginalHttpRequest request = new OriginalHttpRequest(url + "/insertTestingRunResults", "", "POST", objString, headers, "");
         try {
             OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
@@ -2219,6 +2405,9 @@ public class ClientActor extends DataActor {
                     case "LOGIN_REQUEST":
                         authParam.put("_t", "com.akto.dto.testing.LoginRequestAuthParam");
                         break;
+                    case "TLS_AUTH":
+                        authParam.put("_t", "com.akto.dto.testing.TLSAuthParam");
+                        break;
                     default:
                         break;
                 }
@@ -2237,6 +2426,9 @@ public class ClientActor extends DataActor {
                         break;
                     case "LOGIN_REQUEST":
                         defaultAuthParam.put("_t", "com.akto.dto.testing.LoginRequestAuthParam");
+                        break;
+                    case "TLS_AUTH":
+                        defaultAuthParam.put("_t", "com.akto.dto.testing.TLSAuthParam");
                         break;
                     default:
                         break;
@@ -3017,11 +3209,11 @@ public class ClientActor extends DataActor {
             OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
             String responsePayload = response.getBody();
             if (response.getStatusCode() != 200 || responsePayload == null) {
-                System.out.println("non 2xx response in insertTestingLog");
+                loggerMaker.info("non 2xx response in insertTestingLog");
                 return;
             }
         } catch (Exception e) {
-            System.out.println("error in insertTestingLog" + e);
+            loggerMaker.error("error in insertTestingLog" + e);
             return;
         }
     }
@@ -3065,10 +3257,10 @@ public class ClientActor extends DataActor {
             String decodedPayload = new String(decodedBytes);
             BasicDBObject basicDBObject = BasicDBObject.parse(decodedPayload);
             int accId = (int) basicDBObject.getInt("accountId");
-            System.out.println("checkaccount accountId log " + accId);
+            loggerMaker.info("checkaccount accountId log " + accId);
             return accId == 1000000;
         } catch (Exception e) {
-            System.out.println("checkaccount error" + e.getStackTrace());
+            loggerMaker.error("checkaccount error" + e.getStackTrace());
         }
         return false;
     }
@@ -3523,4 +3715,149 @@ public class ClientActor extends DataActor {
         }
     }
 
+    public TestingRunResultSummary findLatestTestingRunResultSummary(Bson filter) {
+        BasicDBObject obj = new BasicDBObject();
+        obj.put("filter", filter);
+        Map<String, List<String>> headers = buildHeaders();
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/findLatestTestingRunResultSummary", "", "POST",  obj.toString(), headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb("non 2xx response in findLatestTestingRunResultSummary", LoggerMaker.LogDb.TESTING);
+                return null;
+            }
+            BasicDBObject payloadObj;
+            try {
+                payloadObj =  BasicDBObject.parse(responsePayload);
+                BasicDBObject summaryObject = (BasicDBObject) payloadObj.get("trrs");
+                TestingRunResultSummary summary = objectMapper.readValue(summaryObject.toJson(), TestingRunResultSummary.class);
+                return summary;
+            } catch(Exception e) {
+                return null;
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in findLatestTestingRunResultSummary" + e, LoggerMaker.LogDb.RUNTIME);
+            return null;
+        }
+    }
+
+    @Override
+    public void scheduleAutoCreateTicketsJob(int accountId, JobParams params, JobExecutorType jobExecutorType) {
+        Map<String, List<String>> headers = buildHeaders();
+
+        int now = Context.now();
+        Job job = new Job(accountId,
+            ScheduleType.RUN_ONCE,
+            JobStatus.SCHEDULED,
+            params,
+            jobExecutorType,
+            now,
+            0,
+            0,
+            0,
+            now
+        );
+
+        String objString = gson.toJson(new BasicDBObject("job", job));
+        loggerMaker.debug(objString);
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/insertJob", "", "POST", objString, headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb("non 2xx response in insertJob", LoggerMaker.LogDb.RUNTIME);
+                return;
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in insertJob" + e, LoggerMaker.LogDb.RUNTIME);
+        }
+    }
+
+    public List<String> findTestSubCategoriesByTestSuiteId(List<String> testSuiteId) {
+        BasicDBObject obj = new BasicDBObject();
+        obj.put("testSuiteId", testSuiteId);
+        Map<String, List<String>> headers = buildHeaders();
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/findTestSubCategoriesByTestSuiteId", "", "POST", obj.toString(), headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb("non 2xx response in findTestSubCategoriesByTestSuiteId", LogDb.RUNTIME);
+                return new ArrayList<>();
+            }
+            BasicDBObject payloadObj;
+            try {
+                payloadObj = BasicDBObject.parse(responsePayload);
+                BasicDBList testSubCategoriesObj = (BasicDBList) payloadObj.get("testSuiteTestSubCategories");
+                List<String> testSubCategories = new ArrayList<>();
+                for (Object nodeObj : testSubCategoriesObj) {
+                    testSubCategories.add(String.valueOf(nodeObj));
+                }
+                return testSubCategories;
+            } catch (Exception e) {
+                return new ArrayList<>();
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in findTestSubCategoriesByTestSuiteId" + e, LoggerMaker.LogDb.RUNTIME);
+            return new ArrayList<>();
+        }
+    }
+    public TestingRunPlayground getCurrentTestingRunDetailsFromEditor(int timestamp){
+        BasicDBObject obj = new BasicDBObject();
+        obj.put("ts", timestamp);
+
+        Map<String, List<String>> headers = buildHeaders();
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/fetchEditorTest", "", "POST",  obj.toString(), headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb("non 2xx response in fetchEditorTest", LoggerMaker.LogDb.TESTING);
+                return null;
+            }
+            BasicDBObject payloadObj;
+            try {
+                payloadObj = BasicDBObject.parse(responsePayload);
+                BasicDBObject testingRunPlaygroundObj = (BasicDBObject) payloadObj.getOrDefault("testingRunPlayground", null);
+                if (testingRunPlaygroundObj == null) {
+                    return null;
+                }
+                return objectMapper.readValue(testingRunPlaygroundObj.toJson(), TestingRunPlayground.class);
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb("error extracting response in fetchEditorTest " + e, LoggerMaker.LogDb.TESTING);
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in fetchEditorTest " + e, LoggerMaker.LogDb.TESTING);
+        }
+        return null;
+    }
+
+    public void updateTestingRunPlayground(TestingRunPlayground testingRunPlayground) {
+        Map<String, List<String>> headers = buildHeaders();
+        BasicDBObject obj = new BasicDBObject();
+        obj.put("testingRunPlaygroundId", testingRunPlayground.getHexId());
+        obj.put("testingRunPlaygroundType", testingRunPlayground.getTestingRunPlaygroundType());
+        switch (testingRunPlayground.getTestingRunPlaygroundType()) {
+            case TEST_EDITOR_PLAYGROUND:
+                obj.put("testingRunResult", testingRunPlayground.getTestingRunResult());
+                break;
+            case POSTMAN_IMPORTS:
+                obj.put("originalHttpResponse", testingRunPlayground.getOriginalHttpResponse());
+                break;
+        }
+        String jsonString = gson.toJson(obj);
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/updateTestingRunPlaygroundStateAndResult", "", "POST",  jsonString, headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb("non 2xx response in updateTestingRunPlaygroundStateAndResult", LoggerMaker.LogDb.TESTING);
+                return;
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in updateTestingRunPlaygroundStateAndResult" + e, LoggerMaker.LogDb.RUNTIME);
+            return;
+        }
+    }
 }

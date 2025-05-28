@@ -47,12 +47,16 @@ public class Utils {
 
     public static boolean SKIP_SSRF_CHECK = ("true".equalsIgnoreCase(System.getenv("SKIP_SSRF_CHECK")) || !DashboardMode.isSaasDeployment());
 
-    private static final OkHttpClient client = CoreHTTPClient.client.newBuilder()
-        .writeTimeout(5, TimeUnit.SECONDS)
-        .readTimeout(5, TimeUnit.SECONDS)
-        .callTimeout(5, TimeUnit.SECONDS)
-        .build();
+    private static final OkHttpClient client = createHttpClient();
 
+    private static OkHttpClient createHttpClient() {
+        return CoreHTTPClient.client.newBuilder()
+            .writeTimeout(5, TimeUnit.SECONDS)
+            .readTimeout(5, TimeUnit.SECONDS)
+            .callTimeout(5, TimeUnit.SECONDS)
+            .build();
+    }
+    
     public static Boolean checkIfContainsMatch(String text, String keyword) {
         Pattern pattern = Pattern.compile(keyword);
         Matcher matcher = pattern.matcher(text);
@@ -581,8 +585,14 @@ public class Utils {
         return url;
     }
 
-    private static String fetchActualUrl(URI uri, String url) {
+   private static String fetchActualUrl(URI uri, String url) {
         if (uri != null && uri.getHost() != null) {
+            if(uri.getPort() != -1){
+                if (uri.getPort() == 80 || uri.getPort() == 443) {
+                    return uri.getScheme() + "://" + uri.getHost() + url;
+                }
+                return uri.getScheme() + "://" + uri.getHost() + ":" + uri.getPort() + url;
+            }
             return uri.getScheme() + "://" + uri.getHost() + url;
         } else {
             return url;

@@ -8,7 +8,20 @@ on:
   workflow_dispatch:
     inputs:
       release_version:
+        description: 'Release version for the deployment'
         required: true
+      mini-runtime:
+        type: boolean
+        default: true
+        description: Mini-Runtime
+      mini-testing:
+        type: boolean
+        default: true
+        description: Mini-Testing
+      testing-db-layer:
+        type: boolean
+        default: true
+        description: Testing-Db-Layer
 
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
@@ -31,7 +44,7 @@ jobs:
           node-version: '17'
 
       - name: mvn package command
-        run: mvn package
+        run: mvn package -Dakto-image-tag=${{ github.event.inputs.release_version }} -Dakto-build-time=$(eval "date +%s") -Dakto-release-version=${{github.event.inputs.release_version}}
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v1
@@ -61,16 +74,28 @@ jobs:
           IMAGE_TAG: latest
           IMAGE_TAG1: testruntime
           IMAGE_TAG2: local
-          IMAGE_TAG3: 1.42.11_local
+          IMAGE_TAG3: ${{ github.event.inputs.release_version }}_local
         run: |
           docker buildx create --use
           # Build a docker container and push it to DockerHub 
           cd apps/mini-runtime
-          docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/$REGISTRY_ALIAS/akto-api-security-mini-runtime:$IMAGE_TAG -t $ECR_REGISTRY/$REGISTRY_ALIAS/akto-api-security-mini-runtime:$IMAGE_TAG1 -t $ECR_REGISTRY/$REGISTRY_ALIAS/akto-api-security-mini-runtime:$IMAGE_TAG2 -t $ECR_REGISTRY/$REGISTRY_ALIAS/akto-api-security-mini-runtime:$IMAGE_TAG3 . --push
-          echo "::set-output name=image::$ECR_REGISTRY/akto-api-security-mini-runtime:$IMAGE_TAG"
-          cd ../mini-testing
-          docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/$REGISTRY_ALIAS/akto-api-security-mini-testing:$IMAGE_TAG -t $ECR_REGISTRY/$REGISTRY_ALIAS/akto-api-security-mini-testing:$IMAGE_TAG1 -t $ECR_REGISTRY/$REGISTRY_ALIAS/akto-api-security-mini-testing:$IMAGE_TAG2 -t $ECR_REGISTRY/$REGISTRY_ALIAS/akto-api-security-mini-testing:$IMAGE_TAG3 . --push
-          echo "::set-output name=image::$ECR_REGISTRY/akto-api-security-mini-testing:$IMAGE_TAG3"
+          if [[ "${{ github.event.inputs.mini-runtime }}" == "true" ]]; then
+            cd ../mini-runtime
+            docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/$REGISTRY_ALIAS/akto-api-security-mini-runtime:$IMAGE_TAG -t $ECR_REGISTRY/$REGISTRY_ALIAS/akto-api-security-mini-runtime:$IMAGE_TAG1 -t $ECR_REGISTRY/$REGISTRY_ALIAS/akto-api-security-mini-runtime:$IMAGE_TAG2 -t $ECR_REGISTRY/$REGISTRY_ALIAS/akto-api-security-mini-runtime:$IMAGE_TAG3 . --push
+            echo "::set-output name=image::$ECR_REGISTRY/akto-api-security-mini-runtime:$IMAGE_TAG"
+          fi
+
+          if [[ "${{ github.event.inputs.mini-testing }}" == "true" ]]; then
+            cd ../mini-testing
+            docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/$REGISTRY_ALIAS/akto-api-security-mini-testing:$IMAGE_TAG -t $ECR_REGISTRY/$REGISTRY_ALIAS/akto-api-security-mini-testing:$IMAGE_TAG1 -t $ECR_REGISTRY/$REGISTRY_ALIAS/akto-api-security-mini-testing:$IMAGE_TAG2 -t $ECR_REGISTRY/$REGISTRY_ALIAS/akto-api-security-mini-testing:$IMAGE_TAG3 . --push
+            echo "::set-output name=image::$ECR_REGISTRY/akto-api-security-mini-testing:$IMAGE_TAG3"
+          fi
+
+          if [[ "${{ github.event.inputs.testing-db-layer }}" == "true" ]]; then
+            cd ../testing-db-layer
+            docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/$REGISTRY_ALIAS/akto-api-security-testing-db-layer:$IMAGE_TAG -t $ECR_REGISTRY/$REGISTRY_ALIAS/akto-api-security-testing-db-layer:$IMAGE_TAG1 -t $ECR_REGISTRY/$REGISTRY_ALIAS/akto-api-security-testing-db-layer:$IMAGE_TAG2 -t $ECR_REGISTRY/$REGISTRY_ALIAS/akto-api-security-testing-db-layer:$IMAGE_TAG3 . --push
+            echo "::set-output name=image::$ECR_REGISTRY/akto-api-security-testing-db-layer:$IMAGE_TAG3"
+          fi
 
       - name: DockerHub login
         env:
@@ -86,12 +111,46 @@ jobs:
           IMAGE_TAG: latest
           IMAGE_TAG1: testruntime
           IMAGE_TAG2: local
-          IMAGE_TAG3: 1.42.11_local
+          IMAGE_TAG3: ${{ github.event.inputs.release_version }}_local
         run: |
           echo $IMAGE_TAG >> $GITHUB_STEP_SUMMARY
           docker buildx create --use
           # Build a docker container and push it to DockerHub 
           cd apps/mini-runtime
-          docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/mini-runtime:$IMAGE_TAG -t $ECR_REGISTRY/mini-runtime:$IMAGE_TAG1 -t $ECR_REGISTRY/mini-runtime:$IMAGE_TAG2 -t $ECR_REGISTRY/mini-runtime:$IMAGE_TAG3 . --push
-          cd ../mini-testing
-          docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/mini-testing:$IMAGE_TAG -t $ECR_REGISTRY/mini-testing:$IMAGE_TAG1 -t $ECR_REGISTRY/mini-testing:$IMAGE_TAG2 -t $ECR_REGISTRY/mini-testing:$IMAGE_TAG3 . --push
+          if [[ "${{ github.event.inputs.mini-runtime }}" == "true" ]]; then
+            cd ../mini-runtime
+            docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/mini-runtime:$IMAGE_TAG -t $ECR_REGISTRY/mini-runtime:$IMAGE_TAG1 -t $ECR_REGISTRY/mini-runtime:$IMAGE_TAG2 -t $ECR_REGISTRY/mini-runtime:$IMAGE_TAG3 . --push
+          fi
+
+          if [[ "${{ github.event.inputs.mini-testing }}" == "true" ]]; then
+            cd ../mini-testing
+            docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/mini-testing:$IMAGE_TAG -t $ECR_REGISTRY/mini-testing:$IMAGE_TAG1 -t $ECR_REGISTRY/mini-testing:$IMAGE_TAG2 -t $ECR_REGISTRY/mini-testing:$IMAGE_TAG3 . --push
+          fi
+
+          if [[ "${{ github.event.inputs.testing-db-layer }}" == "true" ]]; then
+            cd ../testing-db-layer
+            docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/testing-db-layer:$IMAGE_TAG -t $ECR_REGISTRY/testing-db-layer:$IMAGE_TAG1 -t $ECR_REGISTRY/testing-db-layer:$IMAGE_TAG2 -t $ECR_REGISTRY/testing-db-layer:$IMAGE_TAG3 . --push
+          fi
+      - name: Send Github release notification to Slack
+        id: slack
+        uses: slackapi/slack-github-action@v1.23.0
+        with:
+          payload: |
+            {
+              "text": "Hybrid Runtime and testing version v${{ github.event.inputs.release_version }} released!",
+              "attachments": [
+                {
+                  "color": "#36a64f",
+                  "fields": [
+                    {
+                      "title": "Services Deployed",
+                      "value": "${{ github.event.inputs.mini-runtime == 'true' && 'Mini-Runtime ✅\\\n' || '' }}${{ github.event.inputs.mini-testing == 'true' && 'Mini-Testing ✅\\\n' || '' }}${{ github.event.inputs.testing-db-layer == 'true' && 'Testing-Db-Layer ✅' || '' }}",
+                      "short": false
+                    }
+                  ]
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK

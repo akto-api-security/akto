@@ -9,11 +9,13 @@ public class TestEditorEnums {
         NOT_CONTAINS_EITHER,
         REGEX,
         EQ,
+        EQ_OBJ,
         GTE,
         GT,
         LTE,
         LT,
         NEQ,
+        NEQ_OBJ,
         PARAM,
         CONTAINS_JWT,
         COOKIE_EXPIRE_FILTER,
@@ -214,6 +216,7 @@ public class TestEditorEnums {
         JWT_REPLACE_BODY,
         ATTACH_FILE,
         SEND_SSRF_REQ,
+        FOR_EACH_COMBINATION
     }
 
     public enum NonTerminalExecutorDataOperands {
