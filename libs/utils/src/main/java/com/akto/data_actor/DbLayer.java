@@ -13,11 +13,15 @@ import java.util.Set;
 import com.akto.bulk_update_util.ApiInfoBulkUpdate;
 import com.akto.dao.*;
 import com.akto.dao.filter.MergedUrlsDao;
+import com.akto.dao.metrics.MetricDataDao;
 import com.akto.dao.settings.DataControlSettingsDao;
+import com.akto.dao.testing.config.TestSuiteDao;
 import com.akto.dependency_analyser.DependencyAnalyserUtils;
 import com.akto.dto.*;
 import com.akto.dto.filter.MergedUrls;
+import com.akto.dto.metrics.MetricData;
 import com.akto.dto.settings.DataControlSettings;
+import com.akto.dto.testing.config.TestSuites;
 import com.mongodb.client.model.*;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
@@ -26,6 +30,7 @@ import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.billing.TokensDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.runtime_filters.AdvancedTrafficFiltersDao;
+import com.akto.dao.test_editor.TestingRunPlaygroundDao;
 import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dao.testing.AccessMatrixTaskInfosDao;
 import com.akto.dao.testing.AccessMatrixUrlToRolesDao;
@@ -48,6 +53,7 @@ import com.akto.dto.billing.Organization;
 import com.akto.dto.billing.Tokens;
 import com.akto.dto.dependency_flow.Node;
 import com.akto.dto.runtime_filters.RuntimeFilter;
+import com.akto.dto.test_editor.TestingRunPlayground;
 import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.test_run_findings.TestingRunIssues;
@@ -91,6 +97,22 @@ public class DbLayer {
 
     public static List<CustomDataType> fetchCustomDataTypes() {
         return CustomDataTypeDao.instance.findAll(new BasicDBObject());
+    }
+
+    public static List<TestingRunResult> fetchRerunTestingRunResult(String summaryId) {
+        return TestingRunResultDao.instance.findAll(
+                Filters.and(
+                        Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, new ObjectId(summaryId)),
+                        Filters.eq(TestingRunResult.RERUN, true)
+                ),
+                Projections.include(
+                        TestingRunResult.TEST_RUN_ID,
+                        TestingRunResult.API_INFO_KEY,
+                        TestingRunResult.TEST_SUB_TYPE,
+                        TestingRunResult.VULNERABLE,
+                        TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID
+                )
+        );
     }
 
     public static List<AktoDataType> fetchAktoDataTypes() {
@@ -143,7 +165,7 @@ public class DbLayer {
     }
     public static void bulkWriteSingleTypeInfo(List<WriteModel<SingleTypeInfo>> writesForSingleTypeInfo) {
         BulkWriteResult res = SingleTypeInfoDao.instance.getMCollection().bulkWrite(writesForSingleTypeInfo);
-        System.out.println("bulk write result: del:" + res.getDeletedCount() + " ins:" + res.getInsertedCount() + " match:" + res.getMatchedCount() + " modify:" +res.getModifiedCount());
+        loggerMaker.debug("bulk write result: del:" + res.getDeletedCount() + " ins:" + res.getInsertedCount() + " match:" + res.getMatchedCount() + " modify:" +res.getModifiedCount());
     }
 
     public static void bulkWriteSampleData(List<WriteModel<SampleData>> writesForSampleData) {
@@ -158,6 +180,9 @@ public class DbLayer {
         TrafficInfoDao.instance.getMCollection().bulkWrite(writesForTrafficInfo);
     }
 
+    public static void ingestMetric(List<MetricData> metricData) {
+        MetricDataDao.instance.insertMany(metricData);
+    }
     public static void bulkWriteTrafficMetrics(List<WriteModel<TrafficMetrics>> writesForTrafficMetrics) {
         TrafficMetricsDao.instance.getMCollection().bulkWrite(writesForTrafficMetrics);
     }
@@ -240,11 +265,11 @@ public class DbLayer {
                 try {
                     sti.setStrId(sti.getId().toHexString());
                 } catch (Exception e) {
-                    System.out.println("error" + e);
+                    loggerMaker.error("error" + e);
                 }
             }
         } catch (Exception e) {
-            System.out.println("error" + e);
+            loggerMaker.error("error" + e);
         }
         return stis;
     }
@@ -506,6 +531,27 @@ public class DbLayer {
         return TestingRunDao.instance.findOne("_id", testingRunObjId);
     }
 
+    public static void deleteTestRunResultSummary(String summaryId) {
+        TestingRunResultSummariesDao.instance.deleteAll(Filters.eq(TestingRunResultSummary.ID, new ObjectId(summaryId)));
+    }
+
+    public static void deleteTestingRunResults(String testingRunResultId) {
+        TestingRunResult trr = TestingRunResultDao.instance.getMCollection().findOneAndDelete(Filters.eq(ID, new ObjectId(testingRunResultId)));
+        if (trr.isVulnerable()) {
+            Bson filters = Filters.and(
+                    Filters.eq(TestingRunResult.API_INFO_KEY, trr.getApiInfoKey()),
+                    Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, trr.getTestRunResultSummaryId()),
+                    Filters.eq(TestingRunResult.TEST_SUB_TYPE, trr.getTestSubType())
+            );
+            //VulnerableTestingRunResultDao.instance.deleteAll(filters);
+        }
+    }
+
+    public static void updateStartTsTestRunResultSummary(String summaryId) {
+        TestingRunResultSummariesDao.instance.updateOneNoUpsert(Filters.eq(TestingRunResultSummary.ID, new ObjectId(summaryId)),
+                Updates.set(TestingRunResultSummary.START_TIMESTAMP, Context.now()));
+    }
+
     public static void updateTestRunResultSummaryNoUpsert(String testingRunResultSummaryId) {
         ObjectId summaryObjectId = new ObjectId(testingRunResultSummaryId);
         TestingRunResultSummariesDao.instance.updateOneNoUpsert(
@@ -542,6 +588,12 @@ public class DbLayer {
         ObjectId summaryObjectId = new ObjectId(testingRunResultSummaryId);
         return TestingRunResultSummariesDao.instance.findOne(Filters.eq(TestingRunResultSummary.ID, summaryObjectId));
     }
+
+    public static TestingRunResultSummary fetchRerunTestingRunResultSummary(String testingRunResultSummaryId) {
+        ObjectId summaryObjectId = new ObjectId(testingRunResultSummaryId);
+        return TestingRunResultSummariesDao.instance.findOne(Filters.eq(TestingRunResultSummary.ORIGINAL_TESTING_RUN_SUMMARY_ID, summaryObjectId));
+    }
+
 
     public static TestingRunResultSummary markTestRunResultSummaryFailed(String testingRunResultSummaryId) {
         ObjectId summaryObjectId = new ObjectId(testingRunResultSummaryId);
@@ -635,6 +687,19 @@ public class DbLayer {
             filters.add(new BasicDBObject());
         }
         return YamlTemplateDao.instance.findAll(Filters.or(filters), skip, 50, null);
+    }
+
+    public static List<YamlTemplate> fetchYamlTemplatesWithIds(List<String> ids, boolean fetchOnlyActive) {
+        Bson filter = Filters.in(Constants.ID, ids);
+        if(fetchOnlyActive) {
+            filter = Filters.and(
+                Filters.or(
+                    Filters.exists(YamlTemplate.INACTIVE, false),
+                    Filters.eq(YamlTemplate.INACTIVE, false)
+                )
+            );
+        }
+        return YamlTemplateDao.instance.findAll(filter);
     }
 
     public static void updateTestResultsCountInTestSummary(String summaryId, int testResultsCount) {
@@ -1048,6 +1113,48 @@ public class DbLayer {
         // TODO: Handle cases where the delete API does not have the delete method
         Bson delFilterQ = Filters.and(filterQ, Filters.eq(DependencyNode.METHOD_REQ, reqMethod));
         return DependencyNodeDao.instance.findAll(delFilterQ);
+    }
+
+    public static List<String> findTestSubCategoriesByTestSuiteId(List<String> testSuiteId) {
+        List<ObjectId> testSuiteIds = new ArrayList<>();
+        for (String testSuiteIdStr : testSuiteId) {
+            testSuiteIds.add(new ObjectId(testSuiteIdStr));
+        }
+        List<TestSuites> testSuites = TestSuiteDao.instance.findAll(Filters.in(ID, testSuiteIds));
+        if(testSuites == null || testSuites.isEmpty()) {
+            return new ArrayList<>();
+        }
+
+        Set<String> subcategorySet = new HashSet<>();
+        for (TestSuites testSuite : testSuites) {
+            List<String> subcategoryList = testSuite.getSubCategoryList();
+            if(subcategoryList != null && !subcategoryList.isEmpty()) {
+                subcategorySet.addAll(subcategoryList);
+            }
+        }
+
+        return new ArrayList<>(subcategorySet);
+    }
+
+    public static TestingRunResultSummary findLatestTestingRunResultSummary(Bson filter){
+        return TestingRunResultSummariesDao.instance.findLatestOne(filter);
+    }
+
+    public static TestingRunPlayground getCurrentTestingRunDetailsFromEditor(int timestamp){
+        return TestingRunPlaygroundDao.instance.findOne(
+                Filters.and(
+                        Filters.gte(TestingRunPlayground.CREATED_AT, timestamp),
+                        Filters.eq(TestingRunPlayground.STATE, State.SCHEDULED)
+                )
+        );
+    }
+
+    public static void updateTestingRunPlayground(TestingRunPlayground testingRunPlayground) {
+        TestingRunPlaygroundDao.instance.updateOne(
+                Filters.eq(Constants.ID, testingRunPlayground.getId()),
+                Updates.combine(
+                        Updates.set(TestingRunPlayground.STATE, State.COMPLETED),
+                        Updates.set(TestingRunPlayground.TESTING_RUN_RESULT, testingRunPlayground.getTestingRunResult())));
     }
 
 }

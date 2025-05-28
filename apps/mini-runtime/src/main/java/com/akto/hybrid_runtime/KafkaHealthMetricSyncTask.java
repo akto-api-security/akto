@@ -11,8 +11,6 @@ import com.mongodb.client.model.ReplaceOptions;
 import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.common.TopicPartition;
 import org.bson.conversions.Bson;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.util.Collections;
 import java.util.HashMap;
@@ -21,7 +19,6 @@ import java.util.Map;
 public class KafkaHealthMetricSyncTask implements Runnable{
     Consumer<String, String>  consumer;
     public Map<String,KafkaHealthMetric> kafkaHealthMetricsMap = new HashMap<>();
-    private static final Logger logger = LoggerFactory.getLogger(KafkaHealthMetricSyncTask.class);
     private static final LoggerMaker loggerMaker = new LoggerMaker(APICatalogSync.class);
 
 
@@ -33,7 +30,7 @@ public class KafkaHealthMetricSyncTask implements Runnable{
     @Override
     public void run() {
         try {
-            logger.info("SYNCING");
+            loggerMaker.info("SYNCING");
             for (TopicPartition tp: consumer.assignment()) {
                 String tpName = tp.topic();
                 long position = consumer.position(tp);
@@ -57,7 +54,7 @@ public class KafkaHealthMetricSyncTask implements Runnable{
 
                 KafkaHealthMetricsDao.instance.getMCollection().replaceOne(filter, kafkaHealthMetric, replaceOptions);
             }
-            logger.info("SYNC DONE");
+            loggerMaker.info("SYNC DONE");
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("ERROR in kafka data sync from api runtime" + e, LogDb.RUNTIME);
         }

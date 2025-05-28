@@ -12,9 +12,11 @@ import com.akto.dto.type.SingleTypeInfo;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.metrics.AllMetrics;
-import com.akto.sql.SampleDataAltDb;
+import com.akto.testing_db_layer_client.ClientLayer;
 
 import java.util.*;
+
+import org.checkerframework.checker.units.qual.s;
 
 public class SampleMessageStore {
 
@@ -23,6 +25,7 @@ public class SampleMessageStore {
     private Map<ApiInfo.ApiInfoKey, List<String>> sampleDataMap = new HashMap<>();
     private Map<String, SingleTypeInfo> singleTypeInfos = new HashMap<>();
     private static final DataActor dataActor = DataActorFactory.fetchInstance();
+    private static final ClientLayer clientLayer = new ClientLayer();
     
     private SampleMessageStore() {}
 
@@ -40,7 +43,6 @@ public class SampleMessageStore {
         return dataActor.fetchTestRoles();
     }
 
-
     public void fetchSampleMessages(Set<Integer> apiCollectionIds) {
         List<SampleData> sampleDataList = new ArrayList<>();
         for (int i = 0; i < 200; i++) {
@@ -51,6 +53,10 @@ public class SampleMessageStore {
             }
             sampleDataList.addAll(sampleDataBatch);
         }
+        fillSampleDataMap(sampleDataList);
+    }
+
+    private void fillSampleDataMap(List<SampleData> sampleDataList){
         Map<ApiInfo.ApiInfoKey, List<String>> tempSampleDataMap = new HashMap<>();
         for (SampleData sampleData: sampleDataList) {
             if (sampleData.getSamples() == null) continue;
@@ -66,17 +72,33 @@ public class SampleMessageStore {
         sampleDataMap = new HashMap<>(tempSampleDataMap);
     }
 
-
+    public void fetchSampleMessages(List<ApiInfo.ApiInfoKey> apiInfoKeyList){
+        List<SampleData> sampleDataList = new ArrayList<>();
+        for(int i = 0 ; i < apiInfoKeyList.size(); i += DbLayer.SAMPLE_DATA_LIMIT){
+            List<ApiInfoKey> subList = new ArrayList<>(apiInfoKeyList.subList(i, Math.min(i + DbLayer.SAMPLE_DATA_LIMIT, apiInfoKeyList.size())));  
+            List<SampleData> sampleDataBatch = dataActor.fetchSampleDataForEndpoints(subList);
+            if (sampleDataBatch == null || sampleDataBatch.isEmpty()) {
+                break;
+            }
+            sampleDataList.addAll(sampleDataBatch);
+        }
+        fillSampleDataMap(sampleDataList);
+    }
 
     public List<RawApi> fetchAllOriginalMessages(ApiInfoKey apiInfoKey) {
         List<RawApi> messages = new ArrayList<>();
         try {
             long start = System.currentTimeMillis();
             List<String> samples = new ArrayList<>();
-            try {
-                samples = SampleDataAltDb.findSamplesByApiInfoKey(apiInfoKey);
-            } catch (Exception e) {
+            if(System.getenv("TESTING_DB_LAYER_SERVICE_URL") != null && !System.getenv("TESTING_DB_LAYER_SERVICE_URL").isEmpty()){
+                try {
+                    samples = clientLayer.fetchSamples(apiInfoKey);
+                } catch (Exception e) {
+                    e.printStackTrace();
+                    System.out.println("error in fetchAllOriginalMessages " + e.getMessage());
+                }
             }
+            
             if (samples == null) {
                 samples = new ArrayList<>();
             }

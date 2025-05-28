@@ -9,7 +9,6 @@ import com.akto.log.LoggerMaker.LogDb;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.introspect.AnnotatedMember;
 import com.fasterxml.jackson.databind.introspect.JacksonAnnotationIntrospector;
-import com.mongodb.client.model.Filters;
 import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.PathItem;
 import io.swagger.v3.oas.models.Paths;
@@ -21,30 +20,20 @@ import io.swagger.v3.oas.models.servers.Server;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.*;
-import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import static com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL;
 
 public class Main {
     private static final LoggerMaker loggerMaker = new LoggerMaker(Main.class);
-    private static final Logger logger = LoggerFactory.getLogger(Main.class);
 
     private static final ObjectMapper mapper = new ObjectMapper();
     public static void main2(String[] args) throws URISyntaxException {
         Pattern pattern = Pattern.compile("^((((https?|ftps?|gopher|telnet|nntp)://)|(mailto:|news:))(%[0-9A-Fa-f]{2}|[-()_.!~*';/?:@&=+$,A-Za-z0-9])+)([).!';/?:,][[:blank:|:blank:]])?$");
         String url = "https://petstore.swagger.io/v2/user/STRING";
         URI uri1 =  new URI("https://www.bb.petstore.swagger.io/v2/user/STRING#gg");
-        logger.info(uri1.getPath());
-        logger.info(uri1.getHost());
-//        Matcher a = pattern.matcher(url);
-//        System.out.println(a.matches());
-//        if (a.matches()) {
-//            URI uri =  new URI(url);
-//            System.out.println(uri.getPath());
-//        }
+        loggerMaker.info(uri1.getPath());
+        loggerMaker.info(uri1.getHost());
 
     }
 

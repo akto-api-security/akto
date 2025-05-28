@@ -5,8 +5,13 @@ import com.akto.dto.billing.Organization;
 import com.akto.dto.billing.Tokens;
 import com.akto.dto.dependency_flow.Node;
 import com.akto.dto.filter.MergedUrls;
+import com.akto.dto.jobs.JobExecutorType;
+import com.akto.dto.jobs.JobParams;
+import com.akto.dto.metrics.MetricData;
+import com.akto.dto.monitoring.ModuleInfo;
 import com.akto.dto.runtime_filters.RuntimeFilter;
 import com.akto.dto.settings.DataControlSettings;
+import com.akto.dto.test_editor.TestingRunPlayground;
 import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.test_run_findings.TestingRunIssues;
@@ -96,7 +101,7 @@ public abstract class DataActor {
     public abstract void createCollectionForHost(String host, int colId);
 
     public abstract AccountSettings fetchAccountSettingsForAccount(int accountId);
-    
+
     public abstract void insertRuntimeLog(Log log);
 
     public abstract void insertAnalyserLog(Log log);
@@ -109,9 +114,10 @@ public abstract class DataActor {
 
     public abstract TestingRunResultSummary createTRRSummaryIfAbsent(String testingRunHexId, int start);
 
-    public abstract TestingRun findPendingTestingRun(int delta);
+    public abstract void ingestMetricData(List<MetricData> metricData);
+    public abstract TestingRun findPendingTestingRun(int delta, String miniTestingName);
 
-    public abstract TestingRunResultSummary findPendingTestingRunResultSummary(int now, int delta);
+    public abstract TestingRunResultSummary findPendingTestingRunResultSummary(int now, int delta, String miniTestingName);
 
     public abstract TestingRun findTestingRun(String testingRunId);
 
@@ -120,8 +126,12 @@ public abstract class DataActor {
     public abstract void updateTestingRun(String testingRunId);
 
     public abstract void updateTestRunResultSummary(String summaryId);
+    public abstract void deleteTestRunResultSummary(String summaryId);
+    public abstract void deleteTestingRunResults(String testingRunResultId);
+    public abstract void updateStartTsTestRunResultSummary(String summaryId);
 
     public abstract List<TestingRunResult> fetchLatestTestingRunResult(String testingRunResultSummaryId);
+    public abstract List<TestingRunResult> fetchRerunTestingRunResult(String testingRunResultSummaryId);
 
     public abstract TestingRunResultSummary markTestRunResultSummaryFailed(String testingRunResultSummaryId);
 
@@ -144,6 +154,7 @@ public abstract class DataActor {
     public abstract ApiCollection fetchApiCollectionMeta(int apiCollectionId);
 
     public abstract TestingRunResultSummary fetchTestingRunResultSummary(String testingRunResultSummaryId);
+    public abstract TestingRunResultSummary fetchRerunTestingRunResultSummary(String originalTestingRunResultSummaryId);
 
     public abstract List<ApiCollection> fetchAllApiCollectionsMeta();
 
@@ -156,6 +167,8 @@ public abstract class DataActor {
     public abstract void updateTestInitiatedCountInTestSummary(String summaryId, int testInitiatedCount);
 
     public abstract List<YamlTemplate> fetchYamlTemplates(boolean fetchOnlyActive, int skip);
+
+    public abstract List<YamlTemplate> fetchYamlTemplatesWithIds(List<String> ids, boolean fetchOnlyActive);
 
     public abstract void updateTestResultsCountInTestSummary(String summaryId, int testResultsCount);
 
@@ -239,7 +252,7 @@ public abstract class DataActor {
     public abstract List<YamlTemplate> fetchActiveAdvancedFilters();
 
     public abstract List<TestingRunResultSummary> fetchStatusOfTests();
-    
+
     public abstract Set<MergedUrls> fetchMergedUrls();
 
     public abstract void createCollectionSimpleForVpc(int vxlanId, String vpcId);
@@ -268,4 +281,14 @@ public abstract class DataActor {
 
     public abstract List<DependencyNode> findDependencyNodes(int apiCollectionId, String url, String method, String reqMethod);
 
+    public abstract List<String> findTestSubCategoriesByTestSuiteId(List<String> testSuiteId);
+
+    public abstract TestingRunResultSummary findLatestTestingRunResultSummary(Bson filter);
+    public abstract void updateModuleInfo(ModuleInfo moduleInfo);
+
+    public abstract TestingRunPlayground getCurrentTestingRunDetailsFromEditor(int timestamp);
+
+    public abstract void updateTestingRunPlayground(TestingRunPlayground testingRunPlayground);
+
+    public abstract void scheduleAutoCreateTicketsJob(int accountId, JobParams params, JobExecutorType jobExecutorType);
 }

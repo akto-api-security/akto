@@ -1,7 +1,8 @@
 package com.akto.data_actor;
 
-import com.akto.dao.DependencyFlowNodesDao;
 import com.akto.dao.context.Context;
+import com.akto.dao.metrics.MetricDataDao;
+import com.akto.dao.testing.TestingRunResultDao;
 import com.akto.dao.testing.TestingRunResultSummariesDao;
 import com.akto.dto.*;
 import com.akto.dto.ApiInfo.ApiInfoKey;
@@ -9,8 +10,13 @@ import com.akto.dto.billing.Organization;
 import com.akto.dto.billing.Tokens;
 import com.akto.dto.dependency_flow.Node;
 import com.akto.dto.filter.MergedUrls;
+import com.akto.dto.jobs.JobExecutorType;
+import com.akto.dto.jobs.JobParams;
+import com.akto.dto.metrics.MetricData;
+import com.akto.dto.monitoring.ModuleInfo;
 import com.akto.dto.runtime_filters.RuntimeFilter;
 import com.akto.dto.settings.DataControlSettings;
+import com.akto.dto.test_editor.TestingRunPlayground;
 import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.test_run_findings.TestingRunIssues;
@@ -21,7 +27,6 @@ import com.akto.dto.testing.LoginFlowStepsData;
 import com.akto.dto.testing.OtpTestData;
 import com.akto.dto.testing.TestRoles;
 import com.akto.dto.testing.TestingRun;
-import com.akto.dto.testing.TestingRun.State;
 import com.akto.dto.testing.config.TestScript;
 import com.akto.dto.testing.TestingRunConfig;
 import com.akto.dto.testing.TestingRunResult;
@@ -33,14 +38,12 @@ import com.akto.dto.traffic.SampleData;
 import com.akto.dto.traffic.TrafficInfo;
 import com.akto.dto.traffic_metrics.TrafficMetrics;
 import com.akto.dto.type.SingleTypeInfo;
-import com.akto.dto.type.URLMethods;
 import com.akto.dto.type.URLMethods.Method;
 import com.akto.dto.usage.MetricTypes;
-import com.akto.util.Constants;
+import com.akto.jobs.JobScheduler;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
-import com.mongodb.client.model.FindOneAndUpdateOptions;
-import com.mongodb.client.model.ReturnDocument;
+import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.Updates;
 import com.mongodb.client.model.WriteModel;
 
@@ -240,11 +243,16 @@ public class DbActor extends DataActor {
         return DbLayer.createTRRSummaryIfAbsent(testingRunHexId, start);
     }
 
-    public TestingRun findPendingTestingRun(int delta) {
+    @Override
+    public void ingestMetricData(List<MetricData> metricData) {
+        DbLayer.ingestMetric(metricData);
+    }
+
+    public TestingRun findPendingTestingRun(int delta, String miniTestingName) {
         return DbLayer.findPendingTestingRun(delta);
     }
 
-    public TestingRunResultSummary findPendingTestingRunResultSummary(int now, int delta) {
+    public TestingRunResultSummary findPendingTestingRunResultSummary(int now, int delta, String miniTestingName) {
         return DbLayer.findPendingTestingRunResultSummary(now, delta);
     }
 
@@ -295,6 +303,11 @@ public class DbActor extends DataActor {
         return DbLayer.fetchLatestTestingRunResult(testingRunResultSummaryId);
     }
 
+    @Override
+    public List<TestingRunResult> fetchRerunTestingRunResult(String testingRunResultSummaryId) {
+        return DbLayer.fetchRerunTestingRunResult(testingRunResultSummaryId);
+    }
+
     public List<TestingRunResult> fetchLatestTestingRunResultBySummaryId(String summaryId, int limit, int skip) {
         return DbLayer.fetchLatestTestingRunResultBySummaryId(summaryId, limit, skip);
     }
@@ -343,6 +356,11 @@ public class DbActor extends DataActor {
         return DbLayer.fetchTestingRunResultSummary(testingRunResultSummaryId);
     }
 
+    @Override
+    public TestingRunResultSummary fetchRerunTestingRunResultSummary(String originalTestingRunResultSummaryId) {
+        return DbLayer.fetchRerunTestingRunResultSummary(originalTestingRunResultSummaryId);
+    }
+
     public Map<ObjectId, TestingRunResultSummary> fetchTestingRunResultSummaryMap(String testingRunId) {
         return DbLayer.fetchTestingRunResultSummaryMap(testingRunId);
     }
@@ -361,6 +379,10 @@ public class DbActor extends DataActor {
 
     public List<YamlTemplate> fetchYamlTemplates(boolean fetchOnlyActive, int skip) {
         return DbLayer.fetchYamlTemplates(fetchOnlyActive, skip);
+    }
+
+    public List<YamlTemplate> fetchYamlTemplatesWithIds(List<String> ids, boolean fetchOnlyActive){
+        return DbLayer.fetchYamlTemplatesWithIds(ids, fetchOnlyActive);
     }
 
     public ApiCollection findApiCollectionByName(String apiCollectionName) {
@@ -460,6 +482,21 @@ public class DbActor extends DataActor {
         DbLayer.updateTestRunResultSummary(summaryId);
     }
 
+    @Override
+    public void deleteTestRunResultSummary(String summaryId) {
+        DbLayer.deleteTestRunResultSummary(summaryId);
+    }
+
+    @Override
+    public void deleteTestingRunResults(String testingRunResultId) {
+        DbLayer.deleteTestingRunResults(testingRunResultId);
+    }
+
+    @Override
+    public void updateStartTsTestRunResultSummary(String summaryId) {
+        DbLayer.updateStartTsTestRunResultSummary(summaryId);
+    }
+
     public void updateTestRunResultSummaryNoUpsert(String testingRunResultSummaryId) {
         DbLayer.updateTestRunResultSummaryNoUpsert(testingRunResultSummaryId);
     }
@@ -555,5 +592,29 @@ public class DbActor extends DataActor {
     public List<DependencyNode> findDependencyNodes(int apiCollectionId, String url, String method, String reqMethod){
         return DbLayer.findDependencyNodes(apiCollectionId, url, method, reqMethod);
     }
+
+    public List<String> findTestSubCategoriesByTestSuiteId(List<String> testSuiteId) {
+        return DbLayer.findTestSubCategoriesByTestSuiteId(testSuiteId);
+    }
+
+    public TestingRunResultSummary findLatestTestingRunResultSummary(Bson filter){
+        return DbLayer.findLatestTestingRunResultSummary(filter);
+    }
+
+    public TestingRunPlayground getCurrentTestingRunDetailsFromEditor(int timestamp){
+        return DbLayer.getCurrentTestingRunDetailsFromEditor(timestamp);
+    }
+
+    public void updateTestingRunPlayground(TestingRunPlayground testingRunPlayground) {
+        DbLayer.updateTestingRunPlayground(testingRunPlayground);
+    }
+
+    public void scheduleAutoCreateTicketsJob(int accountId, JobParams params, JobExecutorType jobExecutorType) {
+        JobScheduler.scheduleRunOnceJob(accountId, params, jobExecutorType);
+    }
+    @Override
+    public void updateModuleInfo(ModuleInfo moduleInfo) {
+    }
+
 
 }

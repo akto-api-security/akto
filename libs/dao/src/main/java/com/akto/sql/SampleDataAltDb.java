@@ -2,7 +2,6 @@ package com.akto.sql;
 
 import java.sql.*;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 
@@ -45,7 +44,6 @@ public class SampleDataAltDb {
 
             // execute the INSERT statement and get the inserted id
             int[] updateCounts = stmt.executeBatch();
-            System.out.println(Arrays.toString(updateCounts));
 
         } catch (SQLException e) {
             e.printStackTrace();
@@ -171,7 +169,6 @@ public class SampleDataAltDb {
             }
 
             int count = stmt.executeUpdate();
-            System.out.println("Deleted " + count);
 
         } catch (SQLException e) {
             e.printStackTrace();

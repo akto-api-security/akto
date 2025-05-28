@@ -1,17 +1,30 @@
 package com.akto.util;
 
-import com.akto.dao.context.Context;
-import com.akto.dto.type.SingleTypeInfo;
-import com.akto.types.CappedSet;
 import com.akto.util.grpc.ProtoBufUtils;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.dataformat.xml.XmlMapper;
 import com.mongodb.BasicDBObject;
 import org.json.JSONObject;
 
+import java.io.StringReader;
+import java.io.StringWriter;
 import java.io.UnsupportedEncodingException;
 import java.net.URLDecoder;
 import java.net.URLEncoder;
 import java.util.*;
+
+import javax.xml.parsers.DocumentBuilder;
+import javax.xml.parsers.DocumentBuilderFactory;
+import javax.xml.transform.OutputKeys;
+import javax.xml.transform.TransformerFactory;
+import javax.xml.transform.dom.DOMSource;
+import javax.xml.transform.stream.StreamResult;
+
+import org.w3c.dom.*;
+import org.xml.sax.InputSource;
+
+import javax.xml.transform.*;
 
 import static com.akto.dto.OriginalHttpRequest.*;
 
@@ -21,36 +34,8 @@ public class HttpRequestResponseUtils {
 
     public static final String FORM_URL_ENCODED_CONTENT_TYPE = "application/x-www-form-urlencoded";
     public static final String GRPC_CONTENT_TYPE = "application/grpc";
-
-    public static List<SingleTypeInfo> generateSTIsFromPayload(int apiCollectionId, String url, String method,String body, int responseCode) {
-        int now = Context.now();
-        List<SingleTypeInfo> singleTypeInfos = new ArrayList<>();
-        Map<String, Set<Object>> respFlattened = extractValuesFromPayload(body);
-        for (String param: respFlattened.keySet()) {
-            // values is basically the type
-            Set<Object> values = respFlattened.get(param);
-            if (values == null || values.isEmpty()) continue;
-
-            ArrayList<Object> valuesList = new ArrayList<>(values);
-            String val = valuesList.get(0) == null ? null : valuesList.get(0).toString();
-            SingleTypeInfo.SubType subType = findSubType(val);
-            SingleTypeInfo.ParamId paramId = new SingleTypeInfo.ParamId(url, method,responseCode, false, param, subType, apiCollectionId, false);
-            SingleTypeInfo singleTypeInfo = new SingleTypeInfo(paramId, new HashSet<>(), new HashSet<>(), 0, now, 0, new CappedSet<>(), SingleTypeInfo.Domain.ANY, Long.MAX_VALUE, Long.MIN_VALUE);
-            singleTypeInfos.add(singleTypeInfo);
-        }
-
-        return singleTypeInfos;
-    }
-
-    public static SingleTypeInfo.SubType findSubType(String val) {
-        if (val == null) return SingleTypeInfo.GENERIC;
-        if (val.equalsIgnoreCase("short") || val.equalsIgnoreCase("int")) return  SingleTypeInfo.INTEGER_32;
-        if (val.equalsIgnoreCase("long")) return  SingleTypeInfo.INTEGER_64;
-        if (val.equalsIgnoreCase("float") || val.equalsIgnoreCase("double")) return  SingleTypeInfo.FLOAT;
-        if (val.equalsIgnoreCase("boolean")) return  SingleTypeInfo.TRUE;
-
-        return SingleTypeInfo.GENERIC;
-    }
+    public static final String SOAP = "soap";
+    public static final String XML = "xml";
 
     public static Map<String, Set<Object>> extractValuesFromPayload(String body) {
         if (body == null) return new HashMap<>();
@@ -74,6 +59,8 @@ public class HttpRequestResponseUtils {
                 return convertFormUrlEncodedToJson(rawRequest);
             } else if (acceptableContentType.equals(GRPC_CONTENT_TYPE)) {
                 return convertGRPCEncodedToJson(rawRequest);
+            } else if (acceptableContentType.contains(XML) || acceptableContentType.contains(SOAP) ) {
+                return convertXmlToJson(rawRequest);
             }
         }
 
@@ -99,6 +86,27 @@ public class HttpRequestResponseUtils {
         }
     }
 
+    private static ObjectMapper objectMapper = new ObjectMapper();
+    private static XmlMapper xmlMapper = new XmlMapper();
+
+    public static String convertXmlToJson(String rawRequest) {
+        try {
+            String removeXmlLine = rawRequest.replaceFirst("<\\?xml.*?\\?>", "").trim();
+            JsonNode rootNode = xmlMapper.readTree(removeXmlLine);
+            JsonNode bodyNode = rootNode.get("Body");
+            if (bodyNode == null) {
+                bodyNode = rootNode.get("body");
+            }
+
+            if (bodyNode == null) {
+                bodyNode = rootNode;
+            }
+            return objectMapper.writeValueAsString(bodyNode);
+        } catch (Exception e) {
+            return rawRequest;
+        }
+    }
+
     public static String convertGRPCEncodedToJson(String rawRequest) {
         try {
             Map<Object, Object> map = ProtoBufUtils.getInstance().decodeProto(rawRequest);
@@ -112,7 +120,7 @@ public class HttpRequestResponseUtils {
     }
     
     public static String getAcceptableContentType(Map<String,List<String>> headers) {
-        List<String> acceptableContentTypes = Arrays.asList(JSON_CONTENT_TYPE, FORM_URL_ENCODED_CONTENT_TYPE, GRPC_CONTENT_TYPE);
+        List<String> acceptableContentTypes = Arrays.asList(JSON_CONTENT_TYPE, FORM_URL_ENCODED_CONTENT_TYPE, GRPC_CONTENT_TYPE, XML, SOAP);
         List<String> contentTypeValues;
         if (headers == null) return null;
         for (String k: headers.keySet()) {
@@ -186,6 +194,74 @@ public class HttpRequestResponseUtils {
                 .replaceAll("\\%7E", "~")
                 .replaceAll("\\%5B", "[")
                 .replaceAll("\\%5D", "]");
+    }
+
+    public static String updateXmlWithModifiedJson(String originalXml, String modifiedJson) throws Exception {
+        ObjectMapper objectMapper = new ObjectMapper();
+
+        DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+        factory.setNamespaceAware(true);
+        DocumentBuilder builder = factory.newDocumentBuilder();
+        Document doc = builder.parse(new InputSource(new StringReader(originalXml)));
+
+        NodeList bodyNodes = doc.getElementsByTagNameNS("*", "Body");
+        boolean hasBody = bodyNodes.getLength() > 0;
+        Element targetElement;
+
+        if (hasBody) {
+            targetElement = (Element) bodyNodes.item(0);
+
+            // Clear existing content inside Body
+            while (targetElement.hasChildNodes()) {
+                targetElement.removeChild(targetElement.getFirstChild());
+            }
+        } else {
+            // No Body, target the document root itself
+            targetElement = doc.getDocumentElement();
+
+            // Clear existing content under root
+            while (targetElement.hasChildNodes()) {
+                targetElement.removeChild(targetElement.getFirstChild());
+            }
+        }
+
+        JsonNode modifiedBody = objectMapper.readTree(modifiedJson);
+
+        if (modifiedBody.isTextual()) {
+            String xmlContent = modifiedBody.asText();
+            Document tempDoc = builder.parse(new InputSource(new StringReader(xmlContent)));
+            Node importedNode = doc.importNode(tempDoc.getDocumentElement(), true);
+            targetElement.appendChild(importedNode);
+        } else {
+            appendJsonToXml(modifiedBody, doc, targetElement);
+        }
+
+        TransformerFactory tf = TransformerFactory.newInstance();
+        Transformer transformer = tf.newTransformer();
+        transformer.setOutputProperty(OutputKeys.OMIT_XML_DECLARATION, "no");
+        transformer.setOutputProperty(OutputKeys.INDENT, "yes");
+
+        StringWriter writer = new StringWriter();
+        transformer.transform(new DOMSource(doc), new StreamResult(writer));
+        return writer.toString();
+    }
+
+    private static void appendJsonToXml(JsonNode jsonNode, Document doc, Element parent) {
+        if (jsonNode.isObject()) {
+            jsonNode.fields().forEachRemaining(field -> {
+                Element child = doc.createElement(field.getKey());
+                appendJsonToXml(field.getValue(), doc, child);
+                parent.appendChild(child);
+            });
+        } else if (jsonNode.isArray()) {
+            jsonNode.forEach(item -> {
+                Element itemElement = doc.createElement("item");
+                appendJsonToXml(item, doc, itemElement);
+                parent.appendChild(itemElement);
+            });
+        } else {
+            parent.setTextContent(jsonNode.asText());
+        }
     }
 
 }

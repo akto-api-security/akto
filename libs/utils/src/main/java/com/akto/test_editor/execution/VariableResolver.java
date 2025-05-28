@@ -3,12 +3,14 @@ package com.akto.test_editor.execution;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.concurrent.ConcurrentHashMap;
 
 import com.akto.data_actor.DataActor;
 import com.akto.data_actor.DataActorFactory;
@@ -34,6 +36,8 @@ import static com.akto.runtime.parser.SampleParser.parseSampleMessage;
 public class VariableResolver {
     
     private static final DataActor dataActor = DataActorFactory.fetchInstance();
+    private static final ConcurrentHashMap<ApiInfoKey, SampleData> sampleDataCache = new ConcurrentHashMap<>();
+    private static final int MAX_CACHE_SIZE = 1000;
 
     public static Object getValue(Map<String, Object> varMap, String key) {
         if (!varMap.containsKey(key)) {
@@ -387,6 +391,103 @@ public class VariableResolver {
         return finalValue.isEmpty() ? null : String.join( " ", finalValue);
     }
 
+    public static String resolveAuthContextForPayload(Object resolveObj, String payload, String headerKey) {
+
+        String origExpression = null;
+        if (!(resolveObj instanceof String)) {
+            if (resolveObj instanceof Map) {
+                Map<String, Object> resolveMap = (Map) resolveObj;
+                if (resolveMap.size() != 1) return null;
+
+                origExpression = resolveMap.keySet().iterator().next();
+
+            } else {
+                return null;
+            }
+
+        } else {
+            origExpression = resolveObj.toString();
+        }
+
+        String expression = origExpression;
+        expression = expression.substring(2, expression.length());
+        expression = expression.substring(0, expression.length() - 1);
+
+        String authContextConstant = "auth_context.";
+        String secondParam = expression.substring(authContextConstant.length());// params[1];
+
+        BasicDBObject payloadObj = new BasicDBObject();
+        if (payload != null && payload.startsWith("[")) {
+            payload = "{\"json\": "+payload+"}";
+        }
+        try {
+            payloadObj = BasicDBObject.parse(payload);
+        } catch (Exception e) {
+        }
+
+        if (!payloadObj.containsKey(headerKey)) {
+            return null;
+        }
+
+        String headerVal = payloadObj.getString(headerKey);
+
+        String[] splitValue = headerVal.toString().split(" ");
+        String modifiedHeaderVal = null;
+
+        List<String> finalValue = new ArrayList<>();
+
+        for (String val: splitValue) {
+            if (!KeyTypes.isJWT(val)) {
+                finalValue.add(val);
+                continue;
+            }
+            if (secondParam.equalsIgnoreCase("none_algo_token")) {
+                NoneAlgoJWTModifier noneAlgoJWTModifier = new NoneAlgoJWTModifier("none");
+                try {
+                    modifiedHeaderVal = noneAlgoJWTModifier.jwtModify("", val);
+                } catch(Exception e) {
+                    return null;
+                }
+            } else if (secondParam.equalsIgnoreCase("invalid_signature_token")) {
+                InvalidSignatureJWTModifier invalidSigModified = new InvalidSignatureJWTModifier();
+                modifiedHeaderVal = invalidSigModified.jwtModify("", val);
+            } else if (secondParam.equalsIgnoreCase("jku_added_token")) {
+                AddJkuJWTModifier addJkuJWTModifier = new AddJkuJWTModifier();
+                try {
+                    modifiedHeaderVal = addJkuJWTModifier.jwtModify("", val);
+                } catch(Exception e) {
+                    return null;
+                }
+            } else if (secondParam.equalsIgnoreCase("modify_jwt")) {
+                try {
+                    Map<String, Object> kvPairMap = (Map) ((Map)resolveObj).get(origExpression);
+                    String kvKey = kvPairMap.keySet().iterator().next();
+                    JwtKvModifier jwtKvModifier = new JwtKvModifier(kvKey, kvPairMap.get(kvKey).toString());
+                    modifiedHeaderVal = jwtKvModifier.jwtModify("", val);
+                } catch (Exception e) {
+                    return null;
+                }
+            } else if (secondParam.equalsIgnoreCase("jwk_added_token")) {
+                AddJWKModifier addJWKModifier = new AddJWKModifier();
+                try {
+                    modifiedHeaderVal = addJWKModifier.jwtModify("", val);
+                } catch(Exception e) {
+                    return null;
+                }
+            } else if (secondParam.equalsIgnoreCase("kid_added_token")) {
+                AddKidParamModifier addKidParamModifier = new AddKidParamModifier();
+                try {
+                    modifiedHeaderVal = addKidParamModifier.jwtModify("", val);
+                } catch(Exception e) {
+                    return null;
+                }
+            } 
+            finalValue.add(modifiedHeaderVal);
+        }
+
+        return finalValue.isEmpty() ? null : String.join( " ", finalValue);
+    }
+
     public static Boolean isWordListVariable(Object key, Map<String, Object> varMap) {
         if (key == null) {
             return false;
@@ -588,9 +689,10 @@ public class VariableResolver {
                         continue;
                     }
 
-                    SampleData sd = dataActor.fetchSampleDataByIdMethod(apiInfoKey.getApiCollectionId(), singleTypeInfo.getUrl(), singleTypeInfo.getMethod());
-                    newSampleDataMap.put(infKey, sd.getSamples());
-
+                    SampleData sd = getCachedSampleData(apiInfoKey.getApiCollectionId(), singleTypeInfo.getUrl(), singleTypeInfo.getMethod());
+                    if (sd != null) {
+                        newSampleDataMap.put(infKey, sd.getSamples());
+                    }
                 }
                 
                 List<String> wordListVal = VariableResolver.fetchWordList(newSampleDataMap, key.toString(), location, isRegex);
@@ -854,5 +956,35 @@ public class VariableResolver {
     //     return null;
 
     // }
+
+    private static SampleData getCachedSampleData(int apiCollectionId, String url, String method) {
+        ApiInfoKey cacheKey = new ApiInfoKey(apiCollectionId, url, URLMethods.Method.fromString(method));
+        
+        // Try to get from cache first
+        SampleData cachedData = sampleDataCache.get(cacheKey);
+        if (cachedData != null) {
+            return cachedData;
+        }
+
+        // If cache is too large, remove some entries
+        if (sampleDataCache.size() >= MAX_CACHE_SIZE) {
+            int entriesToRemove = MAX_CACHE_SIZE / 10;
+            Iterator<ApiInfoKey> iterator = sampleDataCache.keySet().iterator();
+            for (int i = 0; i < entriesToRemove && iterator.hasNext(); i++) {
+                iterator.next();
+                iterator.remove();
+            }
+        }
+
+        SampleData sd = dataActor.fetchSampleDataByIdMethod(apiCollectionId, url, method);
+        if (sd != null) {
+            sampleDataCache.put(cacheKey, sd);
+        }
+        return sd;
+    }
+
+    public static void clearSampleDataCache() {
+        sampleDataCache.clear();
+    }
 
 }
