@@ -132,7 +132,7 @@ public class WebhookAction extends UserAction implements ServletRequestAware{
             addActionError("Unauthorized Request");
             return ERROR.toUpperCase();
         } 
-        boolean isUrl = customWebhook.getWebhookType().equals(WebhookType.GMAIL) ||  KeyTypes.patternToSubType.get(SingleTypeInfo.URL).matcher(url).matches() ;
+        boolean isUrl = (customWebhook.getWebhookType() != null && customWebhook.getWebhookType().equals(WebhookType.GMAIL)) ||  KeyTypes.patternToSubType.get(SingleTypeInfo.URL).matcher(url).matches() ;
 
         try{
             OriginalHttpRequest.buildHeadersMap(headerString);
