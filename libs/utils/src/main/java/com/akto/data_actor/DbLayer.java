@@ -492,14 +492,19 @@ public class DbLayer {
             }
         }
 
+        Bson update = Updates.combine(
+                Updates.set(ApiCollection.VXLAN_ID, vxlanId),
+                Updates.setOnInsert("startTs", Context.now()),
+                Updates.setOnInsert("urls", new HashSet<>())
+        );
+
+        if (userEnv != null) {
+            update = Updates.combine(update, Updates.set(ApiCollection.USER_ENV_TYPE, userEnv));
+        }
+
         ApiCollectionsDao.instance.getMCollection().updateOne(
                 filters,
-                Updates.combine(
-                        Updates.set(ApiCollection.VXLAN_ID, vxlanId),
-                        Updates.setOnInsert("startTs", Context.now()),
-                        Updates.setOnInsert("urls", new HashSet<>()),
-                        Updates.set(ApiCollection.USER_ENV_TYPE, userEnv)
-                ),
+                update,
                 updateOptions
         );
     }
@@ -535,9 +540,13 @@ public class DbLayer {
         Bson updates = Updates.combine(
             Updates.setOnInsert("_id", id),
             Updates.setOnInsert("startTs", Context.now()),
-            Updates.setOnInsert("urls", new HashSet<>()),
-            Updates.set(ApiCollection.USER_ENV_TYPE, userEnv)
+            Updates.setOnInsert("urls", new HashSet<>())
         );
+
+        if (userEnv != null) {
+            updates = Updates.combine(updates, Updates.set(ApiCollection.USER_ENV_TYPE, userEnv));
+        }
+
 
         ApiCollectionsDao.instance.getMCollection().findOneAndUpdate(Filters.eq(ApiCollection.HOST_NAME, host), updates, updateOptions);
     }
