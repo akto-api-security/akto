@@ -69,7 +69,7 @@ public class ThreatConfigurationEvaluator {
                             ThreatConfiguration.class, responseBody)
                     .orElse(null);
 
-            logger.debug("Fetched threat configuration" + threatConfiguration.toString());
+            logger.debug("Fetched threat configuration" + this.threatConfiguration.toString());
         } catch (Exception e) {
             e.printStackTrace();
             logger.error("Error while getting threat configuration" + e.getStackTrace());
