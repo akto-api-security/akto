@@ -92,18 +92,4 @@ public class CollectionTags {
 
     }
 
-    public static String convertTagsFormat(List<CollectionTags> tagsList) {
-        if(tagsList == null || tagsList.isEmpty()) {
-            return null;
-        }
-        BasicDBObject tagsListObj = new BasicDBObject();
-        tagsListObj.put("tagsList", tagsList);
-        ObjectMapper objectMapper = new ObjectMapper();
-        try {
-            return objectMapper.writeValueAsString(tagsList);
-        } catch (JsonProcessingException e) {
-            e.printStackTrace();
-            return null;
-        }
-    }
 }
