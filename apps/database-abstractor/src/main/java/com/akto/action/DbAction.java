@@ -20,6 +20,7 @@ import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.testing.*;
 import com.akto.dto.testing.config.TestScript;
 import com.akto.dto.testing.sources.TestSourceConfig;
+import com.akto.dto.traffic.CollectionTags;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.traffic.TrafficInfo;
 import com.akto.dto.traffic_metrics.TrafficMetrics;
@@ -215,7 +216,9 @@ public class DbAction extends ActionSupport {
     KafkaUtils kafkaUtils = new KafkaUtils();
     String endpointLogicalGroupId;
     String vpcId;
-    String tags;
+    @lombok.Getter
+    @lombok.Setter
+    List<CollectionTags> tagsList;
 
     String metricType;
 
@@ -1679,7 +1682,7 @@ public class DbAction extends ActionSupport {
     public String createCollectionSimpleForVpc() {
         try {
             System.out.println("called1 vpcId" + vpcId);
-            DbLayer.createCollectionSimpleForVpc(vxlanId, vpcId, tags);
+            DbLayer.createCollectionSimpleForVpc(vxlanId, vpcId, tagsList);
         } catch (Exception e) {
             return Action.ERROR.toUpperCase();
         }
@@ -1689,7 +1692,7 @@ public class DbAction extends ActionSupport {
     public String createCollectionForHostAndVpc() {
         try {
             System.out.println("called2 vpcId" + vpcId);
-            DbLayer.createCollectionForHostAndVpc(host, colId, vpcId, tags);
+            DbLayer.createCollectionForHostAndVpc(host, colId, vpcId, tagsList);
         } catch (Exception e) {
             return Action.ERROR.toUpperCase();
         }

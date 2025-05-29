@@ -72,6 +72,7 @@ import com.akto.dto.testing.WorkflowTestResult;
 import com.akto.dto.testing.TestingRun.State;
 import com.akto.dto.testing.config.TestScript;
 import com.akto.dto.testing.sources.TestSourceConfig;
+import com.akto.dto.traffic.CollectionTags;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.traffic.TrafficInfo;
 import com.akto.dto.traffic_metrics.TrafficMetrics;
@@ -386,18 +387,23 @@ public class DbLayer {
         );
     }
 
-    public static void createCollectionSimpleForVpc(int vxlanId, String vpcId, String tags) {
+    public static void createCollectionSimpleForVpc(int vxlanId, String vpcId, List<CollectionTags> tags) {
         UpdateOptions updateOptions = new UpdateOptions();
         updateOptions.upsert(true);
 
+        Bson updates = Updates.combine(
+            Updates.set(ApiCollection.VXLAN_ID, vxlanId),
+            Updates.setOnInsert("startTs", Context.now()),
+            Updates.setOnInsert("urls", new HashSet<>()),
+            Updates.set("userSetEnvType", vpcId)
+        );
+        if(tags != null && !tags.isEmpty()) {
+            updates = Updates.combine(updates, Updates.set("tagsList", tags));
+        }
+
         ApiCollectionsDao.instance.getMCollection().updateOne(
                 Filters.eq("_id", vxlanId),
-                Updates.combine(
-                        Updates.set(ApiCollection.VXLAN_ID, vxlanId),
-                        Updates.setOnInsert("startTs", Context.now()),
-                        Updates.setOnInsert("urls", new HashSet<>()),
-                        Updates.set("userSetEnvType", vpcId)
-                ),
+                updates,
                 updateOptions
         );
     }
@@ -416,7 +422,7 @@ public class DbLayer {
         ApiCollectionsDao.instance.getMCollection().findOneAndUpdate(Filters.eq(ApiCollection.HOST_NAME, host), updates, updateOptions);
     }
 
-    public static void createCollectionForHostAndVpc(String host, int id, String vpcId, String tags) {
+    public static void createCollectionForHostAndVpc(String host, int id, String vpcId, List<CollectionTags> tags) {
 
         FindOneAndUpdateOptions updateOptions = new FindOneAndUpdateOptions();
         updateOptions.upsert(true);
@@ -427,6 +433,10 @@ public class DbLayer {
             Updates.setOnInsert("urls", new HashSet<>()),
             Updates.set("userSetEnvType", vpcId)
         );
+
+        if(tags != null && !tags.isEmpty()) {
+            updates = Updates.combine(updates, Updates.set("tagsList", tags));
+        }
 
         ApiCollectionsDao.instance.getMCollection().findOneAndUpdate(Filters.eq(ApiCollection.HOST_NAME, host), updates, updateOptions);
     }
