@@ -437,6 +437,7 @@ public class ThreatActorService {
     List<Document> pipeline = new ArrayList<>();
     pipeline.add(
         new Document("$sort", new Document("country", 1).append("detectedAt", -1))); // sort
+    pipeline.add(new Document("$limit", 10000));
     pipeline.add(
         new Document(
             "$group",
