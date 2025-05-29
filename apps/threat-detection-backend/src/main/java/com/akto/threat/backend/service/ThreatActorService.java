@@ -162,6 +162,8 @@ public class ThreatActorService {
     }
 
     base.add(new Document("$sort", new Document("detectedAt", -1)));
+    base.add(new Document("$skip", skip));
+    base.add(new Document("$limit", limit));
     base.add(
         new Document(
             "$group",
