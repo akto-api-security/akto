@@ -37,10 +37,12 @@ public class CollectionTags {
         return Objects.hash(lastUpdatedTs, keyName, value);
     }
 
-    public static List<CollectionTags> getUpdatedTagsForCollection(List<CollectionTags> collectionTagsList, String tagsJson) {
+
+    public static List<CollectionTags> calculateTagsDiff(List<CollectionTags> collectionTagsList, String tagsJson) {
         if (tagsJson == null || tagsJson.isEmpty()) {
-            return new ArrayList<>();
+            return null;
         }
+
         Gson gson = new Gson();
         Map<String, String> tagsMap = gson.fromJson(tagsJson, Map.class);
         Map<String, String> dbtagsMap = new HashMap<>();
@@ -72,20 +74,7 @@ public class CollectionTags {
         return shouldUpdate ? newTags : null;
     }
 
-    public static String calculateTagsDiff(List<CollectionTags> collectionTagsList, String tagsJson) {
-        if (tagsJson == null || tagsJson.isEmpty()) {
-            return null;
-        }
-
-        List<CollectionTags> newTags = getUpdatedTagsForCollection(collectionTagsList, tagsJson);
-        if (newTags == null || newTags.isEmpty()) {
-            return null;
-        }
-
-        return convertTagsFormat(newTags);
-    }
-
-    public static String convertTagsFormat(String tagsJson){
+    public static List<CollectionTags>convertTagsFormat(String tagsJson){
         if(tagsJson == null || tagsJson.isEmpty()) {
             return null;
         }
@@ -99,7 +88,7 @@ public class CollectionTags {
             CollectionTags collectionTag = new CollectionTags(Context.now(), key, value);
             tagsList.add(collectionTag);
         }
-        return convertTagsFormat(tagsList);
+        return tagsList;
 
     }
 
@@ -111,7 +100,7 @@ public class CollectionTags {
         tagsListObj.put("tagsList", tagsList);
         ObjectMapper objectMapper = new ObjectMapper();
         try {
-            return objectMapper.writeValueAsString(tagsListObj);
+            return objectMapper.writeValueAsString(tagsList);
         } catch (JsonProcessingException e) {
             e.printStackTrace();
             return null;

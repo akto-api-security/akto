@@ -504,6 +504,10 @@ public class DbLayer {
             update = Updates.combine(update, Updates.set(ApiCollection.USER_ENV_TYPE, userEnv));
         }
 
+        if(tags != null && !tags.isEmpty()) {
+            update = Updates.combine(update, Updates.set(ApiCollection.TAGS_STRING, tags));
+        }
+
         ApiCollectionsDao.instance.getMCollection().updateOne(
                 filters,
                 update,
@@ -549,6 +553,9 @@ public class DbLayer {
             updates = Updates.combine(updates, Updates.set(ApiCollection.USER_ENV_TYPE, userEnv));
         }
 
+        if(tags != null && !tags.isEmpty()) {
+            updates = Updates.combine(updates, Updates.set(ApiCollection.TAGS_STRING, tags));
+        }
 
         ApiCollectionsDao.instance.getMCollection().findOneAndUpdate(Filters.eq(ApiCollection.HOST_NAME, host), updates, updateOptions);
     }
