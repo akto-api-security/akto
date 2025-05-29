@@ -172,7 +172,7 @@ public class ApiCollectionsAction extends UserAction {
         List<Bson> pipeLine = new ArrayList<>();
         pipeLine.add(Aggregates.project(Projections.fields(
             Projections.computed(ApiCollection.URLS_COUNT, new BasicDBObject("$size", new BasicDBObject("$ifNull", Arrays.asList("$urls", Collections.emptyList())))),
-            Projections.include(ApiCollection.ID, ApiCollection.NAME, ApiCollection.HOST_NAME, ApiCollection._TYPE, ApiCollection.TAGS_STRING, ApiCollection._DEACTIVATED,ApiCollection.START_TS, ApiCollection.AUTOMATED, ApiCollection.DESCRIPTION)
+            Projections.include(ApiCollection.ID, ApiCollection.NAME, ApiCollection.HOST_NAME, ApiCollection._TYPE, ApiCollection.TAGS_STRING, ApiCollection._DEACTIVATED,ApiCollection.START_TS, ApiCollection.AUTOMATED, ApiCollection.DESCRIPTION, ApiCollection.USER_ENV_TYPE)
         )));
 
         try {
@@ -182,33 +182,15 @@ public class ApiCollectionsAction extends UserAction {
             }
         } catch(Exception e){
         }
-        MongoCursor<BasicDBObject> cursor = ApiCollectionsDao.instance.getMCollection().aggregate(pipeLine, BasicDBObject.class).cursor();
+        MongoCursor<ApiCollection> cursor = ApiCollectionsDao.instance.getMCollection().aggregate(pipeLine, ApiCollection.class).cursor();
         while(cursor.hasNext()){
             try {
-                BasicDBObject collection = cursor.next();
-                ApiCollection apiCollection = new ApiCollection();
-                apiCollection.setId(collection.getInt(ApiCollection.ID));
-                apiCollection.setUrlsCount(collection.getInt(ApiCollection.URLS_COUNT)); 
-                apiCollection.setName(collection.getString(ApiCollection.NAME));
-                apiCollection.setHostName(collection.getString(ApiCollection.HOST_NAME));
-                apiCollection.setDeactivated(collection.getBoolean(ApiCollection._DEACTIVATED));
-                apiCollection.setStartTs(collection.getInt(ApiCollection.START_TS));
-                apiCollection.setAutomated(collection.getBoolean(ApiCollection.AUTOMATED));
-                apiCollection.setDescription(collection.getString(ApiCollection.DESCRIPTION));
-
-                String type = collection.getString(ApiCollection._TYPE);
-                if(type != null && type.length() > 0){
-                    ApiCollection.Type typeEnum = ApiCollection.Type.valueOf(type);
-                    apiCollection.setType(typeEnum);
-                }
+                ApiCollection apiCollection = cursor.next();
                 List<CollectionTags> tagsList = new ArrayList<>();
-                Object value = collection.get(ApiCollection.TAGS_STRING);
-                if (value instanceof List) {
-                    List<?> list = (List<?>) value;
-                    for(Object obj : list) {
-                        BasicDBObject tag = (BasicDBObject) obj;
-                        CollectionTags collectionTags = new CollectionTags(tag.getInt(CollectionTags.LAST_UPDATED_TS), tag.getString(CollectionTags.KEY_NAME), tag.getString(CollectionTags.VALUE));
-
+                List<CollectionTags> value = apiCollection.getTagsList();
+                if(value != null) {
+                    for (CollectionTags tag : value) {
+                        CollectionTags collectionTags = new CollectionTags(tag.getLastUpdatedTs(), tag.getKeyName(), tag.getValue());
                         tagsList.add(collectionTags);
                     }
                 }
@@ -793,13 +775,47 @@ public class ApiCollectionsAction extends UserAction {
                 toAdd.addAll(envType);
             }
             else {
-                Set<CollectionTags> tagsSet = new HashSet<>(envType);
                 for (CollectionTags env : envType) {
-                    if (tagsSet.contains(env)) {
+                    boolean found = tagsList.stream().anyMatch(tag ->
+                            Objects.equals(tag.getKeyName(), env.getKeyName()) &&
+                                    Objects.equals(tag.getValue(), env.getValue())
+                    );
+
+                    if (found) {
                         toPull.add(env);
                     } else {
                         toAdd.add(env);
                     }
+                }
+
+                boolean isAddingStaging = toAdd.stream().anyMatch(tag ->
+                        "envType".equalsIgnoreCase(tag.getKeyName()) &&
+                                "staging".equalsIgnoreCase(tag.getValue())
+                );
+
+                boolean isAddingProduction = toAdd.stream().anyMatch(tag ->
+                        "envType".equalsIgnoreCase(tag.getKeyName()) &&
+                                "production".equalsIgnoreCase(tag.getValue())
+                );
+
+                if (isAddingStaging) {
+                    tagsList.stream()
+                            .filter(tag ->
+                                    "envType".equalsIgnoreCase(tag.getKeyName()) &&
+                                            "production".equalsIgnoreCase(tag.getValue())
+                            )
+                            .findFirst()
+                            .ifPresent(toPull::add);
+                }
+
+                if (isAddingProduction) {
+                    tagsList.stream()
+                            .filter(tag ->
+                                    "envType".equalsIgnoreCase(tag.getKeyName()) &&
+                                            "staging".equalsIgnoreCase(tag.getValue())
+                            )
+                            .findFirst()
+                            .ifPresent(toPull::add);
                 }
             }
 

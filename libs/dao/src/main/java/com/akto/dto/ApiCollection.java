@@ -14,8 +14,6 @@ import com.akto.dto.testing.CustomTestingEndpoints;
 import com.akto.dto.testing.TestingEndpoints;
 import com.akto.dto.traffic.CollectionTags;
 
-import lombok.Getter;
-import lombok.Setter;
 
 public class ApiCollection {
 
@@ -91,8 +89,6 @@ public class ApiCollection {
     List<TestingEndpoints> conditions;
     public static final String CONDITIONS_STRING = "conditions";
 
-    @Getter
-    @Setter
     List<CollectionTags> tagsList;
     public static final String TAGS_STRING = "tagsList";
 
@@ -323,7 +319,13 @@ public class ApiCollection {
 
     @Deprecated
 	public void setUserSetEnvType(String userSetEnvType) {
-		this.userSetEnvType = userSetEnvType;
+        this.userSetEnvType = userSetEnvType;
+
+        if(this.tagsList == null) {
+            this.tagsList = new ArrayList<>();
+        }
+
+        this.tagsList.add(new CollectionTags(Context.now(), "userSetEnvType", userSetEnvType));
 	}
 
     public boolean getAutomated() {
@@ -360,5 +362,13 @@ public class ApiCollection {
 
     public void setDescription(String description) {
         this.description = description;
+    }
+
+    public List<CollectionTags> getTagsList() {
+        return tagsList;
+    }
+
+    public void setTagsList(List<CollectionTags> tagsList) {
+        this.tagsList = tagsList;
     }
 }

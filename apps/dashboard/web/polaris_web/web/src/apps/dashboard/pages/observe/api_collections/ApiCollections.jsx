@@ -34,6 +34,7 @@ import ReactFlow, {
   
   } from 'react-flow-renderer';
 import { on } from "stream";
+import SetUserEnvPopupComponent from "./component/SetUserEnvPopupComponent";
   
 const CenterViewType = {
     Table: 0,
@@ -240,8 +241,6 @@ function ApiCollections() {
     const [normalData, setNormalData] = useState([])
     const [centerView, setCenterView] = useState(CenterViewType.Table);
     const [moreActions, setMoreActions] = useState(false);
-    const [textFieldActive, setTextFieldActive] = useState(false);
-    const [customEnv,setCustomEnv] = useState('')
 
     // const dummyData = dummyJson;
 
@@ -663,34 +662,18 @@ function ApiCollections() {
                 activator={<div onClick={() => setPopover(!popover)}>Set ENV type</div>}
                 onClose={() => {
                     setPopover(false)
-                    setTextFieldActive(false)
                 }}
                 active={popover}
                 autofocusTarget="first-node"
             >
                 <Popover.Pane>
-                    {textFieldActive ? 
-                    <Box padding={"1"}>
-                        <TextField onChange={setCustomEnv} value={customEnv} connectedRight={(
-                            <Tooltip content="Save your Custom env type" dismissOnMouseOut>
-                                <Button onClick={() => {
-                                    resetResourcesSelected();
-                                    updateEnvType(selectedResources, customEnv);
-                                    setTextFieldActive(false);
-                                }} plain icon={FileFilledMinor}/>
-                            </Tooltip>
-                        )}/>
-                    </Box>
-                        :<ActionList
-                        actionRole="menuitem"
-                        items={[
-                            {content: 'Staging', onAction: () => updateEnvType(selectedResources, "STAGING")},
-                            {content: 'Production', onAction: () => updateEnvType(selectedResources, "PRODUCTION")},
-                            {content: 'Reset', onAction: () => updateEnvType(selectedResources, null)},
-                            {content: 'Add Custom', onAction: () => setTextFieldActive(!textFieldActive)}
-                        ]}
-                    
-                    />}
+                    <SetUserEnvPopupComponent
+                        popover={popover}
+                        setPopover={setPopover}
+                        tags={envTypeMap}
+                        updateTags={updateTags}
+                        apiCollectionIds={selectedResources}
+                    />
                 </Popover.Pane>
             </Popover>
         )
@@ -717,39 +700,31 @@ function ApiCollections() {
         setRefreshData(!refreshData)
     }
 
-    const updateEnvType = (apiCollectionIds,type) => {
+    const updateTags = (apiCollectionIds, tagObj) => {
         let copyObj = JSON.parse(JSON.stringify(envTypeMap))
-        const envTypes = type ? type?.split(",") : []
-
-
+        
         apiCollectionIds.forEach(id => {
-            if (!copyObj[id]) {
+            if(!copyObj[id]) {
                 copyObj[id] = []
             }
-    
-            if(type === null) {
+
+            if(tagObj === null) {
                 copyObj[id] = []
             } else {
-                envTypes.forEach(env => {
-                    const index = copyObj[id].indexOf(env)
-                    if (index > -1) {
-                        copyObj[id].splice(index, 1)
-                    } else {
-                        copyObj[id].push(env)
-                    }
-                })
+                copyObj[id] = tagObj
             }
         })
 
-        api.updateEnvTypeOfCollection(envTypes,apiCollectionIds,type === null).then((resp) => {
+
+
+        api.updateEnvTypeOfCollection(tagObj, apiCollectionIds, tagObj === null).then((resp) => {
             func.setToast(true, false, "ENV type updated successfully")
             setEnvTypeMap(copyObj)
             updateData(copyObj)
         })
+
         resetResourcesSelected();
         setPopover(false)
-        setTextFieldActive(false)
-
     }
 
     const modalComponent = <CreateNewCollectionModal
