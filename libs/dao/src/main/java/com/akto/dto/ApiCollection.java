@@ -1,9 +1,9 @@
 package com.akto.dto;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Objects;
 import java.util.Set;
 
 import org.bson.codecs.pojo.annotations.BsonId;
@@ -12,6 +12,8 @@ import org.bson.codecs.pojo.annotations.BsonIgnore;
 import com.akto.dao.context.Context;
 import com.akto.dto.testing.CustomTestingEndpoints;
 import com.akto.dto.testing.TestingEndpoints;
+import com.akto.dto.traffic.CollectionTags;
+
 
 public class ApiCollection {
 
@@ -53,6 +55,18 @@ public class ApiCollection {
     private boolean matchDependencyWithOtherCollections;
     public static final String MATCH_DEPENDENCY_WITH_OTHER_COLLECTIONS = "matchDependencyWithOtherCollections";
 
+    private static final List<String> ENV_KEYWORDS_WITH_DOT = Arrays.asList(
+        "staging", "preprod", "qa", "demo", "dev", "test", "svc", 
+        "localhost", "local", "intranet", "lan", "example", "invalid", 
+        "home", "corp", "priv", "localdomain", "localnet", "network", 
+        "int", "private"
+    );
+
+    private static final List<String> ENV_KEYWORDS_WITHOUT_DOT = Arrays.asList(
+        "kubernetes", "internal"
+    );
+
+
     public enum Type {
         API_GROUP
     }
@@ -63,13 +77,17 @@ public class ApiCollection {
 
     Type type;
     public static final String _TYPE = "type";
-    
+
+    @Deprecated
     String userSetEnvType;
 
 	public static final String USER_ENV_TYPE = "userSetEnvType";
 
     List<TestingEndpoints> conditions;
     public static final String CONDITIONS_STRING = "conditions";
+
+    List<CollectionTags> tagsList;
+    public static final String TAGS_STRING = "tagsList";
 
     public ApiCollection() {
     }
@@ -127,16 +145,31 @@ public class ApiCollection {
         this.urls = urls;
     }
 
-    public String getEnvType(){
+    public List<CollectionTags> getEnvType(){
         if(this.type != null && this.type == Type.API_GROUP) return null;
         
-        if(this.userSetEnvType == null){
-            if(this.hostName != null && this.hostName.matches(".*(staging|preprod|qa|demo|dev|test\\.).*")){
-                return "STAGING";
+        if(this.tagsList == null || this.tagsList.isEmpty()){
+            CollectionTags envTypeTag = new CollectionTags();
+            envTypeTag.setKeyName("envType");
+            if (this.hostName != null) {
+                for (String keyword : ENV_KEYWORDS_WITH_DOT) {
+                    if (this.hostName.contains("." + keyword)) {
+                        envTypeTag.setValue("STAGING");
+                    }
+                }
+                for (String keyword : ENV_KEYWORDS_WITHOUT_DOT) {
+                    if (this.hostName.contains(keyword)) {
+                        envTypeTag.setValue("STAGING");
+                    }
+                }
+
+                if(envTypeTag.getValue() != null) {
+                    return Arrays.asList(envTypeTag);
+                }
             }
             return null;
         }else{
-            return this.userSetEnvType;
+            return this.tagsList;
         }
     }
 
@@ -276,12 +309,20 @@ public class ApiCollection {
         this.sampleCollectionsDropped = sampleCollectionsDropped;
     }
 
+    @Deprecated
     public String getUserSetEnvType() {
 		return userSetEnvType;
 	}
 
+    @Deprecated
 	public void setUserSetEnvType(String userSetEnvType) {
-		this.userSetEnvType = userSetEnvType;
+        this.userSetEnvType = userSetEnvType;
+
+        if(this.tagsList == null) {
+            this.tagsList = new ArrayList<>();
+        }
+
+        this.tagsList.add(new CollectionTags(Context.now(), "userSetEnvType", userSetEnvType));
 	}
 
     public boolean getAutomated() {
@@ -310,5 +351,15 @@ public class ApiCollection {
 
     public void setRunDependencyAnalyser(boolean runDependencyAnalyser) {
         this.runDependencyAnalyser = runDependencyAnalyser;
+    }
+
+
+
+    public List<CollectionTags> getTagsList() {
+        return tagsList;
+    }
+
+    public void setTagsList(List<CollectionTags> tagsList) {
+        this.tagsList = tagsList;
     }
 }

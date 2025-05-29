@@ -14,9 +14,9 @@ public class TestDbLayer extends MongoBasedTest {
         // Test creating a new collection with VPC
         int vxlanId = 123;
         String vpcId = "vpc-123";
-        
-        DbLayer.createCollectionSimpleForVpc(vxlanId, vpcId);
-        
+
+        DbLayer.createCollectionSimpleForVpc(vxlanId, vpcId, null);
+
         ApiCollection collection = ApiCollectionsDao.instance.findOne(Constants.ID, vxlanId);
         assertNotNull(collection);
         assertEquals(vxlanId, collection.getVxlanId());
@@ -32,13 +32,13 @@ public class TestDbLayer extends MongoBasedTest {
         int vxlanId = 456;
         String vpcId1 = "vpc-456";
         String vpcId2 = "vpc-789";
-        
+
         // First create with vpcId1
-        DbLayer.createCollectionSimpleForVpc(vxlanId, vpcId1);
-        
+        DbLayer.createCollectionSimpleForVpc(vxlanId, vpcId1, null);
+
         // Then update with vpcId2
-        DbLayer.createCollectionSimpleForVpc(vxlanId, vpcId2);
-        
+        DbLayer.createCollectionSimpleForVpc(vxlanId, vpcId2, null);
+
         ApiCollection collection = ApiCollectionsDao.instance.findOne(Constants.ID, vxlanId);
         assertNotNull(collection);
         assertEquals(vxlanId, collection.getVxlanId());
@@ -51,9 +51,9 @@ public class TestDbLayer extends MongoBasedTest {
         String host = "example.com";
         int id = 789;
         String vpcId = "vpc-abc";
-        
-        DbLayer.createCollectionForHostAndVpc(host, id, vpcId);
-        
+
+        DbLayer.createCollectionForHostAndVpc(host, id, vpcId, null);
+
         ApiCollection collection = ApiCollectionsDao.instance.findOne(ApiCollection.HOST_NAME, host);
         assertNotNull(collection);
         assertEquals(id, collection.getId());
@@ -71,13 +71,13 @@ public class TestDbLayer extends MongoBasedTest {
         int id = 101;
         String vpcId1 = "vpc-xyz";
         String vpcId2 = "vpc-uvw";
-        
+
         // First create with vpcId1
-        DbLayer.createCollectionForHostAndVpc(host, id, vpcId1);
-        
+        DbLayer.createCollectionForHostAndVpc(host, id, vpcId1, null);
+
         // Then update with vpcId2
-        DbLayer.createCollectionForHostAndVpc(host, id, vpcId2);
-        
+        DbLayer.createCollectionForHostAndVpc(host, id, vpcId2, null);
+
         ApiCollection collection = ApiCollectionsDao.instance.findOne(ApiCollection.HOST_NAME, host);
         assertNotNull(collection);
         assertEquals(id, collection.getId());
@@ -90,9 +90,9 @@ public class TestDbLayer extends MongoBasedTest {
         // Test creating a collection with null VPC ID
         String host = "nullvpc.com";
         int id = 202;
-        
-        DbLayer.createCollectionForHostAndVpc(host, id, null);
-        
+
+        DbLayer.createCollectionForHostAndVpc(host, id, null, null);
+
         ApiCollection collection = ApiCollectionsDao.instance.findOne(ApiCollection.HOST_NAME, host);
         assertNotNull(collection);
         assertEquals(id, collection.getId());
@@ -106,13 +106,13 @@ public class TestDbLayer extends MongoBasedTest {
         String host = "preserve-env.com";
         int id = 303;
         String existingVpcId = "vpc-existing";
-        
+
         // First create with existing VPC ID
-        DbLayer.createCollectionForHostAndVpc(host, id, existingVpcId);
-        
+        DbLayer.createCollectionForHostAndVpc(host, id, existingVpcId, null);
+
         // Then try to update with null VPC ID
-        DbLayer.createCollectionForHostAndVpc(host, id, null);
-        
+        DbLayer.createCollectionForHostAndVpc(host, id, null, null);
+
         ApiCollection collection = ApiCollectionsDao.instance.findOne(ApiCollection.HOST_NAME, host);
         assertNotNull(collection);
         assertEquals(id, collection.getId());

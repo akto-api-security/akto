@@ -30,6 +30,7 @@ import com.akto.dto.testing.*;
 import com.akto.dto.testing.config.TestScript;
 import com.akto.dto.testing.sources.TestSourceConfig;
 import com.akto.dto.threat_detection.ApiHitCountInfo;
+import com.akto.dto.traffic.CollectionTags;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.traffic.SuspectSampleData;
 import com.akto.dto.traffic.TrafficInfo;
@@ -246,6 +247,9 @@ public class DbAction extends ActionSupport {
     KafkaUtils kafkaUtils = new KafkaUtils();
     String endpointLogicalGroupId;
     String vpcId;
+    @lombok.Getter
+    @lombok.Setter
+    List<CollectionTags> tagsList;
     private TestingRunPlayground.TestingRunPlaygroundType testingRunPlaygroundType;
     private OriginalHttpResponse originalHttpResponse;
     String metricType;
@@ -2229,7 +2233,7 @@ public class DbAction extends ActionSupport {
 
     public String createCollectionSimpleForVpc() {
         try {
-            DbLayer.createCollectionSimpleForVpc(vxlanId, vpcId);
+            DbLayer.createCollectionSimpleForVpc(vxlanId, vpcId, tagsList);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error in createCollectionSimpleForVpc " + e.toString());
             return Action.ERROR.toUpperCase();
@@ -2239,7 +2243,7 @@ public class DbAction extends ActionSupport {
 
     public String createCollectionForHostAndVpc() {
         try {
-            DbLayer.createCollectionForHostAndVpc(host, colId, vpcId);
+            DbLayer.createCollectionForHostAndVpc(host, colId, vpcId, tagsList);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error in createCollectionForHostAndVpc " + e.toString());
             return Action.ERROR.toUpperCase();

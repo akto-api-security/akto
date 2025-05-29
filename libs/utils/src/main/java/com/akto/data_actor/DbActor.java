@@ -29,6 +29,7 @@ import com.akto.dto.testing.WorkflowTest;
 import com.akto.dto.testing.WorkflowTestResult;
 import com.akto.dto.testing.sources.TestSourceConfig;
 import com.akto.dto.threat_detection.ApiHitCountInfo;
+import com.akto.dto.traffic.CollectionTags;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.traffic.SuspectSampleData;
 import com.akto.dto.traffic.TrafficInfo;
@@ -554,12 +555,12 @@ public class DbActor extends DataActor {
         return DbLayer.fetchStatusOfTests();
     }
 
-    public void createCollectionSimpleForVpc(int vxlanId, String vpcId) {
-        DbLayer.createCollectionSimpleForVpc(vxlanId, vpcId);
+    public void createCollectionSimpleForVpc(int vxlanId, String vpcId, List<CollectionTags> tags) {
+        DbLayer.createCollectionSimpleForVpc(vxlanId, vpcId, tags);
     }
 
-    public void createCollectionForHostAndVpc(String host, int colId, String vpcId) {
-        DbLayer.createCollectionForHostAndVpc(host, colId, vpcId);
+    public void createCollectionForHostAndVpc(String host, int colId, String vpcId, List<CollectionTags> tags) {
+        DbLayer.createCollectionForHostAndVpc(host, colId, vpcId, tags);
     }
 
     public List<BasicDBObject> fetchEndpointsInCollectionUsingHost(int apiCollectionId, int skip, int deltaPeriodValue) {

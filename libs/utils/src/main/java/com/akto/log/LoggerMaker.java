@@ -164,6 +164,10 @@ public class LoggerMaker  {
         sendToSlack(slackCyborgWebhookUrl, err);
     }
 
+    public void debug(String msg, Object... vars){
+        logger.debug(msg, vars);
+    }
+
     protected String basicError(String err, LogDb db) {
         if(Context.accountId.get() != null){
             err = String.format("%s\nAccount id: %d", err, Context.accountId.get());

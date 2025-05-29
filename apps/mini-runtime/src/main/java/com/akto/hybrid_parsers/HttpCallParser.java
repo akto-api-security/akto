@@ -1,8 +1,6 @@
 package com.akto.hybrid_parsers;
 
 import com.akto.RuntimeMode;
-import com.akto.dao.ApiCollectionsDao;
-import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.traffic_metrics.TrafficMetricsDao;
 import com.akto.hybrid_dependency.DependencyAnalyser;
@@ -13,6 +11,7 @@ import com.akto.dto.billing.Organization;
 import com.akto.dto.bulk_updates.BulkUpdates;
 import com.akto.dto.bulk_updates.UpdatePayload;
 import com.akto.dto.settings.DefaultPayload;
+import com.akto.dto.traffic.CollectionTags;
 import com.akto.dto.traffic_metrics.TrafficMetrics;
 import com.akto.graphql.GraphQLUtils;
 import com.akto.log.LoggerMaker;
@@ -48,6 +47,9 @@ public class HttpCallParser {
     private final int sync_threshold_count;
     private final int sync_threshold_time;
     private int sync_count = 0;
+    private int tagsLastUpdated = 0;
+    private static final int TAGS_UPDATE_INTERVAL = 15 * 60; // 15 minutes
+    private static final String NON_HOSTNAME_KEY = "null" + " "; // used for collections created without hostnames
     private int last_synced;
     private static final LoggerMaker loggerMaker = new LoggerMaker(HttpCallParser.class, LogDb.RUNTIME);
     public APICatalogSync apiCatalogSync;
@@ -120,13 +122,13 @@ public class HttpCallParser {
         return vxlanId;
     }
 
-    public int createCollectionSimpleForVpc(int vxlanId, String vpcId) {
-        dataActor.createCollectionSimpleForVpc(vxlanId, vpcId);
+    public int createCollectionSimpleForVpc(int vxlanId, String vpcId, List<CollectionTags> tags) {
+        dataActor.createCollectionSimpleForVpc(vxlanId, vpcId, tags);
         return vxlanId;
     }
 
 
-    public int createCollectionBasedOnHostName(int id, String host)  throws Exception {
+    public int createCollectionBasedOnHostName(int id, String host, List<CollectionTags> tags)  throws Exception {
         FindOneAndUpdateOptions updateOptions = new FindOneAndUpdateOptions();
         updateOptions.upsert(true);
         String vpcId = System.getenv("VPC_ID");
@@ -138,7 +140,7 @@ public class HttpCallParser {
         for (int i=0;i < 100; i++) {
             id += i;
             try {
-                dataActor.createCollectionForHostAndVpc(host, id, vpcId);
+                dataActor.createCollectionForHostAndVpc(host, id, vpcId, tags);
                 flag = true;
                 break;
             } catch (Exception e) {
@@ -347,6 +349,46 @@ public class HttpCallParser {
 
         trafficMetrics.inc(value);
     }
+/**
+     * Updates API collection tags if any new tags are detected.
+     * 
+     * @param hostNameMapKey     key for the host name map, which is used to create
+     *                           collections based on host names.
+     * @param httpResponseParams
+     */
+    public void updateApiCollectionTags(String hostNameMapKey, HttpResponseParams httpResponseParams) {
+        if (Context.now() - this.tagsLastUpdated < TAGS_UPDATE_INTERVAL) {
+            // Avoid updating tags too frequently
+            return;
+        }
+        this.tagsLastUpdated = Context.now();
+        int apiCollectionId = httpResponseParams.requestParams.getApiCollectionId();
+        ApiCollection apiCollection = apiCollectionsMap.get(apiCollectionId);
+
+        List<CollectionTags> tagsList = CollectionTags.calculateTagsDiff(apiCollection.getTagsList(), httpResponseParams.getTags());
+
+        if (tagsList == null || tagsList.isEmpty()) {
+            return;
+        }
+        
+        // Detects if collections were created based on hostName
+        if (hostNameMapKey.contains(NON_HOSTNAME_KEY)) {
+            String vpcId = System.getenv("VPC_ID");
+            createCollectionSimpleForVpc(
+                    httpResponseParams.requestParams.getApiCollectionId(), vpcId, tagsList);
+        } else {
+            try {
+                createCollectionBasedOnHostName(hostNameMapKey.hashCode(), hostNameMapKey,
+                        tagsList);
+            } catch (Exception e) {
+                loggerMaker.error(
+                        "Error while updating api collection tags for host: " + hostNameMapKey + " " + e.getMessage());
+                e.printStackTrace();
+            }
+        }
+
+        loggerMaker.debug("Updated tags for apiCollectionId: " + apiCollectionId + " with tags: " + tagsList);
+    }
 
     public List<HttpResponseParams> filterHttpResponseParams(List<HttpResponseParams> httpResponseParamsList) {
         List<HttpResponseParams> filteredResponseParams = new ArrayList<>();
@@ -376,7 +418,11 @@ public class HttpCallParser {
 
 
             int vxlanId = httpResponseParam.requestParams.getApiCollectionId();
-            int apiCollectionId ;
+            int apiCollectionId;
+
+            List<CollectionTags> tagsList = CollectionTags.convertTagsFormat(httpResponseParam.getTags());
+
+
 
             if (useHostCondition(hostName, httpResponseParam.getSource())) {
                 hostName = hostName.toLowerCase();
@@ -386,27 +432,30 @@ public class HttpCallParser {
 
                 if (hostNameToIdMap.containsKey(key)) {
                     apiCollectionId = hostNameToIdMap.get(key);
+                    updateApiCollectionTags(key, httpResponseParam);
 
                 } else {
                     int id = hostName.hashCode();
                     try {
 
-                        apiCollectionId = createCollectionBasedOnHostName(id, hostName);
+                        apiCollectionId = createCollectionBasedOnHostName(id, hostName, tagsList);
 
                         hostNameToIdMap.put(key, apiCollectionId);
                     } catch (Exception e) {
                         loggerMaker.errorAndAddToDb("Failed to create collection for host : " + hostName, LogDb.RUNTIME);
                         createCollectionSimple(vxlanId);
-                        hostNameToIdMap.put("null " + vxlanId, vxlanId);
+                        hostNameToIdMap.put(NON_HOSTNAME_KEY + vxlanId, vxlanId);
                         apiCollectionId = httpResponseParam.requestParams.getApiCollectionId();
                     }
                 }
 
             } else {
-                String key = "null" + " " + vxlanId;
+                String key = NON_HOSTNAME_KEY + vxlanId;
                 if (!hostNameToIdMap.containsKey(key)) {
                     createCollectionSimple(vxlanId);
                     hostNameToIdMap.put(key, vxlanId);
+                }else {
+                    updateApiCollectionTags(key, httpResponseParam);
                 }
 
                 apiCollectionId = vxlanId;

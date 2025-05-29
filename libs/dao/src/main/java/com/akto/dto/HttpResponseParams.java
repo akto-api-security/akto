@@ -27,6 +27,8 @@ public class HttpResponseParams {
     String sourceIP;
     String destIP;
     String direction;
+    // K8 pod tags in JSON string
+    String tags;
 
     public HttpResponseParams() {}
 
@@ -37,6 +39,25 @@ public class HttpResponseParams {
                 sourceIP, "", "");
     }
 
+    public HttpResponseParams(String type, int statusCode, String status, Map<String, List<String>> headers, String payload,
+                              HttpRequestParams requestParams, int time, String accountId, boolean isPending, Source source,
+                              String orig, String sourceIP, String destIP, String direction, String tags) {
+        this.type = type;
+        this.statusCode = statusCode;
+        this.status = status;
+        this.headers = headers;
+        this.payload = payload;
+        this.requestParams = requestParams;
+        this.time = time;
+        this.accountId = accountId;
+        this.isPending = isPending;
+        this.source = source;
+        this.orig = orig;
+        this.sourceIP = sourceIP;
+        this.destIP = destIP;
+        this.direction = direction;
+        this.tags = tags;
+    }
     public HttpResponseParams(String type, int statusCode, String status, Map<String, List<String>> headers, String payload,
                               HttpRequestParams requestParams, int time, String accountId, boolean isPending, Source source,
                               String orig, String sourceIP, String destIP, String direction) {
@@ -156,5 +177,13 @@ public class HttpResponseParams {
 
     public void setDirection(String direction) {
         this.direction = direction;
+    }
+
+    public String getTags() {
+        return tags;
+    }
+
+    public void setTags(String tags) {
+        this.tags = tags;
     }
 }

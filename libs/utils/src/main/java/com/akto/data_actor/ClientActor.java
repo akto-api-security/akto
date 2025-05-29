@@ -51,6 +51,7 @@ import com.akto.dto.testing.WorkflowTestResult;
 import com.akto.dto.testing.config.TestScript;
 import com.akto.dto.testing.sources.TestSourceConfig;
 import com.akto.dto.threat_detection.ApiHitCountInfo;
+import com.akto.dto.traffic.CollectionTags;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods;
@@ -1105,12 +1106,13 @@ public class ClientActor extends DataActor {
         }
     }
 
-    public void createCollectionForHostAndVpc(String host, int colId, String vpcId) {
+    public void createCollectionForHostAndVpc(String host, int colId, String vpcId, List<CollectionTags> tags) {
         Map<String, List<String>> headers = buildHeaders();
         BasicDBObject obj = new BasicDBObject();
         obj.put("colId", colId);
         obj.put("host", host);
         obj.put("vpcId", vpcId);
+        obj.put("tagsList", tags);
         OriginalHttpRequest request = new OriginalHttpRequest(url + "/createCollectionForHostAndVpc", "", "POST", obj.toString(), headers, "");
         try {
             OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
@@ -1124,11 +1126,12 @@ public class ClientActor extends DataActor {
         }
     }
 
-    public void createCollectionSimpleForVpc(int vxlanId, String vpcId) {
+    public void createCollectionSimpleForVpc(int vxlanId, String vpcId, List<CollectionTags> tags) {
         Map<String, List<String>> headers = buildHeaders();
         BasicDBObject obj = new BasicDBObject();
         obj.put("vxlanId", vxlanId);
         obj.put("vpcId", vpcId);
+        obj.put("tagsList", tags);
         OriginalHttpRequest request = new OriginalHttpRequest(url + "/createCollectionSimpleForVpc", "", "POST", obj.toString(), headers, "");
         try {
             OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
