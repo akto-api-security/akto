@@ -50,7 +50,7 @@ function ThreatActorPage() {
   const [actorDetails, setActorDetails] = useState(null);
   const [showActorDetails, setShowActorDetails] = useState(false);
 
-  const initialVal = values.ranges[3];
+  const initialVal = values.ranges[0];
   const [currDateRange, dispatchCurrDateRange] = useReducer(
     produce((draft, action) => func.dateRangeReducer(draft, action)),
     initialVal
