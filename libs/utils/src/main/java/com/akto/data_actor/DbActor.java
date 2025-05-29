@@ -34,6 +34,7 @@ import com.akto.dto.testing.TestingRunResultSummary;
 import com.akto.dto.testing.WorkflowTest;
 import com.akto.dto.testing.WorkflowTestResult;
 import com.akto.dto.testing.sources.TestSourceConfig;
+import com.akto.dto.traffic.CollectionTags;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.traffic.TrafficInfo;
 import com.akto.dto.traffic_metrics.TrafficMetrics;
@@ -541,11 +542,11 @@ public class DbActor extends DataActor {
         return DbLayer.fetchMergedUrls();
     }
 
-    public void createCollectionSimpleForVpc(int vxlanId, String vpcId, String tags) {
+    public void createCollectionSimpleForVpc(int vxlanId, String vpcId, List<CollectionTags> tags) {
         DbLayer.createCollectionSimpleForVpc(vxlanId, vpcId, tags);
     }
 
-    public void createCollectionForHostAndVpc(String host, int colId, String vpcId, String tags) {
+    public void createCollectionForHostAndVpc(String host, int colId, String vpcId, List<CollectionTags> tags) {
         DbLayer.createCollectionForHostAndVpc(host, colId, vpcId, tags);
     }
 

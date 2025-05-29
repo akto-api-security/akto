@@ -29,6 +29,7 @@ import com.akto.dto.testing.WorkflowTest;
 import com.akto.dto.testing.WorkflowTestResult;
 import com.akto.dto.testing.config.TestScript;
 import com.akto.dto.testing.sources.TestSourceConfig;
+import com.akto.dto.traffic.CollectionTags;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods;
@@ -255,9 +256,9 @@ public abstract class DataActor {
 
     public abstract Set<MergedUrls> fetchMergedUrls();
 
-    public abstract void createCollectionSimpleForVpc(int vxlanId, String vpcId, String tags);
+    public abstract void createCollectionSimpleForVpc(int vxlanId, String vpcId, List<CollectionTags> tags);
 
-    public abstract void createCollectionForHostAndVpc(String host, int colId, String vpcId, String tags);
+    public abstract void createCollectionForHostAndVpc(String host, int colId, String vpcId, List<CollectionTags> tags);
 
     public abstract List<BasicDBObject> fetchEndpointsInCollectionUsingHost(int apiCollectionId, int skip, int deltaPeriodValue);
 

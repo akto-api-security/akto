@@ -20,7 +20,7 @@ public class CollectionTagsTest {
 
         String tagsJson = "{\"key1\":\"newValue1\",\"key2\":\"newValue2\"}";
 
-        List<CollectionTags> newTags = CollectionTags.getUpdatedTagsForCollection(collectionTagsList, tagsJson);
+        List<CollectionTags> newTags = CollectionTags.calculateTagsDiff(collectionTagsList, tagsJson);
 
         assertEquals(2, newTags.size());
         assertEquals("newValue1", newTags.get(0).getValue());
@@ -34,7 +34,7 @@ public class CollectionTagsTest {
 
         String tagsJson = "{\"key1\":\"value2\",\"key3\":\"value3\"}";
 
-        List<CollectionTags> newTags = CollectionTags.getUpdatedTagsForCollection(collectionTagsList, tagsJson);
+        List<CollectionTags> newTags = CollectionTags.calculateTagsDiff(collectionTagsList, tagsJson);
 
         assertEquals(2, newTags.size());
         assertEquals("value2", newTags.get(0).getValue());
@@ -48,7 +48,7 @@ public class CollectionTagsTest {
 
         String tagsJson = "{\"key3\":\"value3\"}";
 
-        List<CollectionTags> newTags = CollectionTags.getUpdatedTagsForCollection(collectionTagsList, tagsJson);
+        List<CollectionTags> newTags = CollectionTags.calculateTagsDiff(collectionTagsList, tagsJson);
 
         assertEquals(1, newTags.size());
         assertEquals("value3", newTags.get(0).getValue());
@@ -62,7 +62,7 @@ public class CollectionTagsTest {
 
         String tagsJson = "{\"key1\":\"value1\",\"key2\":\"value2\"}";
 
-        List<CollectionTags> newTags = CollectionTags.getUpdatedTagsForCollection(collectionTagsList, tagsJson);
+        List<CollectionTags> newTags = CollectionTags.calculateTagsDiff(collectionTagsList, tagsJson);
         assertNull(newTags);
     }
 
@@ -74,7 +74,7 @@ public class CollectionTagsTest {
 
         String tagsJson = "{}";
 
-        List<CollectionTags> newTags = CollectionTags.getUpdatedTagsForCollection(collectionTagsList, tagsJson);
+        List<CollectionTags> newTags = CollectionTags.calculateTagsDiff(collectionTagsList, tagsJson);
 
         assertTrue(newTags.isEmpty());
     }
@@ -85,7 +85,7 @@ public class CollectionTagsTest {
 
         String tagsJson = "{\"key1\":\"value1\",\"key2\":\"value2\"}";
 
-        List<CollectionTags> newTags = CollectionTags.getUpdatedTagsForCollection(collectionTagsList, tagsJson);
+        List<CollectionTags> newTags = CollectionTags.calculateTagsDiff(collectionTagsList, tagsJson);
 
         assertEquals(2, newTags.size());
         assertEquals("value1", newTags.get(0).getValue());
@@ -100,7 +100,7 @@ public class CollectionTagsTest {
         collectionTagsList.add(new CollectionTags(123456, "key3", "value3"));
 
         String tagsJson = "{\"key1\":\"value1\"}";
-        List<CollectionTags> newTags = CollectionTags.getUpdatedTagsForCollection(collectionTagsList, tagsJson);
+        List<CollectionTags> newTags = CollectionTags.calculateTagsDiff(collectionTagsList, tagsJson);
         assertEquals(1, newTags.size());
         assertEquals("value1", newTags.get(0).getValue());
         assertEquals("key1", newTags.get(0).getKeyName());
@@ -114,7 +114,7 @@ public class CollectionTagsTest {
         collectionTagsList.add(new CollectionTags(123456, "key3", "value3"));
 
         String tagsJson = "{\"key1\":\"value1\",\"key4\":\"value4\"}";
-        List<CollectionTags> newTags = CollectionTags.getUpdatedTagsForCollection(collectionTagsList, tagsJson);
+        List<CollectionTags> newTags = CollectionTags.calculateTagsDiff(collectionTagsList, tagsJson);
         assertEquals(2, newTags.size());
         assertEquals("value1", newTags.get(0).getValue());
         assertEquals("key1", newTags.get(0).getKeyName());
