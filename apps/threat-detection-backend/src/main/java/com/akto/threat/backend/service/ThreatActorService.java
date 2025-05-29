@@ -393,7 +393,7 @@ public class ThreatActorService {
     try {
       TextFormat.getParser().merge(metadataStr, metadataBuilder);
     } catch (Exception e) {
-      return metadataStr;
+      return "";
     }
     Metadata metadataProto = metadataBuilder.build();
     metadataStr = ProtoMessageUtils.toString(metadataProto).orElse("");
