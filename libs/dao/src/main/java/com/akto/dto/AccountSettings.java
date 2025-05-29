@@ -60,7 +60,8 @@ public class AccountSettings {
 
     private Map<String, String> filterHeaderValueMap;
     public static final String FILTER_HEADER_VALUE_MAP = "filterHeaderValueMap";
-
+    public static final String DELTA_IGNORE_TIME_FOR_SCHEDULED_SUMMARIES = "timeForScheduledSummaries";
+    private int timeForScheduledSummaries;
     private Map<String, CollectionReplaceDetails> apiCollectionNameMapper;
     public static final String API_COLLECTION_NAME_MAPPER = "apiCollectionNameMapper";
     public static final String GLOBAL_RATE_LIMIT = "globalRateLimit";
@@ -138,6 +139,14 @@ public class AccountSettings {
 
     public void setGithubAppId(String githubAppId) {
         this.githubAppId = githubAppId;
+    }
+
+    public int getTimeForScheduledSummaries() {
+        return timeForScheduledSummaries;
+    }
+
+    public void setTimeForScheduledSummaries(int timeForScheduledSummaries) {
+        this.timeForScheduledSummaries = timeForScheduledSummaries;
     }
 
     public enum SetupType {
