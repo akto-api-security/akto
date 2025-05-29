@@ -7,6 +7,7 @@ import com.akto.dao.metrics.MetricDataDao;
 import com.akto.dto.jobs.Job;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
@@ -89,6 +90,7 @@ import com.akto.dto.testing.TestingRun.State;
 import com.akto.dto.testing.config.TestScript;
 import com.akto.dto.testing.sources.TestSourceConfig;
 import com.akto.dto.threat_detection.ApiHitCountInfo;
+import com.akto.dto.traffic.CollectionTags;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.traffic.SuspectSampleData;
 import com.akto.dto.traffic.TrafficInfo;
@@ -477,7 +479,7 @@ public class DbLayer {
         );
     }
 
-    public static void createCollectionSimpleForVpc(int vxlanId, String vpcId) {
+    public static void createCollectionSimpleForVpc(int vxlanId, String vpcId, List<CollectionTags> tags) { 
         UpdateOptions updateOptions = new UpdateOptions();
         updateOptions.upsert(true);
 
@@ -523,7 +525,7 @@ public class DbLayer {
         ApiCollectionsDao.instance.getMCollection().findOneAndUpdate(Filters.eq(ApiCollection.HOST_NAME, host), updates, updateOptions);
     }
 
-    public static void createCollectionForHostAndVpc(String host, int id, String vpcId) {
+    public static void createCollectionForHostAndVpc(String host, int id, String vpcId, List<CollectionTags> tags) {
 
         FindOneAndUpdateOptions updateOptions = new FindOneAndUpdateOptions();
         updateOptions.upsert(true);

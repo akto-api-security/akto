@@ -28,6 +28,7 @@ import com.akto.dto.testing.WorkflowTestResult;
 import com.akto.dto.testing.config.TestScript;
 import com.akto.dto.testing.sources.TestSourceConfig;
 import com.akto.dto.threat_detection.ApiHitCountInfo;
+import com.akto.dto.traffic.CollectionTags;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods;
@@ -36,6 +37,7 @@ import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -263,9 +265,9 @@ public abstract class DataActor {
     public abstract Set<MergedUrls> fetchMergedUrls();
 
     public abstract List<TestingRunResultSummary> fetchStatusOfTests();
-    public abstract void createCollectionSimpleForVpc(int vxlanId, String vpcId);
+    public abstract void createCollectionSimpleForVpc(int vxlanId, String vpcId, List<CollectionTags> tags);
 
-    public abstract void createCollectionForHostAndVpc(String host, int colId, String vpcId);
+    public abstract void createCollectionForHostAndVpc(String host, int colId, String vpcId, List<CollectionTags> tags);
 
     public abstract List<BasicDBObject> fetchEndpointsInCollectionUsingHost(int apiCollectionId, int skip, int deltaPeriodValue);
 
