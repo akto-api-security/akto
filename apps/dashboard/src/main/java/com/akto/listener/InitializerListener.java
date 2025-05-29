@@ -3327,39 +3327,6 @@ public class InitializerListener implements ServletContextListener {
         addDefaultAdvancedFilters(backwardCompatibility);
         moveAzureSamlConfig(backwardCompatibility);
         moveOktaOidcSSO(backwardCompatibility);
-        addSupportForMultipleUserEnvTypes(backwardCompatibility);
-    }
-
-    private static void addSupportForMultipleUserEnvTypes(BackwardCompatibility backwardCompatibility) {
-        if(backwardCompatibility.getMultipleUserEnvTypesSupport() == 0) {
-            List<ApiCollection> apiCollectionList = ApiCollectionsDao.instance.findAll(Filters.exists(ApiCollection.USER_ENV_TYPE, true), Projections.include(Constants.ID, ApiCollection.USER_ENV_TYPE, ApiCollection.TAGS_STRING));
-
-            for(ApiCollection apiCollection : apiCollectionList) {
-                List<CollectionTags> tagsList = new ArrayList<>();
-                if(apiCollection.getUserSetEnvType() != null && !apiCollection.getUserSetEnvType().isEmpty()) {
-                    String[] parts = apiCollection.getUserSetEnvType().split(", ");
-                    for(String part : parts) {
-                        if(part.isEmpty()) continue;
-                        if(part.equalsIgnoreCase(ApiCollection.ENV_TYPE.STAGING.name()) || part.equalsIgnoreCase(ApiCollection.ENV_TYPE.PRODUCTION.name())) {
-                            CollectionTags collectionTags = new CollectionTags(Context.now(), "envType", part);
-                            tagsList.add(collectionTags);
-                        } else {
-                            CollectionTags collectionTags = new CollectionTags(Context.now(), "vpcId", part);
-                            tagsList.add(collectionTags);
-                        }
-                    }
-                }
-                ApiCollectionsDao.instance.updateOne(Filters.eq(Constants.ID, apiCollection.getId()), Updates.combine(
-                        Updates.unset(ApiCollection.USER_ENV_TYPE),
-                        Updates.set(ApiCollection.TAGS_STRING, tagsList)
-                ));
-            }
-
-            BackwardCompatibilityDao.instance.updateOne(
-                    Filters.eq("_id", backwardCompatibility.getId()),
-                    Updates.set(BackwardCompatibility.MULTIPLE_USER_ENV_TYPES_SUPPORT, Context.now())
-            );
-        }
     }
 
     public static void printMultipleHosts(int apiCollectionId) {

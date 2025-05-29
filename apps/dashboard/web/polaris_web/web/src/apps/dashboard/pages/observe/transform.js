@@ -439,12 +439,14 @@ const transform = {
     },
 
     getCollectionTypeList(envType){
-        if(envType == null) {
+        if(envType == null || envType.length === 0){ 
             return <></>
         }
         return (
             <ShowListInBadge
-                itemsArr={envType}
+                itemsArr={envType.map((item) => {
+                    return item.value
+                })}
                 maxItems={3}
                 status={"info"}
                 useTooltip={true}
