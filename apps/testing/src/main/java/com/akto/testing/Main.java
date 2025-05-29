@@ -140,29 +140,31 @@ public class Main {
         );
     }
 
+    private static void fillRateLimitMapForAccount(int accountId) {
+        AccountSettings settings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
+        if (settings == null) {
+            return;
+        }
+        int globalRateLimit = settings.getGlobalRateLimit();
+        Map<ApiRateLimit, Integer> rateLimitMap = RateLimitHandler.getInstance(accountId).getRateLimitsMap();
+        rateLimitMap.clear();
+        rateLimitMap.put(new GlobalApiRateLimit(globalRateLimit), globalRateLimit);
+    }
 
-    private static void setupRateLimitWatcher () {
+    private static void scheduleRateLimitWatcher () {
         scheduler.scheduleAtFixedRate(new Runnable() {
             public void run() {
                 AccountTask.instance.executeTaskForNonHybridAccounts(new Consumer<Account>() {
                     @Override
                     public void accept(Account t) {
-                        AccountSettings settings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
-                        if (settings == null) {
-                            return;
-                        }
-                        int globalRateLimit = settings.getGlobalRateLimit();
-                        int accountId = t.getId();
-                        Map<ApiRateLimit, Integer> rateLimitMap =  RateLimitHandler.getInstance(accountId).getRateLimitsMap();
-                        rateLimitMap.clear();
-                        rateLimitMap.put(new GlobalApiRateLimit(globalRateLimit), globalRateLimit);
+                        fillRateLimitMapForAccount(t.getId());
                     }
                 }, "rate-limit-scheduler");
             }
         }, 0, 1, TimeUnit.MINUTES);
     }
 
-    private static void triggerHeartbeatCron() {
+    private static void scheduleHeartbeatCron() {
         scheduler.scheduleAtFixedRate(new Runnable() {
             public void run() {
                 UpdateOptions updateOptions = new UpdateOptions();
@@ -176,6 +178,21 @@ public class Main {
 
             }
         }, 0, 10, TimeUnit.SECONDS);
+    }
+
+    private static void scheduleAccessMatrixTask() {
+        schedulerAccessMatrix.scheduleAtFixedRate(new Runnable() {
+            public void run() {
+                AccountTask.instance.executeTaskForNonHybridAccounts(account -> {
+                    AccessMatrixAnalyzer matrixAnalyzer = new AccessMatrixAnalyzer();
+                    try {
+                        matrixAnalyzer.run();
+                    } catch (Exception e) {
+                        loggerMaker.debugAndAddToDb("could not run matrixAnalyzer: " + e.getMessage(), LogDb.TESTING);
+                    }
+                },"matrix-analyser-task");
+            }
+        }, 0, 1, TimeUnit.MINUTES);
     }
 
     public static Set<Integer> extractApiCollectionIds(List<ApiInfo.ApiInfoKey> apiInfoKeyList) {
@@ -413,23 +430,14 @@ public class Main {
             }
         } while (!connectedToMongo);
 
-        /*
-         * GCP Cloud run job change
-         * 
-         * todo: implementation for account task for job
-         * todo: discuss about keeping periodic crons in job and keeping test execution relevant crons in scheduler
-         */
+        executorService.scheduleAtFixedRate(new Main.MemoryMonitorTask(), 0, 1, TimeUnit.SECONDS);
 
-        setupRateLimitWatcher();
-        
         /*
          * GCP Cloud run job change
          * 
          * Moving heart beat cron to job scheduler branch
          */
         //triggerHeartbeatCron();
-        
-        executorService.scheduleAtFixedRate(new Main.MemoryMonitorTask(), 0, 1, TimeUnit.SECONDS);
 
         if (!SKIP_SSRF_CHECK) {
             Setup setup = SetupDao.instance.findOne(new BasicDBObject());
@@ -438,6 +446,14 @@ public class Main {
                 boolean isSaas = dashboardMode.equalsIgnoreCase(DashboardMode.SAAS.name());
                 if (!isSaas) SKIP_SSRF_CHECK = true;
             }
+        }
+
+        // Schedule crons on saas job scheduler instance and other testing instances except for saas job executor
+        if(Constants.IS_JOB_EXECUTOR == false) {
+            scheduleRateLimitWatcher();
+            scheduleAccessMatrixTask();
+            GetRunningTestsStatus.getRunningTests().scheduleGetRunningTestsTask();
+            SingleTypeInfo.schedulePopulateDataTypesInfoTask();
         }
 
         loggerMaker.debugAndAddToDb("Starting.......", LogDb.TESTING);
@@ -506,19 +522,7 @@ public class Main {
         }
 
 
-        schedulerAccessMatrix.scheduleAtFixedRate(new Runnable() {
-            public void run() {
-                AccountTask.instance.executeTaskForNonHybridAccounts(account -> {
-                    AccessMatrixAnalyzer matrixAnalyzer = new AccessMatrixAnalyzer();
-                    try {
-                        matrixAnalyzer.run();
-                    } catch (Exception e) {
-                        loggerMaker.debugAndAddToDb("could not run matrixAnalyzer: " + e.getMessage(), LogDb.TESTING);
-                    }
-                },"matrix-analyser-task");
-            }
-        }, 0, 1, TimeUnit.MINUTES);
-        GetRunningTestsStatus.getRunningTests().getStatusOfRunningTests();
+        
 
         loggerMaker.debugAndAddToDb("sun.arch.data.model: " +  System.getProperty("sun.arch.data.model"), LogDb.TESTING);
         loggerMaker.debugAndAddToDb("os.arch: " + System.getProperty("os.arch"), LogDb.TESTING);
@@ -530,24 +534,13 @@ public class Main {
             loggerMaker.debug("Testing info folder status: " + val);
         }
 
-        SingleTypeInfo.init();
 
         if(Constants.IS_JOB_EXECUTOR) {
 
             int accountId = Integer.parseInt(System.getenv("JOB_ACCOUNT_ID"));
             ObjectId testingRunId = new ObjectId(System.getenv("JOB_TESTING_RUN_HEX_ID"));
-
+            
             loggerMaker.info(String.format("Beginning testing run execution with id - %s from account - %d", testingRunId, accountId));
-
-            /*
-             * GCP Cloud run job change
-             * 
-             * double check to ensure that only Oren's SaaS account executes the rest of the
-             * loop
-             */
-            if (accountId != 1_692_211_733) {
-                return;
-            }
 
             Context.accountId.set(accountId);
 
@@ -578,6 +571,10 @@ public class Main {
             //boolean isTestingRunRunning = testingRun.getState().equals(State.RUNNING);
 
             SyncLimit syncLimit = featureAccess.fetchSyncLimit();
+
+            // fill rate limit map for account
+            fillRateLimitMapForAccount(accountId);
+            SingleTypeInfo.initForAccount(accountId);
 
             try {
                 fillTestingEndpoints(testingRun);
@@ -631,21 +628,13 @@ public class Main {
         /*
         * GCP Cloud run job change
         */
-        triggerHeartbeatCron();
+        scheduleHeartbeatCron();
     
 
         while (true) {
             AccountTask.instance.executeTaskForNonHybridAccounts(account -> {
                 int accountId = account.getId();
-                /*
-                * GCP Cloud run job change
-                * 
-                * double check to ensure that only Oren's SaaS account executes the rest of the loop
-                */
-                if (accountId != 1_692_211_733) {
-                    return;
-                }
-
+                
                 AccountSettings accountSettings = AccountSettingsDao.instance.findOne(
                     Filters.eq(Constants.ID, accountId), Projections.include(AccountSettings.DELTA_IGNORE_TIME_FOR_SCHEDULED_SUMMARIES)
                 );
@@ -749,10 +738,9 @@ public class Main {
                 /*
                 * GCP Cloud run job change
                 * 
-                * Submit a job instead of running the executor in the testing instance
-                * Make it explicit that only Oren's SaaS account submits a GCP cloud run job
+                * Submit a job instead of running the executor in saas job scheduler testing instance 
                 */
-                if (accountId == 1_692_211_733) { 
+                if (DashboardMode.isSaasDeployment()) { 
                     loggerMaker.info(String.format("Submitting job to GCP for the execution of testing run with hex id - %s", testingRun.getHexId()));
                     
                     try {  

@@ -33,7 +33,7 @@ public class GetRunningTestsStatus {
         return getRunningTestsStatus;
     }
  
-    public void getStatusOfRunningTests(){
+    public void scheduleGetRunningTestsTask(){
         scheduler.scheduleAtFixedRate(new Runnable() {
             public void run(){
                 AccountTask.instance.executeTaskForNonHybridAccounts(new Consumer<Account>() {

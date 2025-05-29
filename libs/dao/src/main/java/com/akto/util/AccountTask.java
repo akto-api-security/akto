@@ -199,7 +199,9 @@ public class AccountTask {
             1662681374, 1662680009, 1662667201, 1662664207, 1662663641, 1662656702, 1662636440, 1662504770
     ));
 
-
+    public static final Set<Integer> testingJobAccountsSet = new HashSet(Arrays.asList(
+        1_692_211_733, 1_000_000
+    ));
 
     public void executeTask(Consumer<Account> consumeAccount, String taskName) {
 
@@ -212,10 +214,10 @@ public class AccountTask {
          * GCP Cloud run job change
          * Added filter to only get Oren's SaaS account
          */
-        Bson orensSaasAccountFilter = Filters.eq("_id", 1_692_211_733);
-
+        Bson testingJobAccountsFilter = Filters.in("_id", testingJobAccountsSet);
         //List<Account> activeAccounts = AccountsDao.instance.findAll(activeFilter);
-        List<Account> activeAccounts = AccountsDao.instance.findAll(orensSaasAccountFilter);
+        List<Account> activeAccounts = AccountsDao.instance.findAll(testingJobAccountsFilter);
+
         for(Account account: activeAccounts) {
             if (inactiveAccountsSet.contains(account.getId())) {
                 continue;
@@ -223,7 +225,7 @@ public class AccountTask {
             try {
                 /*
                  * GCP Cloud run job change
-                 * log to verify account task is only being run for Oren's SaaS account
+                 * log to verify account task is only being run for account's marked to use the new job system on SaaS
                  */
                 logger.info(String.format("%s %d %s", taskName, account.getId(), account.getName()));
 
@@ -276,11 +278,12 @@ public class AccountTask {
 
         /*
          * GCP Cloud run job change
-         * Added filter to only get Oren's SaaS account
+         * Filter for accounts on SaaS that should use the new testing job
          */
-        Bson orensSaasAccountFilter = Filters.eq("_id", 1_692_211_733);
+        Bson testingJobAccountsFilter = Filters.in("_id", testingJobAccountsSet);
 
-        List<Account> activeAccounts = AccountsDao.instance.findAll(Filters.and(activeFilter, nonHybridAccountsFilter, orensSaasAccountFilter));
+        List<Account> activeAccounts = AccountsDao.instance.findAll(Filters.and(activeFilter, nonHybridAccountsFilter, testingJobAccountsFilter));
+
         for(Account account: activeAccounts) {
             if (inactiveAccountsSet.contains(account.getId())) {
                 continue;
@@ -288,7 +291,7 @@ public class AccountTask {
             try {
                 /*
                  * GCP Cloud run job change
-                 * log to verify account task is only being run for Oren's SaaS account
+                 * log to verify account task is only being run for account's marked to use the new job system on SaaS
                  */
                 logger.info(String.format("%s %d %s", taskName, account.getId(), account.getName()));
                 Context.accountId.set(account.getId());
