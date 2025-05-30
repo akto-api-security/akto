@@ -341,7 +341,8 @@ public class DaoInit {
                 new EnumCodec<>(TestCollectionProperty.Id.class),
                 new EnumCodec<>(CustomAuthType.TypeOfToken.class),
                 new EnumCodec<>(ModuleInfo.ModuleType.class),
-                new EnumCodec<>(TLSAuthParam.CertificateType.class)
+                new EnumCodec<>(TLSAuthParam.CertificateType.class),
+                new EnumCodec<>(CollectionTags.TagSource.class)
         );
 
         return fromRegistries(MongoClientSettings.getDefaultCodecRegistry(), pojoCodecRegistry,
