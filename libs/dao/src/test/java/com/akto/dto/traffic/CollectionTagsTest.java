@@ -14,9 +14,9 @@ public class CollectionTagsTest {
     @Test
     public void testCalculateTagsDiffWithUpdatedTags() {
         List<CollectionTags> collectionTagsList = new ArrayList<>();
-        collectionTagsList.add(new CollectionTags(123456, "key1", "value1"));
-        collectionTagsList.add(new CollectionTags(123456, "key2", "value2"));
-        collectionTagsList.add(new CollectionTags(123456, "key3", "value3"));
+        collectionTagsList.add(new CollectionTags(123456, "key1", "value1", CollectionTags.TagSource.KUBERNETES));
+        collectionTagsList.add(new CollectionTags(123456, "key2", "value2", CollectionTags.TagSource.KUBERNETES));
+        collectionTagsList.add(new CollectionTags(123456, "key3", "value3", CollectionTags.TagSource.KUBERNETES));
 
         String tagsJson = "{\"key1\":\"newValue1\",\"key2\":\"newValue2\"}";
 
@@ -30,7 +30,7 @@ public class CollectionTagsTest {
     @Test
     public void testCalculateTagsDiffWithUpdateAndNewTags() {
         List<CollectionTags> collectionTagsList = new ArrayList<>();
-        collectionTagsList.add(new CollectionTags(123456, "key1", "value1"));
+        collectionTagsList.add(new CollectionTags(123456, "key1", "value1", CollectionTags.TagSource.KUBERNETES));
 
         String tagsJson = "{\"key1\":\"value2\",\"key3\":\"value3\"}";
 
@@ -44,7 +44,7 @@ public class CollectionTagsTest {
     @Test
     public void testCalculateTagsDiffWithNewTags() {
         List<CollectionTags> collectionTagsList = new ArrayList<>();
-        collectionTagsList.add(new CollectionTags(123456, "key1", "value1"));
+        collectionTagsList.add(new CollectionTags(123456, "key1", "value1", CollectionTags.TagSource.KUBERNETES));
 
         String tagsJson = "{\"key3\":\"value3\"}";
 
@@ -57,8 +57,8 @@ public class CollectionTagsTest {
     @Test
     public void testCalculateTagsDiffWithNoChanges() {
         List<CollectionTags> collectionTagsList = new ArrayList<>();
-        collectionTagsList.add(new CollectionTags(123456, "key1", "value1"));
-        collectionTagsList.add(new CollectionTags(123456, "key2", "value2"));
+        collectionTagsList.add(new CollectionTags(123456, "key1", "value1", CollectionTags.TagSource.KUBERNETES));
+        collectionTagsList.add(new CollectionTags(123456, "key2", "value2", CollectionTags.TagSource.KUBERNETES));
 
         String tagsJson = "{\"key1\":\"value1\",\"key2\":\"value2\"}";
 
@@ -69,8 +69,8 @@ public class CollectionTagsTest {
     @Test
     public void testCalculateTagsDiffWithEmptyTagsJson() {
         List<CollectionTags> collectionTagsList = new ArrayList<>();
-        collectionTagsList.add(new CollectionTags(123456, "key1", "value1"));
-        collectionTagsList.add(new CollectionTags(123456, "key2", "value2"));
+        collectionTagsList.add(new CollectionTags(123456, "key1", "value1", CollectionTags.TagSource.KUBERNETES));
+        collectionTagsList.add(new CollectionTags(123456, "key2", "value2", CollectionTags.TagSource.KUBERNETES));
 
         String tagsJson = "{}";
 
@@ -95,9 +95,9 @@ public class CollectionTagsTest {
     @Test
     public void testCalculateTagsWithDeletedTags() {
         List<CollectionTags> collectionTagsList = new ArrayList<>();
-        collectionTagsList.add(new CollectionTags(123456, "key1", "value1"));   
-        collectionTagsList.add(new CollectionTags(123456, "key2", "value2"));
-        collectionTagsList.add(new CollectionTags(123456, "key3", "value3"));
+        collectionTagsList.add(new CollectionTags(123456, "key1", "value1", CollectionTags.TagSource.KUBERNETES));   
+        collectionTagsList.add(new CollectionTags(123456, "key2", "value2", CollectionTags.TagSource.KUBERNETES));
+        collectionTagsList.add(new CollectionTags(123456, "key3", "value3", CollectionTags.TagSource.KUBERNETES));
 
         String tagsJson = "{\"key1\":\"value1\"}";
         List<CollectionTags> newTags = CollectionTags.calculateTagsDiff(collectionTagsList, tagsJson);
@@ -109,9 +109,9 @@ public class CollectionTagsTest {
     @Test
     public void testCalculateTagsWithNewAndDeletedTags() {
         List<CollectionTags> collectionTagsList = new ArrayList<>();
-        collectionTagsList.add(new CollectionTags(123456, "key1", "value1"));   
-        collectionTagsList.add(new CollectionTags(123456, "key2", "value2"));
-        collectionTagsList.add(new CollectionTags(123456, "key3", "value3"));
+        collectionTagsList.add(new CollectionTags(123456, "key1", "value1", CollectionTags.TagSource.KUBERNETES));   
+        collectionTagsList.add(new CollectionTags(123456, "key2", "value2", CollectionTags.TagSource.KUBERNETES));
+        collectionTagsList.add(new CollectionTags(123456, "key3", "value3", CollectionTags.TagSource.KUBERNETES));
 
         String tagsJson = "{\"key1\":\"value1\",\"key4\":\"value4\"}";
         List<CollectionTags> newTags = CollectionTags.calculateTagsDiff(collectionTagsList, tagsJson);
