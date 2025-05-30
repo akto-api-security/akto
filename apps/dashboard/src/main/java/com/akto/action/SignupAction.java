@@ -994,6 +994,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
                     throw new IllegalStateException("The account doesn't exist.");
                 }
             } else {
+                logger.infoAndAddToDb("Invited user found, updating accountId: " + accountId + " for user: " + user.getLogin());
                 if(invitedRole != null && accountId != 0){
                     // check if the invited account exists in the user info, if not, add it
                     String accountIdStr = String.valueOf(accountId);
@@ -1003,10 +1004,10 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
                             new RBAC(user.getId(), invitedRole, accountId)
                         );
                         String accountName = account != null ? account.getName() : "My account";
-                        UsersDao.addAccount(user.getLogin(), accountId, accountName);
+                        user = UsersDao.addAccount(user.getLogin(), accountId, accountName);
                     }
 
-                 servletRequest.getSession().setAttribute("accountId", accountId);
+                    servletRequest.getSession().setAttribute("accountId", accountId);
                 }
 
                 LoginAction.loginUser(user, servletResponse, true, servletRequest);
