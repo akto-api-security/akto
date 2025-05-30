@@ -318,11 +318,24 @@ public class ApiCollection {
 	public void setUserSetEnvType(String userSetEnvType) {
         this.userSetEnvType = userSetEnvType;
 
-        if(this.tagsList == null) {
+        if (this.tagsList == null) {
             this.tagsList = new ArrayList<>();
         }
 
-        this.tagsList.add(new CollectionTags(Context.now(), "userSetEnvType", userSetEnvType));
+        // Update the userSetEnvType tag if it exists, otherwise add a new one
+
+        boolean updated = false;
+        for (CollectionTags tag : this.tagsList) {
+            if ("userSetEnvType".equals(tag.getKeyName())) {
+                tag.setValue(userSetEnvType);
+                updated = true;
+                break;
+            }
+        }
+
+        if (!updated) {
+            this.tagsList.add(new CollectionTags(Context.now(), "userSetEnvType", userSetEnvType, CollectionTags.TagSource.USER));
+        }
 	}
 
     public boolean getAutomated() {

@@ -479,6 +479,22 @@ public class DbLayer {
         );
     }
 
+    private static List<CollectionTags> getPreservedTags(ApiCollection apiCollection, List<CollectionTags> tags) {
+        // Replace only the KUBERNETES source tags
+        List<CollectionTags> preservedTags = new ArrayList<>();
+        if (apiCollection!= null && apiCollection.getTagsList() != null) {
+            for (CollectionTags tag : apiCollection.getTagsList()) {
+                if (!CollectionTags.TagSource.KUBERNETES.equals(tag.getSource())) {
+                    preservedTags.add(tag);
+                }
+            }
+        }
+
+        // Merge preserved tags with input tags
+        preservedTags.addAll(tags);
+        return preservedTags;
+    }
+
     public static void createCollectionSimpleForVpc(int vxlanId, String vpcId, List<CollectionTags> tags) { 
         UpdateOptions updateOptions = new UpdateOptions();
         updateOptions.upsert(true);
@@ -504,8 +520,9 @@ public class DbLayer {
             update = Updates.combine(update, Updates.set(ApiCollection.USER_ENV_TYPE, userEnv));
         }
 
-        if(tags != null && !tags.isEmpty()) {
-            update = Updates.combine(update, Updates.set(ApiCollection.TAGS_STRING, tags));
+        if (tags != null && !tags.isEmpty()) {
+            // Update the entire tagsList
+            update = Updates.combine(update, Updates.set(ApiCollection.TAGS_STRING, getPreservedTags(apiCollection, tags)));
         }
 
         ApiCollectionsDao.instance.getMCollection().updateOne(
@@ -554,7 +571,7 @@ public class DbLayer {
         }
 
         if(tags != null && !tags.isEmpty()) {
-            updates = Updates.combine(updates, Updates.set(ApiCollection.TAGS_STRING, tags));
+            updates = Updates.combine(updates, Updates.set(ApiCollection.TAGS_STRING, getPreservedTags(apiCollection, tags)));
         }
 
         ApiCollectionsDao.instance.getMCollection().findOneAndUpdate(Filters.eq(ApiCollection.HOST_NAME, host), updates, updateOptions);
