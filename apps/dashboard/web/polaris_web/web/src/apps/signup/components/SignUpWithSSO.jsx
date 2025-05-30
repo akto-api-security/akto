@@ -2,13 +2,22 @@
 import React, { useState } from 'react'
 import SignUpPageLayout from './SignUpPageLayout';
 import { Button, Form, HorizontalStack, Text, TextField, VerticalStack } from '@shopify/polaris';
+import { useSearchParams } from 'react-router-dom';
 
 function SignUpWithSSO() {
 
     const [email, setEmail] = useState('')
+    const [searchParams] = useSearchParams();
 
     const handleSubmit = () => {
-        window.location.href = "/trigger-saml-sso?email=" + email
+        const signupInvitationCode = searchParams.get('signupInvitationCode') || '';
+        const emailParam = searchParams.get('signupEmailId') || '';
+        let finalUrl = '/trigger-saml-sso?email=' + email;
+        if (signupInvitationCode.length > 0 && emailParam.length > 0) {
+            finalUrl += '&signupEmailId=' + emailParam;
+            finalUrl += '&signupInvitationCode=' + signupInvitationCode;
+        }
+        window.location.href = finalUrl;
     }
 
     const customComponent = (
