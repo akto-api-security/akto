@@ -322,7 +322,7 @@ public class ApiCollection {
             this.tagsList = new ArrayList<>();
         }
 
-        this.tagsList.add(new CollectionTags(Context.now(), "userSetEnvType", userSetEnvType));
+        this.tagsList.add(new CollectionTags(Context.now(), "userSetEnvType", userSetEnvType, CollectionTags.TagSource.USER));
 	}
 
     public boolean getAutomated() {
