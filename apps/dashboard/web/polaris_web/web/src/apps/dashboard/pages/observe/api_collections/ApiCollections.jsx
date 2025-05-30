@@ -34,6 +34,7 @@ import ReactFlow, {
   
   } from 'react-flow-renderer';
 import { on } from "stream";
+import SetUserEnvPopupComponent from "./component/SetUserEnvPopupComponent";
   
 const CenterViewType = {
     Table: 0,
@@ -127,6 +128,10 @@ const headers = [
         showFilter: true,
         textValue: 'envType',
         tooltipContent: (<Text variant="bodySm">Environment type for an API collection, Staging or Production </Text>),
+        mergeType: (a, b) => {
+            return Math.max(a || 0, b || 0);
+        },
+        shouldMerge: true,
     },
     {   
         title: <HeadingWithTooltip content={<Text variant="bodySm">The most recent time an endpoint within collection was either discovered for the first time or seen again</Text>} title="Last traffic seen" />, 
@@ -236,8 +241,6 @@ function ApiCollections() {
     const [normalData, setNormalData] = useState([])
     const [centerView, setCenterView] = useState(CenterViewType.Table);
     const [moreActions, setMoreActions] = useState(false);
-    const [textFieldActive, setTextFieldActive] = useState(false);
-    const [customEnv,setCustomEnv] = useState('')
 
     // const dummyData = dummyJson;
 
@@ -657,33 +660,20 @@ function ApiCollections() {
         const toggleTypeContent = (
             <Popover
                 activator={<div onClick={() => setPopover(!popover)}>Set ENV type</div>}
-                onClose={() => setPopover(false)}
+                onClose={() => {
+                    setPopover(false)
+                }}
                 active={popover}
                 autofocusTarget="first-node"
             >
                 <Popover.Pane>
-                    {textFieldActive ? 
-                    <Box padding={"1"}>
-                        <TextField onChange={setCustomEnv} value={customEnv} connectedRight={(
-                            <Tooltip content="Save your Custom env type" dismissOnMouseOut>
-                                <Button onClick={() => {
-                                    resetResourcesSelected();
-                                    updateEnvType(selectedResources, customEnv);
-                                    setTextFieldActive(false);
-                                }} plain icon={FileFilledMinor}/>
-                            </Tooltip>
-                        )}/>
-                    </Box>
-                        :<ActionList
-                        actionRole="menuitem"
-                        items={[
-                            {content: 'Staging', onAction: () => updateEnvType(selectedResources, "STAGING")},
-                            {content: 'Production', onAction: () => updateEnvType(selectedResources, "PRODUCTION")},
-                            {content: 'Reset', onAction: () => updateEnvType(selectedResources, null)},
-                            {content: 'Add Custom', onAction: () => setTextFieldActive(!textFieldActive)}
-                        ]}
-                    
-                    />}
+                    <SetUserEnvPopupComponent
+                        popover={popover}
+                        setPopover={setPopover}
+                        tags={envTypeMap}
+                        updateTags={updateTags}
+                        apiCollectionIds={selectedResources}
+                    />
                 </Popover.Pane>
             </Popover>
         )
@@ -703,23 +693,38 @@ function ApiCollections() {
         Object.keys(copyObj).forEach((key) => {
             data[key].length > 0 && data[key].forEach((c) => {
                 c['envType'] = dataMap[c.id]
-                c['envTypeComp'] = dataMap[c.id] ? <Badge size="small" status="info">{dataMap[c.id]}</Badge> : null
+                c['envTypeComp'] = transform.getCollectionTypeList(dataMap[c.id])
             })
         })
         setData(copyObj)
         setRefreshData(!refreshData)
     }
 
-    const updateEnvType = (apiCollectionIds,type) => {
+    const updateTags = (apiCollectionIds, tagObj) => {
         let copyObj = JSON.parse(JSON.stringify(envTypeMap))
-        apiCollectionIds.forEach(id => copyObj[id] = type)
-        api.updateEnvTypeOfCollection(type,apiCollectionIds).then((resp) => {
+        
+        apiCollectionIds.forEach(id => {
+            if(!copyObj[id]) {
+                copyObj[id] = []
+            }
+
+            if(tagObj === null) {
+                copyObj[id] = []
+            } else {
+                copyObj[id] = tagObj
+            }
+        })
+
+
+
+        api.updateEnvTypeOfCollection(tagObj, apiCollectionIds, tagObj === null).then((resp) => {
             func.setToast(true, false, "ENV type updated successfully")
             setEnvTypeMap(copyObj)
             updateData(copyObj)
         })
-        resetResourcesSelected();
 
+        resetResourcesSelected();
+        setPopover(false)
     }
 
     const modalComponent = <CreateNewCollectionModal
