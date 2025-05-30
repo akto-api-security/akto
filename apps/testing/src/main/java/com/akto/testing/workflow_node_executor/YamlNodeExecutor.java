@@ -43,6 +43,7 @@ import com.akto.test_editor.execution.ExecutorAlgorithm;
 import com.akto.testing.ApiExecutor;
 import com.akto.testing.TestExecutor;
 import com.akto.testing.Utils;
+import com.akto.testing.kafka_utils.TestingConfigurations;
 import com.akto.util.Constants;
 import static com.akto.runtime.utils.Utils.convertOriginalReqRespToString;
 import com.google.gson.Gson;
@@ -123,11 +124,13 @@ public class YamlNodeExecutor extends NodeExecutor {
         }
         //ExecutorSingleRequest singleReq = executor.buildTestRequest(executorNode, null, rawApis, varMap, authMechanism, customAuthTypes);
         //List<RawApi> testRawApis = singleReq.getRawApis();
-        TestingRunConfig testingRunConfig = new TestingRunConfig();
+        TestingRunConfig testingRunConfig = TestingConfigurations.getInstance().getTestingRunConfig();
         String logId = "";
         if(memory != null) {
-            testingRunConfig = memory.getTestingRunConfig();
             logId = memory.getLogId();
+            if(testingRunConfig == null) {
+                testingRunConfig = memory.getTestingRunConfig();
+            }
         }
         List<TestResult> result = new ArrayList<>();
         boolean vulnerable = false;
