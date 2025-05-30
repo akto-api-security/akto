@@ -1143,7 +1143,8 @@ public class ClientActor extends DataActor {
         obj.put("host", host);
         obj.put("vpcId", vpcId);
         obj.put("tagsList", tags);
-        OriginalHttpRequest request = new OriginalHttpRequest(url + "/createCollectionForHostAndVpc", "", "POST", obj.toString(), headers, "");
+        String objString = gson.toJson(obj);
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/createCollectionForHostAndVpc", "", "POST", objString, headers, "");
         try {
             OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
             String responsePayload = response.getBody();
@@ -1162,7 +1163,8 @@ public class ClientActor extends DataActor {
         obj.put("vxlanId", vxlanId);
         obj.put("vpcId", vpcId);
         obj.put("tagsList", tags);
-        OriginalHttpRequest request = new OriginalHttpRequest(url + "/createCollectionSimpleForVpc", "", "POST", obj.toString(), headers, "");
+        String objString = gson.toJson(obj);
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/createCollectionSimpleForVpc", "", "POST", objString, headers, "");
         try {
             OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
             String responsePayload = response.getBody();
