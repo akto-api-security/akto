@@ -8,10 +8,7 @@ import java.util.Map;
 import java.util.Objects;
 
 import com.akto.dao.context.Context;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.Gson;
-import com.mongodb.BasicDBObject;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -32,9 +29,18 @@ public class CollectionTags {
     String value;
     public static final String VALUE = "value";
 
+
+    public enum TagSource {
+        KUBERNETES, 
+        USER
+    }
+
+    TagSource source;
+    public static final String SOURCE = "source";
+
     @Override
     public int hashCode() {
-        return Objects.hash(lastUpdatedTs, keyName, value);
+        return Objects.hash(lastUpdatedTs, keyName, value, source);
     }
 
 
@@ -49,9 +55,13 @@ public class CollectionTags {
         boolean shouldUpdate = false;
 
         for(CollectionTags collectionTag : collectionTagsList) {
-            // Tag was deleted
+            // Compare only K8 tags source.
+            if (!collectionTag.getSource().equals(CollectionTags.TagSource.KUBERNETES)) {
+                continue;
+            }
             String key = collectionTag.getKeyName();
             dbtagsMap.put(key, collectionTag.getValue());
+            // Tag was deleted
             if (!tagsMap.containsKey(key)) {
                 shouldUpdate = true;
             } else if(tagsMap.containsKey(key) && !tagsMap.get(key).equals(collectionTag.getValue())) {
@@ -68,7 +78,7 @@ public class CollectionTags {
                 // New tag added
                 shouldUpdate = true;
             }
-            newTags.add(new CollectionTags(Context.now(), key, entry.getValue()));
+            newTags.add(new CollectionTags(Context.now(), key, entry.getValue(), TagSource.KUBERNETES));
         }
 
         return shouldUpdate ? newTags : null;
@@ -85,7 +95,7 @@ public class CollectionTags {
         for (Map.Entry<String, String> entry : tagsMap.entrySet()) {
             String key = entry.getKey();
             String value = entry.getValue();
-            CollectionTags collectionTag = new CollectionTags(Context.now(), key, value);
+            CollectionTags collectionTag = new CollectionTags(Context.now(), key, value, TagSource.KUBERNETES);
             tagsList.add(collectionTag);
         }
         return tagsList;
