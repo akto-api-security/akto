@@ -13,13 +13,15 @@ import com.akto.dto.HttpResponseParams;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.RawApi;
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONObject;
 import com.mongodb.BasicDBObject;
 import static com.akto.dto.RawApi.convertHeaders;
 
 public class Utils {
-    private static final Logger logger = LoggerFactory.getLogger(Utils.class);
+    private static final LoggerMaker logger = new LoggerMaker(Utils.class, LogDb.RUNTIME);
 
     private static int debugPrintCounter = 500;
     public static void printL(Object o) {
@@ -150,17 +152,22 @@ public class Utils {
     }
 
     private static Set<String> initializeDebugUrlsSet() {
+        Set<String> ret = new HashSet<>();
+
         String debugUrls = System.getenv("DEBUG_URLS");
         if (debugUrls == null || debugUrls.isEmpty()) {
-            return new HashSet<>(Arrays.asList(
+            ret = new HashSet<>(Arrays.asList(
                     "partner/v2/transactions",
                     "partner/qa/v2/transactions",
                     "partner/v1/transactions",
                     "partner/qa/v2/products",
                     "partner/v2/products"
             ));
+        } else {
+            ret = new HashSet<>(Arrays.asList(debugUrls.split(",")));
         }
-        return new HashSet<>(Arrays.asList(debugUrls.split(",")));
+        logger.info("DEBUG_URLS initialized with: " + ret.toString());
+        return ret;
     }
 
     public static boolean printDebugUrlLog(String url) {
