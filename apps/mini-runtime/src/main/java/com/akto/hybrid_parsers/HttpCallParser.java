@@ -330,7 +330,13 @@ public class HttpCallParser {
     private List<HttpResponseParams> filterDefaultPayloads(List<HttpResponseParams> filteredResponseParams, Map<String, DefaultPayload> defaultPayloadMap) {
         List<HttpResponseParams> ret = new ArrayList<>();
         for(HttpResponseParams httpResponseParams: filteredResponseParams) {
-            if (matchesDefaultPayload(httpResponseParams, defaultPayloadMap)) continue;
+            if (matchesDefaultPayload(httpResponseParams, defaultPayloadMap)) {
+                if (Utils.printDebugUrlLog(httpResponseParams.getRequestParams().getURL())) {
+                    loggerMaker.infoAndAddToDb("Found debug url in filterDefaultPayloads " + httpResponseParams.getRequestParams().getURL());
+                }
+                continue;
+            }
+
 
             ret.add(httpResponseParams);
         }
@@ -570,10 +576,22 @@ public class HttpCallParser {
                 cond = true;
             }
 
-            if (!cond) continue;
+            if (!cond){
+                if (Utils.printDebugUrlLog(httpResponseParam.getRequestParams().getURL())) {
+                    loggerMaker.infoAndAddToDb("Found debug url in filterHttpResponseParams invalid response code "
+                            + httpResponseParam.getRequestParams().getURL() + " response code " + httpResponseParam.getStatusCode());
+                }
+                continue;
+            }
             
             String ignoreAktoFlag = getHeaderValue(httpResponseParam.getRequestParams().getHeaders(),Constants.AKTO_IGNORE_FLAG);
-            if (ignoreAktoFlag != null) continue;
+            if (ignoreAktoFlag != null){
+                if (Utils.printDebugUrlLog(httpResponseParam.getRequestParams().getURL())) {
+                    loggerMaker.infoAndAddToDb("Found debug url in filterHttpResponseParams ignoreAktoFlag "
+                            + httpResponseParam.getRequestParams().getURL());
+                }
+                continue;
+            }
 
             if (httpResponseParam.getRequestParams().getURL().toLowerCase().contains("/health")) {
                 continue;
@@ -582,6 +600,10 @@ public class HttpCallParser {
             // check for garbage points here
             if(!redundantList.isEmpty()){
                 if(isRedundantEndpoint(httpResponseParam.getRequestParams().getURL(),regexPattern)){
+                    if (Utils.printDebugUrlLog(httpResponseParam.getRequestParams().getURL())) {
+                        loggerMaker.infoAndAddToDb("Found debug url in filterHttpResponseParams isRedundantEndpoint "
+                                + httpResponseParam.getRequestParams().getURL() + " pattern " + regexPattern.toString());
+                    }
                     continue;
                 }
                 List<String> contentTypeList = (List<String>) httpResponseParam.getRequestParams().getHeaders().getOrDefault("content-type", new ArrayList<>());
@@ -590,6 +612,10 @@ public class HttpCallParser {
                     contentType = contentTypeList.get(0);
                 }
                 if(isInvalidContentType(contentType)){
+                    if (Utils.printDebugUrlLog(httpResponseParam.getRequestParams().getURL())) {
+                        loggerMaker.infoAndAddToDb("Found debug url in filterHttpResponseParams isInvalidContentType "
+                                + httpResponseParam.getRequestParams().getURL() + " contentType " + contentType);
+                    }
                     continue;
                 }
 
@@ -618,15 +644,31 @@ public class HttpCallParser {
 
             }
 
+            if (Utils.printDebugUrlLog(httpResponseParam.getRequestParams().getURL())) {
+                loggerMaker.infoAndAddToDb("Found debug url in filterHttpResponseParams starting advanced filters "
+                        + httpResponseParam.getRequestParams().getURL());
+            }
+
             Pair<HttpResponseParams,FILTER_TYPE> temp = applyAdvancedFilters(httpResponseParam, executorNodesMap, apiCatalogSync.advancedFilterMap);
             HttpResponseParams param = temp.getFirst();
             if(param == null || temp.getSecond().equals(FILTER_TYPE.UNCHANGED)){
                 if(param == null && httpResponseParam != null && httpResponseParam.getRequestParams() != null){
                     loggerMaker.infoAndAddToDb("blocked api " + httpResponseParam.getRequestParams().getURL() + " " + httpResponseParam.getRequestParams().getApiCollectionId() + " " + httpResponseParam.getRequestParams().getMethod());
+                    if (Utils.printDebugUrlLog(httpResponseParam.getRequestParams().getURL())) {
+                        loggerMaker.infoAndAddToDb(
+                                "Found debug url in filterHttpResponseParams advanced filters, skipping "
+                                        + httpResponseParam.getRequestParams().getURL() + " filterType "
+                                        + temp.getSecond());
+                    }
                 }
                 continue;
             }else{
                 httpResponseParam = param;
+                if (Utils.printDebugUrlLog(httpResponseParam.getRequestParams().getURL())) {
+                    loggerMaker.infoAndAddToDb("Found debug url in filterHttpResponseParams advanced filters, adding "
+                            + httpResponseParam.getRequestParams().getURL() + " filterType " + temp.getSecond());
+                }
+
             }
             
             int apiCollectionId = createApiCollectionId(httpResponseParam);
@@ -638,7 +680,7 @@ public class HttpCallParser {
                 filteredResponseParams.add(httpResponseParam);
             } else {
                 filteredResponseParams.addAll(responseParamsList);
-                loggerMaker.infoAndAddToDb("Adding " + responseParamsList.size() + "new graphql endpoints in invetory",LogDb.RUNTIME);
+                loggerMaker.infoAndAddToDb("Adding " + responseParamsList.size() + "new graphql endpoints in inventory",LogDb.RUNTIME);
             }
 
             if (httpResponseParam.getSource().equals(HttpResponseParams.Source.MIRRORING)) {
