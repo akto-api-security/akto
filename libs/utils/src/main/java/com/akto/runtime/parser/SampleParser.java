@@ -78,7 +78,7 @@ public class SampleParser {
         String logType = (String) json.getOrDefault("logType", "INFO");
         String source = (String) json.getOrDefault("source", "UNKNOWN");
         String logMessage = (String) json.getOrDefault("message", null);
-        int time = (int) json.getOrDefault("time", Context.now());
+        int time = Integer.parseInt(json.getOrDefault("time", Context.now()).toString());
 
         return new TrafficProducerLog(
                 logMessage, source, logType, time);
