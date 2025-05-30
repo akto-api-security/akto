@@ -6,6 +6,7 @@ import com.akto.dto.*;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.runtime_filters.RuntimeFilter;
 import com.akto.runtime.policies.*;
+import com.akto.runtime.utils.Utils;
 import com.akto.dto.type.APICatalog;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods;
@@ -161,6 +162,12 @@ public class AktoPolicyNew {
         PolicyCatalog policyCatalog = getApiInfoFromMap(apiInfoKey);
         policyCatalog.setSeenEarlier(true);
         ApiInfo apiInfo = policyCatalog.getApiInfo();
+
+        if (Utils.printDebugUrlLog(httpResponseParams.getRequestParams().getURL())) {
+            loggerMaker.infoAndAddToDb("Found debug url in process " + httpResponseParams.getRequestParams().getURL()
+                    + " apiInfoKey: " + apiInfo.getId().toString());
+        }
+
 
         Map<Integer, FilterSampleData> filterSampleDataMap = policyCatalog.getFilterSampleDataMap();
         if (filterSampleDataMap == null) {
