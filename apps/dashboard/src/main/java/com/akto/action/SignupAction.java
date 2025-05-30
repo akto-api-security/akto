@@ -1010,7 +1010,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
                     servletRequest.getSession().setAttribute("accountId", accountId);
                 }
 
-                LoginAction.loginUser(user, servletResponse, true, servletRequest);
+                LoginAction.loginUser(user, servletResponse, true, servletRequest, signupInfo);
                 servletResponse.sendRedirect("/dashboard/observe/inventory");
                 return;
             }

@@ -223,6 +223,21 @@ public class LoginAction implements Action, ServletResponseAware, ServletRequest
 
     private final static int REFRESH_INTERVAL = 24 * 60 * 60; // one day.
 
+    public static String loginUser(User user, HttpServletResponse servletResponse, boolean signedUp, HttpServletRequest servletRequest,SignupInfo signupInfo) {
+        if(user != null){
+            if (user.getSignupInfoMap() == null) {
+                user.setSignupInfoMap(new HashMap<>());
+            }
+            user.getSignupInfoMap().put(signupInfo.getKey(), signupInfo);
+            UsersDao.instance.updateOne(
+                    Filters.eq(User.LOGIN, user.getLogin()),
+                    Updates.set(User.SIGNUP_INFO_MAP, user.getSignupInfoMap())
+            );
+        } 
+        return loginUser(user, servletResponse, signedUp, servletRequest);
+    }
+
+
     public static String loginUser(User user, HttpServletResponse servletResponse, boolean signedUp, HttpServletRequest servletRequest) {
         String refreshToken;
         Map<String,Object> claims = new HashMap<>();
