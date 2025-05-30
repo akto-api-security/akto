@@ -1,5 +1,8 @@
 package com.akto.runtime.parser;
 
+import static com.akto.runtime.utils.Utils.printL;
+
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -8,8 +11,6 @@ import org.apache.commons.lang3.math.NumberUtils;
 import com.akto.dto.HttpRequestParams;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.OriginalHttpRequest;
-import com.akto.log.LoggerMaker;
-import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.HttpRequestResponseUtils;
 import com.akto.util.JSONUtils;
 import com.google.gson.Gson;
@@ -17,8 +18,20 @@ import com.google.gson.Gson;
 public class SampleParser {
     
     private static final Gson gson = new Gson();
-    private static final LoggerMaker loggerMaker = new LoggerMaker(SampleParser.class, LogDb.RUNTIME);
+    private  static final List<String> headerValues = new ArrayList<>();
 
+    private static void injectTagsInHeaders(HttpRequestParams httpRequestParams, String tagsJson){
+        if(tagsJson == null || tagsJson.isEmpty()){
+            return;
+        }
+
+        Map<String, String> tagsMap = gson.fromJson(tagsJson, Map.class);
+        for (String tagName: tagsMap.keySet()){
+            headerValues.clear();
+            headerValues.add(tagsMap.get(tagName));
+            httpRequestParams.getHeaders().put("x-akto-k8s-"+ tagName, headerValues);
+        }
+    }
 
     public static HttpResponseParams parseSampleMessage(String message) throws Exception {
                 //convert java object to JSON format
@@ -63,10 +76,13 @@ public class SampleParser {
 
         // JSON string of K8 POD tags
         String tags = (String) json.getOrDefault("tag", "");
-        loggerMaker.infoAndAddToDb("K8 POD tags: " + tags);
+        if(!tags.isEmpty()){
+            printL("K8 Pod Tags" + tags);
+            injectTagsInHeaders(requestParams, tags);
+        }
 
         return new HttpResponseParams(
-                type,statusCode, status, responseHeaders, payload, requestParams, time, accountId, isPending, source, message, sourceIP, destIP, direction
+                type,statusCode, status, responseHeaders, payload, requestParams, time, accountId, isPending, source, message, sourceIP, destIP, direction, tags
         );
 
     }
