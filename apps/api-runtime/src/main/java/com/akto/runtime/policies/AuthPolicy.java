@@ -5,6 +5,7 @@ import com.akto.dto.CustomAuthType;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.runtime_filters.RuntimeFilter;
 import com.akto.dto.type.KeyTypes;
+import com.akto.dto.type.RequestTemplate;
 import com.akto.util.JSONUtils;
 
 import com.mongodb.BasicDBObject;
@@ -66,7 +67,19 @@ public class AuthPolicy {
             if(!customAuthTypePayloadKeys.isEmpty() ){
                 BasicDBObject flattenedPayload = null;
                 try{
-                    BasicDBObject basicDBObject = BasicDBObject.parse(httpResponseParams.getRequestParams().getPayload());
+                    BasicDBObject basicDBObject = new BasicDBObject();
+                    try {
+                        basicDBObject = BasicDBObject.parse(httpResponseParams.getRequestParams().getPayload());   
+                    } catch (Exception e) {
+                        // TODO: handle exception
+                    }
+                    BasicDBObject queryParamObj = new BasicDBObject();
+                    try {
+                        queryParamObj = RequestTemplate.getQueryJSON(httpResponseParams.getRequestParams().getURL());
+                    } catch (Exception e) {
+                        // TODO: handle exception
+                    }
+                    basicDBObject.putAll(queryParamObj.toMap());
                     flattenedPayload = JSONUtils.flattenWithDots(basicDBObject);
                 } catch (Exception e){
                 }
@@ -115,7 +128,6 @@ public class AuthPolicy {
                 }
             }
         }
-
         boolean returnValue = false;
         if (authTypes.isEmpty()) {
             authTypes.add(ApiInfo.AuthType.UNAUTHENTICATED);
