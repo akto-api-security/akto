@@ -12,12 +12,14 @@ import com.akto.threat.backend.constants.MongoDBCollection;
 import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoCursor;
+import com.mongodb.client.model.Filters;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
 import org.bson.Document;
+import org.bson.conversions.Bson;
 
 public class ThreatApiService {
 
@@ -173,7 +175,7 @@ public class ThreatApiService {
   }
 
   public ThreatSeverityWiseCountResponse getSeverityWiseCount(
-      String accountId, ThreatSeverityWiseCountRequest req) {
+    String accountId, ThreatSeverityWiseCountRequest req) {
 
     loggerMaker.info("getSeverityWiseCount start ts " + Context.now());
 
@@ -182,36 +184,24 @@ public class ThreatApiService {
             .getDatabase(accountId)
             .getCollection(MongoDBCollection.ThreatDetection.MALICIOUS_EVENTS, Document.class);
 
-    List<Document> pipeline = new ArrayList<>();
-    Document matchFilter = new Document("$match", 
-      new Document("detectedAt", new Document("$gte", req.getStartTs()).append("$lte", req.getEndTs()))
-    );
-    pipeline.add(matchFilter);
-    pipeline.add(
-        new Document("$sort", new Document("category", 1).append("detectedAt", -1))); // sort
-    pipeline.add(
-        new Document(
-            "$group",
-            new Document(
-                    "_id",
-                    new Document("severity", "$severity"))
-                .append("count", new Document("$sum", 1))));
-
-    pipeline.add(
-        new Document(
-            "$sort",
-            new Document("severity", -1).append("severity", -1).append("count", -1))); // sort
-
     List<ThreatSeverityWiseCountResponse.SeverityCount> categoryWiseCounts = new ArrayList<>();
 
-    try (MongoCursor<Document> cursor = coll.aggregate(pipeline).cursor()) {
-      while (cursor.hasNext()) {
-        Document doc = cursor.next();
-        Document agg = (Document) doc.get("_id");
+    String[] severities = { "CRITICAL", "HIGH", "MEDIUM", "LOW" };
+
+    for (String severity : severities) {
+      Bson filter = Filters.and(
+          Filters.eq("severity", severity),
+          Filters.gte("detectedAt", req.getStartTs()),
+          Filters.lte("detectedAt", req.getEndTs())
+      );
+
+      long count = coll.countDocuments(filter);
+
+      if (count > 0) {
         categoryWiseCounts.add(
             ThreatSeverityWiseCountResponse.SeverityCount.newBuilder()
-                .setSeverity(agg.getString("severity"))
-                .setCount(doc.getInteger("count", 0))
+                .setSeverity(severity)
+                .setCount((int) count)
                 .build());
       }
     }
@@ -222,4 +212,5 @@ public class ThreatApiService {
         .addAllCategoryWiseCounts(categoryWiseCounts)
         .build();
   }
+
 }
