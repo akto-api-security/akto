@@ -1,5 +1,7 @@
 package com.akto.threat.backend.service;
 
+import com.akto.dao.context.Context;
+import com.akto.log.LoggerMaker;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ListThreatApiRequest;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ListThreatApiResponse;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatCategoryWiseCountRequest;
@@ -10,20 +12,26 @@ import com.akto.threat.backend.constants.MongoDBCollection;
 import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoCursor;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+
 import org.bson.Document;
 
 public class ThreatApiService {
 
   private final MongoClient mongoClient;
+  private static final LoggerMaker loggerMaker = new LoggerMaker(ThreatApiService.class);
 
   public ThreatApiService(MongoClient mongoClient) {
     this.mongoClient = mongoClient;
   }
 
   public ListThreatApiResponse listThreatApis(String accountId, ListThreatApiRequest request) {
+
+    loggerMaker.info("listThreatApis start ts " + Context.now());
+
     int skip = request.hasSkip() ? request.getSkip() : 0;
     int limit = request.getLimit();
     Map<String, Integer> sort = request.getSortMap();
@@ -106,52 +114,56 @@ public class ThreatApiService {
       e.printStackTrace();
     }
 
+    loggerMaker.info("listThreatApis end ts " + Context.now());
     return ListThreatApiResponse.newBuilder().addAllApis(apis).setTotal(total).build();
   }
 
   public ThreatCategoryWiseCountResponse getSubCategoryWiseCount(
-      String accountId, ThreatCategoryWiseCountRequest req) {
+    String accountId, ThreatCategoryWiseCountRequest req) {
+
+    loggerMaker.info("getSubCategoryWiseCount start ts " + Context.now());
+
     MongoCollection<Document> coll =
         this.mongoClient
             .getDatabase(accountId)
             .getCollection(MongoDBCollection.ThreatDetection.MALICIOUS_EVENTS, Document.class);
 
     List<Document> pipeline = new ArrayList<>();
-    if (req.getStartTs() != 0 || req.getEndTs() != 0) {
-      Document matchFilter = new Document("$match", 
-        new Document("detectedAt", new Document("$gte", req.getStartTs()).append("$lte", req.getEndTs()))
-      );
-      pipeline.add(matchFilter); 
-    }
-    pipeline.add(
-        new Document("$sort", new Document("category", 1).append("detectedAt", -1))); // sort
-    pipeline.add(
-        new Document(
-            "$group",
-            new Document(
-                    "_id",
-                    new Document("category", "$category").append("subCategory", "$subCategory"))
-                .append("count", new Document("$sum", 1))));
 
-    pipeline.add(
-        new Document(
-            "$sort",
-            new Document("category", -1).append("subCategory", -1).append("count", -1))); // sort
+    // 1. Match on time range
+    if (req.getStartTs() != 0 || req.getEndTs() != 0) {
+      pipeline.add(new Document("$match",
+          new Document("detectedAt",
+              new Document("$gte", req.getStartTs())
+                  .append("$lte", req.getEndTs()))));
+    }
+
+    // 3. Group by category and subCategory
+    pipeline.add(new Document("$group",
+        new Document("_id",
+            new Document("category", "$category"))
+            .append("count", new Document("$sum", 1))));
+
+    // 4. Sort by count descending
+    pipeline.add(new Document("$sort", new Document("count", -1)));
 
     List<ThreatCategoryWiseCountResponse.SubCategoryCount> categoryWiseCounts = new ArrayList<>();
 
-    try (MongoCursor<Document> cursor = coll.aggregate(pipeline).cursor()) {
+    // 5. Execute aggregation with controlled batch size
+    try (MongoCursor<Document> cursor = coll.aggregate(pipeline).batchSize(1000).cursor()) {
       while (cursor.hasNext()) {
         Document doc = cursor.next();
         Document agg = (Document) doc.get("_id");
+
         categoryWiseCounts.add(
             ThreatCategoryWiseCountResponse.SubCategoryCount.newBuilder()
                 .setCategory(agg.getString("category"))
-                .setSubCategory(agg.getString("subCategory"))
                 .setCount(doc.getInteger("count", 0))
                 .build());
       }
     }
+
+    loggerMaker.info("getSubCategoryWiseCount end ts " + Context.now());
 
     return ThreatCategoryWiseCountResponse.newBuilder()
         .addAllCategoryWiseCounts(categoryWiseCounts)
@@ -160,6 +172,9 @@ public class ThreatApiService {
 
   public ThreatSeverityWiseCountResponse getSeverityWiseCount(
       String accountId, ThreatSeverityWiseCountRequest req) {
+
+    loggerMaker.info("getSeverityWiseCount start ts " + Context.now());
+
     MongoCollection<Document> coll =
         this.mongoClient
             .getDatabase(accountId)
@@ -198,6 +213,8 @@ public class ThreatApiService {
                 .build());
       }
     }
+
+    loggerMaker.info("getSeverityWiseCount end ts " + Context.now());
 
     return ThreatSeverityWiseCountResponse.newBuilder()
         .addAllCategoryWiseCounts(categoryWiseCounts)

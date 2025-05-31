@@ -8387,7 +8387,9 @@
                 <param
                     name="includeProperties">^actionErrors.*</param>
             </result>
-            <result name="SUCCESS" type="json"> </result>
+            <result name="SUCCESS" type="json">
+                <param name="includeProperties">^categoryCounts.*</param>
+            </result>
             <result name="ERROR" type="json">
                 <param name="statusCode">422</param>
                 <param name="ignoreHierarchy">false</param>
