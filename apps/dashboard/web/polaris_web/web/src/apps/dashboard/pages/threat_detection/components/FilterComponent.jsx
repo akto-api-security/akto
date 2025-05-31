@@ -63,28 +63,30 @@ function FilterComponent() {
                 </Box>
             </LegacyCard.Section>
             <LegacyCard.Section>
-                <DropdownSearch
-                    placeholder={"Search filters"}
-                    optionsList={allData.map(x => {
-                        return {
-                            label: x.id,
-                            value: x.id
-                        }
-                    })}
-                    setSelected={(value) => {
-                        let content = allData.filter(x =>
-                            x.id == value
-                        )[0].content;
-                        let temp = { message: content }
-                        setId(value)
-                        setData(temp)
-                        setOgData(temp)
-                    }}
-                    preSelected={[
-                        id
-                    ]}
-                    value={id}
-                />
+                <Box width="300px">
+                    <DropdownSearch
+                        placeholder={"Search filters"}
+                        optionsList={testData.map(x => {
+                            return {
+                                label: x.id,
+                                value: x.id
+                            }
+                        })}
+                        setSelected={(value) => {
+                            let content = testData.filter(x =>
+                                x.id == value
+                            )[0].content;
+                            let temp = { message: content }
+                            setId(value)
+                            setData(temp)
+                            setOgData(temp)
+                        }}
+                        preSelected={[
+                            'test1',
+                        ]}
+                        value={'test1'}
+                    />
+                </Box>
             </LegacyCard.Section>
             <LegacyCard.Section flush>
                 <SampleData data={ogData} editorLanguage="custom_yaml" minHeight="65vh" readOnly={false} getEditorData={setData} />

@@ -146,9 +146,11 @@ function SampleDetails(props) {
                                 </div>
                             </HorizontalStack>
                             <HorizontalStack gap={"1"} wrap={false}>
-                                <Tooltip content={moreInfoData?.url}>
-                                    <Text color="subdued" variant="bodySm" truncate>{moreInfoData?.url}</Text>
-                                </Tooltip>
+                                <Box maxWidth="300px">
+                                    <Tooltip content={moreInfoData?.url}>
+                                        <Text breakWord color="subdued" variant="bodySm">{moreInfoData?.url}</Text>
+                                    </Tooltip>
+                                </Box>
                                 {
                                     currentTemplateObj?.category?.name && (
                                         <>

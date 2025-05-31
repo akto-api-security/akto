@@ -25,7 +25,8 @@ message ListMaliciousRequestsResponse {
       string sub_category = 13;
       string type = 14;
       string ref_id = 15;
-      string event_type_val = 16;
+      string severity = 16;
+      string event_type_val = 17;
     }
     repeated MaliciousEvent malicious_events = 1;
     uint64 total = 2;
@@ -44,6 +45,7 @@ message ListMaliciousRequestsRequest {
       optional TimeRangeFilter detected_at_time_range = 4;
       repeated string types = 5;
       repeated string sub_category = 6;
+      repeated string severity = 7;
     }
 
     // The number of alerts to return
@@ -59,6 +61,7 @@ message FetchAlertFiltersResponse {
   repeated string actors = 1;
   repeated string urls = 2;
   repeated string sub_category = 3;
+  repeated string severity = 4;
 }
 
 message ListThreatActorsRequest {
@@ -134,6 +137,8 @@ message ListThreatApiResponse {
     uint64 discovered_at = 3;
     uint32 actors_count = 4;
     uint32 requests_count = 5;
+    string severity = 6;
+    string sub_category = 7;
   }
 
   repeated ThreatApi apis = 1;

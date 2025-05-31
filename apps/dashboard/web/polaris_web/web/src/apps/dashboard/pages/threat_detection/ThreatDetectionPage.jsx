@@ -31,13 +31,14 @@ const convertToGraphData = (severityMap) => {
     return dataArr
 }
 
-const ChartComponent = ({ subCategoryCount, severityCountMap }) => {
+const ChartComponent = ({ subCategoryCount, severityCountMap, onSubCategoryClick, onSeverityClick }) => {
     return (
       <VerticalStack gap={4} columns={2}>
         <HorizontalGrid gap={4} columns={2}>
           <TopThreatTypeChart
             key={"top-threat-types"}
             data={subCategoryCount}
+            onSubCategoryClick={onSubCategoryClick}
           />
           <InfoCard
                 title={"Threats by severity"}
@@ -57,6 +58,7 @@ const ChartComponent = ({ subCategoryCount, severityCountMap }) => {
                         showGridLines={true}
                         barWidth={100 - (severityCountMap.length * 6)}
                         barGap={12}
+                        onBarClick={(eventPoint) => onSeverityClick(eventPoint.category.toUpperCase())}
                     />
                 }
             />
@@ -78,7 +80,7 @@ function ThreatDetectionPage() {
     const [showNewTab, setShowNewTab] = useState(false)
     const [subCategoryCount, setSubCategoryCount] = useState([]);
     const [severityCountMap, setSeverityCountMap] = useState([]);
-
+    const [externalFilter, setExternalFilter] = useState(null);
     const threatFiltersMap = SessionStore((state) => state.threatFiltersMap);
 
     const startTimestamp = parseInt(currDateRange.period.since.getTime()/1000)
@@ -148,11 +150,25 @@ function ThreatDetectionPage() {
         fetchCountBySeverity();
       }, [startTimestamp, endTimestamp]);
 
+      const onSubCategoryClick = (eventPoint ) => {
+        setExternalFilter({key: "subCategory", value: [eventPoint.subCategory]});
+      }
+
+      const onSeverityClick = (severity) => {
+        setExternalFilter({key: "severity", value: [severity]});
+      }
+
     const components = [
-        <ChartComponent subCategoryCount={subCategoryCount} severityCountMap={severityCountMap} />,
+        <ChartComponent
+            subCategoryCount={subCategoryCount}
+            severityCountMap={severityCountMap}
+            onSubCategoryClick={onSubCategoryClick}
+            onSeverityClick={onSeverityClick}
+        />,
         <SusDataTable key={"sus-data-table"}
             currDateRange={currDateRange}
             rowClicked={rowClicked} 
+            externalFilter={externalFilter}
         />,
         !showNewTab ? <NormalSampleDetails
             title={"Attacker payload"}

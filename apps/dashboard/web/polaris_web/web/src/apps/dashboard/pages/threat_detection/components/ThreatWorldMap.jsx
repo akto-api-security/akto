@@ -9,7 +9,7 @@ Exporting(Highcharts);
 ExportData(Highcharts);
 FullScreen(Highcharts);
 
-function ThreatWorldMap({ data, style, loading }) {
+function ThreatWorldMap({style, loading, onCountryClick, data }) {
   useEffect(() => {
     const fetchMapData = async () => {
       const topology = await fetch(
@@ -19,7 +19,10 @@ function ThreatWorldMap({ data, style, loading }) {
       Highcharts.mapChart("threat-world-map-container", {
         chart: {
           map: topology,
-          backgroundColor: "#fff",
+          backgroundColor: '#ffffff',
+          style: {
+            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial'
+          }
         },
 
         title: {
@@ -38,10 +41,6 @@ function ThreatWorldMap({ data, style, loading }) {
           enabled: false,
         },
 
-        mapNavigation: {
-          enabled: false,
-        },
-
         mapView: {
           fitToGeometry: {
             type: "MultiPoint",
@@ -54,7 +53,7 @@ function ThreatWorldMap({ data, style, loading }) {
           },
         },
 
-        exporting: {
+       exporting: {
           enabled: true, // Enables export menu
           buttons: {
             contextButton: {
@@ -73,33 +72,92 @@ function ThreatWorldMap({ data, style, loading }) {
           },
         },
 
+        plotOptions: {
+          map: {
+            color: "#6200EA",
+          },
+          mapbubble: {
+            animation: {
+              duration: 450
+            },
+            minSize: 15,
+            maxSize: 30,
+          }
+        },
+
+        tooltip: {
+          hideDelay: 0,
+          animation: false,
+          followPointer: true
+        },
+
         series: [
           {
+            type: "map",
             name: "Countries",
-            color: "#E0E0E0",
-            enableMouseTracking: false,
-            states: {
-              inactive: {
-                enabled: true,
-                opacity: 1,
-              },
-            },
+            enableMouseTracking: true,
+            showInLegend: false,
           },
           {
+            cursor: "pointer",
+            events: {
+              click: (e) => {
+                onCountryClick(e.point.code);
+              }
+            },
             type: "mapbubble",
-            name: "",
-            data: data,
-            minSize: "4%",
-            maxSize: "4%",
+            name: "Threat Actors",
+            enableMouseTracking: true,
+            animation: {
+              duration: 450,
+            },
+            stickyTracking: true,
+            data: data.map(item => ({
+              z: item.count,
+              value: item.count,
+              code: item.code,
+              name: item.code,
+              count: item.count
+            })),
             joinBy: ["iso-a2", "code"],
             marker: {
-              fillOpacity: 0.5,
+              fillColor: {
+                radialGradient: {
+                  cx: 0.5,
+                  cy: 0.5,
+                  r: 0.7
+                },
+                stops: [
+                  [0, 'rgba(255, 30, 0, 0.1)'],
+                  [0.3, 'rgba(255, 30, 0, 0.2)'],
+                  [0.6, 'rgba(255, 30, 0, 0.4)'],
+                  [0.8, 'rgba(255, 30, 0, 0.7)'],
+                  [1, 'rgba(255, 0, 0, 0.9)']
+                ]
+              },
               lineWidth: 0,
+              symbol: 'circle'
+            },
+            dataLabels: {
+              enabled: true,
+              format: '{point.count}',
+              align: 'center',
+              verticalAlign: 'middle',
+              style: {
+                color: 'white',
+                textOutline: '1px contrast',
+                fontWeight: 'normal',
+                fontSize: '12px'
+              },
+              allowOverlap: true,
+              crop: false,
+              overflow: 'none'
             },
             tooltip: {
-              pointFormat: "<b>{point.name}</b><br>Actors: {point.count}",
+              headerFormat: '',
+              pointFormat: '<b>{point.name}</b><br>Threat Actors: <b>{point.count}</b>'
             },
-          },
+          }
         ],
       });
     };
