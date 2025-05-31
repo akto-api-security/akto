@@ -141,7 +141,8 @@ public class ThreatApiService {
     // 3. Group by category and subCategory
     pipeline.add(new Document("$group",
         new Document("_id",
-            new Document("category", "$category"))
+            new Document("category", "$category")
+            .append("subCategory", "$subCategory"))
             .append("count", new Document("$sum", 1))));
 
     // 4. Sort by count descending
@@ -158,6 +159,7 @@ public class ThreatApiService {
         categoryWiseCounts.add(
             ThreatCategoryWiseCountResponse.SubCategoryCount.newBuilder()
                 .setCategory(agg.getString("category"))
+                .setSubCategory(agg.getString("subCategory"))
                 .setCount(doc.getInteger("count", 0))
                 .build());
       }
