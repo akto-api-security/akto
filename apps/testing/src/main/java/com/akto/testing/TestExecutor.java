@@ -231,7 +231,7 @@ public class TestExecutor {
         sampleMessageStore.fetchSampleMessages(Main.extractApiCollectionIds(apiInfoKeyList));
 
         if (apiInfoKeyList == null || apiInfoKeyList.isEmpty()) return;
-        loggerMaker.debugAndAddToDb("APIs found: " + apiInfoKeyList.size(), LogDb.TESTING);
+        loggerMaker.infoAndAddToDb("APIs found: " + apiInfoKeyList.size(), LogDb.TESTING);
 
         TestingRunResultSummariesDao.instance.updateOne(
             Filters.eq("_id", summaryId),
@@ -281,9 +281,9 @@ public class TestExecutor {
         int currentTime = Context.now();
         Map<String, String> hostAndContentType = new HashMap<>();
         try {
-            loggerMaker.debugAndAddToDb("Starting findAllHosts at: " + currentTime, LogDb.TESTING);
+            loggerMaker.infoAndAddToDb("Starting findAllHosts at: " + currentTime, LogDb.TESTING);
             hostAndContentType = StatusCodeAnalyser.findAllHosts(sampleMessageStore, sampleDataMapForStatusCodeAnalyser);
-            loggerMaker.debugAndAddToDb("Completing findAllHosts in: " + (Context.now() -  currentTime) + " at: " + Context.now(), LogDb.TESTING);
+            loggerMaker.infoAndAddToDb("Completing findAllHosts in: " + (Context.now() -  currentTime) + " at: " + Context.now(), LogDb.TESTING);
         } catch (Exception e){
             loggerMaker.errorAndAddToDb("Error while running findAllHosts " + e.getMessage(), LogDb.TESTING);
         }
@@ -297,9 +297,9 @@ public class TestExecutor {
         }
         try {
             currentTime = Context.now();
-            loggerMaker.debugAndAddToDb("Starting StatusCodeAnalyser at: " + currentTime, LogDb.TESTING);
+            loggerMaker.infoAndAddToDb("Starting StatusCodeAnalyser at: " + currentTime, LogDb.TESTING);
             StatusCodeAnalyser.run(sampleDataMapForStatusCodeAnalyser, sampleMessageStore , attackerTestRole.findMatchingAuthMechanism(null), testingRun.getTestingRunConfig(), hostAndContentType);
-            loggerMaker.debugAndAddToDb("Completing StatusCodeAnalyser in: " + (Context.now() -  currentTime) + " at: " + Context.now(), LogDb.TESTING);
+            loggerMaker.infoAndAddToDb("Completing StatusCodeAnalyser in: " + (Context.now() -  currentTime) + " at: " + Context.now(), LogDb.TESTING);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error while running status code analyser " + e.getMessage(), LogDb.TESTING);
         }
