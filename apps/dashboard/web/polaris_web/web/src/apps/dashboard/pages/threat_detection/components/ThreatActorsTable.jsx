@@ -161,7 +161,7 @@ function ThreatActorTable({ data, currDateRange, handleRowClick }) {
           ...x,
           actor: x.id ? (
             <Text variant="bodyMd" fontWeight="medium">
-              {x.id}
+              {x.id?.length > 50 ? `${x.id.slice(0, 50)}...` : x.id}
             </Text>
           ) : "-",
           latestIp: x.latestApiIp || "-",
