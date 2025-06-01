@@ -48,6 +48,10 @@ public class CollectionTags {
         if (tagsJson == null || tagsJson.isEmpty()) {
             return null;
         }
+        
+        if(collectionTagsList == null || collectionTagsList.isEmpty()) {
+            return convertTagsFormat(tagsJson);
+        }
 
         Gson gson = new Gson();
         Map<String, String> tagsMap = gson.fromJson(tagsJson, Map.class);
