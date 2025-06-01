@@ -18,7 +18,7 @@ import { ThreatSummary } from "./components/ThreatSummary";
 import ThreatActivityTimeline from "./components/ThreatActivityTimeline";
 import React from "react";
 
-const ChartComponent = ({ mapData, loading, onSubCategoryClick, currDateRange }) => {
+const ChartComponent = ({ onSubCategoryClick, currDateRange }) => {
     return (
         <VerticalStack gap={4} columns={2}>
             <HorizontalGrid gap={4} columns={2}>
@@ -28,12 +28,12 @@ const ChartComponent = ({ mapData, loading, onSubCategoryClick, currDateRange })
                     endTimestamp={parseInt(currDateRange.period.until.getTime()/1000)}
                 />
                 <ThreatWorldMap
-                    data={mapData}
+                    startTimestamp={parseInt(currDateRange.period.since.getTime()/1000)}
+                    endTimestamp={parseInt(currDateRange.period.until.getTime()/1000)}
                     style={{
                         width: "100%",
                         marginRight: "auto",
                     }}
-                    loading={loading}
                     key={"threat-actor-world-map"}
                 />
             </HorizontalGrid>
@@ -44,9 +44,6 @@ const ChartComponent = ({ mapData, loading, onSubCategoryClick, currDateRange })
 const MemoizedChartComponent = React.memo(ChartComponent);
 
 function ThreatActorPage() {
-  const [mapData, setMapData] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [subCategoryCount, setSubCategoryCount] = useState([]);
   const [actorDetails, setActorDetails] = useState(null);
   const [showActorDetails, setShowActorDetails] = useState(false);
 
@@ -57,32 +54,6 @@ function ThreatActorPage() {
   );
 
   useEffect(() => {
-    const fetchActorsPerCountry = async () => {
-      setLoading(true);
-      const res = await api.getActorsCountPerCounty();
-      if (res?.actorsCountPerCountry) {
-        setMapData(
-          res.actorsCountPerCountry.map((x) => {
-            return {
-              code: x.country,
-              z: 100,
-              count: x.count,
-            };
-          })
-        );
-      }
-      setLoading(false);
-    };
-    const fetchThreatCategoryCount = async () => {
-      setLoading(true);
-      const res = await api.fetchThreatCategoryCount();
-      const finalObj = threatDetectionFunc.getGraphsData(res);
-      // setCategoryCount(finalObj.categoryCountRes);
-      setSubCategoryCount(finalObj.subCategoryCount);
-      setLoading(false);
-    };
-    fetchActorsPerCountry();
-    fetchThreatCategoryCount();
   }, []);
 
   const onSubCategoryClick = (subCategory) => {
@@ -96,16 +67,14 @@ function ThreatActorPage() {
 
   const components = [
     <ThreatSummary startTimestamp={parseInt(currDateRange.period.since.getTime()/1000)} endTimestamp={parseInt(currDateRange.period.until.getTime()/1000)} />,
-    <MemoizedChartComponent 
-      mapData={mapData}
-      loading={loading}
+    <MemoizedChartComponent
+    key={"threat-actor-chart-component"}
       onSubCategoryClick={onSubCategoryClick}
       currDateRange={currDateRange}
     />,
     <ThreatActorTable
       key={"threat-actor-data-table"}
       currDateRange={currDateRange}
-      loading={loading}
       handleRowClick={onRowClick}
     />,
     ...(showActorDetails ? [<ActorDetails actorDetails={actorDetails} setShowActorDetails={setShowActorDetails} />] : [])
