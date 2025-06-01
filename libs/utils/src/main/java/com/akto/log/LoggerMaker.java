@@ -49,6 +49,7 @@ public class LoggerMaker  {
     private final Class<?> aClass;
 
     private static String slackWebhookUrl;
+    private static int counter = 0;
 
     public static final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
     private static final DataActor dataActor = DataActorFactory.fetchInstance();
@@ -345,6 +346,14 @@ public class LoggerMaker  {
     }
 
     public void debugAndAddToDb(String message) {
+        debugAndAddToDb(message, this.db);
+    }
+
+    public void debugAndAddToDbCount(String message) {
+        if(counter > 500){
+            return;
+        }
+        counter++;
         debugAndAddToDb(message, this.db);
     }
 
