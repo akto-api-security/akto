@@ -3,6 +3,7 @@ package com.akto.test_editor.execution;
 import com.akto.dao.billing.OrganizationsDao;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -502,7 +503,7 @@ public class Executor {
         if (shouldCalculateNewToken) {
             try {
                 LoginFlowResponse loginFlowResponse= new LoginFlowResponse();
-                loggerMaker.debugAndAddToDb("trying to fetch token of step builder type for role " + testRole.getName(), LogDb.TESTING);
+                loggerMaker.infoAndAddToDb("trying to fetch token of step builder type for role " + testRole.getName() + " at time: " + Context.now() , LogDb.TESTING);
                 loginFlowResponse = TestExecutor.executeLoginFlow(authMechanismForRole, null, testRole.getName());
                 if (!loginFlowResponse.getSuccess())
                     throw new Exception(loginFlowResponse.getError());
