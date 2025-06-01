@@ -1,10 +1,6 @@
 package com.akto.utils;
 
-import com.akto.action.IngestionAction;
 import com.akto.log.LoggerMaker;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import com.akto.dao.context.Context;
 import com.akto.dto.IngestDataBatch;
 import com.akto.kafka.Kafka;
