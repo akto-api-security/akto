@@ -1,4 +1,4 @@
-import { use, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import Highcharts from "highcharts/highmaps";
 import Exporting from "highcharts/modules/exporting";
 import ExportData from "highcharts/modules/export-data";
