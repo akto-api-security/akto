@@ -1,4 +1,4 @@
-import { Page, Box } from '@shopify/polaris';
+import { Page, Box, Button } from '@shopify/polaris';
 import EmptyScreensLayout from '../../components/banners/EmptyScreensLayout';
 
 function McpSecurityPage() {
@@ -9,8 +9,7 @@ function McpSecurityPage() {
           iconSrc={"/public/mcp.svg"}
           headingText={"MCP Security is in beta"}
           description={"MCP Security is currently in beta. Contact our sales team to learn more about this feature and get access."}
-          buttonText={"Contact Sales"}
-          redirectUrl={"https://www.akto.io/api-security-demo"}
+          bodyComponent={<Button url="https://www.akto.io/api-security-demo" target="_blank" primary>Contact sales</Button>}
         />
       </Box>
     </Page>
