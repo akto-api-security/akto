@@ -303,10 +303,6 @@ public class ThreatActorService {
         // Stage 1: Match documents within the startTs and endTs range
         new Document("$match", new Document("detectedAt",
             new Document("$gte", startTs).append("$lte", endTs))),
-        
-        new Document("$sort", new Document("detectedAt", -1)),
-
-        new Document(new Document("$limit", 10000)),
 
         // Stage 2: Project required fields and normalize timestamp to daily granularity
         new Document("$project", new Document("dayStart",
