@@ -761,7 +761,7 @@ public class ApiCollectionsAction extends UserAction {
             String userSetEnvType = apiCollection.getUserSetEnvType();
             List<String> userSetEnvTypeList = new ArrayList<>();
             if(userSetEnvType != null && !userSetEnvType.isEmpty()) {
-                userSetEnvTypeList = Arrays.asList(userSetEnvType.split(","));
+                userSetEnvTypeList = new ArrayList<>(Arrays.asList(userSetEnvType.split(",")));
             }
 
             List<CollectionTags> toPull = new ArrayList<>();
@@ -778,7 +778,7 @@ public class ApiCollectionsAction extends UserAction {
                             )
                             .findFirst();
 
-                    if(userSetEnvTypeList.contains(env.getValue())) {
+                    if(env.getKeyName().equalsIgnoreCase("userSetEnvType") && userSetEnvTypeList.contains(env.getValue())) {
                         if(userSetEnvTypeList.size() == 1) {
                             ApiCollectionsDao.instance.updateOne(filter, Updates.unset(ApiCollection.USER_ENV_TYPE));
                         } else {
