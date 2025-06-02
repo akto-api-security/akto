@@ -1,4 +1,4 @@
-import {Box, Navigation, Text} from "@shopify/polaris";
+import {Box, Navigation, Text, Banner, Badge} from "@shopify/polaris";
 import {
     AppsFilledMajor,
     InventoryFilledMajor,
@@ -7,6 +7,7 @@ import {
     DiamondAlertMinor,
     StarFilledMinor,
     FinancesMinor,
+    LockFilledMajor,
 } from "@shopify/polaris-icons";
 import {useLocation, useNavigate} from "react-router-dom";
 
@@ -26,6 +27,7 @@ export default function LeftNav() {
     const currPathString = func.transformString(location.pathname);
 
     const [leftNavSelected, setLeftNavSelected] = useState(currPathString);
+    const [showMcpBanner, setShowMcpBanner] = useState(false);
 
     const active = PersistStore((state) => state.active);
     const setActive = PersistStore((state) => state.setActive);
@@ -302,6 +304,21 @@ export default function LeftNav() {
                             selected: leftNavSelected.includes("_reports"),
                             subNavigationItems: reportsSubNavigationItems,
                             key: "6",
+                        },
+                        {
+                            label: (
+                                <Text variant="bodyMd" fontWeight="medium">
+                                    MCP Security
+                                </Text>
+                            ),
+                            icon: LockFilledMajor,
+                            onClick: () => {
+                                handleSelect("dashboard_mcp_security");
+                                navigate("/dashboard/mcp-security");
+                                setActive("normal");
+                            },
+                            selected: leftNavSelected === "dashboard_mcp_security",
+                            key: "mcp_security",
                         },
                         ...(window?.STIGG_FEATURE_WISE_ALLOWED?.THREAT_DETECTION?.isGranted ? [{
                                 label: (
