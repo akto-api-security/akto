@@ -983,10 +983,12 @@ public class TestExecutor {
         int startTime = Context.now();
 
         try {
-            boolean isGraphQlPayload = filterGraphQlPayload(rawApi, apiInfoKey);
-            if (isGraphQlPayload) testLogs.add(new TestingRunResult.TestLog(TestingRunResult.TestLogType.INFO, "GraphQL payload found"));
+            if (filterGraphQlPayload(rawApi, apiInfoKey)) 
+                testLogs.add(new TestingRunResult.TestLog(TestingRunResult.TestLogType.INFO, "GraphQL payload found"));
+            else if(filterJsonRpcPayload(rawApi, apiInfoKey)) 
+                testLogs.add(new TestingRunResult.TestLog(TestingRunResult.TestLogType.INFO, "JSON-RPC payload found"));
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(e, "Exception in filterGraphQlPayload: " + e.getMessage());
+            loggerMaker.errorAndAddToDb(e, "Exception in filterGraphQlPayload or filterJsonrpcPayload: " + e.getMessage());
             testLogs.add(new TestingRunResult.TestLog(TestingRunResult.TestLogType.ERROR, e.getMessage()));
         }
 
@@ -1159,4 +1161,42 @@ public class TestExecutor {
         }
     }
 
+    public boolean filterJsonRpcPayload(RawApi rawApi, ApiInfo.ApiInfoKey apiInfoKey) throws Exception {
+        String url = apiInfoKey.getUrl();
+    
+        ObjectMapper mapper = new ObjectMapper();
+        //String updatedBody = null, updatedRespBody = null;
+    
+        try {
+            // Parse request body
+            Object requestBodyObj = JSON.parse(rawApi.getRequest().getBody());
+            Map<String, Object> requestMap = mapper.convertValue(requestBodyObj, Map.class);
+    
+            // Detect JSON-RPC 2.0
+            String jsonrpcVersion = String.valueOf(requestMap.get("jsonrpc"));
+            if (!"2.0".equals(jsonrpcVersion)) {
+                return false;
+            }
+    
+            String methodName = (String) requestMap.get("method");
+            if (methodName == null || methodName.isEmpty()) {
+                return false;
+            }
+    
+            if (url != null) {
+                int methodIndex = url.indexOf("/" + methodName);
+                if (methodIndex != -1) {
+                    // Remove everything from method name onwards
+                    String trimmedUrl = url.substring(0, methodIndex);
+                    apiInfoKey.setUrl(trimmedUrl);
+                    rawApi.getRequest().setUrl(trimmedUrl);
+                }
+            }
+    
+            return true;
+        } catch (Exception e) {
+            throw new Exception("Error while filtering JSON-RPC payload: " + e.getMessage());
+        }
+    }
+    
 }
