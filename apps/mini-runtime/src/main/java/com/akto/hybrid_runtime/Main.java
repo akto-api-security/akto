@@ -21,6 +21,8 @@ import com.akto.hybrid_parsers.HttpCallParser;
 import com.akto.data_actor.DataActor;
 import com.akto.data_actor.DataActorFactory;
 import com.akto.metrics.ModuleInfoWorker;
+import com.akto.runtime.parser.SampleParser;
+import com.akto.runtime.utils.Utils;
 import com.akto.testing_db_layer_client.ClientLayer;
 import com.akto.util.DashboardMode;
 import com.google.gson.Gson;
@@ -151,6 +153,18 @@ public class Main {
         return topicName;
     }
 
+    public static String getLogTopicName() {
+        String topicName = System.getenv("AKTO_KAFKA_LOG_TOPIC_NAME");
+        if (topicName == null) {
+            topicName = "akto.api.producer.logs";
+        }
+        return topicName;
+    }
+
+    private static final String LOG_GROUP_ID = "-log";
+
+    static private final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
+
     // REFERENCE: https://www.oreilly.com/library/view/kafka-the-definitive/9781491936153/ch04.html (But how do we Exit?)
     public static void main(String[] args) {
         //String mongoURI = System.getenv("AKTO_MONGO_CONN");;
@@ -220,7 +234,7 @@ public class Main {
         }
 
         final Main main = new Main();
-        Properties properties = main.configProperties(kafkaBrokerUrl, groupIdConfig, maxPollRecordsConfig);
+        Properties properties = Main.configProperties(kafkaBrokerUrl, groupIdConfig, maxPollRecordsConfig);
         main.consumer = new KafkaConsumer<>(properties);
 
         final Thread mainThread = Thread.currentThread();
@@ -294,7 +308,64 @@ public class Main {
 
         long lastSyncOffset = 0;
 
-        Map<Integer, Integer> logSentMap = new HashMap<>();
+        String kafkaUrl = kafkaBrokerUrl;
+        executorService.schedule(new Runnable() {
+            public void run() {
+                try {
+                    loggerMaker.infoAndAddToDb("Starting traffic log consumer");
+                    String logTopicName = getLogTopicName();
+                    
+                    Properties logConsumerProps = Main.configProperties(kafkaUrl, groupIdConfig + LOG_GROUP_ID,maxPollRecordsConfig);
+                    KafkaConsumer<String, String> logConsumer = new KafkaConsumer<>(logConsumerProps);
+                    long lastLogSyncOffset = 0;
+                    try {
+                        logConsumer.subscribe(Collections.singletonList(logTopicName));
+                        loggerMaker.infoAndAddToDb("Second consumer subscribed to " + logTopicName);
+                        while (true) {
+                            ConsumerRecords<String, String> records = logConsumer.poll(Duration.ofMillis(10000));
+                            try {
+                                logConsumer.commitSync();
+                            } catch (Exception e) {
+                                throw e;
+                            }
+                            for (ConsumerRecord<String, String> record : records) {
+                                try {
+                                    lastLogSyncOffset++;
+                                    TrafficProducerLog trafficProducerLog = SampleParser.parseLogMessage(record.value());
+                                    if (trafficProducerLog == null || trafficProducerLog.getMessage() == null) {
+                                        loggerMaker.errorAndAddToDb("Traffic producer log is null");
+                                        continue;
+                                    }
+                                    String message = String.format("[TRAFFIC_PRODUCER] [%s] %s", trafficProducerLog.getSource(), trafficProducerLog.getMessage());
+
+                                    if (trafficProducerLog.getLogType() != null && trafficProducerLog.getLogType().equalsIgnoreCase("ERROR")) {
+                                        loggerMaker.errorAndAddToDb(message);
+                                    } else {
+                                        loggerMaker.infoAndAddToDb(message);
+                                    }
+
+                                    if (lastLogSyncOffset % 100 == 0) {
+                                        loggerMaker.info("Committing log offset at position: " + lastLogSyncOffset);
+                                    }
+
+                                } catch (Exception e) {
+                                    loggerMaker.errorAndAddToDb(e, "Error while parsing traffic producer log kafka message " + e, LogDb.RUNTIME);
+                                    continue;
+                                }
+                            }
+                        }
+                    } catch (WakeupException ignored) {
+                        // Shutdown
+                    } catch (Exception e) {
+                        loggerMaker.errorAndAddToDb(e, "Error in second topic consumer");
+                    } finally {
+                        logConsumer.close();
+                    }
+                } catch (Exception e) {
+                    loggerMaker.errorAndAddToDb(e, "Error while starting traffic log consumer");
+                }
+            }
+        }, 0, TimeUnit.SECONDS);
 
         try {
             main.consumer.subscribe(Arrays.asList(topicName, "har_"+topicName));
@@ -331,6 +402,14 @@ public class Main {
                         }
 
                         httpResponseParams = HttpCallParser.parseKafkaMessage(r.value());
+                        HttpRequestParams requestParams = httpResponseParams.getRequestParams();
+                        String debugHost = Utils.printDebugHostLog(httpResponseParams);
+                        if (debugHost != null) {
+                            loggerMaker.infoAndAddToDb("Found debug host: " + debugHost + " in url: " + requestParams.getMethod() + " " + requestParams.getURL());
+                        }
+                        if (Utils.printDebugUrlLog(requestParams.getURL())) {
+                            loggerMaker.infoAndAddToDb("Found debug url: " + requestParams.getURL());
+                        }
                     } catch (Exception e) {
                         loggerMaker.errorAndAddToDb(e, "Error while parsing kafka message " + e, LogDb.RUNTIME);
                         continue;
@@ -463,8 +542,11 @@ public class Main {
                     if (shouldKeep) {
                         accWiseResponseFiltered.add(accWiseResponseEntry);
                     }
-                }
 
+                    if (Utils.printDebugUrlLog(accWiseResponseEntry.getRequestParams().getURL())) {
+                        loggerMaker.infoAndAddToDb("Found debug url in filterBasedOnHeaders " + accWiseResponseEntry.getRequestParams().getURL() + " shouldKeep: " + shouldKeep);
+                    }
+                }
                 accWiseResponse = accWiseResponseFiltered;
             }
 
@@ -475,23 +557,28 @@ public class Main {
         return accWiseResponse;
     }
 
-    public static void changeTargetCollection(Map<String, Map<Pattern, String>> apiCollectioNameMapper, List<HttpResponseParams> accWiseResponse) {
-        if (apiCollectioNameMapper != null && !apiCollectioNameMapper.isEmpty()) {
+    public static void changeTargetCollection(Map<String, Map<Pattern, String>> apiCollectionNameMapper, List<HttpResponseParams> accWiseResponse) {
+        if (apiCollectionNameMapper != null && !apiCollectionNameMapper.isEmpty()) {
             for(HttpResponseParams accWiseResponseEntry : accWiseResponse) {
                 Map<String, List<String>> reqHeaders = accWiseResponseEntry.getRequestParams().getHeaders();
-                for(String headerName : apiCollectioNameMapper.keySet()) {
+                for(String headerName : apiCollectionNameMapper.keySet()) {
                     List<String> reqHeaderValues = reqHeaders == null ? null : reqHeaders.get(headerName);
                     if (reqHeaderValues != null && !reqHeaderValues.isEmpty()) {
-                        Map<Pattern, String> apiCollectioNameForGivenHeader = apiCollectioNameMapper.get(headerName);
-                        for (Map.Entry<Pattern,String> apiCollectioNameOrigXNew: apiCollectioNameForGivenHeader.entrySet()) {
+                        Map<Pattern, String> apiCollectionNameForGivenHeader = apiCollectionNameMapper.get(headerName);
+                        for (Map.Entry<Pattern,String> apiCollectionNameOrigXNew: apiCollectionNameForGivenHeader.entrySet()) {
                             for (int i = 0; i < reqHeaderValues.size(); i++) {
                                 String reqHeaderValue = reqHeaderValues.get(i);
-                                Pattern regex = apiCollectioNameOrigXNew.getKey();
-                                String newValue = apiCollectioNameOrigXNew.getValue();
+                                Pattern regex = apiCollectionNameOrigXNew.getKey();
+                                String newValue = apiCollectionNameOrigXNew.getValue();
 
                                 try {
-                                    if (regex.matcher(reqHeaderValue).matches()) {
+                                    if (regex.matcher(reqHeaderValue).matches() &&
+                                            reqHeaders != null) {
                                         reqHeaders.put("host", Collections.singletonList(newValue));
+
+                                        if (Utils.printDebugUrlLog(accWiseResponseEntry.getRequestParams().getURL())) {
+                                            loggerMaker.infoAndAddToDb("Found debug url in changeTargetCollection " + accWiseResponseEntry.getRequestParams().getURL() + " newValue: " + newValue + " reqHeaderValue: " + reqHeaderValue);
+                                        }
                                     }
                                 } catch (Exception e) {
                                     // eat it

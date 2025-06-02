@@ -154,6 +154,7 @@ public class LoggerMaker {
         return err;
     }
 
+    @Deprecated
     public void errorAndAddToDb(String err, LogDb db) {
         try {
             basicError(err, db);
@@ -190,6 +191,7 @@ public class LoggerMaker {
         }
     }
 
+    @Deprecated
     public void infoAndAddToDb(String info, LogDb db) {
         String accountId = Context.accountId.get() != null ? Context.accountId.get().toString() : "NA";
         String infoMessage = "acc: " + accountId + ", " + info;
