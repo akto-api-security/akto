@@ -96,6 +96,7 @@ import CloudflareWaf from "../dashboard/pages/settings/integrations/CloudflareWa
 import UndoDemergedApis from "../dashboard/pages/settings/undo_demerged_apis/UndoDemergedApis";
 import GmailWebhookCore from "../dashboard/pages/settings/integrations/gmailWebhooks/GmailWebhookCore";
 import GmailWebhook from "../dashboard/pages/settings/integrations/gmailWebhooks/GmailWebhook";
+import McpSecurityPage from "../dashboard/pages/mcp-security/McpSecurityPage.jsx";
 
 // if you add a component in a new path, please verify the search implementation in function -> 'getSearchItemsArr' in func.js
 
@@ -244,6 +245,10 @@ const router = createBrowserRouter([
                                 element: <AgentTeam/>
                             }
                         ]
+                    },
+                    {
+                        path: "mcp-security",
+                        element: <McpSecurityPage/>,
                     },
                 ]
             },
