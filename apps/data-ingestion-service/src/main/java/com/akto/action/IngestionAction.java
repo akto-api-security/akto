@@ -18,7 +18,7 @@ public class IngestionAction extends ActionSupport {
     List<IngestDataBatch> batchData;
     private static final LoggerMaker loggerMaker = new LoggerMaker(IngestionAction.class, LoggerMaker.LogDb.DATA_INGESTION);
 
-    private static int MAX_INFO_PRINT = 500;
+    private static int MAX_INFO_PRINT = 1000;
 
     private static final int ACCOUNT_ID_TO_ADD_DEFAULT_DATA = getAccountId();
 
@@ -37,6 +37,7 @@ public class IngestionAction extends ActionSupport {
                     payload.setPath("/");
                 }
 
+                printLogs("Initiate payload send to kafka.");
                 KafkaUtils.insertData(payload);
                 printLogs("Data has been inserted to kafka.");
             }
