@@ -8240,6 +8240,7 @@
         <action name="api/getActorsCountPerCounty"
             class="com.akto.action.threat_detection.ThreatActorAction"
             method="getActorsCountPerCounty">
+            <interceptor-ref name="json" />
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="usageInterceptor">
                 <param name="featureLabel">THREAT_DETECTION</param>
@@ -8259,7 +8260,9 @@
                 <param
                     name="includeProperties">^actionErrors.*</param>
             </result>
-            <result name="SUCCESS" type="json"> </result>
+            <result name="SUCCESS" type="json"> 
+                <param name="includeProperties">^actorsCountPerCountry.*</param>
+            </result>
             <result name="ERROR" type="json">
                 <param name="statusCode">422</param>
                 <param name="ignoreHierarchy">false</param>

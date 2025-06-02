@@ -141,6 +141,8 @@ message ListThreatApiResponse {
 }
 
 message ThreatActorByCountryRequest {
+  uint32 start_ts = 1;
+  uint32 end_ts = 2;
 }
 
 message ThreatActorByCountryResponse {

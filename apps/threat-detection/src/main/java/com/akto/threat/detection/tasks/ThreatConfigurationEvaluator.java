@@ -95,12 +95,11 @@ public class ThreatConfigurationEvaluator {
 
     public String getActorId(HttpResponseParams responseParam) {
         getThreatConfiguration();
-        String actor;
-        String sourceIp = SourceIPActorGenerator.instance.generate(responseParam).orElse("");
-        responseParam.setSourceIP(sourceIp);
+        String actor = SourceIPActorGenerator.instance.generate(responseParam).orElse("");
+        responseParam.setSourceIP(actor);
+        logger.debugAndAddToDbCount("Actor ID generated: " + actor + " for response: " + responseParam.getOriginalMsg().get());
 
         if (threatConfiguration == null) {
-            actor = sourceIp;
             return actor;
         }
 
@@ -116,18 +115,16 @@ public class ThreatConfigurationEvaluator {
                             .get(actorId.getKey().toLowerCase());
                     if (header != null && !header.isEmpty()) {
                         actor = header.get(0);
+                        return actor;
                     } else {
                         logger.warn("Defaulting to source IP as actor id, header not found: "
                                 + actorId.getKey());
-                        actor = sourceIp;
+                        return actor;
                     }
-                    break;
                 default:
-                    actor = sourceIp;
                     break;
             }
-            return actor;
         }
-        return sourceIp;
+        return actor;
     }
 }

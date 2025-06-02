@@ -419,30 +419,36 @@ public class ThreatActorService {
             .getCollection(MongoDBCollection.ThreatDetection.MALICIOUS_EVENTS, Document.class);
 
     List<Document> pipeline = new ArrayList<>();
-    pipeline.add(
-        new Document("$sort", new Document("country", 1).append("detectedAt", -1))); // sort
-    pipeline.add(new Document("$limit", 10000));
-    pipeline.add(
-        new Document(
-            "$group",
-            new Document("_id", "$country")
-                .append("distinctActors", new Document("$addToSet", "$actor"))));
 
-    pipeline.add(
-        new Document(
-            "$addFields", new Document("actorsCount", new Document("$size", "$distinctActors"))));
+    // 1. Match on time range
+    if (request.getStartTs() != 0 || request.getEndTs() != 0) {
+      pipeline.add(new Document("$match",
+          new Document("detectedAt",
+              new Document("$gte", request.getStartTs())
+                  .append("$lte", request.getEndTs()))));
+    }
 
-    pipeline.add(new Document("$sort", new Document("actorsCount", -1))); // sort
+    // 2. Project only necessary fields
+    pipeline.add(new Document("$project", new Document("country", 1).append("actor", 1)));
+
+    // 3. Group by country and collect distinct actors
+    pipeline.add(new Document("$group",
+        new Document("_id", "$country")
+            .append("distinctActorsCount", new Document("$addToSet", "$actor"))));
+
+    // 4. Project the size of the distinct actors set
+    pipeline.add(new Document("$project",
+        new Document("distinctActorsCount", new Document("$size", "$distinctActorsCount"))));
 
     List<ThreatActorByCountryResponse.CountryCount> actorsByCountryCount = new ArrayList<>();
 
-    try (MongoCursor<Document> cursor = coll.aggregate(pipeline).cursor()) {
+    try (MongoCursor<Document> cursor = coll.aggregate(pipeline).batchSize(1000).cursor()) {
       while (cursor.hasNext()) {
         Document doc = cursor.next();
         actorsByCountryCount.add(
             ThreatActorByCountryResponse.CountryCount.newBuilder()
                 .setCode(doc.getString("_id"))
-                .setCount(doc.getInteger("actorsCount", 0))
+                .setCount(doc.getInteger("distinctActorsCount", 0))
                 .build());
       }
     }
