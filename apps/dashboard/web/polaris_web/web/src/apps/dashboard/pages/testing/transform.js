@@ -311,6 +311,7 @@ const transform = {
       obj['userEmail'] = data.userEmail
       obj['scan_frequency'] = getScanFrequency(data.periodInSeconds)
       obj['total_apis'] = testingRunResultSummary.totalApis
+      obj['miniTestingServiceName'] = data?.miniTestingServiceName
       if(prettified){
         
         const prettifiedTest={
@@ -1224,6 +1225,7 @@ getMissingConfigs(testResults){
       scheduleTimestamp: testRun?.hourlyLabel === 'Now' && ((testRun.startTimestamp - func.getStartOfTodayEpoch()) < 86400) ? 0 : testRun.startTimestamp,
       recurringWeekly: testRun.recurringWeekly,
       recurringMonthly: testRun.recurringMonthly,
+      miniTestingServiceName: testRun.miniTestingServiceName,
       testSuiteIds:testMode? [] : testSuiteIds,
       autoTicketingDetails: autoTicketingDetails,
     }

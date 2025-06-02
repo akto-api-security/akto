@@ -104,7 +104,6 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
         if (preActivator) {
             setParentActivator(true);
         }
-
     }, [testMode])
 
     const apiCollectionName = collectionsMap[apiCollectionId]
@@ -210,8 +209,6 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
         }
     }, [apiCollectionName, runTestFromOutside])
 
-
-
     useEffect(() => {
         if (shouldRuntestConfig === false) return;
         if (testIdConfig?.testingRunConfig?.testSubCategoryList?.length >= 0) {
@@ -234,12 +231,24 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
             });
 
                 handleAddSettings(parentAdvanceSettingsConfig);
-                const getRunTypeLabel = (runType) => {
-                    if (!runType) return "Once";
-                    if (runType === "CI-CD" || runType === "ONE_TIME") return "Once";
-                    else if (runType === "RECURRING") return "Daily";
+            
+                const getRecurringContext = (periodInSeconds) => {
+                    if (periodInSeconds === 86400) return "Daily"
+                    else if (periodInSeconds === (86400 * 30)) return "Monthly"
+                    else if (periodInSeconds === (86400 * 7)) return "Weekly"
+                    else if (periodInSeconds === -1) return "Continuously"
+                    else return "Once"
+                }
+
+                const getRunTypeLabel = (runType, periodInSeconds) => {
+                    if (!runType || runType === "CI_CD" || runType === "ONE_TIME") return "Once";
+                    else if (runType === "RECURRING") return getRecurringContext(periodInSeconds)
                     else if (runType === "CONTINUOUS_TESTING") return "Continuously";
                 }
+
+                const hourOfTest = func.getHourFromEpoch(testIdConfig.scheduleTimestamp)
+                const hourLabel = func.getFormattedHoursUsingLabel(hourOfTest, hourlyTimes, nowLabel)
+
                 setTestRun(prev => ({
                     ...testRun,
                     tests: updatedTests,
@@ -250,23 +259,26 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                     testRoleId: testIdConfig.testingRunConfig.testRoleId,
                     testRunTimeLabel: (testIdConfig.testRunTime === -1) ? "30 minutes" : getLabel(testRunTimeOptions, testIdConfig.testRunTime.toString())?.label,
                     testRoleLabel: getLabel(testRolesArr, testIdConfig?.testingRunConfig?.testRoleId)?.label,
-                    runTypeLabel: getRunTypeLabel(testRunType),
+                    runTypeLabel: getRunTypeLabel(testRunType, testIdConfig?.periodInSeconds),
                     testName: testIdConfig.name,
                     sendSlackAlert: testIdConfig?.sendSlackAlert,
                     sendMsTeamsAlert: testIdConfig?.sendMsTeamsAlert,
-                    recurringDaily: testIdConfig?.periodInSeconds === 86400,
-                    recurringMonthly: testIdConfig?.periodInSeconds === (86400 * 30), // 30 days
-                    recurringWeekly: testIdConfig?.periodInSeconds === (86400 * 7),  // one week
-                    continuousTesting: testIdConfig?.periodInSeconds === -1,
+                    recurringDaily: getRecurringContext(testIdConfig?.periodInSeconds) === "Daily",
+                    recurringMonthly: getRecurringContext(testIdConfig?.periodInSeconds) === "Monthly",
+                    recurringWeekly: getRecurringContext(testIdConfig?.periodInSeconds) === "Weekly",
+                    continuousTesting: getRecurringContext(testIdConfig?.periodInSeconds) === "Continuously",
                     autoTicketingDetails: testIdConfig?.testingRunConfig?.autoTicketingDetails || initialAutoTicketingDetails,
+                    hourlyLabel: hourLabel.label,
+                    scheduleTimestamp: testIdConfig?.scheduleTimestamp,
+                    startTimestamp: testIdConfig?.scheduleTimestamp,
+                    runTypeParentLabel: testRunType,
+                    miniTestingServiceName: testIdConfig?.miniTestingServiceName || "",
                 }));
                 setTestSuiteIds(testIdConfig?.testingRunConfig?.testSuiteIds || [])
                 setTestNameSuiteModal(testIdConfig?.name||"")
         }
         setShouldRuntestConfig(false);
     }, [shouldRuntestConfig])
-
-
 
     const toggleRunTest = () => {
         if (activeFromTesting) {
@@ -447,7 +459,8 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
         return { label: hourStr, value: `${hour + 12}` }
     })
 
-    const hourlyTimes = [{ label: "Now", value: "Now" }, ...amTimes, ...pmTimes]
+    const nowLabel = { label: "Now", value: "Now" }
+    const hourlyTimes = [nowLabel, ...amTimes, ...pmTimes]
 
     const runTimeMinutes = hours.reduce((abc, x) => {
         if (x < 6) {
@@ -718,6 +731,26 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
         }
     }
 
+    const RunTestConfigurationComponent = (
+        <RunTestConfiguration
+            timeFieldsDisabled={shouldDisable}
+            testRun={testRun}
+            setTestRun={setTestRun}
+            runTypeOptions={runTypeOptions}
+            hourlyTimes={hourlyTimes}
+            testRunTimeOptions={testRunTimeOptions}
+            testRolesArr={testRolesArr}
+            maxConcurrentRequestsOptions={maxConcurrentRequestsOptions}
+            slackIntegrated={slackIntegrated}
+            teamsTestingWebhookIntegrated={teamsTestingWebhookIntegrated}
+            generateLabelForSlackIntegration={generateLabelForSlackIntegration}
+            generateLabelForTeamsIntegration={generateLabelForTeamsIntegration}
+            getLabel={getLabel}
+            jiraProjectMap={jiraProjectMap}
+            generateLabelForJiraIntegration={generateLabelForJiraIntegration}
+            miniTestingServiceNames={miniTestingServiceNames}
+        />
+    )
 
     const editableConfigsComp = (
         <Modal
@@ -733,24 +766,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
         >
             <Modal.Section>
                 <>
-                    <RunTestConfiguration
-                        timeFieldsDisabled={shouldDisable}
-                        testRun={testRun}
-                        setTestRun={setTestRun}
-                        runTypeOptions={runTypeOptions}
-                        hourlyTimes={hourlyTimes}
-                        testRunTimeOptions={testRunTimeOptions}
-                        testRolesArr={testRolesArr}
-                        maxConcurrentRequestsOptions={maxConcurrentRequestsOptions}
-                        slackIntegrated={slackIntegrated}
-                        teamsTestingWebhookIntegrated={teamsTestingWebhookIntegrated}
-                        generateLabelForSlackIntegration={generateLabelForSlackIntegration}
-                        generateLabelForTeamsIntegration={generateLabelForTeamsIntegration}
-                        getLabel={getLabel}
-                        jiraProjectMap={jiraProjectMap}
-                        generateLabelForJiraIntegration={generateLabelForJiraIntegration}
-                        miniTestingServiceNames={miniTestingServiceNames}
-                    />
+                    {RunTestConfigurationComponent}
                     <AdvancedSettingsComponent dispatchConditions={dispatchConditions} conditions={conditions} />
                 </>
             </Modal.Section>
@@ -910,25 +926,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                                         </div>
                                     </div>
                                 </div>
-                                <RunTestConfiguration
-                                    timeFieldsDisabled={shouldDisable}
-                                    testRun={testRun}
-                                    setTestRun={setTestRun}
-                                    runTypeOptions={runTypeOptions}
-                                    hourlyTimes={hourlyTimes}
-                                    testRunTimeOptions={testRunTimeOptions}
-                                    testRolesArr={testRolesArr}
-                                    maxConcurrentRequestsOptions={maxConcurrentRequestsOptions}
-                                    slackIntegrated={slackIntegrated}
-                                    teamsTestingWebhookIntegrated={teamsTestingWebhookIntegrated}
-                                    generateLabelForSlackIntegration={generateLabelForSlackIntegration}
-                                    generateLabelForTeamsIntegration={generateLabelForTeamsIntegration}
-                                    getLabel={getLabel}
-                                    jiraProjectMap={jiraProjectMap}
-                                    generateLabelForJiraIntegration={generateLabelForJiraIntegration}
-                                    miniTestingServiceNames={miniTestingServiceNames}
-                                />
-
+                                {RunTestConfigurationComponent}
                             </VerticalStack>
                             <AdvancedSettingsComponent dispatchConditions={dispatchConditions} conditions={conditions} />
 
@@ -946,24 +944,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                                 testNameSuiteModal={testNameSuiteModal}
                                 setTestNameSuiteModal={setTestNameSuiteModal}/> :
                                 <>
-                                    <RunTestConfiguration
-                                        timeFieldsDisabled={shouldDisable}
-                                        testRun={testRun}
-                                        setTestRun={setTestRun}
-                                        runTypeOptions={runTypeOptions}
-                                        hourlyTimes={hourlyTimes}
-                                        testRunTimeOptions={testRunTimeOptions}
-                                        testRolesArr={testRolesArr}
-                                        maxConcurrentRequestsOptions={maxConcurrentRequestsOptions}
-                                        slackIntegrated={slackIntegrated}
-                                        teamsTestingWebhookIntegrated={teamsTestingWebhookIntegrated}
-                                        generateLabelForSlackIntegration={generateLabelForSlackIntegration}
-                                        generateLabelForTeamsIntegration={generateLabelForTeamsIntegration}
-                                        getLabel={getLabel}
-                                        jiraProjectMap={jiraProjectMap}
-                                        generateLabelForJiraIntegration={generateLabelForJiraIntegration}
-                                        miniTestingServiceNames={miniTestingServiceNames}
-                                    />
+                                    {RunTestConfigurationComponent}
                                     <AdvancedSettingsComponent dispatchConditions={dispatchConditions} conditions={conditions} />
                                 </>
                             }

@@ -166,7 +166,7 @@ export const FindVulnerabilitiesAgent = () => {
                         key={subprocess.subProcessId}
                         agentId={currentAgent?.id || ""}
                         processId={currentAgentRun?.processId || ""}
-                        subProcessFromProp={subprocesses[index]}
+                        subProcessFromProp={subprocess}
                         setCurrentAgentRun={setCurrentAgentRun}
                         triggerCallForSubProcesses={triggerCallForSubProcesses}
                     />

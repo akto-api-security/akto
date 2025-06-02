@@ -31,11 +31,16 @@ function WebhooksCore(props) {
                 Object.fromEntries(Object.entries(obj).filter(([k, v]) => v !== null))
             )
 
-            if (type && type == "MS_TEAMS") {
+            if (type && type === "MS_TEAMS") {
                 filterCustomWebhooks = filterCustomWebhooks.filter((x) => {
-                    return x.webhookType && x.webhookType == "MICROSOFT_TEAMS"
+                    return x.webhookType && x.webhookType === "MICROSOFT_TEAMS"
                 })
-            } else {
+            } else if (type && type === "GMAIL") {
+                filterCustomWebhooks = filterCustomWebhooks.filter((x) => {
+                    return x.webhookType && x.webhookType === "GMAIL"
+                })
+            }
+            else {
                 filterCustomWebhooks = filterCustomWebhooks.filter((x) => {
                     return x.webhookType == undefined || x.webhookType == "DEFAULT"
                 })

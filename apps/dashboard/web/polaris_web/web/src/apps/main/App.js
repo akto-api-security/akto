@@ -27,6 +27,7 @@ import GithubSso from "../dashboard/pages/settings/integrations/GithubSso";
 import GithubAppIntegration from "../dashboard/pages/settings/integrations/GithubAppIntegration";
 import HealthLogs from "../dashboard/pages/settings/health_logs/HealthLogs";
 import About from "../dashboard/pages/settings/about/About";
+import ThreatConfiguration from "../dashboard/pages/settings/threat_configuration/ThreatConfiguration";
 import Metrics from "../dashboard/pages/settings/metrics/Metrics";
 import TestEditor from "../dashboard/pages/test_editor/TestEditor";
 import DataTypes from "../dashboard/pages/observe/data_types/DataTypes";
@@ -93,6 +94,8 @@ import AgentConfig from "../dashboard/pages/settings/integrations/AgentConfig";
 import AzureBoards from "../dashboard/pages/settings/integrations/AzureBoards";
 import CloudflareWaf from "../dashboard/pages/settings/integrations/CloudflareWaf";
 import UndoDemergedApis from "../dashboard/pages/settings/undo_demerged_apis/UndoDemergedApis";
+import GmailWebhookCore from "../dashboard/pages/settings/integrations/gmailWebhooks/GmailWebhookCore";
+import GmailWebhook from "../dashboard/pages/settings/integrations/gmailWebhooks/GmailWebhook";
 
 // if you add a component in a new path, please verify the search implementation in function -> 'getSearchItemsArr' in func.js
 
@@ -257,6 +260,10 @@ const router = createBrowserRouter([
                         element: <Roles/>
                     },
                     {
+                        path: "threat-configuration",
+                        element: <ThreatConfiguration/>
+                    },
+                    {
                         path: "Help",
                         element: <Help/>
                     },
@@ -368,7 +375,18 @@ const router = createBrowserRouter([
                         path: "integrations/teamsWebhooks/create_custom_webhook",
                         element: <TeamsWebhook/>,
                     },
-
+                    {
+                        path: "integrations/gmailWebhooks",
+                        element: <GmailWebhook/>,
+                    },
+                    {
+                        path: "integrations/gmailWebhooks/:webhookId",
+                        element: <GmailWebhookCore/>,
+                    },
+                    {
+                        path: "integrations/gmailWebhooks/create_custom_webhook",
+                        element: <GmailWebhookCore/>,
+                    },
                     {
                         path: "logs",
                         element: <HealthLogs/>,

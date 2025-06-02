@@ -35,6 +35,8 @@ public class AktoPolicyNew {
     ApiAccessTypePolicy apiAccessTypePolicy = new ApiAccessTypePolicy(null);
     boolean redact = false;
 
+    boolean mergeUrlsOnVersions = false;
+
     private static final LoggerMaker loggerMaker = new LoggerMaker(AktoPolicyNew.class);
 
     public void fetchFilters() {
@@ -56,6 +58,7 @@ public class AktoPolicyNew {
                 apiAccessTypePolicy.setPrivateCidrList(cidrList);
             }
             redact = accountSettings.isRedactPayload();
+            mergeUrlsOnVersions = accountSettings.isAllowMergingOnVersions();
         }
 
         apiInfoCatalogMap = new HashMap<>();
@@ -141,13 +144,13 @@ public class AktoPolicyNew {
         }
     }
 
-    public static ApiInfoKey generateFromHttpResponseParams(HttpResponseParams httpResponseParams) {
+    public static ApiInfoKey generateFromHttpResponseParams(HttpResponseParams httpResponseParams, boolean mergeUrlsOnVersions) {
         int apiCollectionId = httpResponseParams.getRequestParams().getApiCollectionId();
         String url = httpResponseParams.getRequestParams().getURL();
         url = url.split("\\?")[0];
         String methodStr = httpResponseParams.getRequestParams().getMethod();
         URLMethods.Method method = URLMethods.Method.fromString(methodStr);
-        URLTemplate urlTemplate = APICatalogSync.tryParamteresingUrl(new URLStatic(url, method));
+        URLTemplate urlTemplate = APICatalogSync.tryParamteresingUrl(new URLStatic(url, method), mergeUrlsOnVersions);
         if (urlTemplate != null) {
             url = urlTemplate.getTemplateString();
         }
@@ -157,7 +160,7 @@ public class AktoPolicyNew {
 
     public void process(HttpResponseParams httpResponseParams, List<String> partnerIpsList) throws Exception {
         List<CustomAuthType> customAuthTypes = SingleTypeInfo.getCustomAuthType(Integer.parseInt(httpResponseParams.getAccountId()));
-        ApiInfo.ApiInfoKey apiInfoKey = generateFromHttpResponseParams(httpResponseParams);
+        ApiInfo.ApiInfoKey apiInfoKey = generateFromHttpResponseParams(httpResponseParams, mergeUrlsOnVersions);
         PolicyCatalog policyCatalog = getApiInfoFromMap(apiInfoKey);
         policyCatalog.setSeenEarlier(true);
         ApiInfo apiInfo = policyCatalog.getApiInfo();

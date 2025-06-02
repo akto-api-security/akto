@@ -7,7 +7,7 @@ import "./style.css"
 
 function FlyLayout(props) {
 
-    const { title, titleComp,  show, setShow, components,loading, showDivider, newComp, handleClose, isHandleClose, width, variant = "default"} = props
+    const { title, titleComp,  show, setShow, components,loading, showDivider, newComp, handleClose, isHandleClose, width,variant = "default"} = props
     const handleExit = () => {
         setShow(!show)
         if(isHandleClose){
@@ -15,7 +15,7 @@ function FlyLayout(props) {
         }
     }
     const divWidth = width || "50vw";
-    const scrollableHeight = variant === "testSuiteFlyout" ? "calc(100vh - 106px)"  : "92vh";
+    const scrollableHeight = variant !== "default" ? "calc(100vh - 106px)"  : "92vh";
     return (
         <div className={"flyLayout " + (show ? "show" : "")} style={{width: divWidth}}>
             <div className="innerFlyLayout">
@@ -23,16 +23,16 @@ function FlyLayout(props) {
                     { loading ? <div style={{position: "absolute", right: "25vw" , top: "50vh"}}><Spinner size="large" /></div>:
                     <VerticalStack gap={"5"}>
                         <Box padding={"4"} paddingBlockEnd={"0"} >
-                            <HorizontalStack align="space-between">
+                            <div style={{display: "flex", justifyContent: "space-between", alignItems:"start"}}>
                                 {titleComp ? titleComp : 
                                     <Text variant="headingMd">
                                         {title}
                                     </Text>
                                 }
                                 <Button icon={CancelMajor} onClick={() => { handleExit()}} plain></Button>
-                            </HorizontalStack>
+                            </div>
                         </Box>
-                        <Scrollable style={{ height: scrollableHeight}} >
+                        <Scrollable style={{ height: scrollableHeight, scrollbarWidth:"none"}} >
                         <Box paddingBlockEnd={"20"}>
                         <VerticalStack>
                         {

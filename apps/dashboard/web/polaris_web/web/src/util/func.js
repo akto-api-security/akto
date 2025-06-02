@@ -157,6 +157,30 @@ prettifyEpoch(epoch) {
     let plural = count <= 1 ? '' : 's'
     return count + ' ' + unit + plural + ' ago'
   },
+  prettifyEpochDuration(diffSeconds) {
+    if(diffSeconds <= 0){
+      return "Error occurred while fetching the time"
+    }
+    const units = [
+      { label: "week", duration: 604800 },
+      { label: "day", duration: 86400 },
+      { label: "hour", duration: 3600 },
+      { label: "minute", duration: 60 },
+      { label: "second", duration: 1 }
+    ];
+
+    let result = [];
+
+    for (let unit of units) {
+      if (diffSeconds >= unit.duration) {
+        let value = Math.floor(diffSeconds / unit.duration);
+        diffSeconds %= unit.seconds;
+        result.push(`${value} ${unit.label}${value > 1 ? "s" : ""}`);
+      }
+    }
+
+    return result.join(", ")
+  },
 
   toSentenceCase(str) {
     if (str == null) return ""
@@ -942,7 +966,7 @@ prepareValuesTooltip(x) {
 },
 
 parameterizeUrl(x) {
-  let re = /INTEGER|STRING|UUID/gi;
+  let re = /INTEGER|STRING|UUID|VERSIONED/gi;
   let newStr = x.replace(re, (match) => { 
       return "{param_" + match + "}";
   });
@@ -987,7 +1011,10 @@ mergeApiInfoAndApiCollection(listEndpoints, apiInfoList, idToName,apiInfoSeverit
           let authTypeTag = authType.replace(",", "");
           let riskScore = apiInfoMap[key] ? apiInfoMap[key]?.riskScore : 0
           let responseCodesArr = apiInfoMap[key] ? apiInfoMap[key]?.responseCodes : [] 
-          let discoveredTimestamp = apiInfoMap[key] ? (apiInfoMap[key].discoveredTimestamp || apiInfoMap[key].startTs) : 0
+          let discoveredTimestamp = apiInfoMap[key] ? (apiInfoMap[key].discoveredTimestamp | apiInfoMap[key].startTs) : 0
+          if(discoveredTimestamp === 0){
+            discoveredTimestamp = x.startTs
+          }
           let description = apiInfoMap[key] ? apiInfoMap[key]['description'] : ""
           ret[key] = {
               id: x.method + "###" + x.url + "###" + x.apiCollectionId + "###" + Math.random(),
@@ -2088,7 +2115,21 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
   },
   getStartOfTodayEpoch() {
     const now = new Date();
-    return Math.floor(new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime() / 1000);
+    return Math.floor(this.getStartOfTodayDate().getTime() / 1000);
+  },
+  getStartOfTodayDate(){
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  },
+  getStartOfDay(now) {
+    try {
+      return new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    } catch(e){
+      return this.getStartOfTodayDate();
+    }
+  },
+  getStartOfDayEpoch(now) {
+    return Math.floor(this.getStartOfDay(now).getTime() / 1000);
   },
   getDayOfWeek(time){
     const temp = new Date(time * 1000);
@@ -2108,6 +2149,32 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
       default:
         return "Sunday"
     }
+  },
+  getHourFromEpoch(time) {
+    try {
+      let date = new Date(time * 1000);
+      let hours = date.getHours();
+      return hours;
+    } catch (e) {
+      return 0;
+    }
+  },
+  getFormattedHoursUsingLabel(hour, labels, defaultLabel) {
+    let hourLabel = hour === 12 ? "noon" : (
+      hour === 0 ? "midnight" : (
+        hour < 13 ? "am" : "pm"
+      )
+    )
+    let hourValue = hour == 0 ? 24 : hour
+
+    let filtered = labels.filter((x) => {
+      return x.value == hourValue && x.label.includes(hourLabel)
+    })
+
+    if (filtered.length == 1) {
+      return filtered[0]
+    }
+    return defaultLabel
   }
 }
 

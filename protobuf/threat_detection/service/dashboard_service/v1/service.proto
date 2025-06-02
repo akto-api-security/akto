@@ -108,7 +108,8 @@ message FetchMaliciousEventsRequest {
 message FetchMaliciousEventsResponse {
   message MaliciousPayloadsResponse {
     string orig = 1;
-    uint64 ts = 2; 
+    uint64 ts = 2;
+    string metadata = 3;
   }
   repeated MaliciousPayloadsResponse malicious_payloads_response = 1;
 }
@@ -140,6 +141,8 @@ message ListThreatApiResponse {
 }
 
 message ThreatActorByCountryRequest {
+  uint32 start_ts = 1;
+  uint32 end_ts = 2;
 }
 
 message ThreatActorByCountryResponse {
@@ -239,4 +242,20 @@ message ModifyThreatActorStatusRequest {
 }
 
 message ModifyThreatActorStatusResponse {  
+}
+
+message GetThreatConfigurationRequest {
+}
+
+message ActorId {
+    string type = 1; // "ip" or "header"
+    string key = 2;  // "ip" or "headername"
+    string kind = 3; // hostname or endpoint or collection
+    string pattern = 4; // regex pattern or collection id
+}
+message Actor {
+    repeated ActorId actor_id = 1;
+}
+message ThreatConfiguration {
+  Actor actor = 1;
 }

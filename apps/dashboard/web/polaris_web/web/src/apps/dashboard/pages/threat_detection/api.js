@@ -64,11 +64,24 @@ const threatDetectionRequests = {
             }
         })
     },
-    getActorsCountPerCounty() {
+    getActorsCountPerCounty(startTs, endTs) {
         return request({
             url: '/api/getActorsCountPerCounty',
+            method: 'post',
+            data: {startTs, endTs}
+        })
+    },
+    fetchThreatConfiguration() {
+        return request({
+            url: '/api/fetchThreatConfiguration',
             method: 'get',
-            data: {}
+        })
+    },
+    modifyThreatConfiguration(data) {
+        return request({
+            url: '/api/modifyThreatConfiguration',
+            method: 'post',
+            data: { threatConfiguration: data}
         })
     },
     fetchThreatCategoryCount(startTs, endTs) {

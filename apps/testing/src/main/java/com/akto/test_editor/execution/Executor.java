@@ -3,6 +3,7 @@ package com.akto.test_editor.execution;
 import com.akto.dao.billing.OrganizationsDao;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -49,6 +50,28 @@ public class Executor {
     private static final LoggerMaker loggerMaker = new LoggerMaker(Executor.class, LogDb.TESTING);
 
     public final String _HOST = "host";
+
+    public static void modifyRawApiUsingTestRole(String logId, TestingRunConfig testingRunConfig, RawApi sampleRawApi, ApiInfo.ApiInfoKey apiInfoKey){
+        if (testingRunConfig != null && StringUtils.isNotBlank(testingRunConfig.getTestRoleId())) {
+            TestRoles role = fetchOrFindTestRole(testingRunConfig.getTestRoleId(), true);
+            if (role != null) {
+                EndpointLogicalGroup endpointLogicalGroup = role.fetchEndpointLogicalGroup();
+                if (endpointLogicalGroup != null && endpointLogicalGroup.getTestingEndpoints() != null  && endpointLogicalGroup.getTestingEndpoints().containsApi(apiInfoKey)) {
+                    synchronized(role) {
+                        loggerMaker.debugAndAddToDb("attempting to override auth " + logId, LogDb.TESTING);
+                        if (modifyAuthTokenInRawApi(role, sampleRawApi) == null) {
+                            loggerMaker.debugAndAddToDb("Default auth mechanism absent: " + logId, LogDb.TESTING);
+                        }
+                    }
+                } else {
+                    loggerMaker.debugAndAddToDb("Endpoint didn't satisfy endpoint condition for testRole" + logId, LogDb.TESTING);
+                }
+            } else {
+                String reason = "Test role has been deleted";
+                loggerMaker.debugAndAddToDb(reason + ", going ahead with sample auth", LogDb.TESTING);
+            }
+        }
+    }
 
     public YamlTestResult execute(ExecutorNode node, RawApi rawApi, Map<String, Object> varMap, String logId,
                                   AuthMechanism authMechanism, FilterNode validatorNode, ApiInfo.ApiInfoKey apiInfoKey, TestingRunConfig testingRunConfig,
@@ -105,26 +128,7 @@ public class Executor {
         }
 
         // new role being updated here without using modify_header {normal role replace here}
-
-        if (testingRunConfig != null && StringUtils.isNotBlank(testingRunConfig.getTestRoleId())) {
-            TestRoles role = fetchOrFindTestRole(testingRunConfig.getTestRoleId(), true);
-            if (role != null) {
-                EndpointLogicalGroup endpointLogicalGroup = role.fetchEndpointLogicalGroup();
-                if (endpointLogicalGroup != null && endpointLogicalGroup.getTestingEndpoints() != null  && endpointLogicalGroup.getTestingEndpoints().containsApi(apiInfoKey)) {
-                    synchronized(role) {
-                        loggerMaker.debugAndAddToDb("attempting to override auth " + logId, LogDb.TESTING);
-                        if (modifyAuthTokenInRawApi(role, sampleRawApi) == null) {
-                            loggerMaker.debugAndAddToDb("Default auth mechanism absent: " + logId, LogDb.TESTING);
-                        }
-                    }
-                } else {
-                    loggerMaker.debugAndAddToDb("Endpoint didn't satisfy endpoint condition for testRole" + logId, LogDb.TESTING);
-                }
-            } else {
-                String reason = "Test role has been deleted";
-                loggerMaker.debugAndAddToDb(reason + ", going ahead with sample auth", LogDb.TESTING);
-            }
-        }
+        modifyRawApiUsingTestRole(logId, testingRunConfig, sampleRawApi, apiInfoKey);
         origRawApi = sampleRawApi.copy();
 
         boolean requestSent = false;
@@ -137,9 +141,11 @@ public class Executor {
                 List<ApiInfo.ApiInfoKey> apiInfoKeys = new ArrayList<>();
                 apiInfoKeys.add(apiInfoKey);
                 memory = new Memory(apiInfoKeys, new HashMap<>());
+                memory.setTestingRunConfig(testingRunConfig);
+                memory.setLogId(logId);
             }
             workflowTest = buildWorkflowGraph(reqNodes, sampleRawApi, authMechanism, customAuthTypes, apiInfoKey, varMap, validatorNode);
-            result.add(triggerMultiExecution(workflowTest, reqNodes, sampleRawApi, authMechanism, customAuthTypes, apiInfoKey, varMap, validatorNode, debug, testLogs, memory, allowAllCombinations));
+            result.add(triggerMultiExecution(workflowTest, authMechanism, customAuthTypes, apiInfoKey, varMap, validatorNode, debug, testLogs, memory, allowAllCombinations));
             yamlTestResult = new YamlTestResult(result, workflowTest);
             
             return yamlTestResult;
@@ -297,7 +303,7 @@ public class Executor {
             return convertToWorkflowGraph(reqNodes, rawApi, authMechanism, customAuthTypes, apiInfoKey, varMap, validatorNode);
         }
 
-    public MultiExecTestResult triggerMultiExecution(WorkflowTest workflowTest, ExecutorNode reqNodes, RawApi rawApi, AuthMechanism authMechanism,
+    public MultiExecTestResult triggerMultiExecution(WorkflowTest workflowTest, AuthMechanism authMechanism,
         List<CustomAuthType> customAuthTypes, ApiInfo.ApiInfoKey apiInfoKey, Map<String, Object> varMap, FilterNode validatorNode, boolean debug, List<TestingRunResult.TestLog> testLogs, Memory memory, boolean allowAllCombinations) {
         
         ApiWorkflowExecutor apiWorkflowExecutor = new ApiWorkflowExecutor();
@@ -497,7 +503,7 @@ public class Executor {
         if (shouldCalculateNewToken) {
             try {
                 LoginFlowResponse loginFlowResponse= new LoginFlowResponse();
-                loggerMaker.debugAndAddToDb("trying to fetch token of step builder type for role " + testRole.getName(), LogDb.TESTING);
+                loggerMaker.infoAndAddToDb("trying to fetch token of step builder type for role " + testRole.getName() + " at time: " + Context.now() , LogDb.TESTING);
                 loginFlowResponse = TestExecutor.executeLoginFlow(authMechanismForRole, null, testRole.getName());
                 if (!loginFlowResponse.getSuccess())
                     throw new Exception(loginFlowResponse.getError());

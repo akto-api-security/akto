@@ -24,7 +24,6 @@ import com.akto.dto.type.SingleTypeInfo.SubType;
 import com.akto.dto.type.SingleTypeInfo.SuperType;
 import com.akto.dto.type.URLMethods.Method;
 import com.akto.dto.usage.MetricTypes;
-import com.akto.graphql.GraphQLUtils;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.filter.DictionaryFilter;
@@ -73,6 +72,10 @@ public class APICatalogSync {
     public Map<SensitiveParamInfo, Boolean> sensitiveParamInfoBooleanMap;
     public static boolean mergeAsyncOutside = true;
     public BloomFilter<CharSequence> existingAPIsInDb = BloomFilter.create(Funnels.stringFunnel(Charsets.UTF_8), 1_000_000, 0.001 );
+    private boolean skipMergingOnKnownStaticURLsForVersionedApis = false;
+
+    public static final Pattern VERSION_PATTERN = Pattern.compile("\\bv([1-9][0-9]?|100)\\b");
+
 
     public static Set<MergedUrls> mergedUrls;
 
@@ -81,7 +84,7 @@ public class APICatalogSync {
     public APICatalogSync(String userIdentifier,int thresh, boolean fetchAllSTI) {
         this(userIdentifier, thresh, fetchAllSTI, true);
     }
-
+    private boolean mergeUrlsOnVersions = false;
     // New overloaded constructor
     public APICatalogSync(String userIdentifier, int thresh, boolean fetchAllSTI, boolean buildFromDb) {
         this.thresh = thresh;
@@ -96,6 +99,7 @@ public class APICatalogSync {
             AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
             if (accountSettings != null && accountSettings.getPartnerIpList() != null) {
                 partnerIpsList = accountSettings.getPartnerIpList();
+                setMergeUrlsOnVersions(accountSettings.isAllowMergingOnVersions());
             }
         }
     }
@@ -251,7 +255,7 @@ public class APICatalogSync {
 
                 URLTemplate parameterisedTemplate = null;
                 if((apiCollectionId != VULNERABLE_API_COLLECTION_ID) && (apiCollectionId != LLM_API_COLLECTION_ID)){
-                    parameterisedTemplate = tryParamteresingUrl(pending);
+                    parameterisedTemplate = tryParamteresingUrl(pending, mergeUrlsOnVersions);
                 }
 
                 if(parameterisedTemplate != null){
@@ -283,7 +287,7 @@ public class APICatalogSync {
     }
 
 
-    public static ApiMergerResult tryMergeURLsInCollection(int apiCollectionId, Boolean urlRegexMatchingEnabled, boolean mergeUrlsBasic, BloomFilter<CharSequence> existingAPIsInDb, boolean ignoreCaseInsensitiveApis) {
+    public static ApiMergerResult tryMergeURLsInCollection(int apiCollectionId, Boolean urlRegexMatchingEnabled, boolean mergeUrlsBasic, BloomFilter<CharSequence> existingAPIsInDb, boolean ignoreCaseInsensitiveApis, boolean mergeUrlsOnVersions) {
         ApiCollection apiCollection = ApiCollectionsDao.instance.getMeta(apiCollectionId);
 
         Bson filterQ = null;
@@ -380,7 +384,7 @@ public class APICatalogSync {
 
 
             for(int size: sizeToUrlToSti.keySet()) {
-                ApiMergerResult result = tryMergingWithKnownStrictURLs(sizeToUrlToSti.get(size), urlRegexMatchingEnabled, !mergeUrlsBasic);
+                ApiMergerResult result = tryMergingWithKnownStrictURLs(sizeToUrlToSti.get(size), urlRegexMatchingEnabled, !mergeUrlsBasic, mergeUrlsOnVersions);
                 finalResult.templateToStaticURLs.putAll(result.templateToStaticURLs);
             }
 
@@ -433,7 +437,7 @@ public class APICatalogSync {
     }
 
     private static ApiMergerResult tryMergingWithKnownStrictURLs(
-        Map<String, Set<String>> pendingRequests, Boolean urlRegexMatchingEnabled, boolean doBodyMatch
+        Map<String, Set<String>> pendingRequests, Boolean urlRegexMatchingEnabled, boolean doBodyMatch, boolean mergeUrlsOnVersions
     ) {
         Map<URLTemplate, Set<String>> templateToStaticURLs = new HashMap<>();
 
@@ -462,7 +466,7 @@ public class APICatalogSync {
 
             URLStatic newStaticUrl = new URLStatic(newEndpoint, newMethod);
 
-            URLTemplate tempUrlTemplate = tryParamteresingUrl(newStaticUrl);
+            URLTemplate tempUrlTemplate = tryParamteresingUrl(newStaticUrl, mergeUrlsOnVersions);
             if(tempUrlTemplate != null){
                 Set<String> matchedStaticURLs = templateToStaticURLs.getOrDefault(tempUrlTemplate, new HashSet<>());
                 matchedStaticURLs.add(newUrl);
@@ -478,7 +482,7 @@ public class APICatalogSync {
                 String aEndpoint = aUrl.split(" ")[1];
                 URLStatic aStatic = new URLStatic(aEndpoint, aMethod);
                 URLStatic newStatic = new URLStatic(newEndpoint, newMethod);
-                URLTemplate mergedTemplate = APICatalogSync.tryMergeUrls(aStatic, newStatic);
+                URLTemplate mergedTemplate = APICatalogSync.tryMergeUrls(aStatic, newStatic, mergeUrlsOnVersions);
                 if (mergedTemplate == null) {
                     continue;
                 }
@@ -567,7 +571,7 @@ public class APICatalogSync {
                 Map<URLTemplate, Set<RequestTemplate>> potentialMerges = new HashMap<>();
                 for(URLStatic dbUrl: dbTemplates.keySet()) {
                     RequestTemplate dbTemplate = dbTemplates.get(dbUrl);
-                    URLTemplate mergedTemplate = tryMergeUrls(dbUrl, newUrl);
+                    URLTemplate mergedTemplate = tryMergeUrls(dbUrl, newUrl, this.mergeUrlsOnVersions);
                     if (mergedTemplate == null) {
                         continue;
                     }
@@ -617,7 +621,7 @@ public class APICatalogSync {
 
             for (URLStatic deltaUrl: deltaCatalog.getStrictURLToMethods().keySet()) {
                 RequestTemplate deltaTemplate = deltaTemplates.get(deltaUrl);
-                URLTemplate mergedTemplate = tryMergeUrls(deltaUrl, newUrl);
+                URLTemplate mergedTemplate = tryMergeUrls(deltaUrl, newUrl, this.mergeUrlsOnVersions);
                 if (mergedTemplate == null || (RequestTemplate.isMergedOnStr(mergedTemplate) && !areBothUuidUrls(newUrl,deltaUrl,mergedTemplate))) {
                     continue;
                 }
@@ -711,6 +715,25 @@ public class APICatalogSync {
         return (intCount >= 3 && charCount >= 1);
     }
 
+    private static boolean isValidVersionToken(String token){
+        if(token == null || token.isEmpty()) return false;
+        token = token.trim().toLowerCase();
+        if(token.startsWith("v") && token.length() > 1 && token.length() < 4) {
+            String versionString = token.substring(1, token.length());
+            try {
+                int version = Integer.parseInt(versionString);
+                if (version > 0) {
+                    return true;
+                } 
+            } catch (Exception e) {
+                // TODO: handle exception
+                return false;
+            }
+            return false;
+        }
+        return false;
+    }
+
 
     private static boolean isValidSubtype(SubType subType){
         return !(subType.getName().equals(SingleTypeInfo.GENERIC.getName()) || subType.getName().equals(SingleTypeInfo.OTHER.getName()));
@@ -730,7 +753,7 @@ public class APICatalogSync {
         }
     }
 
-    public static URLTemplate tryParamteresingUrl(URLStatic newUrl){
+    public static URLTemplate tryParamteresingUrl(URLStatic newUrl, boolean mergeUrlsOnVersions) {
         String[] tokens = tokenize(newUrl.getUrl());
         boolean tokensBelowThreshold = tokens.length < 2;
         Pattern pattern = patternToSubType.get(SingleTypeInfo.UUID);
@@ -755,6 +778,9 @@ public class APICatalogSync {
                 tokens[i] = null;
             }else if(pattern.matcher(tempToken).matches()){
                 newTypes[i] = SuperType.STRING;
+                tokens[i] = null;
+            }else if(mergeUrlsOnVersions && isValidVersionToken(tempToken)){
+                newTypes[i] = SuperType.VERSIONED;
                 tokens[i] = null;
             }
 
@@ -793,7 +819,7 @@ public class APICatalogSync {
     }
 
 
-    public static URLTemplate tryMergeUrls(URLStatic dbUrl, URLStatic newUrl) {
+    public static URLTemplate tryMergeUrls(URLStatic dbUrl, URLStatic newUrl, boolean mergeUrlsOnVersions) {
         if (dbUrl.getMethod() != newUrl.getMethod()) {
             return null;
         }
@@ -835,7 +861,10 @@ public class APICatalogSync {
             }else if(isAlphanumericString(tempToken) && isAlphanumericString(dbToken)){
                 newTypes[i] = SuperType.STRING;
                 newTokens[i] = null;
-            } else {
+            }else if(mergeUrlsOnVersions && isValidVersionToken(tempToken) && isValidVersionToken(dbToken)){
+                newTypes[i] = SuperType.VERSIONED;
+                newTokens[i] = null;
+            }else {
                 newTypes[i] = SuperType.STRING;
                 newTokens[i] = null;
                 templatizedStrTokens++;
@@ -870,10 +899,10 @@ public class APICatalogSync {
 
     }
 
-    public static void mergeUrlsAndSave(int apiCollectionId, Boolean urlRegexMatchingEnabled, boolean mergeUrlsBasic, BloomFilter<CharSequence> existingAPIsInDb,boolean ignoreCaseInsensitiveApis) {
+    public static void mergeUrlsAndSave(int apiCollectionId, Boolean urlRegexMatchingEnabled, boolean mergeUrlsBasic, BloomFilter<CharSequence> existingAPIsInDb,boolean ignoreCaseInsensitiveApis, boolean mergeUrlsOnVersions) {
         if (apiCollectionId == LLM_API_COLLECTION_ID || apiCollectionId == VULNERABLE_API_COLLECTION_ID) return;
 
-        ApiMergerResult result = tryMergeURLsInCollection(apiCollectionId, urlRegexMatchingEnabled, mergeUrlsBasic, existingAPIsInDb, ignoreCaseInsensitiveApis);
+        ApiMergerResult result = tryMergeURLsInCollection(apiCollectionId, urlRegexMatchingEnabled, mergeUrlsBasic, existingAPIsInDb, ignoreCaseInsensitiveApis, mergeUrlsOnVersions);
 
         String deletedStaticUrlsString = "";
         int counter = 0;
@@ -1129,6 +1158,10 @@ public class APICatalogSync {
                 Set<HttpResponseParams> responseParamsList = entry.getValue();
 
                 String endpoint = url.getUrl();
+                if(this.skipMergingOnKnownStaticURLsForVersionedApis && VERSION_PATTERN.matcher(endpoint).find()){
+                    continue;
+                }
+
                 if(makeApisCaseInsensitive){
                     if(lowerCaseApisSet.contains(endpoint.toLowerCase())){
                         iterator.remove();
@@ -1543,8 +1576,10 @@ public class APICatalogSync {
                         List<ApiCollection> allCollections = ApiCollectionsDao.instance.getMetaAll();
                         AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
                         boolean makeApisCaseInsensitive = false;
+                        boolean mergeUrlsOnVersions = false;
                         if(accountSettings != null){
                             makeApisCaseInsensitive = accountSettings.getHandleApisCaseInsensitive();
+                            mergeUrlsOnVersions = accountSettings.isAllowMergingOnVersions();
                         }
                         
                         Boolean urlRegexMatchingEnabled = accountSettings == null || accountSettings.getUrlRegexMatchingEnabled();
@@ -1553,14 +1588,14 @@ public class APICatalogSync {
                             int start = Context.now();
                             loggerMaker.infoAndAddToDb("Started merging API collection " + apiCollection.getId(), LogDb.RUNTIME);
                             try {
-                                mergeUrlsAndSave(apiCollection.getId(), true, true, existingAPIsInDb, makeApisCaseInsensitive);
+                                mergeUrlsAndSave(apiCollection.getId(), true, true, existingAPIsInDb, makeApisCaseInsensitive, mergeUrlsOnVersions);
                                 loggerMaker.infoAndAddToDb("Finished merging API collection basic " + apiCollection.getId() + " in " + (Context.now() - start) + " seconds", LogDb.RUNTIME);
                             } catch (Exception e) {
                                 loggerMaker.errorAndAddToDb(e.getMessage(),LogDb.RUNTIME);
                             }
 
                             try {
-                                mergeUrlsAndSave(apiCollection.getId(), true, false, existingAPIsInDb, makeApisCaseInsensitive);
+                                mergeUrlsAndSave(apiCollection.getId(), true, false, existingAPIsInDb, makeApisCaseInsensitive, mergeUrlsOnVersions);
                                 loggerMaker.infoAndAddToDb("Finished merging API collection all" + apiCollection.getId() + " in " + (Context.now() - start) + " seconds", LogDb.RUNTIME);
                             } catch (Exception e) {
                                 loggerMaker.errorAndAddToDb(e.getMessage(),LogDb.RUNTIME);
@@ -1978,4 +2013,21 @@ public class APICatalogSync {
     public APICatalog getDbState(int apiCollectionId) {
         return this.dbState.get(apiCollectionId);
     }
+
+    public boolean isMergeUrlsOnVersions() {
+        return mergeUrlsOnVersions;
+    }
+
+    public void setMergeUrlsOnVersions(boolean mergeUrlsOnVersions) {
+        this.mergeUrlsOnVersions = mergeUrlsOnVersions;
+    }
+
+    public boolean isSkipMergingOnKnownStaticURLsForVersionedApis() {
+        return skipMergingOnKnownStaticURLsForVersionedApis;
+    }
+
+    public void setSkipMergingOnKnownStaticURLsForVersionedApis(boolean skipMergingOnKnownStaticURLs) {
+        this.skipMergingOnKnownStaticURLsForVersionedApis = skipMergingOnKnownStaticURLs;
+    }
+
 }

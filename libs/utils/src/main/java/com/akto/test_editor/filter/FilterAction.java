@@ -922,7 +922,23 @@ public final class FilterAction {
 
     public boolean getMatchingKeysForPayload(Object obj, String parentKey, Object querySet, String operand, Set<String> matchingKeys, boolean doAllSatisfy) {
         Boolean res = false;
-        if (obj instanceof BasicDBObject) {
+        if (obj instanceof JSONObject) {
+            JSONObject basicDBObject = (JSONObject) obj;
+
+            Set<String> keySet = basicDBObject.keySet();
+
+            for(String key: keySet) {
+                if (key == null) {
+                    continue;
+                }
+                Object value = basicDBObject.get(key);
+                doAllSatisfy = getMatchingKeysForPayload(value, key, querySet, operand, matchingKeys, doAllSatisfy);
+                if (parentKey != null && TestEditorEnums.DataOperands.VALUETYPE.toString().equals(operand)) {
+                    matchingKeys.add(parentKey);
+                }
+                
+            }
+        } else if (obj instanceof BasicDBObject) {
             BasicDBObject basicDBObject = (BasicDBObject) obj;
 
             Set<String> keySet = basicDBObject.keySet();
@@ -962,7 +978,19 @@ public final class FilterAction {
 
     public void valueExists(Object obj, String parentKey, Object querySet, String operand, List<String> matchingKeys, Boolean keyOperandSeen, List<String> matchingValueKeySet, boolean doAllSatisfy, StringBuilder validationReason) {
         Boolean res = false;
-        if (obj instanceof BasicDBObject) {
+        if (obj instanceof JSONObject) {
+            JSONObject basicDBObject = (JSONObject) obj;
+
+            Set<String> keySet = basicDBObject.keySet();
+
+            for(String key: keySet) {
+                if (key == null) {
+                    continue;
+                }
+                Object value = basicDBObject.get(key);
+                valueExists(value, key, querySet, operand, matchingKeys, keyOperandSeen, matchingValueKeySet, doAllSatisfy, validationReason);
+            }
+        } else if (obj instanceof BasicDBObject) {
             BasicDBObject basicDBObject = (BasicDBObject) obj;
 
             Set<String> keySet = basicDBObject.keySet();

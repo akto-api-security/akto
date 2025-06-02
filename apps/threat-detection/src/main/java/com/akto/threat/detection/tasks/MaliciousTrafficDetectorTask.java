@@ -1,5 +1,6 @@
 package com.akto.threat.detection.tasks;
 
+import java.io.IOException;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -12,6 +13,12 @@ import java.util.concurrent.Executors;
 import java.util.function.Supplier;
 
 import org.apache.commons.lang3.math.NumberUtils;
+import org.apache.http.client.methods.CloseableHttpResponse;
+import org.apache.http.client.methods.HttpGet;
+import org.apache.http.client.methods.HttpPost;
+import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.client.HttpClients;
+import org.apache.http.util.EntityUtils;
 import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
@@ -19,6 +26,7 @@ import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
 
 import com.akto.IPLookupClient;
+import com.akto.ProtoMessageUtils;
 import com.akto.RawApiMetadataFactory;
 import com.akto.dao.context.Context;
 import com.akto.dao.monitoring.FilterYamlTemplateDao;
@@ -41,14 +49,12 @@ import com.akto.log.LoggerMaker.LogDb;
 import com.akto.proto.generated.threat_detection.message.malicious_event.event_type.v1.EventType;
 import com.akto.proto.generated.threat_detection.message.malicious_event.v1.MaliciousEventKafkaEnvelope;
 import com.akto.proto.generated.threat_detection.message.malicious_event.v1.MaliciousEventMessage;
-import com.akto.proto.generated.threat_detection.message.sample_request.v1.Metadata;
 import com.akto.proto.generated.threat_detection.message.sample_request.v1.SampleMaliciousRequest;
 import com.akto.proto.generated.threat_detection.message.sample_request.v1.SampleRequestKafkaEnvelope;
 import com.akto.proto.generated.threat_detection.message.sample_request.v1.SchemaConformanceError;
 import com.akto.proto.http_response_param.v1.HttpResponseParam;
 import com.akto.rules.TestPlugin;
 import com.akto.test_editor.filter.data_operands_impl.ValidationResult;
-import com.akto.threat.detection.actor.SourceIPActorGenerator;
 import com.akto.threat.detection.cache.ApiCountCacheLayer;
 import com.akto.threat.detection.cache.RedisBackedCounterCache;
 import com.akto.threat.detection.constants.KafkaTopic;
@@ -60,6 +66,7 @@ import com.akto.util.Constants;
 import com.akto.util.HttpRequestResponseUtils;
 import com.akto.utils.GzipUtils;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.api.services.drive.Drive.About.Get;
 
 import io.lettuce.core.RedisClient;
 import io.lettuce.core.api.StatefulRedisConnection;
@@ -72,6 +79,7 @@ Pass data through filters and identify malicious traffic.
  */
 public class MaliciousTrafficDetectorTask implements Task {
 
+  private ThreatConfigurationEvaluator threatConfigEvaluator;
   private final Consumer<String, byte[]> kafkaConsumer;
   private final KafkaConfig kafkaConfig;
   private final HttpCallParser httpCallParser;
@@ -122,6 +130,7 @@ public class MaliciousTrafficDetectorTask implements Task {
 
     this.httpCallParser = new HttpCallParser(120, 1000);
     
+    this.threatConfigEvaluator = new ThreatConfigurationEvaluator(null);
 
     this.windowBasedThresholdNotifier =
         new WindowBasedThresholdNotifier(
@@ -227,11 +236,9 @@ public class MaliciousTrafficDetectorTask implements Task {
   }
 
 
-
   private void processRecord(HttpResponseParam record) throws Exception {
     HttpResponseParams responseParam = buildHttpResponseParam(record);
-    String actor = SourceIPActorGenerator.instance.generate(responseParam).orElse("");
-    responseParam.setSourceIP(actor);
+    String actor = this.threatConfigEvaluator.getActorId(responseParam);
 
     if (actor == null || actor.isEmpty()) {
       logger.warnAndAddToDb("Dropping processing of record with no actor IP, account: " + responseParam.getAccountId());
