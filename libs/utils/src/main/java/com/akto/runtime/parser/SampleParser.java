@@ -5,9 +5,11 @@ import java.util.Map;
 
 import org.apache.commons.lang3.math.NumberUtils;
 
+import com.akto.dao.context.Context;
 import com.akto.dto.HttpRequestParams;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.OriginalHttpRequest;
+import com.akto.dto.TrafficProducerLog;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.HttpRequestResponseUtils;
@@ -19,10 +21,9 @@ public class SampleParser {
     private static final Gson gson = new Gson();
     private static final LoggerMaker loggerMaker = new LoggerMaker(SampleParser.class, LogDb.RUNTIME);
 
-
     public static HttpResponseParams parseSampleMessage(String message) throws Exception {
                 //convert java object to JSON format
-        Map<String, Object> json = gson.fromJson(message, Map.class);
+        Map<String, Object> json = gson.fromJson(message, new com.google.gson.reflect.TypeToken<Map<String, Object>>(){}.getType());
 
         String method = (String) json.get("method");
         String url = (String) json.get("path");
@@ -69,6 +70,18 @@ public class SampleParser {
                 type,statusCode, status, responseHeaders, payload, requestParams, time, accountId, isPending, source, message, sourceIP, destIP, direction
         );
 
+    }
+
+    public static TrafficProducerLog parseLogMessage(String message) throws Exception {
+
+        Map<String, Object> json = gson.fromJson(message, new com.google.gson.reflect.TypeToken<Map<String, Object>>(){}.getType());
+        String logType = (String) json.getOrDefault("logType", "INFO");
+        String source = (String) json.getOrDefault("source", "UNKNOWN");
+        String logMessage = (String) json.getOrDefault("message", null);
+        int time = Integer.parseInt(json.getOrDefault("time", Context.now()).toString());
+
+        return new TrafficProducerLog(
+                logMessage, source, logType, time);
     }
 
 }
