@@ -1,4 +1,4 @@
-import { Box, Button, Checkbox, HorizontalStack, Icon, Popover, RadioButton, Text, TextField, VerticalStack } from '@shopify/polaris'
+import { Box, Button, HorizontalStack, Icon, Popover, RadioButton, Text, TextField, VerticalStack } from '@shopify/polaris'
 import { DeleteMajor } from "@shopify/polaris-icons"
 import React, { useEffect, useState } from 'react'
 import TooltipText from '../../../../components/shared/TooltipText'
@@ -40,7 +40,7 @@ const SetUserEnvPopupComponent = ({ popover, setPopover, tags, apiCollectionIds,
                     : [...allEnvTypes, { ...tag, lastUpdatedTs: 0 }]
 
                 setAllEnvTypes(newTags)
-                updateTags(apiCollectionIds, [tag])
+                updateTags(apiCollectionIds, tag)
             }
             return
         }
@@ -101,7 +101,7 @@ const SetUserEnvPopupComponent = ({ popover, setPopover, tags, apiCollectionIds,
         }
 
         setAllEnvTypes(newEnvTypes)
-        updateTags(apiCollectionIds, [tag])
+        updateTags(apiCollectionIds, tag)
     }
 
     const handleEnvChange = (value) => {
@@ -136,14 +136,14 @@ const SetUserEnvPopupComponent = ({ popover, setPopover, tags, apiCollectionIds,
         }
 
         setAllEnvTypes(updatedTags)
-        updateTags(apiCollectionIds, updatedTags)
+        updateTags(apiCollectionIds, updatedTags.at(updatedTags.length-1))
     }
 
     useEffect(() => {
         apiCollectionIds.map((apiCollectionId) => {
             const envTypes = tags?.[apiCollectionId]
 
-            envTypes.map((envType) => {
+            envTypes?.map((envType) => {
                 if(envType?.keyName === "envType") {
                     if(envType?.value?.toLowerCase() === "staging" || envType?.value?.toLowerCase() === "production") {
                         setSelectedEnvType(envType?.value?.toLowerCase())

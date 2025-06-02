@@ -206,6 +206,7 @@ const convertToNewData = (collectionsArr, sensitiveInfoMap, severityInfoMap, cov
         }
         return{
             ...c,
+            envType: c?.envType?.map((type) => type?.value),
             displayNameComp: (<Box maxWidth="20vw"><TooltipText tooltip={c.displayName} text={c.displayName} textProps={{fontWeight: 'medium'}}/></Box>),
             testedEndpoints: c.urlsCount === 0 ? 0 : (coverageMap[c.id] ? coverageMap[c.id] : 0),
             sensitiveInRespTypes: sensitiveInfoMap[c.id] ? sensitiveInfoMap[c.id] : [],
@@ -692,17 +693,17 @@ function ApiCollections() {
         let copyObj = data;
         Object.keys(copyObj).forEach((key) => {
             data[key].length > 0 && data[key].forEach((c) => {
-                c['envType'] = dataMap[c.id]
-                c['envTypeComp'] = transform.getCollectionTypeList(dataMap[c.id])
+                const list = dataMap[c?.id]?.map((data) => data?.value);
+                c['envType'] = list
+                c['envTypeComp'] = transform.getCollectionTypeList(list)
             })
         })
         setData(copyObj)
         setRefreshData(!refreshData)
     }
 
-    const updateTags = (apiCollectionIds, tagObj) => {
-        let copyObj = JSON.parse(JSON.stringify(envTypeMap))
-        
+    const updateTags = async (apiCollectionIds, tagObj) => {
+        let copyObj = await JSON.parse(JSON.stringify(envTypeMap))
         apiCollectionIds.forEach(id => {
             if(!copyObj[id]) {
                 copyObj[id] = []
@@ -711,13 +712,39 @@ function ApiCollections() {
             if(tagObj === null) {
                 copyObj[id] = []
             } else {
-                copyObj[id] = tagObj
+                if(tagObj?.keyName?.toLowerCase() === 'envtype') {
+                    const currentEnvIndex = copyObj[id].findIndex(tag => 
+                        tag.keyName.toLowerCase() === 'envtype' &&
+                        (tag.value.toLowerCase() === 'production' || tag.value.toLowerCase() === 'staging')
+                    )
+
+                    if (currentEnvIndex === -1) {
+                        copyObj[id].push(tagObj)
+                    } else {
+                        const currentValue = copyObj[id][currentEnvIndex].value.toLowerCase()
+                        if (tagObj.value.toLowerCase() !== currentValue) {
+                            copyObj[id][currentEnvIndex] = tagObj
+                        } else {
+                            copyObj[id].splice(currentEnvIndex, 1)
+                        }
+                    }
+                } else {
+                    const index = copyObj[id].findIndex(tag => 
+                        tag.keyName === tagObj.keyName && tag.value === tagObj.value
+                    )
+
+                    if (index === -1) {
+                        copyObj[id].push(tagObj)
+                    } else {
+                        copyObj[id].splice(index, 1)
+                    }
+                }
             }
         })
 
 
 
-        api.updateEnvTypeOfCollection(tagObj, apiCollectionIds, tagObj === null).then((resp) => {
+        await api.updateEnvTypeOfCollection(tagObj === null ? tagObj : [tagObj], apiCollectionIds, tagObj === null).then((resp) => {
             func.setToast(true, false, "ENV type updated successfully")
             setEnvTypeMap(copyObj)
             updateData(copyObj)

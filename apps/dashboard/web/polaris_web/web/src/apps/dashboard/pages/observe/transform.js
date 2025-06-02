@@ -444,9 +444,7 @@ const transform = {
         }
         return (
             <ShowListInBadge
-                itemsArr={envType.map((item) => {
-                    return item.value
-                })}
+                itemsArr={envType}
                 maxItems={3}
                 status={"info"}
                 useTooltip={true}

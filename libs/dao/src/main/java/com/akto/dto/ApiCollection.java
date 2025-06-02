@@ -81,6 +81,7 @@ public class ApiCollection {
     Type type;
     public static final String _TYPE = "type";
 
+    // TODO: Remove this field once you are sure that no one is using it.
     @Deprecated
     String userSetEnvType;
 
@@ -325,7 +326,12 @@ public class ApiCollection {
             this.tagsList = new ArrayList<>();
         }
 
-        this.tagsList.add(new CollectionTags(Context.now(), "userSetEnvType", userSetEnvType));
+        if(userSetEnvType != null) {
+            String[] envList = userSetEnvType.split(",");
+            for(String env : envList) {
+                this.tagsList.add(new CollectionTags(Context.now(), "userSetEnvType", env.trim(), CollectionTags.TagSource.USER));
+            }
+        }
 	}
 
     public boolean getAutomated() {
@@ -369,6 +375,10 @@ public class ApiCollection {
     }
 
     public void setTagsList(List<CollectionTags> tagsList) {
-        this.tagsList = tagsList;
+        if(this.tagsList == null) {
+            this.tagsList = new ArrayList<>();
+        }
+
+        this.tagsList.addAll(tagsList);
     }
 }
