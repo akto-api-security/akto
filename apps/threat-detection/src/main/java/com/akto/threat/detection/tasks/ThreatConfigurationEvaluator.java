@@ -97,7 +97,9 @@ public class ThreatConfigurationEvaluator {
         getThreatConfiguration();
         String actor = SourceIPActorGenerator.instance.generate(responseParam).orElse("");
         responseParam.setSourceIP(actor);
-        logger.debugAndAddToDbCount("Actor ID generated: " + actor + " for response: " + responseParam.getOriginalMsg().get());
+        if (responseParam.getOriginalMsg() != null) {
+            logger.debugAndAddToDbCount("Actor ID generated: " + actor + " for response: " + responseParam.getOriginalMsg().get());
+        }
 
         if (threatConfiguration == null) {
             return actor;
