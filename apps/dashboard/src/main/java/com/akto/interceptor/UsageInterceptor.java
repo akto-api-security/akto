@@ -19,6 +19,8 @@ public class UsageInterceptor extends AbstractInterceptor {
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(UsageInterceptor.class, LogDb.DASHBOARD);
 
+    final static String _FEATURE_LABEL = "featureLabel";
+
     String featureLabel;
 
     public void setFeatureLabel(String featureLabel) {
@@ -54,6 +56,12 @@ public class UsageInterceptor extends AbstractInterceptor {
 
             int gracePeriod = organization.getGracePeriod();
 
+            Object moreFeatures = invocation.getInvocationContext().get(_FEATURE_LABEL);
+            String featureLabel = new String(this.featureLabel);
+            if (moreFeatures != null && moreFeatures instanceof String) {
+                featureLabel = featureLabel.concat(" ").concat((String) moreFeatures);
+            }
+
             String[] features = featureLabel.split(" ");
             for (String feature : features) {
                 feature = feature.trim();
@@ -88,7 +96,7 @@ public class UsageInterceptor extends AbstractInterceptor {
         } catch (Exception e) {
             String api = invocation.getProxy().getActionName();
             String error = "Error in UsageInterceptor for api: " + api + " ERROR: " + e.getMessage();
-            loggerMaker.errorAndAddToDb(e, error, LogDb.DASHBOARD);
+            loggerMaker.errorAndAddToDb(e, error);
         }
 
         return invocation.invoke();

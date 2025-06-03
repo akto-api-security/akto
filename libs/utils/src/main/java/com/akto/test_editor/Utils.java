@@ -1043,4 +1043,23 @@ public class Utils {
         }
         return rawApi;
     }
+
+    public static String buildRequestIHttpFormat(RawApi rawApi) {
+        StringBuilder requestBuilder = new StringBuilder();
+        requestBuilder.append(rawApi.getRequest().getMethod() + " " + rawApi.getRequest().getUrl() + "\n");
+        Map<String, List<String>> headers = rawApi.getRequest().getHeaders();
+        for (Map.Entry<String, List<String>> entry : headers.entrySet()) {
+            String headerKey = entry.getKey();
+            List<String> headerValues = entry.getValue();
+            for (String headerValue : headerValues) {
+                requestBuilder.append(headerKey + ": " + headerValue + "\n");
+            }
+        }
+        String requestBody = rawApi.getRequest().getJsonRequestBody();
+        if (requestBody != null && !requestBody.isEmpty()) {
+            requestBuilder.append("\n" + requestBody);
+        }
+        return requestBuilder.toString();
+    }
+
 }
