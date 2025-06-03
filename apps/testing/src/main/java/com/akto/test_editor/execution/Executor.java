@@ -465,7 +465,7 @@ public class Executor {
         try {
             int accountId = Context.accountId.get();
             FeatureAccess featureAccess = UsageMetricUtils.getFeatureAccessSaas(accountId, TestExecutorModifier._AKTO_GPT_AI);
-            if (featureAccess.getIsGranted() || true) {
+            if (featureAccess.getIsGranted()) {
 
                 String request = Utils.buildRequestIHttpFormat(rawApi);
 
