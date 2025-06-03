@@ -29,6 +29,7 @@ import com.akto.hybrid_runtime.filter_updates.FilterUpdates;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.metrics.AllMetrics;
+import com.akto.runtime.utils.Utils;
 import com.akto.data_actor.DataActor;
 import com.akto.data_actor.DataActorFactory;
 import com.akto.hybrid_runtime.policies.AktoPolicyNew;
@@ -251,6 +252,9 @@ public class APICatalogSync {
                 }
 
                 if(parameterisedTemplate != null){
+                    if (Utils.printDebugUrlLog(parameterisedTemplate.getTemplateString())) {
+                        loggerMaker.infoAndAddToDb("Found debug url in parameterisedTemplate " + parameterisedTemplate.getTemplateString());
+                    }
                     RequestTemplate rt = deltaCatalog.getTemplateURLToMethods().get(parameterisedTemplate);
                     if (rt != null) {
                         rt.mergeFrom(pendingTemplate);
@@ -709,16 +713,25 @@ public class APICatalogSync {
                         } else {
                             AllMetrics.instance.setDeltaCatalogTotalCount(1);
                             RequestTemplate alreadyInDelta = deltaCatalog.getTemplateURLToMethods().get(urlTemplate);
+                            if (Utils.printDebugUrlLog(newUrl.getUrl())) {
+                                loggerMaker.infoAndAddToDb("Found debug url in tryWithKnownURLTemplates match " + newUrl.getUrl());
+                            }
 
                             if (alreadyInDelta != null) {
                                 alreadyInDelta.fillUrlParams(tokenize(newUrl.getUrl()), urlTemplate, apiCollectionId);
                                 alreadyInDelta.mergeFrom(newRequestTemplate);
+                                if (Utils.printDebugUrlLog(newUrl.getUrl())) {
+                                    loggerMaker.infoAndAddToDb("Found debug url in tryWithKnownURLTemplates alreadyInDelta non empty " + newUrl.getUrl());
+                                }
                             } else {
                                 RequestTemplate dbTemplate = dbCatalog.getTemplateURLToMethods().get(urlTemplate);
                                 RequestTemplate dbCopy = dbTemplate.copy();
                                 dbCopy.mergeFrom(newRequestTemplate);
                                 dbCopy.fillUrlParams(tokenize(newUrl.getUrl()), urlTemplate, apiCollectionId);
                                 deltaCatalog.getTemplateURLToMethods().put(urlTemplate, dbCopy);
+                                if (Utils.printDebugUrlLog(newUrl.getUrl())) {
+                                    loggerMaker.infoAndAddToDb("Found debug url in tryWithKnownURLTemplates alreadyInDelta empty " + newUrl.getUrl());
+                                }
                             }
                             iterator.remove();
                             break;
@@ -744,6 +757,9 @@ public class APICatalogSync {
                 RequestTemplate requestTemplate = ret.get(url);
                 if (requestTemplate == null) {
                     requestTemplate = new RequestTemplate(new HashMap<>(), new HashMap<>(), new HashMap<>(), new TrafficRecorder(new HashMap<>()));
+                    if (Utils.printDebugUrlLog(url.getUrl())) {
+                        loggerMaker.infoAndAddToDb("Found debug url in createRequestTemplates " + url.getUrl());
+                    }
                     ret.put(url, requestTemplate);
                 }
                 processResponse(requestTemplate, responseParamsList, deletedInfo);
@@ -776,6 +792,9 @@ public class APICatalogSync {
                         if (requestTemplate == null) {
                             requestTemplate = strictMatch.copy(); // to further process the requestTemplate
                             deltaCatalogStrictURLToMethods.put(url, requestTemplate);
+                            if (Utils.printDebugUrlLog(url.getUrl())) {
+                                loggerMaker.infoAndAddToDb("Found debug url in processKnownStaticURLs " + url.getUrl());
+                            }
                             strictMatch.mergeFrom(requestTemplate); // to update the existing requestTemplate in db with new data
                         }
 
@@ -1428,6 +1447,9 @@ public class APICatalogSync {
                     if (!existingAPIsInDb.mightContain(checkString)) {
                         if (syncLimit.updateUsageLeftAndCheckSkip()) {
                             staticUrlIterator.remove();
+                            if (Utils.printDebugUrlLog(checkString)) {
+                                loggerMaker.infoAndAddToDb("Found debug url in updateUsageLeftAndCheckSkip skip " + checkString);
+                            }
                         } else {
                             existingAPIsInDb.put(checkString);
                             deltaUsage++;
@@ -1444,6 +1466,9 @@ public class APICatalogSync {
                     if (!existingAPIsInDb.mightContain(checkString)) {
                         if (syncLimit.updateUsageLeftAndCheckSkip()) {
                             templateUrlIterator.remove();
+                            if (Utils.printDebugUrlLog(checkString)) {
+                                loggerMaker.infoAndAddToDb("Found debug url in updateUsageLeftAndCheckSkip skip " + checkString);
+                            }
                         } else {
                             existingAPIsInDb.put(checkString);
                             deltaUsage++;
@@ -1641,6 +1666,14 @@ public class APICatalogSync {
 
             SingleTypeInfo dbInfo = dbInfoMap.get(key);
             SingleTypeInfo deltaInfo = deltaInfoMap.get(key);
+
+            if (deltaInfo != null && Utils.printDebugUrlLog(deltaInfo.getUrl())) {
+                loggerMaker.infoAndAddToDb("Found debug url in getDBUpdatesForParamsHybrid in deltaInfo " + deltaInfo.getUrl());
+            }
+
+            if (dbInfo != null && Utils.printDebugUrlLog(dbInfo.getUrl())) {
+                loggerMaker.infoAndAddToDb("Found debug url in getDBUpdatesForParamsHybrid in dbInfo " + dbInfo.getUrl());
+            }
 
             if (deltaInfo.getParam().equalsIgnoreCase("host")) {
                 if (dbInfo == null) {

@@ -423,6 +423,9 @@ public class Main {
             int start = Context.now();
             long startDetailed = System.currentTimeMillis();
             int delta = start - 20*60;
+            if (accountSettings.getTimeForScheduledSummaries() > 0) {
+                delta = start - accountSettings.getTimeForScheduledSummaries();
+            }
 
             TestingConfigurations config = TestingConfigurations.getInstance();
             TestingRunResultSummary trrs = dataActor.findPendingTestingRunResultSummary(start, delta, customMiniTestingServiceName);
