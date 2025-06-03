@@ -147,15 +147,10 @@ const McpSecurityPage = () => {
   // Check if user has MCP_SECURITY feature access
   const hasMcpSecurityAccess = useMemo(() => {
     const stiggFeatures = window.STIGG_FEATURE_WISE_ALLOWED;
-    console.log('Stigg Features:', stiggFeatures);
-    console.log('MCP_SECURITY Feature:', stiggFeatures?.['MCP_SECURITY']);
     if (!stiggFeatures || Object.keys(stiggFeatures).length === 0) {
-      console.log('No Stigg features found');
       return false;
     }
-    const hasAccess = stiggFeatures['MCP_SECURITY']?.isGranted || false;
-    console.log('Has MCP Security Access:', hasAccess);
-    return hasAccess;
+    return stiggFeatures['MCP_SECURITY']?.isGranted || false;
   }, []);
 
   // Generate testResultsTableTabs using useMemo
