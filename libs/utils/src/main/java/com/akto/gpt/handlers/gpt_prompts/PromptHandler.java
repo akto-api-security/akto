@@ -126,6 +126,12 @@ public abstract class PromptHandler {
 
     static String processOutput(String rawResponse) {
         try {
+            // Truncate at the last closing brace to remove any trailing notes
+            int lastBrace = rawResponse.lastIndexOf('}');
+            if (lastBrace != -1) {
+                rawResponse = rawResponse.substring(0, lastBrace + 1);
+            }
+
             JSONObject jsonResponse = new JSONObject(rawResponse);
             String cleanResponse = jsonResponse.getString("response");
     
