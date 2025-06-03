@@ -284,6 +284,16 @@ public class ApiExecutor {
             url = url.replace("api.uat.be.edenred.io/api.uat.be.edenred.io", "api.uat.be.edenred.io");
         }
 
+        if (url.contains("apisummit-uat.edenred.com/apisummit-uat.edenred.com")) {
+            url = url.replace("apisummit-uat.edenred.com/apisummit-uat.edenred.com", "apisummit-uat.edenred.com");
+        }
+
+        if (url.contains("apisummit-dev.edenred.com/apisummit-dev.edenred.com")) {
+            url = url.replace("apisummit-dev.edenred.com/apisummit-dev.edenred.com", "apisummit-dev.edenred.com");
+        }
+
+        
+
         if (url.contains("login_submit")) {
             loggerMaker.infoAndAddToDb("Request Payload " + request.getBody(), LogDb.TESTING);
         }
