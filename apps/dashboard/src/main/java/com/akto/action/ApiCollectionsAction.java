@@ -20,6 +20,7 @@ import com.akto.dto.usage.MetricTypes;
 import com.akto.dto.testing.TestingEndpoints;
 import com.akto.dto.traffic.CollectionTags;
 import com.akto.dto.traffic.Key;
+import com.akto.dto.traffic.CollectionTags.TagSource;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.Aggregates;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
@@ -767,9 +768,12 @@ public class ApiCollectionsAction extends UserAction {
             List<CollectionTags> toPull = new ArrayList<>();
             List<CollectionTags> toAdd = new ArrayList<>();
             if(tagsList == null || tagsList.isEmpty()) {
+                envType.stream().forEach((item) -> {
+                    item.setSource(TagSource.USER);
+                });
+
                 toAdd.addAll(envType);
-            }
-            else {
+            } else {
                 for (CollectionTags env : envType) {
                     Optional<CollectionTags> matchingTag = tagsList.stream()
                             .filter(tag ->
@@ -791,6 +795,7 @@ public class ApiCollectionsAction extends UserAction {
                     } else if (matchingTag.isPresent()) {
                         toPull.add(matchingTag.get());
                     } else {
+                        env.setSource(TagSource.USER);
                         toAdd.add(env);
                     }
                 }
