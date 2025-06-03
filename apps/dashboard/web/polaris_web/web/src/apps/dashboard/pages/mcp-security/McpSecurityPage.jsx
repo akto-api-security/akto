@@ -1,7 +1,7 @@
 import { Page, Box, Button, Badge, HorizontalStack, Text } from '@shopify/polaris';
 import EmptyScreensLayout from '../../components/banners/EmptyScreensLayout';
 import LayoutWithTabs from '../../components/layouts/LayoutWithTabs';
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import GithubSimpleTable from '../../components/tables/GithubSimpleTable';
 import { IndexFiltersMode } from '@shopify/polaris';
 import { CellType } from '../../components/tables/rows/GithubRow';
@@ -34,13 +34,15 @@ const headers = [
     text: "Risk Score",
     value: "riskScoreComp",
     title: "Risk Score",
-    sortActive: true
+    sortActive: true,
+    filterKey: "riskScore"
   },
   {
     text: "Hostname",
     value: "hostName",
     title: "Hostname",
-    type: CellType.TEXT
+    type: CellType.TEXT,
+    filterKey: "hostName"
   },
   {
     text: "Discovered",
@@ -143,6 +145,54 @@ const McpSecurityPage = () => {
   const [testResultsLoading, setTestResultsLoading] = useState(false);
   const [testResultsCountMap, setTestResultsCountMap] = useState({});
   const { stigg } = useStiggContext();
+
+  // Add filters state
+  const [filters, setFilters] = useState([]);
+
+  // Function to fill filters
+  const fillFilters = useCallback(() => {
+    const hostnameChoices = data['hostname'].map(collection => ({
+      label: collection.hostName,
+      value: collection.hostName
+    }));
+
+    const riskScoreChoices = [
+      { label: 'High', value: 'high' },
+      { label: 'Medium', value: 'medium' },
+      { label: 'Low', value: 'low' }
+    ];
+
+    const collectionTypeChoices = [
+      { label: 'MCP Server', value: 'MCP_SERVER' },
+      { label: 'Other', value: 'OTHER' }
+    ];
+
+    setFilters([
+      {
+        key: 'type',
+        label: 'Collection Type',
+        title: 'Collection Type',
+        choices: collectionTypeChoices,
+        selected: ['MCP_SERVER'] // Set MCP Server as default
+      },
+      {
+        key: 'hostName',
+        label: 'Hostname',
+        title: 'Hostname',
+        choices: hostnameChoices
+      },
+      {
+        key: 'riskScore',
+        label: 'Risk Score',
+        title: 'Risk Score',
+        choices: riskScoreChoices
+      }
+    ]);
+  }, [data]);
+
+  useEffect(() => {
+    fillFilters();
+  }, [fillFilters]);
 
   // Check if user has MCP_SECURITY feature access
   const hasMcpSecurityAccess = useMemo(() => {
@@ -277,7 +327,7 @@ const McpSecurityPage = () => {
           data={data[definedTableTabs[selected]]}
           sortOptions={sortOptions}
           resourceName={resourceName}
-          filters={[]}
+          filters={filters}
           disambiguateLabel={(key, value) => func.convertToDisambiguateLabel(value, func.toSentenceCase, 2)}
           headers={headers}
           selectable={true}
