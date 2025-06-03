@@ -15,7 +15,6 @@ import com.akto.data_actor.DataActorFactory;
 import com.akto.dto.AccountSettings;
 import com.akto.dto.Config;
 import com.akto.dto.Log;
-import com.akto.util.DashboardMode;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
@@ -191,6 +190,7 @@ public class LoggerMaker  {
         infoAndAddToDb(info, db);
     }
 
+    @Deprecated
     public void errorAndAddToDb(Exception e, String err, LogDb db) {
         try {
             if (e != null && e.getStackTrace() != null && e.getStackTrace().length > 0) {
@@ -206,6 +206,7 @@ public class LoggerMaker  {
         }
     }
 
+    @Deprecated
     public void infoAndAddToDb(String info, LogDb db) {
         String accountId = Context.accountId.get() != null ? Context.accountId.get().toString() : "NA";
         String infoMessage = "acc: " + accountId + ", " + info;

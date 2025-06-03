@@ -1,9 +1,9 @@
 package com.akto.test_editor.execution;
 
+import com.akto.billing.UsageMetricUtils;
 import com.akto.dao.billing.OrganizationsDao;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -17,10 +17,12 @@ import com.akto.dto.testing.*;
 import com.akto.testing.*;
 import com.akto.util.enums.LoginFlowEnums.AuthMechanismTypes;
 import com.akto.dto.api_workflow.Graph;
+import com.akto.dto.billing.FeatureAccess;
 import com.akto.dto.test_editor.*;
 import com.akto.dto.testing.TestResult.Confidence;
 import com.akto.dto.testing.TestResult.TestError;
 import com.akto.dto.type.KeyTypes;
+import com.akto.gpt.handlers.gpt_prompts.TestExecutorModifier;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.rules.TestPlugin;
@@ -29,11 +31,10 @@ import com.akto.util.Constants;
 import com.akto.util.HttpRequestResponseUtils;
 import com.akto.util.modifier.JWTPayloadReplacer;
 import com.fasterxml.jackson.databind.ObjectMapper;
-
 import java.net.URI;
 
+import org.json.JSONArray;
 import org.json.JSONObject;
-
 import com.mongodb.BasicDBObject;
 import static com.akto.test_editor.Utils.bodyValuesUnchanged;
 import static com.akto.test_editor.Utils.headerValuesUnchanged;
@@ -418,15 +419,94 @@ public class Executor {
         return testResult;
     }
 
-    public ExecutorSingleOperationResp invokeOperation(String operationType, Object key, Object value, RawApi rawApi, Map<String, Object> varMap, AuthMechanism authMechanism, List<CustomAuthType> customAuthTypes, ApiInfo.ApiInfoKey apiInfoKey) {
+    public final static String _MAGIC = "$magic";
+
+    private List<BasicDBObject> parseGeneratedKeyValues(BasicDBObject generatedData, String operationType, Object value) {
+        List<BasicDBObject> generatedOperationKeyValuePairs = new ArrayList<>();
+                if (generatedData.containsKey(operationType)) {
+                    Object generatedValue = generatedData.get(operationType);
+                    if (generatedValue instanceof String) {
+                        String generatedKey = generatedValue.toString();
+                        generatedOperationKeyValuePairs.add(new BasicDBObject(generatedKey, value));
+                    } else if (generatedValue instanceof JSONObject) {
+                        JSONObject generatedObj = (JSONObject) generatedValue;
+                        for (String k : generatedObj.keySet()) {
+                            generatedOperationKeyValuePairs.add(new BasicDBObject(k, generatedObj.get(k)));
+                        }
+                    } else if (generatedValue instanceof JSONArray) {
+                        JSONArray generatedArray = (JSONArray) generatedValue;
+                        for (int i = 0; i < generatedArray.length(); i++) {
+                            Object generatedValueAtIndex = generatedArray.get(i);
+                            if(generatedValueAtIndex instanceof String) {
+                                String generatedKey = generatedValueAtIndex.toString();
+                                generatedOperationKeyValuePairs.add(new BasicDBObject(generatedKey, value));
+                                continue;
+                            } else if (generatedValueAtIndex instanceof JSONObject) {
+                                JSONObject generatedObj = (JSONObject) generatedValueAtIndex;
+                                for (String k : generatedObj.keySet()) {
+                                    generatedOperationKeyValuePairs.add(new BasicDBObject(k, generatedObj.get(k)));
+                                }
+                                continue;
+                            }
+                        }
+                    } else {
+                        loggerMaker.errorAndAddToDb("operation " + operationType + " returned unexpected type: " + generatedValue.getClass().getName());
+                    }
+                } else {
+                    loggerMaker.errorAndAddToDb("operation " + operationType + " not found in generated response");
+                }
+        return generatedOperationKeyValuePairs;
+    }
+
+    public ExecutorSingleOperationResp invokeOperation(String operationType, Object key, Object value, RawApi rawApi,
+            Map<String, Object> varMap, AuthMechanism authMechanism, List<CustomAuthType> customAuthTypes,
+            ApiInfo.ApiInfoKey apiInfoKey) {
+        List<BasicDBObject> generatedOperationKeyValuePairs = new ArrayList<>();
         try {
+            int accountId = Context.accountId.get();
+            FeatureAccess featureAccess = UsageMetricUtils.getFeatureAccessSaas(accountId, TestExecutorModifier._AKTO_GPT_AI);
+            if (featureAccess.getIsGranted()) {
+
+                String request = Utils.buildRequestIHttpFormat(rawApi);
+
+                String operationPrompt = "";
+                if (key.equals(_MAGIC)) {
+                    operationPrompt = value.toString();
+                } else if (key.toString().startsWith(_MAGIC)) {
+                    operationPrompt = key.toString().replace(_MAGIC, "").trim();
+                }
+
+                String operationTypeLower = operationType.toLowerCase();
+                String operation = operationTypeLower + ": " + operationPrompt;
+
+                BasicDBObject queryData = new BasicDBObject();
+                queryData.put(TestExecutorModifier._REQUEST, request);
+                queryData.put(TestExecutorModifier._OPERATION, operation);
+                BasicDBObject generatedData = new TestExecutorModifier().handle(queryData);
+                generatedOperationKeyValuePairs = parseGeneratedKeyValues(generatedData, operationTypeLower, value);
+            }
+
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "error invoking operation " + operationType + " " + e.getMessage());
+        }
+
+        try {
+            if(!generatedOperationKeyValuePairs.isEmpty()){
+                ExecutorSingleOperationResp resp = new ExecutorSingleOperationResp(false, "AI generated operation key value pairs, executing them");
+                for (BasicDBObject generatedPair : generatedOperationKeyValuePairs) {
+                    String generatedKey = generatedPair.keySet().iterator().next();
+                    Object generatedValue = generatedPair.get(generatedKey);
+                    resp = runOperation(operationType, rawApi, generatedKey, generatedValue, varMap, authMechanism, customAuthTypes, apiInfoKey);
+                }
+                return resp;
+            }
+
             ExecutorSingleOperationResp resp = runOperation(operationType, rawApi, key, value, varMap, authMechanism, customAuthTypes, apiInfoKey);
             return resp;
-        } catch(Exception e) {
+        } catch (Exception e) {
             return new ExecutorSingleOperationResp(false, "error executing executor operation " + e.getMessage());
         }
     }
-
 
     private static boolean removeAuthIfNotChanged(RawApi originalRawApi, RawApi testRawApi, String authMechanismHeaderKey, List<CustomAuthType> customAuthTypes) {
         boolean removed = false;

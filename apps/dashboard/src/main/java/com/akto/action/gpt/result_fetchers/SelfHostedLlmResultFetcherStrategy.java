@@ -1,9 +1,7 @@
 package com.akto.action.gpt.result_fetchers;
 
-import static com.mongodb.client.model.Filters.type;
-
 import com.akto.action.gpt.handlers.GptQuery;
-import com.akto.action.gpt.handlers.gpt_prompts.AnalyzeRequestResponseHeaders;
+import com.akto.gpt.handlers.gpt_prompts.AnalyzeRequestResponseHeaders;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.mongodb.BasicDBObject;
