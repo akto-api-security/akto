@@ -1,7 +1,32 @@
-import { Page, Box, Button } from '@shopify/polaris';
+import { Page, Box, Button, Text, Card } from '@shopify/polaris';
 import EmptyScreensLayout from '../../components/banners/EmptyScreensLayout';
+import func from '../../../util/func';
 
 function McpSecurityPage() {
+  const hasMcpSecurityAccess = func.checkForFeatureSaas('MCP_SECURITY');
+
+  if (hasMcpSecurityAccess) {
+    // Show actual MCP Security feature content when user has access
+    return (
+      <Page title="MCP Security" fullWidth>
+        <Box width="100%">
+          <Card>
+            <Box padding="4">
+              <Text variant="headingLg" as="h2">MCP Security Dashboard</Text>
+              <Box paddingBlockStart="4">
+                <Text variant="bodyMd">
+                  Welcome to MCP Security! This feature provides advanced security monitoring and control capabilities.
+                </Text>
+              </Box>
+              {/* TODO: Add actual MCP Security feature content here */}
+            </Box>
+          </Card>
+        </Box>
+      </Page>
+    );
+  }
+
+  // Show beta card when user doesn't have access
   return (
     <Page title="MCP Security" fullWidth>
       <Box width="100%">
