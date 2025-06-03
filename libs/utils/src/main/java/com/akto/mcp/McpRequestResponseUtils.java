@@ -85,6 +85,9 @@ public final class McpRequestResponseUtils {
 
         String url = responseParams.getRequestParams().getURL();
         String[] onlyUrl = url.split("\\?");
+        if (onlyUrl.length < 1) {
+            return responseParams;
+        }
         url = onlyUrl[0];
 
         String mcpMethod = mcpJsonRpcModel.getMethod();
@@ -96,9 +99,11 @@ public final class McpRequestResponseUtils {
             }
         }
 
-        String queryParams = onlyUrl[1];
-        if (StringUtils.isNotBlank(queryParams)) {
-            url = url + "?" + queryParams;
+        if (onlyUrl.length == 2) {
+            String queryParams = onlyUrl[1];
+            if (StringUtils.isNotBlank(queryParams)) {
+                url = url + "?" + queryParams;
+            }
         }
 
         HttpResponseParams httpResponseParamsCopy = responseParams.copy();
