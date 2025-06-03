@@ -304,6 +304,11 @@ public class LoggerMaker {
         logger.info(msg);
     }
 
+    public void info(String msg, Object... vars){
+        logger.info(msg, vars);
+    }
+
+
     public void error(String msg){
         logger.error(msg);
     }

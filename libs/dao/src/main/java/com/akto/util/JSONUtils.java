@@ -2,14 +2,21 @@ package com.akto.util;
 
 import com.akto.dto.type.RequestTemplate;
 import com.akto.util.modifier.PayloadModifier;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.Gson;
 import com.google.gson.JsonParser;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 
 import java.util.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class JSONUtils {
+
+    private static final Logger logger = LoggerFactory.getLogger(JSONUtils.class);
+    private static final ObjectMapper mapper = new ObjectMapper();
     private static void flatten(Object obj, String prefix, Map<String, Set<Object>> ret) {
         if (obj instanceof BasicDBObject) {
             BasicDBObject basicDBObject = (BasicDBObject) obj;
@@ -197,4 +204,25 @@ public class JSONUtils {
     }
 
 
+    public static <T> T fromJson(String json, Class<T> clazz) {
+        try {
+            return mapper.readValue(json, clazz);
+        } catch (Exception e) {
+            logger.error("Error while parsing JSON", e);
+            return null;
+        }
+    }
+
+    public static <T> T fromJson(String json, TypeReference<T> typeRef) {
+        try {
+            return mapper.readValue(json, typeRef);
+        } catch (Exception e) {
+            logger.error("Error while parsing JSON", e);
+            return null;
+        }
+    }
+
+    public static Map<String, Object> getMap(String json) {
+        return fromJson(json, new TypeReference<Map<String, Object>>() {});
+    }
 }
