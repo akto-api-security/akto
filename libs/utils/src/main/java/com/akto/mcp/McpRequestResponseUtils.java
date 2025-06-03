@@ -10,13 +10,13 @@ import com.akto.utils.JsonUtils;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
+import lombok.AccessLevel;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
 
-@Data
-@NoArgsConstructor
-public class McpRequestResponseUtils {
+@NoArgsConstructor(access = AccessLevel.PRIVATE)
+public final class McpRequestResponseUtils {
 
     private static final LoggerMaker logger = new LoggerMaker(McpRequestResponseUtils.class, LogDb.RUNTIME);
 

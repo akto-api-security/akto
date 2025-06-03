@@ -5,7 +5,7 @@ import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
-public class JsonRpcUtils {
+public final class JsonRpcUtils {
 
     private static final String JSONRPC_KEY = "jsonrpc";
 
