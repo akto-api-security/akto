@@ -3,10 +3,6 @@ package com.akto.jsonrpc;
 import com.akto.dto.HttpResponseParams;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
-import com.akto.mcp.McpJsonRpcModel;
-import com.akto.mcp.McpJsonRpcModel.McpParams;
-import com.akto.mcp.McpRequestResponseUtils;
-import com.akto.util.Pair;
 import com.akto.utils.JsonUtils;
 import java.util.Map;
 import lombok.AccessLevel;
@@ -23,9 +19,10 @@ public final class JsonRpcUtils {
         String requestPayload = responseParams.getRequestParams().getPayload();
 
         if (!isJsonRpcRequest(responseParams)) {
-            logger.info("Found a JSON RPC request. {}", requestPayload);
             return responseParams;
         }
+
+        logger.info("Found a JSON RPC request. {}", requestPayload);
 
         Map<String, Object> jsonRpcMap = JsonUtils.getMap(requestPayload);
 

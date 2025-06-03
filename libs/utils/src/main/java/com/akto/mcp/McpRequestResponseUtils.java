@@ -14,6 +14,8 @@ import lombok.AccessLevel;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public final class McpRequestResponseUtils {
@@ -84,8 +86,19 @@ public final class McpRequestResponseUtils {
         McpJsonRpcModel mcpJsonRpcModel = mcpRequest.getSecond();
         McpParams params = mcpJsonRpcModel.getParams();
 
+        // Enforce that params is an object in the original JSON
+        boolean paramsIsObject = false;
+        try {
+            ObjectMapper mapper = new ObjectMapper();
+            JsonNode root = mapper.readTree(requestPayload);
+            JsonNode paramsNode = root.get("params");
+            paramsIsObject = paramsNode != null && paramsNode.isObject();
+        } catch (Exception e) {
+            // ignore, treat as not an object
+        }
+
         if (MCP_TOOL_CALL_METHOD.equals(mcpJsonRpcModel.getMethod())
-            && params != null && StringUtils.isNotBlank(params.getName())) {
+            && params != null && StringUtils.isNotBlank(params.getName()) && paramsIsObject) {
             String url = responseParams.getRequestParams().getURL();
 
             url = HttpResponseParams.addPathParamToUrl(url, params.getName());
