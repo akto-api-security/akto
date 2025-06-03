@@ -22,6 +22,7 @@ import com.akto.dto.usage.MetricTypes;
 import com.akto.graphql.GraphQLUtils;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.mcp.McpRequestResponseUtils;
 import com.akto.runtime.APICatalogSync;
 import com.akto.runtime.Main;
 import com.akto.runtime.RuntimeUtil;
@@ -130,24 +131,32 @@ public class HttpCallParser {
         return null;
     }
 
-    public int createCollectionSimple(int vxlanId) {
+    public int createCollectionSimple(int vxlanId, boolean isMcpRequest) {
         UpdateOptions updateOptions = new UpdateOptions();
         updateOptions.upsert(true);
 
+        Bson updates = Updates.combine(
+            Updates.set(ApiCollection.VXLAN_ID, vxlanId),
+            Updates.setOnInsert("startTs", Context.now()),
+            Updates.setOnInsert("urls", new HashSet<>())
+        );
+
+        if (isMcpRequest) {
+            String tag = "MCP Server";
+            updates = Updates.combine(updates, Updates.setOnInsert("userSetEnvType", tag));
+        }
+
+
         ApiCollectionsDao.instance.getMCollection().updateOne(
                 Filters.eq("_id", vxlanId),
-                Updates.combine(
-                        Updates.set(ApiCollection.VXLAN_ID, vxlanId),
-                        Updates.setOnInsert("startTs", Context.now()),
-                        Updates.setOnInsert("urls", new HashSet<>())
-                ),
+                updates,
                 updateOptions
         );
         return vxlanId;
     }
 
 
-    public int createCollectionBasedOnHostName(int id, String host)  throws Exception {
+    public int createCollectionBasedOnHostName(int id, String host, boolean isMcpRequest)  throws Exception {
         FindOneAndUpdateOptions updateOptions = new FindOneAndUpdateOptions();
         updateOptions.upsert(true);
         // 3 cases
@@ -163,6 +172,11 @@ public class HttpCallParser {
                     Updates.setOnInsert("startTs", Context.now()),
                     Updates.setOnInsert("urls", new HashSet<>())
                 );
+
+                if (isMcpRequest) {
+                    String tag = "MCP Server";
+                    updates = Updates.combine(updates, Updates.setOnInsert("userSetEnvType", tag));
+                }
 
                 ApiCollectionsDao.instance.getMCollection().findOneAndUpdate(Filters.eq(ApiCollection.HOST_NAME, host), updates, updateOptions);
 
@@ -471,6 +485,8 @@ public class HttpCallParser {
         }
 
         int vxlanId = httpResponseParam.requestParams.getApiCollectionId();
+
+        boolean isMcpRequest = McpRequestResponseUtils.isMcpRequest(httpResponseParam).getFirst();
         if (useHostCondition(hostName, httpResponseParam.getSource())) {
             hostName = hostName.toLowerCase();
             hostName = hostName.trim();
@@ -484,12 +500,12 @@ public class HttpCallParser {
                 int id = hostName.hashCode();
                 try {
 
-                    apiCollectionId = createCollectionBasedOnHostName(id, hostName);
+                    apiCollectionId = createCollectionBasedOnHostName(id, hostName, isMcpRequest);
 
                     hostNameToIdMap.put(key, apiCollectionId);
                 } catch (Exception e) {
                     loggerMaker.errorAndAddToDb("Failed to create collection for host : " + hostName, LogDb.RUNTIME);
-                    createCollectionSimple(vxlanId);
+                    createCollectionSimple(vxlanId, isMcpRequest);
                     hostNameToIdMap.put("null " + vxlanId, vxlanId);
                     apiCollectionId = httpResponseParam.requestParams.getApiCollectionId();
                 }
@@ -498,7 +514,7 @@ public class HttpCallParser {
         } else {
             String key = "null" + " " + vxlanId;
             if (!hostNameToIdMap.containsKey(key)) {
-                createCollectionSimple(vxlanId);
+                createCollectionSimple(vxlanId, isMcpRequest);
                 hostNameToIdMap.put(key, vxlanId);
             }
 
@@ -618,7 +634,8 @@ public class HttpCallParser {
 
             List<HttpResponseParams> responseParamsList = GraphQLUtils.getUtils().parseGraphqlResponseParam(httpResponseParam);
             if (responseParamsList.isEmpty()) {
-                filteredResponseParams.add(httpResponseParam);
+                HttpResponseParams mcpResponseParams = McpRequestResponseUtils.parseMcpResponseParams(httpResponseParam);
+                filteredResponseParams.add(mcpResponseParams);
             } else {
                 filteredResponseParams.addAll(responseParamsList);
                 loggerMaker.infoAndAddToDb("Adding " + responseParamsList.size() + "new graphql endpoints in inventory",LogDb.RUNTIME);
