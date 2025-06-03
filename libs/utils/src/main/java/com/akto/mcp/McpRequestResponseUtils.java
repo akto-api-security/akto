@@ -82,34 +82,21 @@ public final class McpRequestResponseUtils {
         }
 
         McpJsonRpcModel mcpJsonRpcModel = mcpRequest.getSecond();
+        McpParams params = mcpJsonRpcModel.getParams();
 
-        String url = responseParams.getRequestParams().getURL();
-        String[] onlyUrl = url.split("\\?");
-        if (onlyUrl.length < 1) {
-            return responseParams;
-        }
-        url = onlyUrl[0];
+        if (MCP_TOOL_CALL_METHOD.equals(mcpJsonRpcModel.getMethod())
+            && params != null && StringUtils.isNotBlank(params.getName())) {
+            String url = responseParams.getRequestParams().getURL();
 
-        String mcpMethod = mcpJsonRpcModel.getMethod();
-        url = url + "/" + mcpMethod;
-        if (MCP_TOOL_CALL_METHOD.equals(mcpMethod)) {
-            McpParams params = mcpJsonRpcModel.getParams();
-            if (params != null && StringUtils.isNotBlank(params.getName())) {
-                url = url + "/" + params.getName();
-            }
+            url = HttpResponseParams.addPathParamToUrl(url, params.getName());
+
+            HttpResponseParams httpResponseParamsCopy = responseParams.copy();
+            httpResponseParamsCopy.getRequestParams().setUrl(url);
+
+            return httpResponseParamsCopy;
         }
 
-        if (onlyUrl.length == 2) {
-            String queryParams = onlyUrl[1];
-            if (StringUtils.isNotBlank(queryParams)) {
-                url = url + "?" + queryParams;
-            }
-        }
-
-        HttpResponseParams httpResponseParamsCopy = responseParams.copy();
-        httpResponseParamsCopy.getRequestParams().setUrl(url);
-
-        return httpResponseParamsCopy;
+        return responseParams;
     }
 
     public static Pair<Boolean, McpJsonRpcModel> isMcpRequest(HttpResponseParams responseParams) {

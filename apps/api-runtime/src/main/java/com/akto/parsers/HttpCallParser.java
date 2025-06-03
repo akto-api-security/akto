@@ -20,6 +20,7 @@ import com.akto.dto.traffic_metrics.TrafficMetrics;
 import com.akto.dto.type.URLMethods.Method;
 import com.akto.dto.usage.MetricTypes;
 import com.akto.graphql.GraphQLUtils;
+import com.akto.jsonrpc.JsonRpcUtils;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.mcp.McpRequestResponseUtils;
@@ -634,7 +635,8 @@ public class HttpCallParser {
 
             List<HttpResponseParams> responseParamsList = GraphQLUtils.getUtils().parseGraphqlResponseParam(httpResponseParam);
             if (responseParamsList.isEmpty()) {
-                HttpResponseParams mcpResponseParams = McpRequestResponseUtils.parseMcpResponseParams(httpResponseParam);
+                HttpResponseParams jsonRpcResponse = JsonRpcUtils.parseJsonRpcResponse(httpResponseParam);
+                HttpResponseParams mcpResponseParams = McpRequestResponseUtils.parseMcpResponseParams(jsonRpcResponse);
                 filteredResponseParams.add(mcpResponseParams);
             } else {
                 filteredResponseParams.addAll(responseParamsList);
