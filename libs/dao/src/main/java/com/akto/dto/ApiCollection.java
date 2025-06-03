@@ -318,6 +318,10 @@ public class ApiCollection {
 	public void setUserSetEnvType(String userSetEnvType) {
         this.userSetEnvType = userSetEnvType;
 
+        if (userSetEnvType == null || userSetEnvType.isEmpty()) {
+            return; 
+        }
+
         if (this.tagsList == null) {
             this.tagsList = new ArrayList<>();
         }
