@@ -29,6 +29,21 @@ public final class McpRequestResponseUtils {
     public static final String MCP_RESOURCES_TEMPLATE_LIST_METHOD = "resources/templates/list";
     public static final String MCP_PING_METHOD = "ping";
     public static final String MCP_INITIALIZE_METHOD = "initialize";
+    public static final String MCP_NOTIFICATIONS_CANCELLED_METHOD = "notifications/cancelled";
+    public static final String MCP_COMPLETION_COMPLETE_METHOD = "completion/complete";
+    public static final String MCP_NOTIFICATIONS_INITIALIZED_METHOD = "notifications/initialized";
+    public static final String MCP_LOGGING_SET_LEVEL_METHOD = "logging/setLevel";
+    public static final String MCP_RESOURCES_SUBSCRIBE_METHOD = "resources/subscribe";
+    public static final String MCP_RESOURCES_UNSUBSCRIBE_METHOD = "resources/unsubscribe";
+    public static final String MCP_SAMPLING_CREATE_MESSAGE_METHOD = "sampling/createMessage";
+    public static final String MCP_ROOTS_LIST_METHOD = "roots/list";
+    public static final String MCP_NOTIFICATIONS_MESSAGE_METHOD = "notifications/message";
+    public static final String MCP_NOTIFICATIONS_PROGRESS_METHOD = "notifications/progress";
+    public static final String MCP_NOTIFICATIONS_PROMPTS_LIST_CHANGED_METHOD = "notifications/prompts/list_changed";
+    public static final String MCP_NOTIFICATIONS_RESOURCES_LIST_CHANGED_METHOD = "notifications/resources/list_changed";
+    public static final String MCP_NOTIFICATIONS_RESOURCES_UPDATED_METHOD = "notifications/resources/updated";
+    public static final String MCP_NOTIFICATIONS_ROOTS_LIST_CHANGED_METHOD = "notifications/roots/list_changed";
+    public static final String MCP_NOTIFICATIONS_TOOLS_LIST_CHANGED_METHOD = "notifications/tools/list_changed";
 
     public static final Set<String> MCP_METHOD_SET = new HashSet<>(Arrays.asList(
         MCP_TOOL_LIST_METHOD,
@@ -39,7 +54,22 @@ public final class McpRequestResponseUtils {
         MCP_RESOURCES_READ_METHOD,
         MCP_RESOURCES_TEMPLATE_LIST_METHOD,
         MCP_PING_METHOD,
-        MCP_INITIALIZE_METHOD
+        MCP_INITIALIZE_METHOD,
+        MCP_NOTIFICATIONS_CANCELLED_METHOD,
+        MCP_COMPLETION_COMPLETE_METHOD,
+        MCP_NOTIFICATIONS_INITIALIZED_METHOD,
+        MCP_LOGGING_SET_LEVEL_METHOD,
+        MCP_RESOURCES_SUBSCRIBE_METHOD,
+        MCP_RESOURCES_UNSUBSCRIBE_METHOD,
+        MCP_SAMPLING_CREATE_MESSAGE_METHOD,
+        MCP_ROOTS_LIST_METHOD,
+        MCP_NOTIFICATIONS_MESSAGE_METHOD,
+        MCP_NOTIFICATIONS_PROGRESS_METHOD,
+        MCP_NOTIFICATIONS_PROMPTS_LIST_CHANGED_METHOD,
+        MCP_NOTIFICATIONS_RESOURCES_LIST_CHANGED_METHOD,
+        MCP_NOTIFICATIONS_RESOURCES_UPDATED_METHOD,
+        MCP_NOTIFICATIONS_ROOTS_LIST_CHANGED_METHOD,
+        MCP_NOTIFICATIONS_TOOLS_LIST_CHANGED_METHOD
     ));
 
     public static HttpResponseParams parseMcpResponseParams(HttpResponseParams responseParams) {
