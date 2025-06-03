@@ -6,6 +6,7 @@ import com.akto.dao.context.Context;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.apache.commons.lang3.StringUtils;
 
 public class HttpResponseParams {
 
@@ -191,4 +192,22 @@ public class HttpResponseParams {
     public void setTags(String tags) {
         this.tags = tags;
     }
+
+    public static String addPathParamToUrl(String url, String pathParam) {
+        String[] onlyUrl = url.split("\\?");
+        if (onlyUrl.length < 1) {
+            return url;
+        }
+
+        url = onlyUrl[0];
+        url = url + "/" + pathParam;
+        if (onlyUrl.length == 2) {
+            String queryParams = onlyUrl[1];
+            if (StringUtils.isNotBlank(queryParams)) {
+                url = url + "?" + queryParams;
+            }
+        }
+        return url;
+    }
+
 }
