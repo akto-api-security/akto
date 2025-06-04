@@ -561,8 +561,6 @@ public class HttpCallParser {
                 HttpResponseParams jsonRpcResponse = JsonRpcUtils.parseJsonRpcResponse(httpResponseParam);
                 HttpResponseParams mcpResponseParams = McpRequestResponseUtils.parseMcpResponseParams(jsonRpcResponse);
                 filteredResponseParams.add(mcpResponseParams);
-
-                filteredResponseParams.add(httpResponseParam);
             } else {
                 filteredResponseParams.addAll(responseParamsList);
                 loggerMaker.infoAndAddToDb("Adding " + responseParamsList.size() + "new graphql endpoints in invetory",LogDb.RUNTIME);
