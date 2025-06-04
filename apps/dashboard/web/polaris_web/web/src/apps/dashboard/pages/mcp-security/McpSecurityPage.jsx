@@ -351,7 +351,7 @@ const McpSecurityPage = () => {
     content: 'Test Results',
     component: (
       <Box width="100%" paddingBlockStart={4}>
-        {testResultsTableTabs.length > 0 && (
+        {testResultsTableTabs().length > 0 && (
           <GithubServerTable
             key="test-results-table"
             pageLimit={50}
