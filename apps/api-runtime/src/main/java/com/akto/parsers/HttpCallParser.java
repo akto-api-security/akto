@@ -78,6 +78,8 @@ public class HttpCallParser {
     private static final ConcurrentLinkedQueue<BasicDBObject> queue = new ConcurrentLinkedQueue<>();
     private static final int MAX_ALLOWED_HTML_CONTENT = 1024 * 1024 ;
 
+    private static final String MCP_SERVER_TAG = "MCP Server";
+
     public static void init() {
         trafficMetricsExecutor.scheduleAtFixedRate(new Runnable() {
             @Override
@@ -130,8 +132,7 @@ public class HttpCallParser {
         );
 
         if (isMcpRequest) {
-            String tag = MCP_SERVER_TAG;
-            updates = Updates.combine(updates, Updates.setOnInsert("userSetEnvType", tag));
+            updates = Updates.combine(updates, Updates.setOnInsert("userSetEnvType", MCP_SERVER_TAG));
         }
 
 
