@@ -29,8 +29,19 @@ function SourceCodeAnalyserCTA() {
             }
         })
 
-        await apiCollectionApi.syncExtractedAPIs(apiCollectionName, projectDir, codeAnalysisApisList)
-        func.setToast(true, false, `All the api's are now saved in ${apiCollectionName} collection`)
+        // Process in batches of 100
+        const BATCH_SIZE = 100
+        const totalApis = codeAnalysisApisList.length
+        let processedCount = 0
+
+        for (let i = 0; i < totalApis; i += BATCH_SIZE) {
+            const batch = codeAnalysisApisList.slice(i, i + BATCH_SIZE)
+            await apiCollectionApi.syncExtractedAPIs(apiCollectionName, projectDir, batch)
+            processedCount += batch.length
+            func.setToast(true, false, `Processed ${processedCount}/${totalApis} APIs`)
+        }
+
+        func.setToast(true, false, `All ${totalApis} APIs have been saved in ${apiCollectionName} collection`)
         setFinalCTAShow(false)
     }
 
