@@ -112,7 +112,10 @@ let filters = [
 },
 ]
 
-function TestRunsPage() {
+function TestRunsPage(props) {
+
+  const {showOnlyTable, scopeApiCollectionIds } = props;
+
   const apiCollectionMap = PersistStore(state => state.collectionsMap)
 
   function disambiguateLabel(key, value) {
@@ -164,6 +167,11 @@ const [hasUserInitiatedTestRuns, setHasUserInitiatedTestRuns] = useState(false)
     let ret = [];
     let total = 0;
     
+    if (showOnlyTable) {
+      if(!filters["apiCollectionId"]){
+        filters["apiCollectionId"] = scopeApiCollectionIds ? scopeApiCollectionIds : []
+      }
+    }
 
     switch (currentTab) {
 
@@ -224,8 +232,12 @@ const [hasUserInitiatedTestRuns, setHasUserInitiatedTestRuns] = useState(false)
 
   }
 
-  const fetchCountsMap = async() => {
-    await api.getCountsMap(startTimestamp, endTimestamp).then((resp)=>{
+  const fetchCountsMap = async () => {
+    let filters = {}
+    if (showOnlyTable) {
+      filters["apiCollectionId"] = scopeApiCollectionIds || []
+    }
+    await api.getCountsMap(startTimestamp, endTimestamp, filters).then((resp) => {
       setCountMap(resp)
     })
   }
@@ -367,6 +379,10 @@ const coreTable = (
     callFromOutside={updateTable}
   />   
 )
+
+if (showOnlyTable) {
+  return coreTable
+}
 
 const components = !hasUserInitiatedTestRuns ? [<SummaryCardComponent key={"summary"}/>,<TestrunsBannerComponent key={"banner-comp"}/>, coreTable] : [<SummaryCardComponent key={"summary"}/>, coreTable]
   return (
