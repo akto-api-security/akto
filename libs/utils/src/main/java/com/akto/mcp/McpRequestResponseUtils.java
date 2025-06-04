@@ -99,13 +99,9 @@ public final class McpRequestResponseUtils {
         if (MCP_TOOL_CALL_METHOD.equals(mcpJsonRpcModel.getMethod())
             && params != null && StringUtils.isNotBlank(params.getName()) && paramsIsObject) {
             String url = responseParams.getRequestParams().getURL();
-
             url = HttpResponseParams.addPathParamToUrl(url, params.getName());
 
-            HttpResponseParams httpResponseParamsCopy = responseParams.copy();
-            httpResponseParamsCopy.getRequestParams().setUrl(url);
-
-            return httpResponseParamsCopy;
+            responseParams.getRequestParams().setUrl(url);
         }
 
         return responseParams;

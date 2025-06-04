@@ -514,6 +514,17 @@ public class HttpCallParser {
 
         List<CollectionTags> tagsList = CollectionTags.calculateTagsDiff(apiCollection.getTagsList(), httpResponseParams.getTags());
 
+        if (CollectionUtils.isEmpty(apiCollection.getTagsList()) || apiCollection.getTagsList().stream()
+            .noneMatch(t -> "mcp-server".equals(t.getKeyName()))) {
+            Optional<CollectionTags> mcpServerTagOpt = getMcpServerTag(httpResponseParams);
+            if (tagsList == null) {
+                tagsList = new ArrayList<>();
+            }
+            if (mcpServerTagOpt.isPresent()) {
+                tagsList.add(mcpServerTagOpt.get());
+            }
+        }
+
         if (tagsList == null || tagsList.isEmpty()) {
             return;
         }
@@ -525,10 +536,6 @@ public class HttpCallParser {
                     httpResponseParams.requestParams.getApiCollectionId(), vpcId, tagsList);
         } else {
             try {
-                Optional<CollectionTags> mcpServerTagOpt = getMcpServerTag(httpResponseParams);
-                if (mcpServerTagOpt.isPresent()) {
-                    tagsList.add(mcpServerTagOpt.get());
-                }
                 createCollectionBasedOnHostName(hostNameMapKey.hashCode(), hostNameMapKey,
                         tagsList);
             } catch (Exception e) {
@@ -834,7 +841,7 @@ public class HttpCallParser {
 
     private Optional<CollectionTags> getMcpServerTag(HttpResponseParams responseParams) {
         if (McpRequestResponseUtils.isMcpRequest(responseParams).getFirst()) {
-            return Optional.of(new CollectionTags(Context.now(), "mcp-server", "MCP Server", TagSource.USER));
+            return Optional.of(new CollectionTags(Context.now(), "mcp-server", "MCP Server", TagSource.KUBERNETES));
         }
         return Optional.empty();
     }
