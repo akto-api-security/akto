@@ -93,6 +93,8 @@ public class ApiCollection {
     List<CollectionTags> tagsList;
     public static final String TAGS_STRING = "tagsList";
 
+    public static final String DEFAULT_TAG_KEY = "customEnvType";
+
     public ApiCollection() {
     }
 
@@ -329,7 +331,7 @@ public class ApiCollection {
         if(userSetEnvType != null) {
             String[] envList = userSetEnvType.split(",");
             for(String env : envList) {
-                this.tagsList.add(new CollectionTags(Context.now(), "userSetEnvType", env.trim(), CollectionTags.TagSource.USER));
+                this.tagsList.add(new CollectionTags(Context.now(), DEFAULT_TAG_KEY, env.trim(), CollectionTags.TagSource.USER));
             }
         }
 	}

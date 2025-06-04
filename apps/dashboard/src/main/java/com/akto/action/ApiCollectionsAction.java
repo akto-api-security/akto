@@ -784,7 +784,7 @@ public class ApiCollectionsAction extends UserAction {
                                 )
                                 .findFirst();
 
-                        if (env.getKeyName().equalsIgnoreCase("userSetEnvType") && userSetEnvTypeList.contains(env.getValue())) {
+                        if (env.getKeyName().equalsIgnoreCase(ApiCollection.DEFAULT_TAG_KEY) && userSetEnvTypeList.contains(env.getValue())) {
                             if (userSetEnvTypeList.size() == 1) {
                                 ApiCollectionsDao.instance.updateOne(filter, Updates.unset(ApiCollection.USER_ENV_TYPE));
                             } else {
