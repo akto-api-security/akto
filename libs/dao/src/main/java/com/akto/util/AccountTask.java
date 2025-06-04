@@ -200,7 +200,8 @@ public class AccountTask {
     ));
 
     public static final Set<Integer> testingJobAccountsSet = new HashSet(Arrays.asList(
-        1_692_211_733, 1_000_000
+        1_692_211_733
+        //, 1_000_000
     ));
 
     public void executeTask(Consumer<Account> consumeAccount, String taskName) {

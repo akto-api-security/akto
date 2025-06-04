@@ -89,6 +89,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -571,9 +572,25 @@ public class Main {
             //boolean isTestingRunRunning = testingRun.getState().equals(State.RUNNING);
 
             SyncLimit syncLimit = featureAccess.fetchSyncLimit();
+            
+            /*
+             * Schedule crons required for periodic calculation of local state
+             */
+            scheduler.scheduleAtFixedRate(new Runnable() {
+                public void run() {
+                    Context.accountId.set(accountId);
 
-            // fill rate limit map for account
+                    // Fill currentTestsRunningMap for account to which testing run belongs
+                    GetRunningTestsStatus.getRunningTests().fillCurrentRunningTestMapForAccount();
+                }
+            }, 0, 1, TimeUnit.MINUTES);
+            
+            /* 
+             * Fill local state required for testing run execution
+             */
+            // Fill rate limit map for account
             fillRateLimitMapForAccount(accountId);
+            // Fill custom auth and data types for account
             SingleTypeInfo.initForAccount(accountId);
 
             try {

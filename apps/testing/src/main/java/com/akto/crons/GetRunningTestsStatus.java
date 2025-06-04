@@ -32,6 +32,29 @@ public class GetRunningTestsStatus {
     public static GetRunningTestsStatus getRunningTests() {
         return getRunningTestsStatus;
     }
+
+    public void fillCurrentRunningTestMapForAccount() {
+        try {
+            int timeFilter = Context.now() - 6 * 60 * 60;
+            List<TestingRunResultSummary> currentRunningTests = TestingRunResultSummariesDao.instance.findAll(
+                Filters.gte(TestingRunResultSummary.START_TIMESTAMP, timeFilter),
+                Projections.include("_id", TestingRunResultSummary.STATE, TestingRunResultSummary.TESTING_RUN_ID) 
+            );
+            for(TestingRunResultSummary trrs : currentRunningTests){
+                if(trrs.getState() == TestingRun.State.COMPLETED){
+                    currentRunningTestsMap.remove(trrs.getId());
+                    currentRunningTestsMap.remove(trrs.getTestingRunId());
+                }else{
+                    currentRunningTestsMap.put(trrs.getId(), trrs.getState());
+                    ObjectId TR_ID = trrs.getTestingRunId();
+                    TestingRun testingRun = TestingRunDao.instance.findOne(Filters.eq(Constants.ID, TR_ID), Projections.include(TestingRun.STATE));
+                    currentRunningTestsMap.put(TR_ID, testingRun.getState());
+                }
+            } 
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
  
     public void scheduleGetRunningTestsTask(){
         scheduler.scheduleAtFixedRate(new Runnable() {
@@ -39,26 +62,7 @@ public class GetRunningTestsStatus {
                 AccountTask.instance.executeTaskForNonHybridAccounts(new Consumer<Account>() {
                     @Override
                     public void accept(Account t) {
-                        try {
-                            int timeFilter = Context.now() - 6 * 60 * 60;
-                            List<TestingRunResultSummary> currentRunningTests = TestingRunResultSummariesDao.instance.findAll(
-                                Filters.gte(TestingRunResultSummary.START_TIMESTAMP, timeFilter),
-                                Projections.include("_id", TestingRunResultSummary.STATE, TestingRunResultSummary.TESTING_RUN_ID) 
-                            );
-                            for(TestingRunResultSummary trrs : currentRunningTests){
-                                if(trrs.getState() == TestingRun.State.COMPLETED){
-                                    currentRunningTestsMap.remove(trrs.getId());
-                                    currentRunningTestsMap.remove(trrs.getTestingRunId());
-                                }else{
-                                    currentRunningTestsMap.put(trrs.getId(), trrs.getState());
-                                    ObjectId TR_ID = trrs.getTestingRunId();
-                                    TestingRun testingRun = TestingRunDao.instance.findOne(Filters.eq(Constants.ID, TR_ID), Projections.include(TestingRun.STATE));
-                                    currentRunningTestsMap.put(TR_ID, testingRun.getState());
-                                }
-                            } 
-                        } catch (Exception e) {
-                            e.printStackTrace();
-                        }
+                        fillCurrentRunningTestMapForAccount();
                     }
                 },"get-current-running-tests");
             }
