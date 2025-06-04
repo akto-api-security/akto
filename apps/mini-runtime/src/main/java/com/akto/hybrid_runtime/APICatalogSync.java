@@ -1601,7 +1601,8 @@ public class APICatalogSync {
                         int now = Context.now();
                         Key id = sample.getId();
                         int accountId = Context.accountId.get();
-                        SampleDataAlt sampleDataAlt = new SampleDataAlt(uuid, s, id.getApiCollectionId(),
+                        String piiRedactedSample = RedactSampleData.redactIfRequired(s, false, false);
+                        SampleDataAlt sampleDataAlt = new SampleDataAlt(uuid, piiRedactedSample, id.getApiCollectionId(),
                                 id.getMethod().name(), id.getUrl(), id.getResponseCode(), now, accountId);
                         unfilteredSamples.add(sampleDataAlt);
                         sampleIds.add(uuid.toString());
