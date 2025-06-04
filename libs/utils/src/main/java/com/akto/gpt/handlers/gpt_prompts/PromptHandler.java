@@ -126,6 +126,11 @@ public abstract class PromptHandler {
 
     static String processOutput(String rawResponse) {
         try {
+
+            if(rawResponse == null || rawResponse.isEmpty()) {
+                return "NOT_FOUND";
+            }
+
             // Truncate at the last closing brace to remove any trailing notes
             int lastBrace = rawResponse.lastIndexOf('}');
             if (lastBrace != -1) {
