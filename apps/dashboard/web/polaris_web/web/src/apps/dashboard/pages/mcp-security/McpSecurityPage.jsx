@@ -50,7 +50,7 @@ function McpSecurityPage() {
   }
 
   function customCollectionDataFilter(x) {
-    let valid = x?.userSetEnvType && x?.userSetEnvType.includes('MCP')
+    let valid = x?.envType && x?.envType.filter(x => x?.value.includes('MCP')).length > 0;
     setApiCollectionIds((prev) => {
       if (valid && !prev.includes(x.id)) {
         return [...prev, x.id];
