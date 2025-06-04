@@ -1194,7 +1194,6 @@ function ApiEndpoints(props) {
                             </Box>
                         )
                     }
-                    backUrl="/dashboard/observe/inventory"
                     secondaryActions={secondaryActionsComponent}
                     components={[
                         ...components

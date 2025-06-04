@@ -903,7 +903,6 @@ function SingleTestRunPage() {
     <>
       <PageWithMultipleCards
         title={headingComp}
-        backUrl={`/dashboard/testing/`}
         primaryAction={!workflowTest ? <Box paddingInlineEnd={1}><Button primary onClick={() =>
           func.downloadAsCSV((testRunResultsText[selectedTab]), selectedTestRun)
         }>Export results</Button></Box> : undefined}
