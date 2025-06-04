@@ -16,11 +16,17 @@ const PageWithMultipleCards = (props) => {
     const prevPathRef = useRef();
 
     // Track pathnames in sessionStorage
+    const MAX_STACK_SIZE = 50; // Maximum number of entries in the stack
+
     useEffect(() => {
         let stack = JSON.parse(sessionStorage.getItem('pathnameStack') || '[]');
         const currentPath = location.pathname;
         if (stack.length === 0 || stack[stack.length - 1] !== currentPath) {
             stack.push(currentPath);
+            // Trim the stack to the maximum size
+            if (stack.length > MAX_STACK_SIZE) {
+                stack.shift(); // Remove the oldest entry
+            }
             sessionStorage.setItem('pathnameStack', JSON.stringify(stack));
         }
         prevPathRef.current = currentPath;
