@@ -63,7 +63,7 @@ public class RedactSampleData {
         return cookie;
     }
 
-    private static String handleQueryParams(String url, boolean redactAll, String redactValue) {
+    private static String handleQueryParams(String url, boolean redactAll) {
 
         if (!redactAll || url == null || url.isEmpty()) {
             return url;
@@ -83,7 +83,7 @@ public class RedactSampleData {
                     if (param.length > 1) {
                         finalUrl += param[0] + "=" + redact(param[1]);
                     } else {
-                        finalUrl += param[0] + "=" + redactValue;
+                        finalUrl += param[0] + "=" + redact("");
                     }
                 }
             }
@@ -178,7 +178,7 @@ public class RedactSampleData {
         try {
             JsonParser jp = factory.createParser(responsePayload);
             JsonNode node = mapper.readTree(jp);
-            change(null, node, redactValue, redactAll, false);
+            change(null, node, redactAll, false);
             if (node != null) {
                 responsePayload = node.toString();
             } else {
@@ -195,7 +195,7 @@ public class RedactSampleData {
         // request payload
         String requestPayload = httpResponseParams.requestParams.getPayload();
         //query params
-        String url = handleQueryParams(httpResponseParams.requestParams.getURL(), redactAll, redactValue);
+        String url = handleQueryParams(httpResponseParams.requestParams.getURL(), redactAll);
         httpResponseParams.requestParams.setUrl(url);
         if (requestPayload == null) requestPayload = "{}";
         try {
@@ -211,7 +211,7 @@ public class RedactSampleData {
             }
             JsonParser jp = factory.createParser(requestPayload);
             JsonNode node = mapper.readTree(jp);
-            change(null, node, redactValue, redactAll, isGraphqlModified);
+            change(null, node, redactAll, isGraphqlModified);
             if (node != null) {
                 requestPayload= node.toString();
             } else {
@@ -239,7 +239,7 @@ public class RedactSampleData {
 
     }    
 
-    public static void change(String parentName, JsonNode parent, String newValue, boolean redactAll, boolean isGraphqlModified) {
+    public static void change(String parentName, JsonNode parent, boolean redactAll, boolean isGraphqlModified) {
         if (parent == null) return;
 
         if (parent.isArray()) {
@@ -248,15 +248,15 @@ public class RedactSampleData {
                 JsonNode arrayElement = arrayNode.get(i);
                 if (arrayElement.isValueNode()) {
                     if(redactAll){
-                        arrayNode.set(i, new TextNode(arrayElement.asText()));
+                        arrayNode.set(i, new TextNode(redact(arrayElement.asText())));
                     } else{
                         SingleTypeInfo.SubType subType = KeyTypes.findSubType(arrayElement.asText(), parentName, null);
                         if(SingleTypeInfo.isRedacted(subType.getName())){
-                            arrayNode.set(i, new TextNode(newValue));
+                            arrayNode.set(i, new TextNode(redact(arrayElement.asText())));
                         }
                     }
                 } else {
-                    change(parentName, arrayElement, newValue, redactAll, isGraphqlModified);
+                    change(parentName, arrayElement, redactAll, isGraphqlModified);
                 }
             }
         } else {
@@ -266,17 +266,17 @@ public class RedactSampleData {
                 JsonNode fieldValue = parent.get(f);
                 if (fieldValue.isValueNode()) {
                     if(redactAll && !(isGraphqlModified && f.equalsIgnoreCase(GraphQLUtils.QUERY))){
-                        ((ObjectNode) parent).put(f, newValue);
+                        ((ObjectNode) parent).put(f, redact(fieldValue.asText()));
                     }
                     else {
                         SingleTypeInfo.SubType subType = KeyTypes.findSubType(fieldValue.asText(), f, null);
                         if (SingleTypeInfo.isRedacted(subType.getName())) {
-                            ((ObjectNode) parent).put(f, newValue);
+                            ((ObjectNode) parent).put(f, redact(fieldValue.asText()));
                         }
                     }
 
                 } else {
-                    change(f, fieldValue, newValue, redactAll, isGraphqlModified);
+                    change(f, fieldValue, redactAll, isGraphqlModified);
                 }
             }
         }
