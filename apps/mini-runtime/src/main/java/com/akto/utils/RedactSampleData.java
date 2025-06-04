@@ -105,7 +105,11 @@ public class RedactSampleData {
                     responseHeaders.put(header, Collections.singletonList(cookie));
                     continue;
                 }
-                responseHeaders.put(header, Collections.singletonList(redact(responseHeaders.get(header))));
+                if (responseHeaders.get(header) == null || responseHeaders.get(header).size() == 0) {
+                    responseHeaders.put(header, Collections.singletonList(""));
+                } else {
+                    responseHeaders.put(header, Collections.singletonList(redact(responseHeaders.get(header).get(0))));
+                }
             }
             return;
         }
