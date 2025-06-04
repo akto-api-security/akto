@@ -803,11 +803,11 @@ export default {
             data:{},
         })
     },
-    async updateEnvTypeOfCollection(envType, apiCollectionIds){
+    async updateEnvTypeOfCollection(envType, apiCollectionIds,resetEnvTypes){
         return await request({
             url: '/api/updateEnvType',
             method: 'post',
-            data: {envType, apiCollectionIds}
+            data: {envType, apiCollectionIds,resetEnvTypes}
         })
     },
     fetchEndpoint(apiInfoKey){

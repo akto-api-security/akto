@@ -12,6 +12,8 @@ import org.bson.codecs.pojo.annotations.BsonIgnore;
 import com.akto.dao.context.Context;
 import com.akto.dto.testing.CustomTestingEndpoints;
 import com.akto.dto.testing.TestingEndpoints;
+import com.akto.dto.traffic.CollectionTags;
+
 
 public class ApiCollection {
 
@@ -78,13 +80,20 @@ public class ApiCollection {
 
     Type type;
     public static final String _TYPE = "type";
-    
+
+    // TODO: Remove this field once you are sure that no one is using it.
+    @Deprecated
     String userSetEnvType;
 
 	public static final String USER_ENV_TYPE = "userSetEnvType";
 
     List<TestingEndpoints> conditions;
     public static final String CONDITIONS_STRING = "conditions";
+
+    List<CollectionTags> tagsList;
+    public static final String TAGS_STRING = "tagsList";
+
+    public static final String DEFAULT_TAG_KEY = "userSetEnvType";
 
     public ApiCollection() {
     }
@@ -142,25 +151,31 @@ public class ApiCollection {
         this.urls = urls;
     }
 
-    public String getEnvType(){
+    public List<CollectionTags> getEnvType(){
         if(this.type != null && this.type == Type.API_GROUP) return null;
         
-        if(this.userSetEnvType == null){
+        if(this.tagsList == null || this.tagsList.isEmpty()){
+            CollectionTags envTypeTag = new CollectionTags();
+            envTypeTag.setKeyName("envType");
             if (this.hostName != null) {
                 for (String keyword : ENV_KEYWORDS_WITH_DOT) {
                     if (this.hostName.contains("." + keyword)) {
-                        return "STAGING";
+                        envTypeTag.setValue("STAGING");
                     }
                 }
                 for (String keyword : ENV_KEYWORDS_WITHOUT_DOT) {
                     if (this.hostName.contains(keyword)) {
-                        return "STAGING";
+                        envTypeTag.setValue("STAGING");
                     }
+                }
+
+                if(envTypeTag.getValue() != null) {
+                    return Arrays.asList(envTypeTag);
                 }
             }
             return null;
         }else{
-            return this.userSetEnvType;
+            return this.tagsList;
         }
     }
 
@@ -300,12 +315,25 @@ public class ApiCollection {
         this.sampleCollectionsDropped = sampleCollectionsDropped;
     }
 
+    @Deprecated
     public String getUserSetEnvType() {
 		return userSetEnvType;
 	}
 
+    @Deprecated
 	public void setUserSetEnvType(String userSetEnvType) {
-		this.userSetEnvType = userSetEnvType;
+        this.userSetEnvType = userSetEnvType;
+
+        if(this.tagsList == null) {
+            this.tagsList = new ArrayList<>();
+        }
+
+        if(userSetEnvType != null) {
+            String[] envList = userSetEnvType.split(",");
+            for(String env : envList) {
+                this.tagsList.add(new CollectionTags(Context.now(), DEFAULT_TAG_KEY, env.trim(), CollectionTags.TagSource.USER));
+            }
+        }
 	}
 
     public boolean getAutomated() {
@@ -342,5 +370,17 @@ public class ApiCollection {
 
     public void setDescription(String description) {
         this.description = description;
+    }
+
+    public List<CollectionTags> getTagsList() {
+        return tagsList;
+    }
+
+    public void setTagsList(List<CollectionTags> tagsList) {
+        if(this.tagsList == null) {
+            this.tagsList = new ArrayList<>();
+        }
+
+        this.tagsList.addAll(tagsList);
     }
 }
