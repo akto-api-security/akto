@@ -228,6 +228,7 @@ const SetUserEnvPopupComponent = ({ popover, setPopover, tags, apiCollectionIds,
                                     }
                                     value={newCustomTag?.keyName}
                                     placeholder="Key"
+                                    maxLength={64}
                                 />
                                 <Text>{": "}</Text>
                                 <TextField
@@ -239,6 +240,7 @@ const SetUserEnvPopupComponent = ({ popover, setPopover, tags, apiCollectionIds,
                                     }
                                     value={newCustomTag?.value}
                                     placeholder="Value"
+                                    maxLength={64}
                                 />
                                 <Button onClick={() => {
                                     toggleTags(newCustomTag, apiCollectionIds)

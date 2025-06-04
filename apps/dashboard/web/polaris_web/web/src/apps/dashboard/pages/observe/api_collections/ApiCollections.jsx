@@ -128,10 +128,6 @@ const headers = [
         showFilter: true,
         textValue: 'envType',
         tooltipContent: (<Text variant="bodySm">Environment type for an API collection, Staging or Production </Text>),
-        mergeType: (a, b) => {
-            return Math.max(a || 0, b || 0);
-        },
-        shouldMerge: true,
     },
     {   
         title: <HeadingWithTooltip content={<Text variant="bodySm">The most recent time an endpoint within collection was either discovered for the first time or seen again</Text>} title="Last traffic seen" />, 

@@ -732,7 +732,7 @@ public class ApiCollectionsAction extends UserAction {
             return Action.ERROR.toUpperCase();
         }
         try {
-            Bson filter =  Filters.in("_id", apiCollectionIds);
+            Bson filter = Filters.in("_id", apiCollectionIds);
             FindOneAndUpdateOptions updateOptions = new FindOneAndUpdateOptions();
             updateOptions.upsert(false);
 
@@ -750,102 +750,100 @@ public class ApiCollectionsAction extends UserAction {
             }
 
             if(resetEnvTypes) {
-                UpdateResult updateResult = ApiCollectionsDao.instance.getMCollection().updateOne(filter, Updates.combine(Updates.unset(ApiCollection.TAGS_STRING), Updates.unset(ApiCollection.USER_ENV_TYPE)));
+                UpdateResult updateResult = ApiCollectionsDao.instance.getMCollection().updateMany(filter, Updates.combine(Updates.unset(ApiCollection.TAGS_STRING), Updates.unset(ApiCollection.USER_ENV_TYPE)));
                 if(updateResult == null) {
                     return Action.ERROR.toUpperCase();
                 }
                 return Action.SUCCESS.toUpperCase();
             }
 
-            ApiCollection apiCollection = ApiCollectionsDao.instance.findOne(filter, Projections.include(ApiCollection.TAGS_STRING, ApiCollection.USER_ENV_TYPE));
-            List<CollectionTags> tagsList = apiCollection.getTagsList();
-            String userSetEnvType = apiCollection.getUserSetEnvType();
-            List<String> userSetEnvTypeList = new ArrayList<>();
-            if(userSetEnvType != null && !userSetEnvType.isEmpty()) {
-                userSetEnvTypeList = new ArrayList<>(Arrays.asList(userSetEnvType.split(",")));
-            }
+            List<ApiCollection> apiCollectionList = ApiCollectionsDao.instance.findAll(filter, Projections.include(ApiCollection.TAGS_STRING, ApiCollection.USER_ENV_TYPE));
+            for(ApiCollection apiCollection : apiCollectionList) {
+                filter =  Filters.in(Constants.ID, apiCollection.getId());
+                List<CollectionTags> tagsList = apiCollection.getTagsList();
+                String userSetEnvType = apiCollection.getUserSetEnvType();
+                List<String> userSetEnvTypeList = new ArrayList<>();
+                if (userSetEnvType != null && !userSetEnvType.isEmpty()) {
+                    userSetEnvTypeList = new ArrayList<>(Arrays.asList(userSetEnvType.split(",")));
+                }
 
-            List<CollectionTags> toPull = new ArrayList<>();
-            List<CollectionTags> toAdd = new ArrayList<>();
-            if(tagsList == null || tagsList.isEmpty()) {
-                envType.stream().forEach((item) -> {
-                    item.setSource(TagSource.USER);
-                });
+                List<CollectionTags> toPull = new ArrayList<>();
+                List<CollectionTags> toAdd = new ArrayList<>();
+                if (tagsList == null || tagsList.isEmpty()) {
+                    envType.stream().forEach((item) -> {
+                        item.setSource(TagSource.USER);
+                    });
 
-                toAdd.addAll(envType);
-            } else {
-                for (CollectionTags env : envType) {
-                    Optional<CollectionTags> matchingTag = tagsList.stream()
-                            .filter(tag ->
-                                Objects.equals(tag.getKeyName(), env.getKeyName()) &&
-                                    Objects.equals(tag.getValue(), env.getValue())
-                            )
-                            .findFirst();
+                    toAdd.addAll(envType);
+                } else {
+                    for (CollectionTags env : envType) {
+                        Optional<CollectionTags> matchingTag = tagsList.stream()
+                                .filter(tag ->
+                                        Objects.equals(tag.getKeyName(), env.getKeyName()) &&
+                                                Objects.equals(tag.getValue(), env.getValue())
+                                )
+                                .findFirst();
 
-                    if(env.getKeyName().equalsIgnoreCase("userSetEnvType") && userSetEnvTypeList.contains(env.getValue())) {
-                        if(userSetEnvTypeList.size() == 1) {
-                            ApiCollectionsDao.instance.updateOne(filter, Updates.unset(ApiCollection.USER_ENV_TYPE));
+                        if (env.getKeyName().equalsIgnoreCase("userSetEnvType") && userSetEnvTypeList.contains(env.getValue())) {
+                            if (userSetEnvTypeList.size() == 1) {
+                                ApiCollectionsDao.instance.updateOne(filter, Updates.unset(ApiCollection.USER_ENV_TYPE));
+                            } else {
+                                userSetEnvTypeList.remove(env.getValue());
+                                String userEnvType = String.join(",", userSetEnvTypeList);
+                                ApiCollectionsDao.instance.updateOne(filter, Updates.set(ApiCollection.USER_ENV_TYPE, userEnvType));
+                            }
+
+                            continue;
+                        } else if (matchingTag.isPresent()) {
+                            toPull.add(matchingTag.get());
                         } else {
-                            userSetEnvTypeList.remove(env.getValue());
-                            String userEnvType = String.join(",", userSetEnvTypeList);
-                            ApiCollectionsDao.instance.updateOne(filter, Updates.set(ApiCollection.USER_ENV_TYPE, userEnvType));
+                            env.setSource(TagSource.USER);
+                            toAdd.add(env);
                         }
+                    }
 
-                        return SUCCESS.toUpperCase();
-                    } else if (matchingTag.isPresent()) {
-                        toPull.add(matchingTag.get());
-                    } else {
-                        env.setSource(TagSource.USER);
-                        toAdd.add(env);
+                    boolean isAddingStaging = toAdd.stream().anyMatch(tag ->
+                            "envType".equalsIgnoreCase(tag.getKeyName()) &&
+                                    "staging".equalsIgnoreCase(tag.getValue())
+                    );
+
+                    boolean isAddingProduction = toAdd.stream().anyMatch(tag ->
+                            "envType".equalsIgnoreCase(tag.getKeyName()) &&
+                                    "production".equalsIgnoreCase(tag.getValue())
+                    );
+
+                    if (isAddingStaging) {
+                        tagsList.stream()
+                                .filter(tag ->
+                                        "envType".equalsIgnoreCase(tag.getKeyName()) &&
+                                                "production".equalsIgnoreCase(tag.getValue())
+                                )
+                                .findFirst()
+                                .ifPresent(toPull::add);
+                    }
+
+                    if (isAddingProduction) {
+                        tagsList.stream()
+                                .filter(tag ->
+                                        "envType".equalsIgnoreCase(tag.getKeyName()) &&
+                                                "staging".equalsIgnoreCase(tag.getValue())
+                                )
+                                .findFirst()
+                                .ifPresent(toPull::add);
                     }
                 }
 
-                boolean isAddingStaging = toAdd.stream().anyMatch(tag ->
-                        "envType".equalsIgnoreCase(tag.getKeyName()) &&
-                                "staging".equalsIgnoreCase(tag.getValue())
-                );
-
-                boolean isAddingProduction = toAdd.stream().anyMatch(tag ->
-                        "envType".equalsIgnoreCase(tag.getKeyName()) &&
-                                "production".equalsIgnoreCase(tag.getValue())
-                );
-
-                if (isAddingStaging) {
-                    tagsList.stream()
-                            .filter(tag ->
-                                    "envType".equalsIgnoreCase(tag.getKeyName()) &&
-                                            "production".equalsIgnoreCase(tag.getValue())
-                            )
-                            .findFirst()
-                            .ifPresent(toPull::add);
+                if (!toPull.isEmpty()) {
+                    ApiCollectionsDao.instance.getMCollection().updateOne(filter,
+                            Updates.pullAll(ApiCollection.TAGS_STRING, toPull)
+                    );
                 }
 
-                if (isAddingProduction) {
-                    tagsList.stream()
-                            .filter(tag ->
-                                    "envType".equalsIgnoreCase(tag.getKeyName()) &&
-                                            "staging".equalsIgnoreCase(tag.getValue())
-                            )
-                            .findFirst()
-                            .ifPresent(toPull::add);
+                if (!toAdd.isEmpty()) {
+                    ApiCollectionsDao.instance.getMCollection().updateOne(filter,
+                            Updates.addEachToSet(ApiCollection.TAGS_STRING, toAdd)
+                    );
                 }
-            }
-
-            UpdateResult result = null;
-            if(!toPull.isEmpty()) {
-                result = ApiCollectionsDao.instance.getMCollection().updateOne(filter,
-                        Updates.pullAll(ApiCollection.TAGS_STRING, toPull)
-                );
-            }
-
-            if(!toAdd.isEmpty()) {
-                result = ApiCollectionsDao.instance.getMCollection().updateOne(filter,
-                        Updates.addEachToSet(ApiCollection.TAGS_STRING, toAdd)
-                );
-            }
-
-            if(result == null){
-                return Action.ERROR.toUpperCase();
             }
             return SUCCESS.toUpperCase();
         } catch (Exception e) {
