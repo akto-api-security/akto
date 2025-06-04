@@ -4,6 +4,7 @@ import com.akto.RuntimeMode;
 import com.akto.billing.UsageMetricUtils;
 import com.akto.dao.context.Context;
 import com.akto.dao.traffic_metrics.TrafficMetricsDao;
+import com.akto.dto.traffic.CollectionTags.TagSource;
 import com.akto.hybrid_dependency.DependencyAnalyser;
 import com.akto.data_actor.DataActor;
 import com.akto.data_actor.DataActorFactory;
@@ -23,8 +24,10 @@ import com.akto.dto.traffic_metrics.TrafficMetrics;
 import com.akto.dto.type.URLMethods.Method;
 import com.akto.dto.usage.MetricTypes;
 import com.akto.graphql.GraphQLUtils;
+import com.akto.jsonrpc.JsonRpcUtils;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.mcp.McpRequestResponseUtils;
 import com.akto.runtime.RuntimeUtil;
 import com.akto.runtime.parser.SampleParser;
 import com.akto.runtime.utils.Utils;
@@ -52,6 +55,8 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import org.apache.commons.collections.CollectionUtils;
+import org.apache.kafka.common.quota.ClientQuotaAlteration.Op;
 
 import static com.akto.runtime.RuntimeUtil.matchesDefaultPayload;
 import static com.akto.testing.Utils.validateFilter;
@@ -509,6 +514,17 @@ public class HttpCallParser {
 
         List<CollectionTags> tagsList = CollectionTags.calculateTagsDiff(apiCollection.getTagsList(), httpResponseParams.getTags());
 
+        if (CollectionUtils.isEmpty(apiCollection.getTagsList()) || apiCollection.getTagsList().stream()
+            .noneMatch(t -> "mcp-server".equals(t.getKeyName()))) {
+            Optional<CollectionTags> mcpServerTagOpt = getMcpServerTag(httpResponseParams);
+            if (tagsList == null) {
+                tagsList = new ArrayList<>();
+            }
+            if (mcpServerTagOpt.isPresent()) {
+                tagsList.add(mcpServerTagOpt.get());
+            }
+        }
+
         if (tagsList == null || tagsList.isEmpty()) {
             return;
         }
@@ -556,6 +572,14 @@ public class HttpCallParser {
 
             } else {
                 int id = hostName.hashCode();
+
+                Optional<CollectionTags> mcpServerTagOpt = getMcpServerTag(httpResponseParam);
+                if (mcpServerTagOpt.isPresent()) {
+                    if (tagList == null) {
+                        tagList = new ArrayList<>();
+                    }
+                    tagList.add(mcpServerTagOpt.get());
+                }
                 try {
 
                     apiCollectionId = createCollectionBasedOnHostName(id, hostName, tagList);
@@ -596,7 +620,7 @@ public class HttpCallParser {
         /*
          * To be sure that the content type
          * header matches the actual payload.
-         * 
+         *
          * We will need to add more type validation as needed.
          */
         if (matchContentType.contains("html")) {
@@ -636,7 +660,7 @@ public class HttpCallParser {
                 }
                 continue;
             }
-            
+
             String ignoreAktoFlag = getHeaderValue(httpResponseParam.getRequestParams().getHeaders(),Constants.AKTO_IGNORE_FLAG);
             if (ignoreAktoFlag != null){
                 if (Utils.printDebugUrlLog(httpResponseParam.getRequestParams().getURL())) {
@@ -690,7 +714,7 @@ public class HttpCallParser {
                     if(ignore){
                         continue;
                     }
-    
+
                 } catch(Exception e){
                     loggerMaker.errorAndAddToDb(e, "Error while ignoring content-type redundant samples " + e.toString(), LogDb.RUNTIME);
                 }
@@ -723,14 +747,16 @@ public class HttpCallParser {
                 }
 
             }
-            
+
             int apiCollectionId = createApiCollectionId(httpResponseParam);
 
             httpResponseParam.requestParams.setApiCollectionId(apiCollectionId);
 
             List<HttpResponseParams> responseParamsList = GraphQLUtils.getUtils().parseGraphqlResponseParam(httpResponseParam);
             if (responseParamsList.isEmpty()) {
-                filteredResponseParams.add(httpResponseParam);
+                HttpResponseParams jsonRpcResponse = JsonRpcUtils.parseJsonRpcResponse(httpResponseParam);
+                HttpResponseParams mcpResponseParams = McpRequestResponseUtils.parseMcpResponseParams(jsonRpcResponse);
+                filteredResponseParams.add(mcpResponseParams);
             } else {
                 filteredResponseParams.addAll(responseParamsList);
                 loggerMaker.infoAndAddToDb("Adding " + responseParamsList.size() + "new graphql endpoints in inventory",LogDb.RUNTIME);
@@ -813,5 +839,10 @@ public class HttpCallParser {
         this.trafficMetricsMap = trafficMetricsMap;
     }
 
-
+    private Optional<CollectionTags> getMcpServerTag(HttpResponseParams responseParams) {
+        if (McpRequestResponseUtils.isMcpRequest(responseParams).getFirst()) {
+            return Optional.of(new CollectionTags(Context.now(), "mcp-server", "MCP Server", TagSource.KUBERNETES));
+        }
+        return Optional.empty();
+    }
 }
