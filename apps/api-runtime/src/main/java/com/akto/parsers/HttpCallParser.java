@@ -130,7 +130,7 @@ public class HttpCallParser {
         );
 
         if (isMcpRequest) {
-            String tag = "MCP Server";
+            String tag = MCP_SERVER_TAG;
             updates = Updates.combine(updates, Updates.setOnInsert("userSetEnvType", tag));
         }
 
