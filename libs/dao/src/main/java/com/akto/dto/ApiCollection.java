@@ -93,7 +93,7 @@ public class ApiCollection {
     List<CollectionTags> tagsList;
     public static final String TAGS_STRING = "tagsList";
 
-    public static final String DEFAULT_TAG_KEY = "customEnvType";
+    public static final String DEFAULT_TAG_KEY = "userSetEnvType";
 
     public ApiCollection() {
     }
