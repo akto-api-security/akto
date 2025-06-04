@@ -55,7 +55,7 @@ public class RedactSampleData {
         List<String> cookieList = headers.getOrDefault(header, new ArrayList<>());
         Map<String, String> cookieMap = AuthPolicy.parseCookie(cookieList);
         for (String cookieKey : cookieMap.keySet()) {
-            cookie += cookieKey + "=" + redactValue + ";";
+            cookie += cookieKey + "=" + redact(cookieMap.get(cookieKey)) + ";";
         }
         if (cookie.isEmpty()) {
             cookie = redactValue;
@@ -80,7 +80,11 @@ public class RedactSampleData {
                     if (i != 0) {
                         finalUrl += "&";
                     }
-                    finalUrl += param[0] + "=" + redactValue;
+                    if (param.length > 1) {
+                        finalUrl += param[0] + "=" + redact(param[1]);
+                    } else {
+                        finalUrl += param[0] + "=" + redactValue;
+                    }
                 }
             }
 
@@ -101,7 +105,7 @@ public class RedactSampleData {
                     responseHeaders.put(header, Collections.singletonList(cookie));
                     continue;
                 }
-                responseHeaders.put(header, Collections.singletonList(redactValue));
+                responseHeaders.put(header, Collections.singletonList(redact(responseHeaders.get(header))));
             }
             return;
         }
@@ -119,7 +123,7 @@ public class RedactSampleData {
                     responseHeaders.put(key, Collections.singletonList(cookie));
                     continue;
                 }
-                responseHeaders.put(key, Collections.singletonList(redactValue));
+                responseHeaders.put(key, Collections.singletonList(redact(values.get(0))));
             }
         }
     }
@@ -244,7 +248,7 @@ public class RedactSampleData {
                 JsonNode arrayElement = arrayNode.get(i);
                 if (arrayElement.isValueNode()) {
                     if(redactAll){
-                        arrayNode.set(i, new TextNode(redactValue));
+                        arrayNode.set(i, new TextNode(arrayElement.asText()));
                     } else{
                         SingleTypeInfo.SubType subType = KeyTypes.findSubType(arrayElement.asText(), parentName, null);
                         if(SingleTypeInfo.isRedacted(subType.getName())){
@@ -402,6 +406,29 @@ public class RedactSampleData {
         m.put("originalRequestPayload", origReqPayload);
         m.put("originalResponsePayload", origResPayload);
         return mapper.writeValueAsString(m);
+    }
+
+    public static String redact(Object input) {
+        if (input == null) {
+            return null;
+        }
+
+        String str = input.toString();
+        StringBuilder redacted = new StringBuilder();
+
+        for (char ch : str.toCharArray()) {
+            if (Character.isLowerCase(ch)) {
+                redacted.append('a');
+            } else if (Character.isUpperCase(ch)) {
+                redacted.append('A');
+            } else if (Character.isDigit(ch)) {
+                redacted.append('1');
+            } else {
+                redacted.append('-');
+            }
+        }
+
+        return redacted.toString();
     }
 
 }
