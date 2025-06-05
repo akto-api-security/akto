@@ -262,26 +262,6 @@ public class SaveTestEditorAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
-    public static int compareVersions(String v1, String v2) {
-        try {
-            String[] parts1 = v1.split("\\.");
-            String[] parts2 = v2.split("\\.");
-
-            int length = Math.max(parts1.length, parts2.length);
-            for (int i = 0; i < length; i++) {
-                int num1 = i < parts1.length ? Integer.parseInt(parts1[i]) : 0;
-                int num2 = i < parts2.length ? Integer.parseInt(parts2[i]) : 0;
-                if (num1 != num2) {
-                    return Integer.compare(num1, num2);
-                }
-            }
-            return 0;
-        } catch (Exception e) {
-            //ignore
-        }
-        return 1;
-    }
-
     public String runTestForGivenTemplate() {
         TestExecutor executor = new TestExecutor();
         TestConfig testConfig;
@@ -317,7 +297,7 @@ public class SaveTestEditorAction extends UserAction {
             ModuleInfo moduleInfo = ModuleInfoDao.instance.getMCollection().find(Filters.eq(ModuleInfo.MODULE_TYPE, ModuleInfo.ModuleType.MINI_TESTING)).sort(Sorts.descending(ModuleInfo.LAST_HEARTBEAT_RECEIVED)).limit(1).first();
             if (moduleInfo != null) {
                 String version = moduleInfo.getCurrentVersion().split(" - ")[0];
-                if (compareVersions("1.44.9", version) <= 0) {//latest version
+                if (Utils.compareVersions("1.44.9", version) <= 0) {//latest version
                     TestingRunPlayground testingRunPlayground = new TestingRunPlayground();
                     testingRunPlayground.setTestTemplate(content);
                     testingRunPlayground.setState(State.SCHEDULED);
