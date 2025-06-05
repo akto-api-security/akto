@@ -430,7 +430,7 @@ public class Main {
     }
 
     public static void initializeRuntimeHelper() {
-        SingleTypeInfo.init();
+        SingleTypeInfo.schedulePopulateDataTypesInfoTask();
         try {
             RuntimeVersion runtimeVersion = new RuntimeVersion();
             runtimeVersion.updateVersion(AccountSettings.API_RUNTIME_VERSION, dataActor);
