@@ -202,7 +202,7 @@ public class Build {
                 OriginalHttpResponse response = null;
                 try {
                     Account account = AccountsDao.instance.findOne(Filters.eq(Constants.ID, Context.accountId.get()));
-                    if (account.getHybridTestingEnabled()) {
+                    if (account != null && account.getHybridTestingEnabled()) {
                         ModuleInfo moduleInfo = ModuleInfoDao.instance.getMCollection()
                                 .find(Filters.eq(ModuleInfo.MODULE_TYPE, ModuleInfo.ModuleType.MINI_TESTING))
                                 .sort(Sorts.descending(ModuleInfo.LAST_HEARTBEAT_RECEIVED)).limit(1).first();
