@@ -254,8 +254,15 @@ public class TestRolesAction extends UserAction {
         }
         role.setLastUpdatedTs(Context.now());
         this.selectedRole = role;
-        this.selectedRole.setEndpointLogicalGroup(logicalGroup);        
-        TestRolesDao.instance.updateOne(Filters.eq(Constants.ID, role.getId()), Updates.set(TestRoles.LAST_UPDATED_TS, Context.now()));
+        this.selectedRole.setEndpointLogicalGroup(logicalGroup);
+
+        User sUser = getSUser();
+        if(sUser == null || sUser.getLogin() == null) {
+            addActionError("You are not authorized to perform this action.");
+            return ERROR.toUpperCase();
+        }
+
+        TestRolesDao.instance.updateOne(Filters.eq(Constants.ID, role.getId()), Updates.combine(Updates.set(TestRoles.LAST_UPDATED_TS, Context.now()), Updates.set(TestRoles.LAST_UPDATED_BY, sUser.getLogin())));
         return SUCCESS.toUpperCase();
     }
 

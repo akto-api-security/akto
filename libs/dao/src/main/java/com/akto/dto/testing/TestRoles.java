@@ -32,11 +32,14 @@ public class TestRoles {
     private List<Integer> apiCollectionIds;
 
     public static final String SCOPE_ROLES = "scopeRoles";
-    private List<String> scopeRoles;     
+    private List<String> scopeRoles;
+
+    public static final String LAST_UPDATED_BY = "lastUpdatedBy";
+    private String lastUpdatedBy;
     
     public TestRoles(){}
     
-    public TestRoles(ObjectId id, String name, ObjectId endpointLogicalGroupId, List<AuthWithCond> authWithCondList, String createdBy, int createdTs, int lastUpdatedTs, List<Integer> apiCollectionIds) {
+    public TestRoles(ObjectId id, String name, ObjectId endpointLogicalGroupId, List<AuthWithCond> authWithCondList, String createdBy, int createdTs, int lastUpdatedTs, List<Integer> apiCollectionIds, String lastUpdatedBy) {
         this.id = id;
         this.name = name;
         this.endpointLogicalGroupId = endpointLogicalGroupId;
@@ -45,6 +48,7 @@ public class TestRoles {
         this.createdTs = createdTs;
         this.lastUpdatedTs = lastUpdatedTs;
         this.apiCollectionIds = apiCollectionIds;
+        this.lastUpdatedBy = lastUpdatedBy;
 	}
     
     public EndpointLogicalGroup fetchEndpointLogicalGroup() {
@@ -199,4 +203,11 @@ public class TestRoles {
         this.scopeRoles = scopeRoles;
     }
 
+    public String getLastUpdatedBy() {
+        return lastUpdatedBy;
+    }
+
+    public void setLastUpdatedBy(String lastUpdatedBy) {
+        this.lastUpdatedBy = lastUpdatedBy;
+    }
 }
