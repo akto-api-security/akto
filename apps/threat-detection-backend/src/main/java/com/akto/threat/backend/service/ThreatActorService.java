@@ -33,6 +33,7 @@ import com.mongodb.client.model.Sorts;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
@@ -112,120 +113,99 @@ public class ThreatActorService {
     return builder.build();
 }
 
-  public ListThreatActorResponse listThreatActors(
-      String accountId, ListThreatActorsRequest request) {
-              
-    int skip = request.hasSkip() ? request.getSkip() : 0;
-    int limit = request.getLimit();
-    Map<String, Integer> sort = request.getSortMap();
-    MongoCollection<Document> coll =
-        this.mongoClient
+
+    public ListThreatActorResponse listThreatActors(String accountId, ListThreatActorsRequest request) {
+        int skip = request.hasSkip() ? request.getSkip() : 0;
+        int limit = request.getLimit();
+        Map<String, Integer> sort = request.getSortMap();
+
+        MongoCollection<Document> coll = this.mongoClient
             .getDatabase(accountId)
             .getCollection(MongoDBCollection.ThreatDetection.MALICIOUS_EVENTS, Document.class);
 
-    ListThreatActorsRequest.Filter filter = request.getFilter();
+        ListThreatActorsRequest.Filter filter = request.getFilter();
+        Document match = new Document();
 
-    List<Document> base = new ArrayList<>();
-
-    Document match = new Document();
-
-    if (!filter.getActorsList().isEmpty()) {
-      match.append("actor", new Document("$in", filter.getActorsList()));
-    }
-
-    if (!filter.getLatestIpsList().isEmpty()) {
-      match.append("latestApiIp", new Document("$in", filter.getLatestIpsList()));
-    }
-
-    if (!filter.getLatestAttackList().isEmpty()) {
-      match.append("subCategory", new Document("$in", filter.getLatestAttackList()));
-    }
-
-    if (!filter.getCountryList().isEmpty()) {
-      match.append("country", new Document("$in", filter.getCountryList()));
-    }
-
-    if (filter.hasDetectedAtTimeRange()) {
-      long start = filter.getDetectedAtTimeRange().getStart();
-      long end = filter.getDetectedAtTimeRange().getEnd();
-      match.append("detectedAt", new Document("$gte", start).append("$lte", end));
-    }
-
-    if (request.getStartTs() != 0 && request.getEndTs() != 0) {
-        long start = request.getStartTs();
-        long end = request.getEndTs();
-        match.append("detectedAt", new Document("$gte", start).append("$lte", end));
-    } 
-
-    if (!match.isEmpty()) {
-      base.add(new Document("$match", match));
-    }
-
-    base.add(new Document("$sort", new Document("detectedAt", -1)));
-    base.add(
-        new Document(
-            "$group",
-            new Document("_id", "$actor")
-                .append("latestApiEndpoint", new Document("$last", "$latestApiEndpoint"))
-                .append("latestApiMethod", new Document("$last", "$latestApiMethod"))
-                .append("latestApiIp", new Document("$last", "$latestApiIp"))
-                .append("country", new Document("$last", "$country"))
-                .append("discoveredAt", new Document("$last", "$detectedAt"))
-                .append("latestSubCategory", new Document("$last", "$subCategory"))));
-
-    List<Document> countPipeline = new ArrayList<>(base);
-    countPipeline.add(new Document("$count", "total"));
-
-    Document result = coll.aggregate(countPipeline).first();
-    long total = result != null ? result.getInteger("total", 0) : 0;
-
-    List<Document> pipeline = new ArrayList<>(base);
-
-    pipeline.add(new Document("$skip", skip));
-    pipeline.add(new Document("$limit", limit));
-
-    pipeline.add(
-        new Document(
-            "$sort", new Document("discoveredAt", sort.getOrDefault("discoveredAt", -1)))); // sort
-
-    List<ListThreatActorResponse.ThreatActor> actors = new ArrayList<>();
-    try (MongoCursor<Document> cursor = coll.aggregate(pipeline).cursor()) {
-      while (cursor.hasNext()) {
-        Document doc = cursor.next();
-        
-        Bson filters = Filters.eq("actor", doc.getString("_id"));
-        Bson sort2 = Sorts.descending("detectedAt");
-        MongoCursor<Document> cursor2 = coll.find(filters).sort(sort2).limit(40).cursor();
-        List<ActivityData> activityDataList = new ArrayList<>();
-        while (cursor2.hasNext()) {
-            Document doc2 = cursor2.next();
-            activityDataList.add(
-                ActivityData.newBuilder()
-                .setUrl(doc2.getString("latestApiEndpoint"))
-                .setDetectedAt(doc2.getLong("detectedAt"))
-                .setSubCategory(doc2.getString("subCategory"))
-                .setSeverity(doc2.getString("severity"))
-                .setMethod(doc2.getString("latestApiMethod"))
-                .build()
-            );
+        // Apply filters
+        if (!filter.getActorsList().isEmpty()) match.append("actor", new Document("$in", filter.getActorsList()));
+        if (!filter.getLatestIpsList().isEmpty()) match.append("latestApiIp", new Document("$in", filter.getLatestIpsList()));
+        if (!filter.getLatestAttackList().isEmpty()) match.append("subCategory", new Document("$in", filter.getLatestAttackList()));
+        if (!filter.getCountryList().isEmpty()) match.append("country", new Document("$in", filter.getCountryList()));
+        if (filter.hasDetectedAtTimeRange()) {
+            match.append("detectedAt", new Document("$gte", filter.getDetectedAtTimeRange().getStart()).append("$lte", filter.getDetectedAtTimeRange().getEnd()));
+        }
+        if (request.getStartTs() != 0 && request.getEndTs() != 0) {
+            match.append("detectedAt", new Document("$gte", request.getStartTs()).append("$lte", request.getEndTs()));
         }
 
-        actors.add(
-            ListThreatActorResponse.ThreatActor.newBuilder()
-                .setId(doc.getString("_id"))
+        List<Document> pipeline = new ArrayList<>();
+        if (!match.isEmpty()) pipeline.add(new Document("$match", match));
+
+        // Sort first for $first to work
+        pipeline.add(new Document("$sort", new Document("detectedAt", -1)));
+
+        pipeline.add(new Document("$group", new Document("_id", "$actor")
+            .append("latestApiEndpoint", new Document("$first", "$latestApiEndpoint"))
+            .append("latestApiMethod", new Document("$first", "$latestApiMethod"))
+            .append("latestApiIp", new Document("$first", "$latestApiIp"))
+            .append("country", new Document("$first", "$country"))
+            .append("discoveredAt", new Document("$first", "$detectedAt"))
+            .append("latestSubCategory", new Document("$first", "$subCategory"))
+        ));
+
+        // Facet: count and paginated result
+        List<Document> facetStages = Arrays.asList(
+            new Document("$sort", new Document("discoveredAt", sort.getOrDefault("discoveredAt", -1))),
+            new Document("$skip", skip),
+            new Document("$limit", limit)
+        );
+
+        pipeline.add(new Document("$facet", new Document()
+            .append("paginated", facetStages)
+            .append("count", Arrays.asList(new Document("$count", "total")))
+        ));
+
+        Document result = coll.aggregate(pipeline).first();
+        List<Document> paginated = result.getList("paginated", Document.class, Collections.emptyList());
+        List<Document> countList = result.getList("count", Document.class, Collections.emptyList());
+        long total = countList.isEmpty() ? 0 : countList.get(0).getInteger("total");
+
+        // Activity fetch
+        List<ListThreatActorResponse.ThreatActor> actors = new ArrayList<>();
+        for (Document doc : paginated) {
+            String actorId = doc.getString("_id");
+            List<ActivityData> activityDataList = new ArrayList<>();
+
+            try (MongoCursor<Document> cursor2 = coll.find(Filters.eq("actor", actorId))
+                    .sort(Sorts.descending("detectedAt"))
+                    .limit(40)
+                    .cursor()) {
+                while (cursor2.hasNext()) {
+                    Document doc2 = cursor2.next();
+                    activityDataList.add(ActivityData.newBuilder()
+                        .setUrl(doc2.getString("latestApiEndpoint"))
+                        .setDetectedAt(doc2.getLong("detectedAt"))
+                        .setSubCategory(doc2.getString("subCategory"))
+                        .setSeverity(doc2.getString("severity"))
+                        .setMethod(doc2.getString("latestApiMethod"))
+                        .build());
+                }
+            }
+
+            actors.add(ListThreatActorResponse.ThreatActor.newBuilder()
+                .setId(actorId)
                 .setLatestApiEndpoint(doc.getString("latestApiEndpoint"))
                 .setLatestApiMethod(doc.getString("latestApiMethod"))
                 .setLatestApiIp(doc.getString("latestApiIp"))
                 .setDiscoveredAt(doc.getLong("discoveredAt"))
                 .setCountry(doc.getString("country"))
-                .addAllActivityData(activityDataList)
                 .setLatestSubcategory(doc.getString("latestSubCategory"))
+                .addAllActivityData(activityDataList)
                 .build());
-      }
-    }
+        }
 
-    return ListThreatActorResponse.newBuilder().addAllActors(actors).setTotal(total).build();
-  }
+        return ListThreatActorResponse.newBuilder().addAllActors(actors).setTotal(total).build();
+    }
 
   public DailyActorsCountResponse getDailyActorCounts(String accountId, long startTs, long endTs) {
     
@@ -318,7 +298,7 @@ public class ThreatActorService {
         MongoCollection<Document> coll = this.mongoClient
             .getDatabase(accountId)
             .getCollection(MongoDBCollection.ThreatDetection.MALICIOUS_EVENTS, Document.class);
-
+            
         List<Document> pipeline = Arrays.asList(
         // Stage 1: Match documents within the startTs and endTs range
         new Document("$match", new Document("detectedAt",
@@ -387,7 +367,7 @@ public class ThreatActorService {
     try {
       TextFormat.getParser().merge(metadataStr, metadataBuilder);
     } catch (Exception e) {
-      return metadataStr;
+      return "";
     }
     Metadata metadataProto = metadataBuilder.build();
     metadataStr = ProtoMessageUtils.toString(metadataProto).orElse("");
@@ -435,29 +415,36 @@ public class ThreatActorService {
             .getCollection(MongoDBCollection.ThreatDetection.MALICIOUS_EVENTS, Document.class);
 
     List<Document> pipeline = new ArrayList<>();
-    pipeline.add(
-        new Document("$sort", new Document("country", 1).append("detectedAt", -1))); // sort
-    pipeline.add(
-        new Document(
-            "$group",
-            new Document("_id", "$country")
-                .append("distinctActors", new Document("$addToSet", "$actor"))));
 
-    pipeline.add(
-        new Document(
-            "$addFields", new Document("actorsCount", new Document("$size", "$distinctActors"))));
+    // 1. Match on time range
+    if (request.getStartTs() != 0 || request.getEndTs() != 0) {
+      pipeline.add(new Document("$match",
+          new Document("detectedAt",
+              new Document("$gte", request.getStartTs())
+                  .append("$lte", request.getEndTs()))));
+    }
 
-    pipeline.add(new Document("$sort", new Document("actorsCount", -1))); // sort
+    // 2. Project only necessary fields
+    pipeline.add(new Document("$project", new Document("country", 1).append("actor", 1)));
+
+    // 3. Group by country and collect distinct actors
+    pipeline.add(new Document("$group",
+        new Document("_id", "$country")
+            .append("distinctActorsCount", new Document("$addToSet", "$actor"))));
+
+    // 4. Project the size of the distinct actors set
+    pipeline.add(new Document("$project",
+        new Document("distinctActorsCount", new Document("$size", "$distinctActorsCount"))));
 
     List<ThreatActorByCountryResponse.CountryCount> actorsByCountryCount = new ArrayList<>();
 
-    try (MongoCursor<Document> cursor = coll.aggregate(pipeline).cursor()) {
+    try (MongoCursor<Document> cursor = coll.aggregate(pipeline).batchSize(1000).cursor()) {
       while (cursor.hasNext()) {
         Document doc = cursor.next();
         actorsByCountryCount.add(
             ThreatActorByCountryResponse.CountryCount.newBuilder()
                 .setCode(doc.getString("_id"))
-                .setCount(doc.getInteger("actorsCount", 0))
+                .setCount(doc.getInteger("distinctActorsCount", 0))
                 .build());
       }
     }

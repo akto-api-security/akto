@@ -120,12 +120,25 @@ public class DashboardRouter implements ARouter {
             });
 
         router
-            .get("/get_actors_count_per_country")
+            .post("/get_actors_count_per_country")
             .blockingHandler(ctx -> {
+                RequestBody reqBody = ctx.body();
+                ThreatActorByCountryRequest req = ProtoMessageUtils.<
+                    ThreatActorByCountryRequest
+                >toProtoMessage(
+                    ThreatActorByCountryRequest.class,
+                    reqBody.asString()
+                ).orElse(null);
+
+                if (req == null) {
+                    ctx.response().setStatusCode(400).end("Invalid request");
+                    return;
+                }
+
                 ProtoMessageUtils.toString(
                     threatActorService.getThreatActorByCountry(
                         ctx.get("accountId"),
-                        ThreatActorByCountryRequest.newBuilder().build()
+                        req 
                     )
                 ).ifPresent(s -> ctx.response().setStatusCode(200).end(s));
             });

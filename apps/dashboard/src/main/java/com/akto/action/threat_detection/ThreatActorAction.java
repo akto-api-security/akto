@@ -79,13 +79,27 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
   }
 
   public String getActorsCountPerCounty() {
-    HttpGet get =
-        new HttpGet(
-            String.format("%s/api/dashboard/get_actors_count_per_country", this.getBackendUrl()));
-    get.addHeader("Authorization", "Bearer " + this.getApiToken());
-    get.addHeader("Content-Type", "application/json");
+    HttpPost post = new HttpPost(String.format("%s/api/dashboard/get_actors_count_per_country", this.getBackendUrl()));
+    post.addHeader("Authorization", "Bearer " + this.getApiToken());
+    post.addHeader("Content-Type", "application/json");
 
-    try (CloseableHttpResponse resp = this.httpClient.execute(get)) {
+    if(startTs == 0 || endTs == 0) {
+      startTs = Context.now() - 1 * 24 * 60 * 60; // default to last 1 day
+      endTs = Context.now();
+    }
+
+    Map<String, Object> body = new HashMap<String, Object>() {
+      {
+        put("start_ts", startTs);
+        put("end_ts", endTs);
+      }
+    };
+    String msg = objectMapper.valueToTree(body).toString();
+
+    StringEntity requestEntity = new StringEntity(msg, ContentType.APPLICATION_JSON);
+    post.setEntity(requestEntity);
+
+    try (CloseableHttpResponse resp = this.httpClient.execute(post)) {
       String responseBody = EntityUtils.toString(resp.getEntity());
 
       ProtoMessageUtils.<ThreatActorByCountryResponse>toProtoMessage(

@@ -94,6 +94,9 @@ import AgentConfig from "../dashboard/pages/settings/integrations/AgentConfig";
 import AzureBoards from "../dashboard/pages/settings/integrations/AzureBoards";
 import CloudflareWaf from "../dashboard/pages/settings/integrations/CloudflareWaf";
 import UndoDemergedApis from "../dashboard/pages/settings/undo_demerged_apis/UndoDemergedApis";
+import GmailWebhookCore from "../dashboard/pages/settings/integrations/gmailWebhooks/GmailWebhookCore";
+import GmailWebhook from "../dashboard/pages/settings/integrations/gmailWebhooks/GmailWebhook";
+import McpSecurityPage from "../dashboard/pages/mcp-security/McpSecurityPage.jsx";
 
 // if you add a component in a new path, please verify the search implementation in function -> 'getSearchItemsArr' in func.js
 
@@ -243,6 +246,10 @@ const router = createBrowserRouter([
                             }
                         ]
                     },
+                    {
+                        path: "mcp-security",
+                        element: <McpSecurityPage/>,
+                    },
                 ]
             },
             {
@@ -373,7 +380,18 @@ const router = createBrowserRouter([
                         path: "integrations/teamsWebhooks/create_custom_webhook",
                         element: <TeamsWebhook/>,
                     },
-
+                    {
+                        path: "integrations/gmailWebhooks",
+                        element: <GmailWebhook/>,
+                    },
+                    {
+                        path: "integrations/gmailWebhooks/:webhookId",
+                        element: <GmailWebhookCore/>,
+                    },
+                    {
+                        path: "integrations/gmailWebhooks/create_custom_webhook",
+                        element: <GmailWebhookCore/>,
+                    },
                     {
                         path: "logs",
                         element: <HealthLogs/>,

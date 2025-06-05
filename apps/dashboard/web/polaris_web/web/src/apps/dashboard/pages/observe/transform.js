@@ -7,6 +7,7 @@ import CopyEndpoint from "./api_collections/component/CopyEndpoint"
 import { SearchMinor, InfoMinor, LockMinor, ClockMinor, PasskeyMinor, LinkMinor, DynamicSourceMinor, GlobeMinor, LocationsMinor, PriceLookupMinor, ArrowUpMinor, ArrowDownMinor } from "@shopify/polaris-icons"
 import api from "./api";
 import GetPrettifyEndpoint from "./GetPrettifyEndpoint";
+import ShowListInBadge from "../../components/shared/ShowListInBadge";
 
 const standardHeaders = [
     'accept', 'accept-ch', 'accept-ch-lifetime', 'accept-charset', 'accept-encoding', 'accept-language', 'accept-patch', 'accept-post', 'accept-ranges', 'access-control-allow-credentials', 'access-control-allow-headers', 'access-control-allow-methods', 'access-control-allow-origin', 'access-control-expose-headers', 'access-control-max-age', 'access-control-request-headers', 'access-control-request-method', 'age', 'allow', 'alt-svc', 'alt-used', 'authorization',
@@ -437,6 +438,20 @@ const transform = {
         )
     },
 
+    getCollectionTypeList(envType){
+        if(envType == null || envType.length === 0){ 
+            return <></>
+        }
+        return (
+            <ShowListInBadge
+                itemsArr={envType}
+                maxItems={3}
+                status={"info"}
+                useTooltip={true}
+            />
+        )
+    },
+
     getIssuesListText(severityInfo){
         const sortedSeverityInfo = func.sortObjectBySeverity(severityInfo)
         let val = "-"
@@ -492,7 +507,7 @@ const transform = {
                 riskScore: c.riskScore,
                 deactivatedRiskScore: c.deactivated ? (c.riskScore - 10 ) : c.riskScore,
                 activatedRiskScore: -1 * (c.deactivated ? c.riskScore : (c.riskScore - 10 )),
-                envTypeComp: isLoading ? loadingComp : c.envType ? <Badge size="small" status="info">{c.envType}</Badge> : null,
+                envTypeComp: isLoading ? loadingComp : this.getCollectionTypeList(c.envType),
                 sensitiveSubTypesVal: c?.sensitiveInRespTypes.join(" ") ||  "-"
             }
         })

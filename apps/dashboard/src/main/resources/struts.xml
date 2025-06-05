@@ -17,6 +17,7 @@
             <interceptor name="usageInterceptor" class="com.akto.interceptor.UsageInterceptor" />
             <interceptor name="roleAccessInterceptor" class="com.akto.interceptor.RoleAccessInterceptor" />
             <interceptor name="collectionInterceptor" class="com.akto.interceptor.CollectionInterceptor" />
+            <interceptor name="contextBasedUsageInterceptor" class="com.akto.interceptor.ContextBasedUsageInterceptor" />
         </interceptors>
 
         <default-action-ref name="home" />
@@ -6708,6 +6709,11 @@
                 <param name="actionDescription">User saved a Akto test editor file</param>
             </interceptor-ref>
 
+            <interceptor-ref name="contextBasedUsageInterceptor"/>
+            <interceptor-ref name="usageInterceptor">
+                <param name="featureLabel">CUSTOM_TESTS</param>
+            </interceptor-ref>
+
             <result name="FORBIDDEN" type="json">
                 <param name="statusCode">403</param>
                 <param name="ignoreHierarchy">false</param>
@@ -6716,6 +6722,11 @@
             <result name="SUCCESS" type="json"/>
             <result name="ERROR" type="json">
                 <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="UNAUTHORIZED" type="json">
+                <param name="statusCode">403</param>
                 <param name="ignoreHierarchy">false</param>
                 <param name="includeProperties">^actionErrors.*</param>
             </result>
@@ -8240,6 +8251,7 @@
         <action name="api/getActorsCountPerCounty"
             class="com.akto.action.threat_detection.ThreatActorAction"
             method="getActorsCountPerCounty">
+            <interceptor-ref name="json" />
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="usageInterceptor">
                 <param name="featureLabel">THREAT_DETECTION</param>
@@ -8259,7 +8271,9 @@
                 <param
                     name="includeProperties">^actionErrors.*</param>
             </result>
-            <result name="SUCCESS" type="json"> </result>
+            <result name="SUCCESS" type="json"> 
+                <param name="includeProperties">^actorsCountPerCountry.*</param>
+            </result>
             <result name="ERROR" type="json">
                 <param name="statusCode">422</param>
                 <param name="ignoreHierarchy">false</param>
@@ -8387,7 +8401,9 @@
                 <param
                     name="includeProperties">^actionErrors.*</param>
             </result>
-            <result name="SUCCESS" type="json"> </result>
+            <result name="SUCCESS" type="json">
+                <param name="includeProperties">^categoryCounts.*</param>
+            </result>
             <result name="ERROR" type="json">
                 <param name="statusCode">422</param>
                 <param name="ignoreHierarchy">false</param>
@@ -8419,7 +8435,9 @@
                 <param
                     name="includeProperties">^actionErrors.*</param>
             </result>
-            <result name="SUCCESS" type="json"> </result>
+            <result name="SUCCESS" type="json">
+                <param name="includeProperties">^categoryCounts.*</param>
+            </result>
             <result name="ERROR" type="json">
                 <param name="statusCode">422</param>
                 <param name="ignoreHierarchy">false</param>
@@ -8451,7 +8469,9 @@
                 <param
                     name="includeProperties">^actionErrors.*</param>
             </result>
-            <result name="SUCCESS" type="json"> </result>
+            <result name="SUCCESS" type="json">
+                <param name="includeProperties">^actorsCounts.*</param>
+            </result>
             <result name="ERROR" type="json">
                 <param name="statusCode">422</param>
                 <param name="ignoreHierarchy">false</param>
@@ -8483,7 +8503,9 @@
                 <param
                     name="includeProperties">^actionErrors.*</param>
             </result>
-            <result name="SUCCESS" type="json"> </result>
+            <result name="SUCCESS" type="json">
+                <param name="includeProperties">^threatActivityTimelines.*</param>
+            </result>
             <result name="ERROR" type="json">
                 <param name="statusCode">422</param>
                 <param name="ignoreHierarchy">false</param>

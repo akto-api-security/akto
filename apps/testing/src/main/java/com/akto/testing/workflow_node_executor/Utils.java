@@ -245,6 +245,7 @@ public class Utils {
     public static LoginFlowResponse runLoginFlow(WorkflowTest workflowTest, AuthMechanism authMechanism, LoginFlowParams loginFlowParams, String roleName) throws Exception {
         Graph graph = new Graph();
         graph.buildGraph(workflowTest);
+        int errorExpiryTime = Context.now() + 900; // 15 mins
 
         ArrayList<Object> responses = new ArrayList<Object>();
 
@@ -266,7 +267,7 @@ public class Utils {
                 }
                 nodeResult = processNode(node, valuesMap, allowAllStatusCodes, false, new ArrayList<>(), null, authMechanism);
             } catch (Exception e) {
-                ;
+                authMechanism.updateErrorCacheExpiryEpoch(errorExpiryTime);
                 List<String> testErrors = new ArrayList<>();
                 testErrors.add("Error Processing Node In Login Flow " + e.getMessage());
                 nodeResult = new WorkflowTestResult.NodeResult("{}", false, testErrors);
@@ -289,6 +290,7 @@ public class Utils {
             responses.add(respString.toString());
             
             if (nodeResult.getErrors().size() > 0) {
+                authMechanism.updateErrorCacheExpiryEpoch(errorExpiryTime);
                 return new LoginFlowResponse(responses, "Failed to process node " + node.getId(), false);
             } else {
                 if (loginFlowParams != null && loginFlowParams.getFetchValueMap()) {
@@ -305,6 +307,7 @@ public class Utils {
             try {
                 String value = executeCode(param.getValue(), valuesMap, false);
                 if (!param.getValue().equals(value) && value == null) {
+                    authMechanism.updateErrorCacheExpiryEpoch(errorExpiryTime);
                     return new LoginFlowResponse(responses, "auth param not found at specified path " + 
                     param.getValue(), false);
                 }
@@ -318,6 +321,7 @@ public class Utils {
                     try {
                         String[] parts = tempVal.split("\\.");
                         if (parts.length != 3) {
+                            authMechanism.updateErrorCacheExpiryEpoch(errorExpiryTime);
                             throw new IllegalArgumentException("Invalid JWT token format");
                         }
                         String payload = new String(Base64.getUrlDecoder().decode(parts[1]));
@@ -326,6 +330,7 @@ public class Utils {
                             newExpiryTime = Math.min(payloadJson.getInt("exp"), newExpiryTime);
                             
                         } else {
+                            authMechanism.updateErrorCacheExpiryEpoch(errorExpiryTime);
                             throw new IllegalArgumentException("JWT does not have an 'exp' claim");
                         }
                     } catch (Exception e) {
@@ -335,6 +340,7 @@ public class Utils {
 
                 calculatedAuthParams.add(new HardcodedAuthParam(param.getWhere(), param.getKey(), value, param.getShowHeader()));
             } catch(Exception e) {
+                authMechanism.updateErrorCacheExpiryEpoch(errorExpiryTime);
                 return new LoginFlowResponse(responses, "error resolving auth param " + param.getValue(), false);
             }
         }

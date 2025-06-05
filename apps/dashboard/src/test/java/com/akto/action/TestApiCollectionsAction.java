@@ -8,6 +8,7 @@ import com.akto.dao.context.Context;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.ApiInfo.ApiInfoKey;
+import com.akto.dto.traffic.CollectionTags;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods.Method;
 import com.akto.types.CappedSet;
@@ -177,10 +178,10 @@ public class TestApiCollectionsAction extends MongoBasedTest {
         collection5.setId(5);
         collection5.setHostName("kubernetes-121212-akto.io");
 
-        assertEquals(ApiCollection.ENV_TYPE.STAGING.name().toString(), collection1.getEnvType());
-        assertEquals(ApiCollection.ENV_TYPE.STAGING.name().toString(), collection2.getEnvType());
-        assertNotEquals(ApiCollection.ENV_TYPE.STAGING.name().toString(), collection3.getEnvType());
-        assertEquals(ApiCollection.ENV_TYPE.STAGING.name().toString(), collection4.getEnvType());
-        assertEquals(ApiCollection.ENV_TYPE.STAGING.name().toString(), collection5.getEnvType());
+        assertTrue(collection1.getEnvType() != null && collection1.getEnvType().stream().map(CollectionTags::getValue).anyMatch(value -> value.equals(ApiCollection.ENV_TYPE.STAGING.name())));
+        assertTrue(collection2.getEnvType() != null && collection2.getEnvType().stream().map(CollectionTags::getValue).anyMatch(value -> value.equals(ApiCollection.ENV_TYPE.STAGING.name())));
+        assertTrue(collection3.getEnvType() == null || collection3.getEnvType().stream().map(CollectionTags::getValue).noneMatch(value -> value.equals(ApiCollection.ENV_TYPE.STAGING.name())));
+        assertTrue(collection4.getEnvType() != null && collection4.getEnvType().stream().map(CollectionTags::getValue).anyMatch(value -> value.equals(ApiCollection.ENV_TYPE.STAGING.name())));
+        assertTrue(collection5.getEnvType() != null && collection5.getEnvType().stream().map(CollectionTags::getValue).anyMatch(value -> value.equals(ApiCollection.ENV_TYPE.STAGING.name())));
     }
 }

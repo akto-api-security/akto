@@ -69,7 +69,9 @@ public class ThreatConfigurationEvaluator {
                             ThreatConfiguration.class, responseBody)
                     .orElse(null);
 
-            logger.debug("Fetched threat configuration" + threatConfiguration.toString());
+            if (this.threatConfiguration != null) {
+                logger.debug("Fetched threat configuration" + this.threatConfiguration.toString());
+            }
         } catch (Exception e) {
             e.printStackTrace();
             logger.error("Error while getting threat configuration" + e.getStackTrace());
@@ -93,12 +95,13 @@ public class ThreatConfigurationEvaluator {
 
     public String getActorId(HttpResponseParams responseParam) {
         getThreatConfiguration();
-        String actor;
-        String sourceIp = SourceIPActorGenerator.instance.generate(responseParam).orElse("");
-        responseParam.setSourceIP(sourceIp);
+        String actor = SourceIPActorGenerator.instance.generate(responseParam).orElse("");
+        responseParam.setSourceIP(actor);
+        if (responseParam.getOriginalMsg() != null) {
+            logger.debugAndAddToDbCount("Actor ID generated: " + actor + " for response: " + responseParam.getOriginalMsg().get());
+        }
 
         if (threatConfiguration == null) {
-            actor = sourceIp;
             return actor;
         }
 
@@ -114,18 +117,16 @@ public class ThreatConfigurationEvaluator {
                             .get(actorId.getKey().toLowerCase());
                     if (header != null && !header.isEmpty()) {
                         actor = header.get(0);
+                        return actor;
                     } else {
                         logger.warn("Defaulting to source IP as actor id, header not found: "
                                 + actorId.getKey());
-                        actor = sourceIp;
+                        return actor;
                     }
-                    break;
                 default:
-                    actor = sourceIp;
                     break;
             }
-            return actor;
         }
-        return sourceIp;
+        return actor;
     }
 }

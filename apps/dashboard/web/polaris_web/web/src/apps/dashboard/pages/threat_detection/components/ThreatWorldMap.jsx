@@ -1,16 +1,39 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import Highcharts from "highcharts/highmaps";
 import Exporting from "highcharts/modules/exporting";
 import ExportData from "highcharts/modules/export-data";
 import FullScreen from "highcharts/modules/full-screen";
 import InfoCard from "../../dashboard/new_components/InfoCard";
+import { Spinner } from "@shopify/polaris";
+import api from "../api";
+
 // Initialize modules
 Exporting(Highcharts);
 ExportData(Highcharts);
 FullScreen(Highcharts);
 
-function ThreatWorldMap({ data, style, loading }) {
-  useEffect(() => {
+function ThreatWorldMap({ startTimestamp, endTimestamp,  style}) {
+
+  const [loading, setLoading] = useState(false);
+  const [data, setData] = useState(false);
+
+    const fetchActorsPerCountry = async () => {
+      // setLoading(true);
+      const res = await api.getActorsCountPerCounty(startTimestamp, endTimestamp);
+      if (res?.actorsCountPerCountry) {
+        setData(
+          res.actorsCountPerCountry.map((x) => {
+            return {
+              code: x.country,
+              z: 100,
+              count: x.count,
+            };
+          })
+        );
+      }
+      setLoading(false);
+    };
+
     const fetchMapData = async () => {
       const topology = await fetch(
         "https://code.highcharts.com/mapdata/custom/world.topo.json"
@@ -104,14 +127,28 @@ function ThreatWorldMap({ data, style, loading }) {
       });
     };
 
-    fetchMapData();
+  useEffect(() => {
+    if (data) {
+      fetchMapData();
+    }
   }, [data]);
 
-  return <InfoCard
-    title={"Threat Actor Map"}
-    titleToolTip={"Threat Actor Map"}
-    component={<div id="threat-world-map-container" style={style}></div>}
-  />;
+  useEffect(() => {
+    fetchActorsPerCountry();
+    fetchMapData();
+  }, [startTimestamp, endTimestamp]);
+
+  if (loading) {
+    return <Spinner />;
+  }
+
+  return (
+    <InfoCard
+      title={"Threat Actor Map"}
+      titleToolTip={"Threat Actor Map"}
+      component={<div id="threat-world-map-container" style={style}></div>}
+    />
+  );
 }
 
 export default ThreatWorldMap;
