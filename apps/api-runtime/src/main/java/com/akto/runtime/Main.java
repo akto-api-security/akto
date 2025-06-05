@@ -386,7 +386,7 @@ public class Main {
         AccountTask.instance.executeTask(t -> {
             initializeRuntimeHelper();
         }, "initialize-runtime-task");
-        SingleTypeInfo.init();
+        SingleTypeInfo.schedulePopulateDataTypesInfoTask();
         HttpCallParser.init();
         Setup setup = SetupDao.instance.findOne(new BasicDBObject());
 
