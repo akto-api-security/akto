@@ -75,7 +75,7 @@ import okhttp3.MediaType;
 
 public class Utils {
 
-    private static final LoggerMaker loggerMaker = new LoggerMaker(Utils.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(Utils.class, LogDb.TESTING);
 
     public static void populateValuesMap(Map<String, Object> valuesMap, String payloadStr, String nodeId, Map<String,
             List<String>> headers, boolean isRequest, String queryParams) {
@@ -685,7 +685,7 @@ public class Utils {
             }
             return 0;
         } catch (Exception e) {
-            //ignore
+            loggerMaker.errorAndAddToDb(e, "Error comparing versions: " + e.getMessage());
         }
         return 1;
     }
