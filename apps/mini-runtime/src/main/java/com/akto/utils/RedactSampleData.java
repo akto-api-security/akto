@@ -55,7 +55,7 @@ public class RedactSampleData {
         List<String> cookieList = headers.getOrDefault(header, new ArrayList<>());
         Map<String, String> cookieMap = AuthPolicy.parseCookie(cookieList);
         for (String cookieKey : cookieMap.keySet()) {
-            cookie += cookieKey + "=" + redactValue + ";";
+            cookie += cookieKey + "=" + redact(cookieMap.get(cookieKey)) + ";";
         }
         if (cookie.isEmpty()) {
             cookie = redactValue;
@@ -63,7 +63,7 @@ public class RedactSampleData {
         return cookie;
     }
 
-    private static String handleQueryParams(String url, boolean redactAll, String redactValue) {
+    private static String handleQueryParams(String url, boolean redactAll) {
 
         if (!redactAll || url == null || url.isEmpty()) {
             return url;
@@ -80,7 +80,11 @@ public class RedactSampleData {
                     if (i != 0) {
                         finalUrl += "&";
                     }
-                    finalUrl += param[0] + "=" + redactValue;
+                    if (param.length > 1) {
+                        finalUrl += param[0] + "=" + redact(param[1]);
+                    } else {
+                        finalUrl += param[0] + "=" + redact("");
+                    }
                 }
             }
 
@@ -101,7 +105,11 @@ public class RedactSampleData {
                     responseHeaders.put(header, Collections.singletonList(cookie));
                     continue;
                 }
-                responseHeaders.put(header, Collections.singletonList(redactValue));
+                if (responseHeaders.get(header) == null || responseHeaders.get(header).size() == 0) {
+                    responseHeaders.put(header, Collections.singletonList(""));
+                } else {
+                    responseHeaders.put(header, Collections.singletonList(redact(responseHeaders.get(header).get(0))));
+                }
             }
             return;
         }
@@ -119,7 +127,7 @@ public class RedactSampleData {
                     responseHeaders.put(key, Collections.singletonList(cookie));
                     continue;
                 }
-                responseHeaders.put(key, Collections.singletonList(redactValue));
+                responseHeaders.put(key, Collections.singletonList(redact(values.get(0))));
             }
         }
     }
@@ -174,7 +182,7 @@ public class RedactSampleData {
         try {
             JsonParser jp = factory.createParser(responsePayload);
             JsonNode node = mapper.readTree(jp);
-            change(null, node, redactValue, redactAll, false);
+            change(null, node, redactAll, false);
             if (node != null) {
                 responsePayload = node.toString();
             } else {
@@ -191,7 +199,7 @@ public class RedactSampleData {
         // request payload
         String requestPayload = httpResponseParams.requestParams.getPayload();
         //query params
-        String url = handleQueryParams(httpResponseParams.requestParams.getURL(), redactAll, redactValue);
+        String url = handleQueryParams(httpResponseParams.requestParams.getURL(), redactAll);
         httpResponseParams.requestParams.setUrl(url);
         if (requestPayload == null) requestPayload = "{}";
         try {
@@ -207,7 +215,7 @@ public class RedactSampleData {
             }
             JsonParser jp = factory.createParser(requestPayload);
             JsonNode node = mapper.readTree(jp);
-            change(null, node, redactValue, redactAll, isGraphqlModified);
+            change(null, node, redactAll, isGraphqlModified);
             if (node != null) {
                 requestPayload= node.toString();
             } else {
@@ -235,7 +243,7 @@ public class RedactSampleData {
 
     }    
 
-    public static void change(String parentName, JsonNode parent, String newValue, boolean redactAll, boolean isGraphqlModified) {
+    public static void change(String parentName, JsonNode parent, boolean redactAll, boolean isGraphqlModified) {
         if (parent == null) return;
 
         if (parent.isArray()) {
@@ -244,15 +252,15 @@ public class RedactSampleData {
                 JsonNode arrayElement = arrayNode.get(i);
                 if (arrayElement.isValueNode()) {
                     if(redactAll){
-                        arrayNode.set(i, new TextNode(redactValue));
+                        arrayNode.set(i, new TextNode(redact(arrayElement.asText())));
                     } else{
                         SingleTypeInfo.SubType subType = KeyTypes.findSubType(arrayElement.asText(), parentName, null);
                         if(SingleTypeInfo.isRedacted(subType.getName())){
-                            arrayNode.set(i, new TextNode(newValue));
+                            arrayNode.set(i, new TextNode(redact(arrayElement.asText())));
                         }
                     }
                 } else {
-                    change(parentName, arrayElement, newValue, redactAll, isGraphqlModified);
+                    change(parentName, arrayElement, redactAll, isGraphqlModified);
                 }
             }
         } else {
@@ -262,17 +270,17 @@ public class RedactSampleData {
                 JsonNode fieldValue = parent.get(f);
                 if (fieldValue.isValueNode()) {
                     if(redactAll && !(isGraphqlModified && f.equalsIgnoreCase(GraphQLUtils.QUERY))){
-                        ((ObjectNode) parent).put(f, newValue);
+                        ((ObjectNode) parent).put(f, redact(fieldValue.asText()));
                     }
                     else {
                         SingleTypeInfo.SubType subType = KeyTypes.findSubType(fieldValue.asText(), f, null);
                         if (SingleTypeInfo.isRedacted(subType.getName())) {
-                            ((ObjectNode) parent).put(f, newValue);
+                            ((ObjectNode) parent).put(f, redact(fieldValue.asText()));
                         }
                     }
 
                 } else {
-                    change(f, fieldValue, newValue, redactAll, isGraphqlModified);
+                    change(f, fieldValue, redactAll, isGraphqlModified);
                 }
             }
         }
@@ -402,6 +410,29 @@ public class RedactSampleData {
         m.put("originalRequestPayload", origReqPayload);
         m.put("originalResponsePayload", origResPayload);
         return mapper.writeValueAsString(m);
+    }
+
+    public static String redact(Object input) {
+        if (input == null) {
+            return null;
+        }
+
+        String str = input.toString();
+        StringBuilder redacted = new StringBuilder();
+
+        for (char ch : str.toCharArray()) {
+            if (Character.isLowerCase(ch)) {
+                redacted.append('a');
+            } else if (Character.isUpperCase(ch)) {
+                redacted.append('A');
+            } else if (Character.isDigit(ch)) {
+                redacted.append('1');
+            } else {
+                redacted.append('-');
+            }
+        }
+
+        return redacted.toString();
     }
 
 }

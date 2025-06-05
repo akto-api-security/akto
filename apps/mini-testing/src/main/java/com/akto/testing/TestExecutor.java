@@ -1,5 +1,6 @@
 package com.akto.testing;
 
+import com.akto.PayloadEncodeUtil;
 import com.akto.crons.GetRunningTestsStatus;
 import com.akto.dao.context.Context;
 import com.akto.dao.test_editor.YamlTemplateDao;
@@ -42,6 +43,7 @@ import com.akto.util.Constants;
 import com.akto.util.enums.GlobalEnums.Severity;
 import com.akto.util.enums.LoginFlowEnums;
 import com.alibaba.fastjson2.JSON;
+import com.auth0.jwt.exceptions.JWTVerificationException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.Gson;
 import com.mongodb.BasicDBObject;
@@ -57,6 +59,7 @@ import org.json.JSONObject;
 
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.security.interfaces.RSAPublicKey;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -79,6 +82,8 @@ public class TestExecutor {
     private static final ClientLayer clientLayer = new ClientLayer();
     private static final AtomicInteger totalTestsCount = new AtomicInteger(0);
     private static final boolean shouldCallClientLayerForSampleData = System.getenv("TESTING_DB_LAYER_SERVICE_URL") != null && !System.getenv("TESTING_DB_LAYER_SERVICE_URL").isEmpty();
+    private static RSAPublicKey publicKey = PayloadEncodeUtil.getPublicKey();
+
     public void init(TestingRun testingRun, ObjectId summaryId, SyncLimit syncLimit, boolean shouldInitOnly) {
         totalTestsCount.set(0);
         if (testingRun.getTestIdConfig() != 1) {
@@ -407,6 +412,11 @@ public class TestExecutor {
         if(shouldCallClientLayerForSampleData){
             try {
                 message = clientLayer.fetchLatestSample(apiInfoKey);
+                if (!message.contains("requestPayload") && publicKey != null) {
+                    message = PayloadEncodeUtil.decodePayload(message, publicKey);
+                }
+            } catch (JWTVerificationException e) {
+                loggerMaker.errorAndAddToDb(e, "Error while decoding encoded payload in findOriginalHttpRequest: " + e.getMessage(), LogDb.TESTING);
             } catch (Exception e) {
                 return null;
             }
@@ -816,6 +826,11 @@ public class TestExecutor {
                 
                 try {
                     msg = clientLayer.fetchLatestSample(apiInfoKey);
+                    if (!msg.contains("requestPayload") && publicKey != null) {
+                        msg = PayloadEncodeUtil.decodePayload(msg, publicKey);
+                    }
+                } catch (JWTVerificationException e) {
+                    loggerMaker.errorAndAddToDb(e, "Error while decoding encoded payload in runTestNew: " + e.getMessage(), LogDb.TESTING);
                 } catch (Exception e) {
                 }
                 if (msg != null) {
