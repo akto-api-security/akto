@@ -22,6 +22,7 @@ import com.akto.ProtoMessageUtils;
 import com.akto.threat.backend.constants.MongoDBCollection;
 import com.akto.threat.backend.db.ActorInfoModel;
 import com.akto.threat.backend.db.SplunkIntegrationModel;
+import com.akto.threat.backend.db.MaliciousEventModel.EventType;
 import com.google.protobuf.TextFormat;
 import com.mongodb.client.FindIterable;
 import com.mongodb.client.MongoClient;
@@ -396,17 +397,24 @@ public class ThreatActorService {
     String refId = request.getRefId();
     MongoCollection<Document> coll = this.mongoClient.getDatabase(accountId).getCollection(MongoDBCollection.ThreatDetection.MALICIOUS_EVENTS, Document.class);
     Bson filters = Filters.eq("refId", refId);
-    if (request.getEventType().equalsIgnoreCase("SINGLE")) {
-        FindIterable<Document> respList = (FindIterable<Document>) coll.find(filters);
-       maliciousPayloadsResponse = this.fetchMaliciousPayloadsResponse(respList); 
-    } else {
+    FindIterable<Document> respList;
+
+    if (request.getEventType().equalsIgnoreCase(EventType.AGGREGATED.name())) {
         Bson matchConditions = Filters.and(
             Filters.eq("actor", request.getActor()),
             Filters.gte("filterId", request.getFilterId())
         );
-        FindIterable<Document> respList = (FindIterable<Document>) coll.find(matchConditions).sort(Sorts.descending("detectedAt")).limit(10);
-        maliciousPayloadsResponse = this.fetchMaliciousPayloadsResponse(respList);
+        matchConditions = Filters.or(
+            matchConditions,
+            filters
+        );
+        respList = (FindIterable<Document>) coll.find(matchConditions).sort(Sorts.descending("detectedAt")).limit(10);
+        maliciousPayloadsResponse.addAll(this.fetchMaliciousPayloadsResponse(respList));
         // TODO: Handle case where aggregate was satisfied only once.
+    } else {
+        respList = (FindIterable<Document>) coll.find(filters);
+        maliciousPayloadsResponse = this.fetchMaliciousPayloadsResponse(respList); 
+
     }
     return FetchMaliciousEventsResponse.newBuilder().addAllMaliciousPayloadsResponse(maliciousPayloadsResponse).build();
   }
