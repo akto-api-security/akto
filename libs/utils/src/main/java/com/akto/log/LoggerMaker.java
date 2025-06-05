@@ -308,6 +308,14 @@ public class LoggerMaker {
         logger.info(msg, vars);
     }
 
+     public void warn(String msg){
+        logger.warn(msg);
+    }
+
+    public void warn(String msg, Object... vars){
+        logger.warn(msg, vars);
+    }
+
 
     public void error(String msg){
         logger.error(msg);

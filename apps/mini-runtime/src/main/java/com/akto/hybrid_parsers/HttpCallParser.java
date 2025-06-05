@@ -59,6 +59,7 @@ import org.apache.commons.collections.CollectionUtils;
 import org.apache.kafka.common.quota.ClientQuotaAlteration.Op;
 
 import static com.akto.runtime.RuntimeUtil.matchesDefaultPayload;
+import static com.akto.runtime.utils.Utils.printL;
 import static com.akto.testing.Utils.validateFilter;
 
 public class HttpCallParser {
@@ -512,7 +513,10 @@ public class HttpCallParser {
             return;
         }
 
+
         List<CollectionTags> tagsList = CollectionTags.calculateTagsDiff(apiCollection.getTagsList(), httpResponseParams.getTags());
+
+        printL("Updating tags for apiCollectionId: " + apiCollectionId + "with tags: " + tagsList);
 
         if (CollectionUtils.isEmpty(apiCollection.getTagsList()) || apiCollection.getTagsList().stream()
             .noneMatch(t -> "mcp-server".equals(t.getKeyName()))) {
@@ -545,7 +549,7 @@ public class HttpCallParser {
             }
         }
 
-        loggerMaker.debug("Updated tags for apiCollectionId: " + apiCollectionId + " with tags: " + tagsList);
+        printL("Updated tags for apiCollectionId: " + apiCollectionId + " with tags: " + tagsList);
     }
 
     public int createApiCollectionId(HttpResponseParams httpResponseParam){
