@@ -54,7 +54,7 @@ public class Main {
     private static void printL(Object o) {
         if (debugPrintCounter > 0) {
             debugPrintCounter--;
-            loggerMaker.info(o.toString());
+            loggerMaker.warn(o.toString());
         }
     }   
 

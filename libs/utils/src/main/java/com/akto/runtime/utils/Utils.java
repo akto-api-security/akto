@@ -27,7 +27,7 @@ public class Utils {
     public static void printL(Object o) {
         if (debugPrintCounter > 0) {
             debugPrintCounter--;
-            logger.info(o.toString());
+            logger.warn(o.toString());
         }
     }
 

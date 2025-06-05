@@ -43,6 +43,16 @@ public class CollectionTags {
         return Objects.hash(lastUpdatedTs, keyName, value, source);
     }
 
+    @Override
+    public String toString() {
+        return "CollectionTags{" +
+                "lastUpdatedTs=" + lastUpdatedTs +
+                ", keyName='" + keyName + '\'' +
+                ", value='" + value + '\'' +
+                ", source=" + source +
+                '}';
+    }
+
 
     public static List<CollectionTags> calculateTagsDiff(List<CollectionTags> collectionTagsList, String tagsJson) {
         if (tagsJson == null || tagsJson.isEmpty()) {
