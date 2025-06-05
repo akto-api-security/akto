@@ -6,6 +6,7 @@ import com.akto.kafka.KafkaConfig;
 import com.akto.log.LoggerMaker;
 import com.akto.proto.generated.threat_detection.message.malicious_event.event_type.v1.EventType;
 import com.akto.proto.generated.threat_detection.message.malicious_event.v1.MaliciousEventMessage;
+import com.akto.proto.generated.threat_detection.message.sample_request.v1.SampleMaliciousRequest;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchAlertFiltersRequest;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchAlertFiltersResponse;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ListMaliciousRequestsRequest;
@@ -16,6 +17,7 @@ import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.Ti
 import com.akto.proto.generated.threat_detection.service.malicious_alert_service.v1.RecordMaliciousEventRequest;
 import com.akto.threat.backend.constants.KafkaTopic;
 import com.akto.threat.backend.constants.MongoDBCollection;
+import com.akto.threat.backend.db.AggregateSampleMaliciousEventModel;
 import com.akto.threat.backend.db.MaliciousEventModel;
 import com.akto.threat.backend.utils.KafkaUtils;
 import com.mongodb.client.DistinctIterable;
@@ -79,6 +81,33 @@ public class MaliciousEventService {
             .setType(evt.getType())
             .setMetadata(evt.getMetadata().toString())
             .build();
+
+    if (MaliciousEventModel.EventType.AGGREGATED.equals(maliciousEventType)) {
+      List<AggregateSampleMaliciousEventModel> events = new ArrayList<>();
+      for (SampleMaliciousRequest sampleReq : request.getSampleRequestsList()) {
+        events.add(
+            AggregateSampleMaliciousEventModel.newBuilder()
+                .setActor(actor)
+                .setIp(sampleReq.getIp())
+                .setUrl(sampleReq.getUrl())
+                .setMethod(URLMethods.Method.fromString(sampleReq.getMethod()))
+                .setOrig(sampleReq.getPayload())
+                .setRequestTime(sampleReq.getTimestamp())
+                .setApiCollectionId(sampleReq.getApiCollectionId())
+                .setFilterId(filterId)
+                .setRefId(refId)
+                .setSeverity(evt.getSeverity())
+                .setMetadata(evt.getMetadata().toString())
+                .build());
+      }
+
+      this.kafka.send(
+          KafkaUtils.generateMsg(
+              events,
+              MongoDBCollection.ThreatDetection.AGGREGATE_SAMPLE_MALICIOUS_REQUESTS,
+              accountId),
+          KafkaTopic.ThreatDetection.INTERNAL_DB_MESSAGES);
+    }
 
     this.kafka.send(
         KafkaUtils.generateMsg(

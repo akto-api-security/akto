@@ -103,8 +103,6 @@ message ListThreatActorResponse {
 message FetchMaliciousEventsRequest {
   string ref_id = 1;
   string event_type = 2;
-  string actor = 3;
-  string filter_id = 4;
 }
 
 message FetchMaliciousEventsResponse {

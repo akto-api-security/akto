@@ -22,7 +22,6 @@ import com.akto.ProtoMessageUtils;
 import com.akto.threat.backend.constants.MongoDBCollection;
 import com.akto.threat.backend.db.ActorInfoModel;
 import com.akto.threat.backend.db.SplunkIntegrationModel;
-import com.akto.threat.backend.db.MaliciousEventModel.EventType;
 import com.google.protobuf.TextFormat;
 import com.mongodb.client.FindIterable;
 import com.mongodb.client.MongoClient;
@@ -375,47 +374,36 @@ public class ThreatActorService {
     return metadataStr;
   }
 
-  private List<FetchMaliciousEventsResponse.MaliciousPayloadsResponse> fetchMaliciousPayloadsResponse(FindIterable<Document> respList){
-    if (respList == null) {
-      return Collections.emptyList();
-    }
-    List<FetchMaliciousEventsResponse.MaliciousPayloadsResponse> maliciousPayloadsResponse = new ArrayList<>();
-    for (Document doc: respList) {
-        maliciousPayloadsResponse.add(
-            FetchMaliciousEventsResponse.MaliciousPayloadsResponse.newBuilder().
-            setOrig(HttpResponseParams.getSampleStringFromProtoString(doc.getString("latestApiOrig"))).
-            setMetadata(fetchMetadataString(doc)).
-            setTs(doc.getLong("detectedAt")).build());
-    }
-    return maliciousPayloadsResponse;
-  } 
-
   public FetchMaliciousEventsResponse fetchAggregateMaliciousRequests(
       String accountId, FetchMaliciousEventsRequest request) {
 
     List<FetchMaliciousEventsResponse.MaliciousPayloadsResponse> maliciousPayloadsResponse = new ArrayList<>();
     String refId = request.getRefId();
-    MongoCollection<Document> coll = this.mongoClient.getDatabase(accountId).getCollection(MongoDBCollection.ThreatDetection.MALICIOUS_EVENTS, Document.class);
+    MongoCollection<Document> coll;
     Bson filters = Filters.eq("refId", refId);
-    FindIterable<Document> respList;
-
-    if (request.getEventType().equalsIgnoreCase(EventType.AGGREGATED.name())) {
-        Bson matchConditions = Filters.and(
-            Filters.eq("actor", request.getActor()),
-            Filters.gte("filterId", request.getFilterId())
-        );
-        matchConditions = Filters.or(
-            matchConditions,
-            filters
-        );
-        respList = (FindIterable<Document>) coll.find(matchConditions).sort(Sorts.descending("detectedAt")).limit(10);
-        maliciousPayloadsResponse.addAll(this.fetchMaliciousPayloadsResponse(respList));
-        // TODO: Handle case where aggregate was satisfied only once.
+    if (request.getEventType().equalsIgnoreCase("SINGLE")) {
+        coll =  this.mongoClient.getDatabase(accountId).getCollection(MongoDBCollection.ThreatDetection.MALICIOUS_EVENTS, Document.class);
+        FindIterable<Document> respList = (FindIterable<Document>) coll.find(filters);
+        for (Document doc: respList) {
+            maliciousPayloadsResponse.add(
+                FetchMaliciousEventsResponse.MaliciousPayloadsResponse.newBuilder().
+                setOrig(HttpResponseParams.getSampleStringFromProtoString(doc.getString("latestApiOrig"))).
+                setMetadata(fetchMetadataString(doc)).
+                setTs(doc.getLong("detectedAt")).build());
+        }
     } else {
-        respList = (FindIterable<Document>) coll.find(filters);
-        maliciousPayloadsResponse = this.fetchMaliciousPayloadsResponse(respList); 
-
+        coll = this.mongoClient.getDatabase(accountId).getCollection(MongoDBCollection.ThreatDetection.AGGREGATE_SAMPLE_MALICIOUS_REQUESTS, Document.class);
+        FindIterable<Document> respList = (FindIterable<Document>) coll.find(filters);
+        for (Document doc: respList) {
+            maliciousPayloadsResponse.add(
+                FetchMaliciousEventsResponse.MaliciousPayloadsResponse.newBuilder().
+                setOrig(HttpResponseParams.getSampleStringFromProtoString(doc.getString("orig"))).
+                setMetadata(fetchMetadataString(doc)).
+                setTs(doc.getLong("requestTime")).build());
+        }
     }
+    
+
     return FetchMaliciousEventsResponse.newBuilder().addAllMaliciousPayloadsResponse(maliciousPayloadsResponse).build();
   }
 
