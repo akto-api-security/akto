@@ -109,7 +109,7 @@ public class TestAutomatedAuth {
         authWithCondList.add(createAuthWithCondRecordedLogin());
         authWithCondList.add(createAuthWithCondRequestLogin());
         List<Integer> collectionIds = new ArrayList<>();
-        TestRoles recordedFlowTestRole = new TestRoles(id, name, null, authWithCondList, "akto_test", Context.now(), Context.now(), collectionIds);
+        TestRoles recordedFlowTestRole = new TestRoles(id, name, null, authWithCondList, "akto_test", Context.now(), Context.now(), collectionIds, "akto_test");
 
         // String output = Utils.fetchToken("somerole", createAuthWithCondRecordedLogin().getRecordedLoginFlowInput(), 1);
         // System.out.println("output: " + output);

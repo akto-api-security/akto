@@ -16,6 +16,8 @@ import TooltipText from "../../../components/shared/TooltipText"
 const sortOptions = [
     { label: 'Created at', value: 'created asc', directionLabel: 'Highest', sortKey: 'createdTs', columnIndex: 2 },
     { label: 'Created at', value: 'created desc', directionLabel: 'Lowest', sortKey: 'createdTs', columnIndex: 2 },
+    { label: 'Updated at', value: 'updated asc', directionLabel: 'Highest', sortKey: 'lastUpdatedTs', columnIndex: 3 },
+    { label: 'Updated at', value: 'updated desc', directionLabel: 'Lowest', sortKey: 'lastUpdatedTs', columnIndex: 3 },
 ];
 
 const headers = [
@@ -30,6 +32,20 @@ const headers = [
         value:"createdAt",
         sortKey:"createdTs",
         sortActive:true,
+    },
+    {
+        title:"Last Updated at",
+        text:"Updated at",
+        value:"lastUpdatedAt",
+        sortKey:"lastUpdatedTs",
+        sortActive:true,
+    },
+    {
+        title:"Last Updated By",
+        text:"Updated By",
+        value:"updatedBy",
+        showFilter:true,
+        filterKey:"updatedBy"
     },
     {
         title:"Author",
@@ -105,6 +121,10 @@ function TestRolesPage(){
                 testRole.id=testRole.name;
                 testRole.createdAt = func.prettifyEpoch(testRole.createdTs)
                 testRole.nameComp = (<Box maxWidth="40vw"><TooltipText tooltip={testRole.name} text={testRole.name} textProps={{fontWeight: 'medium'}}/></Box>)
+                testRole.lastUpdatedAt = func.prettifyEpoch(testRole?.lastUpdatedTs)
+                if(testRole?.lastUpdatedBy) {
+                    testRole.updatedBy = testRole?.lastUpdatedBy
+                }
                 all.push(testRole)
                 if(testRole.createdBy === 'System') {
                     system.push(testRole)
