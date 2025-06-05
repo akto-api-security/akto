@@ -219,7 +219,10 @@ const convertToNewData = (collectionsArr, sensitiveInfoMap, severityInfoMap, cov
     return { prettify: prettifyData, normal: newData }
 }
 
-function ApiCollections() {
+function ApiCollections(props) {
+
+    const {customCollectionDataFilter, onlyShowCollectionsTable, sendData} = props;
+
     const userRole = window.USER_ROLE
 
     const navigate = useNavigate();
@@ -305,6 +308,11 @@ function ApiCollections() {
         setLoading(true)
         const apiCollectionsResp = await api.getAllCollectionsBasic();
         setLoading(false)
+
+        if(customCollectionDataFilter){
+            apiCollectionsResp.apiCollections = (apiCollectionsResp.apiCollections || []).filter(customCollectionDataFilter)
+        }
+
         let hasUserEndpoints = await api.getUserEndpoints()
         setHasUsageEndpoints(hasUserEndpoints)
         let tmp = (apiCollectionsResp.apiCollections || []).map(convertToCollectionData)
@@ -890,6 +898,15 @@ function ApiCollections() {
     )
 
     const components = loading ? [<SpinnerCentered key={"loading"}/>]: [<SummaryCardInfo summaryItems={summaryItems} key="summary"/>, (!hasUsageEndpoints ? <CollectionsPageBanner key="page-banner" /> : null) ,modalComponent, tableComponent]
+
+    if(onlyShowCollectionsTable){
+        sendData(data)
+        return (
+            <Box paddingBlockStart={4} paddingInline={4}>
+                {tableComponent}
+            </Box>
+        )
+    }
 
     return(
         <PageWithMultipleCards
