@@ -35,6 +35,7 @@ public class ApiExecutor {
 
     // Load only first 1 MiB of response body into memory.
     private static final int MAX_RESPONSE_SIZE = 1024*1024;
+    private static final ObjectMapper objectMapper = new ObjectMapper();
     
     private static OriginalHttpResponse common(Request request, boolean followRedirects, boolean debug, List<TestingRunResult.TestLog> testLogs, boolean skipSSRFCheck, String requestProtocol) throws Exception {
 
@@ -74,9 +75,9 @@ public class ApiExecutor {
                 HTTPClientHandler.instance.getNewDebugClient(isSaasDeployment, followRedirects, testLogs, requestProtocol) :
                 HTTPClientHandler.instance.getHTTPClient(followRedirects, requestProtocol);
 
-        // if (!skipSSRFCheck && !HostDNSLookup.isRequestValid(request.url().host())) {
-        //     throw new IllegalArgumentException("SSRF attack attempt");
-        // }
+        if (!skipSSRFCheck && !HostDNSLookup.isRequestValid(request.url().host())) {
+            throw new IllegalArgumentException("SSRF attack attempt");
+        }
 
         Call call = client.newCall(request);
         Response response = null;
@@ -545,8 +546,7 @@ public class ApiExecutor {
         try {
             String body = request.getBody();
             if (body == null) return false;
-            ObjectMapper mapper = new ObjectMapper();
-            JsonNode node = mapper.readTree(body);
+            JsonNode node = objectMapper.readTree(body);
             return node.has("jsonrpc") && node.has("id");
         } catch (Exception e) {
             return false;
@@ -557,6 +557,7 @@ public class ApiExecutor {
         String sessionId;
         String endpoint;
         List<String> messages = new ArrayList<>();
+        Response response; // Store the OkHttp Response for cleanup
     }
 
     private static SseSession openSseSession(String host, boolean debug) throws Exception {
@@ -573,6 +574,7 @@ public class ApiExecutor {
         if (!response.isSuccessful()) {
             throw new IOException("Failed to open SSE session: " + response);
         }
+        session.response = response; // Store the response for later closing
         InputStream is = response.body().byteStream();
         Scanner scanner = new Scanner(is);
         while (scanner.hasNextLine()) {
@@ -612,14 +614,13 @@ public class ApiExecutor {
 
     private static String waitForMatchingSseMessage(SseSession session, String id, long timeoutMs) throws Exception {
         long start = System.currentTimeMillis();
-        ObjectMapper mapper = new ObjectMapper();
         while (System.currentTimeMillis() - start < timeoutMs) {
             synchronized (session.messages) {
                 Iterator<String> it = session.messages.iterator();
                 while (it.hasNext()) {
                     String msg = it.next();
                     try {
-                        JsonNode node = mapper.readTree(msg);
+                        JsonNode node = objectMapper.readTree(msg);
                         if (node.has("id") && node.get("id").asText().equals(id)) {
                             return msg;
                         }
@@ -653,14 +654,20 @@ public class ApiExecutor {
 
         // Wait for matching SSE message
         String body = request.getBody();
-        ObjectMapper mapper = new ObjectMapper();
-        JsonNode node = mapper.readTree(body);
+        JsonNode node = objectMapper.readTree(body);
         String id = node.get("id").asText();
-        String sseMsg = waitForMatchingSseMessage(session, id, 10000); // 10s timeout
+        String sseMsg = null;
+        try {
+            sseMsg = waitForMatchingSseMessage(session, id, 10000); // 10s timeout
+        } finally {
+            if (session.response != null) {
+                session.response.close(); // Always close the SSE connection
+            }
+        }
 
         // Return SSE message as JSON (not as a string)
-        JsonNode sseJson = mapper.readTree(sseMsg);
-        String jsonBody = mapper.writeValueAsString(sseJson);
+        JsonNode sseJson = objectMapper.readTree(sseMsg);
+        String jsonBody = objectMapper.writeValueAsString(sseJson);
         return new OriginalHttpResponse(jsonBody, resp.getHeaders(), resp.getStatusCode());
     }
 }
