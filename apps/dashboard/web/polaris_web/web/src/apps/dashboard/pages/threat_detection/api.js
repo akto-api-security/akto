@@ -91,11 +91,11 @@ const threatDetectionRequests = {
             data: {startTs, endTs}
         })
     },
-    fetchMaliciousRequest(refId, eventType, actor, filterId) {
+    fetchMaliciousRequest(refId, eventType){
         return request({
             url: '/api/fetchAggregateMaliciousRequests',
             method: 'post',
-            data: {refId, eventType, actor, filterId}
+            data: {refId, eventType}
         })
     },
     fetchCountBySeverity(startTs, endTs) {
