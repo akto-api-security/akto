@@ -1,5 +1,6 @@
 package com.akto.store;
 
+import com.akto.PayloadEncodeUtil;
 import com.akto.data_actor.DataActor;
 import com.akto.data_actor.DataActorFactory;
 import com.akto.data_actor.DbLayer;
@@ -14,9 +15,9 @@ import com.akto.log.LoggerMaker.LogDb;
 import com.akto.metrics.AllMetrics;
 import com.akto.testing_db_layer_client.ClientLayer;
 
+import java.security.interfaces.RSAPublicKey;
 import java.util.*;
 
-import org.checkerframework.checker.units.qual.s;
 
 public class SampleMessageStore {
 
@@ -26,6 +27,7 @@ public class SampleMessageStore {
     private Map<String, SingleTypeInfo> singleTypeInfos = new HashMap<>();
     private static final DataActor dataActor = DataActorFactory.fetchInstance();
     private static final ClientLayer clientLayer = new ClientLayer();
+    private static RSAPublicKey publicKey = PayloadEncodeUtil.getPublicKey();
     
     private SampleMessageStore() {}
 
@@ -89,10 +91,18 @@ public class SampleMessageStore {
         List<RawApi> messages = new ArrayList<>();
         try {
             long start = System.currentTimeMillis();
+            List<String> encodedSamples = new ArrayList<>();
             List<String> samples = new ArrayList<>();
             if(System.getenv("TESTING_DB_LAYER_SERVICE_URL") != null && !System.getenv("TESTING_DB_LAYER_SERVICE_URL").isEmpty()){
                 try {
-                    samples = clientLayer.fetchSamples(apiInfoKey);
+                    encodedSamples = clientLayer.fetchSamples(apiInfoKey);
+                    for (String sample: encodedSamples) {
+                        if (!sample.contains("requestPayload") && publicKey != null) {
+                            samples.add(PayloadEncodeUtil.decodePayload(sample, publicKey));
+                        } else {
+                            samples.add(sample);
+                        }
+                    }
                 } catch (Exception e) {
                     e.printStackTrace();
                     System.out.println("error in fetchAllOriginalMessages " + e.getMessage());
