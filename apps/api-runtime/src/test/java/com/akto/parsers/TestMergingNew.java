@@ -14,6 +14,7 @@ import com.akto.dto.*;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.*;
 import com.akto.runtime.APICatalogSync;
+import com.akto.runtime.URLAggregator;
 import com.akto.types.CappedSet;
 import com.akto.util.filter.DictionaryFilter;
 import com.akto.utils.RedactSampleData;
@@ -1136,5 +1137,42 @@ public class TestMergingNew extends MongoBasedTest {
         parser.apiCatalogSync.syncWithDB(true, true, SyncLimit.noLimit);
     }
 
+
+    @Test
+    public void testFirstSegmentParameterizedURL() {
+        testInitializer();
+        URLAggregator aggr = new URLAggregator();
+
+        // Add integer first segment
+        aggr.addURL(createSampleParams("user1", "/123/books"));
+        aggr.addURL(createSampleParams("user2", "456/books"));
+
+        // Add string first segment
+        aggr.addURL(createSampleParams("user3", "/17ef17e5-68a2-4348-9578-3ef744c26388/books"));
+        aggr.addURL(createSampleParams("user4", "96a8f231-9292-4870-a22b-ff61a9f38435/books"));
+
+        APICatalogSync sync = new APICatalogSync("access-token", 5, true);
+        sync.computeDelta(aggr, true, 123);
+        sync.syncWithDB(false, true, SyncLimit.noLimit);
+        APICatalogSync.mergeUrlsAndSave(123, true, false, sync.existingAPIsInDb);
+        sync.buildFromDB(false, true);
+
+        // Should not have any strict URLs, only templates
+        assertEquals(0, sync.getDbState(123).getStrictURLToMethods().size());
+        assertEquals(2, sync.getDbState(123).getTemplateURLToMethods().size());
+
+        Iterator<Map.Entry<URLTemplate, RequestTemplate>> iterator = sync.getDbState(123).getTemplateURLToMethods().entrySet().iterator();
+        Map.Entry<URLTemplate, RequestTemplate> entry = iterator.next();
+        Map.Entry<URLTemplate, RequestTemplate> entry1 = iterator.next();
+
+        // Should be either "/INTEGER/books" or "/STRING/books" depending on merge logic
+        String templateStr = entry.getKey().getTemplateString();
+        assertTrue(templateStr.startsWith("/"));
+        assertEquals("/INTEGER/books", templateStr);
+
+        String templateStr1 = entry1.getKey().getTemplateString();
+        assertTrue(templateStr1.startsWith("/"));
+        assertEquals("/STRING/books", templateStr1);
+    }
 
 }
