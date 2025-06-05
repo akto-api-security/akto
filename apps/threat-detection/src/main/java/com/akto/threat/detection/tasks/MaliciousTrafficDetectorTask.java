@@ -1,6 +1,5 @@
 package com.akto.threat.detection.tasks;
 
-import java.io.IOException;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -13,12 +12,6 @@ import java.util.concurrent.Executors;
 import java.util.function.Supplier;
 
 import org.apache.commons.lang3.math.NumberUtils;
-import org.apache.http.client.methods.CloseableHttpResponse;
-import org.apache.http.client.methods.HttpGet;
-import org.apache.http.client.methods.HttpPost;
-import org.apache.http.impl.client.CloseableHttpClient;
-import org.apache.http.impl.client.HttpClients;
-import org.apache.http.util.EntityUtils;
 import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
@@ -26,7 +19,6 @@ import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
 
 import com.akto.IPLookupClient;
-import com.akto.ProtoMessageUtils;
 import com.akto.RawApiMetadataFactory;
 import com.akto.dao.context.Context;
 import com.akto.dao.monitoring.FilterYamlTemplateDao;
@@ -66,8 +58,6 @@ import com.akto.util.Constants;
 import com.akto.util.HttpRequestResponseUtils;
 import com.akto.utils.GzipUtils;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.google.api.services.drive.Drive.About.Get;
-
 import io.lettuce.core.RedisClient;
 import io.lettuce.core.api.StatefulRedisConnection;
 
@@ -100,7 +90,6 @@ public class MaliciousTrafficDetectorTask implements Task {
   private static final DataActor dataActor = DataActorFactory.fetchInstance();
   private static final LoggerMaker logger = new LoggerMaker(MaliciousTrafficDetectorTask.class, LogDb.THREAT_DETECTION);
 
-  private static final ObjectMapper objectMapper = new ObjectMapper();
   private static final HttpRequestParams requestParams = new HttpRequestParams();
   private static final HttpResponseParams responseParams = new HttpResponseParams();
   private static Map<String, Object> varMap = new HashMap<>();
@@ -252,8 +241,6 @@ public class MaliciousTrafficDetectorTask implements Task {
       return;
     }
 
-    List<SampleRequestKafkaEnvelope> maliciousMessages = new ArrayList<>();
-
     RawApi rawApi = RawApi.buildFromMessageNew(responseParam);
     RawApiMetadata metadata = this.rawApiFactory.buildFromHttp(rawApi.getRequest(), rawApi.getResponse());
     rawApi.setRawApiMetdata(metadata);
@@ -320,15 +307,6 @@ public class MaliciousTrafficDetectorTask implements Task {
           maliciousReq = Utils.buildSampleMaliciousRequest(actor, responseParam, apiFilter, metadata, errors);
         }
 
-        if (maliciousReq != null) {
-          maliciousMessages.add(
-              SampleRequestKafkaEnvelope.newBuilder()
-                  .setActor(actor)
-                  .setAccountId(responseParam.getAccountId())
-                  .setMaliciousRequest(maliciousReq)
-                  .build());
-        }
-
         if (!isAggFilter) {
           generateAndPushMaliciousEventRequest(
               apiFilter, actor, responseParam, maliciousReq, EventType.EVENT_TYPE_SINGLE);
@@ -345,12 +323,6 @@ public class MaliciousTrafficDetectorTask implements Task {
               shouldNotify = this.apiCountWindowBasedThresholdNotifier.calcApiCount(apiHitCountKey, responseParam.getTime(), rule);
               if (shouldNotify) {
                 maliciousReq = Utils.buildSampleMaliciousRequest(actor, responseParam, apiFilter, metadata, errors);
-                maliciousMessages.add(
-                  SampleRequestKafkaEnvelope.newBuilder()
-                      .setActor(actor)
-                      .setAccountId(responseParam.getAccountId())
-                      .setMaliciousRequest(maliciousReq)
-                      .build());
               }
           } else {
               shouldNotify = this.windowBasedThresholdNotifier.shouldNotify(aggKey, maliciousReq, rule);
@@ -369,17 +341,6 @@ public class MaliciousTrafficDetectorTask implements Task {
       }
     } 
 
-    // Should we push all the messages in one go
-    // or call kafka.send for each HttpRequestParams
-    try {
-      maliciousMessages.forEach(
-          sample -> {
-            internalKafka.send(KafkaTopic.ThreatDetection.MALICIOUS_EVENTS, sample);
-          });
-    } catch (Exception e) {
-      logger.errorAndAddToDb("Error in sending malicious event to kafka " + e.getMessage());
-      e.printStackTrace();
-    }
   }
 
   private void generateAndPushMaliciousEventRequest(
