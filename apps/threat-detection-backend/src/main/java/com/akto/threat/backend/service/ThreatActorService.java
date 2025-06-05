@@ -374,36 +374,40 @@ public class ThreatActorService {
     return metadataStr;
   }
 
+  private List<FetchMaliciousEventsResponse.MaliciousPayloadsResponse> fetchMaliciousPayloadsResponse(FindIterable<Document> respList){
+    if (respList == null) {
+      return Collections.emptyList();
+    }
+    List<FetchMaliciousEventsResponse.MaliciousPayloadsResponse> maliciousPayloadsResponse = new ArrayList<>();
+    for (Document doc: respList) {
+        maliciousPayloadsResponse.add(
+            FetchMaliciousEventsResponse.MaliciousPayloadsResponse.newBuilder().
+            setOrig(HttpResponseParams.getSampleStringFromProtoString(doc.getString("latestApiOrig"))).
+            setMetadata(fetchMetadataString(doc)).
+            setTs(doc.getLong("detectedAt")).build());
+    }
+    return maliciousPayloadsResponse;
+  } 
+
   public FetchMaliciousEventsResponse fetchAggregateMaliciousRequests(
       String accountId, FetchMaliciousEventsRequest request) {
 
     List<FetchMaliciousEventsResponse.MaliciousPayloadsResponse> maliciousPayloadsResponse = new ArrayList<>();
     String refId = request.getRefId();
-    MongoCollection<Document> coll;
+    MongoCollection<Document> coll = this.mongoClient.getDatabase(accountId).getCollection(MongoDBCollection.ThreatDetection.MALICIOUS_EVENTS, Document.class);
     Bson filters = Filters.eq("refId", refId);
     if (request.getEventType().equalsIgnoreCase("SINGLE")) {
-        coll =  this.mongoClient.getDatabase(accountId).getCollection(MongoDBCollection.ThreatDetection.MALICIOUS_EVENTS, Document.class);
         FindIterable<Document> respList = (FindIterable<Document>) coll.find(filters);
-        for (Document doc: respList) {
-            maliciousPayloadsResponse.add(
-                FetchMaliciousEventsResponse.MaliciousPayloadsResponse.newBuilder().
-                setOrig(HttpResponseParams.getSampleStringFromProtoString(doc.getString("latestApiOrig"))).
-                setMetadata(fetchMetadataString(doc)).
-                setTs(doc.getLong("detectedAt")).build());
-        }
+       maliciousPayloadsResponse = this.fetchMaliciousPayloadsResponse(respList); 
     } else {
-        coll = this.mongoClient.getDatabase(accountId).getCollection(MongoDBCollection.ThreatDetection.AGGREGATE_SAMPLE_MALICIOUS_REQUESTS, Document.class);
-        FindIterable<Document> respList = (FindIterable<Document>) coll.find(filters);
-        for (Document doc: respList) {
-            maliciousPayloadsResponse.add(
-                FetchMaliciousEventsResponse.MaliciousPayloadsResponse.newBuilder().
-                setOrig(HttpResponseParams.getSampleStringFromProtoString(doc.getString("orig"))).
-                setMetadata(fetchMetadataString(doc)).
-                setTs(doc.getLong("requestTime")).build());
-        }
+        Bson matchConditions = Filters.and(
+            Filters.eq("actor", request.getActor()),
+            Filters.gte("filterId", request.getFilterId())
+        );
+        FindIterable<Document> respList = (FindIterable<Document>) coll.find(matchConditions).sort(Sorts.descending("detectedAt")).limit(10);
+        maliciousPayloadsResponse = this.fetchMaliciousPayloadsResponse(respList);
+        // TODO: Handle case where aggregate was satisfied only once.
     }
-    
-
     return FetchMaliciousEventsResponse.newBuilder().addAllMaliciousPayloadsResponse(maliciousPayloadsResponse).build();
   }
 
