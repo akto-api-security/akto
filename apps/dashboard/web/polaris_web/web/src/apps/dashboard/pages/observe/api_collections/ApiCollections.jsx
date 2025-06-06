@@ -202,7 +202,7 @@ const convertToNewData = (collectionsArr, sensitiveInfoMap, severityInfoMap, cov
         }
         return{
             ...c,
-            envType: c?.envType?.map((type) => type?.keyName.slice(0, 30) + '=' + type?.value),
+            envType: c?.envType?.map((type) => type?.keyName?.slice(0, 30) + '=' + type?.value),
             displayNameComp: (<Box maxWidth="20vw"><TooltipText tooltip={c.displayName} text={c.displayName} textProps={{fontWeight: 'medium'}}/></Box>),
             testedEndpoints: c.urlsCount === 0 ? 0 : (coverageMap[c.id] ? coverageMap[c.id] : 0),
             sensitiveInRespTypes: sensitiveInfoMap[c.id] ? sensitiveInfoMap[c.id] : [],
