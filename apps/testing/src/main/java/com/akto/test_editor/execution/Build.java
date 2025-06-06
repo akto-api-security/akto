@@ -196,8 +196,14 @@ public class Build {
 
                 TestingRunConfig testingRunConfig = new TestingRunConfig(0, new HashMap<>(), new ArrayList<>(), null,newHost, null);
                 // in case it is being executed on a mini testing module, we need to set the url
-                String url = ApiExecutor.prepareUrl(request, testingRunConfig);
-                request.setUrl(url);
+                try {
+                    if (newHost != null) {
+                        String url = ApiExecutor.prepareUrl(request, testingRunConfig);
+                        request.setUrl(url);
+                    }
+                } catch (Exception e) {
+                    loggerMaker.errorAndAddToDb(e, "Error while preparing url for " + id.getUrl());
+                }
 
                 OriginalHttpResponse response = null;
                 try {
@@ -242,10 +248,10 @@ public class Build {
                     );
                     runResults.add(runResult);
                 } catch (Exception e) {
-                    loggerMaker.errorAndAddToDb(e, "error while sending request in invoke dependency graph" + id.getUrl(), LoggerMaker.LogDb.DASHBOARD);
+                    loggerMaker.errorAndAddToDb(e, "error while sending request in invoke dependency graph: " + id.getUrl());
                 }
             } catch (Exception e) {
-                loggerMaker.errorAndAddToDb(e, "error while running runPerLevel for " + id.getUrl(), LoggerMaker.LogDb.DASHBOARD);
+                loggerMaker.errorAndAddToDb(e, "error while running runPerLevel for " + id.getUrl());
             }
 
         }
@@ -275,6 +281,23 @@ public class Build {
             }
         } catch (Exception ignored) {
         }
+
+        try {
+            String url = request.getUrl();
+            URI uri = new URI(url);
+            String currentHost = uri.getHost();
+            ModifyHostDetail modifyHostDetail = modifyHostDetailMap.get(currentHost);
+                        String newHost = modifyHostDetail.getNewHost();
+            if (newHost == null) return null;
+            if (newHost.startsWith("http")) {
+                return newHost;
+            } else {
+                return  uri.getScheme() + "://" + newHost;
+            }
+        } catch (Exception ignored) {
+
+        }
+
         return null;
     }
 

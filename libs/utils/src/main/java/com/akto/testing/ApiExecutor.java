@@ -243,8 +243,12 @@ public class ApiExecutor {
         String url = request.getUrl();
         url = url.trim();
 
-        if (!url.startsWith("http")) {
-            url = OriginalHttpRequest.makeUrlAbsolute(url, request.findHostFromHeader(), request.findProtocolFromHeader());
+        try {
+            if (!url.startsWith("http")) {
+                url = OriginalHttpRequest.makeUrlAbsolute(url, request.findHostFromHeader(), request.findProtocolFromHeader());
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "error converting req url to absolute " + url);
         }
 
         return replaceHostFromConfig(url, testingRunConfig);
