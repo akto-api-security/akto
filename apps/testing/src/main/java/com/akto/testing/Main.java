@@ -437,13 +437,6 @@ public class Main {
 
         executorService.scheduleAtFixedRate(new Main.MemoryMonitorTask(), 0, 1, TimeUnit.SECONDS);
 
-        /*
-         * GCP Cloud run job change
-         * 
-         * Moving heart beat cron to job scheduler branch
-         */
-        //triggerHeartbeatCron();
-
         if (!SKIP_SSRF_CHECK) {
             Setup setup = SetupDao.instance.findOne(new BasicDBObject());
             String dashboardMode = setup.getDashboardMode();
@@ -457,6 +450,7 @@ public class Main {
         if(Constants.IS_JOB_EXECUTOR == false) {
             scheduleRateLimitWatcher();
             scheduleAccessMatrixTask();
+            scheduleHeartbeatCron();
             GetRunningTestsStatus.getRunningTests().scheduleGetRunningTestsTask();
             SingleTypeInfo.schedulePopulateDataTypesInfoTask();
         }
@@ -539,7 +533,6 @@ public class Main {
             loggerMaker.debug("Testing info folder status: " + val);
         }
 
-
         if(Constants.IS_JOB_EXECUTOR) {
 
             int accountId = Integer.parseInt(System.getenv("JOB_ACCOUNT_ID"));
@@ -576,7 +569,11 @@ public class Main {
             //boolean isTestingRunRunning = testingRun.getState().equals(State.RUNNING);
 
             SyncLimit syncLimit = featureAccess.fetchSyncLimit();
-            
+
+            TestingInstanceHeartBeatDao.instance.initializeHeartbeat(testingInstanceId);
+            TestingInstanceHeartBeatDao.instance.setTestingRunId(testingInstanceId, testingRun.getHexId());
+            scheduleHeartbeatCron();
+
             /*
              * Schedule crons required for periodic calculation of local state
              */
@@ -621,12 +618,14 @@ public class Main {
 
                 loggerMaker.info(String.format("IS_NEW_TESTING_ENABLED=%s", Constants.IS_NEW_TESTING_ENABLED));
 
-                testingProducer.initProducer(testingRun, summaryId, syncLimit, false);
-                testingConsumer.init(maxRunTime);            
-
-                // TestExecutor testExecutor = new TestExecutor();
-                // testExecutor.init(testingRun, summaryId, syncLimit, false);
-
+                if(Constants.IS_NEW_TESTING_ENABLED){
+                    testingProducer.initProducer(testingRun, summaryId, syncLimit, false);
+                    testingConsumer.init(maxRunTime);  
+                }else{
+                    TestExecutor testExecutor = new TestExecutor();
+                    testExecutor.init(testingRun, summaryId, syncLimit, false);
+                }    
+               
                 loggerMaker.info("Testing run completed execution.");
             }  catch (Exception e) {
                 loggerMaker.errorAndAddToDb(e, "Error in init " + e);
@@ -645,12 +644,6 @@ public class Main {
         else 
         {
         loggerMaker.info("Starting testing run job scheduler.");
-
-        /*
-        * GCP Cloud run job change
-        */
-        scheduleHeartbeatCron();
-    
 
         while (true) {
             AccountTask.instance.executeTaskForNonHybridAccounts(account -> {
@@ -689,11 +682,6 @@ public class Main {
                     return;
                 }
 
-                /*
-                * GCP Cloud run job change
-                * 
-                * implementation requires changes for cloud run jobs
-                */
                 if (!TestingInstanceHeartBeatDao.instance.isTestEligibleForInstance(testingRun.getHexId())) {
                     return;
                 }
@@ -765,13 +753,6 @@ public class Main {
                     loggerMaker.info(String.format("Submitting job to GCP for the execution of testing run with hex id - %s", testingRun.getHexId()));
                     
                     try {  
-                        /*
-                        * GCP Cloud run job change
-                        * 
-                        * todo: should testing instance heart beat for job executor be set instead of job scheduler
-                        * required in the context of failed gcp jobs
-                        */
-                        //TestingInstanceHeartBeatDao.instance.setTestingRunId(testingInstanceId, testingRun.getHexId());
                         ExecuteJob.executeTestingJob(accountId, testingRun.getHexId());
                     } catch(Exception e) {
                         e.printStackTrace();

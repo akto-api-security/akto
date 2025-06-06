@@ -213,7 +213,7 @@ public class AccountTask {
 
         /*
          * GCP Cloud run job change
-         * Added filter to only get Oren's SaaS account
+         * Added filter to only get SaaS account's  for which to use cloud run jobs
          */
         Bson testingJobAccountsFilter = Filters.in("_id", testingJobAccountsSet);
         //List<Account> activeAccounts = AccountsDao.instance.findAll(activeFilter);
