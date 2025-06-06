@@ -23,16 +23,19 @@ import org.springframework.util.StringUtils;
 
 import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.context.Context;
+import com.akto.dao.test_editor.TestingRunPlaygroundDao;
 import com.akto.dao.testing.TestingRunResultDao;
 import com.akto.dao.testing.VulnerableTestingRunResultDao;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.OriginalHttpRequest;
+import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.RawApi;
 import com.akto.dto.CollectionConditions.ConditionsType;
 import com.akto.dto.test_editor.DataOperandsFilterResponse;
 import com.akto.dto.test_editor.FilterNode;
+import com.akto.dto.test_editor.TestingRunPlayground;
 import com.akto.dto.test_editor.Util;
 import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.test_run_findings.TestingRunIssues;
@@ -66,12 +69,13 @@ import com.mongodb.client.model.Accumulators;
 import com.mongodb.client.model.Aggregates;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
+import com.mongodb.client.result.InsertOneResult;
 
 import okhttp3.MediaType;
 
 public class Utils {
 
-    private static final LoggerMaker loggerMaker = new LoggerMaker(Utils.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(Utils.class, LogDb.TESTING);
 
     public static void populateValuesMap(Map<String, Object> valuesMap, String payloadStr, String nodeId, Map<String,
             List<String>> headers, boolean isRequest, String queryParams) {
@@ -666,4 +670,67 @@ public class Utils {
         }
     }
     
+    public static int compareVersions(String v1, String v2) {
+        try {
+            String[] parts1 = v1.split("\\.");
+            String[] parts2 = v2.split("\\.");
+
+            int length = Math.max(parts1.length, parts2.length);
+            for (int i = 0; i < length; i++) {
+                int num1 = i < parts1.length ? Integer.parseInt(parts1[i]) : 0;
+                int num2 = i < parts2.length ? Integer.parseInt(parts2[i]) : 0;
+                if (num1 != num2) {
+                    return Integer.compare(num1, num2);
+                }
+            }
+            return 0;
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error comparing versions: " + e.getMessage());
+        }
+        return 1;
+    }
+
+    public static OriginalHttpResponse runRequestOnHybridTesting(OriginalHttpRequest originalHttpRequest){
+        OriginalHttpResponse res = null;
+        TestingRunPlayground testingRunPlayground = new TestingRunPlayground();
+        testingRunPlayground.setState(TestingRun.State.SCHEDULED);
+        testingRunPlayground.setCreatedAt(Context.now());
+        testingRunPlayground.setTestingRunPlaygroundType(TestingRunPlayground.TestingRunPlaygroundType.POSTMAN_IMPORTS);
+        testingRunPlayground.setOriginalHttpRequest(originalHttpRequest);
+        InsertOneResult insertOne = TestingRunPlaygroundDao.instance.insertOne(testingRunPlayground);
+        if (insertOne.wasAcknowledged()) {
+            String testingRunPlaygroundHexId = Objects.requireNonNull(insertOne.getInsertedId()).asObjectId().getValue().toHexString();
+            int startTime = Context.now();
+            int timeout = 5 * 60; // 5 minutes
+            
+            TestingRunPlayground currentState = null;
+            while (Context.now() - startTime <= timeout) {
+                currentState = TestingRunPlaygroundDao.instance.findOne(
+                    Filters.eq("_id", new ObjectId(testingRunPlaygroundHexId))
+                );
+                
+                if (currentState == null || 
+                    currentState.getState() == TestingRun.State.COMPLETED || 
+                    currentState.getState() == TestingRun.State.FAILED) {
+                    break;
+                }
+                
+                try {
+                    Thread.sleep(1000);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    break;
+                }
+            }
+            
+            res = (currentState != null && (currentState.getState() != TestingRun.State.FAILED
+                    || currentState.getState() != TestingRun.State.SCHEDULED)) ?
+                currentState.getOriginalHttpResponse() : new OriginalHttpResponse();
+        } else {
+            res = new OriginalHttpResponse();
+        }
+        return res;
+    }
+
+
 }
