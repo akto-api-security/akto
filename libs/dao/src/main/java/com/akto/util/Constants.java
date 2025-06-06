@@ -45,6 +45,7 @@ public class Constants {
     public static final int LINGER_MS_KAFKA = StringUtils.hasLength(System.getenv("LINGER_MS_KAFKA")) ?  Integer.parseInt(System.getenv("LINGER_MS_KAFKA")) : 10000;
     public static final int MAX_WAIT_FOR_SLEEP = 3 * 60; // 3 minutes
     public static final String UNDERSCORE = "_";
+    public static final boolean IS_JOB_EXECUTOR = (StringUtils.hasLength(System.getenv("JOB_EXECUTOR")) && System.getenv("JOB_EXECUTOR").equals("true"));
     public static final String AKTO_AGENT_NAME = "AKTO-AI-agents";
     public static final Model AKTO_AGENT_MODEL = new Model(AKTO_AGENT_NAME, ModelType.AZURE_OPENAI, new HashMap<>());
 

@@ -2425,7 +2425,7 @@ public class InitializerListener implements ServletContextListener {
                     }
                 }, "context-initializer");
 
-                SingleTypeInfo.init();
+                SingleTypeInfo.schedulePopulateDataTypesInfoTask();
 
                 int now = Context.now();
                 if (runJobFunctions || runJobFunctionsAnyway) {

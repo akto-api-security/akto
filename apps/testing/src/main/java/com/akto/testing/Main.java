@@ -93,6 +93,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -144,29 +145,31 @@ public class Main {
         );
     }
 
+    private static void fillRateLimitMapForAccount(int accountId) {
+        AccountSettings settings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
+        if (settings == null) {
+            return;
+        }
+        int globalRateLimit = settings.getGlobalRateLimit();
+        Map<ApiRateLimit, Integer> rateLimitMap = RateLimitHandler.getInstance(accountId).getRateLimitsMap();
+        rateLimitMap.clear();
+        rateLimitMap.put(new GlobalApiRateLimit(globalRateLimit), globalRateLimit);
+    }
 
-    private static void setupRateLimitWatcher () {
+    private static void scheduleRateLimitWatcher () {
         scheduler.scheduleAtFixedRate(new Runnable() {
             public void run() {
                 AccountTask.instance.executeTaskForNonHybridAccounts(new Consumer<Account>() {
                     @Override
                     public void accept(Account t) {
-                        AccountSettings settings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
-                        if (settings == null) {
-                            return;
-                        }
-                        int globalRateLimit = settings.getGlobalRateLimit();
-                        int accountId = t.getId();
-                        Map<ApiRateLimit, Integer> rateLimitMap =  RateLimitHandler.getInstance(accountId).getRateLimitsMap();
-                        rateLimitMap.clear();
-                        rateLimitMap.put(new GlobalApiRateLimit(globalRateLimit), globalRateLimit);
+                        fillRateLimitMapForAccount(t.getId());
                     }
                 }, "rate-limit-scheduler");
             }
         }, 0, 1, TimeUnit.MINUTES);
     }
 
-    private static void triggerHeartbeatCron() {
+    private static void scheduleHeartbeatCron() {
         scheduler.scheduleAtFixedRate(new Runnable() {
             public void run() {
                 UpdateOptions updateOptions = new UpdateOptions();
@@ -180,6 +183,21 @@ public class Main {
 
             }
         }, 0, 10, TimeUnit.SECONDS);
+    }
+
+    private static void scheduleAccessMatrixTask() {
+        schedulerAccessMatrix.scheduleAtFixedRate(new Runnable() {
+            public void run() {
+                AccountTask.instance.executeTaskForNonHybridAccounts(account -> {
+                    AccessMatrixAnalyzer matrixAnalyzer = new AccessMatrixAnalyzer();
+                    try {
+                        matrixAnalyzer.run();
+                    } catch (Exception e) {
+                        loggerMaker.debugAndAddToDb("could not run matrixAnalyzer: " + e.getMessage(), LogDb.TESTING);
+                    }
+                },"matrix-analyser-task");
+            }
+        }, 0, 1, TimeUnit.MINUTES);
     }
 
     public static Set<Integer> extractApiCollectionIds(List<ApiInfo.ApiInfoKey> apiInfoKeyList) {
@@ -401,6 +419,7 @@ public class Main {
     }
 
     public static void main(String[] args) throws InterruptedException {
+
         String mongoURI = System.getenv("AKTO_MONGO_CONN");
         ReadPreference readPreference = ReadPreference.primary();
         WriteConcern writeConcern = WriteConcern.W1;
@@ -416,10 +435,6 @@ public class Main {
             }
         } while (!connectedToMongo);
 
-        setupRateLimitWatcher();
-
-        triggerHeartbeatCron();
-        
         executorService.scheduleAtFixedRate(new Main.MemoryMonitorTask(), 0, 1, TimeUnit.SECONDS);
 
         if (!SKIP_SSRF_CHECK) {
@@ -429,6 +444,15 @@ public class Main {
                 boolean isSaas = dashboardMode.equalsIgnoreCase(DashboardMode.SAAS.name());
                 if (!isSaas) SKIP_SSRF_CHECK = true;
             }
+        }
+
+        // Schedule crons on saas job scheduler instance and other testing instances except for saas job executor
+        if(Constants.IS_JOB_EXECUTOR == false) {
+            scheduleRateLimitWatcher();
+            scheduleAccessMatrixTask();
+            scheduleHeartbeatCron();
+            GetRunningTestsStatus.getRunningTests().scheduleGetRunningTestsTask();
+            SingleTypeInfo.schedulePopulateDataTypesInfoTask();
         }
 
         loggerMaker.debugAndAddToDb("Starting.......", LogDb.TESTING);
@@ -497,19 +521,7 @@ public class Main {
         }
 
 
-        schedulerAccessMatrix.scheduleAtFixedRate(new Runnable() {
-            public void run() {
-                AccountTask.instance.executeTaskForNonHybridAccounts(account -> {
-                    AccessMatrixAnalyzer matrixAnalyzer = new AccessMatrixAnalyzer();
-                    try {
-                        matrixAnalyzer.run();
-                    } catch (Exception e) {
-                        loggerMaker.debugAndAddToDb("could not run matrixAnalyzer: " + e.getMessage(), LogDb.TESTING);
-                    }
-                },"matrix-analyser-task");
-            }
-        }, 0, 1, TimeUnit.MINUTES);
-        GetRunningTestsStatus.getRunningTests().getStatusOfRunningTests();
+        
 
         loggerMaker.debugAndAddToDb("sun.arch.data.model: " +  System.getProperty("sun.arch.data.model"), LogDb.TESTING);
         loggerMaker.debugAndAddToDb("os.arch: " + System.getProperty("os.arch"), LogDb.TESTING);
@@ -521,10 +533,122 @@ public class Main {
             loggerMaker.debug("Testing info folder status: " + val);
         }
 
-        SingleTypeInfo.init();
+        if(Constants.IS_JOB_EXECUTOR) {
+
+            int accountId = Integer.parseInt(System.getenv("JOB_ACCOUNT_ID"));
+            ObjectId testingRunId = new ObjectId(System.getenv("JOB_TESTING_RUN_HEX_ID"));
+            
+            loggerMaker.info(String.format("Beginning testing run execution with id - %s from account - %d", testingRunId, accountId));
+
+            Context.accountId.set(accountId);
+
+            Bson filter = Filters.eq(Constants.ID, testingRunId);
+                
+            Bson update = Updates.combine(
+                    Updates.set(TestingRun.STATE, TestingRun.State.RUNNING));
+
+            // returns the previous state of testing run before the update
+            TestingRun testingRun = TestingRunDao.instance.getMCollection().withWriteConcern(WriteConcern.W1).findOneAndUpdate(filter, update);
+
+            AccountSettings accountSettings = AccountSettingsDao.instance.findOne(
+                    Filters.eq(Constants.ID, accountId), Projections.include(AccountSettings.DELTA_IGNORE_TIME_FOR_SCHEDULED_SUMMARIES)
+                );
+
+            int start = Context.now();
+            int defaultTime = DEFAULT_DELTA_IGNORE_TIME;
+
+            TestingConfigurations config = TestingConfigurations.getInstance();
+            TestingRunResultSummary trrs = null;
+
+            boolean isSummaryRunning = trrs != null && trrs.getState().equals(State.RUNNING);
+            boolean isTestingRunResultRerunCase = trrs != null && trrs.getOriginalTestingRunResultSummaryId() != null;
+
+            ObjectId summaryId = null;
+
+            FeatureAccess featureAccess = UsageMetricUtils.getFeatureAccess(accountId, MetricTypes.TEST_RUNS);
+            //boolean isTestingRunRunning = testingRun.getState().equals(State.RUNNING);
+
+            SyncLimit syncLimit = featureAccess.fetchSyncLimit();
+
+            TestingInstanceHeartBeatDao.instance.initializeHeartbeat(testingInstanceId);
+            TestingInstanceHeartBeatDao.instance.setTestingRunId(testingInstanceId, testingRun.getHexId());
+            scheduleHeartbeatCron();
+
+            /*
+             * Schedule crons required for periodic calculation of local state
+             */
+            scheduler.scheduleAtFixedRate(new Runnable() {
+                public void run() {
+                    Context.accountId.set(accountId);
+
+                    // Fill currentTestsRunningMap for account to which testing run belongs
+                    GetRunningTestsStatus.getRunningTests().fillCurrentRunningTestMapForAccount();
+                }
+            }, 0, 1, TimeUnit.MINUTES);
+            
+            /* 
+             * Fill local state required for testing run execution
+             */
+            // Fill rate limit map for account
+            fillRateLimitMapForAccount(accountId);
+            // Fill custom auth and data types for account
+            SingleTypeInfo.initForAccount(accountId);
+
+            try {
+                fillTestingEndpoints(testingRun);
+
+                // todo: continuious testing endpoints
+
+                setTestingRunConfig(testingRun, trrs);
+
+                boolean maxRetriesReached = false;
+
+                TestingRunResultSummary testingRunResultSummary;
+
+                Map<ObjectId, TestingRunResultSummary> objectIdTestingRunResultSummaryMap = TestingRunResultSummariesDao.instance.fetchLatestTestingRunResultSummaries(Collections.singletonList(testingRun.getId()));
+                testingRunResultSummary = objectIdTestingRunResultSummaryMap.get(testingRun.getId());
+
+                if (summaryId == null) {
+                    trrs = createTRRSummaryIfAbsent(testingRun, start);
+                    summaryId = trrs.getId();
+                }
+
+                RequiredConfigs.initiate();
+                int maxRunTime = testingRun.getTestRunTime() <= 0 ? 30*60 : testingRun.getTestRunTime();
+
+                loggerMaker.info(String.format("IS_NEW_TESTING_ENABLED=%s", Constants.IS_NEW_TESTING_ENABLED));
+
+                if(Constants.IS_NEW_TESTING_ENABLED){
+                    testingProducer.initProducer(testingRun, summaryId, syncLimit, false);
+                    testingConsumer.init(maxRunTime);  
+                }else{
+                    TestExecutor testExecutor = new TestExecutor();
+                    testExecutor.init(testingRun, summaryId, syncLimit, false);
+                }    
+               
+                loggerMaker.info("Testing run completed execution.");
+            }  catch (Exception e) {
+                loggerMaker.errorAndAddToDb(e, "Error in init " + e);
+            }
+
+            try {
+                loggerMaker.info("Cleaning up after testing run execution.");
+                testCompletion.markTestAsCompleteAndRunFunctions(testingRun, summaryId);
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb(e, "Error while cleaning up after testing run." + e);
+                System.exit(1);
+            }
+           
+            System.exit(0);
+        } 
+        else 
+        {
+        loggerMaker.info("Starting testing run job scheduler.");
+
         while (true) {
             AccountTask.instance.executeTaskForNonHybridAccounts(account -> {
                 int accountId = account.getId();
+                
                 AccountSettings accountSettings = AccountSettingsDao.instance.findOne(
                     Filters.eq(Constants.ID, accountId), Projections.include(AccountSettings.DELTA_IGNORE_TIME_FOR_SCHEDULED_SUMMARIES)
                 );
@@ -619,10 +743,27 @@ public class Main {
                 }
 
                 SyncLimit syncLimit = featureAccess.fetchSyncLimit();
+            
                 /*
-                 * Since the role cache is static
-                 * so to prevent it from being shared across accounts.
-                 */
+                * GCP Cloud run job change
+                * 
+                * Submit a job instead of running the executor in saas job scheduler testing instance 
+                */
+                if (DashboardMode.isSaasDeployment()) { 
+                    loggerMaker.info(String.format("Submitting job to GCP for the execution of testing run with hex id - %s", testingRun.getHexId()));
+                    
+                    try {  
+                        ExecuteJob.executeTestingJob(accountId, testingRun.getHexId());
+                    } catch(Exception e) {
+                        e.printStackTrace();
+                    }
+                    return;
+                } 
+
+                /*
+                * Since the role cache is static
+                * so to prevent it from being shared across accounts.
+                */
                 Executor.clearRoleCache();
 
                 try {
@@ -846,11 +987,11 @@ public class Main {
                     
                 }
                 /*
-                 * In case the testing run results start overflowing
-                 * due to being a capped collection,
-                 * we will start deleting non-vulnerable results,
-                 * since we cap on size as well as number of documents.
-                 */
+                * In case the testing run results start overflowing
+                * due to being a capped collection,
+                * we will start deleting non-vulnerable results,
+                * since we cap on size as well as number of documents.
+                */
                 deleteScheduler.execute(() -> {
                     Context.accountId.set(accountId);
                     try {
@@ -865,6 +1006,7 @@ public class Main {
 
             }, "testing");
             Thread.sleep(1000);
+            }
         }
     }
 

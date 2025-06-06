@@ -199,7 +199,10 @@ public class AccountTask {
             1662681374, 1662680009, 1662667201, 1662664207, 1662663641, 1662656702, 1662636440, 1662504770
     ));
 
-
+    public static final Set<Integer> testingJobAccountsSet = new HashSet(Arrays.asList(
+        1_692_211_733
+        //, 1_000_000
+    ));
 
     public void executeTask(Consumer<Account> consumeAccount, String taskName) {
 
@@ -208,12 +211,25 @@ public class AccountTask {
                 Filters.eq(Account.INACTIVE_STR, false)
         );
 
-        List<Account> activeAccounts = AccountsDao.instance.findAll(activeFilter);
+        /*
+         * GCP Cloud run job change
+         * Added filter to only get SaaS account's  for which to use cloud run jobs
+         */
+        Bson testingJobAccountsFilter = Filters.in("_id", testingJobAccountsSet);
+        //List<Account> activeAccounts = AccountsDao.instance.findAll(activeFilter);
+        List<Account> activeAccounts = AccountsDao.instance.findAll(testingJobAccountsFilter);
+
         for(Account account: activeAccounts) {
             if (inactiveAccountsSet.contains(account.getId())) {
                 continue;
             }
             try {
+                /*
+                 * GCP Cloud run job change
+                 * log to verify account task is only being run for account's marked to use the new job system on SaaS
+                 */
+                logger.info(String.format("%s %d %s", taskName, account.getId(), account.getName()));
+
                 Context.accountId.set(account.getId());
                 consumeAccount.accept(account);
             } catch (Exception e) {
@@ -261,12 +277,24 @@ public class AccountTask {
             Filters.eq(Account.HYBRID_TESTING_ENABLED, false)
         );
 
-        List<Account> activeAccounts = AccountsDao.instance.findAll(Filters.and(activeFilter, nonHybridAccountsFilter));
+        /*
+         * GCP Cloud run job change
+         * Filter for accounts on SaaS that should use the new testing job
+         */
+        Bson testingJobAccountsFilter = Filters.in("_id", testingJobAccountsSet);
+
+        List<Account> activeAccounts = AccountsDao.instance.findAll(Filters.and(activeFilter, nonHybridAccountsFilter, testingJobAccountsFilter));
+
         for(Account account: activeAccounts) {
             if (inactiveAccountsSet.contains(account.getId())) {
                 continue;
             }
             try {
+                /*
+                 * GCP Cloud run job change
+                 * log to verify account task is only being run for account's marked to use the new job system on SaaS
+                 */
+                logger.info(String.format("%s %d %s", taskName, account.getId(), account.getName()));
                 Context.accountId.set(account.getId());
                 consumeAccount.accept(account);
             } catch (Exception e) {

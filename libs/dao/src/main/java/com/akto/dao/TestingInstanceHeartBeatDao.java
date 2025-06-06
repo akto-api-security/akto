@@ -19,6 +19,13 @@ public class TestingInstanceHeartBeatDao extends CommonContextDao<TestingInstanc
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, true);
     }
 
+    public void initializeHeartbeat(String testingInstanceId) {
+        TestingInstanceHeartBeat testingInstanceHeartBeat = new TestingInstanceHeartBeat(
+            testingInstanceId, Context.now(), ""
+        );
+        instance.insertOne(testingInstanceHeartBeat);
+    }
+
     public boolean isTestEligibleForInstance(String testRunId) {
         
         Bson instanceFilter = Filters.eq("testRunId", testRunId);

@@ -68,12 +68,17 @@ public class SingleTypeInfo {
     public static Map<Integer, AccountDataTypesInfo> getAccountToDataTypesInfo () {
         return accountToDataTypesInfo;
     }
-    public static void init() {
+
+    public static void initForAccount(int accountId) {
+        fetchCustomDataTypes(accountId);
+        fetchCustomAuthTypes(accountId);
+    }
+
+    public static void schedulePopulateDataTypesInfoTask() {
         scheduler.scheduleAtFixedRate(new Runnable() {
             public void run() {
                 AccountTask.instance.executeTask(t -> {
-                    fetchCustomDataTypes(t.getId());
-                    fetchCustomAuthTypes(t.getId());
+                    initForAccount(t.getId());
                 }, "populate-data-types-info");
             }
         }, 0, 5, TimeUnit.MINUTES);
