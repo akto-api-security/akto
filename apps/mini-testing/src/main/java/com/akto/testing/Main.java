@@ -57,7 +57,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
 public class Main {
-    private static final LoggerMaker loggerMaker = new LoggerMaker(Main.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(Main.class, LogDb.TESTING);
 
     private static final DataActor dataActor = DataActorFactory.fetchInstance();
 
@@ -163,18 +163,21 @@ public class Main {
 
     private static void handlePostmanImports(TestingRunPlayground testingRunPlayground) {
         // For Postman imports, we use the original request/response directly
+        loggerMaker.infoAndAddToDb("Running requests for testingRunPlayground, starting: " + testingRunPlayground.getId());
         OriginalHttpRequest originalRequest = testingRunPlayground.getOriginalHttpRequest();
-
         if (originalRequest == null) {
             return;
         }
+        loggerMaker.infoAndAddToDb("Running requests for testingRunPlayground, found req: " + testingRunPlayground.getId());
         OriginalHttpResponse res;
+        TestingRunConfig testingRunConfig = new TestingRunConfig();
         try {
-            res = ApiExecutor.sendRequest(originalRequest, true, null, false, new ArrayList<>());
+            res = ApiExecutor.sendRequest(originalRequest, true, testingRunConfig, false, new ArrayList<>());
         } catch (Exception e) {
             res = new OriginalHttpResponse();
         }
         testingRunPlayground.setOriginalHttpResponse(res);
+        loggerMaker.infoAndAddToDb("Running requests for testingRunPlayground, updating res: " + testingRunPlayground.getId());
         // update testingRunPlayground in DB
         dataActor.updateTestingRunPlayground(testingRunPlayground);
     }
