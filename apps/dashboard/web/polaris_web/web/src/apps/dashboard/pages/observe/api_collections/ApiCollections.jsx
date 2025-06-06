@@ -697,7 +697,7 @@ function ApiCollections(props) {
         let copyObj = data;
         Object.keys(copyObj).forEach((key) => {
             data[key].length > 0 && data[key].forEach((c) => {
-                const list = dataMap[c?.id]?.map((data) => data?.keyName.slice(0,30) + '=' + data?.value);
+                const list = dataMap[c?.id]?.map((data) => (typeof data?.keyName === 'string' ? data.keyName.slice(0, 30) : '') + '=' + data?.value);
                 c['envType'] = list
                 c['envTypeComp'] = transform.getCollectionTypeList(list)
             })
