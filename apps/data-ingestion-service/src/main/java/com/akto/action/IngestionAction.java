@@ -14,11 +14,14 @@ import com.akto.utils.KafkaUtils;
 import com.opensymphony.xwork2.Action;
 import com.opensymphony.xwork2.ActionSupport;
 
+@lombok.Getter
+@lombok.Setter
 public class IngestionAction extends ActionSupport {
     List<IngestDataBatch> batchData;
     private static final LoggerMaker loggerMaker = new LoggerMaker(IngestionAction.class, LoggerMaker.LogDb.DATA_INGESTION);
 
     private static int MAX_INFO_PRINT = 500;
+    private boolean success;
 
     private static final int ACCOUNT_ID_TO_ADD_DEFAULT_DATA = getAccountId();
 
@@ -82,6 +85,7 @@ public class IngestionAction extends ActionSupport {
     }
 
     public String healthCheck() {
+        success = true;
         return Action.SUCCESS.toUpperCase();
     }
     
