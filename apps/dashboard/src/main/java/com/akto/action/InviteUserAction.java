@@ -54,6 +54,10 @@ public class InviteUserAction extends UserAction{
             return INVALID_EMAIL_ERROR;
         }
 
+        if (!email.matches("^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$")) {
+            return INVALID_EMAIL_ERROR;
+        }
+
         // validating if same organisation or not
         String[] loginArr = adminLogin.split("@");
         if (loginArr.length != 2) return "Invalid admin login";
