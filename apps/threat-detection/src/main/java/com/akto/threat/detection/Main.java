@@ -15,17 +15,11 @@ import com.akto.log.LoggerMaker.LogDb;
 import com.akto.metrics.ModuleInfoWorker;
 import com.akto.threat.detection.constants.KafkaTopic;
 import com.akto.threat.detection.crons.ApiCountInfoRelayCron;
-import com.akto.threat.detection.session_factory.SessionFactoryUtils;
-import com.akto.threat.detection.tasks.CleanupTask;
-import com.akto.threat.detection.tasks.FlushSampleDataTask;
 import com.akto.threat.detection.tasks.MaliciousTrafficDetectorTask;
 import com.akto.threat.detection.tasks.SendMaliciousEventsToBackend;
 import com.mongodb.ConnectionString;
 import io.lettuce.core.RedisClient;
 import io.lettuce.core.api.StatefulRedisConnection;
-
-import org.flywaydb.core.Flyway;
-import org.hibernate.SessionFactory;
 
 public class Main {
 
@@ -37,7 +31,6 @@ public class Main {
 
   public static void main(String[] args) throws Exception {
     
-    SessionFactory sessionFactory = null;
     RedisClient localRedis = null;
 
     logger.warnAndAddToDb("aggregation rules enabled " + aggregationRulesEnabled);
@@ -49,8 +42,6 @@ public class Main {
     }
 
     if (aggregationRulesEnabled) {
-        runMigrations();
-        sessionFactory = SessionFactoryUtils.createFactory();
         localRedis = createLocalRedisClient();
         if (localRedis != null) {
             triggerApiInfoRelayCron(localRedis);
@@ -90,16 +81,7 @@ public class Main {
 
     new MaliciousTrafficDetectorTask(trafficKafka, internalKafka, localRedis).run();
 
-    if (aggregationRulesEnabled) {
-        new FlushSampleDataTask(
-            sessionFactory, internalKafka, KafkaTopic.ThreatDetection.MALICIOUS_EVENTS)
-        .run();
-        new CleanupTask(sessionFactory).run();
-    }
-
-    new SendMaliciousEventsToBackend(
-            sessionFactory, internalKafka, KafkaTopic.ThreatDetection.ALERTS)
-        .run();
+    new SendMaliciousEventsToBackend(internalKafka, KafkaTopic.ThreatDetection.ALERTS).run();
 
   }
 
@@ -130,20 +112,6 @@ public class Main {
     }
     logger.infoAndAddToDb("Connected to local redis");
     return redisClient;
-  }
-
-  public static void runMigrations() {
-    String url = System.getenv("AKTO_THREAT_DETECTION_POSTGRES");
-    String user = System.getenv("AKTO_THREAT_DETECTION_POSTGRES_USER");
-    String password = System.getenv("AKTO_THREAT_DETECTION_POSTGRES_PASSWORD");
-    Flyway flyway =
-        Flyway.configure()
-            .dataSource(url, user, password)
-            .locations("classpath:db/migration")
-            .schemas("flyway")
-            .load();
-
-    flyway.migrate();
   }
 
 }
