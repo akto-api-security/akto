@@ -735,21 +735,7 @@ public class IssuesAction extends UserAction {
             idToResultMap.put(id, result);
         }
 
-        if (issues.isEmpty()) {
-            return Collections.emptyMap();
-        }
-
-        Map<String, String> finalResult = new HashMap<>();
-        for (TestingRunIssues issue : issues) {
-            if (StringUtils.isNotBlank(issue.getDescription())) {
-                TestingRunResult result = idToResultMap.get(issue.getId());
-                if (result != null) {
-                    finalResult.put(result.getHexId(), issue.getDescription());
-                }
-            }
-        }
-
-        return finalResult;
+        return Utils.mapIssueDescriptions(issues, idToResultMap);
     }
 
     List<TestingIssuesId> issuesIds;

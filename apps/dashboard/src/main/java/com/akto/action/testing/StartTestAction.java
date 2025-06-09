@@ -860,21 +860,7 @@ public class StartTestAction extends UserAction {
             Projections.include("_id", TestingRunIssues.DESCRIPTION)
         );
 
-        if (issues.isEmpty()) {
-            return Collections.emptyMap();
-        }
-
-        Map<String, String> finalResult = new HashMap<>();
-        for (TestingRunIssues issue : issues) {
-            if (StringUtils.isNotBlank(issue.getDescription())) {
-                TestingRunResult result = idToResultMap.get(issue.getId());
-                if (result != null) {
-                    finalResult.put(result.getHexId(), issue.getDescription());
-                }
-            }
-        }
-
-        return finalResult;
+        return com.akto.action.testing.Utils.mapIssueDescriptions(issues, idToResultMap);
     }
 
     public static void removeTestingRunResultsByIssues(List<TestingRunResult> testingRunResults,
@@ -1120,9 +1106,9 @@ public class StartTestAction extends UserAction {
         ArrayList<Bson> filters = new ArrayList<>();
         filters.addAll(prepareFilters(startTimestamp, endTimestamp));
         filters.addAll(getTableFilters());
-        
+
         long totalCount = TestingRunDao.instance.getMCollection().countDocuments(Filters.and(filters));
-        
+
         ArrayList<Bson> filterForCicd = new ArrayList<>(filters); // Create a copy of filters
         filterForCicd.add(getTestingRunTypeFilter(TestingRunType.CI_CD));
         long cicdCount = TestingRunDao.instance.getMCollection().countDocuments(Filters.and(filterForCicd));
@@ -1140,7 +1126,7 @@ public class StartTestAction extends UserAction {
 
         long scheduleCount = totalCount - oneTimeCount - cicdCount - continuousTestsCount;
 
-        
+
         result.put("allTestRuns", totalCount);
         result.put("oneTime", oneTimeCount);
         result.put("scheduled", scheduleCount);
@@ -1244,7 +1230,7 @@ public class StartTestAction extends UserAction {
     private CurrentTestsStatus currentTestsStatus;
 
     public String getCurrentTestStateStatus(){
-        // polling api 
+        // polling api
         try {
             List<TestingRunResultSummary> runningTrrs = TestingRunResultSummariesDao.instance.getCurrentRunningTestsSummaries();
             int totalRunningTests = 0;
@@ -1412,7 +1398,7 @@ public class StartTestAction extends UserAction {
                         Filters.and(
                             Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, summaryObjectId),
                             vulnerableFilter
-                        ), 
+                        ),
                         Projections.include(TestingRunResult.API_INFO_KEY, TestingRunResult.TEST_SUB_TYPE),
                         isStoredInVulnerableCollection
                     );
@@ -1420,7 +1406,7 @@ public class StartTestAction extends UserAction {
                     if(testingRunResults.isEmpty()){
                         return;
                     }
-            
+
                     Set<TestingIssuesId> issuesIds = new HashSet<>();
                     Map<TestingIssuesId, ObjectId> mapIssueToResultId = new HashMap<>();
                     Set<ObjectId> ignoredResults = new HashSet<>();
@@ -1430,19 +1416,19 @@ public class StartTestAction extends UserAction {
                         mapIssueToResultId.put(issuesId, runResult.getId());
                         ignoredResults.add(runResult.getId());
                     }
-            
+
                     List<TestingRunIssues> issues = TestingRunIssuesDao.instance.findAll(
                         Filters.and(
                             Filters.in(Constants.ID, issuesIds),
                             Filters.eq(TestingRunIssues.TEST_RUN_ISSUES_STATUS, GlobalEnums.TestRunIssueStatus.OPEN)
                         ), Projections.include(TestingRunIssues.KEY_SEVERITY)
                     );
-            
+
                     Map<String, Integer> totalCountIssues = new HashMap<>();
                     totalCountIssues.put("HIGH", 0);
                     totalCountIssues.put("MEDIUM", 0);
                     totalCountIssues.put("LOW", 0);
-            
+
                     for(TestingRunIssues runIssue: issues){
                         int initCount = totalCountIssues.getOrDefault(runIssue.getSeverity().name(), 0);
                         totalCountIssues.put(runIssue.getSeverity().name(), initCount + 1);
@@ -1451,13 +1437,13 @@ public class StartTestAction extends UserAction {
                             ignoredResults.remove(resId);
                         }
                     }
-            
+
                     // update testing run result summary
                     TestingRunResultSummariesDao.instance.updateOne(
                         Filters.eq(Constants.ID, summaryObjectId),
                         Updates.set(TestingRunResultSummary.COUNT_ISSUES, totalCountIssues)
                     );
-            
+
                     // update testing run results, by setting them isIgnored true
                     if(isStoredInVulnerableCollection){
                         VulnerableTestingRunResultDao.instance.updateMany(
@@ -1790,7 +1776,7 @@ public class StartTestAction extends UserAction {
     public void setTestingRunType(TestingRunType testingRunType) {
         this.testingRunType = testingRunType;
     }
-    
+
     public Map<String, Integer> getIssuesSummaryInfoMap() {
         return issuesSummaryInfoMap;
     }
