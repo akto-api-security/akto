@@ -390,7 +390,7 @@ function SingleTestRunPage() {
         let ignoredTestRunResults = []
         await api.fetchIssuesByStatusAndSummaryId(localSelectedTestRun.testingRunResultSummaryHexId, ["IGNORED"], sortKey, sortOrder, skip, limit, filters).then((resp) => {
           const ignoredIssuesTestingResult = resp?.testingRunResultList || [];
-          ignoredTestRunResults = transform.prepareTestRunResults(hexId, ignoredIssuesTestingResult, localSubCategoryMap, subCategoryFromSourceConfigMap)
+          ignoredTestRunResults = transform.prepareTestRunResults(hexId, ignoredIssuesTestingResult, localSubCategoryMap, subCategoryFromSourceConfigMap, resp?.issuesDescriptionMap)
         })
         testRunResultsRes = ignoredTestRunResults
         totalIgnoredIssuesCount = ignoredTestRunResults.length
