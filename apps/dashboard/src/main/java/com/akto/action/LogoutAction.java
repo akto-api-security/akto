@@ -1,9 +1,11 @@
 package com.akto.action;
 
 import static com.akto.filter.UserDetailsFilter.LOGIN_URI;
+import static com.akto.action.SignupAction.SSO_URL;
 
 import com.akto.dao.UsersDao;
 import com.akto.dao.context.Context;
+import com.akto.dto.SignupInfo;
 import com.akto.dto.User;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
@@ -16,12 +18,14 @@ import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
 import java.util.ArrayList;
+import java.util.Map;
 import javax.servlet.http.Cookie;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.servlet.http.HttpSession;
 import org.apache.struts2.interceptor.ServletRequestAware;
 import org.apache.struts2.interceptor.ServletResponseAware;
+import com.akto.dto.Config;
 
 public class LogoutAction extends UserAction implements ServletRequestAware,ServletResponseAware {
 
@@ -43,12 +47,29 @@ public class LogoutAction extends UserAction implements ServletRequestAware,Serv
         if (session != null) {
             session.setAttribute("logout", Context.now());
         }
-        if(DashboardMode.isSaasDeployment()){
-            return auth0Logout();
-        }
+
         try {
+            if(DashboardMode.isSaasDeployment()){
+                Map<String, SignupInfo> signupInfoMap = user.getSignupInfoMap();
+                if (signupInfoMap != null && signupInfoMap.size() >= 1) {
+                    SignupInfo latestSignupInfo = null;
+                    for (SignupInfo signupInfo : signupInfoMap.values()) {
+                        if (latestSignupInfo == null || signupInfo.getTimestamp() > latestSignupInfo.getTimestamp()) {
+                            latestSignupInfo = signupInfo;
+                        }
+                    }
+                    if (latestSignupInfo != null && Config.isConfigSSOType(latestSignupInfo.getConfigType())) {
+                        // if user logged in via SSO, redirect to sso login page
+                        logoutUrl = SSO_URL;
+                        return SUCCESS.toUpperCase();
+                    }
+                }
+                return auth0Logout();
+            }
+
             servletResponse.sendRedirect(LOGIN_URI);
             return null;
+
         } catch (IOException e) {
             e.printStackTrace();
         }

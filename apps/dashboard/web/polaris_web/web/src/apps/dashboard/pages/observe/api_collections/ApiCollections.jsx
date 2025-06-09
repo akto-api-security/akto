@@ -34,6 +34,7 @@ import ReactFlow, {
   
   } from 'react-flow-renderer';
 import { on } from "stream";
+import SetUserEnvPopupComponent from "./component/SetUserEnvPopupComponent";
   
 const CenterViewType = {
     Table: 0,
@@ -201,6 +202,7 @@ const convertToNewData = (collectionsArr, sensitiveInfoMap, severityInfoMap, cov
         }
         return{
             ...c,
+            envType: c?.envType?.map((type) => type?.keyName?.slice(0, 30) + '=' + type?.value),
             displayNameComp: (<Box maxWidth="20vw"><TooltipText tooltip={c.displayName} text={c.displayName} textProps={{fontWeight: 'medium'}}/></Box>),
             testedEndpoints: c.urlsCount === 0 ? 0 : (coverageMap[c.id] ? coverageMap[c.id] : 0),
             sensitiveInRespTypes: sensitiveInfoMap[c.id] ? sensitiveInfoMap[c.id] : [],
@@ -217,7 +219,10 @@ const convertToNewData = (collectionsArr, sensitiveInfoMap, severityInfoMap, cov
     return { prettify: prettifyData, normal: newData }
 }
 
-function ApiCollections() {
+function ApiCollections(props) {
+
+    const {customCollectionDataFilter, onlyShowCollectionsTable, sendData} = props;
+
     const userRole = window.USER_ROLE
 
     const navigate = useNavigate();
@@ -236,8 +241,6 @@ function ApiCollections() {
     const [normalData, setNormalData] = useState([])
     const [centerView, setCenterView] = useState(CenterViewType.Table);
     const [moreActions, setMoreActions] = useState(false);
-    const [textFieldActive, setTextFieldActive] = useState(false);
-    const [customEnv,setCustomEnv] = useState('')
 
     // const dummyData = dummyJson;
 
@@ -305,6 +308,11 @@ function ApiCollections() {
         setLoading(true)
         const apiCollectionsResp = await api.getAllCollectionsBasic();
         setLoading(false)
+
+        if(customCollectionDataFilter){
+            apiCollectionsResp.apiCollections = (apiCollectionsResp.apiCollections || []).filter(customCollectionDataFilter)
+        }
+
         let hasUserEndpoints = await api.getUserEndpoints()
         setHasUsageEndpoints(hasUserEndpoints)
         let tmp = (apiCollectionsResp.apiCollections || []).map(convertToCollectionData)
@@ -657,33 +665,20 @@ function ApiCollections() {
         const toggleTypeContent = (
             <Popover
                 activator={<div onClick={() => setPopover(!popover)}>Set ENV type</div>}
-                onClose={() => setPopover(false)}
+                onClose={() => {
+                    setPopover(false)
+                }}
                 active={popover}
                 autofocusTarget="first-node"
             >
                 <Popover.Pane>
-                    {textFieldActive ? 
-                    <Box padding={"1"}>
-                        <TextField onChange={setCustomEnv} value={customEnv} connectedRight={(
-                            <Tooltip content="Save your Custom env type" dismissOnMouseOut>
-                                <Button onClick={() => {
-                                    resetResourcesSelected();
-                                    updateEnvType(selectedResources, customEnv);
-                                    setTextFieldActive(false);
-                                }} plain icon={FileFilledMinor}/>
-                            </Tooltip>
-                        )}/>
-                    </Box>
-                        :<ActionList
-                        actionRole="menuitem"
-                        items={[
-                            {content: 'Staging', onAction: () => updateEnvType(selectedResources, "STAGING")},
-                            {content: 'Production', onAction: () => updateEnvType(selectedResources, "PRODUCTION")},
-                            {content: 'Reset', onAction: () => updateEnvType(selectedResources, null)},
-                            {content: 'Add Custom', onAction: () => setTextFieldActive(!textFieldActive)}
-                        ]}
-                    
-                    />}
+                    <SetUserEnvPopupComponent
+                        popover={popover}
+                        setPopover={setPopover}
+                        tags={envTypeMap}
+                        updateTags={updateTags}
+                        apiCollectionIds={selectedResources}
+                    />
                 </Popover.Pane>
             </Popover>
         )
@@ -702,24 +697,65 @@ function ApiCollections() {
         let copyObj = data;
         Object.keys(copyObj).forEach((key) => {
             data[key].length > 0 && data[key].forEach((c) => {
-                c['envType'] = dataMap[c.id]
-                c['envTypeComp'] = dataMap[c.id] ? <Badge size="small" status="info">{dataMap[c.id]}</Badge> : null
+                const list = dataMap[c?.id]?.map((data) => data?.keyName?.slice(0, 30) + '=' + data?.value);
+                c['envType'] = list
+                c['envTypeComp'] = transform.getCollectionTypeList(list)
             })
         })
         setData(copyObj)
         setRefreshData(!refreshData)
     }
 
-    const updateEnvType = (apiCollectionIds,type) => {
-        let copyObj = JSON.parse(JSON.stringify(envTypeMap))
-        apiCollectionIds.forEach(id => copyObj[id] = type)
-        api.updateEnvTypeOfCollection(type,apiCollectionIds).then((resp) => {
+    const updateTags = async (apiCollectionIds, tagObj) => {
+        let copyObj = await JSON.parse(JSON.stringify(envTypeMap))
+        apiCollectionIds.forEach(id => {
+            if(!copyObj[id]) {
+                copyObj[id] = []
+            }
+
+            if(tagObj === null) {
+                copyObj[id] = []
+            } else {
+                if(tagObj?.keyName?.toLowerCase() === 'envtype') {
+                    const currentEnvIndex = copyObj[id].findIndex(tag => 
+                        tag.keyName.toLowerCase() === 'envtype' &&
+                        (tag.value.toLowerCase() === 'production' || tag.value.toLowerCase() === 'staging')
+                    )
+
+                    if (currentEnvIndex === -1) {
+                        copyObj[id].push(tagObj)
+                    } else {
+                        const currentValue = copyObj[id][currentEnvIndex].value.toLowerCase()
+                        if (tagObj.value.toLowerCase() !== currentValue) {
+                            copyObj[id][currentEnvIndex] = tagObj
+                        } else {
+                            copyObj[id].splice(currentEnvIndex, 1)
+                        }
+                    }
+                } else {
+                    const index = copyObj[id].findIndex(tag => 
+                        tag.keyName === tagObj.keyName && tag.value === tagObj.value
+                    )
+
+                    if (index === -1) {
+                        copyObj[id].push(tagObj)
+                    } else {
+                        copyObj[id].splice(index, 1)
+                    }
+                }
+            }
+        })
+
+
+
+        await api.updateEnvTypeOfCollection(tagObj === null ? tagObj : [tagObj], apiCollectionIds, tagObj === null).then((resp) => {
             func.setToast(true, false, "ENV type updated successfully")
             setEnvTypeMap(copyObj)
             updateData(copyObj)
         })
-        resetResourcesSelected();
 
+        resetResourcesSelected();
+        setPopover(false)
     }
 
     const modalComponent = <CreateNewCollectionModal
@@ -862,6 +898,15 @@ function ApiCollections() {
     )
 
     const components = loading ? [<SpinnerCentered key={"loading"}/>]: [<SummaryCardInfo summaryItems={summaryItems} key="summary"/>, (!hasUsageEndpoints ? <CollectionsPageBanner key="page-banner" /> : null) ,modalComponent, tableComponent]
+
+    if(onlyShowCollectionsTable){
+        sendData(data)
+        return (
+            <Box paddingBlockStart={4} paddingInline={4}>
+                {tableComponent}
+            </Box>
+        )
+    }
 
     return(
         <PageWithMultipleCards

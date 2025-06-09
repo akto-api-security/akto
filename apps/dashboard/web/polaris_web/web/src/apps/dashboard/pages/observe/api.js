@@ -803,11 +803,11 @@ export default {
             data:{},
         })
     },
-    async updateEnvTypeOfCollection(envType, apiCollectionIds){
+    async updateEnvTypeOfCollection(envType, apiCollectionIds,resetEnvTypes){
         return await request({
             url: '/api/updateEnvType',
             method: 'post',
-            data: {envType, apiCollectionIds}
+            data: {envType, apiCollectionIds,resetEnvTypes}
         })
     },
     fetchEndpoint(apiInfoKey){
@@ -841,6 +841,24 @@ export default {
             url: '/api/saveEndpointDescription',
             method: 'post',
             data: { apiCollectionId, url, method, description }
+        })
+        return resp
+    },
+
+    async fetchApiCallStats(apiCollectionId, url, method, startEpoch, endEpoch) {
+        const resp = await request({
+            url: '/api/fetchApiCallStats',
+            method: 'post',
+            data: { apiCollectionId, url, method, startEpoch, endEpoch }
+        })
+        return resp
+    },
+
+    async fetchIpLevelApiCallStats(apiCollectionId, url, method, startEpoch, endEpoch) {
+        const resp = await request({
+            url: '/api/fetchIpLevelApiCallStats',
+            method: 'post',
+            data: { apiCollectionId, url, method, startEpoch, endEpoch }
         })
         return resp
     },

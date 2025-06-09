@@ -5,9 +5,11 @@ import com.akto.dao.PendingInviteCodesDao;
 import com.akto.dao.RBACDao;
 import com.akto.dao.UsersDao;
 import com.akto.dao.context.Context;
+import com.akto.dto.Config;
 import com.akto.dto.CustomRole;
 import com.akto.dto.PendingInviteCode;
 import com.akto.dto.RBAC.Role;
+import com.akto.dto.SignupInfo;
 import com.akto.dto.User;
 import com.akto.log.LoggerMaker;
 import com.akto.notifications.email.SendgridEmail;
@@ -27,6 +29,9 @@ import java.security.spec.InvalidKeySpecException;
 import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.regex.Pattern;
+
+import org.springframework.util.StringUtils;
 
 public class InviteUserAction extends UserAction{
 
@@ -42,11 +47,17 @@ public class InviteUserAction extends UserAction{
     public static Map<String, String> commonOrganisationsMap = new HashMap<>();
     private static final ExecutorService executor = Executors.newFixedThreadPool(1);
 
+    private static final Pattern EMAIL_PATTERN = Pattern.compile("^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$");
+
     public static String validateEmail(String email, String adminLogin) {
         if (email == null) return INVALID_EMAIL_ERROR;
 
         String[] inviteeEmailArr = email.split("@");
         if (inviteeEmailArr.length != 2) {
+            return INVALID_EMAIL_ERROR;
+        }
+
+        if (!EMAIL_PATTERN.matcher(email).matches()) {
             return INVALID_EMAIL_ERROR;
         }
 
@@ -188,7 +199,27 @@ public class InviteUserAction extends UserAction{
             return ERROR.toUpperCase();
         }
 
+        // check if user who is being invited has sso-signup 
+        boolean hasSSOSignup = false;
+        if (StringUtils.hasText(inviteeEmail)) {
+            User invitedUser = UsersDao.instance.findOne(Filters.and(
+                Filters.eq(User.LOGIN, inviteeEmail)
+            ));
+
+            if(invitedUser != null && invitedUser.getSignupInfoMap() != null && invitedUser.getSignupInfoMap().size() > 0) {
+                for (SignupInfo signupInfo : invitedUser.getSignupInfoMap().values()) {
+                    hasSSOSignup = Config.isConfigSSOType(signupInfo.getConfigType());
+                    if(hasSSOSignup) {
+                        break;
+                    }
+                }
+            }
+        }
+
         String endpoint = DashboardMode.isSaasDeployment() ? "/addUserToAccount" : "/signup";
+        if(hasSSOSignup && DashboardMode.isSaasDeployment()) {
+            endpoint = "/sso-login";
+        }
         finalInviteCode = websiteHostName + endpoint + "?signupInvitationCode=" + inviteCode + "&signupEmailId=" + inviteeEmail;
 
         String inviteFrom = getSUser().getName();

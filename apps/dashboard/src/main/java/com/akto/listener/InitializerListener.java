@@ -170,6 +170,7 @@ import com.akto.dto.testing.TestingRunResultSummary;
 import com.akto.dto.testing.custom_groups.AllAPIsGroup;
 import com.akto.dto.testing.custom_groups.UnauthenticatedEndpoint;
 import com.akto.dto.testing.sources.AuthWithCond;
+import com.akto.dto.traffic.CollectionTags;
 import com.akto.dto.traffic.Key;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.traffic.SuspectSampleData;
@@ -1630,7 +1631,7 @@ public class InitializerListener implements ServletContextListener {
         EndpointLogicalGroupDao.instance.insertOne(endpointLogicalGroup);
         AuthWithCond authWithCond = new AuthWithCond(authMechanism, new HashMap<>(), null);
         List<AuthWithCond> authWithCondList = Collections.singletonList(authWithCond);
-        TestRoles testRoles = new TestRoles(new ObjectId(), "ATTACKER_TOKEN_ALL", endpointLogicalGroup.getId(), authWithCondList, "System", createdTs, createdTs, null);
+        TestRoles testRoles = new TestRoles(new ObjectId(), "ATTACKER_TOKEN_ALL", endpointLogicalGroup.getId(), authWithCondList, "System", createdTs, createdTs, null, "System");
         TestRolesDao.instance.insertOne(testRoles);
         return testRoles;
     }
@@ -2442,6 +2443,8 @@ public class InitializerListener implements ServletContextListener {
                         }
                     }, "context-initializer-secondary");
 
+                    setUpTestEditorTemplatesScheduler();
+
                     if(runJobFunctionsAnyway) {
                         crons.trafficAlertsScheduler();
                         // crons.insertHistoricalDataJob();
@@ -2457,7 +2460,6 @@ public class InitializerListener implements ServletContextListener {
                         setUpWebhookScheduler();
                         cleanInventoryJobRunner();
                         setUpDefaultPayloadRemover();
-                        setUpTestEditorTemplatesScheduler();
                         setUpDependencyFlowScheduler();
                         tokenGeneratorCron.tokenGeneratorScheduler();
                         crons.deleteTestRunsScheduler();
@@ -2741,6 +2743,8 @@ public class InitializerListener implements ServletContextListener {
             String hotjarSiteId = organization.getHotjarSiteId();
             String planType = organization.getplanType();
             String trialMsg = organization.gettrialMsg();
+            String protectionTrialMsg = organization.getprotectionTrialMsg();
+            String agentTrialMsg = organization.getagentTrialMsg();
             String organizationId = organization.getId();
             /*
              * This ensures, we don't fetch feature wise allowed from akto too often.
@@ -2807,6 +2811,8 @@ public class InitializerListener implements ServletContextListener {
             hotjarSiteId = OrganizationUtils.fetchHotjarSiteId(metaData);
             planType = OrganizationUtils.fetchplanType(metaData);
             trialMsg = OrganizationUtils.fetchtrialMsg(metaData);
+            protectionTrialMsg = OrganizationUtils.fetchprotectionTrialMsg(metaData);
+            agentTrialMsg = OrganizationUtils.fetchagentTrialMsg(metaData);
             boolean expired = OrganizationUtils.fetchExpired(metaData);
             if (DashboardMode.isOnPremDeployment()) {
                 boolean telemetryEnabled = OrganizationUtils.fetchTelemetryEnabled(metaData);
@@ -2822,6 +2828,10 @@ public class InitializerListener implements ServletContextListener {
             organization.setplanType(planType);
 
             organization.settrialMsg(trialMsg);
+
+            organization.setprotectionTrialMsg(protectionTrialMsg);
+
+            organization.setagentTrialMsg(agentTrialMsg);
 
             organization.setGracePeriod(gracePeriod);
             organization.setFeatureWiseAllowed(featureWiseAllowed);
@@ -2846,6 +2856,8 @@ public class InitializerListener implements ServletContextListener {
                             Updates.set(Organization.HOTJAR_SITE_ID, hotjarSiteId),
                             Updates.set(Organization.PLAN_TYPE, planType),
                             Updates.set(Organization.TRIAL_MSG, trialMsg),
+                            Updates.set(Organization.AGENTTRIAL_MSG, agentTrialMsg),
+                            Updates.set(Organization.PROTECTIONTRIAL_MSG, protectionTrialMsg),
                             Updates.set(Organization.TEST_TELEMETRY_ENABLED, testTelemetryEnabled),
                             Updates.set(Organization.LAST_FEATURE_MAP_UPDATE, lastFeatureMapUpdate)));
 
@@ -3337,7 +3349,6 @@ public class InitializerListener implements ServletContextListener {
     public void runInitializerFunctions() {
          DaoInit.createIndices();
 
-
         BackwardCompatibility backwardCompatibility = BackwardCompatibilityDao.instance.findOne(new BasicDBObject());
         if (backwardCompatibility == null) {
             backwardCompatibility = new BackwardCompatibility();
@@ -3347,9 +3358,9 @@ public class InitializerListener implements ServletContextListener {
         // backward compatibility
         try {
             setBackwardCompatibilities(backwardCompatibility);
-            logger.debugAndAddToDb("Backward compatibilities set for " + Context.accountId.get(), LogDb.DASHBOARD);
+            logger.infoAndAddToDb("Backward compatibilities set for " + Context.accountId.get(), LogDb.DASHBOARD);
             insertPiiSources();
-            logger.debugAndAddToDb("PII sources inserted set for " + Context.accountId.get(), LogDb.DASHBOARD);
+            logger.infoAndAddToDb("PII sources inserted set for " + Context.accountId.get(), LogDb.DASHBOARD);
 
 //            setUpPiiCleanerScheduler();
 //            setUpDailyScheduler();
@@ -3461,17 +3472,17 @@ public class InitializerListener implements ServletContextListener {
                     
                 } catch (Exception e) {
                     e.printStackTrace();
-                    logger.debugAndAddToDb("Unable to import remediations", LogDb.DASHBOARD);
+                    logger.errorAndAddToDb("Unable to import remediations", LogDb.DASHBOARD);
                 }
                 Map<String, ComplianceInfo> complianceCommonMap = getFromCommonDb();
                 Map<String, byte[]> allYamlTemplates = TestTemplateUtils.getZipFromMultipleRepoAndBranch(getAktoDefaultTestLibs());
                 AccountTask.instance.executeTask((account) -> {
                     try {
-                        logger.debugAndAddToDb("Updating Test Editor Templates for accountId: " + account.getId(), LogDb.DASHBOARD);
+                        logger.infoAndAddToDb("Updating Test Editor Templates for accountId: " + account.getId(), LogDb.DASHBOARD);
                         processTemplateFilesZip(testingTemplates, Constants._AKTO, YamlTemplateSource.AKTO_TEMPLATES.toString(), "");
                         if (!DashboardMode.isMetered()) return;
 
-                        logger.debugAndAddToDb("Updating Pro and Standard Templates for accountId: " + account.getId(), LogDb.DASHBOARD);
+                        logger.infoAndAddToDb("Updating Pro and Standard Templates for accountId: " + account.getId(), LogDb.DASHBOARD);
                         
                         AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
 
@@ -3810,7 +3821,7 @@ public class InitializerListener implements ServletContextListener {
                                     }
                                     continue;
                                 } else {
-                                    logger.debugAndAddToDb("Updating test yaml: " + testConfigId, LogDb.DASHBOARD);
+                                    logger.infoAndAddToDb("Updating test yaml: " + testConfigId, LogDb.DASHBOARD);
                                 }
                             }
 

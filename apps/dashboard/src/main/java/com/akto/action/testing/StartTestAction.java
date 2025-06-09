@@ -1078,6 +1078,7 @@ public class StartTestAction extends UserAction {
         Map<String,Long> result = new HashMap<>();
         ArrayList<Bson> filters = new ArrayList<>();
         filters.addAll(prepareFilters(startTimestamp, endTimestamp));
+        filters.addAll(getTableFilters());
         
         long totalCount = TestingRunDao.instance.getMCollection().countDocuments(Filters.and(filters));
         
@@ -1092,6 +1093,7 @@ public class StartTestAction extends UserAction {
         ArrayList<Bson> continuousTestsFilter = new ArrayList<>(); // Create a copy of filters
         continuousTestsFilter.add(getTestingRunTypeFilter(TestingRunType.CONTINUOUS_TESTING));
         continuousTestsFilter.add(Filters.gte(TestingRun.SCHEDULE_TIMESTAMP, startTimestamp));
+        continuousTestsFilter.addAll(getTableFilters());
 
         long continuousTestsCount = TestingRunDao.instance.getMCollection().countDocuments(Filters.and(continuousTestsFilter));
 
@@ -1329,6 +1331,10 @@ public class StartTestAction extends UserAction {
                                 Updates.set(TestingRun.STATE, State.SCHEDULED)
                             )
                         );
+                    }
+
+                    if(editableTestingRunConfig.getMiniTestingServiceName() != null && !editableTestingRunConfig.getMiniTestingServiceName().isEmpty()){
+                        updates.add(Updates.set(TestingRun.MINI_TESTING_SERVICE_NAME, editableTestingRunConfig.getMiniTestingServiceName()));
                     }
 
                     if (!updates.isEmpty()) {

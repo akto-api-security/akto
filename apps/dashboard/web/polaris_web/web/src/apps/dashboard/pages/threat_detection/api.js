@@ -64,11 +64,24 @@ const threatDetectionRequests = {
             }
         })
     },
-    getActorsCountPerCounty() {
+    getActorsCountPerCounty(startTs, endTs) {
         return request({
             url: '/api/getActorsCountPerCounty',
+            method: 'post',
+            data: {startTs, endTs}
+        })
+    },
+    fetchThreatConfiguration() {
+        return request({
+            url: '/api/fetchThreatConfiguration',
             method: 'get',
-            data: {}
+        })
+    },
+    modifyThreatConfiguration(data) {
+        return request({
+            url: '/api/modifyThreatConfiguration',
+            method: 'post',
+            data: { threatConfiguration: data}
         })
     },
     fetchThreatCategoryCount(startTs, endTs) {
@@ -78,11 +91,11 @@ const threatDetectionRequests = {
             data: {startTs, endTs}
         })
     },
-    fetchMaliciousRequest(refId, eventType){
+    fetchMaliciousRequest(refId, eventType, actor, filterId) {
         return request({
             url: '/api/fetchAggregateMaliciousRequests',
             method: 'post',
-            data: {refId, eventType}
+            data: {refId, eventType, actor, filterId}
         })
     },
     fetchCountBySeverity(startTs, endTs) {

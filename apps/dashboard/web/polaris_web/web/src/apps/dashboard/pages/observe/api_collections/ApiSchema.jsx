@@ -4,6 +4,7 @@ import { ChevronDownMinor, ChevronUpMinor } from "@shopify/polaris-icons"
 import func from "@/util/func"
 import transform from "../transform";
 import { useNavigate } from "react-router-dom";
+import api from "../api";
 
 function prepareTableData (data, handleBadgeClick) {
     let sensitivePayload = []
@@ -70,11 +71,12 @@ function prepareTableData (data, handleBadgeClick) {
 }
 
 function ApiSingleSchema(props) {
-    const { data, title, badgeActive, setBadgeActive } = props;
+    const { data, title } = props;
 
     const [open, setOpen] = useState(true);
     const handleToggle = useCallback(() => setOpen((open) => !open), []);
     const [isHeader, setIsHeader] = useState(true)
+    const [badgeActive, setBadgeActive] = useState(true)
 
     const [dataObj,setDataObj] = useState({
         headerData: [],
@@ -83,7 +85,7 @@ function ApiSingleSchema(props) {
     });
     useEffect(()=>{
         setDataObj(prepareTableData(data, props.handleBadgeClick));
-    },[])
+    },[data])
     const headerCount = dataObj?.headerData?.length
     const payloadCount = dataObj?.payloadData?.length
 
@@ -149,14 +151,61 @@ function ApiSingleSchema(props) {
     )
 }
 
+
 function ApiSchema(props) {
 
-    const { data, badgeActive, setBadgeActive, apiInfo } = props
+    const {badgeActive, setBadgeActive, apiInfo } = props
     const navigate = useNavigate()
+    const [payloadData, setPayloadData] = useState({
+        reqData: [],
+        resData: []
+    })
 
-    let reqData = data.filter((item) => item.responseCode === -1)
-    let resData = data.filter((item) => item.responseCode !== -1)
+    async function fetchData() {
+        const { apiCollectionId, url, method } = apiInfo;
+        await api.loadParamsOfEndpoint(apiCollectionId, url, method).then(resp => {
+            api.loadSensitiveParameters(apiCollectionId, url, method).then(allSensitiveFields => {
+                allSensitiveFields.data.endpoints.filter(x => x.sensitive).forEach(sensitive => {
+                    let index = resp.data.params.findIndex(x =>
+                        x.param === sensitive.param &&
+                        x.isHeader === sensitive.isHeader &&
+                        x.responseCode === sensitive.responseCode
+                    )
 
+                    if (index > -1 && !sensitive.subType) {
+                        resp.data.params[index].savedAsSensitive = true
+                        if (!resp.data.params[index].subType) {
+                            resp.data.params[index].subType = { "name": "CUSTOM" }
+                        } else {
+                            resp.data.params[index].subType = JSON.parse(JSON.stringify(resp.data.params[index].subType))
+                        }
+                    }
+                })
+
+                try {
+                    resp.data.params?.forEach(x => {
+                        if (!values?.skipList.includes(x.subTypeString) && !x?.savedAsSensitive && !x?.sensitive) {
+                            x.nonSensitiveDataType = true
+                        }
+                    })
+                } catch (e) {
+                }
+                let reqData = resp.data.params.filter((item) => item.responseCode === -1)
+                let resData = resp.data.params.filter((item) => item.responseCode !== -1)
+
+                setPayloadData({
+                    reqData: reqData,
+                    resData: resData
+                })
+            })
+        })
+    }
+
+    useEffect(() => {
+        if (apiInfo) {
+            fetchData()
+        }
+    }, [apiInfo])
     const handleBadgeClick = (datatype, position) => {
         const navUrl = "/dashboard/observe/sensitive/" + datatype.toUpperCase() + "/" + apiInfo.apiCollectionId + "/" + btoa(apiInfo.url + " " + apiInfo.method)
         navigate(navUrl)
@@ -166,7 +215,7 @@ function ApiSchema(props) {
         <VerticalStack gap="2">
             {
                 ['Request', 'Response'].map((type, index) => {
-                    return <ApiSingleSchema handleBadgeClick={handleBadgeClick} title={type} key={type} data={index == 0 ? reqData : resData} badgeActive={badgeActive} setBadgeActive={setBadgeActive}/>
+                    return <ApiSingleSchema handleBadgeClick={handleBadgeClick} title={type} key={type} data={index == 0 ? payloadData.reqData : payloadData.resData} badgeActive={badgeActive} setBadgeActive={setBadgeActive}/>
                 })
             }
 

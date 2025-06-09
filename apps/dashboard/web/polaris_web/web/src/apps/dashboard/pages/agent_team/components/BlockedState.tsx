@@ -14,10 +14,9 @@ interface BlockedStateProps {
 
 export const BlockedState = ({ onResume, onDiscard }: BlockedStateProps) => {
     const { agentState, setAttemptedInBlockedState, attemptedInBlockedState, setAgentState, currentAgent, PRstate } = useAgentsStore();
-    const setCurrentAgentState = {}
 
     const handleResume = () => {
-        transform.updateAgentState("idle", currentAgent?.id??"", setAgentState, setCurrentAgentState);
+        transform.updateAgentState("idle", currentAgent?.id??"", setAgentState);
         onResume();
     }
 
@@ -28,7 +27,7 @@ export const BlockedState = ({ onResume, onDiscard }: BlockedStateProps) => {
     const show = isPaused || isThinking || isError;
 
     const handleDiscard = () => {
-        transform.updateAgentState("idle", currentAgent?.id??"", setAgentState, setCurrentAgentState);
+        transform.updateAgentState("idle", currentAgent?.id??"", setAgentState);
         onDiscard();
     }
 

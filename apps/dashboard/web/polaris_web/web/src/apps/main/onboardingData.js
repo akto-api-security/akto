@@ -398,6 +398,14 @@ const learnMoreObject = {
             }
         ],
     },
+    dashboard_settings_threat_configuration:{
+        docsLink: [
+            {
+                content:"How to configure Threat Actor",
+                value:"https://docs.akto.io/api-protection/concepts/threat-actors"
+            },
+        ],
+    },
     dashboard_settings_tags:{
         docsLink: [
             {
@@ -684,7 +692,21 @@ const learnMoreObject = {
                 value: "https://docs.akto.io/"
             }
         ],
-    }
+    },
+    dashboard_mcp_security: {
+        title: "MCP Security",
+        description: "Learn more about MCP Security, discovery, and test results.",
+        docsLink: [
+            {
+                content: "MCP Security Overview",
+                value: "https://docs.akto.io/agentic-ai/akto-mcp-server"
+            },
+            {
+                content: "How to use MCP Security",
+                value: "https://docs.akto.io/agentic-ai/akto-mcp-server"
+            }
+        ]
+    },
 }
 
 export { HOMEDASHBOARD_VIDEO_LENGTH, HOMEDASHBOARD_VIDEO_URL, HOMEDASHBOARD_VIDEO_THUMBNAIL,

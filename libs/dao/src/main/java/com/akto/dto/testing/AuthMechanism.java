@@ -22,6 +22,8 @@ public class AuthMechanism {
 
     @BsonIgnore
     private int cacheExpiryEpoch;
+    @BsonIgnore
+    private int errorCacheExpiryEpoch;
 
     private String type;
 
@@ -68,7 +70,9 @@ public class AuthMechanism {
     }
 
     public boolean isCacheExpired() {
-        return cacheExpiryEpoch <= (Context.now()+30);
+        // take max of cacheExpiryEpoch and errorCacheExpiryEpoch, to check what is the latest expiry time
+        int maxExpiryEpoch = Math.max(cacheExpiryEpoch, errorCacheExpiryEpoch);
+        return maxExpiryEpoch <= (Context.now() + 30);
     }
 
     public boolean removeAuthFromRequest(OriginalHttpRequest request) {
@@ -121,6 +125,11 @@ public class AuthMechanism {
 
     public void updateCacheExpiryEpoch(int cacheExpiryEpoch) {
         this.cacheExpiryEpoch = cacheExpiryEpoch;
+        this.errorCacheExpiryEpoch = cacheExpiryEpoch; // assuming error cache expiry is same as cache expiry
+    }
+
+    public void updateErrorCacheExpiryEpoch(int errorCacheExpiryEpoch) {
+        this.errorCacheExpiryEpoch = errorCacheExpiryEpoch;
     }
 
     public ArrayList<RequestData> getRequestData() {

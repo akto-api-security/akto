@@ -13,6 +13,24 @@ import SampleData from '../../../../components/shared/SampleData'
 import func from "@/util/func"
 import TitleWithInfo from "../../../../components/shared/TitleWithInfo"
 
+const testingOptionsObj = {
+    "type":"TESTING",
+    "title": "Testing run results",
+    "value": "TESTING_RUN_RESULTS",
+    "collectionSelection": false
+}
+
+const infoTab = {
+    id: 'info',
+    content: 'Info',
+    accessibilityLabel: 'Info',
+}
+
+const resultTab = {
+    id: 'result',
+    content: 'Result',
+}
+
 function WebhookCore(props) {
 
     const {webhookType, defaultPayload} = props
@@ -74,21 +92,21 @@ function WebhookCore(props) {
             }
 
             setWebhook({
-                name: customWebhookFindId.webhookName,
-                url: customWebhookFindId.url,
-                method: customWebhookFindId.method,
-                queryParams: customWebhookFindId.queryParams,
-                headers: customWebhookFindId.headerString,
-                body: customWebhookFindId.body,
-                selectedWebhookOptions: customWebhookFindId.selectedWebhookOptions,
-                newEndpointCollections: customWebhookFindId.newEndpointCollections,
-                newSensitiveEndpointCollections: customWebhookFindId.newSensitiveEndpointCollections,
-                frequencyInSeconds: customWebhookFindId.frequencyInSeconds,
-                batchSize: customWebhookFindId.batchSize,
-                sendInstantly: customWebhookFindId.sendInstantly
+                name: customWebhookFindId?.webhookName,
+                url: customWebhookFindId?.url,
+                method: customWebhookFindId?.method,
+                queryParams: customWebhookFindId?.queryParams,
+                headers: customWebhookFindId?.headerString,
+                body: customWebhookFindId?.body,
+                selectedWebhookOptions: customWebhookFindId?.selectedWebhookOptions,
+                newEndpointCollections: customWebhookFindId?.newEndpointCollections,
+                newSensitiveEndpointCollections: customWebhookFindId?.newSensitiveEndpointCollections,
+                frequencyInSeconds: customWebhookFindId?.frequencyInSeconds,
+                batchSize: customWebhookFindId?.batchSize,
+                sendInstantly: customWebhookFindId?.sendInstantly
             })
 
-            let webhookBody = customWebhookFindId.body;
+            let webhookBody = customWebhookFindId?.body;
             setShowOptions(!(webhookBody && webhookBody.indexOf("$") > 0))
             let payload = (webhookBody && webhookBody.indexOf("$") > 0) ? webhookBody : defaultPayload
             setData({
@@ -123,15 +141,14 @@ function WebhookCore(props) {
         { "type":"TRAFFIC", "title": "New API runtime threats", "value": "API_THREAT_PAYLOADS", "collectionSelection": false }
     ]
 
-    if (webhookType == "MICROSOFT_TEAMS") {
+    if (webhookType === "MICROSOFT_TEAMS") {
         customWebhookOptions.push(
-            {
-                "type":"TESTING",
-                "title": "Testing run results",
-                "value": "TESTING_RUN_RESULTS",
-                "collectionSelection": false
-            }
+            testingOptionsObj
         )
+    }
+
+    if( webhookType === "GMAIL") {
+        customWebhookOptions = [testingOptionsObj];
     }
 
     const intervals = [
@@ -157,17 +174,10 @@ function WebhookCore(props) {
         { "name": "Periodic", "value": false },
     ]
 
-    const tabs = [
-        {
-            id: 'info',
-            content: 'Info',
-            accessibilityLabel: 'Info',
-        },
-        {
-            id: 'result',
-            content: 'Result',
-        },
-    ];
+    const tabs = webhookType === "GMAIL" ? [infoTab] : [
+        infoTab,
+        resultTab
+    ]
 
     function handleWebhookTabChange(selectedTabIndex) {
         setSelectedWebhookTab(selectedTabIndex)
@@ -214,13 +224,16 @@ function WebhookCore(props) {
         const frequencyInSeconds = webhook.frequencyInSeconds
         const batchSize = webhook.batchSize
         const sendInstantly = webhook.sendInstantly
-
         if (webhookName === "") {
             setToastConfig({ isActive: true, isError: true, message: "Webhook name required" })
             return
         }
         else if (url === "") {
-            setToastConfig({ isActive: true, isError: true, message: "URL required" })
+            let message = "URL required"
+            if (webhookType === "GMAIL") {
+                message = "Email ID required"
+            }
+            setToastConfig({ isActive: true, isError: true, message: message })
             return
         }
 
@@ -253,13 +266,20 @@ function WebhookCore(props) {
     const InfoCard = (
         <LegacyCard title="Details" key="details">
             <LegacyCard.Section>
-                <TextField label="Name" value={webhook.name} placeholder='Name' requiredIndicator onChange={(name) => updateWebhookState("name", name)} />
-                <br />
-                <TextField label="URL" value={webhook.url} placeholder='URL' requiredIndicator onChange={(url) => updateWebhookState("url", url)} />
-                <br />
-                <TextField label="Query Params" value={webhook.queryParams} placeholder='Query Params' onChange={(queryParams) => updateWebhookState("queryParams", queryParams)} />
-                <br />
-                <TextField label="Headers" value={webhook.headers} placeholder='Headers' onChange={(headers) => updateWebhookState("headers", headers)} />
+                <VerticalStack gap={"2"}>
+                    <TextField label="Webhook Name" value={webhook.name} placeholder='Name' requiredIndicator onChange={(name) => updateWebhookState("name", name)} />
+                    {webhookType !== "GMAIL" ?
+                        <VerticalStack gap={"2"}>
+                            <TextField label="URL" value={webhook.url} placeholder='URL' requiredIndicator onChange={(url) => updateWebhookState("url", url)} />
+                            <TextField label="Query Params" value={webhook.queryParams} placeholder='Query Params' onChange={(queryParams) => updateWebhookState("queryParams", queryParams)} />
+                            <TextField label="Headers" value={webhook.headers} placeholder='Headers' onChange={(headers) => updateWebhookState("headers", headers)} />    
+                        </VerticalStack>
+                    : <VerticalStack gap={"2"}>
+                            <TextField label="Email ID" value={webhook.url} placeholder={window.USER_NAME} requiredIndicator={true} onChange={(val) => updateWebhookState("url", val)} />
+                            <TextField label="User name" value={webhook.queryParams} placeholder={window.USER_FULL_NAME} onChange={(val) => updateWebhookState("queryParams", val)} />
+                        </VerticalStack>
+                    }
+                </VerticalStack>
             </LegacyCard.Section>
         </LegacyCard>
     )
@@ -271,7 +291,7 @@ function WebhookCore(props) {
     )
 
     const OptionsCard = (type) => {
-        const options = customWebhookOptions.filter(x => x.type == type)
+        const options = customWebhookOptions.filter(x => x.type === type)
         return (<div>
             {options.map(customWebhookOption => {
                 return (
@@ -321,7 +341,7 @@ function WebhookCore(props) {
     }
 
     const TestingOptionsCard = (
-        webhookType == "MICROSOFT_TEAMS" ? (<LegacyCard title={"Testing options"} key="testingOptions">
+        webhookType === "MICROSOFT_TEAMS" || webhookType === "GMAIL" ? (<LegacyCard title={"Testing options"} key="testingOptions">
             <LegacyCard.Section>
                 {OptionsCard("TESTING")}
             </LegacyCard.Section>
@@ -415,7 +435,7 @@ function WebhookCore(props) {
                             webhook.selectedWebhookOptions.length == 0) ?
                         TestingOptionsCard : null}
                     {(webhook.selectedWebhookOptions &&
-                        !webhook.selectedWebhookOptions.includes("TESTING_RUN_RESULTS")) ?
+                        !webhook.selectedWebhookOptions.includes("TESTING_RUN_RESULTS")) && webhookType !== "GMAIL" ?
                         OverallCard : null}
                 </div>
                 :   webhook.result.length !== 0 ? 

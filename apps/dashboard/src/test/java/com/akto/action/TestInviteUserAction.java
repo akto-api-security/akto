@@ -32,6 +32,9 @@ public class TestInviteUserAction extends MongoBasedTest{
         String code = InviteUserAction.validateEmail("ankush@akto.io", "avneesh@akto.io");
         assertNull(code);
 
+        code = InviteUserAction.validateEmail("https://app.akto.io/signup?signupInvitationCode=eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoiaW52aXRlX3VzZXIiLCJlbWFpbCI6InVtZXNoKzFAYWt0by5pbyIsImlhdCI6MTc0OTQ1MjQ0MCwiZXhwIjoxNzUwMDU3MjQwfQ.A1wo7Pkg-6X1xvmV7LpJ-yQD5Y2nse3sthtn3sJT0v2-Osb2Hqr85SRMIiZOut6Srp3q1waDzqNpVNC0rdkiQKAGKPUR_hrtv44CcUGxnAv8jJ_1qICg8APHq_ZbhgiwdqlBtVxr-Q1cUA0TiM6yQJRNcXjpm8CWrpwHcOLmjNntAecvfCG50pVtDgiwRXnMKK8tkw-pvQaPyf-mkY9Dp43NNJ2vkocndVXEP4aIMWaK5fWnlvWZrTB5hOKDy4gEa8jzFChDfU2yB5U-CcNM79ZWTLLBf6ZPFIc9PCmQm6cxkuzBRgRvjofceLf2QaSuS2sso11E59hrGaDczd847A&signupEmailId=umesh+2@aktao.io", "avneesh@aktao.io");
+        assertEquals(code, InviteUserAction.INVALID_EMAIL_ERROR);
+
         code = InviteUserAction.validateEmail(null, "avneesh@akto.io");
         assertEquals(code, InviteUserAction.INVALID_EMAIL_ERROR);
 
@@ -41,7 +44,7 @@ public class TestInviteUserAction extends MongoBasedTest{
         code = InviteUserAction.validateEmail("anuj@amazon.com", "avneesh@gmail.io");
         assertEquals(code, InviteUserAction.DIFFERENT_ORG_EMAIL_ERROR);
 
-        code = InviteUserAction.validateEmail("jim@akto", "avneesh@gmail.io");
+        code = InviteUserAction.validateEmail("jim@akto.com", "avneesh@gmail.io");
         assertEquals(code, InviteUserAction.DIFFERENT_ORG_EMAIL_ERROR);
 
         code = InviteUserAction.validateEmail("avneesh@akto.io", "aryan@bigcorp.com");
@@ -58,6 +61,9 @@ public class TestInviteUserAction extends MongoBasedTest{
 
         code = InviteUserAction.validateEmail("avneesh@bigcorp.com", "ankush@bigcorp.com");
         assertNull(code);
+
+        code = InviteUserAction.validateEmail("avneesh@bigcorp.com", "ankush@bigcorp2.com");
+        assertEquals(code, InviteUserAction.DIFFERENT_ORG_EMAIL_ERROR);
 
         InviteUserAction.commonOrganisationsMap = new HashMap<>();
     }

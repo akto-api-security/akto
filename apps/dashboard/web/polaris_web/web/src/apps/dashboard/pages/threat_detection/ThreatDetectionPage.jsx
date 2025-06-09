@@ -100,7 +100,7 @@ function ThreatDetectionPage() {
             const sameRow = currentRefId === data?.refId
             if (!sameRow) {
                 let rowData = [];
-                await threatDetectionRequests.fetchMaliciousRequest(data?.refId, data?.eventType).then((res) => {
+                await threatDetectionRequests.fetchMaliciousRequest(data?.refId, data?.eventType, data?.actor, data?.filterId).then((res) => {
                     rowData = [...res.maliciousPayloadsResponses]
                 }) 
                 setRowDataList(rowData)
@@ -108,6 +108,8 @@ function ThreatDetectionPage() {
                 setShowDetails(true)
                 setMoreInfoData({
                     url: data.url,
+                    method: data.method,
+                    apiCollectionId: data.apiCollectionId,
                     templateId: data.filterId,
                 })
             } else {

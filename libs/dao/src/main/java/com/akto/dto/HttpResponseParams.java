@@ -9,6 +9,7 @@ import com.google.protobuf.TextFormat;
 
 import java.util.*;
 import java.util.function.Supplier;
+import org.apache.commons.lang3.StringUtils;
 
 public class HttpResponseParams {
 
@@ -291,5 +292,22 @@ public class HttpResponseParams {
         }
 
         return origStr;
+    }
+
+    public static String addPathParamToUrl(String url, String pathParam) {
+        String[] onlyUrl = url.split("\\?");
+        if (onlyUrl.length < 1) {
+            return url;
+        }
+
+        url = onlyUrl[0];
+        url = url + "/" + pathParam;
+        if (onlyUrl.length == 2) {
+            String queryParams = onlyUrl[1];
+            if (StringUtils.isNotBlank(queryParams)) {
+                url = url + "?" + queryParams;
+            }
+        }
+        return url;
     }
 }

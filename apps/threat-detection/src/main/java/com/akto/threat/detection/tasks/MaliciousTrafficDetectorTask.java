@@ -41,14 +41,12 @@ import com.akto.log.LoggerMaker.LogDb;
 import com.akto.proto.generated.threat_detection.message.malicious_event.event_type.v1.EventType;
 import com.akto.proto.generated.threat_detection.message.malicious_event.v1.MaliciousEventKafkaEnvelope;
 import com.akto.proto.generated.threat_detection.message.malicious_event.v1.MaliciousEventMessage;
-import com.akto.proto.generated.threat_detection.message.sample_request.v1.Metadata;
 import com.akto.proto.generated.threat_detection.message.sample_request.v1.SampleMaliciousRequest;
 import com.akto.proto.generated.threat_detection.message.sample_request.v1.SampleRequestKafkaEnvelope;
 import com.akto.proto.generated.threat_detection.message.sample_request.v1.SchemaConformanceError;
 import com.akto.proto.http_response_param.v1.HttpResponseParam;
 import com.akto.rules.TestPlugin;
 import com.akto.test_editor.filter.data_operands_impl.ValidationResult;
-import com.akto.threat.detection.actor.SourceIPActorGenerator;
 import com.akto.threat.detection.cache.ApiCountCacheLayer;
 import com.akto.threat.detection.cache.RedisBackedCounterCache;
 import com.akto.threat.detection.constants.KafkaTopic;
@@ -60,7 +58,6 @@ import com.akto.util.Constants;
 import com.akto.util.HttpRequestResponseUtils;
 import com.akto.utils.GzipUtils;
 import com.fasterxml.jackson.databind.ObjectMapper;
-
 import io.lettuce.core.RedisClient;
 import io.lettuce.core.api.StatefulRedisConnection;
 
@@ -72,6 +69,7 @@ Pass data through filters and identify malicious traffic.
  */
 public class MaliciousTrafficDetectorTask implements Task {
 
+  private ThreatConfigurationEvaluator threatConfigEvaluator;
   private final Consumer<String, byte[]> kafkaConsumer;
   private final KafkaConfig kafkaConfig;
   private final HttpCallParser httpCallParser;
@@ -92,7 +90,6 @@ public class MaliciousTrafficDetectorTask implements Task {
   private static final DataActor dataActor = DataActorFactory.fetchInstance();
   private static final LoggerMaker logger = new LoggerMaker(MaliciousTrafficDetectorTask.class, LogDb.THREAT_DETECTION);
 
-  private static final ObjectMapper objectMapper = new ObjectMapper();
   private static final HttpRequestParams requestParams = new HttpRequestParams();
   private static final HttpResponseParams responseParams = new HttpResponseParams();
   private static Map<String, Object> varMap = new HashMap<>();
@@ -122,6 +119,7 @@ public class MaliciousTrafficDetectorTask implements Task {
 
     this.httpCallParser = new HttpCallParser(120, 1000);
     
+    this.threatConfigEvaluator = new ThreatConfigurationEvaluator(null);
 
     this.windowBasedThresholdNotifier =
         new WindowBasedThresholdNotifier(
@@ -227,11 +225,9 @@ public class MaliciousTrafficDetectorTask implements Task {
   }
 
 
-
   private void processRecord(HttpResponseParam record) throws Exception {
     HttpResponseParams responseParam = buildHttpResponseParam(record);
-    String actor = SourceIPActorGenerator.instance.generate(responseParam).orElse("");
-    responseParam.setSourceIP(actor);
+    String actor = this.threatConfigEvaluator.getActorId(responseParam);
 
     if (actor == null || actor.isEmpty()) {
       logger.warnAndAddToDb("Dropping processing of record with no actor IP, account: " + responseParam.getAccountId());
@@ -244,8 +240,6 @@ public class MaliciousTrafficDetectorTask implements Task {
       logger.warnAndAddToDb("No filters found for account " + responseParam.getAccountId());
       return;
     }
-
-    List<SampleRequestKafkaEnvelope> maliciousMessages = new ArrayList<>();
 
     RawApi rawApi = RawApi.buildFromMessageNew(responseParam);
     RawApiMetadata metadata = this.rawApiFactory.buildFromHttp(rawApi.getRequest(), rawApi.getResponse());
@@ -313,15 +307,6 @@ public class MaliciousTrafficDetectorTask implements Task {
           maliciousReq = Utils.buildSampleMaliciousRequest(actor, responseParam, apiFilter, metadata, errors);
         }
 
-        if (maliciousReq != null) {
-          maliciousMessages.add(
-              SampleRequestKafkaEnvelope.newBuilder()
-                  .setActor(actor)
-                  .setAccountId(responseParam.getAccountId())
-                  .setMaliciousRequest(maliciousReq)
-                  .build());
-        }
-
         if (!isAggFilter) {
           generateAndPushMaliciousEventRequest(
               apiFilter, actor, responseParam, maliciousReq, EventType.EVENT_TYPE_SINGLE);
@@ -338,12 +323,6 @@ public class MaliciousTrafficDetectorTask implements Task {
               shouldNotify = this.apiCountWindowBasedThresholdNotifier.calcApiCount(apiHitCountKey, responseParam.getTime(), rule);
               if (shouldNotify) {
                 maliciousReq = Utils.buildSampleMaliciousRequest(actor, responseParam, apiFilter, metadata, errors);
-                maliciousMessages.add(
-                  SampleRequestKafkaEnvelope.newBuilder()
-                      .setActor(actor)
-                      .setAccountId(responseParam.getAccountId())
-                      .setMaliciousRequest(maliciousReq)
-                      .build());
               }
           } else {
               shouldNotify = this.windowBasedThresholdNotifier.shouldNotify(aggKey, maliciousReq, rule);
@@ -362,17 +341,6 @@ public class MaliciousTrafficDetectorTask implements Task {
       }
     } 
 
-    // Should we push all the messages in one go
-    // or call kafka.send for each HttpRequestParams
-    try {
-      maliciousMessages.forEach(
-          sample -> {
-            internalKafka.send(KafkaTopic.ThreatDetection.MALICIOUS_EVENTS, sample);
-          });
-    } catch (Exception e) {
-      logger.errorAndAddToDb("Error in sending malicious event to kafka " + e.getMessage());
-      e.printStackTrace();
-    }
   }
 
   private void generateAndPushMaliciousEventRequest(

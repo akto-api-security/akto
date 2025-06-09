@@ -52,6 +52,10 @@ public class ApiCountInfoRelayCron {
 
                     // build api hit count payload and call cyborg
                     List<ApiHitCountInfo> hitCountInfos = ApiCountInfoRelayUtils.buildPayload(keyValData);
+                    if (hitCountInfos == null || hitCountInfos.size() == 0) {
+                        logger.info("hitCountInfos is empty, returning");
+                        return;
+                    }
                     try {
                         dataActor.bulkInsertApiHitCount(hitCountInfos);
                         cache.set(RedisKeyInfo.API_COUNTER_RELAY_LAST_UPDATE_TS, endBinId);

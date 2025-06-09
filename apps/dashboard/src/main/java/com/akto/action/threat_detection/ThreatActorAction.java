@@ -1,5 +1,6 @@
 package com.akto.action.threat_detection;
 
+import com.akto.ProtoMessageUtils;
 import com.akto.dao.ConfigsDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.Config;
@@ -13,7 +14,6 @@ import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.Fe
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ListThreatActorResponse;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatActorByCountryResponse;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatActorFilterResponse;
-import com.akto.proto.utils.ProtoMessageUtils;
 import com.akto.testing.ApiExecutor;
 import com.akto.util.Constants;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -63,6 +63,8 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
   String actorIp;
   String status;
   String eventType;
+  String actor;
+  String filterId;
 
   private final CloseableHttpClient httpClient;
 
@@ -79,13 +81,27 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
   }
 
   public String getActorsCountPerCounty() {
-    HttpGet get =
-        new HttpGet(
-            String.format("%s/api/dashboard/get_actors_count_per_country", this.getBackendUrl()));
-    get.addHeader("Authorization", "Bearer " + this.getApiToken());
-    get.addHeader("Content-Type", "application/json");
+    HttpPost post = new HttpPost(String.format("%s/api/dashboard/get_actors_count_per_country", this.getBackendUrl()));
+    post.addHeader("Authorization", "Bearer " + this.getApiToken());
+    post.addHeader("Content-Type", "application/json");
 
-    try (CloseableHttpResponse resp = this.httpClient.execute(get)) {
+    if(startTs == 0 || endTs == 0) {
+      startTs = Context.now() - 1 * 24 * 60 * 60; // default to last 1 day
+      endTs = Context.now();
+    }
+
+    Map<String, Object> body = new HashMap<String, Object>() {
+      {
+        put("start_ts", startTs);
+        put("end_ts", endTs);
+      }
+    };
+    String msg = objectMapper.valueToTree(body).toString();
+
+    StringEntity requestEntity = new StringEntity(msg, ContentType.APPLICATION_JSON);
+    post.setEntity(requestEntity);
+
+    try (CloseableHttpResponse resp = this.httpClient.execute(post)) {
       String responseBody = EntityUtils.toString(resp.getEntity());
 
       ProtoMessageUtils.<ThreatActorByCountryResponse>toProtoMessage(
@@ -205,6 +221,8 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
           {
             put("ref_id", refId);
             put("event_type", eventType);
+            put("actor", actor);
+            put("filterId", filterId);
           }
         };
     String msg = objectMapper.valueToTree(body).toString();
@@ -225,6 +243,7 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
                             smr ->
                                 new MaliciousPayloadsResponse(
                                     smr.getOrig(),
+                                    smr.getMetadata(),
                                     smr.getTs()))
                         .collect(Collectors.toList());
               });
@@ -697,6 +716,22 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
 
   public void setEventType(String eventType) {
     this.eventType = eventType;
+  }
+
+  public String getActor() {
+    return actor;
+  }
+
+  public void setActor(String actor) {
+    this.actor = actor;
+  }
+
+  public String getFilterId() {
+    return filterId;
+  }
+
+  public void setFilterId(String filterId) {
+    this.filterId = filterId;
   }
 
   public Map<String, Integer> getSort() {

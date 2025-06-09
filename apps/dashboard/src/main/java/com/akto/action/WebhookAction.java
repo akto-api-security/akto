@@ -73,7 +73,12 @@ public class WebhookAction extends UserAction implements ServletRequestAware{
     public String addCustomWebhook(){
         activeStatus = ActiveStatus.ACTIVE;
 
-        boolean isUrl = KeyTypes.patternToSubType.get(SingleTypeInfo.URL).matcher(url).matches();
+        WebhookType type = WebhookType.DEFAULT;
+        try {
+            type = WebhookType.valueOf(webhookType);
+        } catch (Exception e) {
+        }
+        boolean isUrl = type.equals(WebhookType.GMAIL) ||  KeyTypes.patternToSubType.get(SingleTypeInfo.URL).matcher(url).matches() ;
         
         try{
             OriginalHttpRequest.buildHeadersMap(headerString);
@@ -101,11 +106,6 @@ public class WebhookAction extends UserAction implements ServletRequestAware{
             if (batchSize > 0) {
                 customWebhook.setBatchSize(batchSize);
             }
-            WebhookType type = WebhookType.DEFAULT;
-            try {
-                type = WebhookType.valueOf(webhookType);
-            } catch (Exception e) {
-            }
             customWebhook.setSendInstantly(sendInstantly);
             customWebhook.setWebhookType(type);
             customWebhook.setDashboardUrl(this.dashboardUrl);
@@ -118,14 +118,21 @@ public class WebhookAction extends UserAction implements ServletRequestAware{
 
     public String updateCustomWebhook(){
         activeStatus = ActiveStatus.ACTIVE;
+        String userEmail = getSUser().getLogin();
+        if (userEmail == null) return ERROR.toUpperCase();
 
         CustomWebhook customWebhook = CustomWebhooksDao.instance.findOne(
             Filters.eq("_id",id)
         );
-        boolean isUrl = KeyTypes.patternToSubType.get(SingleTypeInfo.URL).matcher(url).matches();
 
-        String userEmail = getSUser().getLogin();
-        if (userEmail == null) return ERROR.toUpperCase();
+        if (customWebhook == null){
+            addActionError("The webhook does not exist");
+            return ERROR.toUpperCase();
+        } else if ( !userEmail.equals(customWebhook.getUserEmail())){
+            addActionError("Unauthorized Request");
+            return ERROR.toUpperCase();
+        } 
+        boolean isUrl = (customWebhook.getWebhookType() != null && customWebhook.getWebhookType().equals(WebhookType.GMAIL)) ||  KeyTypes.patternToSubType.get(SingleTypeInfo.URL).matcher(url).matches() ;
 
         try{
             OriginalHttpRequest.buildHeadersMap(headerString);
@@ -135,13 +142,7 @@ public class WebhookAction extends UserAction implements ServletRequestAware{
             return ERROR.toUpperCase();
         }
 
-        if (customWebhook == null){
-            addActionError("The webhook does not exist");
-            return ERROR.toUpperCase();
-        } else if ( !userEmail.equals(customWebhook.getUserEmail())){
-            addActionError("Unauthorized Request");
-            return ERROR.toUpperCase();
-        } else if (!isUrl){
+        if (!isUrl){
             addActionError("Please enter a valid url");
             return ERROR.toUpperCase();
         } else if (frequencyInSeconds<=0){

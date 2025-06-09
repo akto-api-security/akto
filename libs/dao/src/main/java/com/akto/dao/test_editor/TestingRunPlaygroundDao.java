@@ -21,7 +21,6 @@ public class TestingRunPlaygroundDao extends AccountsContextDao<TestingRunPlaygr
         Bson indexInfo = Indexes.ascending(fieldNames);
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), indexInfo,
                 new IndexOptions().expireAfter(300L, java.util.concurrent.TimeUnit.SECONDS));
-        System.out.println("Index created for ");
     }
 
     @Override

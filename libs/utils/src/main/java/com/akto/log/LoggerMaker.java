@@ -15,7 +15,6 @@ import com.akto.data_actor.DataActorFactory;
 import com.akto.dto.AccountSettings;
 import com.akto.dto.Config;
 import com.akto.dto.Log;
-import com.akto.util.DashboardMode;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
@@ -37,6 +36,7 @@ public class LoggerMaker  {
         System.setProperty(SimpleLogger.DEFAULT_LOG_LEVEL_KEY, System.getenv().getOrDefault("AKTO_LOG_LEVEL", "WARN"));
         System.setProperty("org.slf4j.simpleLogger.log.org.apache.kafka", "ERROR");
         System.setProperty("org.slf4j.simpleLogger.log.io.lettuce", "ERROR");
+        System.setProperty("org.slf4j.simpleLogger.log.org.mongodb", "ERROR");
         System.setProperty("org.slf4j.simpleLogger.log.io.netty", "ERROR");
         System.setProperty("org.slf4j.simpleLogger.log.org.flywaydb", "ERROR");
         System.out.printf("AKTO_LOG_LEVEL is set to: %s \n", System.getProperty(SimpleLogger.DEFAULT_LOG_LEVEL_KEY));
@@ -48,6 +48,7 @@ public class LoggerMaker  {
     private final Class<?> aClass;
 
     private static String slackWebhookUrl;
+    private static int counter = 0;
 
     public static final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
     private static final DataActor dataActor = DataActorFactory.fetchInstance();
@@ -189,6 +190,7 @@ public class LoggerMaker  {
         infoAndAddToDb(info, db);
     }
 
+    @Deprecated
     public void errorAndAddToDb(Exception e, String err, LogDb db) {
         try {
             if (e != null && e.getStackTrace() != null && e.getStackTrace().length > 0) {
@@ -204,6 +206,7 @@ public class LoggerMaker  {
         }
     }
 
+    @Deprecated
     public void infoAndAddToDb(String info, LogDb db) {
         String accountId = Context.accountId.get() != null ? Context.accountId.get().toString() : "NA";
         String infoMessage = "acc: " + accountId + ", " + info;
@@ -253,9 +256,6 @@ public class LoggerMaker  {
     private void insert(String info, String key, LogDb db) {
         String text = aClass + " : " + info;
         Log log = new Log(text, key, Context.now());
-        if(DashboardMode.isSaasDeployment()) {
-            return;
-        }
         if(checkUpdate() && db!=null){
             switch(db){
                 case TESTING: 
@@ -347,6 +347,14 @@ public class LoggerMaker  {
     }
 
     public void debugAndAddToDb(String message) {
+        debugAndAddToDb(message, this.db);
+    }
+
+    public void debugAndAddToDbCount(String message) {
+        if(counter > 500){
+            return;
+        }
+        counter++;
         debugAndAddToDb(message, this.db);
     }
 
