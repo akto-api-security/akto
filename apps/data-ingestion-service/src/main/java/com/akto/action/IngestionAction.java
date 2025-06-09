@@ -80,5 +80,9 @@ public class IngestionAction extends ActionSupport {
     public void setBatchData(List<IngestDataBatch> batchData) {
         this.batchData = batchData;
     }
+
+    public String healthCheck() {
+        return Action.SUCCESS.toUpperCase();
+    }
     
 }
