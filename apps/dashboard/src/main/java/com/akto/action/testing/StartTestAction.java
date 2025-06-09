@@ -86,6 +86,8 @@ public class StartTestAction extends UserAction {
 
     private AutoTicketingDetails autoTicketingDetails;
 
+    private Map<String, String> issuesDescriptionMap;
+
     private static final Gson gson = new Gson();
 
     Set<Integer> deactivatedCollections = UsageMetricCalculator.getDeactivated();
@@ -788,7 +790,6 @@ public class StartTestAction extends UserAction {
             return ERROR.toUpperCase();
         }
 
-
         if (testingRunResultSummaryHexId != null) loggerMaker.debugAndAddToDb("fetchTestingRunResults called for hexId=" + testingRunResultSummaryHexId);
         if (queryMode != null) loggerMaker.debugAndAddToDb("fetchTestingRunResults called for queryMode="+queryMode);
 
@@ -797,7 +798,8 @@ public class StartTestAction extends UserAction {
                 Filters.in(TestingRunIssues.TEST_RUN_ISSUES_STATUS, "IGNORED"),
                 Filters.in(TestingRunIssues.LATEST_TESTING_RUN_SUMMARY_ID, testingRunResultSummaryId)
         );
-        List<TestingRunIssues> issueslist = TestingRunIssuesDao.instance.findAll(ignoredIssuesFilters, Projections.include("_id"));
+        List<TestingRunIssues> issueslist = TestingRunIssuesDao.instance.findAll(ignoredIssuesFilters,
+            Projections.include("_id"));
         this.issueslistCount = issueslist.size();
         loggerMaker.debugAndAddToDb("[" + (Context.now() - timeNow) + "] Fetched testing run issues of size: " + issueslist.size(), LogDb.DASHBOARD);
 
@@ -825,6 +827,7 @@ public class StartTestAction extends UserAction {
 
             timeNow = Context.now();
             removeTestingRunResultsByIssues(testingRunResults, issueslist, false);
+            this.issuesDescriptionMap = prepareIssueDescriptionMap(testingRunResultSummaryId, testingRunResults);
             loggerMaker.debugAndAddToDb("[" + (Context.now() - timeNow) + "] Removed ignored issues from testing run results. Current size of testing run results: " + testingRunResults.size(), LogDb.DASHBOARD);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "error in fetchLatestTestingRunResult: " + e);
@@ -834,6 +837,44 @@ public class StartTestAction extends UserAction {
         loggerMaker.debugAndAddToDb("fetchTestingRunResults completed in: " + (Context.now() - timeNow), LogDb.DASHBOARD);
 
         return SUCCESS.toUpperCase();
+    }
+
+    private Map<String, String> prepareIssueDescriptionMap(ObjectId latestTestingSummaryId,
+        List<TestingRunResult> testingRunResults) {
+
+        if (testingRunResults == null || testingRunResults.isEmpty()) {
+            return Collections.emptyMap();
+        }
+
+        Map<TestingIssuesId, TestingRunResult> idToResultMap = new HashMap<>();
+        for (TestingRunResult result : testingRunResults) {
+            TestingIssuesId id = new TestingIssuesId(result.getApiInfoKey(), TestErrorSource.AUTOMATED_TESTING, result.getTestSubType());
+            idToResultMap.put(id, result);
+        }
+
+        List<TestingRunIssues> issues = TestingRunIssuesDao.instance.findAll(
+            Filters.and(
+                Filters.eq(TestingRunIssues.LATEST_TESTING_RUN_SUMMARY_ID, latestTestingSummaryId),
+                Filters.in("_id", idToResultMap.keySet())
+            ),
+            Projections.include("_id", TestingRunIssues.DESCRIPTION)
+        );
+
+        if (issues.isEmpty()) {
+            return Collections.emptyMap();
+        }
+
+        Map<String, String> finalResult = new HashMap<>();
+        for (TestingRunIssues issue : issues) {
+            if (StringUtils.isNotBlank(issue.getDescription())) {
+                TestingRunResult result = idToResultMap.get(issue.getId());
+                if (result != null) {
+                    finalResult.put(result.getHexId(), issue.getDescription());
+                }
+            }
+        }
+
+        return finalResult;
     }
 
     public static void removeTestingRunResultsByIssues(List<TestingRunResult> testingRunResults,
@@ -1893,5 +1934,14 @@ public class StartTestAction extends UserAction {
 
     public void setSelectedMiniTestingServiceName(String selectedMiniTestingServiceName) {
         this.selectedMiniTestingServiceName = selectedMiniTestingServiceName;
+    }
+
+    public Map<String, String> getIssuesDescriptionMap() {
+        return issuesDescriptionMap;
+    }
+
+    public void setIssuesDescriptionMap(
+        Map<String, String> issuesDescriptionMap) {
+        this.issuesDescriptionMap = issuesDescriptionMap;
     }
 }

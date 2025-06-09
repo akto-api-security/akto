@@ -338,7 +338,7 @@ const transform = {
     })
     return testRuns;
     },
-    prepareTestRunResult : (hexId, data, subCategoryMap, subCategoryFromSourceConfigMap) => {
+    prepareTestRunResult : (hexId, data, subCategoryMap, subCategoryFromSourceConfigMap, issuesDescriptionMap) => {
       let obj = {};
       obj['id'] = data.hexId;
       obj['name'] = func.getRunResultSubCategory(data, subCategoryFromSourceConfigMap, subCategoryMap, "testName")
@@ -362,12 +362,21 @@ const transform = {
       obj['cveDisplay'] = minimizeTagList(obj['cve'])
       obj['errorsList'] = data.errorsList || []
       obj['testCategoryId'] = data.testSubType
+
+      let testingRunResultHexId = data.hexId;
+
+      if (issuesDescriptionMap && Object.keys(issuesDescriptionMap).length > 0) {
+        if (issuesDescriptionMap[testingRunResultHexId]) {
+          obj['description'] = issuesDescriptionMap[testingRunResultHexId];
+        }
+      }
+      
       return obj;
     },
-    prepareTestRunResults : (hexId, testingRunResults, subCategoryMap, subCategoryFromSourceConfigMap) => {
+    prepareTestRunResults : (hexId, testingRunResults, subCategoryMap, subCategoryFromSourceConfigMap, issuesDescriptionMap) => {
       let testRunResults = []
       testingRunResults.forEach((data) => {
-        let obj = transform.prepareTestRunResult(hexId, data, subCategoryMap, subCategoryFromSourceConfigMap);
+        let obj = transform.prepareTestRunResult(hexId, data, subCategoryMap, subCategoryFromSourceConfigMap, issuesDescriptionMap);
         if(obj['name'] && obj['testCategory']){
           testRunResults.push(obj);
         }
@@ -842,6 +851,13 @@ getCollapsibleRow(urls, severity) {
                   <Link monochrome onClick={() => history.navigate(ele.nextUrl)} removeUnderline >
                     {transform.getUrlComp(ele.url)}
                   </Link>
+                  <Box maxWidth="250px" paddingInlineStart="3">
+                    <TooltipText
+                      text={ele.description}
+                      tooltip={ele.description}
+                      textProps={{ color: "subdued"}}
+                    />
+                  </Box>
                 </HorizontalStack>
               </Box>
             )
@@ -894,7 +910,7 @@ getPrettifiedTestRunResults(testRunResults){
     if(testRunResultsObj.hasOwnProperty(key)){
       let endTimestamp = Math.max(test.endTimestamp, testRunResultsObj[key].endTimestamp)
       let urls = testRunResultsObj[key].urls
-      urls.push({url: test.url, nextUrl: test.nextUrl, testRunResultsId: test.id})
+      urls.push({url: test.url, nextUrl: test.nextUrl, testRunResultsId: test.id, description: test.description})
       let obj = {
         ...test,
         urls: urls,
@@ -906,7 +922,7 @@ getPrettifiedTestRunResults(testRunResults){
       delete obj["errorsList"]
       testRunResultsObj[key] = obj
     }else{
-      let urls = [{url: test.url, nextUrl: test.nextUrl, testRunResultsId: test.id}]
+      let urls = [{url: test.url, nextUrl: test.nextUrl, testRunResultsId: test.id, description: test.description}]
       let obj={
         ...test,
         urls:urls,
