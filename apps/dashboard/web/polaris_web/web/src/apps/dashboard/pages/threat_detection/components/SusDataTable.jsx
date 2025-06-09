@@ -126,7 +126,7 @@ function SusDataTable({ currDateRange, rowClicked }) {
       return {
         ...x,
         id: x.id,
-        actorComp: x?.actor,
+        actorComp: x.actor?.length > 50 ? `${x.actor.slice(0, 50)}...` : x.actor ,
         endpointComp: (
           <GetPrettifyEndpoint maxWidth="300px" method={x.method} url={x.url} isNew={false} />
         ),

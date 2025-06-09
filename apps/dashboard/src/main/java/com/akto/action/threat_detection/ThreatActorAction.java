@@ -63,6 +63,8 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
   String actorIp;
   String status;
   String eventType;
+  String actor;
+  String filterId;
 
   private final CloseableHttpClient httpClient;
 
@@ -219,6 +221,8 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
           {
             put("ref_id", refId);
             put("event_type", eventType);
+            put("actor", actor);
+            put("filterId", filterId);
           }
         };
     String msg = objectMapper.valueToTree(body).toString();
@@ -712,6 +716,22 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
 
   public void setEventType(String eventType) {
     this.eventType = eventType;
+  }
+
+  public String getActor() {
+    return actor;
+  }
+
+  public void setActor(String actor) {
+    this.actor = actor;
+  }
+
+  public String getFilterId() {
+    return filterId;
+  }
+
+  public void setFilterId(String filterId) {
+    this.filterId = filterId;
   }
 
   public Map<String, Integer> getSort() {
