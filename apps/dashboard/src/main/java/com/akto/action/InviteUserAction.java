@@ -29,6 +29,7 @@ import java.security.spec.InvalidKeySpecException;
 import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.regex.Pattern;
 
 import org.springframework.util.StringUtils;
 
@@ -46,6 +47,8 @@ public class InviteUserAction extends UserAction{
     public static Map<String, String> commonOrganisationsMap = new HashMap<>();
     private static final ExecutorService executor = Executors.newFixedThreadPool(1);
 
+    private static final Pattern EMAIL_PATTERN = Pattern.compile("^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$");
+
     public static String validateEmail(String email, String adminLogin) {
         if (email == null) return INVALID_EMAIL_ERROR;
 
@@ -54,7 +57,7 @@ public class InviteUserAction extends UserAction{
             return INVALID_EMAIL_ERROR;
         }
 
-        if (!email.matches("^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$")) {
+        if (!EMAIL_PATTERN.matcher(email).matches()) {
             return INVALID_EMAIL_ERROR;
         }
 
