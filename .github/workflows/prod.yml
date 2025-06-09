@@ -255,15 +255,14 @@ jobs:
         env:
           ECR_REGISTRY: aktosecurity
           ECR_REPOSITORY: akto-api-security
-          IMAGE_TAG_THREAT: latest
-          IMAGE_TAG_THREAT_2: ${{github.event.inputs.release_version_threat}}
+          IMAGE_TAG_THREAT: ${{github.event.inputs.release_version_threat}}
         run: |
           docker buildx create --use
           # Build a docker container and push it to DockerHub
           cd apps/dashboard
           if [[ "${{ github.event.inputs.threat_detection}}" == "true" ]]; then
             cd ../threat-detection
-            docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/akto-threat-detection:$IMAGE_TAG_THREAT -t $ECR_REGISTRY/akto-threat-detection:$IMAGE_TAG_THREAT_2 . --push
+            docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/akto-threat-detection:$IMAGE_TAG_THREAT . --push
           fi
 
           if [[ "${{ github.event.inputs.threat_detection_backend}}" == "true" ]]; then
