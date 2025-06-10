@@ -120,6 +120,10 @@ jobs:
             cd ../dashboard
             docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/$ECR_REPOSITORY-dashboard:$IMAGE_TAG_1 -t $ECR_REGISTRY/$ECR_REPOSITORY-dashboard:$IMAGE_TAG_2 . --push
             echo "::set-output name=image::$ECR_REGISTRY/$ECR_REPOSITORY-dashboard:$IMAGE_TAG"
+
+            # Run Docker Scout CVE Scan
+            docker scout cves $ECR_REGISTRY/$ECR_REPOSITORY-dashboard:$IMAGE_TAG_2 \
+            --only-severities critical,high > scout-dashboard.txt || true
           fi
 
           if [[ "${{ github.event.inputs.testing }}" == "true" ]]; then
@@ -146,6 +150,79 @@ jobs:
             echo "::set-output name=image::$ECR_REGISTRY/akto-internal:$IMAGE_TAG"
           fi
 
+      # --- Docker Scout CVE Scans and Artifact Uploads ---
+
+      # Dashboard
+      - name: Run Docker Scout CVE Scan for Dashboard
+        if: ${{ github.event.inputs.dashboard == 'true' }}
+        run: |
+          docker scout cves aktosecurity/akto-api-security-dashboard:${{ github.event.inputs.release_version }}_local \
+            --only-severities critical,high > scout-dashboard-report.txt || true
+
+      - name: Upload Dashboard Scan Report
+        if: ${{ github.event.inputs.dashboard == 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: scout-report-dashboard
+          path: scout-dashboard-report.txt
+
+      # Testing
+      - name: Run Docker Scout CVE Scan for Testing
+        if: ${{ github.event.inputs.testing == 'true' }}
+        run: |
+          docker scout cves aktosecurity/akto-api-testing:${{ github.event.inputs.release_version }}_local \
+            --only-severities critical,high > scout-testing-report.txt || true
+
+      - name: Upload Testing Scan Report
+        if: ${{ github.event.inputs.testing == 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: scout-report-testing
+          path: scout-testing-report.txt
+
+      # Testing CLI
+      - name: Run Docker Scout CVE Scan for Testing CLI
+        if: ${{ github.event.inputs.testing == 'true' }}
+        run: |
+          docker scout cves aktosecurity/akto-api-testing-cli:${{ github.event.inputs.release_version }}_local \
+            --only-severities critical,high > scout-testing-cli-report.txt || true
+
+      - name: Upload Testing CLI Scan Report
+        if: ${{ github.event.inputs.testing == 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: scout-report-testing-cli
+          path: scout-testing-cli-report.txt
+
+      # Billing
+      - name: Run Docker Scout CVE Scan for Billing
+        if: ${{ github.event.inputs.billing == 'true' }}
+        run: |
+          docker scout cves aktosecurity/akto-billing:${{ github.event.inputs.release_version }}_local \
+            --only-severities critical,high > scout-billing-report.txt || true
+
+      - name: Upload Billing Scan Report
+        if: ${{ github.event.inputs.billing == 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: scout-report-billing
+          path: scout-billing-report.txt
+
+      # Internal
+      - name: Run Docker Scout CVE Scan for Internal
+        if: ${{ github.event.inputs.internal == 'true' }}
+        run: |
+          docker scout cves aktosecurity/akto-internal:${{ github.event.inputs.release_version }}_local \
+            --only-severities critical,high > scout-internal-report.txt || true
+
+      - name: Upload Internal Scan Report
+        if: ${{ github.event.inputs.internal == 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: scout-report-internal
+          path: scout-internal-report.txt
+
+  
       - name: Configure AWS Credentials for ECR
         uses: aws-actions/configure-aws-credentials@v1
         with:
@@ -270,6 +347,35 @@ jobs:
             cd ../threat-detection-backend
             docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/akto-threat-detection-backend:$IMAGE_TAG_THREAT -t $ECR_REGISTRY/akto-threat-detection-backend:$IMAGE_TAG_THREAT_2 . --push
           fi
+
+      # --- Docker Scout Scan for Threat Detection ---
+      - name: Run Docker Scout CVE Scan (Threat Detection)
+        if: ${{ github.event.inputs.threat_detection == 'true' }}
+        run: |
+          docker scout cves aktosecurity/akto-threat-detection:${{ github.event.inputs.release_version_threat }} \
+            --only-severities critical,high > scout-threat-detection-report.txt
+
+      - name: Upload Scout Report (Threat Detection)
+        if: ${{ github.event.inputs.threat_detection == 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: scout-report-threat-detection
+          path: scout-threat-detection-report.txt
+
+      # --- Docker Scout Scan for Threat Detection Backend ---
+      - name: Run Docker Scout CVE Scan (Threat Detection Backend)
+        if: ${{ github.event.inputs.threat_detection_backend == 'true' }}
+        run: |
+          docker scout cves aktosecurity/akto-threat-detection-backend:${{ github.event.inputs.release_version_threat }} \
+            --only-severities critical,high > scout-threat-detection-backend-report.txt
+
+      - name: Upload Scout Report (Threat Detection Backend)
+        if: ${{ github.event.inputs.threat_detection_backend == 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: scout-report-threat-detection-backend
+          path: scout-threat-detection-backend-report.txt
+
       - name: Configure AWS Credentials for ECR
         uses: aws-actions/configure-aws-credentials@v1
         with:
