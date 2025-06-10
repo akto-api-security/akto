@@ -303,13 +303,17 @@ jobs:
       # --- Docker Scout Scan for Threat Detection ---
       - name: Run Docker Scout CVE Scan (Threat Detection)
         if: ${{ github.event.inputs.threat_detection == 'true' }}
-        run: |
-          docker scout cves aktosecurity/akto-threat-detection:${{ github.event.inputs.release_version_threat }} \
-            > scout-threat-detection-report.txt || true
+        uses: docker/scout-action@v1
+        with:
+          command: cves
+          image: aktosecurity/akto-threat-detection:${{ github.event.inputs.release_version_threat  }}_local
+          output: scout-threat-detection-report.json
+          format: json
+        continue-on-error: true
 
-      - name: Upload Scout Report (Threat Detection)
+      - name: Upload Docker Scout report (Threat Detection)
         if: ${{ github.event.inputs.threat_detection == 'true' }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v3
         with:
           name: scout-report-threat-detection
-          path: scout-threat-detection-report.txt
+          path: scout-threat-detection-report.json
