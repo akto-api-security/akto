@@ -12,7 +12,7 @@ function HomePage() {
     width: 78,
     topBarSource:
       '/public/akto_name_with_logo.svg',
-    url: '/dashboard/observe/inventory',
+    url: '/dashboard/home',
     accessibilityLabel: 'Akto Icon',
   };
 

@@ -8,6 +8,7 @@ import {
     StarFilledMinor,
     FinancesMinor,
     LockFilledMajor,
+    HomeFilledIcon,
 } from "@shopify/polaris-icons";
 import {useLocation, useNavigate} from "react-router-dom";
 
@@ -47,7 +48,7 @@ export default function LeftNav() {
         resetSession();
         await api.goToAccount(selected);
         func.setToast(true, false, `Switched to account ${accounts[selected]}`);
-        window.location.href = '/dashboard/observe/inventory';
+        window.location.href = '/dashboard/home';
     };
 
     const accountOptions = Object.keys(accounts).map(accountId => ({
@@ -98,6 +99,17 @@ export default function LeftNav() {
                             ) : null
                         },
                         {
+                            label: "Home",
+                            icon: HomeFilledIcon,
+                            onClick: () => {
+                                handleSelect("dashboard_home");
+                                navigate("/dashboard/home");
+                                setActive("normal");
+                            },
+                            selected: leftNavSelected === "dashboard_home",
+                            key: "0",
+                        },
+                        {
                             label: (
                                 <Text variant="bodyMd" fontWeight="medium">
                                     Quick Start
@@ -116,11 +128,11 @@ export default function LeftNav() {
                             label: "API Security Posture",
                             icon: ReportFilledMinor,
                             onClick: () => {
-                                handleSelect("dashboard_home");
-                                navigate("/dashboard/home");
+                                handleSelect("dashboard_security_posture");
+                                navigate("/dashboard/security-posture");
                                 setActive("normal");
                             },
-                            selected: leftNavSelected === "dashboard_home",
+                            selected: leftNavSelected === "dashboard_security_posture",
                             key: "2",
                         },
                         {

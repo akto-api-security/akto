@@ -1,4 +1,5 @@
 import HomePage from "../dashboard/pages/home/HomePage"
+import SimpleHomePage from "../dashboard/pages/home/SimpleHomePage"
 import TestRunsPage from "../dashboard/pages/testing/TestRunsPage/TestRunsPage";
 import SingleTestRunPage from "../dashboard/pages/testing/SingleTestRunPage/SingleTestRunPage"
 import AllSensitiveData from "../dashboard/pages/observe/AllSensitiveData/AllSensitiveData";
@@ -110,7 +111,15 @@ const router = createBrowserRouter([
                 element: <HomePage/>,
                 children: [
                     {
+                        path: "",
+                        element: <Navigate to="/dashboard/home" replace />,
+                    },
+                    {
                         path: "home",
+                        element: <SimpleHomePage/>,
+                    },
+                    {
+                        path: "security-posture",
                         element: <HomeDashboard/>,
                     },
                     {

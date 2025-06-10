@@ -10,13 +10,13 @@ export default {
                 password
             }
         })
-        var redirectLink = '/dashboard/observe/inventory'
+        var redirectLink = '/dashboard/home'
         if (resp.loginResult && resp.loginResult.redirect) {
             redirectLink = resp.loginResult.redirect
         } else {
-            var redirectLink = new URLSearchParams(window.location.search).get('redirect_uri') || '/dashboard/observe/inventory'
+            var redirectLink = new URLSearchParams(window.location.search).get('redirect_uri') || '/dashboard/home'
             if (!redirectLink.startsWith('/dashboard/')) {
-                redirectLink = '/dashboard/observe/inventory'
+                redirectLink = '/dashboard/home'
             }
         }
         window.location.href = redirectLink
