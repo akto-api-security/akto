@@ -850,7 +850,8 @@ getCollapsibleRow(urls, severity) {
                     <Text color="subdued" fontWeight="semibold">
                     {ele.statusCode  || "-"}
                     {/* add a tooltip to show the response body */}
-                    <TooltipText tooltip={ele.responseBody} text={ele.responseBody} />
+                    {/* handle the case where the response body is null */}
+                    {ele.responseBody ? <TooltipText tooltip={ele.responseBody} text={ele.responseBody} /> : "-"}
                     </Text>
                   </div>
                 </div>
