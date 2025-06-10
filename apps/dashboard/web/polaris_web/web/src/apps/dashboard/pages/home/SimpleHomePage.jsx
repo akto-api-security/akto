@@ -1,10 +1,11 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { useEditor, EditorContent, BubbleMenu } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Placeholder from '@tiptap/extension-placeholder';
 import { Ai } from '@tiptap-pro/extension-ai';
 import { Plus, Sliders, ArrowUp, ShieldCheck, Detective, Bug, TestTube, Check } from 'phosphor-react';
 import { Popover, ActionList, LegacyCard, TextField, Text, Icon } from '@shopify/polaris';
+import settingFunctions from '../settings/module';
 
 function SimpleHomePage() {
   const iconButtonStyle = {
@@ -28,12 +29,27 @@ function SimpleHomePage() {
   };
 
   const [isEditorEmpty, setIsEditorEmpty] = useState(true);
+  const [adminName, setAdminName] = useState('');
+
+  useEffect(() => {
+    async function fetchAdminName() {
+      try {
+        const { accountSettingsDetails } = await settingFunctions.fetchAdminInfo();
+        if (accountSettingsDetails?.name) {
+          setAdminName(accountSettingsDetails.name);
+        }
+      } catch (error) {
+        console.error("Failed to fetch admin name", error);
+      }
+    }
+    fetchAdminName();
+  }, []);
 
   const editor = useEditor({
     extensions: [
       StarterKit,
       Placeholder.configure({
-        placeholder: 'Describe a vulnerability you want to test for, or ask me to generate a report...',
+        placeholder: 'How can I help you today?',
       }),
       Ai.configure({
         appId: 'j9yjx489',
@@ -234,7 +250,7 @@ function SimpleHomePage() {
   return (
     <div style={containerStyle}>
       <div style={contentStyle}>
-        <h1 style={headingStyle}>What can I help with?</h1>
+        <h1 style={headingStyle}>{adminName ? `Welcome back, ${adminName}.` : 'What can I help with?'}</h1>
         
         <div style={inputContainerStyle}>
           {editor && <BubbleMenu editor={editor} tippyOptions={{ duration: 100 }}>
