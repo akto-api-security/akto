@@ -19,7 +19,7 @@ on:
           - 'True'
       data_ingestion:
         type: boolean
-        default: false
+        default: true
         description: Data Ingestion Service
 
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
@@ -54,6 +54,13 @@ jobs:
           DOCKER_PASSWORD: ${{secrets.DOCKER_PASSWORD}}
         run: |
           docker login -u $DOCKER_USERNAME -p $DOCKER_PASSWORD
+
+      - name: Run mvn package
+        if: ${{github.event.inputs.skipTests == 'False' }}
+        run: mvn package -Dakto-image-tag=${{ github.event.inputs.release_version_data_ingestion}} -Dakto-build-time=$(eval "date +%s") -Dakto-release-version=${{github.event.inputs.release_version_data_ingestion}}
+      - name: Run mvn package dangerously
+        if: ${{github.event.inputs.skipTests== 'True' }}
+        run: mvn package -Dakto-image-tag=${{ github.event.inputs.release_version_data_ingestion}} -Dakto-build-time=$(eval "date +%s") -Dakto-release-version=${{github.event.inputs.release_version_data_ingestion}} -DskipTests
 
       - name: Build, tag, and push the image to DockerHub
         id: build-image-dockerhub
@@ -90,7 +97,7 @@ jobs:
         uses: mathieudutour/github-tag-action@v6.1
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          custom_tag: ${{ github.event.inputs.release_version_data_ingestion}}
+          custom_tag: data-ingestion-${{ github.event.inputs.release_version_data_ingestion}}
       - name: Create a GitHub release
         uses: ncipollo/release-action@v1.12.0
         with:
@@ -103,7 +110,7 @@ jobs:
         with:
           payload: |
             {
-              "text": "Akto Open Source v${{ github.event.inputs.release_version_data_ingestion}} released!"
+              "text": "Akto Open Source Data ingestion v${{ github.event.inputs.release_version_data_ingestion}} released!"
             }
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
