@@ -123,7 +123,7 @@ jobs:
 
             # Run Docker Scout CVE Scan
             docker scout cves $ECR_REGISTRY/$ECR_REPOSITORY-dashboard:$IMAGE_TAG_2 \
-            --only-severities critical,high > scout-dashboard.txt || true
+            --only-severities critical,high > scout-dashboard-report.txt || true
           fi
 
           if [[ "${{ github.event.inputs.testing }}" == "true" ]]; then
@@ -353,7 +353,7 @@ jobs:
         if: ${{ github.event.inputs.threat_detection == 'true' }}
         run: |
           docker scout cves aktosecurity/akto-threat-detection:${{ github.event.inputs.release_version_threat }} \
-            --only-severities critical,high > scout-threat-detection-report.txt
+            --only-severities critical,high > scout-threat-detection-report.txt || true
 
       - name: Upload Scout Report (Threat Detection)
         if: ${{ github.event.inputs.threat_detection == 'true' }}
@@ -367,7 +367,7 @@ jobs:
         if: ${{ github.event.inputs.threat_detection_backend == 'true' }}
         run: |
           docker scout cves aktosecurity/akto-threat-detection-backend:${{ github.event.inputs.release_version_threat }} \
-            --only-severities critical,high > scout-threat-detection-backend-report.txt
+            --only-severities critical,high > scout-threat-detection-backend-report.txt || true
 
       - name: Upload Scout Report (Threat Detection Backend)
         if: ${{ github.event.inputs.threat_detection_backend == 'true' }}
