@@ -4,6 +4,9 @@ import com.akto.dao.context.Context;
 import com.akto.dao.notifications.CustomWebhooksDao;
 import com.akto.dao.notifications.CustomWebhooksResultDao;
 import com.akto.dto.OriginalHttpRequest;
+import com.akto.dto.jobs.Job;
+import com.akto.dto.jobs.JobExecutorType;
+import com.akto.dto.jobs.PendingTestsAlertsJobParams;
 import com.akto.dto.notifications.CustomWebhook;
 import com.akto.dto.notifications.CustomWebhook.ActiveStatus;
 import com.akto.dto.notifications.CustomWebhook.WebhookType;
@@ -11,6 +14,7 @@ import com.akto.dto.notifications.CustomWebhookResult;
 import com.akto.dto.type.KeyTypes;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods.Method;
+import com.akto.jobs.JobScheduler;
 import com.akto.listener.InitializerListener;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
@@ -55,6 +59,8 @@ public class WebhookAction extends UserAction implements ServletRequestAware{
     private static final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
 
     private int customWebhookId;
+
+    private static final int PENDING_TESTS_ALERTS_JOB_RECURRING_INTERVAL_SECONDS = 120;
 
     public String fetchCustomWebhooks() {
         if (customWebhookId == 0) {
@@ -110,10 +116,32 @@ public class WebhookAction extends UserAction implements ServletRequestAware{
             customWebhook.setWebhookType(type);
             customWebhook.setDashboardUrl(this.dashboardUrl);
             CustomWebhooksDao.instance.insertOne(customWebhook);
+
+            if(customWebhook.getSelectedWebhookOptions().get(0).equals(CustomWebhook.WebhookOptions.PENDING_TESTS_ALERTS)) {
+                // If the webhook is for pending tests alerts, schedule the job to send pending tests alerts
+                Job job = createRecurringJob(customWebhook);
+
+                if (job == null) {
+                   addActionError("Error while creating recurring job for project key");
+                }
+
+            }
             fetchCustomWebhooks();
         }
 
         return Action.SUCCESS.toUpperCase();
+    }
+
+    private Job createRecurringJob(CustomWebhook webhook) {
+        return JobScheduler.scheduleRecurringJob(
+                Context.accountId.get(),
+                new PendingTestsAlertsJobParams(
+                        Context.now(),
+                        webhook
+                ),
+                JobExecutorType.DASHBOARD,
+                PENDING_TESTS_ALERTS_JOB_RECURRING_INTERVAL_SECONDS
+        );
     }
 
     public String updateCustomWebhook(){
