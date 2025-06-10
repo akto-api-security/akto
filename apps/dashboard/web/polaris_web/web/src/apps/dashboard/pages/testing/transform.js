@@ -823,7 +823,7 @@ getUrlComp(url){
   )
 },
 
-getCollapsibleRow(urls, severity, statusCode) {
+getCollapsibleRow(urls, severity) {
     const borderStyle = '4px solid ' + func.getHexColorForSeverity(severity?.toUpperCase());
     return(
       <tr style={{background: "#FAFBFB", borderLeft: borderStyle, padding: '0px !important', borderTop: '1px solid #dde0e4'}}>
@@ -848,7 +848,7 @@ getCollapsibleRow(urls, severity, statusCode) {
                   </HorizontalStack>
                   <div style={{ marginLeft: "auto" }}>
                     <Text color="subdued" fontWeight="semibold">
-                      {ele.responseStatusCode || statusCode || "-"}
+                    {ele.statusCode  || "-"}
                     </Text>
                   </div>
                 </div>
@@ -900,26 +900,42 @@ getPrettifiedTestRunResults(testRunResults){
       }
     }
 
+    const listOfTestResults = test.testResults
+    let statusCode = null
+    let responseBody = null
+    if (listOfTestResults && listOfTestResults.length > 0){
+      listOfTestResults.forEach((testResult) => {
+        let message = testResult.message
+        if (message) {
+          try {
+            let obj = JSON.parse(message)
+            statusCode = obj?.response?.statusCode
+            responseBody = obj?.response?.body?.slice(0, 50) + "..."
+          } catch (e) {
+          }
+        }
+      })
+    }
     if(testRunResultsObj.hasOwnProperty(key)){
       let endTimestamp = Math.max(test.endTimestamp, testRunResultsObj[key].endTimestamp)
       let urls = testRunResultsObj[key].urls
-      urls.push({url: test.url, nextUrl: test.nextUrl, testRunResultsId: test.id})
+      urls.push({url: test.url, nextUrl: test.nextUrl, testRunResultsId: test.id, statusCode: statusCode, responseBody: responseBody})
       let obj = {
         ...test,
         urls: urls,
         endTimestamp: endTimestamp,
-        errorMessage: error_message
+        errorMessage: error_message,
       }
       delete obj["nextUrl"]
       delete obj["url"]
       delete obj["errorsList"]
       testRunResultsObj[key] = obj
     }else{
-      let urls = [{url: test.url, nextUrl: test.nextUrl, testRunResultsId: test.id}]
+      let urls = [{url: test.url, nextUrl: test.nextUrl, testRunResultsId: test.id, statusCode: statusCode, responseBody: responseBody}]
       let obj={
         ...test,
         urls:urls,
-        errorMessage: error_message
+        errorMessage: error_message,
       }
       delete obj["nextUrl"]
       delete obj["url"]
@@ -945,7 +961,7 @@ getPrettifiedTestRunResults(testRunResults){
       </HorizontalStack> : <Text>-</Text>,
       totalUrls: obj.urls.length,
       scanned_time_comp: <Text variant="bodyMd">{func.prettifyEpoch(obj?.endTimestamp)}</Text>,
-      collapsibleRow: this.getCollapsibleRow(obj.urls, obj?.severity[0], 200),
+      collapsibleRow: this.getCollapsibleRow(obj.urls, obj?.severity[0]),
       urlFilters: obj.urls.map((ele) => ele.url)
     }
     prettifiedResults.push(prettifiedObj)
