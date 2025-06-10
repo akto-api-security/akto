@@ -1,9 +1,10 @@
-import React, { useState, useCallback } from 'react';
-import { useEditor, EditorContent } from '@tiptap/react';
+import React, { useState, useCallback, useMemo } from 'react';
+import { useEditor, EditorContent, BubbleMenu } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Placeholder from '@tiptap/extension-placeholder';
-import { Plus, Sliders, ArrowUp, ShieldCheck, Detective, Bug, TestTube } from 'phosphor-react';
-import { Popover, ActionList } from '@shopify/polaris';
+import { Ai } from '@tiptap-pro/extension-ai';
+import { Plus, Sliders, ArrowUp, ShieldCheck, Detective, Bug, TestTube, Check } from 'phosphor-react';
+import { Popover, ActionList, LegacyCard, TextField, Text, Icon } from '@shopify/polaris';
 
 function SimpleHomePage() {
   const iconButtonStyle = {
@@ -26,11 +27,24 @@ function SimpleHomePage() {
     fontWeight: '500',
   };
 
+  const [isEditorEmpty, setIsEditorEmpty] = useState(true);
+
   const editor = useEditor({
     extensions: [
       StarterKit,
       Placeholder.configure({
-        placeholder: 'Ask Akto anything about your API security...',
+        placeholder: 'Describe a vulnerability you want to test for, or ask me to generate a report...',
+      }),
+      Ai.configure({
+        appId: 'j9yjx489',
+        autocompletion: true,
+        onAuthenticate: (data) => {
+          return fetch('/api/tiptap-auth', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data),
+          }).then(response => response.json());
+        },
       }),
     ],
     content: '',
@@ -39,30 +53,60 @@ function SimpleHomePage() {
         class: 'tiptap-editor',
       },
     },
+    onUpdate: ({ editor }) => {
+      setIsEditorEmpty(editor.isEmpty);
+    },
   });
 
   const [popoverActive, setPopoverActive] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedAgent, setSelectedAgent] = useState('Auto');
   const togglePopoverActive = useCallback(() => setPopoverActive((active) => !active), []);
 
-  const agentOptions = [
-    { content: 'Auto', helpText: 'Agent will choose for you' },
-    { content: 'Modern web app', helpText: 'Made with React and Node.js' },
-    { content: 'Interactive data app', helpText: 'Made with Streamlit and Python' },
-    { content: '3D game', helpText: 'Three.js games and simulations' },
-    { content: 'Web app (Python)', helpText: 'Websites with Python backend' },
-  ];
+  const agentOptions = useMemo(() => [
+    { title: 'Auto', content: 'Agent will choose for you' },
+    { title: 'Modern web app', content: 'Made with React and Node.js' },
+    { title: 'Interactive data app', content: 'Made with Streamlit and Python' },
+    { title: '3D game', content: 'Three.js games and simulations' },
+    { title: 'Web app (Python)', content: 'Websites with Python backend' },
+  ], []);
+
+  const filteredAgents = useMemo(() => {
+    if (!searchQuery) return agentOptions;
+    return agentOptions.filter(agent => 
+      agent.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
+      agent.content.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+  }, [agentOptions, searchQuery]);
 
   const activator = (
-    <button
-      style={toolButtonStyle}
+    <div
       onClick={togglePopoverActive}
-      onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f3f4f6'}
-      onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+      style={{...toolButtonStyle, display: 'inline-flex'}}
     >
       <Sliders size={20} />
-      <span>Agents</span>
-    </button>
+      <span>Agents: {selectedAgent}</span>
+    </div>
   );
+
+  const bubbleMenuStyle = {
+    display: 'flex',
+    backgroundColor: '#ffffff',
+    padding: '4px',
+    borderRadius: '8px',
+    border: '1px solid #e5e7eb',
+    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1)',
+  };
+
+  const bubbleMenuButtonStyle = {
+    border: 'none',
+    backgroundColor: 'transparent',
+    cursor: 'pointer',
+    padding: '8px 12px',
+    fontSize: '14px',
+    borderRadius: '6px',
+    transition: 'background-color 0.2s',
+  };
 
   const containerStyle = {
     display: 'flex',
@@ -141,6 +185,12 @@ function SimpleHomePage() {
     borderRadius: '50%',
     cursor: 'pointer',
     color: '#ffffff',
+    transition: 'opacity 0.2s',
+  };
+
+  const disabledSubmitButtonStyle = {
+    opacity: 0.5,
+    cursor: 'not-allowed',
   };
 
   const suggestionsContainerStyle = {
@@ -180,6 +230,27 @@ function SimpleHomePage() {
         <h1 style={headingStyle}>What can I help with?</h1>
         
         <div style={inputContainerStyle}>
+          {editor && <BubbleMenu editor={editor} tippyOptions={{ duration: 100 }}>
+            <div style={bubbleMenuStyle}>
+              <button
+                style={bubbleMenuButtonStyle}
+                onClick={() => editor.chain().focus().aiAsk('make it better').run()}
+                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f3f4f6'}
+                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+              >
+                Make it better
+              </button>
+              <button
+                style={bubbleMenuButtonStyle}
+                onClick={() => editor.chain().focus().aiAsk('summarize').run()}
+                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f3f4f6'}
+                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+              >
+                Summarize
+              </button>
+            </div>
+          </BubbleMenu>}
+
           <div style={editorWrapperStyle}>
             <EditorContent editor={editor} />
           </div>
@@ -199,10 +270,34 @@ function SimpleHomePage() {
                 autofocusTarget="first-node"
                 onClose={togglePopoverActive}
               >
-                <ActionList
-                  actionRole="menuitem"
-                  items={agentOptions}
-                />
+                <LegacyCard>
+                  <LegacyCard.Section>
+                    <TextField
+                      value={searchQuery}
+                      onChange={setSearchQuery}
+                      placeholder="Search agents..."
+                      clearButton
+                      onClearButtonClick={() => setSearchQuery('')}
+                    />
+                  </LegacyCard.Section>
+                  <ActionList
+                    actionRole="menuitem"
+                    items={filteredAgents.map(agent => ({
+                      content: (
+                        <div>
+                          <Text variant="bodyMd" as="span">{agent.title}</Text>
+                          <Text variant="bodySm" as="p" color="subdued">{agent.content}</Text>
+                        </div>
+                      ),
+                      active: selectedAgent === agent.title,
+                      suffix: selectedAgent === agent.title ? <Check size={16} /> : undefined,
+                      onAction: () => {
+                        setSelectedAgent(agent.title);
+                        togglePopoverActive();
+                      }
+                    }))}
+                  />
+                </LegacyCard>
               </Popover>
             </div>
             <div style={rightFooterStyle}>
