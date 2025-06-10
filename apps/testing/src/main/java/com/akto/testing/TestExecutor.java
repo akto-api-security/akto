@@ -232,7 +232,9 @@ public class TestExecutor {
         loggerMaker.info("APIs found: " + apiInfoKeyList.size(), LogDb.TESTING);
         boolean collectionWise = testingEndpoints.getType().equals(TestingEndpoints.Type.COLLECTION_WISE);
         SampleMessageStore sampleMessageStore = SampleMessageStore.create();
+
         if(collectionWise || apiInfoKeyList.size() > 500){
+            // todo to fix this later. Running test on a group would fetch all samples across apiinfokeys
             sampleMessageStore.fetchSampleMessages(Main.extractApiCollectionIds(apiInfoKeyList));
         }else{
             sampleMessageStore.fetchSampleMessages(apiInfoKeyList);
@@ -356,15 +358,15 @@ public class TestExecutor {
             for (ApiInfo.ApiInfoKey apiInfoKey: apiInfoKeyList) {
 
                 List<String> messages = testingUtil.getSampleMessages().get(apiInfoKey);
-                int temp = totalTestsToBeExecuted.get() - testingRunSubCategories.size();
+                AtomicInteger temp = new AtomicInteger(totalTestsToBeExecuted.get() - testingRunSubCategories.size());
                 if (messages == null || messages.isEmpty()) {
-                    totalTestsToBeExecuted.set(temp);
+                    totalTestsToBeExecuted.set(temp.get());
                     loggerMaker.debugAndAddToDb("No sample messages found for apiInfoKey: " + apiInfoKey.toString(), LogDb.TESTING);
                     continue;
                 }
                 String sample = messages.get(messages.size() - 1);
                 if(sample == null || sample.isEmpty()){
-                    totalTestsToBeExecuted.set(temp);
+                    totalTestsToBeExecuted.set(temp.get());
                     loggerMaker.debugAndAddToDb("Sample message is empty for apiInfoKey: " + apiInfoKey.toString(), LogDb.TESTING);
                     continue;
                 }
@@ -419,7 +421,8 @@ public class TestExecutor {
                                 lastCheckedCount = totalTestsToBeExecuted.get();
                                 prevCalcTime = Context.now();
                             }else{
-                                double percentageTestsCompleted = (1 - ((totalTestsToBeExecuted.get() * 1.0) / totalTestsToBeExecutedCount))* 100.0;
+                                AtomicInteger testsLeft = new AtomicInteger(Math.max(totalTestsToBeExecuted.get(), 0));
+                                double percentageTestsCompleted = (1 - ((testsLeft.get() * 1.0) / totalTestsToBeExecutedCount))* 100.0;
                                 int relaxingTime = 20 * 60;
                                 if(percentageTestsCompleted > 95.0){
                                     relaxingTime = 60;

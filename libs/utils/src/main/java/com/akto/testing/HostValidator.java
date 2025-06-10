@@ -14,6 +14,7 @@ import java.util.concurrent.TimeoutException;
 
 import com.akto.dao.context.Context;
 import com.akto.dto.OriginalHttpRequest;
+import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.testing.TestingRunConfig;
 import com.akto.dto.type.URLMethods;
 import com.akto.log.LoggerMaker;
@@ -148,4 +149,26 @@ public class HostValidator {
         }
     }
 
+    public static String getResponseBodyForHostValidation(String host, Map<String, String> hostAndContentType, int index, TestingRunConfig testingRunConfig, boolean SKIP_SSRF_CHECK) throws Exception {
+        String url = host;
+        if (!url.endsWith("/")) url += "/";
+        if (index > 0) url += "akto-" + index; // we want to hit host url once too
+
+        String contentType = hostAndContentType.get(host);
+        Map<String, List<String>> headers = new HashMap<>();
+
+        if (contentType != null) {
+            headers.put("content-type", Arrays.asList(contentType));
+        }
+        if (host != null && !host.isEmpty()) {
+            headers.put("host", Arrays.asList(host));
+        }
+
+        OriginalHttpRequest request = new OriginalHttpRequest(url, null, URLMethods.Method.GET.name(), null, headers, "");
+        OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, testingRunConfig, false, new ArrayList<>(), SKIP_SSRF_CHECK);
+        boolean isStatusGood = Utils.isStatusGood(response.getStatusCode());
+        if (!isStatusGood) return null;
+
+        return response.getBody();
+    } 
 }

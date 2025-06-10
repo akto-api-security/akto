@@ -14,6 +14,8 @@ import com.akto.log.LoggerMaker.LogDb;
 import com.akto.testing.kafka_utils.TestingConfigurations;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Projections;
+
 import org.bson.conversions.Bson;
 
 import java.util.*;
@@ -101,7 +103,7 @@ public class SampleMessageStore {
 
     public void fetchSampleMessages(Set<Integer> apiCollectionIds) {
         Bson filterQ = Filters.in(ApiInfo.ID_API_COLLECTION_ID, apiCollectionIds);
-        List<SampleData> sampleDataList = SampleDataDao.instance.findAll(filterQ, 0, 10_000, null);
+        List<SampleData> sampleDataList = SampleDataDao.instance.findAll(filterQ, 0, 10_000, null, Projections.slice("samples", -1));
         fillSampleDataMap(sampleDataList);
     }
 

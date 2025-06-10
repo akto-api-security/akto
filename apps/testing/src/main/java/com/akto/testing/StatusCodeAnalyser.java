@@ -5,10 +5,8 @@ import com.akto.dao.context.Context;
 import com.akto.dto.*;
 import com.akto.dto.testing.AuthMechanism;
 import com.akto.dto.testing.TestingRunConfig;
-import com.akto.dto.type.URLMethods;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
-import com.akto.rules.TestPlugin;
 import com.akto.store.SampleMessageStore;
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonParser;
@@ -93,26 +91,7 @@ public class StatusCodeAnalyser {
                 futures.add(executor.submit(() -> {
                     try {
                         Context.accountId.set(accountId);
-                        String url = host;
-                        if (!url.endsWith("/")) url += "/";
-                        if (index > 0) url += "akto-" + index; // we want to hit host url once too
-
-                        String contentType = hostAndContentType.get(host);
-                        Map<String, List<String>> headers = new HashMap<>();
-
-                        if (contentType != null) {
-                            headers.put("content-type", Arrays.asList(contentType));
-                        }
-                        if (host != null && !host.isEmpty()) {
-                            headers.put("host", Arrays.asList(host));
-                        }
-
-                        OriginalHttpRequest request = new OriginalHttpRequest(url, null, URLMethods.Method.GET.name(), null, headers, "");
-                        OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, testingRunConfig, false, new ArrayList<>(), Main.SKIP_SSRF_CHECK);
-                        boolean isStatusGood = TestPlugin.isStatusGood(response.getStatusCode());
-                        if (!isStatusGood) return null;
-
-                        String body = response.getBody();
+                        String body = HostValidator.getResponseBodyForHostValidation(host, hostAndContentType, index, testingRunConfig, Main.SKIP_SSRF_CHECK);
                         fillDefaultPayloadsMap(body);
                     } catch (Exception e) {
                         loggerMaker.errorAndAddToDb(e, "Error in calculateDefaultPayloads " + e.getMessage());

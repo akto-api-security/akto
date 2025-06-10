@@ -732,5 +732,8 @@ public class Utils {
         return res;
     }
 
+    public static boolean isStatusGood(int statusCode) {
+        return statusCode >= 200 && statusCode < 300 && statusCode != 250;
+    }
 
 }
