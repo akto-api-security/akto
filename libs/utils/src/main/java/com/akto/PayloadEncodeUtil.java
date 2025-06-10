@@ -10,14 +10,10 @@ import java.security.spec.PKCS8EncodedKeySpec;
 import java.security.spec.X509EncodedKeySpec;
 import java.util.Base64;
 
+import javax.crypto.Cipher;
+
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
-import com.auth0.jwt.JWT;
-import com.auth0.jwt.JWTVerifier;
-import com.auth0.jwt.algorithms.Algorithm;
-import com.auth0.jwt.exceptions.JWTCreationException;
-import com.auth0.jwt.exceptions.JWTVerificationException;
-import com.auth0.jwt.interfaces.DecodedJWT;
 
 public class PayloadEncodeUtil {
     
@@ -91,28 +87,25 @@ public class PayloadEncodeUtil {
         }
     }
 
-    public static String encodePayload(String payload, RSAPrivateKey privateKey) throws JWTCreationException {
+    public static String encodePayload(String payload, RSAPublicKey publicKey) throws Exception {
         try {
-            Algorithm algorithm = Algorithm.RSA256(null, privateKey);
-            return JWT.create()
-                    .withClaim("payload", payload)
-                    .withIssuer("Akto")
-                    .sign(algorithm);
-        } catch (JWTCreationException e) {
-            throw new JWTCreationException("Error encoding payload to JWT", e);
+            Cipher cipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");
+            cipher.init(Cipher.ENCRYPT_MODE, publicKey);
+            byte[] encryptedBytes = cipher.doFinal(payload.getBytes("UTF-8"));
+            return Base64.getEncoder().encodeToString(encryptedBytes);
+        } catch (Exception e) {
+            throw new Exception("Error encoding payload with public key", e);
         }
     }
 
-    public static String decodePayload(String payload, RSAPublicKey publicKey) throws JWTVerificationException {
+    public static String decodePayload(String payload, RSAPrivateKey privateKey) throws Exception {
         try {
-            Algorithm algorithm = Algorithm.RSA256(publicKey, null);
-            JWTVerifier verifier = JWT.require(algorithm)
-                    .withIssuer("Akto")
-                    .build();
-            DecodedJWT decodedJWT = verifier.verify(payload);
-            return decodedJWT.getClaim("payload").asString();
-        } catch (JWTVerificationException e) {
-            throw new JWTVerificationException("Error decoding JWT", e);
+            Cipher cipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");
+            cipher.init(Cipher.DECRYPT_MODE, privateKey);
+            byte[] decodedBytes = cipher.doFinal(Base64.getDecoder().decode(payload));
+            return new String(decodedBytes, "UTF-8");
+        } catch (Exception e) {
+            throw new Exception("Error decoding payload with private key", e);
         }
     }
 
