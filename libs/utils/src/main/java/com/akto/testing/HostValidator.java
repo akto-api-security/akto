@@ -1,12 +1,18 @@
 package com.akto.testing;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
+import com.akto.dao.context.Context;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.testing.TestingRunConfig;
 import com.akto.dto.type.URLMethods;
@@ -23,6 +29,7 @@ public class HostValidator {
 
     public static final boolean SKIP_SSRF_CHECK = ("true".equalsIgnoreCase(System.getenv("SKIP_SSRF_CHECK")) || !DashboardMode.isSaasDeployment());
     public static final boolean IS_SAAS = "true".equalsIgnoreCase(System.getenv("IS_SAAS"));
+    public static ExecutorService executor = Executors.newFixedThreadPool(15);
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(HostValidator.class, LogDb.TESTING);
     
@@ -91,32 +98,52 @@ public class HostValidator {
         if (hostAndContentType == null) {
             return;
         }
+
+        List<Future<Void>> futures = new ArrayList<>();
+        int accountId = Context.accountId.get();
         for (String host : hostAndContentType.keySet()) {
+            futures.add(
+                executor.submit(() -> {
+                    Context.accountId.set(accountId);
+                    try {
+                        String url = host;
+                        if (!url.endsWith("/"))
+                        url += "/";
+
+                        String contentType = hostAndContentType.get(host);
+                        Map<String, List<String>> headers = new HashMap<>();
+
+                        if (contentType != null) {
+                            headers.put("content-type", Arrays.asList(contentType));
+                        }
+                        if (host != null && !host.isEmpty()) {
+                            headers.put("host", Arrays.asList(host));
+                        }
+
+                        OriginalHttpRequest request = new OriginalHttpRequest(url, null, URLMethods.Method.GET.name(), null, new HashMap<>(), "");
+                        Request actualRequest = ApiExecutor.buildRequest(request, testingRunConfig);
+                        String attemptUrl = getUniformUrlUtil(actualRequest.url());
+                        loggerMaker.infoAndAddToDb("checking reachability for host: " + attemptUrl);
+                        if(!hostReachabilityMap.containsKey(attemptUrl)){
+                            boolean reachable = checkDomainReach(actualRequest, false, contentType);
+                            hostReachabilityMap.put(attemptUrl, reachable);
+                        }
+                    } catch (Exception e) {
+                        loggerMaker.errorAndAddToDb("", LogDb.TESTING);
+                    }
+                    return null;
+                })
+            );
+        }
+
+        for (Future<Void> future : futures) {
             try {
-                String url = host;
-                if (!url.endsWith("/"))
-                url += "/";
-
-                String contentType = hostAndContentType.get(host);
-                Map<String, List<String>> headers = new HashMap<>();
-
-                if (contentType != null) {
-                    headers.put("content-type", Arrays.asList(contentType));
-                }
-                if (host != null && !host.isEmpty()) {
-                    headers.put("host", Arrays.asList(host));
-                }
-
-                OriginalHttpRequest request = new OriginalHttpRequest(url, null, URLMethods.Method.GET.name(), null, new HashMap<>(), "");
-                Request actualRequest = ApiExecutor.buildRequest(request, testingRunConfig);
-                String attemptUrl = getUniformUrlUtil(actualRequest.url());
-                loggerMaker.infoAndAddToDb("checking reachability for host: " + attemptUrl);
-                if(!hostReachabilityMap.containsKey(attemptUrl)){
-                    boolean reachable = checkDomainReach(actualRequest, false, contentType);
-                    hostReachabilityMap.put(attemptUrl, reachable);
-                }
+                future.get(1, TimeUnit.MINUTES);
+            } catch (InterruptedException | TimeoutException e) {
+                future.cancel(true); // Cancel the task
+                loggerMaker.errorAndAddToDb(e, "Timeout in host validation task");
             } catch (Exception e) {
-                loggerMaker.errorAndAddToDb("", LogDb.TESTING);
+                loggerMaker.errorAndAddToDb(e, "Error in host validation task " + e.getMessage());
             }
         }
     }

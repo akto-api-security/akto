@@ -108,7 +108,6 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.commons.lang3.StringUtils;
@@ -125,8 +124,10 @@ public class TestExecutor {
     public static final String REQUEST_HOUR = "requestHour";
     public static final String COUNT = "count";
     public static final int ALLOWED_REQUEST_PER_HOUR = 100;
+    private static final AtomicInteger totalTestsToBeExecuted = new AtomicInteger(0);
 
     public void init(TestingRun testingRun, ObjectId summaryId, SyncLimit syncLimit, boolean shouldInitOnly) {
+        totalTestsToBeExecuted.set(0);
         if (testingRun.getTestIdConfig() != 1) {
             apiWiseInit(testingRun, summaryId, false, new ArrayList<>(), syncLimit, shouldInitOnly);
         } else {
@@ -227,11 +228,15 @@ public class TestExecutor {
                             testingRun.getTestingRunConfig().getTestSubCategoryList().size()));
         }
 
-        SampleMessageStore sampleMessageStore = SampleMessageStore.create();
-        sampleMessageStore.fetchSampleMessages(Main.extractApiCollectionIds(apiInfoKeyList));
-
         if (apiInfoKeyList == null || apiInfoKeyList.isEmpty()) return;
-        loggerMaker.infoAndAddToDb("APIs found: " + apiInfoKeyList.size(), LogDb.TESTING);
+        loggerMaker.info("APIs found: " + apiInfoKeyList.size(), LogDb.TESTING);
+        boolean collectionWise = testingEndpoints.getType().equals(TestingEndpoints.Type.COLLECTION_WISE);
+        SampleMessageStore sampleMessageStore = SampleMessageStore.create();
+        if(collectionWise || apiInfoKeyList.size() > 500){
+            sampleMessageStore.fetchSampleMessages(Main.extractApiCollectionIds(apiInfoKeyList));
+        }else{
+            sampleMessageStore.fetchSampleMessages(apiInfoKeyList);
+        }
 
         TestingRunResultSummariesDao.instance.updateOne(
             Filters.eq("_id", summaryId),
@@ -261,6 +266,10 @@ public class TestExecutor {
             }
         }
 
+        
+        int totalTestsToBeExecutedCount = testingRunSubCategories.size() * apiInfoKeyList.size();
+        totalTestsToBeExecuted.set(totalTestsToBeExecutedCount);
+
         Map<String, TestConfig> testConfigMap = YamlTemplateDao.instance.fetchTestConfigMap(false, true, 0, 10_000, Filters.in("_id", testingRunSubCategories));
 
         List<CustomAuthType> customAuthTypes = CustomAuthTypeDao.instance.findAll(CustomAuthType.ACTIVE,true);
@@ -281,9 +290,9 @@ public class TestExecutor {
         int currentTime = Context.now();
         Map<String, String> hostAndContentType = new HashMap<>();
         try {
-            loggerMaker.infoAndAddToDb("Starting findAllHosts at: " + currentTime, LogDb.TESTING);
+            loggerMaker.info("Starting findAllHosts at: " + currentTime, LogDb.TESTING);
             hostAndContentType = StatusCodeAnalyser.findAllHosts(sampleMessageStore, sampleDataMapForStatusCodeAnalyser);
-            loggerMaker.infoAndAddToDb("Completing findAllHosts in: " + (Context.now() -  currentTime) + " at: " + Context.now(), LogDb.TESTING);
+            loggerMaker.info("Completing findAllHosts in: " + (Context.now() -  currentTime) + " at: " + Context.now(), LogDb.TESTING);
         } catch (Exception e){
             loggerMaker.errorAndAddToDb("Error while running findAllHosts " + e.getMessage(), LogDb.TESTING);
         }
@@ -297,15 +306,13 @@ public class TestExecutor {
         }
         try {
             currentTime = Context.now();
-            loggerMaker.infoAndAddToDb("Starting StatusCodeAnalyser at: " + currentTime, LogDb.TESTING);
+            loggerMaker.infoAndAddToDb("Starting StatusCodeAnalyser at: " + currentTime);
             StatusCodeAnalyser.run(sampleDataMapForStatusCodeAnalyser, sampleMessageStore , attackerTestRole.findMatchingAuthMechanism(null), testingRun.getTestingRunConfig(), hostAndContentType);
-            loggerMaker.infoAndAddToDb("Completing StatusCodeAnalyser in: " + (Context.now() -  currentTime) + " at: " + Context.now(), LogDb.TESTING);
+            loggerMaker.infoAndAddToDb("Completing StatusCodeAnalyser in: " + (Context.now() -  currentTime) + " at: " + Context.now());
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error while running status code analyser " + e.getMessage(), LogDb.TESTING);
         }
-
-        loggerMaker.debugAndAddToDb("StatusCodeAnalyser result = " + StatusCodeAnalyser.result, LogDb.TESTING);
-        loggerMaker.debugAndAddToDb("StatusCodeAnalyser defaultPayloadsMap = " + StatusCodeAnalyser.defaultPayloadsMap, LogDb.TESTING);
+        loggerMaker.debugAndAddToDb("StatusCodeAnalyser result = " + StatusCodeAnalyser.result +  " defaultPayloadsMap = " + StatusCodeAnalyser.defaultPayloadsMap, LogDb.TESTING);
 
         ConcurrentHashMap<String, String> subCategoryEndpointMap = new ConcurrentHashMap<>();
         Map<ApiInfoKey, String> apiInfoKeyToHostMap = new HashMap<>();
@@ -349,12 +356,15 @@ public class TestExecutor {
             for (ApiInfo.ApiInfoKey apiInfoKey: apiInfoKeyList) {
 
                 List<String> messages = testingUtil.getSampleMessages().get(apiInfoKey);
+                int temp = totalTestsToBeExecuted.get() - testingRunSubCategories.size();
                 if (messages == null || messages.isEmpty()) {
+                    totalTestsToBeExecuted.set(temp);
                     loggerMaker.debugAndAddToDb("No sample messages found for apiInfoKey: " + apiInfoKey.toString(), LogDb.TESTING);
                     continue;
                 }
                 String sample = messages.get(messages.size() - 1);
                 if(sample == null || sample.isEmpty()){
+                    totalTestsToBeExecuted.set(temp);
                     loggerMaker.debugAndAddToDb("Sample message is empty for apiInfoKey: " + apiInfoKey.toString(), LogDb.TESTING);
                     continue;
                 }
@@ -367,6 +377,16 @@ public class TestExecutor {
                         OriginalReqResPayloadInformation.getInstance().getOriginalReqPayloadMap().put(key, originalRequestPayload);
                     }
                 }
+
+                if(TestingConfigurations.getInstance().getRawApi(apiInfoKey) == null){
+                    try {
+                        RawApi rawApi = RawApi.buildFromMessage(sample, true);
+                        TestingConfigurations.getInstance().insertRawApi(apiInfoKey, rawApi);
+                    } catch (Exception e) {
+                        loggerMaker.errorAndAddToDb("Error while building RawAPI for " + apiInfoKey + " : " + e, LogDb.TESTING);
+                    }
+                }   
+
                 if(Constants.IS_NEW_TESTING_ENABLED){
                     for (String testSubCategory: testingRunSubCategories) {
                         if (apiInfoKeySubcategoryMap == null || apiInfoKeySubcategoryMap.get(apiInfoKey).contains(testSubCategory)) {
@@ -388,12 +408,35 @@ public class TestExecutor {
     
             try {
                 if(!Constants.IS_NEW_TESTING_ENABLED){
-                    boolean awaitResult = latch.await(maxRunTime, TimeUnit.SECONDS);
-                    if(!awaitResult){
-                        for (Future<Void> future : testingRecords) {
-                            future.cancel(true);
-                        }
-                        loggerMaker.infoAndAddToDb("Canceled all running future tasks due to timeout.", LogDb.TESTING);
+                    int waitTs = Context.now();
+                    int prevCalcTime = Context.now();
+                    int lastCheckedCount = 0;
+                    while(latch.getCount() > 0 && GetRunningTestsStatus.getRunningTests().isTestRunning(summaryId) 
+                        && (Context.now() - waitTs < maxRunTime)) {
+                            loggerMaker.infoAndAddToDb("waiting for tests to finish with count left: " + totalTestsToBeExecuted.get());
+
+                            if(lastCheckedCount != totalTestsToBeExecuted.get()){
+                                lastCheckedCount = totalTestsToBeExecuted.get();
+                                prevCalcTime = Context.now();
+                            }else{
+                                double percentageTestsCompleted = (1 - ((totalTestsToBeExecuted.get() * 1.0) / totalTestsToBeExecutedCount))* 100.0;
+                                int relaxingTime = 20 * 60;
+                                if(percentageTestsCompleted > 95.0){
+                                    relaxingTime = 60;
+                                }else if(percentageTestsCompleted > 90.0){
+                                    relaxingTime = 2 * 60;
+                                }else if(percentageTestsCompleted > 75.0){
+                                    relaxingTime = 10 * 60;
+                                }else if(percentageTestsCompleted > 50.0){
+                                    relaxingTime = 15 * 60;
+                                }
+                                if((Context.now() - prevCalcTime) > relaxingTime){
+                                    loggerMaker.debugInfoAddToDb("No new tests are being executed in the last 20 minutes, stopping the test run", LogDb.TESTING);
+                                    break;
+                                }
+                            }
+
+                            Thread.sleep(5000);
                     }
                 }
 
@@ -563,7 +606,8 @@ public class TestExecutor {
         List<RawApi> messages = sampleMessageStore.fetchAllOriginalMessages(apiInfoKey);
         if (messages.isEmpty()) return null;
 
-        return messages.get(0).getRequest();
+        // getting last as we run test on the latest sample
+        return messages.get(messages.size() - 1).getRequest();
     }
 
     public static String findHostFromOriginalHttpRequest(OriginalHttpRequest originalHttpRequest)
@@ -962,7 +1006,11 @@ public class TestExecutor {
 
     public TestingRunResult runTestNew(ApiInfo.ApiInfoKey apiInfoKey, ObjectId testRunId, TestingUtil testingUtil,
         ObjectId testRunResultSummaryId, TestConfig testConfig, TestingRunConfig testingRunConfig, boolean debug, List<TestingRunResult.TestLog> testLogs, String message) {
-            RawApi rawApi = RawApi.buildFromMessage(message, true);
+            RawApi rawApi = TestingConfigurations.getInstance().getRawApi(apiInfoKey);
+            if(rawApi == null){
+                rawApi = RawApi.buildFromMessage(message, true);
+                TestingConfigurations.getInstance().insertRawApi(apiInfoKey, rawApi);
+            }
             TestRoles attackerTestRole = Executor.fetchOrFindAttackerRole();
             AuthMechanism attackerAuthMechanism = null;
             if (attackerTestRole == null) {
@@ -970,7 +1018,12 @@ public class TestExecutor {
             } else {
                 attackerAuthMechanism = attackerTestRole.findMatchingAuthMechanism(rawApi);
             }
-            return runTestNew(apiInfoKey, testRunId, testingUtil.getSampleMessageStore(), attackerAuthMechanism, testingUtil.getCustomAuthTypes(), testRunResultSummaryId, testConfig, testingRunConfig, debug, testLogs, rawApi);
+            long startTime = System.currentTimeMillis();
+            TestingRunResult tr =  runTestNew(apiInfoKey, testRunId, testingUtil.getSampleMessageStore(), attackerAuthMechanism, testingUtil.getCustomAuthTypes(), testRunResultSummaryId, testConfig, testingRunConfig, debug, testLogs, rawApi);
+            String testSubType = testConfig.getInfo().getSubCategory();
+            loggerMaker.infoAndAddToDb("Test run completed for apiInfoKey: " + apiInfoKey + " testSubType: " + testSubType + " with result: " + tr.isVulnerable() + " in " + (System.currentTimeMillis() - startTime) + "seconds");
+            totalTestsToBeExecuted.decrementAndGet();
+            return tr;
     }
 
     public TestingRunResult runTestNew(ApiInfo.ApiInfoKey apiInfoKey, ObjectId testRunId, SampleMessageStore sampleMessageStore, AuthMechanism attackerAuthMechanism, List<CustomAuthType> customAuthTypes,

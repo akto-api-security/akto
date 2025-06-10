@@ -1,6 +1,7 @@
 package com.akto.testing;
 
 import com.akto.dao.ApiCollectionsDao;
+import com.akto.dao.context.Context;
 import com.akto.dto.*;
 import com.akto.dto.testing.AuthMechanism;
 import com.akto.dto.testing.TestingRunConfig;
@@ -14,6 +15,11 @@ import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.*;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 import static com.akto.runtime.RelationshipSync.extractAllValuesFromPayload;
 
@@ -24,6 +30,8 @@ public class StatusCodeAnalyser {
 
     static List<StatusCodeIdentifier> result = new ArrayList<>();
     static Map<Integer, Integer> defaultPayloadsMap = new HashMap<>();
+
+    private static ExecutorService executor = Executors.newFixedThreadPool(10);
 
     public static class StatusCodeIdentifier {
         public Set<String> keySet;
@@ -78,32 +86,49 @@ public class StatusCodeAnalyser {
 
     public static void calculateDefaultPayloads(SampleMessageStore sampleMessageStore, Map<ApiInfo.ApiInfoKey, List<String>> sampleDataMap, TestingRunConfig testingRunConfig, Map<String, String> hostAndContentType) {
         for (String host: hostAndContentType.keySet()) {
-            loggerMaker.debugAndAddToDb("calc default payload for host: " + host, LogDb.TESTING);
-            for (int idx=0; idx<11;idx++) {
+            List<Future<Void>> futures = new ArrayList<>();
+            int accountId = Context.accountId.get();
+            for (int idx=0; idx<10;idx++) {
+                final int index = idx;
+                futures.add(executor.submit(() -> {
+                    try {
+                        Context.accountId.set(accountId);
+                        String url = host;
+                        if (!url.endsWith("/")) url += "/";
+                        if (index > 0) url += "akto-" + index; // we want to hit host url once too
+
+                        String contentType = hostAndContentType.get(host);
+                        Map<String, List<String>> headers = new HashMap<>();
+
+                        if (contentType != null) {
+                            headers.put("content-type", Arrays.asList(contentType));
+                        }
+                        if (host != null && !host.isEmpty()) {
+                            headers.put("host", Arrays.asList(host));
+                        }
+
+                        OriginalHttpRequest request = new OriginalHttpRequest(url, null, URLMethods.Method.GET.name(), null, headers, "");
+                        OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, testingRunConfig, false, new ArrayList<>(), Main.SKIP_SSRF_CHECK);
+                        boolean isStatusGood = TestPlugin.isStatusGood(response.getStatusCode());
+                        if (!isStatusGood) return null;
+
+                        String body = response.getBody();
+                        fillDefaultPayloadsMap(body);
+                    } catch (Exception e) {
+                        loggerMaker.errorAndAddToDb(e, "Error in calculateDefaultPayloads " + e.getMessage());
+                    }
+                    return null;
+                }));
+            }
+
+            for (Future<Void> future : futures) {
                 try {
-                    String url = host;
-                    if (!url.endsWith("/")) url += "/";
-                    if (idx > 0) url += "akto-"+idx; // we want to hit host url once too
-
-                    String contentType = hostAndContentType.get(host);
-                    Map<String, List<String>> headers = new HashMap<>();
-
-                    if (contentType != null) {
-                        headers.put("content-type", Arrays.asList(contentType));
-                    }
-                    if (host != null && !host.isEmpty()) {
-                        headers.put("host", Arrays.asList(host));
-                    }
-
-                    OriginalHttpRequest request = new OriginalHttpRequest(url, null, URLMethods.Method.GET.name(), null, headers, "");
-                    OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, testingRunConfig, false, new ArrayList<>(), Main.SKIP_SSRF_CHECK);
-                    boolean isStatusGood = TestPlugin.isStatusGood(response.getStatusCode());
-                    if (!isStatusGood) continue;
-
-                    String body = response.getBody();
-                    fillDefaultPayloadsMap(body);
+                    future.get(1, TimeUnit.MINUTES);
+                } catch (InterruptedException | TimeoutException e) {
+                    future.cancel(true); // Cancel the task
+                    loggerMaker.errorAndAddToDb(e, "Timeout in calculateDefaultPayloads");
                 } catch (Exception e) {
-                    loggerMaker.errorAndAddToDb(e, "Error in calculateDefaultPayloads " + e.getMessage(), LogDb.TESTING);
+                    loggerMaker.errorAndAddToDb(e, "Error while waiting for task completion");
                 }
             }
         }
@@ -123,7 +148,7 @@ public class StatusCodeAnalyser {
         return occurrence >= 5;
     }
 
-    private static final LoggerMaker loggerMaker = new LoggerMaker(StatusCodeAnalyser.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(StatusCodeAnalyser.class, LogDb.TESTING);
     public static int MAX_COUNT = 30;
     public static void fillResult(SampleMessageStore sampleMessageStore, Map<ApiInfo.ApiInfoKey, List<String>> sampleDataMap, AuthMechanism authMechanism, TestingRunConfig testingRunConfig) {
         loggerMaker.debugAndAddToDb("Running status analyser", LogDb.TESTING);
