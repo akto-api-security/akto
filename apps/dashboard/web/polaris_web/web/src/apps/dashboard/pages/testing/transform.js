@@ -854,6 +854,13 @@ getCollapsibleRow(urls, severity) {
                     <Link monochrome onClick={() => history.navigate(ele.nextUrl)} removeUnderline>
                       {transform.getUrlComp(ele.url)}
                     </Link>
+                    <Box maxWidth="250px" paddingInlineStart="3">
+                      <TooltipText
+                        text={ele.issueDescription}
+                        tooltip={ele.issueDescription}
+                        textProps={{ color: "subdued"}}
+                      />
+                    </Box>
                   </HorizontalStack>
                   <div style={{ marginLeft: "auto" }}>
                     <Text color="subdued" fontWeight="semibold">
@@ -863,13 +870,6 @@ getCollapsibleRow(urls, severity) {
                     {ele.responseBody ? <TooltipText tooltip={ele.responseBody} text={ele.responseBody} /> : "-"}
                     </Text>
                   </div>
-                  <Box maxWidth="250px" paddingInlineStart="3">
-                    <TooltipText
-                      text={ele.description}
-                      tooltip={ele.description}
-                      textProps={{ color: "subdued"}}
-                    />
-                  </Box>
                 </div>
               </Box>
             )
@@ -938,7 +938,7 @@ getPrettifiedTestRunResults(testRunResults){
     if(testRunResultsObj.hasOwnProperty(key)){
       let endTimestamp = Math.max(test.endTimestamp, testRunResultsObj[key].endTimestamp)
       let urls = testRunResultsObj[key].urls
-      urls.push({url: test.url, nextUrl: test.nextUrl, testRunResultsId: test.id, statusCode: statusCode, responseBody: responseBody, description: test.description}})
+      urls.push({url: test.url, nextUrl: test.nextUrl, testRunResultsId: test.id, statusCode: statusCode, responseBody: responseBody, issueDescription: test.description})
       let obj = {
         ...test,
         urls: urls,
@@ -950,7 +950,7 @@ getPrettifiedTestRunResults(testRunResults){
       delete obj["errorsList"]
       testRunResultsObj[key] = obj
     }else{
-      let urls = [{url: test.url, nextUrl: test.nextUrl, testRunResultsId: test.id, statusCode: statusCode, responseBody: responseBody, description: test.description}}]
+      let urls = [{url: test.url, nextUrl: test.nextUrl, testRunResultsId: test.id, statusCode: statusCode, responseBody: responseBody, issueDescription: test.description}]
       let obj={
         ...test,
         urls:urls,
