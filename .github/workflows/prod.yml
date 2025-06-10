@@ -313,7 +313,7 @@ jobs:
 
       - name: Upload Docker Scout report (Threat Detection)
         if: ${{ github.event.inputs.threat_detection == 'true' }}
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: scout-report-threat-detection
           path: scout-threat-detection-report.json
