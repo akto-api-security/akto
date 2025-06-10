@@ -1,5 +1,5 @@
 
-name: Production
+name: Data Ingestion Deployment 
 
 # Controls when the workflow will run
 on:
