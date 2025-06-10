@@ -152,6 +152,8 @@ public class ReportAction extends UserAction {
                         }
                         status = "ERROR";
                     }
+                } else if(status.equals("FAILED")) {
+                    status = "ERROR";
                 }
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb(e, "Error while polling pdf download for report id - " + reportId, LogDb.DASHBOARD);
