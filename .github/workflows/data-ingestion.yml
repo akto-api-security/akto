@@ -19,7 +19,7 @@ on:
           - 'True'
       data_ingestion:
         type: boolean
-        default: false
+        default: true
         description: Data Ingestion Service
 
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
