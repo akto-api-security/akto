@@ -65,10 +65,11 @@ function SimpleHomePage() {
 
   const agentOptions = useMemo(() => [
     { title: 'Auto', content: 'Agent will choose for you' },
-    { title: 'Modern web app', content: 'Made with React and Node.js' },
-    { title: 'Interactive data app', content: 'Made with Streamlit and Python' },
-    { title: '3D game', content: 'Three.js games and simulations' },
-    { title: 'Web app (Python)', content: 'Websites with Python backend' },
+    { title: 'Argus | Vulnerability scanner', content: 'Identifies and shields against attacks' },
+    { title: 'Sentinel | Source code analyser', content: 'Analyzes source code for patterns' },
+    { title: 'Hunter | Sensitive data type scanner', content: 'Spots exposed personal information' },
+    { title: 'Moriarty | API grouping tool', content: 'Clusters APIs into service groups' },
+    { title: 'Sage | Test false positive finder', content: 'Hunts down misleading test failures' },
   ], []);
 
   const filteredAgents = useMemo(() => {
@@ -82,10 +83,12 @@ function SimpleHomePage() {
   const activator = (
     <div
       onClick={togglePopoverActive}
-      style={{...toolButtonStyle, display: 'inline-flex'}}
+      onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f3f4f6'}
+      onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+      style={{...toolButtonStyle, display: 'inline-flex', padding: '8px 12px'}}
     >
       <Sliders size={20} />
-      <span>Agents: {selectedAgent}</span>
+      <span>Agent: {selectedAgent}</span>
     </div>
   );
 
@@ -140,7 +143,6 @@ function SimpleHomePage() {
     backgroundColor: '#ffffff',
     boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1)',
     width: '100%',
-    minHeight: '140px',
     padding: '16px 20px',
     justifyContent: 'space-between'
   };
@@ -148,10 +150,11 @@ function SimpleHomePage() {
   const editorWrapperStyle = {
     flex: 1,
     width: '100%',
-    minHeight: '60px',
     maxHeight: '400px',
     overflowY: 'auto',
-    textAlign: 'left'
+    textAlign: 'left',
+    paddingTop: '4px',
+    paddingBottom: '4px'
   };
 
   const footerStyle = {
@@ -174,23 +177,27 @@ function SimpleHomePage() {
     gap: '12px'
   };
   
+  const aktoPurple = '#6200EA';
+
   const submitButtonStyle = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     width: '32px',
     height: '32px',
-    backgroundColor: '#000000',
+    backgroundColor: aktoPurple,
     border: 'none',
     borderRadius: '50%',
     cursor: 'pointer',
     color: '#ffffff',
-    transition: 'opacity 0.2s',
+    transition: 'background-color 0.2s, opacity 0.2s',
   };
 
   const disabledSubmitButtonStyle = {
+    ...submitButtonStyle,
     opacity: 0.5,
     cursor: 'not-allowed',
+    backgroundColor: aktoPurple,
   };
 
   const suggestionsContainerStyle = {
@@ -301,7 +308,20 @@ function SimpleHomePage() {
               </Popover>
             </div>
             <div style={rightFooterStyle}>
-              <button style={submitButtonStyle}>
+              <button 
+                style={isEditorEmpty ? disabledSubmitButtonStyle : submitButtonStyle}
+                disabled={isEditorEmpty}
+                onMouseEnter={(e) => {
+                  if (!isEditorEmpty) {
+                    e.currentTarget.style.backgroundColor = '#4d00ba';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!isEditorEmpty) {
+                    e.currentTarget.style.backgroundColor = aktoPurple;
+                  }
+                }}
+              >
                 <ArrowUp size={18} weight="bold" />
               </button>
             </div>
@@ -333,14 +353,13 @@ function SimpleHomePage() {
           .Polaris-Popover__Content {
             border-radius: 12px;
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-            min-width: 280px;
+            min-width: 340px;
           }
           .Polaris-ActionList__Item {
             padding: 12px 16px;
           }
           .tiptap-editor .ProseMirror {
             outline: none;
-            min-height: 60px;
           }
           
           .tiptap-editor .ProseMirror p.is-editor-empty:first-child::before {
