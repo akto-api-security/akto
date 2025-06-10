@@ -5,6 +5,7 @@ import api from "./api"
 import testingTransform from "../testing/transform.js"
 import { history } from "@/util/history";
 import IssuesCheckbox from "./IssuesPage/IssuesCheckbox.jsx"
+import TooltipText from "../../components/shared/TooltipText.jsx"
 
 const transform = {
     sortIssues: (issueItem, sortKey, sortOrder) => {
@@ -42,6 +43,13 @@ const transform = {
                         <Link monochrome onClick={() => this.getNextUrl(JSON.parse(ele.id), isCompliancePage)} removeUnderline >
                             {testingTransform.getUrlComp(ele.url)}
                         </Link>
+                        <Box maxWidth="250px" paddingInlineStart="3">
+                        <TooltipText
+                            text={ele.issueDescription}
+                            tooltip={ele.issueDescription}
+                            textProps={{ color: "subdued"}}
+                            />
+                        </Box>
                     </HorizontalStack>
                     </Box>
                 )
@@ -87,6 +95,7 @@ const transform = {
                     collapsibleRow: transform.getIssuesPageCollapsibleRow(issue.urls.map(urlObj => ({
                         url: `${urlObj.method} ${urlObj.url}`,
                         id: urlObj.id,
+                        issueDescription: urlObj.issueDescription
                     })), isCompliancePage)
                 }
             }))

@@ -36,6 +36,7 @@ import com.akto.util.GroupByTimeRange;
 import com.akto.util.enums.GlobalEnums;
 import com.akto.util.enums.GlobalEnums.Severity;
 import com.akto.util.enums.GlobalEnums.TestCategory;
+import com.akto.util.enums.GlobalEnums.TestErrorSource;
 import com.akto.util.enums.GlobalEnums.TestRunIssueStatus;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.MongoCursor;
@@ -81,6 +82,8 @@ public class IssuesAction extends UserAction {
     private int startEpoch;
     long endTimeStamp;
     private Map<Integer,Map<String,Integer>> severityInfo = new HashMap<>();
+
+    private Map<String, String> issuesDescriptionMap;
 
     private static final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
 
@@ -672,7 +675,8 @@ public class IssuesAction extends UserAction {
                 Filters.in(TestingRunIssues.TEST_RUN_ISSUES_STATUS, issueStatusQuery),
                 Filters.in(TestingRunIssues.LATEST_TESTING_RUN_SUMMARY_ID, objectId)
         );
-        issues = TestingRunIssuesDao.instance.findAll(triFilters, Projections.include("_id"));
+        issues = TestingRunIssuesDao.instance.findAll(triFilters,
+            Projections.include("_id", TestingRunIssues.DESCRIPTION));
         List<Bson> testingRunResultsFilterList = new ArrayList<>();
         boolean isStoredInVulnerableCollection = VulnerableTestingRunResultDao.instance.isStoredInVulnerableCollection(objectId, true);
         for(TestingRunIssues issue: issues) {
@@ -712,7 +716,26 @@ public class IssuesAction extends UserAction {
             testingRunResultList = TestingRunResultDao.instance.fetchLatestTestingRunResultWithCustomAggregations(Filters.and(filtersList), limit, skip, sortStage);
         }
 
+        this.issuesDescriptionMap = prepareIssueDescriptionMap(issues, testingRunResultList);
+
         return SUCCESS.toUpperCase();
+    }
+
+    private Map<String, String> prepareIssueDescriptionMap(List<TestingRunIssues> issues,
+        List<TestingRunResult> testingRunResults) {
+
+        if (testingRunResults == null || testingRunResults.isEmpty()) {
+            return Collections.emptyMap();
+        }
+
+        Map<TestingIssuesId, TestingRunResult> idToResultMap = new HashMap<>();
+        for (TestingRunResult result : testingRunResults) {
+            TestingIssuesId id = new TestingIssuesId(result.getApiInfoKey(), TestErrorSource.AUTOMATED_TESTING,
+                result.getTestSubType());
+            idToResultMap.put(id, result);
+        }
+
+        return Utils.mapIssueDescriptions(issues, idToResultMap);
     }
 
     List<TestingIssuesId> issuesIds;
@@ -1088,5 +1111,13 @@ public class IssuesAction extends UserAction {
     }
     public String getDescription() {
         return description;
+    }
+
+    public Map<String, String> getIssuesDescriptionMap() {
+        return issuesDescriptionMap;
+    }
+
+    public void setIssuesDescriptionMap(Map<String, String> issuesDescriptionMap) {
+        this.issuesDescriptionMap = issuesDescriptionMap;
     }
 }
