@@ -306,7 +306,7 @@ jobs:
         uses: docker/scout-action@v1
         with:
           command: cves
-          image: aktosecurity/akto-threat-detection:${{ github.event.inputs.release_version_threat  }}_local
+          image: aktosecurity/akto-threat-detection:${{ github.event.inputs.release_version_threat  }}
           output: scout-threat-detection-report.json
           format: json
         continue-on-error: true
