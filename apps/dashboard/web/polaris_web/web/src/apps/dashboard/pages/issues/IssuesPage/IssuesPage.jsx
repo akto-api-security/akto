@@ -520,7 +520,7 @@ function IssuesPage() {
                             method: item?.id?.apiInfoKey?.method,
                             url: item?.id?.apiInfoKey?.url,
                             id: JSON.stringify(item?.id),
-                            description: item?.description,
+                            issueDescription: item?.description,
                         }],
                         urlsKey: ['']
                     })
@@ -534,7 +534,7 @@ function IssuesPage() {
                         method: item?.id?.apiInfoKey?.method,
                         url: item?.id?.apiInfoKey?.url,
                         id: JSON.stringify(item?.id),
-                        description: item?.description,
+                        issueDescription: item?.description,
                     })
                     existingIssue.numberOfEndpoints += 1
                 }

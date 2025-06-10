@@ -45,8 +45,8 @@ const transform = {
                         </Link>
                         <Box maxWidth="250px" paddingInlineStart="3">
                         <TooltipText
-                            text={ele.description}
-                            tooltip={ele.description}
+                            text={ele.issueDescription}
+                            tooltip={ele.issueDescription}
                             textProps={{ color: "subdued"}}
                             />
                         </Box>
@@ -95,7 +95,7 @@ const transform = {
                     collapsibleRow: transform.getIssuesPageCollapsibleRow(issue.urls.map(urlObj => ({
                         url: `${urlObj.method} ${urlObj.url}`,
                         id: urlObj.id,
-                        description: urlObj.description
+                        issueDescription: urlObj.issueDescription
                     })), isCompliancePage)
                 }
             }))
