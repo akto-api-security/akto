@@ -8,7 +8,7 @@ import {
     StarFilledMinor,
     FinancesMinor,
     LockFilledMajor,
-    HomeMajor,
+    HomeFilledMinor,
 } from "@shopify/polaris-icons";
 import {useLocation, useNavigate} from "react-router-dom";
 
@@ -100,7 +100,7 @@ export default function LeftNav() {
                         },
                         {
                             label: "Home",
-                            icon: HomeMajor,
+                            icon: HomeFilledMinor,
                             onClick: () => {
                                 handleSelect("dashboard_home");
                                 navigate("/dashboard/home");
