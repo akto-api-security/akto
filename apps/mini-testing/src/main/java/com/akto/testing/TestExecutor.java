@@ -59,7 +59,7 @@ import org.json.JSONObject;
 
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.security.interfaces.RSAPublicKey;
+import java.security.interfaces.RSAPrivateKey;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -82,7 +82,7 @@ public class TestExecutor {
     private static final ClientLayer clientLayer = new ClientLayer();
     private static final AtomicInteger totalTestsCount = new AtomicInteger(0);
     private static final boolean shouldCallClientLayerForSampleData = System.getenv("TESTING_DB_LAYER_SERVICE_URL") != null && !System.getenv("TESTING_DB_LAYER_SERVICE_URL").isEmpty();
-    private static RSAPublicKey publicKey = PayloadEncodeUtil.getPublicKey();
+    private static RSAPrivateKey privateKey = PayloadEncodeUtil.getPrivateKey();
 
     public void init(TestingRun testingRun, ObjectId summaryId, SyncLimit syncLimit, boolean shouldInitOnly) {
         totalTestsCount.set(0);
@@ -412,8 +412,8 @@ public class TestExecutor {
         if(shouldCallClientLayerForSampleData){
             try {
                 message = clientLayer.fetchLatestSample(apiInfoKey);
-                if (!message.contains("requestPayload") && publicKey != null) {
-                    message = PayloadEncodeUtil.decodePayload(message, publicKey);
+                if (!message.contains("requestPayload") && privateKey != null) {
+                    message = PayloadEncodeUtil.decodePayload(message, privateKey);
                 }
             } catch (JWTVerificationException e) {
                 loggerMaker.errorAndAddToDb(e, "Error while decoding encoded payload in findOriginalHttpRequest: " + e.getMessage(), LogDb.TESTING);
@@ -826,8 +826,8 @@ public class TestExecutor {
                 
                 try {
                     msg = clientLayer.fetchLatestSample(apiInfoKey);
-                    if (!msg.contains("requestPayload") && publicKey != null) {
-                        msg = PayloadEncodeUtil.decodePayload(msg, publicKey);
+                    if (!msg.contains("requestPayload") && privateKey != null) {
+                        msg = PayloadEncodeUtil.decodePayload(msg, privateKey);
                     }
                 } catch (JWTVerificationException e) {
                     loggerMaker.errorAndAddToDb(e, "Error while decoding encoded payload in runTestNew: " + e.getMessage(), LogDb.TESTING);
