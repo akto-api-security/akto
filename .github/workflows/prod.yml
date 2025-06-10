@@ -255,15 +255,14 @@ jobs:
         env:
           ECR_REGISTRY: aktosecurity
           ECR_REPOSITORY: akto-api-security
-          IMAGE_TAG_THREAT: latest
-          IMAGE_TAG_THREAT_2: ${{github.event.inputs.release_version_threat}}
+          IMAGE_TAG_THREAT: ${{github.event.inputs.release_version_threat}}
         run: |
           docker buildx create --use
           # Build a docker container and push it to DockerHub
           cd apps/dashboard
           if [[ "${{ github.event.inputs.threat_detection}}" == "true" ]]; then
             cd ../threat-detection
-            docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/akto-threat-detection:$IMAGE_TAG_THREAT -t $ECR_REGISTRY/akto-threat-detection:$IMAGE_TAG_THREAT_2 . --push
+            docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/akto-threat-detection:$IMAGE_TAG_THREAT . --push
           fi
 
           if [[ "${{ github.event.inputs.threat_detection_backend}}" == "true" ]]; then
@@ -324,36 +323,6 @@ jobs:
           key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
           restore-keys: ${{ runner.os }}-m2
 
-      # --- Docker Scout CVE Scans and Artifact Uploads ---
-
-      # Dashboard
-      - name: Run Docker Scout CVE Scan for Dashboard
-        if: ${{ github.event.inputs.dashboard == 'true' }}
-        run: |
-          docker scout cves aktosecurity/akto-api-security-dashboard:${{ github.event.inputs.release_version }}_local \
-            --only-severities critical,high > scout-dashboard-report.txt || true
-
-      - name: Upload Dashboard Scan Report
-        if: ${{ github.event.inputs.dashboard == 'true' }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: scout-report-dashboard
-          path: scout-dashboard-report.txt
-
-      # Testing
-      - name: Run Docker Scout CVE Scan for Testing
-        if: ${{ github.event.inputs.testing == 'true' }}
-        run: |
-          docker scout cves aktosecurity/akto-api-testing:${{ github.event.inputs.release_version }}_local \
-            --only-severities critical,high > scout-testing-report.txt || true
-
-      - name: Upload Testing Scan Report
-        if: ${{ github.event.inputs.testing == 'true' }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: scout-report-testing
-          path: scout-testing-report.txt
-
       # --- Docker Scout Scan for Threat Detection ---
       - name: Run Docker Scout CVE Scan (Threat Detection)
         if: ${{ github.event.inputs.threat_detection == 'true' }}
@@ -367,17 +336,3 @@ jobs:
         with:
           name: scout-report-threat-detection
           path: scout-threat-detection-report.txt
-
-      # --- Docker Scout Scan for Threat Detection Backend ---
-      - name: Run Docker Scout CVE Scan (Threat Detection Backend)
-        if: ${{ github.event.inputs.threat_detection_backend == 'true' }}
-        run: |
-          docker scout cves aktosecurity/akto-threat-detection-backend:${{ github.event.inputs.release_version_threat }} \
-            --only-severities critical,high > scout-threat-detection-backend-report.txt || true
-
-      - name: Upload Scout Report (Threat Detection Backend)
-        if: ${{ github.event.inputs.threat_detection_backend == 'true' }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: scout-report-threat-detection-backend
-          path: scout-threat-detection-backend-report.txt
