@@ -1,9 +1,7 @@
 package com.akto;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
 
-import java.security.KeyFactory;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.interfaces.RSAPrivateKey;
@@ -14,9 +12,6 @@ import java.util.Base64;
 import java.util.Map;
 
 import org.junit.jupiter.api.*;
-
-import com.auth0.jwt.exceptions.JWTCreationException;
-import com.auth0.jwt.exceptions.JWTVerificationException;
 
 public class PayloadEncodeUtilTest {
 
@@ -35,10 +30,19 @@ public class PayloadEncodeUtilTest {
     @Test
     public void testEncodeAndDecodePayload() {
         String originalPayload = "{\"message\":\"test\"}";
-        String jwt = PayloadEncodeUtil.encodePayload(originalPayload, privateKey);
+        String jwt = null;
+        try {
+            jwt = PayloadEncodeUtil.encodePayload(originalPayload, publicKey);            
+        } catch (Exception e) {
+        }
         assertNotNull(jwt);
 
-        String decodedPayload = PayloadEncodeUtil.decodePayload(jwt, publicKey);
+
+        String decodedPayload = null;
+        try {
+            decodedPayload = PayloadEncodeUtil.decodePayload(jwt, privateKey);            
+        } catch (Exception e) {
+        }
         assertEquals(originalPayload, decodedPayload);
     }
 

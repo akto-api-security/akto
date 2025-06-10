@@ -15,7 +15,7 @@ import com.akto.log.LoggerMaker.LogDb;
 import com.akto.metrics.AllMetrics;
 import com.akto.testing_db_layer_client.ClientLayer;
 
-import java.security.interfaces.RSAPublicKey;
+import java.security.interfaces.RSAPrivateKey;
 import java.util.*;
 
 
@@ -27,7 +27,7 @@ public class SampleMessageStore {
     private Map<String, SingleTypeInfo> singleTypeInfos = new HashMap<>();
     private static final DataActor dataActor = DataActorFactory.fetchInstance();
     private static final ClientLayer clientLayer = new ClientLayer();
-    private static RSAPublicKey publicKey = PayloadEncodeUtil.getPublicKey();
+    private static RSAPrivateKey privateKey = PayloadEncodeUtil.getPrivateKey();
     
     private SampleMessageStore() {}
 
@@ -97,8 +97,8 @@ public class SampleMessageStore {
                 try {
                     encodedSamples = clientLayer.fetchSamples(apiInfoKey);
                     for (String sample: encodedSamples) {
-                        if (!sample.contains("requestPayload") && publicKey != null) {
-                            samples.add(PayloadEncodeUtil.decodePayload(sample, publicKey));
+                        if (!sample.contains("requestPayload") && privateKey != null) {
+                            samples.add(PayloadEncodeUtil.decodePayload(sample, privateKey));
                         } else {
                             samples.add(sample);
                         }

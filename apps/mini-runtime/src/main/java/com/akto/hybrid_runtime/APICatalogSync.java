@@ -1,6 +1,6 @@
 package com.akto.hybrid_runtime;
 
-import java.security.interfaces.RSAPrivateKey;
+import java.security.interfaces.RSAPublicKey;
 import java.util.*;
 import java.util.Map.Entry;
 import java.util.concurrent.ConcurrentHashMap;
@@ -73,7 +73,7 @@ public class APICatalogSync {
     private static DataActor dataActor = DataActorFactory.fetchInstance();
     public static Set<MergedUrls> mergedUrls;
     private static final ClientLayer clientLayer = new ClientLayer();
-    private static RSAPrivateKey privateKey = PayloadEncodeUtil.getPrivateKey();
+    private static RSAPublicKey publicKey = PayloadEncodeUtil.getPublicKey();
     public APICatalogSync(String userIdentifier,int thresh, boolean fetchAllSTI) {
         this(userIdentifier, thresh, fetchAllSTI, true);
     }
@@ -1605,8 +1605,8 @@ public class APICatalogSync {
                         Key id = sample.getId();
                         int accountId = Context.accountId.get();
                         String piiRedactedSample = RedactSampleData.redactIfRequired(s, false, false);
-                        if (privateKey != null) {
-                            piiRedactedSample = PayloadEncodeUtil.encodePayload(piiRedactedSample, privateKey);
+                        if (publicKey != null) {
+                            piiRedactedSample = PayloadEncodeUtil.encodePayload(piiRedactedSample, publicKey);
                         }
                         SampleDataAlt sampleDataAlt = new SampleDataAlt(uuid, piiRedactedSample, id.getApiCollectionId(),
                                 id.getMethod().name(), id.getUrl(), id.getResponseCode(), now, accountId);
