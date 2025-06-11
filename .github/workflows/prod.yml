@@ -310,7 +310,11 @@ jobs:
           output: scout-threat-detection-report.json
           format: json
         continue-on-error: true
-
+      - name: Save Docker Scout JSON output to file
+        id: scout
+        if: ${{ github.event.inputs.threat_detection == 'true' }}
+        run: |
+          echo '${{ steps.scout.outputs.result }}' > scout-threat-detection-report.json
       - name: Upload Docker Scout report (Threat Detection)
         if: ${{ github.event.inputs.threat_detection == 'true' }}
         uses: actions/upload-artifact@v4
