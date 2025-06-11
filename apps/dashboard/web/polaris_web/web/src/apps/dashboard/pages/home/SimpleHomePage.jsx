@@ -3,7 +3,7 @@ import { useEditor, EditorContent, BubbleMenu } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Placeholder from '@tiptap/extension-placeholder';
 import { Ai } from '@tiptap-pro/extension-ai';
-import { Plus, Sliders, ArrowUp, ShieldCheck, Detective, Bug, TestTube, Check } from 'phosphor-react';
+import { Plus, Sliders, ArrowUp, ShieldCheck, Detective, Bug, TestTube, X, BookOpen, Terminal, MagnifyingGlass, TextAa } from 'phosphor-react';
 import { Popover, ActionList, LegacyCard, TextField, Text, Icon } from '@shopify/polaris';
 import settingFunctions from '../settings/module';
 
@@ -74,39 +74,51 @@ function SimpleHomePage() {
     },
   });
 
-  const [popoverActive, setPopoverActive] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedAgent, setSelectedAgent] = useState('Auto');
-  const togglePopoverActive = useCallback(() => setPopoverActive((active) => !active), []);
+  // const [popoverActive, setPopoverActive] = useState(false);
+  // const [searchQuery, setSearchQuery] = useState('');
+  // const [selectedAgent, setSelectedAgent] = useState('Auto');
+  // const togglePopoverActive = useCallback(() => setPopoverActive((active) => !active), []);
 
-  const agentOptions = useMemo(() => [
-    { title: 'Auto', content: 'Agent will choose for you' },
-    { title: 'Argus | Vulnerability scanner', content: 'Identifies and shields against attacks' },
-    { title: 'Sentinel | Source code analyser', content: 'Analyzes source code for patterns' },
-    { title: 'Hunter | Sensitive data type scanner', content: 'Spots exposed personal information' },
-    { title: 'Moriarty | API grouping tool', content: 'Clusters APIs into service groups' },
-    { title: 'Sage | Test false positive finder', content: 'Hunts down misleading test failures' },
+  // const agentOptions = useMemo(() => [
+  //   { title: 'Auto', content: 'Agent will choose for you' },
+  //   { title: 'Argus | Vulnerability scanner', content: 'Identifies and shields against attacks' },
+  //   { title: 'Sentinel | Source code analyser', content: 'Analyzes source code for patterns' },
+  //   { title: 'Hunter | Sensitive data type scanner', content: 'Spots exposed personal information' },
+  //   { title: 'Moriarty | API grouping tool', content: 'Clusters APIs into service groups' },
+  //   { title: 'Sage | Test false positive finder', content: 'Hunts down misleading test failures' },
+  // ], []);
+
+  // const filteredAgents = useMemo(() => {
+  //   if (!searchQuery) return agentOptions;
+  //   return agentOptions.filter(agent => 
+  //     agent.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
+  //     agent.content.toLowerCase().includes(searchQuery.toLowerCase())
+  //   );
+  // }, [agentOptions, searchQuery]);
+
+  // const activator = (
+  //   <div
+  //     onClick={togglePopoverActive}
+  //     onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f3f4f6'}
+  //     onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+  //     style={{...toolButtonStyle, display: 'inline-flex', padding: '8px 12px'}}
+  //   >
+  //     <Sliders size={20} />
+  //     <span>Agent: {selectedAgent}</span>
+  //   </div>
+  // );
+
+  const [toolsPopoverActive, setToolsPopoverActive] = useState(false);
+  const toggleToolsPopover = useCallback(() => setToolsPopoverActive((active) => !active), []);
+  const [selectedTool, setSelectedTool] = useState(null);
+
+  const toolOptions = useMemo(() => [
+    { title: 'Documentation', icon: <BookOpen size={16} /> },
+    { title: 'Generate curl command', icon: <Terminal size={16} /> },
+    { title: 'Search for CVE', icon: <MagnifyingGlass size={16} /> },
+    { title: 'Regex validator', icon: <TextAa size={16} /> },
+    { title: 'Create custom test', icon: <TestTube size={16} /> },
   ], []);
-
-  const filteredAgents = useMemo(() => {
-    if (!searchQuery) return agentOptions;
-    return agentOptions.filter(agent => 
-      agent.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
-      agent.content.toLowerCase().includes(searchQuery.toLowerCase())
-    );
-  }, [agentOptions, searchQuery]);
-
-  const activator = (
-    <div
-      onClick={togglePopoverActive}
-      onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f3f4f6'}
-      onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-      style={{...toolButtonStyle, display: 'inline-flex', padding: '8px 12px'}}
-    >
-      <Sliders size={20} />
-      <span>Agent: {selectedAgent}</span>
-    </div>
-  );
 
   const bubbleMenuStyle = {
     display: 'flex',
@@ -125,6 +137,28 @@ function SimpleHomePage() {
     fontSize: '14px',
     borderRadius: '6px',
     transition: 'background-color 0.2s',
+  };
+
+  const selectedToolChipStyle = {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: '8px',
+    padding: '4px 8px',
+    backgroundColor: '#eef4ff',
+    border: '1px solid #dbeafe',
+    borderRadius: '16px',
+    fontSize: '14px',
+    color: '#3b82f6',
+  };
+
+  const chipCloseButtonStyle = {
+      background: 'none',
+      border: 'none',
+      cursor: 'pointer',
+      padding: '0',
+      display: 'flex',
+      alignItems: 'center',
+      color: '#3b82f6'
   };
 
   const containerStyle = {
@@ -287,7 +321,7 @@ function SimpleHomePage() {
               >
                 <Plus size={20} />
               </button>
-              <Popover
+              {/* <Popover
                 active={popoverActive}
                 activator={activator}
                 autofocusTarget="first-node"
@@ -321,7 +355,46 @@ function SimpleHomePage() {
                     }))}
                   />
                 </LegacyCard>
+              </Popover> */}
+              <Popover
+                active={toolsPopoverActive}
+                activator={
+                    <div
+                        onClick={toggleToolsPopover}
+                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f3f4f6'}
+                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                        style={{...toolButtonStyle, display: 'inline-flex', padding: '8px 12px'}}
+                    >
+                        <Sliders size={20} />
+                        <span>Tools</span>
+                    </div>
+                }
+                autofocusTarget="first-node"
+                onClose={toggleToolsPopover}
+              >
+                <ActionList
+                    actionRole="menuitem"
+                    items={toolOptions.map(tool => ({
+                        content: tool.title,
+                        onAction: () => {
+                            setSelectedTool(tool);
+                            toggleToolsPopover();
+                        }
+                    }))}
+                />
               </Popover>
+              {selectedTool && (
+                <div style={selectedToolChipStyle}>
+                    {selectedTool.icon}
+                    <span>{selectedTool.title}</span>
+                    <button
+                        style={chipCloseButtonStyle}
+                        onClick={() => setSelectedTool(null)}
+                    >
+                        <X size={16} />
+                    </button>
+                </div>
+              )}
             </div>
             <div style={rightFooterStyle}>
               <button 
