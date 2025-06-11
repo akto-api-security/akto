@@ -114,6 +114,9 @@ public class StatusCodeAnalyser {
     }
 
     public static void fillDefaultPayloadsMap(String body) {
+        if(body == null || body.isEmpty() || body.equals("{}")) {
+            return;
+        }
         int hash = body.hashCode();
         Integer count = defaultPayloadsMap.getOrDefault(hash, 0);
         defaultPayloadsMap.put(hash, count+1);

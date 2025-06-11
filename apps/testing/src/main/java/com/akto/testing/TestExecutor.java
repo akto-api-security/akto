@@ -424,6 +424,10 @@ public class TestExecutor {
                                 AtomicInteger testsLeft = new AtomicInteger(Math.max(totalTestsToBeExecuted.get(), 0));
                                 double percentageTestsCompleted = (1 - ((testsLeft.get() * 1.0) / totalTestsToBeExecutedCount))* 100.0;
                                 int relaxingTime = 20 * 60;
+                                if(percentageTestsCompleted == 100.0){
+                                    loggerMaker.debugInfoAddToDb("All tests have been executed, stopping the test run", LogDb.TESTING);
+                                    break;
+                                }
                                 if(percentageTestsCompleted > 95.0){
                                     relaxingTime = 60;
                                 }else if(percentageTestsCompleted > 90.0){
@@ -439,7 +443,7 @@ public class TestExecutor {
                                 }
                             }
 
-                            Thread.sleep(5000);
+                            Thread.sleep(2000);
                     }
                 }
 
