@@ -27,11 +27,15 @@ import java.net.URISyntaxException;
 import java.net.URL;
 import java.util.*;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
 public class ApiExecutor {
     private static final LoggerMaker loggerMaker = new LoggerMaker(ApiExecutor.class, LogDb.TESTING);
 
     // Load only first 1 MiB of response body into memory.
     private static final int MAX_RESPONSE_SIZE = 1024*1024;
+    private static final ObjectMapper objectMapper = new ObjectMapper();
     
     private static OriginalHttpResponse common(Request request, boolean followRedirects, boolean debug, List<TestingRunResult.TestLog> testLogs, boolean skipSSRFCheck, String requestProtocol) throws Exception {
 
@@ -239,14 +243,21 @@ public class ApiExecutor {
         String url = request.getUrl();
         url = url.trim();
 
-        if (!url.startsWith("http")) {
-            url = OriginalHttpRequest.makeUrlAbsolute(url, request.findHostFromHeader(), request.findProtocolFromHeader());
+        try {
+            if (!url.startsWith("http")) {
+                url = OriginalHttpRequest.makeUrlAbsolute(url, request.findHostFromHeader(), request.findProtocolFromHeader());
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "error converting req url to absolute " + url);
         }
 
         return replaceHostFromConfig(url, testingRunConfig);
     }
 
     public static OriginalHttpResponse sendRequest(OriginalHttpRequest request, boolean followRedirects, TestingRunConfig testingRunConfig, boolean debug, List<TestingRunResult.TestLog> testLogs, boolean skipSSRFCheck, boolean useTestingRunConfig) throws Exception {
+        if (isJsonRpcRequest(request)) {
+            return sendRequestWithSse(request, followRedirects, testingRunConfig, debug, testLogs, skipSSRFCheck);
+        }
         if(useTestingRunConfig) {
             return sendRequest(request, followRedirects, testingRunConfig, debug, testLogs, skipSSRFCheck);
         }else{
@@ -533,5 +544,134 @@ public class ApiExecutor {
         builder = builder.method(request.getMethod(), body);
         Request okHttpRequest = builder.build();
         return common(okHttpRequest, followRedirects, debug, testLogs, skipSSRFCheck, requestProtocol);
+    }
+
+    private static boolean isJsonRpcRequest(OriginalHttpRequest request) {
+        try {
+            String body = request.getBody();
+            if (body == null) return false;
+            JsonNode node = objectMapper.readTree(body);
+            return node.has("jsonrpc") && node.has("id");
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    private static class SseSession {
+        String sessionId;
+        String endpoint;
+        List<String> messages = new ArrayList<>();
+        Response response; // Store the OkHttp Response for cleanup
+    }
+
+    private static SseSession openSseSession(String host, boolean debug) throws Exception {
+        SseSession session = new SseSession();
+        OkHttpClient client = new OkHttpClient.Builder().build();
+        // header content type = text/event-stream
+        Headers headers = new Headers.Builder()
+                .add("Accept", "*")
+                .add("Content-Type", "text/event-stream")
+                .build();
+        Request request = new Request.Builder().url(host + "/sse").headers(headers).build();
+        Call call = client.newCall(request);
+        Response response = call.execute();
+        if (!response.isSuccessful()) {
+            throw new IOException("Failed to open SSE session: " + response);
+        }
+        session.response = response; // Store the response for later closing
+        InputStream is = response.body().byteStream();
+        Scanner scanner = new Scanner(is);
+        while (scanner.hasNextLine()) {
+            String line = scanner.nextLine();
+            if (line.startsWith("event: endpoint")) {
+                String dataLine = scanner.nextLine();
+                if (dataLine.startsWith("data:")) {
+                    String endpoint = dataLine.substring(5).trim();
+                    session.endpoint = endpoint;
+                    // extract sessionId from endpoint param
+                    int idx = endpoint.indexOf("sessionId=");
+                    if (idx != -1) {
+                        session.sessionId = endpoint.substring(idx + 10);
+                    }
+                    break;
+                }
+            }
+        }
+        // Keep the stream open for later reading
+        session.messages = Collections.synchronizedList(new ArrayList<>());
+        new Thread(() -> {
+            try {
+                while (scanner.hasNextLine()) {
+                    String line = scanner.nextLine();
+                    if (line.startsWith("event: message")) {
+                        String dataLine = scanner.nextLine();
+                        if (dataLine.startsWith("data:")) {
+                            String data = dataLine.substring(5).trim();
+                            session.messages.add(data);
+                        }
+                    }
+                }
+            } catch (Exception ignored) {}
+        }).start();
+        return session;
+    }
+
+    private static String waitForMatchingSseMessage(SseSession session, String id, long timeoutMs) throws Exception {
+        long start = System.currentTimeMillis();
+        while (System.currentTimeMillis() - start < timeoutMs) {
+            synchronized (session.messages) {
+                Iterator<String> it = session.messages.iterator();
+                while (it.hasNext()) {
+                    String msg = it.next();
+                    try {
+                        JsonNode node = objectMapper.readTree(msg);
+                        if (node.has("id") && node.get("id").asText().equals(id)) {
+                            return msg;
+                        }
+                    } catch (Exception ignored) {}
+                }
+            }
+            Thread.sleep(100);
+        }
+        throw new Exception("Timeout waiting for SSE message with id=" + id);
+    }
+
+    public static OriginalHttpResponse sendRequestWithSse(OriginalHttpRequest request, boolean followRedirects, TestingRunConfig testingRunConfig, boolean debug, List<TestingRunResult.TestLog> testLogs, boolean skipSSRFCheck) throws Exception {
+        // Always use prepareUrl to get the absolute URL
+        String url = prepareUrl(request, testingRunConfig);
+        URI uri = new URI(url);
+        if (uri.getScheme() == null || uri.getHost() == null) {
+            throw new IllegalArgumentException("URL must be absolute with scheme and host for SSE: " + url);
+        }
+        String host = uri.getScheme() + "://" + uri.getHost() + (uri.getPort() != -1 ? ":" + uri.getPort() : "");
+        SseSession session = openSseSession(host, debug);
+        if (session.sessionId == null) throw new Exception("No sessionId from SSE endpoint");
+
+        // Add sessionId as query param to actual request
+        String endpoint = session.endpoint;
+        if (!endpoint.startsWith("/")) endpoint = "/" + endpoint;
+        String newUrl = host + endpoint;
+        request.setUrl(newUrl);
+
+        // Send actual request
+        OriginalHttpResponse resp = sendRequest(request, followRedirects, testingRunConfig, debug, testLogs, skipSSRFCheck);
+
+        // Wait for matching SSE message
+        String body = request.getBody();
+        JsonNode node = objectMapper.readTree(body);
+        String id = node.get("id").asText();
+        String sseMsg = null;
+        try {
+            sseMsg = waitForMatchingSseMessage(session, id, 10000); // 10s timeout
+        } finally {
+            if (session.response != null) {
+                session.response.close(); // Always close the SSE connection
+            }
+        }
+
+        // Return SSE message as JSON (not as a string)
+        JsonNode sseJson = objectMapper.readTree(sseMsg);
+        String jsonBody = objectMapper.writeValueAsString(sseJson);
+        return new OriginalHttpResponse(jsonBody, resp.getHeaders(), resp.getStatusCode());
     }
 }

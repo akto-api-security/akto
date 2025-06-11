@@ -1,6 +1,5 @@
 package com.akto.utils;
 
-import com.akto.action.ExportSampleDataAction;
 import com.akto.dao.ThirdPartyAccessDao;
 import com.akto.dao.TrafficInfoDao;
 import com.akto.dao.context.Context;
@@ -12,13 +11,11 @@ import com.akto.dao.SampleDataDao;
 import com.akto.dao.SensitiveParamInfoDao;
 import com.akto.dao.SensitiveSampleDataDao;
 import com.akto.dao.SingleTypeInfoDao;
-import com.akto.dao.test_editor.TestingRunPlaygroundDao;
 import com.akto.dto.AccountSettings;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.dependency_flow.DependencyFlow;
-import com.akto.dto.test_editor.TestingRunPlayground;
 import com.akto.dto.testing.*;
 import com.akto.dto.third_party_access.Credential;
 import com.akto.dto.third_party_access.PostmanCredential;
@@ -39,12 +36,9 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.google.gson.Gson;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
-import com.mongodb.client.result.InsertOneResult;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
-import org.bson.types.ObjectId;
-
 import java.io.File;
 import java.net.MalformedURLException;
 import java.net.URISyntaxException;
@@ -52,7 +46,6 @@ import java.net.URL;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-
 import javax.servlet.http.HttpServletRequest;
 
 import static com.akto.dto.RawApi.convertHeaders;
@@ -272,43 +265,7 @@ public class Utils {
                         if (StringUtils.isEmpty(miniTestingName)) {
                             res = ApiExecutor.sendRequest(originalHttpRequest, true, null, false, new ArrayList<>());
                         } else {
-                            TestingRunPlayground testingRunPlayground = new TestingRunPlayground();
-                            testingRunPlayground.setState(TestingRun.State.SCHEDULED);
-                            testingRunPlayground.setCreatedAt(Context.now());
-                            testingRunPlayground.setTestingRunPlaygroundType(TestingRunPlayground.TestingRunPlaygroundType.POSTMAN_IMPORTS);
-                            testingRunPlayground.setOriginalHttpRequest(originalHttpRequest);
-                            InsertOneResult insertOne = TestingRunPlaygroundDao.instance.insertOne(testingRunPlayground);
-                            if (insertOne.wasAcknowledged()) {
-                                String testingRunPlaygroundHexId = Objects.requireNonNull(insertOne.getInsertedId()).asObjectId().getValue().toHexString();
-                                int startTime = Context.now();
-                                int timeout = 5 * 60; // 5 minutes
-                                
-                                TestingRunPlayground currentState = null;
-                                while (Context.now() - startTime <= timeout) {
-                                    currentState = TestingRunPlaygroundDao.instance.findOne(
-                                        Filters.eq("_id", new ObjectId(testingRunPlaygroundHexId))
-                                    );
-                                    
-                                    if (currentState == null || 
-                                        currentState.getState() == TestingRun.State.COMPLETED || 
-                                        currentState.getState() == TestingRun.State.FAILED) {
-                                        break;
-                                    }
-                                    
-                                    try {
-                                        Thread.sleep(1000);
-                                    } catch (InterruptedException e) {
-                                        Thread.currentThread().interrupt();
-                                        break;
-                                    }
-                                }
-                                
-                                res = (currentState != null && (currentState.getState() != TestingRun.State.FAILED
-                                        || currentState.getState() != TestingRun.State.SCHEDULED)) ?
-                                    currentState.getOriginalHttpResponse() : new OriginalHttpResponse();
-                            } else {
-                                res = new OriginalHttpResponse();
-                            }
+                            res = com.akto.testing.Utils.runRequestOnHybridTesting(originalHttpRequest);
                         }
                         responseHeadersString = convertHeaders(res.getHeaders());
                         responsePayload =  res.getBody();

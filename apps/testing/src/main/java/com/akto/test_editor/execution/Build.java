@@ -1,19 +1,25 @@
 package com.akto.test_editor.execution;
 
+import com.akto.dao.AccountsDao;
 import com.akto.dao.DependencyFlowNodesDao;
 import com.akto.dao.SampleDataDao;
 import com.akto.dao.context.Context;
+import com.akto.dao.monitoring.ModuleInfoDao;
+import com.akto.dto.Account;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.RawApi;
 import com.akto.dto.dependency_flow.*;
+import com.akto.dto.monitoring.ModuleInfo;
 import com.akto.dto.testing.TestingRunConfig;
 import com.akto.dto.traffic.Key;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.URLMethods;
 import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import com.akto.testing.ApiExecutor;
+import com.akto.testing.Utils;
 import com.akto.util.Constants;
 import com.akto.util.HttpRequestResponseUtils;
 import com.akto.util.JSONUtils;
@@ -22,6 +28,7 @@ import com.akto.util.modifier.SetValueModifier;
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Sorts;
 import joptsimple.internal.Strings;
 import org.bson.conversions.Bson;
 import java.net.URI;
@@ -35,7 +42,7 @@ public class Build {
 
     private Map<Integer, ReverseNode> parentToChildMap = new HashMap<>();
 
-    private static final LoggerMaker loggerMaker = new LoggerMaker(Build.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(Build.class, LogDb.DASHBOARD);
 
     public static void buildParentToChildMap(Collection<Node> nodes, Map<Integer, ReverseNode> parentToChildMap) {
         for (Node node: nodes) {
@@ -188,10 +195,34 @@ public class Build {
                 OriginalHttpRequest originalRequest = request.copy();
 
                 TestingRunConfig testingRunConfig = new TestingRunConfig(0, new HashMap<>(), new ArrayList<>(), null,newHost, null);
+                // in case it is being executed on a mini testing module, we need to set the url
+                try {
+                    if (newHost != null) {
+                        String url = ApiExecutor.prepareUrl(request, testingRunConfig);
+                        request.setUrl(url);
+                    }
+                } catch (Exception e) {
+                    loggerMaker.errorAndAddToDb(e, "Error while preparing url for " + id.getUrl());
+                }
 
                 OriginalHttpResponse response = null;
                 try {
-                    response = ApiExecutor.sendRequest(request,false, testingRunConfig, false, new ArrayList<>());
+                    Account account = AccountsDao.instance.findOne(Filters.eq(Constants.ID, Context.accountId.get()));
+                    if (account != null && account.getHybridTestingEnabled()) {
+                        ModuleInfo moduleInfo = ModuleInfoDao.instance.getMCollection()
+                                .find(Filters.eq(ModuleInfo.MODULE_TYPE, ModuleInfo.ModuleType.MINI_TESTING))
+                                .sort(Sorts.descending(ModuleInfo.LAST_HEARTBEAT_RECEIVED)).limit(1).first();
+                        if (moduleInfo != null) {
+                            String version = moduleInfo.getCurrentVersion().split(" - ")[0];
+                            if (Utils.compareVersions("1.44.9", version) <= 0) { // latest version
+                                response = Utils.runRequestOnHybridTesting(request);
+                            }
+                        }
+                    }
+                    if (response == null) {
+                        response = ApiExecutor.sendRequest(request,false, testingRunConfig, false, new ArrayList<>());
+                    }
+
                     apisReplayedSet.add(new ApiInfo.ApiInfoKey(id.getApiCollectionId(), id.getUrl(), id.getMethod()));
                     request.getHeaders().remove(Constants.AKTO_IGNORE_FLAG);
                     ReverseNode parentToChildNode = parentToChildMap.get(Objects.hash(id.getApiCollectionId()+"", id.getUrl(), id.getMethod().name()));
@@ -217,10 +248,10 @@ public class Build {
                     );
                     runResults.add(runResult);
                 } catch (Exception e) {
-                    loggerMaker.errorAndAddToDb(e, "error while sending request in invoke dependency graph" + id.getUrl(), LoggerMaker.LogDb.DASHBOARD);
+                    loggerMaker.errorAndAddToDb(e, "error while sending request in invoke dependency graph: " + id.getUrl());
                 }
             } catch (Exception e) {
-                loggerMaker.errorAndAddToDb(e, "error while running runPerLevel for " + id.getUrl(), LoggerMaker.LogDb.DASHBOARD);
+                loggerMaker.errorAndAddToDb(e, "error while running runPerLevel for " + id.getUrl());
             }
 
         }
@@ -250,6 +281,23 @@ public class Build {
             }
         } catch (Exception ignored) {
         }
+
+        try {
+            String url = request.getUrl();
+            URI uri = new URI(url);
+            String currentHost = uri.getHost();
+            ModifyHostDetail modifyHostDetail = modifyHostDetailMap.get(currentHost);
+                        String newHost = modifyHostDetail.getNewHost();
+            if (newHost == null) return null;
+            if (newHost.startsWith("http")) {
+                return newHost;
+            } else {
+                return  uri.getScheme() + "://" + newHost;
+            }
+        } catch (Exception ignored) {
+
+        }
+
         return null;
     }
 
@@ -289,7 +337,7 @@ public class Build {
                 loggerMaker.debugAndAddToDb("Finished running level " + level, LoggerMaker.LogDb.DASHBOARD);
             } catch (Exception e) {
                 e.printStackTrace();
-                loggerMaker.errorAndAddToDb(e, "Error while running for level " + level , LoggerMaker.LogDb.DASHBOARD);
+                loggerMaker.errorAndAddToDb(e, "Error while running for level " + level);
             }
         }
 

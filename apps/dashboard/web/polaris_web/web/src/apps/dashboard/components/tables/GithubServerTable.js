@@ -22,11 +22,13 @@ import tableFunc from './transform';
 import useTable from './TableContext';
 import { debounce } from 'lodash';
 
-import { useSearchParams } from 'react-router-dom';
+import { useNavigate,  useSearchParams } from 'react-router-dom';
 import TableStore from './TableStore';
 import func from '../../../../util/func';
 
 function GithubServerTable(props) {
+
+  const navigate = useNavigate();
 
   const [searchParams, setSearchParams] = useSearchParams();
   const updateQueryParams = (key, value) => {
@@ -164,9 +166,9 @@ function GithubServerTable(props) {
         ...tableSelectedMap,
         [window.location.pathname]: id
       })
-      const primitivePath = window.location.origin + window.location.pathname + window.location?.search
+      const primitivePath = window.location.pathname + window.location?.search
       const newUrl = primitivePath + "#" +  tableTabs[x].id
-      window.history.replaceState(null, null, newUrl)
+      navigate(newUrl, { replace: true });
     }
     let val = total
     if(total instanceof Object){

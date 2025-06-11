@@ -251,11 +251,11 @@ export default {
         return resp
     },
 
-    async getCountsMap(startTimestamp, endTimestamp){
+    async getCountsMap(startTimestamp, endTimestamp, filters){
         return await request({
             url: '/api/getAllTestsCountMap',
             method: 'post',
-            data: {startTimestamp, endTimestamp}
+            data: {startTimestamp, endTimestamp, filters}
         })
     },
 

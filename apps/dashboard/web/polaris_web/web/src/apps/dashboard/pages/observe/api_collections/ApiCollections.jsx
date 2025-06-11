@@ -202,7 +202,7 @@ const convertToNewData = (collectionsArr, sensitiveInfoMap, severityInfoMap, cov
         }
         return{
             ...c,
-            envType: c?.envType?.map((type) => type?.value),
+            envType: c?.envType?.map((type) => type?.keyName?.slice(0, 30) + '=' + type?.value),
             displayNameComp: (<Box maxWidth="20vw"><TooltipText tooltip={c.displayName} text={c.displayName} textProps={{fontWeight: 'medium'}}/></Box>),
             testedEndpoints: c.urlsCount === 0 ? 0 : (coverageMap[c.id] ? coverageMap[c.id] : 0),
             sensitiveInRespTypes: sensitiveInfoMap[c.id] ? sensitiveInfoMap[c.id] : [],
@@ -219,7 +219,10 @@ const convertToNewData = (collectionsArr, sensitiveInfoMap, severityInfoMap, cov
     return { prettify: prettifyData, normal: newData }
 }
 
-function ApiCollections() {
+function ApiCollections(props) {
+
+    const {customCollectionDataFilter, onlyShowCollectionsTable, sendData} = props;
+
     const userRole = window.USER_ROLE
 
     const navigate = useNavigate();
@@ -305,6 +308,11 @@ function ApiCollections() {
         setLoading(true)
         const apiCollectionsResp = await api.getAllCollectionsBasic();
         setLoading(false)
+
+        if(customCollectionDataFilter){
+            apiCollectionsResp.apiCollections = (apiCollectionsResp.apiCollections || []).filter(customCollectionDataFilter)
+        }
+
         let hasUserEndpoints = await api.getUserEndpoints()
         setHasUsageEndpoints(hasUserEndpoints)
         let tmp = (apiCollectionsResp.apiCollections || []).map(convertToCollectionData)
@@ -689,7 +697,7 @@ function ApiCollections() {
         let copyObj = data;
         Object.keys(copyObj).forEach((key) => {
             data[key].length > 0 && data[key].forEach((c) => {
-                const list = dataMap[c?.id]?.map((data) => data?.value);
+                const list = dataMap[c?.id]?.map((data) => data?.keyName?.slice(0, 30) + '=' + data?.value);
                 c['envType'] = list
                 c['envTypeComp'] = transform.getCollectionTypeList(list)
             })
@@ -890,6 +898,15 @@ function ApiCollections() {
     )
 
     const components = loading ? [<SpinnerCentered key={"loading"}/>]: [<SummaryCardInfo summaryItems={summaryItems} key="summary"/>, (!hasUsageEndpoints ? <CollectionsPageBanner key="page-banner" /> : null) ,modalComponent, tableComponent]
+
+    if(onlyShowCollectionsTable){
+        sendData(data)
+        return (
+            <Box paddingBlockStart={4} paddingInline={4}>
+                {tableComponent}
+            </Box>
+        )
+    }
 
     return(
         <PageWithMultipleCards

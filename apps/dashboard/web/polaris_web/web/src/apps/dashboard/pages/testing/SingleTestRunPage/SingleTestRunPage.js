@@ -726,7 +726,7 @@ function SingleTestRunPage() {
 
 
   const components = [
-    runningTestsComp, <TrendChart key={tempLoading.running} hexId={hexId} setSummary={setSummary} show={selectedTestRun.run_type && selectedTestRun.run_type !== 'One-time'} totalVulnerabilities={tableCountObj.vulnerable} />,
+    runningTestsComp, <TrendChart key={tempLoading.running} hexId={hexId} setSummary={setSummary} show={true} totalVulnerabilities={tableCountObj.vulnerable} />,
     metadataComponent(), loading ? <SpinnerCentered key="loading" /> : (!workflowTest ? resultTable : workflowTestBuilder)];
 
   const openVulnerabilityReport = async () => {
@@ -903,7 +903,6 @@ function SingleTestRunPage() {
     <>
       <PageWithMultipleCards
         title={headingComp}
-        backUrl={`/dashboard/testing/`}
         primaryAction={!workflowTest ? <Box paddingInlineEnd={1}><Button primary onClick={() =>
           func.downloadAsCSV((testRunResultsText[selectedTab]), selectedTestRun)
         }>Export results</Button></Box> : undefined}

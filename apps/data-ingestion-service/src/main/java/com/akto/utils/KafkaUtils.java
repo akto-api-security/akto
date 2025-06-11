@@ -1,10 +1,6 @@
 package com.akto.utils;
 
-import com.akto.action.IngestionAction;
 import com.akto.log.LoggerMaker;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import com.akto.dao.context.Context;
 import com.akto.dto.IngestDataBatch;
 import com.akto.kafka.Kafka;
@@ -16,15 +12,15 @@ public class KafkaUtils {
     private static Kafka kafkaProducer;
 
     public void initKafkaProducer() {
-        String kafkaBrokerUrl = System.getenv("AKTO_KAFKA_BROKER_URL");
-        int batchSize = Integer.parseInt(System.getenv("AKTO_KAFKA_PRODUCER_BATCH_SIZE"));
-        int kafkaLingerMS = Integer.parseInt(System.getenv("AKTO_KAFKA_PRODUCER_LINGER_MS"));
+        String kafkaBrokerUrl = System.getenv().getOrDefault("AKTO_KAFKA_BROKER_URL", "localhost:29092");
+        int batchSize = Integer.parseInt(System.getenv().getOrDefault("AKTO_KAFKA_PRODUCER_BATCH_SIZE", "100"));
+        int kafkaLingerMS = Integer.parseInt(System.getenv().getOrDefault("AKTO_KAFKA_PRODUCER_LINGER_MS", "10"));
         kafkaProducer = new Kafka(kafkaBrokerUrl, kafkaLingerMS, batchSize, LoggerMaker.LogDb.DATA_INGESTION);
         logger.infoAndAddToDb("Kafka Producer Init " + Context.now(), LoggerMaker.LogDb.DATA_INGESTION);
     }
 
     public static void insertData(IngestDataBatch payload) {
-        String topicName = System.getenv("AKTO_KAFKA_TOPIC_NAME");
+        String topicName = System.getenv().getOrDefault("AKTO_KAFKA_TOPIC_NAME", "akto.api.logs");
         BasicDBObject obj = new BasicDBObject();
         obj.put("path", payload.getPath());
         obj.put("requestHeaders", payload.getRequestHeaders());
@@ -33,6 +29,7 @@ public class KafkaUtils {
         obj.put("requestPayload", payload.getRequestPayload());
         obj.put("responsePayload", payload.getResponsePayload());
         obj.put("ip", payload.getIp());
+        obj.put("destIp", payload.getDestIp());
         obj.put("time", payload.getTime());
         obj.put("statusCode", payload.getStatusCode());
         obj.put("type", payload.getType());
@@ -41,6 +38,11 @@ public class KafkaUtils {
         obj.put("akto_vxlan_id", payload.getAkto_vxlan_id());
         obj.put("is_pending", payload.getIs_pending());
         obj.put("source", payload.getSource());
+        obj.put("direction", payload.getDirection());
+        obj.put("process_id", payload.getProcess_id());
+        obj.put("socket_id", payload.getSocket_id());
+        obj.put("daemonset_id", payload.getDaemonset_id());
+        obj.put("enabled_graph", payload.getEnabled_graph());
         kafkaProducer.send(obj.toString(), topicName);
     }
 

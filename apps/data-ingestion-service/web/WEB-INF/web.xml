@@ -6,6 +6,16 @@
     <display-name>data-ingestion-service</display-name>
 
     <filter>
+        <filter-name>AuthFilter</filter-name>
+        <filter-class>com.akto.filters.AuthFilter</filter-class>
+    </filter>
+
+    <filter-mapping>
+        <filter-name>AuthFilter</filter-name>
+        <url-pattern>/api/*</url-pattern>
+    </filter-mapping>
+
+    <filter>
         <filter-name>struts2</filter-name>
         <filter-class>org.apache.struts2.dispatcher.filter.StrutsPrepareAndExecuteFilter</filter-class>
     </filter>

@@ -1,6 +1,7 @@
 package com.akto.testing;
 
 import com.akto.MongoBasedTest;
+import com.akto.crons.GetRunningTestsStatus;
 import com.akto.dao.SampleDataDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.ApiInfo;
@@ -23,8 +24,15 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 public class TestExecutorTest extends MongoBasedTest {
 
@@ -122,4 +130,48 @@ public class TestExecutorTest extends MongoBasedTest {
         assertEquals(true, result);
         assertEquals("http://example.com/testMethod", apiInfoKey.getUrl());
     }
+
+    @Test
+    public void testNoInfiniteLoopWhenTestsFinish() throws Exception {
+        // Setup inputs
+        AtomicInteger totalTestsToBeExecuted = new AtomicInteger(0);
+        int totalTestsToBeExecutedCount = 10;
+        long maxRunTime = 60 * 1000; // 1 min max wait
+
+        CountDownLatch latch = new CountDownLatch(1);
+
+        AtomicInteger tempVal = new AtomicInteger(1);
+
+        // Set up the thread to simulate the actual logic
+        Thread thread = new Thread(() -> {
+            try {
+                int waitTs = Context.now();
+                int prevCalcTime = Context.now();
+                int lastCheckedCount = 0;
+                tempVal.set(2);
+                while (latch.getCount() > 0 && (Context.now() - waitTs < maxRunTime)) {
+                    tempVal.set(3);
+                    if (lastCheckedCount != totalTestsToBeExecuted.get()) {
+                        lastCheckedCount = totalTestsToBeExecuted.get();
+                        prevCalcTime = Context.now();
+                    } else {
+                        int relaxingTime = Utils.getRelaxingTimeForTests(totalTestsToBeExecuted, totalTestsToBeExecutedCount);
+                        if (relaxingTime == 0 || (Context.now() - prevCalcTime > relaxingTime)) {
+                            break;
+                        }
+                    }
+                    Thread.sleep(100); // shorter sleep for faster test
+                }
+            } catch (InterruptedException e) {
+                fail("Thread interrupted unexpectedly");
+            }
+        });
+
+        thread.start();
+        thread.join(); // wait for the loop to finish
+
+        // If the test reaches this point without timeout, it's a pass
+        assertEquals(3, tempVal.get());
+    }
 }
+

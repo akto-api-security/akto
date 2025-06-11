@@ -301,7 +301,6 @@ public class TeamAction extends UserAction implements ServletResponseAware, Serv
         if(isIssuer || isAdmin) {
             Bson filters = Filters.and(
                     Filters.eq(PendingInviteCode.ACCOUNT_ID, Context.accountId.get()),
-                    Filters.eq(PendingInviteCode._ISSUER, sUser.getId()),
                     Filters.eq(PendingInviteCode.INVITEE_EMAIL_ID, email)
             );
             PendingInviteCodesDao.instance.getMCollection().deleteOne(filters);
