@@ -2175,6 +2175,9 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
       return filtered[0]
     }
     return defaultLabel
+  },
+  formatCollectionType(type) {
+    return (type?.keyName?.slice(0, 30) ?? '') + '=' + (type?.value?.slice(0, 30) ?? '')
   }
 }
 
