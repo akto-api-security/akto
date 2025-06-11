@@ -413,7 +413,7 @@ public class TestExecutor {
             try {
                 message = clientLayer.fetchLatestSample(apiInfoKey);
                 if (!message.contains("requestPayload") && privateKey != null) {
-                    message = PayloadEncodeUtil.decodePayload(message, privateKey);
+                    message = PayloadEncodeUtil.decryptPacked(message, privateKey);
                 }
             } catch (JWTVerificationException e) {
                 loggerMaker.errorAndAddToDb(e, "Error while decoding encoded payload in findOriginalHttpRequest: " + e.getMessage(), LogDb.TESTING);
@@ -827,7 +827,7 @@ public class TestExecutor {
                 try {
                     msg = clientLayer.fetchLatestSample(apiInfoKey);
                     if (!msg.contains("requestPayload") && privateKey != null) {
-                        msg = PayloadEncodeUtil.decodePayload(msg, privateKey);
+                        msg = PayloadEncodeUtil.decryptPacked(msg, privateKey);
                     }
                 } catch (JWTVerificationException e) {
                     loggerMaker.errorAndAddToDb(e, "Error while decoding encoded payload in runTestNew: " + e.getMessage(), LogDb.TESTING);
