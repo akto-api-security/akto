@@ -14,6 +14,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -734,6 +735,25 @@ public class Utils {
 
     public static boolean isStatusGood(int statusCode) {
         return statusCode >= 200 && statusCode < 300 && statusCode != 250;
+    }
+
+    public static int getRelaxingTimeForTests(AtomicInteger totalTestsToBeExecuted, int totalTestsToBeExecutedCount){
+        AtomicInteger testsLeft = new AtomicInteger(Math.max(totalTestsToBeExecuted.get(), 0));
+        double percentageTestsCompleted = (1 - ((testsLeft.get() * 1.0) / totalTestsToBeExecutedCount))* 100.0;
+        int relaxingTime = 20 * 60;
+        if(percentageTestsCompleted == 100.0){
+            return 0;
+        }
+        if(percentageTestsCompleted > 95.0){
+            relaxingTime = 60;
+        }else if(percentageTestsCompleted > 90.0){
+            relaxingTime = 2 * 60;
+        }else if(percentageTestsCompleted > 75.0){
+            relaxingTime = 10 * 60;
+        }else if(percentageTestsCompleted > 50.0){
+            relaxingTime = 15 * 60;
+        }
+        return relaxingTime;
     }
 
 }

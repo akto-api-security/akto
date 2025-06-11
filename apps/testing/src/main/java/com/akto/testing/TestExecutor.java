@@ -421,26 +421,15 @@ public class TestExecutor {
                                 lastCheckedCount = totalTestsToBeExecuted.get();
                                 prevCalcTime = Context.now();
                             }else{
-                                AtomicInteger testsLeft = new AtomicInteger(Math.max(totalTestsToBeExecuted.get(), 0));
-                                double percentageTestsCompleted = (1 - ((testsLeft.get() * 1.0) / totalTestsToBeExecutedCount))* 100.0;
-                                int relaxingTime = 20 * 60;
-                                if(percentageTestsCompleted == 100.0){
-                                    loggerMaker.debugInfoAddToDb("All tests have been executed, stopping the test run", LogDb.TESTING);
+                                int relaxingTime = Utils.getRelaxingTimeForTests(totalTestsToBeExecuted, totalTestsToBeExecutedCount);
+                                if(relaxingTime == 0){
+                                    loggerMaker.info("Successfully completed all tests.");
                                     break;
                                 }
-                                if(percentageTestsCompleted > 95.0){
-                                    relaxingTime = 60;
-                                }else if(percentageTestsCompleted > 90.0){
-                                    relaxingTime = 2 * 60;
-                                }else if(percentageTestsCompleted > 75.0){
-                                    relaxingTime = 10 * 60;
-                                }else if(percentageTestsCompleted > 50.0){
-                                    relaxingTime = 15 * 60;
-                                }
-                                if((Context.now() - prevCalcTime) > relaxingTime){
-                                    loggerMaker.debugInfoAddToDb("No new tests are being executed in the last 20 minutes, stopping the test run", LogDb.TESTING);
+                                if(Context.now() - prevCalcTime > relaxingTime){
+                                    loggerMaker.infoAndAddToDb("Relaxing time reached => " + relaxingTime + " minutes, stopping tests with count left: " + totalTestsToBeExecuted.get());
                                     break;
-                                }
+                                }                               
                             }
 
                             Thread.sleep(2000);
