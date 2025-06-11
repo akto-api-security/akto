@@ -48,8 +48,8 @@ public class ConditionalGraphExecutor extends GraphExecutor {
         try {
             int waitInSeconds = node.getWaitInSeconds();
             if (waitInSeconds > 0) {
-                if (waitInSeconds > 60) {
-                    waitInSeconds = 60;
+                if (waitInSeconds > 100) {
+                    waitInSeconds = 100;
                 }
                 logger.info("encountered sleep command in node " + node.getId() + " sleeping for " + waitInSeconds + " seconds");
                 Thread.sleep(waitInSeconds * 1000);
