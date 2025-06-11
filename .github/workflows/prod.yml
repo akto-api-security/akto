@@ -307,22 +307,28 @@ jobs:
         with:
           command: quickview, recommendations
           image: aktosecurity/akto-threat-detection:${{ github.event.inputs.release_version_threat }}
-          sarif-file: threat-detection.sarif
+          sarif-file: scout-reports/threat-detection.sarif
           only-severities: critical,high
           summary: true
         continue-on-error: true
 
-      - name: Upload SARIF to GitHub Security (Threat Detection)
+      - name: Analyze for critical and high CVEs (Threat Detection)
         if: ${{ github.event.inputs.threat_detection == 'true' }}
-        uses: github/codeql-action/upload-sarif@v3
+        uses: docker/scout-action@v1
         with:
-          sarif_file: threat-detection.sarif
+          command: quickview, recommendations
+          image: aktosecurity/akto-threat-detection:${{ github.event.inputs.release_version_threat }}
+          sarif-file: scout-reports/threat-detection-v2.sarif
+          only-severities: critical,high
+          summary: true
+        continue-on-error: true
+
 
       - name: Upload SARIF file as artifact
         if: ${{ github.event.inputs.threat_detection == 'true' }}
         uses: actions/upload-artifact@v4
         with:
-          name: docker-scout-sarif
-          path: threat-detection.sarif
+          name: docker-scout-cve-reports
+          path: scout-reports/
 
 
