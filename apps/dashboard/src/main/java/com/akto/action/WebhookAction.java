@@ -60,7 +60,7 @@ public class WebhookAction extends UserAction implements ServletRequestAware{
 
     private int customWebhookId;
 
-    private static final int PENDING_TESTS_ALERTS_JOB_RECURRING_INTERVAL_SECONDS = 120;
+    private static final int PENDING_TESTS_ALERTS_JOB_RECURRING_INTERVAL_SECONDS = 900; // 15 minutes
 
     public String fetchCustomWebhooks() {
         if (customWebhookId == 0) {
