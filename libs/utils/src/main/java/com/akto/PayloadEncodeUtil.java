@@ -91,29 +91,6 @@ public class PayloadEncodeUtil {
         }
     }
 
-    public static String encodePayload(String payload, RSAPublicKey publicKey) throws Exception {
-        try {
-            Cipher cipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");
-            cipher.init(Cipher.ENCRYPT_MODE, publicKey);
-            byte[] encryptedBytes = cipher.doFinal(payload.getBytes("UTF-8"));
-            return Base64.getEncoder().encodeToString(encryptedBytes);
-        } catch (Exception e) {
-            throw new Exception("Error encoding payload with public key", e);
-        }
-    }
-
-    public static String decodePayload(String payload, RSAPrivateKey privateKey) throws Exception {
-        try {
-            Cipher cipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");
-            cipher.init(Cipher.DECRYPT_MODE, privateKey);
-            byte[] decodedBytes = cipher.doFinal(Base64.getDecoder().decode(payload));
-            return new String(decodedBytes, "UTF-8");
-        } catch (Exception e) {
-            throw new Exception("Error decoding payload with private key", e);
-        }
-    }
-
-
     public static String encryptAndPack(String payload, RSAPublicKey rsaPublicKey) throws Exception {
         // Generate AES key
         KeyGenerator keyGen = KeyGenerator.getInstance("AES");
