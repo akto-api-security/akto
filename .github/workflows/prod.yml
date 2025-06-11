@@ -318,3 +318,11 @@ jobs:
         with:
           sarif_file: threat-detection.sarif
 
+      - name: Upload SARIF file as artifact
+        if: ${{ github.event.inputs.threat_detection == 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: docker-scout-sarif
+          path: scout-reports/threat-detection.sarif
+
+
