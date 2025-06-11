@@ -31,11 +31,11 @@ import com.akto.store.TestingUtil;
 import com.akto.test_editor.filter.Filter;
 import com.akto.test_editor.filter.data_operands_impl.ValidationResult;
 import com.akto.testing.StatusCodeAnalyser;
+import com.akto.testing.Utils;
 import com.akto.types.CappedSet;
 import com.akto.util.JSONUtils;
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.google.gson.Gson;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import java.util.ArrayList;
@@ -55,7 +55,6 @@ public abstract class TestPlugin {
     static ObjectMapper mapper = new ObjectMapper();
     static JsonFactory factory = mapper.getFactory();
     static final LoggerMaker loggerMaker = new LoggerMaker(TestPlugin.class, LogDb.TESTING);
-    private static final Gson gson = new Gson();
 
     public abstract Result  start(ApiInfoKey apiInfoKey, TestingUtil testingUtil, TestingRunConfig testingRunConfig);
 
@@ -64,7 +63,7 @@ public abstract class TestPlugin {
 
     public static boolean isStatusGood(int statusCode) {
         // TODO: 250 status code is for a client. To be verified later.
-        return statusCode >= 200 && statusCode < 300 && statusCode != 250;
+        return Utils.isStatusGood(statusCode);
     }
 
     public static void extractAllValuesFromPayload(String payload, Map<String,Set<String>> payloadMap) throws Exception{

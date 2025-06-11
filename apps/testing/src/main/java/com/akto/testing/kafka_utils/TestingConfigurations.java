@@ -1,10 +1,13 @@
 package com.akto.testing.kafka_utils;
 
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 import com.akto.dto.ApiInfo;
+import com.akto.dto.ApiInfo.ApiInfoKey;
+import com.akto.dto.RawApi;
 import com.akto.dto.test_editor.TestConfig;
 import com.akto.dto.testing.TestingRunConfig;
 import com.akto.dto.testing.TestingRunResult;
@@ -22,6 +25,7 @@ public class TestingConfigurations {
     private List<TestingRunResult> testingRunResultList;
     private TestingRunResultSummary rerunTestingRunResultSummary;
     Map<String, TestConfig> testConfigMap;
+    private  Map<ApiInfoKey, RawApi> rawApiMap = new HashMap<>();
 
     private TestingConfigurations() {
     }
@@ -87,5 +91,15 @@ public class TestingConfigurations {
 
     public void setRerunTestingRunResultSummary(TestingRunResultSummary rerunTestingRunResultSummary) {
         this.rerunTestingRunResultSummary = rerunTestingRunResultSummary;
+    }
+
+    public void insertRawApi(ApiInfoKey apiInfoKey, RawApi rawApi) {
+        if (rawApi == null || apiInfoKey == null) return;
+        instance.rawApiMap.put(apiInfoKey, rawApi);
+    }
+
+    public RawApi getRawApi(ApiInfoKey apiInfoKey) {
+        if (apiInfoKey == null) return null;
+        return instance.rawApiMap.get(apiInfoKey);
     }
 }

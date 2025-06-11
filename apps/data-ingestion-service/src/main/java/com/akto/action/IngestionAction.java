@@ -14,11 +14,14 @@ import com.akto.utils.KafkaUtils;
 import com.opensymphony.xwork2.Action;
 import com.opensymphony.xwork2.ActionSupport;
 
+@lombok.Getter
+@lombok.Setter
 public class IngestionAction extends ActionSupport {
     List<IngestDataBatch> batchData;
     private static final LoggerMaker loggerMaker = new LoggerMaker(IngestionAction.class, LoggerMaker.LogDb.DATA_INGESTION);
 
     private static int MAX_INFO_PRINT = 500;
+    private boolean success;
 
     private static final int ACCOUNT_ID_TO_ADD_DEFAULT_DATA = getAccountId();
 
@@ -50,11 +53,11 @@ public class IngestionAction extends ActionSupport {
     private static void printLogs(String msg) {
         MAX_INFO_PRINT--;
         if(MAX_INFO_PRINT > 0) {
-            loggerMaker.infoAndAddToDb(msg, LoggerMaker.LogDb.DATA_INGESTION);
+            loggerMaker.warnAndAddToDb(msg);
         }
 
         if(MAX_INFO_PRINT == 0) {
-            loggerMaker.infoAndAddToDb("Info log print limit reached.", LoggerMaker.LogDb.DATA_INGESTION);
+            loggerMaker.warnAndAddToDb("Debug log print limit reached.");
         }
     }
 
@@ -79,6 +82,11 @@ public class IngestionAction extends ActionSupport {
 
     public void setBatchData(List<IngestDataBatch> batchData) {
         this.batchData = batchData;
+    }
+
+    public String healthCheck() {
+        success = true;
+        return Action.SUCCESS.toUpperCase();
     }
     
 }
