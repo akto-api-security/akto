@@ -301,6 +301,9 @@ jobs:
           restore-keys: ${{ runner.os }}-m2
 
       # --- Docker Scout Scan for Threat Detection ---
+      - name: Create reports directory
+        run: mkdir -p scout-reports
+        
       - name: Analyze for critical and high CVEs (Threat Detection)
         if: ${{ github.event.inputs.threat_detection == 'true' }}
         uses: docker/scout-action@v1
