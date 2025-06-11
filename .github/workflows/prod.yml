@@ -305,7 +305,7 @@ jobs:
         if: ${{ github.event.inputs.threat_detection == 'true' }}
         uses: docker/scout-action@v1
         with:
-          command: quickview, recommendations
+          command: cves
           image: aktosecurity/akto-threat-detection:${{ github.event.inputs.release_version_threat }}
           sarif-file: scout-reports/threat-detection.sarif
           only-severities: critical,high
@@ -316,7 +316,7 @@ jobs:
         if: ${{ github.event.inputs.threat_detection == 'true' }}
         uses: docker/scout-action@v1
         with:
-          command: quickview, recommendations
+          command: cves
           image: aktosecurity/akto-threat-detection:${{ github.event.inputs.release_version_threat }}
           sarif-file: scout-reports/threat-detection-v2.sarif
           only-severities: critical,high
