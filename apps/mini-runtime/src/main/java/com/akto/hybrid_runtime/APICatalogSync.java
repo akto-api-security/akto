@@ -1606,7 +1606,11 @@ public class APICatalogSync {
                         int accountId = Context.accountId.get();
                         String piiRedactedSample = RedactSampleData.redactIfRequired(s, false, false);
                         if (publicKey != null) {
-                            piiRedactedSample = PayloadEncodeUtil.encodePayload(piiRedactedSample, publicKey);
+                            try {
+                                piiRedactedSample = PayloadEncodeUtil.encryptAndPack(piiRedactedSample, publicKey);                                
+                            } catch (Exception e) {
+                                loggerMaker.errorAndAddToDb("error encoding payload string " + e.getMessage());
+                            }
                         }
                         SampleDataAlt sampleDataAlt = new SampleDataAlt(uuid, piiRedactedSample, id.getApiCollectionId(),
                                 id.getMethod().name(), id.getUrl(), id.getResponseCode(), now, accountId);

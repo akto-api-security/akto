@@ -11,6 +11,10 @@ import java.security.spec.X509EncodedKeySpec;
 import java.util.Base64;
 
 import javax.crypto.Cipher;
+import javax.crypto.KeyGenerator;
+import javax.crypto.SecretKey;
+import javax.crypto.spec.GCMParameterSpec;
+import javax.crypto.spec.SecretKeySpec;
 
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
@@ -107,6 +111,61 @@ public class PayloadEncodeUtil {
         } catch (Exception e) {
             throw new Exception("Error decoding payload with private key", e);
         }
+    }
+
+
+    public static String encryptAndPack(String payload, RSAPublicKey rsaPublicKey) throws Exception {
+        // Generate AES key
+        KeyGenerator keyGen = KeyGenerator.getInstance("AES");
+        keyGen.init(256);
+        SecretKey aesKey = keyGen.generateKey();
+    
+        // Generate IV
+        byte[] iv = new byte[12];
+        SecureRandom random = new SecureRandom();
+        random.nextBytes(iv);
+    
+        // Encrypt payload with AES
+        Cipher aesCipher = Cipher.getInstance("AES/GCM/NoPadding");
+        GCMParameterSpec spec = new GCMParameterSpec(128, iv);
+        aesCipher.init(Cipher.ENCRYPT_MODE, aesKey, spec);
+        byte[] encryptedPayload = aesCipher.doFinal(payload.getBytes("UTF-8"));
+    
+        // Encrypt AES key with RSA
+        Cipher rsaCipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");
+        rsaCipher.init(Cipher.ENCRYPT_MODE, rsaPublicKey);
+        byte[] encryptedAesKey = rsaCipher.doFinal(aesKey.getEncoded());
+    
+        // Encode all parts to Base64
+        String encKey = Base64.getEncoder().encodeToString(encryptedAesKey);
+        String encIv = Base64.getEncoder().encodeToString(iv);
+        String encData = Base64.getEncoder().encodeToString(encryptedPayload);
+    
+        // Pack as single string
+        return encKey + ":" + encIv + ":" + encData;
+    }
+    
+    public static String decryptPacked(String packed, RSAPrivateKey rsaPrivateKey) throws Exception {
+        String[] parts = packed.split(":");
+        if (parts.length != 3) throw new IllegalArgumentException("Invalid encrypted string format");
+
+        byte[] encryptedAesKey = Base64.getDecoder().decode(parts[0]);
+        byte[] iv = Base64.getDecoder().decode(parts[1]);
+        byte[] encryptedPayload = Base64.getDecoder().decode(parts[2]);
+
+        // Decrypt AES key using RSA
+        Cipher rsaCipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");
+        rsaCipher.init(Cipher.DECRYPT_MODE, rsaPrivateKey);
+        byte[] aesKeyBytes = rsaCipher.doFinal(encryptedAesKey);
+        SecretKeySpec aesKey = new SecretKeySpec(aesKeyBytes, "AES");
+
+        // Decrypt payload using AES
+        Cipher aesCipher = Cipher.getInstance("AES/GCM/NoPadding");
+        GCMParameterSpec spec = new GCMParameterSpec(128, iv);
+        aesCipher.init(Cipher.DECRYPT_MODE, aesKey, spec);
+        byte[] decrypted = aesCipher.doFinal(encryptedPayload);
+
+        return new String(decrypted, "UTF-8");
     }
 
 }
