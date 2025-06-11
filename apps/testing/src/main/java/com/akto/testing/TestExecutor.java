@@ -1017,7 +1017,7 @@ public class TestExecutor {
             long startTime = System.currentTimeMillis();
             TestingRunResult tr =  runTestNew(apiInfoKey, testRunId, testingUtil.getSampleMessageStore(), attackerAuthMechanism, testingUtil.getCustomAuthTypes(), testRunResultSummaryId, testConfig, testingRunConfig, debug, testLogs, rawApi);
             String testSubType = testConfig.getInfo().getSubCategory();
-            loggerMaker.infoAndAddToDb("Test run completed for apiInfoKey: " + apiInfoKey + " testSubType: " + testSubType + " with result: " + tr.isVulnerable() + " in " + (System.currentTimeMillis() - startTime) + "seconds");
+            loggerMaker.infoAndAddToDb("Test run completed for apiInfoKey: " + apiInfoKey + " testSubType: " + testSubType + " with result: " + tr.isVulnerable() + " in " + (System.currentTimeMillis() - startTime) + "ms");
             totalTestsToBeExecuted.decrementAndGet();
             return tr;
     }
