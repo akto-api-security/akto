@@ -303,6 +303,7 @@ jobs:
       # --- Docker Scout Scan for Threat Detection ---
       - name: Run Docker Scout CVE Scan (Threat Detection)
         if: ${{ github.event.inputs.threat_detection == 'true' }}
+        id: scout-threat-detection
         uses: docker/scout-action@v1
         with:
           command: cves
@@ -311,7 +312,6 @@ jobs:
           format: json
         continue-on-error: true
       - name: Save Docker Scout JSON output to file
-        id: scout
         if: ${{ github.event.inputs.threat_detection == 'true' }}
         run: |
           echo '${{ steps.scout.outputs.result }}' > scout-threat-detection-report.json
@@ -319,5 +319,5 @@ jobs:
         if: ${{ github.event.inputs.threat_detection == 'true' }}
         uses: actions/upload-artifact@v4
         with:
-          name: scout-report-threat-detection
+          name: scout-reports/threat-detection
           path: scout-threat-detection-report.json
