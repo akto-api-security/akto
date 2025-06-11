@@ -29,7 +29,7 @@ public class Graph {
             if (node == null) {
                 if (mapNodeIdToWorkflowNodeDetails.get(sourceId) instanceof YamlNodeDetails) {
                     YamlNodeDetails workflowNodeDetails = (YamlNodeDetails) mapNodeIdToWorkflowNodeDetails.get(sourceId);
-                    node = new Node(sourceId, workflowNodeDetails, workflowNodeDetails.getSuccess(), workflowNodeDetails.getFailure());
+                    node = new Node(sourceId, workflowNodeDetails, workflowNodeDetails.getSuccess(), workflowNodeDetails.getFailure(), workflowNodeDetails.getWaitInSeconds());
                 } else {
                     WorkflowNodeDetails workflowNodeDetails = mapNodeIdToWorkflowNodeDetails.get(sourceId);
                     node = new Node(sourceId, workflowNodeDetails);
