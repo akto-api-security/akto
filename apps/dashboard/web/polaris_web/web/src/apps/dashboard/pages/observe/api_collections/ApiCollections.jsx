@@ -281,6 +281,7 @@ function ApiCollections(props) {
     // const allCollections = dummyData.allCollections;
     const setAllCollections = PersistStore(state => state.setAllCollections)
     const setCollectionsMap = PersistStore(state => state.setCollectionsMap)
+    const setTagCollectionsMap = PersistStore(state => state.setTagCollectionsMap)
     const setHostNameMap = PersistStore(state => state.setHostNameMap)
     const setCoverageMap = PersistStore(state => state.setCoverageMap)
 
@@ -460,6 +461,7 @@ function ApiCollections(props) {
         setCollectionsMap(func.mapCollectionIdToName(tmp.filter(x => !x?.deactivated)))
         const allHostNameMap = func.mapCollectionIdToHostName(tmp.filter(x => !x?.deactivated))
         setHostNameMap(allHostNameMap)
+        setTagCollectionsMap(func.mapCollectionIdsToTagName(tmp.filter(x => !x?.deactivated)))
         
         tmp = {}
         tmp.all = dataObj.prettify

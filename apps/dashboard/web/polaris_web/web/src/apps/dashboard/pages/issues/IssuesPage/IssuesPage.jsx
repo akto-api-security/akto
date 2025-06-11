@@ -91,6 +91,12 @@ let filtersOptions = [
                 value:false
             }],
         singleSelect:true
+    },
+    {
+        key: 'tagsId',
+        label: 'Tags',
+        title: 'Tags',
+        choices: [],
     }
 ]
 
@@ -183,6 +189,8 @@ function IssuesPage() {
     const endTimestamp = getTimeEpoch("until")
 
     const hostNameMap = PersistStore.getState().hostNameMap
+    const tagsCollectionsMap = PersistStore.getState().tagCollectionsMap
+
 
     const setToastConfig = Store(state => state.setToastConfig)
     const setToast = (isActive, isError, message) => {
@@ -259,6 +267,13 @@ function IssuesPage() {
     ]
 
     filtersOptions = func.getCollectionFilters(filtersOptions)
+
+    filtersOptions[6].choices = Object.keys(tagsCollectionsMap).map((key) => {
+        return {
+                label: key,
+                value: key
+            }
+        })
 
     const handleSaveJiraAction = () => {
         setToast(true, false, "Please wait while we create your Jira ticket.")
@@ -421,6 +436,8 @@ function IssuesPage() {
             case "collectionIds":
             case "apiCollectionId":
                 return func.convertToDisambiguateLabelObj(value, apiCollectionMap, 2)
+            case "tagsId":
+                return func.convertToDisambiguateLabelObj(value, null, 2)
             case "activeCollections":
                 if(value[0]){
                     return "Active collections only"
@@ -480,6 +497,9 @@ function IssuesPage() {
             filterSubCategory = filterSubCategory.concat(categoryToSubCategories[issue])
         })
         filterSubCategory = [...filterSubCategory, ...filters?.issueName]
+        const selectedTagsCollectionId = filters.tagsId || []
+        const tagCollectionIds = selectedTagsCollectionId.map((tag) => tagsCollectionsMap[tag]).flat()
+        filterCollectionsId = filterCollectionsId.concat(tagCollectionIds)
         const collectionIdsArray = filterCollectionsId.map((x) => {return x.toString()})
 
         let obj = {
@@ -571,6 +591,7 @@ function IssuesPage() {
         let filterCompliance = filters?.compliance || []
         const activeCollections = (filters?.activeCollections !== undefined && filters?.activeCollections.length > 0) ? filters?.activeCollections[0] : initialValForResponseFilter;
         const apiCollectionId = filters?.apiCollectionId || []
+        const tagsId = filters?.tagsId || []
         let filterCollectionsId = (apiCollectionId || []).concat(filters?.collectionIds || [])
         let filterSubCategory = []
         filters?.issueCategory?.forEach((issue) => {
