@@ -98,7 +98,11 @@ public class SampleMessageStore {
                     encodedSamples = clientLayer.fetchSamples(apiInfoKey);
                     for (String sample: encodedSamples) {
                         if (!sample.contains("requestPayload") && privateKey != null) {
-                            samples.add(PayloadEncodeUtil.decodePayload(sample, privateKey));
+                            try {
+                                samples.add(PayloadEncodeUtil.decryptPacked(sample, privateKey));
+                            } catch (Exception e) {
+                                loggerMaker.errorAndAddToDb("error while decoding payload " + e.getMessage());
+                            }
                         } else {
                             samples.add(sample);
                         }
