@@ -301,20 +301,29 @@ jobs:
           restore-keys: ${{ runner.os }}-m2
 
       # --- Docker Scout Scan for Threat Detection ---
-      - name: Run Docker Scout CVE Scan (Threat Detection)
+      - name: Create reports directory
+        run: mkdir -p scout-reports
+
+      - name: Run Docker Scout for Threat Detection
         if: ${{ github.event.inputs.threat_detection == 'true' }}
         uses: docker/scout-action@v1
         with:
           command: cves
           image: aktosecurity/akto-threat-detection:${{ github.event.inputs.release_version_threat }}
-          format: json
-          output: scout-reports/threat-detection.json
+          format: sarif
+          output: scout-reports/threat-detection.sarif
+          summary: true             # optionally add a summary section
+          # only-severities: critical,high
+          # fail-on: high             # optionally fail on threshold
+          # github-token: ${{ secrets.GITHUB_TOKEN }}
         continue-on-error: true
 
-      - name: Upload Docker Scout report (Threat Detection)
+      - name: Verify report file
+        run: ls -lh scout-reports
+
+      - name: Upload all Scout reports
         if: ${{ github.event.inputs.threat_detection == 'true' }}
         uses: actions/upload-artifact@v4
         with:
           name: scout-reports
           path: scout-reports/
-
