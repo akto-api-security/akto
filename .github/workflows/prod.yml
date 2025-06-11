@@ -323,6 +323,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: docker-scout-sarif
-          path: scout-reports/threat-detection.sarif
+          path: threat-detection.sarif
 
 
