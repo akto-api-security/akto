@@ -314,7 +314,7 @@ jobs:
 
       - name: Upload SARIF to GitHub Security (Threat Detection)
         if: ${{ github.event.inputs.threat_detection == 'true' }}
-        uses: github/codeql-action/upload-sarif@v2
+        uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: threat-detection.sarif
 
