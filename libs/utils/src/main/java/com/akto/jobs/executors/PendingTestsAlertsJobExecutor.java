@@ -25,6 +25,7 @@ public class PendingTestsAlertsJobExecutor extends JobExecutor<PendingTestsAlert
 
     private static final LoggerMaker logger = new LoggerMaker(PendingTestsAlertsJobExecutor.class);
     public static final PendingTestsAlertsJobExecutor INSTANCE = new PendingTestsAlertsJobExecutor();
+    public static final int oneHour = 3600; // 1 hour in seconds
 
     public PendingTestsAlertsJobExecutor() {
         super(PendingTestsAlertsJobParams.class);
@@ -36,11 +37,11 @@ public class PendingTestsAlertsJobExecutor extends JobExecutor<PendingTestsAlert
         CustomWebhook webhook = params.getCustomWebhook();
         int lastSyncedAt = params.getLastSyncedAt();
 
-
+        int accountId = Context.accountId.get();
         List<TestingRun> scheduledTests = getScheduledTestsForNextHour();
 
         if(scheduledTests.isEmpty()) {
-            logger.info("No scheduled tests found for the next hour and no last synced time set. Skipping job execution.");
+            logger.info("No scheduled tests found for the next hour for accountId {}. Skipping job execution.", accountId);
             params.setLastSyncedAt(Context.now());
             updateJobParams(job, params);
             return;
@@ -105,8 +106,8 @@ public class PendingTestsAlertsJobExecutor extends JobExecutor<PendingTestsAlert
 
     public List<TestingRun> getScheduledTestsForNextHour() {
         int now = Context.now();
-        int oneHourLater = now + 3600; // 3600 seconds = 1 hour
-        int oneHourBefore = now - 3600;
+        int oneHourLater = now + oneHour; // 3600 seconds = 1 hour
+        int oneHourBefore = now - oneHour;
 
         Bson filter = Filters.and(
                 Filters.eq(TestingRun.STATE, TestingRun.State.SCHEDULED),
