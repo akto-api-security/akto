@@ -202,7 +202,7 @@ const convertToNewData = (collectionsArr, sensitiveInfoMap, severityInfoMap, cov
         }
         return{
             ...c,
-            envType: c?.envType?.map((type) => type?.keyName?.slice(0, 30) + '=' + type?.value),
+            envType: c?.envType?.map(func.formatCollectionType),
             displayNameComp: (<Box maxWidth="20vw"><TooltipText tooltip={c.displayName} text={c.displayName} textProps={{fontWeight: 'medium'}}/></Box>),
             testedEndpoints: c.urlsCount === 0 ? 0 : (coverageMap[c.id] ? coverageMap[c.id] : 0),
             sensitiveInRespTypes: sensitiveInfoMap[c.id] ? sensitiveInfoMap[c.id] : [],
@@ -699,9 +699,9 @@ function ApiCollections(props) {
         let copyObj = data;
         Object.keys(copyObj).forEach((key) => {
             data[key].length > 0 && data[key].forEach((c) => {
-                const list = dataMap[c?.id]?.map((data) => data?.keyName?.slice(0, 30) + '=' + data?.value);
+                const list = dataMap[c?.id]?.map(func.formatCollectionType);
                 c['envType'] = list
-                c['envTypeComp'] = transform.getCollectionTypeList(list)
+                c['envTypeComp'] = transform.getCollectionTypeList(list, 1, false)
             })
         })
         setData(copyObj)
