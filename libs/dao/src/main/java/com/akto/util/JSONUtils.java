@@ -222,7 +222,38 @@ public class JSONUtils {
         }
     }
 
+    public static <T> T fromJson(Object object, TypeReference<T> typeRef) {
+        try {
+            return mapper.convertValue(object, typeRef);
+        } catch (Exception e) {
+            logger.error("Error while parsing JSON", e);
+            return null;
+        }
+    }
+
+    public static <T> T fromJson(Object object, Class<T> clazz) {
+        try {
+            return mapper.convertValue(object, clazz);
+        } catch (Exception e) {
+            logger.error("Error while parsing JSON", e);
+            return null;
+        }
+    }
+
     public static Map<String, Object> getMap(String json) {
         return fromJson(json, new TypeReference<Map<String, Object>>() {});
+    }
+
+    public static Map<String, Object> getMap(Object object) {
+        return fromJson(object, new TypeReference<Map<String, Object>>() {});
+    }
+
+    public static String getString(Object object) {
+        try {
+            return mapper.writeValueAsString(object);
+        } catch (Exception e) {
+            logger.error("Error while parsing JSON", e);
+            return null;
+        }
     }
 }

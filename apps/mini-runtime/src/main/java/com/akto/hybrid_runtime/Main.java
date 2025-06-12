@@ -180,7 +180,6 @@ public class Main {
         String instanceType =  System.getenv("AKTO_INSTANCE_TYPE");
         boolean syncImmediately = false;
         boolean fetchAllSTI = true;
-        Map<Integer, AccountInfo> accountInfoMap =  new HashMap<>();
 
         boolean isDashboardInstance = false;
         if (isDashboardInstance) {
@@ -299,8 +298,6 @@ public class Main {
 
         }, 0, 1, TimeUnit.MINUTES);
 
-        Map<String, HttpCallParser> httpCallParserMap = new HashMap<>();
-
         // sync infra metrics thread
         // ScheduledExecutorService executor = Executors.newScheduledThreadPool(1);
         // KafkaHealthMetricSyncTask task = new KafkaHealthMetricSyncTask(main.consumer);
@@ -367,6 +364,13 @@ public class Main {
             }
         }, 0, TimeUnit.SECONDS);
 
+        // schedule MCP sync job for 24 hours
+        loggerMaker.info("Scheduling MCP Sync Job");
+        scheduler.scheduleAtFixedRate(() -> {
+            Context.accountId.set(actualAccountId);
+            McpToolsSyncJobExecutor.INSTANCE.runJob();
+        }, 0, 10, TimeUnit.SECONDS);
+
         try {
             main.consumer.subscribe(Arrays.asList(topicName, "har_"+topicName));
             loggerMaker.infoAndAddToDb("Consumer subscribed", LogDb.RUNTIME);
@@ -421,76 +425,14 @@ public class Main {
                     responseParamsToAccountMap.get(accountId).add(httpResponseParams);
                 }
 
-                for (String accountId: responseParamsToAccountMap.keySet()) {
-                    int accountIdInt;
-                    try {
-                        accountIdInt = Integer.parseInt(accountId);
-                    } catch (Exception ignored) {
-                        loggerMaker.errorAndAddToDb("Account id not string", LogDb.RUNTIME);
-                        continue;
-                    }
-
-                    Context.accountId.set(accountIdInt);
-
-                    AccountInfo accountInfo = accountInfoMap.get(accountIdInt);
-                    if (accountInfo == null) {
-                        accountInfo = new AccountInfo();
-                        accountInfoMap.put(accountIdInt, accountInfo);
-                    }
-
-                    if ((Context.now() - accountInfo.lastEstimatedCountTime) > 60*60) {
-                        loggerMaker.infoAndAddToDb("current time: " + Context.now() + " lastEstimatedCountTime: " + accountInfo.lastEstimatedCountTime, LogDb.RUNTIME);
-                        accountInfo.lastEstimatedCountTime = Context.now();
-                        accountInfo.estimatedCount = dataActor.fetchEstimatedDocCount();
-                        accountInfo.setAccountSettings(dataActor.fetchAccountSettings());
-                        loggerMaker.infoAndAddToDb("STI Estimated count: " + accountInfo.estimatedCount, LogDb.RUNTIME);
-                    }
-
-                    if (!isDashboardInstance && accountInfo.estimatedCount> 20_000_000) {
-                        loggerMaker.infoAndAddToDb("STI count is greater than 20M, skipping", LogDb.RUNTIME);
-                        continue;
-                    }
-
-                    if (!httpCallParserMap.containsKey(accountId)) {
-                        HttpCallParser parser = new HttpCallParser(
-                                apiConfig.getUserIdentifier(), apiConfig.getThreshold(), apiConfig.getSync_threshold_count(),
-                                apiConfig.getSync_threshold_time(), fetchAllSTI
-                        );
-                        httpCallParserMap.put(accountId, parser);
-                        loggerMaker.infoAndAddToDb("New parser created for account: " + accountId, LogDb.RUNTIME);
-                    }
-
-                    HttpCallParser parser = httpCallParserMap.get(accountId);
-
-                    try {
-                        List<HttpResponseParams> accWiseResponse = responseParamsToAccountMap.get(accountId);
-
-                        accWiseResponse = filterBasedOnHeaders(accWiseResponse, accountInfo.accountSettings);
-                        loggerMaker.infoAndAddToDb("Initiating sync function for account: " + accountId, LogDb.RUNTIME);
-                        parser.syncFunction(accWiseResponse, syncImmediately, fetchAllSTI, accountInfo.accountSettings);
-                        loggerMaker.debugInfoAddToDb("Sync function completed for account: " + accountId, LogDb.RUNTIME);
-
-                        // send to central kafka
-                        if (kafkaProducer != null) {
-                            loggerMaker.infoAndAddToDb("Sending " + accWiseResponse.size() +" records to context analyzer", LogDb.RUNTIME);
-                            for (HttpResponseParams httpResponseParams: accWiseResponse) {
-                                try {
-                                    loggerMaker.debugInfoAddToDb("Sending to kafka data for account: " + httpResponseParams.getAccountId(), LogDb.RUNTIME);
-                                    kafkaProducer.send(httpResponseParams.getOrig(), centralKafkaTopicName);
-                                } catch (Exception e) {
-                                    // force close it
-                                    loggerMaker.errorAndAddToDb("Closing kafka: " + e.getMessage(), LogDb.RUNTIME);
-                                    kafkaProducer.close();
-                                    loggerMaker.infoAndAddToDb("Successfully closed kafka", LogDb.RUNTIME);
-                                }
-                            }
-                        } else {
-                            loggerMaker.errorAndAddToDb("Kafka producer is null", LogDb.RUNTIME);
-                        }
-                    } catch (Exception e) {
-                        loggerMaker.errorAndAddToDb(e.toString(), LogDb.RUNTIME);
-                    }
-                }
+                handleResponseParams(responseParamsToAccountMap,
+                    new HashMap<>(),
+                    isDashboardInstance,
+                    new HashMap<>(),
+                    apiConfig,
+                    fetchAllSTI,
+                    syncImmediately,
+                    centralKafkaTopicName);
                 AllMetrics.instance.setRuntimeProcessLatency(System.currentTimeMillis()-start);
             }
 
@@ -504,6 +446,78 @@ public class Main {
             System.exit(0);
         } finally {
             main.consumer.close();
+        }
+    }
+
+    public static void handleResponseParams(Map<String, List<HttpResponseParams>> responseParamsToAccountMap,
+        Map<Integer, AccountInfo> accountInfoMap, boolean isDashboardInstance,
+        Map<String, HttpCallParser> httpCallParserMap, APIConfig apiConfig, boolean fetchAllSTI,
+        boolean syncImmediately, String centralKafkaTopicName) {
+        for (String accountId: responseParamsToAccountMap.keySet()) {
+            int accountIdInt;
+            try {
+                accountIdInt = Integer.parseInt(accountId);
+            } catch (Exception ignored) {
+                loggerMaker.errorAndAddToDb("Account id not string", LogDb.RUNTIME);
+                continue;
+            }
+
+            Context.accountId.set(accountIdInt);
+
+            AccountInfo accountInfo = accountInfoMap.computeIfAbsent(accountIdInt, k -> new AccountInfo());
+
+            if ((Context.now() - accountInfo.lastEstimatedCountTime) > 60*60) {
+                loggerMaker.infoAndAddToDb("current time: " + Context.now() + " lastEstimatedCountTime: " + accountInfo.lastEstimatedCountTime, LogDb.RUNTIME);
+                accountInfo.lastEstimatedCountTime = Context.now();
+                accountInfo.estimatedCount = dataActor.fetchEstimatedDocCount();
+                accountInfo.setAccountSettings(dataActor.fetchAccountSettings());
+                loggerMaker.infoAndAddToDb("STI Estimated count: " + accountInfo.estimatedCount, LogDb.RUNTIME);
+            }
+
+            if (!isDashboardInstance && accountInfo.estimatedCount> 20_000_000) {
+                loggerMaker.infoAndAddToDb("STI count is greater than 20M, skipping", LogDb.RUNTIME);
+                continue;
+            }
+
+            if (!httpCallParserMap.containsKey(accountId)) {
+                HttpCallParser parser = new HttpCallParser(
+                        apiConfig.getUserIdentifier(), apiConfig.getThreshold(), apiConfig.getSync_threshold_count(),
+                        apiConfig.getSync_threshold_time(), fetchAllSTI
+                );
+                httpCallParserMap.put(accountId, parser);
+                loggerMaker.infoAndAddToDb("New parser created for account: " + accountId, LogDb.RUNTIME);
+            }
+
+            HttpCallParser parser = httpCallParserMap.get(accountId);
+
+            try {
+                List<HttpResponseParams> accWiseResponse = responseParamsToAccountMap.get(accountId);
+
+                accWiseResponse = filterBasedOnHeaders(accWiseResponse, accountInfo.accountSettings);
+                loggerMaker.infoAndAddToDb("Initiating sync function for account: " + accountId, LogDb.RUNTIME);
+                parser.syncFunction(accWiseResponse, syncImmediately, fetchAllSTI, accountInfo.accountSettings);
+                loggerMaker.debugInfoAddToDb("Sync function completed for account: " + accountId, LogDb.RUNTIME);
+
+                // send to central kafka
+                if (kafkaProducer != null) {
+                    loggerMaker.infoAndAddToDb("Sending " + accWiseResponse.size() +" records to context analyzer", LogDb.RUNTIME);
+                    for (HttpResponseParams httpResponseParams: accWiseResponse) {
+                        try {
+                            loggerMaker.debugInfoAddToDb("Sending to kafka data for account: " + httpResponseParams.getAccountId(), LogDb.RUNTIME);
+                            kafkaProducer.send(httpResponseParams.getOrig(), centralKafkaTopicName);
+                        } catch (Exception e) {
+                            // force close it
+                            loggerMaker.errorAndAddToDb("Closing kafka: " + e.getMessage(), LogDb.RUNTIME);
+                            kafkaProducer.close();
+                            loggerMaker.infoAndAddToDb("Successfully closed kafka", LogDb.RUNTIME);
+                        }
+                    }
+                } else {
+                    loggerMaker.errorAndAddToDb("Kafka producer is null", LogDb.RUNTIME);
+                }
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb(e.toString(), LogDb.RUNTIME);
+            }
         }
     }
 
