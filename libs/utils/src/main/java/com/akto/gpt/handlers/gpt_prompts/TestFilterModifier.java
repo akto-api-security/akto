@@ -24,6 +24,7 @@ public class TestFilterModifier extends TestExecutorModifier {
                 .append("Expected Output:\n")
                 .append("- A JSON object with operation and value data.\n")
                 .append("- Example: { \"contains_either\": [\"param1\"] }\n")
+                .append("- Example: { \"not_contains_either\": [\"param1\"] }\n")
                 .append("- Example: { \"contains_all\": [\"param1\"] }\n")
                 .append("- Example: { \"contains_jwt\": true }\n")
                 .append("- Example: { \"not_contains\": [\"param1\"] }\n")
