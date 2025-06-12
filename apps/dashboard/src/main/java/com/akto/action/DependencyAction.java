@@ -156,7 +156,7 @@ public class DependencyAction extends UserAction {
                 try {
                     Utils.pushDataToKafka(newCollectionId, "", messages, new ArrayList<>(), true, true);
                 } catch (Exception e) {
-                    loggerMaker.errorAndAddToDb(e, "Error while sending data to kafka in invoke dependency graph function", LoggerMaker.LogDb.DASHBOARD);
+                    loggerMaker.errorAndAddToDb(e, "Error while sending data to kafka in invoke dependency graph function");
                 }
 
             }

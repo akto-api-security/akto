@@ -103,10 +103,16 @@ public class ParameterTransformer {
                 ((ObjectNode) current).set(parts[index], arrayNode);
             }
             
-            ObjectNode newNode = objectMapper.createObjectNode();
-            arrayNode.add(newNode);
+            ObjectNode targetNode;
+            if (arrayNode.size() > 0 && arrayNode.get(arrayNode.size() - 1).isObject()) {
+                // Merge into last object if not already set for this path
+                targetNode = (ObjectNode) arrayNode.get(arrayNode.size() - 1);
+            } else {
+                targetNode = objectMapper.createObjectNode();
+                arrayNode.add(targetNode);
+            }
             // Skip the next part (the $ symbol) in recursive call
-            processPath(newNode, parts, index + 2, value);
+            processPath(targetNode, parts, index + 2, value);
         } else {
             
             ObjectNode nextNode;

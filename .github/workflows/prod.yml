@@ -322,3 +322,66 @@ jobs:
           path: ~/.m2
           key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
           restore-keys: ${{ runner.os }}-m2
+
+      # --- Docker Scout Scan for Threat Detection ---
+      - name: Create reports directory
+        run: mkdir -p scout-reports
+
+      - name: Analyze for critical and high CVEs (Dashboard)
+        env:
+          ECR_REGISTRY: aktosecurity
+          ECR_REPOSITORY: akto-api-security
+        if: ${{ github.event.inputs.dashboard == 'true' }}
+        uses: docker/scout-action@v1
+        with:
+          command: cves
+          image: $ECR_REGISTRY/$ECR_REPOSITORY:${{ github.event.inputs.release_version }}_local
+          sarif-file: scout-reports/dashboard.sarif
+          only-severities: critical,high
+          summary: true
+        continue-on-error: true
+        
+
+      - name: Analyze for critical and high CVEs (Testing)
+        env:
+          ECR_REGISTRY: aktosecurity
+          ECR_REPOSITORY: akto-api-security
+        if: ${{ github.event.inputs.testing == 'true' }}
+        uses: docker/scout-action@v1
+        with:
+          command: cves
+          image: $ECR_REGISTRY/$ECR_REPOSITORY:${{ github.event.inputs.release_version }}_local
+          sarif-file: scout-reports/testing.sarif
+          only-severities: critical,high
+          summary: true
+        continue-on-error: true
+
+      - name: Analyze for critical and high CVEs (Threat Detection)
+        if: ${{ github.event.inputs.threat_detection == 'true' }}
+        uses: docker/scout-action@v1
+        with:
+          command: cves
+          image: aktosecurity/akto-threat-detection:${{ github.event.inputs.release_version_threat }}
+          sarif-file: scout-reports/threat-detection.sarif
+          only-severities: critical,high
+          summary: true
+        continue-on-error: true
+
+      - name: Analyze for critical and high CVEs (Threat Detection Backend)
+        if: ${{ github.event.inputs.threat_detection_backend == 'true' }}
+        uses: docker/scout-action@v1
+        with:
+          command: cves
+          image: aktosecurity/akto-threat-detection-backend:${{ github.event.inputs.release_version_threat }}
+          sarif-file: scout-reports/threat-detection-backend.sarif
+          only-severities: critical,high
+          summary: true
+        continue-on-error: true
+
+      - name: Upload SARIF file as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: docker-scout-cve-reports
+          path: scout-reports/
+
+
