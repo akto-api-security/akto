@@ -1045,6 +1045,11 @@ public class Utils {
 
     public static String buildRequestIHttpFormat(RawApi rawApi) {
         StringBuilder requestBuilder = new StringBuilder();
+
+        if(rawApi.getRequest() == null) {
+            return "No request available";
+        }
+
         requestBuilder.append(rawApi.getRequest().getMethod()).append(" ").append(rawApi.getRequest().getUrl()).append("\n");
         Map<String, List<String>> headers = rawApi.getRequest().getHeaders();
         for (Map.Entry<String, List<String>> entry : headers.entrySet()) {
@@ -1063,6 +1068,11 @@ public class Utils {
 
     public static String buildResponseIHttpFormat(RawApi rawApi) {
         StringBuilder responseBuilder = new StringBuilder();
+
+        if(rawApi.getResponse() == null) {
+            return "No response available";
+        }
+
         responseBuilder.append(rawApi.getResponse().getStatusCode()).append("\n");
         Map<String, List<String>> headers = rawApi.getResponse().getHeaders();
         for (Map.Entry<String, List<String>> entry : headers.entrySet()) {
