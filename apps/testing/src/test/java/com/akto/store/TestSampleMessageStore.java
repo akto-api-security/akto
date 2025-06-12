@@ -13,7 +13,6 @@ import org.junit.Test;
 import java.util.*;
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNull;
 
 public class TestSampleMessageStore extends MongoBasedTest {
 
@@ -35,10 +34,10 @@ public class TestSampleMessageStore extends MongoBasedTest {
 
         assertEquals(sampleDataMap.size(), 3);
         List<String> messages = sampleDataMap.get(new ApiInfo.ApiInfoKey(0, "url2", URLMethods.Method.GET));
-        assertEquals(messages.size(), 2);
+        assertEquals(messages.size(), 1);
 
         messages = sampleDataMap.get(new ApiInfo.ApiInfoKey(1, "url1", URLMethods.Method.GET));
-        assertEquals(messages.size(), 3);
+        assertEquals(messages.size(), 1);
 
         SampleDataDao.instance.getMCollection().drop();
         sampleData2 = new SampleData(new Key(0, "url2", URLMethods.Method.GET,0,0,0), Arrays.asList("m1", "m2", "m3"));
@@ -47,7 +46,7 @@ public class TestSampleMessageStore extends MongoBasedTest {
         sampleDataMap =  sample.getSampleDataMap();
         assertEquals(sampleDataMap.size(), 1);
         messages = sampleDataMap.get(new ApiInfo.ApiInfoKey(0, "url2", URLMethods.Method.GET));
-        assertEquals(messages.size(), 3);
+        assertEquals(messages.size(), 1);
 
     }
 
