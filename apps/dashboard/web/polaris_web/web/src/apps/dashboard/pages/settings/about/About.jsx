@@ -44,6 +44,7 @@ function About() {
         return localStorage.getItem('isSubscribed') === 'true'
     })
     const [modalOpen, setModalOpen] = useState(false)
+    const [deleteMaliciousEventsModal, setDeleteMaliciousEventsModal] = useState(false)
 
     const initialUrlsList = settingFunctions.getRedundantUrlOptions()
     const [selectedUrlList, setSelectedUrlsList] = useState([])
@@ -383,6 +384,15 @@ function About() {
         }
     }
 
+    const handleDeleteAllMaliciousEvents = async() => {
+        setDeleteMaliciousEventsModal(false)
+        await settingRequests.deleteAllMaliciousEvents().then(() => {
+            func.setToast(true, false, "Deleting malicious events - may take a few minutes.")
+        }).catch(() => {
+            func.setToast(true, true, "Something went wrong. Please try again.")
+        })
+    }
+
     const redundantUrlComp = (
         <VerticalStack gap={"4"}>
             <Box width='220px'>
@@ -415,6 +425,35 @@ function About() {
                     </Box>
                 </VerticalStack>
             }
+            <VerticalStack gap={2}>
+                <Text color='subdued' variant='bodyMd'>Delete all malicious events</Text>
+                <Box width='80px'>
+                    <Button onClick={() => setDeleteMaliciousEventsModal(true)}>Delete</Button>
+                </Box>
+            </VerticalStack>
+
+            <Modal
+                open={deleteMaliciousEventsModal}
+                primaryAction={{
+                    content: "Yes, Delete All",
+                    onAction: handleDeleteAllMaliciousEvents
+                }}
+                secondaryActions={[{
+                    content: "Cancel",
+                    onAction: () => {setDeleteMaliciousEventsModal(false)}
+                }]}
+                title="⚠️ Confirm Permanent Deletion"
+                onClose={() => {setDeleteMaliciousEventsModal(false)}}
+            >
+                <Modal.Section>
+                    <VerticalStack>
+                        <Text>You are about to permanently delete all malicious events.</Text>
+                        <Text>This action cannot be undone and all associated data will be lost forever.</Text>
+                        <br/>
+                        <Text>Are you sure you want to proceed?</Text>
+                    </VerticalStack>
+                </Modal.Section>
+            </Modal>
         </VerticalStack>
     )
     

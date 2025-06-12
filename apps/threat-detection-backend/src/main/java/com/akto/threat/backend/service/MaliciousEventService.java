@@ -18,10 +18,7 @@ import com.akto.threat.backend.constants.KafkaTopic;
 import com.akto.threat.backend.constants.MongoDBCollection;
 import com.akto.threat.backend.db.MaliciousEventModel;
 import com.akto.threat.backend.utils.KafkaUtils;
-import com.mongodb.client.DistinctIterable;
-import com.mongodb.client.MongoClient;
-import com.mongodb.client.MongoCollection;
-import com.mongodb.client.MongoCursor;
+import com.mongodb.client.*;
 import com.mongodb.client.model.Filters;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -30,6 +27,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
+import com.mongodb.client.model.Indexes;
 import org.bson.Document;
 import org.bson.conversions.Bson;
 
@@ -141,6 +139,9 @@ public class MaliciousEventService {
 
   public ListMaliciousRequestsResponse listMaliciousRequests(
       String accountId, ListMaliciousRequestsRequest request) {
+
+    createIndexIfAbsent(accountId);
+
     int limit = request.getLimit();
     int skip = request.hasSkip() ? request.getSkip() : 0;
     Map<String, Integer> sort = request.getSortMap();
@@ -216,5 +217,35 @@ public class MaliciousEventService {
           .addAllMaliciousEvents(maliciousEvents)
           .build();
     }
+  }
+
+  public void createIndexIfAbsent(String accountId) {
+    MongoDatabase database = this.mongoClient
+            .getDatabase(accountId);
+    MongoCollection<Document> coll = database
+            .getCollection(MongoDBCollection.ThreatDetection.MALICIOUS_EVENTS, Document.class);
+
+    if(coll == null) {
+      database.createCollection(MongoDBCollection.ThreatDetection.MALICIOUS_EVENTS);
+    }
+
+    MongoCursor<Document> cursor = coll.listIndexes().cursor();
+    List<Document> indices = new ArrayList<>();
+
+    while(cursor.hasNext()) {
+      indices.add(cursor.next());
+    }
+
+    if(indices.isEmpty()) {
+      coll.createIndex(Indexes.ascending("detectedAt"));
+      coll.createIndex(Indexes.descending("detectedAt"));
+      coll.createIndex(Indexes.compoundIndex(Indexes.ascending("country"), Indexes.descending("detectedAt")));
+      coll.createIndex(Indexes.ascending("detectedAt", "category", "subCategory"));
+      coll.createIndex(Indexes.ascending("severity", "detectedAt"));
+      coll.createIndex(Indexes.compoundIndex(Indexes.descending("detectedAt"), Indexes.ascending("actor")));
+      coll.createIndex(Indexes.compoundIndex(Indexes.ascending("actor"), Indexes.descending("detectedAt")));
+    }
+
+    cursor.close();
   }
 }
