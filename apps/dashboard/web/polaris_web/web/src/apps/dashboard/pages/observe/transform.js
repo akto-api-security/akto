@@ -438,16 +438,17 @@ const transform = {
         )
     },
 
-    getCollectionTypeList(envType){
+    getCollectionTypeList(envType, maxItems, wrap){
         if(envType == null || envType.length === 0){ 
             return <></>
         }
         return (
             <ShowListInBadge
                 itemsArr={envType}
-                maxItems={3}
+                maxItems={maxItems}
                 status={"info"}
                 useTooltip={true}
+                wrap={wrap}
             />
         )
     },
@@ -507,7 +508,7 @@ const transform = {
                 riskScore: c.riskScore,
                 deactivatedRiskScore: c.deactivated ? (c.riskScore - 10 ) : c.riskScore,
                 activatedRiskScore: -1 * (c.deactivated ? c.riskScore : (c.riskScore - 10 )),
-                envTypeComp: isLoading ? loadingComp : this.getCollectionTypeList(c.envType),
+                envTypeComp: isLoading ? loadingComp : this.getCollectionTypeList(c.envType, 1, false),
                 sensitiveSubTypesVal: c?.sensitiveInRespTypes.join(" ") ||  "-"
             }
         })
