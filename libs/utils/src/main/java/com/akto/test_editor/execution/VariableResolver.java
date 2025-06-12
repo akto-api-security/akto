@@ -25,6 +25,8 @@ import com.akto.dto.type.RequestTemplate;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods;
 import com.akto.test_editor.Utils;
+import com.akto.util.CookieTransformer;
+import com.akto.util.Pair;
 import com.akto.util.modifier.AddJWKModifier;
 import com.akto.util.modifier.AddJkuJWTModifier;
 import com.akto.util.modifier.AddKidParamModifier;
@@ -35,6 +37,7 @@ import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
 
+import static com.akto.runtime.utils.Utils.parseCookie;
 import static com.akto.runtime.utils.Utils.parseKafkaMessage;
 
 public class VariableResolver {
@@ -298,8 +301,56 @@ public class VariableResolver {
 
     }
 
-    public static String resolveAuthContext(Object resolveObj, Map<String, List<String>> headers, String headerKey) {
+    private static String getModifiedJWTValue(String val, String secondParam, Object resolveObj, String origExpression) {
+        String modifiedHeaderVal = null;
+        if (!KeyTypes.isJWT(val)) {
+            return val;
+        }
+        if (secondParam.equalsIgnoreCase("none_algo_token")) {
+            NoneAlgoJWTModifier noneAlgoJWTModifier = new NoneAlgoJWTModifier("none");
+            try {
+                modifiedHeaderVal = noneAlgoJWTModifier.jwtModify("", val);
+            } catch(Exception e) {
+                return null;
+            }
+        } else if (secondParam.equalsIgnoreCase("invalid_signature_token")) {
+            InvalidSignatureJWTModifier invalidSigModified = new InvalidSignatureJWTModifier();
+            modifiedHeaderVal = invalidSigModified.jwtModify("", val);
+        } else if (secondParam.equalsIgnoreCase("jku_added_token")) {
+            AddJkuJWTModifier addJkuJWTModifier = new AddJkuJWTModifier();
+            try {
+                modifiedHeaderVal = addJkuJWTModifier.jwtModify("", val);
+            } catch(Exception e) {
+                return null;
+            }
+        } else if (secondParam.equalsIgnoreCase("modify_jwt")) {
+            try {
+                Map<String, Object> kvPairMap = (Map) ((Map)resolveObj).get(origExpression);
+                String kvKey = kvPairMap.keySet().iterator().next();
+                JwtKvModifier jwtKvModifier = new JwtKvModifier(kvKey, kvPairMap.get(kvKey).toString());
+                modifiedHeaderVal = jwtKvModifier.jwtModify("", val);
+            } catch (Exception e) {
+                return null;
+            }
+        } else if (secondParam.equalsIgnoreCase("jwk_added_token")) {
+            AddJWKModifier addJWKModifier = new AddJWKModifier();
+            try {
+                modifiedHeaderVal = addJWKModifier.jwtModify("", val);
+            } catch(Exception e) {
+                return null;
+            }
+        } else if (secondParam.equalsIgnoreCase("kid_added_token")) {
+            AddKidParamModifier addKidParamModifier = new AddKidParamModifier();
+            try {
+                modifiedHeaderVal = addKidParamModifier.jwtModify("", val);
+            } catch(Exception e) {
+                return null;
+            }
+        } 
+        return modifiedHeaderVal;
+    }
 
+    private static Pair<String, String> resolveExpression(Object resolveObj) {
         String origExpression = null;
         if (!(resolveObj instanceof String)) {
             if (resolveObj instanceof Map) {
@@ -322,7 +373,17 @@ public class VariableResolver {
 
         String authContextConstant = "auth_context.";
         String secondParam = expression.substring(authContextConstant.length());// params[1];
+        return new Pair<String,String>(origExpression, secondParam);
+    }
 
+    public static String resolveAuthContext(Object resolveObj, Map<String, List<String>> headers, String headerKey) {
+
+        Pair<String, String> pair = resolveExpression(resolveObj);
+        if(pair == null){
+            return null;
+        }
+        String origExpression = pair.getFirst();
+        String secondParam = pair.getSecond();
         if (!headers.containsKey(headerKey)) {
             return null;
         }
@@ -330,60 +391,40 @@ public class VariableResolver {
         String headerVal = headers.get(headerKey).get(0);
 
         String[] splitValue = headerVal.toString().split(" ");
-        String modifiedHeaderVal = null;
 
         List<String> finalValue = new ArrayList<>();
 
         for (String val: splitValue) {
-            if (!KeyTypes.isJWT(val)) {
-                finalValue.add(val);
+            if(val == null || val.isEmpty()) {
                 continue;
             }
-            if (secondParam.equalsIgnoreCase("none_algo_token")) {
-                NoneAlgoJWTModifier noneAlgoJWTModifier = new NoneAlgoJWTModifier("none");
-                try {
-                    modifiedHeaderVal = noneAlgoJWTModifier.jwtModify("", val);
-                } catch(Exception e) {
-                    return null;
-                }
-            } else if (secondParam.equalsIgnoreCase("invalid_signature_token")) {
-                InvalidSignatureJWTModifier invalidSigModified = new InvalidSignatureJWTModifier();
-                modifiedHeaderVal = invalidSigModified.jwtModify("", val);
-            } else if (secondParam.equalsIgnoreCase("jku_added_token")) {
-                AddJkuJWTModifier addJkuJWTModifier = new AddJkuJWTModifier();
-                try {
-                    modifiedHeaderVal = addJkuJWTModifier.jwtModify("", val);
-                } catch(Exception e) {
-                    return null;
-                }
-            } else if (secondParam.equalsIgnoreCase("modify_jwt")) {
-                try {
-                    Map<String, Object> kvPairMap = (Map) ((Map)resolveObj).get(origExpression);
-                    String kvKey = kvPairMap.keySet().iterator().next();
-                    JwtKvModifier jwtKvModifier = new JwtKvModifier(kvKey, kvPairMap.get(kvKey).toString());
-                    modifiedHeaderVal = jwtKvModifier.jwtModify("", val);
-                } catch (Exception e) {
-                    return null;
-                }
-            } else if (secondParam.equalsIgnoreCase("jwk_added_token")) {
-                AddJWKModifier addJWKModifier = new AddJWKModifier();
-                try {
-                    modifiedHeaderVal = addJWKModifier.jwtModify("", val);
-                } catch(Exception e) {
-                    return null;
-                }
-            } else if (secondParam.equalsIgnoreCase("kid_added_token")) {
-                AddKidParamModifier addKidParamModifier = new AddKidParamModifier();
-                try {
-                    modifiedHeaderVal = addKidParamModifier.jwtModify("", val);
-                } catch(Exception e) {
-                    return null;
-                }
-            } 
+            String modifiedHeaderVal = getModifiedJWTValue(val, secondParam, resolveObj, origExpression);
+            if(modifiedHeaderVal == null) {
+                return null;
+            }
             finalValue.add(modifiedHeaderVal);
         }
 
         return finalValue.isEmpty() ? null : String.join( " ", finalValue);
+    }
+
+    public static void resolveAuthContextForCookie(Object resolveObj, List<String> cookieList) {
+        Pair<String, String> pair = resolveExpression(resolveObj);
+        if(pair == null){
+            return;
+        }
+        String origExpression = pair.getFirst();
+        String secondParam = pair.getSecond();
+
+        Map<String,String> cookieMap = parseCookie(cookieList);
+        for (String key: cookieMap.keySet()) {
+            String val = cookieMap.get(key);
+            String modifiedHeaderVal = getModifiedJWTValue(val, secondParam, resolveObj, origExpression);
+            if(modifiedHeaderVal == null) {
+                continue;
+            }
+            CookieTransformer.modifyCookie(cookieList, key, modifiedHeaderVal);
+        }
     }
 
     public static Boolean isWordListVariable(Object key, Map<String, Object> varMap) {

@@ -7,6 +7,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+
 import com.akto.dao.context.Context;
 import com.akto.dao.testing.TestRolesDao;
 import com.akto.dto.ApiInfo;
@@ -28,6 +29,7 @@ import com.akto.log.LoggerMaker.LogDb;
 import com.akto.rules.TestPlugin;
 import com.akto.test_editor.Utils;
 import com.akto.util.Constants;
+import com.akto.util.CookieTransformer;
 import com.akto.util.HttpRequestResponseUtils;
 import com.akto.util.modifier.JWTPayloadReplacer;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -40,6 +42,7 @@ import static com.akto.test_editor.Utils.bodyValuesUnchanged;
 import static com.akto.test_editor.Utils.headerValuesUnchanged;
 import static com.akto.runtime.utils.Utils.convertOriginalReqRespToString;
 import static com.akto.testing.Utils.compareWithOriginalResponse;
+import static com.akto.runtime.utils.Utils.parseCookie;
 
 
 import org.apache.commons.lang3.StringUtils;
@@ -720,6 +723,7 @@ public class Executor {
                 if (VariableResolver.isAuthContext(key)) {
                     // resolve context for auth mechanism keys
                     authVal = VariableResolver.resolveAuthContext(key, rawApi.getRequest().getHeaders(), authHeader);
+                    // get cookie auth val as well
                     if (authVal != null) {
                         ExecutorSingleOperationResp authMechanismContextResult = Operations.modifyHeader(rawApi, authHeader, authVal, true);
                         modifiedAtLeastOne = modifiedAtLeastOne || authMechanismContextResult.getSuccess();
@@ -743,6 +747,12 @@ public class Executor {
                             ExecutorSingleOperationResp customAuthContextResult = Operations.modifyBodyParam(rawApi, customAuthPayloadKey, authVal);
                             modifiedAtLeastOne = modifiedAtLeastOne || customAuthContextResult.getSuccess();
                         }
+                    }
+
+                    // if cookie is present in the request, we can also resolve cookie auth context
+                    if(rawApi.getRequest().getHeaders().containsKey("cookie")){
+                        List<String> cookieList = rawApi.getRequest().getHeaders().get("cookie");
+                        VariableResolver.resolveAuthContextForCookie(key.toString(), cookieList);
                     }
 
                 } else {
@@ -771,7 +781,14 @@ public class Executor {
             case "jwt_replace_body":
                 JWTPayloadReplacer jwtPayloadReplacer = new JWTPayloadReplacer(key.toString());
                 boolean modified = false;
+                String keyToBeModified = "";
+                String finalValueToBeModified = "";
+                boolean containsCookie = false;
                 for (String k: rawApi.getRequest().getHeaders().keySet()) {
+                    if(k.equals("cookie")){
+                        containsCookie = true;
+                        continue; 
+                    }
                     List<String> hList = rawApi.getRequest().getHeaders().getOrDefault(k, new ArrayList<>());
                     if (hList.size() == 0){
                         continue;
@@ -802,12 +819,33 @@ public class Executor {
                         continue;
                     }
                     modified = true;
+                    keyToBeModified = k;
+                    finalValueToBeModified = String.join( " ", finalValue);
+                    break;
+                }
+                // try for cookie here
+                if(containsCookie){
+                    List<String> hList = rawApi.getRequest().getHeaders().get("cookie");
+                    Map<String, String> cookieMap = parseCookie(hList);
+                    for (String k: cookieMap.keySet()) {
+                        String val = cookieMap.get(key);
+                        if (val == null || !KeyTypes.isJWT(val)) {
+                            continue;
+                        }
+                        try {
+                            String modifiedHeaderVal = jwtPayloadReplacer.jwtModify("", val);
+                            CookieTransformer.modifyCookie(hList, k, modifiedHeaderVal);
+                        } catch (Exception e) {
+                            // TODO: handle exception
+                        }
+                        
+                    }
+                }
 
-                    return Operations.modifyHeader(rawApi, k, String.join( " ", finalValue));
+                if(modified){
+                    return Operations.modifyHeader(rawApi, keyToBeModified, finalValueToBeModified);
                 }
-                if (!modified) {
-                    return new ExecutorSingleOperationResp(true, "");
-                }
+                return new ExecutorSingleOperationResp(true, "");
             default:
                 return Utils.modifySampleDataUtil(operationType, rawApi, key, value, varMap, apiInfoKey);
 
