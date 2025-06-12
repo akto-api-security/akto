@@ -4,6 +4,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.akto.dao.test_editor.TestEditorEnums;
 import com.akto.dto.api_workflow.Node;
 import com.akto.dto.test_editor.DataOperandsFilterResponse;
@@ -19,6 +22,8 @@ import lombok.Setter;
 @Getter
 @Setter
 public class ConditionalGraphExecutor extends GraphExecutor {
+
+    private static final Logger logger = LoggerFactory.getLogger(ConditionalGraphExecutor.class);
     boolean allowAllCombinations;
     public ConditionalGraphExecutor(boolean allowAllCombinations) {
         this.allowAllCombinations = allowAllCombinations;
@@ -40,6 +45,19 @@ public class ConditionalGraphExecutor extends GraphExecutor {
         boolean success = false;
 
         WorkflowTestResult.NodeResult nodeResult;
+        try {
+            int waitInSeconds = node.getWaitInSeconds();
+            if (waitInSeconds > 0) {
+                if (waitInSeconds > 100) {
+                    waitInSeconds = 100;
+                }
+                logger.info("encountered sleep command in node " + node.getId() + " sleeping for " + waitInSeconds + " seconds");
+                Thread.sleep(waitInSeconds * 1000);
+            }
+        } catch (Exception e) {
+            // TODO: handle exception
+        }
+
         nodeResult = Utils.executeNode(node, graphExecutorRequest.getValuesMap(), debug, testLogs, memory, this.allowAllCombinations);
 
         graphExecutorRequest.getWorkflowTestResult().getNodeResultMap().put(node.getId(), nodeResult);

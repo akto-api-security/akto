@@ -700,6 +700,22 @@ prettifyEpoch(epoch) {
 
     return collectionsObj
   },
+
+  mapCollectionIdsToTagName(collections) {
+        const allTagCollectionsMap = {};
+              collections
+                .filter(col => !col.deactivated && Array.isArray(col.envType) && col.envType.length > 0)
+                .forEach(col => {
+                  col.envType.forEach(env => {
+                    const key = `${env.keyName}=${env.value}`;
+                    if (!allTagCollectionsMap[key]) {
+                      allTagCollectionsMap[key] = [];
+                    }
+                    allTagCollectionsMap[key].push(col.id);
+                  });
+                });
+       return allTagCollectionsMap
+    },
   mapCollectionId(collections) {
     let collectionsObj = {}
     collections.forEach((collection)=>{

@@ -242,7 +242,8 @@ public class TestEditorEnums {
         TEST_NAME,
         LABEL,
         SUCCESS,
-        FAILURE
+        FAILURE,
+        WAIT
     }
 
     public enum ValidateExecutorDataOperands {

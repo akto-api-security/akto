@@ -25,6 +25,7 @@ function Dashboard() {
     history.navigate = useNavigate();
     const setAllCollections = PersistStore(state => state.setAllCollections)
     const setCollectionsMap = PersistStore(state => state.setCollectionsMap)
+    const setTagCollectionsMap = PersistStore(state => state.setTagCollectionsMap)
     const setHostNameMap = PersistStore(state => state.setHostNameMap)
     const threatFiltersMap = SessionStore(state => state.threatFiltersMap);
     const setThreatFiltersMap = SessionStore(state => state.setThreatFiltersMap);
@@ -52,8 +53,10 @@ function Dashboard() {
         apiCollections = apiCollections.filter((x) => x?.deactivated !== true)
         const allCollectionsMap = func.mapCollectionIdToName(apiCollections)
         const allHostNameMap = func.mapCollectionIdToHostName(apiCollections)
+        const allTagCollectionsMap = func.mapCollectionIdsToTagName(apiCollections)
         setHostNameMap(allHostNameMap)
         setCollectionsMap(allCollectionsMap)
+        setTagCollectionsMap(allTagCollectionsMap)
     }
     const trafficAlerts = PersistStore(state => state.trafficAlerts)
     const setTrafficAlerts = PersistStore(state => state.setTrafficAlerts)
