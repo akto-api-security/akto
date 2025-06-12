@@ -707,7 +707,10 @@ prettifyEpoch(epoch) {
                 .filter(col => !col.deactivated && Array.isArray(col.envType) && col.envType.length > 0)
                 .forEach(col => {
                   col.envType.forEach(env => {
-                    const key = `${env.keyName}=${env.value}`;
+                  const keyName = env.keyName.startsWith('userSetEnvType') || env.keyName.startsWith('envType')
+                    ? env.keyName.replace(/^(userSetEnvType|envType)/, 'env')
+                    : env.keyName;
+                    const key = `${keyName}=${env.value}`;
                     if (!allTagCollectionsMap[key]) {
                       allTagCollectionsMap[key] = [];
                     }
@@ -2193,7 +2196,7 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
     return defaultLabel
   },
   formatCollectionType(type) {
-    return (type?.keyName?.slice(0, 30) ?? '') + '=' + (type?.value?.slice(0, 30) ?? '')
+    return (type?.keyName?.replace(/^(userSetEnvType|envType)/, 'env')?.slice(0, 30) ?? '') + '=' + (type?.value?.slice(0, 30) ?? '')
   }
 }
 

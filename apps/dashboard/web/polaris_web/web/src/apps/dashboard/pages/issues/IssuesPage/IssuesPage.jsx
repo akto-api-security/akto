@@ -268,12 +268,15 @@ function IssuesPage() {
 
     filtersOptions = func.getCollectionFilters(filtersOptions)
 
-    filtersOptions[6].choices = Object.keys(tagsCollectionsMap).map((key) => {
-        return {
-                label: key,
-                value: key
-            }
-        })
+    const tagsFilter = filtersOptions.find(filter => filter.key === 'tagsId');
+        if (tagsFilter) {
+            tagsFilter.choices = Object.keys(tagsCollectionsMap).map((key) => {
+                return {
+                    label: key,
+                    value: key
+                }
+            });
+        }
 
     const handleSaveJiraAction = () => {
         setToast(true, false, "Please wait while we create your Jira ticket.")
