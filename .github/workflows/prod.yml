@@ -145,7 +145,7 @@ jobs:
             docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/akto-internal:$IMAGE_TAG_1 -t $ECR_REGISTRY/akto-internal:$IMAGE_TAG_2 . --push
             echo "::set-output name=image::$ECR_REGISTRY/akto-internal:$IMAGE_TAG"
           fi
-  
+
       - name: Configure AWS Credentials for ECR
         uses: aws-actions/configure-aws-credentials@v1
         with:
@@ -255,21 +255,21 @@ jobs:
         env:
           ECR_REGISTRY: aktosecurity
           ECR_REPOSITORY: akto-api-security
-          IMAGE_TAG_THREAT: ${{github.event.inputs.release_version_threat}}
+          IMAGE_TAG_THREAT: latest
+          IMAGE_TAG_THREAT_2: ${{github.event.inputs.release_version_threat}}
         run: |
           docker buildx create --use
           # Build a docker container and push it to DockerHub
           cd apps/dashboard
           if [[ "${{ github.event.inputs.threat_detection}}" == "true" ]]; then
             cd ../threat-detection
-            docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/akto-threat-detection:$IMAGE_TAG_THREAT . --push
+            docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/akto-threat-detection:$IMAGE_TAG_THREAT -t $ECR_REGISTRY/akto-threat-detection:$IMAGE_TAG_THREAT_2 . --push
           fi
 
           if [[ "${{ github.event.inputs.threat_detection_backend}}" == "true" ]]; then
             cd ../threat-detection-backend
             docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/akto-threat-detection-backend:$IMAGE_TAG_THREAT -t $ECR_REGISTRY/akto-threat-detection-backend:$IMAGE_TAG_THREAT_2 . --push
           fi
-
       - name: Configure AWS Credentials for ECR
         uses: aws-actions/configure-aws-credentials@v1
         with:
@@ -283,6 +283,29 @@ jobs:
           mask-password: "true"
           registry-type: public
 
+      - name: Push git tag
+        id: tag_version
+        uses: mathieudutour/github-tag-action@v6.1
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          custom_tag: threat-${{ github.event.inputs.release_version_threat }}
+      - name: Create a GitHub release
+        uses: ncipollo/release-action@v1.12.0
+        with:
+          tag: ${{ steps.tag_version.outputs.new_tag }}
+          name: Release ${{ steps.tag_version.outputs.new_tag }}
+          omitBody: true
+      - name: Send Github release notification to Slack
+        id: slack
+        uses: slackapi/slack-github-action@v1.23.0
+        with:
+          payload: |
+            {
+              "text": "Akto Open Source Threat v${{ github.event.inputs.release_version_threat }} released!"
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
       - name: Set up JDK 11
         uses: actions/setup-java@v1
         with:
@@ -303,7 +326,36 @@ jobs:
       # --- Docker Scout Scan for Threat Detection ---
       - name: Create reports directory
         run: mkdir -p scout-reports
+
+      - name: Analyze for critical and high CVEs (Dashboard)
+        env:
+          ECR_REGISTRY: aktosecurity
+          ECR_REPOSITORY: akto-api-security
+        if: ${{ github.event.inputs.dashboard == 'true' }}
+        uses: docker/scout-action@v1
+        with:
+          command: cves
+          image: $ECR_REGISTRY/$ECR_REPOSITORY:${{ github.event.inputs.release_version }}_local
+          sarif-file: scout-reports/dashboard.sarif
+          only-severities: critical,high
+          summary: true
+        continue-on-error: true
         
+
+      - name: Analyze for critical and high CVEs (Testing)
+        env:
+          ECR_REGISTRY: aktosecurity
+          ECR_REPOSITORY: akto-api-security
+        if: ${{ github.event.inputs.testing == 'true' }}
+        uses: docker/scout-action@v1
+        with:
+          command: cves
+          image: $ECR_REGISTRY/$ECR_REPOSITORY:${{ github.event.inputs.release_version }}_local
+          sarif-file: scout-reports/testing.sarif
+          only-severities: critical,high
+          summary: true
+        continue-on-error: true
+
       - name: Analyze for critical and high CVEs (Threat Detection)
         if: ${{ github.event.inputs.threat_detection == 'true' }}
         uses: docker/scout-action@v1
@@ -315,20 +367,18 @@ jobs:
           summary: true
         continue-on-error: true
 
-      - name: Analyze for critical and high CVEs (Threat Detection)
-        if: ${{ github.event.inputs.threat_detection == 'true' }}
+      - name: Analyze for critical and high CVEs (Threat Detection Backend)
+        if: ${{ github.event.inputs.threat_detection_backend == 'true' }}
         uses: docker/scout-action@v1
         with:
           command: cves
-          image: aktosecurity/akto-threat-detection:${{ github.event.inputs.release_version_threat }}
-          sarif-file: scout-reports/threat-detection-v2.sarif
+          image: aktosecurity/akto-threat-detection-backend:${{ github.event.inputs.release_version_threat }}
+          sarif-file: scout-reports/threat-detection-backend.sarif
           only-severities: critical,high
           summary: true
         continue-on-error: true
 
-
       - name: Upload SARIF file as artifact
-        if: ${{ github.event.inputs.threat_detection == 'true' }}
         uses: actions/upload-artifact@v4
         with:
           name: docker-scout-cve-reports
