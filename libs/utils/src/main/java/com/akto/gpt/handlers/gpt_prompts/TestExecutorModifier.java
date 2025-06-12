@@ -78,11 +78,12 @@ public class TestExecutorModifier extends PromptHandler {
     protected BasicDBObject processResponse(String rawResponse) {
         BasicDBObject resp = new BasicDBObject();
         String processed = processOutput(rawResponse).trim();
-        if (processed.equalsIgnoreCase(_NOT_FOUND)) {
+        String processedResponse = cleanJSON(processed);
+        if (processedResponse.equalsIgnoreCase(_NOT_FOUND)) {
             return resp;
         }
         try {
-            JSONObject json = new JSONObject(processed);
+            JSONObject json = new JSONObject(processedResponse);
             for (java.util.Iterator<?> it = json.keys(); it.hasNext(); ) {
                 String key = String.valueOf(it.next());
                 key = key.trim().toLowerCase();

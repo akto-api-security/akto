@@ -428,8 +428,6 @@ public class Executor {
         return testResult;
     }
 
-    public final static String _MAGIC = "$magic";
-
     private List<BasicDBObject> parseGeneratedKeyValues(BasicDBObject generatedData, String operationType, Object value) {
         List<BasicDBObject> generatedOperationKeyValuePairs = new ArrayList<>();
                 if (generatedData.containsKey(operationType)) {
@@ -479,20 +477,22 @@ public class Executor {
                 String request = Utils.buildRequestIHttpFormat(rawApi);
 
                 String operationPrompt = "";
-                if (key.equals(_MAGIC)) {
+                if (key.equals(Utils._MAGIC)) {
                     operationPrompt = value.toString();
-                } else if (key.toString().startsWith(_MAGIC)) {
-                    operationPrompt = key.toString().replace(_MAGIC, "").trim();
+                } else if (key.toString().startsWith(Utils._MAGIC)) {
+                    operationPrompt = key.toString().replace(Utils._MAGIC, "").trim();
                 }
 
-                String operationTypeLower = operationType.toLowerCase();
-                String operation = operationTypeLower + ": " + operationPrompt;
+                if (!operationPrompt.isEmpty()) {
+                    String operationTypeLower = operationType.toLowerCase();
+                    String operation = operationTypeLower + ": " + operationPrompt;
 
-                BasicDBObject queryData = new BasicDBObject();
-                queryData.put(TestExecutorModifier._REQUEST, request);
-                queryData.put(TestExecutorModifier._OPERATION, operation);
-                BasicDBObject generatedData = new TestExecutorModifier().handle(queryData);
-                generatedOperationKeyValuePairs = parseGeneratedKeyValues(generatedData, operationTypeLower, value);
+                    BasicDBObject queryData = new BasicDBObject();
+                    queryData.put(TestExecutorModifier._REQUEST, request);
+                    queryData.put(TestExecutorModifier._OPERATION, operation);
+                    BasicDBObject generatedData = new TestExecutorModifier().handle(queryData);
+                    generatedOperationKeyValuePairs = parseGeneratedKeyValues(generatedData, operationTypeLower, value);
+                }
             }
 
         } catch (Exception e) {
