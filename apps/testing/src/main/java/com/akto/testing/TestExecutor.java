@@ -1217,9 +1217,34 @@ public class TestExecutor {
         //String updatedBody = null, updatedRespBody = null;
     
         try {
+
+            Map<String, List<String>> headers = rawApi.getRequest().getHeaders();
+            if (headers == null || headers.isEmpty()) {
+                return false;
+            }
+            final String CONTENT_TYPE = "content-type";
+            if (!headers.containsKey(CONTENT_TYPE)) {
+                return false;
+            }
+            List<String> contentTypeValues = headers.get(CONTENT_TYPE);
+            if (contentTypeValues == null || contentTypeValues.isEmpty()) {
+                return false;
+            }
+            String contentType = contentTypeValues.get(0).toLowerCase();
+            if (!contentType.contains("application/json") && !contentType.contains("application/json-rpc")) {
+                return false;
+            }
+
             // Parse request body
-            Object requestBodyObj = JSON.parse(rawApi.getRequest().getBody());
-            Map<String, Object> requestMap = mapper.convertValue(requestBodyObj, Map.class);
+            Map<String, Object> requestMap = new HashMap<>();
+            try {
+                Object requestBodyObj = JSON.parse(rawApi.getRequest().getBody());
+                requestMap = mapper.convertValue(requestBodyObj, Map.class);
+            } catch (Exception e) {
+                throw new Exception("Invalid JSON in request body: " + e.getMessage());
+                // TODO: handle exception
+            }
+            
     
             // Detect JSON-RPC 2.0
             String jsonrpcVersion = String.valueOf(requestMap.get("jsonrpc"));
@@ -1241,10 +1266,10 @@ public class TestExecutor {
                     rawApi.getRequest().setUrl(trimmedUrl);
                 }
             }
-    
             return true;
         } catch (Exception e) {
-            throw new Exception("Error while filtering JSON-RPC payload: " + e.getMessage());
+            loggerMaker.errorAndAddToDb("Error while filtering JSON-RPC payload: " + e.getMessage());   
+            return false; 
         }
     }
     
