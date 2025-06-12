@@ -1,6 +1,8 @@
 package com.akto.threat.backend.service;
 
+import com.akto.dao.MCollection;
 import com.akto.dto.HttpResponseParams;
+import com.akto.dto.billing.Organization;
 import com.akto.proto.generated.threat_detection.message.sample_request.v1.Metadata;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.DailyActorsCountResponse;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchMaliciousEventsRequest;
@@ -24,11 +26,9 @@ import com.akto.threat.backend.db.ActorInfoModel;
 import com.akto.threat.backend.db.SplunkIntegrationModel;
 import com.akto.threat.backend.db.MaliciousEventModel.EventType;
 import com.google.protobuf.TextFormat;
-import com.mongodb.client.FindIterable;
-import com.mongodb.client.MongoClient;
-import com.mongodb.client.MongoCollection;
-import com.mongodb.client.MongoCursor;
+import com.mongodb.client.*;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Indexes;
 import com.mongodb.client.model.Updates;
 import com.mongodb.client.model.Sorts;
 
@@ -113,6 +113,14 @@ public class ThreatActorService {
     }
     return builder.build();
 }
+
+    public void deleteAllMaliciousEvents(String accountId) {
+        MongoCollection<Document> coll = this.mongoClient
+                .getDatabase(accountId)
+                .getCollection(MongoDBCollection.ThreatDetection.MALICIOUS_EVENTS, Document.class);
+
+        coll.drop();
+    }
 
 
     public ListThreatActorResponse listThreatActors(String accountId, ListThreatActorsRequest request) {

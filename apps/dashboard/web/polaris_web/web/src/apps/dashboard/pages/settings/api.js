@@ -654,6 +654,13 @@ const settingRequests = {
             method: 'post',
             data: {mergedUrls: mergedApis}
         })
+    },
+    async deleteAllMaliciousEvents() {
+        return await request({
+            url: '/api/deleteAllMaliciousEvents',
+            method: 'post',
+            data: {}
+        })
     }
 }
 
