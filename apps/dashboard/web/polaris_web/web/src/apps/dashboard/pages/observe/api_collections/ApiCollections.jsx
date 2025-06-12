@@ -701,7 +701,7 @@ function ApiCollections(props) {
             data[key].length > 0 && data[key].forEach((c) => {
                 const list = dataMap[c?.id]?.map(func.formatCollectionType);
                 c['envType'] = list
-                c['envTypeComp'] = transform.getCollectionTypeList(list)
+                c['envTypeComp'] = transform.getCollectionTypeList(list, 1, false)
             })
         })
         setData(copyObj)
