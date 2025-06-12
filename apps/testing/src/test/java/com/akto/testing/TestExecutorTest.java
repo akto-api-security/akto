@@ -21,8 +21,10 @@ import org.junit.Test;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -105,6 +107,9 @@ public class TestExecutorTest extends MongoBasedTest {
         rawApi.setRequest(new OriginalHttpRequest());
         rawApi.getRequest().setBody("{\"jsonrpc\": \"2.0\", \"method\": \"testMethod\", \"params\": {}}");
         rawApi.getRequest().setUrl("http://example.com/testMethod");
+        Map<String, List<String>> headers = new HashMap<>();
+        headers.put("content-type", Collections.singletonList("application/json"));
+        rawApi.getRequest().setHeaders(headers);
         ApiInfo.ApiInfoKey apiInfoKey = new ApiInfo.ApiInfoKey(0, "http://example.com/testMethod", URLMethods.Method.POST);
 
         boolean result = testExecutor.filterJsonRpcPayload(rawApi, apiInfoKey);
