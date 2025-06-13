@@ -6,6 +6,7 @@ import com.akto.dto.APIConfig;
 import com.akto.dto.AccountSettings;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.HttpResponseParams;
+import com.akto.dto.HttpResponseParams.Source;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.traffic.CollectionTags;
@@ -32,7 +33,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.http.HttpStatus;
+import org.springframework.http.HttpMethod;
 
 public class McpToolsSyncJobExecutor {
 
@@ -41,11 +44,18 @@ public class McpToolsSyncJobExecutor {
 
     public static final McpToolsSyncJobExecutor INSTANCE = new McpToolsSyncJobExecutor();
 
+    public McpToolsSyncJobExecutor() {
+        Json.mapper().registerModule(new SimpleModule().addSerializer(new JsonNodeExampleSerializer()));
+    }
+
     public void runJob() {
         logger.info("Staring MCP Sync Job");
         List<ApiCollection> apiCollections = DataActorFactory.fetchInstance().fetchAllApiCollections();
         List<ApiCollection> eligibleCollections = new ArrayList<>();
         for (ApiCollection apiCollection : apiCollections) {
+            if (StringUtils.isEmpty(apiCollection.getHostName())) {
+                continue;
+            }
             List<CollectionTags> tagsList = apiCollection.getTagsList();
             if (CollectionUtils.isEmpty(tagsList)) {
                 continue;
@@ -72,7 +82,22 @@ public class McpToolsSyncJobExecutor {
 
         try {
             OriginalHttpRequest toolsListRequest = createToolsListRequest(host);
-            JSONRPCResponse toolsListResponse = sendRequest(toolsListRequest);
+            String jsonrpcResponse = sendRequest(toolsListRequest);
+
+            JSONRPCResponse toolsListResponse = (JSONRPCResponse) McpSchema.deserializeJsonRpcMessage(mapper,
+                jsonrpcResponse);
+
+            List<HttpResponseParams> responseParamsList = new ArrayList<>();
+
+            responseParamsList.add(
+                convertToAktoFormat(apiCollection.getId(),
+                    toolsListRequest.getPath(),
+                    buildHeaders(host),
+                    HttpMethod.POST.name(),
+                    toolsListRequest.getBody(),
+                    "http",
+                    new OriginalHttpResponse(jsonrpcResponse, Collections.emptyMap(), HttpStatus.SC_OK))
+            );
 
             logger.info("Received tools/list response. Processing tools.....");
 
@@ -89,7 +114,6 @@ public class McpToolsSyncJobExecutor {
                 return;
             }
             int id = 2;
-            List<HttpResponseParams> responseParamsList = new ArrayList<>();
             for (Tool tool : tools) {
                 String toolName = tool.getName();
                 JsonSchema inputSchema = tool.getInputSchema();
@@ -106,11 +130,13 @@ public class McpToolsSyncJobExecutor {
                 reqBody.put("params", params);
                 String reqBodyStr = mapper.writeValueAsString(reqBody);
 
-                OriginalHttpRequest callRequest = new OriginalHttpRequest(toolsListRequest.getUrl(), null, "POST",
-                    reqBodyStr, buildHeaders(host), "http");
-
-                HttpResponseParams httpResponseParams = convertToAktoFormat(callRequest,
-                    new OriginalHttpResponse("{}", Collections.emptyMap(), HttpStatus.SC_OK));
+                HttpResponseParams httpResponseParams = convertToAktoFormat(apiCollection.getId(),
+                    toolsListRequest.getPath(),
+                    buildHeaders(host),
+                    HttpMethod.POST.name(),
+                    reqBodyStr,
+                    "http",
+                    new OriginalHttpResponse("", Collections.emptyMap(), HttpStatus.SC_OK));
 
                 responseParamsList.add(httpResponseParams);
             }
@@ -138,32 +164,24 @@ public class McpToolsSyncJobExecutor {
         }
     }
 
-    private static Map<String, List<String>> buildHeaders(String host) {
-        Map<String, List<String>> headers = new HashMap<>();
-        headers.put("Content-Type", Collections.singletonList("application/json"));
-        headers.put("Accept", Collections.singletonList("*/*"));
-        headers.put("host", Collections.singletonList(host));
-        return headers;
+    private static String buildHeaders(String host) {
+        return "{\"Content-Type\":\"application/json\",\"Accept\":\"*/*\",\"host\":\"" + host + "\"}";
     }
 
     public static OriginalHttpRequest createToolsListRequest(String host) {
         String url = "/tools/list";
         String method = "POST";
         String body = "{\"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"tools/list\", \"params\": {}}";
-        Map<String, List<String>> headers = buildHeaders(host);
+        String headers = buildHeaders(host);
         String type = "http";
-        return new OriginalHttpRequest(url, null, method, body, headers, type);
+        return new OriginalHttpRequest(url, null, method, body, OriginalHttpRequest.buildHeadersMap(headers), type);
     }
 
-    public static JSONRPCResponse sendRequest(OriginalHttpRequest request) throws Exception {
+    public static String sendRequest(OriginalHttpRequest request) throws Exception {
         try {
             OriginalHttpResponse response = ApiExecutor.sendRequestWithSse(request, true, null, false,
                 new ArrayList<>(), false);
-            JSONRPCResponse jsonrpcResponse = (JSONRPCResponse) McpSchema.deserializeJsonRpcMessage(new ObjectMapper(), response.getBody());
-            if (jsonrpcResponse.getError() != null) {
-                logger.warn("Received error response from mcp server. Request: {}, Response: {}", request, jsonrpcResponse);
-            }
-            return jsonrpcResponse;
+            return response.getBody();
         } catch (Exception e) {
             logger.error("Error while making request to MCP server.", e);
             throw e;
@@ -180,8 +198,6 @@ public class McpToolsSyncJobExecutor {
             String inputSchemaJson = mapper.writeValueAsString(inputSchema);
             Schema openApiSchema = io.swagger.v3.core.util.Json.mapper().readValue(inputSchemaJson, Schema.class);
             Example example = ExampleBuilder.fromSchema(openApiSchema, null);
-            SimpleModule simpleModule = new SimpleModule().addSerializer(new JsonNodeExampleSerializer());
-            Json.mapper().registerModule(simpleModule);
             return JSONUtils.getMap(Json.pretty(example));
 
         } catch (Exception e) {
@@ -190,22 +206,24 @@ public class McpToolsSyncJobExecutor {
         }
     }
 
-
-    private static HttpResponseParams convertToAktoFormat(OriginalHttpRequest request,
-        OriginalHttpResponse response) {
+    private static HttpResponseParams convertToAktoFormat(int apiCollectionId, String path, String requestHeaders, String method,
+        String body, String type, OriginalHttpResponse response) {
         Map<String, Object> value = new HashMap<>();
 
-        value.put("path", request.getUrl());
-        value.put("requestHeaders", JSONUtils.getString(request.getHeaders()));
+        value.put("path", path);
+        value.put("requestHeaders", requestHeaders);
         value.put("responseHeaders", JSONUtils.getString(response.getHeaders()));
-        value.put("method", request.getMethod());
-        value.put("requestPayload", request.getBody());
+        value.put("method", method);
+        value.put("requestPayload", body);
         value.put("responsePayload", response.getBody());
         value.put("time", String.valueOf(System.currentTimeMillis() / 1000));
         value.put("statusCode", String.valueOf(response.getStatusCode()));
-        value.put("type", request.getType());
+        value.put("type", type);
         value.put("status", String.valueOf(response.getStatusCode()));
         value.put("akto_account_id", String.valueOf(Context.accountId.get()));
+        value.put("akto_vxlan_id", String.valueOf(apiCollectionId));
+        value.put("source", Source.MIRRORING);
+        value.put("ip", "127.0.0.1");
 
         String message = JSONUtils.getString(value);
         try {
