@@ -649,7 +649,7 @@ public class ApiExecutor {
     public static OriginalHttpResponse sendRequestWithSse(OriginalHttpRequest request, boolean followRedirects, TestingRunConfig testingRunConfig, boolean debug, List<TestingRunResult.TestLog> testLogs, boolean skipSSRFCheck) throws Exception {
         // Always use prepareUrl to get the absolute URL
         String url = prepareUrl(request, testingRunConfig);
-        loggerMaker.info("replaced url");
+        url = url.replace("https", "http");
         URI uri = new URI(url);
         if (uri.getScheme() == null || uri.getHost() == null) {
             throw new IllegalArgumentException("URL must be absolute with scheme and host for SSE: " + url);
