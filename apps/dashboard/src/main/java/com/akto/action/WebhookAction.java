@@ -161,26 +161,6 @@ public class WebhookAction extends UserAction implements ServletRequestAware{
         } 
         boolean isUrl = (customWebhook.getWebhookType() != null && customWebhook.getWebhookType().equals(WebhookType.GMAIL)) ||  KeyTypes.patternToSubType.get(SingleTypeInfo.URL).matcher(url).matches() ;
 
-        if(customWebhook.getSelectedWebhookOptions().get(0).equals(CustomWebhook.WebhookOptions.PENDING_TESTS_ALERTS)) {
-            // If the webhook is for pending tests alerts, we need to ensure that the job is created or updated
-            Job existingJob = JobsDao.instance.findOne(
-                    Filters.and(
-                            Filters.eq("jobParams.customWebhookId", id)
-                    )
-            );
-            if (existingJob == null) {
-                createRecurringJob(id);
-            }else{
-                // If the job already exists, we can update the job parameters if needed
-                PendingTestsAlertsJobParams params = (PendingTestsAlertsJobParams) existingJob.getJobParams();
-                params.setCustomWebhookId(customWebhook.getId());
-                JobsDao.instance.updateOne(
-                        Filters.eq("_id", existingJob.getId()),
-                        Updates.set("jobParams", params)
-                );
-            }
-        }
-
         try{
             OriginalHttpRequest.buildHeadersMap(headerString);
         }
