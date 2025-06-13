@@ -14,6 +14,7 @@ import com.akto.hybrid_parsers.HttpCallParser;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.mcp.McpSchema;
+import com.akto.mcp.McpSchema.CallToolRequest;
 import com.akto.mcp.McpSchema.JSONRPCRequest;
 import com.akto.mcp.McpSchema.JSONRPCResponse;
 import com.akto.mcp.McpSchema.JsonSchema;
@@ -23,7 +24,6 @@ import com.akto.testing.ApiExecutor;
 import com.akto.util.JSONUtils;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.module.SimpleModule;
-import io.modelcontextprotocol.spec.McpSchema.CallToolRequest;
 import io.swagger.oas.inflector.examples.ExampleBuilder;
 import io.swagger.oas.inflector.examples.models.Example;
 import io.swagger.oas.inflector.processors.JsonNodeExampleSerializer;
@@ -74,8 +74,11 @@ public class McpToolsSyncJobExecutor {
             return;
         }
 
-        eligibleCollections.forEach(apiCollection ->
-            handleMcpDiscovery(apiCollection, apiConfig)
+        eligibleCollections.forEach(apiCollection -> {
+            logger.info("Starting MCP sync for apiCollectionId: {} and hostname: {}", apiCollection.getId(),
+                apiCollection.getHostName());
+                handleMcpDiscovery(apiCollection, apiConfig);
+            }
         );
     }
 
