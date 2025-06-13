@@ -366,10 +366,18 @@ public class Main {
 
         // schedule MCP sync job for 24 hours
         loggerMaker.info("Scheduling MCP Sync Job");
+        APIConfig finalApiConfig = apiConfig;
         scheduler.scheduleAtFixedRate(() -> {
             Context.accountId.set(actualAccountId);
-            McpToolsSyncJobExecutor.INSTANCE.runJob();
-        }, 0, 10, TimeUnit.SECONDS);
+            try {
+                loggerMaker.infoAndAddToDb("Executing MCP Tools Sync job");
+                McpToolsSyncJobExecutor.INSTANCE.runJob(finalApiConfig);
+                loggerMaker.infoAndAddToDb("Finished executing MCP Tools Sync job");
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb(e, "Error while executing MCP Tools Sync Job");
+            }
+
+        }, 30, 24, TimeUnit.MINUTES);
 
         try {
             main.consumer.subscribe(Arrays.asList(topicName, "har_"+topicName));

@@ -14,6 +14,7 @@ import com.akto.hybrid_parsers.HttpCallParser;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.mcp.McpSchema;
+import com.akto.mcp.McpSchema.JSONRPCRequest;
 import com.akto.mcp.McpSchema.JSONRPCResponse;
 import com.akto.mcp.McpSchema.JsonSchema;
 import com.akto.mcp.McpSchema.ListToolsResult;
@@ -22,6 +23,7 @@ import com.akto.testing.ApiExecutor;
 import com.akto.util.JSONUtils;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.module.SimpleModule;
+import io.modelcontextprotocol.spec.McpSchema.CallToolRequest;
 import io.swagger.oas.inflector.examples.ExampleBuilder;
 import io.swagger.oas.inflector.examples.models.Example;
 import io.swagger.oas.inflector.processors.JsonNodeExampleSerializer;
@@ -41,15 +43,15 @@ public class McpToolsSyncJobExecutor {
 
     private static final LoggerMaker logger = new LoggerMaker(McpToolsSyncJobExecutor.class, LogDb.RUNTIME);
     private static final ObjectMapper mapper = new ObjectMapper();
-
     public static final McpToolsSyncJobExecutor INSTANCE = new McpToolsSyncJobExecutor();
-
+    private static final String MCP_TOOLS_LIST_REQUEST_JSON = "{\"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"tools/list\", \"params\": {}}";
+    private static final String AKTO_MCP_SERVER_TAG = "mcp-server";
+    private static final String LOCAL_IP = "127.0.0.1";
     public McpToolsSyncJobExecutor() {
         Json.mapper().registerModule(new SimpleModule().addSerializer(new JsonNodeExampleSerializer()));
     }
 
-    public void runJob() {
-        logger.info("Staring MCP Sync Job");
+    public void runJob(APIConfig apiConfig) {
         List<ApiCollection> apiCollections = DataActorFactory.fetchInstance().fetchAllApiCollections();
         List<ApiCollection> eligibleCollections = new ArrayList<>();
         for (ApiCollection apiCollection : apiCollections) {
@@ -61,23 +63,23 @@ public class McpToolsSyncJobExecutor {
                 continue;
             }
             tagsList.stream()
-                .filter(t -> "mcp-server".equals(t.getKeyName()))
+                .filter(t -> AKTO_MCP_SERVER_TAG.equals(t.getKeyName()))
                 .findFirst()
                 .ifPresent(c -> eligibleCollections.add(apiCollection));
         }
 
-        logger.info("Found {} collections for MCP server.", eligibleCollections.size());
+        logger.debug("Found {} collections for MCP server.", eligibleCollections.size());
 
         if (eligibleCollections.isEmpty()) {
             return;
         }
 
-        eligibleCollections.forEach(
-            McpToolsSyncJobExecutor::handleMcpDiscovery
+        eligibleCollections.forEach(apiCollection ->
+            handleMcpDiscovery(apiCollection, apiConfig)
         );
     }
 
-    public static void handleMcpDiscovery(ApiCollection apiCollection) {
+    public static void handleMcpDiscovery(ApiCollection apiCollection, APIConfig apiConfig) {
         String host = apiCollection.getHostName();
 
         try {
@@ -89,17 +91,18 @@ public class McpToolsSyncJobExecutor {
 
             List<HttpResponseParams> responseParamsList = new ArrayList<>();
 
-            responseParamsList.add(
-                convertToAktoFormat(apiCollection.getId(),
-                    toolsListRequest.getPath(),
-                    buildHeaders(host),
-                    HttpMethod.POST.name(),
-                    toolsListRequest.getBody(),
-                    "http",
-                    new OriginalHttpResponse(jsonrpcResponse, Collections.emptyMap(), HttpStatus.SC_OK))
-            );
+            HttpResponseParams toolsListresponseParams = convertToAktoFormat(apiCollection.getId(),
+                toolsListRequest.getPath(),
+                buildHeaders(host),
+                HttpMethod.POST.name(),
+                toolsListRequest.getBody(),
+                new OriginalHttpResponse(jsonrpcResponse, Collections.emptyMap(), HttpStatus.SC_OK));
 
-            logger.info("Received tools/list response. Processing tools.....");
+            if (toolsListresponseParams != null) {
+                responseParamsList.add(toolsListresponseParams);
+            }
+
+            logger.debug("Received tools/list response. Processing tools.....");
 
             // Parse tools from response
             ListToolsResult toolsResult = JSONUtils.fromJson(toolsListResponse.getResult(), ListToolsResult.class);
@@ -115,40 +118,26 @@ public class McpToolsSyncJobExecutor {
             }
             int id = 2;
             for (Tool tool : tools) {
-                String toolName = tool.getName();
-                JsonSchema inputSchema = tool.getInputSchema();
-                Map<String, Object> exampleArguments = generateExampleArguments(inputSchema);
+                JSONRPCRequest request = new JSONRPCRequest(
+                    McpSchema.JSONRPC_VERSION,
+                    McpSchema.METHOD_TOOLS_CALL,
+                    id++,
+                    new CallToolRequest(tool.getName(), generateExampleArguments(tool.getInputSchema()))
+                );
 
-                // Build request body
-                Map<String, Object> params = new HashMap<>();
-                params.put("name", toolName);
-                params.put("arguments", exampleArguments);
-                Map<String, Object> reqBody = new HashMap<>();
-                reqBody.put("jsonrpc", "2.0");
-                reqBody.put("id", id++);
-                reqBody.put("method", "tools/call");
-                reqBody.put("params", params);
-                String reqBodyStr = mapper.writeValueAsString(reqBody);
-
-                HttpResponseParams httpResponseParams = convertToAktoFormat(apiCollection.getId(),
+                HttpResponseParams toolsCallHttpResponseParams = convertToAktoFormat(apiCollection.getId(),
                     toolsListRequest.getPath(),
                     buildHeaders(host),
                     HttpMethod.POST.name(),
-                    reqBodyStr,
-                    "http",
+                    mapper.writeValueAsString(request),
                     new OriginalHttpResponse("", Collections.emptyMap(), HttpStatus.SC_OK));
 
-                responseParamsList.add(httpResponseParams);
+                if (toolsCallHttpResponseParams != null) {
+                    responseParamsList.add(toolsCallHttpResponseParams);
+                }
             }
             Map<String, List<HttpResponseParams>> responseParamsToAccountIdMap = new HashMap<>();
-            logger.info(Context.accountId.get().toString());
             responseParamsToAccountIdMap.put(Context.accountId.get().toString(), responseParamsList);
-
-            String configName = System.getenv("AKTO_CONFIG_NAME");
-            APIConfig apiConfig = DataActorFactory.fetchInstance().fetchApiConfig(configName);
-            if (apiConfig == null) {
-                apiConfig = new APIConfig(configName,"access-token", 1, 10_000_000, Main.sync_threshold_time); // this sync threshold time is used for deleting sample data
-            }
 
             Main.handleResponseParams(responseParamsToAccountIdMap,
                 new HashMap<>(),
@@ -169,12 +158,13 @@ public class McpToolsSyncJobExecutor {
     }
 
     public static OriginalHttpRequest createToolsListRequest(String host) {
-        String url = "/tools/list";
-        String method = "POST";
-        String body = "{\"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"tools/list\", \"params\": {}}";
-        String headers = buildHeaders(host);
-        String type = "http";
-        return new OriginalHttpRequest(url, null, method, body, OriginalHttpRequest.buildHeadersMap(headers), type);
+        return new OriginalHttpRequest(McpSchema.METHOD_TOOLS_LIST,
+            null,
+            HttpMethod.POST.name(),
+            MCP_TOOLS_LIST_REQUEST_JSON,
+            OriginalHttpRequest.buildHeadersMap(buildHeaders(host)),
+            "http"
+        );
     }
 
     public static String sendRequest(OriginalHttpRequest request) throws Exception {
@@ -207,7 +197,7 @@ public class McpToolsSyncJobExecutor {
     }
 
     private static HttpResponseParams convertToAktoFormat(int apiCollectionId, String path, String requestHeaders, String method,
-        String body, String type, OriginalHttpResponse response) {
+        String body, OriginalHttpResponse response) {
         Map<String, Object> value = new HashMap<>();
 
         value.put("path", path);
@@ -218,12 +208,12 @@ public class McpToolsSyncJobExecutor {
         value.put("responsePayload", response.getBody());
         value.put("time", String.valueOf(System.currentTimeMillis() / 1000));
         value.put("statusCode", String.valueOf(response.getStatusCode()));
-        value.put("type", type);
+        value.put("type", "http");
         value.put("status", String.valueOf(response.getStatusCode()));
         value.put("akto_account_id", String.valueOf(Context.accountId.get()));
         value.put("akto_vxlan_id", String.valueOf(apiCollectionId));
         value.put("source", Source.MIRRORING);
-        value.put("ip", "127.0.0.1");
+        value.put("ip", LOCAL_IP);
 
         String message = JSONUtils.getString(value);
         try {
