@@ -49,7 +49,7 @@ public class McpToolsSyncJobExecutor {
     }
 
     public void runJob() {
-        logger.info("Staring MCP Sync Job");
+        logger.info("Starting MCP Sync Job");
         List<ApiCollection> apiCollections = DataActorFactory.fetchInstance().fetchAllApiCollections();
         List<ApiCollection> eligibleCollections = new ArrayList<>();
         for (ApiCollection apiCollection : apiCollections) {
