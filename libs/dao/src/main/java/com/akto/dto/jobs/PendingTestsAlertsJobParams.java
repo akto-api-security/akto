@@ -15,7 +15,7 @@ public class PendingTestsAlertsJobParams extends JobParams {
 
 
     private int lastSyncedAt;
-    private CustomWebhook customWebhook;
+    private int customWebhookId;
 
     @Override
     public JobType getJobType() {

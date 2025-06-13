@@ -1,6 +1,7 @@
 package com.akto.jobs.executors;
 
 import com.akto.dao.context.Context;
+import com.akto.dao.notifications.CustomWebhooksDao;
 import com.akto.dao.testing.TestingRunDao;
 import com.akto.dto.jobs.Job;
 import com.akto.dto.jobs.PendingTestsAlertsJobParams;
@@ -20,6 +21,8 @@ import org.bson.conversions.Bson;
 import java.util.*;
 import java.util.stream.Collectors;
 
+import static com.akto.runtime.utils.Utils.convertEpochToDateTime;
+
 
 public class PendingTestsAlertsJobExecutor extends JobExecutor<PendingTestsAlertsJobParams> {
 
@@ -33,8 +36,9 @@ public class PendingTestsAlertsJobExecutor extends JobExecutor<PendingTestsAlert
 
     @Override
     protected void runJob(Job job) throws Exception {
+        logger.info("Starting sendPendingTestsWebhookAlert job for job: {}", job.getId());
         PendingTestsAlertsJobParams params = paramClass.cast(job.getJobParams());
-        CustomWebhook webhook = params.getCustomWebhook();
+        int webhookId = params.getCustomWebhookId();
         int lastSyncedAt = params.getLastSyncedAt();
 
         int accountId = Context.accountId.get();
@@ -48,7 +52,7 @@ public class PendingTestsAlertsJobExecutor extends JobExecutor<PendingTestsAlert
         }else {
 
             logger.info("Found {} scheduled tests for the next hour", scheduledTests.size());
-            createPayloadForPendingTests(scheduledTests, webhook);
+            createPayloadForPendingTests(scheduledTests, webhookId);
 
         }
 
@@ -73,9 +77,10 @@ public class PendingTestsAlertsJobExecutor extends JobExecutor<PendingTestsAlert
         logger.info("sendPendingTestsWebhookTimestamp Alert job completed.");
     }
 
-    private void createPayloadForPendingTests(List<TestingRun> pendingTests, CustomWebhook webhook) {
+    private void createPayloadForPendingTests(List<TestingRun> pendingTests, int webhookId) {
         try {
-            logger.info("Starting to create Webhook Payload {}", webhook.getUrl());
+            CustomWebhook webhook = CustomWebhooksDao.instance.findOne(Filters.eq("_id", webhookId));
+            logger.info("Starting to create Webhook Payload for pending tests with webhookId: {}", webhookId);
             if (pendingTests == null || pendingTests.isEmpty()) {
                 logger.info("No pending tests found. Skipping webhook sending.");
                 return;
@@ -86,7 +91,7 @@ public class PendingTestsAlertsJobExecutor extends JobExecutor<PendingTestsAlert
             }
 
             List<ScheduledTestInfo> tests = pendingTests.stream()
-                    .map(tr -> new ScheduledTestInfo(tr.getName(), tr.getScheduleTimestamp()))
+                    .map(tr -> new ScheduledTestInfo(tr.getName(), convertEpochToDateTime(tr.getScheduleTimestamp())))
                     .collect(Collectors.toList());
 
             ScheduledTestsDetails details = new ScheduledTestsDetails(pendingTests.size(), tests);

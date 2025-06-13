@@ -1,12 +1,11 @@
 package com.akto.action;
 
 import com.akto.dao.context.Context;
+import com.akto.dao.jobs.JobsDao;
 import com.akto.dao.notifications.CustomWebhooksDao;
 import com.akto.dao.notifications.CustomWebhooksResultDao;
 import com.akto.dto.OriginalHttpRequest;
-import com.akto.dto.jobs.Job;
-import com.akto.dto.jobs.JobExecutorType;
-import com.akto.dto.jobs.PendingTestsAlertsJobParams;
+import com.akto.dto.jobs.*;
 import com.akto.dto.notifications.CustomWebhook;
 import com.akto.dto.notifications.CustomWebhook.ActiveStatus;
 import com.akto.dto.notifications.CustomWebhook.WebhookType;
@@ -115,12 +114,12 @@ public class WebhookAction extends UserAction implements ServletRequestAware{
             customWebhook.setSendInstantly(sendInstantly);
             customWebhook.setWebhookType(type);
             customWebhook.setDashboardUrl(this.dashboardUrl);
+            customWebhook.setUrl(this.url);
             CustomWebhooksDao.instance.insertOne(customWebhook);
 
             if(customWebhook.getSelectedWebhookOptions().get(0).equals(CustomWebhook.WebhookOptions.PENDING_TESTS_ALERTS)) {
                 // If the webhook is for pending tests alerts, schedule the job to send pending tests alerts
-                Job job = createRecurringJob(customWebhook);
-
+                Job job = createRecurringJob(customWebhook.getId());
                 if (job == null) {
                    addActionError("Error while creating recurring job for project key");
                 }
@@ -132,12 +131,12 @@ public class WebhookAction extends UserAction implements ServletRequestAware{
         return Action.SUCCESS.toUpperCase();
     }
 
-    private Job createRecurringJob(CustomWebhook webhook) {
+    private Job createRecurringJob(int webhookId) {
         return JobScheduler.scheduleRecurringJob(
                 Context.accountId.get(),
                 new PendingTestsAlertsJobParams(
                         Context.now(),
-                        webhook
+                        webhookId
                 ),
                 JobExecutorType.DASHBOARD,
                 PENDING_TESTS_ALERTS_JOB_RECURRING_INTERVAL_SECONDS
@@ -161,6 +160,26 @@ public class WebhookAction extends UserAction implements ServletRequestAware{
             return ERROR.toUpperCase();
         } 
         boolean isUrl = (customWebhook.getWebhookType() != null && customWebhook.getWebhookType().equals(WebhookType.GMAIL)) ||  KeyTypes.patternToSubType.get(SingleTypeInfo.URL).matcher(url).matches() ;
+
+        if(customWebhook.getSelectedWebhookOptions().get(0).equals(CustomWebhook.WebhookOptions.PENDING_TESTS_ALERTS)) {
+            // If the webhook is for pending tests alerts, we need to ensure that the job is created or updated
+            Job existingJob = JobsDao.instance.findOne(
+                    Filters.and(
+                            Filters.eq("jobParams.customWebhookId", id)
+                    )
+            );
+            if (existingJob == null) {
+                createRecurringJob(id);
+            }else{
+                // If the job already exists, we can update the job parameters if needed
+                PendingTestsAlertsJobParams params = (PendingTestsAlertsJobParams) existingJob.getJobParams();
+                params.setCustomWebhookId(customWebhook.getId());
+                JobsDao.instance.updateOne(
+                        Filters.eq("_id", existingJob.getId()),
+                        Updates.set("jobParams", params)
+                );
+            }
+        }
 
         try{
             OriginalHttpRequest.buildHeadersMap(headerString);
@@ -224,16 +243,36 @@ public class WebhookAction extends UserAction implements ServletRequestAware{
         } else if ( !userEmail.equals(customWebhook.getUserEmail() )){
             addActionError("Unauthorized Request");
             return ERROR.toUpperCase();
-        } else{
+        } else {
             int now = Context.now();
-            
-            Bson updates = 
-            Updates.combine(
-                Updates.set("activeStatus",activeStatus),
-                Updates.set("lastUpdateTime",now)
-            );
 
-            CustomWebhooksDao.instance.updateOne(Filters.eq("_id",id), updates);
+            Bson updates =
+                    Updates.combine(
+                            Updates.set("activeStatus", activeStatus),
+                            Updates.set("lastUpdateTime", now)
+                    );
+
+            CustomWebhooksDao.instance.updateOne(Filters.eq("_id", id), updates);
+
+            addActionMessage("Webhook status updated successfully");
+            // If the status is update of Webhook of type PENDING_TESTS_ALERTS, then we need to handle the job accordingly
+            if (customWebhook.getSelectedWebhookOptions().get(0).equals(CustomWebhook.WebhookOptions.PENDING_TESTS_ALERTS)) {
+                addActionMessage("Webhook status updated for Pending Tests Alerts, hence job status to be updated accordingly");
+                Job pendingAlertTestJob = JobsDao.instance.findOne(
+                        Filters.and(
+                                Filters.eq("jobParams.customWebhookId", id)
+                        )
+                );
+                if (pendingAlertTestJob != null && activeStatus.equals(ActiveStatus.INACTIVE)) {
+                    // If the webhook has a job id, delete the job if status is set to INACTIVE
+                    JobScheduler.deleteJob(pendingAlertTestJob.getId());
+                    addActionMessage("Job deleted for Pending Tests Alerts");
+                } else if (pendingAlertTestJob != null && activeStatus.equals(ActiveStatus.ACTIVE) && pendingAlertTestJob.getJobStatus().equals(JobStatus.STOPPED)) {
+                    // If the webhook has a job id, restart the job if status is set to ACTIVE
+                    JobScheduler.restartJob(pendingAlertTestJob.getId());
+                    addActionMessage("Job restarted for Pending Tests Alerts");
+                }
+            }
         }
         return Action.SUCCESS.toUpperCase();
     }
