@@ -3,7 +3,6 @@ package com.akto.action;
 import com.akto.dao.*;
 import com.akto.dao.context.Context;
 import com.akto.dao.test_editor.YamlTemplateDao;
-import com.akto.dao.threat_detection.ApiHitCountInfoDao;
 import com.akto.dao.traffic_collector.TrafficCollectorInfoDao;
 import com.akto.dao.traffic_collector.TrafficCollectorMetricsDao;
 import com.akto.data_actor.DbLayer;
@@ -15,7 +14,6 @@ import com.akto.dto.bulk_updates.BulkUpdates;
 import com.akto.dto.bulk_updates.UpdatePayload;
 import com.akto.dto.dependency_flow.Node;
 import com.akto.dto.filter.MergedUrls;
-import com.akto.dto.graph.SvcToSvcGraph;
 import com.akto.dto.graph.SvcToSvcGraphEdge;
 import com.akto.dto.graph.SvcToSvcGraphNode;
 import com.akto.dto.metrics.MetricData;
@@ -59,7 +57,6 @@ import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.enums.GlobalEnums.TestErrorSource;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.module.SimpleModule;
 import com.opensymphony.xwork2.Action;
 import com.opensymphony.xwork2.ActionSupport;
 import com.mongodb.BasicDBList;
@@ -68,7 +65,6 @@ import com.mongodb.client.model.*;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 import com.google.gson.Gson;
-import com.akto.dao.metrics.MetricDataDao;
 
 import java.util.*;
 import java.util.concurrent.Executors;
@@ -3744,6 +3740,17 @@ public class DbAction extends ActionSupport {
             return ERROR.toUpperCase();
         }
         return SUCCESS.toUpperCase();
+    }
+
+    public String deMergeUrls() {
+        try {
+            loggerMaker.infoAndAddToDb("deMerge URLs called");
+            DbLayer.deMergeUrls(apiCollectionId, url, method);
+            return SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error in deMergeUrls api: " + e, LogDb.DB_ABS);
+            return ERROR.toUpperCase();
+        }
     }
 
     private String result;

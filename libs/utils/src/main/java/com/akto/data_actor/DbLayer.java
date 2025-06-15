@@ -7,7 +7,6 @@ import com.akto.dao.metrics.MetricDataDao;
 import com.akto.dto.jobs.Job;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
@@ -1650,5 +1649,17 @@ public class DbLayer {
 
     public static void insertDataIngestionLog(Log log) {
         DataIngestionLogsDao.instance.insertOne(log);
+    }
+
+    public static void deMergeUrls(int apiCollectionId, String url, Method method) {
+        MergedUrlsDao.instance.updateOne(Filters.and(
+            Filters.eq(MergedUrls.URL, url),
+            Filters.eq(MergedUrls.METHOD, method.name()),
+            Filters.eq(MergedUrls.API_COLLECTION_ID, apiCollectionId)
+        ), Updates.combine(
+            Updates.set(MergedUrls.URL, url),
+            Updates.set(MergedUrls.METHOD, method),
+            Updates.set(MergedUrls.API_COLLECTION_ID, apiCollectionId)
+        ));
     }
 }
