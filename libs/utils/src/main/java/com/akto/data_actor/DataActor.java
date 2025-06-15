@@ -33,6 +33,7 @@ import com.akto.dto.traffic.CollectionTags;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods;
+import com.akto.dto.type.URLMethods.Method;
 import com.akto.dto.usage.MetricTypes;
 import com.mongodb.BasicDBObject;
 
@@ -96,6 +97,7 @@ public abstract class DataActor {
     public abstract List<ApiInfo.ApiInfoKey> fetchEndpointsInCollection();
 
     public abstract List<ApiCollection> fetchApiCollections();
+    public abstract List<ApiCollection> fetchAllApiCollections();
 
     public abstract void createCollectionSimple(int vxlanId);
 
@@ -292,4 +294,6 @@ public abstract class DataActor {
     public abstract void updateTestingRunPlayground(TestingRunPlayground testingRunPlayground);
 
     public abstract void scheduleAutoCreateTicketsJob(int accountId, JobParams params, JobExecutorType jobExecutorType);
+
+    public abstract void deMergeUrls(int apiCollectionId, String url, Method method);
 }

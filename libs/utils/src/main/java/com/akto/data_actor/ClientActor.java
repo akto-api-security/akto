@@ -11,6 +11,7 @@ import com.akto.dto.jobs.ScheduleType;
 import com.akto.dto.metrics.MetricData;
 import com.akto.dto.monitoring.ModuleInfo;
 import com.akto.dto.settings.DataControlSettings;
+import com.akto.dto.type.URLMethods.Method;
 import com.akto.testing.ApiExecutor;
 import com.auth0.jwt.JWT;
 import com.auth0.jwt.interfaces.DecodedJWT;
@@ -1097,6 +1098,41 @@ public class ClientActor extends DataActor {
             loggerMaker.errorAndAddToDb("error in fetchApiCollections" + e, LoggerMaker.LogDb.RUNTIME);
         }
         loggerMaker.infoAndAddToDb("fetchEndpointsInCollection api called size " + apiCollections.size(), LoggerMaker.LogDb.RUNTIME);
+        return apiCollections;
+    }
+
+    public List<ApiCollection> fetchAllApiCollections() {
+        Map<String, List<String>> headers = buildHeaders();
+        List<ApiCollection> apiCollections = new ArrayList<>();
+        loggerMaker.infoAndAddToDb("fetchAllApiCollections api called ", LoggerMaker.LogDb.RUNTIME);
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/fetchAllApiCollections", "", "POST", null, headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb("invalid response in fetchAllApiCollections", LoggerMaker.LogDb.RUNTIME);
+            }
+            BasicDBObject payloadObj;
+            try {
+                payloadObj =  BasicDBObject.parse(responsePayload);
+
+                BasicDBList apiCollectionList = (BasicDBList) payloadObj.get("apiCollections");
+
+                for (Object obj: apiCollectionList) {
+                    BasicDBObject aObj = (BasicDBObject) obj;
+                    aObj.remove("displayName");
+                    aObj.remove("urlsCount");
+                    aObj.remove("envType");
+                    ApiCollection col = objectMapper.readValue(aObj.toJson(), ApiCollection.class);
+                    apiCollections.add(col);
+                }
+            } catch(Exception e) {
+                loggerMaker.errorAndAddToDb("error extracting response in fetchApiCollections" + e, LoggerMaker.LogDb.RUNTIME);
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in fetchApiCollections" + e, LoggerMaker.LogDb.RUNTIME);
+        }
+        loggerMaker.infoAndAddToDb("fetchAllApiCollections api called size " + apiCollections.size(), LoggerMaker.LogDb.RUNTIME);
         return apiCollections;
     }
 
@@ -3863,6 +3899,26 @@ public class ClientActor extends DataActor {
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("error in updateTestingRunPlaygroundStateAndResult" + e, LoggerMaker.LogDb.RUNTIME);
             return;
+        }
+    }
+
+    public void deMergeUrls(int apiCollectionId, String url, Method method) {
+        Map<String, List<String>> headers = buildHeaders();
+        BasicDBObject obj = new BasicDBObject();
+        obj.put("url", url);
+        obj.put("method", method.name());
+        obj.put("apiCollectionId", apiCollectionId);
+        OriginalHttpRequest request = new OriginalHttpRequest(ClientActor.url + "/deMergeUrls", "", "POST", obj.toString(), headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
+            if (response.getStatusCode() != 200) {
+                loggerMaker.errorAndAddToDb("non 2xx response in deMergeUrls", LoggerMaker.LogDb.RUNTIME);
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(
+                "Error in calling deMergeUrls API for apiCollectionId: " + apiCollectionId + ", url: " + url
+                    + ", method: " + method,
+                LoggerMaker.LogDb.RUNTIME);
         }
     }
 }
