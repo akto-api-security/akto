@@ -683,7 +683,7 @@ public class ApiExecutor {
         String id = node.get("id").asText();
         String sseMsg = null;
         try {
-            sseMsg = waitForMatchingSseMessage(session, id, 10000); // 10s timeout
+            sseMsg = waitForMatchingSseMessage(session, id, 30000); // 30s timeout
 
         } finally {
             if (session.readerThread != null) {
