@@ -3746,6 +3746,31 @@ public class DbAction extends ActionSupport {
         try {
             loggerMaker.infoAndAddToDb("deMerge URLs called");
             DbLayer.deMergeUrls(apiCollectionId, url, method);
+
+//            SampleData sampleData = SampleDataDao.instance.fetchSampleDataForApi(apiCollectionId, url, method);
+//            List<String> samples = sampleData.getSamples();
+//            loggerMaker.debug("Found " + samples.size() + " samples for API: " + apiCollectionId + " " + url + method);
+
+
+            /*
+
+            @Shivansh, Need to check the below logic.
+            If the below lines are commented then the discovery will not work properly.
+            Consider the case: If there was a url - /message/tools/call/STRING, then any new endpoint matching this url will be merged.
+            If the below lines are not commented then the url will be deleted and any new endpoint matching this url will not be merged.
+
+            However, In cyborg there is a cron  job the runs every 10 minutes and it merges all the matching urls to - /message/tools/call/STRING
+
+             */
+
+            Bson stiFilter = SingleTypeInfoDao.filterForSTIUsingURL(apiCollectionId, url, method);
+            SingleTypeInfoDao.instance.deleteAll(stiFilter);
+
+            Bson sampleDataFilter = SampleDataDao.filterForSampleData(apiCollectionId, url, method);
+            ApiInfoDao.instance.deleteAll(sampleDataFilter);
+            SampleDataDao.instance.deleteAll(sampleDataFilter);
+            SensitiveSampleDataDao.instance.deleteAll(sampleDataFilter);
+            TrafficInfoDao.instance.deleteAll(sampleDataFilter);
             return SUCCESS.toUpperCase();
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error in deMergeUrls api: " + e, LogDb.DB_ABS);
