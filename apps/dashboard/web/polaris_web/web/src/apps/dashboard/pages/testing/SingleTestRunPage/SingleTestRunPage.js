@@ -390,14 +390,14 @@ function SingleTestRunPage() {
         let ignoredTestRunResults = []
         await api.fetchIssuesByStatusAndSummaryId(localSelectedTestRun.testingRunResultSummaryHexId, ["IGNORED"], sortKey, sortOrder, skip, limit, filters).then((resp) => {
           const ignoredIssuesTestingResult = resp?.testingRunResultList || [];
-          ignoredTestRunResults = transform.prepareTestRunResults(hexId, ignoredIssuesTestingResult, localSubCategoryMap, subCategoryFromSourceConfigMap)
+          ignoredTestRunResults = transform.prepareTestRunResults(hexId, ignoredIssuesTestingResult, localSubCategoryMap, subCategoryFromSourceConfigMap, resp?.issuesDescriptionMap)
         })
         testRunResultsRes = ignoredTestRunResults
         totalIgnoredIssuesCount = ignoredTestRunResults.length
       } else {
-        await api.fetchTestingRunResults(localSelectedTestRun.testingRunResultSummaryHexId, tableTabMap[selectedTab], sortKey, sortOrder, skip, limit, filters, queryValue).then(({ testingRunResults, errorEnums, issueslistCount }) => {
+        await api.fetchTestingRunResults(localSelectedTestRun.testingRunResultSummaryHexId, tableTabMap[selectedTab], sortKey, sortOrder, skip, limit, filters, queryValue).then(({ testingRunResults, errorEnums, issueslistCount, issuesDescriptionMap }) => {
           ignoredIssueListCount = issueslistCount
-          testRunResultsRes = transform.prepareTestRunResults(hexId, testingRunResults, localSubCategoryMap, subCategoryFromSourceConfigMap)
+          testRunResultsRes = transform.prepareTestRunResults(hexId, testingRunResults, localSubCategoryMap, subCategoryFromSourceConfigMap, issuesDescriptionMap)
           if (selectedTab === 'domain_unreachable' || selectedTab === 'skipped' || selectedTab === 'need_configurations') {
             errorEnums['UNKNOWN_ERROR_OCCURRED'] = "OOPS! Unknown error occurred."
             setErrorsObject(errorEnums)
