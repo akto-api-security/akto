@@ -126,7 +126,11 @@ public class McpToolsSyncJobExecutor {
                 logger.error("No tools found in MCP server");
                 return;
             }
+
             int id = 2;
+            String urlWithQueryParams = toolsListRequest.getPathWithQueryParams();
+            String toolsCallRequestHeaders = buildHeaders(host);
+
             for (Tool tool : tools) {
                 JSONRPCRequest request = new JSONRPCRequest(
                     McpSchema.JSONRPC_VERSION,
@@ -136,8 +140,8 @@ public class McpToolsSyncJobExecutor {
                 );
 
                 HttpResponseParams toolsCallHttpResponseParams = convertToAktoFormat(apiCollection.getId(),
-                    toolsListRequest.getPath(),
-                    buildHeaders(host),
+                    urlWithQueryParams,
+                    toolsCallRequestHeaders,
                     HttpMethod.POST.name(),
                     mapper.writeValueAsString(request),
                     new OriginalHttpResponse("", Collections.emptyMap(), HttpStatus.SC_OK));
