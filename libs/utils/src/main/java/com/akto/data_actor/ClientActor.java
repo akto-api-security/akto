@@ -1131,7 +1131,7 @@ public class ClientActor extends DataActor {
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("error in fetchApiCollections" + e, LoggerMaker.LogDb.RUNTIME);
         }
-        loggerMaker.infoAndAddToDb("fetchEndpointsInCollection api called size " + apiCollections.size(), LoggerMaker.LogDb.RUNTIME);
+        loggerMaker.infoAndAddToDb("fetchAllApiCollections api called size " + apiCollections.size(), LoggerMaker.LogDb.RUNTIME);
         return apiCollections;
     }
 
