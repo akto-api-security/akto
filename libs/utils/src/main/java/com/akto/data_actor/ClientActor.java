@@ -11,6 +11,7 @@ import com.akto.dto.jobs.ScheduleType;
 import com.akto.dto.metrics.MetricData;
 import com.akto.dto.monitoring.ModuleInfo;
 import com.akto.dto.settings.DataControlSettings;
+import com.akto.dto.type.URLMethods.Method;
 import com.akto.testing.ApiExecutor;
 import com.auth0.jwt.JWT;
 import com.auth0.jwt.interfaces.DecodedJWT;
@@ -3898,6 +3899,26 @@ public class ClientActor extends DataActor {
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("error in updateTestingRunPlaygroundStateAndResult" + e, LoggerMaker.LogDb.RUNTIME);
             return;
+        }
+    }
+
+    public void deMergeUrls(int apiCollectionId, String url, Method method) {
+        Map<String, List<String>> headers = buildHeaders();
+        BasicDBObject obj = new BasicDBObject();
+        obj.put("url", url);
+        obj.put("method", method.name());
+        obj.put("apiCollectionId", apiCollectionId);
+        OriginalHttpRequest request = new OriginalHttpRequest(ClientActor.url + "/deMergeUrls", "", "POST", obj.toString(), headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
+            if (response.getStatusCode() != 200) {
+                loggerMaker.errorAndAddToDb("non 2xx response in deMergeUrls", LoggerMaker.LogDb.RUNTIME);
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(
+                "Error in calling deMergeUrls API for apiCollectionId: " + apiCollectionId + ", url: " + url
+                    + ", method: " + method,
+                LoggerMaker.LogDb.RUNTIME);
         }
     }
 }
