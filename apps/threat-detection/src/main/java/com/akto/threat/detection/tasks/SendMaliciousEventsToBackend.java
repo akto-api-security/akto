@@ -14,6 +14,7 @@ import org.apache.http.entity.ContentType;
 import org.apache.http.entity.StringEntity;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
+import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 
 /*
@@ -23,10 +24,17 @@ public class SendMaliciousEventsToBackend extends AbstractKafkaConsumerTask<byte
 
   private final CloseableHttpClient httpClient;
   private static final LoggerMaker logger = new LoggerMaker(SendMaliciousEventsToBackend.class, LogDb.THREAT_DETECTION);
+  private static final PoolingHttpClientConnectionManager connManager = new PoolingHttpClientConnectionManager();
+  
 
   public SendMaliciousEventsToBackend(KafkaConfig trafficConfig, String topic) {
     super(trafficConfig, topic);
-    this.httpClient = HttpClients.createDefault();
+    connManager.setMaxTotal(100);
+    connManager.setDefaultMaxPerRoute(100);
+    this.httpClient = HttpClients.custom()
+        .setConnectionManager(connManager)
+        .setKeepAliveStrategy((response, context) -> 30_000)
+        .build();
   }
 
   protected void processRecords(ConsumerRecords<String, byte[]> records) {
@@ -67,6 +75,7 @@ public class SendMaliciousEventsToBackend extends AbstractKafkaConsumerTask<byte
                         logger.debugAndAddToDb("sending malicious event to threat backend for url " + evt.getLatestApiEndpoint() + " filterId " + evt.getFilterId() + " eventType " + evt.getEventType().toString());
                         this.httpClient.execute(req);
                       } catch (IOException e) {
+                        logger.errorAndAddToDb("error sending malicious event " + e.getMessage());
                         e.printStackTrace();
                       }
 
