@@ -674,16 +674,6 @@ public class APICatalogSync {
         if (templatizedStrTokens <= 1) {
             URLTemplate urlTemplate = new URLTemplate(newTokens, newTypes, newUrl.getMethod());
 
-            try {
-                for(MergedUrls mergedUrl : mergedUrls) {
-                    if(mergedUrl.getUrl().equals(urlTemplate.getTemplateString()) &&
-                            mergedUrl.getMethod().equals(urlTemplate.getMethod().name())) {
-                        return null;
-                    }
-                }
-            } catch(Exception e) {
-                loggerMaker.errorAndAddToDb("Error while creating a new URL object: " + e.getMessage(), LogDb.RUNTIME);
-            }
             return getMergedUrlTemplate(urlTemplate);
         }
         return null;
