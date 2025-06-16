@@ -12,6 +12,7 @@ import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.*;
 import com.akto.types.CappedSet;
 import com.mongodb.client.model.*;
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.math.NumberUtils;
 import org.bson.conversions.Bson;
 
@@ -25,6 +26,7 @@ import static com.akto.runtime.RuntimeUtil.isValidVersionToken;
 public class MergingLogic {
 
     public static final int STRING_MERGING_THRESHOLD = 10;
+    private static final String AKTO_MCP_SERVER_TAG = "mcp-server";
     private static final LoggerMaker loggerMaker = new LoggerMaker(MergingLogic.class);
 
     public static void mergeUrlsAndSave(int apiCollectionId, boolean mergeUrlsBasic, boolean allowMergingOnVersions) {
@@ -189,6 +191,13 @@ public class MergingLogic {
 
     public static ApiMergerResult tryMergeURLsInCollection(int apiCollectionId, boolean mergeUrlsBasic, boolean allowMergingOnVersions) {
         ApiCollection apiCollection = ApiCollectionsDao.instance.getMeta(apiCollectionId);
+
+        if (apiCollection != null && !CollectionUtils.isEmpty(apiCollection.getTagsList())) {
+            if (apiCollection.getTagsList().stream()
+                .anyMatch(t -> AKTO_MCP_SERVER_TAG.equals(t.getKeyName()))) {
+                return new ApiMergerResult(new HashMap<>());
+            }
+        }
 
         Bson filterQ = null;
         if (apiCollection != null && apiCollection.getHostName() == null) {
