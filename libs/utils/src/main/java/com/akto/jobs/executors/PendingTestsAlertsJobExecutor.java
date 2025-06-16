@@ -42,6 +42,7 @@ public class PendingTestsAlertsJobExecutor extends JobExecutor<PendingTestsAlert
         int lastSyncedAt = params.getLastSyncedAt();
 
         int accountId = Context.accountId.get();
+        Context.accountId.set(accountId);
         List<TestingRun> scheduledTests = getScheduledTestsForNextHour();
 
         if(scheduledTests.isEmpty()) {
