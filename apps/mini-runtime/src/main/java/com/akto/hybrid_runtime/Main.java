@@ -180,6 +180,7 @@ public class Main {
         String instanceType =  System.getenv("AKTO_INSTANCE_TYPE");
         boolean syncImmediately = false;
         boolean fetchAllSTI = true;
+        Map<Integer, AccountInfo> accountInfoMap =  new HashMap<>();
 
         boolean isDashboardInstance = false;
         if (isDashboardInstance) {
@@ -297,6 +298,8 @@ public class Main {
             }
 
         }, 0, 1, TimeUnit.MINUTES);
+
+        Map<String, HttpCallParser> httpCallParserMap = new HashMap<>();
 
         // sync infra metrics thread
         // ScheduledExecutorService executor = Executors.newScheduledThreadPool(1);
@@ -434,9 +437,9 @@ public class Main {
                 }
 
                 handleResponseParams(responseParamsToAccountMap,
-                    new HashMap<>(),
+                    accountInfoMap,
                     isDashboardInstance,
-                    new HashMap<>(),
+                    httpCallParserMap,
                     apiConfig,
                     fetchAllSTI,
                     syncImmediately,
