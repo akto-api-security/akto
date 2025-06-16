@@ -10,7 +10,6 @@ import com.akto.dto.HttpResponseParams.Source;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.traffic.CollectionTags;
-import com.akto.dto.type.URLMethods.Method;
 import com.akto.hybrid_parsers.HttpCallParser;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
@@ -105,12 +104,6 @@ public class McpToolsSyncJobExecutor {
             if (toolsListresponseParams != null) {
                 responseParamsList.add(toolsListresponseParams);
             }
-
-            DataActorFactory.fetchInstance().deMergeUrls(
-                apiCollection.getId(),
-                toolsListRequest.getPath() + "/" + McpSchema.METHOD_TOOLS_CALL + "/STRING",
-                Method.POST
-            );
 
             logger.debug("Received tools/list response. Processing tools.....");
 

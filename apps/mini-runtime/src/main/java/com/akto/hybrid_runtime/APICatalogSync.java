@@ -78,6 +78,14 @@ public class APICatalogSync {
         this(userIdentifier, thresh, fetchAllSTI, true);
     }
 
+    /* Note: We have hardcoded the logic of not merging URLs for MCP Server.
+        The apiCollectionId - -1 has nothing to do with this.
+        Since we do not know the collectionId for MCP Server, we have set it to -1.
+     */
+    private static final Set<MergedUrls> MERGED_URLS_FOR_MCP = new HashSet<>(Collections.singletonList(
+        new MergedUrls("tools/call/STRING", "POST", -1)
+    ));
+
     private boolean mergeUrlsOnVersions;
 
     // New overloaded constructor
@@ -604,18 +612,7 @@ public class APICatalogSync {
 
         URLTemplate urlTemplate = new URLTemplate(tokens, newTypes, newUrl.getMethod());
 
-        try {
-            for(MergedUrls mergedUrl : mergedUrls) {
-                if(mergedUrl.getUrl().equals(urlTemplate.getTemplateString()) &&
-                        mergedUrl.getMethod().equals(urlTemplate.getMethod().name())) {
-                    return null;
-                }
-            }
-        } catch(Exception e) {
-            loggerMaker.errorAndAddToDb("Error while creating a new URL object: " + e.getMessage(), LogDb.RUNTIME);
-        }
-
-        return urlTemplate;
+        return getMergedUrlTemplate(urlTemplate);
     }
 
 
@@ -687,12 +684,30 @@ public class APICatalogSync {
             } catch(Exception e) {
                 loggerMaker.errorAndAddToDb("Error while creating a new URL object: " + e.getMessage(), LogDb.RUNTIME);
             }
+            return getMergedUrlTemplate(urlTemplate);
+        }
+        return null;
+    }
 
-            return urlTemplate;
+    public static URLTemplate getMergedUrlTemplate(URLTemplate urlTemplate) {
+        try {
+            for(MergedUrls mergedUrl : mergedUrls) {
+                if(mergedUrl.getUrl().equals(urlTemplate.getTemplateString()) &&
+                        mergedUrl.getMethod().equals(urlTemplate.getMethod().name())) {
+                    return null;
+                }
+            }
+            for (MergedUrls mergedUrl : MERGED_URLS_FOR_MCP) {
+                if(urlTemplate.getTemplateString().endsWith(mergedUrl.getUrl()) &&
+                        mergedUrl.getMethod().equals(urlTemplate.getMethod().name())) {
+                    return null;
+                }
+            }
+        } catch(Exception e) {
+            loggerMaker.errorAndAddToDb("Error while creating a new URL object: " + e.getMessage(), LogDb.RUNTIME);
         }
 
-        return null;
-
+        return urlTemplate;
     }
 
     private void tryWithKnownURLTemplates(
