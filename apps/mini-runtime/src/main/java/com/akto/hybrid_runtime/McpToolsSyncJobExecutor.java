@@ -11,6 +11,7 @@ import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.traffic.CollectionTags;
 import com.akto.hybrid_parsers.HttpCallParser;
+import com.akto.hybrid_runtime.Main.AccountInfo;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.mcp.McpSchema;
@@ -54,6 +55,9 @@ public class McpToolsSyncJobExecutor {
     public void runJob(APIConfig apiConfig) {
         List<ApiCollection> apiCollections = DataActorFactory.fetchInstance().fetchAllApiCollections();
         List<ApiCollection> eligibleCollections = new ArrayList<>();
+        Map<String, HttpCallParser> httpCallParserMap = new HashMap<>();
+        Map<Integer, AccountInfo> accountInfoMap =  new HashMap<>();
+
         for (ApiCollection apiCollection : apiCollections) {
             if (StringUtils.isEmpty(apiCollection.getHostName())) {
                 continue;
@@ -77,12 +81,13 @@ public class McpToolsSyncJobExecutor {
         eligibleCollections.forEach(apiCollection -> {
             logger.info("Starting MCP sync for apiCollectionId: {} and hostname: {}", apiCollection.getId(),
                 apiCollection.getHostName());
-                handleMcpDiscovery(apiCollection, apiConfig);
+                handleMcpDiscovery(apiCollection, apiConfig, httpCallParserMap, accountInfoMap);
             }
         );
     }
 
-    public static void handleMcpDiscovery(ApiCollection apiCollection, APIConfig apiConfig) {
+    public static void handleMcpDiscovery(ApiCollection apiCollection, APIConfig apiConfig,
+        Map<String, HttpCallParser> httpCallParserMap, Map<Integer, AccountInfo> accountInfoMap) {
         String host = apiCollection.getHostName();
 
         try {
@@ -147,9 +152,9 @@ public class McpToolsSyncJobExecutor {
             responseParamsToAccountIdMap.put(Context.accountId.get().toString(), responseParamsList);
 
             Main.handleResponseParams(responseParamsToAccountIdMap,
-                new HashMap<>(),
+                accountInfoMap,
                 false,
-                new HashMap<>(),
+                httpCallParserMap,
                 apiConfig,
                 true,
                 false,
