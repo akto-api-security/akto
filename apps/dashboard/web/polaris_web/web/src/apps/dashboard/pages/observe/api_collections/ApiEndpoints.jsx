@@ -1158,7 +1158,8 @@ function ApiEndpoints(props) {
         if(editableDescription === description) return;
         api.saveCollectionDescription(apiCollectionId, editableDescription)
             .then(() => {
-                updateCollectionDescription(allCollections, apiCollectionId, editableDescription);
+                updateCollectionDescription(allCollections, parseInt(apiCollectionId, 10), editableDescription);
+                setAllCollections(allCollections);
                 func.setToast(true, false, "Description saved successfully");
                 setDescription(editableDescription);
             })
@@ -1192,18 +1193,26 @@ function ApiEndpoints(props) {
                                     </HorizontalStack>
                                     <HorizontalStack gap={2}>
                                         {isEditingDescription ? (
-                                            <InlineEditableText textValue={editableDescription} setTextValue={setEditableDescription} handleSaveClick={handleSaveDescription} setIsEditing={setIsEditingDescription} placeholder={"Add a brief description"} maxLength={64} />
+                                            <InlineEditableText 
+                                                textValue={editableDescription} 
+                                                setTextValue={setEditableDescription} 
+                                                handleSaveClick={handleSaveDescription} 
+                                                setIsEditing={setIsEditingDescription} 
+                                                placeholder={"Add a brief description"} 
+                                                fitParentWidth={true}
+                                            />
                                         ) : (
                                             !description ? (
                                                 <Button plain removeUnderline onClick={() => setIsEditingDescription(true)}>
                                                     Add description
                                                 </Button>
                                             ) : (
-                                                <Button plain removeUnderline onClick={() => setIsEditingDescription(true)}>
-                                                    <Text as="span" variant="bodyMd" color="subdued" alignment="start">
-                                                        {description}
-                                                    </Text>
-                                                </Button>
+                                                /*
+                                                 Setting maxWidth to 100% to override the tooltipSpan class max-width of 63 vw and instead use the max-width of the parent HorizontalStack.
+                                                */
+                                                <Box maxWidth="100%" onClick={() => setIsEditingDescription(true)}>
+                                                    <TooltipText tooltip={description} text={description} textProps={{ variant: 'bodyMd', fontWeight: "medium"}} />
+                                                </Box>
                                             )
                                         )}
                                     </HorizontalStack>
