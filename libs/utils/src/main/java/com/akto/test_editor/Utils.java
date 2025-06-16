@@ -22,7 +22,6 @@ import com.akto.dto.ApiInfo.ApiAccessType;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.test_editor.ExecutorSingleOperationResp;
 import com.akto.dto.testing.UrlModifierPayload;
-import com.akto.dto.type.URLMethods.Method;
 import com.akto.test_editor.execution.Operations;
 import com.akto.util.Constants;
 import com.akto.util.DashboardMode;
@@ -1046,6 +1045,11 @@ public class Utils {
 
     public static String buildRequestIHttpFormat(RawApi rawApi) {
         StringBuilder requestBuilder = new StringBuilder();
+
+        if(rawApi.getRequest() == null) {
+            return "No request available";
+        }
+
         requestBuilder.append(rawApi.getRequest().getMethod()).append(" ").append(rawApi.getRequest().getUrl()).append("\n");
         Map<String, List<String>> headers = rawApi.getRequest().getHeaders();
         for (Map.Entry<String, List<String>> entry : headers.entrySet()) {
@@ -1061,5 +1065,30 @@ public class Utils {
         }
         return requestBuilder.toString();
     }
+
+    public static String buildResponseIHttpFormat(RawApi rawApi) {
+        StringBuilder responseBuilder = new StringBuilder();
+
+        if(rawApi.getResponse() == null) {
+            return "No response available";
+        }
+
+        responseBuilder.append(rawApi.getResponse().getStatusCode()).append("\n");
+        Map<String, List<String>> headers = rawApi.getResponse().getHeaders();
+        for (Map.Entry<String, List<String>> entry : headers.entrySet()) {
+            String headerKey = entry.getKey();
+            List<String> headerValues = entry.getValue();
+            for (String headerValue : headerValues) {
+                responseBuilder.append(headerKey).append(": ").append(headerValue).append("\n");
+            }
+        }
+        String responseBody = rawApi.getResponse().getJsonResponseBody();
+        if (responseBody != null && !responseBody.isEmpty()) {
+            responseBuilder.append("\n").append(responseBody);
+        }
+        return responseBuilder.toString();
+    }
+
+    public final static String _MAGIC = "$magic";
 
 }

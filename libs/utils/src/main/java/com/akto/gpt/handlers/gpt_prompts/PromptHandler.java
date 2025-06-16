@@ -124,18 +124,29 @@ public abstract class PromptHandler {
      */
     protected abstract BasicDBObject processResponse(String rawResponse);
 
+    static String cleanJSON(String rawResponse) {
+        if (rawResponse == null || rawResponse.isEmpty()) {
+            return "NOT_FOUND";
+        }
+
+        // Truncate at the last closing brace to remove any trailing notes
+        int lastBrace = rawResponse.lastIndexOf('}');
+        if (lastBrace != -1) {
+            rawResponse = rawResponse.substring(0, lastBrace + 1);
+        }
+
+        // Start at the first opening brace to remove any forward notes
+        int firstBrace = rawResponse.indexOf('{');
+        if (firstBrace != -1) {
+            rawResponse = rawResponse.substring(firstBrace);
+        }
+        return rawResponse.trim();
+    }
+
     static String processOutput(String rawResponse) {
         try {
 
-            if(rawResponse == null || rawResponse.isEmpty()) {
-                return "NOT_FOUND";
-            }
-
-            // Truncate at the last closing brace to remove any trailing notes
-            int lastBrace = rawResponse.lastIndexOf('}');
-            if (lastBrace != -1) {
-                rawResponse = rawResponse.substring(0, lastBrace + 1);
-            }
+            rawResponse = cleanJSON(rawResponse);
 
             JSONObject jsonResponse = new JSONObject(rawResponse);
             String cleanResponse = jsonResponse.getString("response");

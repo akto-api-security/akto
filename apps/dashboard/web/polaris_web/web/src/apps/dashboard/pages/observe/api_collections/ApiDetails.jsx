@@ -319,10 +319,12 @@ function ApiDetails(props) {
     }, [apiDetail])
 
     useEffect(() => {
-        const { apiCollectionId, endpoint, method } = apiDetail;
-        fetchStats(apiCollectionId, endpoint, method);
-        fetchDistributionData();
-        setApiCallDistribution([]);
+        if(showDetails){
+            const { apiCollectionId, endpoint, method } = apiDetail;
+            fetchStats(apiCollectionId, endpoint, method);
+            fetchDistributionData();
+            setApiCallDistribution([]);
+        }
     }, [startTime, apiDetail]);
 
     function displayGPT() {
@@ -543,6 +545,7 @@ function ApiDetails(props) {
     };
     
     const deMergeApis = () => {
+        const  { apiCollectionId, endpoint, method } = apiDetail;
         api.deMergeApi(apiCollectionId, endpoint, method).then((resp) => {
             func.setToast(true, false, "De-merging successful!!.")
             window.location.reload()
