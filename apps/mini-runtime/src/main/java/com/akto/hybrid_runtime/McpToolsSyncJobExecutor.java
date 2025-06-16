@@ -170,7 +170,7 @@ public class McpToolsSyncJobExecutor {
             HttpMethod.POST.name(),
             MCP_TOOLS_LIST_REQUEST_JSON,
             OriginalHttpRequest.buildHeadersMap(buildHeaders(host)),
-            "http"
+            "HTTP/1.1"
         );
     }
 
