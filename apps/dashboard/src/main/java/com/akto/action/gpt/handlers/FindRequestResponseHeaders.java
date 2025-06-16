@@ -1,10 +1,13 @@
 package com.akto.action.gpt.handlers;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import com.akto.action.gpt.GptAction;
 import com.akto.action.gpt.data_extractors.ListHeaderNamesWithValues;
 import com.akto.action.gpt.result_fetchers.ResultFetcherStrategy;
+import com.akto.dao.MetaDataAnalysisDao;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.Pair;
@@ -23,9 +26,16 @@ public class FindRequestResponseHeaders implements QueryHandler {
     public BasicDBObject handleQuery(BasicDBObject meta) {
         BasicDBObject request = new BasicDBObject();
         String headersWithValues = "";
+        Map<String, String> knownAnsMap = new HashMap<>();
         try {
             List<Pair<String, String>> headerKeysWithValues = new ListHeaderNamesWithValues().extractData(meta);
             for (Pair<String, String> pair : headerKeysWithValues) {
+                // filter headers with known answer values
+                String knownAnswer = MetaDataAnalysisDao.instance.getValueFromFinalHeadersTechMap(pair.getFirst());
+                if(knownAnswer != null) {
+                    knownAnsMap.put(pair.getFirst(), knownAnswer);
+                    continue;
+                }
                 String currentHeaderString = pair.getFirst() + ": " + pair.getSecond();
                 if (headersWithValues.isEmpty()) {
                     headersWithValues = currentHeaderString;
@@ -41,8 +51,15 @@ public class FindRequestResponseHeaders implements QueryHandler {
         request.put(GptAction.USER_EMAIL, meta.getString(GptAction.USER_EMAIL));
         logger.debug("request: " + request.toJson());
         BasicDBObject resp =  this.resultFetcherStrategy.fetchResult(request);
-        String respStr = resp.toJson();
-        return BasicDBObject.parse(respStr);
+        if(!knownAnsMap.isEmpty()){
+            knownAnsMap.keySet().forEach(header -> {
+                String value = knownAnsMap.get(header);
+                if (value != null && !value.isEmpty()) {
+                    resp.put(header, value);
+                }
+            });
+        }
+        return resp;
     }
     
 }
