@@ -215,7 +215,7 @@ public class McpToolsSyncJobExecutor {
         value.put("responsePayload", response.getBody());
         value.put("time", String.valueOf(System.currentTimeMillis() / 1000));
         value.put("statusCode", String.valueOf(response.getStatusCode()));
-        value.put("type", "http");
+        value.put("type", "HTTP/1.1");
         value.put("status", String.valueOf(response.getStatusCode()));
         value.put("akto_account_id", String.valueOf(Context.accountId.get()));
         value.put("akto_vxlan_id", String.valueOf(apiCollectionId));
