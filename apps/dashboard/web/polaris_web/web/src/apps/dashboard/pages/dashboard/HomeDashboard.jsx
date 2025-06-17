@@ -12,7 +12,7 @@ import testingApi from "../testing/api"
 import PersistStore from '../../../main/PersistStore';
 import { DashboardBanner } from './components/DashboardBanner';
 import SummaryCard from './new_components/SummaryCard';
-import { ArrowUpMinor, ArrowDownMinor, ExternalMinor, EmailMinor, TicketMinor } from '@shopify/polaris-icons';
+import { ArrowUpMinor, ArrowDownMinor, ExternalMinor, EmailMinor, TicketMinor, EmailMajor } from '@shopify/polaris-icons';
 import TestSummaryCardsList from './new_components/TestSummaryCardsList';
 import InfoCard from './new_components/InfoCard';
 import ProgressBarChart from './new_components/ProgressBarChart';
@@ -40,7 +40,7 @@ const sampleActionItems = [
         whyItMatters: 'Uncontrolled/unknown attack surface',
         displayName: 'Shadow API detected in prod',
         assignee: <Button plain removeUnderline>Assign task</Button>,
-        actions: <Avatar size="extraSmall" shape="square" source="/public/logo_jira.svg" />
+        actions: <HorizontalStack gap="2"><Icon source={EmailMajor} color="base" /><Avatar size="extraSmall" shape="square" source="/public/logo_jira.svg" /></HorizontalStack>
     },
     {
         id: '2',
@@ -53,7 +53,7 @@ const sampleActionItems = [
         ticket: 'LAN-10',
         displayName: 'Testing overdue on 12 APIs',
         assignee: <Button plain removeUnderline>Assign task</Button>,
-        actions: <Avatar size="extraSmall" shape="square" source="/public/logo_jira.svg" />
+        actions: <HorizontalStack gap="2"><Icon source={EmailMajor} color="base" /><Avatar size="extraSmall" shape="square" source="/public/logo_jira.svg" /></HorizontalStack>
     },
     {
         id: '3',
@@ -65,7 +65,7 @@ const sampleActionItems = [
         whyItMatters: 'DOS & abuse risk',
         displayName: 'Rate limiting missing on reset end...',
         assignee: <Button plain removeUnderline>Assign task</Button>,
-        actions: <Avatar size="extraSmall" shape="square" source="/public/logo_jira.svg" />
+        actions: <HorizontalStack gap="2"><Icon source={EmailMajor} color="base" /><Avatar size="extraSmall" shape="square" source="/public/logo_jira.svg" /></HorizontalStack>
     },
     {
         id: '4',
@@ -77,7 +77,7 @@ const sampleActionItems = [
         whyItMatters: 'Privilege escalation possible',
         displayName: 'API leaking access token in respo...',
         assignee: <Button plain removeUnderline>Assign task</Button>,
-        actions: <Avatar size="extraSmall" shape="square" source="/public/logo_jira.svg" />
+        actions: <HorizontalStack gap="2"><Icon source={EmailMajor} color="base" /><Avatar size="extraSmall" shape="square" source="/public/logo_jira.svg" /></HorizontalStack>
     },
     {
         id: '5',
@@ -89,7 +89,7 @@ const sampleActionItems = [
         whyItMatters: 'Known CVEs in external packages',
         displayName: 'Old version of 3rd-party lib used',
         assignee: <Button plain removeUnderline>Assign task</Button>,
-        actions: <Avatar size="extraSmall" shape="square" source="/public/logo_jira.svg" />
+        actions: <HorizontalStack gap="2"><Icon source={EmailMajor} color="base" /><Avatar size="extraSmall" shape="square" source="/public/logo_jira.svg" /></HorizontalStack>
     },
     {
         id: '6',
@@ -101,7 +101,7 @@ const sampleActionItems = [
         whyItMatters: 'May expose infrastructure/system info',
         displayName: 'Debug API exposed in prod',
         assignee: <Button plain removeUnderline>Assign task</Button>,
-        actions: <Avatar size="extraSmall" shape="square" source="/public/logo_jira.svg" />
+        actions: <HorizontalStack gap="2"><Icon source={EmailMajor} color="base" /><Avatar size="extraSmall" shape="square" source="/public/logo_jira.svg" /></HorizontalStack>
     },
     {
         id: '7',
@@ -113,7 +113,7 @@ const sampleActionItems = [
         whyItMatters: 'Credential stuffing possible',
         displayName: 'Brute-force vulnerability on login',
         assignee: <Button plain removeUnderline>Assign task</Button>,
-        actions: <Avatar size="extraSmall" shape="square" source="/public/logo_jira.svg" />
+        actions: <HorizontalStack gap="2"><Icon source={EmailMajor} color="base" /><Avatar size="extraSmall" shape="square" source="/public/logo_jira.svg" /></HorizontalStack>
     },
 ];
 
