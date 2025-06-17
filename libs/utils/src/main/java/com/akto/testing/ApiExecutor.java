@@ -46,7 +46,7 @@ public class ApiExecutor {
             while (RateLimitHandler.getInstance(accountId).shouldWait(request)) {
                 if(rateLimitHit){
                     if (!(request.url().toString().contains("insertRuntimeLog") || request.url().toString().contains("insertTestingLog") || request.url().toString().contains("insertProtectionLog"))) {
-                        loggerMaker.infoAndAddToDb("Rate limit hit, sleeping", LogDb.TESTING);
+                        loggerMaker.infoAndAddToDb("Rate limit hit, sleeping");
                     }else {
                         System.out.println("Rate limit hit, sleeping");
                     }
@@ -57,7 +57,7 @@ public class ApiExecutor {
 
                 if (i%30 == 0) {
                     if (!(request.url().toString().contains("insertRuntimeLog") || request.url().toString().contains("insertTestingLog") || request.url().toString().contains("insertProtectionLog"))) {
-                        loggerMaker.infoAndAddToDb("waiting for rate limit availability", LogDb.TESTING);
+                        loggerMaker.infoAndAddToDb("waiting for rate limit availability");
                     }else{
                         System.out.println("waiting for rate limit availability");
                     }                
@@ -81,13 +81,27 @@ public class ApiExecutor {
 
         Call call = client.newCall(request);
         Response response = null;
-        String body;
+        String body = null;
         byte[] grpcBody = null;
+        Map<String, List<String>> responseHeaders = new HashMap<>();
         try {
             response = call.execute();
-            ResponseBody responseBody = response.peekBody(MAX_RESPONSE_SIZE);
-            if (responseBody == null) {
-                throw new Exception("Couldn't read response body");
+            Headers headers = response.headers();
+            responseHeaders = generateHeadersMapFromHeadersObject(headers);
+
+            String contentTypeHeader = getHeaderValue(responseHeaders, HttpRequestResponseUtils.CONTENT_TYPE);
+
+            if (contentTypeHeader != null && !contentTypeHeader.isEmpty() &&
+                    contentTypeHeader.equalsIgnoreCase(HttpRequestResponseUtils.TEXT_EVENT_STREAM_CONTENT_TYPE)) {
+                body = getEventStreamResponseBodyWithTimeout(response, 20000); // 20 seconds timeout
+            }
+
+            ResponseBody responseBody = null;
+            if (body == null) {
+                responseBody = response.peekBody(MAX_RESPONSE_SIZE);
+                if (responseBody == null) {
+                    throw new Exception("Couldn't read response body");
+                }
             }
             try {
                 if (requestProtocol != null && requestProtocol.contains(HttpRequestResponseUtils.GRPC_CONTENT_TYPE)) {//GRPC request
@@ -98,13 +112,13 @@ public class ApiExecutor {
                         builder.append(b).append(",");
                     }
                     if (!(request.url().toString().contains("insertRuntimeLog") || request.url().toString().contains("insertTestingLog") || request.url().toString().contains("insertProtectionLog"))) {
-                        loggerMaker.infoAndAddToDb(builder.toString(), LogDb.TESTING);
+                        loggerMaker.infoAndAddToDb(builder.toString());
                     }else {
                         System.out.println(builder.toString());
                     }
                     String responseBase64Encoded = Base64.getEncoder().encodeToString(grpcBody);
                     if (!(request.url().toString().contains("insertRuntimeLog") || request.url().toString().contains("insertTestingLog") || request.url().toString().contains("insertProtectionLog"))) {
-                        loggerMaker.infoAndAddToDb("grpc response base64 encoded:" + responseBase64Encoded, LogDb.TESTING);
+                        loggerMaker.infoAndAddToDb("grpc response base64 encoded:" + responseBase64Encoded);
                     }else {
                         System.out.println("grpc response base64 encoded:" + responseBase64Encoded);
                     }
@@ -115,7 +129,13 @@ public class ApiExecutor {
                     body = HttpRequestResponseUtils.convertXmlToJson(responseBody.string());
                 } 
                 else {
-                    body = responseBody.string();
+                    if (body == null) {
+                        if(responseBody != null){
+                            body = responseBody.string();
+                        } else {
+                            body = "{}"; // default to empty json if response body is null
+                        }
+                    }
                 }
             } catch (IOException e) {
                 if (!(request.url().toString().contains("insertRuntimeLog") || request.url().toString().contains("insertTestingLog") || request.url().toString().contains("insertProtectionLog"))) {
@@ -138,14 +158,36 @@ public class ApiExecutor {
             }
         }
 
-        int statusCode = response.code();
-        Headers headers = response.headers();
-
-        Map<String, List<String>> responseHeaders = generateHeadersMapFromHeadersObject(headers);
+        int statusCode = -1;
+        if (response != null) {
+            statusCode = response.code();
+        } else {
+            loggerMaker.errorAndAddToDb("Response is null when trying to access status code and headers", LogDb.TESTING);
+        }
         return new OriginalHttpResponse(body, responseHeaders, statusCode);
     }
 
+    private static String getHeaderValue(Map<String, List<String>> responseHeaders, String headerName) {
+        if (responseHeaders == null || responseHeaders.isEmpty()) {
+            return null;
+        }
+
+        for (String key : responseHeaders.keySet()) {
+            if (key.equalsIgnoreCase(headerName)) {
+                List<String> values = responseHeaders.get(key);
+                if (values != null && !values.isEmpty()) {
+                    return values.get(0).toUpperCase();
+                }
+            }
+        }
+        return null;
+    }
+
     public static Map<String, List<String>> generateHeadersMapFromHeadersObject(Headers headers) {
+        if (headers == null || headers.size() == 0) {
+            return Collections.emptyMap();
+        }
+
         Iterator<Pair<String, String>> headersIterator = headers.iterator();
         Map<String, List<String>> responseHeaders = new HashMap<>();
         while (headersIterator.hasNext()) {
@@ -556,6 +598,39 @@ public class ApiExecutor {
             return false;
         }
     }
+    
+    private static String getEventStreamResponseBodyWithTimeout(Response response, long timeoutMs) throws IOException {
+        StringBuilder sb = new StringBuilder();
+        InputStream is = response.body().byteStream();
+        Scanner scanner = new Scanner(is);
+
+        long startTime = System.currentTimeMillis();
+        int waitLoopCount = 0;
+
+        try {
+            while (System.currentTimeMillis() - startTime < timeoutMs) {
+                if (scanner.hasNextLine()) {
+                    String line = scanner.nextLine();
+                    sb.append(line).append("\n");
+                    waitLoopCount = 0; // Reset wait loop count on new data
+                } else {
+                    // Avoid tight CPU loop; sleep briefly
+                    waitLoopCount++;
+                    if (waitLoopCount > 10) { // If no data for a while, break
+                        break;
+                    }
+                    Thread.sleep(100);
+                }
+            }
+        } catch (Exception e) {
+            // Read timeout or interruption: end gracefully
+            sb.append("\n[Stream ended early: ").append(e.getMessage()).append("]");
+        } finally {
+            scanner.close();
+        }
+        return sb.toString();
+    }
+
 
     private static class SseSession {
         String sessionId;
@@ -597,6 +672,7 @@ public class ApiExecutor {
                 }
             }
         }
+        scanner.close();
         // Keep the stream open for later reading
         session.messages = Collections.synchronizedList(new ArrayList<>());
         new Thread(() -> {
