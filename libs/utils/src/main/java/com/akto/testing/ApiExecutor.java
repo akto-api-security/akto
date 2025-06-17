@@ -562,6 +562,7 @@ public class ApiExecutor {
         String endpoint;
         List<String> messages = new ArrayList<>();
         Response response; // Store the OkHttp Response for cleanup
+        Thread readerThread;
     }
 
     private static SseSession openSseSession(String host, boolean debug) throws Exception {
@@ -569,9 +570,8 @@ public class ApiExecutor {
         OkHttpClient client = new OkHttpClient.Builder().build();
         // header content type = text/event-stream
         Headers headers = new Headers.Builder()
-                .add("Accept", "*")
-                .add("Content-Type", "text/event-stream")
-                .build();
+            .add("Accept", "text/event-stream")
+            .build();
         Request request = new Request.Builder().url(host + "/sse").headers(headers).build();
         Call call = client.newCall(request);
         Response response = call.execute();
@@ -599,7 +599,7 @@ public class ApiExecutor {
         }
         // Keep the stream open for later reading
         session.messages = Collections.synchronizedList(new ArrayList<>());
-        new Thread(() -> {
+        session.readerThread = new Thread(() -> {
             try {
                 while (scanner.hasNextLine()) {
                     String line = scanner.nextLine();
@@ -612,7 +612,8 @@ public class ApiExecutor {
                     }
                 }
             } catch (Exception ignored) {}
-        }).start();
+        });
+        session.readerThread.start();
         return session;
     }
 
@@ -656,16 +657,31 @@ public class ApiExecutor {
         // Send actual request
         OriginalHttpResponse resp = sendRequest(request, followRedirects, testingRunConfig, debug, testLogs, skipSSRFCheck);
 
+        if (resp.getStatusCode() >= 400) {
+            if (session.readerThread != null) {
+                session.readerThread.interrupt();
+                session.readerThread.join(); // Wait for thread to finish
+            }
+            if (session.response != null) {
+                session.response.close(); // Now it's safe
+            }
+            return resp;
+        }
+
         // Wait for matching SSE message
         String body = request.getBody();
         JsonNode node = objectMapper.readTree(body);
         String id = node.get("id").asText();
-        String sseMsg = null;
+        String sseMsg;
         try {
             sseMsg = waitForMatchingSseMessage(session, id, 10000); // 10s timeout
         } finally {
+            if (session.readerThread != null) {
+                session.readerThread.interrupt();
+                session.readerThread.join(); // Wait for thread to finish
+            }
             if (session.response != null) {
-                session.response.close(); // Always close the SSE connection
+                session.response.close(); // Now it's safe
             }
         }
 

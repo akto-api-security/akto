@@ -21,7 +21,10 @@ public class Job {
     public static final String JOB_EXECUTOR_TYPE = "jobExecutorType";
     public static final String LAST_UPDATED_AT = "lastUpdatedAt";
     public static final String RECURRING_INTERVAL_SECONDS = "recurringIntervalSeconds";
+    public static final String SCHEDULE_TYPE = "scheduleType";
     public static final String JOB_PARAMS = "jobParams";
+    public static final String ACCOUNT_ID = "accountId";
+    public static final String JOB_TYPE = "jobParams.jobType";
 
     private ObjectId id;
     private int accountId;
