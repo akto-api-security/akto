@@ -1,9 +1,9 @@
-import React, { useEffect, useReducer, useState } from 'react'
+import React, { useEffect, useReducer, useState, useCallback } from 'react'
 import api from './api';
 import func from '@/util/func';
 import observeFunc from "../observe/transform"
 import PageWithMultipleCards from "../../components/layouts/PageWithMultipleCards"
-import { Box, DataTable, HorizontalGrid, HorizontalStack, Icon, Link, Scrollable, Text, VerticalStack } from '@shopify/polaris';
+import { Box, DataTable, HorizontalGrid, HorizontalStack, Icon, Link, Scrollable, Text, VerticalStack, LegacyTabs } from '@shopify/polaris';
 import observeApi from "../observe/api"
 import testingTransform from "../testing/transform"
 import StackedChart from '../../components/charts/StackedChart';
@@ -31,6 +31,25 @@ function HomeDashboard() {
     const [loading, setLoading] = useState(true);
     const [showBannerComponent, setShowBannerComponent] = useState(false)
     const [testSummaryInfo, setTestSummaryInfo] = useState([])
+    const [selectedTab, setSelectedTab] = useState(0);
+
+    const handleTabChange = useCallback(
+        (selectedTabIndex) => setSelectedTab(selectedTabIndex),
+        [],
+    );
+
+    const tabs = [
+        {
+            id: 'home',
+            content: 'Home',
+            panelID: 'home-content',
+        },
+        {
+            id: 'action-items',
+            content: 'Action Items',
+            panelID: 'action-items-content',
+        },
+    ];
 
     const allCollections = PersistStore(state => state.allCollections)
     const hostNameMap = PersistStore(state => state.hostNameMap)
@@ -265,7 +284,7 @@ function HomeDashboard() {
         )
     }
 
-    const runTestEmptyCardComponent = <Text alignment='center' color='subdued'>There’s no data to show. <Link url="/dashboard/testing" target='_blank'>Run test</Link> to get data populated. </Text>
+    const runTestEmptyCardComponent = <Text alignment='center' color='subdued'>There's no data to show. <Link url="/dashboard/testing" target='_blank'>Run test</Link> to get data populated. </Text>
 
     function mapAccessTypes(apiStats) {
         if (!apiStats) return
@@ -642,13 +661,32 @@ function HomeDashboard() {
 
     const dashboardComp = (
         <VerticalStack gap={4}>
-            {components.map((component) => {
-                return component
+            {components.map((component, index) => {
+                return <div key={index}>{component}</div>
             })}
         </VerticalStack>
     )
 
-    const pageComponents = [showBannerComponent ? <DashboardBanner key="dashboardBanner" /> : dashboardComp]
+    const homeTabContent = (
+        <Box paddingTop="4">
+            {dashboardComp}
+        </Box>
+    );
+
+    const actionItemsContent = (
+        <Box paddingTop={"4"}>
+            <Text>Action Items</Text>
+        </Box>
+    )
+
+    const tabsComponent = (
+        <VerticalStack gap="4" key="tabs-stack">
+            <LegacyTabs tabs={tabs} selected={selectedTab} onSelect={handleTabChange} />
+            {selectedTab === 0 ? homeTabContent : actionItemsContent}
+        </VerticalStack>
+    )
+
+    const pageComponents = [showBannerComponent ? <DashboardBanner key="dashboardBanner" /> : tabsComponent]
 
     return (
         <Box>
