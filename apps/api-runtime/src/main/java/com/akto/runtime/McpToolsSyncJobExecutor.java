@@ -163,7 +163,7 @@ public class McpToolsSyncJobExecutor {
                 false
             );
         } catch (Exception e) {
-            logger.error("Error wile discovering mcp and its tools for hostname: {}", host, e);
+            logger.error("Error while discovering mcp and its tools for hostname: {}", host, e);
         }
     }
 
