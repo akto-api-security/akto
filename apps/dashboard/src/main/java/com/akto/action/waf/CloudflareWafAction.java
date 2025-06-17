@@ -9,12 +9,15 @@ import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
 import org.bson.conversions.Bson;
 
+import java.util.List;
+
 public class CloudflareWafAction extends UserAction {
 
     private String apiKey;
     private String email;
     private String integrationType;
     private String accountOrZoneId;
+    private List<String> severityLevels;
 
     private Config.CloudflareWafConfig cloudflareWafConfig;
 
@@ -40,7 +43,7 @@ public class CloudflareWafAction extends UserAction {
         if(existingConfig != null) {
             setApiKey(existingConfig.getApiKey());
         }
-        Config.CloudflareWafConfig config = new Config.CloudflareWafConfig(apiKey, email, integrationType, accountOrZoneId, accId);
+        Config.CloudflareWafConfig config = new Config.CloudflareWafConfig(apiKey, email, integrationType, accountOrZoneId, accId, severityLevels);
         String cloudFlareIPAccessRuleByActorIP = ThreatActorAction.getCloudFlareIPAccessRuleByActorIP("", config);
         if(cloudFlareIPAccessRuleByActorIP == null) {
             addActionError("Invalid cloudflare credentials.");
@@ -51,7 +54,8 @@ public class CloudflareWafAction extends UserAction {
             Bson updates = Updates.combine(
                     Updates.set(Config.CloudflareWafConfig.ACCOUNT_OR_ZONE_ID, accountOrZoneId),
                     Updates.set(Config.CloudflareWafConfig.INTEGRATION_TYPE, integrationType),
-                    Updates.set(Config.CloudflareWafConfig.EMAIL, email)
+                    Updates.set(Config.CloudflareWafConfig.EMAIL, email),
+                    Updates.set(Config.CloudflareWafConfig.SEVERITY_LEVELS, severityLevels)
             );
             ConfigsDao.instance.updateOne(filters, updates);
         } else {
@@ -111,5 +115,13 @@ public class CloudflareWafAction extends UserAction {
 
     public void setIntegrationType(String integrationType) {
         this.integrationType = integrationType;
+    }
+
+    public List<String> getSeverityLevels() {
+        return severityLevels;
+    }
+
+    public void setSeverityLevels(List<String> severityLevels) {
+        this.severityLevels = severityLevels;
     }
 }
