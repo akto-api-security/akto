@@ -33,7 +33,7 @@ const sampleActionItems = [
     {
         id: '1',
         priority: 'P1',
-        priorityComp: <Badge status="critical-strong-experimental">P1</Badge>,
+        priorityComp: <Badge status="critical">P1</Badge>,
         actionItem: 'Shadow API detected in prod',
         team: 'Security',
         effort: 'High',
@@ -44,7 +44,7 @@ const sampleActionItems = [
     {
         id: '2',
         priority: 'P1',
-        priorityComp: <Badge status="critical-strong-experimental">P1</Badge>,
+        priorityComp: <Badge status="critical">P1</Badge>,
         actionItem: 'Testing overdue on 12 APIs',
         team: 'QA',
         effort: 'Low',
@@ -56,7 +56,7 @@ const sampleActionItems = [
     {
         id: '3',
         priority: 'P1',
-        priorityComp: <Badge status="critical-strong-experimental">P1</Badge>,
+        priorityComp: <Badge status="critical">P1</Badge>,
         actionItem: 'Rate limiting missing on reset end...',
         team: 'Backend',
         effort: 'Medium',
@@ -67,7 +67,7 @@ const sampleActionItems = [
     {
         id: '4',
         priority: 'P2',
-        priorityComp: <Badge status="warning-strong-experimental">P2</Badge>,
+        priorityComp: <Badge status="warning">P2</Badge>,
         actionItem: 'API leaking access token in respo...',
         team: 'Backend',
         effort: 'Medium',
@@ -78,7 +78,7 @@ const sampleActionItems = [
     {
         id: '5',
         priority: 'P2',
-        priorityComp: <Badge status="warning-strong-experimental">P2</Badge>,
+        priorityComp: <Badge status="warning">P2</Badge>,
         actionItem: 'Old version of 3rd-party lib used',
         team: 'DevOps',
         effort: 'Low',
@@ -89,7 +89,7 @@ const sampleActionItems = [
     {
         id: '6',
         priority: 'P3',
-        priorityComp: <Badge status="success-strong-experimental">P3</Badge>,
+        priorityComp: <Badge status="neutral">P3</Badge>,
         actionItem: 'Debug API exposed in prod',
         team: 'Infra',
         effort: 'Low',
@@ -100,7 +100,7 @@ const sampleActionItems = [
     {
         id: '7',
         priority: 'P3',
-        priorityComp: <Badge status="success-strong-experimental">P3</Badge>,
+        priorityComp: <Badge status="neutral">P3</Badge>,
         actionItem: 'Brute-force vulnerability on login',
         team: 'AppSec',
         effort: 'Medium',
