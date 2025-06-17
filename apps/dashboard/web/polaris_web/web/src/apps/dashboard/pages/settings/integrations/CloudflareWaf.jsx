@@ -10,8 +10,22 @@ function CloudflareWaf() {
     const [accountOrZoneId, setAccountOrZoneId] = useState('');
     const [apiKey, setApiKey] = useState('');
     const [integrationType, setIntegrationType] = useState('accounts');
+    const [severityLevels, setSeverityLevels] = useState(['critical']);
     const [email, setEmail] = useState('');
 
+  const SeveritLevelComp = (
+
+    <DropdownSearch
+      label="Block severity levels"
+      placeholder="Select severity levels"
+      optionsList={[{ label: "Critical", value: "critical" }, { label: "High", value: "high" }, { label: "Medium", value: "medium" }, { label: "Low", value: "low" }]}
+      setSelected={setSeverityLevels}
+      preSelected={severityLevels}
+      itemName={"severity level"}
+      value={`${severityLevels.length} severity level${severityLevels.length === 1 ? '' : 's'} selected`}
+      allowMultiple
+    />
+  )
     const wafCard = (
         <LegacyCard
             primaryFooterAction={{content: 'Save', onAction: () => addCloudflareWafIntegration()}}
@@ -37,6 +51,7 @@ function CloudflareWaf() {
                     value={integrationType}
                 />
                 <TextField value={accountOrZoneId} onChange={setAccountOrZoneId} label={integrationType === "accounts" ? "Account ID" : "Zone ID"} placeholder=""/>
+                {SeveritLevelComp}
             </VerticalStack>
           </LegacyCard.Section> 
         </LegacyCard>
