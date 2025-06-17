@@ -190,20 +190,18 @@ const SetUserEnvPopupComponent = ({ popover, setPopover, tags, apiCollectionIds,
                                             if (["staging", "production"].includes(env?.value?.toLowerCase())) return null
 
                                             return (
-                                                <div style={{ cursor: 'pointer' }} onClick={() => toggleTags(env, apiCollectionIds)}>
-                                                    <HorizontalStack align='space-between' gap={4}>
-                                                        <HorizontalStack >
-                                                            <Box maxWidth='150px'>
-                                                                <TooltipText textProps={{fontWeight:"bold"}} tooltip={`${env?.keyName}`} text={`${env?.keyName}`}/>
-                                                            </Box>
-                                                            <Text>=</Text>
-                                                            <Box width='150px'>
-                                                                <TooltipText tooltip={env?.value} text={env?.value}/>
-                                                            </Box>
-                                                        </HorizontalStack>
-                                                        <div style={{ cursor: 'pointer' }}><Icon source={DeleteMajor} /></div>
+                                                <HorizontalStack align='space-between' gap={4}>
+                                                    <HorizontalStack >
+                                                        <Box maxWidth='150px'>
+                                                            <TooltipText textProps={{fontWeight:"bold"}} tooltip={`${env?.keyName}`} text={`${env?.keyName}`}/>
+                                                        </Box>
+                                                        <Text>=</Text>
+                                                        <Box width='150px'>
+                                                            <TooltipText tooltip={env?.value} text={env?.value}/>
+                                                        </Box>
                                                     </HorizontalStack>
-                                                </div>
+                                                    <div style={{ cursor: 'pointer' }} onClick={() => toggleTags(env, apiCollectionIds)}><Icon source={DeleteMajor} /></div>
+                                                </HorizontalStack>
                                             )
                                         })
                                     }
