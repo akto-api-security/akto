@@ -7,7 +7,6 @@ import com.akto.dao.metrics.MetricDataDao;
 import com.akto.dto.jobs.Job;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
