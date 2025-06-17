@@ -3,7 +3,7 @@ import api from './api';
 import func from '@/util/func';
 import observeFunc from "../observe/transform"
 import PageWithMultipleCards from "../../components/layouts/PageWithMultipleCards"
-import { Box, DataTable, HorizontalGrid, HorizontalStack, Icon, Link, Scrollable, Text, VerticalStack, LegacyTabs } from '@shopify/polaris';
+import { Box, DataTable, HorizontalGrid, HorizontalStack, Icon, Link, Scrollable, Text, VerticalStack, LegacyTabs, Badge, Button } from '@shopify/polaris';
 import observeApi from "../observe/api"
 import testingTransform from "../testing/transform"
 import StackedChart from '../../components/charts/StackedChart';
@@ -12,7 +12,7 @@ import testingApi from "../testing/api"
 import PersistStore from '../../../main/PersistStore';
 import { DashboardBanner } from './components/DashboardBanner';
 import SummaryCard from './new_components/SummaryCard';
-import { ArrowUpMinor, ArrowDownMinor } from '@shopify/polaris-icons';
+import { ArrowUpMinor, ArrowDownMinor, ExternalMinor, EmailMinor, TicketMinor } from '@shopify/polaris-icons';
 import TestSummaryCardsList from './new_components/TestSummaryCardsList';
 import InfoCard from './new_components/InfoCard';
 import ProgressBarChart from './new_components/ProgressBarChart';
@@ -25,6 +25,90 @@ import TooltipText from '../../components/shared/TooltipText';
 import transform from '../observe/transform';
 import CriticalUnsecuredAPIsOverTimeGraph from '../issues/IssuesPage/CriticalUnsecuredAPIsOverTimeGraph';
 import CriticalFindingsGraph from '../issues/IssuesPage/CriticalFindingsGraph';
+import GithubSimpleTable from '../../components/tables/GithubSimpleTable';
+import ActionItemCard from './components/ActionItemCard';
+import GridRows from '../../components/shared/GridRows';
+
+const sampleActionItems = [
+    {
+        id: '1',
+        priority: 'P1',
+        priorityComp: <Badge status="critical-strong-experimental">P1</Badge>,
+        actionItem: 'Shadow API detected in prod',
+        team: 'Security',
+        effort: 'High',
+        whyItMatters: 'Uncontrolled/unknown attack surface',
+        displayName: 'Shadow API detected in prod',
+        assignee: 'Assign task'
+    },
+    {
+        id: '2',
+        priority: 'P1',
+        priorityComp: <Badge status="critical-strong-experimental">P1</Badge>,
+        actionItem: 'Testing overdue on 12 APIs',
+        team: 'QA',
+        effort: 'Low',
+        whyItMatters: 'Coverage gap in high-sensitivity endpoints',
+        ticket: 'LAN-10',
+        displayName: 'Testing overdue on 12 APIs',
+        assignee: 'Assign task'
+    },
+    {
+        id: '3',
+        priority: 'P1',
+        priorityComp: <Badge status="critical-strong-experimental">P1</Badge>,
+        actionItem: 'Rate limiting missing on reset end...',
+        team: 'Backend',
+        effort: 'Medium',
+        whyItMatters: 'DOS & abuse risk',
+        displayName: 'Rate limiting missing on reset end...',
+        assignee: 'Assign task'
+    },
+    {
+        id: '4',
+        priority: 'P2',
+        priorityComp: <Badge status="warning-strong-experimental">P2</Badge>,
+        actionItem: 'API leaking access token in respo...',
+        team: 'Backend',
+        effort: 'Medium',
+        whyItMatters: 'Privilege escalation possible',
+        displayName: 'API leaking access token in respo...',
+        assignee: 'Assign task'
+    },
+    {
+        id: '5',
+        priority: 'P2',
+        priorityComp: <Badge status="warning-strong-experimental">P2</Badge>,
+        actionItem: 'Old version of 3rd-party lib used',
+        team: 'DevOps',
+        effort: 'Low',
+        whyItMatters: 'Known CVEs in external packages',
+        displayName: 'Old version of 3rd-party lib used',
+        assignee: 'Assign task'
+    },
+    {
+        id: '6',
+        priority: 'P3',
+        priorityComp: <Badge status="success-strong-experimental">P3</Badge>,
+        actionItem: 'Debug API exposed in prod',
+        team: 'Infra',
+        effort: 'Low',
+        whyItMatters: 'May expose infrastructure/system info',
+        displayName: 'Debug API exposed in prod',
+        assignee: 'Assign task'
+    },
+    {
+        id: '7',
+        priority: 'P3',
+        priorityComp: <Badge status="success-strong-experimental">P3</Badge>,
+        actionItem: 'Brute-force vulnerability on login',
+        team: 'AppSec',
+        effort: 'Medium',
+        whyItMatters: 'Credential stuffing possible',
+        displayName: 'Brute-force vulnerability on login',
+        assignee: 'Assign task'
+    },
+];
 
 function HomeDashboard() {
 
@@ -32,6 +116,7 @@ function HomeDashboard() {
     const [showBannerComponent, setShowBannerComponent] = useState(false)
     const [testSummaryInfo, setTestSummaryInfo] = useState([])
     const [selectedTab, setSelectedTab] = useState(0);
+    const [actionItems, setActionItems] = useState(sampleActionItems)
 
     const handleTabChange = useCallback(
         (selectedTabIndex) => setSelectedTab(selectedTabIndex),
@@ -50,6 +135,105 @@ function HomeDashboard() {
             panelID: 'action-items-content',
         },
     ];
+
+    
+
+    const resourceName = {
+        singular: 'action item',
+        plural: 'action items'
+    };
+
+    const actionItemsHeaders = [
+        {
+            title: '',
+            value: 'priorityComp',
+            sortActive: true,
+            maxWidth: '50px'
+        },
+        {
+            title: 'Action Item',
+            value: 'actionItem',
+            type: 'text',
+            maxWidth: '300px'
+        },
+        {
+            title: 'Team',
+            value: 'team',
+            type: 'text',
+            maxWidth: '100px'
+        },
+        {
+            title: 'Effort',
+            value: 'effort',
+            type: 'text',
+            maxWidth: '100px'
+        },
+        {
+            title: 'Why it matters',
+            value: 'whyItMatters',
+            type: 'text',
+            maxWidth: '300px'
+        },
+        {
+            title: 'Assignee',
+            value: 'assignee',
+            type: 'text',
+            maxWidth: '150px'
+        },
+        {
+            title: 'Actions',
+            value: 'actions',
+            type: 'action',
+            maxWidth: '100px'
+        }
+    ];
+
+    function getActions(item) {
+        return [{
+            items: [
+                {
+                    content: 'Email',
+                    icon: EmailMinor,
+                    url: '#',
+                    external: true
+                },
+                {
+                    content: item.ticket || 'Create ticket',
+                    icon: item.ticket ? undefined : TicketMinor,
+                    url: '#',
+                    external: true
+                }
+            ]
+        }];
+    }
+
+    const actionItemsContent = (
+        <VerticalStack gap={"5"}>
+            <GridRows items={[{}, {}, {}, {}, {}, {}, {}]} CardComponent={ActionItemCard} columns={4}/>
+            <Box padding="4">
+                <GithubSimpleTable
+                    key={"table"}
+                    data={actionItems}
+                    resourceName={resourceName}
+                    headers={actionItemsHeaders}
+                    headings={actionItemsHeaders}
+                    useNewRow={true}
+                    condensedHeight={true}
+                    hideQueryField={true}
+                    hidePagination={true}
+                    hasZebraStriping={true}
+                    getActions={getActions}
+                    hasRowActions={true}
+                    defaultSortField="priority"
+                    defaultSortDirection="asc"
+                    renderBadge={(item) => (
+                        <Badge status={item.priorityDisplay}>{item.priority}</Badge>
+                    )}
+                />
+            </Box>
+        </VerticalStack>
+    
+    );
 
     const allCollections = PersistStore(state => state.allCollections)
     const hostNameMap = PersistStore(state => state.hostNameMap)
@@ -648,41 +832,53 @@ function HomeDashboard() {
     />
 
     const gridComponents = showTestingComponents ?
-        [criticalUnsecuredAPIsOverTime, vulnerableApisBySeverityComponent, criticalFindings, apisByRiskscoreComponent, apisByAccessTypeComponent, apisByAuthTypeComponent, apisByTypeComponent, newDomainsComponent] :
-        [apisByRiskscoreComponent, apisByAccessTypeComponent, apisByAuthTypeComponent, apisByTypeComponent, newDomainsComponent, criticalUnsecuredAPIsOverTime, vulnerableApisBySeverityComponent, criticalFindings]
+        [
+            {id: 'critical-apis', component: criticalUnsecuredAPIsOverTime},
+            {id: 'vulnerable-apis', component: vulnerableApisBySeverityComponent},
+            {id: 'critical-findings', component: criticalFindings},
+            {id: 'risk-score', component: apisByRiskscoreComponent},
+            {id: 'access-type', component: apisByAccessTypeComponent},
+            {id: 'auth-type', component: apisByAuthTypeComponent},
+            {id: 'api-type', component: apisByTypeComponent},
+            {id: 'new-domains', component: newDomainsComponent}
+        ] :
+        [
+            {id: 'risk-score', component: apisByRiskscoreComponent},
+            {id: 'access-type', component: apisByAccessTypeComponent},
+            {id: 'auth-type', component: apisByAuthTypeComponent},
+            {id: 'api-type', component: apisByTypeComponent},
+            {id: 'new-domains', component: newDomainsComponent},
+            {id: 'critical-apis', component: criticalUnsecuredAPIsOverTime},
+            {id: 'vulnerable-apis', component: vulnerableApisBySeverityComponent},
+            {id: 'critical-findings', component: criticalFindings}
+        ]
 
     const gridComponent = (
         <HorizontalGrid gap={5} columns={2}>
-            {gridComponents}
+            {gridComponents.map(({id, component}) => (
+                <div key={id}>{component}</div>
+            ))}
         </HorizontalGrid>
     )
 
-    const components = [summaryComp, testSummaryCardsList, gridComponent]
+    const components = [
+        {id: 'summary', component: summaryComp},
+        {id: 'test-summary', component: testSummaryCardsList},
+        {id: 'grid', component: gridComponent}
+    ]
 
     const dashboardComp = (
         <VerticalStack gap={4}>
-            {components.map((component, index) => {
-                return <div key={index}>{component}</div>
-            })}
+            {components.map(({id, component}) => (
+                <div key={id}>{component}</div>
+            ))}
         </VerticalStack>
-    )
-
-    const homeTabContent = (
-        <Box paddingTop="4">
-            {dashboardComp}
-        </Box>
-    );
-
-    const actionItemsContent = (
-        <Box paddingTop={"4"}>
-            <Text>Action Items</Text>
-        </Box>
     )
 
     const tabsComponent = (
         <VerticalStack gap="4" key="tabs-stack">
             <LegacyTabs tabs={tabs} selected={selectedTab} onSelect={handleTabChange} />
-            {selectedTab === 0 ? homeTabContent : actionItemsContent}
+            {selectedTab === 0 ? dashboardComp : actionItemsContent}
         </VerticalStack>
     )
 
