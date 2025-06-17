@@ -210,7 +210,7 @@ function HomeDashboard() {
     const actionItemsContent = (
         <VerticalStack gap={"5"}>
             <GridRows items={[{}, {}, {}, {}, {}, {}, {}]} CardComponent={ActionItemCard} columns={4}/>
-            <Box padding="4">
+            <Box>
                 <GithubSimpleTable
                     key={"table"}
                     data={actionItems}
