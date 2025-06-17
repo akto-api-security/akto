@@ -39,7 +39,7 @@ const sampleActionItems = [
         effort: 'High',
         whyItMatters: 'Uncontrolled/unknown attack surface',
         displayName: 'Shadow API detected in prod',
-        assignee: 'Assign task'
+        assignee: <Button plain removeUnderline>Assign task</Button>
     },
     {
         id: '2',
@@ -51,7 +51,7 @@ const sampleActionItems = [
         whyItMatters: 'Coverage gap in high-sensitivity endpoints',
         ticket: 'LAN-10',
         displayName: 'Testing overdue on 12 APIs',
-        assignee: 'Assign task'
+        assignee: <Button plain removeUnderline>Assign task</Button>
     },
     {
         id: '3',
@@ -62,7 +62,7 @@ const sampleActionItems = [
         effort: 'Medium',
         whyItMatters: 'DOS & abuse risk',
         displayName: 'Rate limiting missing on reset end...',
-        assignee: 'Assign task'
+        assignee: <Button plain removeUnderline>Assign task</Button>
     },
     {
         id: '4',
@@ -73,7 +73,7 @@ const sampleActionItems = [
         effort: 'Medium',
         whyItMatters: 'Privilege escalation possible',
         displayName: 'API leaking access token in respo...',
-        assignee: 'Assign task'
+        assignee: <Button plain removeUnderline>Assign task</Button>
     },
     {
         id: '5',
@@ -84,7 +84,7 @@ const sampleActionItems = [
         effort: 'Low',
         whyItMatters: 'Known CVEs in external packages',
         displayName: 'Old version of 3rd-party lib used',
-        assignee: 'Assign task'
+        assignee: <Button plain removeUnderline>Assign task</Button>
     },
     {
         id: '6',
@@ -95,7 +95,7 @@ const sampleActionItems = [
         effort: 'Low',
         whyItMatters: 'May expose infrastructure/system info',
         displayName: 'Debug API exposed in prod',
-        assignee: 'Assign task'
+        assignee: <Button plain removeUnderline>Assign task</Button>
     },
     {
         id: '7',
@@ -106,7 +106,7 @@ const sampleActionItems = [
         effort: 'Medium',
         whyItMatters: 'Credential stuffing possible',
         displayName: 'Brute-force vulnerability on login',
-        assignee: 'Assign task'
+        assignee: <Button plain removeUnderline>Assign task</Button>
     },
 ];
 
