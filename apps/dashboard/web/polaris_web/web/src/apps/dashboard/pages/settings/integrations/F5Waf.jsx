@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import IntegrationsLayout from './IntegrationsLayout'
 import { LegacyCard, TextField, VerticalStack } from '@shopify/polaris'
 import PasswordTextField from '../../../components/layouts/PasswordTextField';
+import SeverityLevelDropdown from '../../../components/shared/SeverityLevelDropdown';
 
 function F5Waf() {
 
@@ -9,6 +10,7 @@ function F5Waf() {
     const [policyName, setPolicyName] = useState('');
     const [userName, setUserName] = useState('');
     const [passWord, setPassWord] = useState('');
+    const [severityLevels, setSeverityLevels] = useState(['CRITICAL']);
 
     const f5Waf = (
         <LegacyCard primaryFooterAction={{content: 'Save', onAction: () => {}}} secondaryFooterActions={[{content: 'Test integration', onAction: () => {}}]}>
@@ -22,6 +24,10 @@ function F5Waf() {
                 <VerticalStack gap={"2"}>
                     <TextField onChange={setUserName} value={userName} label="Username" placeholder="johndoe@waf.com" />
                     <PasswordTextField text={passWord} setField={setPassWord} onFunc={true} field={passWord} label="Password" />
+                    <SeverityLevelDropdown
+                       severityLevels={severityLevels}
+                       setSeverityLevels={setSeverityLevels}
+                    />
                 </VerticalStack>
             </LegacyCard.Section>
         </LegacyCard>

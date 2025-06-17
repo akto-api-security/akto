@@ -5,12 +5,14 @@ import IntegrationsLayout from './IntegrationsLayout';
 import settingRequests from '../api';
 import func from '@/util/func'
 import DropdownSearch from '../../../components/shared/DropdownSearch';
+import SeverityLevelDropdown from '../../../components/shared/SeverityLevelDropdown';
 
 function CloudflareWaf() {
     const [accountOrZoneId, setAccountOrZoneId] = useState('');
     const [apiKey, setApiKey] = useState('');
     const [integrationType, setIntegrationType] = useState('accounts');
     const [email, setEmail] = useState('');
+    const [severityLevels, setSeverityLevels] = useState(['CRITICAL']);
 
     const wafCard = (
         <LegacyCard
@@ -37,13 +39,17 @@ function CloudflareWaf() {
                     value={integrationType}
                 />
                 <TextField value={accountOrZoneId} onChange={setAccountOrZoneId} label={integrationType === "accounts" ? "Account ID" : "Zone ID"} placeholder=""/>
+                <SeverityLevelDropdown
+                  severityLevels={severityLevels}
+                  setSeverityLevels={setSeverityLevels}
+                />
             </VerticalStack>
           </LegacyCard.Section> 
         </LegacyCard>
     )
 
     async function addCloudflareWafIntegration(){
-      await settingRequests.addCloudflareWafIntegration(accountOrZoneId, apiKey, email, integrationType)
+      await settingRequests.addCloudflareWafIntegration(accountOrZoneId, apiKey, email, integrationType,severityLevels)
       func.setToast(true, false, "Successfully added Cloudflare Waf Integration")
       fetchIntegration()
     }
@@ -64,6 +70,7 @@ function CloudflareWaf() {
       setEmail(resp?.cloudflareWafConfig?.email || "")
       setAccountOrZoneId(resp?.cloudflareWafConfig?.accountOrZoneId || "")
       setIntegrationType(resp?.cloudflareWafConfig?.integrationType || "accounts")
+      setSeverityLevels(resp?.cloudflareWafConfig?.severityLevels || ['CRITICAL'])
     }
 
     useEffect(() => {
