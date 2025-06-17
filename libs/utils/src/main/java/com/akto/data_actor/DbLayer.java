@@ -1650,16 +1650,4 @@ public class DbLayer {
     public static void insertDataIngestionLog(Log log) {
         DataIngestionLogsDao.instance.insertOne(log);
     }
-
-    public static void deMergeUrls(int apiCollectionId, String url, Method method) {
-        MergedUrlsDao.instance.updateOne(Filters.and(
-            Filters.eq(MergedUrls.URL, url),
-            Filters.eq(MergedUrls.METHOD, method.name()),
-            Filters.eq(MergedUrls.API_COLLECTION_ID, apiCollectionId)
-        ), Updates.combine(
-            Updates.set(MergedUrls.URL, url),
-            Updates.set(MergedUrls.METHOD, method.name()),
-            Updates.set(MergedUrls.API_COLLECTION_ID, apiCollectionId)
-        ));
-    }
 }
