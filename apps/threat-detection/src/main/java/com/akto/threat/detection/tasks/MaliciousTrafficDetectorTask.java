@@ -159,7 +159,7 @@ public class MaliciousTrafficDetectorTask implements Task {
                 kafkaConsumer.commitSync();
               }
             } catch (Exception e) {
-              logger.errorAndAddToDb("Error in processing record " + e.getMessage());
+              logger.errorAndAddToDb("Error observed in processing record " + e.getMessage());
               e.printStackTrace();
             }
           }
