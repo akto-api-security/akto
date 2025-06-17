@@ -3,7 +3,7 @@ import api from './api';
 import func from '@/util/func';
 import observeFunc from "../observe/transform"
 import PageWithMultipleCards from "../../components/layouts/PageWithMultipleCards"
-import { Box, DataTable, HorizontalGrid, HorizontalStack, Icon, Link, Scrollable, Text, VerticalStack, LegacyTabs, Badge, Button } from '@shopify/polaris';
+import { Box, DataTable, HorizontalGrid, HorizontalStack, Icon, Link, Scrollable, Text, VerticalStack, LegacyTabs, Badge, Button, Avatar } from '@shopify/polaris';
 import observeApi from "../observe/api"
 import testingTransform from "../testing/transform"
 import StackedChart from '../../components/charts/StackedChart';
@@ -39,7 +39,8 @@ const sampleActionItems = [
         effort: 'High',
         whyItMatters: 'Uncontrolled/unknown attack surface',
         displayName: 'Shadow API detected in prod',
-        assignee: <Button plain removeUnderline>Assign task</Button>
+        assignee: <Button plain removeUnderline>Assign task</Button>,
+        actions: <Avatar size="extraSmall" shape="square" source="/public/logo_jira.svg" />
     },
     {
         id: '2',
@@ -51,7 +52,8 @@ const sampleActionItems = [
         whyItMatters: 'Coverage gap in high-sensitivity endpoints',
         ticket: 'LAN-10',
         displayName: 'Testing overdue on 12 APIs',
-        assignee: <Button plain removeUnderline>Assign task</Button>
+        assignee: <Button plain removeUnderline>Assign task</Button>,
+        actions: <Avatar size="extraSmall" shape="square" source="/public/logo_jira.svg" />
     },
     {
         id: '3',
@@ -62,7 +64,8 @@ const sampleActionItems = [
         effort: 'Medium',
         whyItMatters: 'DOS & abuse risk',
         displayName: 'Rate limiting missing on reset end...',
-        assignee: <Button plain removeUnderline>Assign task</Button>
+        assignee: <Button plain removeUnderline>Assign task</Button>,
+        actions: <Avatar size="extraSmall" shape="square" source="/public/logo_jira.svg" />
     },
     {
         id: '4',
@@ -73,7 +76,8 @@ const sampleActionItems = [
         effort: 'Medium',
         whyItMatters: 'Privilege escalation possible',
         displayName: 'API leaking access token in respo...',
-        assignee: <Button plain removeUnderline>Assign task</Button>
+        assignee: <Button plain removeUnderline>Assign task</Button>,
+        actions: <Avatar size="extraSmall" shape="square" source="/public/logo_jira.svg" />
     },
     {
         id: '5',
@@ -84,7 +88,8 @@ const sampleActionItems = [
         effort: 'Low',
         whyItMatters: 'Known CVEs in external packages',
         displayName: 'Old version of 3rd-party lib used',
-        assignee: <Button plain removeUnderline>Assign task</Button>
+        assignee: <Button plain removeUnderline>Assign task</Button>,
+        actions: <Avatar size="extraSmall" shape="square" source="/public/logo_jira.svg" />
     },
     {
         id: '6',
@@ -95,7 +100,8 @@ const sampleActionItems = [
         effort: 'Low',
         whyItMatters: 'May expose infrastructure/system info',
         displayName: 'Debug API exposed in prod',
-        assignee: <Button plain removeUnderline>Assign task</Button>
+        assignee: <Button plain removeUnderline>Assign task</Button>,
+        actions: <Avatar size="extraSmall" shape="square" source="/public/logo_jira.svg" />
     },
     {
         id: '7',
@@ -106,7 +112,8 @@ const sampleActionItems = [
         effort: 'Medium',
         whyItMatters: 'Credential stuffing possible',
         displayName: 'Brute-force vulnerability on login',
-        assignee: <Button plain removeUnderline>Assign task</Button>
+        assignee: <Button plain removeUnderline>Assign task</Button>,
+        actions: <Avatar size="extraSmall" shape="square" source="/public/logo_jira.svg" />
     },
 ];
 

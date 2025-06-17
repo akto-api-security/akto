@@ -28,7 +28,7 @@ function ActionItemCard() {
                 <div style={{display: 'flex', justifyContent: 'space-between', gap: "12px"}}>
                     <Button plain removeUnderline>Assign Task</Button>
                     <HorizontalStack gap={"2"}>
-                        <Icon source={EmailMajor}/>
+                        <Icon source={EmailMajor} color="subdued"/>
                         <Avatar size="extraSmall" shape="square" source="/public/logo_jira.svg" />
                     </HorizontalStack>
                 </div>
