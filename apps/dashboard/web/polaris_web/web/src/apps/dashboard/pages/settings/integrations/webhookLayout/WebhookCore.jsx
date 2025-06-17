@@ -138,7 +138,8 @@ function WebhookCore(props) {
         { "type":"TRAFFIC", "title": "New sensitive endpoint count", "value": "NEW_SENSITIVE_ENDPOINT_COUNT", "collectionSelection": false },
         { "type":"TRAFFIC", "title": "New sensitive parameter count", "value": "NEW_SENSITIVE_PARAMETER_COUNT", "collectionSelection": false },
         { "type":"TRAFFIC", "title": "New parameter count", "value": "NEW_PARAMETER_COUNT", "collectionSelection": false },
-        { "type":"TRAFFIC", "title": "New API runtime threats", "value": "API_THREAT_PAYLOADS", "collectionSelection": false }
+        { "type":"TRAFFIC", "title": "New API runtime threats", "value": "API_THREAT_PAYLOADS", "collectionSelection": false },
+        { "type":"TRAFFIC", "title": "Pending tests alerts", "value": "PENDING_TESTS_ALERTS", "collectionSelection": false }
     ]
 
     if (webhookType === "MICROSOFT_TEAMS") {
@@ -352,7 +353,8 @@ function WebhookCore(props) {
         <LegacyCard title={CardTitle} key="options" actions={[{content: actionContent, onAction: toggleShowOptions}]}>
             <LegacyCard.Section>
                 {CardComponent}
-                {(webhook.selectedWebhookOptions && !webhook.selectedWebhookOptions.includes("TRAFFIC_ALERTS")) ?
+                {(webhook.selectedWebhookOptions && !webhook.selectedWebhookOptions.includes("TRAFFIC_ALERTS")
+                    && !webhook.selectedWebhookOptions.includes("PENDING_TESTS_ALERTS")) ?
                 (<>
                 <Divider />
                 <div style={{ paddingTop: "10px" }}>

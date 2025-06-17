@@ -4,6 +4,7 @@ import PasswordTextField from '../../../components/layouts/PasswordTextField';
 import IntegrationsLayout from './IntegrationsLayout';
 import settingRequests from '../api';
 import func from '@/util/func'
+import SeverityLevelDropdown from '../../../components/shared/SeverityLevelDropdown';
 
 function AWSWaf() {
     const [accessKey, setAccessKey] = useState('');
@@ -12,6 +13,8 @@ function AWSWaf() {
     const [ruleSetId, setRuleSetId] = useState('');
     const [ruleSetName, setRuleSetName] = useState('');
     const [isPresent, setIsPresent] = useState(false);
+    const [severityLevels, setSeverityLevels] = useState(['CRITICAL']);
+
     const wafCard = (
         <LegacyCard
             primaryFooterAction={{content: 'Save', onAction: () => addAwsWafIntegration()}}
@@ -30,13 +33,17 @@ function AWSWaf() {
                 <TextField value={region} onChange={setRegion} label="Region" placeholder="Region"/>
                 <TextField value={ruleSetId} onChange={setRuleSetId} label="Waf Rule Set Id" placeholder="Rule-Set=Id"/>
                 <TextField value={ruleSetName} onChange={setRuleSetName} label="Waf Rule Set Name" placeholder="Waf-Rule-Set-Name"/>
+                <SeverityLevelDropdown
+                  severityLevels={severityLevels}
+                  setSeverityLevels={setSeverityLevels}
+                />
             </VerticalStack>
           </LegacyCard.Section> 
         </LegacyCard>
     )
 
     async function addAwsWafIntegration(){
-      await settingRequests.addAwsWafIntegration(accessKey, secretKey, region, ruleSetId, ruleSetName)
+      await settingRequests.addAwsWafIntegration(accessKey, secretKey, region, ruleSetId, ruleSetName,severityLevels)
       func.setToast(true, false, "Successfully added Aws Waf Integration")
     }
 
@@ -48,6 +55,7 @@ function AWSWaf() {
       setRegion(resp?.wafConfig?.region)
       setRuleSetId(resp?.wafConfig?.ruleSetId)
       setRuleSetName(resp?.wafConfig?.ruleSetName)
+      setSeverityLevels(resp?.wafConfig?.severityLevels || ['CRITICAL'])
     }
 
     useEffect(() => {

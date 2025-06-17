@@ -1075,14 +1075,18 @@ public class InitializerListener implements ServletContextListener {
          * triggered only on test complete not periodically.
          * 
          * TRAFFIC_ALERTS type webhooks have a separate cron.
+         * PENDING_TESTS_ALERTS type webhooks have a separate job
          */
+
 
         if (webhook.getSelectedWebhookOptions() != null &&
                 !webhook.getSelectedWebhookOptions().isEmpty()
                 && (webhook.getSelectedWebhookOptions()
                         .contains(CustomWebhook.WebhookOptions.TESTING_RUN_RESULTS)
                         || webhook.getSelectedWebhookOptions()
-                                .contains(CustomWebhook.WebhookOptions.TRAFFIC_ALERTS))) {
+                                .contains(CustomWebhook.WebhookOptions.TRAFFIC_ALERTS)
+            || webhook.getSelectedWebhookOptions()
+                .contains(WebhookOptions.PENDING_TESTS_ALERTS))) {
             return;
         }
 
