@@ -231,7 +231,7 @@ public class McpToolsSyncJobExecutor {
         try {
             return HttpCallParser.parseKafkaMessage(message);
         } catch (Exception e) {
-            logger.error("Error while parsing MCP message.");
+            logger.error("Error while parsing MCP message.", e);
         }
         return null;
     }
