@@ -1,6 +1,7 @@
 import { Box, Button, HorizontalStack, Icon, Popover, RadioButton, Text, TextField, VerticalStack } from '@shopify/polaris'
 import { DeleteMajor } from "@shopify/polaris-icons"
 import React, { useEffect, useState } from 'react'
+import func from "@/util/func"
 import TooltipText from '../../../../components/shared/TooltipText'
 
 const SetUserEnvPopupComponent = ({ popover, setPopover, tags, apiCollectionIds, updateTags }) => {
@@ -184,7 +185,7 @@ const SetUserEnvPopupComponent = ({ popover, setPopover, tags, apiCollectionIds,
                         <Popover.Section>
                             <VerticalStack gap={2}>
                                 <Text variant='headingXs'>Custom Env</Text>
-                                <VerticalStack gap={2}>
+                                <VerticalStack gap={3}>
                                     {
                                         allEnvTypes.map((env) => {
                                             if (["staging", "production"].includes(env?.value?.toLowerCase())) return null
@@ -200,7 +201,14 @@ const SetUserEnvPopupComponent = ({ popover, setPopover, tags, apiCollectionIds,
                                                             <TooltipText tooltip={env?.value} text={env?.value}/>
                                                         </Box>
                                                     </HorizontalStack>
-                                                    <div style={{ cursor: 'pointer' }} onClick={() => toggleTags(env, apiCollectionIds)}><Icon source={DeleteMajor} /></div>
+                                                    <Button 
+                                                        icon={DeleteMajor}
+                                                        plain
+                                                        onClick={() => {
+                                                            const deleteConfirmationMessage = "Are you sure you want to delete this custom enviroment type?"
+                                                            func.showConfirmationModal(deleteConfirmationMessage, "Delete", () => toggleTags(env, apiCollectionIds) )}
+                                                        }
+                                                    />
                                                 </HorizontalStack>
                                             )
                                         })
