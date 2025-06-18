@@ -2,6 +2,7 @@ package com.akto.jobs;
 
 import com.akto.dto.jobs.JobParams;
 import com.akto.dto.jobs.JobType;
+import com.akto.jobs.executors.CommonJobExecutor;
 import com.akto.jobs.executors.JiraTicketJobExecutor;
 import com.akto.jobs.executors.TicketSyncJobExecutor;
 import java.util.Collections;
@@ -15,6 +16,7 @@ public class JobExecutorFactory {
         Map<JobType, JobExecutor<? extends JobParams>> map = new HashMap<>();
         map.put(JobType.JIRA_AUTO_CREATE_TICKETS, JiraTicketJobExecutor.INSTANCE);
         map.put(JobType.TICKET_SYNC, TicketSyncJobExecutor.INSTANCE);
+        map.put(JobType.MCP_TOOLS_SYNC, CommonJobExecutor.INSTANCE);
 
         registry = Collections.unmodifiableMap(map);
     }

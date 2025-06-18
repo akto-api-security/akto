@@ -11,7 +11,9 @@ import com.akto.log.LoggerMaker;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.FindOneAndUpdateOptions;
 import com.mongodb.client.model.ReturnDocument;
+import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.Updates;
+import org.bson.Document;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 
@@ -60,6 +62,44 @@ public final class JobScheduler {
                 recurringIntervalSeconds
             );
             JobsDao.instance.insertOne(job);
+            logger.debug("Job scheduled with parameters. accountId: {}. jobParams: {}", accountId, params);
+            return job;
+        } catch (Exception e) {
+            logger.error("Error while scheduling job for accountId: {} and jobParams: {}", accountId, params, e);
+            return null;
+        }
+    }
+
+    public static Job scheduleRecurringJobUpsert(int accountId, JobParams params, JobExecutorType jobExecutorType,
+        int recurringIntervalSeconds) {
+        try {
+            int now = Context.now();
+            Job job = new Job(
+                accountId,
+                ScheduleType.RECURRING,
+                JobStatus.SCHEDULED,
+                params,
+                jobExecutorType,
+                now + recurringIntervalSeconds,
+                0,
+                0,
+                0,
+                now,
+                now,
+                recurringIntervalSeconds
+            );
+
+            Bson filter = Filters.and(
+                Filters.eq(Job.ACCOUNT_ID, accountId),
+                Filters.eq(Job.JOB_TYPE, params.getJobType().name()),
+                Filters.eq(Job.JOB_EXECUTOR_TYPE, jobExecutorType.name())
+            );
+            JobsDao.instance.getMCollection().updateOne(
+                filter,
+                new Document("$setOnInsert", job),
+                new UpdateOptions().upsert(true)
+            );
+            //JobsDao.instance.insertOne(job);
             logger.debug("Job scheduled with parameters. accountId: {}. jobParams: {}", accountId, params);
             return job;
         } catch (Exception e) {
