@@ -20,6 +20,7 @@ import com.mongodb.client.model.Updates;
 
 import org.bson.conversions.Bson;
 
+import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.ApiInfoDao;
 import com.akto.dao.SampleDataDao;
 import com.akto.dao.SensitiveSampleDataDao;
@@ -306,7 +307,7 @@ public class CleanInventory {
                 if (apiCollection.getHostName() == null) {
                     continue;
                 }
-                List<BasicDBObject> endpoints = com.akto.action.observe.Utils.fetchEndpointsInCollectionUsingHost(apiCollection.getId(), 0);
+                List<BasicDBObject> endpoints = ApiCollectionsDao.fetchEndpointsInCollectionUsingHost(apiCollection.getId(), 0, false);
 
                 if (endpoints == null || endpoints.isEmpty()) {
                     continue;
@@ -375,7 +376,7 @@ public class CleanInventory {
             if (apiCollection.getHostName() == null) {
                 continue;
             }
-            List<BasicDBObject> endpoints = com.akto.action.observe.Utils.fetchEndpointsInCollectionUsingHost(apiCollection.getId(), 0);
+            List<BasicDBObject> endpoints = ApiCollectionsDao.fetchEndpointsInCollectionUsingHost(apiCollection.getId(), 0, false);
 
             if (endpoints == null || endpoints.isEmpty()) {
                 continue;

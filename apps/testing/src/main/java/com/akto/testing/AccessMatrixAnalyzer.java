@@ -2,7 +2,6 @@ package com.akto.testing;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 
 import com.akto.dao.ApiCollectionsDao;
@@ -10,14 +9,12 @@ import com.akto.dao.CustomAuthTypeDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.testing.AccessMatrixTaskInfosDao;
 import com.akto.dao.testing.EndpointLogicalGroupDao;
-import com.akto.dao.testing.TestRolesDao;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.CustomAuthType;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.RawApi;
 import com.akto.dto.testing.*;
-import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods.Method;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
@@ -30,6 +27,7 @@ import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
 
+import org.apache.commons.lang3.StringUtils;
 import org.bson.conversions.Bson;
 
 public class AccessMatrixAnalyzer {
@@ -46,9 +44,14 @@ public class AccessMatrixAnalyzer {
         for(ApiCollection apiCollection: ApiCollectionsDao.instance.getMetaAll()) {
             int lastBatchSize = 0;
             int skip = 0;
+            boolean isAutomatedTrafficCollection = apiCollection != null && !StringUtils.isEmpty(apiCollection.getHostName());
             do {
-                List<BasicDBObject> apiBatch =
-                        ApiCollectionsDao.fetchEndpointsInCollectionUsingHost(apiCollection.getId(), skip, LIMIT, DELTA_PERIOD_VALUE);
+                List<BasicDBObject> apiBatch = new ArrayList<>();
+                if(isAutomatedTrafficCollection){
+                    apiBatch = ApiCollectionsDao.fetchEndpointsInCollectionUsingHost(apiCollection.getId(), skip, false);
+                }else{
+                    apiBatch = ApiCollectionsDao.fetchEndpointsInCollection(apiCollection.getId(), skip, LIMIT, DELTA_PERIOD_VALUE);
+                }
                 skip += LIMIT;
                 lastBatchSize = apiBatch.size();
                 if (!apiBatch.isEmpty()) {

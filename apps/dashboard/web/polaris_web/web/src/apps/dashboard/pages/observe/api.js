@@ -274,18 +274,6 @@ export default {
             }
         })
     },
-    fetchAPICollection(apiCollectionId) {
-        return request({
-            url: '/api/fetchAPICollection',
-            method: 'post',
-            data: {
-                apiCollectionId: apiCollectionId,
-                useHost: !!window.useHost
-            }
-        }).then((resp) => {
-            return resp
-        })
-    },
 
     async fetchAPIsFromSourceCode(apiCollectionId) {
         return await request({
