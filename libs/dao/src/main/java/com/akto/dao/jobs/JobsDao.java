@@ -29,8 +29,5 @@ public class JobsDao extends CommonContextDao<Job> {
 
         fieldNames = new String[]{Job.JOB_EXECUTOR_TYPE, Job.JOB_STATUS, Job.HEARTBEAT_AT};
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames,true);
-
-        fieldNames = new String[]{Job.ACCOUNT_ID, Job.JOB_EXECUTOR_TYPE, Job.JOB_TYPE};
-        MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames,true);
     }
 }

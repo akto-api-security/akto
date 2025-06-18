@@ -1,17 +1,14 @@
 package com.akto.mcp;
 
-import com.akto.dao.context.Context;
 import com.akto.dto.HttpResponseParams;
-import com.akto.dto.jobs.JobExecutorType;
-import com.akto.dto.jobs.McpSyncToolsJobParams;
-import com.akto.jobs.JobScheduler;
 import com.akto.jsonrpc.JsonRpcUtils;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.mcp.McpJsonRpcModel.McpParams;
 import com.akto.util.Pair;
 import com.akto.utils.JsonUtils;
-import com.mongodb.client.model.Filters;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
@@ -20,12 +17,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import org.bson.conversions.Bson;
-import com.akto.dto.jobs.Job;
-import com.akto.dto.jobs.JobType;
-import com.akto.dao.jobs.JobsDao;
 
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public final class McpRequestResponseUtils {

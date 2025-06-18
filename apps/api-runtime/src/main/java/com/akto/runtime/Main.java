@@ -1,8 +1,5 @@
 package com.akto.runtime;
 
-import com.akto.crons.ApiRuntimeJobsCron;
-import com.akto.dto.jobs.JobType;
-import com.akto.jobs.executors.CommonJobExecutor;
 import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.Executors;
@@ -192,24 +189,6 @@ public class Main {
                 }
             }
         });
-
-        try {
-            APIConfig finalApiConfig = apiConfig;
-            CommonJobExecutor.registerFunction(JobType.MCP_TOOLS_SYNC, (job) -> {
-                try {
-                    loggerMaker.info("Executing MCP tools sync function for job: {}", job);
-                    McpToolsSyncJobExecutor.INSTANCE.runJob(finalApiConfig);
-                    loggerMaker.info("Completed MCP tools sync function for job: {}", job);
-                } catch (Exception e) {
-                    throw new RuntimeException("Error executing MCP tools sync function", e);
-                }
-            });
-
-            loggerMaker.info("Registered functions with CommonJobExecutor");
-            ApiRuntimeJobsCron.INSTANCE.jobsScheduler(scheduler);
-        } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("Error starting API runtime jobs cron: " + e.getMessage(), LogDb.RUNTIME);
-        }
 
         Map<String, HttpCallParser> httpCallParserMap = new HashMap<>();
 
