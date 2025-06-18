@@ -616,7 +616,7 @@ public class ApiExecutor {
                 } else {
                     // Avoid tight CPU loop; sleep briefly
                     waitLoopCount++;
-                    if (waitLoopCount > 10) { // If no data for a while, break
+                    if (waitLoopCount > 20) { // If no data for a while, break
                         break;
                     }
                     Thread.sleep(100);
