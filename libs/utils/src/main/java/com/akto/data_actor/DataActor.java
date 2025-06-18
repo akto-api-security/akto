@@ -66,7 +66,6 @@ public abstract class DataActor {
 
     public abstract List<ApiCollection> fetchApiCollections();
 
-    public abstract List<ApiCollection> fetchAllApiCollections();
     public abstract void createCollectionSimple(int vxlanId);
 
     public abstract void createCollectionForHost(String host, int colId);

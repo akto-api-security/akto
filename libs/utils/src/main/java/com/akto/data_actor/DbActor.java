@@ -156,10 +156,6 @@ public class DbActor extends DataActor {
         return DbLayer.fetchApiCollections();
     }
 
-    public List<ApiCollection> fetchAllApiCollections() {
-        return DbLayer.fetchAllApiCollections();
-    }
-
     public void createCollectionSimple(int vxlanId) {
         DbLayer.createCollectionSimple(vxlanId);
     }
