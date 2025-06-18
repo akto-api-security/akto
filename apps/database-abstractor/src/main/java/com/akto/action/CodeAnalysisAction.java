@@ -7,7 +7,6 @@ import java.util.*;
 import com.akto.dao.*;
 import com.akto.dto.*;
 import com.akto.dto.type.SingleTypeInfo;
-import com.akto.types.CappedSet;
 import com.opensymphony.xwork2.ActionSupport;
 import org.bson.Document;
 import org.bson.conversions.Bson;
@@ -24,7 +23,6 @@ import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.Updates;
 import com.mongodb.client.model.WriteModel;
 
-import static com.akto.util.HttpRequestResponseUtils.extractValuesFromPayload;
 import static com.akto.util.HttpRequestResponseUtils.generateSTIsFromPayload;
 
 public class CodeAnalysisAction extends ActionSupport {
@@ -86,8 +84,14 @@ public class CodeAnalysisAction extends ActionSupport {
          * GET /books/INTEGER -> GET /books/AKTO_TEMPLATE_STR
          * POST /city/STRING/district/INTEGER -> POST /city/AKTO_TEMPLATE_STR/district/AKTO_TEMPLATE_STR
          */
-
-        List<BasicDBObject> trafficApis = ApiCollectionsDao.fetchEndpointsInCollectionUsingHost(apiCollection.getId(), 0, -1,  60 * 24 * 60 * 60);
+        List<BasicDBObject> trafficApis = new ArrayList<>();
+        if (apiCollection.getHostName() != null && !apiCollection.getHostName().isEmpty()) {
+            // If the api collection has a host name, fetch traffic endpoints using the host name
+            trafficApis = ApiCollectionsDao.fetchEndpointsInCollectionUsingHost(apiCollection.getId(), 0, false);
+        } else {
+            // If the api collection does not have a host name, fetch traffic endpoints without host name
+            trafficApis = ApiCollectionsDao.fetchEndpointsInCollection(apiCollection.getId(), 0, -1, 60 * 24 * 60 * 60);
+        }
         Map<String, String> trafficApiEndpointAktoTemplateStrToOriginalMap = new HashMap<>();
         List<String> trafficApiKeys = new ArrayList<>();
         for (BasicDBObject trafficApi: trafficApis) {

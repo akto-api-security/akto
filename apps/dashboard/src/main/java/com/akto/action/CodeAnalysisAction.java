@@ -142,7 +142,14 @@ public class CodeAnalysisAction extends UserAction {
          * GET /books/INTEGER -> GET /books/AKTO_TEMPLATE_STR
          * POST /city/STRING/district/INTEGER -> POST /city/AKTO_TEMPLATE_STR/district/AKTO_TEMPLATE_STR
          */
-        List<BasicDBObject> trafficApis = Utils.fetchEndpointsInCollectionUsingHost(apiCollection.getId(), 0);
+       List<BasicDBObject> trafficApis = new ArrayList<>();
+        if (apiCollection.getHostName() != null && !apiCollection.getHostName().isEmpty()) {
+            // If the api collection has a host name, fetch traffic endpoints using the host name
+            trafficApis = ApiCollectionsDao.fetchEndpointsInCollectionUsingHost(apiCollection.getId(), 0, false);
+        } else {
+            // If the api collection does not have a host name, fetch traffic endpoints without host name
+            trafficApis = ApiCollectionsDao.fetchEndpointsInCollection(apiCollection.getId(), 0, -1, 60 * 24 * 60 * 60);
+        }
         Map<String, String> trafficApiEndpointAktoTemplateStrToOriginalMap = new HashMap<>();
         List<String> trafficApiKeys = new ArrayList<>();
         for (BasicDBObject trafficApi: trafficApis) {

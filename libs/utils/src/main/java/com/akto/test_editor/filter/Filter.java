@@ -39,6 +39,7 @@ public class Filter {
     public static Object generateQuerySet(FilterActionRequest filterActionRequest) {
         Object querySet = filterActionRequest.getQuerySet();
         String operationTypeLower = filterActionRequest.getOperand().toLowerCase();
+        String operation = "";
         Object newQuerySet = querySet;
         try {
             int accountId = Context.accountId.get();
@@ -64,7 +65,7 @@ public class Filter {
 
                 if(!operationPrompt.isEmpty()){
 
-                    String operation = operationTypeLower + ": " + operationPrompt;
+                    operation = operationTypeLower + ": " + operationPrompt;
                     if(filterActionRequest.getConcernedProperty() != null && !filterActionRequest.getConcernedProperty().isEmpty()) {
                         operation = operation + " in " + filterActionRequest.getConcernedProperty();
                     }
@@ -99,6 +100,7 @@ public class Filter {
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "error invoking operation " + operationTypeLower + " " + e.getMessage());
         }
+
         return newQuerySet;
     }
 

@@ -500,7 +500,7 @@ public class Executor {
         }
 
         try {
-            if(!generatedOperationKeyValuePairs.isEmpty()){
+            if (generatedOperationKeyValuePairs != null && !generatedOperationKeyValuePairs.isEmpty()) {
                 ExecutorSingleOperationResp resp = new ExecutorSingleOperationResp(false, "AI generated operation key value pairs, executing them");
                 for (BasicDBObject generatedPair : generatedOperationKeyValuePairs) {
                     String generatedKey = generatedPair.keySet().iterator().next();
