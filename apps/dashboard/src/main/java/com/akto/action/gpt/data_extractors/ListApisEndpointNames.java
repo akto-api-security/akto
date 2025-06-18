@@ -2,11 +2,21 @@ package com.akto.action.gpt.data_extractors;
 
 import com.akto.action.gpt.data_extractors.filters.Filter;
 import com.akto.action.observe.Utils;
+import com.akto.dao.ApiCollectionsDao;
+import com.akto.dto.ApiCollection;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.util.Constants;
+import com.google.protobuf.Api;
 import com.mongodb.BasicDBObject;
+import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Projections;
+
 import java.util.ArrayList;
 import java.util.List;
+
+import org.apache.commons.lang3.StringUtils;
+import org.checkerframework.checker.units.qual.A;
 
 public class ListApisEndpointNames implements DataExtractor<String>{
     private static final LoggerMaker logger = new LoggerMaker(ListApisEndpointNames.class, LogDb.DASHBOARD);
@@ -35,7 +45,17 @@ public class ListApisEndpointNames implements DataExtractor<String>{
             }
 
         } else {
-            List<BasicDBObject> list = Utils.fetchEndpointsInCollectionUsingHost(apiCollectionId, 0);
+            ApiCollection apiCollection = ApiCollectionsDao.instance.findOne(Filters.eq(Constants.ID, apiCollectionId), Projections.include(ApiCollection.HOST_NAME));
+            if(apiCollection == null){
+                return new ArrayList<>();
+            }
+            List<BasicDBObject> list = new ArrayList<>();
+            if(StringUtils.isEmpty(apiCollection.getHostName())){
+                list = ApiCollectionsDao.fetchEndpointsInCollection(apiCollectionId, 0, Utils.LIMIT, Utils.DELTA_PERIOD_VALUE);
+            }else{
+                // For automated traffic collections, we use the host name to fetch endpoints
+                list = ApiCollectionsDao.fetchEndpointsInCollectionUsingHost(apiCollectionId, 0, false);
+            }
             
             for (BasicDBObject obj : list) {
                 String url = ((BasicDBObject)obj.get("_id")).getString("url", "");

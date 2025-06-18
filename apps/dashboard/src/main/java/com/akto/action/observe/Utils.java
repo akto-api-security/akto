@@ -13,11 +13,6 @@ public class Utils {
     public final static int DELTA_PERIOD_VALUE = 60 * 24 * 60 * 60;
     public static final int LIMIT = -1;
 
-    public static List<BasicDBObject> fetchEndpointsInCollectionUsingHost(int apiCollectionId, int skip) {
-
-        return ApiCollectionsDao.fetchEndpointsInCollectionUsingHost(apiCollectionId, skip, LIMIT, DELTA_PERIOD_VALUE);
-    }
-
     public final static String _START_TS = "startTs";
     public final static String _LAST_SEEN_TS = "lastSeenTs";
 
