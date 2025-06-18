@@ -1594,9 +1594,6 @@ public class APICatalogSync {
             List<String> sampleIds = new ArrayList<>();
             ArrayList<String> updates = new ArrayList<>();
             for (String s: sample.getSamples()) {
-                if (sample.getId().getApiCollectionId() == 0) {
-                    continue;
-                }
                 try {
                     String redactedSample = RedactSampleData.redactIfRequired(s, accountLevelRedact, apiCollectionLevelRedact);
                     if (accountLevelRedact || apiCollectionLevelRedact) {
@@ -1617,7 +1614,9 @@ public class APICatalogSync {
                         }
                         SampleDataAlt sampleDataAlt = new SampleDataAlt(uuid, piiRedactedSample, id.getApiCollectionId(),
                                 id.getMethod().name(), id.getUrl(), id.getResponseCode(), now, accountId);
-                        unfilteredSamples.add(sampleDataAlt);
+                        if (sample.getId().getApiCollectionId() != 0) {
+                            unfilteredSamples.add(sampleDataAlt);
+                        }
                         sampleIds.add(uuid.toString());
 
                     }
