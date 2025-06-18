@@ -366,7 +366,7 @@ public class DbLayer {
 
     public static List<ApiCollection> fetchAllApiCollections() {
         return ApiCollectionsDao.instance.findAll(new BasicDBObject(),
-            Projections.exclude("urls", "conditions", "envType"));
+            Projections.exclude("urls", "conditions"));
     }
 
     public static Organization fetchOrganization(int accountId) {
