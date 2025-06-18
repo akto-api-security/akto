@@ -101,15 +101,6 @@ public class Filter {
             loggerMaker.errorAndAddToDb(e, "error invoking operation " + operationTypeLower + " " + e.getMessage());
         }
 
-        if(newQuerySet == null) {
-            loggerMaker.infoAndAddToDb("Generated query set: operation:" + operation + " output: null");
-        } else if (newQuerySet instanceof List) {
-            loggerMaker.infoAndAddToDb(
-                    "Generated query set: operation:" + operation + " output: " + newQuerySet.toString());
-        } else {
-            loggerMaker.infoAndAddToDb("Generated query set: operation:" + operation + " output: " + newQuerySet);
-        }
-
         return newQuerySet;
     }
 
