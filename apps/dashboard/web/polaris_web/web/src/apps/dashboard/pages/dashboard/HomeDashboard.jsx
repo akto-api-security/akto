@@ -28,6 +28,8 @@ import CriticalFindingsGraph from '../issues/IssuesPage/CriticalFindingsGraph';
 import GithubSimpleTable from '../../components/tables/GithubSimpleTable';
 import ActionItemCard from './components/ActionItemCard';
 import GridRows from '../../components/shared/GridRows';
+import FlyLayout from '../../components/layouts/FlyLayout';
+import ActionItemDetails from './components/ActionItemDetails';
 
 function AssigneeCell() {
     const [popoverActive, setPopoverActive] = useState(false);
@@ -173,6 +175,8 @@ function HomeDashboard() {
     const [testSummaryInfo, setTestSummaryInfo] = useState([])
     const [selectedTab, setSelectedTab] = useState(0);
     const [actionItems, setActionItems] = useState(sampleActionItems)
+    const [showFlyout, setShowFlyout] = useState(false);
+    const [selectedItem, setSelectedItem] = useState(null);
 
     const handleTabChange = useCallback(
         (selectedTabIndex) => setSelectedTab(selectedTabIndex),
@@ -263,6 +267,20 @@ function HomeDashboard() {
         }];
     }
 
+    const handleRowClick = (item, e) => {
+        // Check if the click was on or inside the assign task section
+        if (e && e.target) {
+            const isAssignTaskClick = e.target.closest('.assign-task-section') || 
+                                    e.target.closest('button') ||
+                                    e.target.closest('.Polaris-Popover');
+            if (isAssignTaskClick) {
+                return;
+            }
+        }
+        setSelectedItem(item);
+        setShowFlyout(true);
+    };
+
     const actionItemsContent = (
         <VerticalStack gap={"5"}>
             <GridRows items={[{}, {}, {}, {}, {}, {}, {}]} CardComponent={ActionItemCard} columns={4}/>
@@ -285,10 +303,17 @@ function HomeDashboard() {
                     renderBadge={(item) => (
                         <Badge status={item.priorityDisplay}>{item.priority}</Badge>
                     )}
+                    onRowClick={handleRowClick}
                 />
             </Box>
+
+            <FlyLayout
+                show={showFlyout}
+                setShow={setShowFlyout}
+                title="Action item details"
+                components={[<ActionItemDetails item={selectedItem} />]}
+            />
         </VerticalStack>
-    
     );
 
     const allCollections = PersistStore(state => state.allCollections)
