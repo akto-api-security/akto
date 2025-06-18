@@ -1,8 +1,9 @@
-import { Avatar, Badge, Box, Button, Card, Divider, HorizontalGrid, HorizontalStack, Icon, Text, VerticalStack, Popover, OptionList, Tag } from '@shopify/polaris'
+import { Avatar, Badge, Box, Button, Card, Divider, HorizontalStack, Icon, Text, VerticalStack, Popover, OptionList, Tag } from '@shopify/polaris'
 import React, { useState } from 'react'
 import { TeamMajor, ToolsMajor, EmailMajor } from "@shopify/polaris-icons"
 
-function ActionItemCard() {
+function ActionItemCard(props) {
+    const {cardObj, onButtonClick } = props ;
     const [popoverActive, setPopoverActive] = useState(false);
     const [selectedUser, setSelectedUser] = useState([]);
 
@@ -31,6 +32,7 @@ function ActionItemCard() {
     const assignedUser = selectedUser.length > 0 ? users.find(u => u.value === selectedUser[0]) : null;
 
     return (
+        <div onClick={() => onButtonClick(cardObj)} style={{cursor: 'pointer'}}>
         <Card padding={"5"}>
             <VerticalStack gap={"3"}>
                 <Box width='30px'>
@@ -53,8 +55,8 @@ function ActionItemCard() {
                     </HorizontalStack>
                 </HorizontalStack>
                 <Divider />
-                <div style={{display: 'flex', justifyContent: 'space-between', gap: "12px"}}>
-                    <div>
+                <HorizontalStack gap={"3"} align="space-between" wrap={false}>
+                    <Box>
                         {assignedUser ? (
                             <Tag onRemove={() => setSelectedUser([])}>
                                 {assignedUser.label}
@@ -74,14 +76,15 @@ function ActionItemCard() {
                                 />
                             </Popover>
                         )}
-                    </div>
+                    </Box>
                     <HorizontalStack gap={"2"}>
                         <Icon source={EmailMajor} color="subdued"/>
                         <Avatar size="extraSmall" shape="square" source="/public/logo_jira.svg" />
                     </HorizontalStack>
-                </div>
+                </HorizontalStack>
             </VerticalStack>
         </Card>
+        </div>
     )
 }
 

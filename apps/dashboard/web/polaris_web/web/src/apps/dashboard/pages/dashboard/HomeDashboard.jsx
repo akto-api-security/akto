@@ -267,23 +267,14 @@ function HomeDashboard() {
         }];
     }
 
-    const handleRowClick = (item, e) => {
-        // Check if the click was on or inside the assign task section
-        if (e && e.target) {
-            const isAssignTaskClick = e.target.closest('.assign-task-section') || 
-                                    e.target.closest('button') ||
-                                    e.target.closest('.Polaris-Popover');
-            if (isAssignTaskClick) {
-                return;
-            }
-        }
+    const handleRowClick = (item) => {
         setSelectedItem(item);
         setShowFlyout(true);
     };
 
     const actionItemsContent = (
         <VerticalStack gap={"5"}>
-            <GridRows items={[{}, {}, {}, {}, {}, {}, {}]} CardComponent={ActionItemCard} columns={4}/>
+            <GridRows items={[{}, {}, {}, {}, {}, {}, {}]} CardComponent={ActionItemCard} columns={4} onButtonClick={handleRowClick}/>
             <Box>
                 <GithubSimpleTable
                     key={"table"}
