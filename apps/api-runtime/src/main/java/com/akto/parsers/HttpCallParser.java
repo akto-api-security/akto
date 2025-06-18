@@ -5,6 +5,7 @@ import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.traffic_metrics.TrafficMetricsDao;
+import com.akto.data_actor.DbLayer;
 import com.akto.dependency.DependencyAnalyser;
 import com.akto.dto.*;
 import com.akto.dto.ApiInfo.ApiInfoKey;
@@ -109,9 +110,9 @@ public class HttpCallParser {
         apiCatalogSync = new APICatalogSync(userIdentifier, thresh, fetchAllSTI);
         apiCatalogSync.buildFromDB(false, fetchAllSTI);
         apiCollectionMap = new HashMap<>();
-        List<ApiCollection> apiCollections = ApiCollectionsDao.instance.findAll(new BasicDBObject(),
-            Projections.exclude("urls", "conditions"));
-        apiCollections.forEach(apiCollection -> apiCollectionMap.put(apiCollection.getId(), apiCollection));
+        DbLayer.fetchAllApiCollections()
+            .forEach(apiCollection -> apiCollectionMap.put(apiCollection.getId(), apiCollection));
+
         this.dependencyAnalyser = new DependencyAnalyser(apiCatalogSync.dbState, !Main.isOnprem);
     }
 
@@ -309,6 +310,9 @@ public class HttpCallParser {
         this.sync_count += filteredResponseParams.size();
         int syncThresh = numberOfSyncs < 10 ? 10000 : sync_threshold_count;
         if (syncImmediately || this.sync_count >= syncThresh || (Context.now() - this.last_synced) > this.sync_threshold_time || isHarOrPcap) {
+            apiCollectionMap = new HashMap<>();
+            DbLayer.fetchAllApiCollections()
+                .forEach(apiCollection -> apiCollectionMap.put(apiCollection.getId(), apiCollection));
 
             FeatureAccess featureAccess = UsageMetricUtils.getFeatureAccess(Context.accountId.get(), MetricTypes.ACTIVE_ENDPOINTS);
             SyncLimit syncLimit = featureAccess.fetchSyncLimit();
