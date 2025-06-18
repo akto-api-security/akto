@@ -96,6 +96,7 @@ public abstract class DataActor {
     public abstract List<ApiInfo.ApiInfoKey> fetchEndpointsInCollection();
 
     public abstract List<ApiCollection> fetchApiCollections();
+    public abstract List<ApiCollection> fetchAllApiCollections();
 
     public abstract void createCollectionSimple(int vxlanId);
 

@@ -1,9 +1,5 @@
 package com.akto.data_actor;
 
-import com.akto.dao.context.Context;
-import com.akto.dao.metrics.MetricDataDao;
-import com.akto.dao.testing.TestingRunResultDao;
-import com.akto.dao.testing.TestingRunResultSummariesDao;
 import com.akto.dto.*;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.billing.Organization;
@@ -43,9 +39,6 @@ import com.akto.dto.type.URLMethods.Method;
 import com.akto.dto.usage.MetricTypes;
 import com.akto.jobs.JobScheduler;
 import com.mongodb.BasicDBObject;
-import com.mongodb.client.model.Filters;
-import com.mongodb.client.model.Projections;
-import com.mongodb.client.model.Updates;
 import com.mongodb.client.model.WriteModel;
 
 import java.util.ArrayList;
@@ -204,6 +197,10 @@ public class DbActor extends DataActor {
 
     public List<ApiCollection> fetchApiCollections() {
         return DbLayer.fetchApiCollections();
+    }
+
+    public List<ApiCollection> fetchAllApiCollections() {
+        return DbLayer.fetchAllApiCollections();
     }
 
     public void createCollectionSimple(int vxlanId) {
@@ -616,6 +613,4 @@ public class DbActor extends DataActor {
     @Override
     public void updateModuleInfo(ModuleInfo moduleInfo) {
     }
-
-
 }

@@ -368,6 +368,22 @@ public class OriginalHttpRequest {
         }
     }
 
+    public String getPathWithQueryParams() {
+        URI uri = URI.create(this.url);
+        String path = uri.getPath();
+        String query = uri.getQuery();
+
+        if (path == null) {
+            path = "";
+        }
+
+        if (query == null || query.isEmpty()) {
+            return path;
+        } else {
+            return path + "?" + query;
+        }
+    }
+
     @Override
     public String toString() {
         return "OriginalHttpRequest{" +
