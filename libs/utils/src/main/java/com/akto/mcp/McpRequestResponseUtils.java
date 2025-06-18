@@ -1,21 +1,31 @@
 package com.akto.mcp;
 
+import com.akto.dao.context.Context;
 import com.akto.dto.HttpResponseParams;
+import com.akto.dto.jobs.JobExecutorType;
+import com.akto.dto.jobs.McpSyncToolsJobParams;
+import com.akto.jobs.JobScheduler;
 import com.akto.jsonrpc.JsonRpcUtils;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.mcp.McpJsonRpcModel.McpParams;
 import com.akto.util.Pair;
 import com.akto.utils.JsonUtils;
+import com.mongodb.client.model.Filters;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import lombok.AccessLevel;
-import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.bson.conversions.Bson;
+import com.akto.dto.jobs.Job;
+import com.akto.dto.jobs.JobType;
+import com.akto.dao.jobs.JobsDao;
 
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public final class McpRequestResponseUtils {
@@ -74,6 +84,9 @@ public final class McpRequestResponseUtils {
         MCP_NOTIFICATIONS_TOOLS_LIST_CHANGED_METHOD
     ));
 
+    // Thread-safe set to cache registered accountIds and avoid repeated DB checks
+    private static final Set<Integer> registeredAccounts = Collections.newSetFromMap(new ConcurrentHashMap<>());
+
     public static HttpResponseParams parseMcpResponseParams(HttpResponseParams responseParams) {
         String requestPayload = responseParams.getRequestParams().getPayload();
 
@@ -108,6 +121,8 @@ public final class McpRequestResponseUtils {
             return httpResponseParamsCopy;
         }
 
+        registerMcpSyncToolsJob();
+
         return responseParams;
     }
 
@@ -122,5 +137,29 @@ public final class McpRequestResponseUtils {
 
         boolean isMcpRequest = mcpJsonRpcModel != null && MCP_METHOD_SET.contains(mcpJsonRpcModel.getMethod());
         return new Pair<>(isMcpRequest, mcpJsonRpcModel);
+    }
+
+    private static void registerMcpSyncToolsJob() {
+        int accountId = Context.accountId.get();
+        if (registeredAccounts.contains(accountId)) {
+            logger.info("not registering MCP sync tools job for accountId: " + accountId + " as it is already registered");
+            return;
+        }
+        Bson filter = Filters.and(
+            Filters.eq(Job.ACCOUNT_ID, accountId),
+            Filters.eq(Job.JOB_TYPE, JobType.MCP_TOOLS_SYNC.name()),
+            Filters.eq(Job.JOB_EXECUTOR_TYPE, JobExecutorType.RUNTIME.name())
+        );
+        Job existingJob = JobsDao.instance.findOne(filter);
+        if (existingJob != null) {
+            registeredAccounts.add(accountId);
+            return;
+        }
+        JobScheduler.scheduleRecurringJobUpsert(accountId,
+            new McpSyncToolsJobParams(),
+            JobExecutorType.RUNTIME,
+            30 // 24 hours
+        );
+        registeredAccounts.add(accountId);
     }
 }

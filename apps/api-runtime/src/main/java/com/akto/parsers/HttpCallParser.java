@@ -16,6 +16,8 @@ import com.akto.dto.billing.Organization;
 import com.akto.dto.settings.DefaultPayload;
 import com.akto.dto.test_editor.ExecutorNode;
 import com.akto.dto.testing.custom_groups.AllAPIsGroup;
+import com.akto.dto.traffic.CollectionTags;
+import com.akto.dto.traffic.CollectionTags.TagSource;
 import com.akto.dto.traffic_metrics.TrafficMetrics;
 import com.akto.dto.type.URLMethods.Method;
 import com.akto.dto.usage.MetricTypes;
@@ -40,6 +42,7 @@ import com.akto.util.Constants;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.*;
 import okhttp3.*;
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.bson.conversions.Bson;
 
@@ -74,6 +77,8 @@ public class HttpCallParser {
             .callTimeout(1, TimeUnit.SECONDS)
             .build();
 
+    private Map<Integer, ApiCollection> apiCollectionMap = new HashMap<>();
+
     private static final ConcurrentLinkedQueue<BasicDBObject> queue = new ConcurrentLinkedQueue<>();
 
     public static void init() {
@@ -103,12 +108,11 @@ public class HttpCallParser {
         this.sync_threshold_time = sync_threshold_time;
         apiCatalogSync = new APICatalogSync(userIdentifier, thresh, fetchAllSTI);
         apiCatalogSync.buildFromDB(false, fetchAllSTI);
+        apiCollectionMap = new HashMap<>();
+        List<ApiCollection> apiCollections = ApiCollectionsDao.instance.findAll(new BasicDBObject(),
+            Projections.exclude("urls", "conditions"));
+        apiCollections.forEach(apiCollection -> apiCollectionMap.put(apiCollection.getId(), apiCollection));
         this.dependencyAnalyser = new DependencyAnalyser(apiCatalogSync.dbState, !Main.isOnprem);
-    }
-
-    public HttpCallParser(int sync_threshold_count, int sync_threshold_time) {
-        this.sync_threshold_count = sync_threshold_count;
-        this.sync_threshold_time = sync_threshold_time;
     }
 
     public static HttpResponseParams parseKafkaMessage(String message) throws Exception {
@@ -160,6 +164,7 @@ public class HttpCallParser {
     public int createCollectionBasedOnHostName(int id, String host, boolean isMcpRequest)  throws Exception {
         FindOneAndUpdateOptions updateOptions = new FindOneAndUpdateOptions();
         updateOptions.upsert(true);
+        updateOptions.returnDocument(ReturnDocument.AFTER);
         // 3 cases
         // 1. If 2 threads are trying to insert same host simultaneously then both will succeed with upsert true
         // 2. If we are trying to insert different host but same id (hashCode collision) then it will fail,
@@ -175,11 +180,15 @@ public class HttpCallParser {
                 );
 
                 if (isMcpRequest) {
-                    String tag = "MCP Server";
-                    updates = Updates.combine(updates, Updates.setOnInsert("userSetEnvType", tag));
+                    updates = Updates.combine(updates,
+                        Updates.set(ApiCollection.TAGS_STRING, Collections.singletonList(getMcpServerTag())));
                 }
 
-                ApiCollectionsDao.instance.getMCollection().findOneAndUpdate(Filters.eq(ApiCollection.HOST_NAME, host), updates, updateOptions);
+                ApiCollection createdCollection = ApiCollectionsDao.instance.getMCollection()
+                    .findOneAndUpdate(Filters.eq(ApiCollection.HOST_NAME, host), updates, updateOptions);
+                if (createdCollection != null) {
+                    apiCollectionMap.put(createdCollection.getId(), createdCollection);
+                }
 
                 flag = true;
                 break;
@@ -496,7 +505,7 @@ public class HttpCallParser {
 
             if (hostNameToIdMap.containsKey(key)) {
                 apiCollectionId = hostNameToIdMap.get(key);
-
+                updateMcpServerTag(apiCollectionId, isMcpRequest);
             } else {
                 int id = hostName.hashCode();
                 try {
@@ -522,6 +531,36 @@ public class HttpCallParser {
             apiCollectionId = vxlanId;
         }
         return apiCollectionId;
+    }
+
+    private void updateMcpServerTag(int apiCollectionId, boolean isMcpRequest) {
+        if (!isMcpRequest) {
+            return;
+        }
+
+        ApiCollection apiCollection = apiCollectionMap.get(apiCollectionId);
+        if (apiCollection == null) {
+            return;
+        }
+
+        List<CollectionTags> collectionTags = apiCollection.getTagsList();
+        boolean isMcpTagPresent = !CollectionUtils.isEmpty(collectionTags) &&
+            collectionTags.stream().anyMatch(tag -> "mcp-server".equals(tag.getKeyName()));
+
+        if (isMcpTagPresent) {
+            return;
+        }
+
+        if (collectionTags == null) {
+            collectionTags = new ArrayList<>();
+        }
+
+        collectionTags.add(getMcpServerTag());
+
+        ApiCollectionsDao.instance.updateOne(
+            Filters.eq(ApiCollection.ID, apiCollection.getId()),
+            Updates.set(ApiCollection.TAGS_STRING, collectionTags)
+        );
     }
 
     private boolean isBlankResponseBodyForGET(String method, String contentType, String matchContentType,
@@ -725,5 +764,9 @@ public class HttpCallParser {
 
     public void setTrafficMetricsMap(Map<TrafficMetrics.Key, TrafficMetrics> trafficMetricsMap) {
         this.trafficMetricsMap = trafficMetricsMap;
+    }
+
+    private CollectionTags getMcpServerTag() {
+        return new CollectionTags(Context.now(), "mcp-server", "MCP Server", TagSource.KUBERNETES);
     }
 }
