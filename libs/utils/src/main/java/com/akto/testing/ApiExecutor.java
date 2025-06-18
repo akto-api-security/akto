@@ -661,13 +661,7 @@ public class ApiExecutor {
             if (line.startsWith("event: endpoint")) {
                 String dataLine = scanner.nextLine();
                 if (dataLine.startsWith("data:")) {
-                    String endpoint = dataLine.substring(5).trim();
-                    session.endpoint = endpoint;
-                    // extract sessionId from endpoint param
-                    int idx = endpoint.indexOf("sessionId=");
-                    if (idx != -1) {
-                        session.sessionId = endpoint.substring(idx + 10);
-                    }
+                    session.endpoint = dataLine.substring(5).trim();
                     break;
                 }
             }
@@ -721,7 +715,6 @@ public class ApiExecutor {
         }
         String host = uri.getScheme() + "://" + uri.getHost() + (uri.getPort() != -1 ? ":" + uri.getPort() : "");
         SseSession session = openSseSession(host, debug);
-        if (session.sessionId == null) throw new Exception("No sessionId from SSE endpoint");
 
         // Add sessionId as query param to actual request
         String endpoint = session.endpoint;
