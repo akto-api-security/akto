@@ -492,14 +492,6 @@ public class Executor {
                     queryData.put(TestExecutorModifier._OPERATION, operation);
                     BasicDBObject generatedData = new TestExecutorModifier().handle(queryData);
                     generatedOperationKeyValuePairs = parseGeneratedKeyValues(generatedData, operationTypeLower, value);
-
-                    if (generatedOperationKeyValuePairs != null) {
-                        loggerMaker.infoAndAddToDb("Generated data in invokeOperation: operation:" + operation
-                                + " output: " + generatedOperationKeyValuePairs.toString());
-                    } else {
-                        loggerMaker.errorAndAddToDb("Generated data is null for operation: " + operation);
-                    }
-
                 }
             }
 
