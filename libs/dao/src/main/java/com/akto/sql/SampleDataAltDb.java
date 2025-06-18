@@ -360,5 +360,45 @@ public class SampleDataAltDb {
         executeQuery(prepareStmt, (rs) -> null);
     }
 
+    final static String DELETE_BATCH_API_COLLECTION_0_QUERY = 
+        "DELETE FROM sampledata02\n" + //
+        "WHERE id IN (\n" + //
+        "    SELECT id\n" + //
+        "    FROM (\n" + //
+        "        SELECT id\n" + //
+        "        FROM sampledata02\n" + //
+        "        WHERE api_collection_id = 0\n" + //
+        "        LIMIT 50000\n" + //
+        "    ) sub\n" + //
+        ")";
+
+    public static int deleteApiCollectionZeroEntriesInBatch() throws Exception {
+        FailableFunction<Connection, PreparedStatement, SQLException> prepareStmt = (conn) -> {
+            return conn.prepareStatement(DELETE_BATCH_API_COLLECTION_0_QUERY, Statement.RETURN_GENERATED_KEYS);
+        };
+        return executeUpdateQuery(prepareStmt);
+    }
+
+    public static int deleteOldTimestampInBatch() throws Exception {
+        FailableFunction<Connection, PreparedStatement, SQLException> prepareStmt = (conn) -> {
+            return conn.prepareStatement(DELETE_OLD_TIMESTAMP_BATCH_QUERY, Statement.RETURN_GENERATED_KEYS);
+        };
+        return executeUpdateQuery(prepareStmt);
+    }
+
+    final static String DELETE_OLD_TIMESTAMP_BATCH_QUERY = 
+    "DELETE FROM sampledata02\n" + //
+    "WHERE id IN (\n" + //
+    "    SELECT id\n" + //
+    "    FROM (\n" + //
+    "        SELECT id\n" + //
+    "        FROM sampledata02\n" + //
+    "        WHERE timestamp < 1750098600\n" + //
+    "        LIMIT 50000\n" + //
+    "    ) sub\n" + //
+    ")";
+
+
+
     // TODO: close all connections or create some connections for different use cases, and use them.
 }
