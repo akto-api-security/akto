@@ -121,8 +121,6 @@ public final class McpRequestResponseUtils {
             return httpResponseParamsCopy;
         }
 
-        registerMcpSyncToolsJob();
-
         return responseParams;
     }
 
@@ -137,29 +135,5 @@ public final class McpRequestResponseUtils {
 
         boolean isMcpRequest = mcpJsonRpcModel != null && MCP_METHOD_SET.contains(mcpJsonRpcModel.getMethod());
         return new Pair<>(isMcpRequest, mcpJsonRpcModel);
-    }
-
-    private static void registerMcpSyncToolsJob() {
-        int accountId = Context.accountId.get();
-        if (registeredAccounts.contains(accountId)) {
-            logger.info("not registering MCP sync tools job for accountId: " + accountId + " as it is already registered");
-            return;
-        }
-        Bson filter = Filters.and(
-            Filters.eq(Job.ACCOUNT_ID, accountId),
-            Filters.eq(Job.JOB_TYPE, JobType.MCP_TOOLS_SYNC.name()),
-            Filters.eq(Job.JOB_EXECUTOR_TYPE, JobExecutorType.RUNTIME.name())
-        );
-        Job existingJob = JobsDao.instance.findOne(filter);
-        if (existingJob != null) {
-            registeredAccounts.add(accountId);
-            return;
-        }
-        JobScheduler.scheduleRecurringJobUpsert(accountId,
-            new McpSyncToolsJobParams(),
-            JobExecutorType.RUNTIME,
-            30 // 24 hours
-        );
-        registeredAccounts.add(accountId);
     }
 }
