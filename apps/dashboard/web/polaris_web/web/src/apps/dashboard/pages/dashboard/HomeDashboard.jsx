@@ -190,9 +190,9 @@ function HomeDashboard() {
             panelID: 'home-content',
         },
         {
-            id: 'action-items',
-            content: 'Action Items',
-            panelID: 'action-items-content',
+            id: 'analytics',
+            content: 'Analytics',
+            panelID: 'analytics-content',
         },
     ];
 
@@ -976,7 +976,7 @@ function HomeDashboard() {
                     }
                     isFirstPage={true}
                     components={pageComponents}
-                    primaryAction={<DateRangeFilter initialDispatch={currDateRange} dispatch={(dateObj) => dispatchCurrDateRange({ type: "update", period: dateObj.period, title: dateObj.title, alias: dateObj.alias })} />}
+                    primaryAction={<DateRangeFilter initialDispatch={currDateRange} dispatch={(dateObj) => dispatchCurrDateRange({ type: "update", period: dateObj.period, title: dateObj.title, alias: dateObj.alias })} disabled={selectedTab === 1} />}
                 />
             }
 
