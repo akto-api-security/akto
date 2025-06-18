@@ -672,7 +672,6 @@ public class ApiExecutor {
                 }
             }
         }
-        scanner.close();
         // Keep the stream open for later reading
         session.messages = Collections.synchronizedList(new ArrayList<>());
         session.readerThread = new Thread(() -> {
