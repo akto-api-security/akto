@@ -45,7 +45,8 @@ const initialState = {
     subCategoryFromSourceConfigMap: {},
     active: '',
     allCollections: [], // Persist only this
-    collectionsMap: {}, // Keep in memory (not persisted)
+    collectionsMap: {},
+    tagCollectionsMap: {},// Keep in memory (not persisted)
     hostNameMap: {}, // Keep in memory (not persisted)
     lastFetchedInfo: { lastRiskScoreInfo: 0, lastSensitiveInfo: 0 },
     lastFetchedResp: { criticalUrls: 0, riskScoreMap: {} },
@@ -86,7 +87,7 @@ let persistStore = (set, get) => ({
     },
     setAllCollections: (allCollections) => {
         try {
-            const optimizedCollections = allCollections.map(({ id, displayName, urlsCount, deactivated, type, automated, startTs, hostName, name, description }) => ({
+            const optimizedCollections = allCollections.map(({ id, displayName, urlsCount, deactivated, type, automated, startTs, hostName, name, description, envType }) => ({
                 id,
                 displayName,
                 urlsCount,
@@ -96,18 +97,27 @@ let persistStore = (set, get) => ({
                 startTs,
                 hostName,
                 name,
-                description
+                description,
+                envType
             }));
             set({ allCollections: optimizedCollections });
         } catch (error) {
             console.error("Error setting allCollections:", error);
         }
     },
-    setCollectionsMap: (collectionsMap) => {
+   setCollectionsMap: (collectionsMap) => {
         try {
             set({ collectionsMap });
         } catch (error) {
             console.error("Error setting collectionsMap:", error);
+        }
+    },
+
+    setTagCollectionsMap: (tagCollectionsMap) => {
+       try {
+            set({ tagCollectionsMap });
+        } catch (error) {
+            console.error("Error setting tagCollectionsMap:", error);
         }
     },
     setHostNameMap: (hostNameMap) => {

@@ -770,9 +770,19 @@ function ApiEndpoints(props) {
         const activePrompts = dashboardFunc.getPrompts(requestObj)
         setPrompts(activePrompts)
     }
+
+    function getCollectionTypeListComp(collectionsObj) {
+        const envType = collectionsObj?.envType
+        const envTypeList = envType?.map(func.formatCollectionType)
+
+        return transform.getCollectionTypeList(envTypeList, 3, true)
+    }
+
     const collectionsObj = (allCollections && allCollections.length > 0) ? allCollections.filter(x => Number(x.id) === Number(apiCollectionId))[0] : {}
     const isApiGroup = collectionsObj?.type === 'API_GROUP'
     const isHostnameCollection = hostNameMap[collectionsObj?.id] !== null && hostNameMap[collectionsObj?.id] !== undefined 
+    const collectionTypeListComp = getCollectionTypeListComp(collectionsObj)
+    
 
     const secondaryActionsComponent = (
         <HorizontalStack gap="2">
@@ -1148,7 +1158,8 @@ function ApiEndpoints(props) {
         if(editableDescription === description) return;
         api.saveCollectionDescription(apiCollectionId, editableDescription)
             .then(() => {
-                updateCollectionDescription(allCollections, apiCollectionId, editableDescription);
+                updateCollectionDescription(allCollections, parseInt(apiCollectionId, 10), editableDescription);
+                setAllCollections(allCollections);
                 func.setToast(true, false, "Description saved successfully");
                 setDescription(editableDescription);
             })
@@ -1167,26 +1178,41 @@ function ApiEndpoints(props) {
                         title={(
                             <Box maxWidth="35vw">
                                 <VerticalStack gap={2}>
-                                    {isEditing ? (
-                                        <InlineEditableText textValue={editableTitle} setTextValue={handleTitleChange} handleSaveClick={handleSaveClick} setIsEditing={setIsEditing} maxLength={24} />
-                                    ) :
-                                        <div style={{ cursor: isApiGroup ? 'pointer' : 'default' }} onClick={isApiGroup ? () => { setIsEditing(true); } : undefined}>
-                                            <TooltipText tooltip={pageTitle} text={pageTitle} textProps={{ variant: 'headingLg' }} />
-                                        </div>}
+                                    <HorizontalStack gap={2}>
+                                        <>
+                                            {isEditing ? (
+                                                <InlineEditableText textValue={editableTitle} setTextValue={handleTitleChange} handleSaveClick={handleSaveClick} setIsEditing={setIsEditing} maxLength={24} />
+                                            ) :
+                                                <div style={{ cursor: isApiGroup ? 'pointer' : 'default' }} onClick={isApiGroup ? () => { setIsEditing(true); } : undefined}>
+                                                    <TooltipText tooltip={pageTitle} text={pageTitle} textProps={{ variant: 'headingLg' }} />
+                                                </div>}
+                                        </>
+                                        <>
+                                            {collectionTypeListComp}
+                                        </>  
+                                    </HorizontalStack>
                                     <HorizontalStack gap={2}>
                                         {isEditingDescription ? (
-                                            <InlineEditableText textValue={editableDescription} setTextValue={setEditableDescription} handleSaveClick={handleSaveDescription} setIsEditing={setIsEditingDescription} placeholder={"Add a brief description"} maxLength={64} />
+                                            <InlineEditableText 
+                                                textValue={editableDescription} 
+                                                setTextValue={setEditableDescription} 
+                                                handleSaveClick={handleSaveDescription} 
+                                                setIsEditing={setIsEditingDescription} 
+                                                placeholder={"Add a brief description"} 
+                                                fitParentWidth={true}
+                                            />
                                         ) : (
                                             !description ? (
                                                 <Button plain removeUnderline onClick={() => setIsEditingDescription(true)}>
                                                     Add description
                                                 </Button>
                                             ) : (
-                                                <Button plain removeUnderline onClick={() => setIsEditingDescription(true)}>
-                                                    <Text as="span" variant="bodyMd" color="subdued" alignment="start">
-                                                        {description}
-                                                    </Text>
-                                                </Button>
+                                                /*
+                                                 Setting maxWidth to 100% to override the tooltipSpan class max-width of 63 vw and instead use the max-width of the parent HorizontalStack.
+                                                */
+                                                <Box maxWidth="100%" onClick={() => setIsEditingDescription(true)}>
+                                                    <TooltipText tooltip={description} text={description} textProps={{ variant: 'bodyMd', fontWeight: "medium"}} />
+                                                </Box>
                                             )
                                         )}
                                     </HorizontalStack>

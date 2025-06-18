@@ -37,6 +37,8 @@ public class HttpRequestResponseUtils {
 
     public static final String FORM_URL_ENCODED_CONTENT_TYPE = "application/x-www-form-urlencoded";
     public static final String GRPC_CONTENT_TYPE = "application/grpc";
+    public static final String TEXT_EVENT_STREAM_CONTENT_TYPE = "text/event-stream";
+    public static final String CONTENT_TYPE = "CONTENT-TYPE";
 
     public static List<SingleTypeInfo> generateSTIsFromPayload(int apiCollectionId, String url, String method,String body, int responseCode) {
         int now = Context.now();

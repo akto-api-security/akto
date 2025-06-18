@@ -14,6 +14,8 @@ import com.mongodb.client.model.Updates;
 import software.amazon.awssdk.services.wafv2.Wafv2Client;
 import software.amazon.awssdk.services.wafv2.model.GetIpSetResponse;
 
+import java.util.List;
+
 public class AwsWafAction extends UserAction {
     
     private String awsAccessKey;
@@ -22,6 +24,7 @@ public class AwsWafAction extends UserAction {
     private String ruleSetId;
     private String ruleSetName;
     Config.AwsWafConfig wafConfig;
+    private List<String> severityLevels;
 
     public String addAwsWafIntegration() {
 
@@ -65,11 +68,12 @@ public class AwsWafAction extends UserAction {
                 Updates.set("awsSecretKey", awsSecretKey),
                 Updates.set("region", region),
                 Updates.set("ruleSetName", ruleSetName),
-                Updates.set("ruleSetId", ruleSetId)
+                Updates.set("ruleSetId", ruleSetId),
+                 Updates.set("severityLevels", severityLevels)
             );
             ConfigsDao.instance.updateOne(filters, updates);
         } else {
-            Config.AwsWafConfig config = new Config.AwsWafConfig(awsAccessKey, awsSecretKey, region, ruleSetId, ruleSetName, accId);
+            Config.AwsWafConfig config = new Config.AwsWafConfig(awsAccessKey, awsSecretKey, region, ruleSetId, ruleSetName, accId,severityLevels);
             ConfigsDao.instance.insertOne(config);
         }
 
@@ -143,6 +147,14 @@ public class AwsWafAction extends UserAction {
 
     public void setWafConfig(Config.AwsWafConfig wafConfig) {
         this.wafConfig = wafConfig;
+    }
+
+    public List<String> getSeverityLevels() {
+        return severityLevels;
+    }
+
+    public void setSeverityLevels(List<String> severityLevels) {
+        this.severityLevels = severityLevels;
     }
 
 }

@@ -4,7 +4,7 @@ import com.akto.action.test_editor.SaveTestEditorAction;
 import com.akto.gpt.handlers.gpt_prompts.TestExecutorModifier;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
-import com.akto.test_editor.execution.Executor;
+import com.akto.test_editor.Utils;
 import com.akto.util.DashboardMode;
 import com.opensymphony.xwork2.ActionInvocation;
 
@@ -26,7 +26,7 @@ public class ContextBasedUsageInterceptor extends UsageInterceptor {
             if (actionObject instanceof SaveTestEditorAction) {
                 SaveTestEditorAction action = (SaveTestEditorAction) actionObject;
                 if (action.getContent() != null && action.getContent().length() > 0
-                        && action.getContent().contains(Executor._MAGIC)) {
+                        && action.getContent().contains(Utils._MAGIC)) {
                     invocation.getInvocationContext().put(_FEATURE_LABEL, TestExecutorModifier._AKTO_GPT_AI);
                     return invocation.invoke();
                 }

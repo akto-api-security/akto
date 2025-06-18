@@ -7,6 +7,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+
 import com.akto.dao.context.Context;
 import com.akto.dao.testing.TestRolesDao;
 import com.akto.dto.ApiInfo;
@@ -28,6 +29,7 @@ import com.akto.log.LoggerMaker.LogDb;
 import com.akto.rules.TestPlugin;
 import com.akto.test_editor.Utils;
 import com.akto.util.Constants;
+import com.akto.util.CookieTransformer;
 import com.akto.util.HttpRequestResponseUtils;
 import com.akto.util.modifier.JWTPayloadReplacer;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -40,6 +42,7 @@ import static com.akto.test_editor.Utils.bodyValuesUnchanged;
 import static com.akto.test_editor.Utils.headerValuesUnchanged;
 import static com.akto.runtime.utils.Utils.convertOriginalReqRespToString;
 import static com.akto.testing.Utils.compareWithOriginalResponse;
+import static com.akto.runtime.utils.Utils.parseCookie;
 
 
 import org.apache.commons.lang3.StringUtils;
@@ -354,6 +357,12 @@ public class Executor {
 
             String successNodeId = reqNode.fetchConditionalString("success");
             String failureNodeId = reqNode.fetchConditionalString("failure");
+            String waitInSecondsStr = reqNode.fetchConditionalString("wait");
+            int waitInSeconds = 0;
+            try {
+                waitInSeconds = Integer.parseInt(waitInSecondsStr);
+            } catch (Exception e) {
+            }
 
             if (testId != null) {
                 JSONObject json = new JSONObject() ;
@@ -363,10 +372,10 @@ public class Executor {
                 json.put("requestHeaders", rawApi.getRequest().getHeaders().toString());
                 json.put("type", "");
                 
-                YamlNodeDetails yamlNodeDetails = new YamlNodeDetails(testId, null, reqNode, customAuthTypes, authMechanism, rawApi, apiInfoKey, rawApi.getOriginalMessage(), successNodeId, failureNodeId);
+                YamlNodeDetails yamlNodeDetails = new YamlNodeDetails(testId, null, reqNode, customAuthTypes, authMechanism, rawApi, apiInfoKey, rawApi.getOriginalMessage(), successNodeId, failureNodeId, waitInSeconds);
                 mapNodeIdToWorkflowNodeDetails.put(source, yamlNodeDetails);
             } else {
-                YamlNodeDetails yamlNodeDetails = new YamlNodeDetails(null, validatorNode, reqNode, customAuthTypes, authMechanism, rawApi, apiInfoKey, rawApi.getOriginalMessage(), successNodeId, failureNodeId);
+                YamlNodeDetails yamlNodeDetails = new YamlNodeDetails(null, validatorNode, reqNode, customAuthTypes, authMechanism, rawApi, apiInfoKey, rawApi.getOriginalMessage(), successNodeId, failureNodeId, waitInSeconds);
                 mapNodeIdToWorkflowNodeDetails.put(source, yamlNodeDetails);
             }
 
@@ -419,8 +428,6 @@ public class Executor {
         return testResult;
     }
 
-    public final static String _MAGIC = "$magic";
-
     private List<BasicDBObject> parseGeneratedKeyValues(BasicDBObject generatedData, String operationType, Object value) {
         List<BasicDBObject> generatedOperationKeyValuePairs = new ArrayList<>();
                 if (generatedData.containsKey(operationType)) {
@@ -470,20 +477,22 @@ public class Executor {
                 String request = Utils.buildRequestIHttpFormat(rawApi);
 
                 String operationPrompt = "";
-                if (key.equals(_MAGIC)) {
+                if (key.equals(Utils._MAGIC)) {
                     operationPrompt = value.toString();
-                } else if (key.toString().startsWith(_MAGIC)) {
-                    operationPrompt = key.toString().replace(_MAGIC, "").trim();
+                } else if (key.toString().startsWith(Utils._MAGIC)) {
+                    operationPrompt = key.toString().replace(Utils._MAGIC, "").trim();
                 }
 
-                String operationTypeLower = operationType.toLowerCase();
-                String operation = operationTypeLower + ": " + operationPrompt;
+                if (!operationPrompt.isEmpty()) {
+                    String operationTypeLower = operationType.toLowerCase();
+                    String operation = operationTypeLower + ": " + operationPrompt;
 
-                BasicDBObject queryData = new BasicDBObject();
-                queryData.put(TestExecutorModifier._REQUEST, request);
-                queryData.put(TestExecutorModifier._OPERATION, operation);
-                BasicDBObject generatedData = new TestExecutorModifier().handle(queryData);
-                generatedOperationKeyValuePairs = parseGeneratedKeyValues(generatedData, operationTypeLower, value);
+                    BasicDBObject queryData = new BasicDBObject();
+                    queryData.put(TestExecutorModifier._REQUEST, request);
+                    queryData.put(TestExecutorModifier._OPERATION, operation);
+                    BasicDBObject generatedData = new TestExecutorModifier().handle(queryData);
+                    generatedOperationKeyValuePairs = parseGeneratedKeyValues(generatedData, operationTypeLower, value);
+                }
             }
 
         } catch (Exception e) {
@@ -491,7 +500,7 @@ public class Executor {
         }
 
         try {
-            if(!generatedOperationKeyValuePairs.isEmpty()){
+            if (generatedOperationKeyValuePairs != null && !generatedOperationKeyValuePairs.isEmpty()) {
                 ExecutorSingleOperationResp resp = new ExecutorSingleOperationResp(false, "AI generated operation key value pairs, executing them");
                 for (BasicDBObject generatedPair : generatedOperationKeyValuePairs) {
                     String generatedKey = generatedPair.keySet().iterator().next();
@@ -720,6 +729,7 @@ public class Executor {
                 if (VariableResolver.isAuthContext(key)) {
                     // resolve context for auth mechanism keys
                     authVal = VariableResolver.resolveAuthContext(key, rawApi.getRequest().getHeaders(), authHeader);
+                    // get cookie auth val as well
                     if (authVal != null) {
                         ExecutorSingleOperationResp authMechanismContextResult = Operations.modifyHeader(rawApi, authHeader, authVal, true);
                         modifiedAtLeastOne = modifiedAtLeastOne || authMechanismContextResult.getSuccess();
@@ -743,6 +753,12 @@ public class Executor {
                             ExecutorSingleOperationResp customAuthContextResult = Operations.modifyBodyParam(rawApi, customAuthPayloadKey, authVal);
                             modifiedAtLeastOne = modifiedAtLeastOne || customAuthContextResult.getSuccess();
                         }
+                    }
+
+                    // if cookie is present in the request, we can also resolve cookie auth context
+                    if(rawApi.getRequest().getHeaders().containsKey("cookie")){
+                        List<String> cookieList = rawApi.getRequest().getHeaders().get("cookie");
+                        VariableResolver.resolveAuthContextForCookie(key.toString(), cookieList);
                     }
 
                 } else {
@@ -771,7 +787,14 @@ public class Executor {
             case "jwt_replace_body":
                 JWTPayloadReplacer jwtPayloadReplacer = new JWTPayloadReplacer(key.toString());
                 boolean modified = false;
+                String keyToBeModified = "";
+                String finalValueToBeModified = "";
+                boolean containsCookie = false;
                 for (String k: rawApi.getRequest().getHeaders().keySet()) {
+                    if(k.equals("cookie")){
+                        containsCookie = true;
+                        continue; 
+                    }
                     List<String> hList = rawApi.getRequest().getHeaders().getOrDefault(k, new ArrayList<>());
                     if (hList.size() == 0){
                         continue;
@@ -802,12 +825,33 @@ public class Executor {
                         continue;
                     }
                     modified = true;
+                    keyToBeModified = k;
+                    finalValueToBeModified = String.join( " ", finalValue);
+                    break;
+                }
+                // try for cookie here
+                if(containsCookie){
+                    List<String> hList = rawApi.getRequest().getHeaders().get("cookie");
+                    Map<String, String> cookieMap = parseCookie(hList);
+                    for (String k: cookieMap.keySet()) {
+                        String val = cookieMap.get(key);
+                        if (val == null || !KeyTypes.isJWT(val)) {
+                            continue;
+                        }
+                        try {
+                            String modifiedHeaderVal = jwtPayloadReplacer.jwtModify("", val);
+                            CookieTransformer.modifyCookie(hList, k, modifiedHeaderVal);
+                        } catch (Exception e) {
+                            // TODO: handle exception
+                        }
+                        
+                    }
+                }
 
-                    return Operations.modifyHeader(rawApi, k, String.join( " ", finalValue));
+                if(modified){
+                    return Operations.modifyHeader(rawApi, keyToBeModified, finalValueToBeModified);
                 }
-                if (!modified) {
-                    return new ExecutorSingleOperationResp(true, "");
-                }
+                return new ExecutorSingleOperationResp(true, "");
             default:
                 return Utils.modifySampleDataUtil(operationType, rawApi, key, value, varMap, apiInfoKey);
 

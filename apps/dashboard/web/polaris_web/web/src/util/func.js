@@ -700,6 +700,25 @@ prettifyEpoch(epoch) {
 
     return collectionsObj
   },
+
+  mapCollectionIdsToTagName(collections) {
+        const allTagCollectionsMap = {};
+              collections
+                .filter(col => !col.deactivated && Array.isArray(col.envType) && col.envType.length > 0)
+                .forEach(col => {
+                  col.envType.forEach(env => {
+                  const keyName = env.keyName.startsWith('userSetEnvType') || env.keyName.startsWith('envType')
+                    ? env.keyName.replace(/^(userSetEnvType|envType)/, 'env')
+                    : env.keyName;
+                    const key = `${keyName}=${env.value}`;
+                    if (!allTagCollectionsMap[key]) {
+                      allTagCollectionsMap[key] = [];
+                    }
+                    allTagCollectionsMap[key].push(col.id);
+                  });
+                });
+       return allTagCollectionsMap
+    },
   mapCollectionId(collections) {
     let collectionsObj = {}
     collections.forEach((collection)=>{
@@ -2175,6 +2194,9 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
       return filtered[0]
     }
     return defaultLabel
+  },
+  formatCollectionType(type) {
+    return (type?.keyName?.replace(/^(userSetEnvType|envType)/, 'env')?.slice(0, 30) ?? '') + '=' + (type?.value?.slice(0, 30) ?? '')
   }
 }
 

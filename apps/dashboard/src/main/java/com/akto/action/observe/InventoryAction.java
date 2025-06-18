@@ -9,8 +9,7 @@ import com.akto.dto.*;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.CodeAnalysisApiInfo.CodeAnalysisApiInfoKey;
 import com.akto.dto.rbac.UsersCollectionsList;
-import com.akto.dto.test_run_findings.TestingRunIssues;
-import com.akto.dto.testing.TestingRun;
+import com.akto.dto.testing.custom_groups.AllAPIsGroup;
 import com.akto.dto.filter.MergedUrls;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.*;
@@ -143,7 +142,24 @@ public class InventoryAction extends UserAction {
 
     public String fetchCollectionWiseApiEndpoints() {
         listOfEndpointsInCollection = new HashSet<>();
-        List<BasicDBObject> list = Utils.fetchEndpointsInCollectionUsingHost(apiCollectionId, skip);
+        List<BasicDBObject> list = new ArrayList<>();
+        if (apiCollectionId == -1) {
+            addActionError("API Collection ID cannot be -1");
+            return Action.ERROR.toUpperCase();
+        }
+        ApiCollection apiCollection = ApiCollectionsDao.instance.findOne(
+            Filters.eq(Constants.ID, apiCollectionId),
+            Projections.include(ApiCollection.HOST_NAME)
+        );
+        if(apiCollection == null) {
+            addActionError("No such collection exists");
+            return Action.ERROR.toUpperCase();
+        }
+        if(apiCollection.getHostName() == null || apiCollection.getHostName().isEmpty()) {
+            list = ApiCollectionsDao.fetchEndpointsInCollection(apiCollectionId, skip, limit, Utils.DELTA_PERIOD_VALUE);
+        }else{
+            list = ApiCollectionsDao.fetchEndpointsInCollectionUsingHost(apiCollectionId, skip, false);
+        }
 
         if (list != null && !list.isEmpty()) {
             list.forEach(element -> {
@@ -295,24 +311,6 @@ public class InventoryAction extends UserAction {
         return unused;
     }
 
-    private void attachUnusedEndpoints(List<BasicDBObject> list,BasicDBObject response){
-        APISpec apiSpec = APISpecDao.instance.findById(apiCollectionId);
-        Set<String> unused = null;
-        try {
-            if (apiSpec != null) {
-                SwaggerParseResult result = new OpenAPIParser().readContents(apiSpec.getContent(), null, null);
-                OpenAPI openAPI = result.getOpenAPI();
-                unused = fetchSwaggerData(list, openAPI);
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-        if (unused == null) {
-            unused = new HashSet<>();
-        }
-        response.put("unusedEndpoints", unused);
-    }
-
     private void attachCodeAnalysisInResponse(BasicDBObject response){
         BasicDBObject codeAnalysisCollectionInfo = new BasicDBObject();
         ApiCollection apiCollection = ApiCollectionsDao.instance.getMeta(apiCollectionId);
@@ -357,14 +355,14 @@ public class InventoryAction extends UserAction {
             return Action.ERROR.toUpperCase();
         }
         List<BasicDBObject> list = new ArrayList<>();
-        if(collection.getHostName() == null || collection.getHostName().isEmpty()){
+        if((collection.getHostName() == null || collection.getHostName().isEmpty()) && collection.getId() != AllAPIsGroup.ALL_APIS_GROUP_ID){
             Bson filter = Filters.and(
                 Filters.in(SingleTypeInfo._COLLECTION_IDS, apiCollectionId),
                 Filters.nin(SingleTypeInfo._API_COLLECTION_ID, deactivatedCollections)
             );
             list = ApiCollectionsDao.fetchEndpointsInCollection(filter, 0, -1, Utils.DELTA_PERIOD_VALUE);
         }else{
-            list = Utils.fetchEndpointsInCollectionUsingHost(apiCollectionId, 0);
+            list = ApiCollectionsDao.fetchEndpointsInCollectionUsingHost(apiCollectionId, 0, collection.getId() == AllAPIsGroup.ALL_APIS_GROUP_ID);
         }
          
         response = new BasicDBObject();
@@ -389,18 +387,6 @@ public class InventoryAction extends UserAction {
                 response.put("redacted", apiCollection.getRedact());
             }
         }
-        return Action.SUCCESS.toUpperCase();
-    }
-
-    public String fetchAPICollection() {
-        List<BasicDBObject> list = Utils.fetchEndpointsInCollectionUsingHost(apiCollectionId, skip);
-        attachTagsInAPIList(list);
-        attachAPIInfoListInResponse(list, apiCollectionId);
-        attachUnusedEndpoints(list, response);
-
-        // Attach code analysis collection
-        attachCodeAnalysisInResponse(response);
-
         return Action.SUCCESS.toUpperCase();
     }
 
