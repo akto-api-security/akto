@@ -379,8 +379,7 @@ public class Main {
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb(e, "Error while executing MCP Tools Sync Job");
             }
-
-        }, 30, 24, TimeUnit.MINUTES);
+        }, 30, 24, TimeUnit.HOURS);
 
         try {
             main.consumer.subscribe(Arrays.asList(topicName, "har_"+topicName));
