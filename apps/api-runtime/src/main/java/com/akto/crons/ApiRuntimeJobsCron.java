@@ -31,45 +31,47 @@ public class ApiRuntimeJobsCron {
 
     public void jobsScheduler(ScheduledExecutorService scheduler) {
         scheduler.scheduleAtFixedRate(() -> {
-
-            long now = Context.now();
-
-            Bson scheduledFilter = getScheduleJobsFilter();
-
-            Bson updateQ = Updates.combine(
-                Updates.set(Job.JOB_STATUS, JobStatus.RUNNING.name()),
-                Updates.set(Job.STARTED_AT, now),
-                Updates.set(Job.HEARTBEAT_AT, now)
-            );
-
-            FindOneAndUpdateOptions options = new FindOneAndUpdateOptions()
-                .sort(Sorts.ascending(Job.SCHEDULED_AT))
-                .returnDocument(ReturnDocument.AFTER);
-
-            Job job = null;
             try {
-                job = JobsDao.instance.getMCollection().findOneAndUpdate(
-                    scheduledFilter,
-                    updateQ,
-                    options
+                long now = Context.now();
+
+                Bson scheduledFilter = getScheduleJobsFilter();
+
+                Bson updateQ = Updates.combine(
+                    Updates.set(Job.JOB_STATUS, JobStatus.RUNNING.name()),
+                    Updates.set(Job.STARTED_AT, now),
+                    Updates.set(Job.HEARTBEAT_AT, now)
+                );
+
+                FindOneAndUpdateOptions options = new FindOneAndUpdateOptions()
+                    .sort(Sorts.ascending(Job.SCHEDULED_AT))
+                    .returnDocument(ReturnDocument.AFTER);
+
+                Job job = null;
+                try {
+                    job = JobsDao.instance.getMCollection().findOneAndUpdate(
+                        scheduledFilter,
+                        updateQ,
+                        options
+                    );
+                } catch (Exception e) {
+                    logger.error("error while fetching scheduled jobs ", e);
+                }
+
+                if (job == null) {
+                    logger.debug("No jobs to run");
+                    return;
+                }
+
+                Job finalJob = job;
+                executorService.submit(
+                    () -> {
+                        Context.accountId.set(finalJob.getAccountId());
+                        JobExecutorFactory.getExecutor(finalJob.getJobParams().getJobType()).execute(finalJob);
+                    }
                 );
             } catch (Exception e) {
-                logger.error("error while fetching scheduled jobs ", e);
+                logger.error("Error while scheduling jobs", e);
             }
-
-            if (job == null) {
-                logger.debug("No jobs to run");
-                return;
-            }
-
-            Job finalJob = job;
-            executorService.submit(
-                () -> {
-                    Context.accountId.set(finalJob.getAccountId());
-                    JobExecutorFactory.getExecutor(finalJob.getJobParams().getJobType()).execute(finalJob);
-                }
-            );
-
         }, 0, 5, TimeUnit.SECONDS);
     }
 
