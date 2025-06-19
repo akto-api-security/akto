@@ -53,6 +53,8 @@ public class TestingRun {
 
     public static final String SEND_MS_TEAMS_ALERT = "sendMsTeamsAlert";
     private boolean sendMsTeamsAlert = false;
+    public static final String SEND_PENDING_TESTS_WEBHOOK_TIMESTAMP = "sendPendingTestsWebhookTimestamp";
+    private int sendPendingTestsWebhookTimestamp;
 
     public TestingRun() { }
 
@@ -246,6 +248,13 @@ public class TestingRun {
         this.miniTestingServiceName = miniTestingServiceName;
     }
 
+    public int getSendPendingTestsWebhookTimestamp() {
+        return sendPendingTestsWebhookTimestamp;
+    }
+
+    public void setSendPendingTestsWebhookTimestamp(int sendPendingTestsWebhookTimestamp) {
+        this.sendPendingTestsWebhookTimestamp = sendPendingTestsWebhookTimestamp;
+    }
     @Override
     public String toString() {
         return "{" +

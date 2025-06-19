@@ -1,5 +1,9 @@
 package com.akto.runtime.utils;
 
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -243,6 +247,16 @@ public class Utils {
         originalHttpResponseParams.setRequestParams(ogRequestParams);
 
         return originalHttpResponseParams;
+    }
+
+    public static String convertEpochToDateTime(int epoch) {
+        if (epoch <= 0) {
+            return "Invalid epoch time";
+        }
+        ZonedDateTime dateTime = Instant.ofEpochSecond(epoch)
+                .atZone(ZoneId.systemDefault());
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd MMM yyyy, h:mm a");
+        return dateTime.format(formatter);
     }
 
 
