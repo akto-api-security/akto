@@ -191,7 +191,7 @@ function HomeDashboard() {
         },
         {
             id: 'analytics',
-            content: 'Analytics',
+            content: 'Analysis',
             panelID: 'analytics-content',
         },
     ];
