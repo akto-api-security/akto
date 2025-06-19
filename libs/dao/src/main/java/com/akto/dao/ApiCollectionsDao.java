@@ -270,7 +270,7 @@ public class ApiCollectionsDao extends AccountsContextDaoWithRbac<ApiCollection>
             }
             lastScannedId = stis.size() != 0 ? stis.get(stis.size() - 1).getId() : null;
             allUrlsInCollection.addAll(stis);
-            if(stis.size() <= STIS_LIMIT){
+            if(stis.size() < STIS_LIMIT){
                 break;
             }
 
