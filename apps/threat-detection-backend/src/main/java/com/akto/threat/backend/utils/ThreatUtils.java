@@ -29,13 +29,13 @@ public class ThreatUtils {
         }
 
         Map<String, Bson> requiredIndexes = new HashMap<>();
-        requiredIndexes.put("detectedAt_asc", Indexes.ascending("detectedAt"));
-        requiredIndexes.put("detectedAt_desc", Indexes.descending("detectedAt"));
-        requiredIndexes.put("country_detectedAt", Indexes.compoundIndex(Indexes.ascending("country"), Indexes.descending("detectedAt")));
-        requiredIndexes.put("detectedAt_category_subCategory", Indexes.ascending("detectedAt", "category", "subCategory"));
-        requiredIndexes.put("severity_detectedAt", Indexes.ascending("severity", "detectedAt"));
-        requiredIndexes.put("detectedAt_desc_actor", Indexes.compoundIndex(Indexes.descending("detectedAt"), Indexes.ascending("actor")));
-        requiredIndexes.put("actor_detectedAt_desc", Indexes.compoundIndex(Indexes.ascending("actor"), Indexes.descending("detectedAt")));
+        requiredIndexes.put("detectedAt_1", Indexes.ascending("detectedAt"));
+        requiredIndexes.put("detectedAt_-1", Indexes.descending("detectedAt"));
+        requiredIndexes.put("country_1_detectedAt_-1", Indexes.compoundIndex(Indexes.ascending("country"), Indexes.descending("detectedAt")));
+        requiredIndexes.put("detectedAt_1_category_1_subCategory_1", Indexes.ascending("detectedAt", "category", "subCategory"));
+        requiredIndexes.put("severity_1_detectedAt_1", Indexes.ascending("severity", "detectedAt"));
+        requiredIndexes.put("detectedAt_-1_actor_1", Indexes.compoundIndex(Indexes.descending("detectedAt"), Indexes.ascending("actor")));
+        requiredIndexes.put("actor_1_detectedAt_-1", Indexes.compoundIndex(Indexes.ascending("actor"), Indexes.descending("detectedAt")));
 
         for (Map.Entry<String, Bson> entry : requiredIndexes.entrySet()) {
             if (!existingIndexes.contains(entry.getKey())) {
