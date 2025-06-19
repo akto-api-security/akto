@@ -58,7 +58,8 @@ public class CustomWebhook {
         // optionReplaceString not being used for Testing Run results.
         TESTING_RUN_RESULTS("Testing run results", "${AKTO.changes_info.apiTestingRunResults}"),
         // optionReplaceString not being used for Traffic alerts.
-        TRAFFIC_ALERTS("Traffic alerts", "${AKTO.changes_info.apiTrafficAlerts}");
+        TRAFFIC_ALERTS("Traffic alerts", "${AKTO.changes_info.apiTrafficAlerts}"),
+        PENDING_TESTS_ALERTS("Pending tests alerts", "${AKTO.changes_info.apiPendingTestsAlerts}");
 
         final String optionName;
         final String optionReplaceString;
