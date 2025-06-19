@@ -97,6 +97,16 @@ public class TestVariableResolver {
 
         result = VariableResolver.resolveWordListVar(key, varMap);
         assertEquals(Arrays.asList("${changed_body_value}"), result);
+
+        varMap = new HashMap<>();
+        varMap.put("changed_body_value", "akto");
+        varMap.put("randomVar", "random");
+        varMap.put("wordList_specialCharacters", Arrays.asList(".", "$", "/"));
+        varMap.put("wordList_names", Arrays.asList(".", "$", "/"));
+        key = "nothing here";
+
+        result = VariableResolver.resolveWordListVar(key, varMap);
+        assertEquals(Arrays.asList("nothing here"), result);
     }
 
 }
