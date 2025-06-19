@@ -67,7 +67,8 @@ public class JsonRpcUtilsTest {
         reqParams.setUrl("http://localhost:8080/api");
         HttpResponseParams responseParams = new HttpResponseParams();
         responseParams.setRequestParams(reqParams);
-        assertThrows(NullPointerException.class, () -> JsonRpcUtils.parseJsonRpcResponse(responseParams));
+        HttpResponseParams resp = JsonRpcUtils.parseJsonRpcResponse(responseParams);
+        assertEquals("http://localhost:8080/api", resp.getRequestParams().getURL());
     }
 
     @Test
