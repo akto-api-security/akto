@@ -247,8 +247,12 @@ public class WebhookAction extends UserAction implements ServletRequestAware{
             CustomWebhooksDao.instance.updateOne(Filters.eq("_id", id), updates);
 
             addActionMessage("Webhook status updated successfully");
-            // If the status is update of Webhook of type PENDING_TESTS_ALERTS, then we need to handle the job accordingly
-            if (customWebhook.getSelectedWebhookOptions().get(0).equals(CustomWebhook.WebhookOptions.PENDING_TESTS_ALERTS)) {
+            // If the status is update of Webhook of type PENDING_TESTS_ALERTS, then we need
+            // to handle the job accordingly
+            if (customWebhook != null && customWebhook.getSelectedWebhookOptions() != null &&
+                    !customWebhook.getSelectedWebhookOptions().isEmpty() &&
+                    customWebhook.getSelectedWebhookOptions().get(0)
+                            .equals(CustomWebhook.WebhookOptions.PENDING_TESTS_ALERTS)) {
                 addActionMessage("Webhook status updated for Pending Tests Alerts, hence job status to be updated accordingly");
                 Job pendingAlertTestJob = JobsDao.instance.findOne(
                         Filters.and(
