@@ -1,0 +1,47 @@
+package com.akto.threat.backend.utils;
+
+import com.akto.threat.backend.constants.MongoDBCollection;
+import com.mongodb.client.*;
+import com.mongodb.client.model.IndexOptions;
+import com.mongodb.client.model.Indexes;
+import org.bson.Document;
+import org.bson.conversions.Bson;
+
+import java.util.*;
+
+public class ThreatUtils {
+
+    public static void createIndexIfAbsent(String accountId, MongoClient mongoClient) {
+        MongoDatabase database = mongoClient.getDatabase(accountId);
+        MongoCollection<Document> coll = database.getCollection(MongoDBCollection.ThreatDetection.MALICIOUS_EVENTS, Document.class);
+
+        if (coll == null) {
+            database.createCollection(MongoDBCollection.ThreatDetection.MALICIOUS_EVENTS);
+            coll = database.getCollection(MongoDBCollection.ThreatDetection.MALICIOUS_EVENTS, Document.class);
+        }
+
+        Set<String> existingIndexes = new HashSet<>();
+        try (MongoCursor<Document> cursor = coll.listIndexes().iterator()) {
+            while (cursor.hasNext()) {
+                Document index = cursor.next();
+                existingIndexes.add(index.get("name", ""));
+            }
+        }
+
+        Map<String, Bson> requiredIndexes = new HashMap<>();
+        requiredIndexes.put("detectedAt_asc", Indexes.ascending("detectedAt"));
+        requiredIndexes.put("detectedAt_desc", Indexes.descending("detectedAt"));
+        requiredIndexes.put("country_detectedAt", Indexes.compoundIndex(Indexes.ascending("country"), Indexes.descending("detectedAt")));
+        requiredIndexes.put("detectedAt_category_subCategory", Indexes.ascending("detectedAt", "category", "subCategory"));
+        requiredIndexes.put("severity_detectedAt", Indexes.ascending("severity", "detectedAt"));
+        requiredIndexes.put("detectedAt_desc_actor", Indexes.compoundIndex(Indexes.descending("detectedAt"), Indexes.ascending("actor")));
+        requiredIndexes.put("actor_detectedAt_desc", Indexes.compoundIndex(Indexes.ascending("actor"), Indexes.descending("detectedAt")));
+
+        for (Map.Entry<String, Bson> entry : requiredIndexes.entrySet()) {
+            if (!existingIndexes.contains(entry.getKey())) {
+                coll.createIndex(entry.getValue(), new IndexOptions().name(entry.getKey()));
+            }
+        }
+    }
+
+}

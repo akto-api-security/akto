@@ -18,14 +18,11 @@ import com.akto.threat.backend.constants.KafkaTopic;
 import com.akto.threat.backend.constants.MongoDBCollection;
 import com.akto.threat.backend.db.MaliciousEventModel;
 import com.akto.threat.backend.utils.KafkaUtils;
+import com.akto.threat.backend.utils.ThreatUtils;
 import com.mongodb.client.*;
 import com.mongodb.client.model.Filters;
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.UUID;
+
+import java.util.*;
 
 import com.mongodb.client.model.Indexes;
 import org.bson.Document;
@@ -36,6 +33,8 @@ public class MaliciousEventService {
   private final Kafka kafka;
   private final MongoClient mongoClient;
   private static final LoggerMaker logger = new LoggerMaker(MaliciousEventService.class);
+
+  private static final HashMap<String, Boolean> shouldNotCreateIndexes = new HashMap<>();
 
   public MaliciousEventService(
       KafkaConfig kafkaConfig, MongoClient mongoClient) {
@@ -140,7 +139,9 @@ public class MaliciousEventService {
   public ListMaliciousRequestsResponse listMaliciousRequests(
       String accountId, ListMaliciousRequestsRequest request) {
 
-    createIndexIfAbsent(accountId);
+    if(!shouldNotCreateIndexes.getOrDefault(accountId, false)) {
+      createIndexIfAbsent(accountId);
+    }
 
     int limit = request.getLimit();
     int skip = request.hasSkip() ? request.getSkip() : 0;
@@ -220,32 +221,7 @@ public class MaliciousEventService {
   }
 
   public void createIndexIfAbsent(String accountId) {
-    MongoDatabase database = this.mongoClient
-            .getDatabase(accountId);
-    MongoCollection<Document> coll = database
-            .getCollection(MongoDBCollection.ThreatDetection.MALICIOUS_EVENTS, Document.class);
-
-    if(coll == null) {
-      database.createCollection(MongoDBCollection.ThreatDetection.MALICIOUS_EVENTS);
-    }
-
-    MongoCursor<Document> cursor = coll.listIndexes().cursor();
-    List<Document> indices = new ArrayList<>();
-
-    while(cursor.hasNext()) {
-      indices.add(cursor.next());
-    }
-
-    if(indices.isEmpty()) {
-      coll.createIndex(Indexes.ascending("detectedAt"));
-      coll.createIndex(Indexes.descending("detectedAt"));
-      coll.createIndex(Indexes.compoundIndex(Indexes.ascending("country"), Indexes.descending("detectedAt")));
-      coll.createIndex(Indexes.ascending("detectedAt", "category", "subCategory"));
-      coll.createIndex(Indexes.ascending("severity", "detectedAt"));
-      coll.createIndex(Indexes.compoundIndex(Indexes.descending("detectedAt"), Indexes.ascending("actor")));
-      coll.createIndex(Indexes.compoundIndex(Indexes.ascending("actor"), Indexes.descending("detectedAt")));
-    }
-
-    cursor.close();
+    ThreatUtils.createIndexIfAbsent(accountId, mongoClient);
+    shouldNotCreateIndexes.put(accountId, true);
   }
 }
