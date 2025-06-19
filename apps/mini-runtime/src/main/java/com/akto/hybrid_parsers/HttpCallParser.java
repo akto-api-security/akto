@@ -114,7 +114,7 @@ public class HttpCallParser {
         for (ApiCollection apiCollection: apiCollections) {
             apiCollectionsMap.put(apiCollection.getId(), apiCollection);
         }
-        if (Main.actualAccountId == 1745303931) {
+        if (Main.actualAccountId == 1745303931 || Main.actualAccountId == 1741069294) {
             this.dependencyAnalyser = new DependencyAnalyser(apiCatalogSync.dbState, Main.isOnprem, RuntimeMode.isHybridDeployment(), apiCollectionsMap);
         }
     }
@@ -287,7 +287,7 @@ public class HttpCallParser {
             apiCatalogSync.computeDelta(aggregator, false, apiCollectionId);
         }
 
-        if (Main.actualAccountId == 1745303931) {
+        if (Main.actualAccountId == 1745303931 || Main.actualAccountId == 1741069294) {
             for (HttpResponseParams responseParam: filteredResponseParams) {
                 dependencyAnalyser.analyse(responseParam.getOrig(), responseParam.requestParams.getApiCollectionId());
             }
@@ -303,7 +303,7 @@ public class HttpCallParser {
             }
             SyncLimit syncLimit = fetchSyncLimit();
             apiCatalogSync.syncWithDB(syncImmediately, fetchAllSTI, syncLimit);
-            if (Main.actualAccountId == 1745303931) {
+            if (Main.actualAccountId == 1745303931 || Main.actualAccountId == 1741069294) {
                 dependencyAnalyser.dbState = apiCatalogSync.dbState;
                 dependencyAnalyser.syncWithDb();
             }
