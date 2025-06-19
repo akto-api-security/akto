@@ -464,6 +464,8 @@ public class VariableResolver {
 
         Pattern pattern = Pattern.compile("\\$\\{[^}]*\\}");
         Matcher matcher = pattern.matcher(expression);
+        List<String> result = new ArrayList<>();
+        result.add(expression);
         while (matcher.find()) {
             try {
                 String match = matcher.group(0);
@@ -475,17 +477,21 @@ public class VariableResolver {
                 if (isWordListVar) {
                     wordList = (List<String>) varMap.get("wordList_" + match);
                     wordListKey = originalKey;
-                    break;
+                    List<String> tempResult = new ArrayList<>();
+                    for (String temp : result) {
+                        for (Object word : wordList) {
+                            // TODO: handle case to use numbers as well.
+                            String tempWord = temp.replace(wordListKey, word.toString());
+                            expression = tempWord;
+                            tempResult.add(tempWord);
+                        }
+                    }
+                    result = tempResult;
+                    matcher = pattern.matcher(expression);
                 }
             } catch (Exception e) {
                 e.printStackTrace();
             }
-        }
-
-        List<String> result = new ArrayList<>();
-        for (Object word: wordList) {
-            // TODO: handle case to use numbers as well.
-            result.add(expression.replace(wordListKey, word.toString()));
         }
 
         return result;
