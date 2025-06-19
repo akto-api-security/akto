@@ -89,7 +89,7 @@ public class DependencyAnalyser {
         ApiCollection apiCollection = apiCollectionsMap.get(finalApiCollectionId);
         // for on prem customers always run dependency graph
         // for saas customers, run if flag is set true
-        boolean runDependencyAnalyser = apiCollection == null || apiCollection.isRunDependencyAnalyser() || Main.actualAccountId == 1745303931;
+        boolean runDependencyAnalyser = apiCollection == null || apiCollection.isRunDependencyAnalyser() || Main.actualAccountId == 1745303931 || Main.actualAccountId == 1741069294;
         if (!isOnPrem && (isHybrid && !runDependencyAnalyser)) {
             return;
         }
