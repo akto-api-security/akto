@@ -13,7 +13,7 @@ function MoreInfoComponent({icon, label, text, isLink, linkUrl}){
 
 function FlyoutHeadingComponent({itemDetails}) {
     return (
-        <HorizontalStack gap={"2"} align="space-between">
+        <HorizontalStack gap={"2"} align="space-between" wrap={true}>
            
             <Box maxWidth="350px">
                 <VerticalStack gap={"2"}>
@@ -39,10 +39,14 @@ function FlyoutHeadingComponent({itemDetails}) {
             <ButtonGroup spacing="tight">
                 {itemDetails?.secondaryActions.map((action, index) => {
                     return (
-                        <Button key={index + 10} icon={action.icon} onClick={action.onClick} />
+                        <Button 
+                            key={index + 10} 
+                            icon={action.iconComp}
+                            onClick={action.onClick} 
+                        />
                     )
                 })}
-                <Button primary onClick={itemDetails?.primaryAction}>{itemDetails?.primaryActionText}</Button>
+            {itemDetails?.primaryActionComp ? itemDetails?.primaryActionComp : <Button plain={itemDetails?.isPrimaryPlain} removeUnderline onClick={itemDetails?.primaryAction}>{itemDetails?.primaryActionText}</Button>}
             </ButtonGroup>
         </HorizontalStack>  
     )

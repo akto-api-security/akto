@@ -90,10 +90,12 @@ function ActionItemCard(props) {
                             </Popover>
                         )}
                     </Box>
-                    <HorizontalStack gap={"2"}>
-                        <Icon source={EmailMajor} color="subdued"/>
-                        <Avatar size="extraSmall" shape="square" source="/public/logo_jira.svg" />
-                    </HorizontalStack>
+                    <Box className="action-item-card-actions">
+                        <HorizontalStack gap={"2"}>
+                            <button className="Polaris-Modal-CloseButton" onClick={() => {}}><Box><Icon color="subdued" source={EmailMajor} /></Box></button>
+                            <button className="Polaris-Modal-CloseButton" onClick={() => {}}><Box className='reduce-size'><Avatar size="extraSmall" shape="square" source="/public/logo_jira.svg"/></Box></button>
+                        </HorizontalStack>
+                    </Box>
                 </HorizontalStack>
             </VerticalStack>
         </Card>

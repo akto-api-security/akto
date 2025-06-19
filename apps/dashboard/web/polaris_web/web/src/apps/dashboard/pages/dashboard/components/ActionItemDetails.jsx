@@ -1,7 +1,8 @@
-import { Divider, Text, VerticalStack } from '@shopify/polaris';
-import React from 'react';
+import { Divider, Text, VerticalStack, Avatar, Icon, Box } from '@shopify/polaris';
+import React, { useState } from 'react';
 import { ClockMajor, TeamMajor, ToolsMajor, EmailMajor } from '@shopify/polaris-icons';
 import FlyoutHeadingComponent from '../../../components/shared/FlyoutHeadingComponent';
+import AssignTaskToUser from './AssignTaskToUser';
 
 const temporaryItemDetails = {
     title: '3 APIs have no authentication',
@@ -23,12 +24,15 @@ const temporaryItemDetails = {
     ],
     secondaryActions: [
         {
-            icon: EmailMajor,
-            onClick: () => {}
+            iconComp: () => <Box><Icon source={EmailMajor} color="base" /></Box>,
+            onClick: () => { /* TODO: Add email action here */ }
+        },
+        {
+            iconComp: () => <Box className='reduce-size'><Avatar size="extraSmall" shape="square" source="/public/logo_jira.svg"/></Box>,
+            onClick: () => { /* TODO: Add Jira action here */ }
         }
     ],
-    primaryAction: () => {},
-    primaryActionText: 'Assign task'
+    primaryActionComp: <AssignTaskToUser />
 }   
 
 function ActionItemDetails({ item }) {

@@ -3,7 +3,7 @@ import api from './api';
 import func from '@/util/func';
 import observeFunc from "../observe/transform"
 import PageWithMultipleCards from "../../components/layouts/PageWithMultipleCards"
-import { Box, DataTable, HorizontalGrid, HorizontalStack, Icon, Link, Scrollable, Text, VerticalStack, LegacyTabs, Badge, Button, Avatar, Popover, OptionList, Tag } from '@shopify/polaris';
+import { Box, DataTable, HorizontalGrid, HorizontalStack, Icon, Link, Scrollable, Text, VerticalStack, LegacyTabs, Badge, Avatar } from '@shopify/polaris';
 import observeApi from "../observe/api"
 import testingTransform from "../testing/transform"
 import StackedChart from '../../components/charts/StackedChart';
@@ -12,7 +12,7 @@ import testingApi from "../testing/api"
 import PersistStore from '../../../main/PersistStore';
 import { DashboardBanner } from './components/DashboardBanner';
 import SummaryCard from './new_components/SummaryCard';
-import { ArrowUpMinor, ArrowDownMinor, ExternalMinor, EmailMinor, TicketMinor, EmailMajor } from '@shopify/polaris-icons';
+import { ArrowUpMinor, ArrowDownMinor, EmailMinor, TicketMinor, EmailMajor } from '@shopify/polaris-icons';
 import TestSummaryCardsList from './new_components/TestSummaryCardsList';
 import InfoCard from './new_components/InfoCard';
 import ProgressBarChart from './new_components/ProgressBarChart';
@@ -30,55 +30,8 @@ import ActionItemCard from './components/ActionItemCard';
 import GridRows from '../../components/shared/GridRows';
 import FlyLayout from '../../components/layouts/FlyLayout';
 import ActionItemDetails from './components/ActionItemDetails';
+import AssignTaskToUser from './components/AssignTaskToUser';
 
-function AssigneeCell() {
-    const [popoverActive, setPopoverActive] = useState(false);
-    const [selectedUser, setSelectedUser] = useState([]);
-
-    // Sample users - in real app, this would come from your users list
-    const users = [
-        {value: 'user1', label: 'John Doe'},
-        {value: 'user2', label: 'Jane Smith'},
-        {value: 'user3', label: 'Mike Johnson'},
-    ];
-
-    const togglePopoverActive = () => {
-        setPopoverActive((active) => !active);
-    };
-
-    const handleUserSelect = (value) => {
-        setSelectedUser(value);
-        setPopoverActive(false);
-    };
-
-    const activator = (
-        <Button onClick={togglePopoverActive} plain removeUnderline>
-            Assign Task
-        </Button>
-    );
-
-    const assignedUser = selectedUser.length > 0 ? users.find(u => u.value === selectedUser[0]) : null;
-
-    return assignedUser ? (
-        <Tag onRemove={() => setSelectedUser([])}>
-            {assignedUser.label}
-        </Tag>
-    ) : (
-        <Popover
-            active={popoverActive}
-            activator={activator}
-            onClose={() => setPopoverActive(false)}
-            autofocusTarget="first-node"
-        >
-            <OptionList
-                title="Assign to"
-                onChange={handleUserSelect}
-                options={users}
-                selected={selectedUser}
-            />
-        </Popover>
-    );
-}
 
 const sampleActionItems = [
     {
@@ -90,7 +43,7 @@ const sampleActionItems = [
         effort: 'High',
         whyItMatters: 'Uncontrolled/unknown attack surface',
         displayName: 'Shadow API detected in prod',
-        assignee: <AssigneeCell />,
+        assignee: <AssignTaskToUser />,
         actions: <HorizontalStack gap="2"><Icon source={EmailMajor} color="base" /><Avatar size="extraSmall" shape="square" source="/public/logo_jira.svg" /></HorizontalStack>
     },
     {
@@ -103,7 +56,7 @@ const sampleActionItems = [
         whyItMatters: 'Coverage gap in high-sensitivity endpoints',
         ticket: 'LAN-10',
         displayName: 'Testing overdue on 12 APIs',
-        assignee: <AssigneeCell />,
+        assignee: <AssignTaskToUser />,
         actions: <HorizontalStack gap="2"><Icon source={EmailMajor} color="base" /><Avatar size="extraSmall" shape="square" source="/public/logo_jira.svg" /></HorizontalStack>
     },
     {
@@ -115,7 +68,7 @@ const sampleActionItems = [
         effort: 'Medium',
         whyItMatters: 'DOS & abuse risk',
         displayName: 'Rate limiting missing on reset end...',
-        assignee: <AssigneeCell />,
+        assignee: <AssignTaskToUser />,
         actions: <HorizontalStack gap="2"><Icon source={EmailMajor} color="base" /><Avatar size="extraSmall" shape="square" source="/public/logo_jira.svg" /></HorizontalStack>
     },
     {
@@ -127,7 +80,7 @@ const sampleActionItems = [
         effort: 'Medium',
         whyItMatters: 'Privilege escalation possible',
         displayName: 'API leaking access token in respo...',
-        assignee: <AssigneeCell />,
+        assignee: <AssignTaskToUser />,
         actions: <HorizontalStack gap="2"><Icon source={EmailMajor} color="base" /><Avatar size="extraSmall" shape="square" source="/public/logo_jira.svg" /></HorizontalStack>
     },
     {
@@ -139,7 +92,7 @@ const sampleActionItems = [
         effort: 'Low',
         whyItMatters: 'Known CVEs in external packages',
         displayName: 'Old version of 3rd-party lib used',
-        assignee: <AssigneeCell />,
+        assignee: <AssignTaskToUser />,
         actions: <HorizontalStack gap="2"><Icon source={EmailMajor} color="base" /><Avatar size="extraSmall" shape="square" source="/public/logo_jira.svg" /></HorizontalStack>
     },
     {
@@ -151,7 +104,7 @@ const sampleActionItems = [
         effort: 'Low',
         whyItMatters: 'May expose infrastructure/system info',
         displayName: 'Debug API exposed in prod',
-        assignee: <AssigneeCell />,
+        assignee: <AssignTaskToUser />,
         actions: <HorizontalStack gap="2"><Icon source={EmailMajor} color="base" /><Avatar size="extraSmall" shape="square" source="/public/logo_jira.svg" /></HorizontalStack>
     },
     {
@@ -163,7 +116,7 @@ const sampleActionItems = [
         effort: 'Medium',
         whyItMatters: 'Credential stuffing possible',
         displayName: 'Brute-force vulnerability on login',
-        assignee: <AssigneeCell />,
+        assignee: <AssignTaskToUser />,
         actions: <HorizontalStack gap="2"><Icon source={EmailMajor} color="base" /><Avatar size="extraSmall" shape="square" source="/public/logo_jira.svg" /></HorizontalStack>
     },
 ];
@@ -302,7 +255,7 @@ function HomeDashboard() {
                 show={showFlyout}
                 setShow={setShowFlyout}
                 title="Action item details"
-                components={[<ActionItemDetails item={selectedItem} />]}
+                components={[<ActionItemDetails item={selectedItem}/>]}
             />
         </VerticalStack>
     );
