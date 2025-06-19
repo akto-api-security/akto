@@ -32,7 +32,20 @@ function ActionItemCard(props) {
     const assignedUser = selectedUser.length > 0 ? users.find(u => u.value === selectedUser[0]) : null;
 
     return (
-        <div onClick={() => onButtonClick(cardObj)} style={{cursor: 'pointer'}}>
+        <div
+            onClick={e => {
+                // Prevent flyout if clicking on assign button, popover, or tag
+                if (
+                    e.target.closest('.Polaris-Button') ||
+                    e.target.closest('.Polaris-Popover') ||
+                    e.target.closest('.Polaris-Tag')
+                ) {
+                    return;
+                }
+                onButtonClick(cardObj);
+            }}
+            style={{cursor: 'pointer'}}
+        >
         <Card padding={"5"}>
             <VerticalStack gap={"3"}>
                 <Box width='30px'>
