@@ -1,6 +1,7 @@
 import { Avatar, Badge, Box, Button, Card, Divider, HorizontalStack, Icon, Text, VerticalStack, Popover, OptionList, Tag } from '@shopify/polaris'
 import React, { useState } from 'react'
 import { TeamMajor, ToolsMajor, EmailMajor } from "@shopify/polaris-icons"
+import TooltipText from '../../../components/shared/TooltipText'
 
 function ActionItemCard(props) {
     const {cardObj, onButtonClick } = props ;
@@ -51,11 +52,9 @@ function ActionItemCard(props) {
                 <Box width='30px'>
                 <Badge status="critical-strong-experimental">P0</Badge>
                 </Box>
-                <Box>
-                    <Text variant="headingSm">3 APIs have no authentication</Text>
-                    <Text variant='bodyMd' color='subdued'>
-                        Publicly accessible business logic
-                    </Text>
+                <Box maxWidth="220px">
+                    <TooltipText tooltip={"lmfao bro this is isnaen dedejde onde on"} text={"lmfaoooo jdnew jnewd wedwed wednjkwed wedjkn w wedjn edn"} textProps={{variant: 'headingSm'}} />
+                    <TooltipText tooltip={"lmfao"} text={"lmfaoooo"} textProps={{variant: 'bodyMd', color: 'subdued'}} />
                 </Box>
                 <HorizontalStack gap={"2"}>
                     <HorizontalStack gap={"1"}>
