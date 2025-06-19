@@ -156,7 +156,7 @@ public class InventoryAction extends UserAction {
             return Action.ERROR.toUpperCase();
         }
         if(apiCollection.getHostName() == null || apiCollection.getHostName().isEmpty()) {
-            list = ApiCollectionsDao.fetchEndpointsInCollection(apiCollectionId, skip, limit, Utils.DELTA_PERIOD_VALUE);
+            list = ApiCollectionsDao.fetchEndpointsInCollection(apiCollectionId, skip, Utils.LIMIT, Utils.DELTA_PERIOD_VALUE);
         }else{
             list = ApiCollectionsDao.fetchEndpointsInCollectionUsingHost(apiCollectionId, skip, false);
         }
