@@ -20,6 +20,18 @@ public class YamlTemplateDao extends AccountsContextDao<YamlTemplate> {
 
     public static final YamlTemplateDao instance = new YamlTemplateDao();
 
+    public Map<String, List<String>> fetchCommonWordListMap() {
+        YamlTemplate commonTemplate = CommonTemplateDao.instance.findOne(Filters.empty());
+        Map<String, List<String>> commonWordListMap = new HashMap<>();
+        if (commonTemplate != null) {
+            String content = commonTemplate.getContent();
+            if (content != null && !content.isEmpty()) {
+                commonWordListMap = TestConfigYamlParser.parseWordLists(content);
+            }
+        }
+        return commonWordListMap;
+    }
+
     public Map<String, TestConfig> fetchTestConfigMap(boolean includeYamlContent, boolean fetchOnlyActive, int skip, int limit, Bson customFilter) {
         Map<String, TestConfig> testConfigMap = new HashMap<>();
         List<Bson> filters = new ArrayList<>();
@@ -39,6 +51,8 @@ public class YamlTemplateDao extends AccountsContextDao<YamlTemplate> {
         int localSkip = skip;
         int localLimit = Math.min(100, limit);
 
+        Map<String, List<String>> commonWordListMap = fetchCommonWordListMap();
+
         while (localCounter < limit) {
             yamlTemplates = YamlTemplateDao.instance.findAll(Filters.and(filters), localSkip, localLimit, Sorts.ascending("_id"), proj);
             for (YamlTemplate yamlTemplate: yamlTemplates) {
@@ -51,6 +65,11 @@ public class YamlTemplateDao extends AccountsContextDao<YamlTemplate> {
                     }
                     testConfig.setInactive(yamlTemplate.getInactive());
                     testConfig.setAuthor(yamlTemplate.getAuthor());
+                    if (testConfig.getWordlists() != null) {
+                        testConfig.getWordlists().putAll(commonWordListMap);
+                    } else {
+                        testConfig.setWordlists(commonWordListMap);
+                    }
                     testConfigMap.put(testConfig.getId(), testConfig);
 
                     if (testConfig.getInfo() != null && yamlTemplate.getInfo() != null && yamlTemplate.getInfo().getCompliance() != null) {
