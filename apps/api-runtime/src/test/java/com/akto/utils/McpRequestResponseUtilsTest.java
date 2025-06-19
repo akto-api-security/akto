@@ -112,10 +112,9 @@ public class McpRequestResponseUtilsTest {
         reqParams.setUrl("http://localhost:8080/mcp");
         HttpResponseParams responseParams = new HttpResponseParams();
         responseParams.setRequestParams(reqParams);
-        assertThrows(NullPointerException.class, () -> {
-            HttpResponseParams afterJsonRpc = JsonRpcUtils.parseJsonRpcResponse(responseParams);
-            McpRequestResponseUtils.parseMcpResponseParams(afterJsonRpc);
-        });
+        HttpResponseParams afterJsonRpc = JsonRpcUtils.parseJsonRpcResponse(responseParams);
+        HttpResponseParams afterMcp = McpRequestResponseUtils.parseMcpResponseParams(afterJsonRpc);
+        assertEquals("http://localhost:8080/mcp", afterMcp.getRequestParams().getURL());
     }
 
     @Test
