@@ -364,6 +364,10 @@ public class DbLayer {
         return apiCollections;
     }
 
+    public static List<ApiCollection> fetchAllApiCollections() {
+        return ApiCollectionsDao.instance.findAll(new BasicDBObject(), Projections.exclude("urls", "conditions"));
+    }
+
     public static Organization fetchOrganization(int accountId) {
         return OrganizationsDao.instance.findOne(Filters.eq(Organization.ACCOUNTS, accountId));
     }

@@ -7,15 +7,16 @@ import com.akto.log.LoggerMaker.LogDb;
 import com.akto.mcp.McpJsonRpcModel.McpParams;
 import com.akto.util.Pair;
 import com.akto.utils.JsonUtils;
-import java.util.Arrays;
-import java.util.HashSet;
-import java.util.Set;
-import lombok.AccessLevel;
-import lombok.Data;
-import lombok.NoArgsConstructor;
-import org.apache.commons.lang3.StringUtils;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import lombok.AccessLevel;
+import lombok.NoArgsConstructor;
+import org.apache.commons.lang3.StringUtils;
 
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public final class McpRequestResponseUtils {
@@ -73,6 +74,9 @@ public final class McpRequestResponseUtils {
         MCP_NOTIFICATIONS_ROOTS_LIST_CHANGED_METHOD,
         MCP_NOTIFICATIONS_TOOLS_LIST_CHANGED_METHOD
     ));
+
+    // Thread-safe set to cache registered accountIds and avoid repeated DB checks
+    private static final Set<Integer> registeredAccounts = Collections.newSetFromMap(new ConcurrentHashMap<>());
 
     public static HttpResponseParams parseMcpResponseParams(HttpResponseParams responseParams) {
         String requestPayload = responseParams.getRequestParams().getPayload();

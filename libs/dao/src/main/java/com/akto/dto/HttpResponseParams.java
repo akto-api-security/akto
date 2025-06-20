@@ -301,6 +301,9 @@ public class HttpResponseParams {
         }
 
         url = onlyUrl[0];
+        if (url.endsWith("/")) {
+            url = url.substring(0, url.length() - 1);
+        }
         url = url + "/" + pathParam;
         if (onlyUrl.length == 2) {
             String queryParams = onlyUrl[1];

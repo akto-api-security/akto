@@ -2,6 +2,8 @@ package com.akto.util;
 
 import com.akto.dto.type.RequestTemplate;
 import com.akto.util.modifier.PayloadModifier;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.Gson;
 import com.google.gson.JsonParser;
 import com.mongodb.BasicDBList;
@@ -10,8 +12,13 @@ import com.alibaba.fastjson2.JSONArray;
 import com.alibaba.fastjson2.JSONObject;
 
 import java.util.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class JSONUtils {
+
+    private static final Logger logger = LoggerFactory.getLogger(JSONUtils.class);
+    private static final ObjectMapper mapper = new ObjectMapper();
     public static Map<String, Set<Object>> flattenJSONObject(JSONObject jsonObject) {
         Map<String, Set<Object>> ret = new HashMap<>();
         if (jsonObject == null) return ret;
@@ -252,4 +259,56 @@ public class JSONUtils {
     }
 
 
+    public static <T> T fromJson(String json, Class<T> clazz) {
+        try {
+            return mapper.readValue(json, clazz);
+        } catch (Exception e) {
+            logger.error("Error while parsing JSON", e);
+            return null;
+        }
+    }
+
+    public static <T> T fromJson(String json, TypeReference<T> typeRef) {
+        try {
+            return mapper.readValue(json, typeRef);
+        } catch (Exception e) {
+            logger.error("Error while parsing JSON", e);
+            return null;
+        }
+    }
+
+    public static <T> T fromJson(Object object, TypeReference<T> typeRef) {
+        try {
+            return mapper.convertValue(object, typeRef);
+        } catch (Exception e) {
+            logger.error("Error while parsing JSON", e);
+            return null;
+        }
+    }
+
+    public static <T> T fromJson(Object object, Class<T> clazz) {
+        try {
+            return mapper.convertValue(object, clazz);
+        } catch (Exception e) {
+            logger.error("Error while parsing JSON", e);
+            return null;
+        }
+    }
+
+    public static Map<String, Object> getMap(String json) {
+        return fromJson(json, new TypeReference<Map<String, Object>>() {});
+    }
+
+    public static Map<String, Object> getMap(Object object) {
+        return fromJson(object, new TypeReference<Map<String, Object>>() {});
+    }
+
+    public static String getString(Object object) {
+        try {
+            return mapper.writeValueAsString(object);
+        } catch (Exception e) {
+            logger.error("Error while parsing JSON", e);
+            return null;
+        }
+    }
 }
