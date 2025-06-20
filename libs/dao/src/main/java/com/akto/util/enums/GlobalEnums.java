@@ -46,7 +46,9 @@ public class GlobalEnums {
         IIM("IIM", Severity.HIGH, "Improper Inventory Management (IIM)", "Improper Inventory Management"),
         INJECT("INJECT", Severity.MEDIUM, "Injection Attacks (INJECT)", "Injection Attacks"),
         INPUT("INPUT", Severity.MEDIUM, "Input Validation (INPUT)", "Input Validation"),
+        MCP("MCP", Severity.HIGH, "Model Context Protocol (MCP) Security", "MCP"),
         LLM("LLM",Severity.HIGH,"LLM (Large Language Models) Top 10","LLM");
+        
 
         private final String name;
         private final Severity severity;
