@@ -15,6 +15,7 @@ import TestCollectionConfiguration from '../configurations/TestCollectionConfigu
 import InfoCard from "../../dashboard/new_components/InfoCard";
 import LocalStore from "../../../../main/LocalStorageStore";
 import func from "@/util/func"
+import SampleData from "../../../components/shared/SampleData";
 
 function UserConfig() {
 
@@ -24,6 +25,8 @@ function UserConfig() {
     const [hardcodedOpen, setHardcodedOpen] = useState(true);
     const [initialLimit, setInitialLimit] = useState(0);
     const [preRequestScript, setPreRequestScript] = useState({javascript: ""});
+    const [commonTestTemplate, setCommonTestTemplate] = useState({message: ""});
+    const [commonTestTemplate2, setCommonTestTemplate2] = useState("");
     const [initialDeltaTime, setInitialDeltaTime] = useState(120) ;
 
     const handleToggleHardcodedOpen = () => setHardcodedOpen((prev) => !prev)
@@ -62,8 +65,16 @@ function UserConfig() {
         setIsLoading(false)
     }
 
+    async function fetchCommonTestTemplate() {
+        const resp = await api.fetchCommonTestTemplate()
+        if (resp) {
+            setCommonTestTemplate({ message: resp })
+        }
+    }
+
     useEffect(() => {
         fetchAuthMechanismData()
+        fetchCommonTestTemplate()
     }, [])
 
     async function addOrUpdateScript() {
@@ -228,7 +239,29 @@ function UserConfig() {
         </LegacyCard>
     )
 
-    let components = [<TestCollectionConfiguration/>, rateLimit, updateDeltaPeriodTime]
+    async function saveCommonTemplate() {
+        await api.saveCommonTestTemplate(commonTestTemplate2)
+        setToastConfig({ isActive: true, isError: false, message: "Test template saved successfully!" })
+    }
+
+    const commonTemplateComponent = (
+        <LegacyCard sectioned title="Configure global test configuration" key="commonTestTemplate" primaryFooterAction={
+            {
+                content: "Save", destructive: false, onAction: () => { saveCommonTemplate() }
+            }
+        }>
+            <Divider />
+            <LegacyCard.Section flush>
+                <SampleData
+                data={commonTestTemplate} 
+                editorLanguage="custom_yaml" minHeight="240px" 
+                readOnly={false} 
+                getEditorData={setCommonTestTemplate2} />
+            </LegacyCard.Section>
+        </LegacyCard>
+    )
+
+    let components = [<TestCollectionConfiguration/>, rateLimit, updateDeltaPeriodTime, commonTemplateComponent]
 
     if (func.checkForFeatureSaas("TEST_PRE_SCRIPT")) {
         components.push(preRequestScriptComponent)
