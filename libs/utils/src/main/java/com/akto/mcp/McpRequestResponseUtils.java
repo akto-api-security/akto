@@ -79,7 +79,6 @@ public final class McpRequestResponseUtils {
 
         Pair<Boolean, McpJsonRpcModel> mcpRequest = isMcpRequest(responseParams);
         if (!mcpRequest.getFirst()) {
-            logger.info("Found a JSON RPC request. {}", requestPayload);
             return responseParams;
         }
 

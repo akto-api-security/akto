@@ -2435,10 +2435,6 @@ public class InitializerListener implements ServletContextListener {
                 if (runJobFunctions || runJobFunctionsAnyway) {
 
                     logger.debug("Starting init functions and scheduling jobs at " + now);
-                    JobsCron.instance.jobsScheduler(JobExecutorType.DASHBOARD);
-                    if (DashboardMode.isMetered()) {
-                        setupUsageScheduler();
-                    }
 
                     AccountTask.instance.executeTask(new Consumer<Account>() {
                         @Override
@@ -2447,7 +2443,18 @@ public class InitializerListener implements ServletContextListener {
                         }
                     }, "context-initializer-secondary");
 
+                   
+                    
+                    if (DashboardMode.isMetered()) {
+                        setupUsageScheduler();
+                    }
+                    setupAutomatedApiGroupsScheduler();
+                    updateApiGroupsForAccounts(); 
+                    updateSensitiveInfoInApiInfo.setUpSensitiveMapInApiInfoScheduler();
+                    syncCronInfo.setUpUpdateCronScheduler();
                     setUpTestEditorTemplatesScheduler();
+                    setUpWebhookScheduler();
+                    JobsCron.instance.jobsScheduler(JobExecutorType.DASHBOARD);
 
                     if(runJobFunctionsAnyway) {
                         crons.trafficAlertsScheduler();
@@ -2461,24 +2468,17 @@ public class InitializerListener implements ServletContextListener {
                         setUpTrafficAlertScheduler();
                         // setUpAktoMixpanelEndpointsScheduler();
                         setUpDailyScheduler();
-                        setUpWebhookScheduler();
+                        
                         cleanInventoryJobRunner();
                         setUpDefaultPayloadRemover();
                         setUpDependencyFlowScheduler();
                         tokenGeneratorCron.tokenGeneratorScheduler();
                         crons.deleteTestRunsScheduler();
-                        updateSensitiveInfoInApiInfo.setUpSensitiveMapInApiInfoScheduler();
-                        syncCronInfo.setUpUpdateCronScheduler();
-                        updateApiGroupsForAccounts();
                         setUpUpdateCustomCollections();
                         setUpFillCollectionIdArrayJob();
-                        setupAutomatedApiGroupsScheduler();
-
-//                     * This is a temporary job.
-//                            * TODO: Remove this once traffic pipeline is cleaned.
+                                               
 
                         CleanInventory.cleanInventoryJobRunner();
-                        // CleanTestingJob.cleanTestingJobRunner();
 
                         MatchingJob.MatchingJobRunner();
                     }
