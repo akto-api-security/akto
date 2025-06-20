@@ -552,6 +552,8 @@ function HomeDashboard() {
         titleToolTip="Distribution of APIs based on their calculated risk scores. Higher scores indicate greater potential security risks."
         linkText="Check out"
         linkUrl="/dashboard/observe/inventory"
+        totalAPIs={totalAPIs}
+        comparisonValue={riskScoreData.reduce((acc, item) => acc + item.text, 0)}
     />
 
     const apisByAccessTypeComponent = <InfoCard
@@ -562,6 +564,8 @@ function HomeDashboard() {
         titleToolTip="Categorization of APIs based on their access permissions and intended usage (Partner, Internal, External, etc.)."
         linkText="Check out"
         linkUrl="/dashboard/observe/inventory"
+        totalAPIs={totalAPIs}
+        comparisonValue={Object.values(accessTypeMap).reduce((acc, item) => acc + item.text, 0)}
     />
 
     const apisByAuthTypeComponent =
@@ -575,6 +579,8 @@ function HomeDashboard() {
             titleToolTip="Breakdown of APIs by the authentication methods they use, including unauthenticated APIs which may pose security risks."
             linkText="Check out"
             linkUrl="/dashboard/observe/inventory"
+            totalAPIs={totalAPIs}
+            comparisonValue={Object.values(authMap).reduce((acc, item) => acc + item.text, 0)}
         />
 
     const apisByTypeComponent = <InfoCard
@@ -605,6 +611,8 @@ function HomeDashboard() {
         titleToolTip="Distribution of APIs by their architectural style or protocol (e.g., REST, GraphQL, gRPC, SOAP)."
         linkText="Check out"
         linkUrl="/dashboard/observe/inventory"
+        totalAPIs={totalAPIs}
+        comparisonValue={apiTypesData.reduce((acc, item) => acc + item.data.reduce((sum, curr) => sum + curr[1], 0), 0)}    
     />
 
     const newDomainsComponent = <InfoCard

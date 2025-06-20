@@ -17,6 +17,7 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import com.mongodb.client.model.Updates;
+import com.mongodb.client.model.WriteModel;
 
 import org.bson.conversions.Bson;
 
@@ -31,6 +32,7 @@ import com.akto.dto.Account;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.HttpResponseParams;
+import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.monitoring.FilterConfig;
 import com.akto.dto.monitoring.FilterConfig.FILTER_TYPE;
 import com.akto.dto.test_editor.ExecutorNode;
@@ -44,12 +46,16 @@ import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.parsers.HttpCallParser;
 import com.akto.test_editor.execution.ParseAndExecute;
+import com.akto.usage.UsageMetricCalculator;
 import com.akto.util.AccountTask;
+import com.akto.util.Constants;
 import com.akto.util.DashboardMode;
 import com.akto.util.Pair;
 import com.akto.utils.Utils;
 import com.mongodb.BasicDBObject;
+import com.mongodb.client.model.DeleteOneModel;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.Sorts;
 
 import static com.akto.utils.Utils.deleteApis;
@@ -395,6 +401,115 @@ public class CleanInventory {
                 }
             }
             deleteApis(toBeDeleted);
+        }
+    }
+
+    public static int deleteApiInfosForMissingSTIs(boolean deleteAPIsInstantly){
+        // first delete all apiInfos for which default host is there
+        Set<Integer> deactivatedCollections = UsageMetricCalculator.getDeactivated();
+        try {
+
+            int count = 0;
+            // then delete all apiInfos for which host is not present in apiCollections
+            Bson sort = Sorts.ascending(ApiInfo.LAST_SEEN);
+            int lastSeenTimeStamp = 0;
+            int limit = 2000;
+            while(true){
+                List<ApiInfo> apiInfos = ApiInfoDao.instance.findAll(
+                    Filters.and(
+                        Filters.gt(ApiInfo.LAST_SEEN, lastSeenTimeStamp)
+                    ),  0, limit, sort, Projections.include(Constants.ID, ApiInfo.LAST_SEEN)
+                );
+
+                if (apiInfos.isEmpty()) {
+                    break;
+                }
+
+                ArrayList<WriteModel<ApiInfo>> bulkUpdate = new ArrayList<>();
+
+                List<Bson> filterList = new ArrayList<>();
+                for (ApiInfo apiInfo : apiInfos) {
+                    if(deactivatedCollections.contains(apiInfo.getId().getApiCollectionId())){
+                        continue;
+                    }
+                    Bson filter = Filters.and(
+                        Filters.eq(SingleTypeInfo._URL, apiInfo.getId().getUrl()),
+                        Filters.eq(SingleTypeInfo._METHOD, apiInfo.getId().getMethod()),
+                        Filters.eq(SingleTypeInfo._RESPONSE_CODE, -1),
+                        Filters.eq(SingleTypeInfo._IS_HEADER, true),
+                        Filters.eq(SingleTypeInfo._PARAM, "host"),
+                        Filters.eq(SingleTypeInfo.SUB_TYPE, SingleTypeInfo.GENERIC.getName()),
+                        Filters.eq(SingleTypeInfo._API_COLLECTION_ID, apiInfo.getId().getApiCollectionId())
+                    );
+                    filterList.add(filter);
+                }
+                List<SingleTypeInfo> stisForTs = SingleTypeInfoDao.instance.findAll(Filters.or(filterList), Projections.include(SingleTypeInfo._API_COLLECTION_ID, SingleTypeInfo._URL, SingleTypeInfo._METHOD, SingleTypeInfo._TIMESTAMP));
+                
+                // make set of apiInfos which are not present in STIs
+                Set<ApiInfoKey> apiInfoKeys = new HashSet<>();
+                stisForTs.forEach(sti -> {
+                    apiInfoKeys.add(new ApiInfoKey(sti.getApiCollectionId(), sti.getUrl(), Method.fromString(sti.getMethod())));
+                });
+
+                for (ApiInfo apiInfo : apiInfos) {
+                    if (!apiInfoKeys.contains(apiInfo.getId())) {
+                        // delete this apiInfo
+                        count++;
+                        Bson filter = ApiInfoDao.getFilter(apiInfo.getId());
+                        logger.info("Deleting apiInfo for missing STI host: " + apiInfo.getId());
+                        if(deleteAPIsInstantly){
+                            bulkUpdate.add(new DeleteOneModel<>(filter));
+                        }
+                        
+                    }
+                }
+
+                if (!bulkUpdate.isEmpty() && deleteAPIsInstantly) {
+                    ApiInfoDao.instance.getMCollection().bulkWrite(bulkUpdate);
+                }
+                if(apiInfos.size() < limit){
+                    break;
+                }
+                lastSeenTimeStamp = apiInfos.get(apiInfos.size() - 1).getLastSeen();
+                    
+            }
+            logger.info("Deleted " + count + " apiInfos for missing STIs");
+            return count;
+        } catch (Exception e) {
+            e.printStackTrace();
+            // TODO: handle exception
+        }
+
+        return 0;
+    }
+
+
+    public static void deleteApisForMissingApiInfos(){
+        // this is the case when apiInfo is not present for a given apiCollectionId, url and method in STI
+        
+        try {
+            Set<Integer> apiCollectionIds = ApiCollectionsDao.instance.findAll(Filters.empty(), Projections.include(ApiCollection.ID)).stream()
+                .map(ApiCollection::getId)
+                .collect(Collectors.toSet());
+            int count = 0;
+
+            for (Integer apiCollectionId : apiCollectionIds) {
+                List<BasicDBObject> endpoints = ApiCollectionsDao.fetchEndpointsInCollectionUsingHost(apiCollectionId, 0, false);
+                for (BasicDBObject singleTypeInfo : endpoints) {
+                    singleTypeInfo = (BasicDBObject) (singleTypeInfo.getOrDefault("_id", new BasicDBObject()));
+                    int apiCollectionIdFromDb = singleTypeInfo.getInt("apiCollectionId");
+                    String url = singleTypeInfo.getString("url");
+                    String method = singleTypeInfo.getString("method");
+                    Bson filter = ApiInfoDao.getFilter(url, method, apiCollectionIdFromDb);
+                    ApiInfo apiInfo = ApiInfoDao.instance.findOne(filter);
+                    if (apiInfo == null) {
+                        count++;
+                        logger.info("Deleting api for missing apiInfo: " + url + " " + method + " " + apiCollectionIdFromDb);
+                    }
+                }
+            }
+            logger.info("Deleted " + count + " apis for missing apiInfos");
+        } catch (Exception e) {
         }
     }
 }
