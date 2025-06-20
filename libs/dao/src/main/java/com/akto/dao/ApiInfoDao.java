@@ -229,7 +229,15 @@ public class ApiInfoDao extends AccountsContextDaoWithRbac<ApiInfo>{
         float totalRiskScore = 0;
 
         // we need only end timestamp filter because data needs to be till end timestamp while start timestamp is for calculating delta
-        Bson filter = Filters.and(collectionFilter, Filters.lte(ApiInfo.DISCOVERED_TIMESTAMP, endTimestamp));
+        Bson filter = Filters.and(collectionFilter,
+            Filters.or(
+                Filters.lte(ApiInfo.DISCOVERED_TIMESTAMP, endTimestamp),
+                Filters.and(
+                    Filters.exists(ApiInfo.DISCOVERED_TIMESTAMP, false),
+                    Filters.lte(ApiInfo.LAST_SEEN, endTimestamp) // in case discovered timestamp is not set
+                )// in case discovered timestamp is not set
+            )
+        );
         try {
             List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(),Context.accountId.get());
             if (collectionIds != null) {

@@ -18,7 +18,6 @@ import com.akto.dao.runtime_filters.AdvancedTrafficFiltersDao;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.monitoring.FilterConfig;
 import com.akto.dto.test_editor.YamlTemplate;
-import com.akto.dto.usage.UsageMetric;
 import com.akto.usage.UsageMetricCalculator;
 import com.akto.util.Constants;
 import com.akto.utils.TrafficFilterUtil;
@@ -29,6 +28,8 @@ import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.Sorts;
 import com.mongodb.client.model.Updates;
 import com.opensymphony.xwork2.Action;
+
+import lombok.Getter;
 
 public class AdvancedTrafficFiltersAction extends UserAction {
 
@@ -135,6 +136,34 @@ public class AdvancedTrafficFiltersAction extends UserAction {
             addActionError(e.getMessage());
             return ERROR.toUpperCase();
         }
+    }
+
+    @Getter
+    public int deleteApisCount;
+
+    public String deleteNonHostApiInfos() {
+        try {
+            int accountId = Context.accountId.get();
+            if (this.deleteAPIsInstantly) {
+                executorService.schedule(new Runnable() {
+                    public void run() {
+                        Context.accountId.set(accountId);
+                        try {
+                            CleanInventory.deleteApiInfosForMissingSTIs(deleteAPIsInstantly);
+                        } catch (Exception e) {
+                            e.printStackTrace();
+                        }
+                    }
+                }, 0, TimeUnit.SECONDS);
+            }else{
+                this.deleteApisCount = CleanInventory.deleteApiInfosForMissingSTIs(deleteAPIsInstantly);
+            }
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ERROR.toUpperCase();
+        }
+        return SUCCESS.toUpperCase();
     }
 
     public List<YamlTemplate> getTemplatesList() {

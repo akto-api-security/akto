@@ -36,6 +36,13 @@ const trafficFiltersRequest = {
             data: {yamlContent, deleteAPIsInstantly}
         })
     },
+    cleanUpInventory(deleteAPIsInstantly){
+        return request({
+            url: '/api/cleanNonHostApiInfos',
+            method: 'post',
+            data: {deleteAPIsInstantly}
+        })
+    },
     getAdvancedFiltersPermissions(){
         return request({
             url: '/api/getAccountSettingsForAdvancedFilters',
