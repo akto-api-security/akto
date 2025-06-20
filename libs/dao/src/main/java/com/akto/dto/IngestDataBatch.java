@@ -27,5 +27,6 @@ public class IngestDataBatch {
     String socket_id;
     String daemonset_id;
     String enabled_graph;
+    String tag;
 
 }
