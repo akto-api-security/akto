@@ -43,6 +43,7 @@ public class KafkaUtils {
         obj.put("socket_id", payload.getSocket_id());
         obj.put("daemonset_id", payload.getDaemonset_id());
         obj.put("enabled_graph", payload.getEnabled_graph());
+        obj.put("tag", payload.getTag());
         kafkaProducer.send(obj.toString(), topicName);
     }
 
