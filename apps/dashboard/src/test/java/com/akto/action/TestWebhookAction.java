@@ -126,7 +126,9 @@ public class TestWebhookAction extends MongoBasedTest{
     @Test
     public void testChangeStatus(){
         CustomWebhooksDao.instance.getMCollection().drop();
-        CustomWebhook customWebhook = new CustomWebhook(1,"webhook name","http://test.akto.io","","queryParam=test","body",Method.POST,10,"test@akto.io",0,0,0,ActiveStatus.ACTIVE, null, null, null);
+        List<CustomWebhook.WebhookOptions> selectedWebhookOptions = new ArrayList<>();
+        selectedWebhookOptions.add(CustomWebhook.WebhookOptions.API_THREAT_PAYLOADS);
+        CustomWebhook customWebhook = new CustomWebhook(1,"webhook name","http://test.akto.io","","queryParam=test","body",Method.POST,10,"test@akto.io",0,0,0,ActiveStatus.ACTIVE, selectedWebhookOptions, null, null);
         CustomWebhooksDao.instance.insertOne(customWebhook);
 
         WebhookAction webhookAction = new WebhookAction();
