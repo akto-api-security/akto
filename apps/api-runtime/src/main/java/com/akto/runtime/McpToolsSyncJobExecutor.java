@@ -17,12 +17,16 @@ import com.akto.mcp.McpSchema.CallToolRequest;
 import com.akto.mcp.McpSchema.JSONRPCRequest;
 import com.akto.mcp.McpSchema.JSONRPCResponse;
 import com.akto.mcp.McpSchema.JsonSchema;
+import com.akto.mcp.McpSchema.ListResourcesResult;
 import com.akto.mcp.McpSchema.ListToolsResult;
+import com.akto.mcp.McpSchema.ReadResourceRequest;
+import com.akto.mcp.McpSchema.Resource;
 import com.akto.mcp.McpSchema.Tool;
 import com.akto.parsers.HttpCallParser;
 import com.akto.runtime.Main.AccountInfo;
 import com.akto.testing.ApiExecutor;
 import com.akto.util.JSONUtils;
+import com.akto.util.Pair;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.module.SimpleModule;
 import com.mongodb.BasicDBObject;
@@ -47,9 +51,14 @@ public class McpToolsSyncJobExecutor {
     private static final LoggerMaker logger = new LoggerMaker(McpToolsSyncJobExecutor.class, LogDb.RUNTIME);
     private static final ObjectMapper mapper = new ObjectMapper();
     public static final McpToolsSyncJobExecutor INSTANCE = new McpToolsSyncJobExecutor();
-    private static final String MCP_TOOLS_LIST_REQUEST_JSON = "{\"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"tools/list\", \"params\": {}}";
+    private static final String MCP_TOOLS_LIST_REQUEST_JSON =
+        "{\"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"" + McpSchema.METHOD_TOOLS_LIST + "\", \"params\": {}}";
+    private static final String MCP_RESOURCE_LIST_REQUEST_JSON =
+        "{\"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"" + McpSchema.METHOD_RESOURCES_LIST + "\", \"params\": {}}";
     private static final String AKTO_MCP_SERVER_TAG = "mcp-server";
     private static final String LOCAL_IP = "127.0.0.1";
+    private final Map<String, HttpCallParser> httpCallParserMap = new HashMap<>();
+    private final Map<Integer, AccountInfo> accountInfoMap =  new HashMap<>();
     public McpToolsSyncJobExecutor() {
         Json.mapper().registerModule(new SimpleModule().addSerializer(new JsonNodeExampleSerializer()));
     }
@@ -58,8 +67,6 @@ public class McpToolsSyncJobExecutor {
         List<ApiCollection> apiCollections = ApiCollectionsDao.instance.findAll(new BasicDBObject(),
             Projections.exclude("urls", "conditions"));
         List<ApiCollection> eligibleCollections = new ArrayList<>();
-        Map<String, HttpCallParser> httpCallParserMap = new HashMap<>();
-        Map<Integer, AccountInfo> accountInfoMap =  new HashMap<>();
 
         for (ApiCollection apiCollection : apiCollections) {
             if (StringUtils.isEmpty(apiCollection.getHostName())) {
@@ -84,121 +91,136 @@ public class McpToolsSyncJobExecutor {
         eligibleCollections.forEach(apiCollection -> {
                 logger.info("Starting MCP sync for apiCollectionId: {} and hostname: {}", apiCollection.getId(),
                     apiCollection.getHostName());
-                handleMcpDiscovery(apiCollection, apiConfig, httpCallParserMap, accountInfoMap);
+                handleMcpToolsDiscovery(apiCollection, apiConfig, httpCallParserMap, accountInfoMap);
+                handleMcpResourceDiscovery(apiCollection, apiConfig, httpCallParserMap, accountInfoMap);
             }
         );
     }
 
-    public static void handleMcpDiscovery(ApiCollection apiCollection, APIConfig apiConfig,
+    private void handleMcpToolsDiscovery(ApiCollection apiCollection, APIConfig apiConfig,
         Map<String, HttpCallParser> httpCallParserMap, Map<Integer, AccountInfo> accountInfoMap) {
         String host = apiCollection.getHostName();
 
         try {
-            OriginalHttpRequest toolsListRequest = createToolsListRequest(host);
-            String jsonrpcResponse = sendRequest(toolsListRequest);
-
-            JSONRPCResponse toolsListResponse = (JSONRPCResponse) McpSchema.deserializeJsonRpcMessage(mapper,
-                jsonrpcResponse);
-
             List<HttpResponseParams> responseParamsList = new ArrayList<>();
 
-            HttpResponseParams toolsListresponseParams = convertToAktoFormat(apiCollection.getId(),
-                toolsListRequest.getPath(),
-                buildHeaders(host),
-                HttpMethod.POST.name(),
-                toolsListRequest.getBody(),
-                new OriginalHttpResponse(jsonrpcResponse, Collections.emptyMap(), HttpStatus.SC_OK));
+            Pair<JSONRPCResponse, HttpResponseParams> toolsListResponsePair = getMcpMethodResponse(
+                host, McpSchema.METHOD_TOOLS_LIST, MCP_TOOLS_LIST_REQUEST_JSON, apiCollection);
 
-            if (toolsListresponseParams != null) {
-                responseParamsList.add(toolsListresponseParams);
+            if (toolsListResponsePair.getSecond() != null) {
+                responseParamsList.add(toolsListResponsePair.getSecond());
             }
-
             logger.debug("Received tools/list response. Processing tools.....");
 
-            // Parse tools from response
-            ListToolsResult toolsResult = JSONUtils.fromJson(toolsListResponse.getResult(), ListToolsResult.class);
+            ListToolsResult toolsResult = JSONUtils.fromJson(toolsListResponsePair.getFirst().getResult(),
+                ListToolsResult.class);
 
-            if (toolsResult == null) {
-                logger.error("Skipping as List Tool Result is null");
-                return;
-            }
-            List<McpSchema.Tool> tools = toolsResult.getTools();
-            if (CollectionUtils.isEmpty(tools)) {
-                logger.error("No tools found in MCP server");
-                return;
-            }
+            if (toolsResult != null && !CollectionUtils.isEmpty(toolsResult.getTools())) {
+                int id = 2;
+                String urlWithQueryParams = toolsListResponsePair.getSecond().getRequestParams().getURL();
+                String toolsCallRequestHeaders = buildHeaders(host);
 
-            int id = 2;
-            String urlWithQueryParams = toolsListRequest.getPathWithQueryParams();
-            String toolsCallRequestHeaders = buildHeaders(host);
+                for (Tool tool : toolsResult.getTools()) {
+                    JSONRPCRequest request = new JSONRPCRequest(
+                        McpSchema.JSONRPC_VERSION,
+                        McpSchema.METHOD_TOOLS_CALL,
+                        id++,
+                        new CallToolRequest(tool.getName(), generateExampleArguments(tool.getInputSchema()))
+                    );
 
-            for (Tool tool : tools) {
-                JSONRPCRequest request = new JSONRPCRequest(
-                    McpSchema.JSONRPC_VERSION,
-                    McpSchema.METHOD_TOOLS_CALL,
-                    id++,
-                    new CallToolRequest(tool.getName(), generateExampleArguments(tool.getInputSchema()))
-                );
+                    HttpResponseParams toolsCallHttpResponseParams = convertToAktoFormat(apiCollection.getId(),
+                        urlWithQueryParams,
+                        toolsCallRequestHeaders,
+                        HttpMethod.POST.name(),
+                        mapper.writeValueAsString(request),
+                        new OriginalHttpResponse("", Collections.emptyMap(), HttpStatus.SC_OK));
 
-                HttpResponseParams toolsCallHttpResponseParams = convertToAktoFormat(apiCollection.getId(),
-                    urlWithQueryParams,
-                    toolsCallRequestHeaders,
-                    HttpMethod.POST.name(),
-                    mapper.writeValueAsString(request),
-                    new OriginalHttpResponse("", Collections.emptyMap(), HttpStatus.SC_OK));
-
-                if (toolsCallHttpResponseParams != null) {
-                    responseParamsList.add(toolsCallHttpResponseParams);
+                    if (toolsCallHttpResponseParams != null) {
+                        responseParamsList.add(toolsCallHttpResponseParams);
+                    }
                 }
+            } else {
+                logger.debug("Skipping as List Resource Result is null or Resources are empty");
             }
-            Map<String, List<HttpResponseParams>> responseParamsToAccountIdMap = new HashMap<>();
-            responseParamsToAccountIdMap.put(Context.accountId.get().toString(), responseParamsList);
-
-            Main.handleResponseParams(responseParamsToAccountIdMap,
-                accountInfoMap,
-                false,
-                httpCallParserMap,
-                apiConfig,
-                true,
-                false
-            );
+            processResponseParams(apiConfig, responseParamsList);
         } catch (Exception e) {
             logger.error("Error while discovering mcp and its tools for hostname: {}", host, e);
         }
     }
 
-    private static String buildHeaders(String host) {
-        return "{\"Content-Type\":\"application/json\",\"Accept\":\"*/*\",\"host\":\"" + host + "\"}";
-    }
+    private void handleMcpResourceDiscovery(ApiCollection apiCollection, APIConfig apiConfig,
+        Map<String, HttpCallParser> httpCallParserMap, Map<Integer, AccountInfo> accountInfoMap) {
+        String host = apiCollection.getHostName();
 
-    public static OriginalHttpRequest createToolsListRequest(String host) {
-        return new OriginalHttpRequest(McpSchema.METHOD_TOOLS_LIST,
-            null,
-            HttpMethod.POST.name(),
-            MCP_TOOLS_LIST_REQUEST_JSON,
-            OriginalHttpRequest.buildHeadersMap(buildHeaders(host)),
-            "HTTP/1.1"
-        );
-    }
-
-    public static String sendRequest(OriginalHttpRequest request) throws Exception {
         try {
-            OriginalHttpResponse response = ApiExecutor.sendRequestWithSse(request, true, null, false,
-                new ArrayList<>(), false);
-            return response.getBody();
+            List<HttpResponseParams> responseParamsList = new ArrayList<>();
+            Pair<JSONRPCResponse, HttpResponseParams> resourcesListResponsePair = getMcpMethodResponse(
+                host, McpSchema.METHOD_RESOURCES_LIST, MCP_RESOURCE_LIST_REQUEST_JSON, apiCollection);
+
+            if (resourcesListResponsePair.getSecond() != null) {
+                responseParamsList.add(resourcesListResponsePair.getSecond());
+            }
+            logger.debug("Received resources/list response. Processing tools.....");
+
+            ListResourcesResult resourcesResult = JSONUtils.fromJson(resourcesListResponsePair.getFirst().getResult(),
+                ListResourcesResult.class);
+
+            if (resourcesResult != null && !CollectionUtils.isEmpty(resourcesResult.getResources())) {
+                int id = 2;
+                String urlWithQueryParams = resourcesListResponsePair.getSecond().getRequestParams().getURL();
+                String toolsCallRequestHeaders = buildHeaders(host);
+
+                for (Resource resource : resourcesResult.getResources()) {
+                    JSONRPCRequest request = new JSONRPCRequest(
+                        McpSchema.JSONRPC_VERSION,
+                        McpSchema.METHOD_TOOLS_CALL,
+                        id++,
+                        new ReadResourceRequest(resource.getUri())
+                    );
+
+                    HttpResponseParams readResourceHttpResponseParams = convertToAktoFormat(apiCollection.getId(),
+                        urlWithQueryParams,
+                        toolsCallRequestHeaders,
+                        HttpMethod.POST.name(),
+                        mapper.writeValueAsString(request),
+                        new OriginalHttpResponse("", Collections.emptyMap(), HttpStatus.SC_OK));
+
+                    if (readResourceHttpResponseParams != null) {
+                        responseParamsList.add(readResourceHttpResponseParams);
+                    }
+                }
+            } else {
+                logger.debug("Skipping as List Resource Result is null or Resources are empty");
+            }
+            processResponseParams(apiConfig, responseParamsList);
         } catch (Exception e) {
-            logger.error("Error while making request to MCP server.", e);
-            throw e;
+            logger.error("Error while discovering mcp resources for hostname: {}", host, e);
         }
     }
 
-    // Helper to generate example arguments from inputSchema
-    private static Map<String, Object> generateExampleArguments(JsonSchema inputSchema) {
+    private void processResponseParams(APIConfig apiConfig, List<HttpResponseParams> responseParamsList) {
+        if (CollectionUtils.isEmpty(responseParamsList)) {
+            logger.debug("No response params to process for MCP tools sync job.");
+            return;
+        }
+        Map<String, List<HttpResponseParams>> responseParamsToAccountIdMap = new HashMap<>();
+        responseParamsToAccountIdMap.put(Context.accountId.get().toString(), responseParamsList);
+
+        Main.handleResponseParams(responseParamsToAccountIdMap,
+            accountInfoMap,
+            false,
+            httpCallParserMap,
+            apiConfig,
+            true,
+            false
+        );
+    }
+
+    private Map<String, Object> generateExampleArguments(JsonSchema inputSchema) {
         if (inputSchema == null) {
             return Collections.emptyMap();
         }
         try {
-            // Convert inputSchema to OpenAPI Schema
             String inputSchemaJson = mapper.writeValueAsString(inputSchema);
             Schema openApiSchema = io.swagger.v3.core.util.Json.mapper().readValue(inputSchemaJson, Schema.class);
             Example example = ExampleBuilder.fromSchema(openApiSchema, null);
@@ -210,7 +232,57 @@ public class McpToolsSyncJobExecutor {
         }
     }
 
-    private static HttpResponseParams convertToAktoFormat(int apiCollectionId, String path, String requestHeaders, String method,
+    private Pair<JSONRPCResponse, HttpResponseParams> getMcpMethodResponse(String host, String mcpMethod,
+        String mcpMethodRequestJson, ApiCollection apiCollection) throws Exception {
+        OriginalHttpRequest mcpRequest = createRequest(host, mcpMethod, mcpMethodRequestJson);
+        String jsonrpcResponse = sendRequest(mcpRequest);
+
+        JSONRPCResponse rpcResponse = (JSONRPCResponse) McpSchema.deserializeJsonRpcMessage(mapper, jsonrpcResponse);
+
+        if (rpcResponse.getError() != null) {
+            String errorMessage = "Error in JSONRPC response from " + mcpMethod + ": " +
+                rpcResponse.getError().getMessage();
+            throw new Exception(errorMessage);
+        }
+
+        HttpResponseParams responseParams = convertToAktoFormat(
+            apiCollection.getId(),
+            mcpRequest.getPathWithQueryParams(),
+            buildHeaders(host),
+            HttpMethod.POST.name(),
+            mcpRequest.getBody(),
+            new OriginalHttpResponse(jsonrpcResponse, Collections.emptyMap(), HttpStatus.SC_OK)
+        );
+
+        return new Pair<>(rpcResponse, responseParams);
+    }
+
+    private OriginalHttpRequest createRequest(String host, String mcpMethod, String mcpMethodRequestJson) {
+        return new OriginalHttpRequest(mcpMethod,
+            null,
+            HttpMethod.POST.name(),
+            mcpMethodRequestJson,
+            OriginalHttpRequest.buildHeadersMap(buildHeaders(host)),
+            "HTTP/1.1"
+        );
+    }
+
+    private String buildHeaders(String host) {
+        return "{\"Content-Type\":\"application/json\",\"Accept\":\"*/*\",\"host\":\"" + host + "\"}";
+    }
+
+    private String sendRequest(OriginalHttpRequest request) throws Exception {
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequestWithSse(request, true, null, false,
+                new ArrayList<>(), false);
+            return response.getBody();
+        } catch (Exception e) {
+            logger.error("Error while making request to MCP server.", e);
+            throw e;
+        }
+    }
+
+    private HttpResponseParams convertToAktoFormat(int apiCollectionId, String path, String requestHeaders, String method,
         String body, OriginalHttpResponse response) {
         Map<String, Object> value = new HashMap<>();
 
@@ -238,4 +310,3 @@ public class McpToolsSyncJobExecutor {
         return null;
     }
 }
-
