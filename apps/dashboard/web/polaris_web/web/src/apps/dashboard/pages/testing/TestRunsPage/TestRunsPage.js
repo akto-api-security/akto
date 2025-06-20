@@ -340,17 +340,23 @@ const SummaryCardComponent = () =>{
     </LegacyCard>
   )
 }
-  const promotedBulkActions = (selectedTestRuns) => { 
+
+  const handleTestRunDeletion = async (selectedTestRuns) => {
+    await api.deleteTestRuns(selectedTestRuns);
+    func.setToast(true, false, <div data-testid="delete_success_message">{`${selectedTestRuns.length} test run${selectedTestRuns.length > 1 ? "s" : ""} deleted successfully`}</div>)
+    window.location.reload();
+  }
+  const promotedBulkActions = (selectedTestRuns) => {
     return [
-    {
-      content: <div data-testid="delete_result_button">{`Delete ${selectedTestRuns.length} test run${selectedTestRuns.length ===1 ? '' : 's'}`}</div>,
-      onAction: async() => {
-        await api.deleteTestRuns(selectedTestRuns);
-        func.setToast(true, false, <div data-testid="delete_success_message">{`${selectedTestRuns.length} test run${selectedTestRuns.length > 1 ? "s" : ""} deleted successfully`}</div>)
-        window.location.reload();
+      {
+        content: <div data-testid="delete_result_button">{`Delete ${selectedTestRuns.length} test run${selectedTestRuns.length === 1 ? '' : 's'}`}</div>,
+        onAction: () => {
+          const deleteConfirmationMessage = `Are you sure, you want to delete test run${func.addPlurality(selectedTestRuns.length)}?`
+          func.showConfirmationModal(deleteConfirmationMessage, "Delete", () => handleTestRunDeletion(selectedTestRuns))
+        },
       },
-    },
-  ]};
+    ]
+  };
 
   const key = currentTab + startTimestamp + endTimestamp;
 const coreTable = (
