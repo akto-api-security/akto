@@ -18,18 +18,13 @@ import com.akto.threat.backend.constants.KafkaTopic;
 import com.akto.threat.backend.constants.MongoDBCollection;
 import com.akto.threat.backend.db.MaliciousEventModel;
 import com.akto.threat.backend.utils.KafkaUtils;
-import com.mongodb.client.DistinctIterable;
-import com.mongodb.client.MongoClient;
-import com.mongodb.client.MongoCollection;
-import com.mongodb.client.MongoCursor;
+import com.akto.threat.backend.utils.ThreatUtils;
+import com.mongodb.client.*;
 import com.mongodb.client.model.Filters;
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.UUID;
 
+import java.util.*;
+
+import com.mongodb.client.model.Indexes;
 import org.bson.Document;
 import org.bson.conversions.Bson;
 
@@ -38,6 +33,8 @@ public class MaliciousEventService {
   private final Kafka kafka;
   private final MongoClient mongoClient;
   private static final LoggerMaker logger = new LoggerMaker(MaliciousEventService.class);
+
+  private static final HashMap<String, Boolean> shouldNotCreateIndexes = new HashMap<>();
 
   public MaliciousEventService(
       KafkaConfig kafkaConfig, MongoClient mongoClient) {
@@ -141,6 +138,11 @@ public class MaliciousEventService {
 
   public ListMaliciousRequestsResponse listMaliciousRequests(
       String accountId, ListMaliciousRequestsRequest request) {
+
+    if(!shouldNotCreateIndexes.getOrDefault(accountId, false)) {
+      createIndexIfAbsent(accountId);
+    }
+
     int limit = request.getLimit();
     int skip = request.hasSkip() ? request.getSkip() : 0;
     Map<String, Integer> sort = request.getSortMap();
@@ -216,5 +218,10 @@ public class MaliciousEventService {
           .addAllMaliciousEvents(maliciousEvents)
           .build();
     }
+  }
+
+  public void createIndexIfAbsent(String accountId) {
+    ThreatUtils.createIndexIfAbsent(accountId, mongoClient);
+    shouldNotCreateIndexes.put(accountId, true);
   }
 }
