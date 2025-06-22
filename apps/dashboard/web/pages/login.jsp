@@ -1,4 +1,5 @@
 <%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8" %>
+<%@ page import="com.akto.utils.Utils" %>
     <!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
     <%-- Using Struts2 Tags in JSP --%>
         <%@ taglib uri="/struts-tags" prefix="s" %>
@@ -72,7 +73,7 @@
                     window.AZURE_BOARDS_INTEGRATED ='${requestScope.azureBoardsIntegrated}'
                     window.USER_ROLE ='${requestScope.userRole}'
                     window.TIME_ZONE = '${requestScope.currentTimeZone}'
-                    window.USER_FULL_NAME = '${requestScope.userFullName}'
+                    window.USER_FULL_NAME = '<%= Utils.escapeForJavaScript((String)request.getAttribute("userFullName")) %>'
                     window.ORGANIZATION_NAME = '${requestScope.organizationName}'
                     window.GOOGLE_SAML_AUTH_URL=atob('${requestScope.googleSamlAuthUrl}')
                     window.OKTA_AUTH_URL = '${requestScope.oktaAuthUrl}'
