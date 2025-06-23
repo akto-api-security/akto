@@ -54,7 +54,7 @@ function HomeDashboard() {
     const [showBannerComponent, setShowBannerComponent] = useState(false)
     const [testSummaryInfo, setTestSummaryInfo] = useState([])
     const [selectedTab, setSelectedTab] = useState(0);
-    const [actionItems, setActionItems] = useState(sampleActionItems)
+    const [actionItems, setActionItems] = useState([])
     const [showFlyout, setShowFlyout] = useState(false);
     const [selectedItem, setSelectedItem] = useState(null);
 
