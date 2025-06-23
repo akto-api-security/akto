@@ -136,18 +136,18 @@ function HomeDashboard() {
         [],
     );
 
-    const tabs = [
-        {
-            id: 'home',
-            content: 'Home',
-            panelID: 'home-content',
-        },
-        {
-            id: 'analytics',
-            content: 'Analysis',
-            panelID: 'analytics-content',
-        },
-    ];
+    // const tabs = [
+    //     {
+    //         id: 'home',
+    //         content: 'Home',
+    //         panelID: 'home-content',
+    //     },
+    //     {
+    //         id: 'analytics',
+    //         content: 'Analysis',
+    //         panelID: 'analytics-content',
+    //     },
+    // ];
 
     
 
@@ -900,14 +900,14 @@ function HomeDashboard() {
         </VerticalStack>
     )
 
-    const tabsComponent = (
-        <VerticalStack gap="4" key="tabs-stack">
-            <LegacyTabs tabs={tabs} selected={selectedTab} onSelect={handleTabChange} />
-            {selectedTab === 0 ? dashboardComp : actionItemsContent}
-        </VerticalStack>
-    )
+    // const tabsComponent = (
+    //     <VerticalStack gap="4" key="tabs-stack">
+    //         <LegacyTabs tabs={tabs} selected={selectedTab} onSelect={handleTabChange} />
+    //         {selectedTab === 0 ? dashboardComp : actionItemsContent}
+    //     </VerticalStack>
+    // )
 
-    const pageComponents = [showBannerComponent ? <DashboardBanner key="dashboardBanner" /> : tabsComponent]
+    const pageComponents = [showBannerComponent ? <DashboardBanner key="dashboardBanner" /> : dashboardComp]
 
     return (
         <Box>
