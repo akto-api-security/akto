@@ -5,32 +5,32 @@ import TooltipText from '../../../components/shared/TooltipText'
 
 function ActionItemCard(props) {
     const {cardObj, onButtonClick } = props ;
-    const [popoverActive, setPopoverActive] = useState(false);
-    const [selectedUser, setSelectedUser] = useState([]);
+    // const [popoverActive, setPopoverActive] = useState(false);
+    // const [selectedUser, setSelectedUser] = useState([]);
 
     // Sample users - in real app, this would come from your users list
-    const users = [
-        {value: 'user1', label: 'John Doe'},
-        {value: 'user2', label: 'Jane Smith'},
-        {value: 'user3', label: 'Mike Johnson'},
-    ];
+    // const users = [
+    //     {value: 'user1', label: 'John Doe'},
+    //     {value: 'user2', label: 'Jane Smith'},
+    //     {value: 'user3', label: 'Mike Johnson'},
+    // ];
 
-    const togglePopoverActive = () => {
-        setPopoverActive((active) => !active);
-    };
+    // const togglePopoverActive = () => {
+    //     setPopoverActive((active) => !active);
+    // };
 
-    const handleUserSelect = (value) => {
-        setSelectedUser(value);
-        setPopoverActive(false);
-    };
+    // const handleUserSelect = (value) => {
+    //     setSelectedUser(value);
+    //     setPopoverActive(false);
+    // };
 
-    const activator = (
-        <Button onClick={togglePopoverActive} plain removeUnderline>
-            Assign Task
-        </Button>
-    );
+    // const activator = (
+    //     <Button onClick={togglePopoverActive} plain removeUnderline>
+    //         Assign Task
+    //     </Button>
+    // );
 
-    const assignedUser = selectedUser.length > 0 ? users.find(u => u.value === selectedUser[0]) : null;
+    // const assignedUser = selectedUser.length > 0 ? users.find(u => u.value === selectedUser[0]) : null;
 
     return (
         <div
@@ -68,8 +68,15 @@ function ActionItemCard(props) {
                 </HorizontalStack>
                 <Divider />
                 <HorizontalStack gap={"3"} align="space-between" wrap={false}>
+                    <Box className="action-item-card-actions">
+                        <HorizontalStack gap={"2"}>
+                            <button className="Polaris-Modal-CloseButton" onClick={() => {}}><Box><Icon color="subdued" source={EmailMajor} /></Box></button>
+                            <button className="Polaris-Modal-CloseButton" onClick={() => {}}><Box className='reduce-size'><Avatar size="extraSmall" shape="square" source="/public/logo_jira.svg"/></Box></button>
+                        </HorizontalStack>
+                    </Box>
                     <Box>
-                        {assignedUser ? (
+                        {/* TODO: Re-enable assign task functionality in future iteration */}
+                        {/* {assignedUser ? (
                             <Tag onRemove={() => setSelectedUser([])}>
                                 {assignedUser.label}
                             </Tag>
@@ -87,13 +94,7 @@ function ActionItemCard(props) {
                                     selected={selectedUser}
                                 />
                             </Popover>
-                        )}
-                    </Box>
-                    <Box className="action-item-card-actions">
-                        <HorizontalStack gap={"2"}>
-                            <button className="Polaris-Modal-CloseButton" onClick={() => {}}><Box><Icon color="subdued" source={EmailMajor} /></Box></button>
-                            <button className="Polaris-Modal-CloseButton" onClick={() => {}}><Box className='reduce-size'><Avatar size="extraSmall" shape="square" source="/public/logo_jira.svg"/></Box></button>
-                        </HorizontalStack>
+                        )} */}
                     </Box>
                 </HorizontalStack>
             </VerticalStack>

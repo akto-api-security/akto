@@ -43,7 +43,7 @@ const sampleActionItems = [
         effort: 'High',
         whyItMatters: 'Uncontrolled/unknown attack surface',
         displayName: 'Shadow API detected in prod',
-        assignee: <AssignTaskToUser />,
+        // assignee: <AssignTaskToUser />, // TODO: Re-enable assignee in future iteration
         actions: <HorizontalStack gap="2"><Icon source={EmailMajor} color="base" /><Avatar size="extraSmall" shape="square" source="/public/logo_jira.svg" /></HorizontalStack>
     },
     {
@@ -56,7 +56,7 @@ const sampleActionItems = [
         whyItMatters: 'Coverage gap in high-sensitivity endpoints',
         ticket: 'LAN-10',
         displayName: 'Testing overdue on 12 APIs',
-        assignee: <AssignTaskToUser />,
+        // assignee: <AssignTaskToUser />, // TODO: Re-enable assignee in future iteration
         actions: <HorizontalStack gap="2"><Icon source={EmailMajor} color="base" /><Avatar size="extraSmall" shape="square" source="/public/logo_jira.svg" /></HorizontalStack>
     },
     {
@@ -68,7 +68,7 @@ const sampleActionItems = [
         effort: 'Medium',
         whyItMatters: 'DOS & abuse risk',
         displayName: 'Rate limiting missing on reset end...',
-        assignee: <AssignTaskToUser />,
+        // assignee: <AssignTaskToUser />, // TODO: Re-enable assignee in future iteration
         actions: <HorizontalStack gap="2"><Icon source={EmailMajor} color="base" /><Avatar size="extraSmall" shape="square" source="/public/logo_jira.svg" /></HorizontalStack>
     },
     {
@@ -80,7 +80,7 @@ const sampleActionItems = [
         effort: 'Medium',
         whyItMatters: 'Privilege escalation possible',
         displayName: 'API leaking access token in respo...',
-        assignee: <AssignTaskToUser />,
+        // assignee: <AssignTaskToUser />, // TODO: Re-enable assignee in future iteration
         actions: <HorizontalStack gap="2"><Icon source={EmailMajor} color="base" /><Avatar size="extraSmall" shape="square" source="/public/logo_jira.svg" /></HorizontalStack>
     },
     {
@@ -92,7 +92,7 @@ const sampleActionItems = [
         effort: 'Low',
         whyItMatters: 'Known CVEs in external packages',
         displayName: 'Old version of 3rd-party lib used',
-        assignee: <AssignTaskToUser />,
+        // assignee: <AssignTaskToUser />, // TODO: Re-enable assignee in future iteration
         actions: <HorizontalStack gap="2"><Icon source={EmailMajor} color="base" /><Avatar size="extraSmall" shape="square" source="/public/logo_jira.svg" /></HorizontalStack>
     },
     {
@@ -104,7 +104,7 @@ const sampleActionItems = [
         effort: 'Low',
         whyItMatters: 'May expose infrastructure/system info',
         displayName: 'Debug API exposed in prod',
-        assignee: <AssignTaskToUser />,
+        // assignee: <AssignTaskToUser />, // TODO: Re-enable assignee in future iteration
         actions: <HorizontalStack gap="2"><Icon source={EmailMajor} color="base" /><Avatar size="extraSmall" shape="square" source="/public/logo_jira.svg" /></HorizontalStack>
     },
     {
@@ -116,7 +116,7 @@ const sampleActionItems = [
         effort: 'Medium',
         whyItMatters: 'Credential stuffing possible',
         displayName: 'Brute-force vulnerability on login',
-        assignee: <AssignTaskToUser />,
+        // assignee: <AssignTaskToUser />, // TODO: Re-enable assignee in future iteration
         actions: <HorizontalStack gap="2"><Icon source={EmailMajor} color="base" /><Avatar size="extraSmall" shape="square" source="/public/logo_jira.svg" /></HorizontalStack>
     },
 ];
@@ -187,12 +187,12 @@ function HomeDashboard() {
             type: 'text',
             maxWidth: '300px'
         },
-        {
-            title: 'Assignee',
-            value: 'assignee',
-            type: 'text',
-            maxWidth: '150px'
-        },
+        // {
+        //     title: 'Assignee',
+        //     value: 'assignee',
+        //     type: 'text',
+        //     maxWidth: '150px'
+        // },
         {
             title: 'Actions',
             value: 'actions',

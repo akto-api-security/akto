@@ -46,7 +46,7 @@ function FlyoutHeadingComponent({itemDetails}) {
                         />
                     )
                 })}
-            {itemDetails?.primaryActionComp ? itemDetails?.primaryActionComp : <Button plain={itemDetails?.isPrimaryPlain} removeUnderline onClick={itemDetails?.primaryAction}>{itemDetails?.primaryActionText}</Button>}
+                {itemDetails?.primaryActionComp ? itemDetails.primaryActionComp : (itemDetails?.primaryActionText ? <Button plain={itemDetails?.isPrimaryPlain} removeUnderline onClick={itemDetails?.primaryAction}>{itemDetails?.primaryActionText}</Button> : null)}
             </ButtonGroup>
         </HorizontalStack>  
     )

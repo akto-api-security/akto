@@ -32,7 +32,7 @@ const temporaryItemDetails = {
             onClick: () => { /* TODO: Add Jira action here */ }
         }
     ],
-    primaryActionComp: <AssignTaskToUser />
+    // primaryActionComp: <AssignTaskToUser /> // TODO: Re-enable assign task CTA in future iteration
 }   
 
 function ActionItemDetails({ item }) {
