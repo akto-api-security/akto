@@ -33,93 +33,20 @@ import ActionItemDetails from './components/ActionItemDetails';
 import AssignTaskToUser from './components/AssignTaskToUser';
 
 
-const sampleActionItems = [
-    {
-        id: '1',
-        priority: 'P1',
-        priorityComp: <Badge status="critical">P1</Badge>,
-        actionItem: 'Shadow API detected in prod',
-        team: 'Security',
-        effort: 'High',
-        whyItMatters: 'Uncontrolled/unknown attack surface',
-        displayName: 'Shadow API detected in prod',
-        // assignee: <AssignTaskToUser />, // TODO: Re-enable assignee in future iteration
-        actions: <HorizontalStack gap="2"><Icon source={EmailMajor} color="base" /><Avatar size="extraSmall" shape="square" source="/public/logo_jira.svg" /></HorizontalStack>
-    },
-    {
-        id: '2',
-        priority: 'P1',
-        priorityComp: <Badge status="critical">P1</Badge>,
-        actionItem: 'Testing overdue on 12 APIs',
-        team: 'QA',
-        effort: 'Low',
-        whyItMatters: 'Coverage gap in high-sensitivity endpoints',
-        ticket: 'LAN-10',
-        displayName: 'Testing overdue on 12 APIs',
-        // assignee: <AssignTaskToUser />, // TODO: Re-enable assignee in future iteration
-        actions: <HorizontalStack gap="2"><Icon source={EmailMajor} color="base" /><Avatar size="extraSmall" shape="square" source="/public/logo_jira.svg" /></HorizontalStack>
-    },
-    {
-        id: '3',
-        priority: 'P1',
-        priorityComp: <Badge status="critical">P1</Badge>,
-        actionItem: 'Rate limiting missing on reset end...',
-        team: 'Backend',
-        effort: 'Medium',
-        whyItMatters: 'DOS & abuse risk',
-        displayName: 'Rate limiting missing on reset end...',
-        // assignee: <AssignTaskToUser />, // TODO: Re-enable assignee in future iteration
-        actions: <HorizontalStack gap="2"><Icon source={EmailMajor} color="base" /><Avatar size="extraSmall" shape="square" source="/public/logo_jira.svg" /></HorizontalStack>
-    },
-    {
-        id: '4',
-        priority: 'P2',
-        priorityComp: <Badge status="warning">P2</Badge>,
-        actionItem: 'API leaking access token in respo...',
-        team: 'Backend',
-        effort: 'Medium',
-        whyItMatters: 'Privilege escalation possible',
-        displayName: 'API leaking access token in respo...',
-        // assignee: <AssignTaskToUser />, // TODO: Re-enable assignee in future iteration
-        actions: <HorizontalStack gap="2"><Icon source={EmailMajor} color="base" /><Avatar size="extraSmall" shape="square" source="/public/logo_jira.svg" /></HorizontalStack>
-    },
-    {
-        id: '5',
-        priority: 'P2',
-        priorityComp: <Badge status="warning">P2</Badge>,
-        actionItem: 'Old version of 3rd-party lib used',
-        team: 'DevOps',
-        effort: 'Low',
-        whyItMatters: 'Known CVEs in external packages',
-        displayName: 'Old version of 3rd-party lib used',
-        // assignee: <AssignTaskToUser />, // TODO: Re-enable assignee in future iteration
-        actions: <HorizontalStack gap="2"><Icon source={EmailMajor} color="base" /><Avatar size="extraSmall" shape="square" source="/public/logo_jira.svg" /></HorizontalStack>
-    },
-    {
-        id: '6',
-        priority: 'P3',
-        priorityComp: <Badge status="neutral">P3</Badge>,
-        actionItem: 'Debug API exposed in prod',
-        team: 'Infra',
-        effort: 'Low',
-        whyItMatters: 'May expose infrastructure/system info',
-        displayName: 'Debug API exposed in prod',
-        // assignee: <AssignTaskToUser />, // TODO: Re-enable assignee in future iteration
-        actions: <HorizontalStack gap="2"><Icon source={EmailMajor} color="base" /><Avatar size="extraSmall" shape="square" source="/public/logo_jira.svg" /></HorizontalStack>
-    },
-    {
-        id: '7',
-        priority: 'P3',
-        priorityComp: <Badge status="neutral">P3</Badge>,
-        actionItem: 'Brute-force vulnerability on login',
-        team: 'AppSec',
-        effort: 'Medium',
-        whyItMatters: 'Credential stuffing possible',
-        displayName: 'Brute-force vulnerability on login',
-        // assignee: <AssignTaskToUser />, // TODO: Re-enable assignee in future iteration
-        actions: <HorizontalStack gap="2"><Icon source={EmailMajor} color="base" /><Avatar size="extraSmall" shape="square" source="/public/logo_jira.svg" /></HorizontalStack>
-    },
-];
+// const sampleActionItems = [
+//     {
+//         id: '1',
+//         priority: 'P1',
+//         priorityComp: <Badge status="critical">P1</Badge>,
+//         actionItem: 'Shadow API detected in prod',
+//         team: 'Security',
+//         effort: 'High',
+//         whyItMatters: 'Uncontrolled/unknown attack surface',
+//         displayName: 'Shadow API detected in prod',
+//         // assignee: <AssignTaskToUser />, // TODO: Re-enable assignee in future iteration
+//         actions: <HorizontalStack gap="2"><Icon source={EmailMajor} color="base" /><Avatar size="extraSmall" shape="square" source="/public/logo_jira.svg" /></HorizontalStack>
+//     }
+// ];
 
 function HomeDashboard() {
 
