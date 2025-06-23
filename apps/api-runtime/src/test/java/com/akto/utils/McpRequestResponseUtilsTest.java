@@ -4,7 +4,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.akto.dto.HttpRequestParams;
@@ -15,7 +14,6 @@ import com.akto.mcp.McpJsonRpcModel;
 import com.akto.util.Pair;
 import org.junit.jupiter.api.Test;
 import java.net.URL;
-import java.util.Set;
 
 public class McpRequestResponseUtilsTest {
 
@@ -112,10 +110,9 @@ public class McpRequestResponseUtilsTest {
         reqParams.setUrl("http://localhost:8080/mcp");
         HttpResponseParams responseParams = new HttpResponseParams();
         responseParams.setRequestParams(reqParams);
-        assertThrows(NullPointerException.class, () -> {
-            HttpResponseParams afterJsonRpc = JsonRpcUtils.parseJsonRpcResponse(responseParams);
-            McpRequestResponseUtils.parseMcpResponseParams(afterJsonRpc);
-        });
+        HttpResponseParams afterJsonRpc = JsonRpcUtils.parseJsonRpcResponse(responseParams);
+        HttpResponseParams afterMcp = McpRequestResponseUtils.parseMcpResponseParams(afterJsonRpc);
+        assertEquals("http://localhost:8080/mcp", afterMcp.getRequestParams().getURL());
     }
 
     @Test

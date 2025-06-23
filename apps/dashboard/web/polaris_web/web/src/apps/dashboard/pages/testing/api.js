@@ -581,7 +581,21 @@ export default {
         return request({
             url: '/api/updateIssueDescription',
             method: 'post',
-            data: {issueId, description}
+            data: { issueId, description }
+        })
+    },
+    fetchCommonTestTemplate() {
+        return request({
+            url: '/api/fetchCommonTestTemplate',
+            method: 'post',
+            data: {}
+        })
+    },
+    saveCommonTestTemplate(content) {
+        return request({
+            url: '/api/saveCommonTestTemplate',
+            method: 'post',
+            data: { content }
         })
     }
 }
