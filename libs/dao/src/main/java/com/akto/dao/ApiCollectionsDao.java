@@ -21,6 +21,7 @@ import java.util.Map;
 public class ApiCollectionsDao extends AccountsContextDaoWithRbac<ApiCollection> {
 
     public static final ApiCollectionsDao instance = new ApiCollectionsDao();
+    private static Bson projectionForApis = Projections.include(Constants.TIMESTAMP, ApiInfoKey.API_COLLECTION_ID, ApiInfoKey.URL, ApiInfoKey.METHOD);
 
     private ApiCollectionsDao() {}
 
@@ -248,6 +249,17 @@ public class ApiCollectionsDao extends AccountsContextDaoWithRbac<ApiCollection>
         return SingleTypeInfoDao.instance.findAll(filterQ, skip, STIS_LIMIT, Sorts.ascending(Constants.ID), projection);
     }
 
+    public static List<SingleTypeInfo> fetchHostSTIWithinTsRange(int apiCollectionId, int skip, ObjectId lastScannedId, Bson projection, int startTs, int endTs) {
+        Bson filterQ = SingleTypeInfoDao.filterForHostHeader(apiCollectionId, true);
+        if(lastScannedId != null){
+            filterQ = Filters.and(filterQ, Filters.gte(Constants.ID, lastScannedId));
+            if(endTs > 0) {
+                filterQ = Filters.and(filterQ, Filters.and(Filters.lte(SingleTypeInfo._TIMESTAMP, endTs), Filters.gte(SingleTypeInfo._TIMESTAMP, startTs)));
+            }
+        }
+        return SingleTypeInfoDao.instance.findAll(filterQ, skip, STIS_LIMIT, Sorts.ascending(Constants.ID), projection);
+    }
+
     public static List<SingleTypeInfo> fetchHostSTI(int apiCollectionId, int skip, ObjectId lastScannedId, Bson projection) {
         Bson filterQ = SingleTypeInfoDao.filterForHostHeader(apiCollectionId, true);
         if(lastScannedId != null){
@@ -260,13 +272,13 @@ public class ApiCollectionsDao extends AccountsContextDaoWithRbac<ApiCollection>
         List<SingleTypeInfo> allUrlsInCollection = new ArrayList<>();
         int localSkip = skip;
         ObjectId lastScannedId = null;
-        Bson projection = Projections.include(Constants.TIMESTAMP, ApiInfoKey.API_COLLECTION_ID, ApiInfoKey.URL, ApiInfoKey.METHOD);
+        
         while(true){
             List<SingleTypeInfo> stis = new ArrayList<>();
             if(isApiGroup) {
-                stis = fetchHostSTIsForGroups(apiCollectionId, localSkip, lastScannedId, projection);
+                stis = fetchHostSTIsForGroups(apiCollectionId, localSkip, lastScannedId, projectionForApis);
             } else {
-                stis = fetchHostSTI(apiCollectionId, localSkip, lastScannedId, projection);
+                stis = fetchHostSTI(apiCollectionId, localSkip, lastScannedId, projectionForApis);
             }
             lastScannedId = stis.size() != 0 ? stis.get(stis.size() - 1).getId() : null;
             allUrlsInCollection.addAll(stis);
@@ -287,6 +299,33 @@ public class ApiCollectionsDao extends AccountsContextDaoWithRbac<ApiCollection>
 
         return endpoints;
         
+    }
+
+    public static List<BasicDBObject> fetchEndpointsInCollectionUsingHostWithTsRange(int apiCollectionId, int startTs, int endTs) {
+        List<SingleTypeInfo> allUrlsInCollection = new ArrayList<>();
+        int localSkip = 0;
+        ObjectId lastScannedId = null;
+        
+        while(true){
+            List<SingleTypeInfo> stis = fetchHostSTIWithinTsRange(apiCollectionId, localSkip, lastScannedId, projectionForApis, startTs, endTs);
+            lastScannedId = stis.size() != 0 ? stis.get(stis.size() - 1).getId() : null;
+            allUrlsInCollection.addAll(stis);
+            if(stis.size() < STIS_LIMIT){
+                break;
+            }
+
+            localSkip += STIS_LIMIT;
+        }
+
+        List<BasicDBObject> endpoints = new ArrayList<>();
+        for(SingleTypeInfo singleTypeInfo: allUrlsInCollection) {
+            BasicDBObject groupId = new BasicDBObject(ApiInfoKey.API_COLLECTION_ID, singleTypeInfo.getApiCollectionId())
+                .append(ApiInfoKey.URL, singleTypeInfo.getUrl())
+                .append(ApiInfoKey.METHOD, singleTypeInfo.getMethod());
+            endpoints.add(new BasicDBObject("startTs", singleTypeInfo.getTimestamp()).append(Constants.ID, groupId));
+        }
+
+        return endpoints;
     }
 
     public static List<ApiCollection> fetchAllHosts() {
