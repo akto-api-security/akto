@@ -1,9 +1,11 @@
 package com.akto.dao.test_editor;
 
 import com.akto.dao.AccountsContextDao;
+import com.akto.dao.context.Context;
 import com.akto.dto.test_editor.Info;
 import com.akto.dto.test_editor.TestConfig;
 import com.akto.dto.test_editor.YamlTemplate;
+import com.akto.util.Pair;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
@@ -19,6 +21,29 @@ import org.bson.conversions.Bson;
 public class YamlTemplateDao extends AccountsContextDao<YamlTemplate> {
 
     public static final YamlTemplateDao instance = new YamlTemplateDao();
+
+    private static final int CACHE_CHECK = 15 * 60;
+    private static Map<Integer, Pair<Integer, YamlTemplate>> commonTemplateCache = new HashMap<>();
+
+    public Map<String, List<String>> fetchCommonWordListMap() {
+        int accountId = Context.accountId.get();
+        YamlTemplate commonTemplate = null;
+        Pair<Integer, YamlTemplate> pair = commonTemplateCache.get(accountId);
+        Map<String, List<String>> commonWordListMap = new HashMap<>();
+        if (pair != null && pair.getFirst() + CACHE_CHECK > Context.now()) {
+            commonTemplate = pair.getSecond();
+        } else {
+            commonTemplate = CommonTemplateDao.instance.findOne(Filters.empty());
+            commonTemplateCache.put(accountId, new Pair<>(Context.now(), commonTemplate));
+        }
+        if (commonTemplate != null) {
+            String content = commonTemplate.getContent();
+            if (content != null && !content.isEmpty()) {
+                commonWordListMap = TestConfigYamlParser.parseWordLists(content);
+            }
+        }
+        return commonWordListMap;
+    }
 
     public Map<String, TestConfig> fetchTestConfigMap(boolean includeYamlContent, boolean fetchOnlyActive, int skip, int limit, Bson customFilter) {
         Map<String, TestConfig> testConfigMap = new HashMap<>();
@@ -39,6 +64,8 @@ public class YamlTemplateDao extends AccountsContextDao<YamlTemplate> {
         int localSkip = skip;
         int localLimit = Math.min(100, limit);
 
+        Map<String, List<String>> commonWordListMap = fetchCommonWordListMap();
+
         while (localCounter < limit) {
             yamlTemplates = YamlTemplateDao.instance.findAll(Filters.and(filters), localSkip, localLimit, Sorts.ascending("_id"), proj);
             for (YamlTemplate yamlTemplate: yamlTemplates) {
@@ -51,6 +78,11 @@ public class YamlTemplateDao extends AccountsContextDao<YamlTemplate> {
                     }
                     testConfig.setInactive(yamlTemplate.getInactive());
                     testConfig.setAuthor(yamlTemplate.getAuthor());
+                    if (testConfig.getWordlists() != null) {
+                        testConfig.getWordlists().putAll(commonWordListMap);
+                    } else {
+                        testConfig.setWordlists(commonWordListMap);
+                    }
                     testConfigMap.put(testConfig.getId(), testConfig);
 
                     if (testConfig.getInfo() != null && yamlTemplate.getInfo() != null && yamlTemplate.getInfo().getCompliance() != null) {

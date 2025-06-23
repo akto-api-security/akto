@@ -5,7 +5,6 @@ import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.regex.Pattern;
 
-
 import com.akto.dao.*;
 import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dto.*;
@@ -295,6 +294,32 @@ public class DashboardAction extends UserAction {
                     Updates.set(Organization.NAME_LAST_UPDATE, Context.now())
             ));
         }
+
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String getAPIInfosForMissingData(){
+        Bson filter = Filters.and(UsageMetricCalculator.excludeDemosAndDeactivated(Constants.ID), Filters.exists(ApiCollection.HOST_NAME));
+
+        // this map get the detailed count of missing api info keys in the api info dao with respect to the api collection id
+        Map<Integer, BasicDBObject> missingInfoMap = ApiInfoDao.instance.getApisListMissingInApiInfoDao(filter, this.startTimeStamp, this.endTimeStamp);    
+        response = new BasicDBObject();
+        int totalMissing = 0;
+        int apiTypeMissing = 0;
+        int authNotCalculated = 0;
+        int accessTypeNotCalculated = 0;
+        for(BasicDBObject value: missingInfoMap.values()) {
+            totalMissing += ((List<?>) value.get("missingApiInfoKeysInSti")).size();
+            apiTypeMissing += ((List<?>) value.get("missingApiInfoKeysInSamples")).size();
+            authNotCalculated += ((List<?>) value.get("missingApiInfoKeysForAuth")).size();
+            accessTypeNotCalculated += ((List<?>) value.get("missingApiInfoKeysForAccessType")).size();
+        }
+
+        // currently we just need to return the total count of missing api info keys, hence this
+        response.put("totalMissing", totalMissing);
+        response.put("apiTypeMissing", apiTypeMissing);
+        response.put("authNotCalculated", authNotCalculated);
+        response.put("accessTypeNotCalculated", accessTypeNotCalculated);
 
         return Action.SUCCESS.toUpperCase();
     }

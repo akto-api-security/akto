@@ -98,6 +98,18 @@ jobs:
       - name: Run mvn package dangerously
         if: ${{github.event.inputs.skipTests== 'True' }}
         run: mvn package -Dakto-image-tag=${{ github.event.inputs.release_version }} -Dakto-build-time=$(eval "date +%s") -Dakto-release-version=${{github.event.inputs.release_version}} -DskipTests
+      - name: Send mvn notification to Slack
+        id: slack-mvn
+        if: ${{github.event.inputs.skipTests== 'True' }}
+        uses: slackapi/slack-github-action@v1.23.0
+        with:
+          payload: |
+            {
+              "text": "Releasing Akto Open Source v${{ github.event.inputs.release_version }}, after skipping unit tests"
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
       - name: DockerHub login
         env:
           DOCKER_USERNAME: ${{secrets.DOCKER_USERNAME}}
@@ -242,7 +254,6 @@ jobs:
       - name: Run mvn package dangerously
         if: ${{github.event.inputs.skipTests== 'True' }}
         run: mvn package -Dakto-image-tag=${{ github.event.inputs.release_version_threat }} -Dakto-build-time=$(eval "date +%s") -Dakto-release-version=${{github.event.inputs.release_version_threat}} -DskipTests
-
       - name: DockerHub login
         env:
           DOCKER_USERNAME: ${{secrets.DOCKER_USERNAME}}

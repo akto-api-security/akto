@@ -1,5 +1,6 @@
 package com.akto.jsonrpc;
 
+import com.akto.dto.HttpRequestParams;
 import com.akto.dto.HttpResponseParams;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
@@ -44,6 +45,10 @@ public final class JsonRpcUtils {
     }
 
     public static boolean isJsonRpcRequest(HttpResponseParams responseParams) {
-        return responseParams.getRequestParams().getPayload().contains(JSONRPC_KEY);
+        HttpRequestParams params = responseParams.getRequestParams();
+        if (params == null || params.getPayload() == null) {
+            return false;
+        }
+        return params.getPayload().contains(JSONRPC_KEY);
     }
 }
