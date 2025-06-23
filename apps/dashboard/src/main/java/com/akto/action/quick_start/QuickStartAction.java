@@ -278,9 +278,13 @@ public class QuickStartAction extends UserAction {
     }
 
     @Setter
-    private int getExpiryTimeInMonth;
+    private int expiryTimeInMonth;
 
     public String fetchRuntimeHelmCommand() {
+        if(this.expiryTimeInMonth == 0 || this.expiryTimeInMonth > 24 || this.expiryTimeInMonth < -1) {
+            addActionError("Expiry time must be between 1 and 24 months");
+            return Action.ERROR.toUpperCase();
+        }
         try {
             Map<String,Object> claims = new HashMap<>();
             claims.put("accountId", Context.accountId.get());
@@ -289,7 +293,7 @@ public class QuickStartAction extends UserAction {
                 "Akto",
                 "invite_user",
                 Calendar.MONTH,
-                this.getExpiryTimeInMonth
+                this.expiryTimeInMonth
             );
         } catch (Exception e) {
             e.printStackTrace();
