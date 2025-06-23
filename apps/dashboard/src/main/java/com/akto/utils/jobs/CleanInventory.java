@@ -8,9 +8,12 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.regex.Pattern;
@@ -405,76 +408,83 @@ public class CleanInventory {
     }
 
     public static int deleteApiInfosForMissingSTIs(boolean deleteAPIsInstantly){
-        // first delete all apiInfos for which default host is there
-        Set<Integer> deactivatedCollections = UsageMetricCalculator.getDeactivated();
         try {
+            Bson filterQ = Filters.and(UsageMetricCalculator.excludeDemosAndDeactivated(Constants.ID), Filters.exists(ApiCollection.HOST_NAME));
+            ExecutorService executor = Executors.newFixedThreadPool(20);
+            Set<Integer> apiCollectionIds = ApiCollectionsDao.instance.findAll(filterQ, Projections.include(ApiCollection.ID)).stream()
+                    .map(ApiCollection::getId)
+                    .collect(Collectors.toSet());
 
-            int count = 0;
-            // then delete all apiInfos for which host is not present in apiCollections
-            Bson sort = Sorts.ascending(ApiInfo.LAST_SEEN);
-            int lastSeenTimeStamp = 0;
-            int limit = 2000;
-            while(true){
-                List<ApiInfo> apiInfos = ApiInfoDao.instance.findAll(
-                    Filters.and(
-                        Filters.gt(ApiInfo.LAST_SEEN, lastSeenTimeStamp)
-                    ),  0, limit, sort, Projections.include(Constants.ID, ApiInfo.LAST_SEEN)
-                );
+            List<Future<Void>> futures = new ArrayList<>();
+            int accountId = Context.accountId.get();
 
-                if (apiInfos.isEmpty()) {
-                    break;
-                }
+            AtomicInteger counter = new AtomicInteger(0);
+            ArrayList<WriteModel<ApiInfo>> bulkUpdate = new ArrayList<>();
+            
+            for (Integer apiCollectionId : apiCollectionIds) {
+                futures.add(executor.submit(() -> {
+                    Context.accountId.set(accountId);
+                    try {
+                        List<ApiInfo> actualApiInfosInColl = ApiInfoDao.instance.findAll(
+                            Filters.eq(ApiInfo.ID_API_COLLECTION_ID, apiCollectionId),
+                            Projections.include(Constants.ID)
+                        );
 
-                ArrayList<WriteModel<ApiInfo>> bulkUpdate = new ArrayList<>();
-
-                List<Bson> filterList = new ArrayList<>();
-                for (ApiInfo apiInfo : apiInfos) {
-                    if(deactivatedCollections.contains(apiInfo.getId().getApiCollectionId())){
-                        continue;
-                    }
-                    Bson filter = Filters.and(
-                        Filters.eq(SingleTypeInfo._URL, apiInfo.getId().getUrl()),
-                        Filters.eq(SingleTypeInfo._METHOD, apiInfo.getId().getMethod()),
-                        Filters.eq(SingleTypeInfo._RESPONSE_CODE, -1),
-                        Filters.eq(SingleTypeInfo._IS_HEADER, true),
-                        Filters.eq(SingleTypeInfo._PARAM, "host"),
-                        Filters.eq(SingleTypeInfo.SUB_TYPE, SingleTypeInfo.GENERIC.getName()),
-                        Filters.eq(SingleTypeInfo._API_COLLECTION_ID, apiInfo.getId().getApiCollectionId())
-                    );
-                    filterList.add(filter);
-                }
-                List<SingleTypeInfo> stisForTs = SingleTypeInfoDao.instance.findAll(Filters.or(filterList), Projections.include(SingleTypeInfo._API_COLLECTION_ID, SingleTypeInfo._URL, SingleTypeInfo._METHOD, SingleTypeInfo._TIMESTAMP));
-                
-                // make set of apiInfos which are not present in STIs
-                Set<ApiInfoKey> apiInfoKeys = new HashSet<>();
-                stisForTs.forEach(sti -> {
-                    apiInfoKeys.add(new ApiInfoKey(sti.getApiCollectionId(), sti.getUrl(), Method.fromString(sti.getMethod())));
-                });
-
-                for (ApiInfo apiInfo : apiInfos) {
-                    if (!apiInfoKeys.contains(apiInfo.getId())) {
-                        // delete this apiInfo
-                        count++;
-                        Bson filter = ApiInfoDao.getFilter(apiInfo.getId());
-                        logger.info("Deleting apiInfo for missing STI host: " + apiInfo.getId());
-                        if(deleteAPIsInstantly){
-                            bulkUpdate.add(new DeleteOneModel<>(filter));
+                        logger.info("Found " + actualApiInfosInColl.size() + " apiInfos in collection: " + apiCollectionId);
+                        if(actualApiInfosInColl.isEmpty()){
+                            return null;
                         }
-                        
-                    }
-                }
 
-                if (!bulkUpdate.isEmpty() && deleteAPIsInstantly) {
-                    ApiInfoDao.instance.getMCollection().bulkWrite(bulkUpdate);
-                }
-                if(apiInfos.size() < limit){
-                    break;
-                }
-                lastSeenTimeStamp = apiInfos.get(apiInfos.size() - 1).getLastSeen();
-                    
+                        List<BasicDBObject> stisApis = ApiCollectionsDao.fetchEndpointsInCollectionUsingHost(apiCollectionId, 0, false);
+                        Set<ApiInfoKey> apiInfoKeys = stisApis.stream()
+                            .map(sti -> {
+                                BasicDBObject idObj = (BasicDBObject) sti.get(Constants.ID);
+                                if (idObj == null) return null;
+                                int collId = idObj.getInt(ApiInfoKey.API_COLLECTION_ID);
+                                String url = idObj.getString(ApiInfoKey.URL);
+                                String method = idObj.getString(ApiInfoKey.METHOD);
+                                return new ApiInfoKey(collId, url, Method.fromString(method));
+                            })
+                            .filter(java.util.Objects::nonNull)
+                            .collect(Collectors.toSet());
+
+                        logger.info("Found " + apiInfoKeys.size() + " STIs in collection: " + apiCollectionId);
+                        for (ApiInfo apiInfo : actualApiInfosInColl) {
+                            if (!apiInfoKeys.contains(apiInfo.getId())) {
+                                // delete this apiInfo
+                                counter.incrementAndGet();
+                                Bson filter = ApiInfoDao.getFilter(apiInfo.getId());
+                                logger.info("Deleting apiInfo for missing STI host: " + apiInfo.getId());
+                                if(deleteAPIsInstantly){
+                                    bulkUpdate.add(new DeleteOneModel<>(filter));
+                                }
+                                
+                            }
+                        }
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+
+                    return null;
+                }));
             }
-            logger.info("Deleted " + count + " apiInfos for missing STIs");
-            return count;
+
+            executor.shutdown();
+            int shutdownTime = deleteAPIsInstantly ? 5 : 1;
+            try {
+                
+                if (!executor.awaitTermination(shutdownTime, TimeUnit.MINUTES)) {
+                    executor.shutdownNow();
+                }
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+
+            if (!bulkUpdate.isEmpty() && deleteAPIsInstantly) {
+                ApiInfoDao.instance.getMCollection().bulkWrite(bulkUpdate);
+            }
+
+            return counter.get();
         } catch (Exception e) {
             e.printStackTrace();
             // TODO: handle exception
