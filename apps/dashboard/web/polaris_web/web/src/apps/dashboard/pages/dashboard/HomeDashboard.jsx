@@ -143,7 +143,7 @@ function HomeDashboard() {
             api.fetchApiStats(startTimestamp, endTimestamp),
             api.fetchEndpointsCount(startTimestamp, endTimestamp),
             testingApi.fetchSeverityInfoForIssues({}, [], 0),
-            api.getApiInfoForMissingData(startTimestamp, endTimestamp)
+            api.getApiInfoForMissingData(0, endTimestamp)
         ];
 
         let results = await Promise.allSettled(apiPromises);
