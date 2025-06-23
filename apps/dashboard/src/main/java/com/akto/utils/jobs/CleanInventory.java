@@ -482,34 +482,4 @@ public class CleanInventory {
 
         return 0;
     }
-
-
-    public static void deleteApisForMissingApiInfos(){
-        // this is the case when apiInfo is not present for a given apiCollectionId, url and method in STI
-        
-        try {
-            Set<Integer> apiCollectionIds = ApiCollectionsDao.instance.findAll(Filters.empty(), Projections.include(ApiCollection.ID)).stream()
-                .map(ApiCollection::getId)
-                .collect(Collectors.toSet());
-            int count = 0;
-
-            for (Integer apiCollectionId : apiCollectionIds) {
-                List<BasicDBObject> endpoints = ApiCollectionsDao.fetchEndpointsInCollectionUsingHost(apiCollectionId, 0, false);
-                for (BasicDBObject singleTypeInfo : endpoints) {
-                    singleTypeInfo = (BasicDBObject) (singleTypeInfo.getOrDefault("_id", new BasicDBObject()));
-                    int apiCollectionIdFromDb = singleTypeInfo.getInt("apiCollectionId");
-                    String url = singleTypeInfo.getString("url");
-                    String method = singleTypeInfo.getString("method");
-                    Bson filter = ApiInfoDao.getFilter(url, method, apiCollectionIdFromDb);
-                    ApiInfo apiInfo = ApiInfoDao.instance.findOne(filter);
-                    if (apiInfo == null) {
-                        count++;
-                        logger.info("Deleting api for missing apiInfo: " + url + " " + method + " " + apiCollectionIdFromDb);
-                    }
-                }
-            }
-            logger.info("Deleted " + count + " apis for missing apiInfos");
-        } catch (Exception e) {
-        }
-    }
 }

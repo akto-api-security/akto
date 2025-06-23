@@ -1,6 +1,7 @@
 package com.akto.dao;
 
 import com.akto.dao.context.Context;
+import com.akto.dto.ApiCollection;
 import com.akto.dto.ApiCollectionUsers;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.ApiInfo.ApiAccessType;
@@ -31,6 +32,12 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 public class ApiInfoDao extends AccountsContextDaoWithRbac<ApiInfo>{
 
@@ -269,6 +276,95 @@ public class ApiInfoDao extends AccountsContextDaoWithRbac<ApiInfo>{
         apiStatsEnd.setTotalRiskScore(totalRiskScore);
 
         return new Pair<>(apiStatsStart, apiStatsEnd);
+    }
+
+    public Map<Integer, BasicDBObject> getApisListMissingInApiInfoDao(Bson customFilterForCollection){
+        Map<Integer, BasicDBObject> result = new HashMap<>();
+        ExecutorService executor = Executors.newFixedThreadPool(20);
+        Set<Integer> apiCollectionIds = ApiCollectionsDao.instance.findAll(customFilterForCollection, Projections.include(ApiCollection.ID)).stream()
+                .map(ApiCollection::getId)
+                .collect(Collectors.toSet());
+
+        List<Future<Void>> futures = new ArrayList<>();
+        int accountId = Context.accountId.get();
+        
+        for (Integer apiCollectionId : apiCollectionIds) {
+            futures.add(executor.submit(() -> {
+                Context.accountId.set(accountId);
+                List<ApiInfoKey> missingApiInfoKeysInSti = new ArrayList<>();
+                List<ApiInfoKey> missingApiInfoKeysInSamples = new ArrayList<>();
+                List<ApiInfoKey> missingApiInfoKeysForAuth = new ArrayList<>();
+                List<ApiInfoKey> missingApiInfoKeysForAccessType = new ArrayList<>();
+
+
+                BasicDBObject missingInfos = new BasicDBObject();
+
+
+                List<BasicDBObject> endpoints = ApiCollectionsDao.fetchEndpointsInCollectionUsingHost(apiCollectionId, 0, false);
+                Set<ApiInfoKey> sampleApis = SampleDataDao.instance.findAll(Filters.eq(ApiInfo.ID_API_COLLECTION_ID, apiCollectionId), Projections.include(Constants.ID)).stream().map((data) -> {
+                    return new ApiInfoKey(apiCollectionId, data.getId().getUrl(), data.getId().getMethod());
+                }).collect(Collectors.toSet());
+
+                List<ApiInfo> actualApiInfosInColl = ApiInfoDao.instance.findAll(
+                        Filters.eq(ApiInfo.ID_API_COLLECTION_ID, apiCollectionId),
+                        Projections.include(Constants.ID, ApiInfo.ALL_AUTH_TYPES_FOUND, ApiInfo.API_ACCESS_TYPES));
+
+
+                Map<ApiInfoKey, ApiInfo> apiInfos = actualApiInfosInColl.stream()
+                        .collect(Collectors.toMap(ApiInfo::getId, Function.identity()));
+
+
+
+                for (BasicDBObject singleTypeInfo : endpoints) {
+                    singleTypeInfo = (BasicDBObject) (singleTypeInfo.getOrDefault("_id", new BasicDBObject()));
+                    int apiCollectionIdFromDb = singleTypeInfo.getInt("apiCollectionId");
+                    String url = singleTypeInfo.getString("url");
+                    String method = singleTypeInfo.getString("method");
+                    ApiInfoKey apiInfoKey = new ApiInfoKey(apiCollectionIdFromDb, url, Method.fromString(method));
+                    if (!apiInfos.containsKey(apiInfoKey)) {
+                        missingApiInfoKeysInSti.add(apiInfoKey);
+                    }
+                }
+
+                for (ApiInfoKey sampleApiKey : sampleApis) {
+                    if (!apiInfos.containsKey(sampleApiKey)) {
+                        missingApiInfoKeysInSamples.add(sampleApiKey);
+                    }
+                }
+
+                for (ApiInfoKey apiInfoKey : apiInfos.keySet()) {
+                    ApiInfo apiInfo = apiInfos.get(apiInfoKey);
+                    if (apiInfo.getAllAuthTypesFound() == null || apiInfo.getAllAuthTypesFound().isEmpty()) {
+                        missingApiInfoKeysForAuth.add(apiInfoKey);
+                    }
+                    if (apiInfo.getApiAccessTypes() == null || apiInfo.getApiAccessTypes().isEmpty()) {
+                        missingApiInfoKeysForAccessType.add(apiInfoKey);
+                    }
+                }
+
+                if(missingApiInfoKeysInSti.isEmpty() && missingApiInfoKeysInSamples.isEmpty() && missingApiInfoKeysForAuth.isEmpty() && missingApiInfoKeysForAccessType.isEmpty()) {
+                    return null;
+                }
+
+                missingInfos.append("missingApiInfoKeysInSti", missingApiInfoKeysInSti);
+                missingInfos.append("missingApiInfoKeysInSamples", missingApiInfoKeysInSamples);
+                missingInfos.append("missingApiInfoKeysForAuth", missingApiInfoKeysForAuth);
+                missingInfos.append("missingApiInfoKeysForAccessType", missingApiInfoKeysForAccessType);
+                result.put(apiCollectionId, missingInfos);
+                return null;
+            }));
+        }
+     
+        executor.shutdown();
+        try {
+            if (!executor.awaitTermination(1, TimeUnit.MINUTES)) {
+                executor.shutdownNow();
+            }
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+
+        return result;
     }
 
     @Override

@@ -85,6 +85,11 @@ function HomeDashboard() {
             "text": 0,
             "color": "#68B3D0",
             "filterKey": "Third Party"
+        },
+        "Missing": {
+            "text": 0,
+            "color": "#FFB3B3",
+            "filterKey": "Missing"
         }
     });
 
@@ -137,7 +142,8 @@ function HomeDashboard() {
             api.findTotalIssues(startTimestamp, endTimestamp),
             api.fetchApiStats(startTimestamp, endTimestamp),
             api.fetchEndpointsCount(startTimestamp, endTimestamp),
-            testingApi.fetchSeverityInfoForIssues({}, [], 0)
+            testingApi.fetchSeverityInfoForIssues({}, [], 0),
+            api.getApiInfoForMissingData()
         ];
 
         let results = await Promise.allSettled(apiPromises);
@@ -147,6 +153,8 @@ function HomeDashboard() {
         let apisStatsResp = results[2].status === 'fulfilled' ? results[2].value : {}
         let fetchEndpointsCountResp = results[3].status === 'fulfilled' ? results[3].value : {}
         let issueSeverityMap = results[4].status === 'fulfilled' ? results[4].value : {}
+        let missingApiInfoData = results[5].status === 'fulfilled' ? results[5].value : {}
+        const totalMissingApis = missingApiInfoData?.totalMissing|| 0
 
         setShowBannerComponent(!userEndpoints)
 
@@ -154,10 +162,10 @@ function HomeDashboard() {
         // TODO: Fix apiStats API to return the correct total apis
         buildMetrics(apisStatsResp.apiStatsEnd, fetchEndpointsCountResp)
         testSummaryData()
-        mapAccessTypes(apisStatsResp)
-        mapAuthTypes(apisStatsResp)
-        buildAuthTypesData(apisStatsResp.apiStatsEnd)
-        buildSetRiskScoreData(apisStatsResp.apiStatsEnd) //todo
+        mapAccessTypes(apisStatsResp, (totalMissingApis + (missingApiInfoData?.accessTypeNotCalculated || 0)))
+        mapAuthTypes(apisStatsResp, (totalMissingApis + (missingApiInfoData?.authNotCalculated || 0)))
+        buildAPITypesData(apisStatsResp.apiStatsEnd, (totalMissingApis + (missingApiInfoData?.apiTypeMissing || 0)))
+        buildSetRiskScoreData(apisStatsResp.apiStatsEnd, totalMissingApis) //todo
         getCollectionsWithCoverage()
         buildSeverityMap(issueSeverityMap.severityInfo)
         buildIssuesSummary(findTotalIssuesResp)
@@ -267,7 +275,7 @@ function HomeDashboard() {
 
     const runTestEmptyCardComponent = <Text alignment='center' color='subdued'>There’s no data to show. <Link url="/dashboard/testing" target='_blank'>Run test</Link> to get data populated. </Text>
 
-    function mapAccessTypes(apiStats) {
+    function mapAccessTypes(apiStats, missingCount) {
         if (!apiStats) return
         const apiStatsEnd = apiStats.apiStatsEnd
         const apiStatsStart = apiStats.apiStatsStart
@@ -276,7 +284,8 @@ function HomeDashboard() {
             "PUBLIC": "External",
             "PRIVATE": "Internal",
             "PARTNER": "Partner",
-            "THIRD_PARTY": "Third Party"
+            "THIRD_PARTY": "Third Party",
+            "MISSING": "Missing"
         };
 
         for (const [key, value] of Object.entries(apiStatsEnd.accessTypeMap)) {
@@ -286,11 +295,17 @@ function HomeDashboard() {
                 accessTypeMap[mappedKey].dataTableComponent = generateChangeComponent((value - apiStatsStart.accessTypeMap[key]), false);
             }
         }
+        // Handle missing access types
+        if( missingCount && missingCount > 0) {
+            accessTypeMap["Missing"].text = missingCount;
+            accessTypeMap["Missing"].dataTableComponent = generateChangeComponent(0, false);
+        }
+        
         setAccessTypeMap(accessTypeMap)
     }
 
 
-    function mapAuthTypes(apiStats) {
+    function mapAuthTypes(apiStats, missingCount) {
         const apiStatsEnd = apiStats.apiStatsEnd
         const apiStatsStart = apiStats.apiStatsStart
         const convertKey = (key) => {
@@ -323,24 +338,37 @@ function HomeDashboard() {
             };
         });
 
+        if(missingCount > 0) {
+            authMap["Missing"] = {
+                "text": missingCount,
+                "color": "#EFE3FF",
+                "filterKey": "Missing",
+                "dataTableComponent": generateChangeComponent(0, false) // No change component for missing auth types
+            };
+        }
+
+        
         setAuthMap(authMap)
     }
 
 
-    function buildAuthTypesData(apiStats) {
+    function buildAPITypesData(apiStats, missingCount) {
         // Initialize the data with default values for all API types
         const data = [
             ["REST", apiStats.apiTypeMap.REST || 0], // Use the value from apiTypeMap or 0 if not available
             ["GraphQL", apiStats.apiTypeMap.GRAPHQL || 0],
             ["gRPC", apiStats.apiTypeMap.GRPC || 0],
-            ["SOAP", apiStats.apiTypeMap.SOAP || 0]
+            ["SOAP", apiStats.apiTypeMap.SOAP || 0],
         ];
+        if(missingCount > 0) {
+            data.push(["Not Calculated", missingCount]);
+        }
 
         setApiTypesData([{ data: data, color: "#D6BBFB" }])
     }
 
-    function buildSetRiskScoreData(apiStats) {
-        const totalApisCount = apiStats.totalAPIs
+    function buildSetRiskScoreData(apiStats, missingCount) {
+        const totalApisCount = apiStats.totalAPIs + (missingCount || 0);
 
         let tempScore = 0, tempTotal = 0
         Object.keys(apiStats.riskScoreMap).forEach((x) => {
@@ -386,6 +414,16 @@ function HomeDashboard() {
             }
         });
 
+        if(missingCount > 0){
+            result.push({
+                "badgeValue": "N/A",
+                "progressValue": (missingCount / totalApisCount) * 100 + "%",
+                "text": missingCount,
+                "topColor": "#DDE0E4",
+                "backgroundColor": "#F6F7F8",
+                "badgeColor": "subdued"
+            })
+        }
         setRiskScoreData(result)
     }
 
@@ -552,8 +590,6 @@ function HomeDashboard() {
         titleToolTip="Distribution of APIs based on their calculated risk scores. Higher scores indicate greater potential security risks."
         linkText="Check out"
         linkUrl="/dashboard/observe/inventory"
-        totalAPIs={totalAPIs}
-        comparisonValue={riskScoreData.reduce((acc, item) => acc + item.text, 0)}
     />
 
     const apisByAccessTypeComponent = <InfoCard
@@ -564,8 +600,6 @@ function HomeDashboard() {
         titleToolTip="Categorization of APIs based on their access permissions and intended usage (Partner, Internal, External, etc.)."
         linkText="Check out"
         linkUrl="/dashboard/observe/inventory"
-        totalAPIs={totalAPIs}
-        comparisonValue={Object.values(accessTypeMap).reduce((acc, item) => acc + item.text, 0)}
     />
 
     const apisByAuthTypeComponent =
@@ -579,8 +613,6 @@ function HomeDashboard() {
             titleToolTip="Breakdown of APIs by the authentication methods they use, including unauthenticated APIs which may pose security risks."
             linkText="Check out"
             linkUrl="/dashboard/observe/inventory"
-            totalAPIs={totalAPIs}
-            comparisonValue={Object.values(authMap).reduce((acc, item) => acc + item.text, 0)}
         />
 
     const apisByTypeComponent = <InfoCard
@@ -595,7 +627,7 @@ function HomeDashboard() {
                 defaultChartOptions={defaultChartOptions}
                 text="true"
                 yAxisTitle="Number of APIs"
-                width={40}
+                width={Object.keys(apiTypesData).length > 4 ? "25" : "40"}
                 gap={10}
                 showGridLines={true}
                 customXaxis={
@@ -611,8 +643,6 @@ function HomeDashboard() {
         titleToolTip="Distribution of APIs by their architectural style or protocol (e.g., REST, GraphQL, gRPC, SOAP)."
         linkText="Check out"
         linkUrl="/dashboard/observe/inventory"
-        totalAPIs={totalAPIs}
-        comparisonValue={apiTypesData.reduce((acc, item) => acc + item.data.reduce((sum, curr) => sum + curr[1], 0), 0)}    
     />
 
     const newDomainsComponent = <InfoCard

@@ -77,7 +77,15 @@ const api = {
                 connectionSkipped: skippedConnection
             }
         })
-    }
+    },
+
+    getApiInfoForMissingData: async() =>{
+        return request({
+            url: '/api/getAPIInfosForMissingData',
+            method: 'post',
+            data: {}
+        })
+    },
 }
 
 export default api;

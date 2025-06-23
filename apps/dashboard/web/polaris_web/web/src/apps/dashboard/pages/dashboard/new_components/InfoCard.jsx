@@ -1,7 +1,7 @@
-import { Box, Card, HorizontalStack, Link, Text, VerticalStack } from '@shopify/polaris';
+import { Box, Card, HorizontalStack, Link, VerticalStack } from '@shopify/polaris';
 import TitleWithInfo from "@/apps/dashboard/components/shared/TitleWithInfo"
 
-function InfoCard({component, title, titleToolTip, linkText, linkUrl, minHeight, totalAPIs, comparisonValue}) {
+function InfoCard({component, title, titleToolTip, linkText, linkUrl, minHeight}) {
     return (
         <Card padding={5} key="info">
             
@@ -18,7 +18,6 @@ function InfoCard({component, title, titleToolTip, linkText, linkUrl, minHeight,
                         </HorizontalStack>
                         {component}
                     </VerticalStack>
-                    {totalAPIs && comparisonValue && comparisonValue < totalAPIs ? <Text variant="bodySm" color="subdued">Note: Need more information for calculation of {title.toLowerCase()}</Text> : null}
                 </VerticalStack>
             </Box>
         </Card>
