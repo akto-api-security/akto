@@ -10,6 +10,7 @@ import com.akto.dto.ApiCollection;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.*;
+import com.akto.log.LoggerMaker.LogDb;
 import com.akto.types.CappedSet;
 import com.mongodb.client.model.*;
 import org.apache.commons.collections.CollectionUtils;
@@ -195,6 +196,9 @@ public class MergingLogic {
         if (apiCollection != null && !CollectionUtils.isEmpty(apiCollection.getTagsList())) {
             if (apiCollection.getTagsList().stream()
                 .anyMatch(t -> AKTO_MCP_SERVER_TAG.equals(t.getKeyName()))) {
+                loggerMaker.infoAndAddToDb(
+                    "Skipping merging for API collection " + apiCollectionId + " as it is an MCP server",
+                    LogDb.DB_ABS);
                 return new ApiMergerResult(new HashMap<>());
             }
         }
