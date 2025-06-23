@@ -302,7 +302,7 @@ public class DashboardAction extends UserAction {
         Bson filter = Filters.and(UsageMetricCalculator.excludeDemosAndDeactivated(Constants.ID), Filters.exists(ApiCollection.HOST_NAME));
 
         // this map get the detailed count of missing api info keys in the api info dao with respect to the api collection id
-        Map<Integer, BasicDBObject> missingInfoMap = ApiInfoDao.instance.getApisListMissingInApiInfoDao(filter);    
+        Map<Integer, BasicDBObject> missingInfoMap = ApiInfoDao.instance.getApisListMissingInApiInfoDao(filter, this.startTimeStamp, this.endTimeStamp);    
         response = new BasicDBObject();
         int totalMissing = 0;
         int apiTypeMissing = 0;

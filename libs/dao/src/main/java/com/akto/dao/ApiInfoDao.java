@@ -278,7 +278,7 @@ public class ApiInfoDao extends AccountsContextDaoWithRbac<ApiInfo>{
         return new Pair<>(apiStatsStart, apiStatsEnd);
     }
 
-    public Map<Integer, BasicDBObject> getApisListMissingInApiInfoDao(Bson customFilterForCollection){
+    public Map<Integer, BasicDBObject> getApisListMissingInApiInfoDao(Bson customFilterForCollection, int startTimestamp, int endTimestamp){
         Map<Integer, BasicDBObject> result = new HashMap<>();
         ExecutorService executor = Executors.newFixedThreadPool(20);
         Set<Integer> apiCollectionIds = ApiCollectionsDao.instance.findAll(customFilterForCollection, Projections.include(ApiCollection.ID)).stream()
@@ -300,14 +300,26 @@ public class ApiInfoDao extends AccountsContextDaoWithRbac<ApiInfo>{
                 BasicDBObject missingInfos = new BasicDBObject();
 
 
-                List<BasicDBObject> endpoints = ApiCollectionsDao.fetchEndpointsInCollectionUsingHost(apiCollectionId, 0, false);
+                List<BasicDBObject> endpoints = ApiCollectionsDao.fetchEndpointsInCollectionUsingHostWithTsRange(apiCollectionId, startTimestamp, endTimestamp);
                 Set<ApiInfoKey> sampleApis = SampleDataDao.instance.findAll(Filters.eq(ApiInfo.ID_API_COLLECTION_ID, apiCollectionId), Projections.include(Constants.ID)).stream().map((data) -> {
                     return new ApiInfoKey(apiCollectionId, data.getId().getUrl(), data.getId().getMethod());
                 }).collect(Collectors.toSet());
 
+                Bson apiInfoFilter = Filters.eq(ApiInfo.ID_API_COLLECTION_ID, apiCollectionId);
+                if(endTimestamp > 0) {
+                    apiInfoFilter = Filters.and(apiInfoFilter, Filters.or(
+                            Filters.lte(ApiInfo.DISCOVERED_TIMESTAMP, endTimestamp),
+                            Filters.and(
+                                    Filters.exists(ApiInfo.DISCOVERED_TIMESTAMP, false),
+                                    Filters.lte(ApiInfo.LAST_SEEN, endTimestamp) // in case discovered timestamp is not set
+                            )// in case discovered timestamp is not set
+                    ));
+                }
+
                 List<ApiInfo> actualApiInfosInColl = ApiInfoDao.instance.findAll(
-                        Filters.eq(ApiInfo.ID_API_COLLECTION_ID, apiCollectionId),
-                        Projections.include(Constants.ID, ApiInfo.ALL_AUTH_TYPES_FOUND, ApiInfo.API_ACCESS_TYPES));
+                    apiInfoFilter,
+                    Projections.include(Constants.ID, ApiInfo.ALL_AUTH_TYPES_FOUND, ApiInfo.API_ACCESS_TYPES)
+                );
 
 
                 Map<ApiInfoKey, ApiInfo> apiInfos = actualApiInfosInColl.stream()

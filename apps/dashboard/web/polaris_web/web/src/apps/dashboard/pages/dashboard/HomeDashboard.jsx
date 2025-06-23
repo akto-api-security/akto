@@ -143,7 +143,7 @@ function HomeDashboard() {
             api.fetchApiStats(startTimestamp, endTimestamp),
             api.fetchEndpointsCount(startTimestamp, endTimestamp),
             testingApi.fetchSeverityInfoForIssues({}, [], 0),
-            api.getApiInfoForMissingData()
+            api.getApiInfoForMissingData(startTimestamp, endTimestamp)
         ];
 
         let results = await Promise.allSettled(apiPromises);
@@ -388,7 +388,7 @@ function HomeDashboard() {
         const sumOfRiskScores = Object.values(apiStats.riskScoreMap).reduce((acc, value) => acc + value, 0);
 
         // Calculate the additional APIs that should be added to risk score "0"
-        const additionalAPIsForZero = totalApisCount - sumOfRiskScores;
+        const additionalAPIsForZero = totalApisCount - sumOfRiskScores - missingCount;
         apiStats.riskScoreMap["0"] = apiStats.riskScoreMap["0"] ? apiStats.riskScoreMap["0"] : 0
         if (additionalAPIsForZero > 0) apiStats.riskScoreMap["0"] += additionalAPIsForZero;
 
