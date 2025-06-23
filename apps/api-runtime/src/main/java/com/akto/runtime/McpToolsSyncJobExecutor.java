@@ -14,6 +14,8 @@ import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.mcp.McpSchema;
 import com.akto.mcp.McpSchema.CallToolRequest;
+import com.akto.mcp.McpSchema.ClientCapabilities;
+import com.akto.mcp.McpSchema.InitializeResult;
 import com.akto.mcp.McpSchema.JSONRPCRequest;
 import com.akto.mcp.McpSchema.JSONRPCResponse;
 import com.akto.mcp.McpSchema.JsonSchema;
@@ -21,6 +23,7 @@ import com.akto.mcp.McpSchema.ListResourcesResult;
 import com.akto.mcp.McpSchema.ListToolsResult;
 import com.akto.mcp.McpSchema.ReadResourceRequest;
 import com.akto.mcp.McpSchema.Resource;
+import com.akto.mcp.McpSchema.ServerCapabilities;
 import com.akto.mcp.McpSchema.Tool;
 import com.akto.parsers.HttpCallParser;
 import com.akto.runtime.Main.AccountInfo;
@@ -50,7 +53,6 @@ public class McpToolsSyncJobExecutor {
 
     private static final LoggerMaker logger = new LoggerMaker(McpToolsSyncJobExecutor.class, LogDb.RUNTIME);
     private static final ObjectMapper mapper = new ObjectMapper();
-    public static final McpToolsSyncJobExecutor INSTANCE = new McpToolsSyncJobExecutor();
     private static final String MCP_TOOLS_LIST_REQUEST_JSON =
         "{\"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"" + McpSchema.METHOD_TOOLS_LIST + "\", \"params\": {}}";
     private static final String MCP_RESOURCE_LIST_REQUEST_JSON =
@@ -59,6 +61,10 @@ public class McpToolsSyncJobExecutor {
     private static final String LOCAL_IP = "127.0.0.1";
     private final Map<String, HttpCallParser> httpCallParserMap = new HashMap<>();
     private final Map<Integer, AccountInfo> accountInfoMap =  new HashMap<>();
+    private ServerCapabilities mcpServerCapabilities = null;
+
+    public static final McpToolsSyncJobExecutor INSTANCE = new McpToolsSyncJobExecutor();
+
     public McpToolsSyncJobExecutor() {
         Json.mapper().registerModule(new SimpleModule().addSerializer(new JsonNodeExampleSerializer()));
     }
@@ -89,19 +95,45 @@ public class McpToolsSyncJobExecutor {
         }
 
         eligibleCollections.forEach(apiCollection -> {
-                logger.info("Starting MCP sync for apiCollectionId: {} and hostname: {}", apiCollection.getId(),
-                    apiCollection.getHostName());
-                handleMcpToolsDiscovery(apiCollection, apiConfig, httpCallParserMap, accountInfoMap);
-                handleMcpResourceDiscovery(apiCollection, apiConfig, httpCallParserMap, accountInfoMap);
-            }
-        );
+            logger.info("Starting MCP sync for apiCollectionId: {} and hostname: {}", apiCollection.getId(),
+                apiCollection.getHostName());
+            initializeMcpServerCapabilities(apiCollection, apiConfig);
+            handleMcpToolsDiscovery(apiCollection, apiConfig);
+            handleMcpResourceDiscovery(apiCollection, apiConfig);
+        });
     }
 
-    private void handleMcpToolsDiscovery(ApiCollection apiCollection, APIConfig apiConfig,
-        Map<String, HttpCallParser> httpCallParserMap, Map<Integer, AccountInfo> accountInfoMap) {
+    private void initializeMcpServerCapabilities(ApiCollection apiCollection, APIConfig apiConfig) {
+        String host = apiCollection.getHostName();
+        try {
+            JSONRPCRequest initializeRequest = new JSONRPCRequest(
+                McpSchema.JSONRPC_VERSION,
+                McpSchema.METHOD_INITIALIZE,
+                0,
+                new ClientCapabilities(null, null, null)
+            );
+            Pair<JSONRPCResponse, HttpResponseParams> responsePair = getMcpMethodResponse(
+                host, McpSchema.METHOD_INITIALIZE, JSONUtils.getString(initializeRequest), apiCollection);
+            InitializeResult initializeResult = JSONUtils.fromJson(responsePair.getFirst().getResult(),
+                InitializeResult.class);
+            if (initializeResult == null || initializeResult.getCapabilities() == null) {
+                return;
+            }
+            mcpServerCapabilities = initializeResult.getCapabilities();
+            processResponseParams(apiConfig, Collections.singletonList(responsePair.getSecond()));
+        } catch (Exception e) {
+            logger.error("Error while initializing MCP server capabilities for hostname: {}", host, e);
+        }
+    }
+
+    private void handleMcpToolsDiscovery(ApiCollection apiCollection, APIConfig apiConfig) {
         String host = apiCollection.getHostName();
 
         try {
+            if (mcpServerCapabilities != null && mcpServerCapabilities.getTools() == null) {
+                logger.debug("Skipping tools discovery as MCP server capabilities do not support tools.");
+                return;
+            }
             List<HttpResponseParams> responseParamsList = new ArrayList<>();
 
             Pair<JSONRPCResponse, HttpResponseParams> toolsListResponsePair = getMcpMethodResponse(
@@ -148,11 +180,14 @@ public class McpToolsSyncJobExecutor {
         }
     }
 
-    private void handleMcpResourceDiscovery(ApiCollection apiCollection, APIConfig apiConfig,
-        Map<String, HttpCallParser> httpCallParserMap, Map<Integer, AccountInfo> accountInfoMap) {
+    private void handleMcpResourceDiscovery(ApiCollection apiCollection, APIConfig apiConfig) {
         String host = apiCollection.getHostName();
 
         try {
+            if (mcpServerCapabilities != null && mcpServerCapabilities.getResources() == null) {
+                logger.debug("Skipping tools discovery as MCP server capabilities do not support tools.");
+                return;
+            }
             List<HttpResponseParams> responseParamsList = new ArrayList<>();
             Pair<JSONRPCResponse, HttpResponseParams> resourcesListResponsePair = getMcpMethodResponse(
                 host, McpSchema.METHOD_RESOURCES_LIST, MCP_RESOURCE_LIST_REQUEST_JSON, apiCollection);
