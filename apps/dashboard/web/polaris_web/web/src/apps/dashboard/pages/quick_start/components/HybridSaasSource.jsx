@@ -52,7 +52,7 @@ function HybridSaasSource() {
                 id={`select-expiry`}
                 menuItems={expiryDurationOptions}
                 value={getLabelFromValue(selectedExpiryDuration)}
-                initial={expiryDurationOptions[2].value}
+                initial={selectedExpiryDuration}
                 selected={(type) => {setSelectedExpiryDuration(type); fetchRuntimeHelmCommand(type)}}
             />
             </Box>
