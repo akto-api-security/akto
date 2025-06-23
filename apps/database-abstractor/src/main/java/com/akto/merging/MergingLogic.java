@@ -2,6 +2,7 @@ package com.akto.merging;
 
 import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.ApiInfoDao;
+import com.akto.dto.traffic.CollectionTags;
 import com.akto.log.LoggerMaker;
 import com.akto.dao.SampleDataDao;
 import com.akto.dao.SingleTypeInfoDao;
@@ -13,6 +14,7 @@ import com.akto.dto.type.*;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.types.CappedSet;
 import com.mongodb.client.model.*;
+import java.util.stream.Collectors;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.math.NumberUtils;
 import org.bson.conversions.Bson;
@@ -194,6 +196,9 @@ public class MergingLogic {
         ApiCollection apiCollection = ApiCollectionsDao.instance.getMeta(apiCollectionId);
 
         if (apiCollection != null && !CollectionUtils.isEmpty(apiCollection.getTagsList())) {
+            loggerMaker.infoAndAddToDb(
+                "Found tags for API collection " + apiCollectionId + ": " + apiCollection.getTagsList().stream().map(
+                    CollectionTags::getKeyName).collect(Collectors.joining(",")), LogDb.DB_ABS);
             if (apiCollection.getTagsList().stream()
                 .anyMatch(t -> AKTO_MCP_SERVER_TAG.equals(t.getKeyName()))) {
                 loggerMaker.infoAndAddToDb(
