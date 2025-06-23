@@ -39,6 +39,9 @@ import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
 import com.opensymphony.xwork2.Action;
+
+import lombok.Setter;
+
 import java.io.BufferedReader;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -274,6 +277,9 @@ public class QuickStartAction extends UserAction {
         return Action.SUCCESS.toUpperCase();
     }
 
+    @Setter
+    private int getExpiryTimeInMonth;
+
     public String fetchRuntimeHelmCommand() {
         try {
             Map<String,Object> claims = new HashMap<>();
@@ -283,7 +289,7 @@ public class QuickStartAction extends UserAction {
                 "Akto",
                 "invite_user",
                 Calendar.MONTH,
-                6
+                this.getExpiryTimeInMonth
             );
         } catch (Exception e) {
             e.printStackTrace();
