@@ -86,10 +86,10 @@ function HomeDashboard() {
             "color": "#68B3D0",
             "filterKey": "Third Party"
         },
-        "Missing": {
+        "Need more data": {
             "text": 0,
             "color": "#FFB3B3",
-            "filterKey": "Missing"
+            "filterKey": "Need more data"
         }
     });
 
@@ -285,7 +285,7 @@ function HomeDashboard() {
             "PRIVATE": "Internal",
             "PARTNER": "Partner",
             "THIRD_PARTY": "Third Party",
-            "MISSING": "Missing"
+            "NEED_MORE_DATA": "Need more data"
         };
 
         for (const [key, value] of Object.entries(apiStatsEnd.accessTypeMap)) {
@@ -297,8 +297,8 @@ function HomeDashboard() {
         }
         // Handle missing access types
         if( missingCount && missingCount > 0) {
-            accessTypeMap["Missing"].text = missingCount;
-            accessTypeMap["Missing"].dataTableComponent = generateChangeComponent(0, false);
+            accessTypeMap["Need more data"].text = missingCount;
+            accessTypeMap["Need more data"].dataTableComponent = generateChangeComponent(0, false);
         }
         
         setAccessTypeMap(accessTypeMap)
@@ -339,10 +339,10 @@ function HomeDashboard() {
         });
 
         if(missingCount > 0) {
-            authMap["Missing"] = {
+            authMap["Need more data"] = {
                 "text": missingCount,
                 "color": "#EFE3FF",
-                "filterKey": "Missing",
+                "filterKey": "Need more data",
                 "dataTableComponent": generateChangeComponent(0, false) // No change component for missing auth types
             };
         }
@@ -361,7 +361,7 @@ function HomeDashboard() {
             ["SOAP", apiStats.apiTypeMap.SOAP || 0],
         ];
         if(missingCount > 0) {
-            data.push(["Not Calculated", missingCount]);
+            data.push(["Need more data", missingCount]);
         }
 
         setApiTypesData([{ data: data, color: "#D6BBFB" }])
