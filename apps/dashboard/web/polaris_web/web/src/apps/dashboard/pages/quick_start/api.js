@@ -130,11 +130,11 @@ const api = {
         })
     },
 
-    fetchRuntimeHelmCommand() {
+    fetchRuntimeHelmCommand(expiryTimeInMonth) {
         return request({
             url: '/api/fetchRuntimeHelmCommand',
             method: 'post',
-            data: {}
+            data: {expiryTimeInMonth}
         })
     },
 

@@ -1,4 +1,4 @@
-import {Box, Navigation, Text, Banner, Badge} from "@shopify/polaris";
+import {Box, Navigation, Text} from "@shopify/polaris";
 import {
     AppsFilledMajor,
     InventoryFilledMajor,
@@ -27,7 +27,6 @@ export default function LeftNav() {
     const currPathString = func.transformString(location.pathname);
 
     const [leftNavSelected, setLeftNavSelected] = useState(currPathString);
-    const [showMcpBanner, setShowMcpBanner] = useState(false);
 
     const active = PersistStore((state) => state.active);
     const setActive = PersistStore((state) => state.setActive);

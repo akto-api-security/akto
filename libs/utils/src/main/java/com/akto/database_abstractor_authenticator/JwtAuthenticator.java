@@ -35,10 +35,17 @@ public class JwtAuthenticator {
         java.util.Date issueTime = calendar.getTime();
 
         calendar.setTime(issueTime);
+        if(expiryDuration < 0){
+           return Jwts.builder()
+                .setIssuer(issuer)
+                .setSubject(subject)
+                .addClaims(claims)
+                .setIssuedAt(issueTime)
+                .signWith(privateKey)
+                .compact();
+        }
         calendar.add(expiryUnit, expiryDuration);
         java.util.Date expiryTime = calendar.getTime();
-
-
         return Jwts.builder()
                 .setIssuer(issuer)
                 .setSubject(subject)
