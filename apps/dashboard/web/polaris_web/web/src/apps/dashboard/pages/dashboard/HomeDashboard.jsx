@@ -500,7 +500,7 @@ function HomeDashboard() {
 
         if(countMissing > 0) {
             authMap["Need more data"] = {
-                "text": missingCount,
+                "text": countMissing,
                 "color": "#EFE3FF",
                 "filterKey": "Need more data",
                 "dataTableComponent": generateChangeComponent(0, false) // No change component for missing auth types
