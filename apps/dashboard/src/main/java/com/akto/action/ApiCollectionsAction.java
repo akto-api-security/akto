@@ -4,11 +4,8 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 import com.akto.action.observe.InventoryAction;
-import com.akto.dao.filter.MergedUrlsDao;
 import com.akto.dto.*;
-import com.akto.dto.filter.MergedUrls;
 import com.akto.util.Pair;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.bson.conversions.Bson;
 
 import com.akto.action.observe.Utils;
@@ -34,7 +31,6 @@ import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.usage.UsageMetricCalculator;
 import com.akto.usage.UsageMetricHandler;
-import com.akto.dto.ApiCollection.ENV_TYPE;
 import com.akto.util.Constants;
 import com.akto.util.LastCronRunInfo;
 import com.mongodb.client.model.Accumulators;
@@ -154,15 +150,7 @@ public class ApiCollectionsAction extends UserAction {
     private int startTimestamp;
     private int endTimestamp;
     public String fetchApiStats() {
-        Set<Integer> demoCollections = new HashSet<>();
-        demoCollections.addAll(deactivatedCollections);
-        demoCollections.add(RuntimeListener.LLM_API_COLLECTION_ID);
-        demoCollections.add(RuntimeListener.VULNERABLE_API_COLLECTION_ID);
-
-        ApiCollection juiceshopCollection = ApiCollectionsDao.instance.findByName("juice_shop_demo");
-        if (juiceshopCollection != null) demoCollections.add(juiceshopCollection.getId());
-
-        Bson filter = Filters.nin("_id.apiCollectionId", demoCollections);
+        Bson filter = UsageMetricCalculator.excludeDemosAndDeactivated(ApiInfo.ID_API_COLLECTION_ID);
         Pair<ApiStats, ApiStats> result = ApiInfoDao.instance.fetchApiInfoStats(filter, startTimestamp, endTimestamp);
         apiStatsStart = result.getFirst();
         apiStatsEnd = result.getSecond();

@@ -555,11 +555,11 @@ const settingRequests = {
             data: {roleName}
         })
     },
-    addAwsWafIntegration(awsAccessKey, awsSecretKey, region, ruleSetId, ruleSetName) {
+    addAwsWafIntegration(awsAccessKey, awsSecretKey, region, ruleSetId, ruleSetName,severityLevels) {
         return request({
             url: '/api/addAwsWafIntegration',
             method: 'post',
-            data: {awsAccessKey, awsSecretKey, region, ruleSetId, ruleSetName}
+            data: {awsAccessKey, awsSecretKey, region, ruleSetId, ruleSetName,severityLevels}
         })
     },
     fetchAwsWafIntegration() {
@@ -634,11 +634,11 @@ const settingRequests = {
             data: {}
         })
     },
-    async addCloudflareWafIntegration(accountOrZoneId, apiKey, email, integrationType) {
+    async addCloudflareWafIntegration(accountOrZoneId, apiKey, email, integrationType,severityLevels) {
         return await request({
             url: '/api/addCloudflareWafIntegration',
             method: 'post',
-            data: {accountOrZoneId, apiKey, email, integrationType}
+            data: {accountOrZoneId, apiKey, email, integrationType,severityLevels}
         })
     },
     async getDeMergedApis() {
@@ -653,6 +653,13 @@ const settingRequests = {
             url: '/api/undoDemergedApis',
             method: 'post',
             data: {mergedUrls: mergedApis}
+        })
+    },
+    async downloadSamplePdf() {
+        return await request({
+            url: '/api/downloadSamplePdf',
+            method: 'post',
+            data: {}
         })
     }
 }

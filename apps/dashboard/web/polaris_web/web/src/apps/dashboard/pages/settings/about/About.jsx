@@ -51,6 +51,8 @@ function About() {
     const [mergingOnVersions, setMergingOnVersions] = useState(false)
     const [retrospective, setRetrospective] = useState(false)
 
+    const [pdf, setPdf] = useState("")
+
     const setupOptions = settingFunctions.getSetupOptions()
 
     const isOnPrem = window.DASHBOARD_MODE && window.DASHBOARD_MODE.toLowerCase() === 'on_prem'
@@ -361,6 +363,26 @@ function About() {
         await settingRequests.handleRedundantUrls(urlsList)
     }
 
+    const printPdf = (pdf) => {
+        try {
+            const byteCharacters = atob(pdf);
+            const byteNumbers = new Array(byteCharacters.length);
+            for (let i = 0; i < byteCharacters.length; i++) {
+                byteNumbers[i] = byteCharacters.charCodeAt(i);
+            }
+            const byteArray = new Uint8Array(byteNumbers);
+            const blob = new Blob([byteArray], { type: "application/pdf" });
+            const link = document.createElement("a");
+            link.href = window.URL.createObjectURL(blob);
+            link.setAttribute("download", "akto_security_findings.pdf");
+            document.body.appendChild(link);
+            link.click();
+            func.setToast(true, false, "Report PDF downloaded.")
+        } catch (err) {
+            console.log(err)
+        }
+    }
+
     const redundantUrlComp = (
         <VerticalStack gap={"4"}>
             <Box width='220px'>
@@ -379,6 +401,18 @@ function About() {
             <ToggleComponent text={"Treat URLs as case insensitive"} onToggle={handleApisCaseInsensitive} initial={toggleCaseSensitiveApis} disabled={window.USER_ROLE !== "ADMIN"}/>
             <ToggleComponent text={"Use akto's testing module"} onToggle={toggleMiniTesting} initial={miniTesting} disabled={window.USER_ROLE !== "ADMIN"}/>
             <ToggleComponent text={"Allow merging on versions"} onToggle={() => setModalOpen(true)} initial={mergingOnVersions} disabled={window.USER_ROLE !== "ADMIN"}/>
+            <VerticalStack gap={2}>
+                <Text>Sample PDF Download</Text>
+                <Box width='200px'>
+                    <Button onClick={async () => {
+                        await settingRequests.downloadSamplePdf().then((res) => {
+                            if(res?.status?.toLowerCase() === 'completed') {
+                                printPdf(res?.pdf)
+                            }
+                        })
+                    }}>Download</Button>
+                </Box>
+            </VerticalStack>
         </VerticalStack>
     )
     

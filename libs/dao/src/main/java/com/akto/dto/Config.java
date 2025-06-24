@@ -2,6 +2,7 @@ package com.akto.dto;
 
 import java.util.Arrays;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 import lombok.Getter;
@@ -701,6 +702,8 @@ public abstract class Config {
         private String accountOrZoneId;
         public static final String ACCOUNT_ID = "accountId";
         private int accountId;
+        private List<String> severityLevels;
+        public static final String SEVERITY_LEVELS = "severityLevels";
 
         public static final String _CONFIG_ID = "configId";
         public static final String CONFIG_ID = ConfigType.CLOUDFLARE_WAF.name();
@@ -710,13 +713,14 @@ public abstract class Config {
             this.id = CONFIG_ID;
         }
 
-        public CloudflareWafConfig(String apiKey, String email, String integrationType, String accountOrZoneId, int accountId) {
+        public CloudflareWafConfig(String apiKey, String email, String integrationType, String accountOrZoneId, int accountId,List<String> severityLevels) {
             this.apiKey = apiKey;
             this.email = email;
             this.integrationType = integrationType;
             this.accountOrZoneId = accountOrZoneId;
             this.accountId = accountId;
             this.id = accountId + "_" + CONFIG_ID;
+            this.severityLevels = severityLevels;
         }
 
         public String getApiKey() {
@@ -762,6 +766,14 @@ public abstract class Config {
         public static String getConfigId() {
             return CONFIG_ID;
         }
+
+        public List<String> getSeverityLevels() {
+            return severityLevels;
+        }
+
+        public void setSeverityLevels(List<String> severityLevels) {
+            this.severityLevels = severityLevels;
+        }
     }
 
     @BsonDiscriminator
@@ -772,6 +784,7 @@ public abstract class Config {
         private String ruleSetId;
         private String ruleSetName;
         private int accountId;
+        private List<String> severityLevels;
 
         public static final String CONFIG_ID = ConfigType.AWS_WAF.name();
 
@@ -781,7 +794,7 @@ public abstract class Config {
         }
 
         public AwsWafConfig(String awsAccessKey, String awsSecretKey, String region, String ruleSetId,
-                String ruleSetName, int accountId) {
+                String ruleSetName, int accountId,List<String> severityLevels) {
             this.awsAccessKey = awsAccessKey;
             this.awsSecretKey = awsSecretKey;
             this.region = region;
@@ -841,6 +854,14 @@ public abstract class Config {
 
         public void setAccountId(int accountId) {
             this.accountId = accountId;
+        }
+
+        public List<String> getSeverityLevels() {
+            return severityLevels;
+        }
+
+        public void setSeverityLevels(List<String> severityLevels) {
+            this.severityLevels = severityLevels;
         }
        
     }

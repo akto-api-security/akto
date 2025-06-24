@@ -8,18 +8,23 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import com.mongodb.client.model.Updates;
+import com.mongodb.client.model.WriteModel;
 
 import org.bson.conversions.Bson;
 
+import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.ApiInfoDao;
 import com.akto.dao.SampleDataDao;
 import com.akto.dao.SensitiveSampleDataDao;
@@ -30,6 +35,7 @@ import com.akto.dto.Account;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.HttpResponseParams;
+import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.monitoring.FilterConfig;
 import com.akto.dto.monitoring.FilterConfig.FILTER_TYPE;
 import com.akto.dto.test_editor.ExecutorNode;
@@ -43,12 +49,16 @@ import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.parsers.HttpCallParser;
 import com.akto.test_editor.execution.ParseAndExecute;
+import com.akto.usage.UsageMetricCalculator;
 import com.akto.util.AccountTask;
+import com.akto.util.Constants;
 import com.akto.util.DashboardMode;
 import com.akto.util.Pair;
 import com.akto.utils.Utils;
 import com.mongodb.BasicDBObject;
+import com.mongodb.client.model.DeleteOneModel;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.Sorts;
 
 import static com.akto.utils.Utils.deleteApis;
@@ -306,7 +316,7 @@ public class CleanInventory {
                 if (apiCollection.getHostName() == null) {
                     continue;
                 }
-                List<BasicDBObject> endpoints = com.akto.action.observe.Utils.fetchEndpointsInCollectionUsingHost(apiCollection.getId(), 0);
+                List<BasicDBObject> endpoints = ApiCollectionsDao.fetchEndpointsInCollectionUsingHost(apiCollection.getId(), 0, false);
 
                 if (endpoints == null || endpoints.isEmpty()) {
                     continue;
@@ -375,7 +385,7 @@ public class CleanInventory {
             if (apiCollection.getHostName() == null) {
                 continue;
             }
-            List<BasicDBObject> endpoints = com.akto.action.observe.Utils.fetchEndpointsInCollectionUsingHost(apiCollection.getId(), 0);
+            List<BasicDBObject> endpoints = ApiCollectionsDao.fetchEndpointsInCollectionUsingHost(apiCollection.getId(), 0, false);
 
             if (endpoints == null || endpoints.isEmpty()) {
                 continue;
@@ -395,5 +405,112 @@ public class CleanInventory {
             }
             deleteApis(toBeDeleted);
         }
+    }
+
+    public static int deleteApiInfosForMissingSTIs(boolean deleteAPIsInstantly){
+        try {
+            Bson filterInfo = UsageMetricCalculator.excludeDemosAndDeactivated(ApiInfo.ID_API_COLLECTION_ID);
+            Bson filterQ = Filters.and(UsageMetricCalculator.excludeDemosAndDeactivated(Constants.ID));
+            Map<Integer, ApiCollection> apiCollectionMap = ApiCollectionsDao.instance.findAll(filterQ, Projections.include(ApiCollection.ID, ApiCollection.HOST_NAME)).stream().collect(Collectors.toMap(ApiCollection::getId, Function.identity()));
+            ExecutorService executor = Executors.newFixedThreadPool(20);
+            List<Future<Void>> futures = new ArrayList<>();
+            int accountId = Context.accountId.get();
+
+            AtomicInteger counter = new AtomicInteger(0);
+            ArrayList<WriteModel<ApiInfo>> bulkUpdate = new ArrayList<>();
+            
+            for (Integer apiCollectionId : apiCollectionMap.keySet()) {
+                ApiCollection apiCollection = apiCollectionMap.get(apiCollectionId);
+                if (apiCollection == null || apiCollection.getHostName() == null || apiCollection.getHostName().isEmpty()) {
+                    logger.info("Skipping apiCollectionId: " + apiCollectionId + " as it has no hostName");
+                    continue;
+                }
+                futures.add(executor.submit(() -> {
+                    Context.accountId.set(accountId);
+                    try {
+                        List<ApiInfo> actualApiInfosInColl = ApiInfoDao.instance.findAll(
+                            Filters.eq(ApiInfo.ID_API_COLLECTION_ID, apiCollectionId),
+                            Projections.include(Constants.ID)
+                        );
+
+                        logger.info("Found " + actualApiInfosInColl.size() + " apiInfos in collection: " + apiCollectionId);
+                        if(actualApiInfosInColl.isEmpty()){
+                            return null;
+                        }
+
+                        List<BasicDBObject> stisApis = ApiCollectionsDao.fetchEndpointsInCollectionUsingHost(apiCollectionId, 0, false);
+                        Set<ApiInfoKey> apiInfoKeys = stisApis.stream()
+                            .map(sti -> {
+                                BasicDBObject idObj = (BasicDBObject) sti.get(Constants.ID);
+                                if (idObj == null) return null;
+                                int collId = idObj.getInt(ApiInfoKey.API_COLLECTION_ID);
+                                String url = idObj.getString(ApiInfoKey.URL);
+                                String method = idObj.getString(ApiInfoKey.METHOD);
+                                return new ApiInfoKey(collId, url, Method.fromString(method));
+                            })
+                            .filter(java.util.Objects::nonNull)
+                            .collect(Collectors.toSet());
+
+                        logger.info("Found " + apiInfoKeys.size() + " STIs in collection: " + apiCollectionId);
+                        for (ApiInfo apiInfo : actualApiInfosInColl) {
+                            if (!apiInfoKeys.contains(apiInfo.getId())) {
+                                // delete this apiInfo
+                                counter.incrementAndGet();
+                                Bson filter = ApiInfoDao.getFilter(apiInfo.getId());
+                                logger.info("Deleting apiInfo for missing STI host: " + apiInfo.getId());
+                                if(deleteAPIsInstantly){
+                                    bulkUpdate.add(new DeleteOneModel<>(filter));
+                                }
+                                
+                            }
+                        }
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+
+                    return null;
+                }));
+            }
+
+            executor.shutdown();
+            int shutdownTime = deleteAPIsInstantly ? 5 : 1;
+            try {
+                
+                if (!executor.awaitTermination(shutdownTime, TimeUnit.MINUTES)) {
+                    executor.shutdownNow();
+                }
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+
+            if (!bulkUpdate.isEmpty() && deleteAPIsInstantly) {
+                ApiInfoDao.instance.getMCollection().bulkWrite(bulkUpdate);
+            }
+
+            counter.addAndGet((int) ApiInfoDao.instance.count(
+                Filters.and(
+                    Filters.nin(ApiInfo.ID_API_COLLECTION_ID, apiCollectionMap.keySet()),
+                    filterInfo
+                )
+            ));
+
+            if (deleteAPIsInstantly) {
+                ApiInfoDao.instance.deleteAll(
+                Filters.and(
+                    Filters.nin(ApiInfo.ID_API_COLLECTION_ID, apiCollectionMap.keySet()),
+                    filterInfo
+                ));
+                
+            } else {
+                logger.info("Found " + counter.get() + " apiInfos for missing STIs, but not deleted as deleteAPIsInstantly is false.");
+            }
+
+            return counter.get();
+        } catch (Exception e) {
+            e.printStackTrace();
+            // TODO: handle exception
+        }
+
+        return 0;
     }
 }

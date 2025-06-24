@@ -170,7 +170,6 @@ import com.akto.dto.testing.TestingRunResultSummary;
 import com.akto.dto.testing.custom_groups.AllAPIsGroup;
 import com.akto.dto.testing.custom_groups.UnauthenticatedEndpoint;
 import com.akto.dto.testing.sources.AuthWithCond;
-import com.akto.dto.traffic.CollectionTags;
 import com.akto.dto.traffic.Key;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.traffic.SuspectSampleData;
@@ -415,11 +414,15 @@ public class InitializerListener implements ServletContextListener {
     }
 
     public void updateApiGroupsForAccounts() {
-        List<Integer> accounts = new ArrayList<>(Arrays.asList(1_000_000, 1718042191, 1664578207, 1693004074, 1685916748));
-        for (int account : accounts) {
-            Context.accountId.set(account);
-            createFirstUnauthenticatedApiGroup();
-        }
+        List<Integer> accounts = new ArrayList<>(Arrays.asList(1_000_000, 1718042191, 1664578207, 1693004074, 1685916748, 1736798101));
+        scheduler.scheduleAtFixedRate(new Runnable() {
+            public void run() {
+                for (int account : accounts) {
+                    Context.accountId.set(account);
+                    createFirstUnauthenticatedApiGroup();
+                }
+            }
+        }, 0, 4, TimeUnit.HOURS);
     }
 
     private static void raiseMixpanelEvent() {
@@ -1686,8 +1689,10 @@ public class InitializerListener implements ServletContextListener {
 
     public static void createUnauthenticatedApiGroup() {
 
-        if (ApiCollectionsDao.instance.findOne(
-                Filters.eq("_id", UnauthenticatedEndpoint.UNAUTHENTICATED_GROUP_ID)) == null) {
+        ApiCollection collection = ApiCollectionsDao.instance.findOne(
+                Filters.eq("_id", UnauthenticatedEndpoint.UNAUTHENTICATED_GROUP_ID));
+
+        if (collection == null) {
             logger.debugAndAddToDb("AccountId: " + Context.accountId.get() + " Creating unauthenticated api group.", LogDb.DASHBOARD);
             ApiCollection unauthenticatedApisGroup = new ApiCollection(UnauthenticatedEndpoint.UNAUTHENTICATED_GROUP_ID,
                     "Unauthenticated APIs", Context.now(), new HashSet<>(), null, 0, false, false);
@@ -1699,13 +1704,16 @@ public class InitializerListener implements ServletContextListener {
             unauthenticatedApisGroup.setConditions(conditions);
 
             ApiCollectionsDao.instance.insertOne(unauthenticatedApisGroup);
+        }else{
+            ApiCollectionUsers.computeCollectionsForCollectionId(collection.getConditions(), collection.getId());
         }
 
     }
 
     public static void createAllApisGroup() {
-        if (ApiCollectionsDao.instance
-                .findOne(Filters.eq("_id", 111111121)) == null) {
+        ApiCollection collection = ApiCollectionsDao.instance
+                .findOne(Filters.eq("_id", 111111121));
+        if (collection == null) {
             logger.debugAndAddToDb("AccountId: " + Context.accountId.get() + " Creating all apis group.", LogDb.DASHBOARD);
             ApiCollection allApisGroup = new ApiCollection(111_111_121, "All Apis", Context.now(), new HashSet<>(),
                     null, 0, false, false);
@@ -1717,6 +1725,8 @@ public class InitializerListener implements ServletContextListener {
             allApisGroup.setConditions(conditions);
 
             ApiCollectionsDao.instance.insertOne(allApisGroup);
+        }else{
+            ApiCollectionUsers.computeCollectionsForCollectionId(collection.getConditions(), collection.getId());
         }
 
     }
@@ -2435,10 +2445,6 @@ public class InitializerListener implements ServletContextListener {
                 if (runJobFunctions || runJobFunctionsAnyway) {
 
                     logger.debug("Starting init functions and scheduling jobs at " + now);
-                    JobsCron.instance.jobsScheduler(JobExecutorType.DASHBOARD);
-                    if (DashboardMode.isMetered()) {
-                        setupUsageScheduler();
-                    }
 
                     AccountTask.instance.executeTask(new Consumer<Account>() {
                         @Override
@@ -2447,7 +2453,16 @@ public class InitializerListener implements ServletContextListener {
                         }
                     }, "context-initializer-secondary");
 
+                    updateApiGroupsForAccounts(); 
+                    if (DashboardMode.isMetered()) {
+                        setupUsageScheduler();
+                    }
+                    updateSensitiveInfoInApiInfo.setUpSensitiveMapInApiInfoScheduler();
+                    syncCronInfo.setUpUpdateCronScheduler();
                     setUpTestEditorTemplatesScheduler();
+                    setUpWebhookScheduler();
+                    setupAutomatedApiGroupsScheduler();
+                    JobsCron.instance.jobsScheduler(JobExecutorType.DASHBOARD);
 
                     if(runJobFunctionsAnyway) {
                         crons.trafficAlertsScheduler();
@@ -2461,24 +2476,17 @@ public class InitializerListener implements ServletContextListener {
                         setUpTrafficAlertScheduler();
                         // setUpAktoMixpanelEndpointsScheduler();
                         setUpDailyScheduler();
-                        setUpWebhookScheduler();
+                        
                         cleanInventoryJobRunner();
                         setUpDefaultPayloadRemover();
                         setUpDependencyFlowScheduler();
                         tokenGeneratorCron.tokenGeneratorScheduler();
                         crons.deleteTestRunsScheduler();
-                        updateSensitiveInfoInApiInfo.setUpSensitiveMapInApiInfoScheduler();
-                        syncCronInfo.setUpUpdateCronScheduler();
-                        updateApiGroupsForAccounts();
                         setUpUpdateCustomCollections();
                         setUpFillCollectionIdArrayJob();
-                        setupAutomatedApiGroupsScheduler();
-
-//                     * This is a temporary job.
-//                            * TODO: Remove this once traffic pipeline is cleaned.
+                                               
 
                         CleanInventory.cleanInventoryJobRunner();
-                        // CleanTestingJob.cleanTestingJobRunner();
 
                         MatchingJob.MatchingJobRunner();
                     }
@@ -2942,11 +2950,12 @@ public class InitializerListener implements ServletContextListener {
 
         long count = ApiInfoDao.instance.count(Filters.exists(ApiInfo.DISCOVERED_TIMESTAMP, false));
         if (count == 0) {
-            logger.debugAndAddToDb("No need to backFillDiscovered");
+            logger.warnAndAddToDb("No need to backFillDiscovered for accountId: " + Context.accountId.get());
             return;
         }
 
-        logger.debugAndAddToDb("Running back fill discovered");
+        logger.warnAndAddToDb("Running back fill discovered for accountId: "  + Context.accountId.get());
+        int startTime = Context.now();
 
         List<SingleTypeInfo> singleTypeInfos = new ArrayList<>();
         ObjectId id = null;
@@ -2993,21 +3002,22 @@ public class InitializerListener implements ServletContextListener {
 
         } while (!singleTypeInfos.isEmpty());
 
-        logger.debugAndAddToDb("Finished running back fill discovered");
+        logger.warnAndAddToDb("Finished running back fill discovered for accountId: "  + Context.accountId.get() + " in: " + (Context.now() - startTime) + " seconds");
     }
 
     private static void backFillStatusCodeType() {
         long count = ApiInfoDao.instance.count(Filters.exists(ApiInfo.API_TYPE, false));
         if (count == 0) {
-            logger.debugAndAddToDb("No need to run backFillStatusCodeType");
+            logger.warnAndAddToDb("No need to run backFillStatusCodeType");
             return;
         }
 
-        logger.debugAndAddToDb("Running backFillStatusCodeType");
+        logger.warnAndAddToDb("Running backFillStatusCodeType for accountId: " + Context.accountId.get());
 
         List<SampleData> sampleDataList = new ArrayList<>();
         Bson sort = Sorts.ascending("_id.apiCollectionId", "_id.url", "_id.method");
         int skip = 0;
+        int startTime = Context.now();
         do {
             sampleDataList = SampleDataDao.instance.findAll(Filters.empty(), skip, 100, sort);
             skip += sampleDataList.size();
@@ -3057,7 +3067,7 @@ public class InitializerListener implements ServletContextListener {
 
         } while (!sampleDataList.isEmpty());
 
-        logger.debugAndAddToDb("Finished running backFillStatusCodeType");
+        logger.warnAndAddToDb("Finished running backFillStatusCodeType for accountId: " + Context.accountId.get() + " in: " + (Context.now() - startTime) + " seconds");
     }
 
     private static void dropLastCronRunInfoField(BackwardCompatibility backwardCompatibility){
@@ -3351,7 +3361,7 @@ public class InitializerListener implements ServletContextListener {
     }
 
     public void runInitializerFunctions() {
-         DaoInit.createIndices();
+        DaoInit.createIndices();
 
         BackwardCompatibility backwardCompatibility = BackwardCompatibilityDao.instance.findOne(new BasicDBObject());
         if (backwardCompatibility == null) {
@@ -3371,8 +3381,8 @@ public class InitializerListener implements ServletContextListener {
 //            setUpWebhookScheduler();
 //            setUpPiiAndTestSourcesScheduler();
 
-            AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
-            dropSampleDataIfEarlierNotDroped(accountSettings);
+            // AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
+            // dropSampleDataIfEarlierNotDroped(accountSettings);
 
             backFillDiscovered();
             backFillStatusCodeType();
