@@ -309,7 +309,8 @@ function HomeDashboard() {
         let fetchEndpointsCountResp = results[3].status === 'fulfilled' ? results[3].value : {}
         let issueSeverityMap = results[4].status === 'fulfilled' ? results[4].value : {}
         let missingApiInfoData = results[5].status === 'fulfilled' ? results[5].value : {}
-        const totalMissingApis = missingApiInfoData?.totalMissing|| 0
+        const totalRedundantApis = missingApiInfoData?.redundantApiInfoKeys || 0  
+        const totalMissingApis = missingApiInfoData?.totalMissing|| 0 
 
         setShowBannerComponent(!userEndpoints)
 
@@ -317,10 +318,10 @@ function HomeDashboard() {
         // TODO: Fix apiStats API to return the correct total apis
         buildMetrics(apisStatsResp.apiStatsEnd, fetchEndpointsCountResp)
         testSummaryData()
-        mapAccessTypes(apisStatsResp, (totalMissingApis + (missingApiInfoData?.accessTypeNotCalculated || 0)))
-        mapAuthTypes(apisStatsResp, (totalMissingApis + (missingApiInfoData?.authNotCalculated || 0)))
-        buildAPITypesData(apisStatsResp.apiStatsEnd, (totalMissingApis + (missingApiInfoData?.apiTypeMissing || 0)))
-        buildSetRiskScoreData(apisStatsResp.apiStatsEnd, totalMissingApis) //todo
+        mapAccessTypes(apisStatsResp, totalMissingApis, totalRedundantApis, missingApiInfoData?.accessTypeNotCalculated || 0)
+        mapAuthTypes(apisStatsResp, totalMissingApis, totalRedundantApis, (missingApiInfoData?.authNotCalculated || 0))
+        buildAPITypesData(apisStatsResp.apiStatsEnd, totalMissingApis, totalRedundantApis, (missingApiInfoData?.apiTypeMissing || 0))
+        buildSetRiskScoreData(apisStatsResp.apiStatsEnd, Math.max(0, totalMissingApis - totalRedundantApis)) //todo
         getCollectionsWithCoverage()
         buildSeverityMap(issueSeverityMap.severityInfo)
         buildIssuesSummary(findTotalIssuesResp)
@@ -430,10 +431,12 @@ function HomeDashboard() {
 
     const runTestEmptyCardComponent = <Text alignment='center' color='subdued'>There's no data to show. <Link url="/dashboard/testing" target='_blank'>Run test</Link> to get data populated. </Text>
 
-    function mapAccessTypes(apiStats, missingCount) {
+    function mapAccessTypes(apiStats, missingCount, redundantCount, apiTypeMissing) {
         if (!apiStats) return
         const apiStatsEnd = apiStats.apiStatsEnd
         const apiStatsStart = apiStats.apiStatsStart
+
+        const countMissing = apiTypeMissing  + missingCount - redundantCount
 
         const accessTypeMapping = {
             "PUBLIC": "External",
@@ -451,8 +454,8 @@ function HomeDashboard() {
             }
         }
         // Handle missing access types
-        if( missingCount && missingCount > 0) {
-            accessTypeMap["Need more data"].text = missingCount;
+        if(countMissing > 0) {
+            accessTypeMap["Need more data"].text = countMissing;
             accessTypeMap["Need more data"].dataTableComponent = generateChangeComponent(0, false);
         }
         
@@ -460,7 +463,7 @@ function HomeDashboard() {
     }
 
 
-    function mapAuthTypes(apiStats, missingCount) {
+    function mapAuthTypes(apiStats, missingCount, redundantCount, authTypeMissing) {
         const apiStatsEnd = apiStats.apiStatsEnd
         const apiStatsStart = apiStats.apiStatsStart
         const convertKey = (key) => {
@@ -493,9 +496,11 @@ function HomeDashboard() {
             };
         });
 
-        if(missingCount > 0) {
+        const countMissing = authTypeMissing + missingCount - redundantCount
+
+        if(countMissing > 0) {
             authMap["Need more data"] = {
-                "text": missingCount,
+                "text": countMissing,
                 "color": "#EFE3FF",
                 "filterKey": "Need more data",
                 "dataTableComponent": generateChangeComponent(0, false) // No change component for missing auth types
@@ -507,7 +512,7 @@ function HomeDashboard() {
     }
 
 
-    function buildAPITypesData(apiStats, missingCount) {
+    function buildAPITypesData(apiStats, missingCount, redundantCount, apiTypeMissing) {
         // Initialize the data with default values for all API types
         const data = [
             ["REST", apiStats.apiTypeMap.REST || 0], // Use the value from apiTypeMap or 0 if not available
@@ -515,8 +520,9 @@ function HomeDashboard() {
             ["gRPC", apiStats.apiTypeMap.GRPC || 0],
             ["SOAP", apiStats.apiTypeMap.SOAP || 0],
         ];
+        const countMissing = apiTypeMissing - (missingCount + redundantCount)
         if(missingCount > 0) {
-            data.push(["Need more data", missingCount]);
+            data.push(["Need more data", countMissing]);
         }
 
         setApiTypesData([{ data: data, color: "#D6BBFB" }])

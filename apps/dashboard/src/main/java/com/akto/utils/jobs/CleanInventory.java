@@ -409,19 +409,22 @@ public class CleanInventory {
 
     public static int deleteApiInfosForMissingSTIs(boolean deleteAPIsInstantly){
         try {
-            Bson filterQ = Filters.and(UsageMetricCalculator.excludeDemosAndDeactivated(Constants.ID), Filters.exists(ApiCollection.HOST_NAME));
+            Bson filterInfo = UsageMetricCalculator.excludeDemosAndDeactivated(ApiInfo.ID_API_COLLECTION_ID);
+            Bson filterQ = Filters.and(UsageMetricCalculator.excludeDemosAndDeactivated(Constants.ID));
+            Map<Integer, ApiCollection> apiCollectionMap = ApiCollectionsDao.instance.findAll(filterQ, Projections.include(ApiCollection.ID, ApiCollection.HOST_NAME)).stream().collect(Collectors.toMap(ApiCollection::getId, Function.identity()));
             ExecutorService executor = Executors.newFixedThreadPool(20);
-            Set<Integer> apiCollectionIds = ApiCollectionsDao.instance.findAll(filterQ, Projections.include(ApiCollection.ID)).stream()
-                    .map(ApiCollection::getId)
-                    .collect(Collectors.toSet());
-
             List<Future<Void>> futures = new ArrayList<>();
             int accountId = Context.accountId.get();
 
             AtomicInteger counter = new AtomicInteger(0);
             ArrayList<WriteModel<ApiInfo>> bulkUpdate = new ArrayList<>();
             
-            for (Integer apiCollectionId : apiCollectionIds) {
+            for (Integer apiCollectionId : apiCollectionMap.keySet()) {
+                ApiCollection apiCollection = apiCollectionMap.get(apiCollectionId);
+                if (apiCollection == null || apiCollection.getHostName() == null || apiCollection.getHostName().isEmpty()) {
+                    logger.info("Skipping apiCollectionId: " + apiCollectionId + " as it has no hostName");
+                    continue;
+                }
                 futures.add(executor.submit(() -> {
                     Context.accountId.set(accountId);
                     try {
@@ -482,6 +485,24 @@ public class CleanInventory {
 
             if (!bulkUpdate.isEmpty() && deleteAPIsInstantly) {
                 ApiInfoDao.instance.getMCollection().bulkWrite(bulkUpdate);
+            }
+
+            counter.addAndGet((int) ApiInfoDao.instance.count(
+                Filters.and(
+                    Filters.nin(ApiInfo.ID_API_COLLECTION_ID, apiCollectionMap.keySet()),
+                    filterInfo
+                )
+            ));
+
+            if (deleteAPIsInstantly) {
+                ApiInfoDao.instance.deleteAll(
+                Filters.and(
+                    Filters.nin(ApiInfo.ID_API_COLLECTION_ID, apiCollectionMap.keySet()),
+                    filterInfo
+                ));
+                
+            } else {
+                logger.info("Found " + counter.get() + " apiInfos for missing STIs, but not deleted as deleteAPIsInstantly is false.");
             }
 
             return counter.get();
