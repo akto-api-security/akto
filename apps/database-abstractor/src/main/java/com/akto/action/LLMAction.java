@@ -26,7 +26,7 @@ import org.json.JSONObject;
 public class LLMAction extends ActionSupport {
 
     private static final LoggerMaker logger = new LoggerMaker(LLMAction.class, LogDb.DB_ABS);
-    private static final String JARVIS_ENDPOINT = "http://35.226.83.20/api/generate";
+    private static final String JARVIS_ENDPOINT = "http://jarvis.internal.akto.io/api/generate";
     private static final Gson gson = new Gson();
     private static final OkHttpClient client = new OkHttpClient.Builder()
         .connectTimeout(60, TimeUnit.SECONDS)
@@ -83,7 +83,7 @@ public class LLMAction extends ActionSupport {
                 }.getType());
             logger.debug("LLM Response: {}", llmResponsePayload);
             return Action.SUCCESS.toUpperCase();
-        } catch (IOException e) {
+        } catch (Exception e) {
             logger.error("Error while executing request: " + e.getMessage());
             return Action.ERROR.toUpperCase();
         }
