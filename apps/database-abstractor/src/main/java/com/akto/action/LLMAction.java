@@ -2,8 +2,11 @@ package com.akto.action;
 
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.util.JSONUtils;
 import com.akto.util.http_util.CoreHTTPClient;
 import com.google.gson.Gson;
+import com.google.gson.reflect.TypeToken;
+import com.mongodb.BasicDBObject;
 import com.opensymphony.xwork2.Action;
 import com.opensymphony.xwork2.ActionSupport;
 import java.io.IOException;
@@ -16,7 +19,6 @@ import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.RequestBody;
 import okhttp3.Response;
-import okhttp3.ResponseBody;
 import org.json.JSONObject;
 
 @Getter
@@ -24,8 +26,9 @@ import org.json.JSONObject;
 public class LLMAction extends ActionSupport {
 
     private static final LoggerMaker logger = new LoggerMaker(LLMAction.class, LogDb.DB_ABS);
-    private static final String JARVIS_ENDPOINT = "http://jarvis.internal.akto.io/api/generate";
-    private static final OkHttpClient client = CoreHTTPClient.client.newBuilder()
+    private static final String JARVIS_ENDPOINT = "http://35.226.83.20/api/generate";
+    private static final Gson gson = new Gson();
+    private static final OkHttpClient client = new OkHttpClient.Builder()
         .connectTimeout(60, TimeUnit.SECONDS)
         .readTimeout(60, TimeUnit.SECONDS)
         .writeTimeout(60, TimeUnit.SECONDS)
@@ -48,7 +51,7 @@ public class LLMAction extends ActionSupport {
 
     Map<String, Object> llmPayload;
 
-    String llmResponsePayload;
+    Map<String, Object> llmResponsePayload;
 
     public String getLLMResponse() {
 
@@ -68,15 +71,17 @@ public class LLMAction extends ActionSupport {
             .addHeader("Content-Type", "application/json")
             .build();
 
-        try (
-            Response response = client.newCall(request).execute()) {
+        try (Response response = client.newCall(request).execute()) {
+            logger.debug("llmPayload: {}",  gson.toJson(llmPayload));
             if (!response.isSuccessful() || response.body() == null) {
                 logger.error("Request failed with status code: {} and response: {}" + response.code(),
                     response.body() != null ? response.body().string() : "null");
                 return Action.ERROR.toUpperCase();
             }
-            ResponseBody responseBody = response.body();
-            llmResponsePayload = responseBody.string();
+            llmResponsePayload = new Gson().fromJson(response.body().string(),
+                new TypeToken<Map<String, Object>>() {
+                }.getType());
+            logger.debug("LLM Response: {}", llmResponsePayload);
             return Action.SUCCESS.toUpperCase();
         } catch (IOException e) {
             logger.error("Error while executing request: " + e.getMessage());
