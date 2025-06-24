@@ -2,14 +2,11 @@ package com.akto.action;
 
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
-import com.akto.util.JSONUtils;
 import com.akto.util.http_util.CoreHTTPClient;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
-import com.mongodb.BasicDBObject;
 import com.opensymphony.xwork2.Action;
 import com.opensymphony.xwork2.ActionSupport;
-import java.io.IOException;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import lombok.Getter;
@@ -28,7 +25,7 @@ public class LLMAction extends ActionSupport {
     private static final LoggerMaker logger = new LoggerMaker(LLMAction.class, LogDb.DB_ABS);
     private static final String JARVIS_ENDPOINT = "http://jarvis.internal.akto.io/api/generate";
     private static final Gson gson = new Gson();
-    private static final OkHttpClient client = new OkHttpClient.Builder()
+    private static final OkHttpClient client = CoreHTTPClient.client.newBuilder()
         .connectTimeout(60, TimeUnit.SECONDS)
         .readTimeout(60, TimeUnit.SECONDS)
         .writeTimeout(60, TimeUnit.SECONDS)
