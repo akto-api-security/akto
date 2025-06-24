@@ -17,14 +17,9 @@ import com.akto.dao.testing.VulnerableTestingRunResultDao;
 import com.akto.dao.testing.WorkflowTestResultsDao;
 import com.akto.dao.testing.WorkflowTestsDao;
 import com.akto.dao.testing.config.TestSuiteDao;
-import com.akto.dto.ApiInfo;
+import com.akto.dto.*;
 import com.akto.dto.ApiInfo.ApiInfoKey;
-import com.akto.dto.CustomAuthType;
-import com.akto.dto.DependencyNode;
 import com.akto.dto.DependencyNode.ParamInfo;
-import com.akto.dto.OriginalHttpRequest;
-import com.akto.dto.OriginalHttpResponse;
-import com.akto.dto.RawApi;
 import com.akto.dto.api_workflow.Graph;
 import com.akto.dto.billing.SyncLimit;
 import com.akto.dto.dependency_flow.KVPair;
@@ -1012,6 +1007,8 @@ public class TestExecutor {
             if (attackerTestRole == null) {
                 loggerMaker.debugAndAddToDb("ATTACKER_TOKEN_ALL test role not found", LogDb.TESTING);
             } else {
+                RawApiMetadata rawApiMetadata = new RawApiMetadata(apiInfoKey.getApiCollectionId());
+                rawApi.setRawApiMetdata(rawApiMetadata);
                 attackerAuthMechanism = attackerTestRole.findMatchingAuthMechanism(rawApi);
             }
             long startTime = System.currentTimeMillis();

@@ -64,6 +64,11 @@ public class SampleDataDao extends AccountsContextDaoWithRbac<SampleData> {
         return SampleDataDao.instance.findOne(filterQSampleData);
     }
 
+    public SampleData fetchSampleDataForApiURL(int apiCollectionId, String url) {
+        Bson filterQSampleData = filterForSampleDataURL(apiCollectionId, url);
+        return SampleDataDao.instance.findOne(filterQSampleData);
+    }
+
     public SampleData fetchAllSampleDataForApi(int apiCollectionId, String url, URLMethods.Method method) {
         Bson filterQSampleData = filterForSampleData(apiCollectionId, url, method);
         List<SampleData> list = SampleDataDao.instance.findAll(filterQSampleData);
@@ -86,6 +91,14 @@ public class SampleDataDao extends AccountsContextDaoWithRbac<SampleData> {
                 Filters.eq("_id.method", method.name())
         );
     }
+
+    public static Bson filterForSampleDataURL(int apiCollectionId, String url) {
+        return Filters.and(
+                Filters.eq("_id.apiCollectionId", apiCollectionId),
+                Filters.eq("_id.url", url)
+        );
+    }
+
 
 
     public static List<Bson> filterForMultipleSampleData(List<Key> sampleList) {

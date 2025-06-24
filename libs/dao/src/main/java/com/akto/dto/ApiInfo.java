@@ -142,6 +142,10 @@ public class ApiInfo {
 
     }
 
+    public ApiInfo(ApiType apiType, Set<Set<AuthType>> allAuthTypesFound) {
+        this.apiType = apiType;
+        this.allAuthTypesFound = allAuthTypesFound;
+    }
 
     public ApiInfo() { }
 
