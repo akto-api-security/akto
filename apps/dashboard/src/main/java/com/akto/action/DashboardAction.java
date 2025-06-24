@@ -299,8 +299,7 @@ public class DashboardAction extends UserAction {
     }
 
     public String getAPIInfosForMissingData(){
-        Bson filter = Filters.and(UsageMetricCalculator.excludeDemosAndDeactivated(Constants.ID), Filters.exists(ApiCollection.HOST_NAME));
-
+        Bson filter = UsageMetricCalculator.excludeDemosAndDeactivated(Constants.ID);
         // this map get the detailed count of missing api info keys in the api info dao with respect to the api collection id
         Map<Integer, BasicDBObject> missingInfoMap = ApiInfoDao.instance.getApisListMissingInApiInfoDao(filter, this.startTimeStamp, this.endTimeStamp);    
         response = new BasicDBObject();
@@ -308,11 +307,13 @@ public class DashboardAction extends UserAction {
         int apiTypeMissing = 0;
         int authNotCalculated = 0;
         int accessTypeNotCalculated = 0;
+        int redundantApis = 0;
         for(BasicDBObject value: missingInfoMap.values()) {
-            totalMissing += ((List<?>) value.get("missingApiInfoKeysInSti")).size();
+            totalMissing += ((Set<?>) value.get("missingApiInfoKeysInSti")).size();
             apiTypeMissing += ((List<?>) value.get("missingApiInfoKeysInSamples")).size();
             authNotCalculated += ((List<?>) value.get("missingApiInfoKeysForAuth")).size();
             accessTypeNotCalculated += ((List<?>) value.get("missingApiInfoKeysForAccessType")).size();
+            redundantApis += ((List<?>) value.get("redundantApiInfoKeys")).size();
         }
 
         // currently we just need to return the total count of missing api info keys, hence this
@@ -320,6 +321,7 @@ public class DashboardAction extends UserAction {
         response.put("apiTypeMissing", apiTypeMissing);
         response.put("authNotCalculated", authNotCalculated);
         response.put("accessTypeNotCalculated", accessTypeNotCalculated);
+        response.put("redundantApiInfoKeys", redundantApis);
 
         return Action.SUCCESS.toUpperCase();
     }
