@@ -71,8 +71,8 @@ public class LLMAction extends ActionSupport {
         try (Response response = client.newCall(request).execute()) {
             logger.debug("llmPayload: {}",  gson.toJson(llmPayload));
             if (!response.isSuccessful() || response.body() == null) {
-                logger.error("Request failed with status code: {} and response: {}" + response.code(),
-                    response.body() != null ? response.body().string() : "null");
+                logger.error("Request failed with status code: {} and response: {}", 
+                    response.code(), response.body() != null ? response.body().string() : "null");
                 return Action.ERROR.toUpperCase();
             }
             llmResponsePayload = new Gson().fromJson(response.body().string(),
