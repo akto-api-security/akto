@@ -42,6 +42,7 @@ import java.util.Set;
 
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
+import org.json.JSONObject;
 
 public abstract class DataActor {
 
@@ -293,4 +294,6 @@ public abstract class DataActor {
     public abstract void updateTestingRunPlayground(TestingRunPlayground testingRunPlayground);
 
     public abstract void scheduleAutoCreateTicketsJob(int accountId, JobParams params, JobExecutorType jobExecutorType);
+
+    public abstract String getLLMPromptResponse(JSONObject promptPayload);
 }

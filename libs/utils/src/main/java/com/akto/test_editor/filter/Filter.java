@@ -1,5 +1,11 @@
 package com.akto.test_editor.filter;
 
+import com.akto.billing.UsageMetricUtils;
+import com.akto.dao.context.Context;
+import com.akto.dto.billing.FeatureAccess;
+import com.akto.gpt.handlers.gpt_prompts.TestExecutorModifier;
+import com.akto.gpt.handlers.gpt_prompts.TestFilterModifier;
+import com.akto.test_editor.Utils;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
@@ -18,6 +24,7 @@ import com.akto.dto.test_editor.DataOperandsFilterResponse;
 import com.akto.dto.test_editor.FilterActionRequest;
 import com.akto.dto.test_editor.FilterNode;
 import com.mongodb.BasicDBObject;
+import org.json.JSONArray;
 
 public class Filter {
 
@@ -56,6 +63,13 @@ public class Filter {
             FilterActionRequest filterActionRequest = new FilterActionRequest(node.getValues(), rawApi, testRawApi, apiInfoKey, node.getConcernedProperty(), node.getSubConcernedProperty(), matchingKeySet, contextEntities, operand, context, keyValOperandSeen, node.getBodyOperand(), node.getContextProperty(), node.getCollectionProperty());
             Object updatedQuerySet = filterAction.resolveQuerySetValues(filterActionRequest, node.fetchNodeValues(), varMap);
             filterActionRequest.setQuerySet(updatedQuerySet);
+
+            Object generatedQuerySet = generateQuerySet(filterActionRequest);
+
+            if (generatedQuerySet != null) {
+                filterActionRequest.setQuerySet(generatedQuerySet);
+            }
+
             if (node.getOperand().equalsIgnoreCase(ExtractOperator.EXTRACT.toString()) || node.getOperand().equalsIgnoreCase(ExtractOperator.EXTRACTMULTIPLE.toString())) {
                 boolean resp = true;
                 boolean extractMultiple = node.getOperand().equalsIgnoreCase(ExtractOperator.EXTRACTMULTIPLE.toString());
@@ -150,6 +164,74 @@ public class Filter {
             output.add(s);
         }
         return output;
+    }
+
+    public static Object generateQuerySet(FilterActionRequest filterActionRequest) {
+        Object querySet = filterActionRequest.getQuerySet();
+        String operationTypeLower = filterActionRequest.getOperand().toLowerCase();
+        String operation = "";
+        Object newQuerySet = querySet;
+        try {
+            int accountId = Context.accountId.get();
+            FeatureAccess featureAccess = UsageMetricUtils.getFeatureAccessSaas(accountId, TestExecutorModifier._AKTO_GPT_AI);
+            if (featureAccess.getIsGranted()) {
+
+
+                String operationPrompt = "";
+                if (querySet instanceof String) {
+                    String query = (String) querySet;
+                    if (query.startsWith(Utils._MAGIC)) {
+                        operationPrompt = query.replace(Utils._MAGIC, "").trim();
+                    }
+                } else if (querySet instanceof ArrayList) {
+                    ArrayList<?> query = (ArrayList<?>) querySet;
+                    if (query.size() == 1 && query.get(0) instanceof String) {
+                        String str = (String) query.get(0);
+                        if (str.startsWith(Utils._MAGIC)) {
+                            operationPrompt = str.replace(Utils._MAGIC, "").trim();
+                        }
+                    }
+                }
+
+                if(!operationPrompt.isEmpty()){
+
+                    operation = operationTypeLower + ": " + operationPrompt;
+                    if(filterActionRequest.getConcernedProperty() != null && !filterActionRequest.getConcernedProperty().isEmpty()) {
+                        operation = operation + " in " + filterActionRequest.getConcernedProperty();
+                    }
+                    if(filterActionRequest.getConcernedSubProperty() != null && !filterActionRequest.getConcernedSubProperty().isEmpty()) {
+                        operation = operation + " at " + filterActionRequest.getConcernedSubProperty();
+                    }
+                    BasicDBObject queryData = new BasicDBObject();
+
+                    RawApi rawApi = filterActionRequest.fetchRawApiBasedOnContext();
+                    String ogRequest = Utils.buildRequestIHttpFormat(rawApi);
+                    String response = Utils.buildResponseIHttpFormat(rawApi);
+                    String request = ogRequest + "\n\n" + response;
+                    queryData.put(TestExecutorModifier._REQUEST, request);
+                    queryData.put(TestExecutorModifier._OPERATION, operation);
+                    BasicDBObject generatedData = new TestFilterModifier().handle(queryData);
+                    if (generatedData.containsKey(operationTypeLower)) {
+                        Object generatedQuerySet = generatedData.get(operationTypeLower);
+                        if (generatedQuerySet instanceof JSONArray) {
+                            JSONArray arr = (JSONArray) generatedQuerySet;
+                            List<Object> list = new ArrayList<>();
+                            for (int i = 0; i < arr.length(); i++) {
+                                list.add(arr.get(i));
+                            }
+                            newQuerySet = list;
+                        } else {
+                            newQuerySet = generatedQuerySet;
+                        }
+                    }
+                }
+            }
+
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "error invoking operation " + operationTypeLower + " " + e.getMessage());
+        }
+
+        return newQuerySet;
     }
 
 }

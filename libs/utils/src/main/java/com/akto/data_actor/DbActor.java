@@ -48,6 +48,7 @@ import java.util.Set;
 
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
+import org.json.JSONObject;
 
 public class DbActor extends DataActor {
 
@@ -610,6 +611,13 @@ public class DbActor extends DataActor {
     public void scheduleAutoCreateTicketsJob(int accountId, JobParams params, JobExecutorType jobExecutorType) {
         JobScheduler.scheduleRunOnceJob(accountId, params, jobExecutorType);
     }
+
+    @Override
+    public String getLLMPromptResponse(JSONObject promptPayload) {
+        // no implementation needed.
+        return null;
+    }
+
     @Override
     public void updateModuleInfo(ModuleInfo moduleInfo) {
     }

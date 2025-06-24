@@ -84,6 +84,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 import com.google.gson.Gson;
+import org.json.JSONObject;
 
 public class ClientActor extends DataActor {
 
@@ -3899,5 +3900,37 @@ public class ClientActor extends DataActor {
             loggerMaker.errorAndAddToDb("error in updateTestingRunPlaygroundStateAndResult" + e, LoggerMaker.LogDb.RUNTIME);
             return;
         }
+    }
+
+    @Override
+    public String getLLMPromptResponse(JSONObject promptPayload) {
+        try {
+            JSONObject requst = new JSONObject();
+            requst.put("llmPayload", promptPayload);
+            OriginalHttpRequest request = new OriginalHttpRequest(
+                url + "/getLLMResponse",
+                "",
+                "POST",
+                requst.toString(),
+                buildHeaders(),
+                "");
+            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb("non 2xx response in getLLMResponse", LoggerMaker.LogDb.TESTING);
+            } else {
+                BasicDBObject payloadObj = BasicDBObject.parse(responsePayload);
+                loggerMaker.info(">>>>>>>>>>>>>>>>>>>>Received response from LLM server: " + payloadObj.toJson());
+                String llmResponse = payloadObj.getString("llmResponsePayload");
+                if (llmResponse != null) {
+                    return llmResponse;
+                } else {
+                    loggerMaker.errorAndAddToDb("llmResponse is null in getLLMResponse", LoggerMaker.LogDb.TESTING);
+                }
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in getLLMResponse" + e, LogDb.TESTING);
+        }
+        return null;
     }
 }
