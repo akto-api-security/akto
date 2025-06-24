@@ -270,23 +270,20 @@ public class ApiCollectionsDao extends AccountsContextDaoWithRbac<ApiCollection>
 
     public static List<BasicDBObject> fetchEndpointsInCollectionUsingHost(int apiCollectionId, int skip, boolean isApiGroup) {
         List<SingleTypeInfo> allUrlsInCollection = new ArrayList<>();
-        int localSkip = skip;
         ObjectId lastScannedId = null;
         
         while(true){
             List<SingleTypeInfo> stis = new ArrayList<>();
             if(isApiGroup) {
-                stis = fetchHostSTIsForGroups(apiCollectionId, localSkip, lastScannedId, projectionForApis);
+                stis = fetchHostSTIsForGroups(apiCollectionId, 0, lastScannedId, projectionForApis);
             } else {
-                stis = fetchHostSTI(apiCollectionId, localSkip, lastScannedId, projectionForApis);
+                stis = fetchHostSTI(apiCollectionId, 0, lastScannedId, projectionForApis);
             }
             lastScannedId = stis.size() != 0 ? stis.get(stis.size() - 1).getId() : null;
             allUrlsInCollection.addAll(stis);
             if(stis.size() < STIS_LIMIT){
                 break;
             }
-
-            localSkip += STIS_LIMIT;
         }
 
         List<BasicDBObject> endpoints = new ArrayList<>();
