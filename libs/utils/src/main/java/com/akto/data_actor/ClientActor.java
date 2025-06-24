@@ -64,6 +64,14 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 
+import java.io.PrintWriter;
+import java.io.StringWriter;
+import okhttp3.MediaType;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.RequestBody;
+import okhttp3.Response;
+import okhttp3.ResponseBody;
 import org.bson.BsonReader;
 import org.bson.Document;
 import org.bson.codecs.Codec;
@@ -3905,31 +3913,44 @@ public class ClientActor extends DataActor {
     @Override
     public String getLLMPromptResponse(JSONObject promptPayload) {
         try {
-            JSONObject requst = new JSONObject();
-            requst.put("llmPayload", promptPayload);
+            JSONObject requestJson = new JSONObject();
+            requestJson.put("llmPayload", promptPayload);
+
             OriginalHttpRequest request = new OriginalHttpRequest(
                 url + "/getLLMResponse",
                 "",
                 "POST",
-                requst.toString(),
+                requestJson.toString(),
                 buildHeaders(),
-                "");
+                ""
+            );
+
+            loggerMaker.debug("Sending request to LLM server: {}", requestJson);
+
             OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
-            String responsePayload = response.getBody();
-            if (response.getStatusCode() != 200 || responsePayload == null) {
-                loggerMaker.errorAndAddToDb("non 2xx response in getLLMResponse", LoggerMaker.LogDb.TESTING);
-            } else {
-                BasicDBObject payloadObj = BasicDBObject.parse(responsePayload);
-                loggerMaker.info(">>>>>>>>>>>>>>>>>>>>Received response from LLM server: " + payloadObj.toJson());
-                String llmResponse = payloadObj.getString("llmResponsePayload");
-                if (llmResponse != null) {
-                    return llmResponse;
-                } else {
-                    loggerMaker.errorAndAddToDb("llmResponse is null in getLLMResponse", LoggerMaker.LogDb.TESTING);
-                }
+
+            if (response == null) {
+                loggerMaker.errorAndAddToDb("Response object is null from LLM server", LoggerMaker.LogDb.TESTING);
+                return null;
             }
+
+            String responsePayload = response.getBody();
+
+            if (response.getStatusCode() != 200) {
+                loggerMaker.errorAndAddToDb("Non-2xx response in getLLMResponse: " + response.getStatusCode(), LoggerMaker.LogDb.TESTING);
+                return null;
+            }
+
+            if (responsePayload == null || responsePayload.trim().isEmpty()) {
+                loggerMaker.errorAndAddToDb("Empty or null response body from LLM server", LoggerMaker.LogDb.TESTING);
+                return null;
+            }
+
+            loggerMaker.debug("Received response from LLM server: {}", responsePayload);
+            return responsePayload;
+
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("error in getLLMResponse" + e, LogDb.TESTING);
+            loggerMaker.errorAndAddToDb(e, "Exception in getLLMResponse." , LoggerMaker.LogDb.TESTING);
         }
         return null;
     }

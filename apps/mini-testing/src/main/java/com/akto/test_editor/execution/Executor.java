@@ -49,7 +49,7 @@ import org.apache.commons.lang3.StringUtils;
 
 public class Executor {
 
-    private static final LoggerMaker loggerMaker = new LoggerMaker(Executor.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(Executor.class, LogDb.TESTING);
     private static final DataActor dataActor = DataActorFactory.fetchInstance();
 
     public final String _HOST = "host";
