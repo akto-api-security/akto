@@ -10,10 +10,8 @@ import com.akto.utils.JsonUtils;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
@@ -74,10 +72,6 @@ public final class McpRequestResponseUtils {
         MCP_NOTIFICATIONS_ROOTS_LIST_CHANGED_METHOD,
         MCP_NOTIFICATIONS_TOOLS_LIST_CHANGED_METHOD
     ));
-
-    // Thread-safe set to cache registered accountIds and avoid repeated DB checks
-    private static final Set<Integer> registeredAccounts = Collections.newSetFromMap(new ConcurrentHashMap<>());
-
     public static HttpResponseParams parseMcpResponseParams(HttpResponseParams responseParams) {
         String requestPayload = responseParams.getRequestParams().getPayload();
 
@@ -98,6 +92,7 @@ public final class McpRequestResponseUtils {
             paramsIsObject = paramsNode != null && paramsNode.isObject();
         } catch (Exception e) {
             // ignore, treat as not an object
+            logger.error("Error parsing params as JSON-RPC object. Skipping....", e);
         }
 
         if (MCP_TOOL_CALL_METHOD.equals(mcpJsonRpcModel.getMethod())
