@@ -231,3 +231,8 @@
     color: #202223 !important;
     font-weight: 550 !important;
 }
+
+.action-item-card-actions .Polaris-Modal-CloseButton{
+    margin-left: 0px !important;
+    padding: 4px !important;
+}

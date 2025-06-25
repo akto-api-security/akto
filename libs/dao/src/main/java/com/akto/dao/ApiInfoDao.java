@@ -291,19 +291,14 @@ public class ApiInfoDao extends AccountsContextDaoWithRbac<ApiInfo>{
         for (Integer apiCollectionId : apiCollectionIds) {
             futures.add(executor.submit(() -> {
                 Context.accountId.set(accountId);
-                List<ApiInfoKey> missingApiInfoKeysInSti = new ArrayList<>();
+                Set<ApiInfoKey> missingApiInfoKeysInSti = new HashSet<>();
                 List<ApiInfoKey> missingApiInfoKeysInSamples = new ArrayList<>();
                 List<ApiInfoKey> missingApiInfoKeysForAuth = new ArrayList<>();
                 List<ApiInfoKey> missingApiInfoKeysForAccessType = new ArrayList<>();
-
-
+                List<ApiInfoKey> redundantApiInfoKeys = new ArrayList<>();
                 BasicDBObject missingInfos = new BasicDBObject();
 
-
                 List<BasicDBObject> endpoints = ApiCollectionsDao.fetchEndpointsInCollectionUsingHostWithTsRange(apiCollectionId, startTimestamp, endTimestamp);
-                Set<ApiInfoKey> sampleApis = SampleDataDao.instance.findAll(Filters.eq(ApiInfo.ID_API_COLLECTION_ID, apiCollectionId), Projections.include(Constants.ID)).stream().map((data) -> {
-                    return new ApiInfoKey(apiCollectionId, data.getId().getUrl(), data.getId().getMethod());
-                }).collect(Collectors.toSet());
 
                 Bson apiInfoFilter = Filters.eq(ApiInfo.ID_API_COLLECTION_ID, apiCollectionId);
                 if(endTimestamp > 0) {
@@ -318,43 +313,49 @@ public class ApiInfoDao extends AccountsContextDaoWithRbac<ApiInfo>{
 
                 List<ApiInfo> actualApiInfosInColl = ApiInfoDao.instance.findAll(
                     apiInfoFilter,
-                    Projections.include(Constants.ID, ApiInfo.ALL_AUTH_TYPES_FOUND, ApiInfo.API_ACCESS_TYPES)
+                    Projections.include(Constants.ID, ApiInfo.ALL_AUTH_TYPES_FOUND, ApiInfo.API_ACCESS_TYPES, ApiInfo.API_TYPE)
                 );
-
-
                 Map<ApiInfoKey, ApiInfo> apiInfos = actualApiInfosInColl.stream()
                         .collect(Collectors.toMap(ApiInfo::getId, Function.identity()));
 
-
-
+                Set<ApiInfoKey> apiInfoKeysFromStis = new HashSet<>();
                 for (BasicDBObject singleTypeInfo : endpoints) {
+                    // apiinfos which are not present in the sti
                     singleTypeInfo = (BasicDBObject) (singleTypeInfo.getOrDefault("_id", new BasicDBObject()));
                     int apiCollectionIdFromDb = singleTypeInfo.getInt("apiCollectionId");
                     String url = singleTypeInfo.getString("url");
                     String method = singleTypeInfo.getString("method");
                     ApiInfoKey apiInfoKey = new ApiInfoKey(apiCollectionIdFromDb, url, Method.fromString(method));
-                    if (!apiInfos.containsKey(apiInfoKey)) {
+                    apiInfoKeysFromStis.add(apiInfoKey);
+                    if (apiInfos.get(apiInfoKey) == null) {
                         missingApiInfoKeysInSti.add(apiInfoKey);
                     }
                 }
 
-                for (ApiInfoKey sampleApiKey : sampleApis) {
-                    if (!apiInfos.containsKey(sampleApiKey)) {
-                        missingApiInfoKeysInSamples.add(sampleApiKey);
+                Set<ApiInfoKey> sampleApisKeys = SampleDataDao.instance.findAll(Filters.eq(ApiInfo.ID_API_COLLECTION_ID, apiCollectionId), Projections.include(Constants.ID)).stream().map((data) -> {
+                    return new ApiInfoKey(apiCollectionId, data.getId().getUrl(), data.getId().getMethod());
+                }).collect(Collectors.toSet());
+                for (ApiInfoKey apiInfoKey : sampleApisKeys) {
+                    if (apiInfos.get(apiInfoKey) == null) {
+                        missingApiInfoKeysInSamples.add(apiInfoKey);
                     }
                 }
 
-                for (ApiInfoKey apiInfoKey : apiInfos.keySet()) {
-                    ApiInfo apiInfo = apiInfos.get(apiInfoKey);
+                for (ApiInfo apiInfo : actualApiInfosInColl) {
+                    ApiInfoKey apiInfoKey = apiInfo.getId();
+                    if (!apiInfoKeysFromStis.contains(apiInfoKey)) {
+                        redundantApiInfoKeys.add(apiInfoKey);
+                    }
                     if (apiInfo.getAllAuthTypesFound() == null || apiInfo.getAllAuthTypesFound().isEmpty()) {
                         missingApiInfoKeysForAuth.add(apiInfoKey);
                     }
                     if (apiInfo.getApiAccessTypes() == null || apiInfo.getApiAccessTypes().isEmpty()) {
                         missingApiInfoKeysForAccessType.add(apiInfoKey);
                     }
+                    
                 }
 
-                if(missingApiInfoKeysInSti.isEmpty() && missingApiInfoKeysInSamples.isEmpty() && missingApiInfoKeysForAuth.isEmpty() && missingApiInfoKeysForAccessType.isEmpty()) {
+                if(missingApiInfoKeysInSti.isEmpty() && missingApiInfoKeysInSamples.isEmpty() && missingApiInfoKeysForAuth.isEmpty() && missingApiInfoKeysForAccessType.isEmpty() && redundantApiInfoKeys.isEmpty()) {
                     return null;
                 }
 
@@ -362,6 +363,7 @@ public class ApiInfoDao extends AccountsContextDaoWithRbac<ApiInfo>{
                 missingInfos.append("missingApiInfoKeysInSamples", missingApiInfoKeysInSamples);
                 missingInfos.append("missingApiInfoKeysForAuth", missingApiInfoKeysForAuth);
                 missingInfos.append("missingApiInfoKeysForAccessType", missingApiInfoKeysForAccessType);
+                missingInfos.append("redundantApiInfoKeys", redundantApiInfoKeys);
                 result.put(apiCollectionId, missingInfos);
                 return null;
             }));

@@ -654,6 +654,13 @@ const settingRequests = {
             method: 'post',
             data: {mergedUrls: mergedApis}
         })
+    },
+    async downloadSamplePdf() {
+        return await request({
+            url: '/api/downloadSamplePdf',
+            method: 'post',
+            data: {}
+        })
     }
 }
 

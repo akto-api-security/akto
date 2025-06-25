@@ -164,6 +164,33 @@ public class ReportAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
+    public String downloadSamplePdf() {
+        try {
+            String url = System.getenv("SAMPLE_PUPPETEER_REPLAY_SERVICE_URL") + "/samplePDF";
+
+            JSONObject requestBody = new JSONObject();
+            String reqData = requestBody.toString();
+
+            JsonNode responseNode = ApiRequest.postRequest(new HashMap<>(), url, reqData);
+            
+            if (responseNode == null || !responseNode.has("base64PDF")) {
+                status = "ERROR";
+                System.err.println("No PDF data found in the response.");
+                return ERROR.toUpperCase();
+            }
+
+            pdf = responseNode.get("base64PDF").asText();
+
+            status = "COMPLETED";
+            return SUCCESS.toUpperCase();
+
+        } catch (Exception e) {
+            status = "ERROR";
+            e.printStackTrace();
+            return ERROR.toUpperCase();
+        }
+    }
+
     public String getReportId() {
         return reportId;
     }
