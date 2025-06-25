@@ -39,7 +39,7 @@ public class AuthPolicy {
     public static List<String> authHeaders = new ArrayList<>();
     public static Map<String, String> headersMap = new HashMap<>();
 
-    public static boolean findAuthType(HttpResponseParams httpResponseParams, ApiInfo apiInfo, RuntimeFilter filter, List<CustomAuthType> customAuthTypes, RawApi rawApi) {
+    public static boolean findAuthType(HttpResponseParams httpResponseParams, ApiInfo apiInfo, RuntimeFilter filter, List<CustomAuthType> customAuthTypes) {
         authHeaders = new ArrayList<>();
         headersMap = new HashMap<>();
         Set<Set<ApiInfo.AuthType>> allAuthTypesFound = apiInfo.getAllAuthTypesFound();
@@ -50,7 +50,7 @@ public class AuthPolicy {
 
 
         // find Authorization header
-        Map<String, List<String>> headers = rawApi.fetchReqHeaders();
+        Map<String, List<String>> headers = httpResponseParams.getRequestParams().getHeaders();
         List<String> cookieList = headers.getOrDefault(COOKIE_NAME, new ArrayList<>());
         Map<String,String> cookieMap = parseCookie(cookieList);
         Set<ApiInfo.AuthType> authTypes = new HashSet<>();

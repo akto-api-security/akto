@@ -1639,7 +1639,6 @@ public class InitializerListener implements ServletContextListener {
         AuthWithCond authWithCond = new AuthWithCond(authMechanism, new HashMap<>(), null);
         List<AuthWithCond> authWithCondList = Collections.singletonList(authWithCond);
         TestRoles testRoles = new TestRoles(new ObjectId(), "ATTACKER_TOKEN_ALL", endpointLogicalGroup.getId(), authWithCondList, "System", createdTs, createdTs, null, "System");
-        testRoles.setDefaultPresetAuth(true);
         TestRolesDao.instance.insertOne(testRoles);
         return testRoles;
     }

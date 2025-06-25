@@ -1,6 +1,7 @@
 package com.akto.runtime.policies;
 
 import com.akto.dao.*;
+import com.akto.dao.common.AuthPolicy;
 import com.akto.dao.context.Context;
 import com.akto.dao.filter.MergedUrlsDao;
 import com.akto.dto.*;

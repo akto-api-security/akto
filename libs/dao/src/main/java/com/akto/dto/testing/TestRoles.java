@@ -36,7 +36,6 @@ public class TestRoles {
     @BsonIgnore
     private EndpointLogicalGroup endpointLogicalGroup;
 
-    private boolean defaultPresetAuth = false;
     public static final String CREATED_BY = "createdBy";
     private String createdBy;
     private int createdTs;
@@ -106,7 +105,7 @@ public class TestRoles {
                   }
               }
         }
-        if (this.defaultPresetAuth || deafaultAuthHeader.equals(default_token)) {
+        if (deafaultAuthHeader.equals(default_token)) {
 
              try {
 
@@ -125,7 +124,7 @@ public class TestRoles {
                     customAuthTypes.add(customAuthType);
                 }
 
-                AuthPolicy.findAuthType(httpResponseParams, apiInfo, null, customAuthTypes, rawApi);
+                AuthPolicy.findAuthType(httpResponseParams, apiInfo, null, customAuthTypes);
 
                 Map<String, String> headersMap = AuthPolicy.headersMap;
                 List<String> authHeaders = AuthPolicy.authHeaders;
@@ -139,7 +138,7 @@ public class TestRoles {
                  if( apiInfoLatest != null)
                      latestUrl = apiInfoLatest.getId().getUrl();
 
-                 SampleData sampleData = SampleDataDao.instance.fetchSampleDataForApiURL(rawApi.getRawApiMetadata().getApiCollectionId(), latestUrl);
+                 SampleData sampleData = SampleDataDao.instance.fetchSampleDataForApi(rawApi.getRawApiMetadata().getApiCollectionId(), latestUrl, URLMethods.Method.fromString(rawApi.getRequest().getMethod()));
 
                  if (sampleData == null || sampleData.getSamples() == null || sampleData.getSamples().isEmpty()) {
                      return findDefaultAuthMechanism();
@@ -190,7 +189,6 @@ public class TestRoles {
                 AuthMechanism mechanism = new AuthMechanism();
                 mechanism.setAuthParams(authParams);
                 if (mechanism != null) {
-                    this.setDefaultPresetAuth(false);
                     return mechanism;
                 }
 
@@ -328,14 +326,6 @@ public class TestRoles {
         this.lastUpdatedBy = lastUpdatedBy;
     }
 
-    public boolean isDefaultPresetAuth() {
-        return defaultPresetAuth;
-    }
-
-    public void setDefaultPresetAuth(boolean defaultPresetAuth) {
-        this.defaultPresetAuth = defaultPresetAuth;
-    }
-
     public static HttpResponseParams createResponseParamsFromRawApi(RawApi rawApi) {
         if (rawApi == null || rawApi.getResponse() == null) {
             return null;
@@ -344,6 +334,9 @@ public class TestRoles {
         responseParams.setStatusCode(rawApi.getResponse().getStatusCode());
         responseParams.setHeaders(rawApi.getResponse().getHeaders());
         responseParams.setPayload(rawApi.getResponse().getBody());
+        HttpRequestParams requestParams = new HttpRequestParams();
+        requestParams.setHeaders(rawApi.fetchReqHeaders());
+        responseParams.setRequestParams(requestParams);
         return responseParams;
 
     }

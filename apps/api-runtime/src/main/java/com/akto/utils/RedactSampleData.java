@@ -1,5 +1,6 @@
 package com.akto.utils;
 
+import com.akto.dao.common.AuthPolicy;
 import com.akto.dto.*;
 import com.akto.dto.type.KeyTypes;
 import com.akto.dto.type.SingleTypeInfo;
@@ -7,7 +8,6 @@ import com.akto.graphql.GraphQLUtils;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.parsers.HttpCallParser;
-import com.akto.runtime.policies.AuthPolicy;
 import com.akto.test_editor.Utils;
 import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONObject;

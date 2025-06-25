@@ -25,7 +25,6 @@ public class TestRolesTest {
         testRoles.setId(objectId);
         testRoles.setName("ExampleRole");
         testRoles.setCreatedBy("admin");
-        testRoles.setDefaultPresetAuth(false);
 
         defaultAuthWithCond = new AuthWithCond();
         defaultAuthWithCond.setHeaderKVPairs(new HashMap<>());
@@ -154,7 +153,7 @@ public class TestRolesTest {
     }
 
     @Test
-    public void testFindMatchingAuthMechanism_withDefaultPresetAuth_true() {
+    public void testFindMatchingAuthMechanism() {
         // --- Step 1: prepare static headers from AuthPolicy ---
         Map<String, String> headersMap = new HashMap<>();
         headersMap.put("authorization", "Bearer example");
@@ -197,9 +196,6 @@ public class TestRolesTest {
         AuthParam param = result.getAuthParams().get(0);
         assertEquals("Authorization", param.getKey());
         assertTrue(param instanceof HardcodedAuthParam);
-
-        // verify flag reset
-        assertFalse("defaultPresetAuth should be reset to false", testRoles.isDefaultPresetAuth());
     }
 
 }
