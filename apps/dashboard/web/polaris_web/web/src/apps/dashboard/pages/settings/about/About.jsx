@@ -374,7 +374,7 @@ function About() {
             const blob = new Blob([byteArray], { type: "application/pdf" });
             const link = document.createElement("a");
             link.href = window.URL.createObjectURL(blob);
-            link.setAttribute("download", "akto_security_findings.pdf");
+            link.setAttribute("download", "akto_sample_pdf.pdf");
             document.body.appendChild(link);
             link.click();
             func.setToast(true, false, "Report PDF downloaded.")
@@ -401,18 +401,20 @@ function About() {
             <ToggleComponent text={"Treat URLs as case insensitive"} onToggle={handleApisCaseInsensitive} initial={toggleCaseSensitiveApis} disabled={window.USER_ROLE !== "ADMIN"}/>
             <ToggleComponent text={"Use akto's testing module"} onToggle={toggleMiniTesting} initial={miniTesting} disabled={window.USER_ROLE !== "ADMIN"}/>
             <ToggleComponent text={"Allow merging on versions"} onToggle={() => setModalOpen(true)} initial={mergingOnVersions} disabled={window.USER_ROLE !== "ADMIN"}/>
-            <VerticalStack gap={2}>
-                <Text>Sample PDF Download</Text>
-                <Box width='200px'>
-                    <Button onClick={async () => {
-                        await settingRequests.downloadSamplePdf().then((res) => {
-                            if(res?.status?.toLowerCase() === 'completed') {
-                                printPdf(res?.pdf)
-                            }
-                        })
-                    }}>Download</Button>
-                </Box>
-            </VerticalStack>
+            {(window?.DASHBOARD_MODE === 'ON_PREM' || window?.USER_NAME?.toLowerCase()?.includes("@akto.io")) &&
+                <VerticalStack gap={2}>
+                    <Text>Sample PDF Download</Text>
+                    <Box width='200px'>
+                        <Button onClick={async () => {
+                            await settingRequests.downloadSamplePdf().then((res) => {
+                                if(res?.status?.toLowerCase() === 'completed') {
+                                    printPdf(res?.pdf)
+                                }
+                            })
+                        }}>Download</Button>
+                    </Box>
+                </VerticalStack>
+            }
         </VerticalStack>
     )
     
