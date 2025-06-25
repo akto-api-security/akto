@@ -39,6 +39,9 @@ public final class McpSchema {
     public static final String METHOD_ROOTS_LIST = "roots/list";
     public static final String METHOD_NOTIFICATION_ROOTS_LIST_CHANGED = "notifications/roots/list_changed";
     public static final String METHOD_SAMPLING_CREATE_MESSAGE = "sampling/createMessage";
+    public static final String MCP_NOTIFICATIONS_CANCELLED_METHOD = "notifications/cancelled";
+    public static final String MCP_NOTIFICATIONS_PROGRESS_METHOD = "notifications/progress";
+    public static final String MCP_NOTIFICATIONS_RESOURCES_UPDATED_METHOD = "notifications/resources/updated";
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
     public static final class ErrorCodes {
         public static final int PARSE_ERROR = -32700;
