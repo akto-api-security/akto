@@ -95,15 +95,19 @@ public class TestRoles {
         }
 
         String deafaultAuthHeader = "";
-        List<AuthWithCond> authWithConds = this.getAuthWithCondList();
-        for(AuthWithCond authWithCond: authWithConds) {
-            List<AuthParam> params = authWithCond.getAuthMechanism().getAuthParams();
-              for(AuthParam param: params) {
-                  if(param.getKey().equals("Authorization") && param.getValue() != null) {
-                      deafaultAuthHeader  = param.getValue();
-                      break;
-                  }
-              }
+        try {
+            List<AuthWithCond> authWithConds = this.getAuthWithCondList();
+            for (AuthWithCond authWithCond : authWithConds) {
+                List<AuthParam> params = authWithCond.getAuthMechanism().getAuthParams();
+                for (AuthParam param : params) {
+                    if (param.getKey().equals("Authorization") && param.getValue() != null) {
+                        deafaultAuthHeader = param.getValue();
+                        break;
+                    }
+                }
+            }
+        }catch (Exception e){
+            return findDefaultAuthMechanism();
         }
         if (deafaultAuthHeader.equals(default_token)) {
 
