@@ -26,7 +26,6 @@ import com.akto.mcp.McpSchema.Resource;
 import com.akto.mcp.McpSchema.ServerCapabilities;
 import com.akto.mcp.McpSchema.Tool;
 import com.akto.parsers.HttpCallParser;
-import com.akto.runtime.Main.AccountInfo;
 import com.akto.testing.ApiExecutor;
 import com.akto.util.Constants;
 import com.akto.util.JSONUtils;
@@ -59,8 +58,6 @@ public class McpToolsSyncJobExecutor {
     private static final String MCP_RESOURCE_LIST_REQUEST_JSON =
         "{\"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"" + McpSchema.METHOD_RESOURCES_LIST + "\", \"params\": {}}";
     private static final String LOCAL_IP = "127.0.0.1";
-    private final Map<String, HttpCallParser> httpCallParserMap = new HashMap<>();
-    private final Map<Integer, AccountInfo> accountInfoMap =  new HashMap<>();
     private ServerCapabilities mcpServerCapabilities = null;
 
     public static final McpToolsSyncJobExecutor INSTANCE = new McpToolsSyncJobExecutor();
@@ -97,14 +94,20 @@ public class McpToolsSyncJobExecutor {
         eligibleCollections.forEach(apiCollection -> {
             logger.info("Starting MCP sync for apiCollectionId: {} and hostname: {}", apiCollection.getId(),
                 apiCollection.getHostName());
-            initializeMcpServerCapabilities(apiCollection, apiConfig);
-            handleMcpToolsDiscovery(apiCollection, apiConfig);
-            handleMcpResourceDiscovery(apiCollection, apiConfig);
+            List<HttpResponseParams> initResponseList = initializeMcpServerCapabilities(apiCollection, apiConfig);
+            List<HttpResponseParams> toolsResponseList = handleMcpToolsDiscovery(apiCollection, apiConfig);
+            List<HttpResponseParams> resourcesResponseList =  handleMcpResourceDiscovery(apiCollection, apiConfig);
+            processResponseParams(apiConfig, new ArrayList<HttpResponseParams>() {{
+                addAll(initResponseList);
+                addAll(toolsResponseList);
+                addAll(resourcesResponseList);
+            }});
         });
     }
 
-    private void initializeMcpServerCapabilities(ApiCollection apiCollection, APIConfig apiConfig) {
+    private List<HttpResponseParams> initializeMcpServerCapabilities(ApiCollection apiCollection, APIConfig apiConfig) {
         String host = apiCollection.getHostName();
+        List<HttpResponseParams> responseParamsList = new ArrayList<>();
         try {
             JSONRPCRequest initializeRequest = new JSONRPCRequest(
                 McpSchema.JSONRPC_VERSION,
@@ -117,24 +120,26 @@ public class McpToolsSyncJobExecutor {
             InitializeResult initializeResult = JSONUtils.fromJson(responsePair.getFirst().getResult(),
                 InitializeResult.class);
             if (initializeResult == null || initializeResult.getCapabilities() == null) {
-                return;
+                return Collections.emptyList();
             }
             mcpServerCapabilities = initializeResult.getCapabilities();
-            processResponseParams(apiConfig, Collections.singletonList(responsePair.getSecond()));
+            responseParamsList.add(responsePair.getSecond());
         } catch (Exception e) {
             logger.error("Error while initializing MCP server capabilities for hostname: {}", host, e);
         }
+
+        return responseParamsList;
     }
 
-    private void handleMcpToolsDiscovery(ApiCollection apiCollection, APIConfig apiConfig) {
+    private List<HttpResponseParams> handleMcpToolsDiscovery(ApiCollection apiCollection, APIConfig apiConfig) {
         String host = apiCollection.getHostName();
 
+        List<HttpResponseParams> responseParamsList = new ArrayList<>();
         try {
             if (mcpServerCapabilities != null && mcpServerCapabilities.getTools() == null) {
                 logger.debug("Skipping tools discovery as MCP server capabilities do not support tools.");
-                return;
+                return responseParamsList;
             }
-            List<HttpResponseParams> responseParamsList = new ArrayList<>();
 
             Pair<JSONRPCResponse, HttpResponseParams> toolsListResponsePair = getMcpMethodResponse(
                 host, McpSchema.METHOD_TOOLS_LIST, MCP_TOOLS_LIST_REQUEST_JSON, apiCollection);
@@ -174,21 +179,21 @@ public class McpToolsSyncJobExecutor {
             } else {
                 logger.debug("Skipping as List Resource Result is null or Resources are empty");
             }
-            processResponseParams(apiConfig, responseParamsList);
         } catch (Exception e) {
             logger.error("Error while discovering mcp and its tools for hostname: {}", host, e);
         }
+        return responseParamsList;
     }
 
-    private void handleMcpResourceDiscovery(ApiCollection apiCollection, APIConfig apiConfig) {
+    private List<HttpResponseParams> handleMcpResourceDiscovery(ApiCollection apiCollection, APIConfig apiConfig) {
         String host = apiCollection.getHostName();
 
+        List<HttpResponseParams> responseParamsList = new ArrayList<>();
         try {
             if (mcpServerCapabilities != null && mcpServerCapabilities.getResources() == null) {
                 logger.debug("Skipping tools discovery as MCP server capabilities do not support tools.");
-                return;
+                return responseParamsList;
             }
-            List<HttpResponseParams> responseParamsList = new ArrayList<>();
             Pair<JSONRPCResponse, HttpResponseParams> resourcesListResponsePair = getMcpMethodResponse(
                 host, McpSchema.METHOD_RESOURCES_LIST, MCP_RESOURCE_LIST_REQUEST_JSON, apiCollection);
 
@@ -227,10 +232,10 @@ public class McpToolsSyncJobExecutor {
             } else {
                 logger.debug("Skipping as List Resource Result is null or Resources are empty");
             }
-            processResponseParams(apiConfig, responseParamsList);
         } catch (Exception e) {
             logger.error("Error while discovering mcp resources for hostname: {}", host, e);
         }
+        return responseParamsList;
     }
 
     private void processResponseParams(APIConfig apiConfig, List<HttpResponseParams> responseParamsList) {
@@ -242,12 +247,12 @@ public class McpToolsSyncJobExecutor {
         responseParamsToAccountIdMap.put(Context.accountId.get().toString(), responseParamsList);
 
         Main.handleResponseParams(responseParamsToAccountIdMap,
-            accountInfoMap,
+            new HashMap<>(),
             false,
-            httpCallParserMap,
+            new HashMap<>(),
             apiConfig,
             true,
-            false
+            true
         );
     }
 
