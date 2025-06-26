@@ -16,6 +16,8 @@ import com.akto.log.LoggerMaker.LogDb;
 import com.akto.mcp.McpSchema;
 import com.akto.mcp.McpSchema.CallToolRequest;
 import com.akto.mcp.McpSchema.ClientCapabilities;
+import com.akto.mcp.McpSchema.Implementation;
+import com.akto.mcp.McpSchema.InitializeRequest;
 import com.akto.mcp.McpSchema.InitializeResult;
 import com.akto.mcp.McpSchema.JSONRPCRequest;
 import com.akto.mcp.McpSchema.JSONRPCResponse;
@@ -54,7 +56,7 @@ public class McpToolsSyncJobExecutor {
     private static final String MCP_TOOLS_LIST_REQUEST_JSON =
         "{\"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"" + McpSchema.METHOD_TOOLS_LIST + "\", \"params\": {}}";
     private static final String MCP_RESOURCE_LIST_REQUEST_JSON =
-        "{\"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"" + McpSchema.METHOD_RESOURCES_LIST + "\", \"params\": {}}";
+        "{\"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"" + McpSchema.METHOD_RESOURCES_TEMPLATES_LIST + "\", \"params\": {}}";
     private static final String LOCAL_IP = "127.0.0.1";
     private ServerCapabilities mcpServerCapabilities = null;
 
@@ -109,8 +111,16 @@ public class McpToolsSyncJobExecutor {
             JSONRPCRequest initializeRequest = new JSONRPCRequest(
                 McpSchema.JSONRPC_VERSION,
                 McpSchema.METHOD_INITIALIZE,
-                0,
-                new ClientCapabilities(null, null, null)
+                String.valueOf(0),
+                new InitializeRequest(
+                    McpSchema.LATEST_PROTOCOL_VERSION,
+                    new ClientCapabilities(
+                        null,
+                        null,
+                        null
+                    ),
+                    new Implementation("akto-api-security", "1.0.0")
+                )
             );
             Pair<JSONRPCResponse, HttpResponseParams> responsePair = getMcpMethodResponse(
                 host, McpSchema.METHOD_INITIALIZE, JSONUtils.getString(initializeRequest), apiCollection);
@@ -188,7 +198,7 @@ public class McpToolsSyncJobExecutor {
         List<HttpResponseParams> responseParamsList = new ArrayList<>();
         try {
             if (mcpServerCapabilities != null && mcpServerCapabilities.getResources() == null) {
-                logger.debug("Skipping tools discovery as MCP server capabilities do not support tools.");
+                logger.debug("Skipping resources discovery as MCP server capabilities do not support resources.");
                 return responseParamsList;
             }
             Pair<JSONRPCResponse, HttpResponseParams> resourcesListResponsePair = getMcpMethodResponse(
@@ -197,7 +207,7 @@ public class McpToolsSyncJobExecutor {
             if (resourcesListResponsePair.getSecond() != null) {
                 responseParamsList.add(resourcesListResponsePair.getSecond());
             }
-            logger.debug("Received resources/list response. Processing tools.....");
+            logger.debug("Received resources/list response. Processing resources.....");
 
             ListResourcesResult resourcesResult = JSONUtils.fromJson(resourcesListResponsePair.getFirst().getResult(),
                 ListResourcesResult.class);
