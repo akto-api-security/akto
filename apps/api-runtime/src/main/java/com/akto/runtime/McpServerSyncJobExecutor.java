@@ -49,9 +49,9 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.http.HttpStatus;
 import org.springframework.http.HttpMethod;
 
-public class McpToolsSyncJobExecutor {
+public class McpServerSyncJobExecutor {
 
-    private static final LoggerMaker logger = new LoggerMaker(McpToolsSyncJobExecutor.class, LogDb.RUNTIME);
+    private static final LoggerMaker logger = new LoggerMaker(McpServerSyncJobExecutor.class, LogDb.RUNTIME);
     private static final ObjectMapper mapper = new ObjectMapper();
     private static final String MCP_TOOLS_LIST_REQUEST_JSON =
         "{\"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"" + McpSchema.METHOD_TOOLS_LIST + "\", \"params\": {}}";
@@ -60,9 +60,9 @@ public class McpToolsSyncJobExecutor {
     private static final String LOCAL_IP = "127.0.0.1";
     private ServerCapabilities mcpServerCapabilities = null;
 
-    public static final McpToolsSyncJobExecutor INSTANCE = new McpToolsSyncJobExecutor();
+    public static final McpServerSyncJobExecutor INSTANCE = new McpServerSyncJobExecutor();
 
-    public McpToolsSyncJobExecutor() {
+    public McpServerSyncJobExecutor() {
         Json.mapper().registerModule(new SimpleModule().addSerializer(new JsonNodeExampleSerializer()));
     }
 
@@ -94,9 +94,9 @@ public class McpToolsSyncJobExecutor {
         eligibleCollections.forEach(apiCollection -> {
             logger.info("Starting MCP sync for apiCollectionId: {} and hostname: {}", apiCollection.getId(),
                 apiCollection.getHostName());
-            List<HttpResponseParams> initResponseList = initializeMcpServerCapabilities(apiCollection, apiConfig);
-            List<HttpResponseParams> toolsResponseList = handleMcpToolsDiscovery(apiCollection, apiConfig);
-            List<HttpResponseParams> resourcesResponseList =  handleMcpResourceDiscovery(apiCollection, apiConfig);
+            List<HttpResponseParams> initResponseList = initializeMcpServerCapabilities(apiCollection);
+            List<HttpResponseParams> toolsResponseList = handleMcpToolsDiscovery(apiCollection);
+            List<HttpResponseParams> resourcesResponseList =  handleMcpResourceDiscovery(apiCollection);
             processResponseParams(apiConfig, new ArrayList<HttpResponseParams>() {{
                 addAll(initResponseList);
                 addAll(toolsResponseList);
@@ -105,7 +105,7 @@ public class McpToolsSyncJobExecutor {
         });
     }
 
-    private List<HttpResponseParams> initializeMcpServerCapabilities(ApiCollection apiCollection, APIConfig apiConfig) {
+    private List<HttpResponseParams> initializeMcpServerCapabilities(ApiCollection apiCollection) {
         String host = apiCollection.getHostName();
         List<HttpResponseParams> responseParamsList = new ArrayList<>();
         try {
@@ -131,7 +131,7 @@ public class McpToolsSyncJobExecutor {
         return responseParamsList;
     }
 
-    private List<HttpResponseParams> handleMcpToolsDiscovery(ApiCollection apiCollection, APIConfig apiConfig) {
+    private List<HttpResponseParams> handleMcpToolsDiscovery(ApiCollection apiCollection) {
         String host = apiCollection.getHostName();
 
         List<HttpResponseParams> responseParamsList = new ArrayList<>();
@@ -185,7 +185,7 @@ public class McpToolsSyncJobExecutor {
         return responseParamsList;
     }
 
-    private List<HttpResponseParams> handleMcpResourceDiscovery(ApiCollection apiCollection, APIConfig apiConfig) {
+    private List<HttpResponseParams> handleMcpResourceDiscovery(ApiCollection apiCollection) {
         String host = apiCollection.getHostName();
 
         List<HttpResponseParams> responseParamsList = new ArrayList<>();
