@@ -68,7 +68,7 @@ public class ModuleInfoWorker {
             loggerMaker.error("Error getting local version, skipping heartbeat check");
             return;
         }
-        loggerMaker.infoAndAddToDb("Starting heartbeat update for module: " + moduleType.name());
+        loggerMaker.infoAndAddToDb("Starting heartbeat update for module: " + moduleType.name() + " with version: " + version + " and name: " + name);
         ModuleInfoWorker infoWorker = new ModuleInfoWorker(moduleType, version, dataActor, name);
         infoWorker.scheduleHeartBeatUpdate();
     }
