@@ -1,5 +1,7 @@
 package com.akto.mcp;
 
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -13,11 +15,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import lombok.Data;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 public final class McpSchema {
-    private static final Logger logger = LoggerFactory.getLogger(McpSchema.class);
+    private static final LoggerMaker logger = new LoggerMaker(McpSchema.class, LogDb.RUNTIME);
     private McpSchema() {}
     public static final String LATEST_PROTOCOL_VERSION = "2024-11-05";
     public static final String JSONRPC_VERSION = "2.0";
