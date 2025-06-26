@@ -15,6 +15,8 @@ import com.akto.log.LoggerMaker.LogDb;
 import com.akto.mcp.McpSchema;
 import com.akto.mcp.McpSchema.CallToolRequest;
 import com.akto.mcp.McpSchema.ClientCapabilities;
+import com.akto.mcp.McpSchema.Implementation;
+import com.akto.mcp.McpSchema.InitializeRequest;
 import com.akto.mcp.McpSchema.InitializeResult;
 import com.akto.mcp.McpSchema.JSONRPCRequest;
 import com.akto.mcp.McpSchema.JSONRPCResponse;
@@ -112,8 +114,16 @@ public class McpToolsSyncJobExecutor {
             JSONRPCRequest initializeRequest = new JSONRPCRequest(
                 McpSchema.JSONRPC_VERSION,
                 McpSchema.METHOD_INITIALIZE,
-                0,
-                new ClientCapabilities(null, null, null)
+                String.valueOf(0),
+                new InitializeRequest(
+                    McpSchema.LATEST_PROTOCOL_VERSION,
+                    new ClientCapabilities(
+                        null,
+                        null,
+                        null
+                    ),
+                    new Implementation("akto-api-security", "1.0.0")
+                )
             );
             Pair<JSONRPCResponse, HttpResponseParams> responsePair = getMcpMethodResponse(
                 host, McpSchema.METHOD_INITIALIZE, JSONUtils.getString(initializeRequest), apiCollection);
