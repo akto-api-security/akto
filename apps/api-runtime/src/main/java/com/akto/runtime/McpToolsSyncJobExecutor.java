@@ -28,6 +28,7 @@ import com.akto.mcp.McpSchema.Tool;
 import com.akto.parsers.HttpCallParser;
 import com.akto.runtime.Main.AccountInfo;
 import com.akto.testing.ApiExecutor;
+import com.akto.util.Constants;
 import com.akto.util.JSONUtils;
 import com.akto.util.Pair;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -57,7 +58,6 @@ public class McpToolsSyncJobExecutor {
         "{\"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"" + McpSchema.METHOD_TOOLS_LIST + "\", \"params\": {}}";
     private static final String MCP_RESOURCE_LIST_REQUEST_JSON =
         "{\"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"" + McpSchema.METHOD_RESOURCES_LIST + "\", \"params\": {}}";
-    private static final String AKTO_MCP_SERVER_TAG = "mcp-server";
     private static final String LOCAL_IP = "127.0.0.1";
     private final Map<String, HttpCallParser> httpCallParserMap = new HashMap<>();
     private final Map<Integer, AccountInfo> accountInfoMap =  new HashMap<>();
@@ -83,7 +83,7 @@ public class McpToolsSyncJobExecutor {
                 continue;
             }
             tagsList.stream()
-                .filter(t -> AKTO_MCP_SERVER_TAG.equals(t.getKeyName()))
+                .filter(t -> Constants.AKTO_MCP_SERVER_TAG.equals(t.getKeyName()))
                 .findFirst()
                 .ifPresent(c -> eligibleCollections.add(apiCollection));
         }

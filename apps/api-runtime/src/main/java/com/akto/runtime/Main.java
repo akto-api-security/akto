@@ -200,7 +200,7 @@ public class Main {
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb("Error in MCP tools sync job: " + e.getMessage(), LogDb.RUNTIME);
             }
-        }, 30, 24, TimeUnit.HOURS);
+        }, 0, 24, TimeUnit.HOURS);
 
         Map<String, HttpCallParser> httpCallParserMap = new HashMap<>();
 

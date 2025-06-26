@@ -1,9 +1,9 @@
-import React, { useEffect, useReducer, useState } from 'react'
+import React, { useEffect, useReducer, useState, useCallback } from 'react'
 import api from './api';
 import func from '@/util/func';
 import observeFunc from "../observe/transform"
 import PageWithMultipleCards from "../../components/layouts/PageWithMultipleCards"
-import { Box, DataTable, HorizontalGrid, HorizontalStack, Icon, Link, Scrollable, Text, VerticalStack } from '@shopify/polaris';
+import { Box, DataTable, HorizontalGrid, HorizontalStack, Icon, Link, Scrollable, Text, VerticalStack, LegacyTabs, Badge, Avatar } from '@shopify/polaris';
 import observeApi from "../observe/api"
 import testingTransform from "../testing/transform"
 import StackedChart from '../../components/charts/StackedChart';
@@ -12,7 +12,7 @@ import testingApi from "../testing/api"
 import PersistStore from '../../../main/PersistStore';
 import { DashboardBanner } from './components/DashboardBanner';
 import SummaryCard from './new_components/SummaryCard';
-import { ArrowUpMinor, ArrowDownMinor } from '@shopify/polaris-icons';
+import { ArrowUpMinor, ArrowDownMinor, EmailMinor, TicketMinor, EmailMajor } from '@shopify/polaris-icons';
 import TestSummaryCardsList from './new_components/TestSummaryCardsList';
 import InfoCard from './new_components/InfoCard';
 import ProgressBarChart from './new_components/ProgressBarChart';
@@ -25,12 +25,167 @@ import TooltipText from '../../components/shared/TooltipText';
 import transform from '../observe/transform';
 import CriticalUnsecuredAPIsOverTimeGraph from '../issues/IssuesPage/CriticalUnsecuredAPIsOverTimeGraph';
 import CriticalFindingsGraph from '../issues/IssuesPage/CriticalFindingsGraph';
+import GithubSimpleTable from '../../components/tables/GithubSimpleTable';
+import ActionItemCard from './components/ActionItemCard';
+import GridRows from '../../components/shared/GridRows';
+import FlyLayout from '../../components/layouts/FlyLayout';
+import ActionItemDetails from './components/ActionItemDetails';
+import AssignTaskToUser from './components/AssignTaskToUser';
+
+
+// const sampleActionItems = [
+//     {
+//         id: '1',
+//         priority: 'P1',
+//         priorityComp: <Badge status="critical">P1</Badge>,
+//         actionItem: 'Shadow API detected in prod',
+//         team: 'Security',
+//         effort: 'High',
+//         whyItMatters: 'Uncontrolled/unknown attack surface',
+//         displayName: 'Shadow API detected in prod',
+//         // assignee: <AssignTaskToUser />, // TODO: Re-enable assignee in future iteration
+//         actions: <HorizontalStack gap="2"><Icon source={EmailMajor} color="base" /><Avatar size="extraSmall" shape="square" source="/public/logo_jira.svg" /></HorizontalStack>
+//     }
+// ];
 
 function HomeDashboard() {
 
     const [loading, setLoading] = useState(true);
     const [showBannerComponent, setShowBannerComponent] = useState(false)
     const [testSummaryInfo, setTestSummaryInfo] = useState([])
+    const [selectedTab, setSelectedTab] = useState(0);
+    const [actionItems, setActionItems] = useState([])
+    const [showFlyout, setShowFlyout] = useState(false);
+    const [selectedItem, setSelectedItem] = useState(null);
+
+    const handleTabChange = useCallback(
+        (selectedTabIndex) => setSelectedTab(selectedTabIndex),
+        [],
+    );
+
+    // const tabs = [
+    //     {
+    //         id: 'home',
+    //         content: 'Home',
+    //         panelID: 'home-content',
+    //     },
+    //     {
+    //         id: 'analytics',
+    //         content: 'Analysis',
+    //         panelID: 'analytics-content',
+    //     },
+    // ];
+
+    
+
+    const resourceName = {
+        singular: 'action item',
+        plural: 'action items'
+    };
+
+    const actionItemsHeaders = [
+        {
+            title: '',
+            value: 'priorityComp',
+            sortActive: true,
+            maxWidth: '50px'
+        },
+        {
+            title: 'Action Item',
+            value: 'actionItem',
+            type: 'text',
+            maxWidth: '300px'
+        },
+        {
+            title: 'Team',
+            value: 'team',
+            type: 'text',
+            maxWidth: '100px'
+        },
+        {
+            title: 'Effort',
+            value: 'effort',
+            type: 'text',
+            maxWidth: '100px'
+        },
+        {
+            title: 'Why it matters',
+            value: 'whyItMatters',
+            type: 'text',
+            maxWidth: '300px'
+        },
+        // {
+        //     title: 'Assignee',
+        //     value: 'assignee',
+        //     type: 'text',
+        //     maxWidth: '150px'
+        // },
+        {
+            title: 'Actions',
+            value: 'actions',
+            type: 'action',
+            maxWidth: '100px'
+        }
+    ];
+
+    function getActions(item) {
+        return [{
+            items: [
+                {
+                    content: 'Email',
+                    icon: EmailMinor,
+                    url: '#',
+                    external: true
+                },
+                {
+                    content: item.ticket || 'Create ticket',
+                    icon: item.ticket ? undefined : TicketMinor,
+                    url: '#',
+                    external: true
+                }
+            ]
+        }];
+    }
+
+    const handleRowClick = (item) => {
+        setSelectedItem(item);
+        setShowFlyout(true);
+    };
+
+    const actionItemsContent = (
+        <VerticalStack gap={"5"}>
+            <GridRows items={[{}, {}, {}, {}, {}, {}, {}]} CardComponent={ActionItemCard} columns={4} onButtonClick={handleRowClick}/>
+            <Box>
+                <GithubSimpleTable
+                    key={"table"}
+                    data={actionItems}
+                    resourceName={resourceName}
+                    headers={actionItemsHeaders}
+                    headings={actionItemsHeaders}
+                    useNewRow={true}
+                    condensedHeight={true}
+                    hideQueryField={true}
+                    hidePagination={true}
+                    hasZebraStriping={true}
+                    getActions={getActions}
+                    hasRowActions={true}
+                    defaultSortField="priority"
+                    defaultSortDirection="asc"
+                    renderBadge={(item) => (
+                        <Badge status={item.priorityDisplay}>{item.priority}</Badge>
+                    )}
+                    onRowClick={handleRowClick}
+                />
+            </Box>
+
+            <FlyLayout
+                show={showFlyout}
+                setShow={setShowFlyout}
+                title="Action item details"
+                components={[<ActionItemDetails item={selectedItem}/>]}
+            />
+        </VerticalStack>
+    );
 
     const allCollections = PersistStore(state => state.allCollections)
     const hostNameMap = PersistStore(state => state.hostNameMap)
@@ -154,7 +309,8 @@ function HomeDashboard() {
         let fetchEndpointsCountResp = results[3].status === 'fulfilled' ? results[3].value : {}
         let issueSeverityMap = results[4].status === 'fulfilled' ? results[4].value : {}
         let missingApiInfoData = results[5].status === 'fulfilled' ? results[5].value : {}
-        const totalMissingApis = missingApiInfoData?.totalMissing|| 0
+        const totalRedundantApis = missingApiInfoData?.redundantApiInfoKeys || 0  
+        const totalMissingApis = missingApiInfoData?.totalMissing|| 0 
 
         setShowBannerComponent(!userEndpoints)
 
@@ -162,10 +318,10 @@ function HomeDashboard() {
         // TODO: Fix apiStats API to return the correct total apis
         buildMetrics(apisStatsResp.apiStatsEnd, fetchEndpointsCountResp)
         testSummaryData()
-        mapAccessTypes(apisStatsResp, (totalMissingApis + (missingApiInfoData?.accessTypeNotCalculated || 0)))
-        mapAuthTypes(apisStatsResp, (totalMissingApis + (missingApiInfoData?.authNotCalculated || 0)))
-        buildAPITypesData(apisStatsResp.apiStatsEnd, (totalMissingApis + (missingApiInfoData?.apiTypeMissing || 0)))
-        buildSetRiskScoreData(apisStatsResp.apiStatsEnd, totalMissingApis) //todo
+        mapAccessTypes(apisStatsResp, totalMissingApis, totalRedundantApis, missingApiInfoData?.accessTypeNotCalculated || 0)
+        mapAuthTypes(apisStatsResp, totalMissingApis, totalRedundantApis, (missingApiInfoData?.authNotCalculated || 0))
+        buildAPITypesData(apisStatsResp.apiStatsEnd, totalMissingApis, totalRedundantApis, (missingApiInfoData?.apiTypeMissing || 0))
+        buildSetRiskScoreData(apisStatsResp.apiStatsEnd, Math.max(0, totalMissingApis - totalRedundantApis)) //todo
         getCollectionsWithCoverage()
         buildSeverityMap(issueSeverityMap.severityInfo)
         buildIssuesSummary(findTotalIssuesResp)
@@ -273,12 +429,14 @@ function HomeDashboard() {
         )
     }
 
-    const runTestEmptyCardComponent = <Text alignment='center' color='subdued'>There’s no data to show. <Link url="/dashboard/testing" target='_blank'>Run test</Link> to get data populated. </Text>
+    const runTestEmptyCardComponent = <Text alignment='center' color='subdued'>There's no data to show. <Link url="/dashboard/testing" target='_blank'>Run test</Link> to get data populated. </Text>
 
-    function mapAccessTypes(apiStats, missingCount) {
+    function mapAccessTypes(apiStats, missingCount, redundantCount, apiTypeMissing) {
         if (!apiStats) return
         const apiStatsEnd = apiStats.apiStatsEnd
         const apiStatsStart = apiStats.apiStatsStart
+
+        const countMissing = apiTypeMissing  + missingCount - redundantCount
 
         const accessTypeMapping = {
             "PUBLIC": "External",
@@ -296,8 +454,8 @@ function HomeDashboard() {
             }
         }
         // Handle missing access types
-        if( missingCount && missingCount > 0) {
-            accessTypeMap["Need more data"].text = missingCount;
+        if(countMissing > 0) {
+            accessTypeMap["Need more data"].text = countMissing;
             accessTypeMap["Need more data"].dataTableComponent = generateChangeComponent(0, false);
         }
         
@@ -305,7 +463,7 @@ function HomeDashboard() {
     }
 
 
-    function mapAuthTypes(apiStats, missingCount) {
+    function mapAuthTypes(apiStats, missingCount, redundantCount, authTypeMissing) {
         const apiStatsEnd = apiStats.apiStatsEnd
         const apiStatsStart = apiStats.apiStatsStart
         const convertKey = (key) => {
@@ -338,9 +496,11 @@ function HomeDashboard() {
             };
         });
 
-        if(missingCount > 0) {
+        const countMissing = authTypeMissing + missingCount - redundantCount
+
+        if(countMissing > 0) {
             authMap["Need more data"] = {
-                "text": missingCount,
+                "text": countMissing,
                 "color": "#EFE3FF",
                 "filterKey": "Need more data",
                 "dataTableComponent": generateChangeComponent(0, false) // No change component for missing auth types
@@ -352,7 +512,7 @@ function HomeDashboard() {
     }
 
 
-    function buildAPITypesData(apiStats, missingCount) {
+    function buildAPITypesData(apiStats, missingCount, redundantCount, apiTypeMissing) {
         // Initialize the data with default values for all API types
         const data = [
             ["REST", apiStats.apiTypeMap.REST || 0], // Use the value from apiTypeMap or 0 if not available
@@ -360,8 +520,9 @@ function HomeDashboard() {
             ["gRPC", apiStats.apiTypeMap.GRPC || 0],
             ["SOAP", apiStats.apiTypeMap.SOAP || 0],
         ];
+        const countMissing = apiTypeMissing - (missingCount + redundantCount)
         if(missingCount > 0) {
-            data.push(["Need more data", missingCount]);
+            data.push(["Need more data", countMissing]);
         }
 
         setApiTypesData([{ data: data, color: "#D6BBFB" }])
@@ -667,24 +828,55 @@ function HomeDashboard() {
     />
 
     const gridComponents = showTestingComponents ?
-        [criticalUnsecuredAPIsOverTime, vulnerableApisBySeverityComponent, criticalFindings, apisByRiskscoreComponent, apisByAccessTypeComponent, apisByAuthTypeComponent, apisByTypeComponent, newDomainsComponent] :
-        [apisByRiskscoreComponent, apisByAccessTypeComponent, apisByAuthTypeComponent, apisByTypeComponent, newDomainsComponent, criticalUnsecuredAPIsOverTime, vulnerableApisBySeverityComponent, criticalFindings]
+        [
+            {id: 'critical-apis', component: criticalUnsecuredAPIsOverTime},
+            {id: 'vulnerable-apis', component: vulnerableApisBySeverityComponent},
+            {id: 'critical-findings', component: criticalFindings},
+            {id: 'risk-score', component: apisByRiskscoreComponent},
+            {id: 'access-type', component: apisByAccessTypeComponent},
+            {id: 'auth-type', component: apisByAuthTypeComponent},
+            {id: 'api-type', component: apisByTypeComponent},
+            {id: 'new-domains', component: newDomainsComponent}
+        ] :
+        [
+            {id: 'risk-score', component: apisByRiskscoreComponent},
+            {id: 'access-type', component: apisByAccessTypeComponent},
+            {id: 'auth-type', component: apisByAuthTypeComponent},
+            {id: 'api-type', component: apisByTypeComponent},
+            {id: 'new-domains', component: newDomainsComponent},
+            {id: 'critical-apis', component: criticalUnsecuredAPIsOverTime},
+            {id: 'vulnerable-apis', component: vulnerableApisBySeverityComponent},
+            {id: 'critical-findings', component: criticalFindings}
+        ]
 
     const gridComponent = (
         <HorizontalGrid gap={5} columns={2}>
-            {gridComponents}
+            {gridComponents.map(({id, component}) => (
+                <div key={id}>{component}</div>
+            ))}
         </HorizontalGrid>
     )
 
-    const components = [summaryComp, testSummaryCardsList, gridComponent]
+    const components = [
+        {id: 'summary', component: summaryComp},
+        {id: 'test-summary', component: testSummaryCardsList},
+        {id: 'grid', component: gridComponent}
+    ]
 
     const dashboardComp = (
         <VerticalStack gap={4}>
-            {components.map((component) => {
-                return component
-            })}
+            {components.map(({id, component}) => (
+                <div key={id}>{component}</div>
+            ))}
         </VerticalStack>
     )
+
+    // const tabsComponent = (
+    //     <VerticalStack gap="4" key="tabs-stack">
+    //         <LegacyTabs tabs={tabs} selected={selectedTab} onSelect={handleTabChange} />
+    //         {selectedTab === 0 ? dashboardComp : actionItemsContent}
+    //     </VerticalStack>
+    // )
 
     const pageComponents = [showBannerComponent ? <DashboardBanner key="dashboardBanner" /> : dashboardComp]
 
@@ -699,7 +891,7 @@ function HomeDashboard() {
                     }
                     isFirstPage={true}
                     components={pageComponents}
-                    primaryAction={<DateRangeFilter initialDispatch={currDateRange} dispatch={(dateObj) => dispatchCurrDateRange({ type: "update", period: dateObj.period, title: dateObj.title, alias: dateObj.alias })} />}
+                    primaryAction={<DateRangeFilter initialDispatch={currDateRange} dispatch={(dateObj) => dispatchCurrDateRange({ type: "update", period: dateObj.period, title: dateObj.title, alias: dateObj.alias })} disabled={selectedTab === 1} />}
                 />
             }
 

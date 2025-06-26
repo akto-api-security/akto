@@ -78,7 +78,7 @@ public class HttpCallParser {
             .callTimeout(1, TimeUnit.SECONDS)
             .build();
 
-    private Map<Integer, ApiCollection> apiCollectionMap = new HashMap<>();
+    private Map<Integer, ApiCollection> apiCollectionMap;
 
     private static final ConcurrentLinkedQueue<BasicDBObject> queue = new ConcurrentLinkedQueue<>();
 
@@ -549,7 +549,7 @@ public class HttpCallParser {
 
         List<CollectionTags> collectionTags = apiCollection.getTagsList();
         boolean isMcpTagPresent = !CollectionUtils.isEmpty(collectionTags) &&
-            collectionTags.stream().anyMatch(tag -> "mcp-server".equals(tag.getKeyName()));
+            collectionTags.stream().anyMatch(tag -> Constants.AKTO_MCP_SERVER_TAG.equals(tag.getKeyName()));
 
         if (isMcpTagPresent) {
             return;
@@ -771,6 +771,6 @@ public class HttpCallParser {
     }
 
     private CollectionTags getMcpServerTag() {
-        return new CollectionTags(Context.now(), "mcp-server", "MCP Server", TagSource.KUBERNETES);
+        return new CollectionTags(Context.now(), Constants.AKTO_MCP_SERVER_TAG, "MCP Server", TagSource.KUBERNETES);
     }
 }

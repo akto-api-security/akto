@@ -7,7 +7,7 @@ import func from "@/util/func"
 
 function DateRangeFilter(props){
 
-    const {dispatch, initialDispatch} = props;
+    const {dispatch, initialDispatch, disabled = false} = props;
     const [popoverActive, setPopoverActive] = useState(false);
     
     const handlePopoverState = (popoverState) =>{
@@ -27,6 +27,7 @@ function DateRangeFilter(props){
           <Button
             icon={CalendarMinor}
             onClick={() => setPopoverActive(!popoverActive)}
+            disabled={disabled}
           >
             <span style={{whiteSpace: "nowrap"}}>
               {func.getDateValue(initialDispatch)}

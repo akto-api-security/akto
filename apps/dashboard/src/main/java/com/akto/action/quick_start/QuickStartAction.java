@@ -39,6 +39,9 @@ import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
 import com.opensymphony.xwork2.Action;
+
+import lombok.Setter;
+
 import java.io.BufferedReader;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -274,7 +277,14 @@ public class QuickStartAction extends UserAction {
         return Action.SUCCESS.toUpperCase();
     }
 
+    @Setter
+    private int expiryTimeInMonth;
+
     public String fetchRuntimeHelmCommand() {
+        if(this.expiryTimeInMonth == 0 || this.expiryTimeInMonth > 24 || this.expiryTimeInMonth < -1) {
+            addActionError("Expiry time must be between 1 and 24 months");
+            return Action.ERROR.toUpperCase();
+        }
         try {
             Map<String,Object> claims = new HashMap<>();
             claims.put("accountId", Context.accountId.get());
@@ -283,7 +293,7 @@ public class QuickStartAction extends UserAction {
                 "Akto",
                 "invite_user",
                 Calendar.MONTH,
-                6
+                this.expiryTimeInMonth
             );
         } catch (Exception e) {
             e.printStackTrace();
