@@ -21,6 +21,8 @@ import com.akto.dto.ApiInfo.ApiAccessType;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.test_editor.ExecutorSingleOperationResp;
 import com.akto.dto.testing.UrlModifierPayload;
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import com.akto.test_editor.execution.Operations;
 import com.akto.util.Constants;
 import com.akto.util.DashboardMode;
@@ -47,6 +49,8 @@ public class Utils {
     private static final Gson gson = new Gson();
 
     public static boolean SKIP_SSRF_CHECK = ("true".equalsIgnoreCase(System.getenv("SKIP_SSRF_CHECK")) || !DashboardMode.isSaasDeployment());
+
+    private static final LoggerMaker loggerMaker = new LoggerMaker(Utils.class, LogDb.TESTING);
 
     private static final OkHttpClient client = createHttpClient();
 
@@ -1026,7 +1030,7 @@ public class Utils {
             rawApi.setRequest(req);
         } catch (Exception e) {
             e.printStackTrace();
-            System.out.println("Error: " + e.getMessage());
+            loggerMaker.errorAndAddToDb(e, "Error in modifyRawApiPayload: " + e.getMessage());
         }
         return rawApi;
     }
