@@ -1,6 +1,5 @@
 package com.akto.hybrid_runtime;
 
-import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.context.Context;
 import com.akto.data_actor.DataActorFactory;
 import com.akto.dto.APIConfig;
@@ -12,7 +11,6 @@ import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.traffic.CollectionTags;
 import com.akto.hybrid_parsers.HttpCallParser;
-import com.akto.hybrid_runtime.Main.AccountInfo;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.mcp.McpSchema;
@@ -34,8 +32,6 @@ import com.akto.util.JSONUtils;
 import com.akto.util.Pair;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.module.SimpleModule;
-import com.mongodb.BasicDBObject;
-import com.mongodb.client.model.Projections;
 import io.swagger.oas.inflector.examples.ExampleBuilder;
 import io.swagger.oas.inflector.examples.models.Example;
 import io.swagger.oas.inflector.processors.JsonNodeExampleSerializer;
@@ -69,8 +65,7 @@ public class McpToolsSyncJobExecutor {
     }
 
     public void runJob(APIConfig apiConfig) {
-        List<ApiCollection> apiCollections = ApiCollectionsDao.instance.findAll(new BasicDBObject(),
-            Projections.exclude("urls", "conditions"));
+        List<ApiCollection> apiCollections = DataActorFactory.fetchInstance().fetchAllApiCollections();
         List<ApiCollection> eligibleCollections = new ArrayList<>();
 
         for (ApiCollection apiCollection : apiCollections) {
