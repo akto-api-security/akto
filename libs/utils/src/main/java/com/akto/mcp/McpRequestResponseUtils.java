@@ -24,6 +24,7 @@ public final class McpRequestResponseUtils {
         McpSchema.METHOD_TOOLS_CALL,
         McpSchema.METHOD_RESOURCES_READ
     ));
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
     public static HttpResponseParams parseMcpResponseParams(HttpResponseParams responseParams) {
         String requestPayload = responseParams.getRequestParams().getPayload();
@@ -62,8 +63,7 @@ public final class McpRequestResponseUtils {
         // Enforce that params is an object in the original JSON
         boolean paramsIsObject;
         try {
-            ObjectMapper mapper = new ObjectMapper();
-            JsonNode root = mapper.readTree(requestPayload);
+            JsonNode root = OBJECT_MAPPER.readTree(requestPayload);
             JsonNode paramsNode = root.get("params");
             paramsIsObject = paramsNode != null && paramsNode.isObject();
         } catch (Exception e) {
