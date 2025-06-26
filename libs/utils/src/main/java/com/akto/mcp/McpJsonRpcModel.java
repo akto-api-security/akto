@@ -25,5 +25,6 @@ public class McpJsonRpcModel {
     public static class McpParams {
         @JsonProperty("name")
         private String name;
+        private String uri;
     }
 }
