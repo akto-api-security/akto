@@ -166,7 +166,7 @@ public class ReportAction extends UserAction {
 
     public String downloadSamplePdf() {
         try {
-            String url = System.getenv("SAMPLE_PUPPETEER_REPLAY_SERVICE_URL") + "/samplePDF";
+            String url = System.getenv("PUPPETEER_REPLAY_SERVICE_URL") + "/samplePDF";
 
             JSONObject requestBody = new JSONObject();
             String reqData = requestBody.toString();
