@@ -184,10 +184,10 @@ public class McpToolsSyncJobExecutor {
                     }
                 }
             } else {
-                logger.debug("Skipping as List Resource Result is null or Resources are empty");
+                logger.debug("Skipping as List Tools Result is null or Tools are empty");
             }
         } catch (Exception e) {
-            logger.error("Error while discovering mcp and its tools for hostname: {}", host, e);
+            logger.error("Error while discovering mcp tools for hostname: {}", host, e);
         }
         return responseParamsList;
     }
@@ -247,7 +247,7 @@ public class McpToolsSyncJobExecutor {
 
     private void processResponseParams(APIConfig apiConfig, List<HttpResponseParams> responseParamsList) {
         if (CollectionUtils.isEmpty(responseParamsList)) {
-            logger.debug("No response params to process for MCP tools sync job.");
+            logger.debug("No response params to process for MCP sync job.");
             return;
         }
         Map<String, List<HttpResponseParams>> responseParamsToAccountIdMap = new HashMap<>();
