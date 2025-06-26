@@ -187,7 +187,7 @@ public class McpToolsSyncJobExecutor {
                     }
                 }
             } else {
-                logger.debug("Skipping as List Resource Result is null or Resources are empty");
+                logger.debug("Skipping as List Tools Result is null or Tools are empty");
             }
         } catch (Exception e) {
             logger.error("Error while discovering mcp and its tools for hostname: {}", host, e);
@@ -201,7 +201,7 @@ public class McpToolsSyncJobExecutor {
         List<HttpResponseParams> responseParamsList = new ArrayList<>();
         try {
             if (mcpServerCapabilities != null && mcpServerCapabilities.getResources() == null) {
-                logger.debug("Skipping tools discovery as MCP server capabilities do not support tools.");
+                logger.debug("Skipping resources discovery as MCP server capabilities do not support resources.");
                 return responseParamsList;
             }
             Pair<JSONRPCResponse, HttpResponseParams> resourcesListResponsePair = getMcpMethodResponse(
