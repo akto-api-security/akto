@@ -848,7 +848,7 @@ public class StartTestAction extends UserAction {
 
         Map<TestingIssuesId, TestingRunResult> idToResultMap = new HashMap<>();
         for (TestingRunResult result : testingRunResults) {
-            TestingIssuesId id = new TestingIssuesId(result.getApiInfoKey(), TestErrorSource.AUTOMATED_TESTING, result.getTestSubType());
+            TestingIssuesId id = getTestingIssueIdFromRunResult(result);
             idToResultMap.put(id, result);
         }
 
@@ -1411,7 +1411,7 @@ public class StartTestAction extends UserAction {
                     Map<TestingIssuesId, ObjectId> mapIssueToResultId = new HashMap<>();
                     Set<ObjectId> ignoredResults = new HashSet<>();
                     for(TestingRunResult runResult: testingRunResults){
-                        TestingIssuesId issuesId = new TestingIssuesId(runResult.getApiInfoKey(), TestErrorSource.AUTOMATED_TESTING , runResult.getTestSubType());
+                        TestingIssuesId issuesId = getTestingIssueIdFromRunResult(runResult);
                         issuesIds.add(issuesId);
                         mapIssueToResultId.put(issuesId, runResult.getId());
                         ignoredResults.add(runResult.getId());
@@ -1513,6 +1513,11 @@ public class StartTestAction extends UserAction {
             }
         }
         return SUCCESS.toUpperCase();
+    }
+
+    private TestingIssuesId getTestingIssueIdFromRunResult(TestingRunResult runResult) {
+        return new TestingIssuesId(runResult.getApiInfoKey(), TestErrorSource.AUTOMATED_TESTING,
+            runResult.getTestSubType());
     }
 
 
