@@ -1,5 +1,6 @@
 package com.akto.runtime;
 
+import com.akto.mcp.McpSchema;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
@@ -84,13 +85,6 @@ public class APICatalogSync {
         The apiCollectionId - -1 has nothing to do with this.
         Since we do not know the collectionId for MCP Server, we have set it to -1.
     */
-    private static final Set<MergedUrls> MERGED_URLS_FOR_MCP = new HashSet<>(Arrays.asList(
-        new MergedUrls("tools/call/STRING", "POST", -1),
-        new MergedUrls("tools/call/INTEGER", "POST", -1),
-        new MergedUrls("tools/call/FLOAT", "POST", -1),
-        new MergedUrls("tools/call/OBJECT_ID", "POST", -1),
-        new MergedUrls("tools/call/VERSIONED", "POST", -1)
-    ));
 
     public APICatalogSync(String userIdentifier,int thresh, boolean fetchAllSTI) {
         this(userIdentifier, thresh, fetchAllSTI, true);
@@ -893,11 +887,10 @@ public class APICatalogSync {
                     return null;
                 }
             }
-            for (MergedUrls mergedUrl : MERGED_URLS_FOR_MCP) {
-                if(urlTemplate.getTemplateString().endsWith(mergedUrl.getUrl()) &&
-                    mergedUrl.getMethod().equals(urlTemplate.getMethod().name())) {
-                    return null;
-                }
+
+            String mergedUrlString = urlTemplate.getTemplateString();
+            if (McpSchema.MCP_METHOD_SET.stream().anyMatch(mergedUrlString::contains)) {
+                return null;
             }
         } catch(Exception e) {
             loggerMaker.errorAndAddToDb("Error while creating a new URL object: " + e.getMessage(), LogDb.RUNTIME);

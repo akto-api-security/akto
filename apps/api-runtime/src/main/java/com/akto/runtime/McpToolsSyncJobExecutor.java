@@ -208,7 +208,7 @@ public class McpToolsSyncJobExecutor {
                 for (Resource resource : resourcesResult.getResources()) {
                     JSONRPCRequest request = new JSONRPCRequest(
                         McpSchema.JSONRPC_VERSION,
-                        McpSchema.METHOD_TOOLS_CALL,
+                        McpSchema.METHOD_RESOURCES_READ,
                         id++,
                         new ReadResourceRequest(resource.getUri())
                     );
