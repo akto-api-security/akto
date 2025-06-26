@@ -1,35 +1,37 @@
 package com.akto.test_editor.filter;
 
-import com.akto.billing.UsageMetricUtils;
-import com.akto.dao.context.Context;
-import com.akto.dto.billing.FeatureAccess;
-import com.akto.gpt.handlers.gpt_prompts.TestExecutorModifier;
-import com.akto.gpt.handlers.gpt_prompts.TestFilterModifier;
-import com.akto.test_editor.Utils;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import com.akto.log.LoggerMaker;
-import com.akto.log.LoggerMaker.LogDb;
+
+import org.json.JSONArray;
+
+import com.akto.billing.UsageMetricUtils;
+import com.akto.dao.context.Context;
 import com.akto.dao.test_editor.TestEditorEnums;
 import com.akto.dao.test_editor.TestEditorEnums.ExtractOperator;
 import com.akto.dao.test_editor.TestEditorEnums.OperandTypes;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.RawApi;
+import com.akto.dto.billing.FeatureAccess;
 import com.akto.dto.test_editor.DataOperandFilterRequest;
 import com.akto.dto.test_editor.DataOperandsFilterResponse;
 import com.akto.dto.test_editor.FilterActionRequest;
 import com.akto.dto.test_editor.FilterNode;
+import com.akto.gpt.handlers.gpt_prompts.TestExecutorModifier;
+import com.akto.gpt.handlers.gpt_prompts.TestFilterModifier;
+import com.akto.log.LoggerMaker;
+import com.akto.test_editor.Utils;
 import com.mongodb.BasicDBObject;
-import org.json.JSONArray;
 
 public class Filter {
 
     private FilterAction filterAction;
-    private static final LoggerMaker loggerMaker = new LoggerMaker(Filter.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(Filter.class, LoggerMaker.LogDb.TESTING);
+    private static final String INVALID_QS_ = "invalid_" + Context.now();
 
     public Filter() {
         this.filterAction = new FilterAction();
@@ -171,13 +173,14 @@ public class Filter {
         String operationTypeLower = filterActionRequest.getOperand().toLowerCase();
         String operation = "";
         Object newQuerySet = querySet;
+        boolean querySetUpdated = false;
+        String operationPrompt = "";
         try {
             int accountId = Context.accountId.get();
             FeatureAccess featureAccess = UsageMetricUtils.getFeatureAccessSaas(accountId, TestExecutorModifier._AKTO_GPT_AI);
             if (featureAccess.getIsGranted()) {
 
 
-                String operationPrompt = "";
                 if (querySet instanceof String) {
                     String query = (String) querySet;
                     if (query.startsWith(Utils._MAGIC)) {
@@ -211,6 +214,7 @@ public class Filter {
                     queryData.put(TestExecutorModifier._REQUEST, request);
                     queryData.put(TestExecutorModifier._OPERATION, operation);
                     BasicDBObject generatedData = new TestFilterModifier().handle(queryData);
+                    loggerMaker.infoAndAddToDb("JARVIS_LLM_RESPONSE: " + generatedData);
                     if (generatedData.containsKey(operationTypeLower)) {
                         Object generatedQuerySet = generatedData.get(operationTypeLower);
                         if (generatedQuerySet instanceof JSONArray) {
@@ -223,7 +227,12 @@ public class Filter {
                         } else {
                             newQuerySet = generatedQuerySet;
                         }
+                        querySetUpdated = true;
                     }
+
+                    if(!querySetUpdated && !operationPrompt.isEmpty()){
+                        newQuerySet = INVALID_QS_;
+                     }
                 }
             }
 
