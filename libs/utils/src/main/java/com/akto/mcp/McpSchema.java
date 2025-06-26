@@ -9,6 +9,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -45,9 +46,8 @@ public final class McpSchema {
     public static final String MCP_NOTIFICATIONS_CANCELLED_METHOD = "notifications/cancelled";
     public static final String MCP_NOTIFICATIONS_PROGRESS_METHOD = "notifications/progress";
     public static final String MCP_NOTIFICATIONS_RESOURCES_UPDATED_METHOD = "notifications/resources/updated";
-    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
-    public static final Set<String> MCP_METHOD_SET = new HashSet<>(Arrays.asList(
+    public static final Set<String> MCP_METHOD_SET = Collections.unmodifiableSet(new HashSet<>(Arrays.asList(
         McpSchema.METHOD_TOOLS_LIST,
         McpSchema.METHOD_TOOLS_CALL,
         McpSchema.METHOD_PROMPT_LIST,
@@ -72,7 +72,7 @@ public final class McpSchema {
         McpSchema.MCP_NOTIFICATIONS_RESOURCES_UPDATED_METHOD,
         McpSchema.METHOD_NOTIFICATION_ROOTS_LIST_CHANGED,
         McpSchema.METHOD_NOTIFICATION_TOOLS_LIST_CHANGED
-    ));
+    )));
 
 
     public static final class ErrorCodes {
