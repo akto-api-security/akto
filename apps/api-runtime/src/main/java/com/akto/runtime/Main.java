@@ -196,7 +196,7 @@ public class Main {
             try {
                 AccountTask.instance.executeTask(t -> {
                     loggerMaker.info("Starting MCP sync job");
-                    McpServerSyncJobExecutor.INSTANCE.runJob(finalApiConfig);
+                    McpToolsSyncJobExecutor.INSTANCE.runJob(finalApiConfig);
                 }, "mcp-tools-sync");
                 loggerMaker.info("Finished MCP sync job");
             } catch (Exception e) {

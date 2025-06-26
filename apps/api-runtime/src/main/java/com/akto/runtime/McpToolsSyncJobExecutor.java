@@ -49,9 +49,9 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.http.HttpStatus;
 import org.springframework.http.HttpMethod;
 
-public class McpServerSyncJobExecutor {
+public class McpToolsSyncJobExecutor {
 
-    private static final LoggerMaker logger = new LoggerMaker(McpServerSyncJobExecutor.class, LogDb.RUNTIME);
+    private static final LoggerMaker logger = new LoggerMaker(McpToolsSyncJobExecutor.class, LogDb.RUNTIME);
     private static final ObjectMapper mapper = new ObjectMapper();
     private static final String MCP_TOOLS_LIST_REQUEST_JSON =
         "{\"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"" + McpSchema.METHOD_TOOLS_LIST + "\", \"params\": {}}";
@@ -60,9 +60,9 @@ public class McpServerSyncJobExecutor {
     private static final String LOCAL_IP = "127.0.0.1";
     private ServerCapabilities mcpServerCapabilities = null;
 
-    public static final McpServerSyncJobExecutor INSTANCE = new McpServerSyncJobExecutor();
+    public static final McpToolsSyncJobExecutor INSTANCE = new McpToolsSyncJobExecutor();
 
-    public McpServerSyncJobExecutor() {
+    public McpToolsSyncJobExecutor() {
         Json.mapper().registerModule(new SimpleModule().addSerializer(new JsonNodeExampleSerializer()));
     }
 
