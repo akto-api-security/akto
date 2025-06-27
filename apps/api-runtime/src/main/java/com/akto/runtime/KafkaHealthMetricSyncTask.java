@@ -3,8 +3,8 @@ package com.akto.runtime;
 import com.akto.dao.KafkaHealthMetricsDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.KafkaHealthMetric;
-import com.akto.log.LoggerMaker;
-import com.akto.log.LoggerMaker.LogDb;
+import com.akto.dao.common.LoggerMaker;
+import com.akto.dao.common.LoggerMaker.LogDb;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.ReplaceOptions;
 

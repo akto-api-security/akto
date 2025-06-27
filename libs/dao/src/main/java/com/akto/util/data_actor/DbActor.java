@@ -1,4 +1,4 @@
-package com.akto.data_actor;
+package com.akto.util.data_actor;
 
 import com.akto.dto.*;
 import com.akto.dto.ApiInfo.ApiInfoKey;
@@ -332,6 +332,10 @@ public class DbActor extends DataActor {
 
     public SampleData fetchSampleDataByIdMethod(int apiCollectionId, String url, String method) {
         return DbLayer.fetchSampleDataByIdMethod(apiCollectionId, url, method);
+    }
+
+    public SampleData fetchLatestAuthenticatedByApiCollectionId(int apiCollectionId) {
+        return DbLayer.fetchLatestAuthenticatedByApiCollectionId(apiCollectionId);
     }
 
     public TestRoles fetchTestRole(String key) {

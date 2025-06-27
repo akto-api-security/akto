@@ -5,7 +5,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Collections;
 
-import com.akto.dto.ApiInfo;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.api_workflow.Node;
@@ -14,8 +13,8 @@ import com.akto.dto.testing.WorkflowNodeDetails;
 import com.akto.dto.testing.WorkflowTestResult;
 import com.akto.dto.testing.WorkflowUpdatedSampleData;
 import com.akto.dto.testing.WorkflowTestResult.NodeResult;
-import com.akto.log.LoggerMaker;
-import com.akto.log.LoggerMaker.LogDb;
+import com.akto.dao.common.LoggerMaker;
+import com.akto.dao.common.LoggerMaker.LogDb;
 import com.akto.test_editor.execution.Memory;
 import com.akto.testing.ApiExecutor;
 import com.akto.testing.Main;

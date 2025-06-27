@@ -1,4 +1,4 @@
-package com.akto;
+package com.akto.dao.common;
 
 public enum RuntimeMode {
 

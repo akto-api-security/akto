@@ -26,7 +26,7 @@ import com.akto.dto.test_editor.TestConfig;
 import com.akto.dto.testing.TestingRunResult;
 import com.akto.dto.testing.TestResult.TestError;
 import com.akto.dto.testing.info.SingleTestPayload;
-import com.akto.log.LoggerMaker;
+import com.akto.dao.common.LoggerMaker;
 import com.akto.testing.TestExecutor;
 import com.akto.testing.Utils;
 import com.akto.util.Constants;

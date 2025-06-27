@@ -7,7 +7,7 @@ import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.RawApi;
 import com.akto.dto.test_editor.*;
 import com.akto.dto.testing.*;
-import com.akto.log.LoggerMaker;
+import com.akto.dao.common.LoggerMaker;
 import com.akto.rules.RequiredConfigs;
 import com.akto.rules.TestPlugin;
 import com.akto.test_editor.Utils;
@@ -16,7 +16,6 @@ import com.akto.test_editor.execution.Executor;
 import com.akto.test_editor.filter.data_operands_impl.ValidationResult;
 import com.akto.testing.StatusCodeAnalyser;
 
-import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;

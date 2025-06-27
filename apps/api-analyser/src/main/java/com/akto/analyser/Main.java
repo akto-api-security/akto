@@ -5,7 +5,7 @@ import com.akto.dao.AccountSettingsDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.AccountSettings;
 import com.akto.dto.HttpResponseParams;
-import com.akto.log.LoggerMaker;
+import com.akto.dao.common.LoggerMaker;
 import com.akto.parsers.HttpCallParser;
 import com.mongodb.ConnectionString;
 import com.mongodb.client.model.Updates;

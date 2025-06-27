@@ -3,8 +3,8 @@ package com.akto.utils.cloud.serverless.aws;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
 
-import com.akto.log.LoggerMaker;
-import com.akto.log.LoggerMaker.LogDb;
+import com.akto.dao.common.LoggerMaker;
+import com.akto.dao.common.LoggerMaker.LogDb;
 
 import com.akto.utils.cloud.serverless.ServerlessFunction;
 import com.akto.utils.cloud.serverless.UpdateFunctionRequest;

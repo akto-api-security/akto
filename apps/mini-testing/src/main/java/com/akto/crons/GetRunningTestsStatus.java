@@ -8,8 +8,8 @@ import java.util.concurrent.ScheduledExecutorService;
 
 import org.bson.types.ObjectId;
 
-import com.akto.data_actor.DataActor;
-import com.akto.data_actor.DataActorFactory;
+import com.akto.util.data_actor.DataActor;
+import com.akto.util.data_actor.DataActorFactory;
 import com.akto.dto.testing.TestingRun;
 import com.akto.dto.testing.TestingRunResultSummary;
 

@@ -1,4 +1,4 @@
-package com.akto.data_actor;
+package com.akto.util.data_actor;
 
 import static com.akto.util.Constants.ID;
 
@@ -12,6 +12,9 @@ import java.util.Set;
 
 import com.akto.bulk_update_util.ApiInfoBulkUpdate;
 import com.akto.dao.*;
+import com.akto.dao.common.LoggerMaker;
+import com.akto.dao.common.UsageMetricCalculator;
+import com.akto.dao.common.UsageMetricHandler;
 import com.akto.dao.filter.MergedUrlsDao;
 import com.akto.dao.metrics.MetricDataDao;
 import com.akto.dao.settings.DataControlSettingsDao;
@@ -43,7 +46,6 @@ import com.akto.dao.testing.TestingRunResultDao;
 import com.akto.dao.testing.TestingRunResultSummariesDao;
 import com.akto.dao.testing.WorkflowTestResultsDao;
 import com.akto.dao.testing.WorkflowTestsDao;
-import com.akto.dao.testing.config.TestCollectionPropertiesDao;
 import com.akto.dao.testing.config.TestScriptsDao;
 import com.akto.dao.testing.sources.TestSourceConfigsDao;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
@@ -80,10 +82,7 @@ import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods;
 import com.akto.dto.type.URLMethods.Method;
 import com.akto.dto.usage.MetricTypes;
-import com.akto.log.LoggerMaker;
-import com.akto.log.LoggerMaker.LogDb;
-import com.akto.usage.UsageMetricCalculator;
-import com.akto.usage.UsageMetricHandler;
+
 import com.akto.util.Constants;
 import com.mongodb.BasicDBObject;
 import com.mongodb.bulk.BulkWriteResult;

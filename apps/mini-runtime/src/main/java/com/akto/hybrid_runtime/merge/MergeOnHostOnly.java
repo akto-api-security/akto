@@ -8,7 +8,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import com.akto.log.LoggerMaker;
+import com.akto.dao.common.LoggerMaker;
 import com.mongodb.client.model.Projections;
 import org.bson.conversions.Bson;
 

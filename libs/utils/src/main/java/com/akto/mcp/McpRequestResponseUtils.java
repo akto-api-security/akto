@@ -2,8 +2,8 @@ package com.akto.mcp;
 
 import com.akto.dto.HttpResponseParams;
 import com.akto.jsonrpc.JsonRpcUtils;
-import com.akto.log.LoggerMaker;
-import com.akto.log.LoggerMaker.LogDb;
+import com.akto.dao.common.LoggerMaker;
+import com.akto.dao.common.LoggerMaker.LogDb;
 import com.akto.mcp.McpJsonRpcModel.McpParams;
 import com.akto.util.JSONUtils;
 import com.akto.util.Pair;

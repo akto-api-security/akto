@@ -3,7 +3,7 @@ package com.akto.notifications.slack;
 import com.akto.dao.context.Context;
 import com.akto.dao.notifications.SlackWebhooksDao;
 import com.akto.dto.notifications.SlackWebhook;
-import com.akto.log.LoggerMaker;
+import com.akto.dao.common.LoggerMaker;
 import com.mongodb.BasicDBObject;
 import com.slack.api.Slack;
 import com.slack.api.webhook.WebhookResponse;

@@ -8,7 +8,7 @@ import java.util.concurrent.ConcurrentMap;
 import com.akto.dto.type.URLStatic;
 import com.akto.dto.type.URLMethods.Method;
 import com.akto.dto.HttpResponseParams;
-import com.akto.log.LoggerMaker;
+import com.akto.dao.common.LoggerMaker;
 
 public class URLAggregator {
 

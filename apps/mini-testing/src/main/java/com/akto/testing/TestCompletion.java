@@ -11,12 +11,12 @@ import java.util.concurrent.ScheduledExecutorService;
 import org.bson.types.ObjectId;
 import com.akto.crons.GetRunningTestsStatus;
 import com.akto.dao.context.Context;
-import com.akto.data_actor.DataActor;
-import com.akto.data_actor.DataActorFactory;
+import com.akto.util.data_actor.DataActor;
+import com.akto.util.data_actor.DataActorFactory;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.testing.TestingRun;
-import com.akto.log.LoggerMaker;
-import com.akto.log.LoggerMaker.LogDb;
+import com.akto.dao.common.LoggerMaker;
+import com.akto.dao.common.LoggerMaker.LogDb;
 import com.akto.metrics.AllMetrics;
 
 public class TestCompletion {

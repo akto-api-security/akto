@@ -1,7 +1,7 @@
 package com.akto.dependency_flow;
 
-import com.akto.data_actor.DataActor;
-import com.akto.data_actor.DataActorFactory;
+import com.akto.util.data_actor.DataActor;
+import com.akto.util.data_actor.DataActorFactory;
 import com.akto.dto.dependency_flow.Connection;
 import com.akto.dto.dependency_flow.Edge;
 import com.akto.dto.dependency_flow.Node;

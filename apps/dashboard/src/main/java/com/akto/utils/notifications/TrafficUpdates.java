@@ -1,6 +1,5 @@
 package com.akto.utils.notifications;
 
-import com.akto.calendar.DateUtils;
 import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.traffic_metrics.TrafficMetricsAlertsDao;
@@ -8,9 +7,8 @@ import com.akto.dao.traffic_metrics.TrafficMetricsDao;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.traffic_metrics.TrafficMetrics;
 import com.akto.dto.traffic_metrics.TrafficMetricsAlert;
-import com.akto.log.LoggerMaker;
+import com.akto.dao.common.LoggerMaker;
 import com.akto.notifications.slack.DailyUpdate;
-import com.akto.runtime.Main;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.MongoCursor;

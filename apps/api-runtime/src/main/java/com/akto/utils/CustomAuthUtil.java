@@ -16,8 +16,8 @@ import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.CustomAuthType;
 import com.akto.dto.type.SingleTypeInfo;
-import com.akto.log.LoggerMaker;
-import com.akto.log.LoggerMaker.LogDb;
+import com.akto.dao.common.LoggerMaker;
+import com.akto.dao.common.LoggerMaker.LogDb;
 
 import static com.akto.dto.ApiInfo.ALL_AUTH_TYPES_FOUND;
 import static com.akto.runtime.utils.Utils.parseCookie;

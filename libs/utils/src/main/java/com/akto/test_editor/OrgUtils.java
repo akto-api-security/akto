@@ -1,8 +1,8 @@
 package com.akto.test_editor;
 
 import com.akto.dao.context.Context;
-import com.akto.data_actor.DataActor;
-import com.akto.data_actor.DataActorFactory;
+import com.akto.util.data_actor.DataActor;
+import com.akto.util.data_actor.DataActorFactory;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.billing.Tokens;
 import com.mongodb.BasicDBObject;

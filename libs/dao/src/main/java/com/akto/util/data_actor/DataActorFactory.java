@@ -1,4 +1,4 @@
-package com.akto.data_actor;
+package com.akto.util.data_actor;
 
 import com.akto.RuntimeMode;
 

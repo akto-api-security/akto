@@ -1,7 +1,7 @@
 package com.akto.hybrid_runtime;
 
 import com.akto.dao.context.Context;
-import com.akto.data_actor.DataActorFactory;
+import com.akto.util.data_actor.DataActorFactory;
 import com.akto.dto.APIConfig;
 import com.akto.dto.AccountSettings;
 import com.akto.dto.ApiCollection;
@@ -12,8 +12,8 @@ import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.traffic.CollectionTags;
 import com.akto.hybrid_parsers.HttpCallParser;
 import com.akto.hybrid_runtime.Main.AccountInfo;
-import com.akto.log.LoggerMaker;
-import com.akto.log.LoggerMaker.LogDb;
+import com.akto.dao.common.LoggerMaker;
+import com.akto.dao.common.LoggerMaker.LogDb;
 import com.akto.mcp.McpSchema;
 import com.akto.mcp.McpSchema.CallToolRequest;
 import com.akto.mcp.McpSchema.JSONRPCRequest;

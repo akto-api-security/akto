@@ -3,8 +3,8 @@ package com.akto.action;
 import java.util.List;
 
 import com.akto.dto.Log;
-import com.akto.log.LoggerMaker;
-import com.akto.log.LoggerMaker.LogDb;
+import com.akto.dao.common.LoggerMaker;
+import com.akto.dao.common.LoggerMaker.LogDb;
 
 public class DbLogsAction extends UserAction {
     

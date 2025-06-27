@@ -1,21 +1,17 @@
 package com.akto.action;
 
 import java.net.URI;
-import java.net.URL;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
-import org.bson.types.Code;
 import org.bson.types.ObjectId;
-import org.checkerframework.checker.units.qual.s;
 import org.json.JSONObject;
 
 import com.akto.action.observe.Utils;
@@ -25,7 +21,6 @@ import com.akto.dao.CodeAnalysisCollectionDao;
 import com.akto.dao.RBACDao;
 import com.akto.dao.UsersDao;
 import com.akto.dao.context.Context;
-import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.CodeAnalysisApi;
 import com.akto.dto.CodeAnalysisApiInfo;
@@ -33,11 +28,9 @@ import com.akto.dto.CodeAnalysisApiLocation;
 import com.akto.dto.CodeAnalysisCollection;
 import com.akto.dto.RBAC;
 import com.akto.dto.RBAC.Role;
-import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.type.SingleTypeInfo.SuperType;
-import com.akto.listener.InitializerListener;
-import com.akto.log.LoggerMaker;
-import com.akto.log.LoggerMaker.LogDb;
+import com.akto.dao.common.LoggerMaker;
+import com.akto.dao.common.LoggerMaker.LogDb;
 import com.akto.mixpanel.AktoMixpanel;
 import com.akto.util.DashboardMode;
 import com.akto.util.EmailAccountName;

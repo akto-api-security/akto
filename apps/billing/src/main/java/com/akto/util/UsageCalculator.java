@@ -11,7 +11,7 @@ import com.akto.dto.billing.OrganizationUsage;
 import com.akto.dto.usage.MetricTypes;
 import com.akto.dto.usage.UsageMetric;
 import com.akto.log.CacheLoggerMaker;
-import com.akto.log.LoggerMaker;
+import com.akto.dao.common.LoggerMaker;
 import com.akto.notifications.email.SendgridEmail;
 import com.akto.stigg.StiggReporterClient;
 import com.mongodb.BasicDBList;

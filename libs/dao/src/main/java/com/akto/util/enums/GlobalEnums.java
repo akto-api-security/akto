@@ -108,6 +108,10 @@ public class GlobalEnums {
         CUSTOM
     }
 
+    public enum ENCODING_TYPE{
+        BASE_64_ENCODED, JWT
+    }
+
 
     /* ********************************************************************** */
 }
