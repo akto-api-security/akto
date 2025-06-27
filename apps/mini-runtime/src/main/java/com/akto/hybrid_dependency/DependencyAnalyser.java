@@ -1,8 +1,8 @@
 package com.akto.hybrid_dependency;
 
 import com.akto.dao.context.Context;
-import com.akto.util.data_actor.DataActor;
-import com.akto.util.data_actor.DataActorFactory;
+import com.akto.data_actor.DataActor;
+import com.akto.data_actor.DataActorFactory;
 import com.akto.hybrid_dependency.store.BFStore;
 import com.akto.hybrid_dependency.store.HashSetStore;
 import com.akto.hybrid_dependency.store.Store;

@@ -1,7 +1,7 @@
 package com.akto.test_editor.filter.data_operands_impl;
 
-import com.akto.util.data_actor.DataActor;
-import com.akto.util.data_actor.DataActorFactory;
+import com.akto.data_actor.DataActor;
+import com.akto.data_actor.DataActorFactory;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.test_editor.DataOperandFilterRequest;
 import java.net.MalformedURLException;

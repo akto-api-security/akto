@@ -1,10 +1,10 @@
 package com.akto.dto.testing;
 
 import com.akto.dao.testing.EndpointLogicalGroupDao;
+import com.akto.data_actor.DataActor;
+import com.akto.data_actor.DataActorFactory;
 import com.akto.dto.RawApi;
 import com.akto.dto.testing.sources.AuthWithCond;
-import com.akto.util.data_actor.DataActor;
-import com.akto.util.data_actor.DataActorFactory;
 import com.mongodb.client.model.Filters;
 import org.bson.codecs.pojo.annotations.BsonIgnore;
 import org.bson.types.ObjectId;

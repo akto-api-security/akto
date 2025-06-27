@@ -1,7 +1,7 @@
 package com.akto.hybrid_runtime;
 
 import com.akto.dao.context.Context;
-import com.akto.util.data_actor.DataActorFactory;
+import com.akto.data_actor.DataActorFactory;
 import com.akto.dto.APIConfig;
 import com.akto.dto.AccountSettings;
 import com.akto.dto.ApiCollection;

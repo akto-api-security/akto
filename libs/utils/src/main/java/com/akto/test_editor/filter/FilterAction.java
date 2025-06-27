@@ -7,14 +7,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import com.akto.util.data_actor.DataActor;
-import com.akto.util.data_actor.DataActorFactory;
 import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.testing.AccessMatrixUrlToRole;
 
 import com.akto.dao.test_editor.TestEditorEnums;
 import com.akto.dao.test_editor.TestEditorEnums.BodyOperator;
 import com.akto.dao.test_editor.TestEditorEnums.CollectionOperands;
+import com.akto.data_actor.DataActor;
+import com.akto.data_actor.DataActorFactory;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.OriginalHttpRequest;

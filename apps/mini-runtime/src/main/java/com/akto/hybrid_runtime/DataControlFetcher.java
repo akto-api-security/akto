@@ -1,6 +1,6 @@
 package com.akto.hybrid_runtime;
 
-import com.akto.util.data_actor.DataActor;
+import com.akto.data_actor.DataActor;
 import com.akto.dto.settings.DataControlSettings;
 import com.akto.testing_db_layer_client.ClientLayer;
 import com.mongodb.BasicDBList;
