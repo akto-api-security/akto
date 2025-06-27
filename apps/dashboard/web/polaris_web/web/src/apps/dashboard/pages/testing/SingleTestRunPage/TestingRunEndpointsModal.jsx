@@ -39,6 +39,7 @@ const TestingEndpointsModal = ({ showTestingEndpointsModal, setShowTestingEndpoi
 
             limitedApisList = limitedApisList.map(api => ({
                 ...api,
+                id: api.method + "###" + api.url + "###" + api.apiCollectionId + "###" + Math.random(),
                 apiEndpointComp: <GetPrettifyEndpoint method={api.method} url={api.url} isNew={false} maxWidth="15vw" />,
                 apiCollectionName: collectionsMap?.[api.apiCollectionId] || ""
             }));
