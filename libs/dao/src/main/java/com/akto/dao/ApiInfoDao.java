@@ -179,4 +179,9 @@ public class ApiInfoDao extends AccountsContextDao<ApiInfo>{
         );
     }
 
+    public List<ApiInfo> find(BasicDBObject query, BasicDBObject sort, int i, int i1) {
+        Bson filter = Filters.and(query);
+        return instance.findAll(filter, i, i1, sort);
+    }
+
 }
