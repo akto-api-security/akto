@@ -2,8 +2,9 @@ package com.akto.open_api.parser.parameter_parser;
 
 import java.util.HashMap;
 import java.util.List;
-import com.akto.dao.common.LoggerMaker;
-import com.akto.dao.common.LoggerMaker.LogDb;
+
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 
 import io.swagger.oas.inflector.examples.ExampleBuilder;
 import io.swagger.oas.inflector.examples.models.Example;

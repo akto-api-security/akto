@@ -11,7 +11,7 @@ import com.akto.dto.RBAC;
 import com.akto.dto.billing.FeatureAccess;
 import com.akto.dto.billing.OrgMetaData;
 import com.akto.dto.billing.Organization;
-import com.akto.dao.common.LoggerMaker;
+import com.akto.log.LoggerMaker;
 import com.akto.util.UsageUtils;
 import com.akto.util.http_util.CoreHTTPClient;
 import com.google.gson.Gson;

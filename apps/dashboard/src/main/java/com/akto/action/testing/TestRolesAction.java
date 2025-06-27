@@ -11,7 +11,7 @@ import com.akto.dto.data_types.Predicate;
 import com.akto.dto.data_types.Predicate.Type;
 import com.akto.dto.testing.*;
 import com.akto.dto.testing.sources.AuthWithCond;
-import com.akto.dao.common.LoggerMaker;
+import com.akto.log.LoggerMaker;
 import com.akto.util.Constants;
 import com.akto.util.enums.LoginFlowEnums;
 import com.mongodb.BasicDBObject;

@@ -9,8 +9,8 @@ import com.akto.dao.test_editor.TestEditorEnums.ExecutorOperandTypes;
 import com.akto.dto.test_editor.ExecutionOrderResp;
 import com.akto.dto.test_editor.ExecutorNode;
 import com.akto.dto.test_editor.ModifyExecutionOrderResp;
-import com.akto.dao.common.LoggerMaker;
-import com.akto.dao.common.LoggerMaker.LogDb;
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 
 public class ExecutionListBuilder {
     

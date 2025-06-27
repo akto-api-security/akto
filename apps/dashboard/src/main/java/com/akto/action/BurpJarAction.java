@@ -7,7 +7,7 @@ import com.akto.dto.ApiToken;
 import com.akto.dto.BurpPluginInfo;
 import com.akto.dto.ApiToken.Utility;
 import com.akto.listener.InitializerListener;
-import com.akto.dao.common.LoggerMaker;
+import com.akto.log.LoggerMaker;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
 

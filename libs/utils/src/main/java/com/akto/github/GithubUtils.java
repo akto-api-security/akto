@@ -8,7 +8,7 @@ import com.akto.dto.ApiInfo;
 import com.akto.dto.testing.TestingRun;
 import com.akto.dto.testing.TestingRunResult;
 import com.akto.dto.testing.TestingRunResultSummary;
-import com.akto.dao.common.LoggerMaker;
+import com.akto.log.LoggerMaker;
 import com.akto.util.enums.GlobalEnums;
 import com.akto.util.http_util.CoreHTTPClient;
 import com.mongodb.client.model.Filters;

@@ -1,8 +1,8 @@
 package com.akto.filter;
 
 import com.akto.listener.InfraMetricsListener;
-import com.akto.dao.common.LoggerMaker;
-import com.akto.dao.common.LoggerMaker.LogDb;
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.Tag;

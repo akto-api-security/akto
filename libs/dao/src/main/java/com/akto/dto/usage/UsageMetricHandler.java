@@ -1,4 +1,4 @@
-package com.akto.dao.common;
+package com.akto.dto.usage;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -15,10 +15,8 @@ import com.akto.dao.usage.UsageMetricsDao;
 import com.akto.dto.AccountSettings;
 import com.akto.dto.billing.FeatureAccess;
 import com.akto.dto.billing.Organization;
-import com.akto.dto.usage.MetricTypes;
-import com.akto.dto.usage.UsageMetric;
-import com.akto.dto.usage.UsageMetricInfo;
-import com.akto.dao.common.LoggerMaker.LogDb;
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.DashboardMode;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.FindOneAndReplaceOptions;

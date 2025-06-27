@@ -12,8 +12,8 @@ import okhttp3.Response;
 import okhttp3.ResponseBody;
 
 import com.akto.github.GithubFile;
-import com.akto.dao.common.LoggerMaker;
-import com.akto.dao.common.LoggerMaker.LogDb;
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.http_util.CoreHTTPClient;
 
 public class GithubSync {

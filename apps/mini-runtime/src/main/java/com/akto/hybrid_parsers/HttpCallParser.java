@@ -1,6 +1,6 @@
 package com.akto.hybrid_parsers;
 
-import com.akto.dao.common.RuntimeMode;
+import com.akto.RuntimeMode;
 import com.akto.billing.UsageMetricUtils;
 import com.akto.dao.context.Context;
 import com.akto.dao.traffic_metrics.TrafficMetricsDao;
@@ -25,8 +25,8 @@ import com.akto.dto.type.URLMethods.Method;
 import com.akto.dto.usage.MetricTypes;
 import com.akto.graphql.GraphQLUtils;
 import com.akto.jsonrpc.JsonRpcUtils;
-import com.akto.dao.common.LoggerMaker;
-import com.akto.dao.common.LoggerMaker.LogDb;
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import com.akto.mcp.McpRequestResponseUtils;
 import com.akto.runtime.RuntimeUtil;
 import com.akto.runtime.parser.SampleParser;

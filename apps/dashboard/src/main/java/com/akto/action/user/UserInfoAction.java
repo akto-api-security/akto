@@ -3,7 +3,7 @@ package com.akto.action.user;
 import com.akto.action.UserAction;
 import com.akto.dao.UsersDao;
 import com.akto.dto.User;
-import com.akto.dao.common.LoggerMaker;
+import com.akto.log.LoggerMaker;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
 import com.opensymphony.xwork2.Action;

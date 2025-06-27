@@ -12,9 +12,6 @@ import java.util.Set;
 
 import com.akto.bulk_update_util.ApiInfoBulkUpdate;
 import com.akto.dao.*;
-import com.akto.dao.common.LoggerMaker;
-import com.akto.dao.common.UsageMetricCalculator;
-import com.akto.dao.common.UsageMetricHandler;
 import com.akto.dao.filter.MergedUrlsDao;
 import com.akto.dao.metrics.MetricDataDao;
 import com.akto.dao.settings.DataControlSettingsDao;
@@ -82,7 +79,9 @@ import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods;
 import com.akto.dto.type.URLMethods.Method;
 import com.akto.dto.usage.MetricTypes;
-
+import com.akto.dto.usage.UsageMetricCalculator;
+import com.akto.dto.usage.UsageMetricHandler;
+import com.akto.log.LoggerMaker;
 import com.akto.util.Constants;
 import com.mongodb.BasicDBObject;
 import com.mongodb.bulk.BulkWriteResult;

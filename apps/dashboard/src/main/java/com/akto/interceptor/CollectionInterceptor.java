@@ -4,9 +4,9 @@ import java.util.Set;
 
 import com.akto.action.TrafficAction;
 import com.akto.action.observe.InventoryAction;
-import com.akto.dao.common.LoggerMaker;
-import com.akto.dao.common.LoggerMaker.LogDb;
-import com.akto.dao.common.UsageMetricCalculator;
+import com.akto.dto.usage.UsageMetricCalculator;
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.DashboardMode;
 import com.opensymphony.xwork2.ActionInvocation;
 import com.opensymphony.xwork2.ActionSupport;

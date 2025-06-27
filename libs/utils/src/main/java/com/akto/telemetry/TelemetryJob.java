@@ -5,7 +5,7 @@ import com.akto.dao.context.Context;
 import com.akto.dto.AccountSettings;
 import com.akto.dto.Log;
 import com.akto.dto.billing.Organization;
-import com.akto.dao.common.LoggerMaker;
+import com.akto.log.LoggerMaker;
 import com.akto.util.EmailAccountName;
 import com.akto.util.http_util.CoreHTTPClient;
 import com.mongodb.BasicDBList;

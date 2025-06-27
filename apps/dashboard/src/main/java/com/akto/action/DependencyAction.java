@@ -9,7 +9,7 @@ import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.dependency_flow.*;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.URLMethods;
-import com.akto.dao.common.LoggerMaker;
+import com.akto.log.LoggerMaker;
 import com.akto.runtime.RelationshipSync;
 import com.akto.test_editor.execution.Build;
 import com.akto.utils.Utils;

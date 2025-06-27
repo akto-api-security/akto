@@ -7,7 +7,7 @@ import com.akto.dao.traffic_metrics.TrafficMetricsDao;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.traffic_metrics.TrafficMetrics;
 import com.akto.dto.traffic_metrics.TrafficMetricsAlert;
-import com.akto.dao.common.LoggerMaker;
+import com.akto.log.LoggerMaker;
 import com.akto.notifications.slack.DailyUpdate;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;

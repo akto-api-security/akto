@@ -8,8 +8,8 @@ import javax.servlet.ServletContextListener;
 
 import com.akto.DaoInit;
 import com.akto.dao.AccountsDao;
-import com.akto.dao.common.LoggerMaker;
-import com.akto.dao.common.LoggerMaker.LogDb;
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import com.mongodb.ConnectionString;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
