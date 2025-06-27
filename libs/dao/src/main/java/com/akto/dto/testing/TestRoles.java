@@ -1,27 +1,14 @@
 package com.akto.dto.testing;
 
 import com.akto.dao.testing.EndpointLogicalGroupDao;
-// import com.akto.data_actor.DataActor;
-// import com.akto.data_actor.DataActorFactory;
-import com.akto.dto.RawApi;
 import com.akto.dto.testing.sources.AuthWithCond;
 import com.mongodb.client.model.Filters;
 import org.bson.codecs.pojo.annotations.BsonIgnore;
 import org.bson.types.ObjectId;
 
-import java.util.ArrayList;
 import java.util.List;
-import com.akto.dao.ApiInfoDao;
-import com.akto.dao.SampleDataDao;
-import com.akto.dao.common.AuthPolicy;
-import com.akto.dto.*;
-import com.akto.dto.traffic.SampleData;
-import com.akto.dto.type.URLMethods;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.util.*;
-import static com.akto.util.Constants.default_token;
 
 import static com.akto.util.Constants.ID;
 
@@ -154,25 +141,4 @@ public class TestRoles {
         this.endpointLogicalGroupIdHexId = endpointLogicalGroupIdHexId;
     }
 
-    public static HttpResponseParams createResponseParamsFromRawApi(RawApi rawApi) {
-        if (rawApi == null || rawApi.getResponse() == null) {
-            return null;
-        }
-        HttpResponseParams responseParams = new HttpResponseParams();
-        responseParams.setStatusCode(rawApi.getResponse().getStatusCode());
-        responseParams.setHeaders(rawApi.getResponse().getHeaders());
-        responseParams.setPayload(rawApi.getResponse().getBody());
-        HttpRequestParams requestParams = new HttpRequestParams();
-        requestParams.setHeaders(rawApi.fetchReqHeaders());
-        responseParams.setRequestParams(requestParams);
-        return responseParams;
-
-    }
-
-    public static ApiInfo createApiInfoFromRawApi(HttpResponseParams httpResponseParams) {
-        if (httpResponseParams == null || httpResponseParams.requestParams == null) {
-            return null;
-        }
-        return new ApiInfo(httpResponseParams);
-    }
 }

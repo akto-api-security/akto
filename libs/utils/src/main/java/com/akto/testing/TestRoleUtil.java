@@ -7,26 +7,27 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import org.json.Test;
+import com.akto.dto.*;
 
-import com.akto.dao.ApiInfoDao;
 import com.akto.dao.common.AuthPolicy;
 import com.akto.data_actor.DataActor;
 import com.akto.data_actor.DataActorFactory;
-import com.akto.dto.ApiInfo;
-import com.akto.dto.CustomAuthType;
-import com.akto.dto.HttpResponseParams;
-import com.akto.dto.RawApi;
 import com.akto.dto.testing.AuthMechanism;
 import com.akto.dto.testing.AuthParam;
 import com.akto.dto.testing.HardcodedAuthParam;
 import com.akto.dto.testing.TestRoles;
 import com.akto.dto.testing.sources.AuthWithCond;
 import com.akto.dto.traffic.SampleData;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import static com.akto.util.Constants.default_token;
 
 public class TestRoleUtil {
 
         private static final DataActor dataActor = DataActorFactory.fetchInstance();
+
+        private static final Logger log = LoggerFactory.getLogger(TestRoles.class);
 
     public static AuthMechanism findDefaultAuthMechanism(TestRoles testRole) {
         try {
@@ -75,7 +76,6 @@ public class TestRoleUtil {
 
                 Set<Set<ApiInfo.AuthType>> allAuthTypesFound = new HashSet<>();
                 ApiInfo apiInfo= new ApiInfo(ApiInfo.ApiType.REST, allAuthTypesFound);
-                //ApiInfo apiInfo = createApiInfoFromRawApi(httpResponseParams);
 
                 Map<String, List<String>> headers = rawApi.fetchReqHeaders();
                 List<String> headerKeys = new ArrayList<>(headers.keySet());
@@ -96,7 +96,7 @@ public class TestRoleUtil {
 
 
                 // TODO
-                ApiInfo apiInfoLatest = ApiInfoDao.fetchLatestAuthenticatedByApiCollectionId(rawApi.getRawApiMetadata().getApiCollectionId());
+                ApiInfo apiInfoLatest = dataActor.fetchLatestAuthenticatedByApiCollectionId(rawApi.getRawApiMetadata().getApiCollectionId());
                 String latestUrl = rawApi.getRequest().getUrl();
                 if( apiInfoLatest != null)
                     latestUrl = apiInfoLatest.getId().getUrl();
@@ -190,6 +190,21 @@ public class TestRoleUtil {
         }
 
         return findDefaultAuthMechanism(testRole);
+    }
+
+    public static HttpResponseParams createResponseParamsFromRawApi(RawApi rawApi) {
+        if (rawApi == null || rawApi.getResponse() == null) {
+            return null;
+        }
+        HttpResponseParams responseParams = new HttpResponseParams();
+        responseParams.setStatusCode(rawApi.getResponse().getStatusCode());
+        responseParams.setHeaders(rawApi.getResponse().getHeaders());
+        responseParams.setPayload(rawApi.getResponse().getBody());
+        HttpRequestParams requestParams = new HttpRequestParams();
+        requestParams.setHeaders(rawApi.fetchReqHeaders());
+        responseParams.setRequestParams(requestParams);
+        return responseParams;
+
     }
 
 

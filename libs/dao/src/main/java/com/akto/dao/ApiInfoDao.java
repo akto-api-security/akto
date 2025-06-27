@@ -176,21 +176,7 @@ public class ApiInfoDao extends AccountsContextDao<ApiInfo>{
         );
     }
 
-    public static ApiInfo fetchLatestAuthenticatedByApiCollectionId(int apiCollectionId) {
-        // Query: apiCollectionId matches, allAuthTypesFound does NOT contain only UNAUTHENTICATED
-        BasicDBObject query = new BasicDBObject("_id.apiCollectionId", apiCollectionId)
-                .append("allAuthTypesFound", new BasicDBObject("$not", new BasicDBObject("$size", 1)))
-                .append("allAuthTypesFound", new BasicDBObject("$ne", Collections.singleton(Collections.singleton(ApiInfo.AuthType.UNAUTHENTICATED))));
-        BasicDBObject sort = new BasicDBObject("lastSeen", -1); // descending
-
-        List<ApiInfo> results = ApiInfoDao.instance.find(query, sort, 0, 1);
-        if (results != null && !results.isEmpty()) {
-            return results.get(0);
-        }
-        return null;
-    }
-
-    private List<ApiInfo> find(BasicDBObject query, BasicDBObject sort, int i, int i1) {
+    public List<ApiInfo> find(BasicDBObject query, BasicDBObject sort, int i, int i1) {
         Bson filter = Filters.and(query);
         return instance.findAll(filter, i, i1, sort);
     }

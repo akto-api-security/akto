@@ -53,6 +53,8 @@ import java.net.URISyntaxException;
 import java.util.*;
 import java.util.concurrent.*;
 
+import static com.akto.testing.TestRoleUtil.findMatchingAuthMechanism;
+
 public class TestExecutor {
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(TestExecutor.class, LogDb.TESTING);
@@ -157,7 +159,7 @@ public class TestExecutor {
         }
 
         try {
-            StatusCodeAnalyser.run(sampleDataMapForStatusCodeAnalyser, sampleMessageStore , attackerTestRole.findMatchingAuthMechanism(null), testingRun.getTestingRunConfig());
+            StatusCodeAnalyser.run(sampleDataMapForStatusCodeAnalyser, sampleMessageStore , findMatchingAuthMechanism(null, null), testingRun.getTestingRunConfig());
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error while running status code analyser " + e.getMessage(), LogDb.TESTING);
         }
@@ -618,7 +620,7 @@ public class TestExecutor {
                     rawApi.setRawApiMetdata(rawApiMetadata);
                     loggerMaker.infoAndAddToDb("ATTACKER_TOKEN_ALL test role not found", LogDb.TESTING);
                 } else {
-                    attackerAuthMechanism = attackerTestRole.findMatchingAuthMechanism(rawApi);
+                    attackerAuthMechanism = TestRoleUtil.findMatchingAuthMechanism(attackerTestRole,rawApi);
                 }
             }
             return runTestNew(apiInfoKey, testRunId, testingUtil.getSampleMessageStore(), attackerAuthMechanism, testingUtil.getCustomAuthTypes(), testRunResultSummaryId, testConfig, testingRunConfig, debug, testLogs);
