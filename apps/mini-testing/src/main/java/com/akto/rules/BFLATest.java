@@ -7,7 +7,7 @@ import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.RawApi;
 import com.akto.dto.testing.*;
-import com.akto.dao.common.LoggerMaker.LogDb;
+import com.akto.log.LoggerMaker.LogDb;
 import com.akto.store.TestingUtil;
 import com.akto.test_editor.execution.Executor;
 import com.akto.testing.ApiExecutor;

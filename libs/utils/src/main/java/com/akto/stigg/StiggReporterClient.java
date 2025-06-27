@@ -3,7 +3,7 @@ package com.akto.stigg;
 import com.akto.dao.ConfigsDao;
 import com.akto.dto.Config;
 import com.akto.dto.billing.Organization;
-import com.akto.dao.common.LoggerMaker;
+import com.akto.log.LoggerMaker;
 import com.akto.util.http_util.CoreHTTPClient;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;

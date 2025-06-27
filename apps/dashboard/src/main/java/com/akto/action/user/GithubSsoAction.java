@@ -12,7 +12,7 @@ import com.akto.dto.Config;
 import com.akto.dto.User;
 import com.akto.utils.sso.SsoUtils;
 import com.akto.github.GithubUtils;
-import com.akto.dao.common.LoggerMaker;
+import com.akto.log.LoggerMaker;
 import com.akto.util.DashboardMode;
 import com.akto.util.http_util.CoreHTTPClient;
 import com.mongodb.BasicDBObject;

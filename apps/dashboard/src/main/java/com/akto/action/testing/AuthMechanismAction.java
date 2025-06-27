@@ -6,7 +6,7 @@ import com.akto.dao.testing.TestRolesDao;
 import com.akto.dao.testing.TestingRunDao;
 import com.akto.dao.testing.WorkflowTestResultsDao;
 import com.akto.dto.testing.*;
-import com.akto.dao.common.LoggerMaker;
+import com.akto.log.LoggerMaker;
 import com.akto.testing.TestExecutor;
 import com.akto.util.Constants;
 import com.akto.util.enums.LoginFlowEnums;

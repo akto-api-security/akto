@@ -17,7 +17,7 @@ import com.akto.dto.ApiToken.Utility;
 import com.akto.dto.billing.FeatureAccess;
 import com.akto.dto.billing.Organization;
 import com.akto.listener.InitializerListener;
-import com.akto.dao.common.LoggerMaker;
+import com.akto.log.LoggerMaker;
 import com.akto.util.Constants;
 import com.akto.util.EmailAccountName;
 import com.akto.utils.Intercom;

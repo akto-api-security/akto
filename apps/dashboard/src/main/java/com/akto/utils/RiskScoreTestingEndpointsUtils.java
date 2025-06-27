@@ -12,8 +12,8 @@ import com.akto.dto.ApiCollectionUsers;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.testing.RiskScoreTestingEndpoints;
 import com.akto.dto.testing.TestingEndpoints;
-import com.akto.dao.common.LoggerMaker;
-import com.akto.dao.common.LoggerMaker.LogDb;
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 
 public class RiskScoreTestingEndpointsUtils {
     private static final LoggerMaker loggerMaker = new LoggerMaker(RiskScoreTestingEndpointsUtils.class);

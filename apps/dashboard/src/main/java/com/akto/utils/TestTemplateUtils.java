@@ -1,8 +1,8 @@
 package com.akto.utils;
 
-import com.akto.dao.common.LoggerMaker;
-
 import static com.akto.listener.InitializerListener.loadTemplateFilesFromDirectory;
+
+import com.akto.log.LoggerMaker;
 
 public class TestTemplateUtils {
 

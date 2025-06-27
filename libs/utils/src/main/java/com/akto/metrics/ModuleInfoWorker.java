@@ -3,7 +3,7 @@ package com.akto.metrics;
 import com.akto.dao.context.Context;
 import com.akto.util.data_actor.DataActor;
 import com.akto.dto.monitoring.ModuleInfo;
-import com.akto.dao.common.LoggerMaker;
+import com.akto.log.LoggerMaker;
 import com.akto.util.VersionUtil;
 
 import java.io.InputStream;

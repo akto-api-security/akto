@@ -12,7 +12,7 @@ import com.akto.dto.testing.TestingRunConfig;
 import com.akto.dto.traffic.Key;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.URLMethods;
-import com.akto.dao.common.LoggerMaker;
+import com.akto.log.LoggerMaker;
 import com.akto.testing.ApiExecutor;
 import com.akto.util.Constants;
 import com.akto.util.HttpRequestResponseUtils;

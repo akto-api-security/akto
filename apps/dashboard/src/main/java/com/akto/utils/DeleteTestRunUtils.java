@@ -17,7 +17,7 @@ import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.testing.DeleteTestRuns;
 import com.akto.dto.testing.TestingRunResult;
 import com.akto.dto.usage.MetricTypes;
-import com.akto.dao.common.UsageMetricHandler;
+import com.akto.dto.usage.UsageMetricHandler;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
 import com.mongodb.client.result.DeleteResult;

@@ -2,7 +2,7 @@ package com.akto.action;
 
 import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dto.type.SingleTypeInfo;
-import com.akto.dao.common.LoggerMaker;
+import com.akto.log.LoggerMaker;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.Aggregates;
 import com.mongodb.client.model.Filters;

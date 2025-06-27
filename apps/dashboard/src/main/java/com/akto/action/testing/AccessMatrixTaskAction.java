@@ -7,7 +7,7 @@ import com.akto.dto.HttpResponseParams;
 import com.akto.dto.testing.EndpointLogicalGroup;
 import com.akto.dto.traffic.Key;
 import com.akto.dto.traffic.SampleData;
-import com.akto.dao.common.LoggerMaker;
+import com.akto.log.LoggerMaker;
 import com.akto.parsers.HttpCallParser;
 import com.mongodb.client.result.DeleteResult;
 import com.mongodb.client.result.UpdateResult;

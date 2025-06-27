@@ -3,8 +3,9 @@ package com.akto.action.metrics;
 import com.akto.action.UserAction;
 import com.akto.dao.metrics.MetricDataDao;
 import com.akto.dto.metrics.MetricData;
-import com.akto.dao.common.LoggerMaker;
-import com.akto.dao.common.LoggerMaker.LogDb;
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
+
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;

@@ -1,5 +1,6 @@
-package com.akto.dao.common;
+package com.akto.log;
 
+import com.akto.RuntimeMode;
 import com.akto.dao.*;
 import com.akto.dao.context.Context;
 import com.akto.util.data_actor.DataActor;

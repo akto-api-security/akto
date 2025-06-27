@@ -1,7 +1,7 @@
 package com.akto.utils.cloud;
 
-import com.akto.dao.common.LoggerMaker;
-import com.akto.dao.common.LoggerMaker.LogDb;
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import com.amazonaws.services.cloudformation.AmazonCloudFormation;
 import com.amazonaws.services.cloudformation.AmazonCloudFormationClientBuilder;
 import com.amazonaws.services.cloudformation.model.*;

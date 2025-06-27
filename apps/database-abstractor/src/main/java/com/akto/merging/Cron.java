@@ -4,7 +4,7 @@ import com.akto.dao.context.Context;
 import com.akto.util.data_actor.DbLayer;
 import com.akto.dto.Account;
 import com.akto.dto.dependency_flow.DependencyFlow;
-import com.akto.dao.common.LoggerMaker;
+import com.akto.log.LoggerMaker;
 import com.akto.util.AccountTask;
 
 import java.util.List;
