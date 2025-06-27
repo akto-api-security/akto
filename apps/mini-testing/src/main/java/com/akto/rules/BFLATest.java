@@ -1,7 +1,7 @@
 package com.akto.rules;
 
-import com.akto.util.data_actor.DataActor;
-import com.akto.util.data_actor.DataActorFactory;
+import com.akto.data_actor.DataActor;
+import com.akto.data_actor.DataActorFactory;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.OriginalHttpResponse;

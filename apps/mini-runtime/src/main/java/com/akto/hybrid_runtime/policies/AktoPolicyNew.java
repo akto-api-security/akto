@@ -2,6 +2,8 @@ package com.akto.hybrid_runtime.policies;
 
 import com.akto.dao.*;
 import com.akto.dao.context.Context;
+import com.akto.data_actor.DataActor;
+import com.akto.data_actor.DataActorFactory;
 import com.akto.dto.*;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.runtime_filters.RuntimeFilter;
@@ -15,8 +17,6 @@ import com.akto.dto.type.URLTemplate;
 import com.akto.hybrid_runtime.APICatalogSync;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
-import com.akto.util.data_actor.DataActor;
-import com.akto.util.data_actor.DataActorFactory;
 import com.mongodb.client.model.*;
 import org.bson.conversions.Bson;
 

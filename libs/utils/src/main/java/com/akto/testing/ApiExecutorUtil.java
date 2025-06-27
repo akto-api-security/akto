@@ -12,8 +12,8 @@ import javax.script.SimpleScriptContext;
 
 import com.akto.billing.UsageMetricUtils;
 import com.akto.dao.context.Context;
-import com.akto.util.data_actor.DataActor;
-import com.akto.util.data_actor.DataActorFactory;
+import com.akto.data_actor.DataActor;
+import com.akto.data_actor.DataActorFactory;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.billing.FeatureAccess;
 import com.akto.dto.testing.config.TestScript;

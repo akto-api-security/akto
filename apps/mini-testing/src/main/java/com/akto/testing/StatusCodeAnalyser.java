@@ -2,8 +2,8 @@ package com.akto.testing;
 
 import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.context.Context;
-import com.akto.util.data_actor.DataActor;
-import com.akto.util.data_actor.DataActorFactory;
+import com.akto.data_actor.DataActor;
+import com.akto.data_actor.DataActorFactory;
 import com.akto.dto.*;
 import com.akto.dto.testing.AuthMechanism;
 import com.akto.dto.testing.TestingRunConfig;

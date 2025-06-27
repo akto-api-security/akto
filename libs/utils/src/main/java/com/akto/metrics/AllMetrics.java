@@ -1,8 +1,8 @@
 package com.akto.metrics;
 
 import com.akto.dao.context.Context;
-import com.akto.util.data_actor.DataActor;
-import com.akto.util.data_actor.DataActorFactory;
+import com.akto.data_actor.DataActor;
+import com.akto.data_actor.DataActorFactory;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.metrics.MetricData;
 import com.akto.log.LoggerMaker;

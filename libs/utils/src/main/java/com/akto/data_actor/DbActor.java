@@ -1,4 +1,4 @@
-package com.akto.util.data_actor;
+package com.akto.data_actor;
 
 import com.akto.dto.*;
 import com.akto.dto.ApiInfo.ApiInfoKey;

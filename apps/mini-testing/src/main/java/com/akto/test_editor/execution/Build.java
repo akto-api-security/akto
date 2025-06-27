@@ -1,9 +1,9 @@
 package com.akto.test_editor.execution;
 
 import com.akto.dao.context.Context;
-import com.akto.util.data_actor.DataActor;
-import com.akto.util.data_actor.DataActorFactory;
-import com.akto.util.data_actor.DbLayer;
+import com.akto.data_actor.DataActor;
+import com.akto.data_actor.DataActorFactory;
+import com.akto.data_actor.DbLayer;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.OriginalHttpRequest;

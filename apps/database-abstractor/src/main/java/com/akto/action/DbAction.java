@@ -2,7 +2,7 @@ package com.akto.action;
 
 import com.akto.dao.*;
 import com.akto.dao.context.Context;
-import com.akto.util.data_actor.DbLayer;
+import com.akto.data_actor.DbLayer;
 import com.akto.dto.*;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.billing.Organization;

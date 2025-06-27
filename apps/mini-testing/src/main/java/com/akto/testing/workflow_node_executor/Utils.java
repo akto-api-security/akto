@@ -21,8 +21,8 @@ import org.apache.commons.lang3.StringUtils;
 import org.json.JSONObject;
 
 import com.akto.dao.context.Context;
-import com.akto.util.data_actor.DataActor;
-import com.akto.util.data_actor.DataActorFactory;
+import com.akto.data_actor.DataActor;
+import com.akto.data_actor.DataActorFactory;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.RecordedLoginFlowInput;
 import com.akto.dto.api_workflow.Graph;

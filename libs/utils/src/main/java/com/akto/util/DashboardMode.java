@@ -1,8 +1,8 @@
 package com.akto.util;
 
 import com.akto.dao.context.Context;
-import com.akto.util.data_actor.DataActor;
-import com.akto.util.data_actor.DataActorFactory;
+import com.akto.data_actor.DataActor;
+import com.akto.data_actor.DataActorFactory;
 import com.akto.dto.Setup;
 import com.akto.onprem.Constants;
 

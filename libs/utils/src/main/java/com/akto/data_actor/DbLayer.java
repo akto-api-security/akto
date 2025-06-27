@@ -1,4 +1,4 @@
-package com.akto.util.data_actor;
+package com.akto.data_actor;
 
 import static com.akto.util.Constants.ID;
 

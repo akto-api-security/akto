@@ -1,9 +1,9 @@
 package com.akto.store;
 
 import com.akto.PayloadEncodeUtil;
-import com.akto.util.data_actor.DataActor;
-import com.akto.util.data_actor.DataActorFactory;
-import com.akto.util.data_actor.DbLayer;
+import com.akto.data_actor.DataActor;
+import com.akto.data_actor.DataActorFactory;
+import com.akto.data_actor.DbLayer;
 import com.akto.dto.*;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.testing.*;

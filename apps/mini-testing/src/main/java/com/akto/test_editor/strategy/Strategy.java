@@ -4,8 +4,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 import com.akto.dao.context.Context;
-import com.akto.util.data_actor.DataActor;
-import com.akto.util.data_actor.DataActorFactory;
+import com.akto.data_actor.DataActor;
+import com.akto.data_actor.DataActorFactory;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.testing.GenericTestResult;
 import com.akto.dto.testing.TestResult;

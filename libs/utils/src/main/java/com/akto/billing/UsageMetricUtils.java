@@ -18,8 +18,8 @@ import com.akto.dao.context.Context;
 // TODO: remove dao imports
 import com.akto.dao.usage.UsageMetricInfoDao;
 import com.akto.dao.usage.UsageMetricsDao;
-import com.akto.util.data_actor.DataActor;
-import com.akto.util.data_actor.DataActorFactory;
+import com.akto.data_actor.DataActor;
+import com.akto.data_actor.DataActorFactory;
 import com.akto.dto.Config;
 import com.akto.dto.billing.FeatureAccess;
 import com.akto.dto.billing.Organization;
