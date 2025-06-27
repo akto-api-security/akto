@@ -3,7 +3,6 @@ package com.akto.action.billing;
 import com.akto.action.UserAction;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.type.SingleTypeInfo;
-import com.akto.dto.usage.UsageMetricHandler;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.dao.billing.OrganizationsDao;
@@ -17,6 +16,7 @@ import io.micrometer.core.instrument.util.StringUtils;
 import java.util.Arrays;
 import java.util.HashSet;
 import com.akto.usage.OrgUtils;
+import com.akto.usage.UsageMetricHandler;
 import com.mongodb.client.model.Filters;
 
 import java.util.concurrent.Executors;

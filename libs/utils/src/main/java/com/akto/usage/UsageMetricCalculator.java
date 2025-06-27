@@ -1,4 +1,4 @@
-package com.akto.dto.usage;
+package com.akto.usage;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -19,6 +19,8 @@ import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.testing.TestResult;
 import com.akto.dto.testing.TestingRunResult;
 import com.akto.dto.type.SingleTypeInfo;
+import com.akto.dto.usage.MetricTypes;
+import com.akto.dto.usage.UsageMetric;
 import com.akto.dto.usage.metadata.ActiveAccounts;
 import com.akto.log.LoggerMaker;
 import com.akto.util.enums.GlobalEnums.YamlTemplateSource;
