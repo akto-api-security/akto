@@ -1,4 +1,4 @@
-package com.akto.dto.usage;
+package com.akto.usage;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -15,6 +15,9 @@ import com.akto.dao.usage.UsageMetricsDao;
 import com.akto.dto.AccountSettings;
 import com.akto.dto.billing.FeatureAccess;
 import com.akto.dto.billing.Organization;
+import com.akto.dto.usage.MetricTypes;
+import com.akto.dto.usage.UsageMetric;
+import com.akto.dto.usage.UsageMetricInfo;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.DashboardMode;
