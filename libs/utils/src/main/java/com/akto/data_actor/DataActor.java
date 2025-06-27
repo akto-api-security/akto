@@ -240,6 +240,8 @@ public abstract class DataActor {
 
     public abstract SampleData fetchSampleDataByIdMethod(int apiCollectionId, String url, String method);
 
+    public abstract ApiInfo fetchLatestAuthenticatedByApiCollectionId(int apiCollectionId);
+
     public abstract void modifyHybridTestingSetting(boolean hybridTestingEnabled);
 
     public abstract void insertTestingLog(Log log);

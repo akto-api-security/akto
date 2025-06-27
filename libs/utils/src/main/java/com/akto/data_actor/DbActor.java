@@ -334,9 +334,8 @@ public class DbActor extends DataActor {
         return DbLayer.fetchSampleDataByIdMethod(apiCollectionId, url, method);
     }
 
-    public SampleData fetchLatestAuthenticatedByApiCollectionId(int apiCollectionId) {
-        return null;
-        // return DbLayer.fetchLatestAuthenticatedByApiCollectionId(apiCollectionId);
+    public ApiInfo fetchLatestAuthenticatedByApiCollectionId(int apiCollectionId) {
+        return DbLayer.fetchLatestAuthenticatedByApiCollectionId(apiCollectionId);
     }
 
     public TestRoles fetchTestRole(String key) {

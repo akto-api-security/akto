@@ -39,6 +39,7 @@ import com.mongodb.BasicDBObject;
 import static com.akto.test_editor.Utils.bodyValuesUnchanged;
 import static com.akto.test_editor.Utils.headerValuesUnchanged;
 import static com.akto.runtime.utils.Utils.convertOriginalReqRespToString;
+import static com.akto.testing.TestRoleUtil.findMatchingAuthMechanism;
 
 
 import org.apache.commons.lang3.StringUtils;
@@ -459,7 +460,7 @@ public class Executor {
     }
 
     public synchronized static ExecutorSingleOperationResp modifyAuthTokenInRawApi(TestRoles testRole, RawApi rawApi) {
-        AuthMechanism authMechanismForRole = testRole.findMatchingAuthMechanism(rawApi);
+        AuthMechanism authMechanismForRole = findMatchingAuthMechanism(testRole,rawApi);
 
         if (authMechanismForRole == null) {
             return null;
