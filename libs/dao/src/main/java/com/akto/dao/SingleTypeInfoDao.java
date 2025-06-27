@@ -62,6 +62,9 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
         fieldNames = new String[]{SingleTypeInfo._RESPONSE_CODE, SingleTypeInfo._IS_HEADER, SingleTypeInfo._PARAM, SingleTypeInfo.SUB_TYPE, SingleTypeInfo._API_COLLECTION_ID};
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, true);
 
+        fieldNames = new String[]{SingleTypeInfo._RESPONSE_CODE, SingleTypeInfo._IS_HEADER, SingleTypeInfo._PARAM, SingleTypeInfo.SUB_TYPE, SingleTypeInfo._API_COLLECTION_ID, Constants.ID};
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, true);
+
         fieldNames = new String[]{SingleTypeInfo.SUB_TYPE, SingleTypeInfo._RESPONSE_CODE};
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, true);
 
@@ -450,7 +453,7 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
         Map<String, Map<String, Integer>> resultMap = new HashMap<>();
         resultMap.put("REQUEST", requestResult);
         resultMap.put("RESPONSE", responseResult);
-        
+
         return resultMap;
     }
 

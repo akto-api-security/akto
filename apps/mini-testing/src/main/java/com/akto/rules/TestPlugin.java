@@ -1,7 +1,7 @@
 package com.akto.rules;
 
-import com.akto.data_actor.DataActor;
-import com.akto.data_actor.DataActorFactory;
+import com.akto.util.data_actor.DataActor;
+import com.akto.util.data_actor.DataActorFactory;
 import com.akto.dto.*;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.test_editor.DataOperandsFilterResponse;
@@ -9,8 +9,8 @@ import com.akto.dto.test_editor.FilterNode;
 import com.akto.dto.testing.*;
 import com.akto.dto.testing.info.TestInfo;
 import com.akto.dto.type.*;
-import com.akto.log.LoggerMaker;
-import com.akto.log.LoggerMaker.LogDb;
+import com.akto.dao.common.LoggerMaker;
+import com.akto.dao.common.LoggerMaker.LogDb;
 import com.akto.runtime.RelationshipSync;
 import com.akto.store.TestingUtil;
 import com.akto.test_editor.filter.Filter;

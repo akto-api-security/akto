@@ -1,14 +1,12 @@
 package com.akto.metrics;
 
 import com.akto.dao.context.Context;
-import com.akto.dao.metrics.MetricDataDao;
-import com.akto.data_actor.ClientActor;
-import com.akto.data_actor.DataActor;
-import com.akto.data_actor.DataActorFactory;
+import com.akto.util.data_actor.DataActor;
+import com.akto.util.data_actor.DataActorFactory;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.metrics.MetricData;
-import com.akto.log.LoggerMaker;
-import com.akto.log.LoggerMaker.LogDb;
+import com.akto.dao.common.LoggerMaker;
+import com.akto.dao.common.LoggerMaker.LogDb;
 import com.akto.util.http_util.CoreHTTPClient;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;

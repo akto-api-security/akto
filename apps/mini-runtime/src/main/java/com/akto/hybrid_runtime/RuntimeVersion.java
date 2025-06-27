@@ -5,7 +5,7 @@ import java.io.BufferedReader;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 
-import com.akto.data_actor.DataActor;
+import com.akto.util.data_actor.DataActor;
 
 public class RuntimeVersion {
 

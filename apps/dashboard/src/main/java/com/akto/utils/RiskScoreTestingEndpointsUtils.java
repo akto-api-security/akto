@@ -6,16 +6,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
 
 import com.akto.dao.context.Context;
 import com.akto.dto.ApiCollectionUsers;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.testing.RiskScoreTestingEndpoints;
 import com.akto.dto.testing.TestingEndpoints;
-import com.akto.log.LoggerMaker;
-import com.akto.log.LoggerMaker.LogDb;
+import com.akto.dao.common.LoggerMaker;
+import com.akto.dao.common.LoggerMaker.LogDb;
 
 public class RiskScoreTestingEndpointsUtils {
     private static final LoggerMaker loggerMaker = new LoggerMaker(RiskScoreTestingEndpointsUtils.class);

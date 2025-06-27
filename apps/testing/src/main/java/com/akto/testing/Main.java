@@ -11,13 +11,11 @@ import com.akto.dao.testing.TestingRunDao;
 import com.akto.dao.testing.TestingRunResultDao;
 import com.akto.dao.testing.TestingRunResultSummariesDao;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
-import com.akto.database_abstractor_authenticator.JwtAuthenticator;
 import com.akto.dto.billing.FeatureAccess;
 import com.akto.dto.billing.SyncLimit;
 import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.*;
 import com.akto.dto.billing.Organization;
-import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.testing.*;
 import com.akto.dto.testing.TestingEndpoints.Operator;
 import com.akto.dto.testing.TestingRun.State;
@@ -26,10 +24,10 @@ import com.akto.dto.testing.rate_limit.GlobalApiRateLimit;
 import com.akto.dto.testing.rate_limit.RateLimitHandler;
 import com.akto.dto.usage.MetricTypes;
 import com.akto.github.GithubUtils;
-import com.akto.log.LoggerMaker;
-import com.akto.log.LoggerMaker.LogDb;
+import com.akto.dao.common.LoggerMaker;
+import com.akto.dao.common.LoggerMaker.LogDb;
 import com.akto.mixpanel.AktoMixpanel;
-import com.akto.usage.UsageMetricHandler;
+import com.akto.dao.common.UsageMetricHandler;
 import com.akto.notifications.slack.APITestStatusAlert;
 import com.akto.notifications.slack.NewIssuesModel;
 import com.akto.notifications.slack.SlackAlerts;
@@ -196,7 +194,7 @@ public class Main {
     }
 
     public static void main(String[] args) throws InterruptedException {
-        String mongoURI = System.getenv("AKTO_MONGO_CONN");
+        String mongoURI = "mongodb://localhost:27017";
         DaoInit.init(new ConnectionString(mongoURI));
 
         boolean connectedToMongo = false;

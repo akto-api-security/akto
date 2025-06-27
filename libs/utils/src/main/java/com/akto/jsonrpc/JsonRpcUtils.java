@@ -1,8 +1,8 @@
 package com.akto.jsonrpc;
 
 import com.akto.dto.HttpResponseParams;
-import com.akto.log.LoggerMaker;
-import com.akto.log.LoggerMaker.LogDb;
+import com.akto.dao.common.LoggerMaker;
+import com.akto.dao.common.LoggerMaker.LogDb;
 import com.akto.util.JSONUtils;
 import java.util.Map;
 import lombok.AccessLevel;

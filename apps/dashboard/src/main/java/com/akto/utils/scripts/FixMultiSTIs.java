@@ -9,7 +9,7 @@ import com.akto.dto.type.APICatalog;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods;
 import com.akto.dto.type.URLStatic;
-import com.akto.log.LoggerMaker;
+import com.akto.dao.common.LoggerMaker;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.Sorts;
@@ -20,8 +20,6 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-
-import static com.akto.action.observe.Utils.fetchHostSTI;
 
 public class FixMultiSTIs {
 

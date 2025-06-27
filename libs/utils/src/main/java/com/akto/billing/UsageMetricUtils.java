@@ -5,20 +5,20 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import com.akto.log.LoggerMaker;
+import com.akto.dao.common.LoggerMaker;
 import com.akto.log.CacheLoggerMaker;
-import com.akto.log.LoggerMaker.LogDb;
+import com.akto.dao.common.LoggerMaker.LogDb;
 
 import org.json.JSONException;
 import org.json.JSONObject;
 
-import com.akto.RuntimeMode;
+import com.akto.dao.common.RuntimeMode;
 import com.akto.dao.context.Context;
 // TODO: remove dao imports
 import com.akto.dao.usage.UsageMetricInfoDao;
 import com.akto.dao.usage.UsageMetricsDao;
-import com.akto.data_actor.DataActor;
-import com.akto.data_actor.DataActorFactory;
+import com.akto.util.data_actor.DataActor;
+import com.akto.util.data_actor.DataActorFactory;
 import com.akto.dto.Config;
 import com.akto.dto.billing.FeatureAccess;
 import com.akto.dto.billing.Organization;

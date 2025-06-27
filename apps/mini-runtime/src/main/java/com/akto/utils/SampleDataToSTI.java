@@ -13,7 +13,7 @@ import com.akto.hybrid_parsers.HttpCallParser;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.SensitiveSampleData;
 import com.akto.dto.type.APICatalog;
-import com.akto.log.LoggerMaker;
+import com.akto.dao.common.LoggerMaker;
 import com.akto.hybrid_runtime.APICatalogSync;
 import com.akto.hybrid_runtime.URLAggregator;
 

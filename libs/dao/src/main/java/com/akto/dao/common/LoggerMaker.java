@@ -1,10 +1,9 @@
-package com.akto.log;
+package com.akto.dao.common;
 
-import com.akto.RuntimeMode;
 import com.akto.dao.*;
 import com.akto.dao.context.Context;
-import com.akto.data_actor.DataActor;
-import com.akto.data_actor.DataActorFactory;
+import com.akto.util.data_actor.DataActor;
+import com.akto.util.data_actor.DataActorFactory;
 import com.akto.dto.AccountSettings;
 import com.akto.dto.Config;
 import com.akto.dto.Log;

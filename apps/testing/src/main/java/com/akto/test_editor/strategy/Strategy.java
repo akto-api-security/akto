@@ -10,8 +10,8 @@ import com.akto.dto.ApiCollection;
 import com.akto.dto.testing.GenericTestResult;
 import com.akto.dto.testing.TestResult;
 import com.akto.dto.testing.YamlTestResult;
-import com.akto.log.LoggerMaker;
-import com.akto.log.LoggerMaker.LogDb;
+import com.akto.dao.common.LoggerMaker;
+import com.akto.dao.common.LoggerMaker.LogDb;
 import com.akto.test_editor.Utils;
 
 public class Strategy {

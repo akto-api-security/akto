@@ -1,4 +1,4 @@
-package com.akto.usage;
+package com.akto.dao.common;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -22,7 +22,6 @@ import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.usage.MetricTypes;
 import com.akto.dto.usage.UsageMetric;
 import com.akto.dto.usage.metadata.ActiveAccounts;
-import com.akto.log.LoggerMaker;
 import com.akto.util.enums.GlobalEnums.YamlTemplateSource;
 import com.google.gson.Gson;
 import com.mongodb.client.model.Filters;

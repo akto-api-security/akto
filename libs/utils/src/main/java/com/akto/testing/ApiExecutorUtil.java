@@ -12,13 +12,13 @@ import javax.script.SimpleScriptContext;
 
 import com.akto.billing.UsageMetricUtils;
 import com.akto.dao.context.Context;
-import com.akto.data_actor.DataActor;
-import com.akto.data_actor.DataActorFactory;
+import com.akto.util.data_actor.DataActor;
+import com.akto.util.data_actor.DataActorFactory;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.billing.FeatureAccess;
 import com.akto.dto.testing.config.TestScript;
-import com.akto.log.LoggerMaker;
-import com.akto.log.LoggerMaker.LogDb;
+import com.akto.dao.common.LoggerMaker;
+import com.akto.dao.common.LoggerMaker.LogDb;
 import jdk.nashorn.api.scripting.ScriptObjectMirror;
 
 public class ApiExecutorUtil {

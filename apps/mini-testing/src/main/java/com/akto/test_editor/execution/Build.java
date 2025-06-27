@@ -1,9 +1,9 @@
 package com.akto.test_editor.execution;
 
 import com.akto.dao.context.Context;
-import com.akto.data_actor.DataActor;
-import com.akto.data_actor.DataActorFactory;
-import com.akto.data_actor.DbLayer;
+import com.akto.util.data_actor.DataActor;
+import com.akto.util.data_actor.DataActorFactory;
+import com.akto.util.data_actor.DbLayer;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.OriginalHttpRequest;
@@ -14,8 +14,8 @@ import com.akto.dto.testing.TestingRunConfig;
 import com.akto.dto.traffic.Key;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.URLMethods;
-import com.akto.log.LoggerMaker;
-import com.akto.log.LoggerMaker.LogDb;
+import com.akto.dao.common.LoggerMaker;
+import com.akto.dao.common.LoggerMaker.LogDb;
 import com.akto.testing.ApiExecutor;
 import com.akto.util.Constants;
 import com.akto.util.HttpRequestResponseUtils;

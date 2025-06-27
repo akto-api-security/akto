@@ -6,33 +6,28 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import com.akto.dao.context.Context;
-import com.akto.dao.testing.TestRolesDao;
-import com.akto.data_actor.DataActor;
-import com.akto.data_actor.DataActorFactory;
+import com.akto.util.data_actor.DataActor;
+import com.akto.util.data_actor.DataActorFactory;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.CustomAuthType;
 import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.RawApi;
-import com.akto.dto.RecordedLoginFlowInput;
 import com.akto.dto.testing.*;
 import com.akto.dto.testing.AuthParam.Location;
-import com.akto.dto.testing.sources.AuthWithCond;
 import com.akto.testing.*;
-import com.akto.util.enums.LoginFlowEnums;
 import com.akto.util.enums.LoginFlowEnums.AuthMechanismTypes;
 import com.akto.dto.api_workflow.Graph;
 import com.akto.dto.test_editor.*;
 import com.akto.dto.testing.TestResult.Confidence;
 import com.akto.dto.testing.TestResult.TestError;
 import com.akto.dto.type.KeyTypes;
-import com.akto.log.LoggerMaker;
-import com.akto.log.LoggerMaker.LogDb;
+import com.akto.dao.common.LoggerMaker;
+import com.akto.dao.common.LoggerMaker.LogDb;
 import com.akto.rules.TestPlugin;
 import com.akto.test_editor.OrgUtils;
 import com.akto.test_editor.Utils;
 import com.akto.util.Constants;
 import com.akto.util.HttpRequestResponseUtils;
-import com.akto.util.JSONUtils;
 import com.akto.util.modifier.JWTPayloadReplacer;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -47,7 +42,6 @@ import static com.akto.runtime.utils.Utils.convertOriginalReqRespToString;
 
 
 import org.apache.commons.lang3.StringUtils;
-import org.bson.types.ObjectId;
 
 public class Executor {
 

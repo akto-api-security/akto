@@ -24,15 +24,15 @@ import com.akto.dto.type.SingleTypeInfo.SubType;
 import com.akto.dto.type.SingleTypeInfo.SuperType;
 import com.akto.dto.type.URLMethods.Method;
 import com.akto.dto.usage.MetricTypes;
-import com.akto.log.LoggerMaker;
-import com.akto.log.LoggerMaker.LogDb;
+import com.akto.dao.common.LoggerMaker;
+import com.akto.dao.common.LoggerMaker.LogDb;
 import com.akto.util.filter.DictionaryFilter;
 import com.akto.runtime.merge.MergeOnHostOnly;
 import com.akto.runtime.policies.AktoPolicyNew;
 import com.akto.task.Cluster;
 import com.akto.types.CappedSet;
-import com.akto.usage.UsageMetricCalculator;
-import com.akto.usage.UsageMetricHandler;
+import com.akto.dao.common.UsageMetricCalculator;
+import com.akto.dao.common.UsageMetricHandler;
 import com.akto.utils.RedactSampleData;
 import com.google.api.client.util.Charsets;
 import com.google.common.hash.BloomFilter;
@@ -49,8 +49,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.Map.Entry;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.regex.Pattern;
 
 import static com.akto.dto.type.KeyTypes.patternToSubType;
 

@@ -1,6 +1,5 @@
 package com.akto.action.testing;
 
-import java.net.URL;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.Executors;
@@ -15,8 +14,8 @@ import com.akto.dao.RecordedLoginInputDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.testing.LoginFlowStepsDao;
 import com.akto.dto.RecordedLoginFlowInput;
-import com.akto.log.LoggerMaker;
-import com.akto.log.LoggerMaker.LogDb;
+import com.akto.dao.common.LoggerMaker;
+import com.akto.dao.common.LoggerMaker.LogDb;
 import com.akto.util.RecordedLoginFlowUtil;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;

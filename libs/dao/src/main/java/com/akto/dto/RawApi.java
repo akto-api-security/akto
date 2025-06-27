@@ -18,11 +18,19 @@ public class RawApi {
     private OriginalHttpResponse response;
     private String originalMessage;
     static ObjectMapper om = new ObjectMapper();
+    private RawApiMetadata metadata;
 
     public RawApi(OriginalHttpRequest request, OriginalHttpResponse response, String originalMessage) {
         this.request = request;
         this.response = response;
         this.originalMessage = originalMessage;
+    }
+
+    public RawApi(OriginalHttpRequest request, OriginalHttpResponse response, String originalMessage, RawApiMetadata metadata) {
+        this.request = request;
+        this.response = response;
+        this.originalMessage = originalMessage;
+        this.metadata = metadata;
     }
 
     public static RawApi buildFromMessage(String message) {
@@ -274,5 +282,13 @@ public class RawApi {
 
     public void setOriginalMessage(String originalMessage) {
         this.originalMessage = originalMessage;
+    }
+
+    public RawApiMetadata getRawApiMetadata(){
+        return this.metadata;
+    }
+
+    public void setRawApiMetdata(RawApiMetadata metadata){
+        this.metadata = metadata;
     }
 }

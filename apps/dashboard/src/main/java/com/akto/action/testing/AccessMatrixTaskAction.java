@@ -7,7 +7,7 @@ import com.akto.dto.HttpResponseParams;
 import com.akto.dto.testing.EndpointLogicalGroup;
 import com.akto.dto.traffic.Key;
 import com.akto.dto.traffic.SampleData;
-import com.akto.log.LoggerMaker;
+import com.akto.dao.common.LoggerMaker;
 import com.akto.parsers.HttpCallParser;
 import com.mongodb.client.result.DeleteResult;
 import com.mongodb.client.result.UpdateResult;
@@ -15,7 +15,6 @@ import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 
 import com.akto.action.UserAction;
-import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.testing.AccessMatrixTaskInfosDao;
 import com.akto.dao.testing.AccessMatrixUrlToRolesDao;

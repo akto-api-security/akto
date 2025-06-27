@@ -1,6 +1,6 @@
 package com.akto.parsers;
 
-import com.akto.RuntimeMode;
+import com.akto.dao.common.RuntimeMode;
 import com.akto.billing.UsageMetricUtils;
 import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.billing.OrganizationsDao;
@@ -19,8 +19,8 @@ import com.akto.dto.type.URLMethods.Method;
 import com.akto.dto.usage.MetricTypes;
 import com.akto.graphql.GraphQLUtils;
 import com.akto.jsonrpc.JsonRpcUtils;
-import com.akto.log.LoggerMaker;
-import com.akto.log.LoggerMaker.LogDb;
+import com.akto.dao.common.LoggerMaker;
+import com.akto.dao.common.LoggerMaker.LogDb;
 import com.akto.mcp.McpRequestResponseUtils;
 import com.akto.runtime.APICatalogSync;
 import com.akto.runtime.Main;
@@ -30,17 +30,13 @@ import com.akto.runtime.parser.SampleParser;
 import com.akto.runtime.utils.Utils;
 import com.akto.test_editor.execution.VariableResolver;
 import com.akto.test_editor.filter.data_operands_impl.ValidationResult;
-import com.akto.usage.UsageMetricCalculator;
-import com.akto.util.JSONUtils;
+import com.akto.dao.common.UsageMetricCalculator;
 import com.akto.util.http_util.CoreHTTPClient;
 import com.akto.util.Constants;
 import com.akto.util.DbMode;
-import com.akto.util.HttpRequestResponseUtils;
-import com.google.gson.Gson;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.*;
 import okhttp3.*;
-import org.apache.commons.lang3.StringUtils;
 import org.bson.conversions.Bson;
 
 import java.io.IOException;

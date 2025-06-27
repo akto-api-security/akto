@@ -48,12 +48,19 @@ public class ApiInfo {
     public static final String LAST_CALCULATED_TIME = "lastCalculatedTime";
     private int lastCalculatedTime;
 
+    private ApiType apiType;
+    public static final String API_TYPE = "apiType";
+
     public enum AuthType {
         UNAUTHENTICATED, BASIC, AUTHORIZATION_HEADER, JWT, API_TOKEN, BEARER, CUSTOM
     }
 
     public enum ApiAccessType {
         PUBLIC, PRIVATE, PARTNER, THIRD_PARTY
+    }
+
+    public enum ApiType {
+        REST, GRAPHQL, GRPC, SOAP
     }
 
     public static class ApiInfoKey {
@@ -123,6 +130,10 @@ public class ApiInfo {
 
     }
 
+    public ApiInfo(ApiType apiType, Set<Set<AuthType>> allAuthTypesFound) {
+        this.apiType = apiType;
+        this.allAuthTypesFound = allAuthTypesFound;
+    }
 
     public ApiInfo() { }
 
@@ -347,5 +358,14 @@ public class ApiInfo {
     public void setLastCalculatedTime(int lastCalculatedTime) {
         this.lastCalculatedTime = lastCalculatedTime;
     }
+
+    public ApiType getApiType() {
+        return apiType;
+    }
+
+    public void setApiType(ApiType apiType) {
+        this.apiType = apiType;
+    }
+
 
 }

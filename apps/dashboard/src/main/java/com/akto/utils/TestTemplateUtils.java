@@ -1,6 +1,6 @@
 package com.akto.utils;
 
-import com.akto.log.LoggerMaker;
+import com.akto.dao.common.LoggerMaker;
 
 import static com.akto.listener.InitializerListener.loadTemplateFilesFromDirectory;
 

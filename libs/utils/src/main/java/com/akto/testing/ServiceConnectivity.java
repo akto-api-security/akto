@@ -1,13 +1,12 @@
 package com.akto.testing;
 
-import com.akto.log.LoggerMaker;
+import com.akto.dao.common.LoggerMaker;
 
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
-import java.util.logging.Logger;
 
 public class ServiceConnectivity {
     private static final LoggerMaker logger = new LoggerMaker(ServiceConnectivity.class, LoggerMaker.LogDb.DASHBOARD);

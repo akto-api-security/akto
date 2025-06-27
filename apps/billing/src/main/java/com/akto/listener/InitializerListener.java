@@ -18,8 +18,8 @@ import com.akto.dao.usage.UsageSyncDao;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.billing.OrganizationFlags;
 import com.akto.dto.usage.UsageSync;
-import com.akto.log.LoggerMaker;
-import com.akto.log.LoggerMaker.LogDb;
+import com.akto.dao.common.LoggerMaker;
+import com.akto.dao.common.LoggerMaker.LogDb;
 import com.akto.util.UsageCalculator;
 import com.akto.util.UsageUtils;
 import com.akto.util.tasks.OrganizationTask;
@@ -27,13 +27,8 @@ import com.mongodb.BasicDBObject;
 import com.mongodb.ConnectionString;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
-import org.bson.conversions.Bson;
-import org.mockito.internal.matchers.Or;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import static com.akto.dto.billing.OrganizationUsage.ORG_ID;
-import static com.akto.dto.billing.OrganizationUsage.SINKS;
 
 public class InitializerListener implements ServletContextListener {
     public static boolean connectedToMongo = false;

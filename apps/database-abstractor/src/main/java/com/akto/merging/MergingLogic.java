@@ -2,7 +2,7 @@ package com.akto.merging;
 
 import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.ApiInfoDao;
-import com.akto.log.LoggerMaker;
+import com.akto.dao.common.LoggerMaker;
 import com.akto.dao.SampleDataDao;
 import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dao.context.Context;
