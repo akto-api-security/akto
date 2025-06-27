@@ -592,13 +592,7 @@ public class ApiExecutor {
             if (line.startsWith("event: endpoint")) {
                 String dataLine = scanner.nextLine();
                 if (dataLine.startsWith("data:")) {
-                    String endpoint = dataLine.substring(5).trim();
-                    session.endpoint = endpoint;
-                    // extract sessionId from endpoint param
-                    int idx = endpoint.indexOf("sessionId=");
-                    if (idx != -1) {
-                        session.sessionId = endpoint.substring(idx + 10);
-                    }
+                    session.endpoint = dataLine.substring(5).trim();
                     break;
                 }
             }
