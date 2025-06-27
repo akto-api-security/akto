@@ -1568,6 +1568,17 @@ public class DbAction extends ActionSupport {
         return Action.SUCCESS.toUpperCase();
     }
 
+    public String fetchLatestAuthenticatedByApiCollectionId() {
+        try {
+            apiInfo = DbLayer.fetchLatestAuthenticatedByApiCollectionId(apiCollectionId);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in fetchLatestAuthenticatedByApiCollectionId " + e.toString());
+            return Action.ERROR.toUpperCase();
+
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
     public String fetchTestRole() {
         try {
             testRole = DbLayer.fetchTestRole(key);
