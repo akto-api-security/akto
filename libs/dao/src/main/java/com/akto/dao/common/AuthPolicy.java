@@ -35,11 +35,17 @@ public class AuthPolicy {
         value = value.trim();
         boolean twoFields = value.split(" ").length == 2;
         if (twoFields && value.substring(0, Math.min(6, value.length())).equalsIgnoreCase("bearer")) {
+            headersMap.put(header, value);
+            authHeaders.add(header);
             return Collections.singletonList(ApiInfo.AuthType.BEARER);
         } else if (twoFields && value.substring(0, Math.min(5, value.length())).equalsIgnoreCase("basic")) {
+            headersMap.put(header, value);
+            authHeaders.add(header);
             return Collections.singletonList(ApiInfo.AuthType.BASIC);
         } else if (header.equals(AUTHORIZATION_HEADER_NAME) || header.equals("auth")) {
             // todo: check jwt first and then this
+            headersMap.put(header, value);
+            authHeaders.add(header);
             return Collections.singletonList(ApiInfo.AuthType.AUTHORIZATION_HEADER);
         }
         return new ArrayList<>();
