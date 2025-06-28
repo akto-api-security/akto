@@ -8,6 +8,7 @@ import java.util.Set;
 import java.util.ArrayList;
 import java.util.Collections;
 
+import com.akto.dao.common.AuthPolicy;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.*;
 import org.apache.commons.lang3.function.FailableFunction;
@@ -25,7 +26,6 @@ import com.akto.dto.type.SingleTypeInfo;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.parsers.HttpCallParser;
-import com.akto.runtime.policies.AuthPolicy;
 import com.google.gson.Gson;
 
 import static com.akto.dto.ApiInfo.ALL_AUTH_TYPES_FOUND;

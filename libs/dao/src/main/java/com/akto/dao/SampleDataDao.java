@@ -64,6 +64,7 @@ public class SampleDataDao extends AccountsContextDaoWithRbac<SampleData> {
         return SampleDataDao.instance.findOne(filterQSampleData);
     }
 
+
     public SampleData fetchAllSampleDataForApi(int apiCollectionId, String url, URLMethods.Method method) {
         Bson filterQSampleData = filterForSampleData(apiCollectionId, url, method);
         List<SampleData> list = SampleDataDao.instance.findAll(filterQSampleData);

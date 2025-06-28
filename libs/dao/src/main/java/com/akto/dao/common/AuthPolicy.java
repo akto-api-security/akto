@@ -1,18 +1,20 @@
-package com.akto.runtime.policies;
+package com.akto.dao.common;
 
-import com.akto.dto.ApiInfo;
-import com.akto.dto.CustomAuthType;
-import com.akto.dto.HttpResponseParams;
+import com.akto.dto.*;
 import com.akto.dto.runtime_filters.RuntimeFilter;
 import com.akto.dto.type.KeyTypes;
+import com.akto.util.Constants;
+import com.akto.util.HttpRequestResponseUtils;
 import com.akto.util.JSONUtils;
-
+import com.alibaba.fastjson2.JSON;
+import com.alibaba.fastjson2.JSONObject;
 import com.mongodb.BasicDBObject;
+import org.apache.commons.lang3.math.NumberUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.*;
-import static com.akto.runtime.utils.Utils.parseCookie;
+
 
 public class AuthPolicy {
 
@@ -34,7 +36,12 @@ public class AuthPolicy {
         return new ArrayList<>();
     }
 
+    public static List<String> authHeaders = new ArrayList<>();
+    public static Map<String, String> headersMap = new HashMap<>();
+
     public static boolean findAuthType(HttpResponseParams httpResponseParams, ApiInfo apiInfo, RuntimeFilter filter, List<CustomAuthType> customAuthTypes) {
+        authHeaders = new ArrayList<>();
+        headersMap = new HashMap<>();
         Set<Set<ApiInfo.AuthType>> allAuthTypesFound = apiInfo.getAllAuthTypesFound();
         if (allAuthTypesFound == null) allAuthTypesFound = new HashSet<>();
 
@@ -63,7 +70,7 @@ public class AuthPolicy {
 
             // Find custom auth type in payload
             List<String> customAuthTypePayloadKeys = customAuthType.getPayloadKeys();
-            if(!customAuthTypePayloadKeys.isEmpty() ){
+            if(customAuthTypePayloadKeys != null && !customAuthTypePayloadKeys.isEmpty() ){
                 BasicDBObject flattenedPayload = null;
                 try{
                     BasicDBObject basicDBObject = BasicDBObject.parse(httpResponseParams.getRequestParams().getPayload());
@@ -93,9 +100,13 @@ public class AuthPolicy {
         for (String cookieKey : cookieMap.keySet()) {
             // Find bearer or basic token in cookie values
             authTypes.addAll(findBearerBasicAuth(cookieKey, cookieMap.get(cookieKey)));
+
             // Find JWT in cookie values
+
             if (KeyTypes.isJWT(cookieMap.get(cookieKey))) {
                 authTypes.add(ApiInfo.AuthType.JWT);
+                headersMap.put(cookieKey, cookieMap.get(cookieKey));
+                authHeaders.add(cookieKey);
                 flag = true;
             }
         }
@@ -109,8 +120,11 @@ public class AuthPolicy {
             List<String> headerValues =headers.getOrDefault(headerName,new ArrayList<>());
             for (String header: headerValues) {
                 if (KeyTypes.isJWT(header)){
+
                     authTypes.add(ApiInfo.AuthType.JWT);
                     flag = true;
+                    headersMap.put(headerName, header);
+                    authHeaders.add(headerName);
                     break;
                 }
             }
@@ -126,6 +140,84 @@ public class AuthPolicy {
         allAuthTypesFound.add(authTypes);
         apiInfo.setAllAuthTypesFound(allAuthTypesFound);
 
+        for(int i=0; i<headersMap.size(); i++) {
+            logger.info("HeaderMap  found: {}", headersMap.get(i), headersMap.get(i));
+        }
         return returnValue;
+    }
+
+    public static Map<String,String> parseCookie(List<String> cookieList){
+        Map<String,String> cookieMap = new HashMap<>();
+        if(cookieList==null)return cookieMap;
+        for (String cookieValues : cookieList) {
+            String[] cookies = cookieValues.split(";");
+            for (String cookie : cookies) {
+                cookie=cookie.trim();
+                String[] cookieFields = cookie.split("=");
+                boolean twoCookieFields = cookieFields.length == 2;
+                if (twoCookieFields) {
+                    if(!cookieMap.containsKey(cookieFields[0])){
+                        cookieMap.put(cookieFields[0], cookieFields[1]);
+                    }
+                }
+            }
+        }
+        return cookieMap;
+    }
+
+    public static HttpResponseParams parseSampleData(String sample) throws Exception {
+
+        //convert java object to JSON format
+
+        JSONObject jsonObject = JSON.parseObject(sample);
+
+        String method = jsonObject.getString("method");
+        String url = jsonObject.getString("path");
+        String type = jsonObject.getString("type");
+        Map<String,List<String>> requestHeaders = OriginalHttpRequest.buildHeadersMap(jsonObject, "requestHeaders");
+
+        String rawRequestPayload = jsonObject.getString("requestPayload");
+        String requestPayload = null;
+        Map<String,String> decryptedRequestPayload = HttpRequestResponseUtils.decryptRequestPayload(rawRequestPayload);
+        if(!decryptedRequestPayload.isEmpty() && decryptedRequestPayload.get("type") != null){
+            requestPayload = decryptedRequestPayload.get("payload");
+            logger.info("decrypted request payload: " + requestPayload);
+            requestHeaders.put(
+                    Constants.AKTO_DECRYPT_HEADER,
+                    Arrays.asList(decryptedRequestPayload.get("type"))
+            );
+        }else{
+            requestPayload = HttpRequestResponseUtils.rawToJsonString(rawRequestPayload,requestHeaders);
+        }
+        String apiCollectionIdStr = jsonObject.getOrDefault("akto_vxlan_id", "0").toString();
+        int apiCollectionId = 0;
+        if (NumberUtils.isDigits(apiCollectionIdStr)) {
+            apiCollectionId = NumberUtils.toInt(apiCollectionIdStr, 0);
+        }
+
+        HttpRequestParams requestParams = new HttpRequestParams(
+                method,url,type, requestHeaders, requestPayload, apiCollectionId
+        );
+
+        int statusCode = jsonObject.getInteger("statusCode");
+        String status = jsonObject.getString("status");
+        Map<String,List<String>> responseHeaders = OriginalHttpRequest.buildHeadersMap(jsonObject, "responseHeaders");
+        String payload = jsonObject.getString("responsePayload");
+        payload = HttpRequestResponseUtils.rawToJsonString(payload, responseHeaders);
+        payload = JSONUtils.parseIfJsonP(payload);
+        int time = jsonObject.getInteger("time");
+        String accountId = jsonObject.getString("akto_account_id");
+        String sourceIP = jsonObject.getString("ip");
+        String destIP = jsonObject.getString("destIp");
+        String direction = jsonObject.getString("direction");
+
+        String isPendingStr = (String) jsonObject.getOrDefault("is_pending", "false");
+        boolean isPending = !isPendingStr.toLowerCase().equals("false");
+        String sourceStr = (String) jsonObject.getOrDefault("source", HttpResponseParams.Source.OTHER.name());
+        HttpResponseParams.Source source = HttpResponseParams.Source.valueOf(sourceStr);
+
+        return new HttpResponseParams(
+                type,statusCode, status, responseHeaders, payload, requestParams, time, accountId, isPending, source, sample, sourceIP, destIP, direction
+        );
     }
 }
