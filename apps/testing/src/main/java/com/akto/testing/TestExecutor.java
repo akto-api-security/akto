@@ -616,10 +616,10 @@ public class TestExecutor {
                 RawApi rawApi = RawApi.buildFromMessage(sampleMessages.get(0));
                 TestRoles attackerTestRole = Executor.fetchOrFindAttackerRole();
                 if (attackerTestRole == null) {
-                    RawApiMetadata rawApiMetadata = new RawApiMetadata(apiInfoKey.getApiCollectionId());
-                    rawApi.setRawApiMetdata(rawApiMetadata);
                     loggerMaker.infoAndAddToDb("ATTACKER_TOKEN_ALL test role not found", LogDb.TESTING);
                 } else {
+                    RawApiMetadata rawApiMetadata = new RawApiMetadata(apiInfoKey.getApiCollectionId());
+                    rawApi.setRawApiMetdata(rawApiMetadata);
                     attackerAuthMechanism = TestRoleUtil.findMatchingAuthMechanism(attackerTestRole,rawApi);
                 }
             }
