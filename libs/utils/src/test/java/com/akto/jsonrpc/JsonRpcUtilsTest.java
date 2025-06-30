@@ -6,6 +6,8 @@ import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;
 import java.net.URL;
+import java.util.Map;
+import com.akto.util.Pair;
 
 public class JsonRpcUtilsTest {
 
@@ -15,6 +17,7 @@ public class JsonRpcUtilsTest {
         reqParams.setUrl(url);
         HttpResponseParams responseParams = new HttpResponseParams();
         responseParams.setRequestParams(reqParams);
+        responseParams.statusCode = 200;
         return responseParams;
     }
 
@@ -61,37 +64,6 @@ public class JsonRpcUtilsTest {
     }
 
     @Test
-    public void testNullPayload() {
-        HttpRequestParams reqParams = new HttpRequestParams();
-        reqParams.setPayload(null);
-        reqParams.setUrl("http://localhost:8080/api");
-        HttpResponseParams responseParams = new HttpResponseParams();
-        responseParams.setRequestParams(reqParams);
-        assertThrows(NullPointerException.class, () -> JsonRpcUtils.parseJsonRpcResponse(responseParams));
-    }
-
-    @Test
-    public void testNullRequestParams() {
-        HttpResponseParams responseParams = new HttpResponseParams();
-        responseParams.setRequestParams(null);
-        assertThrows(NullPointerException.class, () -> JsonRpcUtils.parseJsonRpcResponse(responseParams));
-    }
-
-    @Test
-    public void testIsJsonRpcRequestTrue() {
-        String payload = "{ \"jsonrpc\": \"2.0\", \"method\": \"foo\" }";
-        HttpResponseParams responseParams = createHttpResponseParams(payload, "http://localhost:8080/api");
-        assertTrue(JsonRpcUtils.isJsonRpcRequest(responseParams));
-    }
-
-    @Test
-    public void testIsJsonRpcRequestFalse() {
-        String payload = "{ \"foo\": \"bar\" }";
-        HttpResponseParams responseParams = createHttpResponseParams(payload, "http://localhost:8080/api");
-        assertFalse(JsonRpcUtils.isJsonRpcRequest(responseParams));
-    }
-
-    @Test
     public void testJsonRpcRequestWithMethodAndQueryParams() throws Exception {
         String payload = "{ \"jsonrpc\": \"2.0\", \"method\": \"testMethod\", \"id\": 1 }";
         String url = "http://localhost:8080/api?foo=bar&baz=qux";
@@ -124,5 +96,97 @@ public class JsonRpcUtilsTest {
         URL finalUrl = new URL(result.getRequestParams().getURL());
         assertEquals(originalUrl.getPath(), finalUrl.getPath());
         assertEquals(originalUrl.getQuery(), finalUrl.getQuery());
+    }
+
+    @Test
+    public void testMissingJsonRpcKey() {
+        String payload = "{ \"foo\": \"bar\" }";
+        HttpResponseParams responseParams = createHttpResponseParams(payload, "http://localhost:8080/api");
+        responseParams.statusCode = 200;
+        Pair<Boolean, Map<String, Object>> result = JsonRpcUtils.validateAndParseJsonRpc(responseParams);
+        assertFalse(result.getFirst());
+        assertNull(result.getSecond());
+    }
+
+    @Test
+    public void testWrongJsonRpcVersion() {
+        String payload = "{ \"jsonrpc\": \"1.0\", \"method\": \"foo\" }";
+        HttpResponseParams responseParams = createHttpResponseParams(payload, "http://localhost:8080/api");
+        responseParams.statusCode = 200;
+        Pair<Boolean, Map<String, Object>> result = JsonRpcUtils.validateAndParseJsonRpc(responseParams);
+        assertFalse(result.getFirst());
+        assertNotNull(result.getSecond());
+    }
+
+    @Test
+    public void testEmptyOrInvalidMap() {
+        String payload = "";
+        HttpResponseParams responseParams = createHttpResponseParams(payload, "http://localhost:8080/api");
+        responseParams.statusCode = 200;
+        Pair<Boolean, Map<String, Object>> result = JsonRpcUtils.validateAndParseJsonRpc(responseParams);
+        assertFalse(result.getFirst());
+        assertNull(result.getSecond());
+    }
+
+    @Test
+    public void testStatusCodeOutOfRange() {
+        String payload = "{ \"jsonrpc\": \"2.0\", \"method\": \"foo\" }";
+        HttpResponseParams responseParams = createHttpResponseParams(payload, "http://localhost:8080/api");
+        responseParams.statusCode = 199;
+        Pair<Boolean, Map<String, Object>> result = JsonRpcUtils.validateAndParseJsonRpc(responseParams);
+        assertFalse(result.getFirst());
+        assertNotNull(result.getSecond());
+        responseParams.statusCode = 300;
+        result = JsonRpcUtils.validateAndParseJsonRpc(responseParams);
+        assertFalse(result.getFirst());
+        assertNotNull(result.getSecond());
+    }
+
+    @Test
+    public void testValidJsonRpc() {
+        String payload = "{ \"jsonrpc\": \"2.0\", \"method\": \"foo\" }";
+        HttpResponseParams responseParams = createHttpResponseParams(payload, "http://localhost:8080/api");
+        responseParams.statusCode = 200;
+        Pair<Boolean, Map<String, Object>> result = JsonRpcUtils.validateAndParseJsonRpc(responseParams);
+        assertTrue(result.getFirst());
+        assertNotNull(result.getSecond());
+    }
+
+    @Test
+    public void testEmptyOrMissingMethod() {
+        String payload = "{ \"jsonrpc\": \"2.0\", \"method\": \"\" }";
+        HttpResponseParams responseParams = createHttpResponseParams(payload, "http://localhost:8080/api");
+        responseParams.statusCode = 200;
+        HttpResponseParams resultParams = JsonRpcUtils.parseJsonRpcResponse(responseParams);
+        assertEquals(responseParams.getRequestParams().getURL(), resultParams.getRequestParams().getURL());
+
+        payload = "{ \"jsonrpc\": \"2.0\" }";
+        responseParams = createHttpResponseParams(payload, "http://localhost:8080/api");
+        responseParams.statusCode = 200;
+        resultParams = JsonRpcUtils.parseJsonRpcResponse(responseParams);
+        assertEquals(responseParams.getRequestParams().getURL(), resultParams.getRequestParams().getURL());
+    }
+
+    @Test
+    public void testNullRequestPayload() {
+        HttpRequestParams reqParams = new HttpRequestParams();
+        reqParams.setPayload(null);
+        reqParams.setUrl("http://localhost:8080/api");
+        HttpResponseParams responseParams = new HttpResponseParams();
+        responseParams.setRequestParams(reqParams);
+        responseParams.statusCode = 200;
+        Pair<Boolean, Map<String, Object>> result = JsonRpcUtils.validateAndParseJsonRpc(responseParams);
+        assertFalse(result.getFirst());
+        assertNull(result.getSecond());
+    }
+
+    @Test
+    public void testStatusCodeGreaterThan400() {
+        String payload = "{ \"jsonrpc\": \"2.0\", \"method\": \"foo\" }";
+        HttpResponseParams responseParams = createHttpResponseParams(payload, "http://localhost:8080/api");
+        responseParams.statusCode = 401;
+        Pair<Boolean, Map<String, Object>> result = JsonRpcUtils.validateAndParseJsonRpc(responseParams);
+        assertFalse(result.getFirst());
+        assertNotNull(result.getSecond());
     }
 } 

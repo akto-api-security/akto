@@ -109,7 +109,7 @@ public final class McpRequestResponseUtils {
     public static Pair<Boolean, McpJsonRpcModel> isMcpRequest(HttpResponseParams responseParams) {
         String requestPayload = responseParams.getRequestParams().getPayload();
 
-        if (!JsonRpcUtils.isJsonRpcRequest(responseParams)) {
+        if (!JsonRpcUtils.validateAndParseJsonRpc(responseParams).getFirst()) {
             return new Pair<>(false, null);
         }
 
