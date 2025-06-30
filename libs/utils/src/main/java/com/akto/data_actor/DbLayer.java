@@ -478,13 +478,22 @@ public class DbLayer {
         );
     }
 
-    private static List<CollectionTags> getFilteredTags(List<CollectionTags> tags) {
+    private static List<CollectionTags> getFilteredTags(ApiCollection apiCollection, List<CollectionTags> tags) {
         if(tags == null || tags.isEmpty()) {
             return Collections.emptyList();
         }
         List<String> igNoreList = Arrays.asList("pod-template-hash");
         // Ignore tags from the ignore list
         tags.removeIf(tag -> tag.getKeyName() != null && igNoreList.contains(tag.getKeyName()));
+
+        if (apiCollection == null || apiCollection.getTagsList() == null || apiCollection.getTagsList().isEmpty()) {
+            return tags;
+        }
+
+        Set<CollectionTags> mergedTags = new HashSet<>(apiCollection.getTagsList());
+        mergedTags.addAll(tags);
+
+        tags = new ArrayList<>(mergedTags);
 
         return tags;
     }
@@ -516,7 +525,7 @@ public class DbLayer {
 
         if (tags != null && !tags.isEmpty()) {
             // Update the entire tagsList
-            update = Updates.combine(update, Updates.addEachToSet(ApiCollection.TAGS_STRING, getFilteredTags(tags)));
+            update = Updates.combine(update, Updates.set(ApiCollection.TAGS_STRING, getFilteredTags(apiCollection, tags)));
         }
 
         ApiCollectionsDao.instance.getMCollection().updateOne(
@@ -565,7 +574,7 @@ public class DbLayer {
         }
 
         if(tags != null && !tags.isEmpty()) {
-            updates = Updates.combine(updates, Updates.addEachToSet(ApiCollection.TAGS_STRING, getFilteredTags(tags)));
+            updates = Updates.combine(updates, Updates.set(ApiCollection.TAGS_STRING, getFilteredTags(apiCollection, tags)));
         }
 
         ApiCollectionsDao.instance.getMCollection().findOneAndUpdate(Filters.eq(ApiCollection.HOST_NAME, host), updates, updateOptions);
