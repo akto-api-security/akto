@@ -173,7 +173,7 @@ public class ApiCollectionsAction extends UserAction {
         List<Bson> pipeLine = new ArrayList<>();
         pipeLine.add(Aggregates.project(Projections.fields(
             Projections.computed(ApiCollection.URLS_COUNT, new BasicDBObject("$size", new BasicDBObject("$ifNull", Arrays.asList("$urls", Collections.emptyList())))),
-            Projections.include(ApiCollection.ID, ApiCollection.NAME, ApiCollection.HOST_NAME, ApiCollection._TYPE, ApiCollection.TAGS_STRING, ApiCollection._DEACTIVATED,ApiCollection.START_TS, ApiCollection.AUTOMATED, ApiCollection.DESCRIPTION, ApiCollection.USER_ENV_TYPE)
+            Projections.include(ApiCollection.ID, ApiCollection.NAME, ApiCollection.HOST_NAME, ApiCollection._TYPE, ApiCollection.TAGS_STRING, ApiCollection._DEACTIVATED,ApiCollection.START_TS, ApiCollection.AUTOMATED, ApiCollection.DESCRIPTION, ApiCollection.USER_ENV_TYPE, ApiCollection.IS_OUT_OF_TESTING_SCOPE)
         )));
 
         try {
@@ -699,6 +699,83 @@ public class ApiCollectionsAction extends UserAction {
         }
         UsageMetricHandler.calcAndFetchFeatureAccessUsingDeltaUsage(MetricTypes.ACTIVE_ENDPOINTS, Context.accountId.get(), count);
         return Action.SUCCESS.toUpperCase();
+    }
+
+    private List<Map<String,String>> apiCollectionsForOutOfTestScope;
+
+    public void setApiCollectionsForOutOfTestScope(List<Map<String,String>> apiCollectionsForOutOfTestScope){
+        this.apiCollectionsForOutOfTestScope = apiCollectionsForOutOfTestScope;
+    }
+
+    public String markCollectionsOutOfTestScope(){
+        try{
+            if(apiCollectionsForOutOfTestScope==null || apiCollectionsForOutOfTestScope.isEmpty()){
+                addActionError("No collections provided");
+                return ERROR.toUpperCase();
+            }
+            List<Integer> apiCollectionIdsForOutOfTestScope = apiCollectionsForOutOfTestScope.stream()
+                .map(item -> Integer.parseInt(item.get("id")))
+                .filter(id -> id != 0)
+                .collect(Collectors.toList());
+
+            if(apiCollectionIdsForOutOfTestScope.isEmpty()){
+                addActionError("No valid collections provided");
+                return ERROR.toUpperCase();
+            }
+            List<Integer> accessibleCollectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
+            if(accessibleCollectionIds != null){
+                apiCollectionIdsForOutOfTestScope.removeIf(id -> !accessibleCollectionIds.contains(id));
+            }
+            if(apiCollectionIdsForOutOfTestScope.isEmpty()){
+                addActionError("No accessible collections provided");
+                return ERROR.toUpperCase();
+            }
+            ApiCollectionsDao.instance.updateMany(
+                Filters.in(ApiCollection.ID, apiCollectionIdsForOutOfTestScope),
+                Updates.set(ApiCollection.IS_OUT_OF_TESTING_SCOPE, true)
+            );
+
+            return SUCCESS.toUpperCase();
+
+        } catch(Exception e){
+            addActionError("Error marking collections as Out of Test Scope");
+            return ERROR.toUpperCase();
+        }
+    }
+
+    public String unmarkCollectionsOutOfTestScope(){
+        try{
+            if(apiCollectionsForOutOfTestScope==null || apiCollectionsForOutOfTestScope.isEmpty()){
+                addActionError("No collections provided");
+                return ERROR.toUpperCase();
+            }
+            List<Integer> apiCollectionIdsForOutOfTestScope = apiCollectionsForOutOfTestScope.stream()
+                .map(item -> Integer.parseInt(item.get("id")))
+                .filter(id -> id!=0)
+                .collect(Collectors.toList());
+
+            if(apiCollectionIdsForOutOfTestScope.isEmpty()){
+                addActionError("No valid collections provided");
+                return ERROR.toUpperCase();
+            }
+            List<Integer> accessibleCollectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
+            if(accessibleCollectionIds != null){
+                apiCollectionIdsForOutOfTestScope.removeIf(id -> !accessibleCollectionIds.contains(id));
+            }
+            if(apiCollectionIdsForOutOfTestScope.isEmpty()){
+                addActionError("No accessible collections are provided");
+            }
+            ApiCollectionsDao.instance.updateMany(
+                Filters.in(ApiCollection.ID, apiCollectionIdsForOutOfTestScope),
+                Updates.set(ApiCollection.IS_OUT_OF_TESTING_SCOPE, false)
+            );
+
+            return SUCCESS.toUpperCase();
+
+        } catch(Exception e){
+            addActionError("Error unmarking collections as Out of Test Scope");
+            return ERROR.toUpperCase();
+        }
     }
 
     public String fetchCustomerEndpoints(){

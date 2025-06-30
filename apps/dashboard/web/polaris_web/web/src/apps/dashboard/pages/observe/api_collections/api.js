@@ -28,5 +28,19 @@ export default {
             method: 'post',
             data: {apiCollectionId}
         })
+    },
+    markCollectionsOutOfTestScope(items){
+        return request({
+            url: '/api/markCollectionsOutOfTestScope',
+            method: 'post',
+            data: { apiCollectionsForOutOfTestScope: items }
+        })
+    },
+    unmarkCollectionsOutOfTestScope(items){
+        return request({
+            url: 'api/unmarkCollectionsOutOfTestScope',
+            method: 'post',
+            data: { apiCollectionsForOutOfTestScope: items }
+        })
     }
 }

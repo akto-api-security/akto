@@ -156,6 +156,14 @@ const headers = [
         textValue: 'description',
         filterKey: "description",
         tooltipContent: 'Description of the collection'
+    },
+    {
+        title: "Out of Testing scope",
+        text: 'Out of Testing scope',
+        value: 'outOfTestingScopeComp',
+        isText: CellType.TEXT,
+        filterKey: 'isOutOfTestingScope',
+        tooltipContent: 'Whether the collection is excluded from testing '
     }
 ];
 
@@ -212,6 +220,8 @@ const convertToNewData = (collectionsArr, sensitiveInfoMap, severityInfoMap, cov
             riskScore: c.urlsCount === 0 ? 0 : (riskScoreMap[c.id] ? riskScoreMap[c.id] : 0),
             discovered: func.prettifyEpoch(c.startTs || 0),
             descriptionComp: (<Box maxWidth="300px"><TooltipText tooltip={c.description} text={c.description}/></Box>),
+            outOfTestingScopeComp: c.isOutOfTestingScope ? (<Text>Yes</Text>) : (<Text>No</Text>),
+            // outOfTestingScope: c.isOutOfTestingScope || false
         }
     })
 
@@ -453,9 +463,11 @@ function ApiCollections(props) {
         setDeactivateCollections(JSON.parse(JSON.stringify(deactivatedCollectionsCopy)));
         
         // Calculate summary data only for active collections
+        console.log("data to summary data: ", dataObj.normal);
         const summary = transform.getSummaryData(dataObj.normal)
         summary.totalCriticalEndpoints = riskScoreObj.criticalUrls;
         summary.totalSensitiveEndpoints = sensitiveInfo.sensitiveUrls
+        console.log("totalEndpoints:", summary.totalEndpoints, " totalTestedEndPoints: ", summary.totalTestedEndpoints);
         setSummaryData(summary)
 
         setCollectionsMap(func.mapCollectionIdToName(tmp.filter(x => !x?.deactivated)))
@@ -688,6 +700,35 @@ function ApiCollections(props) {
         const toggleEnvType = {
             content: toggleTypeContent
         }
+
+        const allOutOfTestScopeFalse = selectedResources.every(id => {
+            const collection = normalData.find(c => c.id === id);
+            return collection && !collection.isOutOfTestingScope;
+        })
+
+        const allOutOfTestScopeTrue = selectedResources.every(id => {
+            const collection = normalData.find(c => c.id === id);
+            return collection && collection.isOutOfTestingScope;
+        })
+
+        if(allOutOfTestScopeFalse){
+            actions.push(
+                {
+                    content: `Mark collection${func.addPlurality(selectedResources.length)} as out of testing scope`,
+                    onAction: () => handleCollectionsAction(selectedResources, collectionApi.markCollectionsOutOfTestScope, "marked out of testing scope")
+                }
+            )  
+        }
+        else if(allOutOfTestScopeTrue){
+            actions.push(
+                {
+                    content: `Mark collection${func.addPlurality(selectedResources.length)} as in testing scope`,
+                    onAction: () => handleCollectionsAction(selectedResources, collectionApi.unmarkCollectionsOutOfTestScope, "marked in testing scope")
+                }
+            )
+        }
+
+
 
         const bulkActionsOptions = [...actions];
         if(selectedTab !== 'groups') {

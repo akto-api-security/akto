@@ -485,11 +485,13 @@ const transform = {
     prettifyCollectionsData(newData, isLoading){
         const prettifyData = newData.map((c)=>{
             let calcCoverage = '0%';
-            if(c.urlsCount > 0){
-                if(c.urlsCount < c.testedEndpoints){
-                    calcCoverage= '100%'
-                }else{
-                    calcCoverage =  Math.ceil((c.testedEndpoints * 100)/c.urlsCount) + '%'
+            if(!c.isOutOfTestingScope){
+                if(c.urlsCount > 0){
+                    if(c.urlsCount < c.testedEndpoints){
+                        calcCoverage= '100%'
+                    }else{
+                        calcCoverage =  Math.ceil((c.testedEndpoints * 100)/c.urlsCount) + '%'
+                    }
                 }
             }
             const loadingComp = <Text color="subdued" variant="bodyMd">...</Text>
@@ -527,6 +529,9 @@ const transform = {
                 return
             }
             if (c.deactivated) {
+                return
+            }
+            if(c.isOutOfTestingScope){
                 return
             }
             totalUrl += c.urlsCount ;
