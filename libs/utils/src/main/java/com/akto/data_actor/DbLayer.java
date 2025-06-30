@@ -478,15 +478,20 @@ public class DbLayer {
         );
     }
 
-    private static List<CollectionTags> getFilteredTags(List<CollectionTags> tags) {
-        if(tags == null || tags.isEmpty()) {
-            return Collections.emptyList();
+    private static List<CollectionTags> getPreservedTags(ApiCollection apiCollection, List<CollectionTags> tags) {
+        // Replace only the KUBERNETES source tags
+        List<CollectionTags> preservedTags = new ArrayList<>();
+        if (apiCollection!= null && apiCollection.getTagsList() != null) {
+            for (CollectionTags tag : apiCollection.getTagsList()) {
+                if (!CollectionTags.TagSource.KUBERNETES.equals(tag.getSource())) {
+                    preservedTags.add(tag);
+                }
+            }
         }
-        List<String> igNoreList = Arrays.asList("pod-template-hash");
-        // Ignore tags from the ignore list
-        tags.removeIf(tag -> tag.getKeyName() != null && igNoreList.contains(tag.getKeyName()));
 
-        return tags;
+        // Merge preserved tags with input tags
+        preservedTags.addAll(tags);
+        return preservedTags;
     }
 
     public static void createCollectionSimpleForVpc(int vxlanId, String vpcId, List<CollectionTags> tags) { 
@@ -516,7 +521,7 @@ public class DbLayer {
 
         if (tags != null && !tags.isEmpty()) {
             // Update the entire tagsList
-            update = Updates.combine(update, Updates.addEachToSet(ApiCollection.TAGS_STRING, getFilteredTags(tags)));
+            update = Updates.combine(update, Updates.set(ApiCollection.TAGS_STRING, getPreservedTags(apiCollection, tags)));
         }
 
         ApiCollectionsDao.instance.getMCollection().updateOne(
@@ -565,7 +570,7 @@ public class DbLayer {
         }
 
         if(tags != null && !tags.isEmpty()) {
-            updates = Updates.combine(updates, Updates.addEachToSet(ApiCollection.TAGS_STRING, getFilteredTags(tags)));
+            updates = Updates.combine(updates, Updates.set(ApiCollection.TAGS_STRING, getPreservedTags(apiCollection, tags)));
         }
 
         ApiCollectionsDao.instance.getMCollection().findOneAndUpdate(Filters.eq(ApiCollection.HOST_NAME, host), updates, updateOptions);
