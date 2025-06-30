@@ -478,7 +478,7 @@ public class DbLayer {
         );
     }
 
-    private static List<CollectionTags> getPreservedTags(ApiCollection apiCollection, List<CollectionTags> tags) {
+    private static List<CollectionTags> getPreservedTags(List<CollectionTags> tags) {
         if(tags == null || tags.isEmpty()) {
             return Collections.emptyList();
         }
