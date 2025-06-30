@@ -2,6 +2,8 @@ package com.akto.hybrid_runtime.policies;
 
 import com.akto.dao.*;
 import com.akto.dao.context.Context;
+import com.akto.data_actor.DataActor;
+import com.akto.data_actor.DataActorFactory;
 import com.akto.dto.*;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.runtime_filters.RuntimeFilter;
@@ -12,16 +14,11 @@ import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods;
 import com.akto.dto.type.URLStatic;
 import com.akto.dto.type.URLTemplate;
+import com.akto.hybrid_runtime.APICatalogSync;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
-import com.akto.hybrid_runtime.APICatalogSync;
-import com.akto.data_actor.DataActor;
-import com.akto.data_actor.DataActorFactory;
-import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.*;
 import org.bson.conversions.Bson;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 import java.util.*;

@@ -12,7 +12,7 @@ import com.akto.dto.SensitiveParamInfo;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods;
-import com.akto.util.Util;
+import com.akto.util.Constants;
 import com.akto.dto.type.URLMethods.Method;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.MongoCursor;
@@ -60,6 +60,9 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, true);
 
         fieldNames = new String[]{SingleTypeInfo._RESPONSE_CODE, SingleTypeInfo._IS_HEADER, SingleTypeInfo._PARAM, SingleTypeInfo.SUB_TYPE, SingleTypeInfo._API_COLLECTION_ID};
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, true);
+
+        fieldNames = new String[]{SingleTypeInfo._RESPONSE_CODE, SingleTypeInfo._IS_HEADER, SingleTypeInfo._PARAM, SingleTypeInfo.SUB_TYPE, SingleTypeInfo._API_COLLECTION_ID, Constants.ID};
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, true);
 
         fieldNames = new String[]{SingleTypeInfo.SUB_TYPE, SingleTypeInfo._RESPONSE_CODE};
@@ -450,7 +453,7 @@ public class SingleTypeInfoDao extends AccountsContextDao<SingleTypeInfo> {
         Map<String, Map<String, Integer>> resultMap = new HashMap<>();
         resultMap.put("REQUEST", requestResult);
         resultMap.put("RESPONSE", responseResult);
-        
+
         return resultMap;
     }
 

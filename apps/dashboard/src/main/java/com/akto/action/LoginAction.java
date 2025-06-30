@@ -11,7 +11,6 @@ import com.akto.dto.SignupInfo;
 import com.akto.dto.SignupUserInfo;
 import com.akto.dto.User;
 import com.akto.listener.RuntimeListener;
-import com.akto.log.LoggerMaker.LogDb;
 import com.akto.utils.Token;
 import com.akto.utils.JWT;
 import com.mongodb.BasicDBObject;
@@ -35,8 +34,6 @@ import java.security.spec.InvalidKeySpecException;
 import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-
-import static com.akto.filter.UserDetailsFilter.LOGIN_URI;
 
 // Validates user from the supplied username and password
 // Generates refresh token jwt using the username if valid user

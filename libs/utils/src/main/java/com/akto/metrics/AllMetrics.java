@@ -1,8 +1,6 @@
 package com.akto.metrics;
 
 import com.akto.dao.context.Context;
-import com.akto.dao.metrics.MetricDataDao;
-import com.akto.data_actor.ClientActor;
 import com.akto.data_actor.DataActor;
 import com.akto.data_actor.DataActorFactory;
 import com.akto.dto.billing.Organization;

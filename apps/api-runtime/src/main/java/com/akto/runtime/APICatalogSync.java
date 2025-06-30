@@ -49,8 +49,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.Map.Entry;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.regex.Pattern;
 
 import static com.akto.dto.type.KeyTypes.patternToSubType;
 

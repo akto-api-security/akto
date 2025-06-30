@@ -12,11 +12,8 @@ import com.akto.dto.ApiInfo;
 import com.akto.dto.CustomAuthType;
 import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.RawApi;
-import com.akto.dto.RecordedLoginFlowInput;
 import com.akto.dto.testing.*;
-import com.akto.dto.testing.sources.AuthWithCond;
 import com.akto.testing.*;
-import com.akto.util.enums.LoginFlowEnums;
 import com.akto.util.enums.LoginFlowEnums.AuthMechanismTypes;
 import com.akto.dto.api_workflow.Graph;
 import com.akto.dto.test_editor.*;
@@ -39,6 +36,7 @@ import com.mongodb.BasicDBObject;
 import static com.akto.test_editor.Utils.bodyValuesUnchanged;
 import static com.akto.test_editor.Utils.headerValuesUnchanged;
 import static com.akto.runtime.utils.Utils.convertOriginalReqRespToString;
+import static com.akto.testing.TestRoleUtil.findMatchingAuthMechanism;
 import static com.akto.testing.Utils.compareWithOriginalResponse;
 
 import com.mongodb.client.model.Filters;
@@ -431,7 +429,7 @@ public class Executor {
 
     public static ExecutorSingleOperationResp modifyAuthTokenInRawApi(TestRoles testRole, RawApi rawApi) {
 
-        AuthMechanism authMechanismForRole = testRole.findMatchingAuthMechanism(rawApi);
+        AuthMechanism authMechanismForRole = findMatchingAuthMechanism(testRole,rawApi);
 
         if (authMechanismForRole == null) {
             return null;

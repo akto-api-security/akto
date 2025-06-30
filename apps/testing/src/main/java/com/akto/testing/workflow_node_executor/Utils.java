@@ -15,7 +15,6 @@ import javax.script.ScriptEngine;
 import javax.script.ScriptEngineManager;
 import javax.script.ScriptException;
 
-import com.akto.dto.ApiInfo;
 import com.akto.dto.testing.*;
 import com.akto.test_editor.execution.Memory;
 import org.apache.commons.lang3.StringUtils;

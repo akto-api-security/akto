@@ -15,7 +15,6 @@ import com.akto.log.LoggerMaker.LogDb;
 import com.akto.parsers.HttpCallParser;
 import com.akto.runtime.APICatalogSync;
 import com.akto.runtime.URLAggregator;
-import com.akto.runtime.policies.AuthPolicy;
 import com.akto.util.HTTPHeadersExample;
 import com.akto.util.JSONUtils;
 import com.google.common.base.Charsets;

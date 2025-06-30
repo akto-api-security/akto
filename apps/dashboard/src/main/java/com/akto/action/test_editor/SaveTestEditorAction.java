@@ -4,15 +4,12 @@ import com.akto.DaoInit;
 import com.akto.action.UserAction;
 import com.akto.action.testing_issues.IssuesAction;
 import com.akto.dao.AccountSettingsDao;
-import com.akto.dao.AuthMechanismsDao;
 import com.akto.dao.CustomAuthTypeDao;
 import com.akto.dao.SampleDataDao;
-import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.test_editor.TestConfigYamlParser;
 import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dao.test_editor.info.InfoParser;
-import com.akto.dao.testing.TestRolesDao;
 import com.akto.dao.testing.TestingRunResultDao;
 import com.akto.dto.AccountSettings;
 import com.akto.dto.ApiInfo;
@@ -25,16 +22,11 @@ import com.akto.dto.test_editor.TestLibrary;
 import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.test_run_findings.TestingRunIssues;
-import com.akto.dto.testing.AuthMechanism;
 import com.akto.dto.testing.GenericTestResult;
 import com.akto.dto.testing.MultiExecTestResult;
 import com.akto.dto.testing.TestResult;
-import com.akto.dto.testing.TestResult.Confidence;
 import com.akto.dto.testing.TestingRunResult;
-import com.akto.dto.testing.WorkflowNodeDetails;
-import com.akto.dto.testing.WorkflowTestResult.NodeResult;
 import com.akto.dto.traffic.SampleData;
-import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods;
 import com.akto.listener.InitializerListener;
 import com.akto.log.LoggerMaker;
@@ -70,8 +62,6 @@ import java.util.*;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
-
-import static com.akto.util.enums.GlobalEnums.YamlTemplateSource;
 
 public class SaveTestEditorAction extends UserAction {
 

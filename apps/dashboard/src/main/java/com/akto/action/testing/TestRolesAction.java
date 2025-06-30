@@ -4,8 +4,6 @@ import com.akto.action.UserAction;
 import com.akto.dao.context.Context;
 import com.akto.dao.testing.EndpointLogicalGroupDao;
 import com.akto.dao.testing.TestRolesDao;
-import com.akto.dao.testing.config.TestCollectionPropertiesDao;
-import com.akto.dto.testing.config.TestCollectionProperty;
 import com.akto.dto.RecordedLoginFlowInput;
 import com.akto.dto.data_types.Conditions;
 import com.akto.dto.data_types.Conditions.Operator;

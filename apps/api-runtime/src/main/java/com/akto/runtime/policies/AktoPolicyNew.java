@@ -1,6 +1,7 @@
 package com.akto.runtime.policies;
 
 import com.akto.dao.*;
+import com.akto.dao.common.AuthPolicy;
 import com.akto.dto.*;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.runtime_filters.RuntimeFilter;

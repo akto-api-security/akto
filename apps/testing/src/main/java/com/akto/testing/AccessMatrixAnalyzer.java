@@ -10,7 +10,6 @@ import com.akto.dao.CustomAuthTypeDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.testing.AccessMatrixTaskInfosDao;
 import com.akto.dao.testing.EndpointLogicalGroupDao;
-import com.akto.dao.testing.TestRolesDao;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.CustomAuthType;
