@@ -482,6 +482,7 @@ public class DbLayer {
         if(tags == null || tags.isEmpty()) {
             return Collections.emptyList();
         }
+
         List<String> igNoreList = Arrays.asList("pod-template-hash");
         // Ignore tags from the ignore list
         tags.removeIf(tag -> tag.getKeyName() != null && igNoreList.contains(tag.getKeyName()));
