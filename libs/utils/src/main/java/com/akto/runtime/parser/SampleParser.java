@@ -13,6 +13,8 @@ import com.akto.dto.HttpRequestParams;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.TrafficProducerLog;
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.HttpRequestResponseUtils;
 import com.akto.util.JSONUtils;
 import com.google.gson.Gson;
