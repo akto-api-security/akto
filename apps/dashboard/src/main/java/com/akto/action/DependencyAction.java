@@ -1,26 +1,20 @@
 package com.akto.action;
 
-import com.akto.DaoInit;
 import com.akto.dao.*;
 import com.akto.dao.context.Context;
 import com.akto.dependency_flow.TreeHelper;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.OriginalHttpRequest;
-import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.dependency_flow.*;
 import com.akto.dto.traffic.SampleData;
-import com.akto.dto.type.APICatalog;
 import com.akto.dto.type.URLMethods;
-import com.akto.dto.type.URLMethods.Method;
 import com.akto.log.LoggerMaker;
 import com.akto.runtime.RelationshipSync;
 import com.akto.test_editor.execution.Build;
 import com.akto.utils.Utils;
 import com.mongodb.BasicDBObject;
-import com.mongodb.ConnectionString;
 import com.mongodb.client.model.*;
-import org.apache.logging.log4j.util.Strings;
 import org.bson.conversions.Bson;
 
 import java.util.*;

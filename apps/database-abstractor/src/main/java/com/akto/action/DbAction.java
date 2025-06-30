@@ -2,7 +2,6 @@ package com.akto.action;
 
 import com.akto.dao.*;
 import com.akto.dao.context.Context;
-import com.akto.dao.settings.DataControlSettingsDao;
 import com.akto.data_actor.DbLayer;
 import com.akto.dto.*;
 import com.akto.dto.ApiInfo.ApiInfoKey;
@@ -10,7 +9,6 @@ import com.akto.dto.billing.Organization;
 import com.akto.dto.billing.Tokens;
 import com.akto.dto.bulk_updates.BulkUpdates;
 import com.akto.dto.bulk_updates.UpdatePayload;
-import com.akto.dto.filter.MergedUrls;
 import com.akto.dto.runtime_filters.RuntimeFilter;
 import com.akto.dto.settings.DataControlSettings;
 import com.akto.dto.test_editor.TestingRunPlayground;
@@ -25,11 +23,11 @@ import com.akto.dto.traffic.SampleData;
 import com.akto.dto.traffic.TrafficInfo;
 import com.akto.dto.traffic_metrics.TrafficMetrics;
 import com.akto.dto.type.SingleTypeInfo;
-import com.akto.log.LoggerMaker;
 import com.akto.utils.KafkaUtils;
 import com.akto.dto.type.URLMethods;
 import com.akto.dto.type.URLMethods.Method;
 import com.akto.dto.usage.MetricTypes;
+import com.akto.log.LoggerMaker;
 import com.akto.util.enums.GlobalEnums.TestErrorSource;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.opensymphony.xwork2.Action;
@@ -37,7 +35,6 @@ import com.opensymphony.xwork2.ActionSupport;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.*;
-import org.bson.Document;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 
@@ -1284,6 +1281,16 @@ public class DbAction extends ActionSupport {
             return Action.ERROR.toUpperCase();
         }
         return Action.SUCCESS.toUpperCase();
+    }
+
+    public ApiInfo fetchLatestAuthenticatedByApiCollectionId() {
+        try {
+            apiInfo = DbLayer.fetchLatestAuthenticatedByApiCollectionId(apiCollectionId);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in fetchLatestAuthenticatedByApiCollectionId " + e.toString());
+
+        }
+        return apiInfo;
     }
 
     public String fetchTestRole() {

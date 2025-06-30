@@ -2,9 +2,6 @@ package com.akto.utils.cloud.stack.aws;
 
 import java.util.Set;
 
-import java.io.BufferedReader;
-import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;

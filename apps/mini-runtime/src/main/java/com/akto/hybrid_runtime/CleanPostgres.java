@@ -2,12 +2,9 @@ package com.akto.hybrid_runtime;
 
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
 
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
-import com.akto.metrics.AllMetrics;
-import com.akto.sql.SampleDataAltDb;
 
 public class CleanPostgres {
 

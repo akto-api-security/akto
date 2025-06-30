@@ -1,20 +1,15 @@
 package com.akto.stigg;
 
 import com.akto.dao.ConfigsDao;
-import com.akto.dao.context.Context;
 import com.akto.dto.Config;
-import com.akto.dto.billing.FeatureAccess;
 import com.akto.dto.billing.Organization;
 import com.akto.log.LoggerMaker;
-import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.http_util.CoreHTTPClient;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import okhttp3.*;
-import org.apache.commons.lang3.StringUtils;
 
 import java.io.IOException;
-import java.util.HashMap;
 
 public class StiggReporterClient {
 

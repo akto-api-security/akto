@@ -11,12 +11,9 @@ import com.akto.dao.testing.TestingRunResultDao;
 import com.akto.dao.testing.TestingRunResultSummariesDao;
 import com.akto.dao.testing.WorkflowTestResultsDao;
 import com.akto.dao.testing.WorkflowTestsDao;
-import com.akto.dto.ApiInfo;
+import com.akto.dto.*;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.billing.SyncLimit;
-import com.akto.dto.CustomAuthType;
-import com.akto.dto.OriginalHttpRequest;
-import com.akto.dto.RawApi;
 import com.akto.dto.api_workflow.Graph;
 import com.akto.dto.test_editor.*;
 import com.akto.dto.testing.*;
@@ -55,6 +52,8 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.*;
 import java.util.concurrent.*;
+
+import static com.akto.testing.TestRoleUtil.findMatchingAuthMechanism;
 
 public class TestExecutor {
 
@@ -160,7 +159,7 @@ public class TestExecutor {
         }
 
         try {
-            StatusCodeAnalyser.run(sampleDataMapForStatusCodeAnalyser, sampleMessageStore , attackerTestRole.findMatchingAuthMechanism(null), testingRun.getTestingRunConfig());
+            StatusCodeAnalyser.run(sampleDataMapForStatusCodeAnalyser, sampleMessageStore , findMatchingAuthMechanism(null, null), testingRun.getTestingRunConfig());
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error while running status code analyser " + e.getMessage(), LogDb.TESTING);
         }
@@ -619,7 +618,9 @@ public class TestExecutor {
                 if (attackerTestRole == null) {
                     loggerMaker.infoAndAddToDb("ATTACKER_TOKEN_ALL test role not found", LogDb.TESTING);
                 } else {
-                    attackerAuthMechanism = attackerTestRole.findMatchingAuthMechanism(rawApi);
+                    RawApiMetadata rawApiMetadata = new RawApiMetadata(apiInfoKey.getApiCollectionId());
+                    rawApi.setRawApiMetdata(rawApiMetadata);
+                    attackerAuthMechanism = TestRoleUtil.findMatchingAuthMechanism(attackerTestRole,rawApi);
                 }
             }
             return runTestNew(apiInfoKey, testRunId, testingUtil.getSampleMessageStore(), attackerAuthMechanism, testingUtil.getCustomAuthTypes(), testRunResultSummaryId, testConfig, testingRunConfig, debug, testLogs);

@@ -5,6 +5,9 @@ import com.akto.dto.billing.FeatureAccess;
 import com.akto.dto.jobs.AutoTicketParams;
 import com.akto.dto.jobs.JobExecutorType;
 import com.akto.dto.testing.TestingRunConfig;
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
+
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 
@@ -15,8 +18,6 @@ import com.akto.data_actor.DataActor;
 import com.akto.data_actor.DataActorFactory;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.testing.TestingRun;
-import com.akto.log.LoggerMaker;
-import com.akto.log.LoggerMaker.LogDb;
 import com.akto.metrics.AllMetrics;
 
 public class TestCompletion {

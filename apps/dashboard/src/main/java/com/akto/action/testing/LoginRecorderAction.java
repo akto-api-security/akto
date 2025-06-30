@@ -1,6 +1,5 @@
 package com.akto.action.testing;
 
-import java.net.URL;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.Executors;

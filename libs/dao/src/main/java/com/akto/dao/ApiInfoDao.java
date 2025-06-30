@@ -19,10 +19,7 @@ import com.mongodb.client.model.Updates;
 import org.bson.Document;
 import org.bson.conversions.Bson;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 public class ApiInfoDao extends AccountsContextDao<ApiInfo>{
 
@@ -177,6 +174,11 @@ public class ApiInfoDao extends AccountsContextDao<ApiInfo>{
                 Filters.eq("_id.method", method),
                 Filters.eq("_id.apiCollectionId", apiCollectionId)
         );
+    }
+
+    public List<ApiInfo> find(BasicDBObject query, BasicDBObject sort, int i, int i1) {
+        Bson filter = Filters.and(query);
+        return instance.findAll(filter, i, i1, sort);
     }
 
 }

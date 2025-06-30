@@ -5,7 +5,6 @@ import com.akto.analyser.ResourceAnalyser;
 import com.akto.action.HarAction;
 import com.akto.dao.AccountSettingsDao;
 import com.akto.dao.ApiCollectionsDao;
-import com.akto.dao.AuthMechanismsDao;
 import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.demo.VulnerableRequestForTemplateDao;

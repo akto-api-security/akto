@@ -8,7 +8,6 @@ import com.akto.dto.jobs.JobParams;
 import com.akto.dto.jobs.JobStatus;
 import com.akto.dto.jobs.ScheduleType;
 import com.akto.log.LoggerMaker;
-import org.bson.types.ObjectId;
 
 public final class JobScheduler {
     private static final LoggerMaker logger = new LoggerMaker(JobScheduler.class, LoggerMaker.LogDb.DASHBOARD);
