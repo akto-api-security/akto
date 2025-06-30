@@ -516,7 +516,7 @@ public class DbLayer {
 
         if (tags != null && !tags.isEmpty()) {
             // Update the entire tagsList
-            update = Updates.combine(update, Updates.addEachToSet(ApiCollection.TAGS_STRING, getFilteredTags(apiCollection, tags)));
+            update = Updates.combine(update, Updates.addEachToSet(ApiCollection.TAGS_STRING, getFilteredTags(tags)));
         }
 
         ApiCollectionsDao.instance.getMCollection().updateOne(
@@ -565,7 +565,7 @@ public class DbLayer {
         }
 
         if(tags != null && !tags.isEmpty()) {
-            updates = Updates.combine(updates, Updates.addEachToSet(ApiCollection.TAGS_STRING, getFilteredTags(apiCollection, tags)));
+            updates = Updates.combine(updates, Updates.addEachToSet(ApiCollection.TAGS_STRING, getFilteredTags(tags)));
         }
 
         ApiCollectionsDao.instance.getMCollection().findOneAndUpdate(Filters.eq(ApiCollection.HOST_NAME, host), updates, updateOptions);
