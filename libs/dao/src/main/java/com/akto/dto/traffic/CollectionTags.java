@@ -8,11 +8,7 @@ import java.util.Map;
 import java.util.Objects;
 
 import com.akto.dao.context.Context;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.Gson;
-import com.mongodb.BasicDBObject;
-
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -43,7 +39,17 @@ public class CollectionTags {
 
     @Override
     public int hashCode() {
-        return Objects.hash(lastUpdatedTs, keyName, value, source);
+        return Objects.hash(keyName, value, source);
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        if (this == obj) return true;
+        if (obj == null || getClass() != obj.getClass()) return false;
+        CollectionTags that = (CollectionTags) obj;
+        return Objects.equals(keyName, that.keyName) &&
+               Objects.equals(value, that.value) &&
+               source == that.source;
     }
 
 
