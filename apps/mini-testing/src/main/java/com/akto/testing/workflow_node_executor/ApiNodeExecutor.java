@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Collections;
 
+import com.akto.dto.ApiInfo;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.api_workflow.Node;

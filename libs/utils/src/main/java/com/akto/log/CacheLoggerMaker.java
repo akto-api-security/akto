@@ -3,7 +3,6 @@ package com.akto.log;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
-
 import com.akto.dao.context.Context;
 
 public class CacheLoggerMaker extends LoggerMaker {

@@ -51,8 +51,6 @@ import static com.akto.test_editor.execution.Build.modifyRequest;
 import com.akto.testing.kafka_utils.TestingConfigurations;
 import com.akto.testing.kafka_utils.Producer;
 import com.akto.dto.testing.info.SingleTestPayload;
-
-import static com.akto.testing.TestRoleUtil.findMatchingAuthMechanism;
 import static com.akto.testing.Utils.writeJsonContentInFile;
 
 import org.apache.commons.lang3.StringUtils;
@@ -240,7 +238,7 @@ public class TestExecutor {
         currentTime = Context.now();
         loggerMaker.infoAndAddToDb("Starting status code analyser", LogDb.TESTING);
         try {
-            StatusCodeAnalyser.run(sampleDataMapForStatusCodeAnalyser, sampleMessageStore ,  findMatchingAuthMechanism(null, null), testingRun.getTestingRunConfig(), hostAndContentType);
+            StatusCodeAnalyser.run(sampleDataMapForStatusCodeAnalyser, sampleMessageStore ,  attackerTestRole.findMatchingAuthMechanism(null), testingRun.getTestingRunConfig(), hostAndContentType);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error while running status code analyser " + e.getMessage(), LogDb.TESTING);
         }
@@ -812,7 +810,7 @@ public class TestExecutor {
             if (attackerTestRole == null) {
                 loggerMaker.infoAndAddToDb("ATTACKER_TOKEN_ALL test role not found", LogDb.TESTING);
             } else {
-                attackerAuthMechanism = findMatchingAuthMechanism(attackerTestRole, rawApi);
+                attackerAuthMechanism = attackerTestRole.findMatchingAuthMechanism(rawApi);
             }
             return runTestNew(apiInfoKey, testRunId, testingUtil.getSampleMessageStore(), attackerAuthMechanism, testingUtil.getCustomAuthTypes(), testRunResultSummaryId, testConfig, testingRunConfig, debug, testLogs, rawApi);
     }

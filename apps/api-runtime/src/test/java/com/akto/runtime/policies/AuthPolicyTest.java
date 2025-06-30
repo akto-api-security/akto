@@ -2,7 +2,6 @@ package com.akto.runtime.policies;
 
 import com.akto.MongoBasedTest;
 import com.akto.dao.CustomAuthTypeDao;
-import com.akto.dao.common.AuthPolicy;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.CustomAuthType;
 import com.akto.dto.HttpRequestParams;
