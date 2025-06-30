@@ -27,8 +27,13 @@ import com.mongodb.BasicDBObject;
 import com.mongodb.ConnectionString;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
+import org.bson.conversions.Bson;
+import org.mockito.internal.matchers.Or;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import static com.akto.dto.billing.OrganizationUsage.ORG_ID;
+import static com.akto.dto.billing.OrganizationUsage.SINKS;
 
 public class InitializerListener implements ServletContextListener {
     public static boolean connectedToMongo = false;

@@ -22,7 +22,6 @@ public class TestRolesDao extends AccountsContextDao<TestRoles> {
         return MongoDBEnums.Collection.TEST_ROLES.getCollectionName();
     }
     public static final TestRolesDao instance = new TestRolesDao();
-
     private TestRolesDao(){}
     @Override
     public Class<TestRoles> getClassT() {
@@ -65,33 +64,10 @@ public class TestRolesDao extends AccountsContextDao<TestRoles> {
         if (testRoles == null) {
             return null;
         }
-        if(rawApi == null) {
-           return findDefaultAuthMechanism(testRoles);
-        }
-        // TODO: This is not being called with non-null rawAPI. In case it is, use findMatchingAuthMechanism.
-        return findDefaultAuthMechanism(testRoles);
+        return testRoles.findMatchingAuthMechanism(rawApi);
     }
 
     public BasicDBObject fetchAttackerTokenDoc(int apiCollectionId) {
         throw new IllegalStateException("Not implemented");
-    }
-
-    public static AuthMechanism findDefaultAuthMechanism(TestRoles testRole) {
-        try {
-            for(AuthWithCond authWithCond: testRole.getAuthWithCondList()) {
-                if (authWithCond.getHeaderKVPairs().isEmpty()) {
-                    AuthMechanism ret = authWithCond.getAuthMechanism();
-                    if(authWithCond.getRecordedLoginFlowInput()!=null){
-                        ret.setRecordedLoginFlowInput(authWithCond.getRecordedLoginFlowInput());
-                    }
-
-                    return ret;
-                }
-            }
-        } catch (Exception e) {
-            return null;
-        }
-
-        return null;
     }
 }

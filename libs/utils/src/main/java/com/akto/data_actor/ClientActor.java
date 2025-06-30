@@ -3227,35 +3227,6 @@ public class ClientActor extends DataActor {
         }
     }
 
-    public ApiInfo fetchLatestAuthenticatedByApiCollectionId(int apiCollectionId) {
-        Map<String, List<String>> headers = buildHeaders();
-        BasicDBObject obj = new BasicDBObject();
-        obj.put("apiCollectionId", apiCollectionId);
-
-        OriginalHttpRequest request = new OriginalHttpRequest(url + "/fetchLatestAuthenticatedByApiCollectionId", "", "POST", obj.toString(), headers, "");
-        try {
-            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
-            String responsePayload = response.getBody();
-            if (response.getStatusCode() != 200 || responsePayload == null) {
-                loggerMaker.errorAndAddToDb("non 2xx response in fetchLatestAuthenticatedByApiCollectionId", LoggerMaker.LogDb.RUNTIME);
-                return null;
-            }
-            BasicDBObject payloadObj;
-            try {
-                payloadObj =  BasicDBObject.parse(responsePayload);
-                BasicDBObject apiInfo = (BasicDBObject) payloadObj.get("apiInfo");
-                return objectMapper.readValue(apiInfo.toJson(), ApiInfo.class);
-            } catch(Exception e) {
-                loggerMaker.errorAndAddToDb("error extracting response in fetchLatestAuthenticatedByApiCollectionId" + e, LoggerMaker.LogDb.RUNTIME);
-
-                return null;
-            }
-        } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("error in fetchLatestAuthenticatedByApiCollectionId" + e, LoggerMaker.LogDb.RUNTIME);
-            return null;
-        }
-    }
-
     public void modifyHybridTestingSetting(boolean hybridTestingEnabled) {
         Map<String, List<String>> headers = buildHeaders();
         BasicDBObject obj = new BasicDBObject();

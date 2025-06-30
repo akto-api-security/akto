@@ -17,6 +17,8 @@ import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.SingleTypeInfo.SubType;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.mongodb.BasicDBObject;
+import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.UpdateOneModel;
 import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.Updates;
