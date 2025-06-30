@@ -7,22 +7,31 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import org.json.JSONArray;
+
+import com.akto.billing.UsageMetricUtils;
+import com.akto.dao.context.Context;
 import com.akto.dao.test_editor.TestEditorEnums;
 import com.akto.dao.test_editor.TestEditorEnums.ExtractOperator;
 import com.akto.dao.test_editor.TestEditorEnums.OperandTypes;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.RawApi;
+import com.akto.dto.billing.FeatureAccess;
 import com.akto.dto.test_editor.DataOperandFilterRequest;
 import com.akto.dto.test_editor.DataOperandsFilterResponse;
 import com.akto.dto.test_editor.FilterActionRequest;
 import com.akto.dto.test_editor.FilterNode;
 import com.akto.log.LoggerMaker;
+import com.akto.gpt.handlers.gpt_prompts.TestExecutorModifier;
+import com.akto.gpt.handlers.gpt_prompts.TestFilterModifier;
+import com.akto.test_editor.Utils;
 import com.mongodb.BasicDBObject;
 
 public class Filter {
 
     private FilterAction filterAction;
-    private static final LoggerMaker loggerMaker = new LoggerMaker(Filter.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(Filter.class, LoggerMaker.LogDb.TESTING);
+    private static final String INVALID_QS_ = "invalid_" + Context.now();
 
     public Filter() {
         this.filterAction = new FilterAction();
@@ -56,6 +65,13 @@ public class Filter {
             FilterActionRequest filterActionRequest = new FilterActionRequest(node.getValues(), rawApi, testRawApi, apiInfoKey, node.getConcernedProperty(), node.getSubConcernedProperty(), matchingKeySet, contextEntities, operand, context, keyValOperandSeen, node.getBodyOperand(), node.getContextProperty(), node.getCollectionProperty());
             Object updatedQuerySet = filterAction.resolveQuerySetValues(filterActionRequest, node.fetchNodeValues(), varMap);
             filterActionRequest.setQuerySet(updatedQuerySet);
+
+            Object generatedQuerySet = generateQuerySet(filterActionRequest);
+
+            if (generatedQuerySet != null) {
+                filterActionRequest.setQuerySet(generatedQuerySet);
+            }
+
             if (node.getOperand().equalsIgnoreCase(ExtractOperator.EXTRACT.toString()) || node.getOperand().equalsIgnoreCase(ExtractOperator.EXTRACTMULTIPLE.toString())) {
                 boolean resp = true;
                 boolean extractMultiple = node.getOperand().equalsIgnoreCase(ExtractOperator.EXTRACTMULTIPLE.toString());
@@ -150,6 +166,81 @@ public class Filter {
             output.add(s);
         }
         return output;
+    }
+
+    public static Object generateQuerySet(FilterActionRequest filterActionRequest) {
+        Object querySet = filterActionRequest.getQuerySet();
+        String operationTypeLower = filterActionRequest.getOperand().toLowerCase();
+        String operation = "";
+        Object newQuerySet = querySet;
+        boolean querySetUpdated = false;
+        String operationPrompt = "";
+        try {
+            int accountId = Context.accountId.get();
+            FeatureAccess featureAccess = UsageMetricUtils.getFeatureAccessSaas(accountId, TestExecutorModifier._AKTO_GPT_AI);
+            if (featureAccess.getIsGranted()) {
+
+
+                if (querySet instanceof String) {
+                    String query = (String) querySet;
+                    if (query.startsWith(Utils._MAGIC)) {
+                        operationPrompt = query.replace(Utils._MAGIC, "").trim();
+                    }
+                } else if (querySet instanceof ArrayList) {
+                    ArrayList<?> query = (ArrayList<?>) querySet;
+                    if (query.size() == 1 && query.get(0) instanceof String) {
+                        String str = (String) query.get(0);
+                        if (str.startsWith(Utils._MAGIC)) {
+                            operationPrompt = str.replace(Utils._MAGIC, "").trim();
+                        }
+                    }
+                }
+
+                if(!operationPrompt.isEmpty()){
+
+                    operation = operationTypeLower + ": " + operationPrompt;
+                    if(filterActionRequest.getConcernedProperty() != null && !filterActionRequest.getConcernedProperty().isEmpty()) {
+                        operation = operation + " in " + filterActionRequest.getConcernedProperty();
+                    }
+                    if(filterActionRequest.getConcernedSubProperty() != null && !filterActionRequest.getConcernedSubProperty().isEmpty()) {
+                        operation = operation + " at " + filterActionRequest.getConcernedSubProperty();
+                    }
+                    BasicDBObject queryData = new BasicDBObject();
+
+                    RawApi rawApi = filterActionRequest.fetchRawApiBasedOnContext();
+                    String ogRequest = Utils.buildRequestIHttpFormat(rawApi);
+                    String response = Utils.buildResponseIHttpFormat(rawApi);
+                    String request = ogRequest + "\n\n" + response;
+                    queryData.put(TestExecutorModifier._REQUEST, request);
+                    queryData.put(TestExecutorModifier._OPERATION, operation);
+                    BasicDBObject generatedData = new TestFilterModifier().handle(queryData);
+                    loggerMaker.infoAndAddToDb("JARVIS_LLM_RESPONSE: " + generatedData);
+                    if (generatedData.containsKey(operationTypeLower)) {
+                        Object generatedQuerySet = generatedData.get(operationTypeLower);
+                        if (generatedQuerySet instanceof JSONArray) {
+                            JSONArray arr = (JSONArray) generatedQuerySet;
+                            List<Object> list = new ArrayList<>();
+                            for (int i = 0; i < arr.length(); i++) {
+                                list.add(arr.get(i));
+                            }
+                            newQuerySet = list;
+                        } else {
+                            newQuerySet = generatedQuerySet;
+                        }
+                        querySetUpdated = true;
+                    }
+
+                    if(!querySetUpdated && !operationPrompt.isEmpty()){
+                        newQuerySet = INVALID_QS_;
+                     }
+                }
+            }
+
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "error invoking operation " + operationTypeLower + " " + e.getMessage());
+        }
+
+        return newQuerySet;
     }
 
 }

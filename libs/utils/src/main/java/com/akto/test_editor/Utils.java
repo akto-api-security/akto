@@ -14,13 +14,16 @@ import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import com.akto.dao.context.Context;
+import com.akto.dto.ApiInfo;
+import com.akto.dto.ApiInfo.ApiAccessType;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.RawApi;
-import com.akto.dao.context.Context;
-import com.akto.dto.ApiInfo.ApiAccessType;
-import com.akto.dto.ApiInfo;
 import com.akto.dto.test_editor.ExecutorSingleOperationResp;
 import com.akto.dto.testing.UrlModifierPayload;
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
+import static com.akto.runtime.RuntimeUtil.extractAllValuesFromPayload;
 import com.akto.test_editor.execution.Operations;
 import com.akto.util.Constants;
 import com.akto.util.DashboardMode;
@@ -31,13 +34,17 @@ import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.fasterxml.jackson.databind.node.TextNode;
 import com.google.gson.Gson;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 
-import static com.akto.runtime.RuntimeUtil.extractAllValuesFromPayload;
-import okhttp3.*;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.RequestBody;
+import okhttp3.Response;
+import okhttp3.ResponseBody;
 
 public class Utils {
 
@@ -46,6 +53,8 @@ public class Utils {
     private static final Gson gson = new Gson();
 
     public static boolean SKIP_SSRF_CHECK = ("true".equalsIgnoreCase(System.getenv("SKIP_SSRF_CHECK")) || !DashboardMode.isSaasDeployment());
+
+    private static final LoggerMaker loggerMaker = new LoggerMaker(Utils.class, LogDb.TESTING);
 
     private static final OkHttpClient client = createHttpClient();
 
@@ -914,6 +923,137 @@ public class Utils {
                 return new ExecutorSingleOperationResp(false, "invalid operationType");
         }
             
+    }
+
+
+
+    public static String buildRequestIHttpFormat(RawApi rawApi) {
+        StringBuilder requestBuilder = new StringBuilder();
+
+        if(rawApi.getRequest() == null) {
+            return "No request available";
+        }
+
+        requestBuilder.append(rawApi.getRequest().getMethod()).append(" ").append(rawApi.getRequest().getUrl()).append("\n");
+        Map<String, List<String>> headers = rawApi.getRequest().getHeaders();
+        for (Map.Entry<String, List<String>> entry : headers.entrySet()) {
+            String headerKey = entry.getKey();
+            List<String> headerValues = entry.getValue();
+            for (String headerValue : headerValues) {
+                requestBuilder.append(headerKey).append(": ").append(headerValue).append("\n");
+            }
+        }
+        String requestBody = rawApi.getRequest().getJsonRequestBody();
+        if (requestBody != null && !requestBody.isEmpty()) {
+            requestBuilder.append("\n").append(requestBody);
+        }
+        return requestBuilder.toString();
+    }
+
+    public static String buildResponseIHttpFormat(RawApi rawApi) {
+        StringBuilder responseBuilder = new StringBuilder();
+
+        if(rawApi.getResponse() == null) {
+            return "No response available";
+        }
+
+        responseBuilder.append(rawApi.getResponse().getStatusCode()).append("\n");
+        Map<String, List<String>> headers = rawApi.getResponse().getHeaders();
+        for (Map.Entry<String, List<String>> entry : headers.entrySet()) {
+            String headerKey = entry.getKey();
+            List<String> headerValues = entry.getValue();
+            for (String headerValue : headerValues) {
+                responseBuilder.append(headerKey).append(": ").append(headerValue).append("\n");
+            }
+        }
+        String responseBody = rawApi.getResponse().getJsonResponseBody();
+        if (responseBody != null && !responseBody.isEmpty()) {
+            String contentType = null;
+        
+            if (headers.containsKey("content-type")) {
+                contentType = headers.get("content-type").get(0);
+            }
+        
+            if (contentType != null && contentType.toLowerCase().contains("text/event-stream")) {
+                String[] events = responseBody.split("event:");
+                if (events.length > 2) {
+                    for (int i = events.length - 2; i < events.length; i++) {           
+                        responseBuilder.append("\n").append("event:").append(events[i].trim());
+                    }
+                } else {
+                    responseBuilder.append("\n").append(responseBody);
+                }
+            } else {
+                responseBuilder.append("\n").append(responseBody);
+            }
+        }
+        return responseBuilder.toString();
+    }
+
+    public final static String _MAGIC = "$magic";
+
+    public static RawApi modifyRawApiPayload(RawApi rawApi, String keyPath, Object value) {
+        try {
+            JsonNode originalPayload = mapper.convertValue(rawApi.fetchReqPayload(), JsonNode.class);
+
+            boolean isWrappedJsonArray = originalPayload.isObject() && originalPayload.has("json") && originalPayload.get("json").isArray();
+
+            JsonNode payload = isWrappedJsonArray
+                    ? originalPayload.get("json").deepCopy()
+                    : originalPayload.deepCopy();
+
+            boolean isRootArray = payload.isArray();
+            JsonNode current = isRootArray ? payload.get(0) : payload;
+
+            String[] keys = keyPath.split("\\.");
+            for (int i = 0; i < keys.length - 1; i++) {
+                String key = keys[i];
+                if (key.matches(".*\\[\\d+\\]")) {
+                    String arrayKey = key.substring(0, key.indexOf('['));
+                    int index = Integer.parseInt(key.substring(key.indexOf('[') + 1, key.indexOf(']')));
+                    if (!current.has(arrayKey) || !current.get(arrayKey).isArray()) {
+                        ((ObjectNode) current).putArray(arrayKey);
+                    }
+                    ArrayNode array = (ArrayNode) current.get(arrayKey);
+                    while (array.size() <= index) {
+                        array.addObject();
+                    }
+                    current = array.get(index);
+                } else {
+                    if (!current.has(key) || !current.get(key).isObject()) {
+                        ((ObjectNode) current).putObject(key);
+                    }
+                    current = current.get(key);
+                }
+            }
+
+            // Set the final value
+            String finalKey = keys[keys.length - 1];
+            if (finalKey.matches(".*\\[\\d+\\]")) {
+                String arrayKey = finalKey.substring(0, finalKey.indexOf('['));
+                int index = Integer.parseInt(finalKey.substring(finalKey.indexOf('[') + 1, finalKey.indexOf(']')));
+                if (!current.has(arrayKey) || !current.get(arrayKey).isArray()) {
+                    ((ObjectNode) current).putArray(arrayKey);
+                }
+                ArrayNode array = (ArrayNode) current.get(arrayKey);
+                while (array.size() <= index) {
+                    array.addNull();
+                }
+                array.set(index, mapper.valueToTree(value));
+            } else {
+                ((ObjectNode) current).set(finalKey, mapper.valueToTree(value));
+            }
+
+            // Save final modified payload
+            String finalJson = mapper.writeValueAsString(payload);
+            OriginalHttpRequest req = rawApi.getRequest();
+            req.setBody(finalJson);
+            rawApi.setRequest(req);
+        } catch (Exception e) {
+            e.printStackTrace();
+            loggerMaker.errorAndAddToDb(e, "Error in modifyRawApiPayload: " + e.getMessage());
+        }
+        return rawApi;
     }
 
 }
