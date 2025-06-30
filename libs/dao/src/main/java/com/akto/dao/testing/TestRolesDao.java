@@ -68,6 +68,7 @@ public class TestRolesDao extends AccountsContextDao<TestRoles> {
         if(rawApi == null) {
            return findDefaultAuthMechanism(testRoles);
         }
+        // TODO: This is not being called with non-null rawAPI. In case it is, use findMatchingAuthMechanism.
         return findDefaultAuthMechanism(testRoles);
     }
 
