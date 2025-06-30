@@ -478,7 +478,7 @@ public class DbLayer {
         );
     }
 
-    private static List<CollectionTags> getPreservedTags(List<CollectionTags> tags) {
+    private static List<CollectionTags> getFilteredTags(List<CollectionTags> tags) {
         if(tags == null || tags.isEmpty()) {
             return Collections.emptyList();
         }
@@ -516,7 +516,7 @@ public class DbLayer {
 
         if (tags != null && !tags.isEmpty()) {
             // Update the entire tagsList
-            update = Updates.combine(update, Updates.addEachToSet(ApiCollection.TAGS_STRING, getPreservedTags(apiCollection, tags)));
+            update = Updates.combine(update, Updates.addEachToSet(ApiCollection.TAGS_STRING, getFilteredTags(apiCollection, tags)));
         }
 
         ApiCollectionsDao.instance.getMCollection().updateOne(
@@ -565,7 +565,7 @@ public class DbLayer {
         }
 
         if(tags != null && !tags.isEmpty()) {
-            updates = Updates.combine(updates, Updates.addEachToSet(ApiCollection.TAGS_STRING, getPreservedTags(apiCollection, tags)));
+            updates = Updates.combine(updates, Updates.addEachToSet(ApiCollection.TAGS_STRING, getFilteredTags(apiCollection, tags)));
         }
 
         ApiCollectionsDao.instance.getMCollection().findOneAndUpdate(Filters.eq(ApiCollection.HOST_NAME, host), updates, updateOptions);
