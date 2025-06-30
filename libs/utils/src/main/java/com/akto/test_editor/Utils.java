@@ -89,6 +89,10 @@ public class Utils {
                     continue;
                 }
                 Object value = basicDBObject.get(key);
+                if (key.equalsIgnoreCase(queryKey)) {
+                    basicDBObject.remove(key);
+                    return true;
+                }
                 if (!( (value instanceof BasicDBObject) || (value instanceof BasicDBList) )) {
                     if (key.equalsIgnoreCase(queryKey)) {
                         basicDBObject.remove(key);
