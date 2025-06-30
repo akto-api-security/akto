@@ -194,7 +194,7 @@ public class Main {
     }
 
     public static void main(String[] args) throws InterruptedException {
-        String mongoURI = "mongodb://localhost:27017";
+        String mongoURI = System.getenv("AKTO_MONGO_CONN");
         DaoInit.init(new ConnectionString(mongoURI));
 
         boolean connectedToMongo = false;

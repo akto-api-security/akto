@@ -13,7 +13,6 @@ import org.slf4j.LoggerFactory;
 import static com.akto.util.Constants.ID;
 
 public class TestRoles {
-    private static final Logger log = LoggerFactory.getLogger(TestRoles.class);
     private ObjectId id;
     @BsonIgnore
     private String hexId;
