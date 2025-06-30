@@ -3,6 +3,7 @@ package com.akto.threat.backend;
 import com.akto.threat.backend.interceptors.AuthenticationInterceptor;
 import com.akto.threat.backend.router.DashboardRouter;
 import com.akto.threat.backend.router.ThreatDetectionRouter;
+import com.akto.threat.backend.service.ApiDistributionDataService;
 import com.akto.threat.backend.service.MaliciousEventService;
 import com.akto.threat.backend.service.ThreatActorService;
 import com.akto.threat.backend.service.ThreatApiService;
@@ -16,14 +17,17 @@ public class BackendVerticle extends AbstractVerticle {
   private final MaliciousEventService maliciousEventService;
   private final ThreatActorService threatActorService;
   private final ThreatApiService threatApiService;
+  private final ApiDistributionDataService apiDistributionDataService;
 
   public BackendVerticle(
       MaliciousEventService maliciousEventService,
       ThreatActorService threatActorService,
-      ThreatApiService threatApiService) {
+      ThreatApiService threatApiService,
+      ApiDistributionDataService apiDistributionDataService) {
     this.maliciousEventService = maliciousEventService;
     this.threatActorService = threatActorService;
     this.threatApiService = threatApiService;
+    this.apiDistributionDataService = apiDistributionDataService;
   }
 
   @Override
@@ -41,7 +45,7 @@ public class BackendVerticle extends AbstractVerticle {
     Router dashboardRouter =
         new DashboardRouter(maliciousEventService, threatActorService, threatApiService)
             .setup(vertx);
-    Router threatDetectionRouter = new ThreatDetectionRouter(maliciousEventService).setup(vertx);
+    Router threatDetectionRouter = new ThreatDetectionRouter(maliciousEventService, apiDistributionDataService).setup(vertx);
 
     api.route("/dashboard/*").subRouter(dashboardRouter);
     api.route("/threat_detection/*").subRouter(threatDetectionRouter);
