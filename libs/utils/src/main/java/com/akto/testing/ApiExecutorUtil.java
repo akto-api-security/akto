@@ -19,7 +19,6 @@ import com.akto.dto.billing.FeatureAccess;
 import com.akto.dto.testing.config.TestScript;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
-
 import jdk.nashorn.api.scripting.ScriptObjectMirror;
 
 public class ApiExecutorUtil {

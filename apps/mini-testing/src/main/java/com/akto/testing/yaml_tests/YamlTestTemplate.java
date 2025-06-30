@@ -7,6 +7,7 @@ import com.akto.dto.RawApi;
 import com.akto.dto.test_editor.*;
 import com.akto.dto.testing.*;
 import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import com.akto.rules.TestPlugin;
 import com.akto.test_editor.auth.AuthValidator;
 import com.akto.test_editor.execution.Executor;

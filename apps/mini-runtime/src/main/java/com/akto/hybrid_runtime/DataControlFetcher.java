@@ -2,6 +2,7 @@ package com.akto.hybrid_runtime;
 
 import com.akto.data_actor.DataActor;
 import com.akto.dto.settings.DataControlSettings;
+import com.akto.sql.SampleDataAltDb;
 import com.akto.testing_db_layer_client.ClientLayer;
 import com.mongodb.BasicDBList;
 import org.apache.commons.lang3.StringUtils;

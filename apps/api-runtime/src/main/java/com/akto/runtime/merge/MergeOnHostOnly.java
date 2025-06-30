@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import com.akto.log.LoggerMaker;
 import com.mongodb.client.model.Projections;
 import org.bson.conversions.Bson;
 
@@ -21,12 +22,13 @@ import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dao.TrafficInfoDao;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.ApiInfo;
+import com.akto.dto.FilterSampleData;
 import com.akto.dto.SensitiveSampleData;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.traffic.TrafficInfo;
 import com.akto.dto.type.SingleTypeInfo;
-import com.akto.log.LoggerMaker;
 import com.akto.util.Util;
+import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.InsertManyOptions;
 import com.mongodb.client.model.UpdateOptions;
