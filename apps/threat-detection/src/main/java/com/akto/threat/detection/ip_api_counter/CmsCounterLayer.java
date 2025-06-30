@@ -25,32 +25,37 @@ public class CmsCounterLayer {
     private static final ConcurrentHashMap<String, CountMinSketch> sketches = new ConcurrentHashMap<>();
     private static CounterCache cache;
     private static final LoggerMaker logger = new LoggerMaker(CmsCounterLayer.class);
+    private static final CmsCounterLayer INSTANCE = new CmsCounterLayer();
 
-    static {
-        ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
-        scheduler.scheduleAtFixedRate(CmsCounterLayer::cleanupOldWindows, 1, 1, TimeUnit.MINUTES);
-        scheduler.scheduleAtFixedRate(CmsCounterLayer::syncToRedis, 1, 1, TimeUnit.MINUTES);
+    private CmsCounterLayer() {
     }
 
-    public CmsCounterLayer(RedisClient redisClient) {
+    public static CmsCounterLayer getInstance() {
+        return INSTANCE;
+    }
+
+    public static void initialize(RedisClient redisClient) {
         if (redisClient != null) {
             cache = new ApiCountCacheLayer(redisClient);
+            ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(2);
+            scheduler.scheduleAtFixedRate(CmsCounterLayer::cleanupOldWindows, 0, 1, TimeUnit.MINUTES);
+            scheduler.scheduleAtFixedRate(CmsCounterLayer::syncToRedis, 0, 1, TimeUnit.MINUTES);
         } else {
             cache = null;
         }
     }
 
-    public static void increment(String key, String windowKey) {
+    public void increment(String key, String windowKey) {
         CountMinSketch cms = sketches.computeIfAbsent(windowKey, k ->
             new CountMinSketch(EPSILON, CONFIDENCE, SEED)
         );
         cms.add(key, 1);
     }
 
-    public static long estimateCount(String key, String windowKey) {
+    public long estimateCount(String key, String windowKey) {
         CountMinSketch cms = sketches.get(windowKey);
         if (cms == null) {
-            cms = fetchFromRedis(windowKey);
+            cms = fetchFromRedis(RedisKeyInfo.IP_API_CMS_DATA_PREFIX + "|" + windowKey);
             if (cms != null) {
                 sketches.put(windowKey, cms);
             } else {
@@ -61,6 +66,7 @@ public class CmsCounterLayer {
     }
 
     public static void cleanupOldWindows() {
+        logger.debug("cleanupOldWindows triggered at " + Context.now());
         long currentEpochMin = Context.now() / 60;
         long startWindow = currentEpochMin - 90;
         long endWindow = currentEpochMin - 61;
@@ -74,20 +80,18 @@ public class CmsCounterLayer {
     }
 
     private static void syncToRedis() {
-        if (cache == null) {
-            return;
-        }
+        logger.debug("syncToRedis triggered at " + Context.now());
         long currentEpochMin = Context.now()/60;
         long startWindow = currentEpochMin - 5;
    
         for (long i = startWindow; i < currentEpochMin; i++) {
-            String windowKey = String.valueOf(startWindow);
+            String windowKey = String.valueOf(i);
             CountMinSketch cms = sketches.get(windowKey);
             if (cms == null || cms.size() == 0) continue;
 
             try {
                 byte[] serialized = CountMinSketch.serialize(cms);
-                String redisKey = (RedisKeyInfo.IP_API_CMS_DATA_PREFIX + windowKey);
+                String redisKey = RedisKeyInfo.IP_API_CMS_DATA_PREFIX + "|" + windowKey;
                 cache.setBytesWithExpiry(redisKey, serialized, CMS_DATA_RETENTION_MINUTES * 60);
             } catch (Exception e) {
                 // add log

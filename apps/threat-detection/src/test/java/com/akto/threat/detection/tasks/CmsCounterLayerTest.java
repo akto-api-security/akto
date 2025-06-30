@@ -34,7 +34,8 @@ public class CmsCounterLayerTest {
 
     @BeforeEach
     void setUp() {
-        cmsCounterLayer = new CmsCounterLayer(null);
+        CmsCounterLayer.initialize(null);
+        cmsCounterLayer = CmsCounterLayer.getInstance();
         Field cacheField;
         try {
             cacheField = CmsCounterLayer.class.getDeclaredField("cache");
@@ -47,7 +48,7 @@ public class CmsCounterLayerTest {
     
     @Test
     void testIncrementAndEstimateSingleKey() {
-        String key = "1.1.1.1|/api/foo";
+        String key = "1.1.1.1|GET|/api/foo";
         String window = windowKeyNow();
 
         cmsCounterLayer.increment(key, window);

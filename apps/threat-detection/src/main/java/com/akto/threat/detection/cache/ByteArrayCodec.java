@@ -8,25 +8,24 @@ import io.lettuce.core.codec.RedisCodec;
 public class ByteArrayCodec implements RedisCodec<String, byte[]>{
 
   @Override
-  public String decodeKey(ByteBuffer bytes) {
-    return StandardCharsets.UTF_8.decode(bytes).toString();
-  }
+    public String decodeKey(ByteBuffer bytes) {
+        return StandardCharsets.UTF_8.decode(bytes).toString();
+    }
 
-  @Override
-  public byte[] decodeValue(ByteBuffer bytes) {
-    byte[] array = new byte[bytes.remaining()];
-    bytes.get(array);
-    return array;
-  }
+    @Override
+    public byte[] decodeValue(ByteBuffer bytes) {
+        byte[] array = new byte[bytes.remaining()];
+        bytes.get(array);
+        return array;
+    }
 
-  @Override
-  public ByteBuffer encodeKey(String key) {
-    return StandardCharsets.UTF_8.encode(key);
-  }
+    @Override
+    public ByteBuffer encodeKey(String key) {
+        return StandardCharsets.UTF_8.encode(key);
+    }
 
-  @Override
-  public ByteBuffer encodeValue(byte[] value) {
-    String valueAsString = value.toString();
-    return StandardCharsets.UTF_8.encode(valueAsString);
-  }
+    @Override
+    public ByteBuffer encodeValue(byte[] value) {
+        return ByteBuffer.wrap(value);
+    }
 }

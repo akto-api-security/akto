@@ -19,10 +19,7 @@ import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
 import com.akto.ProtoMessageUtils;
 import com.akto.dao.context.Context;
 import com.akto.log.LoggerMaker;
-import com.akto.proto.generated.threat_detection.message.malicious_event.v1.MaliciousEventMessage;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ApiDistributionDataRequestPayload;
-import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ListMaliciousRequestsResponse;
-import com.akto.proto.generated.threat_detection.service.malicious_alert_service.v1.RecordMaliciousEventRequest;
 import com.akto.threat.detection.cache.ApiCountCacheLayer;
 import com.akto.threat.detection.cache.CounterCache;
 import com.akto.threat.detection.constants.RedisKeyInfo;
@@ -87,9 +84,14 @@ public class DistributionDataForwardLayer {
                     
                         if (distribution == null || distribution.isEmpty()) continue;
 
+                        String[] parts = apiKey.split("\\|");
+                        String url = parts[0];
+                        String method = parts[1];
+
                         ApiDistributionDataRequestPayload.DistributionData data =
                             ApiDistributionDataRequestPayload.DistributionData.newBuilder()
-                                .setApiKey(apiKey)
+                                .setUrl(url)
+                                .setMethod(method)
                                 .setWindowSize(windowSize)
                                 .setWindowStartEpochMin(i)
                                 .putAllDistribution(distribution)

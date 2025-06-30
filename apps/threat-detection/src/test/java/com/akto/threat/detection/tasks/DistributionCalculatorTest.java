@@ -14,18 +14,20 @@ public class DistributionCalculatorTest {
 
     private DistributionCalculator calculator;
     private String apiKey;
+    private String cmsKey;
 
     @Before
     public void setup() {
         calculator = new DistributionCalculator();
         CmsCounterLayer.reset();
-        apiKey = "GET:/users";
+        apiKey = "GET|/users";
+        cmsKey = "1.1.1.1|GET|/users";
     }
 
     @Test
     public void testSingleCallGoesToB1() {
         long baseEpochMin = 20000;
-        calculator.updateFrequencyBuckets(apiKey, baseEpochMin);
+        calculator.updateFrequencyBuckets(apiKey, baseEpochMin, cmsKey);
 
         assertWindowBucket(apiKey, 5, baseEpochMin, "b1", 1);
         assertWindowBucket(apiKey, 15, baseEpochMin, "b1", 1);
@@ -36,7 +38,7 @@ public class DistributionCalculatorTest {
     public void testTwelveCallsGoToB2() {
         long baseEpochMin = 30000;
         for (int i = 0; i < 12; i++) {
-            calculator.updateFrequencyBuckets(apiKey, baseEpochMin);
+            calculator.updateFrequencyBuckets(apiKey, baseEpochMin, cmsKey);
         }
 
         assertWindowBucket(apiKey, 5, baseEpochMin, "b2", 1);
@@ -48,9 +50,9 @@ public class DistributionCalculatorTest {
     public void testBucketTransitionFromB1ToB2() {
         long baseEpochMin = 40000;
 
-        calculator.updateFrequencyBuckets(apiKey, baseEpochMin); // count = 1 (b1)
+        calculator.updateFrequencyBuckets(apiKey, baseEpochMin, cmsKey); // count = 1 (b1)
         for (int i = 0; i < 11; i++) {
-            calculator.updateFrequencyBuckets(apiKey, baseEpochMin); // total = 12 (b2)
+            calculator.updateFrequencyBuckets(apiKey, baseEpochMin, cmsKey); // total = 12 (b2)
         }
 
         for (int windowSize : new int[]{5, 15, 30}) {
@@ -62,11 +64,12 @@ public class DistributionCalculatorTest {
     @Test
     public void testMultipleKeysInSameWindow() {
         long baseEpochMin = 50000;
-        String secondKey = "POST:/orders";
+        String secondKey = "POST|/orders";
+        String secondCmsKey = "2.2.2.2|POST|/orders";
 
-        calculator.updateFrequencyBuckets(apiKey, baseEpochMin);
-        calculator.updateFrequencyBuckets(secondKey, baseEpochMin);
-        calculator.updateFrequencyBuckets(secondKey, baseEpochMin);
+        calculator.updateFrequencyBuckets(apiKey, baseEpochMin, cmsKey);
+        calculator.updateFrequencyBuckets(secondKey, baseEpochMin, secondCmsKey);
+        calculator.updateFrequencyBuckets(secondKey, baseEpochMin, secondCmsKey);
 
         assertWindowBucket(apiKey, 5, baseEpochMin, "b1", 1);
         assertWindowBucket(secondKey, 5, baseEpochMin, "b1", 1);
@@ -75,11 +78,12 @@ public class DistributionCalculatorTest {
     @Test
     public void testMultipleKeysInSameWindow2() {
         long baseEpochMin = 50000;
-        String secondKey = "POST:/orders";
+        String secondKey = "POST|/orders";
+        String secondCmsKey = "2.2.2.2|POST|/orders";
 
-        calculator.updateFrequencyBuckets(apiKey, baseEpochMin);
-        calculator.updateFrequencyBuckets(secondKey, baseEpochMin);
-        calculator.updateFrequencyBuckets(secondKey, baseEpochMin);
+        calculator.updateFrequencyBuckets(apiKey, baseEpochMin, cmsKey);
+        calculator.updateFrequencyBuckets(secondKey, baseEpochMin, secondCmsKey);
+        calculator.updateFrequencyBuckets(secondKey, baseEpochMin, secondCmsKey);
 
         assertWindowBucket(apiKey, 5, baseEpochMin, "b1", 1);
         assertWindowBucket(secondKey, 5, baseEpochMin, "b1", 1);
@@ -90,8 +94,8 @@ public class DistributionCalculatorTest {
         long t1 = 60000;
         long t2 = 60001;
 
-        calculator.updateFrequencyBuckets(apiKey, t1);
-        calculator.updateFrequencyBuckets(apiKey, t2);
+        calculator.updateFrequencyBuckets(apiKey, t1, cmsKey);
+        calculator.updateFrequencyBuckets(apiKey, t2, cmsKey);
 
         assertWindowBucket(apiKey, 5, t2, "b1", 1);
     }
@@ -101,10 +105,10 @@ public class DistributionCalculatorTest {
         long t1 = 60000;
         long t2 = 60001;
 
-        calculator.updateFrequencyBuckets(apiKey, t1);
-        calculator.updateFrequencyBuckets(apiKey, t2);
+        calculator.updateFrequencyBuckets(apiKey, t1, cmsKey);
+        calculator.updateFrequencyBuckets(apiKey, t2, cmsKey);
         for (int i = 0; i < 10; i++) {
-            calculator.updateFrequencyBuckets(apiKey, t2);
+            calculator.updateFrequencyBuckets(apiKey, t2, cmsKey);
         }
 
         assertWindowBucket(apiKey, 5, t2, "b1", 0);

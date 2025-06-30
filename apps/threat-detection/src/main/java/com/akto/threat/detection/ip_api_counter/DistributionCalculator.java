@@ -10,9 +10,11 @@ import java.util.concurrent.ConcurrentHashMap;
 public class DistributionCalculator {
 
     private static Map<String, Map<String, Map<String, Integer>>> frequencyBuckets;
+    private static CmsCounterLayer cmsCounterLayer;
 
     public DistributionCalculator() {
         frequencyBuckets = new ConcurrentHashMap<>();
+        cmsCounterLayer = CmsCounterLayer.getInstance();
     }
 
     private static final List<Range> BUCKET_RANGES = Arrays.asList(
@@ -23,16 +25,16 @@ public class DistributionCalculator {
             new Range(50001, 100000, "b13"), new Range(100001, Integer.MAX_VALUE, "b14")
     );
 
-    public void updateFrequencyBuckets(String apiKey, long currentEpochMin) {
+    public void updateFrequencyBuckets(String apiKey, long currentEpochMin, String cmsKey) {
         // Increment CMS for current minute
-        CmsCounterLayer.increment(apiKey, String.valueOf(currentEpochMin));
+        cmsCounterLayer.increment(cmsKey, String.valueOf(currentEpochMin));
 
         for (int windowSize : Arrays.asList(5, 15, 30)) {
             long windowEnd = ((currentEpochMin - 1) / windowSize + 1) * windowSize;
             long windowStart = windowEnd - windowSize + 1;
             String compositeKey = windowSize + "|" + windowStart;
 
-            long count = getCountInRange(apiKey, windowStart, windowEnd);
+            long count = getCountInRange(cmsKey, windowStart, windowEnd);
             String newBucket = getBucketLabel(count);
             String oldBucket = getBucketLabel(count - 1);
 
@@ -59,7 +61,7 @@ public class DistributionCalculator {
     private long getCountInRange(String key, long startEpochMin, long endEpochMin) {
         long sum = 0;
         for (long ts = startEpochMin; ts <= endEpochMin; ts++) {
-            sum += CmsCounterLayer.estimateCount(key, String.valueOf(ts));
+            sum += cmsCounterLayer.estimateCount(key, String.valueOf(ts));
         }
         return sum;
     }

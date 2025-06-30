@@ -16,6 +16,14 @@ public class Utils {
         return RedisKeyInfo.API_COUNTER_KEY_PREFIX + "|" + apiCollectionId + "|" + url + "|" + method;
     }
 
+    public static String buildIpApiCmsDataKey(String ip, String url, String method) {
+        return RedisKeyInfo.IP_API_CMS_DATA_PREFIX + "|" + ip + "|" + url + "|" + method;
+    }
+
+    public static String buildApiDistributionKey(String url, String method) {
+        return url + "|" + method;
+    }
+
     public static SampleMaliciousRequest buildSampleMaliciousRequest(String actor, HttpResponseParams responseParam, FilterConfig apiFilter, RawApiMetadata metadata, List<SchemaConformanceError> errors) {
         Metadata.Builder metadataBuilder = Metadata.newBuilder();
         if(errors != null && !errors.isEmpty()) {
@@ -35,4 +43,13 @@ public class Utils {
         maliciousReqBuilder.setMetadata(metadataBuilder.build());
         return maliciousReqBuilder.build();
     }
+
+    public static boolean apiDistributionEnabled(boolean redisEnabled, boolean apiDistributionEnabled) {
+        if (!redisEnabled) {
+            return false;
+        }
+
+        return apiDistributionEnabled;
+    }
+
 }

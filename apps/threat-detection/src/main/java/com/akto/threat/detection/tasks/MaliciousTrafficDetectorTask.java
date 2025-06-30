@@ -51,13 +51,13 @@ import com.akto.threat.detection.cache.ApiCountCacheLayer;
 import com.akto.threat.detection.cache.RedisBackedCounterCache;
 import com.akto.threat.detection.constants.KafkaTopic;
 import com.akto.threat.detection.constants.RedisKeyInfo;
+import com.akto.threat.detection.ip_api_counter.DistributionCalculator;
 import com.akto.threat.detection.kafka.KafkaProtoProducer;
 import com.akto.threat.detection.smart_event_detector.window_based.WindowBasedThresholdNotifier;
 import com.akto.threat.detection.utils.Utils;
 import com.akto.util.Constants;
 import com.akto.util.HttpRequestResponseUtils;
 import com.akto.utils.GzipUtils;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import io.lettuce.core.RedisClient;
 import io.lettuce.core.api.StatefulRedisConnection;
 
@@ -94,10 +94,11 @@ public class MaliciousTrafficDetectorTask implements Task {
   private static final HttpResponseParams responseParams = new HttpResponseParams();
   private static Map<String, Object> varMap = new HashMap<>();
   private static Supplier<String> lazyToString;
-
+  private DistributionCalculator distributionCalculator;
+  private boolean apiDistributionEnabled;
 
   public MaliciousTrafficDetectorTask(
-      KafkaConfig trafficConfig, KafkaConfig internalConfig, RedisClient redisClient) throws Exception {
+      KafkaConfig trafficConfig, KafkaConfig internalConfig, RedisClient redisClient, DistributionCalculator distributionCalculator, boolean apiDistributionEnabled) throws Exception {
     this.kafkaConfig = trafficConfig;
 
     Properties properties = new Properties();
@@ -135,6 +136,8 @@ public class MaliciousTrafficDetectorTask implements Task {
 
     this.internalKafka = new KafkaProtoProducer(internalConfig);
     this.rawApiFactory = new RawApiMetadataFactory(new IPLookupClient());
+    this.distributionCalculator = distributionCalculator;
+    this.apiDistributionEnabled = apiDistributionEnabled;
   }
 
   public void run() {
@@ -257,6 +260,13 @@ public class MaliciousTrafficDetectorTask implements Task {
         this.apiCountWindowBasedThresholdNotifier.incrementApiHitcount(apiHitCountKey, responseParam.getTime(), RedisKeyInfo.API_COUNTER_SORTED_SET);
     }
     
+    if (apiDistributionEnabled) {
+      String distributionKey = Utils.buildApiDistributionKey(url, method.toString());
+      String ipApiCmsKey = Utils.buildIpApiCmsDataKey(actor, url, method.toString());
+      long curEpochMin = responseParam.getTime()/60;
+      this.distributionCalculator.updateFrequencyBuckets(distributionKey, curEpochMin, ipApiCmsKey);
+    }
+
     List<SchemaConformanceError> errors = null; 
     for (FilterConfig apiFilter : apiFilters.values()) {
       boolean hasPassedFilter = false; 
