@@ -26,6 +26,7 @@ public class McpRequestResponseUtilsTest {
 
         HttpResponseParams responseParams = new HttpResponseParams();
         responseParams.setRequestParams(reqParams);
+        responseParams.statusCode = 200;
 
         return responseParams;
     }
@@ -109,13 +110,13 @@ public class McpRequestResponseUtilsTest {
     public void testNullPayload() {
         HttpRequestParams reqParams = new HttpRequestParams();
         reqParams.setPayload(null);
-        reqParams.setUrl("http://localhost:8080/mcp");
+        String url = "http://localhost:8080/mcp";
+        reqParams.setUrl(url);
         HttpResponseParams responseParams = new HttpResponseParams();
         responseParams.setRequestParams(reqParams);
-        Assertions.assertThrows(NullPointerException.class, () -> {
-            HttpResponseParams afterJsonRpc = JsonRpcUtils.parseJsonRpcResponse(responseParams);
-            McpRequestResponseUtils.parseMcpResponseParams(afterJsonRpc);
-        });
+        HttpResponseParams afterJsonRpc = JsonRpcUtils.parseJsonRpcResponse(responseParams);
+        HttpResponseParams afterMcp = McpRequestResponseUtils.parseMcpResponseParams(afterJsonRpc);
+        Assertions.assertEquals(url, afterMcp.getRequestParams().getURL());
     }
 
     @Test
