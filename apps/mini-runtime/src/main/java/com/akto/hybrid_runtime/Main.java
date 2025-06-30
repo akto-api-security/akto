@@ -195,7 +195,7 @@ public class Main {
             System.exit(0);
         }
         actualAccountId = aSettings.getId();
-        loggerMaker.infoAndAddToDb("Fetched account settings ", LogDb.RUNTIME);
+        loggerMaker.infoAndAddToDb("Fetched account settings for account ", LogDb.RUNTIME);
 
         DataControlFetcher.init(dataActor);
 
