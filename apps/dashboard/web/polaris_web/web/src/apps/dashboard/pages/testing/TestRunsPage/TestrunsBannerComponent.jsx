@@ -46,7 +46,7 @@ function SelectCollectionComponent() {
     )
 }
 
-function TestrunsBannerComponent({isInventory,onButtonClick}) {
+function TestrunsBannerComponent({isInventory,onButtonClick, disabled=false}) {
     const allCollections = PersistStore(state => state.allCollections);
     let urlsCount = 0
     allCollections.filter(x => x.type !== "API_GROUP")
@@ -65,8 +65,9 @@ function TestrunsBannerComponent({isInventory,onButtonClick}) {
             // videoLink={TESTING_VIDEO_URL}
             videoThumbnail={TESTING_VIDEO_THUMBNAIL}
             bodyComponent={isInventory ? null :<SelectCollectionComponent /> }
-            {...isInventory ? {buttonText: "Run test"}: {}}
-            {...isInventory ? {onClick: () => onButtonClick()} : {}}
+            disabled={disabled}
+            {...isInventory ? {buttonText: "Run test", disabled:disabled}: {}}
+            {...isInventory ? {onClick: () => onButtonClick(), disabled:disabled} : {}}
             {...urlsCount === 0 ? {buttonText: "Go to inventory"}: {}} 
             {...urlsCount === 0 ? {buttonUrl: "/dashboard/observe/inventory"}: {}} 
         />

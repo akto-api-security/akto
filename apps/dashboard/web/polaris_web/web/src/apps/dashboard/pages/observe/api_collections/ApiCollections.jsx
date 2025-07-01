@@ -156,6 +156,14 @@ const headers = [
         textValue: 'description',
         filterKey: "description",
         tooltipContent: 'Description of the collection'
+    },
+    {
+        title: "Out of Testing scope",
+        text: 'Out of Testing scope',
+        value: 'outOfTestingScopeComp',
+        isText: CellType.TEXT,
+        filterKey: 'isOutOfTestingScope',
+        tooltipContent: 'Whether the collection is excluded from testing '
     }
 ];
 
@@ -212,6 +220,8 @@ const convertToNewData = (collectionsArr, sensitiveInfoMap, severityInfoMap, cov
             riskScore: c.urlsCount === 0 ? 0 : (riskScoreMap[c.id] ? riskScoreMap[c.id] : 0),
             discovered: func.prettifyEpoch(c.startTs || 0),
             descriptionComp: (<Box maxWidth="300px"><TooltipText tooltip={c.description} text={c.description}/></Box>),
+            outOfTestingScopeComp: c.isOutOfTestingScope ? (<Text>Yes</Text>) : (<Text>No</Text>),
+            // outOfTestingScope: c.isOutOfTestingScope || false
         }
     })
 
@@ -496,9 +506,11 @@ function ApiCollections(props) {
         TableStore.getState().setSelectedItems([])
         selectItems([])
     }
-    async function handleCollectionsAction(collectionIdList, apiFunction, toastContent){
+    async function handleCollectionsAction(collectionIdList, apiFunction, toastContent, currentIsOutOfTestingScopeVal=null){
         const collectionIdListObj = collectionIdList.map(collectionId => ({ id: collectionId.toString() }))
-        await apiFunction(collectionIdListObj).then(() => {
+        await (currentIsOutOfTestingScopeVal !== null
+                ? apiFunction(collectionIdListObj, currentIsOutOfTestingScopeVal)
+                : apiFunction(collectionIdListObj)).then(() => {
             func.setToast(true, false, `${collectionIdList.length} API collection${func.addPlurality(collectionIdList.length)} ${toastContent} successfully`)
         }).catch((error) => {
             func.setToast(true, true, error.message || 'Something went wrong!')
@@ -688,6 +700,35 @@ function ApiCollections(props) {
         const toggleEnvType = {
             content: toggleTypeContent
         }
+
+        const allOutOfTestScopeFalse = selectedResources.every(id => {
+            const collection = normalData.find(c => c.id === id);
+            return collection && !collection.isOutOfTestingScope;
+        })
+
+        const allOutOfTestScopeTrue = selectedResources.every(id => {
+            const collection = normalData.find(c => c.id === id);
+            return collection && collection.isOutOfTestingScope;
+        })
+
+        if(allOutOfTestScopeFalse){
+            actions.push(
+                {
+                    content: `Mark collection${func.addPlurality(selectedResources.length)} as out of testing scope`,
+                    onAction: () => handleCollectionsAction(selectedResources, collectionApi.toggleCollectionsOutOfTestScope, "marked out of testing scope", false)
+                }
+            )  
+        }
+        else if(allOutOfTestScopeTrue){
+            actions.push(
+                {
+                    content: `Mark collection${func.addPlurality(selectedResources.length)} as in testing scope`,
+                    onAction: () => handleCollectionsAction(selectedResources, collectionApi.toggleCollectionsOutOfTestScope, "marked in testing scope", true)
+                }
+            )
+        }
+
+
 
         const bulkActionsOptions = [...actions];
         if(selectedTab !== 'groups') {
