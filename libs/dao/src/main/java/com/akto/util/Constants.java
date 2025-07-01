@@ -39,4 +39,5 @@ public class Constants {
     public static final String UNDERSCORE = "_";
 
     public final static String _AKTO = "AKTO";
+    public static final String AKTO_MCP_SERVER_TAG = "mcp-server";
 }

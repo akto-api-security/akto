@@ -1,5 +1,6 @@
 package com.akto.hybrid_runtime;
 
+import com.akto.mcp.McpSchema;
 import java.security.interfaces.RSAPublicKey;
 import java.util.*;
 import java.util.Map.Entry;
@@ -691,11 +692,10 @@ public class APICatalogSync {
                     return null;
                 }
             }
-            for (MergedUrls mergedUrl : MERGED_URLS_FOR_MCP) {
-                if(urlTemplate.getTemplateString().endsWith(mergedUrl.getUrl()) &&
-                        mergedUrl.getMethod().equals(urlTemplate.getMethod().name())) {
-                    return null;
-                }
+
+            String mergedUrlString = urlTemplate.getTemplateString();
+            if (McpSchema.MCP_METHOD_SET.stream().anyMatch(mergedUrlString::contains)) {
+                return null;
             }
         } catch(Exception e) {
             loggerMaker.errorAndAddToDb("Error while creating a new URL object: " + e.getMessage(), LogDb.RUNTIME);
