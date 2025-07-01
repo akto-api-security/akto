@@ -11,6 +11,7 @@ public class TestExecutorModifier extends PromptHandler {
 
     static final int MAX_QUERY_LENGTH = 100000;
     public static final String _REQUEST = "request";
+    public static final String _RESPONSE = "response";
     public static final String _OPERATION = "operation";
     static final String _NOT_FOUND = "not_found";
     public final static String _AKTO_GPT_AI = "AKTO_GPT_AI";

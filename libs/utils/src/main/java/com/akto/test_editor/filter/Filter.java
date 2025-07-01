@@ -1,5 +1,6 @@
 package com.akto.test_editor.filter;
 
+import com.akto.gpt.handlers.gpt_prompts.TestValidatorModifier;
 import java.util.*;
 
 import com.akto.log.LoggerMaker;
@@ -78,11 +79,18 @@ public class Filter {
                     RawApi rawApi = filterActionRequest.fetchRawApiBasedOnContext();
                     String ogRequest = Utils.buildRequestIHttpFormat(rawApi);
                     String response = Utils.buildResponseIHttpFormat(rawApi);
-                    String request = ogRequest + "\n\n" + response;
-                    queryData.put(TestExecutorModifier._REQUEST, request);
+
                     queryData.put(TestExecutorModifier._OPERATION, operation);
-                    BasicDBObject generatedData = new TestFilterModifier().handle(queryData);
-                    
+                    BasicDBObject generatedData;
+                    if (filterActionRequest.isValidationContext()) {
+                        queryData.put(TestExecutorModifier._RESPONSE, response);
+                        generatedData = new TestValidatorModifier().handle(queryData);
+                    } else {
+                        String request = ogRequest + "\n\n" + response;
+                        queryData.put(TestExecutorModifier._REQUEST, request);
+                        generatedData = new TestFilterModifier().handle(queryData);
+                    }
+
                     if (generatedData.containsKey(operationTypeLower)) {
                         Object generatedQuerySet = generatedData.get(operationTypeLower);
                         if (generatedQuerySet instanceof JSONArray) {
