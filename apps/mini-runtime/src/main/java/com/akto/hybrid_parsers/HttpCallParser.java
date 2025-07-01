@@ -501,10 +501,10 @@ public class HttpCallParser {
      * @param httpResponseParams
      */
     public void updateApiCollectionTags(String hostNameMapKey, HttpResponseParams httpResponseParams) {
-        // if (Context.now() - this.tagsLastUpdated < TAGS_UPDATE_INTERVAL) {
-        //     // Avoid updating tags too frequently
-        //     return;
-        // }
+        if (Context.now() - this.tagsLastUpdated < TAGS_UPDATE_INTERVAL) {
+            // Avoid updating tags too frequently
+            return;
+        }
         this.tagsLastUpdated = Context.now();
         int apiCollectionId = hostNameToIdMap.get(hostNameMapKey);
         ApiCollection apiCollection = apiCollectionsMap.get(apiCollectionId);
