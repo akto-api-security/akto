@@ -83,7 +83,7 @@ public class Filter {
                     queryData.put(TestExecutorModifier._OPERATION, operation);
                     BasicDBObject generatedData;
                     if (filterActionRequest.isValidationContext()) {
-                        queryData.put(TestExecutorModifier._RESPONSE, response);
+                        queryData.put(TestExecutorModifier._REQUEST, response);
                         generatedData = new TestValidatorModifier().handle(queryData);
                     } else {
                         String request = ogRequest + "\n\n" + response;
