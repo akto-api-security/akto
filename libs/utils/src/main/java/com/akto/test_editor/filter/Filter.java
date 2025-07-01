@@ -30,6 +30,7 @@ public class Filter {
     private static final LoggerMaker loggerMaker = new LoggerMaker(Filter.class, LogDb.TESTING);
     
     private static boolean isTestingContext = true;
+    private static final String INVALID_QS_ = "invalid_" + Context.now();
 
     public Filter() {
         this.filterAction = new FilterAction();
@@ -41,13 +42,13 @@ public class Filter {
         String operationTypeLower = filterActionRequest.getOperand().toLowerCase();
         String operation = "";
         Object newQuerySet = querySet;
+        boolean querySetUpdated = false;
+        String operationPrompt = "";
+
         try {
             int accountId = Context.accountId.get();
             FeatureAccess featureAccess = UsageMetricUtils.getFeatureAccessSaas(accountId, TestExecutorModifier._AKTO_GPT_AI);
             if (featureAccess.getIsGranted()) {
-
-
-                String operationPrompt = "";
                 if (querySet instanceof String) {
                     String query = (String) querySet;
                     if (query.startsWith(Utils._MAGIC)) {
@@ -81,6 +82,7 @@ public class Filter {
                     queryData.put(TestExecutorModifier._REQUEST, request);
                     queryData.put(TestExecutorModifier._OPERATION, operation);
                     BasicDBObject generatedData = new TestFilterModifier().handle(queryData);
+                    
                     if (generatedData.containsKey(operationTypeLower)) {
                         Object generatedQuerySet = generatedData.get(operationTypeLower);
                         if (generatedQuerySet instanceof JSONArray) {
@@ -93,14 +95,19 @@ public class Filter {
                         } else {
                             newQuerySet = generatedQuerySet;
                         }
+                        querySetUpdated = true;
                     }
+
+                    if(!querySetUpdated && !operationPrompt.isEmpty()){
+                        newQuerySet = INVALID_QS_;
+                     }
                 } 
             }
 
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "error invoking operation " + operationTypeLower + " " + e.getMessage());
         }
-
+        
         return newQuerySet;
     }
 
