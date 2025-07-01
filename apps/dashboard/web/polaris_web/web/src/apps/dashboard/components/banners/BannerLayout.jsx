@@ -2,7 +2,7 @@ import React from 'react'
 import { Box, Button, Card, Text, VerticalStack, VideoThumbnail } from "@shopify/polaris"
 import { useNavigate } from 'react-router-dom';
 
-function BannerLayout({title, text, buttonText, buttonUrl, bodyComponent, videoThumbnail, videoLink, videoLength, linkButton, containerComp, newTab, onClick, isDisabled}) {
+function BannerLayout({title, text, buttonText, buttonUrl, bodyComponent, videoThumbnail, videoLink, videoLength, linkButton, containerComp, newTab, onClick, disabled=false}) {
     const properties = linkButton ? {plain: true} : {primary: true}
     const navigate = useNavigate();
     const handleRedirect = () =>{ newTab ? window.open(buttonUrl, "_blank") :navigate(buttonUrl)}
@@ -16,7 +16,7 @@ function BannerLayout({title, text, buttonText, buttonUrl, bodyComponent, videoT
                             <Text color="subdued" variant="bodyMd">{text}</Text>
                             {bodyComponent}
                             {buttonText ? <Box paddingBlockStart={2}>
-                                <Button {...properties} disabled={isDisabled} onClick={() => {handleRedirect(); onClick()}}>{buttonText}</Button>
+                                <Button {...properties} disabled={disabled} onClick={() => {handleRedirect(); onClick()}}>{buttonText}</Button>
                             </Box> : null}
                         </VerticalStack>
                     </Box>

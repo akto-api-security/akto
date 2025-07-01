@@ -701,22 +701,19 @@ public class ApiCollectionsAction extends UserAction {
         return Action.SUCCESS.toUpperCase();
     }
 
-    private List<Map<String,String>> apiCollectionsForOutOfTestScope;
+    private Boolean currentIsOutOfTestingScopeVal;
 
-    public void setApiCollectionsForOutOfTestScope(List<Map<String,String>> apiCollectionsForOutOfTestScope){
-        this.apiCollectionsForOutOfTestScope = apiCollectionsForOutOfTestScope;
+    public void setCurrentIsOutOfTestingScopeVal(Boolean currentIsOutOfTestingScopeVal){
+        this.currentIsOutOfTestingScopeVal = currentIsOutOfTestingScopeVal;
     }
 
-    public String markCollectionsOutOfTestScope(){
+    public String toggleCollectionsOutOfTestScope(){
         try{
-            if(apiCollectionsForOutOfTestScope==null || apiCollectionsForOutOfTestScope.isEmpty()){
+            if(this.apiCollections==null || this.apiCollections.isEmpty()){
                 addActionError("No collections provided");
                 return ERROR.toUpperCase();
             }
-            List<Integer> apiCollectionIdsForOutOfTestScope = apiCollectionsForOutOfTestScope.stream()
-                .map(item -> Integer.parseInt(item.get("id")))
-                .filter(id -> id != 0)
-                .collect(Collectors.toList());
+            List<Integer> apiCollectionIdsForOutOfTestScope = reduceApiCollectionToId(this.apiCollections);
 
             if(apiCollectionIdsForOutOfTestScope.isEmpty()){
                 addActionError("No valid collections provided");
@@ -732,48 +729,13 @@ public class ApiCollectionsAction extends UserAction {
             }
             ApiCollectionsDao.instance.updateMany(
                 Filters.in(ApiCollection.ID, apiCollectionIdsForOutOfTestScope),
-                Updates.set(ApiCollection.IS_OUT_OF_TESTING_SCOPE, true)
+                Updates.set(ApiCollection.IS_OUT_OF_TESTING_SCOPE, !this.currentIsOutOfTestingScopeVal)
             );
 
             return SUCCESS.toUpperCase();
 
         } catch(Exception e){
             addActionError("Error marking collections as Out of Test Scope");
-            return ERROR.toUpperCase();
-        }
-    }
-
-    public String unmarkCollectionsOutOfTestScope(){
-        try{
-            if(apiCollectionsForOutOfTestScope==null || apiCollectionsForOutOfTestScope.isEmpty()){
-                addActionError("No collections provided");
-                return ERROR.toUpperCase();
-            }
-            List<Integer> apiCollectionIdsForOutOfTestScope = apiCollectionsForOutOfTestScope.stream()
-                .map(item -> Integer.parseInt(item.get("id")))
-                .filter(id -> id!=0)
-                .collect(Collectors.toList());
-
-            if(apiCollectionIdsForOutOfTestScope.isEmpty()){
-                addActionError("No valid collections provided");
-                return ERROR.toUpperCase();
-            }
-            List<Integer> accessibleCollectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
-            if(accessibleCollectionIds != null){
-                apiCollectionIdsForOutOfTestScope.removeIf(id -> !accessibleCollectionIds.contains(id));
-            }
-            if(apiCollectionIdsForOutOfTestScope.isEmpty()){
-                addActionError("No accessible collections are provided");
-            }
-            ApiCollectionsDao.instance.updateMany(
-                Filters.in(ApiCollection.ID, apiCollectionIdsForOutOfTestScope),
-                Updates.set(ApiCollection.IS_OUT_OF_TESTING_SCOPE, false)
-            );
-
-            return SUCCESS.toUpperCase();
-
-        } catch(Exception e){
-            addActionError("Error unmarking collections as Out of Test Scope");
             return ERROR.toUpperCase();
         }
     }

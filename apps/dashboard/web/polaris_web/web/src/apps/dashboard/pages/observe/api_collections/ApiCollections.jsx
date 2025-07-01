@@ -463,11 +463,9 @@ function ApiCollections(props) {
         setDeactivateCollections(JSON.parse(JSON.stringify(deactivatedCollectionsCopy)));
         
         // Calculate summary data only for active collections
-        console.log("data to summary data: ", dataObj.normal);
         const summary = transform.getSummaryData(dataObj.normal)
         summary.totalCriticalEndpoints = riskScoreObj.criticalUrls;
         summary.totalSensitiveEndpoints = sensitiveInfo.sensitiveUrls
-        console.log("totalEndpoints:", summary.totalEndpoints, " totalTestedEndPoints: ", summary.totalTestedEndpoints);
         setSummaryData(summary)
 
         setCollectionsMap(func.mapCollectionIdToName(tmp.filter(x => !x?.deactivated)))
@@ -508,9 +506,11 @@ function ApiCollections(props) {
         TableStore.getState().setSelectedItems([])
         selectItems([])
     }
-    async function handleCollectionsAction(collectionIdList, apiFunction, toastContent){
+    async function handleCollectionsAction(collectionIdList, apiFunction, toastContent, currentIsOutOfTestingScopeVal=null){
         const collectionIdListObj = collectionIdList.map(collectionId => ({ id: collectionId.toString() }))
-        await apiFunction(collectionIdListObj).then(() => {
+        await (currentIsOutOfTestingScopeVal !== null
+                ? apiFunction(collectionIdListObj, currentIsOutOfTestingScopeVal)
+                : apiFunction(collectionIdListObj)).then(() => {
             func.setToast(true, false, `${collectionIdList.length} API collection${func.addPlurality(collectionIdList.length)} ${toastContent} successfully`)
         }).catch((error) => {
             func.setToast(true, true, error.message || 'Something went wrong!')
@@ -715,7 +715,7 @@ function ApiCollections(props) {
             actions.push(
                 {
                     content: `Mark collection${func.addPlurality(selectedResources.length)} as out of testing scope`,
-                    onAction: () => handleCollectionsAction(selectedResources, collectionApi.markCollectionsOutOfTestScope, "marked out of testing scope")
+                    onAction: () => handleCollectionsAction(selectedResources, collectionApi.toggleCollectionsOutOfTestScope, "marked out of testing scope", false)
                 }
             )  
         }
@@ -723,7 +723,7 @@ function ApiCollections(props) {
             actions.push(
                 {
                     content: `Mark collection${func.addPlurality(selectedResources.length)} as in testing scope`,
-                    onAction: () => handleCollectionsAction(selectedResources, collectionApi.unmarkCollectionsOutOfTestScope, "marked in testing scope")
+                    onAction: () => handleCollectionsAction(selectedResources, collectionApi.toggleCollectionsOutOfTestScope, "marked in testing scope", true)
                 }
             )
         }

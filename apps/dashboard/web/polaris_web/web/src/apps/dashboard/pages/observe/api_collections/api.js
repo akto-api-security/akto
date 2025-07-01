@@ -29,18 +29,11 @@ export default {
             data: {apiCollectionId}
         })
     },
-    markCollectionsOutOfTestScope(items){
+    toggleCollectionsOutOfTestScope(items, currentIsOutOfTestingScopeVal){
         return request({
-            url: '/api/markCollectionsOutOfTestScope',
+            url: '/api/toggleCollectionsOutOfTestScope',
             method: 'post',
-            data: { apiCollectionsForOutOfTestScope: items }
+            data: { apiCollections: items, currentIsOutOfTestingScopeVal }
         })
     },
-    unmarkCollectionsOutOfTestScope(items){
-        return request({
-            url: 'api/unmarkCollectionsOutOfTestScope',
-            method: 'post',
-            data: { apiCollectionsForOutOfTestScope: items }
-        })
-    }
 }
