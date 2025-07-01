@@ -67,7 +67,7 @@ public class HttpCallParser {
     private final int sync_threshold_time;
     private int sync_count = 0;
     private int tagsLastUpdated = 0;
-    private static final int TAGS_UPDATE_INTERVAL = 5 * 60; // 5 minutes
+    private static final int TAGS_UPDATE_INTERVAL = 20; // 5 minutes
     private int last_synced;
     private static final LoggerMaker loggerMaker = new LoggerMaker(HttpCallParser.class, LogDb.RUNTIME);
     public APICatalogSync apiCatalogSync;
