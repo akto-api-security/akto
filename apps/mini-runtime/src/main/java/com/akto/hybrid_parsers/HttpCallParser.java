@@ -517,7 +517,6 @@ public class HttpCallParser {
 
         List<CollectionTags> tagsList = CollectionTags.convertTagsFormat(httpResponseParams.getTags());
 
-        printL("Updating tags for apiCollectionId: " + apiCollectionId + "with tags: " + tagsList + "hostNameMapKey:" + hostNameMapKey + " httpResponseParams: " + httpResponseParams.getOrig());
 
         if (CollectionUtils.isEmpty(apiCollection.getTagsList()) || apiCollection.getTagsList().stream()
             .noneMatch(t -> "mcp-server".equals(t.getKeyName()))) {
@@ -550,7 +549,7 @@ public class HttpCallParser {
             }
         }
 
-        printL("Updated tags for apiCollectionId: " + apiCollectionId + "with tags: " + tagsList + "hostNameMapKey:" + hostNameMapKey + " httpResponseParams: " + httpResponseParams.getOrig());
+        printL("Updated tags for apiCollectionId: " + apiCollectionId + "with tags: " + tagsList + "hostNameMapKey:" + hostNameMapKey);
     }
 
     public int createApiCollectionId(HttpResponseParams httpResponseParam){
