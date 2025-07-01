@@ -75,6 +75,9 @@ public static ThreadLocal<Integer> accountId = new ThreadLocal<Integer>();
     public static int now() {
         return (int) (System.currentTimeMillis()/1000l);
     }
+    public static int prevSecNow(int seconds) {
+        return (int) ((System.currentTimeMillis()/1000l) - seconds);
+    }
 
     public static int nowInMillis() {
         return (int) (System.currentTimeMillis() % 100000000l);

@@ -56,7 +56,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.apache.commons.collections.CollectionUtils;
-import org.apache.kafka.common.quota.ClientQuotaAlteration.Op;
 
 import static com.akto.runtime.RuntimeUtil.matchesDefaultPayload;
 import static com.akto.runtime.utils.Utils.printL;
@@ -66,7 +65,6 @@ public class HttpCallParser {
     private final int sync_threshold_count;
     private final int sync_threshold_time;
     private int sync_count = 0;
-    private static final int TAGS_UPDATE_INTERVAL = 1 * 60; // 5 minutes
     private Map<Integer, Integer> apiCollectionIdTagsSyncTimestampMap = new HashMap<>();
     private int last_synced;
     private static final LoggerMaker loggerMaker = new LoggerMaker(HttpCallParser.class, LogDb.RUNTIME);
@@ -114,6 +112,7 @@ public class HttpCallParser {
         List<ApiCollection> apiCollections = dataActor.fetchAllApiCollectionsMeta();
         for (ApiCollection apiCollection: apiCollections) {
             apiCollectionsMap.put(apiCollection.getId(), apiCollection);
+            apiCollectionIdTagsSyncTimestampMap.put(apiCollection.getId(), Context.prevSecNow(300));
         }
         if (Main.actualAccountId == 1745303931 || Main.actualAccountId == 1741069294) {
             this.dependencyAnalyser = new DependencyAnalyser(apiCatalogSync.dbState, Main.isOnprem, RuntimeMode.isHybridDeployment(), apiCollectionsMap);
@@ -510,7 +509,7 @@ public class HttpCallParser {
             return;
         }
 
-        if (Context.now() - this.apiCollectionIdTagsSyncTimestampMap.getOrDefault(apiCollectionId, Context.now()) < TAGS_UPDATE_INTERVAL) {
+        if (Context.now() - this.apiCollectionIdTagsSyncTimestampMap.getOrDefault(apiCollectionId, Context.now()) < this.sync_threshold_time) {
             // Avoid updating tags too frequently
             return;
         }
