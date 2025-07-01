@@ -1,25 +1,11 @@
 package com.akto.gpt.handlers.gpt_prompts;
 
-import com.akto.data_actor.ClientActor;
 import com.akto.data_actor.DataActorFactory;
-import java.util.Date;
-import java.util.concurrent.TimeUnit;
-
-import javax.validation.ValidationException;
-
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
-import com.akto.util.http_util.CoreHTTPClient;
 import com.mongodb.BasicDBObject;
-
-import okhttp3.OkHttpClient;
-import java.io.IOException;
+import javax.validation.ValidationException;
 import org.json.JSONObject;
-import okhttp3.MediaType;
-import okhttp3.Request;
-import okhttp3.RequestBody;
-import okhttp3.Response;
-import okhttp3.ResponseBody;
 
 public abstract class PromptHandler {
 
@@ -27,6 +13,7 @@ public abstract class PromptHandler {
     private static final String OLLAMA_MODEL = "llama3:8b";
     private static final Double temperature = 0.1;
     private static final int max_tokens = 4000;
+    private static final Object llmLock = new Object();
 
     /**
      * Process the input query data and return a String response.
@@ -77,7 +64,9 @@ public abstract class PromptHandler {
         payload.put("frequency_penalty", 0.0); // Don't punish frequency
         payload.put("stream", false);
 
-        return DataActorFactory.fetchInstance().getLLMPromptResponse(payload);
+        synchronized (llmLock) {
+            return DataActorFactory.fetchInstance().getLLMPromptResponse(payload);
+        }
     }
 
     /**
