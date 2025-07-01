@@ -264,11 +264,12 @@ message ThreatConfiguration {
 
 message ApiDistributionDataRequestPayload {
   message DistributionData {
-    string url = 1;
-    string method = 2;
-    int32 window_size = 3;
-    int64 window_start_epoch_min = 4;
-    map<string, int32> distribution = 5;
+    int32 api_collection_id = 1;
+    string url = 2;
+    string method = 3;
+    int32 window_size = 4;
+    int64 window_start_epoch_min = 5;
+    map<string, int32> distribution = 6;
   }
   repeated DistributionData distribution_data = 1;
 }
@@ -277,10 +278,11 @@ message ApiDistributionDataResponsePayload {
 }
 
 message FetchApiDistributionDataRequest {
-    string url = 1;
-    string method = 2;
-    int32 start_window = 3;
-    int32 end_window = 4;
+    int32 api_collection_id = 1;
+    string url = 2;
+    string method = 3;
+    int32 start_window = 4;
+    int32 end_window = 5;
 }
 
 message FetchApiDistributionDataResponse {
@@ -289,9 +291,9 @@ message FetchApiDistributionDataResponse {
 
 message BucketStats {
   string bucket_label = 1; // e.g., "b1", "b2", ..., "b14"
-  int32 min = 2;
-  int32 max = 3;
-  int32 p25 = 4;
-  int32 p50 = 5; // median
-  int32 p75 = 6;
+  optional int32 min = 2;
+  optional int32 max = 3;
+  optional int32 p25 = 4;
+  optional int32 p50 = 5; // median
+  optional int32 p75 = 6;
 }

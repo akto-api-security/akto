@@ -48,7 +48,7 @@ public class CmsCounterLayerTest {
     
     @Test
     void testIncrementAndEstimateSingleKey() {
-        String key = "1.1.1.1|GET|/api/foo";
+        String key = "11111|1.1.1.1|GET|/api/foo";
         String window = windowKeyNow();
 
         cmsCounterLayer.increment(key, window);
@@ -62,8 +62,8 @@ public class CmsCounterLayerTest {
     @Test
     void testEstimateDifferentKeysSameWindow() {
         String window = windowKeyNow();
-        String key1 = "1.1.1.1|/api/a";
-        String key2 = "2.2.2.2|/api/b";
+        String key1 = "11111|1.1.1.1|/api/a";
+        String key2 = "11111|2.2.2.2|/api/b";
 
         for (int i = 0; i < 10; i++) cmsCounterLayer.increment(key1, window);
         for (int i = 0; i < 5; i++) cmsCounterLayer.increment(key2, window);
@@ -74,7 +74,7 @@ public class CmsCounterLayerTest {
 
     @Test
     void testSameKeyDifferentWindows() {
-        String key = "3.3.3.3|/api/x";
+        String key = "11111|3.3.3.3|/api/x";
         String window1 = windowKeyOffsetMinutes(2);
         String window2 = windowKeyOffsetMinutes(1);
 
@@ -89,14 +89,14 @@ public class CmsCounterLayerTest {
     @Test
     void testMissingWindowReturnsZero() {
         String nonexistentWindow = String.valueOf(99999999L);
-        String key = "no.key|/missing";
+        String key = "11111|no.key|/missing";
         assertEquals(0, cmsCounterLayer.estimateCount(key, nonexistentWindow));
     }
 
     @Test
     void testSerializationDeserialization() throws IOException {
         String window = windowKeyOffsetMinutes(5);
-        String key = "9.9.9.9|/api/serialize";
+        String key = "11111|9.9.9.9|/api/serialize";
 
         for (int i = 0; i < 7; i++) {
             cmsCounterLayer.increment(key, window);
@@ -114,7 +114,7 @@ public class CmsCounterLayerTest {
         for (int min = 0; min < 3; min++) {
             String window = windowKeyOffsetMinutes(min);
             for (int i = 0; i < min + 1; i++) {
-                String key = "4.4.4." + i + "|/api/z";
+                String key = "11111|4.4.4." + i + "|/api/z";
                 System.out.println("key " + key + " window " + window);
                 cmsCounterLayer.increment(key, window);
                 System.out.println("key " + key + " window " + window);
@@ -122,9 +122,9 @@ public class CmsCounterLayerTest {
             }
         }
 
-        assertEquals(2, cmsCounterLayer.estimateCount("4.4.4.0|/api/z", windowKeyOffsetMinutes(0)));
-        assertEquals(2, cmsCounterLayer.estimateCount("4.4.4.1|/api/z", windowKeyOffsetMinutes(1)));
-        assertEquals(2, cmsCounterLayer.estimateCount("4.4.4.2|/api/z", windowKeyOffsetMinutes(2)));
+        assertEquals(2, cmsCounterLayer.estimateCount("11111|4.4.4.0|/api/z", windowKeyOffsetMinutes(0)));
+        assertEquals(2, cmsCounterLayer.estimateCount("11111|4.4.4.1|/api/z", windowKeyOffsetMinutes(1)));
+        assertEquals(2, cmsCounterLayer.estimateCount("11111|4.4.4.2|/api/z", windowKeyOffsetMinutes(2)));
     }
 
     @Test
@@ -196,7 +196,7 @@ public class CmsCounterLayerTest {
 
     @Test
     void testCleanupOldWindows() throws Exception {
-        String key = "8.8.8.8|/api/test";
+        String key = "11111|8.8.8.8|/api/test";
 
         // Add windows: 70, 65, 60, 59, 55 minutes ago
         String oldWindow1 = windowKeyOffsetMinutes(70);

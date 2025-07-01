@@ -261,8 +261,9 @@ public class MaliciousTrafficDetectorTask implements Task {
     }
     
     if (apiDistributionEnabled) {
-      String distributionKey = Utils.buildApiDistributionKey(url, method.toString());
-      String ipApiCmsKey = Utils.buildIpApiCmsDataKey(actor, url, method.toString());
+      String apiCollectionIdStr = Integer.toString(apiCollectionId);
+      String distributionKey = Utils.buildApiDistributionKey(apiCollectionIdStr, url, method.toString());
+      String ipApiCmsKey = Utils.buildIpApiCmsDataKey(actor, apiCollectionIdStr, url, method.toString());
       long curEpochMin = responseParam.getTime()/60;
       this.distributionCalculator.updateFrequencyBuckets(distributionKey, curEpochMin, ipApiCmsKey);
     }
@@ -391,9 +392,9 @@ public class MaliciousTrafficDetectorTask implements Task {
 
     String apiCollectionIdStr = httpResponseParamProto.getAktoVxlanId();
     int apiCollectionId = 0;
-    if (NumberUtils.isDigits(apiCollectionIdStr)) {
-      apiCollectionId = NumberUtils.toInt(apiCollectionIdStr, 0);
-    }
+
+    Integer parsed = NumberUtils.createInteger(apiCollectionIdStr);
+    apiCollectionId = parsed != null ? parsed : 0;
 
     String requestPayload =
         HttpRequestResponseUtils.rawToJsonString(httpResponseParamProto.getRequestPayload(), null);

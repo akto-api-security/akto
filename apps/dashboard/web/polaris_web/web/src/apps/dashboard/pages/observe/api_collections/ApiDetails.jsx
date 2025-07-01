@@ -23,6 +23,11 @@ import InlineEditableText from "../../../components/shared/InlineEditableText";
 import GridRows from "../../../components/shared/GridRows";
 import Dropdown from "../../../components/layouts/Dropdown";
 
+import Highcharts from 'highcharts';
+import HighchartsMore from 'highcharts/highcharts-more';
+
+HighchartsMore(Highcharts);
+
 const statsOptions = [
     {label: "15 minutes", value: 15*60},
     {label: "30 minutes", value: 30*60},
@@ -135,51 +140,60 @@ function ApiDetails(props) {
         };
     };
 
-    // Updated fetchDistributionData with binning
     const fetchDistributionData = async () => {
         try {
             const { apiCollectionId, endpoint, method } = apiDetail;
-            const res = await api.fetchIpLevelApiCallStats(apiCollectionId, endpoint, method, startTime, endTs); // Use startTime
-            const rawData = res?.result?.apiCallStats || [];
+
+            const now = new Date();
+            const startOfToday = Math.floor(new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime() / 1000);
+            const startOfTomorrow = startOfToday + 86400; // seconds in a day
     
-            const formattedData = rawData.map(({ count, users }) => [count, users]);
-            const { data: binnedData, binSize } = binData(formattedData, 10);
+            const res = await api.fetchIpLevelApiCallStats(apiCollectionId, endpoint, method, Math.floor(startOfToday / 60),  Math.floor(startOfTomorrow / 60));
     
-            const chartData = [
-                {
-                    name: '', // Empty name since legend is disabled
-                    data: binnedData,
-                    color: '#1E90FF',
-                    binSize
-                }
-            ];
+            const bucketStats = res.bucketStats || [];
     
-            setApiCallDistribution(chartData);
+            const sortedBuckets = bucketStats
+                .filter(b => b.p25 !== undefined && b.p50 !== undefined && b.p75 !== undefined)
+                .sort((a, b) => {
+                    const aIndex = parseInt(a.bucketLabel.replace("b", ""), 10);
+                    const bIndex = parseInt(b.bucketLabel.replace("b", ""), 10);
+                    return aIndex - bIndex;
+                });
     
-            // Update disabledTabs logic to consider both stats and distribution data in ApiCallStatsTab
+            const categories = sortedBuckets.map(b => b.bucketLabel);
+    
+            const data = sortedBuckets.map(b => [
+                b.min ?? b.p25,  // whisker low
+                b.p25,
+                b.p50,           // median
+                b.p75,
+                b.max ?? b.p75   // whisker high
+            ]);
+    
+            const boxPlotSeries = [{
+                name: "API Call Distribution",
+                type: "boxplot",
+                data,
+                color: "#1E90FF",
+                categories
+            }];
+    
+            setApiCallDistribution(boxPlotSeries);
+    
             setDisabledTabs(prev => {
-                const newDisabledTabs = [...prev.filter(tab => tab !== "api-call-stats")];
-                if (
-                    (!chartData || chartData.length === 0 || !chartData[0]?.data || chartData[0].data.length === 0) &&
-                    (!apiCallStats || apiCallStats.length === 0 || !apiCallStats[0]?.data || apiCallStats[0].data.length === 0)
-                ) {
-                    newDisabledTabs.push("api-call-stats");
-                }
-                return newDisabledTabs;
+                const newTabs = prev.filter(tab => tab !== "api-call-stats");
+                const hasData = boxPlotSeries.length > 0 && boxPlotSeries[0].data.length > 0;
+                if (!hasData) newTabs.push("api-call-stats");
+                return newTabs;
             });
-        } catch (error) {
-            console.error("Error fetching API call distribution data:", error);
+        } catch (err) {
+            console.error("Error fetching distribution:", err);
             setApiCallDistribution([]);
-            // Update disabledTabs logic
-            setDisabledTabs(prev => {
-                const newDisabledTabs = [...prev.filter(tab => tab !== "api-call-stats")];
-                if (!apiCallStats || apiCallStats.length === 0 || !apiCallStats[0]?.data || apiCallStats[0].data.length === 0) {
-                    newDisabledTabs.push("api-call-stats");
-                }
-                return newDisabledTabs;
-            });
+            setDisabledTabs(prev => [...prev.filter(tab => tab !== "api-call-stats"), "api-call-stats"]);
         }
     };
+    
+    
 
     const fetchStats = async (apiCollectionId, endpoint, method) => {
         try {
@@ -196,7 +210,7 @@ function ApiDetails(props) {
             setDisabledTabs(prev => {
                 const newDisabledTabs = [...prev.filter(tab => tab !== "api-call-stats")];
                 if (!transformedData || transformedData.length === 0 || !transformedData[0]?.data || transformedData[0].data.length === 0) {
-                    newDisabledTabs.push("api-call-stats");
+                    //newDisabledTabs.push("api-call-stats");
                 }
                 return newDisabledTabs;
             });
@@ -436,6 +450,60 @@ function ApiDetails(props) {
         legend: { enabled: false },
     };
 
+    const distributionBoxplotOptions = {
+        chart: {
+            type: 'boxplot',
+            marginTop: 10,
+            marginBottom: 70,
+            marginRight: 10
+        },
+        title: { text: null },
+        subtitle: { text: null },
+        legend: { enabled: false },
+        xAxis: {
+            categories: apiCallDistribution?.[0]?.categories || [],
+            title: {
+                text: 'Buckets',
+                style: { fontSize: '12px' }
+            },
+            labels: {
+                style: { fontSize: '12px' },
+                enabled: true
+            }
+        },
+        yAxis: {
+            title: {
+                text: 'API Call Count',
+                style: { fontSize: '12px' }
+            },
+            gridLineWidth: 0
+        },
+        tooltip: {
+            shared: true,
+            useHTML: true,
+            headerFormat: '<b>{point.key}</b><br>',
+            pointFormat:
+                'Min: {point.low}<br>' +
+                'P25: {point.q1}<br>' +
+                'Median: {point.median}<br>' +
+                'P75: {point.q3}<br>' +
+                'Max: {point.high}'
+        },
+        plotOptions: {
+            boxplot: {
+                fillColor: '#f0f0f0',
+                lineWidth: 1,
+                medianColor: '#000000',
+                medianWidth: 2,
+                stemColor: '#999999',
+                stemDashStyle: 'dot',
+                whiskerColor: '#999999',
+                whiskerLength: '50%',
+            }
+        }
+    };
+    
+
     const SchemaTab = {
         id: 'schema',
         content: "Schema",
@@ -512,9 +580,7 @@ function ApiDetails(props) {
                             text='true'
                             inputMetrics={[]}
                         />
-                    ) : (
-                        <Box minHeight="330px" />
-                    )}
+                    ) : null}
                     {/* API Call Distribution Graph */}
                     {apiCallDistribution != undefined && apiCallDistribution.length > 0 && apiCallDistribution[0]?.data !== undefined && apiCallDistribution[0]?.data?.length > 0 ? (
                         <GraphMetric
@@ -527,12 +593,8 @@ function ApiDetails(props) {
                             subtitle={undefined}
                             defaultChartOptions={{
                                 ...defaultChartOptions(false),
-                                ...distributionChartOptions,
-                                xAxis: {
-                                    ...distributionChartOptions.xAxis,
-                                    tickPositions: apiCallDistribution[0]?.data?.map(point => point.binRange[0]) || [],
-                                },
-                            }}
+                                ...distributionBoxplotOptions
+                            }}                            
                             backgroundColor='#ffffff'
                             text={false}
                             inputMetrics={[]}

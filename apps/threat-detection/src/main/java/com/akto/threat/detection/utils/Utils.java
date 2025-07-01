@@ -16,12 +16,12 @@ public class Utils {
         return RedisKeyInfo.API_COUNTER_KEY_PREFIX + "|" + apiCollectionId + "|" + url + "|" + method;
     }
 
-    public static String buildIpApiCmsDataKey(String ip, String url, String method) {
-        return RedisKeyInfo.IP_API_CMS_DATA_PREFIX + "|" + ip + "|" + url + "|" + method;
+    public static String buildIpApiCmsDataKey(String apiCollectionId, String ip, String url, String method) {
+        return RedisKeyInfo.IP_API_CMS_DATA_PREFIX + "|" + apiCollectionId + "|" + ip + "|" + url + "|" + method;
     }
 
-    public static String buildApiDistributionKey(String url, String method) {
-        return url + "|" + method;
+    public static String buildApiDistributionKey(String apiCollectionId, String url, String method) {
+        return apiCollectionId + "|" + url + "|" + method;
     }
 
     public static SampleMaliciousRequest buildSampleMaliciousRequest(String actor, HttpResponseParams responseParam, FilterConfig apiFilter, RawApiMetadata metadata, List<SchemaConformanceError> errors) {

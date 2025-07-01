@@ -73,7 +73,7 @@ public class DistributionDataForwardLayer {
 
                 for (long i = windowStart; i <= safeWindowEnd; i += windowSize) {
 
-                    Map<String, Map<String, Integer>> apiToBuckets = distributionCalculator.getBucketDistribution(windowSize, i);
+                    Map<String, Map<String, Integer>> apiToBuckets = distributionCalculator.getBucketDistribution(windowSize, i + 1);
                     if (apiToBuckets == null || apiToBuckets.isEmpty()) continue;
 
                     List<ApiDistributionDataRequestPayload.DistributionData> batch = new ArrayList<>();
@@ -85,15 +85,18 @@ public class DistributionDataForwardLayer {
                         if (distribution == null || distribution.isEmpty()) continue;
 
                         String[] parts = apiKey.split("\\|");
-                        String url = parts[0];
-                        String method = parts[1];
+                        String apiCollectionIdStr = parts[0];
+                        int apiCollectionId = Integer.parseInt(apiCollectionIdStr);
+                        String url = parts[1];
+                        String method = parts[2];
 
                         ApiDistributionDataRequestPayload.DistributionData data =
                             ApiDistributionDataRequestPayload.DistributionData.newBuilder()
+                            .setApiCollectionId(apiCollectionId)
                                 .setUrl(url)
                                 .setMethod(method)
                                 .setWindowSize(windowSize)
-                                .setWindowStartEpochMin(i)
+                                .setWindowStartEpochMin(i + 1)
                                 .putAllDistribution(distribution)
                                 .build();
                     

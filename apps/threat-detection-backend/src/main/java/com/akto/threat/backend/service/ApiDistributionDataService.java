@@ -43,6 +43,7 @@ public class ApiDistributionDataService {
 
         for (ApiDistributionDataRequestPayload.DistributionData protoData : payload.getDistributionDataList()) {
             Bson filter = Filters.and(
+                Filters.eq("apiCollectionId", protoData.getApiCollectionId()),
                 Filters.eq("url", protoData.getUrl()),
                 Filters.eq("method", protoData.getMethod()),
                 Filters.eq("windowSize", protoData.getWindowSize()),
@@ -51,6 +52,7 @@ public class ApiDistributionDataService {
 
             Bson update = Updates.combine(
                 Updates.set("distribution", protoData.getDistributionMap()),
+                Updates.set("apiCollectionId", protoData.getApiCollectionId()),
                 Updates.set("url", protoData.getUrl()),
                 Updates.set("method", protoData.getMethod()),
                 Updates.set("windowSize", protoData.getWindowSize()),
@@ -78,8 +80,10 @@ public class ApiDistributionDataService {
             .getCollection("api_distribution_data", ApiDistributionDataModel.class);
 
         Bson filter = Filters.and(
+            Filters.eq("apiCollectionId", fetchApiDistributionDataRequest.getApiCollectionId()),
             Filters.eq("url", fetchApiDistributionDataRequest.getUrl()),
             Filters.eq("method", fetchApiDistributionDataRequest.getMethod()),
+            Filters.eq("windowSize", 5),
             Filters.gte("windowStart", fetchApiDistributionDataRequest.getStartWindow()),
             Filters.lte("windowStart", fetchApiDistributionDataRequest.getEndWindow())
         );

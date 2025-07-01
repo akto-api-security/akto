@@ -20,8 +20,8 @@ public class DistributionCalculatorTest {
     public void setup() {
         calculator = new DistributionCalculator();
         CmsCounterLayer.reset();
-        apiKey = "GET|/users";
-        cmsKey = "1.1.1.1|GET|/users";
+        apiKey = "11111|GET|/users";
+        cmsKey = "11111|1.1.1.1|GET|/users";
     }
 
     @Test
@@ -64,8 +64,8 @@ public class DistributionCalculatorTest {
     @Test
     public void testMultipleKeysInSameWindow() {
         long baseEpochMin = 50000;
-        String secondKey = "POST|/orders";
-        String secondCmsKey = "2.2.2.2|POST|/orders";
+        String secondKey = "11111|POST|/orders";
+        String secondCmsKey = "11111|2.2.2.2|POST|/orders";
 
         calculator.updateFrequencyBuckets(apiKey, baseEpochMin, cmsKey);
         calculator.updateFrequencyBuckets(secondKey, baseEpochMin, secondCmsKey);
@@ -78,8 +78,8 @@ public class DistributionCalculatorTest {
     @Test
     public void testMultipleKeysInSameWindow2() {
         long baseEpochMin = 50000;
-        String secondKey = "POST|/orders";
-        String secondCmsKey = "2.2.2.2|POST|/orders";
+        String secondKey = "11111|POST|/orders";
+        String secondCmsKey = "11111|2.2.2.2|POST|/orders";
 
         calculator.updateFrequencyBuckets(apiKey, baseEpochMin, cmsKey);
         calculator.updateFrequencyBuckets(secondKey, baseEpochMin, secondCmsKey);
