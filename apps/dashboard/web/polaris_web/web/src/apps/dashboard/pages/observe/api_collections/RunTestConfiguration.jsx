@@ -5,7 +5,7 @@ import SingleDate from "../../../components/layouts/SingleDate";
 import func from "@/util/func"
 import DropdownSearch from '../../../components/shared/DropdownSearch';
 
-const RunTestConfiguration = ({ testRun, setTestRun, runTypeOptions, hourlyTimes, testRunTimeOptions, testRolesArr, maxConcurrentRequestsOptions, slackIntegrated, generateLabelForSlackIntegration,getLabel, timeFieldsDisabled, teamsTestingWebhookIntegrated, generateLabelForTeamsIntegration, miniTestingServiceNames, jiraProjectMap, generateLabelForJiraIntegration}) => {
+const RunTestConfiguration = ({ testRun, setTestRun, runTypeOptions, hourlyTimes, testRunTimeOptions, testRolesArr, maxConcurrentRequestsOptions, slackIntegrated, generateLabelForSlackIntegration,getLabel, timeFieldsDisabled, teamsTestingWebhookIntegrated, generateLabelForTeamsIntegration, miniTestingServiceNames, slackChannels, jiraProjectMap, generateLabelForJiraIntegration}) => {
     const reducer = (state, action) => {
         switch (action.type) {
           case "update":
@@ -218,12 +218,31 @@ const RunTestConfiguration = ({ testRun, setTestRun, runTypeOptions, hourlyTimes
                     }}
                 /> : <></>
             }
+
+            <HorizontalStack gap={4}>
             <Checkbox
                 label={slackIntegrated ? "Send slack alert post test completion" : generateLabelForSlackIntegration()}
                 checked={testRun.sendSlackAlert}
                 onChange={() => setTestRun(prev => ({ ...prev, sendSlackAlert: !prev.sendSlackAlert }))}
                 disabled={!slackIntegrated}
             />
+
+            {
+                slackChannels?.length > 0 ?  (
+                    <Dropdown
+                        label="Slack Channel"
+                        menuItems={slackChannels}
+                        initial={testRun?.slackChannel || slackChannels?.[0]?.value}
+                        selected={(val) => {
+                            console.log("val", val)
+                            setTestRun(prev => ({
+                                ...prev,
+                                slackChannel: val
+                            }))
+                        }}
+                    />
+                ) : <></>}
+            </HorizontalStack>
             <Checkbox
                 label={teamsTestingWebhookIntegrated ? "Send MS Teams alert post test completion" : generateLabelForTeamsIntegration()}
                 checked={testRun.sendMsTeamsAlert}
