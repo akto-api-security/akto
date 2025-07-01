@@ -112,7 +112,6 @@ public class HttpCallParser {
         List<ApiCollection> apiCollections = dataActor.fetchAllApiCollectionsMeta();
         for (ApiCollection apiCollection: apiCollections) {
             apiCollectionsMap.put(apiCollection.getId(), apiCollection);
-            apiCollectionIdTagsSyncTimestampMap.put(apiCollection.getId(), Context.prevSecNow(300));
         }
         if (Main.actualAccountId == 1745303931 || Main.actualAccountId == 1741069294) {
             this.dependencyAnalyser = new DependencyAnalyser(apiCatalogSync.dbState, Main.isOnprem, RuntimeMode.isHybridDeployment(), apiCollectionsMap);
@@ -509,7 +508,8 @@ public class HttpCallParser {
             return;
         }
 
-        if (Context.now() - this.apiCollectionIdTagsSyncTimestampMap.getOrDefault(apiCollectionId, Context.now()) < this.sync_threshold_time) {
+        int lastSynctime = this.apiCollectionIdTagsSyncTimestampMap.getOrDefault(apiCollectionId, 0);
+        if (Context.now() - lastSynctime < this.sync_threshold_time) {
             // Avoid updating tags too frequently
             return;
         }
