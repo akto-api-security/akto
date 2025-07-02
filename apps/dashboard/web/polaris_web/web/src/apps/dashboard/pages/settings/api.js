@@ -205,11 +205,11 @@ const settingRequests = {
             data: {id}
         })
     },
-    addSlackWebhook(webhookUrl) {
+    addSlackWebhook(webhookUrl, webhookName) {
         return request({
             url: '/api/addSlackWebhook',
             method: 'post',
-            data: {webhookUrl}
+            data: {webhookUrl, webhookName}
         })
     },
     deleteSlackWebhook(apiTokenId) {
