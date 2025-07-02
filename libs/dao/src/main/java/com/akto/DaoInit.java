@@ -74,6 +74,8 @@ import com.mongodb.MongoClientSettings;
 import com.mongodb.ReadPreference;
 import com.mongodb.client.MongoClients;
 
+import javassist.tools.reflect.Sample;
+
 import org.bson.codecs.configuration.CodecRegistries;
 import org.bson.codecs.configuration.CodecRegistry;
 import org.bson.codecs.pojo.ClassModel;
@@ -159,6 +161,8 @@ public class DaoInit {
         ClassModel<AuthParam> authParamClassModel = ClassModel.builder(AuthParam.class).enableDiscriminator(true)
                 .build();
         ClassModel<HardcodedAuthParam> hardcodedAuthParamClassModel = ClassModel.builder(HardcodedAuthParam.class)
+                .enableDiscriminator(true).build();
+        ClassModel<SampleDataAuthParam> sampleDataAuthParamClassModel = ClassModel.builder(SampleDataAuthParam.class)
                 .enableDiscriminator(true).build();
         ClassModel<LoginRequestAuthParam> loginReqAuthParamClassModel = ClassModel.builder(LoginRequestAuthParam.class)
                 .enableDiscriminator(true).build();
@@ -278,7 +282,7 @@ public class DaoInit {
                 cappedListClassModel,
                 equalsToPredicateClassModel, isNumberPredicateClassModel, testingRunClassModel,
                 testingRunResultClassModel, testResultClassModel, genericTestResultClassModel,
-                authMechanismClassModel, authParamClassModel, hardcodedAuthParamClassModel, loginReqAuthParamClassModel,
+                authMechanismClassModel, authParamClassModel, hardcodedAuthParamClassModel, loginReqAuthParamClassModel, sampleDataAuthParamClassModel,
                 testingEndpointsClassModel, customTestingEndpointsClassModel, collectionWiseTestingEndpointsClassModel,
                 workflowTestingEndpointsClassModel, workflowTestResultClassModel,
                 cappedSetClassModel, CustomWebhookClassModel, WorkflowNodeDetailsClassModel, CustomWebhookResultClassModel,
