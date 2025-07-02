@@ -120,15 +120,15 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                 const apiTokenList = slackResp.apiTokenList
                 setSlackIntegrated(apiTokenList && apiTokenList.length > 0)
                 setSlackChannels(apiTokenList.map(token => {
-                    let label = token.name;
+                    let slackName = token.name;
                         // Check if name is missing or is a URL
-                        if (!label ) {
-                            label = 'Slack Webhook';
-                        } else if ( /^https?:\/\//i.test(label)){
-                            label = prettifyUrl(token.name);}
+                        if (!slackName ) {
+                            slackName = 'Slack Webhook';
+                        } else if ( /^https?:\/\//i.test(slackName)){
+                            slackName = prettifyUrl(token.name)
                         }
                         return {
-                            label,
+                            label: slackName,
                             value: token.id
                         }
                 }))
