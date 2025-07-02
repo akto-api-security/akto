@@ -11,7 +11,7 @@ import org.apache.commons.lang3.StringUtils;
 public class HttpResponseParams {
 
     public enum Source {
-        HAR, PCAP, MIRRORING, SDK, OTHER, POSTMAN
+        HAR, PCAP, MIRRORING, SDK, OTHER, POSTMAN, OPEN_API
     }
 
     public String accountId;
