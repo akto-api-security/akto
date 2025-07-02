@@ -8,18 +8,17 @@ import com.akto.dao.CustomAuthTypeDao;
 import com.akto.dao.SampleDataDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.monitoring.ModuleInfoDao;
+import com.akto.dao.test_editor.CommonTemplateDao;
 import com.akto.dao.test_editor.TestConfigYamlParser;
 import com.akto.dao.test_editor.TestingRunPlaygroundDao;
 import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dao.test_editor.info.InfoParser;
 import com.akto.dao.testing.DefaultTestSuitesDao;
-import com.akto.dao.testing.TestRolesDao;
 import com.akto.dao.testing.TestingRunResultDao;
 import com.akto.dto.Account;
 import com.akto.dto.AccountSettings;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.CustomAuthType;
-import com.akto.dto.RawApi;
 import com.akto.dto.monitoring.ModuleInfo;
 import com.akto.dto.test_editor.Category;
 import com.akto.dto.test_editor.Info;
@@ -29,11 +28,9 @@ import com.akto.dto.test_editor.TestingRunPlayground;
 import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.test_run_findings.TestingRunIssues;
-import com.akto.dto.testing.AuthMechanism;
 import com.akto.dto.testing.GenericTestResult;
 import com.akto.dto.testing.MultiExecTestResult;
 import com.akto.dto.testing.TestResult;
-import com.akto.dto.testing.TestRoles;
 import com.akto.dto.testing.TestingRunConfig;
 import com.akto.dto.testing.TestingRunResult;
 import com.akto.dto.testing.TestingRun.State;
@@ -51,8 +48,8 @@ import com.akto.testing.Utils;
 import com.akto.util.Constants;
 import com.akto.util.enums.GlobalEnums;
 import com.akto.util.enums.GlobalEnums.Severity;
-import com.akto.util.enums.GlobalEnums.YamlTemplateSource;
 import com.akto.utils.GithubSync;
+import com.akto.utils.TrafficFilterUtil;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import com.fasterxml.jackson.dataformat.yaml.YAMLGenerator;
@@ -276,6 +273,13 @@ public class SaveTestEditorAction extends UserAction {
         if (testConfig == null) {
             addActionError("testConfig is null");
             return ERROR.toUpperCase();
+        }
+
+        Map<String, List<String>> commonWordListMap = YamlTemplateDao.instance.fetchCommonWordListMap();
+        if (testConfig.getWordlists() != null) {
+            testConfig.getWordlists().putAll(commonWordListMap);
+        } else {
+            testConfig.setWordlists(commonWordListMap);
         }
 
         if (apiInfoKey == null) {
@@ -625,6 +629,48 @@ public class SaveTestEditorAction extends UserAction {
         }
 
         this.content = template.getContent();
+        return SUCCESS.toUpperCase();
+    }
+
+    public String fetchCommonTestTemplate() {
+        YamlTemplate template = CommonTemplateDao.instance.findOne(Filters.empty());
+        if (template != null) {
+            this.content = template.getContent();
+        }
+        return SUCCESS.toUpperCase();
+    }
+
+    public static final String COMMON_TEST_TEMPLATE = "common-test-template";
+
+    public String saveCommonTestTemplate() {
+        try {
+            Map<String, List<String>> commonWordListMap = new HashMap<>();
+            if (content != null && !content.isEmpty()) {
+                commonWordListMap = TestConfigYamlParser.parseWordLists(content);
+            }
+
+            // TODO: add checks to remove extra content apart from wordLists
+
+            if(commonWordListMap == null || commonWordListMap.isEmpty()) {
+                addActionError("wordLists cannot be empty");
+                return ERROR.toUpperCase();
+            }
+
+            String userName = "system";
+            if (getSUser() != null && !getSUser().getLogin().isEmpty()) {
+                userName = getSUser().getLogin();
+            }
+            List<Bson> updates = TrafficFilterUtil.getDbUpdateForTemplate(this.content, userName);
+            // this has upsert true, so it will create a new document if it does not exist
+            CommonTemplateDao.instance.updateOne(
+                    Filters.eq(Constants.ID, COMMON_TEST_TEMPLATE),
+                    Updates.combine(updates));
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            addActionError("Error while saving custom test template: " + e.getMessage());
+            return ERROR.toUpperCase();
+        }
         return SUCCESS.toUpperCase();
     }
 

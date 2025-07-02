@@ -77,7 +77,18 @@ const api = {
                 connectionSkipped: skippedConnection
             }
         })
-    }
+    },
+
+    getApiInfoForMissingData: async(startTimeStamp, endTimeStamp) =>{
+        return request({
+            url: '/api/getAPIInfosForMissingData',
+            method: 'post',
+            data: {
+                startTimeStamp,
+                endTimeStamp
+            }
+        })
+    },
 }
 
 export default api;

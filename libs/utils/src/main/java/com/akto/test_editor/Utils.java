@@ -14,14 +14,15 @@ import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import com.akto.dto.OriginalHttpRequest;
-import com.akto.dto.RawApi;
 import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.context.Context;
-import com.akto.dto.ApiInfo.ApiAccessType;
 import com.akto.dto.ApiInfo;
+import com.akto.dto.ApiInfo.ApiAccessType;
+import com.akto.dto.OriginalHttpRequest;
+import com.akto.dto.RawApi;
 import com.akto.dto.test_editor.ExecutorSingleOperationResp;
 import com.akto.dto.testing.UrlModifierPayload;
+import static com.akto.runtime.RuntimeUtil.extractAllValuesFromPayload;
 import com.akto.test_editor.execution.Operations;
 import com.akto.util.Constants;
 import com.akto.util.DashboardMode;
@@ -38,8 +39,11 @@ import com.google.gson.Gson;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 
-import static com.akto.runtime.RuntimeUtil.extractAllValuesFromPayload;
-import okhttp3.*;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.RequestBody;
+import okhttp3.Response;
+import okhttp3.ResponseBody;
 
 public class Utils {
 
@@ -1082,10 +1086,30 @@ public class Utils {
                 responseBuilder.append(headerKey).append(": ").append(headerValue).append("\n");
             }
         }
+
         String responseBody = rawApi.getResponse().getJsonResponseBody();
         if (responseBody != null && !responseBody.isEmpty()) {
-            responseBuilder.append("\n").append(responseBody);
+            String contentType = null;
+        
+            if (headers.containsKey("content-type")) {
+                contentType = headers.get("content-type").get(0);
+            }
+        
+            if (contentType != null && contentType.toLowerCase().contains("text/event-stream")) {
+                String[] events = responseBody.split("event:");
+                if (events.length > 2) {
+                    for (int i = events.length - 2; i < events.length; i++) {           
+                        responseBuilder.append("\n").append("event:").append(events[i].trim());
+                    }
+                } else {
+                    responseBuilder.append("\n").append(responseBody);
+                }
+            } else {
+                responseBuilder.append("\n").append(responseBody);
+            }
         }
+        
+        
         return responseBuilder.toString();
     }
 

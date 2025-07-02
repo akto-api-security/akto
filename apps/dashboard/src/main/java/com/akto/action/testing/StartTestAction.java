@@ -4,6 +4,7 @@ import com.akto.action.UserAction;
 import com.akto.billing.UsageMetricUtils;
 import com.akto.dao.context.Context;
 import com.akto.dao.monitoring.ModuleInfoDao;
+import com.akto.dao.notifications.SlackWebhooksDao;
 import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dao.testing.*;
 import com.akto.dao.testing.sources.TestSourceConfigsDao;
@@ -14,6 +15,7 @@ import com.akto.dto.CollectionConditions.TestConfigsAdvancedSettings;
 import com.akto.dto.User;
 import com.akto.dto.billing.FeatureAccess;
 import com.akto.dto.monitoring.ModuleInfo;
+import com.akto.dto.notifications.SlackWebhook;
 import com.akto.dto.test_editor.Info;
 import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.test_run_findings.TestingRunIssues;
@@ -35,6 +37,7 @@ import com.akto.util.enums.GlobalEnums.TestErrorSource;
 import com.akto.utils.DeleteTestRunUtils;
 import com.akto.utils.Utils;
 import com.google.gson.Gson;
+import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.*;
 import com.mongodb.client.result.InsertOneResult;
 import com.opensymphony.xwork2.Action;
@@ -119,7 +122,7 @@ public class StartTestAction extends UserAction {
     private boolean sendSlackAlert = false;
     private boolean sendMsTeamsAlert = false;
 
-    private TestingRun createTestingRun(int scheduleTimestamp, int periodInSeconds, String miniTestingServiceName) {
+    private TestingRun createTestingRun(int scheduleTimestamp, int periodInSeconds, String miniTestingServiceName, int selectedSlackChannelId) {
         User user = getSUser();
 
         if (!StringUtils.isEmpty(this.overriddenTestAppUrl)) {
@@ -179,10 +182,11 @@ public class StartTestAction extends UserAction {
 
         return new TestingRun(scheduleTimestamp, user.getLogin(),
                 testingEndpoints, testIdConfig, State.SCHEDULED, periodInSeconds, testName, this.testRunTime,
-                this.maxConcurrentRequests, this.sendSlackAlert, this.sendMsTeamsAlert, miniTestingServiceName);
+                this.maxConcurrentRequests, this.sendSlackAlert, this.sendMsTeamsAlert, miniTestingServiceName,selectedSlackChannelId);
     }
 
     String selectedMiniTestingServiceName;
+    int selectedSlackWebhook;
     private List<String> selectedTests;
     private List<TestConfigsAdvancedSettings> testConfigsAdvancedSettings;
 
@@ -227,7 +231,7 @@ public class StartTestAction extends UserAction {
         }
         if (localTestingRun == null) {
             try {
-                localTestingRun = createTestingRun(scheduleTimestamp, getPeriodInSeconds(recurringDaily, recurringWeekly, recurringMonthly), selectedMiniTestingServiceName);
+                localTestingRun = createTestingRun(scheduleTimestamp, getPeriodInSeconds(recurringDaily, recurringWeekly, recurringMonthly), selectedMiniTestingServiceName, selectedSlackWebhook);
                 // pass boolean from ui, which will tell if testing is coniinuous on new endpoints
                 if (this.continuousTesting) {
                     localTestingRun.setPeriodInSeconds(-1);
@@ -1363,6 +1367,8 @@ public class StartTestAction extends UserAction {
                     if(editableTestingRunConfig.getMiniTestingServiceName() != null && !editableTestingRunConfig.getMiniTestingServiceName().isEmpty()){
                         updates.add(Updates.set(TestingRun.MINI_TESTING_SERVICE_NAME, editableTestingRunConfig.getMiniTestingServiceName()));
                     }
+
+                    updates.add(Updates.set(TestingRun.SELECTED_SLACK_CHANNEL_ID, editableTestingRunConfig.getSelectedSlackChannelId()));
 
                     if (!updates.isEmpty()) {
                         TestingRunDao.instance.updateOne(

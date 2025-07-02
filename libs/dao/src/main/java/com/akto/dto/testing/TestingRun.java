@@ -42,7 +42,9 @@ public class TestingRun {
     private String name;
 
     public static final String MINI_TESTING_SERVICE_NAME = "miniTestingServiceName";
+    public static final String SELECTED_SLACK_CHANNEL_ID = "selectedSlackChannelId";
     private String miniTestingServiceName;
+    private int selectedSlackChannelId;
 
     public enum TestingRunType{
         ONE_TIME, RECURRING, CI_CD, CONTINUOUS_TESTING
@@ -53,6 +55,8 @@ public class TestingRun {
 
     public static final String SEND_MS_TEAMS_ALERT = "sendMsTeamsAlert";
     private boolean sendMsTeamsAlert = false;
+    public static final String SEND_PENDING_TESTS_WEBHOOK_TIMESTAMP = "sendPendingTestsWebhookTimestamp";
+    private int sendPendingTestsWebhookTimestamp;
 
     public TestingRun() { }
 
@@ -73,13 +77,13 @@ public class TestingRun {
         this.isNewTestRun = true;
     }
 
-    public TestingRun(int scheduleTimestamp, String userEmail, TestingEndpoints testingEndpoints, int testIdConfig, State state, int periodInSeconds, String name, int testRunTime, int maxConcurrentRequests, boolean sendSlackAlert, String miniTestingServiceName) {
-        this(scheduleTimestamp, userEmail,testingEndpoints,testIdConfig, state, periodInSeconds, name, testRunTime, maxConcurrentRequests, sendSlackAlert, false, miniTestingServiceName);
+    public TestingRun(int scheduleTimestamp, String userEmail, TestingEndpoints testingEndpoints, int testIdConfig, State state, int periodInSeconds, String name, int testRunTime, int maxConcurrentRequests, boolean sendSlackAlert, String miniTestingServiceName, int selectedSlackChannelId) {
+        this(scheduleTimestamp, userEmail,testingEndpoints,testIdConfig, state, periodInSeconds, name, testRunTime, maxConcurrentRequests, sendSlackAlert, false, miniTestingServiceName, selectedSlackChannelId);
     }
 
     public TestingRun(int scheduleTimestamp, String userEmail, TestingEndpoints testingEndpoints, int testIdConfig,
         State state, int periodInSeconds, String name, int testRunTime, int maxConcurrentRequests,
-        boolean sendSlackAlert, boolean sendMsTeamsAlert, String miniTestingServiceName) {
+        boolean sendSlackAlert, boolean sendMsTeamsAlert, String miniTestingServiceName, int selectedSlackChannelId) {
         this.scheduleTimestamp = scheduleTimestamp;
         this.testRunTime = testRunTime;
         this.maxConcurrentRequests = maxConcurrentRequests;
@@ -95,6 +99,7 @@ public class TestingRun {
         this.miniTestingServiceName = miniTestingServiceName;
         this.isNewTestRun = true;
         this.sendMsTeamsAlert = sendMsTeamsAlert;
+        this.selectedSlackChannelId = selectedSlackChannelId;
     }
 
     public TestingRunConfig getTestingRunConfig() {
@@ -246,6 +251,21 @@ public class TestingRun {
         this.miniTestingServiceName = miniTestingServiceName;
     }
 
+    public int getSelectedSlackChannelId() {
+        return selectedSlackChannelId;
+    }
+
+    public void setSelectedSlackChannelId(int selectedSlackChannelId) {
+        this.selectedSlackChannelId = selectedSlackChannelId;
+    }
+
+    public int getSendPendingTestsWebhookTimestamp() {
+        return sendPendingTestsWebhookTimestamp;
+    }
+
+    public void setSendPendingTestsWebhookTimestamp(int sendPendingTestsWebhookTimestamp) {
+        this.sendPendingTestsWebhookTimestamp = sendPendingTestsWebhookTimestamp;
+    }
     @Override
     public String toString() {
         return "{" +
