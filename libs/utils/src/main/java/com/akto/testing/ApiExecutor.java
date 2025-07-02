@@ -649,7 +649,6 @@ public class ApiExecutor {
         }
         String host = uri.getScheme() + "://" + uri.getHost() + (uri.getPort() != -1 ? ":" + uri.getPort() : "");
         SseSession session = openSseSession(host);
-        if (session.sessionId == null) throw new Exception("No sessionId from SSE endpoint");
 
         // Add sessionId as query param to actual request
         String endpoint = session.endpoint;
