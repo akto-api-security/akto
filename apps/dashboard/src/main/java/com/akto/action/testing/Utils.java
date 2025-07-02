@@ -1,9 +1,16 @@
 package com.akto.action.testing;
 
+import com.akto.dto.test_run_findings.TestingIssuesId;
+import com.akto.dto.test_run_findings.TestingRunIssues;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.collections.MapUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.bson.conversions.Bson;
 
 import com.akto.dto.ApiInfo.ApiInfoKey;
@@ -54,6 +61,25 @@ public class Utils {
             return Filters.empty();
         }
         return Filters.and(filterList);
+    }
+
+    public static Map<String, String> mapIssueDescriptions(List<TestingRunIssues> issues,
+        Map<TestingIssuesId, TestingRunResult> idToResultMap) {
+
+        if (CollectionUtils.isEmpty(issues) || MapUtils.isEmpty(idToResultMap)) {
+            return Collections.emptyMap();
+        }
+
+        Map<String, String> finalResult = new HashMap<>();
+        for (TestingRunIssues issue : issues) {
+            if (StringUtils.isNotBlank(issue.getDescription())) {
+                TestingRunResult result = idToResultMap.get(issue.getId());
+                if (result != null) {
+                    finalResult.put(result.getHexId(), issue.getDescription());
+                }
+            }
+        }
+        return finalResult;
     }
 
 }
