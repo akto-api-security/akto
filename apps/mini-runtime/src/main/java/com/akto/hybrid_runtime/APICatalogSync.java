@@ -1,10 +1,13 @@
 package com.akto.hybrid_runtime;
 
+import com.akto.mcp.McpSchema;
+import java.security.interfaces.RSAPublicKey;
 import java.util.*;
 import java.util.Map.Entry;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
 
+import com.akto.PayloadEncodeUtil;
 import com.akto.dao.*;
 import com.akto.dao.context.Context;
 import com.akto.dao.monitoring.FilterYamlTemplateDao;
@@ -30,6 +33,7 @@ import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.metrics.AllMetrics;
 import com.akto.runtime.SvcToSvcGraphManager;
+import com.akto.runtime.utils.Utils;
 import com.akto.data_actor.DataActor;
 import com.akto.data_actor.DataActorFactory;
 import com.akto.hybrid_runtime.policies.AktoPolicyNew;
@@ -72,10 +76,24 @@ public class APICatalogSync {
     private static DataActor dataActor = DataActorFactory.fetchInstance();
     public static Set<MergedUrls> mergedUrls;
     private static final ClientLayer clientLayer = new ClientLayer();
-
+    private static RSAPublicKey publicKey = PayloadEncodeUtil.getPublicKey();
     public APICatalogSync(String userIdentifier,int thresh, boolean fetchAllSTI) {
         this(userIdentifier, thresh, fetchAllSTI, true);
     }
+
+    /* Note: We have hardcoded the logic of not merging URLs for MCP Server.
+        The apiCollectionId - -1 has nothing to do with this.
+        Since we do not know the collectionId for MCP Server, we have set it to -1.
+     */
+    private static final Set<MergedUrls> MERGED_URLS_FOR_MCP = new HashSet<>(Arrays.asList(
+        new MergedUrls("tools/call/STRING", "POST", -1),
+        new MergedUrls("tools/call/INTEGER", "POST", -1),
+        new MergedUrls("tools/call/FLOAT", "POST", -1),
+        new MergedUrls("tools/call/OBJECT_ID", "POST", -1),
+        new MergedUrls("tools/call/VERSIONED", "POST", -1)
+    ));
+
+    private boolean mergeUrlsOnVersions;
 
     // New overloaded constructor
     public APICatalogSync(String userIdentifier, int thresh, boolean fetchAllSTI, boolean buildFromDb) {
@@ -252,10 +270,13 @@ public class APICatalogSync {
 
                 URLTemplate parameterisedTemplate = null;
                 if((apiCollectionId != VULNERABLE_API_COLLECTION_ID) && (apiCollectionId != LLM_API_COLLECTION_ID)){
-                    parameterisedTemplate = tryParamteresingUrl(pending);
+                    parameterisedTemplate = tryParamteresingUrl(pending, this.mergeUrlsOnVersions);
                 }
 
                 if(parameterisedTemplate != null){
+                    if (Utils.printDebugUrlLog(parameterisedTemplate.getTemplateString())) {
+                        loggerMaker.infoAndAddToDb("Found debug url in parameterisedTemplate " + parameterisedTemplate.getTemplateString());
+                    }
                     RequestTemplate rt = deltaCatalog.getTemplateURLToMethods().get(parameterisedTemplate);
                     if (rt != null) {
                         rt.mergeFrom(pendingTemplate);
@@ -372,7 +393,7 @@ public class APICatalogSync {
                 Map<URLTemplate, Set<RequestTemplate>> potentialMerges = new HashMap<>();
                 for(URLStatic dbUrl: dbTemplates.keySet()) {
                     RequestTemplate dbTemplate = dbTemplates.get(dbUrl);
-                    URLTemplate mergedTemplate = tryMergeUrls(dbUrl, newUrl);
+                    URLTemplate mergedTemplate = tryMergeUrls(dbUrl, newUrl, this.mergeUrlsOnVersions);
                     if (mergedTemplate == null) {
                         continue;
                     }
@@ -422,7 +443,7 @@ public class APICatalogSync {
 
             for (URLStatic deltaUrl: deltaCatalog.getStrictURLToMethods().keySet()) {
                 RequestTemplate deltaTemplate = deltaTemplates.get(deltaUrl);
-                URLTemplate mergedTemplate = tryMergeUrls(deltaUrl, newUrl);
+                URLTemplate mergedTemplate = tryMergeUrls(deltaUrl, newUrl, this.mergeUrlsOnVersions);
                 if (mergedTemplate == null || (RequestTemplate.isMergedOnStr(mergedTemplate) && !areBothUuidUrls(newUrl,deltaUrl,mergedTemplate))) {
                     continue;
                 }
@@ -535,7 +556,26 @@ public class APICatalogSync {
         }
     }
 
-    public static URLTemplate tryParamteresingUrl(URLStatic newUrl){
+    private static boolean isValidVersionToken(String token){
+        if(token == null || token.isEmpty()) return false;
+        token = token.trim().toLowerCase();
+        if(token.startsWith("v") && token.length() > 1 && token.length() < 4) {
+            String versionString = token.substring(1, token.length());
+            try {
+                int version = Integer.parseInt(versionString);
+                if (version > 0) {
+                    return true;
+                } 
+            } catch (Exception e) {
+                // TODO: handle exception
+                return false;
+            }
+            return false;
+        }
+        return false;
+    }
+
+    public static URLTemplate tryParamteresingUrl(URLStatic newUrl, boolean mergeUrlsOnVersions){
         String[] tokens = tokenize(newUrl.getUrl());
         if(tokens.length < 2){
             return null;
@@ -557,6 +597,9 @@ public class APICatalogSync {
                 tokens[i] = null;
             }else if(pattern.matcher(tempToken).matches()){
                 newTypes[i] = SuperType.STRING;
+                tokens[i] = null;
+            }else if(mergeUrlsOnVersions && isValidVersionToken(tempToken)){
+                newTypes[i] = SuperType.VERSIONED;
                 tokens[i] = null;
             }
 
@@ -580,22 +623,11 @@ public class APICatalogSync {
 
         URLTemplate urlTemplate = new URLTemplate(tokens, newTypes, newUrl.getMethod());
 
-        try {
-            for(MergedUrls mergedUrl : mergedUrls) {
-                if(mergedUrl.getUrl().equals(urlTemplate.getTemplateString()) &&
-                        mergedUrl.getMethod().equals(urlTemplate.getMethod().name())) {
-                    return null;
-                }
-            }
-        } catch(Exception e) {
-            loggerMaker.errorAndAddToDb("Error while creating a new URL object: " + e.getMessage(), LogDb.RUNTIME);
-        }
-
-        return urlTemplate;
+        return getMergedUrlTemplate(urlTemplate);
     }
 
 
-    public static URLTemplate tryMergeUrls(URLStatic dbUrl, URLStatic newUrl) {
+    public static URLTemplate tryMergeUrls(URLStatic dbUrl, URLStatic newUrl, boolean mergeUrlsOnVersions) {
         if (dbUrl.getMethod() != newUrl.getMethod()) {
             return null;
         }
@@ -626,7 +658,11 @@ public class APICatalogSync {
             } else if(ObjectId.isValid(tempToken) && ObjectId.isValid(dbToken)){
                 newTypes[i] = SuperType.OBJECT_ID;
                 newTokens[i] = null;
-            } else if(pattern.matcher(tempToken).matches() && pattern.matcher(dbToken).matches()){
+            }else if(isValidVersionToken(tempToken) && isValidVersionToken(dbToken)){
+                newTypes[i] = SuperType.VERSIONED;
+                newTokens[i] = null;
+            } 
+            else if(pattern.matcher(tempToken).matches() && pattern.matcher(dbToken).matches()){
                 newTypes[i] = SuperType.STRING;
                 newTokens[i] = null;
             }else if(isAlphanumericString(tempToken) && isAlphanumericString(dbToken)){
@@ -649,22 +685,29 @@ public class APICatalogSync {
         if (templatizedStrTokens <= 1) {
             URLTemplate urlTemplate = new URLTemplate(newTokens, newTypes, newUrl.getMethod());
 
-            try {
-                for(MergedUrls mergedUrl : mergedUrls) {
-                    if(mergedUrl.getUrl().equals(urlTemplate.getTemplateString()) &&
-                            mergedUrl.getMethod().equals(urlTemplate.getMethod().name())) {
-                        return null;
-                    }
+            return getMergedUrlTemplate(urlTemplate);
+        }
+        return null;
+    }
+
+    public static URLTemplate getMergedUrlTemplate(URLTemplate urlTemplate) {
+        try {
+            for(MergedUrls mergedUrl : mergedUrls) {
+                if(mergedUrl.getUrl().equals(urlTemplate.getTemplateString()) &&
+                        mergedUrl.getMethod().equals(urlTemplate.getMethod().name())) {
+                    return null;
                 }
-            } catch(Exception e) {
-                loggerMaker.errorAndAddToDb("Error while creating a new URL object: " + e.getMessage(), LogDb.RUNTIME);
             }
 
-            return urlTemplate;
+            String mergedUrlString = urlTemplate.getTemplateString();
+            if (McpSchema.MCP_METHOD_SET.stream().anyMatch(mergedUrlString::contains)) {
+                return null;
+            }
+        } catch(Exception e) {
+            loggerMaker.errorAndAddToDb("Error while creating a new URL object: " + e.getMessage(), LogDb.RUNTIME);
         }
 
-        return null;
-
+        return urlTemplate;
     }
 
     private void tryWithKnownURLTemplates(
@@ -688,16 +731,25 @@ public class APICatalogSync {
                         } else {
                             AllMetrics.instance.setDeltaCatalogTotalCount(1);
                             RequestTemplate alreadyInDelta = deltaCatalog.getTemplateURLToMethods().get(urlTemplate);
+                            if (Utils.printDebugUrlLog(newUrl.getUrl())) {
+                                loggerMaker.infoAndAddToDb("Found debug url in tryWithKnownURLTemplates match " + newUrl.getUrl());
+                            }
 
                             if (alreadyInDelta != null) {
                                 alreadyInDelta.fillUrlParams(tokenize(newUrl.getUrl()), urlTemplate, apiCollectionId);
                                 alreadyInDelta.mergeFrom(newRequestTemplate);
+                                if (Utils.printDebugUrlLog(newUrl.getUrl())) {
+                                    loggerMaker.infoAndAddToDb("Found debug url in tryWithKnownURLTemplates alreadyInDelta non empty " + newUrl.getUrl());
+                                }
                             } else {
                                 RequestTemplate dbTemplate = dbCatalog.getTemplateURLToMethods().get(urlTemplate);
                                 RequestTemplate dbCopy = dbTemplate.copy();
                                 dbCopy.mergeFrom(newRequestTemplate);
                                 dbCopy.fillUrlParams(tokenize(newUrl.getUrl()), urlTemplate, apiCollectionId);
                                 deltaCatalog.getTemplateURLToMethods().put(urlTemplate, dbCopy);
+                                if (Utils.printDebugUrlLog(newUrl.getUrl())) {
+                                    loggerMaker.infoAndAddToDb("Found debug url in tryWithKnownURLTemplates alreadyInDelta empty " + newUrl.getUrl());
+                                }
                             }
                             iterator.remove();
                             break;
@@ -723,6 +775,9 @@ public class APICatalogSync {
                 RequestTemplate requestTemplate = ret.get(url);
                 if (requestTemplate == null) {
                     requestTemplate = new RequestTemplate(new HashMap<>(), new HashMap<>(), new HashMap<>(), new TrafficRecorder(new HashMap<>()));
+                    if (Utils.printDebugUrlLog(url.getUrl())) {
+                        loggerMaker.infoAndAddToDb("Found debug url in createRequestTemplates " + url.getUrl());
+                    }
                     ret.put(url, requestTemplate);
                 }
                 processResponse(requestTemplate, responseParamsList, deletedInfo);
@@ -755,6 +810,9 @@ public class APICatalogSync {
                         if (requestTemplate == null) {
                             requestTemplate = strictMatch.copy(); // to further process the requestTemplate
                             deltaCatalogStrictURLToMethods.put(url, requestTemplate);
+                            if (Utils.printDebugUrlLog(url.getUrl())) {
+                                loggerMaker.infoAndAddToDb("Found debug url in processKnownStaticURLs " + url.getUrl());
+                            }
                             strictMatch.mergeFrom(requestTemplate); // to update the existing requestTemplate in db with new data
                         }
 
@@ -1407,6 +1465,9 @@ public class APICatalogSync {
                     if (!existingAPIsInDb.mightContain(checkString)) {
                         if (syncLimit.updateUsageLeftAndCheckSkip()) {
                             staticUrlIterator.remove();
+                            if (Utils.printDebugUrlLog(checkString)) {
+                                loggerMaker.infoAndAddToDb("Found debug url in updateUsageLeftAndCheckSkip skip " + checkString);
+                            }
                         } else {
                             existingAPIsInDb.put(checkString);
                             deltaUsage++;
@@ -1423,6 +1484,9 @@ public class APICatalogSync {
                     if (!existingAPIsInDb.mightContain(checkString)) {
                         if (syncLimit.updateUsageLeftAndCheckSkip()) {
                             templateUrlIterator.remove();
+                            if (Utils.printDebugUrlLog(checkString)) {
+                                loggerMaker.infoAndAddToDb("Found debug url in updateUsageLeftAndCheckSkip skip " + checkString);
+                            }
                         } else {
                             existingAPIsInDb.put(checkString);
                             deltaUsage++;
@@ -1561,9 +1625,19 @@ public class APICatalogSync {
                         int now = Context.now();
                         Key id = sample.getId();
                         int accountId = Context.accountId.get();
-                        SampleDataAlt sampleDataAlt = new SampleDataAlt(uuid, s, id.getApiCollectionId(),
+                        String piiRedactedSample = RedactSampleData.redactIfRequired(s, false, false);
+                        if (publicKey != null) {
+                            try {
+                                piiRedactedSample = PayloadEncodeUtil.encryptAndPack(piiRedactedSample, publicKey);                                
+                            } catch (Exception e) {
+                                loggerMaker.errorAndAddToDb("error encoding payload string " + e.getMessage());
+                            }
+                        }
+                        SampleDataAlt sampleDataAlt = new SampleDataAlt(uuid, piiRedactedSample, id.getApiCollectionId(),
                                 id.getMethod().name(), id.getUrl(), id.getResponseCode(), now, accountId);
-                        unfilteredSamples.add(sampleDataAlt);
+                        if (sample.getId().getApiCollectionId() != 0) {
+                            unfilteredSamples.add(sampleDataAlt);
+                        }
                         sampleIds.add(uuid.toString());
 
                     }
@@ -1626,6 +1700,14 @@ public class APICatalogSync {
 
             SingleTypeInfo dbInfo = dbInfoMap.get(key);
             SingleTypeInfo deltaInfo = deltaInfoMap.get(key);
+
+            if (deltaInfo != null && Utils.printDebugUrlLog(deltaInfo.getUrl())) {
+                loggerMaker.infoAndAddToDb("Found debug url in getDBUpdatesForParamsHybrid in deltaInfo " + deltaInfo.getUrl());
+            }
+
+            if (dbInfo != null && Utils.printDebugUrlLog(dbInfo.getUrl())) {
+                loggerMaker.infoAndAddToDb("Found debug url in getDBUpdatesForParamsHybrid in dbInfo " + dbInfo.getUrl());
+            }
 
             if (deltaInfo.getParam().equalsIgnoreCase("host")) {
                 if (dbInfo == null) {
@@ -1808,5 +1890,13 @@ public class APICatalogSync {
 
     public APICatalog getDbState(int apiCollectionId) {
         return this.dbState.get(apiCollectionId);
+    }
+
+    public boolean isMergeUrlsOnVersions() {
+        return mergeUrlsOnVersions;
+    }
+
+    public void setMergeUrlsOnVersions(boolean mergeUrlsOnVersions) {
+        this.mergeUrlsOnVersions = mergeUrlsOnVersions;
     }
 }

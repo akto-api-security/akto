@@ -1,24 +1,23 @@
 package com.akto.test_editor.execution;
 
+import com.akto.billing.UsageMetricUtils;
+import com.akto.dto.billing.FeatureAccess;
+import com.akto.gpt.handlers.gpt_prompts.TestExecutorModifier;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import com.akto.dao.context.Context;
-import com.akto.dao.testing.TestRolesDao;
 import com.akto.data_actor.DataActor;
 import com.akto.data_actor.DataActorFactory;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.CustomAuthType;
 import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.RawApi;
-import com.akto.dto.RecordedLoginFlowInput;
 import com.akto.dto.testing.*;
 import com.akto.dto.testing.AuthParam.Location;
-import com.akto.dto.testing.sources.AuthWithCond;
 import com.akto.testing.*;
-import com.akto.util.enums.LoginFlowEnums;
 import com.akto.util.enums.LoginFlowEnums.AuthMechanismTypes;
 import com.akto.dto.api_workflow.Graph;
 import com.akto.dto.test_editor.*;
@@ -29,28 +28,28 @@ import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.rules.TestPlugin;
 import com.akto.test_editor.OrgUtils;
-import com.akto.test_editor.Utils;
+import com.akto.test_editor.utils.Utils;
 import com.akto.util.Constants;
-import com.akto.util.JSONUtils;
+import com.akto.util.HttpRequestResponseUtils;
 import com.akto.util.modifier.JWTPayloadReplacer;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.net.URI;
 
+import org.json.JSONArray;
 import org.json.JSONObject;
 
 import com.mongodb.BasicDBObject;
-import static com.akto.test_editor.Utils.bodyValuesUnchanged;
-import static com.akto.test_editor.Utils.headerValuesUnchanged;
+import static com.akto.test_editor.utils.Utils.bodyValuesUnchanged;
+import static com.akto.test_editor.utils.Utils.headerValuesUnchanged;
 import static com.akto.runtime.utils.Utils.convertOriginalReqRespToString;
 
 
 import org.apache.commons.lang3.StringUtils;
-import org.bson.types.ObjectId;
 
 public class Executor {
 
-    private static final LoggerMaker loggerMaker = new LoggerMaker(Executor.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(Executor.class, LogDb.TESTING);
     private static final DataActor dataActor = DataActorFactory.fetchInstance();
 
     public final String _HOST = "host";
@@ -183,6 +182,17 @@ public class Executor {
             }
             try {
                 // follow redirects = true for now
+                List<String> contentType = origRawApi.getRequest().getHeaders().getOrDefault("content-type", new ArrayList<>());
+                String contentTypeString = "";
+                if(!contentType.isEmpty()){
+                    contentTypeString = contentType.get(0);
+                }
+                if(!contentTypeString.isEmpty() && (contentTypeString.contains(HttpRequestResponseUtils.SOAP) || contentTypeString.contains(HttpRequestResponseUtils.XML))){
+                    // since we are storing a map for original raw payload, we need original raw url and method to float to api executor
+                    // we are adding custom header here and when sending request we will remove them
+                    testReq.getRequest().getHeaders().put("x-akto-original-url", Collections.singletonList(origRawApi.getRequest().getUrl()));
+                    testReq.getRequest().getHeaders().put("x-akto-original-method", Collections.singletonList(origRawApi.getRequest().getMethod()));   
+                }
                 testResponse = ApiExecutor.sendRequest(testReq.getRequest(), followRedirect, testingRunConfig, debug, testLogs, Main.SKIP_SSRF_CHECK);
                 requestSent = true;
                 ExecutionResult attempt = new ExecutionResult(singleReq.getSuccess(), singleReq.getErrMsg(), testReq.getRequest(), testResponse);
@@ -386,13 +396,93 @@ public class Executor {
         return testResult;
     }
 
-    public ExecutorSingleOperationResp invokeOperation(String operationType, Object key, Object value, RawApi rawApi, Map<String, Object> varMap, AuthMechanism authMechanism, List<CustomAuthType> customAuthTypes, ApiInfo.ApiInfoKey apiInfoKey) {
+    public ExecutorSingleOperationResp invokeOperation(String operationType, Object key, Object value, RawApi rawApi,
+        Map<String, Object> varMap, AuthMechanism authMechanism, List<CustomAuthType> customAuthTypes,
+        ApiInfo.ApiInfoKey apiInfoKey) {
+        List<BasicDBObject> generatedOperationKeyValuePairs = new ArrayList<>();
         try {
+            int accountId = Context.accountId.get();
+            FeatureAccess featureAccess = UsageMetricUtils.getFeatureAccessSaas(accountId, TestExecutorModifier._AKTO_GPT_AI);
+            if (featureAccess.getIsGranted()) {
+
+                String request = com.akto.test_editor.Utils.buildRequestIHttpFormat(rawApi);
+
+                String operationPrompt = "";
+                if (key.equals(com.akto.test_editor.Utils._MAGIC)) {
+                    operationPrompt = value.toString();
+                } else if (key.toString().startsWith(com.akto.test_editor.Utils._MAGIC)) {
+                    operationPrompt = key.toString().replace(com.akto.test_editor.Utils._MAGIC, "").trim();
+                }
+
+                if (!operationPrompt.isEmpty()) {
+                    String operationTypeLower = operationType.toLowerCase();
+                    String operation = operationTypeLower + ": " + operationPrompt;
+
+                    BasicDBObject queryData = new BasicDBObject();
+                    queryData.put(TestExecutorModifier._REQUEST, request);
+                    queryData.put(TestExecutorModifier._OPERATION, operation);
+                    BasicDBObject generatedData = new TestExecutorModifier().handle(queryData);
+                    generatedOperationKeyValuePairs = parseGeneratedKeyValues(generatedData, operationTypeLower, value);
+                }
+            }
+
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "error invoking operation " + operationType + " " + e.getMessage());
+        }
+
+        try {
+            if (generatedOperationKeyValuePairs != null && !generatedOperationKeyValuePairs.isEmpty()) {
+                ExecutorSingleOperationResp resp = new ExecutorSingleOperationResp(false, "AI generated operation key value pairs, executing them");
+                for (BasicDBObject generatedPair : generatedOperationKeyValuePairs) {
+                    String generatedKey = generatedPair.keySet().iterator().next();
+                    Object generatedValue = generatedPair.get(generatedKey);
+                    resp = runOperation(operationType, rawApi, generatedKey, generatedValue, varMap, authMechanism, customAuthTypes, apiInfoKey);
+                }
+                return resp;
+            }
+
             ExecutorSingleOperationResp resp = runOperation(operationType, rawApi, key, value, varMap, authMechanism, customAuthTypes, apiInfoKey);
             return resp;
-        } catch(Exception e) {
+        } catch (Exception e) {
             return new ExecutorSingleOperationResp(false, "error executing executor operation " + e.getMessage());
         }
+    }
+
+    private List<BasicDBObject> parseGeneratedKeyValues(BasicDBObject generatedData, String operationType, Object value) {
+        List<BasicDBObject> generatedOperationKeyValuePairs = new ArrayList<>();
+        if (generatedData.containsKey(operationType)) {
+            Object generatedValue = generatedData.get(operationType);
+            if (generatedValue instanceof String) {
+                String generatedKey = generatedValue.toString();
+                generatedOperationKeyValuePairs.add(new BasicDBObject(generatedKey, value));
+            } else if (generatedValue instanceof JSONObject) {
+                JSONObject generatedObj = (JSONObject) generatedValue;
+                for (String k : generatedObj.keySet()) {
+                    generatedOperationKeyValuePairs.add(new BasicDBObject(k, generatedObj.get(k)));
+                }
+            } else if (generatedValue instanceof JSONArray) {
+                JSONArray generatedArray = (JSONArray) generatedValue;
+                for (int i = 0; i < generatedArray.length(); i++) {
+                    Object generatedValueAtIndex = generatedArray.get(i);
+                    if(generatedValueAtIndex instanceof String) {
+                        String generatedKey = generatedValueAtIndex.toString();
+                        generatedOperationKeyValuePairs.add(new BasicDBObject(generatedKey, value));
+                        continue;
+                    } else if (generatedValueAtIndex instanceof JSONObject) {
+                        JSONObject generatedObj = (JSONObject) generatedValueAtIndex;
+                        for (String k : generatedObj.keySet()) {
+                            generatedOperationKeyValuePairs.add(new BasicDBObject(k, generatedObj.get(k)));
+                        }
+                        continue;
+                    }
+                }
+            } else {
+                loggerMaker.errorAndAddToDb("operation " + operationType + " returned unexpected type: " + generatedValue.getClass().getName());
+            }
+        } else {
+            loggerMaker.errorAndAddToDb("operation " + operationType + " not found in generated response");
+        }
+        return generatedOperationKeyValuePairs;
     }
 
 

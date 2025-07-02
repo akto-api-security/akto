@@ -233,6 +233,20 @@ const settingFunctions = {
       })
       return trafficData
     },
+    fetchNewMetricsData: async function(groupBy, startTimestamp, endTimestamp, names, host){
+      let metricsData = {}
+      await settingRequests.fetchNewMetrics(groupBy, startTimestamp, endTimestamp, names, host).then((resp)=>{
+        metricsData = resp.metricsMap
+      })
+      return metricsData
+    },
+    fetchMetricsData: async function(metricId, startTime, endTime, host) {
+      let metricsData = {}
+      await settingRequests.fetchMetrics(metricId, startTime, endTime, host).then((resp) => {
+        metricsData = resp.metrics
+      })
+      return metricsData
+    },
     testJiraIntegration: async function(userEmail, apiToken, baseUrl, projId){
       let issueType = ""
       await settingRequests.testJiraIntegration(userEmail, apiToken, baseUrl, projId).then((resp)=>{

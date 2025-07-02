@@ -2,12 +2,11 @@ package com.akto.testing;
 
 import com.akto.dao.context.Context;
 import com.akto.dao.test_editor.TestEditorEnums;
-import com.akto.data_actor.DataActor;
-import com.akto.data_actor.DataActorFactory;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.CollectionConditions.ConditionsType;
 import com.akto.dto.CollectionConditions.TestConfigsAdvancedSettings;
+import com.akto.dto.testing.TLSAuthParam;
 import com.akto.dto.testing.TestingRunConfig;
 import com.akto.dto.testing.TestingRunResult;
 import com.akto.dto.testing.rate_limit.RateLimitHandler;
@@ -19,6 +18,8 @@ import com.akto.util.Constants;
 import com.akto.util.HttpRequestResponseUtils;
 import com.akto.util.grpc.ProtoBufUtils;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import kotlin.Pair;
 import okhttp3.*;
 import okio.BufferedSink;
@@ -33,12 +34,14 @@ import java.net.URL;
 import java.util.*;
 
 public class ApiExecutor {
-    private static final LoggerMaker loggerMaker = new LoggerMaker(ApiExecutor.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(ApiExecutor.class, LogDb.TESTING);
 
     // Load only first 1 MiB of response body into memory.
     private static final int MAX_RESPONSE_SIZE = 1024*1024;
-    
-    private static OriginalHttpResponse common(Request request, boolean followRedirects, boolean debug, List<TestingRunResult.TestLog> testLogs, boolean skipSSRFCheck, boolean nonTestingContext, String requestProtocol) throws Exception {
+    private static final ObjectMapper objectMapper = new ObjectMapper();
+
+
+    private static OriginalHttpResponse common(Request request, boolean followRedirects, boolean debug, List<TestingRunResult.TestLog> testLogs, boolean skipSSRFCheck, boolean nonTestingContext, String requestProtocol, TLSAuthParam authParam) throws Exception {
 
         Integer accountId = Context.accountId.get();
         if (accountId != null) {
@@ -74,13 +77,17 @@ public class ApiExecutor {
 
         OkHttpClient client = debug ?
                 HTTPClientHandler.instance.getNewDebugClient(isSaasDeployment, followRedirects, testLogs, requestProtocol) :
-                HTTPClientHandler.instance.getHTTPClient(followRedirects, requestProtocol);
+                HTTPClientHandler.instance.getHTTPClient(request.isHttps(), followRedirects, requestProtocol);
 
         if (!skipSSRFCheck && !HostDNSLookup.isRequestValid(request.url().host())) {
             throw new IllegalArgumentException("SSRF attack attempt");
         }
         boolean isCyborgCall = request.url().toString().contains("cyborg.akto.io");
         long start = System.currentTimeMillis();
+
+        if (authParam != null) {
+            client = CustomHTTPClientHandler.instance.getClient(authParam, request.isHttps(), followRedirects, requestProtocol);
+        }
 
         Call call = client.newCall(request);
         Response response = null;
@@ -268,7 +275,7 @@ public class ApiExecutor {
         }
 
         boolean executeScript = testingRunConfig != null;
-        ApiExecutorUtil.calculateHashAndAddAuth(request, executeScript);
+        String tempPayload = ApiExecutorUtil.calculateHashAndAddAuth(request, executeScript);
 
         String url = prepareUrl(request, testingRunConfig);
 
@@ -280,6 +287,16 @@ public class ApiExecutor {
         if (url.contains("api.uat.be.edenred.io/api.uat.be.edenred.io")) {
             url = url.replace("api.uat.be.edenred.io/api.uat.be.edenred.io", "api.uat.be.edenred.io");
         }
+
+        if (url.contains("apisummit-uat.edenred.com/apisummit-uat.edenred.com")) {
+            url = url.replace("apisummit-uat.edenred.com/apisummit-uat.edenred.com", "apisummit-uat.edenred.com");
+        }
+
+        if (url.contains("apisummit-dev.edenred.com/apisummit-dev.edenred.com")) {
+            url = url.replace("apisummit-dev.edenred.com/apisummit-dev.edenred.com", "apisummit-dev.edenred.com");
+        }
+
+        
 
         if (url.contains("login_submit")) {
             loggerMaker.infoAndAddToDb("Request Payload " + request.getBody(), LogDb.TESTING);
@@ -337,6 +354,8 @@ public class ApiExecutor {
         if (url.contains("login_submit")) {
             loggerMaker.infoAndAddToDb("Response Payload " + response.getBody(), LogDb.TESTING);
         }
+
+        request.setBody(tempPayload);
         return response;
     }
     public static OriginalHttpResponse sendRequest(OriginalHttpRequest request, boolean followRedirects, TestingRunConfig testingRunConfig, boolean debug, List<TestingRunResult.TestLog> testLogs) throws Exception {
@@ -375,7 +394,7 @@ public class ApiExecutor {
 
     private static OriginalHttpResponse getRequest(OriginalHttpRequest request, Request.Builder builder, boolean followRedirects, boolean debug, List<TestingRunResult.TestLog> testLogs, boolean skipSSRFCheck, boolean nonTestingContext)  throws Exception{
         Request okHttpRequest = builder.build();
-        return common(okHttpRequest, followRedirects, debug, testLogs, skipSSRFCheck, nonTestingContext, "application/json");
+        return common(okHttpRequest, followRedirects, debug, testLogs, skipSSRFCheck, nonTestingContext, "application/json", request.getTlsAuthParam());
     }
 
     public static RequestBody getFileRequestBody(String fileUrl){
@@ -451,7 +470,6 @@ public class ApiExecutor {
         );
     }
 
-
     private static OriginalHttpResponse sendWithRequestBody(OriginalHttpRequest request, Request.Builder builder, boolean followRedirects, boolean debug, List<TestingRunResult.TestLog> testLogs, boolean skipSSRFCheck, boolean nonTestingContext, String requestProtocol) throws Exception {
         Map<String,List<String>> headers = request.getHeaders();
         if (headers == null) {
@@ -468,7 +486,7 @@ public class ApiExecutor {
             builder.removeHeader(Constants.AKTO_ATTACH_FILE);
             Request updatedRequest = builder.build();
 
-            return common(updatedRequest, followRedirects, debug, testLogs, skipSSRFCheck, nonTestingContext, requestProtocol);
+            return common(updatedRequest, followRedirects, debug, testLogs, skipSSRFCheck, nonTestingContext, requestProtocol, request.getTlsAuthParam());
         }
 
         String contentType = request.findContentType();
@@ -499,7 +517,24 @@ public class ApiExecutor {
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb(e, "Unable to decode grpc payload:" + payload, LogDb.TESTING);
             }
-        }
+        }else if(contentType.contains(HttpRequestResponseUtils.SOAP) || contentType.contains(HttpRequestResponseUtils.XML)){
+            // here we are assuming that the request is in xml format
+            // now convert this into valid json body string
+
+            // get the url and method from temp headers
+            if(request.getHeaders().containsKey("x-akto-original-url") && request.getHeaders().containsKey("x-akto-original-method")){
+                String url = request.getHeaders().get("x-akto-original-url").get(0);
+                String method = request.getHeaders().get("x-akto-original-method").get(0);
+                String originalXmlPayload = OriginalReqResPayloadInformation.getInstance().getOriginalReqPayloadMap().get(method + "_" + url); // get original payload
+                if(originalXmlPayload != null && !originalXmlPayload.isEmpty()){
+                    String modifiedXmlPayload = HttpRequestResponseUtils.updateXmlWithModifiedJson(originalXmlPayload, payload);
+                    payload = modifiedXmlPayload;
+                }
+                // remove the temp headers
+                request.getHeaders().remove("x-akto-original-url");
+                request.getHeaders().remove("x-akto-original-method");
+            }  
+        } 
 
         if (payload == null) payload = "";
         if (body == null) {// body not created by GRPC block yet
@@ -512,6 +547,150 @@ public class ApiExecutor {
         }
         builder = builder.method(request.getMethod(), body);
         Request okHttpRequest = builder.build();
-        return common(okHttpRequest, followRedirects, debug, testLogs, skipSSRFCheck, nonTestingContext, requestProtocol);
+        return common(okHttpRequest, followRedirects, debug, testLogs, skipSSRFCheck, nonTestingContext, requestProtocol, request.getTlsAuthParam());
+    }
+
+    private static boolean isJsonRpcRequest(OriginalHttpRequest request) {
+        try {
+            String body = request.getBody();
+            if (body == null) return false;
+            JsonNode node = objectMapper.readTree(body);
+            return node.has("jsonrpc") && node.has("id");
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    private static class SseSession {
+        String sessionId;
+        String endpoint;
+        List<String> messages = new ArrayList<>();
+        Response response; // Store the OkHttp Response for cleanup
+        Thread readerThread;
+    }
+
+    private static SseSession openSseSession(String host) throws Exception {
+        SseSession session = new SseSession();
+        OkHttpClient client = new OkHttpClient.Builder().build();
+        // header content type = text/event-stream
+        Headers headers = new Headers.Builder()
+            .add("Accept", "text/event-stream")
+            //.add("Content-Type", "text/event-stream")
+            .build();
+        Request request = new Request.Builder().url(host + "/sse").headers(headers).method("GET", null).build();
+        Call call = client.newCall(request);
+        Response response = call.execute();
+        if (!response.isSuccessful()) {
+            loggerMaker.warn("ResponseHeader: {}", response.headers());
+            throw new IOException("Failed to open SSE session: " + response);
+        }
+        session.response = response; // Store the response for later closing
+        InputStream is = response.body().byteStream();
+        Scanner scanner = new Scanner(is);
+        while (scanner.hasNextLine()) {
+            String line = scanner.nextLine();
+            if (line.startsWith("event: endpoint")) {
+                String dataLine = scanner.nextLine();
+                if (dataLine.startsWith("data:")) {
+                    session.endpoint = dataLine.substring(5).trim();
+                    break;
+                }
+            }
+        }
+        // Keep the stream open for later reading
+        session.messages = Collections.synchronizedList(new ArrayList<>());
+        session.readerThread = new Thread(() -> {
+            try {
+                while (scanner.hasNextLine()) {
+                    String line = scanner.nextLine();
+                    if (line.startsWith("event: message")) {
+                        String dataLine = scanner.nextLine();
+                        if (dataLine.startsWith("data:")) {
+                            String data = dataLine.substring(5).trim();
+                            session.messages.add(data);
+                        }
+                    }
+                }
+            } catch (Exception ignored) {}
+        });
+        session.readerThread.start();
+        return session;
+    }
+
+    private static String waitForMatchingSseMessage(SseSession session, String id, long timeoutMs) throws Exception {
+        long start = System.currentTimeMillis();
+        while (System.currentTimeMillis() - start < timeoutMs) {
+            synchronized (session.messages) {
+                Iterator<String> it = session.messages.iterator();
+                while (it.hasNext()) {
+                    String msg = it.next();
+                    try {
+                        JsonNode node = objectMapper.readTree(msg);
+                        if (node.has("method")) {
+                            continue;
+                        }
+                        if (node.has("id") && node.get("id").asText().equals(id)) {
+                            return msg;
+                        }
+                    } catch (Exception ignored) {}
+                }
+            }
+            Thread.sleep(100);
+        }
+        throw new Exception("Timeout waiting for SSE message with id=" + id);
+    }
+
+    public static OriginalHttpResponse sendRequestWithSse(OriginalHttpRequest request, boolean followRedirects, TestingRunConfig testingRunConfig, boolean debug, List<TestingRunResult.TestLog> testLogs, boolean skipSSRFCheck) throws Exception {
+        // Always use prepareUrl to get the absolute URL
+        String url = prepareUrl(request, testingRunConfig);
+        URI uri = new URI(url);
+        if (uri.getScheme() == null || uri.getHost() == null) {
+            throw new IllegalArgumentException("URL must be absolute with scheme and host for SSE: " + url);
+        }
+        String host = uri.getScheme() + "://" + uri.getHost() + (uri.getPort() != -1 ? ":" + uri.getPort() : "");
+        SseSession session = openSseSession(host);
+
+        // Add sessionId as query param to actual request
+        String endpoint = session.endpoint;
+        if (!endpoint.startsWith("/")) endpoint = "/" + endpoint;
+        String newUrl = host + endpoint;
+        request.setUrl(newUrl);
+
+        // Send actual request
+        OriginalHttpResponse resp = sendRequest(request, followRedirects, testingRunConfig, debug, testLogs, skipSSRFCheck);
+
+        if (resp.getStatusCode() >= 400) {
+            if (session.readerThread != null) {
+                session.readerThread.interrupt();
+                session.readerThread.join(); // Wait for thread to finish
+            }
+            if (session.response != null) {
+                session.response.close(); // Now it's safe
+            }
+            return resp;
+        }
+
+        // Wait for matching SSE message
+        String body = request.getBody();
+        JsonNode node = objectMapper.readTree(body);
+        String id = node.get("id").asText();
+        String sseMsg = null;
+        try {
+            sseMsg = waitForMatchingSseMessage(session, id, 30000); // 30s timeout
+
+        } finally {
+            if (session.readerThread != null) {
+                session.readerThread.interrupt();
+                session.readerThread.join(); // Wait for thread to finish
+            }
+            if (session.response != null) {
+                session.response.close(); // Now it's safe
+            }
+        }
+
+        // Return SSE message as JSON (not as a string)
+        JsonNode sseJson = objectMapper.readTree(sseMsg);
+        String jsonBody = objectMapper.writeValueAsString(sseJson);
+        return new OriginalHttpResponse(jsonBody, resp.getHeaders(), resp.getStatusCode());
     }
 }

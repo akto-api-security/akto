@@ -63,6 +63,18 @@ public class InitializerListener implements ServletContextListener {
             logger.error("Unable to clean postgres", e);
         }
 
+        try {
+            CleanPostgres.cleanApiCollectionZeroDataJobCron();
+        } catch (Exception e) {
+            logger.error("Error scheduling cleanApiCollectionZeroDataJob job ", e);
+        }
+
+        try {
+            CleanPostgres.deleteOldTimestampInBatchJobCron();
+        } catch (Exception e) {
+            logger.error("Error scheduling deleteOldTimestampInBatchJobCron job ", e);
+        }
+
     }
 
     @Override

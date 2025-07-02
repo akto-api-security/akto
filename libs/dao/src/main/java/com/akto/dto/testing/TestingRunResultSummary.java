@@ -32,7 +32,14 @@ public class TestingRunResultSummary {
     private int testInitiatedCount;
 
     private int testIdConfig;
-
+    /*
+     * originalTestingRunResultSummaryId this will be used to trigger running testingRunResults
+     *
+     * */
+    private ObjectId originalTestingRunResultSummaryId;
+    @BsonIgnore
+    private String originalTestingRunResultSummaryHexId;
+    public static final String ORIGINAL_TESTING_RUN_SUMMARY_ID = "originalTestingRunResultSummaryId";
     @BsonIgnore
     private String hexId;
 
@@ -170,5 +177,24 @@ public class TestingRunResultSummary {
             ", metadata='" + getMetadata().toString() + "'" +
             ", testInitiatedCount='" + getTestInitiatedCount() + "'" +
             "}";
+    }
+
+    public ObjectId getOriginalTestingRunResultSummaryId() {
+        return originalTestingRunResultSummaryId;
+    }
+
+    public void setOriginalTestingRunResultSummaryId(ObjectId originalTestingRunResultSummaryId) {
+        this.originalTestingRunResultSummaryId = originalTestingRunResultSummaryId;
+    }
+
+    public String getOriginalTestingRunResultSummaryHexId() {
+        if (originalTestingRunResultSummaryHexId == null && this.originalTestingRunResultSummaryId != null) {
+            return this.originalTestingRunResultSummaryId.toHexString();
+        }
+        return originalTestingRunResultSummaryHexId;
+    }
+
+    public void setOriginalTestingRunResultSummaryHexId(String originalTestingRunResultSummaryHexId) {
+        this.originalTestingRunResultSummaryHexId = originalTestingRunResultSummaryHexId;
     }
 }

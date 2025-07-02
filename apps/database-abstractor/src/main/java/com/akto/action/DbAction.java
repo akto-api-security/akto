@@ -16,16 +16,19 @@ import com.akto.dto.graph.SvcToSvcGraphEdge;
 import com.akto.dto.graph.SvcToSvcGraphNode;
 import com.akto.dto.runtime_filters.RuntimeFilter;
 import com.akto.dto.settings.DataControlSettings;
+import com.akto.dto.test_editor.TestingRunPlayground;
 import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.testing.*;
 import com.akto.dto.testing.config.TestScript;
 import com.akto.dto.testing.sources.TestSourceConfig;
+import com.akto.dto.traffic.CollectionTags;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.traffic.TrafficInfo;
 import com.akto.dto.traffic_metrics.TrafficMetrics;
 import com.akto.dto.type.SingleTypeInfo;
+import com.akto.log.LoggerMaker;
 import com.akto.utils.KafkaUtils;
 import com.akto.dto.type.URLMethods;
 import com.akto.dto.type.URLMethods.Method;
@@ -81,6 +84,7 @@ public class DbAction extends ActionSupport {
     List<DependencyNode> dependencyNodeList;
     TestScript testScript;
 
+    private static final LoggerMaker loggerMaker = new LoggerMaker(DbAction.class, LoggerMaker.LogDb.DASHBOARD);
     public List<BulkUpdates> getWritesForTestingRunIssues() {
         return writesForTestingRunIssues;
     }
@@ -208,12 +212,16 @@ public class DbAction extends ActionSupport {
     List<YamlTemplate> yamlTemplates;
     SingleTypeInfo sti;
     int scheduleTs;
+    TestingRunPlayground testingRunPlayground;
 
     private static final Gson gson = new Gson();
     ObjectMapper objectMapper = new ObjectMapper();
     KafkaUtils kafkaUtils = new KafkaUtils();
     String endpointLogicalGroupId;
     String vpcId;
+    @lombok.Getter
+    @lombok.Setter
+    List<CollectionTags> tagsList;
 
     String metricType;
 
@@ -1677,7 +1685,7 @@ public class DbAction extends ActionSupport {
     public String createCollectionSimpleForVpc() {
         try {
             System.out.println("called1 vpcId" + vpcId);
-            DbLayer.createCollectionSimpleForVpc(vxlanId, vpcId);
+            DbLayer.createCollectionSimpleForVpc(vxlanId, vpcId, tagsList);
         } catch (Exception e) {
             return Action.ERROR.toUpperCase();
         }
@@ -1687,7 +1695,7 @@ public class DbAction extends ActionSupport {
     public String createCollectionForHostAndVpc() {
         try {
             System.out.println("called2 vpcId" + vpcId);
-            DbLayer.createCollectionForHostAndVpc(host, colId, vpcId);
+            DbLayer.createCollectionForHostAndVpc(host, colId, vpcId, tagsList);
         } catch (Exception e) {
             return Action.ERROR.toUpperCase();
         }
@@ -1735,6 +1743,25 @@ public class DbAction extends ActionSupport {
     
     public String countTestingRunResultSummaries() {
         count = DbLayer.countTestingRunResultSummaries(filter);
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String getCurrentTestingRunDetailsFromEditor(){
+        try {
+            testingRunPlayground = DbLayer.getCurrentTestingRunDetailsFromEditor(this.ts);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in getCurrentTestingRunDetailsFromEditor " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String updateTestingRunPlaygroundStateAndResult(){
+        try {
+            DbLayer.updateTestingRunPlayground(this.testingRunPlayground);
+        } catch (Exception e) {
+            return Action.ERROR.toUpperCase();
+        }
         return Action.SUCCESS.toUpperCase();
     }
 
@@ -2715,6 +2742,14 @@ public class DbAction extends ActionSupport {
 
     public void setOperator(String operator) {
         this.operator = operator;
+    }
+
+    public TestingRunPlayground getTestingRunPlayground() {
+        return testingRunPlayground;
+    }
+
+    public void setTestingRunPlayground(TestingRunPlayground testingRunPlayground) {
+        this.testingRunPlayground = testingRunPlayground;
     }
 
 }

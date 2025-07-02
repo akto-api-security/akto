@@ -1,5 +1,6 @@
 package com.akto.store;
 
+import com.akto.PayloadEncodeUtil;
 import com.akto.data_actor.DataActor;
 import com.akto.data_actor.DataActorFactory;
 import com.akto.data_actor.DbLayer;
@@ -12,10 +13,11 @@ import com.akto.dto.type.SingleTypeInfo;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.metrics.AllMetrics;
-import com.akto.sql.SampleDataAltDb;
 import com.akto.testing_db_layer_client.ClientLayer;
 
+import java.security.interfaces.RSAPrivateKey;
 import java.util.*;
+
 
 public class SampleMessageStore {
 
@@ -25,6 +27,7 @@ public class SampleMessageStore {
     private Map<String, SingleTypeInfo> singleTypeInfos = new HashMap<>();
     private static final DataActor dataActor = DataActorFactory.fetchInstance();
     private static final ClientLayer clientLayer = new ClientLayer();
+    private static RSAPrivateKey privateKey = PayloadEncodeUtil.getPrivateKey();
     
     private SampleMessageStore() {}
 
@@ -42,7 +45,6 @@ public class SampleMessageStore {
         return dataActor.fetchTestRoles();
     }
 
-
     public void fetchSampleMessages(Set<Integer> apiCollectionIds) {
         List<SampleData> sampleDataList = new ArrayList<>();
         for (int i = 0; i < 200; i++) {
@@ -53,6 +55,10 @@ public class SampleMessageStore {
             }
             sampleDataList.addAll(sampleDataBatch);
         }
+        fillSampleDataMap(sampleDataList);
+    }
+
+    private void fillSampleDataMap(List<SampleData> sampleDataList){
         Map<ApiInfo.ApiInfoKey, List<String>> tempSampleDataMap = new HashMap<>();
         for (SampleData sampleData: sampleDataList) {
             if (sampleData.getSamples() == null) continue;
@@ -68,16 +74,39 @@ public class SampleMessageStore {
         sampleDataMap = new HashMap<>(tempSampleDataMap);
     }
 
-
+    public void fetchSampleMessages(List<ApiInfo.ApiInfoKey> apiInfoKeyList){
+        List<SampleData> sampleDataList = new ArrayList<>();
+        for(int i = 0 ; i < apiInfoKeyList.size(); i += DbLayer.SAMPLE_DATA_LIMIT){
+            List<ApiInfoKey> subList = new ArrayList<>(apiInfoKeyList.subList(i, Math.min(i + DbLayer.SAMPLE_DATA_LIMIT, apiInfoKeyList.size())));  
+            List<SampleData> sampleDataBatch = dataActor.fetchSampleDataForEndpoints(subList);
+            if (sampleDataBatch == null || sampleDataBatch.isEmpty()) {
+                break;
+            }
+            sampleDataList.addAll(sampleDataBatch);
+        }
+        fillSampleDataMap(sampleDataList);
+    }
 
     public List<RawApi> fetchAllOriginalMessages(ApiInfoKey apiInfoKey) {
         List<RawApi> messages = new ArrayList<>();
         try {
             long start = System.currentTimeMillis();
+            List<String> encodedSamples = new ArrayList<>();
             List<String> samples = new ArrayList<>();
             if(System.getenv("TESTING_DB_LAYER_SERVICE_URL") != null && !System.getenv("TESTING_DB_LAYER_SERVICE_URL").isEmpty()){
                 try {
-                    samples = clientLayer.fetchSamples(apiInfoKey);
+                    encodedSamples = clientLayer.fetchSamples(apiInfoKey);
+                    for (String sample: encodedSamples) {
+                        if (!sample.contains("requestPayload") && privateKey != null) {
+                            try {
+                                samples.add(PayloadEncodeUtil.decryptPacked(sample, privateKey));
+                            } catch (Exception e) {
+                                loggerMaker.errorAndAddToDb("error while decoding payload " + e.getMessage());
+                            }
+                        } else {
+                            samples.add(sample);
+                        }
+                    }
                 } catch (Exception e) {
                     e.printStackTrace();
                     System.out.println("error in fetchAllOriginalMessages " + e.getMessage());

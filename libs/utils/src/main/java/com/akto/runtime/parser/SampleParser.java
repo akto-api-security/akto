@@ -1,16 +1,22 @@
 package com.akto.runtime.parser;
 
+import static com.akto.runtime.utils.Utils.printL;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
 import org.apache.commons.lang3.math.NumberUtils;
 
+import com.akto.dao.context.Context;
 import com.akto.dto.HttpRequestParams;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.graph.K8sDaemonsetGraphParams;
 import com.akto.dto.graph.SvcToSvcGraphParams;
+import com.akto.dto.TrafficProducerLog;
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.HttpRequestResponseUtils;
 import com.akto.util.JSONUtils;
 import com.google.gson.Gson;
@@ -18,11 +24,24 @@ import com.google.gson.Gson;
 public class SampleParser {
     
     private static final Gson gson = new Gson();
+    private  static final List<String> headerValues = new ArrayList<>();
 
+    private static void injectTagsInHeaders(HttpRequestParams httpRequestParams, String tagsJson){
+        if(tagsJson == null || tagsJson.isEmpty()){
+            return;
+        }
+
+        Map<String, String> tagsMap = gson.fromJson(tagsJson, Map.class);
+        for (String tagName: tagsMap.keySet()){
+            headerValues.clear();
+            headerValues.add(tagsMap.get(tagName));
+            httpRequestParams.getHeaders().put("x-akto-k8s-"+ tagName, headerValues);
+        }
+    }
 
     public static HttpResponseParams parseSampleMessage(String message) throws Exception {
                 //convert java object to JSON format
-        Map<String, Object> json = gson.fromJson(message, Map.class);
+        Map<String, Object> json = gson.fromJson(message, new com.google.gson.reflect.TypeToken<Map<String, Object>>(){}.getType());
 
         String method = (String) json.get("method");
         String url = (String) json.get("path");
@@ -76,10 +95,30 @@ public class SampleParser {
             }
             
         }
+
+        // JSON string of K8 POD tags
+        String tags = (String) json.getOrDefault("tag", "");
+        if(!tags.isEmpty()){
+            printL("K8 Pod Tags" + tags + "Host:" + requestHeaders.getOrDefault("host", new ArrayList<>()) + "Url:" + url);
+            injectTagsInHeaders(requestParams, tags);
+        }
+
         return new HttpResponseParams(
-                type,statusCode, status, responseHeaders, payload, requestParams, time, accountId, isPending, source, message, sourceIP, destIP, direction, graphParams
+                type,statusCode, status, responseHeaders, payload, requestParams, time, accountId, isPending, source, message, sourceIP, destIP, direction, graphParams, tags
         );
 
+    }
+
+    public static TrafficProducerLog parseLogMessage(String message) throws Exception {
+
+        Map<String, Object> json = gson.fromJson(message, new com.google.gson.reflect.TypeToken<Map<String, Object>>(){}.getType());
+        String logType = (String) json.getOrDefault("logType", "INFO");
+        String source = (String) json.getOrDefault("source", "UNKNOWN");
+        String logMessage = (String) json.getOrDefault("message", null);
+        int time = Integer.parseInt(json.getOrDefault("time", Context.now()).toString());
+
+        return new TrafficProducerLog(
+                logMessage, source, logType, time);
     }
 
 }

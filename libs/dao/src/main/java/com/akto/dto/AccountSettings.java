@@ -15,6 +15,9 @@ import com.akto.dto.type.CollectionReplaceDetails;
 import com.akto.util.ConnectionInfo;
 import com.akto.util.LastCronRunInfo;
 
+import lombok.Getter;
+import lombok.Setter;
+
 import com.akto.dto.test_editor.TestLibrary;
 
 public class AccountSettings {
@@ -57,7 +60,8 @@ public class AccountSettings {
 
     private Map<String, String> filterHeaderValueMap;
     public static final String FILTER_HEADER_VALUE_MAP = "filterHeaderValueMap";
-
+    public static final String DELTA_IGNORE_TIME_FOR_SCHEDULED_SUMMARIES = "timeForScheduledSummaries";
+    private int timeForScheduledSummaries;
     private Map<String, CollectionReplaceDetails> apiCollectionNameMapper;
     public static final String API_COLLECTION_NAME_MAPPER = "apiCollectionNameMapper";
     public static final String GLOBAL_RATE_LIMIT = "globalRateLimit";
@@ -98,6 +102,11 @@ public class AccountSettings {
     public static final String ALLOW_REDUNDANT_ENDPOINTS_LIST = "allowRedundantEndpointsList";
     private List<String> allowRedundantEndpointsList;
 
+    public static final String ALLOW_MERGING_ON_VERSIONS = "allowMergingOnVersions";
+    @Getter
+    @Setter
+    private boolean allowMergingOnVersions;
+
     public AccountSettings() {
     }
 
@@ -130,6 +139,14 @@ public class AccountSettings {
 
     public void setGithubAppId(String githubAppId) {
         this.githubAppId = githubAppId;
+    }
+
+    public int getTimeForScheduledSummaries() {
+        return timeForScheduledSummaries;
+    }
+
+    public void setTimeForScheduledSummaries(int timeForScheduledSummaries) {
+        this.timeForScheduledSummaries = timeForScheduledSummaries;
     }
 
     public enum SetupType {

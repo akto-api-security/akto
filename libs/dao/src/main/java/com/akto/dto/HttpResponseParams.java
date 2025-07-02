@@ -7,6 +7,7 @@ import com.akto.dto.graph.SvcToSvcGraphParams;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.apache.commons.lang3.StringUtils;
 
 public class HttpResponseParams {
 
@@ -30,6 +31,8 @@ public class HttpResponseParams {
     String direction;
     SvcToSvcGraphParams svcToSvcGraphParams;
     
+    // K8 pod tags in JSON string
+    String tags;
 
     public HttpResponseParams() {}
 
@@ -37,12 +40,12 @@ public class HttpResponseParams {
                               HttpRequestParams requestParams, int time, String accountId, boolean isPending, Source source, 
                               String orig, String sourceIP) {
         this(type, statusCode, status, headers, payload, requestParams, time, accountId, isPending, source, orig,
-                sourceIP, "", "", null);
+                sourceIP, "", "", null, null);
     }
 
     public HttpResponseParams(String type, int statusCode, String status, Map<String, List<String>> headers, String payload,
                               HttpRequestParams requestParams, int time, String accountId, boolean isPending, Source source,
-                              String orig, String sourceIP, String destIP, String direction, SvcToSvcGraphParams svcToSvcGraphParams) {
+                              String orig, String sourceIP, String destIP, String direction, SvcToSvcGraphParams svcToSvcGraphParams, String tags) {
         this.type = type;
         this.statusCode = statusCode;
         this.status = status;
@@ -58,7 +61,9 @@ public class HttpResponseParams {
         this.destIP = destIP;
         this.direction = direction;
         this.svcToSvcGraphParams = svcToSvcGraphParams;
+        this.tags = tags;
     }
+
 
     public static boolean validHttpResponseCode(int statusCode)  {
         return statusCode >= 200 && (statusCode < 300 || statusCode == 302);
@@ -80,7 +85,8 @@ public class HttpResponseParams {
                 this.sourceIP,
                 this.destIP,
                 this.direction,
-                this.svcToSvcGraphParams
+                this.svcToSvcGraphParams,
+                this.tags
         );
     }
 
@@ -176,4 +182,32 @@ public class HttpResponseParams {
     public void setSvcToSvcGraphParams(SvcToSvcGraphParams svcToSvcGraphParams) {
         this.svcToSvcGraphParams = svcToSvcGraphParams;
     }
+    public String getTags() {
+        return tags;
+    }
+
+    public void setTags(String tags) {
+        this.tags = tags;
+    }
+
+    public static String addPathParamToUrl(String url, String pathParam) {
+        String[] onlyUrl = url.split("\\?");
+        if (onlyUrl.length < 1) {
+            return url;
+        }
+
+        url = onlyUrl[0];
+        if (url.endsWith("/")) {
+            url = url.substring(0, url.length() - 1);
+        }
+        url = url + "/" + pathParam;
+        if (onlyUrl.length == 2) {
+            String queryParams = onlyUrl[1];
+            if (StringUtils.isNotBlank(queryParams)) {
+                url = url + "?" + queryParams;
+            }
+        }
+        return url;
+    }
+
 }

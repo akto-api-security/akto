@@ -1,5 +1,6 @@
 package com.akto.log;
 
+import com.akto.RuntimeMode;
 import com.akto.dao.*;
 import com.akto.dao.context.Context;
 import com.akto.data_actor.DataActor;
@@ -29,6 +30,11 @@ public class LoggerMaker {
     static {
         System.setProperty(SimpleLogger.DEFAULT_LOG_LEVEL_KEY, System.getenv().getOrDefault("AKTO_LOG_LEVEL", "WARN"));
         System.out.printf("AKTO_LOG_LEVEL is set to: %s \n", System.getProperty(SimpleLogger.DEFAULT_LOG_LEVEL_KEY));
+        System.setProperty("org.slf4j.simpleLogger.log.org.apache.kafka", "ERROR");
+        System.setProperty("org.slf4j.simpleLogger.log.io.lettuce", "ERROR");
+        System.setProperty("org.slf4j.simpleLogger.log.org.mongodb", "ERROR");
+        System.setProperty("org.slf4j.simpleLogger.log.io.netty", "ERROR");
+        System.setProperty("org.slf4j.simpleLogger.log.org.flywaydb", "ERROR");
     }
 
     public static final int LOG_SAVE_INTERVAL = 60*60; // 1 hour
@@ -50,6 +56,11 @@ public class LoggerMaker {
             @Override
             public void run() {
                 try {
+
+                    if(RuntimeMode.isHybridDeployment()){
+                        return;
+                    }
+
                     Config config = ConfigsDao.instance.findOne("_id", Config.SlackAlertConfig.CONFIG_ID);
                     if (config == null) {
                         return;
@@ -148,6 +159,7 @@ public class LoggerMaker {
         return err;
     }
 
+    @Deprecated
     public void errorAndAddToDb(String err, LogDb db) {
         try {
             basicError(err, db);
@@ -184,6 +196,7 @@ public class LoggerMaker {
         }
     }
 
+    @Deprecated
     public void infoAndAddToDb(String info, LogDb db) {
         String accountId = Context.accountId.get() != null ? Context.accountId.get().toString() : "NA";
         String infoMessage = "acc: " + accountId + ", " + info;
@@ -291,6 +304,19 @@ public class LoggerMaker {
         logger.info(msg);
     }
 
+    public void info(String msg, Object... vars){
+        logger.info(msg, vars);
+    }
+
+     public void warn(String msg){
+        logger.warn(msg);
+    }
+
+    public void warn(String msg, Object... vars){
+        logger.warn(msg, vars);
+    }
+
+
     public void error(String msg){
         logger.error(msg);
     }
@@ -299,7 +325,11 @@ public class LoggerMaker {
         logger.error(msg, t);
     }
 
-    public void debug(String msg){
-        logger.error(msg);
+    public void error(String msg, Object... vars){
+        logger.error(msg, vars);
+    }
+
+    public void debug(String msg, Object... vars){
+        logger.debug(msg, vars);
     }
 }

@@ -4,6 +4,7 @@ import com.akto.RuntimeMode;
 import com.akto.billing.UsageMetricUtils;
 import com.akto.dao.context.Context;
 import com.akto.dao.traffic_metrics.TrafficMetricsDao;
+import com.akto.dto.traffic.CollectionTags.TagSource;
 import com.akto.hybrid_dependency.DependencyAnalyser;
 import com.akto.data_actor.DataActor;
 import com.akto.data_actor.DataActorFactory;
@@ -18,12 +19,15 @@ import com.akto.dto.monitoring.FilterConfig;
 import com.akto.dto.monitoring.FilterConfig.FILTER_TYPE;
 import com.akto.dto.settings.DefaultPayload;
 import com.akto.dto.test_editor.ExecutorNode;
+import com.akto.dto.traffic.CollectionTags;
 import com.akto.dto.traffic_metrics.TrafficMetrics;
 import com.akto.dto.type.URLMethods.Method;
 import com.akto.dto.usage.MetricTypes;
 import com.akto.graphql.GraphQLUtils;
+import com.akto.jsonrpc.JsonRpcUtils;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.mcp.McpRequestResponseUtils;
 import com.akto.runtime.RuntimeUtil;
 import com.akto.runtime.parser.SampleParser;
 import com.akto.runtime.utils.Utils;
@@ -51,14 +55,17 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import org.apache.commons.collections.CollectionUtils;
 
 import static com.akto.runtime.RuntimeUtil.matchesDefaultPayload;
+import static com.akto.runtime.utils.Utils.printL;
 import static com.akto.testing.Utils.validateFilter;
 
 public class HttpCallParser {
     private final int sync_threshold_count;
     private final int sync_threshold_time;
     private int sync_count = 0;
+    private Map<Integer, Integer> apiCollectionIdTagsSyncTimestampMap = new HashMap<>();
     private int last_synced;
     private static final LoggerMaker loggerMaker = new LoggerMaker(HttpCallParser.class, LogDb.RUNTIME);
     public APICatalogSync apiCatalogSync;
@@ -67,6 +74,7 @@ public class HttpCallParser {
     private Map<TrafficMetrics.Key, TrafficMetrics> trafficMetricsMap = new HashMap<>();
     public static final ScheduledExecutorService trafficMetricsExecutor = Executors.newScheduledThreadPool(1);
     private static final String trafficMetricsUrl = "https://logs.akto.io/traffic-metrics";
+    private static final String NON_HOSTNAME_KEY = "null" + " "; // used for collections created without hostnames
 
     // Using default timeouts [10 seconds], as this is a slow API.
     private static final OkHttpClient client = CoreHTTPClient.client.newBuilder().build();
@@ -100,11 +108,14 @@ public class HttpCallParser {
         apiCatalogSync = new APICatalogSync(userIdentifier, thresh, fetchAllSTI);
         apiCatalogSync.buildFromDB(false, fetchAllSTI);
         apiCollectionsMap = new HashMap<>();
+        apiCollectionIdTagsSyncTimestampMap = new HashMap<>();
         List<ApiCollection> apiCollections = dataActor.fetchAllApiCollectionsMeta();
         for (ApiCollection apiCollection: apiCollections) {
             apiCollectionsMap.put(apiCollection.getId(), apiCollection);
         }
-        //this.dependencyAnalyser = new DependencyAnalyser(apiCatalogSync.dbState, Main.isOnprem, RuntimeMode.isHybridDeployment(), apiCollectionsMap);
+        if (Main.actualAccountId == 1745303931 || Main.actualAccountId == 1741069294) {
+            this.dependencyAnalyser = new DependencyAnalyser(apiCatalogSync.dbState, Main.isOnprem, RuntimeMode.isHybridDeployment(), apiCollectionsMap);
+        }
     }
     
     public static HttpResponseParams parseKafkaMessage(String message) throws Exception {
@@ -128,13 +139,13 @@ public class HttpCallParser {
         return vxlanId;
     }
 
-    public int createCollectionSimpleForVpc(int vxlanId, String vpcId) {
-        dataActor.createCollectionSimpleForVpc(vxlanId, vpcId);
+    public int createCollectionSimpleForVpc(int vxlanId, String vpcId, List<CollectionTags> tags) {
+        dataActor.createCollectionSimpleForVpc(vxlanId, vpcId, tags);
         return vxlanId;
     }
 
 
-    public int createCollectionBasedOnHostName(int id, String host)  throws Exception {
+    public int createCollectionBasedOnHostName(int id, String host, List<CollectionTags> tags)  throws Exception {
         FindOneAndUpdateOptions updateOptions = new FindOneAndUpdateOptions();
         updateOptions.upsert(true);
         String vpcId = System.getenv("VPC_ID");
@@ -146,7 +157,7 @@ public class HttpCallParser {
         for (int i=0;i < 100; i++) {
             id += i;
             try {
-                dataActor.createCollectionForHostAndVpc(host, id, vpcId);
+                dataActor.createCollectionForHostAndVpc(host, id, vpcId, tags);
                 flag = true;
                 break;
             } catch (Exception e) {
@@ -268,15 +279,18 @@ public class HttpCallParser {
         }
         filteredResponseParams = filterHttpResponseParams(filteredResponseParams, accountSettings);
         boolean isHarOrPcap = aggregate(filteredResponseParams, aggregatorMap);
+        apiCatalogSync.setMergeUrlsOnVersions(accountSettings.isAllowMergingOnVersions());
 
         for (int apiCollectionId: aggregatorMap.keySet()) {
             URLAggregator aggregator = aggregatorMap.get(apiCollectionId);
             apiCatalogSync.computeDelta(aggregator, false, apiCollectionId);
         }
 
-        //  for (HttpResponseParams responseParam: filteredResponseParams) {
-        //      dependencyAnalyser.analyse(responseParam.getOrig(), responseParam.requestParams.getApiCollectionId());
-        //  }
+        if (Main.actualAccountId == 1745303931 || Main.actualAccountId == 1741069294) {
+            for (HttpResponseParams responseParam: filteredResponseParams) {
+                dependencyAnalyser.analyse(responseParam.getOrig(), responseParam.requestParams.getApiCollectionId());
+            }
+        }
 
         this.sync_count += filteredResponseParams.size();
         int syncThresh = numberOfSyncs < 10 ? 10000 : sync_threshold_count;
@@ -288,8 +302,10 @@ public class HttpCallParser {
             }
             SyncLimit syncLimit = fetchSyncLimit();
             apiCatalogSync.syncWithDB(syncImmediately, fetchAllSTI, syncLimit);
-            // dependencyAnalyser.dbState = apiCatalogSync.dbState;
-            // dependencyAnalyser.syncWithDb();
+            if (Main.actualAccountId == 1745303931 || Main.actualAccountId == 1741069294) {
+                dependencyAnalyser.dbState = apiCatalogSync.dbState;
+                dependencyAnalyser.syncWithDb();
+            }
             syncTrafficMetricsWithDB();
             this.last_synced = Context.now();
             this.sync_count = 0;
@@ -323,7 +339,13 @@ public class HttpCallParser {
     private List<HttpResponseParams> filterDefaultPayloads(List<HttpResponseParams> filteredResponseParams, Map<String, DefaultPayload> defaultPayloadMap) {
         List<HttpResponseParams> ret = new ArrayList<>();
         for(HttpResponseParams httpResponseParams: filteredResponseParams) {
-            if (matchesDefaultPayload(httpResponseParams, defaultPayloadMap)) continue;
+            if (matchesDefaultPayload(httpResponseParams, defaultPayloadMap)) {
+                if (Utils.printDebugUrlLog(httpResponseParams.getRequestParams().getURL())) {
+                    loggerMaker.infoAndAddToDb("Found debug url in filterDefaultPayloads " + httpResponseParams.getRequestParams().getURL());
+                }
+                continue;
+            }
+
 
             ret.add(httpResponseParams);
         }
@@ -470,6 +492,66 @@ public class HttpCallParser {
         return res;
     }
 
+    /**
+     * Updates API collection tags if any new tags are detected.
+     * 
+     * @param hostNameMapKey     key for the host name map, which is used to create
+     *                           collections based on host names.
+     * @param httpResponseParams
+     */
+    public void updateApiCollectionTags(String hostNameMapKey, HttpResponseParams httpResponseParams) {
+        int apiCollectionId = hostNameToIdMap.get(hostNameMapKey);
+        ApiCollection apiCollection = apiCollectionsMap.get(apiCollectionId);
+
+        if( apiCollection == null) {
+            loggerMaker.debug("No tags updated. ApiCollection not found for id: " + apiCollectionId);
+            return;
+        }
+
+        int lastSynctime = this.apiCollectionIdTagsSyncTimestampMap.getOrDefault(apiCollectionId, 0);
+        if (Context.now() - lastSynctime < this.sync_threshold_time) {
+            // Avoid updating tags too frequently
+            return;
+        }
+        this.apiCollectionIdTagsSyncTimestampMap.put(apiCollectionId, Context.now());
+
+        List<CollectionTags> tagsList = CollectionTags.convertTagsFormat(httpResponseParams.getTags());
+
+
+        if (CollectionUtils.isEmpty(apiCollection.getTagsList()) || apiCollection.getTagsList().stream()
+            .noneMatch(t -> "mcp-server".equals(t.getKeyName()))) {
+            Optional<CollectionTags> mcpServerTagOpt = getMcpServerTag(httpResponseParams);
+            if (tagsList == null) {
+                tagsList = new ArrayList<>();
+            }
+            if (mcpServerTagOpt.isPresent()) {
+                tagsList.add(mcpServerTagOpt.get());
+            }
+        }
+
+        if (tagsList == null || tagsList.isEmpty()) {
+            return;
+        }
+        
+        // Detects if collections were created based on hostName
+        if (hostNameMapKey.contains(NON_HOSTNAME_KEY)) {
+            String vpcId = System.getenv("VPC_ID");
+            createCollectionSimpleForVpc(
+                    httpResponseParams.requestParams.getApiCollectionId(), vpcId, tagsList);
+        } else {
+            try {
+                createCollectionBasedOnHostName(hostNameMapKey.hashCode(), hostNameMapKey,
+                        tagsList);
+            } catch (Exception e) {
+                loggerMaker.error(
+                        "Error while updating api collection tags for host: " + hostNameMapKey + " " + e.getMessage());
+                e.printStackTrace();
+            }
+        }
+
+        printL("Updated tags for apiCollectionId: " + apiCollectionId + "with tags: " + tagsList + "hostNameMapKey:" + hostNameMapKey);
+    }
+
     public int createApiCollectionId(HttpResponseParams httpResponseParam){
         int apiCollectionId;
         String hostName = getHeaderValue(httpResponseParam.getRequestParams().getHeaders(), "host");
@@ -480,6 +562,7 @@ public class HttpCallParser {
 
         int vxlanId = httpResponseParam.requestParams.getApiCollectionId();
         String vpcId = System.getenv("VPC_ID");
+        List<CollectionTags> tagList = CollectionTags.convertTagsFormat(httpResponseParam.getTags());
 
         if (useHostCondition(hostName, httpResponseParam.getSource())) {
             hostName = hostName.toLowerCase();
@@ -489,27 +572,38 @@ public class HttpCallParser {
 
             if (hostNameToIdMap.containsKey(key)) {
                 apiCollectionId = hostNameToIdMap.get(key);
+                updateApiCollectionTags(key, httpResponseParam);
 
             } else {
                 int id = hostName.hashCode();
+
+                Optional<CollectionTags> mcpServerTagOpt = getMcpServerTag(httpResponseParam);
+                if (mcpServerTagOpt.isPresent()) {
+                    if (tagList == null) {
+                        tagList = new ArrayList<>();
+                    }
+                    tagList.add(mcpServerTagOpt.get());
+                }
                 try {
 
-                    apiCollectionId = createCollectionBasedOnHostName(id, hostName);
+                    apiCollectionId = createCollectionBasedOnHostName(id, hostName, tagList);
 
                     hostNameToIdMap.put(key, apiCollectionId);
                 } catch (Exception e) {
                     loggerMaker.errorAndAddToDb("Failed to create collection for host : " + hostName, LogDb.RUNTIME);
-                    createCollectionSimpleForVpc(vxlanId, vpcId);
-                    hostNameToIdMap.put("null " + vxlanId, vxlanId);
+                    createCollectionSimpleForVpc(vxlanId, vpcId, tagList);
+                    hostNameToIdMap.put(NON_HOSTNAME_KEY + vxlanId, vxlanId);
                     apiCollectionId = httpResponseParam.requestParams.getApiCollectionId();
                 }
             }
 
         } else {
-            String key = "null" + " " + vxlanId;
+            String key = NON_HOSTNAME_KEY + vxlanId;
             if (!hostNameToIdMap.containsKey(key)) {
-                createCollectionSimpleForVpc(vxlanId, vpcId);
+                createCollectionSimpleForVpc(vxlanId, vpcId, tagList);
                 hostNameToIdMap.put(key, vxlanId);
+            }else{
+                updateApiCollectionTags(key, httpResponseParam);
             }
 
             apiCollectionId = vxlanId;
@@ -530,7 +624,7 @@ public class HttpCallParser {
         /*
          * To be sure that the content type
          * header matches the actual payload.
-         * 
+         *
          * We will need to add more type validation as needed.
          */
         if (matchContentType.contains("html")) {
@@ -563,10 +657,22 @@ public class HttpCallParser {
                 cond = true;
             }
 
-            if (!cond) continue;
-            
+            if (!cond){
+                if (Utils.printDebugUrlLog(httpResponseParam.getRequestParams().getURL())) {
+                    loggerMaker.infoAndAddToDb("Found debug url in filterHttpResponseParams invalid response code "
+                            + httpResponseParam.getRequestParams().getURL() + " response code " + httpResponseParam.getStatusCode());
+                }
+                continue;
+            }
+
             String ignoreAktoFlag = getHeaderValue(httpResponseParam.getRequestParams().getHeaders(),Constants.AKTO_IGNORE_FLAG);
-            if (ignoreAktoFlag != null) continue;
+            if (ignoreAktoFlag != null){
+                if (Utils.printDebugUrlLog(httpResponseParam.getRequestParams().getURL())) {
+                    loggerMaker.infoAndAddToDb("Found debug url in filterHttpResponseParams ignoreAktoFlag "
+                            + httpResponseParam.getRequestParams().getURL());
+                }
+                continue;
+            }
 
             if (httpResponseParam.getRequestParams().getURL().toLowerCase().contains("/health")) {
                 continue;
@@ -575,6 +681,10 @@ public class HttpCallParser {
             // check for garbage points here
             if(!redundantList.isEmpty()){
                 if(isRedundantEndpoint(httpResponseParam.getRequestParams().getURL(),regexPattern)){
+                    if (Utils.printDebugUrlLog(httpResponseParam.getRequestParams().getURL())) {
+                        loggerMaker.infoAndAddToDb("Found debug url in filterHttpResponseParams isRedundantEndpoint "
+                                + httpResponseParam.getRequestParams().getURL() + " pattern " + regexPattern.toString());
+                    }
                     continue;
                 }
                 List<String> contentTypeList = (List<String>) httpResponseParam.getRequestParams().getHeaders().getOrDefault("content-type", new ArrayList<>());
@@ -583,6 +693,10 @@ public class HttpCallParser {
                     contentType = contentTypeList.get(0);
                 }
                 if(isInvalidContentType(contentType)){
+                    if (Utils.printDebugUrlLog(httpResponseParam.getRequestParams().getURL())) {
+                        loggerMaker.infoAndAddToDb("Found debug url in filterHttpResponseParams isInvalidContentType "
+                                + httpResponseParam.getRequestParams().getURL() + " contentType " + contentType);
+                    }
                     continue;
                 }
 
@@ -604,11 +718,16 @@ public class HttpCallParser {
                     if(ignore){
                         continue;
                     }
-    
+
                 } catch(Exception e){
                     loggerMaker.errorAndAddToDb(e, "Error while ignoring content-type redundant samples " + e.toString(), LogDb.RUNTIME);
                 }
 
+            }
+
+            if (Utils.printDebugUrlLog(httpResponseParam.getRequestParams().getURL())) {
+                loggerMaker.infoAndAddToDb("Found debug url in filterHttpResponseParams starting advanced filters "
+                        + httpResponseParam.getRequestParams().getURL());
             }
 
             Pair<HttpResponseParams,FILTER_TYPE> temp = applyAdvancedFilters(httpResponseParam, executorNodesMap, apiCatalogSync.advancedFilterMap);
@@ -616,22 +735,35 @@ public class HttpCallParser {
             if(param == null || temp.getSecond().equals(FILTER_TYPE.UNCHANGED)){
                 if(param == null && httpResponseParam != null && httpResponseParam.getRequestParams() != null){
                     loggerMaker.infoAndAddToDb("blocked api " + httpResponseParam.getRequestParams().getURL() + " " + httpResponseParam.getRequestParams().getApiCollectionId() + " " + httpResponseParam.getRequestParams().getMethod());
+                    if (Utils.printDebugUrlLog(httpResponseParam.getRequestParams().getURL())) {
+                        loggerMaker.infoAndAddToDb(
+                                "Found debug url in filterHttpResponseParams advanced filters, skipping "
+                                        + httpResponseParam.getRequestParams().getURL() + " filterType "
+                                        + temp.getSecond());
+                    }
                 }
                 continue;
             }else{
                 httpResponseParam = param;
+                if (Utils.printDebugUrlLog(httpResponseParam.getRequestParams().getURL())) {
+                    loggerMaker.infoAndAddToDb("Found debug url in filterHttpResponseParams advanced filters, adding "
+                            + httpResponseParam.getRequestParams().getURL() + " filterType " + temp.getSecond());
+                }
+
             }
-            
+
             int apiCollectionId = createApiCollectionId(httpResponseParam);
 
             httpResponseParam.requestParams.setApiCollectionId(apiCollectionId);
 
             List<HttpResponseParams> responseParamsList = GraphQLUtils.getUtils().parseGraphqlResponseParam(httpResponseParam);
             if (responseParamsList.isEmpty()) {
-                filteredResponseParams.add(httpResponseParam);
+                HttpResponseParams jsonRpcResponse = JsonRpcUtils.parseJsonRpcResponse(httpResponseParam);
+                HttpResponseParams mcpResponseParams = McpRequestResponseUtils.parseMcpResponseParams(jsonRpcResponse);
+                filteredResponseParams.add(mcpResponseParams);
             } else {
                 filteredResponseParams.addAll(responseParamsList);
-                loggerMaker.infoAndAddToDb("Adding " + responseParamsList.size() + "new graphql endpoints in invetory",LogDb.RUNTIME);
+                loggerMaker.infoAndAddToDb("Adding " + responseParamsList.size() + "new graphql endpoints in inventory",LogDb.RUNTIME);
             }
 
             if (httpResponseParam.getSource().equals(HttpResponseParams.Source.MIRRORING)) {
@@ -709,5 +841,12 @@ public class HttpCallParser {
 
     public void setTrafficMetricsMap(Map<TrafficMetrics.Key, TrafficMetrics> trafficMetricsMap) {
         this.trafficMetricsMap = trafficMetricsMap;
+    }
+
+    private Optional<CollectionTags> getMcpServerTag(HttpResponseParams responseParams) {
+        if (McpRequestResponseUtils.isMcpRequest(responseParams).getFirst()) {
+            return Optional.of(new CollectionTags(Context.now(), "mcp-server", "MCP Server", TagSource.KUBERNETES));
+        }
+        return Optional.empty();
     }
 }

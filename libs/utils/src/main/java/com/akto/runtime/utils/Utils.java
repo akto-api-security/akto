@@ -1,10 +1,6 @@
 package com.akto.runtime.utils;
 
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Properties;
-import java.util.StringJoiner;
+import java.util.*;
 import java.util.regex.Pattern;
 
 import org.apache.kafka.clients.consumer.ConsumerConfig;
@@ -17,19 +13,21 @@ import com.akto.dto.HttpResponseParams;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.RawApi;
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONObject;
 import com.mongodb.BasicDBObject;
 import static com.akto.dto.RawApi.convertHeaders;
 
 public class Utils {
-    private static final Logger logger = LoggerFactory.getLogger(Utils.class);
+    private static final LoggerMaker logger = new LoggerMaker(Utils.class, LogDb.RUNTIME);
 
     private static int debugPrintCounter = 500;
     public static void printL(Object o) {
         if (debugPrintCounter > 0) {
             debugPrintCounter--;
-            logger.info(o.toString());
+            logger.warn(o.toString());
         }
     }
 
@@ -127,6 +125,64 @@ public class Utils {
             }
         }
         return cookieMap;
+    }
+
+    private static final Set<String> DEBUG_HOSTS_SET = initializeDebugHostsSet();
+    private static final Set<String> DEBUG_URLS_SET = initializeDebugUrlsSet();
+
+    private static Set<String> initializeDebugHostsSet() {
+        String debugHosts = System.getenv("DEBUG_HOSTS");
+        if (debugHosts == null || debugHosts.isEmpty()) {
+            return new HashSet<>();
+        }
+        return new HashSet<>(Arrays.asList(debugHosts.split(",")));
+    }
+
+    public static String printDebugHostLog(HttpResponseParams httpResponseParams) {
+        if (DEBUG_HOSTS_SET.isEmpty()) return null;
+        if (httpResponseParams == null || httpResponseParams.requestParams == null || httpResponseParams.requestParams.getHeaders() == null) {
+            return null;
+        }
+        Map<String, List<String>> headers = httpResponseParams.getRequestParams().getHeaders();
+        List<String> hosts = headers.get("host");
+        if (hosts == null || hosts.isEmpty()) return null;
+        String host = hosts.get(0);
+
+        return DEBUG_HOSTS_SET.contains(host) ? host : null;
+    }
+
+    private static Set<String> initializeDebugUrlsSet() {
+        Set<String> ret = new HashSet<>();
+
+        String debugUrls = System.getenv("DEBUG_URLS");
+        if (debugUrls == null || debugUrls.isEmpty()) {
+            ret = new HashSet<>(Arrays.asList(
+                    "partner/v2/transactions",
+                    "partner/qa/v2/transactions",
+                    "partner/v1/transactions",
+                    "partner/qa/v2/products",
+                    "partner/v2/products"
+            ));
+        } else {
+            ret = new HashSet<>(Arrays.asList(debugUrls.split(",")));
+        }
+        logger.info("DEBUG_URLS initialized with: " + ret.toString());
+        return ret;
+    }
+
+    public static boolean printDebugUrlLog(String url) {
+        if (DEBUG_URLS_SET.isEmpty())
+            return false;
+        if (url == null || url.isEmpty())
+            return false;
+        if (DEBUG_URLS_SET.isEmpty())
+            return false;
+        for (String debugUrl : DEBUG_URLS_SET) {
+            if (url.contains(debugUrl)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public static Pattern createRegexPatternFromList(List<String> discardedUrlList){
