@@ -234,7 +234,6 @@ const RunTestConfiguration = ({ testRun, setTestRun, runTypeOptions, hourlyTimes
                         menuItems={slackChannels}
                         initial={testRun?.slackChannel || slackChannels?.[0]?.value}
                         selected={(val) => {
-                            console.log("val", val)
                             setTestRun(prev => ({
                                 ...prev,
                                 slackChannel: val

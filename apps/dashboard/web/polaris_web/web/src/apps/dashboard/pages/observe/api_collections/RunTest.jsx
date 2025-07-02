@@ -120,10 +120,15 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                 const apiTokenList = slackResp.apiTokenList
                 setSlackIntegrated(apiTokenList && apiTokenList.length > 0)
                 setSlackChannels(apiTokenList.map(token => {
-                    return {
-                        label: token.name,
-                        value: token.id
-                    }
+                    let label = token.name;
+                        // Check if name is missing or is a URL
+                        if (!label || /^https?:\/\//i.test(label)) {
+                            label = prettifyUrl(token.name);
+                        }
+                        return {
+                            label,
+                            value: token.id
+                        }
                 }))
 
                 const webhookPresent = teamsResp.webhookPresent
