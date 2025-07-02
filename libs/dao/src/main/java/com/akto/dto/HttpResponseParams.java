@@ -2,6 +2,7 @@ package com.akto.dto;
 
 
 import com.akto.dao.context.Context;
+import com.akto.dto.graph.SvcToSvcGraphParams;
 
 import java.util.HashMap;
 import java.util.List;
@@ -28,6 +29,8 @@ public class HttpResponseParams {
     String sourceIP;
     String destIP;
     String direction;
+    SvcToSvcGraphParams svcToSvcGraphParams;
+    
     // K8 pod tags in JSON string
     String tags;
 
@@ -37,12 +40,12 @@ public class HttpResponseParams {
                               HttpRequestParams requestParams, int time, String accountId, boolean isPending, Source source, 
                               String orig, String sourceIP) {
         this(type, statusCode, status, headers, payload, requestParams, time, accountId, isPending, source, orig,
-                sourceIP, "", "");
+                sourceIP, "", "", null, null);
     }
 
     public HttpResponseParams(String type, int statusCode, String status, Map<String, List<String>> headers, String payload,
                               HttpRequestParams requestParams, int time, String accountId, boolean isPending, Source source,
-                              String orig, String sourceIP, String destIP, String direction, String tags) {
+                              String orig, String sourceIP, String destIP, String direction, SvcToSvcGraphParams svcToSvcGraphParams, String tags) {
         this.type = type;
         this.statusCode = statusCode;
         this.status = status;
@@ -57,27 +60,10 @@ public class HttpResponseParams {
         this.sourceIP = sourceIP;
         this.destIP = destIP;
         this.direction = direction;
+        this.svcToSvcGraphParams = svcToSvcGraphParams;
         this.tags = tags;
     }
 
-    public HttpResponseParams(String type, int statusCode, String status, Map<String, List<String>> headers, String payload,
-                              HttpRequestParams requestParams, int time, String accountId, boolean isPending, Source source,
-                              String orig, String sourceIP, String destIP, String direction) {
-        this.type = type;
-        this.statusCode = statusCode;
-        this.status = status;
-        this.headers = headers;
-        this.payload = payload;
-        this.requestParams = requestParams;
-        this.time = time;
-        this.accountId = accountId;
-        this.isPending = isPending;
-        this.source = source;
-        this.orig = orig;
-        this.sourceIP = sourceIP;
-        this.destIP = destIP;
-        this.direction = direction;
-    }
 
     public static boolean validHttpResponseCode(int statusCode)  {
         return statusCode >= 200 && (statusCode < 300 || statusCode == 302);
@@ -96,7 +82,11 @@ public class HttpResponseParams {
                 this.isPending,
                 this.source,
                 this.orig,
-                this.sourceIP
+                this.sourceIP,
+                this.destIP,
+                this.direction,
+                this.svcToSvcGraphParams,
+                this.tags
         );
     }
 
@@ -185,6 +175,13 @@ public class HttpResponseParams {
         this.requestParams = requestParams;
     }
 
+    public SvcToSvcGraphParams getSvcToSvcGraphParams() {
+        return svcToSvcGraphParams;
+    }
+
+    public void setSvcToSvcGraphParams(SvcToSvcGraphParams svcToSvcGraphParams) {
+        this.svcToSvcGraphParams = svcToSvcGraphParams;
+    }
     public String getTags() {
         return tags;
     }

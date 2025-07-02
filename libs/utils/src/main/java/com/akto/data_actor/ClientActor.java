@@ -3,6 +3,8 @@ package com.akto.data_actor;
 import com.akto.DaoInit;
 import com.akto.dao.context.Context;
 import com.akto.dto.filter.MergedUrls;
+import com.akto.dto.graph.SvcToSvcGraphEdge;
+import com.akto.dto.graph.SvcToSvcGraphNode;
 import com.akto.dto.jobs.Job;
 import com.akto.dto.jobs.JobExecutorType;
 import com.akto.dto.jobs.JobParams;
@@ -64,6 +66,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 
+import org.apache.kafka.common.protocol.types.Field.Str;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import okhttp3.MediaType;
@@ -3852,6 +3855,118 @@ public class ClientActor extends DataActor {
             return new ArrayList<>();
         }
     }
+    @Override
+    public List<SvcToSvcGraphEdge> findSvcToSvcGraphEdges(int startTs, int endTs, int skip, int limit) {
+        Map<String, List<String>> headers = buildHeaders();
+        BasicDBObject obj = new BasicDBObject();
+        obj.put("startTimestamp", startTs);
+        obj.put("endTimestamp", endTs);
+        obj.put("skip", skip);
+        obj.put("limit", limit);
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/findSvcToSvcGraphEdges", "", "POST", obj.toString(), headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb("non 2xx response in findSvcToSvcGraphEdges", LoggerMaker.LogDb.RUNTIME);
+                return null;
+            }
+            BasicDBObject payloadObj;
+            try {
+                payloadObj =  BasicDBObject.parse(responsePayload);
+                BasicDBList edges = (BasicDBList) payloadObj.get("svcToSvcGraphEdges");
+                List<SvcToSvcGraphEdge> edgesList = new ArrayList<>();
+                for (Object edge: edges) {
+                    BasicDBObject edgeObj = (BasicDBObject) edge;
+                    SvcToSvcGraphEdge svcToSvcGraphEdge = objectMapper.readValue(edgeObj.toJson(), SvcToSvcGraphEdge.class);
+                    edgesList.add(svcToSvcGraphEdge);
+                }
+                return edgesList;
+            } catch(Exception e) {
+                return null;
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in findSvcToSvcGraphEdges" + e, LoggerMaker.LogDb.RUNTIME);
+            return null;
+        }
+    }
+
+    public List<SvcToSvcGraphNode> findSvcToSvcGraphNodes(int startTs, int endTs, int skip, int limit) {
+        Map<String, List<String>> headers = buildHeaders();
+        BasicDBObject obj = new BasicDBObject();
+        obj.put("startTimestamp", startTs);
+        obj.put("endTimestamp", endTs);
+        obj.put("skip", skip);
+        obj.put("limit", limit);
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/findSvcToSvcGraphNodes", "", "POST", obj.toString(), headers, "");
+        
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb("non 2xx response in findSvcToSvcGraphNodes", LoggerMaker.LogDb.RUNTIME);
+                return null;
+            }
+            BasicDBObject payloadObj;
+            try {
+
+                payloadObj =  BasicDBObject.parse(responsePayload);
+                BasicDBList nodes = (BasicDBList) payloadObj.get("svcToSvcGraphNodes");
+                List<SvcToSvcGraphNode> nodesList = new ArrayList<>();
+                for (Object node: nodes) {
+                    BasicDBObject nodeObj = (BasicDBObject) node;
+                    SvcToSvcGraphNode svcToSvcGraphNode = objectMapper.readValue(nodeObj.toJson(), SvcToSvcGraphNode.class);
+                    nodesList.add(svcToSvcGraphNode);
+                }
+                return nodesList;
+            } catch(Exception e) {
+                return null;
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in findSvcToSvcGraphNodes" + e, LoggerMaker.LogDb.RUNTIME);
+            return null;
+        }
+    }
+
+    @Override
+    public void updateSvcToSvcGraphEdges(List<SvcToSvcGraphEdge> edges) {
+        Map<String, List<String>> headers = buildHeaders();
+        BasicDBObject obj = new BasicDBObject();
+        obj.put("svcToSvcGraphEdges", edges);
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/updateSvcToSvcGraphEdges", "", "POST", gson.toJson(obj), headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb("non 2xx response in updateSvcToSvcGraphEdges", LoggerMaker.LogDb.RUNTIME);
+                return;
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in updateSvcToSvcGraphEdges" + e, LoggerMaker.LogDb.RUNTIME);
+            return;
+        }
+    }
+
+    @Override
+    public void updateSvcToSvcGraphNodes(List<SvcToSvcGraphNode> nodes) {
+        Map<String, List<String>> headers = buildHeaders();
+        BasicDBObject obj = new BasicDBObject();
+        obj.put("svcToSvcGraphNodes", nodes);
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/updateSvcToSvcGraphNodes", "", "POST", gson.toJson(obj), headers, "");
+        
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb("non 2xx response in updateSvcToSvcGraphNodes", LoggerMaker.LogDb.RUNTIME);
+                return;
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in updateSvcToSvcGraphNodes" + e, LoggerMaker.LogDb.RUNTIME);
+            return;
+        }
+    }
+
     public TestingRunPlayground getCurrentTestingRunDetailsFromEditor(int timestamp){
         BasicDBObject obj = new BasicDBObject();
         obj.put("ts", timestamp);

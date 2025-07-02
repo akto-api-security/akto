@@ -12,6 +12,8 @@ import com.akto.dao.context.Context;
 import com.akto.dto.HttpRequestParams;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.OriginalHttpRequest;
+import com.akto.dto.graph.K8sDaemonsetGraphParams;
+import com.akto.dto.graph.SvcToSvcGraphParams;
 import com.akto.dto.TrafficProducerLog;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
@@ -77,6 +79,22 @@ public class SampleParser {
         boolean isPending = !isPendingStr.toLowerCase().equals("false");
         String sourceStr = (String) json.getOrDefault("source", HttpResponseParams.Source.OTHER.name());
         HttpResponseParams.Source source = HttpResponseParams.Source.valueOf(sourceStr);
+        
+        String enableGraph = (String) json.getOrDefault("enable_graph", "false");
+        SvcToSvcGraphParams graphParams = null; 
+        if (enableGraph.equals("true")) {
+            List<String> hostNameList = requestHeaders.getOrDefault("host", requestHeaders.getOrDefault(":authority", new ArrayList<>()));
+            if (hostNameList != null && hostNameList.size()>0) {
+                String processId = (String) json.get("process_id");
+                String socketId = (String) json.get("socket_id");
+                String daemonsetId = (String) json.get("daemonset_id");
+                String hostname = hostNameList.get(0);
+                if (hostname.charAt(0) >= 'a' && hostname.charAt(0) <= 'z') {
+                    graphParams = new K8sDaemonsetGraphParams(hostNameList.get(0), processId, socketId, daemonsetId, direction);
+                }   
+            }
+            
+        }
 
         // JSON string of K8 POD tags
         String tags = (String) json.getOrDefault("tag", "");
@@ -86,7 +104,7 @@ public class SampleParser {
         }
 
         return new HttpResponseParams(
-                type,statusCode, status, responseHeaders, payload, requestParams, time, accountId, isPending, source, message, sourceIP, destIP, direction, tags
+                type,statusCode, status, responseHeaders, payload, requestParams, time, accountId, isPending, source, message, sourceIP, destIP, direction, graphParams, tags
         );
 
     }

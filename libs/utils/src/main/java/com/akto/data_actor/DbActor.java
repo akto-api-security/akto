@@ -6,6 +6,8 @@ import com.akto.dto.billing.Organization;
 import com.akto.dto.billing.Tokens;
 import com.akto.dto.dependency_flow.Node;
 import com.akto.dto.filter.MergedUrls;
+import com.akto.dto.graph.SvcToSvcGraphEdge;
+import com.akto.dto.graph.SvcToSvcGraphNode;
 import com.akto.dto.jobs.JobExecutorType;
 import com.akto.dto.jobs.JobParams;
 import com.akto.dto.metrics.MetricData;
@@ -598,6 +600,26 @@ public class DbActor extends DataActor {
 
     public TestingRunResultSummary findLatestTestingRunResultSummary(Bson filter){
         return DbLayer.findLatestTestingRunResultSummary(filter);
+    }
+
+    @Override
+    protected List<SvcToSvcGraphEdge> findSvcToSvcGraphEdges(int startTs, int endTs, int skip, int limit) {
+        return DbLayer.findSvcToSvcGraphEdges(startTs, endTs, skip, limit);
+    }
+
+    @Override
+    protected List<SvcToSvcGraphNode> findSvcToSvcGraphNodes(int startTs, int endTs, int skip, int limit) {
+        return DbLayer.findSvcToSvcGraphNodes(startTs, endTs, skip, limit);
+    }
+
+    @Override
+    public void updateSvcToSvcGraphEdges(List<SvcToSvcGraphEdge> edges) {
+        DbLayer.updateSvcToSvcGraphEdges(edges);
+    }
+
+    @Override
+    public void updateSvcToSvcGraphNodes(List<SvcToSvcGraphNode> nodes) {
+        DbLayer.updateSvcToSvcGraphNodes(nodes);
     }
 
     public TestingRunPlayground getCurrentTestingRunDetailsFromEditor(int timestamp){
