@@ -4,7 +4,7 @@ import com.akto.dao.context.Context;
 import com.akto.dao.notifications.SlackWebhooksDao;
 import com.akto.dto.notifications.SlackWebhook;
 import com.akto.log.LoggerMaker;
-import com.mongodb.BasicDBObject;
+import com.mongodb.client.model.Filters;
 import com.slack.api.Slack;
 import com.slack.api.webhook.WebhookResponse;
 
@@ -29,7 +29,7 @@ public class SlackSender {
 
             if(slackWebhookId != null) {
                 // Get specific slack webhook url by id
-                SlackWebhook slackWebhook = SlackWebhooksDao.instance.findOne(new BasicDBObject("_id", slackWebhookId));
+                SlackWebhook slackWebhook = SlackWebhooksDao.instance.findOne(Filters.eq("_id", slackWebhookId));
                 if(slackWebhook == null) {
                     loggerMaker.infoAndAddToDb("Slack Alert Type: " + alertType + " Info: " + "No slack webhook found with id: " + slackWebhookId);
                     webhookUrl = getDefaultSlackWebhook();
@@ -80,7 +80,7 @@ public class SlackSender {
 
     public static String getDefaultSlackWebhook() {
         String webhookUrl ="";
-        List<SlackWebhook> listWebhooks = SlackWebhooksDao.instance.findAll(new BasicDBObject());
+        List<SlackWebhook> listWebhooks = SlackWebhooksDao.instance.findAll(Filters.empty());
         if (listWebhooks == null || listWebhooks.isEmpty()) {
             loggerMaker.infoAndAddToDb(" No slack webhook found.");
         } else {
