@@ -56,7 +56,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.apache.commons.collections.CollectionUtils;
-import org.apache.kafka.common.quota.ClientQuotaAlteration.Op;
 
 import static com.akto.runtime.RuntimeUtil.matchesDefaultPayload;
 import static com.akto.runtime.utils.Utils.printL;
@@ -66,8 +65,7 @@ public class HttpCallParser {
     private final int sync_threshold_count;
     private final int sync_threshold_time;
     private int sync_count = 0;
-    private int tagsLastUpdated = 0;
-    private static final int TAGS_UPDATE_INTERVAL = 5 * 60; // 5 minutes
+    private Map<Integer, Integer> apiCollectionIdTagsSyncTimestampMap = new HashMap<>();
     private int last_synced;
     private static final LoggerMaker loggerMaker = new LoggerMaker(HttpCallParser.class, LogDb.RUNTIME);
     public APICatalogSync apiCatalogSync;
@@ -110,6 +108,7 @@ public class HttpCallParser {
         apiCatalogSync = new APICatalogSync(userIdentifier, thresh, fetchAllSTI);
         apiCatalogSync.buildFromDB(false, fetchAllSTI);
         apiCollectionsMap = new HashMap<>();
+        apiCollectionIdTagsSyncTimestampMap = new HashMap<>();
         List<ApiCollection> apiCollections = dataActor.fetchAllApiCollectionsMeta();
         for (ApiCollection apiCollection: apiCollections) {
             apiCollectionsMap.put(apiCollection.getId(), apiCollection);
@@ -501,22 +500,23 @@ public class HttpCallParser {
      * @param httpResponseParams
      */
     public void updateApiCollectionTags(String hostNameMapKey, HttpResponseParams httpResponseParams) {
-        if (Context.now() - this.tagsLastUpdated < TAGS_UPDATE_INTERVAL) {
-            // Avoid updating tags too frequently
-            return;
-        }
-        this.tagsLastUpdated = Context.now();
         int apiCollectionId = hostNameToIdMap.get(hostNameMapKey);
         ApiCollection apiCollection = apiCollectionsMap.get(apiCollectionId);
+
         if( apiCollection == null) {
             loggerMaker.debug("No tags updated. ApiCollection not found for id: " + apiCollectionId);
             return;
         }
 
+        int lastSynctime = this.apiCollectionIdTagsSyncTimestampMap.getOrDefault(apiCollectionId, 0);
+        if (Context.now() - lastSynctime < this.sync_threshold_time) {
+            // Avoid updating tags too frequently
+            return;
+        }
+        this.apiCollectionIdTagsSyncTimestampMap.put(apiCollectionId, Context.now());
 
-        List<CollectionTags> tagsList = CollectionTags.calculateTagsDiff(apiCollection.getTagsList(), httpResponseParams.getTags());
+        List<CollectionTags> tagsList = CollectionTags.convertTagsFormat(httpResponseParams.getTags());
 
-        printL("Updating tags for apiCollectionId: " + apiCollectionId + "with tags: " + tagsList);
 
         if (CollectionUtils.isEmpty(apiCollection.getTagsList()) || apiCollection.getTagsList().stream()
             .noneMatch(t -> "mcp-server".equals(t.getKeyName()))) {
@@ -549,7 +549,7 @@ public class HttpCallParser {
             }
         }
 
-        printL("Updated tags for apiCollectionId: " + apiCollectionId + " with tags: " + tagsList);
+        printL("Updated tags for apiCollectionId: " + apiCollectionId + "with tags: " + tagsList + "hostNameMapKey:" + hostNameMapKey);
     }
 
     public int createApiCollectionId(HttpResponseParams httpResponseParam){

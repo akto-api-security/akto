@@ -81,7 +81,7 @@ public class SampleParser {
         // JSON string of K8 POD tags
         String tags = (String) json.getOrDefault("tag", "");
         if(!tags.isEmpty()){
-            printL("K8 Pod Tags" + tags);
+            printL("K8 Pod Tags" + tags + "Host:" + requestHeaders.getOrDefault("host", new ArrayList<>()) + "Url:" + url);
             injectTagsInHeaders(requestParams, tags);
         }
 
