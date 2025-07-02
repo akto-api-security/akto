@@ -146,7 +146,7 @@ public class TestRolesAction extends UserAction {
                         param = new TLSAuthParam(authParamDataElem.getCertAuthorityCertificate(),
                             authParamDataElem.getCertificateType(), authParamDataElem.getClientCertificate(),
                             authParamDataElem.getClientKey());
-
+                        break;
                     case SAMPLE_DATA:
                         param = new SampleDataAuthParam(authParamDataElem.getWhere(), authParamDataElem.getKey(),
                             authParamDataElem.getValue(), true);
