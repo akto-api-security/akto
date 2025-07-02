@@ -122,8 +122,10 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                 setSlackChannels(apiTokenList.map(token => {
                     let label = token.name;
                         // Check if name is missing or is a URL
-                        if (!label || /^https?:\/\//i.test(label)) {
-                            label = prettifyUrl(token.name);
+                        if (!label ) {
+                            label = 'Slack Webhook';
+                        } else if ( /^https?:\/\//i.test(label)){
+                            label = prettifyUrl(token.name);}
                         }
                         return {
                             label,
