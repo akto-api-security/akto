@@ -1057,10 +1057,10 @@ public class Utils {
             return false;
         }
 
-        return Optional.ofNullable(headers.get(HttpRequestResponseUtils.CONTENT_TYPE))
-            .map(list -> list.stream()
-                .anyMatch(s -> s.toLowerCase().contains(HttpRequestResponseUtils.TEXT_EVENT_STREAM_CONTENT_TYPE)))
-            .orElse(false);
+        return headers.entrySet().stream()
+            .filter(entry -> entry.getKey().equalsIgnoreCase(HttpRequestResponseUtils.CONTENT_TYPE))
+            .flatMap(entry -> entry.getValue().stream())
+            .anyMatch(s -> s.toLowerCase().contains(HttpRequestResponseUtils.TEXT_EVENT_STREAM_CONTENT_TYPE));
     }
 
     public static String buildEventStreamResponseIHttpFormat(OriginalHttpResponse response) {
