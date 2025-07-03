@@ -21,19 +21,18 @@ public class TestExecutorModifier extends PromptHandler {
 
     @Override
     protected void validate(BasicDBObject queryData) throws ValidationException {
-        if (!queryData.containsKey(_REQUEST)) {
-            throw new ValidationException("Missing mandatory param: " + _REQUEST);
-        }
-        Object data = queryData.get(_REQUEST);
-        if (!(data instanceof String)) {
-            throw new ValidationException(_REQUEST + " must be a string.");
-        }
-        String request = (String) data;
-        if (request.isEmpty()) {
-            throw new ValidationException(_REQUEST + " is empty.");
-        }
-        if (request.length() > MAX_QUERY_LENGTH) {
-            throw new ValidationException(_REQUEST + " is too long.");
+        if (queryData.containsKey(_REQUEST)) {
+            Object data = queryData.get(_REQUEST);
+            if (!(data instanceof String)) {
+                throw new ValidationException(_REQUEST + " must be a string.");
+            }
+            String request = (String) data;
+            if (request.isEmpty()) {
+                throw new ValidationException(_REQUEST + " is empty.");
+            }
+            if (request.length() > MAX_QUERY_LENGTH) {
+                throw new ValidationException(_REQUEST + " is too long.");
+            }
         }
 
         // Validation for operation
