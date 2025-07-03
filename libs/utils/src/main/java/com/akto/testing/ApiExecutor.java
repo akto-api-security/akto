@@ -1,17 +1,16 @@
 package com.akto.testing;
 
 import com.akto.dao.context.Context;
-import com.akto.dao.test_editor.TestEditorEnums.NonTerminalExecutorDataOperands;
-import com.akto.dao.test_editor.TestEditorEnums.TerminalExecutorDataOperands;
+import com.akto.dao.test_editor.TestEditorEnums;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.CollectionConditions.ConditionsType;
 import com.akto.dto.CollectionConditions.TestConfigsAdvancedSettings;
 import com.akto.dto.testing.TLSAuthParam;
 import com.akto.dto.testing.TestingRunConfig;
-import com.akto.dto.testing.TestingRunResult.TestLog;
+import com.akto.dto.testing.TestingRunResult;
 import com.akto.dto.testing.rate_limit.RateLimitHandler;
-import com.akto.dto.type.URLMethods.Method;
+import com.akto.dto.type.URLMethods;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.metrics.AllMetrics;
@@ -23,7 +22,6 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import kotlin.Pair;
 import okhttp3.*;
-import okhttp3.Request.Builder;
 import okio.BufferedSink;
 
 import org.apache.commons.lang3.StringUtils;
@@ -43,7 +41,7 @@ public class ApiExecutor {
     private static final ObjectMapper objectMapper = new ObjectMapper();
 
 
-    private static OriginalHttpResponse common(Request request, boolean followRedirects, boolean debug, List<TestLog> testLogs, boolean skipSSRFCheck, boolean nonTestingContext, String requestProtocol, TLSAuthParam authParam) throws Exception {
+    private static OriginalHttpResponse common(Request request, boolean followRedirects, boolean debug, List<TestingRunResult.TestLog> testLogs, boolean skipSSRFCheck, boolean nonTestingContext, String requestProtocol, TLSAuthParam authParam) throws Exception {
 
         Integer accountId = Context.accountId.get();
         if (accountId != null) {
@@ -93,31 +91,20 @@ public class ApiExecutor {
 
         Call call = client.newCall(request);
         Response response = null;
-        String body = null;
-        boolean isResponseEventStream = false;
+        String body;
         byte[] grpcBody = null;
-        Map<String, List<String>> responseHeaders;
         try {
             response = call.execute();
 
-            Headers headers = response.headers();
-            responseHeaders = generateHeadersMapFromHeadersObject(headers);
-            isResponseEventStream = com.akto.test_editor.Utils.isEventStream(responseHeaders);
             ResponseBody responseBody = null;
-            if (isResponseEventStream) {
-                body = getEventStreamResponseBodyWithTimeout(response, 20000);// 20 seconds timeout
-                return new OriginalHttpResponse(body, responseHeaders, response.code());
+            if (nonTestingContext) {
+                responseBody = response.body();
             } else {
-                if (nonTestingContext) {
-                    responseBody = response.body();
-                } else {
-                    responseBody = response.peekBody(MAX_RESPONSE_SIZE);
-                }
-                if (responseBody == null) {
-                    throw new Exception("Couldn't read response body");
-                }
+                responseBody = response.peekBody(MAX_RESPONSE_SIZE);
             }
-
+            if (responseBody == null) {
+                throw new Exception("Couldn't read response body");
+            }
             try {
                 if (requestProtocol != null && requestProtocol.contains(HttpRequestResponseUtils.GRPC_CONTENT_TYPE)) {//GRPC request
                     grpcBody = responseBody.bytes();
@@ -166,7 +153,13 @@ public class ApiExecutor {
                 response.close();
             }
         }
-        return new OriginalHttpResponse(body, responseHeaders, response.code());
+
+        int statusCode = response.code();
+        Headers headers = response.headers();
+
+        Map<String, List<String>> responseHeaders = generateHeadersMapFromHeadersObject(headers);
+
+        return new OriginalHttpResponse(body, responseHeaders, statusCode);
     }
 
     public static Map<String, List<String>> generateHeadersMapFromHeadersObject(Headers headers) {
@@ -274,7 +267,7 @@ public class ApiExecutor {
         return replaceHostFromConfig(url, testingRunConfig);
     }
 
-    public static OriginalHttpResponse sendRequest(OriginalHttpRequest request, boolean followRedirects, TestingRunConfig testingRunConfig, boolean debug, List<TestLog> testLogs, boolean skipSSRFCheck) throws Exception {
+    public static OriginalHttpResponse sendRequest(OriginalHttpRequest request, boolean followRedirects, TestingRunConfig testingRunConfig, boolean debug, List<TestingRunResult.TestLog> testLogs, boolean skipSSRFCheck) throws Exception {
         // don't lowercase url because query params will change and will result in incorrect request
 
         if(testingRunConfig != null && testingRunConfig.getConfigsAdvancedSettings() != null && !testingRunConfig.getConfigsAdvancedSettings().isEmpty()){
@@ -310,7 +303,7 @@ public class ApiExecutor {
         }
         request.setUrl(url);
 
-        Builder builder = new Builder();
+        Request.Builder builder = new Request.Builder();
 
         // add headers
         List<String> forbiddenHeaders = Arrays.asList("content-length", "accept-encoding");
@@ -329,7 +322,7 @@ public class ApiExecutor {
         }
 
         String type = request.findContentType();
-        Method method = Method.fromString(request.getMethod());
+        URLMethods.Method method = URLMethods.Method.fromString(request.getMethod());
 
         builder = builder.url(request.getFullUrlWithParams());
 
@@ -365,13 +358,13 @@ public class ApiExecutor {
         request.setBody(tempPayload);
         return response;
     }
-    public static OriginalHttpResponse sendRequest(OriginalHttpRequest request, boolean followRedirects, TestingRunConfig testingRunConfig, boolean debug, List<TestLog> testLogs) throws Exception {
+    public static OriginalHttpResponse sendRequest(OriginalHttpRequest request, boolean followRedirects, TestingRunConfig testingRunConfig, boolean debug, List<TestingRunResult.TestLog> testLogs) throws Exception {
         return sendRequest(request, followRedirects, testingRunConfig, debug, testLogs, false);
     }
 
     private static final List<Integer> BACK_OFF_LIMITS = new ArrayList<>(Arrays.asList(1, 2, 5));
 
-    public static OriginalHttpResponse sendRequestBackOff(OriginalHttpRequest request, boolean followRedirects, TestingRunConfig testingRunConfig, boolean debug, List<TestLog> testLogs) throws Exception {
+    public static OriginalHttpResponse sendRequestBackOff(OriginalHttpRequest request, boolean followRedirects, TestingRunConfig testingRunConfig, boolean debug, List<TestingRunResult.TestLog> testLogs) throws Exception {
         OriginalHttpResponse response = null;
 
         for (int limit : BACK_OFF_LIMITS) {
@@ -399,7 +392,7 @@ public class ApiExecutor {
         return response;
     }
 
-    private static OriginalHttpResponse getRequest(OriginalHttpRequest request, Builder builder, boolean followRedirects, boolean debug, List<TestLog> testLogs, boolean skipSSRFCheck, boolean nonTestingContext)  throws Exception{
+    private static OriginalHttpResponse getRequest(OriginalHttpRequest request, Request.Builder builder, boolean followRedirects, boolean debug, List<TestingRunResult.TestLog> testLogs, boolean skipSSRFCheck, boolean nonTestingContext)  throws Exception{
         Request okHttpRequest = builder.build();
         return common(okHttpRequest, followRedirects, debug, testLogs, skipSSRFCheck, nonTestingContext, "application/json", request.getTlsAuthParam());
     }
@@ -458,26 +451,26 @@ public class ApiExecutor {
         List<ConditionsType> emptyList = new ArrayList<>();
 
         Utils.modifyHeaderOperations(originalHttpRequest, 
-            headerConditions.getOrDefault(NonTerminalExecutorDataOperands.MODIFY_HEADER.name(), emptyList), 
-            headerConditions.getOrDefault(NonTerminalExecutorDataOperands.ADD_HEADER.name(), emptyList),
-            headerConditions.getOrDefault(TerminalExecutorDataOperands.DELETE_HEADER.name(), emptyList)
+            headerConditions.getOrDefault(TestEditorEnums.NonTerminalExecutorDataOperands.MODIFY_HEADER.name(), emptyList),
+            headerConditions.getOrDefault(TestEditorEnums.NonTerminalExecutorDataOperands.ADD_HEADER.name(), emptyList),
+            headerConditions.getOrDefault(TestEditorEnums.TerminalExecutorDataOperands.DELETE_HEADER.name(), emptyList)
         );
 
         Utils.modifyBodyOperations(originalHttpRequest, 
-            payloadConditions.getOrDefault(NonTerminalExecutorDataOperands.MODIFY_BODY_PARAM.name(), emptyList), 
-            payloadConditions.getOrDefault(NonTerminalExecutorDataOperands.ADD_BODY_PARAM.name(), emptyList),
-            payloadConditions.getOrDefault(TerminalExecutorDataOperands.DELETE_BODY_PARAM.name(), emptyList)
+            payloadConditions.getOrDefault(TestEditorEnums.NonTerminalExecutorDataOperands.MODIFY_BODY_PARAM.name(), emptyList),
+            payloadConditions.getOrDefault(TestEditorEnums.NonTerminalExecutorDataOperands.ADD_BODY_PARAM.name(), emptyList),
+            payloadConditions.getOrDefault(TestEditorEnums.TerminalExecutorDataOperands.DELETE_BODY_PARAM.name(), emptyList)
         );
 
         // modify query params as well from payload conditions only, not handling query conditions separately for now
         Utils.modifyQueryOperations(originalHttpRequest, 
-            payloadConditions.getOrDefault(NonTerminalExecutorDataOperands.MODIFY_BODY_PARAM.name(), emptyList), 
+            payloadConditions.getOrDefault(TestEditorEnums.NonTerminalExecutorDataOperands.MODIFY_BODY_PARAM.name(), emptyList),
             emptyList,
-            payloadConditions.getOrDefault(TerminalExecutorDataOperands.DELETE_BODY_PARAM.name(), emptyList)
+            payloadConditions.getOrDefault(TestEditorEnums.TerminalExecutorDataOperands.DELETE_BODY_PARAM.name(), emptyList)
         );
     }
 
-    private static OriginalHttpResponse sendWithRequestBody(OriginalHttpRequest request, Builder builder, boolean followRedirects, boolean debug, List<TestLog> testLogs, boolean skipSSRFCheck, boolean nonTestingContext, String requestProtocol) throws Exception {
+    private static OriginalHttpResponse sendWithRequestBody(OriginalHttpRequest request, Request.Builder builder, boolean followRedirects, boolean debug, List<TestingRunResult.TestLog> testLogs, boolean skipSSRFCheck, boolean nonTestingContext, String requestProtocol) throws Exception {
         Map<String,List<String>> headers = request.getHeaders();
         if (headers == null) {
             headers = new HashMap<>();
@@ -584,7 +577,7 @@ public class ApiExecutor {
             .add("Accept", "text/event-stream")
             //.add("Content-Type", "text/event-stream")
             .build();
-        Request request = new Builder().url(host + "/sse").headers(headers).method("GET", null).build();
+        Request request = new Request.Builder().url(host + "/sse").headers(headers).method("GET", null).build();
         Call call = client.newCall(request);
         Response response = call.execute();
         if (!response.isSuccessful()) {
@@ -647,7 +640,7 @@ public class ApiExecutor {
         throw new Exception("Timeout waiting for SSE message with id=" + id);
     }
 
-    public static OriginalHttpResponse sendRequestWithSse(OriginalHttpRequest request, boolean followRedirects, TestingRunConfig testingRunConfig, boolean debug, List<TestLog> testLogs, boolean skipSSRFCheck) throws Exception {
+    public static OriginalHttpResponse sendRequestWithSse(OriginalHttpRequest request, boolean followRedirects, TestingRunConfig testingRunConfig, boolean debug, List<TestingRunResult.TestLog> testLogs, boolean skipSSRFCheck) throws Exception {
         // Always use prepareUrl to get the absolute URL
         String url = prepareUrl(request, testingRunConfig);
         URI uri = new URI(url);
@@ -699,33 +692,5 @@ public class ApiExecutor {
         JsonNode sseJson = objectMapper.readTree(sseMsg);
         String jsonBody = objectMapper.writeValueAsString(sseJson);
         return new OriginalHttpResponse(jsonBody, resp.getHeaders(), resp.getStatusCode());
-    }
-
-    private static String getEventStreamResponseBodyWithTimeout(Response response, long timeoutMs) throws IOException {
-        StringBuilder sb = new StringBuilder();
-        InputStream is = response.body().byteStream();
-
-        try (Scanner scanner = new Scanner(is)) {
-            long startTime = System.currentTimeMillis();
-            int waitLoopCount = 0;
-            while (System.currentTimeMillis() - startTime < timeoutMs) {
-                if (scanner.hasNextLine()) {
-                    String line = scanner.nextLine();
-                    sb.append(line).append("\n");
-                    waitLoopCount = 0; // Reset wait loop count on new data
-                } else {
-                    // Avoid tight CPU loop; sleep briefly
-                    waitLoopCount++;
-                    if (waitLoopCount > 20) { // If no data for a while, break
-                        break;
-                    }
-                    Thread.sleep(100);
-                }
-            }
-        } catch (Exception e) {
-            // Read timeout or interruption: end gracefully
-            sb.append("\n[Stream ended early: ").append(e.getMessage()).append("]");
-        }
-        return sb.toString();
     }
 }
