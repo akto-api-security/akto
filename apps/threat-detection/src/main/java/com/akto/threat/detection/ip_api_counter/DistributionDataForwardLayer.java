@@ -67,9 +67,13 @@ public class DistributionDataForwardLayer {
                 String redisKey = RedisKeyInfo.API_DISTRIBUTION_DATA_LAST_SENT_PREFIX + windowSize;
                 long lastSuccessfulUpdateTs = cache.get(redisKey);
                 long currentEpochMin = Context.now() / 60;
+                // - Align the current time to the nearest window size. 12:03 will align to 12:00 for a 5-minute window.
                 long currentAlignedWindowEnd = (currentEpochMin / windowSize) * windowSize;
 
+                // - Determine the safe window end to ensure only completed windows are processed.
                 long safeWindowEnd = currentAlignedWindowEnd - windowSize;
+
+                // - Start from lastSuccessfulUpdateTs or 60 minutes before.
                 long windowStart = Math.max(lastSuccessfulUpdateTs + windowSize, safeWindowEnd - 60);
 
                 for (long i = windowStart; i <= safeWindowEnd; i += windowSize) {
