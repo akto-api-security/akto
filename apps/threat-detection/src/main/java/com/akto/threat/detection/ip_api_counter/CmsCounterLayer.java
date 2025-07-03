@@ -8,6 +8,7 @@ import java.util.concurrent.TimeUnit;
 
 import com.akto.dao.context.Context;
 import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import com.akto.threat.detection.cache.ApiCountCacheLayer;
 import com.akto.threat.detection.cache.CounterCache;
 import com.akto.threat.detection.constants.RedisKeyInfo;
@@ -22,9 +23,15 @@ public class CmsCounterLayer {
     private static final int SEED = 12345; // fixed seed for reproducibility
     private static final int CMS_DATA_RETENTION_MINUTES = 60; // retain last 60 minutes
 
+    /*
+     * 12:01 -> CMS
+     * 12:02 -> CMS
+     * 12:03 -> CMS
+     * Each CMS stores: IP|API -> Count of calls for this API from this IP
+     */
     private static final ConcurrentHashMap<String, CountMinSketch> sketches = new ConcurrentHashMap<>();
     private static CounterCache cache;
-    private static final LoggerMaker logger = new LoggerMaker(CmsCounterLayer.class);
+    private static final LoggerMaker logger = new LoggerMaker(CmsCounterLayer.class, LogDb.THREAT_DETECTION);
     private static final CmsCounterLayer INSTANCE = new CmsCounterLayer();
 
     private CmsCounterLayer() {
@@ -52,6 +59,10 @@ public class CmsCounterLayer {
         cms.add(key, 1);
     }
 
+    // Key is count of API calls for this IP,
+    // e.g., "ipApiCmsData|10.2.3.4|123|/api/v1/resource|GET"
+
+    // windowKey is timestamp in minutes.
     public long estimateCount(String key, String windowKey) {
         CountMinSketch cms = sketches.get(windowKey);
         if (cms == null) {
@@ -65,6 +76,10 @@ public class CmsCounterLayer {
         return cms.estimateCount(key);
     }
 
+    /**
+     * Cleanup CMS from in-memory HashMap that are more than 60 minutes old.
+     * Redis will automatically handle the expiration of keys.
+     */
     public static void cleanupOldWindows() {
         logger.debug("cleanupOldWindows triggered at " + Context.now());
         long currentEpochMin = Context.now() / 60;
@@ -94,7 +109,7 @@ public class CmsCounterLayer {
                 String redisKey = RedisKeyInfo.IP_API_CMS_DATA_PREFIX + "|" + windowKey;
                 cache.setBytesWithExpiry(redisKey, serialized, CMS_DATA_RETENTION_MINUTES * 60);
             } catch (Exception e) {
-                // add log
+                logger.errorAndAddToDb(e, "Error in sync to redis CountMinSketch for window " + windowKey);
             }
 
         }

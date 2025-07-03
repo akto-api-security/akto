@@ -19,6 +19,7 @@ import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
 import com.akto.ProtoMessageUtils;
 import com.akto.dao.context.Context;
 import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ApiDistributionDataRequestPayload;
 import com.akto.threat.detection.cache.ApiCountCacheLayer;
 import com.akto.threat.detection.cache.CounterCache;
@@ -29,7 +30,7 @@ import io.lettuce.core.RedisClient;
 public class DistributionDataForwardLayer {
     
     private static final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
-    private static final LoggerMaker logger = new LoggerMaker(DistributionDataForwardLayer.class);
+    private static final LoggerMaker logger = new LoggerMaker(DistributionDataForwardLayer.class, LogDb.THREAT_DETECTION);
     private static CounterCache cache;
     private final DistributionCalculator distributionCalculator;
     private final CloseableHttpClient httpClient;
@@ -131,7 +132,7 @@ public class DistributionDataForwardLayer {
                             logger.info("Sent distribution data for windowSize={} windowStart={}", windowSize, i);
                             cache.set(redisKey, i);
                         } catch (Exception e) {
-                            logger.error("Failed to send distribution for windowSize {} windowStart {}: {}", windowSize, windowStart, e.getMessage());
+                            logger.errorAndAddToDb(e, "Failed to send distribution for windowSize: " + windowSize + " windowStart: " + windowStart);
                             return;
                         }
                     } else {
