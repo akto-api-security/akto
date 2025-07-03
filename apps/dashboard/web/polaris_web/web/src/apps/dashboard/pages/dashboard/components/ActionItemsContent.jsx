@@ -87,7 +87,7 @@ export const ActionItemsContent = () => {
                 const apiStatsStart = response.apiStatsStart;
 
                 const highRiskCount = Object.entries(apiStatsEnd.riskScoreMap || {})
-                    .filter(([score]) => parseInt(score) == 3)
+                    .filter(([score]) => parseInt(score) > 3)
                     .reduce((total, [, count]) => total + count, 0);
 
                 const unauthenticatedCount = apiStatsEnd.authTypeMap?.UNAUTHENTICATED || 0;
