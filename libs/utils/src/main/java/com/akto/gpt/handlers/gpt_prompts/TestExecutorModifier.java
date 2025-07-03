@@ -51,15 +51,22 @@ public class TestExecutorModifier extends PromptHandler {
 
     @Override
     protected String getPrompt(BasicDBObject queryData) {
-        String request = queryData.getString(_REQUEST);
         String operation = queryData.getString(_OPERATION);
         StringBuilder promptBuilder = new StringBuilder();
-        promptBuilder.append("You are a API request expert.\n\n")
-            .append("You are given an API request :\n")
-            .append("----------------------------------------\n")
-            .append(request)
-            .append("\n----------------------------------------\n\n")
-            .append("Your task:\n")
+        promptBuilder.append("You are an API request expert.\n\n");
+
+        if (queryData.containsKey(_REQUEST)) {
+            String request = queryData.getString(_REQUEST);
+            promptBuilder.append("You are given an API request :\n")
+                .append("----------------------------------------\n")
+                .append(request)
+                .append("\n----------------------------------------\n\n");
+        } else {
+            promptBuilder.append(
+                "You are given with a contextual information on which you have to perform the operation described below.\n\n");
+        }
+
+        promptBuilder.append("Your task:\n")
             .append("- Give out the delta key and value (optional) for the operation described.\n")
             .append("- The operation is: ")
             .append(operation)
@@ -73,6 +80,7 @@ public class TestExecutorModifier extends PromptHandler {
             .append("- Example: { \"delete_body_param\": \"param1\" }\n")
             .append("- Example: { \"modify_header\": {\"header1\": \"value1\"} }\n")
             .append("- Example: { \"modify_url\": \"https://example.com/product?id=5 OR 1=1\" }\n")
+            .append("- Example: { \"modify_body_param\": {\"key\": \"value1\"} }\n")
             .append("- Return ONLY the JSON or " + _NOT_FOUND + " — nothing else.");
         return promptBuilder.toString();
     }
