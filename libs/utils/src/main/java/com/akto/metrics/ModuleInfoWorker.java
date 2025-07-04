@@ -52,10 +52,6 @@ public class ModuleInfoWorker {
         }, 0, 30, TimeUnit.SECONDS);
     }
 
-    public static void init(ModuleInfo.ModuleType moduleType, DataActor dataActor) {
-        init(moduleType, dataActor, null);
-    }
-
     public static void init(ModuleInfo.ModuleType moduleType, DataActor dataActor, String name) {
         String version;
         try (InputStream in = ModuleInfoWorker.class.getResourceAsStream("/version.txt")) {
