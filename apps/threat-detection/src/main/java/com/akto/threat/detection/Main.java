@@ -15,8 +15,12 @@ import com.akto.log.LoggerMaker.LogDb;
 import com.akto.metrics.ModuleInfoWorker;
 import com.akto.threat.detection.constants.KafkaTopic;
 import com.akto.threat.detection.crons.ApiCountInfoRelayCron;
+import com.akto.threat.detection.ip_api_counter.CmsCounterLayer;
+import com.akto.threat.detection.ip_api_counter.DistributionCalculator;
+import com.akto.threat.detection.ip_api_counter.DistributionDataForwardLayer;
 import com.akto.threat.detection.tasks.MaliciousTrafficDetectorTask;
 import com.akto.threat.detection.tasks.SendMaliciousEventsToBackend;
+import com.akto.threat.detection.utils.Utils;
 import com.mongodb.ConnectionString;
 import io.lettuce.core.RedisClient;
 import io.lettuce.core.api.StatefulRedisConnection;
@@ -79,7 +83,15 @@ public class Main {
             .build();
 
 
-    new MaliciousTrafficDetectorTask(trafficKafka, internalKafka, localRedis).run();
+    CmsCounterLayer.initialize(localRedis);
+    DistributionCalculator distributionCalculator = new DistributionCalculator();
+    DistributionDataForwardLayer distributionDataForwardLayer = new DistributionDataForwardLayer(localRedis, distributionCalculator);
+
+    boolean apiDistributionEnabled = Utils.apiDistributionEnabled(localRedis != null, System.getenv().getOrDefault("API_DISTRIBUTION_ENABLED", "true").equals("true"));
+
+    triggerDistributionDataForwardCron(apiDistributionEnabled, distributionDataForwardLayer);
+
+    new MaliciousTrafficDetectorTask(trafficKafka, internalKafka, localRedis, distributionCalculator, apiDistributionEnabled).run();
 
     new SendMaliciousEventsToBackend(internalKafka, KafkaTopic.ThreatDetection.ALERTS).run();
 
@@ -93,6 +105,17 @@ public class Main {
     try {
         logger.info("Scheduling relayApiCountInfoCron at " + Context.now());
         apiCountInfoRelayCron.relayApiCountInfo();
+    } catch (Exception e) {
+        logger.error("Error scheduling relayApiCountInfoCron : {} ", e);
+    }
+  }
+
+  public static void triggerDistributionDataForwardCron(boolean apiDistributionEnabled, DistributionDataForwardLayer distributionDataForwardLayer) {
+    if (!apiDistributionEnabled) {
+      return;
+    }
+    try {
+        distributionDataForwardLayer.sendLastFiveMinuteDistributionData();
     } catch (Exception e) {
         logger.error("Error scheduling relayApiCountInfoCron : {} ", e);
     }
