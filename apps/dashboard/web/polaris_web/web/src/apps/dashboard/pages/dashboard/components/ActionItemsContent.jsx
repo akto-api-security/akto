@@ -1,5 +1,5 @@
 import { VerticalStack, Box, Badge, HorizontalStack, Icon, Avatar } from '@shopify/polaris'
-import ActionItemDetails from './ActionItemDetails'
+import ActionItemDetails from './ActionItemDetails';
 import { EmailMajor, ChevronDownMinor, AlertMajor } from '@shopify/polaris-icons'
 import { useEffect, useState } from 'react'
 import api from '../api'
@@ -9,44 +9,15 @@ import FlyLayout from '../../../components/layouts/FlyLayout'
 import GridRows from '../../../components/shared/GridRows'
 import observeApi from '../../observe/api'
 import TooltipText from '../../../components/shared/TooltipText'
+import JiraTicketCreationModal from '../../../components/shared/JiraTicketCreationModal';
 
 const actionItemsHeaders = [
-    {
-        title: '', 
-        value: 'priority',
-        type: 'text',
-        maxWidth: '60px'
-    },
-    {
-        title: 'Action Item',
-        value: 'actionItem',
-        type: 'text',
-        maxWidth: '300px'
-    },
-    {
-        title: 'Team',
-        value: 'team',
-        type: 'text',
-        maxWidth: '120px'
-    },
-    {
-        title: 'Efforts',
-        value: 'effort',
-        type: 'text',
-        maxWidth: '80px'
-    },
-    {
-        title: 'Why It Matters',
-        value: 'whyItMatters',
-        type: 'text',
-        maxWidth: '300px'
-    },
-    {
-        title: 'Action',
-        value: 'actions',
-        type: 'action',
-        maxWidth: '100px'
-    }
+    { title: '', value: 'priority', type: 'text' },
+    { title: 'Action Item', value: 'actionItem', type: 'text' },
+    { title: 'Team', value: 'team', type: 'text' },
+    { title: 'Efforts', value: 'effort', type: 'text' },
+    { title: 'Why It Matters', value: 'whyItMatters', type: 'text' },
+    { title: 'Action', value: 'actions', type: 'action' }
 ];
 
 const resourceName = {
@@ -59,11 +30,9 @@ const JIRA_INTEGRATION_URL = "/dashboard/settings/integrations/jira";
 function JiraLogoClickable() {
     const isIntegrated = typeof window !== 'undefined' && window.JIRA_INTEGRATED === true;
     const handleClick = (e) => {
+        e.stopPropagation();
         if (!isIntegrated) {
-            e.stopPropagation();
             window.location.href = JIRA_INTEGRATION_URL;
-        } else {
-            e.stopPropagation(); // Prevent row click if any
         }
     };
     return (
@@ -95,14 +64,9 @@ export const ActionItemsContent = () => {
         }];
     }
 
-    const handleRowClick = (item) => {
-        setSelectedItem(item);
-        setShowFlyout(true);
-    };
-
     const fetchData = async () => {
         const endTimestamp = func.timeNow();
-        const startTimestamp = func.timeNow() - 3600 * 24 * 7; // 7 days ago
+        const startTimestamp = func.timeNow() - 3600 * 24 * 7;
 
         let sensitiveDataCount = 0;
         try {
@@ -121,51 +85,40 @@ export const ActionItemsContent = () => {
                     .reduce((total, [, count]) => total + count, 0);
 
                 const unauthenticatedCount = apiStatsEnd.authTypeMap?.UNAUTHENTICATED || 0;
-
                 const currentThirdParty = apiStatsEnd.accessTypeMap?.THIRD_PARTY || 0;
                 const previousThirdParty = apiStatsStart.accessTypeMap?.THIRD_PARTY || 0;
                 const thirdPartyDiff = currentThirdParty - previousThirdParty;
+
+                const buildTruncatableCell = (tooltip, text, maxWidth = '400px') => (
+                    <Box style={{ minWidth: 0, flex: 1, maxWidth }}>
+                        <div style={{
+                            whiteSpace: 'nowrap',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis'
+                        }}>
+                            <TooltipText
+                                tooltip={tooltip}
+                                text={text}
+                                textProps={{ variant: 'bodyMd', fontWeight: 'medium' }}
+                            />
+                        </div>
+                    </Box>
+                );
 
                 const dynamicActionItems = [
                     {
                         id: '1',
                         priority: <Badge status="critical">P1</Badge>,
                         priorityComp: <Badge status="critical">P1</Badge>,
-                        actionItem: (
-                            <Box maxWidth="300px">
-                                <TooltipText 
-                                    tooltip={`${highRiskCount} APIs with risk score more than 3`}
-                                    text={`${highRiskCount} APIs with risk score more than 3`}
-                                    textProps={{variant: 'bodyMd', fontWeight: 'medium'}}
-                                />
-                            </Box>
+                        actionItem: buildTruncatableCell(
+                            `${highRiskCount} APIs with risk score more than 3`,
+                            `${highRiskCount} APIs with risk score more than 3`
                         ),
-                        team: (
-                            <Box maxWidth="120px">
-                                <TooltipText 
-                                    tooltip="Security Team"
-                                    text="Security Team"
-                                    textProps={{variant: 'bodyMd'}}
-                                />
-                            </Box>
-                        ),
-                        effort: (
-                            <Box maxWidth="80px">
-                                <TooltipText 
-                                    tooltip="Medium"
-                                    text="Medium"
-                                    textProps={{variant: 'bodyMd'}}
-                                />
-                            </Box>
-                        ),
-                        whyItMatters: (
-                            <Box maxWidth="300px">
-                                <TooltipText 
-                                    tooltip="Creates multiple attack vectors for malicious actors"
-                                    text="Creates multiple attack vectors for malicious actors"
-                                    textProps={{variant: 'bodyMd'}}
-                                />
-                            </Box>
+                        team: buildTruncatableCell("Security Team", "Security Team", '200px'),
+                        effort: buildTruncatableCell("Medium", "Medium", '100px'),
+                        whyItMatters: buildTruncatableCell(
+                            "Creates multiple attack vectors for malicious actors",
+                            "Creates multiple attack vectors for malicious actors"
                         ),
                         displayName: `${highRiskCount} APIs with risk score more than 3`,
                         actions: (
@@ -181,41 +134,15 @@ export const ActionItemsContent = () => {
                         id: '2',
                         priority: <Badge status="critical">P1</Badge>,
                         priorityComp: <Badge status="critical">P1</Badge>,
-                        actionItem: (
-                            <Box maxWidth="300px">
-                                <TooltipText 
-                                    tooltip={`${sensitiveDataCount} Endpoints exposing PII or confidential information`}
-                                    text={`${sensitiveDataCount} Endpoints exposing PII or confidential information`}
-                                    textProps={{variant: 'bodyMd', fontWeight: 'medium'}}
-                                />
-                            </Box>
+                        actionItem: buildTruncatableCell(
+                            `${sensitiveDataCount} Endpoints exposing PII or confidential information`,
+                            `${sensitiveDataCount} Endpoints exposing PII or confidential information`
                         ),
-                        team: (
-                            <Box maxWidth="120px">
-                                <TooltipText 
-                                    tooltip="Development"
-                                    text="Development"
-                                    textProps={{variant: 'bodyMd'}}
-                                />
-                            </Box>
-                        ),
-                        effort: (
-                            <Box maxWidth="80px">
-                                <TooltipText 
-                                    tooltip="Medium"
-                                    text="Medium"
-                                    textProps={{variant: 'bodyMd'}}
-                                />
-                            </Box>
-                        ),
-                        whyItMatters: (
-                            <Box maxWidth="300px">
-                                <TooltipText 
-                                    tooltip="Violates data privacy regulations (GDPR, CCPA) and risks customer trust"
-                                    text="Violates data privacy regulations (GDPR, CCPA) and risks customer trust"
-                                    textProps={{variant: 'bodyMd'}}
-                                />
-                            </Box>
+                        team: buildTruncatableCell("Development", "Development", '200px'),
+                        effort: buildTruncatableCell("Medium", "Medium", '100px'),
+                        whyItMatters: buildTruncatableCell(
+                            "Violates data privacy regulations (GDPR, CCPA) and risks customer trust",
+                            "Violates data privacy regulations (GDPR, CCPA) and risks customer trust"
                         ),
                         displayName: `${sensitiveDataCount} Endpoints exposing PII or confidential information`,
                         actions: (
@@ -231,41 +158,15 @@ export const ActionItemsContent = () => {
                         id: '3',
                         priority: <Badge status="critical">P1</Badge>,
                         priorityComp: <Badge status="critical">P1</Badge>,
-                        actionItem: (
-                            <Box maxWidth="300px">
-                                <TooltipText 
-                                    tooltip={`${unauthenticatedCount} APIs lacking proper authentication controls`}
-                                    text={`${unauthenticatedCount} APIs lacking proper authentication controls`}
-                                    textProps={{variant: 'bodyMd', fontWeight: 'medium'}}
-                                />
-                            </Box>
+                        actionItem: buildTruncatableCell(
+                            `${unauthenticatedCount} APIs lacking proper authentication controls`,
+                            `${unauthenticatedCount} APIs lacking proper authentication controls`
                         ),
-                        team: (
-                            <Box maxWidth="120px">
-                                <TooltipText 
-                                    tooltip="Security Team"
-                                    text="Security Team"
-                                    textProps={{variant: 'bodyMd'}}
-                                />
-                            </Box>
-                        ),
-                        effort: (
-                            <Box maxWidth="80px">
-                                <TooltipText 
-                                    tooltip="Medium"
-                                    text="Medium"
-                                    textProps={{variant: 'bodyMd'}}
-                                />
-                            </Box>
-                        ),
-                        whyItMatters: (
-                            <Box maxWidth="300px">
-                                <TooltipText 
-                                    tooltip="Easy target for unauthorized access and data exfiltration"
-                                    text="Easy target for unauthorized access and data exfiltration"
-                                    textProps={{variant: 'bodyMd'}}
-                                />
-                            </Box>
+                        team: buildTruncatableCell("Security Team", "Security Team", '200px'),
+                        effort: buildTruncatableCell("Medium", "Medium", '100px'),
+                        whyItMatters: buildTruncatableCell(
+                            "Easy target for unauthorized access and data exfiltration",
+                            "Easy target for unauthorized access and data exfiltration"
                         ),
                         displayName: `${unauthenticatedCount} APIs lacking proper authentication controls`,
                         actions: (
@@ -281,41 +182,15 @@ export const ActionItemsContent = () => {
                         id: '4',
                         priority: <Badge status="attention">P2</Badge>,
                         priorityComp: <Badge status="attention">P2</Badge>,
-                        actionItem: (
-                            <Box maxWidth="300px">
-                                <TooltipText 
-                                    tooltip={`${Math.max(0, thirdPartyDiff)} Third-party APIs frequently invoked or newly integrated within last 7 days`}
-                                    text={`${Math.max(0, thirdPartyDiff)} Third-party APIs frequently invoked or newly integrated within last 7 days`}
-                                    textProps={{variant: 'bodyMd', fontWeight: 'medium'}}
-                                />
-                            </Box>
+                        actionItem: buildTruncatableCell(
+                            `${Math.max(0, thirdPartyDiff)} Third-party APIs frequently invoked or newly integrated within last 7 days`,
+                            `${Math.max(0, thirdPartyDiff)} Third-party APIs frequently invoked or newly integrated within last 7 days`
                         ),
-                        team: (
-                            <Box maxWidth="120px">
-                                <TooltipText 
-                                    tooltip="Integration Team"
-                                    text="Integration Team"
-                                    textProps={{variant: 'bodyMd'}}
-                                />
-                            </Box>
-                        ),
-                        effort: (
-                            <Box maxWidth="80px">
-                                <TooltipText 
-                                    tooltip="Low"
-                                    text="Low"
-                                    textProps={{variant: 'bodyMd'}}
-                                />
-                            </Box>
-                        ),
-                        whyItMatters: (
-                            <Box maxWidth="300px">
-                                <TooltipText 
-                                    tooltip="New integrations may introduce unvetted security risks"
-                                    text="New integrations may introduce unvetted security risks"
-                                    textProps={{variant: 'bodyMd'}}
-                                />
-                            </Box>
+                        team: buildTruncatableCell("Integration Team", "Integration Team", '200px'),
+                        effort: buildTruncatableCell("Low", "Low", '100px'),
+                        whyItMatters: buildTruncatableCell(
+                            "New integrations may introduce unvetted security risks",
+                            "New integrations may introduce unvetted security risks"
                         ),
                         displayName: `${Math.max(0, thirdPartyDiff)} Third-party APIs frequently invoked or newly integrated within last 7 days`,
                         actions: (
@@ -329,7 +204,7 @@ export const ActionItemsContent = () => {
                     }
                 ];
 
-                const filteredActionItems = dynamicActionItems.filter(item => item.count > 0);
+                const filteredActionItems = dynamicActionItems.filter(item => item.count > -1);
                 setActionItems(filteredActionItems);
             } else {
                 console.error('Invalid API response structure');
@@ -346,10 +221,10 @@ export const ActionItemsContent = () => {
     }, []);
 
     return (
-        <VerticalStack gap={"5"}>
+        <VerticalStack gap="5">
             <Box maxWidth="100%" style={{ overflowX: 'hidden' }}>
                 <GithubSimpleTable
-                    key={"table"}
+                    key="table"
                     data={actionItems}
                     resourceName={resourceName}
                     headers={actionItemsHeaders}
@@ -370,13 +245,6 @@ export const ActionItemsContent = () => {
                     // onRowClick={handleRowClick}
                 />
             </Box>
-
-            {/* <FlyLayout
-                show={showFlyout}
-                setShow={setShowFlyout}
-                title="Action item details"
-                components={[<ActionItemDetails item={selectedItem} />]}
-            /> */}
         </VerticalStack>
     );
 };
