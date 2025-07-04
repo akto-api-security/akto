@@ -107,9 +107,9 @@ export const ActionItemsContent = () => {
         let sensitiveDataCount = 0;
         try {
             const response = await api.fetchApiStats(startTimestamp, endTimestamp);
-            console.log('API Stats Response:', response);
+            // console.log('API Stats Response:', response);
             const countMapResp = await observeApi.fetchCountMapOfApis();
-            console.log('Count Map Response:', countMapResp);
+            // console.log('Count Map Response:', countMapResp);
             if (countMapResp && typeof countMapResp.totalApisCount === 'number') {
                 sensitiveDataCount = countMapResp.totalApisCount;
             }
@@ -331,7 +331,7 @@ export const ActionItemsContent = () => {
                     }
                 ];
 
-                const filteredActionItems = dynamicActionItems.filter(item => item.count > -1);
+                const filteredActionItems = dynamicActionItems.filter(item => item.count > 0);
                 setActionItems(filteredActionItems);
             } else {
                 console.error('Invalid API response structure');
