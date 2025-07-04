@@ -217,6 +217,7 @@ public class HttpCallParser {
         FILTER_TYPE filterType = FILTER_TYPE.UNCHANGED;
         String message = responseParam.getOrig();
         RawApi rawApi = RawApi.buildFromMessage(message);
+        rawApi.getRequest().setHeaders(responseParam.getRequestParams().getHeaders());
         int apiCollectionId = responseParam.requestParams.getApiCollectionId();
         String url = responseParam.getRequestParams().getURL();
         Method method = Method.fromString(responseParam.getRequestParams().getMethod());
