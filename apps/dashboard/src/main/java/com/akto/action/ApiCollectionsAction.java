@@ -64,6 +64,8 @@ public class ApiCollectionsAction extends UserAction {
     List<ApiInfoKey> apiList;
     private BasicDBObject response;
     private boolean hasUsageEndpoints;
+    int sensitiveUnauthenticatedEndpointsCount;
+    int highRiskThirdPartyEndpointsCount;
 
     public List<ApiInfoKey> getApiList() {
         return apiList;
@@ -933,6 +935,35 @@ public class ApiCollectionsAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
+    public String fetchSensitiveAndUnauthenticatedValue(){
+
+        List<ApiInfo> sensitiveEndpoints = ApiInfoDao.instance.findAll(Filters.eq(ApiInfo.IS_SENSITIVE, true));
+
+        for(ApiInfo apiInfo: sensitiveEndpoints) {
+            if(apiInfo.getAllAuthTypesFound() != null && !apiInfo.getAllAuthTypesFound().isEmpty()) {
+                for(Set<ApiInfo.AuthType> authType: apiInfo.getAllAuthTypesFound()) {
+                    if(authType.contains(ApiInfo.AuthType.UNAUTHENTICATED)) {
+                        this.sensitiveUnauthenticatedEndpointsCount++;
+                    }
+                }
+            }
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String fetchHighRiskThirdPartyValue(){
+
+        List<ApiInfo> highRiskEndpoints = ApiInfoDao.instance.findAll(
+                Filters.and(
+                        Filters.gte(ApiInfo.RISK_SCORE, 3),
+                        Filters.in(ApiInfo.API_ACCESS_TYPES, ApiInfo.ApiAccessType.THIRD_PARTY)
+                )
+        );
+        this.highRiskThirdPartyEndpointsCount = highRiskEndpoints.size();
+        return Action.SUCCESS.toUpperCase();
+    }
+
+
     public List<ApiCollection> getApiCollections() {
         return this.apiCollections;
     }
@@ -1055,5 +1086,21 @@ public class ApiCollectionsAction extends UserAction {
 
     public void setResetEnvTypes(boolean resetEnvTypes) {
         this.resetEnvTypes = resetEnvTypes;
+    }
+
+    public int getHighRiskThirdPartyEndpointsCount() {
+        return highRiskThirdPartyEndpointsCount;
+    }
+
+    public void setHighRiskThirdPartyEndpointsCount(int highRiskThirdPartyEndpointsCount) {
+        this.highRiskThirdPartyEndpointsCount = highRiskThirdPartyEndpointsCount;
+    }
+
+    public int getSensitiveUnauthenticatedEndpointsCount() {
+        return sensitiveUnauthenticatedEndpointsCount;
+    }
+
+    public void setSensitiveUnauthenticatedEndpointsCount(int sensitiveUnauthenticatedEndpointsCount) {
+        this.sensitiveUnauthenticatedEndpointsCount = sensitiveUnauthenticatedEndpointsCount;
     }
 }
