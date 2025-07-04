@@ -9,7 +9,7 @@ import FlyLayout from '../../../components/layouts/FlyLayout'
 import GridRows from '../../../components/shared/GridRows'
 import observeApi from '../../observe/api'
 import TooltipText from '../../../components/shared/TooltipText'
-import JiraTicketCreationModal from '../../../components/shared/JiraTicketCreationModal';
+import JiraTicketCreationModal from '../../../components/shared/JiraTicketCreationModal'
 
 const actionItemsHeaders = [
     { title: '', value: 'priority', type: 'text' },
@@ -27,29 +27,40 @@ const resourceName = {
 
 const JIRA_INTEGRATION_URL = "/dashboard/settings/integrations/jira";
 
-function JiraLogoClickable() {
-    const isIntegrated = typeof window !== 'undefined' && window.JIRA_INTEGRATED === true;
-    const handleClick = (e) => {
-        e.stopPropagation();
-        if (!isIntegrated) {
-            window.location.href = JIRA_INTEGRATION_URL;
-        }
-    };
-    return (
-        <span
-            style={{ cursor: isIntegrated ? 'default' : 'pointer', display: 'inline-block' }}
-            onClick={handleClick}
-            title={isIntegrated ? undefined : 'Integrate Jira'}
-        >
-            <Avatar size="extraSmall" shape="square" source="/public/logo_jira.svg" />
-        </span>
-    );
-}
-
 export const ActionItemsContent = () => {
     const [showFlyout, setShowFlyout] = useState(false);
     const [selectedItem, setSelectedItem] = useState(null);
     const [actionItems, setActionItems] = useState([]);
+
+    // Modal-related state
+    const [modalActive, setModalActive] = useState(false);
+    const [projId, setProjId] = useState('');
+    const [issueType, setIssueType] = useState('');
+    const [issueId, setIssueId] = useState('');
+    const [jiraProjectMaps, setJiraProjectMaps] = useState({});
+
+    const isIntegrated = typeof window !== 'undefined' && window.JIRA_INTEGRATED === true;
+
+    const handleClick = (e) => {
+        e.stopPropagation();
+        if (!isIntegrated) {
+            window.location.href = JIRA_INTEGRATION_URL;
+        } else {
+            setModalActive(true);
+        }
+    };
+
+    function JiraLogoClickable() {
+        return (
+            <span
+                style={{ cursor: isIntegrated ? 'pointer' : 'pointer', display: 'inline-block' }}
+                onClick={handleClick}
+                title={isIntegrated ? 'Create Jira Ticket' : 'Integrate Jira'}
+            >
+                <Avatar size="extraSmall" shape="square" source="/public/logo_jira.svg" />
+            </span>
+        );
+    }
 
     function getActions(item) {
         return [{
@@ -242,9 +253,28 @@ export const ActionItemsContent = () => {
                         <Badge status={item.priorityDisplay}>{item.priority}</Badge>
                     )}
                     emptyStateMessage="No action items found"
-                    // onRowClick={handleRowClick}
                 />
             </Box>
+
+            <JiraTicketCreationModal
+                activator={null}
+                modalActive={modalActive}
+                setModalActive={setModalActive}
+                handleSaveAction={() => { }}
+                jiraProjectMaps={jiraProjectMaps}
+                setProjId={setProjId}
+                setIssueType={setIssueType}
+                projId={projId}
+                issueType={issueType}
+                issueId={issueId}
+                isAzureModal={false}
+            />
+            {/* <FlyLayout
+                    show={showFlyout}
+                    setShow={setShowFlyout}
+                    title="Action item details"
+                    components={[<ActionItemDetails item={selectedItem} />]}
+                /> */}
         </VerticalStack>
     );
 };
