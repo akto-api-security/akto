@@ -190,11 +190,7 @@ public class HttpCallParser {
                 return syncLimit;
             }
 
-            AccountSettings accountSettings = dataActor.fetchAccountSettings();
-            int accountId = Context.accountId.get();
-            if (accountSettings != null) {
-                accountId = accountSettings.getId();
-            }
+            int accountId = Main.actualAccountId;
 
             /*
              * If a user is using on-prem mini-runtime, no limits would apply there.
@@ -369,7 +365,7 @@ public class HttpCallParser {
     public void syncTrafficMetricsWithDBHelper() {
         List<BulkUpdates> bulkUpdates = new ArrayList<>();
         BasicDBObject metricsData = new BasicDBObject();
-        int accountId = Context.accountId.get();
+        int accountId = Main.actualAccountId;
         Organization organization = dataActor.fetchOrganization(accountId);
         for (TrafficMetrics trafficMetrics: trafficMetricsMap.values()) {
             TrafficMetrics.Key key = trafficMetrics.getId();
