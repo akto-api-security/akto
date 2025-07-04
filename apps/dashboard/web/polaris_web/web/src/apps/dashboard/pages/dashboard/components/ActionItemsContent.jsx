@@ -204,7 +204,7 @@ export const ActionItemsContent = () => {
                     }
                 ];
 
-                const filteredActionItems = dynamicActionItems.filter(item => item.count > -1);
+                const filteredActionItems = dynamicActionItems.filter(item => item.count > 0);
                 setActionItems(filteredActionItems);
             } else {
                 console.error('Invalid API response structure');
