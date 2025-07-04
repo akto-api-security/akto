@@ -1,9 +1,13 @@
 package com.akto.action;
 
 
+import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.ApiInfoDao;
+import com.akto.dto.ApiCollection;
 import com.akto.dto.ApiInfo;
+import com.akto.util.Constants;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Projections;
 
 import java.util.List;
 
@@ -30,7 +34,16 @@ public class ApiInfoAction extends UserAction {
     private ApiInfo apiInfo;
 
     public String fetchApiInfo(){
+        ApiCollection collection = ApiCollectionsDao.instance.findOne(Filters.eq(Constants.ID, apiCollectionId), Projections.include(ApiCollection._TYPE));
         Bson filter = ApiInfoDao.getFilter(url, method, apiCollectionId);
+        if(collection.getType() != null && collection.getType().equals(ApiCollection.Type.API_GROUP)) {
+            filter = Filters.and(
+                Filters.in(ApiInfo.COLLECTION_IDS, apiCollectionId),
+                Filters.eq(ApiInfo.ID_URL, url),
+                Filters.eq(ApiInfo.ID_METHOD, method)   
+            );
+        }
+       
         this.apiInfo = ApiInfoDao.instance.findOne(filter);
         return SUCCESS.toUpperCase();
     }
