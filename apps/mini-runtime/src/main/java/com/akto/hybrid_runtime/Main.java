@@ -163,6 +163,11 @@ public class Main {
 
     private static final String LOG_GROUP_ID = "-log";
 
+    public static final String customMiniRuntimeServiceName;
+    static {
+        customMiniRuntimeServiceName = System.getenv("MINI_RUNTIME_NAME") == null? "Default_" + UUID.randomUUID().toString().substring(0, 4) : System.getenv("MINI_RUNTIME_NAME");
+    }
+
     static private final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
 
     // REFERENCE: https://www.oreilly.com/library/view/kafka-the-definitive/9781491936153/ch04.html (But how do we Exit?)
@@ -200,7 +205,8 @@ public class Main {
         DataControlFetcher.init(dataActor);
 
         aSettings = dataActor.fetchAccountSettings();
-        ModuleInfoWorker.init(ModuleInfo.ModuleType.MINI_RUNTIME, dataActor);
+        ModuleInfoWorker.init(ModuleInfo.ModuleType.MINI_RUNTIME, dataActor, customMiniRuntimeServiceName);
+        loggerMaker.setModuleId(customMiniRuntimeServiceName);
         //DaoInit.init(new ConnectionString(mongoURI));
         // DictionaryFilter.readDictionaryBinary();
 

@@ -1,13 +1,11 @@
 package com.akto.metrics;
 
 import com.akto.dao.context.Context;
-import com.akto.data_actor.ClientActor;
 import com.akto.data_actor.DataActor;
 import com.akto.dto.monitoring.ModuleInfo;
 import com.akto.log.LoggerMaker;
 import com.akto.util.VersionUtil;
 
-import javax.annotation.OverridingMethodsMustInvokeSuper;
 import java.io.InputStream;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -50,10 +48,6 @@ public class ModuleInfoWorker {
             _this.dataActor.updateModuleInfo(moduleInfo);
             loggerMaker.info("Sending heartbeat at : " + moduleInfo.getLastHeartbeatReceived() + " for module: " + moduleInfo.getModuleType().name());
         }, 0, 30, TimeUnit.SECONDS);
-    }
-
-    public static void init(ModuleInfo.ModuleType moduleType, DataActor dataActor) {
-        init(moduleType, dataActor, null);
     }
 
     public static void init(ModuleInfo.ModuleType moduleType, DataActor dataActor, String name) {
