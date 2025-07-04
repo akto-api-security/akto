@@ -962,7 +962,7 @@ public class ApiCollectionsAction extends UserAction {
 
         List<ApiInfo> highRiskEndpoints = ApiInfoDao.instance.findAll(
                 Filters.and(
-                        Filters.gte(ApiInfo.RISK_SCORE, 3),
+                        Filters.gte(ApiInfo.RISK_SCORE, 4),
                         Filters.in(ApiInfo.API_ACCESS_TYPES, ApiInfo.ApiAccessType.THIRD_PARTY)
                 )
         );
