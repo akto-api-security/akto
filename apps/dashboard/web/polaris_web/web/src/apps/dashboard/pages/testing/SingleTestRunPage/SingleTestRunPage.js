@@ -25,7 +25,8 @@ import {
   RefreshMajor,
   CustomersMinor,
   PlusMinor,
-  SettingsMinor
+  SettingsMinor,
+  ViewMajor
 } from '@shopify/polaris-icons';
 import api from "../api";
 import observeApi from "../../observe/api";
@@ -49,6 +50,7 @@ import { produce } from "immer"
 import GithubServerTable from "../../../components/tables/GithubServerTable";
 import RunTest from '../../observe/api_collections/RunTest';
 import TableStore from '../../../components/tables/TableStore'
+import TestingRunEndpointsModal from './TestingRunEndpointsModal';
 let sortOptions = [
   { label: 'Severity', value: 'severity asc', directionLabel: 'Highest severity', sortKey: 'total_severity', columnIndex: 3 },
   { label: 'Severity', value: 'severity desc', directionLabel: 'Lowest severity', sortKey: 'total_severity', columnIndex: 3 },
@@ -620,6 +622,8 @@ function SingleTestRunPage() {
   }
   
   const [activeFromTesting, setActiveFromTesting] = useState(false)
+  
+  const [showTestingEndpointsModal, setShowTestingEndpointsModal] = useState(false)
 
   const resultTable = (
     <>
@@ -638,6 +642,12 @@ function SingleTestRunPage() {
         testRunType={testingRunResultSummariesObj?.testingRunType} 
         disabled={window.USER_ROLE === "GUEST"}
         shouldDisable={selectedTestRun.type === "CI_CD" || selectedTestRun.type === "RECURRING"}
+      />
+      <TestingRunEndpointsModal
+        key={"testing-endpoints-modal"}
+        showTestingEndpointsModal={showTestingEndpointsModal}
+        setShowTestingEndpointsModal={setShowTestingEndpointsModal}
+        testingEndpoints={testingRunResultSummariesObj?.testingRun?.testingEndpoints}
       />
       <GithubServerTable
         key={"table"}
@@ -877,6 +887,11 @@ function SingleTestRunPage() {
   moreActionsList.push({
     title: 'More',
     items: [
+      {
+        content: 'See APIs',
+        icon: ViewMajor,
+        onAction: () => { setShowTestingEndpointsModal(true) }
+      },
       {
         content: 'Re-Calculate Issues Count',
         icon: RefreshMajor,
