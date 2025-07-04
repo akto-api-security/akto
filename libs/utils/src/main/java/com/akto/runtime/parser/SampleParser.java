@@ -22,7 +22,6 @@ import com.google.gson.Gson;
 public class SampleParser {
     
     private static final Gson gson = new Gson();
-    private  static final List<String> headerValues = new ArrayList<>();
 
     private static void injectTagsInHeaders(HttpRequestParams httpRequestParams, String tagsJson){
         if(tagsJson == null || tagsJson.isEmpty()){
@@ -31,7 +30,7 @@ public class SampleParser {
 
         Map<String, String> tagsMap = gson.fromJson(tagsJson, Map.class);
         for (String tagName: tagsMap.keySet()){
-            headerValues.clear();
+            List<String> headerValues = new ArrayList<>();
             headerValues.add(tagsMap.get(tagName));
             httpRequestParams.getHeaders().put("x-akto-k8s-"+ tagName, headerValues);
         }
