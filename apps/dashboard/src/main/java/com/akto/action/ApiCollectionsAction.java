@@ -6,6 +6,7 @@ import java.util.stream.Collectors;
 import com.akto.action.observe.InventoryAction;
 import com.akto.dto.*;
 import com.akto.util.Pair;
+import lombok.Getter;
 import org.bson.conversions.Bson;
 
 import com.akto.action.observe.Utils;
@@ -66,8 +67,11 @@ public class ApiCollectionsAction extends UserAction {
     List<ApiInfoKey> apiList;
     private BasicDBObject response;
     private boolean hasUsageEndpoints;
+    @Getter
     int sensitiveUnauthenticatedEndpointsCount;
+    @Getter
     int highRiskThirdPartyEndpointsCount;
+    @Getter
     int shadowApisCount;
 
     public List<ApiInfoKey> getApiList() {
@@ -1103,27 +1107,4 @@ public class ApiCollectionsAction extends UserAction {
         this.resetEnvTypes = resetEnvTypes;
     }
 
-    public int getHighRiskThirdPartyEndpointsCount() {
-        return highRiskThirdPartyEndpointsCount;
-    }
-
-    public void setHighRiskThirdPartyEndpointsCount(int highRiskThirdPartyEndpointsCount) {
-        this.highRiskThirdPartyEndpointsCount = highRiskThirdPartyEndpointsCount;
-    }
-
-    public int getSensitiveUnauthenticatedEndpointsCount() {
-        return sensitiveUnauthenticatedEndpointsCount;
-    }
-
-    public void setSensitiveUnauthenticatedEndpointsCount(int sensitiveUnauthenticatedEndpointsCount) {
-        this.sensitiveUnauthenticatedEndpointsCount = sensitiveUnauthenticatedEndpointsCount;
-    }
-
-    public int getShadowApisCount() {
-        return shadowApisCount;
-    }
-
-    public void setShadowApisCount(int shadowApisCount) {
-        this.shadowApisCount = shadowApisCount;
-    }
 }
