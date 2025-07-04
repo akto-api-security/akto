@@ -15,6 +15,7 @@ public class EditableTestingRunConfig extends TestingRunConfig {
     private boolean continuousTesting;
     private boolean sendMsTeamsAlert;
     private int scheduleTimestamp;
+    private int selectedSlackChannelId;
 
     @Getter
     @Setter
@@ -101,6 +102,14 @@ public class EditableTestingRunConfig extends TestingRunConfig {
 
     public void setScheduleTimestamp(int scheduleTimestamp) {
         this.scheduleTimestamp = scheduleTimestamp;
+    }
+
+    public int getSelectedSlackChannelId() {
+        return selectedSlackChannelId;
+    }
+
+    public void setSelectedSlackChannelId(int selectedSlackChannelId) {
+        this.selectedSlackChannelId = selectedSlackChannelId;
     }
 }
 
