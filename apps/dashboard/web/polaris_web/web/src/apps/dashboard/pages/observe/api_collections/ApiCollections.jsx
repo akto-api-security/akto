@@ -1,6 +1,6 @@
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards"
-import { Text, Button, IndexFiltersMode, Box, Badge, Popover, ActionList, ResourceItem, Avatar,  HorizontalStack, Icon, TextField, Tooltip} from "@shopify/polaris"
-import { HideMinor, ViewMinor,FileMinor, FileFilledMinor } from '@shopify/polaris-icons';
+import { Text, Button, IndexFiltersMode, Box, Popover, ActionList, ResourceItem, Avatar,  HorizontalStack, Icon} from "@shopify/polaris"
+import { HideMinor, ViewMinor,FileMinor } from '@shopify/polaris-icons';
 import api from "../api"
 import dashboardApi from "../../dashboard/api"
 import settingRequests from "../../settings/api"
@@ -33,7 +33,6 @@ import ReactFlow, {
     useEdgesState,
   
   } from 'react-flow-renderer';
-import { on } from "stream";
 import SetUserEnvPopupComponent from "./component/SetUserEnvPopupComponent";
   
 const CenterViewType = {
@@ -240,7 +239,7 @@ function ApiCollections(props) {
     const [active, setActive] = useState(false);
     const [loading, setLoading] = useState(false)
           
-    const [summaryData, setSummaryData] = useState({totalEndpoints:0 , totalTestedEndpoints: 0, totalSensitiveEndpoints: 0, totalCriticalEndpoints: 0})
+    const [summaryData, setSummaryData] = useState({totalEndpoints:0 , totalTestedEndpoints: 0, totalSensitiveEndpoints: 0, totalCriticalEndpoints: 0, totalAllowedForTesting: 0})
     const [hasUsageEndpoints, setHasUsageEndpoints] = useState(true)
     const [envTypeMap, setEnvTypeMap] = useState({})
     const [refreshData, setRefreshData] = useState(false)
@@ -509,7 +508,7 @@ function ApiCollections(props) {
     async function handleCollectionsAction(collectionIdList, apiFunction, toastContent, currentIsOutOfTestingScopeVal=null){
         const collectionIdListObj = collectionIdList.map(collectionId => ({ id: collectionId.toString() }))
         await (currentIsOutOfTestingScopeVal !== null
-                ? apiFunction(collectionIdListObj, currentIsOutOfTestingScopeVal)
+                ? apiFunction(collectionIdList, currentIsOutOfTestingScopeVal)
                 : apiFunction(collectionIdListObj)).then(() => {
             func.setToast(true, false, `${collectionIdList.length} API collection${func.addPlurality(collectionIdList.length)} ${toastContent} successfully`)
         }).catch((error) => {
@@ -711,25 +710,24 @@ function ApiCollections(props) {
             return collection && collection.isOutOfTestingScope;
         })
 
+        let content = "";
+        let toastContent = "";
         if(allOutOfTestScopeFalse){
-            actions.push(
-                {
-                    content: `Mark collection${func.addPlurality(selectedResources.length)} as out of testing scope`,
-                    onAction: () => handleCollectionsAction(selectedResources, collectionApi.toggleCollectionsOutOfTestScope, "marked out of testing scope", false)
-                }
-            )  
+            content = `Mark collection${func.addPlurality(selectedResources.length)} as out of testing scope`
+            toastContent = "marked out of testing scope"
+        }else if(allOutOfTestScopeTrue){
+            content = `Mark collection${func.addPlurality(selectedResources.length)} as in testing scope`
+            toastContent = "marked in testing scope"
         }
-        else if(allOutOfTestScopeTrue){
+
+        if(content.length > 0 && toastContent.length > 0){
             actions.push(
                 {
-                    content: `Mark collection${func.addPlurality(selectedResources.length)} as in testing scope`,
-                    onAction: () => handleCollectionsAction(selectedResources, collectionApi.toggleCollectionsOutOfTestScope, "marked in testing scope", true)
+                    content: content,
+                    onAction: () => handleCollectionsAction(selectedResources, collectionApi.toggleCollectionsOutOfTestScope, toastContent, allOutOfTestScopeTrue)
                 }
             )
         }
-
-
-
         const bulkActionsOptions = [...actions];
         if(selectedTab !== 'groups') {
             bulkActionsOptions.push(toggleEnvType)
@@ -810,11 +808,11 @@ function ApiCollections(props) {
     />
 
     let coverage = '0%';
-    if(summaryData.totalEndpoints !== 0){
-        if(summaryData.totalEndpoints < summaryData.totalTestedEndpoints){
+    if(summaryData.totalAllowedForTesting !== 0){
+        if(summaryData.totalAllowedForTesting < summaryData.totalTestedEndpoints){
             coverage = '100%'
         }else{
-            coverage = Math.ceil((summaryData.totalTestedEndpoints * 100) / summaryData.totalEndpoints) + '%'
+            coverage = Math.ceil((summaryData.totalTestedEndpoints * 100) / summaryData.totalAllowedForTesting) + '%'
         }
     }
 

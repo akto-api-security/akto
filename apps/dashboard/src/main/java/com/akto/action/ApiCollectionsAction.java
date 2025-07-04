@@ -46,6 +46,8 @@ import com.mongodb.client.model.UnwindOptions;
 import com.mongodb.client.model.UpdateOptions;
 import com.opensymphony.xwork2.Action;
 
+import lombok.Setter;
+
 public class ApiCollectionsAction extends UserAction {
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(ApiCollectionsAction.class, LogDb.DASHBOARD);
@@ -689,36 +691,29 @@ public class ApiCollectionsAction extends UserAction {
         return Action.SUCCESS.toUpperCase();
     }
 
-    private Boolean currentIsOutOfTestingScopeVal;
-
-    public void setCurrentIsOutOfTestingScopeVal(Boolean currentIsOutOfTestingScopeVal){
-        this.currentIsOutOfTestingScopeVal = currentIsOutOfTestingScopeVal;
-    }
+    @Setter
+    private boolean currentIsOutOfTestingScopeVal;
 
     public String toggleCollectionsOutOfTestScope(){
         try{
-            if(this.apiCollections==null || this.apiCollections.isEmpty()){
+            if(this.apiCollectionIds ==null || this.apiCollectionIds.isEmpty()){
                 addActionError("No collections provided");
-                return ERROR.toUpperCase();
-            }
-            List<Integer> apiCollectionIdsForOutOfTestScope = reduceApiCollectionToId(this.apiCollections);
-
-            if(apiCollectionIdsForOutOfTestScope.isEmpty()){
-                addActionError("No valid collections provided");
                 return ERROR.toUpperCase();
             }
             List<Integer> accessibleCollectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
             if(accessibleCollectionIds != null){
-                apiCollectionIdsForOutOfTestScope.removeIf(id -> !accessibleCollectionIds.contains(id));
+                this.apiCollectionIds.removeIf(id -> !accessibleCollectionIds.contains(id));
             }
-            if(apiCollectionIdsForOutOfTestScope.isEmpty()){
+            if(this.apiCollectionIds.isEmpty()){
                 addActionError("No accessible collections provided");
                 return ERROR.toUpperCase();
             }
             ApiCollectionsDao.instance.updateMany(
-                Filters.in(ApiCollection.ID, apiCollectionIdsForOutOfTestScope),
+                Filters.in(ApiCollection.ID, this.apiCollectionIds),
                 Updates.set(ApiCollection.IS_OUT_OF_TESTING_SCOPE, !this.currentIsOutOfTestingScopeVal)
             );
+            response = new BasicDBObject();
+            response.put("success", true);
 
             return SUCCESS.toUpperCase();
 
