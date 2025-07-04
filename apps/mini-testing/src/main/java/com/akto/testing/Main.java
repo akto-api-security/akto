@@ -332,6 +332,7 @@ public class Main {
         ConsumerUtil testingConsumer = new ConsumerUtil();
         TestCompletion testCompletion = new TestCompletion();
         ModuleInfoWorker.init(ModuleInfo.ModuleType.MINI_TESTING, dataActor, customMiniTestingServiceName);
+        loggerMaker.setModuleId(customMiniTestingServiceName);
         loggerMaker.infoAndAddToDb("Starting.......", LogDb.TESTING);
 
         if(Constants.IS_NEW_TESTING_ENABLED){
