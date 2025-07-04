@@ -6,6 +6,7 @@ import java.util.stream.Collectors;
 import com.akto.action.observe.InventoryAction;
 import com.akto.dto.*;
 import com.akto.util.Pair;
+import lombok.Getter;
 import org.bson.conversions.Bson;
 
 import com.akto.action.observe.Utils;
@@ -46,6 +47,8 @@ import com.mongodb.client.model.UnwindOptions;
 import com.mongodb.client.model.UpdateOptions;
 import com.opensymphony.xwork2.Action;
 
+import static com.akto.util.Constants.AKTO_DISCOVERED_APIS_COLLECTION;
+
 public class ApiCollectionsAction extends UserAction {
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(ApiCollectionsAction.class, LogDb.DASHBOARD);
@@ -64,6 +67,12 @@ public class ApiCollectionsAction extends UserAction {
     List<ApiInfoKey> apiList;
     private BasicDBObject response;
     private boolean hasUsageEndpoints;
+    @Getter
+    int sensitiveUnauthenticatedEndpointsCount;
+    @Getter
+    int highRiskThirdPartyEndpointsCount;
+    @Getter
+    int shadowApisCount;
 
     public List<ApiInfoKey> getApiList() {
         return apiList;
@@ -933,6 +942,47 @@ public class ApiCollectionsAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
+    public String fetchSensitiveAndUnauthenticatedValue(){
+
+        List<ApiInfo> sensitiveEndpoints = ApiInfoDao.instance.findAll(Filters.eq(ApiInfo.IS_SENSITIVE, true));
+
+        for(ApiInfo apiInfo: sensitiveEndpoints) {
+            if(apiInfo.getAllAuthTypesFound() != null && !apiInfo.getAllAuthTypesFound().isEmpty()) {
+                for(Set<ApiInfo.AuthType> authType: apiInfo.getAllAuthTypesFound()) {
+                    if(authType.contains(ApiInfo.AuthType.UNAUTHENTICATED)) {
+                        this.sensitiveUnauthenticatedEndpointsCount++;
+                    }
+                }
+            }
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String fetchHighRiskThirdPartyValue(){
+
+        List<ApiInfo> highRiskEndpoints = ApiInfoDao.instance.findAll(
+                Filters.and(
+                        Filters.gte(ApiInfo.RISK_SCORE, 3),
+                        Filters.in(ApiInfo.API_ACCESS_TYPES, ApiInfo.ApiAccessType.THIRD_PARTY)
+                )
+        );
+        this.highRiskThirdPartyEndpointsCount = highRiskEndpoints.size();
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String fetchShadowApisValue(){
+
+        ApiCollection shadowApisCollection;
+        shadowApisCollection = ApiCollectionsDao.instance.findByName(AKTO_DISCOVERED_APIS_COLLECTION);
+
+        if(shadowApisCollection != null) {
+            this.shadowApisCount = shadowApisCollection.getUrls().size();
+        } else {
+            this.shadowApisCount = 0;
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
     public List<ApiCollection> getApiCollections() {
         return this.apiCollections;
     }
@@ -1056,4 +1106,5 @@ public class ApiCollectionsAction extends UserAction {
     public void setResetEnvTypes(boolean resetEnvTypes) {
         this.resetEnvTypes = resetEnvTypes;
     }
+
 }

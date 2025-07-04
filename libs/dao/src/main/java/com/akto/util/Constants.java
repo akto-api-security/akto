@@ -51,5 +51,6 @@ public class Constants {
     public final static String _AKTO = "AKTO";
 
     public final static String DEFAULT_AKTO_DASHBOARD_URL = "https://app.akto.io";
+    public static final String AKTO_DISCOVERED_APIS_COLLECTION = "shadow_apis";
 
 }
