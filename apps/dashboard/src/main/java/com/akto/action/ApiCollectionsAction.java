@@ -46,6 +46,8 @@ import com.mongodb.client.model.UnwindOptions;
 import com.mongodb.client.model.UpdateOptions;
 import com.opensymphony.xwork2.Action;
 
+import static com.akto.util.Constants.AKTO_DISCOVERED_APIS_COLLECTION;
+
 public class ApiCollectionsAction extends UserAction {
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(ApiCollectionsAction.class, LogDb.DASHBOARD);
@@ -66,6 +68,7 @@ public class ApiCollectionsAction extends UserAction {
     private boolean hasUsageEndpoints;
     int sensitiveUnauthenticatedEndpointsCount;
     int highRiskThirdPartyEndpointsCount;
+    int shadowApisCount;
 
     public List<ApiInfoKey> getApiList() {
         return apiList;
@@ -963,6 +966,18 @@ public class ApiCollectionsAction extends UserAction {
         return Action.SUCCESS.toUpperCase();
     }
 
+    public String fetchShadowApisValue(){
+
+        ApiCollection shadowApisCollection;
+        shadowApisCollection = ApiCollectionsDao.instance.findByName(AKTO_DISCOVERED_APIS_COLLECTION);
+
+        if(shadowApisCollection != null) {
+            this.shadowApisCount = shadowApisCollection.getUrls().size();
+        } else {
+            this.shadowApisCount = 0;
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
 
     public List<ApiCollection> getApiCollections() {
         return this.apiCollections;
@@ -1102,5 +1117,13 @@ public class ApiCollectionsAction extends UserAction {
 
     public void setSensitiveUnauthenticatedEndpointsCount(int sensitiveUnauthenticatedEndpointsCount) {
         this.sensitiveUnauthenticatedEndpointsCount = sensitiveUnauthenticatedEndpointsCount;
+    }
+
+    public int getShadowApisCount() {
+        return shadowApisCount;
+    }
+
+    public void setShadowApisCount(int shadowApisCount) {
+        this.shadowApisCount = shadowApisCount;
     }
 }
