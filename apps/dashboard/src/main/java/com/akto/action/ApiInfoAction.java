@@ -34,17 +34,17 @@ public class ApiInfoAction extends UserAction {
     private ApiInfo apiInfo;
 
     public String fetchApiInfo(){
-        ApiCollection collection = ApiCollectionsDao.instance.findOne(Filters.eq(Constants.ID, apiCollectionId), Projections.include(ApiCollection._TYPE));
         Bson filter = ApiInfoDao.getFilter(url, method, apiCollectionId);
-        if(collection.getType() != null && collection.getType().equals(ApiCollection.Type.API_GROUP)) {
-            filter = Filters.and(
-                Filters.in(ApiInfo.COLLECTION_IDS, apiCollectionId),
-                Filters.eq(ApiInfo.ID_URL, url),
-                Filters.eq(ApiInfo.ID_METHOD, method)   
-            );
-        }
-       
         this.apiInfo = ApiInfoDao.instance.findOne(filter);
+        if(this.apiInfo == null){
+            // case of slash missing in first character of url
+            // search for url having no leading slash
+            if (url != null && url.startsWith("/")) {
+                String urlWithoutLeadingSlash = url.substring(1);
+                filter = ApiInfoDao.getFilter(urlWithoutLeadingSlash, method, apiCollectionId);
+                this.apiInfo = ApiInfoDao.instance.findOne(filter);   
+            }
+        }
         return SUCCESS.toUpperCase();
     }
 
