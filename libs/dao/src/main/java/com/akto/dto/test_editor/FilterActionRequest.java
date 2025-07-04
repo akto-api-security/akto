@@ -172,4 +172,7 @@ public class FilterActionRequest {
         this.collectionProperty = collectionProperty;
     }
 
+    public boolean isValidationContext() {
+        return !"filter".equals(this.context);
+    }
 }
