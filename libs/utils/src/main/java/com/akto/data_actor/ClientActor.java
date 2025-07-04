@@ -1315,10 +1315,10 @@ public class ClientActor extends DataActor {
                 BasicDBObject accountObj = (BasicDBObject) payloadObj.get("organization");
                 organization = objectMapper.readValue(accountObj.toJson(), Organization.class);
             } catch(Exception e) {
-                loggerMaker.errorAndAddToDb("error extracting response in fetchSetupObject" + e, LoggerMaker.LogDb.RUNTIME);
+                loggerMaker.errorAndAddToDb(e, "error extracting response in fetchOrganization " + e, LoggerMaker.LogDb.RUNTIME);
             }
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("error in fetchOrganization" + e, LoggerMaker.LogDb.RUNTIME);
+            loggerMaker.errorAndAddToDb(e, "error in fetchOrganization" + e, LoggerMaker.LogDb.RUNTIME);
         }
         return organization;
     }
