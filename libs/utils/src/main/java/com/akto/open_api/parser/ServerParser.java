@@ -12,15 +12,21 @@ public class ServerParser {
         for (List<Server> servers : serverLists) {
             if (servers != null && !servers.isEmpty()) {
                 replaceServerVariables(servers);
-                // using first server only.
-                String serverUrl = servers.get(0).getUrl();
-                if (!serverUrl.endsWith("/")) {
-                    serverUrl += "/";
+                // Use first valid server URL
+                for (Server server : servers) {
+                    if (server.getUrl() == null || server.getUrl().isEmpty()) {
+                        continue;
+                    }
+                    String serverUrl = server.getUrl();
+
+                    if (!serverUrl.endsWith("/")) {
+                        serverUrl += "/";
+                    }
+                    if (path.startsWith("/")) {
+                        path = path.substring(1);
+                    }
+                    return serverUrl + path;
                 }
-                if (path.startsWith("/")) {
-                    path = path.substring(1);
-                }
-                return serverUrl + path;
             }
         }
         return path;

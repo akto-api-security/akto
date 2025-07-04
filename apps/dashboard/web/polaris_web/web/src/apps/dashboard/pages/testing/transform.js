@@ -988,6 +988,17 @@ getTestingRunResultUrl(testingResult){
   
 },
 getRowInfo(severity, apiInfo,jiraIssueUrl, sensitiveData, isIgnored, azureBoardsWorkItemUrl){
+  if(apiInfo == null || apiInfo === undefined){
+    apiInfo = {
+      allAuthTypesFound: [],
+      apiAccessTypes: [],
+      lastSeen: 0,
+      id: {
+        method: "NA",
+        url: "NA"
+      }
+    }
+  }
   let auth_type = apiInfo["allAuthTypesFound"].join(", ")
   let access_type = null
   let access_types = apiInfo["apiAccessTypes"]
