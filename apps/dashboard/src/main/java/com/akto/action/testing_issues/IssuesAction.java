@@ -741,10 +741,16 @@ public class IssuesAction extends UserAction {
         Bson projection = Projections.include(
                 TestingRunResultSummary.STATE,
                 TestingRunResultSummary.START_TIMESTAMP,
-                TestingRunResultSummary.END_TIMESTAMP
-        );
+                TestingRunResultSummary.END_TIMESTAMP,
+                TestingRunResultSummary.TESTING_RUN_ID);
 
-        testingRunResultSummary = TestingRunResultSummariesDao.instance.findOne(Filters.eq(TestingRunResultSummary.ID, testingRunSummaryObj), projection);
+        testingRunResultSummary = TestingRunResultSummariesDao.instance
+                .findOne(Filters.eq(TestingRunResultSummary.ID, testingRunSummaryObj), projection);
+                
+        if (testingRunResultSummary != null && testingRunResultSummary.getTestingRunId() != null) {
+            testingRunResultSummary.setTestingRunHexId(
+                    testingRunResultSummary.getTestingRunId().toHexString());
+        }
 
         return SUCCESS.toUpperCase();
     }
