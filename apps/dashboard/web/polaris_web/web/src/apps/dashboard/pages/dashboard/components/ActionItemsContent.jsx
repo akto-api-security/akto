@@ -53,57 +53,6 @@ const resourceName = {
     plural: 'action items'
 };
 
-const PriorityIcon = ({ priority }) => {
-    const getIconStyle = () => {
-        switch (priority) {
-            case 'P1':
-                return {
-                    backgroundColor: '#FED3D1',
-                    color: '#000000',
-                    borderRadius: '12px',
-                    width: '32px',
-                    height: '20px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontSize: '12px',
-                    fontWeight: 'normal'
-                };
-            case 'P2':
-                return {
-                    backgroundColor: '#FFD79D',
-                    color: '#000000',
-                    borderRadius: '12px',
-                    width: '32px',
-                    height: '20px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontSize: '12px',
-                    fontWeight: 'normal'
-                };
-            case 'P3':
-                return {
-                    backgroundColor: '#E5E5E5',
-                    color: '#000000',
-                    borderRadius: '12px',
-                    width: '32px',
-                    height: '20px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontSize: '12px',
-                    fontWeight: 'normal'
-                };
-        }
-    };
-
-    return (
-        <div style={getIconStyle()}>
-            {priority}
-        </div>
-    );
-};
 
 export const ActionItemsContent = () => {
     const [showFlyout, setShowFlyout] = useState(false);
@@ -159,8 +108,8 @@ export const ActionItemsContent = () => {
                 const dynamicActionItems = [
                     {
                         id: '1',
-                        priority: <PriorityIcon priority="P1" />,
-                        priorityComp: <PriorityIcon priority="P1" />,
+                        priority: <Badge status="critical">P1</Badge>,
+                        priorityComp: <Badge status="critical">P1</Badge>,
                         actionItem: `${highRiskCount} APIs with risk score more than 3`,
                         team: 'Security Team',
                         effort: 'Medium',
@@ -177,8 +126,8 @@ export const ActionItemsContent = () => {
                     },
                     {
                         id: '2',
-                        priority: <PriorityIcon priority="P1" />,
-                        priorityComp: <PriorityIcon priority="P1" />,
+                        priority: <Badge status="critical">P1</Badge>,
+                        priorityComp: <Badge status="critical">P1</Badge>,
                         actionItem: `${sensitiveDataCount} Endpoints exposing PII or confidential information`,
                         team: 'Development',
                         effort: 'Medium',
@@ -195,8 +144,8 @@ export const ActionItemsContent = () => {
                     },
                     {
                         id: '3',
-                        priority: <PriorityIcon priority="P1" />,
-                        priorityComp: <PriorityIcon priority="P1" />,
+                        priority: <Badge status="critical">P1</Badge>,
+                        priorityComp: <Badge status="critical">P1</Badge>,
                         actionItem: `${unauthenticatedCount} APIs lacking proper authentication controls`,
                         team: 'Security Team',
                         effort: 'Medium',
@@ -213,8 +162,8 @@ export const ActionItemsContent = () => {
                     },
                     {
                         id: '4',
-                        priority: <PriorityIcon priority="P2" />,
-                        priorityComp: <PriorityIcon priority="P2" />,
+                        priority: <Badge status="attention">P2</Badge>,
+                        priorityComp: <Badge status="attention">P2</Badge>,
                         actionItem: `${Math.max(0, thirdPartyDiff)} Third-party APIs frequently invoked or newly integrated within last 7 days`,
                         team: 'Integration Team',
                         effort: 'Low',
