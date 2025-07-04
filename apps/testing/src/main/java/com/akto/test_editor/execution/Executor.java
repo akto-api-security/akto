@@ -483,10 +483,23 @@ public class Executor {
                 String request = Utils.buildRequestIHttpFormat(rawApi);
 
                 String operationPrompt = "";
-                if (key.equals(Utils._MAGIC)) {
+
+                boolean isMagicContext = false;
+                // for $magic_context - no request is passed as context.
+                if (key.equals(Utils.MAGIC_CONTEXT)) {
                     operationPrompt = value.toString();
-                } else if (key.toString().startsWith(Utils._MAGIC)) {
-                    operationPrompt = key.toString().replace(Utils._MAGIC, "").trim();
+                    isMagicContext = true;
+                } else if (key.toString().startsWith(Utils.MAGIC_CONTEXT)) {
+                    operationPrompt = key.toString().replace(Utils.MAGIC_CONTEXT, "").trim();
+                    isMagicContext = true;
+                }
+
+                if (!isMagicContext) {
+                    if (key.equals(Utils._MAGIC)) {
+                        operationPrompt = value.toString();
+                    } else if (key.toString().startsWith(Utils._MAGIC)) {
+                        operationPrompt = key.toString().replace(Utils._MAGIC, "").trim();
+                    }
                 }
 
                 if (!operationPrompt.isEmpty()) {
@@ -494,7 +507,9 @@ public class Executor {
                     String operation = operationTypeLower + ": " + operationPrompt;
 
                     BasicDBObject queryData = new BasicDBObject();
-                    queryData.put(TestExecutorModifier._REQUEST, request);
+                    if (!isMagicContext) {
+                        queryData.put(TestExecutorModifier._REQUEST, request);
+                    }
                     queryData.put(TestExecutorModifier._OPERATION, operation);
                     BasicDBObject generatedData = new TestExecutorModifier().handle(queryData);
                     generatedOperationKeyValuePairs = parseGeneratedKeyValues(generatedData, operationTypeLower, value);
