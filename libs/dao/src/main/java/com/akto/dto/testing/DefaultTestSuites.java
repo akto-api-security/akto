@@ -21,7 +21,8 @@ public class DefaultTestSuites extends TestSuites {
     public enum DefaultSuitesType {
         OWASP,
         TESTING_METHODS,
-        SEVERITY
+        SEVERITY,
+        DURATION
     }
 
     public static final Map<String, List<String>> owaspTop10List = new HashMap<>();

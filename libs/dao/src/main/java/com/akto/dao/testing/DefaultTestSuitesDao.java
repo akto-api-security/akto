@@ -49,6 +49,7 @@ public class DefaultTestSuitesDao extends AccountsContextDao<DefaultTestSuites> 
 
 
         Map<String, List<String>> testingMethodsSuites = new HashMap<>();
+        Map<String, List<String>> durationTestSuites = new HashMap<>();
         for(YamlTemplate yamlTemplate : yamlTemplateList) {
             if(yamlTemplate.getAttributes() != null) {
                 if(yamlTemplate.getAttributes().getNature().name().equals(GlobalEnums.TemplateNature.INTRUSIVE.name())) {
@@ -57,6 +58,14 @@ public class DefaultTestSuitesDao extends AccountsContextDao<DefaultTestSuites> 
                 } else {
                     testingMethodsSuites.putIfAbsent("Non Intrusive", new ArrayList<>());
                     testingMethodsSuites.get("Non Intrusive").add(yamlTemplate.getId());
+                }
+
+                if(yamlTemplate.getAttributes().getDuration().name().equals(GlobalEnums.TemplateDuration.FAST.name())){
+                    durationTestSuites.putIfAbsent("Fast", new ArrayList<>());
+                    durationTestSuites.get("Fast").add(yamlTemplate.getId());
+                } else {
+                    durationTestSuites.putIfAbsent("Slow", new ArrayList<>());
+                    durationTestSuites.get("Slow").add(yamlTemplate.getId());
                 }
             }
         }
@@ -83,6 +92,7 @@ public class DefaultTestSuitesDao extends AccountsContextDao<DefaultTestSuites> 
         defaultTestSuites.put(DefaultTestSuites.DefaultSuitesType.OWASP.name(), owaspSuites);
         defaultTestSuites.put(DefaultTestSuites.DefaultSuitesType.TESTING_METHODS.name(), testingMethodsSuites);
         defaultTestSuites.put(DefaultTestSuites.DefaultSuitesType.SEVERITY.name(), severitySuites);
+        defaultTestSuites.put(DefaultTestSuites.DefaultSuitesType.DURATION.name(), durationTestSuites);
 
         return defaultTestSuites;
     }
