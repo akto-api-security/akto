@@ -2197,6 +2197,18 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
   },
   formatCollectionType(type) {
     return (type?.keyName?.replace(/^(userSetEnvType|envType)/, 'env')?.slice(0, 30) ?? '') + '=' + (type?.value?.slice(0, 30) ?? '')
+  },
+  getRecurringContext(periodInSeconds) {
+    if (periodInSeconds === 86400) return "Daily"
+    else if (periodInSeconds === (86400 * 30)) return "Monthly"
+    else if (periodInSeconds === (86400 * 7)) return "Weekly"
+    else if (periodInSeconds === -1) return "Continuously"
+    else return "Once"
+  },
+  getRunTypeLabel(runType, periodInSeconds) {
+    if (!runType || runType === "CI_CD" || runType === "ONE_TIME") return "Once";
+    else if (runType === "RECURRING") return this.getRecurringContext(periodInSeconds)
+    else if (runType === "CONTINUOUS_TESTING") return "Continuously";
   }
 }
 
