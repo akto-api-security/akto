@@ -543,8 +543,8 @@ function IssuesPage() {
                             method: item?.id?.apiInfoKey?.method,
                             url: item?.id?.apiInfoKey?.url,
                             id: JSON.stringify(item?.id),
+                            jiraIssueUrl: item?.jiraIssueUrl || "",
                         }],
-                        urlsKey: ['']
                     })
                 } else {
                     const existingIssue = uniqueIssuesMap.get(key)
@@ -556,6 +556,7 @@ function IssuesPage() {
                         method: item?.id?.apiInfoKey?.method,
                         url: item?.id?.apiInfoKey?.url,
                         id: JSON.stringify(item?.id),
+                        jiraIssueUrl: item?.jiraIssueUrl || ""
                     })
                     existingIssue.numberOfEndpoints += 1
                 }

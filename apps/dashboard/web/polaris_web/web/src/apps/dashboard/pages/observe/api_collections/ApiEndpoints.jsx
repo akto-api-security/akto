@@ -688,7 +688,7 @@ function ApiEndpoints(props) {
             if (source) {
                 formData.append("source", source)
             }
-            func.setToast(true, false, "We are uploading your openapi file, please dont refresh the page!")
+            func.setToast(true, false, "We are uploading your openapi file, please don't refresh the page!")
 
             api.uploadOpenApiFile(formData).then(resp => {
                 if (file.size > 2097152) {
@@ -735,7 +735,7 @@ function ApiEndpoints(props) {
                     formData.append("hsFile", reader.result)
                     formData.append("skipKafka", skipKafka)
                     formData.append("apiCollectionId", apiCollectionId);
-                    func.setToast(true, false, "We are uploading your har file, please dont refresh the page!")
+                    func.setToast(true, false, "We are uploading your har file, please don't refresh the page!")
 
                     api.uploadHarFile(formData).then(resp => {
                         if (file.size > 2097152) {

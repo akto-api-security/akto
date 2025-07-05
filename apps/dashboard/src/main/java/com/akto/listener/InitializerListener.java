@@ -2462,6 +2462,8 @@ public class InitializerListener implements ServletContextListener {
                     setUpTestEditorTemplatesScheduler();
                     setUpWebhookScheduler();
                     setupAutomatedApiGroupsScheduler();
+                    setUpDailyScheduler();
+                    setUpTrafficAlertScheduler();
                     JobsCron.instance.jobsScheduler(JobExecutorType.DASHBOARD);
 
                     if(runJobFunctionsAnyway) {
@@ -2473,10 +2475,6 @@ public class InitializerListener implements ServletContextListener {
 
                         // trimCappedCollectionsJob();
                         setUpPiiAndTestSourcesScheduler();
-                        setUpTrafficAlertScheduler();
-                        // setUpAktoMixpanelEndpointsScheduler();
-                        setUpDailyScheduler();
-                        
                         cleanInventoryJobRunner();
                         setUpDefaultPayloadRemover();
                         setUpDependencyFlowScheduler();
@@ -3375,11 +3373,6 @@ public class InitializerListener implements ServletContextListener {
             logger.infoAndAddToDb("Backward compatibilities set for " + Context.accountId.get(), LogDb.DASHBOARD);
             insertPiiSources();
             logger.infoAndAddToDb("PII sources inserted set for " + Context.accountId.get(), LogDb.DASHBOARD);
-
-//            setUpPiiCleanerScheduler();
-//            setUpDailyScheduler();
-//            setUpWebhookScheduler();
-//            setUpPiiAndTestSourcesScheduler();
 
             // AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
             // dropSampleDataIfEarlierNotDroped(accountSettings);

@@ -10,6 +10,7 @@ function Slack() {
     
     const [slackWebhooks, setSlackWebhooks] = useState([])
     const [slackWebhookUrl, setSlackWebhookUrl] = useState("")
+    const [slackWebhookName, setSlackWebhookName] = useState("")
 
     async function fetchWebhooks() {
         let arr = await settingFunctions.getTokenList("SLACK")
@@ -30,7 +31,7 @@ function Slack() {
     }
 
     const handleAddSlackWebhook = async () => {
-        const response = await settingRequests.addSlackWebhook(slackWebhookUrl)
+        const response = await settingRequests.addSlackWebhook(slackWebhookUrl, slackWebhookName)
         if (response) {
             if (response.error) {
                 func.setToast(true, true, response.error)
@@ -45,7 +46,7 @@ function Slack() {
 
     const listComponent = (
         slackWebhooks.map((slackWebhook, index) => (
-            <LegacyCard.Section title={`Slack Webhook ${index + 1}`} key={index}
+            <LegacyCard.Section title={slackWebhook?.name || `Slack webhook ${index}`} key={index}
                 actions={[{ content: 'Delete', destructive: true, onAction: () => handleDeleteSlackWebhook(slackWebhook.id) }]}>
                 <p>{func.prettifyEpoch(slackWebhook.timestamp)}</p>
                 <PasswordTextField field={slackWebhook.key} />
@@ -55,10 +56,14 @@ function Slack() {
 
     const slackFormComponent = (
         <LegacyCard.Section title="Add Slack Webhook">
+            <TextField
+                label="Slack Webhook Name"
+                value={slackWebhookName}
+                onChange={(slackWebhookName) => setSlackWebhookName(slackWebhookName)} />
             <TextField 
-            label="Slack Webhook URL"
-            value={slackWebhookUrl} 
-            onChange={(slackWebhookUrl) => setSlackWebhookUrl(slackWebhookUrl)} />
+                label="Slack Webhook URL"
+                value={slackWebhookUrl} 
+                onChange={(slackWebhookUrl) => setSlackWebhookUrl(slackWebhookUrl)} />
         </LegacyCard.Section>
     )
     

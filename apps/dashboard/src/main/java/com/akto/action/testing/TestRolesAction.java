@@ -22,6 +22,7 @@ import com.akto.dto.testing.EndpointLogicalGroup;
 import com.akto.dto.testing.HardcodedAuthParam;
 import com.akto.dto.testing.LoginRequestAuthParam;
 import com.akto.dto.testing.RequestData;
+import com.akto.dto.testing.SampleDataAuthParam;
 import com.akto.dto.testing.TLSAuthParam;
 import com.akto.dto.testing.TestRoles;
 import com.akto.dto.testing.config.TestCollectionProperty;
@@ -30,6 +31,7 @@ import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.Constants;
 import com.akto.util.enums.LoginFlowEnums;
+import com.akto.util.enums.LoginFlowEnums.AuthMechanismTypes;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
@@ -128,19 +130,31 @@ public class TestRolesAction extends UserAction {
 
             for (AuthParamData authParamDataElem : authParamData) {
                 AuthParam param = null;
-                if (authAutomationType.toUpperCase().equals(LoginFlowEnums.AuthMechanismTypes.HARDCODED.toString())) {
-                    param = new HardcodedAuthParam(authParamDataElem.getWhere(), authParamDataElem.getKey(),
+
+                switch (AuthMechanismTypes.valueOf(authAutomationType.toUpperCase())) {
+                    case HARDCODED:
+                        param = new HardcodedAuthParam(authParamDataElem.getWhere(), authParamDataElem.getKey(),
                             authParamDataElem.getValue(), true);
-                } else if (authAutomationType.toUpperCase()
-                        .equals(LoginFlowEnums.AuthMechanismTypes.LOGIN_REQUEST.toString())) {
-                    param = new LoginRequestAuthParam(authParamDataElem.getWhere(), authParamDataElem.getKey(),
+                        break;
+                    
+                    case LOGIN_REQUEST:
+                        param = new LoginRequestAuthParam(authParamDataElem.getWhere(), authParamDataElem.getKey(),
                             authParamDataElem.getValue(), authParamDataElem.getShowHeader());
-                } else if (authAutomationType.toUpperCase()
-                        .equals(LoginFlowEnums.AuthMechanismTypes.TLS_AUTH.toString())) {
-                    param = new TLSAuthParam(authParamDataElem.getCertAuthorityCertificate(),
+                        break;    
+
+                    case TLS_AUTH:
+                        param = new TLSAuthParam(authParamDataElem.getCertAuthorityCertificate(),
                             authParamDataElem.getCertificateType(), authParamDataElem.getClientCertificate(),
                             authParamDataElem.getClientKey());
+                        break;
+                    case SAMPLE_DATA:
+                        param = new SampleDataAuthParam(authParamDataElem.getWhere(), authParamDataElem.getKey(),
+                            authParamDataElem.getValue(), true);
+                        break;        
+                    default:
+                        break;
                 }
+
                 authParams.add(param);
             }
 
