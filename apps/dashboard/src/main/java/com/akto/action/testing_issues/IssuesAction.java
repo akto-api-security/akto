@@ -225,6 +225,7 @@ public class IssuesAction extends UserAction {
         ));
         Bson criticalIssuesMatchStage = Aggregates.match(Filters.and(
                 filters,
+                Filters.in(TestingRunIssues.TEST_RUN_ISSUES_STATUS, TestRunIssueStatus.OPEN.name()),
                 Filters.in(TestingRunIssues.KEY_SEVERITY, Severity.CRITICAL.name(), Severity.HIGH.name())
         ));
 

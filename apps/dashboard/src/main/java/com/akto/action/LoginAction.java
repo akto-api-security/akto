@@ -2,47 +2,32 @@ package com.akto.action;
 
 import static com.akto.util.Constants.TWO_HOURS_TIMESTAMP;
 
-import com.akto.dao.ApiInfoDao;
 import com.akto.dao.BackwardCompatibilityDao;
 import com.akto.dao.SignupDao;
 import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dao.UsersDao;
 import com.akto.dao.context.Context;
-import com.akto.dao.testing.TestingRunResultDao;
-import com.akto.dto.ApiInfo;
-import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.BackwardCompatibility;
 import com.akto.dto.Config;
 import com.akto.dto.SignupInfo;
 import com.akto.dto.SignupUserInfo;
 import com.akto.dto.User;
-import com.akto.dto.testing.TestResult;
-import com.akto.dto.testing.TestingRunResult;
 import com.akto.dto.type.SingleTypeInfo;
-import com.akto.dto.type.URLMethods.Method;
 import com.akto.listener.InitializerListener;
 import com.akto.listener.RuntimeListener;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.notifications.email.SendgridEmail;
 import com.akto.password_reset.PasswordResetUtils;
-import com.akto.util.Constants;
 import com.akto.util.DashboardMode;
 import com.akto.utils.JWT;
 import com.akto.utils.Token;
 import com.mongodb.BasicDBObject;
-import com.mongodb.client.MongoCursor;
-import com.mongodb.client.model.Accumulators;
-import com.mongodb.client.model.Aggregates;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.FindOneAndUpdateOptions;
 import com.mongodb.client.model.PushOptions;
 import com.mongodb.client.model.ReturnDocument;
-import com.mongodb.client.model.Sorts;
-import com.mongodb.client.model.UpdateOneModel;
-import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.Updates;
-import com.mongodb.client.model.WriteModel;
 import com.opensymphony.xwork2.Action;
 import com.sendgrid.helpers.mail.Mail;
 import java.io.IOException;
@@ -171,56 +156,6 @@ public class LoginAction implements Action, ServletResponseAware, ServletRequest
         }
     }
 
-    private static void backFillLastTested(){
-        List<Bson> pipeLine = new ArrayList<>();
-        int timeNow = (int) Context.now();
-        pipeLine.add(Aggregates.sort(Sorts.descending(TestingRunResult.END_TIMESTAMP)));
-            pipeLine.add(
-                Aggregates.match(Filters.and(
-                    Filters.size(TestingRunResult.TEST_RESULTS + "." + TestResult.ERRORS, 0),
-                    Filters.gte(TestingRunResult.END_TIMESTAMP, Context.now() - (Constants.ONE_MONTH_TIMESTAMP))
-                ))
-            );
-
-            pipeLine.add(
-                Aggregates.group(
-                    "$" + TestingRunResult.API_INFO_KEY, Accumulators.max(TestingRunResult.END_TIMESTAMP, "$" + TestingRunResult.END_TIMESTAMP)
-                )
-            );
-
-            MongoCursor<BasicDBObject> cursor = TestingRunResultDao.instance.getMCollection().aggregate(pipeLine, BasicDBObject.class).cursor();
-            Bson filter;
-            List<WriteModel<ApiInfo>> bulkUpdates = new ArrayList<>();
-            while(cursor.hasNext()) {
-                BasicDBObject basicDBObject = cursor.next();
-                BasicDBObject idObj = (BasicDBObject) basicDBObject.get(Constants.ID);
-                ApiInfo.ApiInfoKey id = new ApiInfoKey(
-                    idObj.getInt(SingleTypeInfo._API_COLLECTION_ID),
-                    idObj.getString(SingleTypeInfo._URL),
-                    Method.fromString(idObj.getString(SingleTypeInfo._METHOD))
-                );
-                filter = ApiInfoDao.getFilter(id);
-                int lastTestedField = basicDBObject.getInt(TestingRunResult.END_TIMESTAMP);
-                bulkUpdates.add(new UpdateOneModel<>(filter, Updates.set(ApiInfo.LAST_TESTED, lastTestedField), new UpdateOptions().upsert(false)));
-
-                if(bulkUpdates.size() >= 200){
-                    try {
-                        ApiInfoDao.instance.getMCollection().bulkWrite(bulkUpdates);
-                        bulkUpdates.clear();
-                    } catch (Exception e) {
-                        e.printStackTrace();
-                    }
-                    
-                }
-            }
-
-            if(!bulkUpdates.isEmpty()){
-                ApiInfoDao.instance.getMCollection().bulkWrite(bulkUpdates);
-            }  
-            
-            logger.infoAndAddToDb("Finished back filling last tested field for account: " + Context.accountId.get() + " time taken: " + (Context.now() - timeNow), LogDb.DASHBOARD);
-    }
-
     private final static int REFRESH_INTERVAL = 24 * 60 * 60; // one day.
 
     public static String loginUser(User user, HttpServletResponse servletResponse, boolean signedUp, HttpServletRequest servletRequest,SignupInfo signupInfo) {
@@ -298,18 +233,6 @@ public class LoginAction implements Action, ServletResponseAware, ServletRequest
                  */
 
                 if ((tempUser.getLastLoginTs() + REFRESH_INTERVAL) < Context.now()) {
-                    // No longer needed for , TODO: heavy job, need to optimize
-                    // service.submit(() -> {
-                    //     try {
-                    //         for (String accountIdStr : user.getAccounts().keySet()) {
-                    //             int accountId = Integer.parseInt(accountIdStr);
-                    //             Context.accountId.set(accountId);
-                    //             backFillLastTested();
-                    //         }
-                    //     } catch (Exception e) {
-                    //         e.printStackTrace();
-                    //     }
-                    // });
                     service.submit(() -> {
                         try {
                             for (String accountIdStr : user.getAccounts().keySet()) {
