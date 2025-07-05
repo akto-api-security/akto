@@ -13,7 +13,6 @@ function ActionItemCard(props) {
             window.location.href = "/dashboard/settings/integrations/jira";
         } else {
             // Handle Jira integration
-            console.log('Create Jira ticket for:', cardObj);
         }
     };
 
