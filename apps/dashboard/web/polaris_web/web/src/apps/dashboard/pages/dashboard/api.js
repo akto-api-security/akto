@@ -32,6 +32,30 @@ const api = {
         })
     },
 
+    fetchSensitiveAndUnauthenticatedValue: async() =>{
+            return await request({
+                url: '/api/getSensitiveAndUnauthenticatedValue',
+                method: 'post',
+                data: {}
+            })
+    },
+
+    fetchHighRiskThirdPartyValue: async() =>{
+            return await request({
+                url: '/api/getHighRiskThirdPartyValue',
+                method: 'post',
+                data: {}
+            })
+     },
+
+     fetchShadowApisValue: async() =>{
+                 return await request({
+                     url: 'a',
+                     method: 'post',
+                     data: {}
+                 })
+     },
+
     fetchCriticalIssuesTrend: async(startTimeStamp,endTimeStamp) =>{
         return await request({
             url: '/api/fetchCriticalIssuesTrend',
