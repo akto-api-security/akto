@@ -1,5 +1,6 @@
 import { VerticalStack, Box, Badge, HorizontalStack, Icon, Avatar } from '@shopify/polaris'
 import ActionItemDetails from './ActionItemDetails';
+import ActionItemCard from './ActionItemCard';
 import { EmailMajor, ChevronDownMinor, AlertMajor } from '@shopify/polaris-icons'
 import { useEffect, useState } from 'react'
 import api from '../api'
@@ -31,8 +32,8 @@ export const ActionItemsContent = () => {
     const [showFlyout, setShowFlyout] = useState(false);
     const [selectedItem, setSelectedItem] = useState(null);
     const [actionItems, setActionItems] = useState([]);
+    const [criticalCardData, setCriticalCardData] = useState(null);
 
-    // Modal-related state
     const [modalActive, setModalActive] = useState(false);
     const [projId, setProjId] = useState('');
     const [issueType, setIssueType] = useState('');
@@ -50,6 +51,7 @@ export const ActionItemsContent = () => {
         }
     };
 
+    // todo: handle jira integration
     function JiraLogoClickable() {
         return (
             <span
@@ -81,15 +83,19 @@ export const ActionItemsContent = () => {
 
         let sensitiveDataCount = 0;
         try {
-            const response = await api.fetchApiStats(startTimestamp, endTimestamp);
+            const apiStats = await api.fetchApiStats(startTimestamp, endTimestamp);
             const countMapResp = await observeApi.fetchCountMapOfApis();
+            const SensitiveAndUnauthenticatedValue = await api.fetchSensitiveAndUnauthenticatedValue();
+            const highRiskThirdPartyValue = await api.fetchHighRiskThirdPartyValue();
+            const shadowApisValue = await api.fetchShadowApisValue();
+
             if (countMapResp && typeof countMapResp.totalApisCount === 'number') {
                 sensitiveDataCount = countMapResp.totalApisCount;
             }
 
-            if (response && response.apiStatsEnd && response.apiStatsStart) {
-                const apiStatsEnd = response.apiStatsEnd;
-                const apiStatsStart = response.apiStatsStart;
+            if (apiStats && apiStats.apiStatsEnd && apiStats.apiStatsStart) {
+                const apiStatsEnd = apiStats.apiStatsEnd;
+                const apiStatsStart = apiStats.apiStatsStart;
 
                 const highRiskCount = Object.entries(apiStatsEnd.riskScoreMap || {})
                     .filter(([score]) => parseInt(score) > 3)
@@ -100,7 +106,7 @@ export const ActionItemsContent = () => {
                 const previousThirdParty = apiStatsStart.accessTypeMap?.THIRD_PARTY || 0;
                 const thirdPartyDiff = currentThirdParty - previousThirdParty;
 
-                const buildTruncatableCell = (tooltip, text, maxWidth = '400px') => (
+                const buildTruncatableCell = (tooltip, text, maxWidth = '400px', fontWeight = 'regular') => (
                     <Box style={{ minWidth: 0, flex: 1, maxWidth }}>
                         <div style={{
                             whiteSpace: 'nowrap',
@@ -110,7 +116,7 @@ export const ActionItemsContent = () => {
                             <TooltipText
                                 tooltip={tooltip}
                                 text={text}
-                                textProps={{ variant: 'bodyMd', fontWeight: 'medium' }}
+                                textProps={{ variant: 'bodyMd', fontWeight: fontWeight }}
                             />
                         </div>
                     </Box>
@@ -123,7 +129,9 @@ export const ActionItemsContent = () => {
                         priorityComp: <Badge status="critical">P1</Badge>,
                         actionItem: buildTruncatableCell(
                             `${highRiskCount} APIs with risk score more than 3`,
-                            `${highRiskCount} APIs with risk score more than 3`
+                            `${highRiskCount} APIs with risk score more than 3`,
+                            '400px',
+                            'medium'
                         ),
                         team: buildTruncatableCell("Security Team", "Security Team", '200px'),
                         effort: buildTruncatableCell("Medium", "Medium", '100px'),
@@ -147,7 +155,9 @@ export const ActionItemsContent = () => {
                         priorityComp: <Badge status="critical">P1</Badge>,
                         actionItem: buildTruncatableCell(
                             `${sensitiveDataCount} Endpoints exposing PII or confidential information`,
-                            `${sensitiveDataCount} Endpoints exposing PII or confidential information`
+                            `${sensitiveDataCount} Endpoints exposing PII or confidential information`,
+                            '400px',
+                            'medium'
                         ),
                         team: buildTruncatableCell("Development", "Development", '200px'),
                         effort: buildTruncatableCell("Medium", "Medium", '100px'),
@@ -171,7 +181,9 @@ export const ActionItemsContent = () => {
                         priorityComp: <Badge status="critical">P1</Badge>,
                         actionItem: buildTruncatableCell(
                             `${unauthenticatedCount} APIs lacking proper authentication controls`,
-                            `${unauthenticatedCount} APIs lacking proper authentication controls`
+                            `${unauthenticatedCount} APIs lacking proper authentication controls`,
+                            '400px',
+                            'medium'
                         ),
                         team: buildTruncatableCell("Security Team", "Security Team", '200px'),
                         effort: buildTruncatableCell("Medium", "Medium", '100px'),
@@ -195,7 +207,9 @@ export const ActionItemsContent = () => {
                         priorityComp: <Badge status="attention">P2</Badge>,
                         actionItem: buildTruncatableCell(
                             `${Math.max(0, thirdPartyDiff)} Third-party APIs frequently invoked or newly integrated within last 7 days`,
-                            `${Math.max(0, thirdPartyDiff)} Third-party APIs frequently invoked or newly integrated within last 7 days`
+                            `${Math.max(0, thirdPartyDiff)} Third-party APIs frequently invoked or newly integrated within last 7 days`,
+                            '400px',
+                            'medium'
                         ),
                         team: buildTruncatableCell("Integration Team", "Integration Team", '200px'),
                         effort: buildTruncatableCell("Low", "Low", '100px'),
@@ -212,13 +226,79 @@ export const ActionItemsContent = () => {
                             </VerticalStack>
                         ),
                         count: Math.max(0, thirdPartyDiff)
+                    },
+                    {
+                        id: '5',
+                        priority: <Badge status="critical">P1</Badge>,
+                        priorityComp: <Badge status="critical">P1</Badge>,
+                        actionItem: buildTruncatableCell(
+                            `${highRiskThirdPartyValue} External APIs with high risk scores requiring attention`,
+                            `${highRiskThirdPartyValue} External APIs with high risk scores requiring attention`,
+                            '400px',
+                            'medium'
+                        ),
+                        team: buildTruncatableCell("Security Team", "Security Team", '200px'),
+                        effort: buildTruncatableCell("High", "High", '100px'),
+                        whyItMatters: buildTruncatableCell(
+                            "Supply chain vulnerabilities that can compromise entire systems",
+                            "Supply chain vulnerabilities that can compromise entire systems"
+                        ),
+                        displayName: `${highRiskThirdPartyValue} External APIs with high risk scores requiring attention`,
+                        actions: (
+                            <VerticalStack align="center">
+                                <HorizontalStack gap="2" align="center">
+                                    <JiraLogoClickable />
+                                </HorizontalStack>
+                            </VerticalStack>
+                        ),
+                        count: highRiskThirdPartyValue
+                    },
+                    {
+                        id: '6',
+                        priority: <Badge status="attention">P2</Badge>,
+                        priorityComp: <Badge status="attention">P2</Badge>,
+                        actionItem: buildTruncatableCell(
+                            `${shadowApisValue} Undocumented APIs discovered in the system`,
+                            `${shadowApisValue} Undocumented APIs discovered in the system`,
+                            '400px',
+                            'medium'
+                        ),
+                        team: buildTruncatableCell("API Governance", "API Governance", '200px'),
+                        effort: buildTruncatableCell("High", "High", '100px'),
+                        whyItMatters: buildTruncatableCell(
+                            "Unmonitored attack surface with unknown security posture",
+                            "Unmonitored attack surface with unknown security posture"
+                        ),
+                        displayName: `${shadowApisValue} Undocumented APIs discovered in the system`,
+                        actions: (
+                            <VerticalStack align="center">
+                                <HorizontalStack gap="2" align="center">
+                                    <JiraLogoClickable />
+                                </HorizontalStack>
+                            </VerticalStack>
+                        ),
+                        count: shadowApisValue
                     }
                 ];
 
                 const filteredActionItems = dynamicActionItems.filter(item => item.count > 0);
                 setActionItems(filteredActionItems);
+
+                if (SensitiveAndUnauthenticatedValue > 0) {
+                    setCriticalCardData({
+                        id: 'p0-critical',
+                        priority: 'P0',
+                        title: `${SensitiveAndUnauthenticatedValue} APIs returning sensitive data without encryption or proper authorization`,
+                        description: 'Potential data breach with regulatory and compliance implications',
+                        team: 'Security & Development',
+                        effort: 'High',
+                        count: SensitiveAndUnauthenticatedValue
+                    });
+                } else {
+                    setCriticalCardData(null);
+                }
             } else {
-                console.error('Invalid API response structure');
+                console.error('Invalid API apiStats structure');
                 setActionItems([]);
             }
         } catch (error) {
@@ -231,8 +311,22 @@ export const ActionItemsContent = () => {
         fetchData();
     }, []);
 
+    const handleCardClick = (cardObj) => {
+        // Handle card click - you can add flyout logic here if needed
+        console.log('Card clicked:', cardObj);
+    };
+
     return (
         <VerticalStack gap="5">
+            {criticalCardData && (
+                <Box maxWidth="300px">
+                    <ActionItemCard 
+                        cardObj={criticalCardData} 
+                        onButtonClick={handleCardClick}
+                    />
+                </Box>
+            )}
+            
             <Box maxWidth="100%" style={{ overflowX: 'hidden' }}>
                 <GithubSimpleTable
                     key="table"

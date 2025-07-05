@@ -89,6 +89,30 @@ const api = {
             }
         })
     },
+    
+    fetchSensitiveAndUnauthenticatedValue: async () => {
+        return await request({
+            url: '/api/getSensitiveAndUnauthenticatedValue',
+            method: 'post',
+            data: {}
+        })
+    },
+
+    fetchHighRiskThirdPartyValue: async () => {
+        return await request({
+            url: '/api/getHighRiskThirdPartyValue',
+            method: 'post',
+            data: {}
+        })
+    },
+
+    fetchShadowApisValue: async () => {
+        return await request({
+            url: '/api/getShadowApis',
+            method: 'post',
+            data: {}
+        })
+    },
 }
 
 export default api;
