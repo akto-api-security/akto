@@ -92,6 +92,7 @@ public class DefaultTestSuitesDao extends AccountsContextDao<DefaultTestSuites> 
         defaultTestSuites.put(DefaultTestSuites.DefaultSuitesType.OWASP.name(), owaspSuites);
         defaultTestSuites.put(DefaultTestSuites.DefaultSuitesType.TESTING_METHODS.name(), testingMethodsSuites);
         defaultTestSuites.put(DefaultTestSuites.DefaultSuitesType.SEVERITY.name(), severitySuites);
+        defaultTestSuites.put(DefaultTestSuites.DefaultSuitesType.DURATION.name(), durationTestSuites);
 
         return defaultTestSuites;
     }
