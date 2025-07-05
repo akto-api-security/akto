@@ -1,5 +1,6 @@
 import { VerticalStack, Box, Badge, HorizontalStack, Icon, Avatar } from '@shopify/polaris'
-import ActionItemDetails from './ActionItemDetails'
+import ActionItemDetails from './ActionItemDetails';
+import ActionItemCard from './ActionItemCard';
 import { EmailMajor, ChevronDownMinor, AlertMajor } from '@shopify/polaris-icons'
 import { useEffect, useState } from 'react'
 import api from '../api'
@@ -8,44 +9,16 @@ import GithubSimpleTable from '../../../components/tables/GithubSimpleTable'
 import FlyLayout from '../../../components/layouts/FlyLayout'
 import GridRows from '../../../components/shared/GridRows'
 import observeApi from '../../observe/api'
+import TooltipText from '../../../components/shared/TooltipText'
+import JiraTicketCreationModal from '../../../components/shared/JiraTicketCreationModal'
 
 const actionItemsHeaders = [
-    {
-        title: '', 
-        value: 'priority',
-        type: 'text',
-        maxWidth: '60px'
-    },
-    {
-        title: 'Action Item',
-        value: 'actionItem',
-        type: 'text',
-        maxWidth: '300px'
-    },
-    {
-        title: 'Team',
-        value: 'team',
-        type: 'text',
-        maxWidth: '120px'
-    },
-    {
-        title: 'Efforts',
-        value: 'effort',
-        type: 'text',
-        maxWidth: '80px'
-    },
-    {
-        title: 'Why It Matters',
-        value: 'whyItMatters',
-        type: 'text',
-        maxWidth: '300px'
-    },
-    {
-        title: 'Action',
-        value: 'actions',
-        type: 'action',
-        maxWidth: '100px'
-    }
+    { title: '', value: 'priority', type: 'text' },
+    { title: 'Action Item', value: 'actionItem', type: 'text' },
+    { title: 'Team', value: 'team', type: 'text' },
+    { title: 'Efforts', value: 'effort', type: 'text' },
+    { title: 'Why It Matters', value: 'whyItMatters', type: 'text' },
+    { title: 'Action', value: 'actions', type: 'action' }
 ];
 
 const resourceName = {
@@ -53,11 +26,43 @@ const resourceName = {
     plural: 'action items'
 };
 
+const JIRA_INTEGRATION_URL = "/dashboard/settings/integrations/jira";
 
 export const ActionItemsContent = () => {
     const [showFlyout, setShowFlyout] = useState(false);
     const [selectedItem, setSelectedItem] = useState(null);
     const [actionItems, setActionItems] = useState([]);
+    const [criticalCardData, setCriticalCardData] = useState(null);
+
+    const [modalActive, setModalActive] = useState(false);
+    const [projId, setProjId] = useState('');
+    const [issueType, setIssueType] = useState('');
+    const [issueId, setIssueId] = useState('');
+    const [jiraProjectMaps, setJiraProjectMaps] = useState({});
+
+    const isIntegrated = typeof window !== 'undefined' && window.JIRA_INTEGRATED === true;
+
+    const handleClick = (e) => {
+        e.stopPropagation();
+        if (!isIntegrated) {
+            window.location.href = JIRA_INTEGRATION_URL;
+        } else {
+            setModalActive(true);
+        }
+    };
+
+    // todo: handle jira integration
+    function JiraLogoClickable() {
+        return (
+            <span
+                style={{ cursor: isIntegrated ? 'pointer' : 'pointer', display: 'inline-block' }}
+                onClick={handleClick}
+                title={isIntegrated ? 'Create Jira Ticket' : 'Integrate Jira'}
+            >
+                <Avatar size="extraSmall" shape="square" source="/public/logo_jira.svg" />
+            </span>
+        );
+    }
 
     function getActions(item) {
         return [{
@@ -72,53 +77,73 @@ export const ActionItemsContent = () => {
         }];
     }
 
-    const handleRowClick = (item) => {
-        setSelectedItem(item);
-        setShowFlyout(true);
-    };
-
     const fetchData = async () => {
         const endTimestamp = func.timeNow();
-        const startTimestamp = func.timeNow() - 3600 * 24 * 7; // 7 days ago
+        const startTimestamp = func.timeNow() - 3600 * 24 * 7;
 
         let sensitiveDataCount = 0;
         try {
-            const response = await api.fetchApiStats(startTimestamp, endTimestamp);
-            console.log('API Stats Response:', response);
+            const apiStats = await api.fetchApiStats(startTimestamp, endTimestamp);
             const countMapResp = await observeApi.fetchCountMapOfApis();
-            console.log('Count Map Response:', countMapResp);
+            const SensitiveAndUnauthenticatedValue = await api.fetchSensitiveAndUnauthenticatedValue();
+            const highRiskThirdPartyValue = await api.fetchHighRiskThirdPartyValue();
+            const shadowApisValue = await api.fetchShadowApisValue();
+
             if (countMapResp && typeof countMapResp.totalApisCount === 'number') {
                 sensitiveDataCount = countMapResp.totalApisCount;
             }
 
-            if (response && response.apiStatsEnd && response.apiStatsStart) {
-                const apiStatsEnd = response.apiStatsEnd;
-                const apiStatsStart = response.apiStatsStart;
+            if (apiStats && apiStats.apiStatsEnd && apiStats.apiStatsStart) {
+                const apiStatsEnd = apiStats.apiStatsEnd;
+                const apiStatsStart = apiStats.apiStatsStart;
 
                 const highRiskCount = Object.entries(apiStatsEnd.riskScoreMap || {})
                     .filter(([score]) => parseInt(score) > 3)
                     .reduce((total, [, count]) => total + count, 0);
 
                 const unauthenticatedCount = apiStatsEnd.authTypeMap?.UNAUTHENTICATED || 0;
-
                 const currentThirdParty = apiStatsEnd.accessTypeMap?.THIRD_PARTY || 0;
                 const previousThirdParty = apiStatsStart.accessTypeMap?.THIRD_PARTY || 0;
                 const thirdPartyDiff = currentThirdParty - previousThirdParty;
+
+                const buildTruncatableCell = (tooltip, text, maxWidth = '400px', fontWeight = 'regular') => (
+                    <Box style={{ minWidth: 0, flex: 1, maxWidth }}>
+                        <div style={{
+                            whiteSpace: 'nowrap',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis'
+                        }}>
+                            <TooltipText
+                                tooltip={tooltip}
+                                text={text}
+                                textProps={{ variant: 'bodyMd', fontWeight: fontWeight }}
+                            />
+                        </div>
+                    </Box>
+                );
 
                 const dynamicActionItems = [
                     {
                         id: '1',
                         priority: <Badge status="critical">P1</Badge>,
                         priorityComp: <Badge status="critical">P1</Badge>,
-                        actionItem: `${highRiskCount} APIs with risk score more than 3`,
-                        team: 'Security Team',
-                        effort: 'Medium',
-                        whyItMatters: 'Creates multiple attack vectors for malicious actors',
+                        actionItem: buildTruncatableCell(
+                            `${highRiskCount} APIs with risk score more than 3`,
+                            `${highRiskCount} APIs with risk score more than 3`,
+                            '400px',
+                            'medium'
+                        ),
+                        team: buildTruncatableCell("Security Team", "Security Team", '200px'),
+                        effort: buildTruncatableCell("Medium", "Medium", '100px'),
+                        whyItMatters: buildTruncatableCell(
+                            "Creates multiple attack vectors for malicious actors",
+                            "Creates multiple attack vectors for malicious actors"
+                        ),
                         displayName: `${highRiskCount} APIs with risk score more than 3`,
                         actions: (
                             <VerticalStack align="center">
                                 <HorizontalStack gap="2" align="center">
-                                    <Avatar size="extraSmall" shape="square" source="/public/logo_jira.svg" />
+                                    <JiraLogoClickable />
                                 </HorizontalStack>
                             </VerticalStack>
                         ),
@@ -128,15 +153,23 @@ export const ActionItemsContent = () => {
                         id: '2',
                         priority: <Badge status="critical">P1</Badge>,
                         priorityComp: <Badge status="critical">P1</Badge>,
-                        actionItem: `${sensitiveDataCount} Endpoints exposing PII or confidential information`,
-                        team: 'Development',
-                        effort: 'Medium',
-                        whyItMatters: 'Violates data privacy regulations (GDPR, CCPA) and risks customer trust',
+                        actionItem: buildTruncatableCell(
+                            `${sensitiveDataCount} Endpoints exposing PII or confidential information`,
+                            `${sensitiveDataCount} Endpoints exposing PII or confidential information`,
+                            '400px',
+                            'medium'
+                        ),
+                        team: buildTruncatableCell("Development", "Development", '200px'),
+                        effort: buildTruncatableCell("Medium", "Medium", '100px'),
+                        whyItMatters: buildTruncatableCell(
+                            "Violates data privacy regulations (GDPR, CCPA) and risks customer trust",
+                            "Violates data privacy regulations (GDPR, CCPA) and risks customer trust"
+                        ),
                         displayName: `${sensitiveDataCount} Endpoints exposing PII or confidential information`,
                         actions: (
                             <VerticalStack align="center">
                                 <HorizontalStack gap="2" align="center">
-                                    <Avatar size="extraSmall" shape="square" source="/public/logo_jira.svg" />
+                                    <JiraLogoClickable />
                                 </HorizontalStack>
                             </VerticalStack>
                         ),
@@ -146,15 +179,23 @@ export const ActionItemsContent = () => {
                         id: '3',
                         priority: <Badge status="critical">P1</Badge>,
                         priorityComp: <Badge status="critical">P1</Badge>,
-                        actionItem: `${unauthenticatedCount} APIs lacking proper authentication controls`,
-                        team: 'Security Team',
-                        effort: 'Medium',
-                        whyItMatters: 'Easy target for unauthorized access and data exfiltration',
+                        actionItem: buildTruncatableCell(
+                            `${unauthenticatedCount} APIs lacking proper authentication controls`,
+                            `${unauthenticatedCount} APIs lacking proper authentication controls`,
+                            '400px',
+                            'medium'
+                        ),
+                        team: buildTruncatableCell("Security Team", "Security Team", '200px'),
+                        effort: buildTruncatableCell("Medium", "Medium", '100px'),
+                        whyItMatters: buildTruncatableCell(
+                            "Easy target for unauthorized access and data exfiltration",
+                            "Easy target for unauthorized access and data exfiltration"
+                        ),
                         displayName: `${unauthenticatedCount} APIs lacking proper authentication controls`,
                         actions: (
                             <VerticalStack align="center">
                                 <HorizontalStack gap="2" align="center">
-                                    <Avatar size="extraSmall" shape="square" source="/public/logo_jira.svg" />
+                                    <JiraLogoClickable />
                                 </HorizontalStack>
                             </VerticalStack>
                         ),
@@ -164,26 +205,100 @@ export const ActionItemsContent = () => {
                         id: '4',
                         priority: <Badge status="attention">P2</Badge>,
                         priorityComp: <Badge status="attention">P2</Badge>,
-                        actionItem: `${Math.max(0, thirdPartyDiff)} Third-party APIs frequently invoked or newly integrated within last 7 days`,
-                        team: 'Integration Team',
-                        effort: 'Low',
-                        whyItMatters: 'New integrations may introduce unvetted security risks',
+                        actionItem: buildTruncatableCell(
+                            `${Math.max(0, thirdPartyDiff)} Third-party APIs frequently invoked or newly integrated within last 7 days`,
+                            `${Math.max(0, thirdPartyDiff)} Third-party APIs frequently invoked or newly integrated within last 7 days`,
+                            '400px',
+                            'medium'
+                        ),
+                        team: buildTruncatableCell("Integration Team", "Integration Team", '200px'),
+                        effort: buildTruncatableCell("Low", "Low", '100px'),
+                        whyItMatters: buildTruncatableCell(
+                            "New integrations may introduce unvetted security risks",
+                            "New integrations may introduce unvetted security risks"
+                        ),
                         displayName: `${Math.max(0, thirdPartyDiff)} Third-party APIs frequently invoked or newly integrated within last 7 days`,
                         actions: (
                             <VerticalStack align="center">
                                 <HorizontalStack gap="2" align="center">
-                                    <Avatar size="extraSmall" shape="square" source="/public/logo_jira.svg" />
+                                    <JiraLogoClickable />
                                 </HorizontalStack>
                             </VerticalStack>
                         ),
                         count: Math.max(0, thirdPartyDiff)
+                    },
+                    {
+                        id: '5',
+                        priority: <Badge status="critical">P1</Badge>,
+                        priorityComp: <Badge status="critical">P1</Badge>,
+                        actionItem: buildTruncatableCell(
+                            `${highRiskThirdPartyValue} External APIs with high risk scores requiring attention`,
+                            `${highRiskThirdPartyValue} External APIs with high risk scores requiring attention`,
+                            '400px',
+                            'medium'
+                        ),
+                        team: buildTruncatableCell("Security Team", "Security Team", '200px'),
+                        effort: buildTruncatableCell("High", "High", '100px'),
+                        whyItMatters: buildTruncatableCell(
+                            "Supply chain vulnerabilities that can compromise entire systems",
+                            "Supply chain vulnerabilities that can compromise entire systems"
+                        ),
+                        displayName: `${highRiskThirdPartyValue} External APIs with high risk scores requiring attention`,
+                        actions: (
+                            <VerticalStack align="center">
+                                <HorizontalStack gap="2" align="center">
+                                    <JiraLogoClickable />
+                                </HorizontalStack>
+                            </VerticalStack>
+                        ),
+                        count: highRiskThirdPartyValue
+                    },
+                    {
+                        id: '6',
+                        priority: <Badge status="attention">P2</Badge>,
+                        priorityComp: <Badge status="attention">P2</Badge>,
+                        actionItem: buildTruncatableCell(
+                            `${shadowApisValue} Undocumented APIs discovered in the system`,
+                            `${shadowApisValue} Undocumented APIs discovered in the system`,
+                            '400px',
+                            'medium'
+                        ),
+                        team: buildTruncatableCell("API Governance", "API Governance", '200px'),
+                        effort: buildTruncatableCell("High", "High", '100px'),
+                        whyItMatters: buildTruncatableCell(
+                            "Unmonitored attack surface with unknown security posture",
+                            "Unmonitored attack surface with unknown security posture"
+                        ),
+                        displayName: `${shadowApisValue} Undocumented APIs discovered in the system`,
+                        actions: (
+                            <VerticalStack align="center">
+                                <HorizontalStack gap="2" align="center">
+                                    <JiraLogoClickable />
+                                </HorizontalStack>
+                            </VerticalStack>
+                        ),
+                        count: shadowApisValue
                     }
                 ];
 
                 const filteredActionItems = dynamicActionItems.filter(item => item.count > 0);
                 setActionItems(filteredActionItems);
+
+                if (SensitiveAndUnauthenticatedValue > 0) {
+                    setCriticalCardData({
+                        id: 'p0-critical',
+                        priority: 'P0',
+                        title: `${SensitiveAndUnauthenticatedValue} APIs returning sensitive data without encryption or proper authorization`,
+                        description: 'Potential data breach with regulatory and compliance implications',
+                        team: 'Security & Development',
+                        effort: 'High',
+                        count: SensitiveAndUnauthenticatedValue
+                    });
+                } else {
+                    setCriticalCardData(null);
+                }
             } else {
-                console.error('Invalid API response structure');
+                console.error('Invalid API apiStats structure');
                 setActionItems([]);
             }
         } catch (error) {
@@ -196,11 +311,25 @@ export const ActionItemsContent = () => {
         fetchData();
     }, []);
 
+    const handleCardClick = (cardObj) => {
+        // Handle card click - you can add flyout logic here if needed
+        console.log('Card clicked:', cardObj);
+    };
+
     return (
-        <VerticalStack gap={"5"}>
-            <Box>
+        <VerticalStack gap="5">
+            {criticalCardData && (
+                <Box maxWidth="300px">
+                    <ActionItemCard 
+                        cardObj={criticalCardData} 
+                        onButtonClick={handleCardClick}
+                    />
+                </Box>
+            )}
+            
+            <Box maxWidth="100%" style={{ overflowX: 'hidden' }}>
                 <GithubSimpleTable
-                    key={"table"}
+                    key="table"
                     data={actionItems}
                     resourceName={resourceName}
                     headers={actionItemsHeaders}
@@ -218,16 +347,28 @@ export const ActionItemsContent = () => {
                         <Badge status={item.priorityDisplay}>{item.priority}</Badge>
                     )}
                     emptyStateMessage="No action items found"
-                    // onRowClick={handleRowClick}
                 />
             </Box>
 
+            <JiraTicketCreationModal
+                activator={null}
+                modalActive={modalActive}
+                setModalActive={setModalActive}
+                handleSaveAction={() => { }}
+                jiraProjectMaps={jiraProjectMaps}
+                setProjId={setProjId}
+                setIssueType={setIssueType}
+                projId={projId}
+                issueType={issueType}
+                issueId={issueId}
+                isAzureModal={false}
+            />
             {/* <FlyLayout
-                show={showFlyout}
-                setShow={setShowFlyout}
-                title="Action item details"
-                components={[<ActionItemDetails item={selectedItem} />]}
-            /> */}
+                    show={showFlyout}
+                    setShow={setShowFlyout}
+                    title="Action item details"
+                    components={[<ActionItemDetails item={selectedItem} />]}
+                /> */}
         </VerticalStack>
     );
 };
