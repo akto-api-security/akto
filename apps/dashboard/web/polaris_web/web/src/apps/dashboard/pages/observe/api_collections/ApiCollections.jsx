@@ -1,6 +1,6 @@
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards"
-import { Text, Button, IndexFiltersMode, Box, Badge, Popover, ActionList, ResourceItem, Avatar,  HorizontalStack, Icon, TextField, Tooltip} from "@shopify/polaris"
-import { HideMinor, ViewMinor,FileMinor, FileFilledMinor } from '@shopify/polaris-icons';
+import { Text, Button, IndexFiltersMode, Box, Popover, ActionList, ResourceItem, Avatar,  HorizontalStack, Icon} from "@shopify/polaris"
+import { HideMinor, ViewMinor,FileMinor } from '@shopify/polaris-icons';
 import api from "../api"
 import dashboardApi from "../../dashboard/api"
 import settingRequests from "../../settings/api"
@@ -33,7 +33,6 @@ import ReactFlow, {
     useEdgesState,
   
   } from 'react-flow-renderer';
-import { on } from "stream";
 import SetUserEnvPopupComponent from "./component/SetUserEnvPopupComponent";
   
 const CenterViewType = {
@@ -156,6 +155,14 @@ const headers = [
         textValue: 'description',
         filterKey: "description",
         tooltipContent: 'Description of the collection'
+    },
+    {
+        title: "Out of Testing scope",
+        text: 'Out of Testing scope',
+        value: 'outOfTestingScopeComp',
+        isText: CellType.TEXT,
+        filterKey: 'isOutOfTestingScope',
+        tooltipContent: 'Whether the collection is excluded from testing '
     }
 ];
 
@@ -212,6 +219,8 @@ const convertToNewData = (collectionsArr, sensitiveInfoMap, severityInfoMap, cov
             riskScore: c.urlsCount === 0 ? 0 : (riskScoreMap[c.id] ? riskScoreMap[c.id] : 0),
             discovered: func.prettifyEpoch(c.startTs || 0),
             descriptionComp: (<Box maxWidth="300px"><TooltipText tooltip={c.description} text={c.description}/></Box>),
+            outOfTestingScopeComp: c.isOutOfTestingScope ? (<Text>Yes</Text>) : (<Text>No</Text>),
+            // outOfTestingScope: c.isOutOfTestingScope || false
         }
     })
 
@@ -230,7 +239,7 @@ function ApiCollections(props) {
     const [active, setActive] = useState(false);
     const [loading, setLoading] = useState(false)
           
-    const [summaryData, setSummaryData] = useState({totalEndpoints:0 , totalTestedEndpoints: 0, totalSensitiveEndpoints: 0, totalCriticalEndpoints: 0})
+    const [summaryData, setSummaryData] = useState({totalEndpoints:0 , totalTestedEndpoints: 0, totalSensitiveEndpoints: 0, totalCriticalEndpoints: 0, totalAllowedForTesting: 0})
     const [hasUsageEndpoints, setHasUsageEndpoints] = useState(true)
     const [envTypeMap, setEnvTypeMap] = useState({})
     const [refreshData, setRefreshData] = useState(false)
@@ -496,9 +505,11 @@ function ApiCollections(props) {
         TableStore.getState().setSelectedItems([])
         selectItems([])
     }
-    async function handleCollectionsAction(collectionIdList, apiFunction, toastContent){
+    async function handleCollectionsAction(collectionIdList, apiFunction, toastContent, currentIsOutOfTestingScopeVal=null){
         const collectionIdListObj = collectionIdList.map(collectionId => ({ id: collectionId.toString() }))
-        await apiFunction(collectionIdListObj).then(() => {
+        await (currentIsOutOfTestingScopeVal !== null
+                ? apiFunction(collectionIdList, currentIsOutOfTestingScopeVal)
+                : apiFunction(collectionIdListObj)).then(() => {
             func.setToast(true, false, `${collectionIdList.length} API collection${func.addPlurality(collectionIdList.length)} ${toastContent} successfully`)
         }).catch((error) => {
             func.setToast(true, true, error.message || 'Something went wrong!')
@@ -689,6 +700,34 @@ function ApiCollections(props) {
             content: toggleTypeContent
         }
 
+        const allOutOfTestScopeFalse = selectedResources.every(id => {
+            const collection = normalData.find(c => c.id === id);
+            return collection && !collection.isOutOfTestingScope;
+        })
+
+        const allOutOfTestScopeTrue = selectedResources.every(id => {
+            const collection = normalData.find(c => c.id === id);
+            return collection && collection.isOutOfTestingScope;
+        })
+
+        let content = "";
+        let toastContent = "";
+        if(allOutOfTestScopeFalse){
+            content = `Mark collection${func.addPlurality(selectedResources.length)} as out of testing scope`
+            toastContent = "marked out of testing scope"
+        }else if(allOutOfTestScopeTrue){
+            content = `Mark collection${func.addPlurality(selectedResources.length)} as in testing scope`
+            toastContent = "marked in testing scope"
+        }
+
+        if(content.length > 0 && toastContent.length > 0){
+            actions.push(
+                {
+                    content: content,
+                    onAction: () => handleCollectionsAction(selectedResources, collectionApi.toggleCollectionsOutOfTestScope, toastContent, allOutOfTestScopeTrue)
+                }
+            )
+        }
         const bulkActionsOptions = [...actions];
         if(selectedTab !== 'groups') {
             bulkActionsOptions.push(toggleEnvType)
@@ -769,11 +808,11 @@ function ApiCollections(props) {
     />
 
     let coverage = '0%';
-    if(summaryData.totalEndpoints !== 0){
-        if(summaryData.totalEndpoints < summaryData.totalTestedEndpoints){
+    if(summaryData.totalAllowedForTesting !== 0){
+        if(summaryData.totalAllowedForTesting < summaryData.totalTestedEndpoints){
             coverage = '100%'
         }else{
-            coverage = Math.ceil((summaryData.totalTestedEndpoints * 100) / summaryData.totalEndpoints) + '%'
+            coverage = Math.ceil((summaryData.totalTestedEndpoints * 100) / summaryData.totalAllowedForTesting) + '%'
         }
     }
 

@@ -47,6 +47,7 @@ import com.mongodb.client.model.UnwindOptions;
 import com.mongodb.client.model.UpdateOptions;
 import com.opensymphony.xwork2.Action;
 
+import lombok.Setter;
 import static com.akto.util.Constants.AKTO_DISCOVERED_APIS_COLLECTION;
 
 public class ApiCollectionsAction extends UserAction {
@@ -170,7 +171,7 @@ public class ApiCollectionsAction extends UserAction {
         List<Bson> pipeLine = new ArrayList<>();
         pipeLine.add(Aggregates.project(Projections.fields(
             Projections.computed(ApiCollection.URLS_COUNT, new BasicDBObject("$size", new BasicDBObject("$ifNull", Arrays.asList("$urls", Collections.emptyList())))),
-            Projections.include(ApiCollection.ID, ApiCollection.NAME, ApiCollection.HOST_NAME, ApiCollection._TYPE, ApiCollection.TAGS_STRING, ApiCollection._DEACTIVATED,ApiCollection.START_TS, ApiCollection.AUTOMATED, ApiCollection.DESCRIPTION, ApiCollection.USER_ENV_TYPE)
+            Projections.include(ApiCollection.ID, ApiCollection.NAME, ApiCollection.HOST_NAME, ApiCollection._TYPE, ApiCollection.TAGS_STRING, ApiCollection._DEACTIVATED,ApiCollection.START_TS, ApiCollection.AUTOMATED, ApiCollection.DESCRIPTION, ApiCollection.USER_ENV_TYPE, ApiCollection.IS_OUT_OF_TESTING_SCOPE)
         )));
 
         try {
@@ -696,6 +697,38 @@ public class ApiCollectionsAction extends UserAction {
         }
         UsageMetricHandler.calcAndFetchFeatureAccessUsingDeltaUsage(MetricTypes.ACTIVE_ENDPOINTS, Context.accountId.get(), count);
         return Action.SUCCESS.toUpperCase();
+    }
+
+    @Setter
+    private boolean currentIsOutOfTestingScopeVal;
+
+    public String toggleCollectionsOutOfTestScope(){
+        try{
+            if(this.apiCollectionIds ==null || this.apiCollectionIds.isEmpty()){
+                addActionError("No collections provided");
+                return ERROR.toUpperCase();
+            }
+            List<Integer> accessibleCollectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
+            if(accessibleCollectionIds != null){
+                this.apiCollectionIds.removeIf(id -> !accessibleCollectionIds.contains(id));
+            }
+            if(this.apiCollectionIds.isEmpty()){
+                addActionError("No accessible collections provided");
+                return ERROR.toUpperCase();
+            }
+            ApiCollectionsDao.instance.updateMany(
+                Filters.in(ApiCollection.ID, this.apiCollectionIds),
+                Updates.set(ApiCollection.IS_OUT_OF_TESTING_SCOPE, !this.currentIsOutOfTestingScopeVal)
+            );
+            response = new BasicDBObject();
+            response.put("success", true);
+
+            return SUCCESS.toUpperCase();
+
+        } catch(Exception e){
+            addActionError("Error marking collections as Out of Test Scope");
+            return ERROR.toUpperCase();
+        }
     }
 
     public String fetchCustomerEndpoints(){

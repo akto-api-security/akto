@@ -783,7 +783,6 @@ function ApiEndpoints(props) {
     const isHostnameCollection = hostNameMap[collectionsObj?.id] !== null && hostNameMap[collectionsObj?.id] !== undefined 
     const collectionTypeListComp = getCollectionTypeListComp(collectionsObj)
     
-
     const secondaryActionsComponent = (
         <HorizontalStack gap="2">
 
@@ -907,7 +906,7 @@ function ApiEndpoints(props) {
                 filtered={loading ? false : filteredEndpoints.length !== endpointData["all"].length}
                 runTestFromOutside={runTests}
                 closeRunTest={() => setRunTests(false)}
-                disabled={showEmptyScreen || window.USER_ROLE === "GUEST"}
+                disabled={showEmptyScreen || window.USER_ROLE === "GUEST" || collectionsObj.isOutOfTestingScope}
                 selectedResourcesForPrimaryAction={selectedResourcesForPrimaryAction}
                 preActivator={false}
             />
@@ -1072,7 +1071,7 @@ function ApiEndpoints(props) {
                     learnText={"inventory"}
                     docsUrl={ENDPOINTS_PAGE_DOCS_URL}
                 />] : [
-                (coverageInfo[apiCollectionId] === 0 || !(coverageInfo.hasOwnProperty(apiCollectionId)) ? <TestrunsBannerComponent key={"testrunsBanner"} onButtonClick={() => setRunTests(true)} isInventory={true} /> : null),
+                (coverageInfo[apiCollectionId] === 0 || !(coverageInfo.hasOwnProperty(apiCollectionId)) ? <TestrunsBannerComponent key={"testrunsBanner"} onButtonClick={() => setRunTests(true)} isInventory={true}  disabled={collectionsObj.isOutOfTestingScope}/> : null),
                 <div className="apiEndpointsTable" key="table">
                     {apiEndpointTable}
                       <Modal large open={isGptScreenActive} onClose={() => setIsGptScreenActive(false)} title="Akto GPT">
