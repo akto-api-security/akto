@@ -434,6 +434,7 @@ public class Executor {
                     if (!isMagicContext) {
                         queryData.put(TestExecutorModifier._REQUEST, request);
                     }
+                    queryData.put(TestExecutorModifier._IS_EXTERNAL_CONTEXT_IN_OPERATION, isMagicContext);
                     queryData.put(TestExecutorModifier._OPERATION, operation);
                     BasicDBObject generatedData = new TestExecutorModifier().handle(queryData);
                     generatedOperationKeyValuePairs = parseGeneratedKeyValues(generatedData, operationTypeLower, value);
