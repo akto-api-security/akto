@@ -34,6 +34,7 @@ import com.akto.runtime.utils.Utils;
 import com.akto.test_editor.execution.ParseAndExecute;
 import com.akto.test_editor.execution.VariableResolver;
 import com.akto.test_editor.filter.data_operands_impl.ValidationResult;
+import com.akto.usage.OrgUtils;
 import com.akto.hybrid_runtime.APICatalogSync;
 import com.akto.hybrid_runtime.Main;
 import com.akto.hybrid_runtime.MergeLogicLocal;
@@ -113,7 +114,7 @@ public class HttpCallParser {
         for (ApiCollection apiCollection: apiCollections) {
             apiCollectionsMap.put(apiCollection.getId(), apiCollection);
         }
-        if (Main.actualAccountId == 1745303931 || Main.actualAccountId == 1741069294) {
+        if (DataActor.actualAccountId == 1745303931 || DataActor.actualAccountId == 1741069294) {
             this.dependencyAnalyser = new DependencyAnalyser(apiCatalogSync.dbState, Main.isOnprem, RuntimeMode.isHybridDeployment(), apiCollectionsMap);
         }
     }
@@ -190,7 +191,7 @@ public class HttpCallParser {
                 return syncLimit;
             }
 
-            int accountId = Main.actualAccountId;
+            int accountId = DataActor.actualAccountId;
 
             /*
              * If a user is using on-prem mini-runtime, no limits would apply there.
@@ -199,7 +200,7 @@ public class HttpCallParser {
                 return syncLimit;
             }
 
-            Organization organization = dataActor.fetchOrganization(accountId);
+            Organization organization = OrgUtils.getOrganizationCached(accountId);
             FeatureAccess featureAccess = UsageMetricUtils.getFeatureAccess(organization, MetricTypes.ACTIVE_ENDPOINTS);
             syncLimit = featureAccess.fetchSyncLimit();
             lastSyncLimitFetch = Context.now();
@@ -283,7 +284,7 @@ public class HttpCallParser {
             apiCatalogSync.computeDelta(aggregator, false, apiCollectionId);
         }
 
-        if (Main.actualAccountId == 1745303931 || Main.actualAccountId == 1741069294) {
+        if (DataActor.actualAccountId == 1745303931 || DataActor.actualAccountId == 1741069294) {
             for (HttpResponseParams responseParam: filteredResponseParams) {
                 dependencyAnalyser.analyse(responseParam.getOrig(), responseParam.requestParams.getApiCollectionId());
             }
@@ -299,7 +300,7 @@ public class HttpCallParser {
             }
             SyncLimit syncLimit = fetchSyncLimit();
             apiCatalogSync.syncWithDB(syncImmediately, fetchAllSTI, syncLimit);
-            if (Main.actualAccountId == 1745303931 || Main.actualAccountId == 1741069294) {
+            if (DataActor.actualAccountId == 1745303931 || DataActor.actualAccountId == 1741069294) {
                 dependencyAnalyser.dbState = apiCatalogSync.dbState;
                 dependencyAnalyser.syncWithDb();
             }
@@ -365,8 +366,8 @@ public class HttpCallParser {
     public void syncTrafficMetricsWithDBHelper() {
         List<BulkUpdates> bulkUpdates = new ArrayList<>();
         BasicDBObject metricsData = new BasicDBObject();
-        int accountId = Main.actualAccountId;
-        Organization organization = dataActor.fetchOrganization(accountId);
+        int accountId = DataActor.actualAccountId;
+        Organization organization = OrgUtils.getOrganizationCached(accountId);
         for (TrafficMetrics trafficMetrics: trafficMetricsMap.values()) {
             TrafficMetrics.Key key = trafficMetrics.getId();
             Map<String, Long> countMap = trafficMetrics.getCountMap();
