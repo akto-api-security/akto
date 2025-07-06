@@ -906,7 +906,7 @@ function ApiEndpoints(props) {
                 filtered={loading ? false : filteredEndpoints.length !== endpointData["all"].length}
                 runTestFromOutside={runTests}
                 closeRunTest={() => setRunTests(false)}
-                disabled={showEmptyScreen || window.USER_ROLE === "GUEST" || collectionsObj.isOutOfTestingScope}
+                disabled={showEmptyScreen || window.USER_ROLE === "GUEST" || (collectionsObj?.isOutOfTestingScope || false)}
                 selectedResourcesForPrimaryAction={selectedResourcesForPrimaryAction}
                 preActivator={false}
             />
@@ -1071,7 +1071,7 @@ function ApiEndpoints(props) {
                     learnText={"inventory"}
                     docsUrl={ENDPOINTS_PAGE_DOCS_URL}
                 />] : [
-                (coverageInfo[apiCollectionId] === 0 || !(coverageInfo.hasOwnProperty(apiCollectionId)) ? <TestrunsBannerComponent key={"testrunsBanner"} onButtonClick={() => setRunTests(true)} isInventory={true}  disabled={collectionsObj.isOutOfTestingScope}/> : null),
+                (coverageInfo[apiCollectionId] === 0 || !(coverageInfo.hasOwnProperty(apiCollectionId)) ? <TestrunsBannerComponent key={"testrunsBanner"} onButtonClick={() => setRunTests(true)} isInventory={true}  disabled={collectionsObj?.isOutOfTestingScope || false}/> : null),
                 <div className="apiEndpointsTable" key="table">
                     {apiEndpointTable}
                       <Modal large open={isGptScreenActive} onClose={() => setIsGptScreenActive(false)} title="Akto GPT">
