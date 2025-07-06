@@ -12,9 +12,9 @@ import com.akto.util.Constants;
 import com.mongodb.client.model.Filters;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class OrgUtils {
 
@@ -36,8 +36,8 @@ public class OrgUtils {
 
     private static final DataActor dataActor = DataActorFactory.fetchInstance();
 
-    private static final int CACHE_DURATION = 60 * 1; // 1 minute
-    private static final Map<Integer, CachedOrganization> orgCache = new HashMap<>();
+    private static final int CACHE_DURATION = 60 * 5; // 5 minutes
+    private static final Map<Integer, CachedOrganization> orgCache = new ConcurrentHashMap<>();
 
     public static Organization getOrganizationCached(int accountId) {
         CachedOrganization cached = orgCache.get(accountId);
