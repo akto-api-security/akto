@@ -63,15 +63,6 @@ import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
-
-import java.io.PrintWriter;
-import java.io.StringWriter;
-import okhttp3.MediaType;
-import okhttp3.OkHttpClient;
-import okhttp3.Request;
-import okhttp3.RequestBody;
-import okhttp3.Response;
-import okhttp3.ResponseBody;
 import org.bson.BsonReader;
 import org.bson.Document;
 import org.bson.codecs.Codec;
@@ -113,7 +104,7 @@ public class ClientActor extends DataActor {
         if (checkAccount()) {
             dbAbsHost = System.getenv("DATABASE_ABSTRACTOR_SERVICE_URL");
         }
-        loggerMaker.info("dbHost value " + dbAbsHost);
+        loggerMaker.warn("dbHost value " + dbAbsHost);
         if (dbAbsHost.endsWith("/")) {
             dbAbsHost = dbAbsHost.substring(0, dbAbsHost.length() - 1);
         }
@@ -1297,10 +1288,10 @@ public class ClientActor extends DataActor {
                 BasicDBObject accountObj = (BasicDBObject) payloadObj.get("setup");
                 setup = objectMapper.readValue(accountObj.toJson(), Setup.class);
             } catch(Exception e) {
-                loggerMaker.errorAndAddToDb("error extracting response in fetchSetupObject" + e, LoggerMaker.LogDb.RUNTIME);
+                loggerMaker.errorAndAddToDb(e, "error extracting response in fetchSetupObject " + e, LoggerMaker.LogDb.RUNTIME);
             }
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("error in fetchSetupObject" + e, LoggerMaker.LogDb.RUNTIME);
+            loggerMaker.errorAndAddToDb(e, "error in fetchSetupObject" + e, LoggerMaker.LogDb.RUNTIME);
         }
         return setup;
     }
@@ -1324,10 +1315,10 @@ public class ClientActor extends DataActor {
                 BasicDBObject accountObj = (BasicDBObject) payloadObj.get("organization");
                 organization = objectMapper.readValue(accountObj.toJson(), Organization.class);
             } catch(Exception e) {
-                loggerMaker.errorAndAddToDb("error extracting response in fetchSetupObject" + e, LoggerMaker.LogDb.RUNTIME);
+                loggerMaker.errorAndAddToDb(e, "error extracting response in fetchOrganization " + e, LoggerMaker.LogDb.RUNTIME);
             }
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("error in fetchOrganization" + e, LoggerMaker.LogDb.RUNTIME);
+            loggerMaker.errorAndAddToDb(e, "error in fetchOrganization" + e, LoggerMaker.LogDb.RUNTIME);
         }
         return organization;
     }
@@ -3306,7 +3297,7 @@ public class ClientActor extends DataActor {
             String decodedPayload = new String(decodedBytes);
             BasicDBObject basicDBObject = BasicDBObject.parse(decodedPayload);
             int accId = (int) basicDBObject.getInt("accountId");
-            loggerMaker.info("checkaccount accountId log " + accId);
+            loggerMaker.warn("checkAccount accountId log " + accId);
             return accId == 1000000;
         } catch (Exception e) {
             loggerMaker.error("checkaccount error" + e.getStackTrace());
