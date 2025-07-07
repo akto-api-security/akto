@@ -1,12 +1,17 @@
 package com.akto.runtime.utils;
 
+import java.io.BufferedReader;
+import java.io.File;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.util.*;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
 
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.common.serialization.StringDeserializer;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import com.akto.dto.HttpRequestParams;
 import com.akto.dto.HttpResponseParams;
@@ -30,6 +35,14 @@ public class Utils {
             logger.warn(o.toString());
         }
     }
+
+    public static void printUrlDebugLog(Object o){
+        if( o == null ){
+            return;
+        }
+        logger.warn(o.toString());
+    }
+
 
     public static Properties configProperties(String kafkaBrokerUrl, String groupIdConfig, int maxPollRecordsConfig) {
         Properties properties = new Properties();
@@ -128,7 +141,52 @@ public class Utils {
     }
 
     private static final Set<String> DEBUG_HOSTS_SET = initializeDebugHostsSet();
-    private static final Set<String> DEBUG_URLS_SET = initializeDebugUrlsSet();
+    private static volatile Set<String> DEBUG_URLS_SET = initializeDebugUrlsSet();
+    private static final String DEBUG_URLS_FILE_PATH = "/app/debug-urls.txt";
+    private static final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
+
+    static {
+        startDebugUrlsFileWatcher();
+    }
+    private static volatile Set<String> lastFileUrls = null;
+
+    private static void startDebugUrlsFileWatcher() {
+        scheduler.scheduleAtFixedRate(() -> {
+                try {
+                    Set<String> fileUrls = readDebugUrlsFromFile();
+                    if (fileUrls != null && !fileUrls.isEmpty()) {
+                        if (lastFileUrls == null || !lastFileUrls.equals(fileUrls)) {
+                            DEBUG_URLS_SET = fileUrls;
+                            logger.infoAndAddToDb("DEBUG_URLS updated from file: " + DEBUG_URLS_SET.toString());
+                            lastFileUrls = new HashSet<>(fileUrls);
+                        }
+                    }
+                } catch (Exception e) {
+                    logger.errorAndAddToDb(e, "Failed to read debug URLs from file: " + e.getMessage());
+                }
+        }, 0, 30, TimeUnit.SECONDS);
+    }
+
+    private static Set<String> readDebugUrlsFromFile() {
+        File file = new File(DEBUG_URLS_FILE_PATH);
+        if (!file.exists()) {
+            return null;
+        }
+        try (BufferedReader br = Files.newBufferedReader(file.toPath(), StandardCharsets.UTF_8)) {
+            Set<String> urls = new HashSet<>();
+            String line;
+            while ((line = br.readLine()) != null) {
+                line = line.trim();
+                if (!line.isEmpty()) {
+                    urls.add(line);
+                }
+            }
+            return urls;
+        } catch (Exception e) {
+            logger.errorAndAddToDb(e, "Error reading debug URLs file: " + e.getMessage());
+            return null;
+        }
+    }
 
     private static Set<String> initializeDebugHostsSet() {
         String debugHosts = System.getenv("DEBUG_HOSTS");
@@ -156,13 +214,7 @@ public class Utils {
 
         String debugUrls = System.getenv("DEBUG_URLS");
         if (debugUrls == null || debugUrls.isEmpty()) {
-            ret = new HashSet<>(Arrays.asList(
-                    "partner/v2/transactions",
-                    "partner/qa/v2/transactions",
-                    "partner/v1/transactions",
-                    "partner/qa/v2/products",
-                    "partner/v2/products"
-            ));
+            ret = new HashSet<>();
         } else {
             ret = new HashSet<>(Arrays.asList(debugUrls.split(",")));
         }
