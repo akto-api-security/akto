@@ -7,27 +7,23 @@ import TooltipText from '../../../components/shared/TooltipText'
 function ActionItemCard(props) {
     const { cardObj, onButtonClick } = props;
     
-    const handleClick = (e) => {
+    const handleJiraClick = (e) => {
         e.stopPropagation();
-        if (!isIntegrated) {
-            window.location.href = "/dashboard/settings/integrations/jira";
-        } else {
-            // Handle Jira integration
-        }
+        onButtonClick(cardObj);
     };
-
-    const isIntegrated = typeof window !== 'undefined' && window.JIRA_INTEGRATED === true;
     
     return (
         <div
             onClick={e => {
-                // Prevent flyout if clicking on assign button, popover, or tag
                 if (
                     e.target.closest('.Polaris-Button') ||
                     e.target.closest('.Polaris-Popover') ||
                     e.target.closest('.Polaris-Tag') ||
                     e.target.closest('.Polaris-Modal-CloseButton')
                 ) {
+                    return;
+                }
+                if (e.cancelBubble) {
                     return;
                 }
                 onButtonClick(cardObj);
@@ -65,11 +61,10 @@ function ActionItemCard(props) {
                     <HorizontalStack gap={"3"} align="space-between" wrap={false}>
                         <Box className="action-item-card-actions">
                             <HorizontalStack gap={"2"}>
-                                {/* Email icon button removed */}
                                 <button
                                     className="Polaris-Modal-CloseButton"
-                                    onClick={handleClick}
-                                    title={isIntegrated ? 'Create Jira Ticket' : 'Integrate Jira'}
+                                    onClick={handleJiraClick}
+                                    title={window?.JIRA_INTEGRATED ? 'Create Jira Ticket' : 'Integrate Jira'}
                                 >
                                     <Box className='reduce-size'>
                                         <Avatar size="extraSmall" shape="square" source="/public/logo_jira.svg" />
