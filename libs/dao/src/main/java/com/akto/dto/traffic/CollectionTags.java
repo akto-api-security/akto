@@ -2,12 +2,17 @@ package com.akto.dto.traffic;
 
 
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 
 import com.akto.dao.context.Context;
+import com.akto.dto.ApiCollection;
 import com.google.gson.Gson;
 
 import lombok.AllArgsConstructor;
@@ -40,7 +45,17 @@ public class CollectionTags {
 
     @Override
     public int hashCode() {
-        return Objects.hash(lastUpdatedTs, keyName, value, source);
+        return Objects.hash(keyName, value, source);
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        if (this == obj) return true;
+        if (obj == null || getClass() != obj.getClass()) return false;
+        CollectionTags that = (CollectionTags) obj;
+        return Objects.equals(keyName, that.keyName) &&
+               Objects.equals(value, that.value) &&
+               source == that.source;
     }
 
     @Override
@@ -116,4 +131,24 @@ public class CollectionTags {
 
     }
 
+    public static List<CollectionTags> getUniqueTags(ApiCollection apiCollection, List<CollectionTags> tags) {
+        if(tags == null || tags.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        List<String> ignoreList = Arrays.asList("pod-template-hash");
+        // Ignore tags from the ignore list
+        tags.removeIf(tag -> tag.getKeyName() != null && ignoreList.contains(tag.getKeyName()));
+
+        if (apiCollection == null || apiCollection.getTagsList() == null || apiCollection.getTagsList().isEmpty()) {
+            return tags;
+        }
+
+        Set<CollectionTags> mergedTags = new HashSet<>(apiCollection.getTagsList());
+        mergedTags.addAll(tags);
+
+        tags = new ArrayList<>(mergedTags);
+
+        return tags;
+    }
 }
