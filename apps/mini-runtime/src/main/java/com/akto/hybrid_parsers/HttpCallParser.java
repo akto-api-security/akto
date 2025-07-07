@@ -506,15 +506,27 @@ public class HttpCallParser {
             return;
         }
 
+        // Update the tags in-memory for the apiCollection
+        if(Utils.printDebugUrlLog(httpResponseParams.getRequestParams().getURL()) || (Utils.printDebugHostLog(httpResponseParams) != null)) {
+            loggerMaker.warn("Updating tags in-memory for apiCollectionId: " + apiCollectionId + " with hostNameMapKey: " + hostNameMapKey
+                    + " url: " + httpResponseParams.getRequestParams().getURL() + " and tags: " + httpResponseParams.getTags());
+        }
+
+        List<CollectionTags> tagsList = CollectionTags.convertTagsFormat(httpResponseParams.getTags());
+        tagsList = CollectionTags.getUniqueTags(apiCollection, tagsList);
+        apiCollection.setTagsList(tagsList);
+        apiCollectionsMap.put(apiCollectionId, apiCollection);
+        
+
         int lastSynctime = this.apiCollectionIdTagsSyncTimestampMap.getOrDefault(apiCollectionId, 0);
         if (Context.now() - lastSynctime < this.sync_threshold_time) {
             // Avoid updating tags too frequently
             return;
         }
+
+        // Fetch from in-memory map 
+        tagsList = apiCollectionsMap.get(apiCollectionId).getTagsList();
         this.apiCollectionIdTagsSyncTimestampMap.put(apiCollectionId, Context.now());
-
-        List<CollectionTags> tagsList = CollectionTags.convertTagsFormat(httpResponseParams.getTags());
-
 
         if (CollectionUtils.isEmpty(apiCollection.getTagsList()) || apiCollection.getTagsList().stream()
             .noneMatch(t -> "mcp-server".equals(t.getKeyName()))) {
@@ -546,8 +558,11 @@ public class HttpCallParser {
                 e.printStackTrace();
             }
         }
-
-        printL("Updated tags for apiCollectionId: " + apiCollectionId + "with tags: " + tagsList + "hostNameMapKey:" + hostNameMapKey);
+        String log = "Updated tags for apiCollectionId: " + apiCollectionId + " url: " + httpResponseParams.getRequestParams().getURL() + " with tags: " + tagsList + " hostNameMapKey: " + hostNameMapKey;
+        printL(log);
+        if(Utils.printDebugUrlLog(httpResponseParams.getRequestParams().getURL()) || (Utils.printDebugHostLog(httpResponseParams) != null)) {
+            loggerMaker.warn(log);
+        }
     }
 
     public int createApiCollectionId(HttpResponseParams httpResponseParam){
