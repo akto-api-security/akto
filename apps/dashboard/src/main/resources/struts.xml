@@ -10270,6 +10270,15 @@
             </result>
         </action>
 
+        <action name="api/createGeneralJiraTicket" class="com.akto.action.JiraIntegrationAction" method="createGeneralJiraTicket">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="json">
+                <param name="root">result</param>
+            </result>
+        </action>
+
     </package>
 
 </struts>

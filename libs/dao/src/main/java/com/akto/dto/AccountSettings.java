@@ -134,6 +134,9 @@ public class AccountSettings {
     @Setter
     private boolean allowMergingOnVersions;
 
+    public static final String JIRA_TICKET_URL_MAP = "jiraTicketUrlMap";
+    private Map<String, String> jiraTicketUrlMap = new HashMap<>();
+
     public AccountSettings() {
     }
 
@@ -485,5 +488,22 @@ public class AccountSettings {
 
     public void setThreatPolicies(List<TestLibrary>  threatPolicies) {
         this.threatPolicies = threatPolicies;
+    }
+    public void setJiraTicketUrl(String actionItemType, String jiraTicketUrl) {
+        if (this.jiraTicketUrlMap == null) {
+            this.jiraTicketUrlMap = new HashMap<>();
+        }
+        this.jiraTicketUrlMap.put(actionItemType, jiraTicketUrl);
+    }
+
+    public String getJiraTicketUrl(String actionItemType) {
+        if (this.jiraTicketUrlMap == null) {
+            return null;
+        }
+        return this.jiraTicketUrlMap.get(actionItemType);
+    }
+
+    public Map<String, String> getJiraTicketUrlMap() {
+        return this.jiraTicketUrlMap;
     }
 }
