@@ -18,6 +18,7 @@ import com.akto.dto.testing.TestingRun;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.metrics.AllMetrics;
+import com.akto.usage.OrgUtils;
 
 public class TestCompletion {
 
@@ -44,7 +45,7 @@ public class TestCompletion {
 
         AllMetrics.instance.setTestingRunLatency(System.currentTimeMillis() - startDetailed);
 
-        Organization organization = dataActor.fetchOrganization(accountId);
+        Organization organization = OrgUtils.getOrganizationCached(accountId);
 
         if(organization != null && organization.getTestTelemetryEnabled()){
             loggerMaker.infoAndAddToDb("Test telemetry enabled for account: " + accountId + ", sending results", LogDb.TESTING);
