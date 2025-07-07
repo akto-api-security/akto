@@ -16,7 +16,7 @@ public class Utils {
         return RedisKeyInfo.API_COUNTER_KEY_PREFIX + "|" + apiCollectionId + "|" + url + "|" + method;
     }
 
-    public static String buildIpApiCmsDataKey(String apiCollectionId, String ip, String url, String method) {
+    public static String buildIpApiCmsDataKey(String ip, String apiCollectionId, String url, String method) {
         return RedisKeyInfo.IP_API_CMS_DATA_PREFIX + "|" + apiCollectionId + "|" + ip + "|" + url + "|" + method;
     }
 

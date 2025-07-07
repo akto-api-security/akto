@@ -5,7 +5,6 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.TreeMap;
 
 import org.bson.conversions.Bson;
 
@@ -15,15 +14,12 @@ import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.Ap
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.BucketStats;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchApiDistributionDataRequest;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchApiDistributionDataResponse;
-import com.akto.threat.backend.db.AggregateSampleMaliciousEventModel;
 import com.akto.threat.backend.db.ApiDistributionDataModel;
-import com.akto.threat.backend.db.MaliciousEventModel;
 import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.BulkWriteOptions;
 import com.mongodb.client.model.Filters;
-import com.mongodb.client.model.InsertOneModel;
 import com.mongodb.client.model.UpdateOneModel;
 import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.Updates;
@@ -31,7 +27,7 @@ import com.mongodb.client.model.WriteModel;
 
 public class ApiDistributionDataService {
     
-    private static final LoggerMaker logger = new LoggerMaker(MaliciousEventService.class);
+    private static final LoggerMaker logger = new LoggerMaker(ApiDistributionDataService.class);
     private final MongoClient mongoClient;
 
     public ApiDistributionDataService(MongoClient mongoClient) {

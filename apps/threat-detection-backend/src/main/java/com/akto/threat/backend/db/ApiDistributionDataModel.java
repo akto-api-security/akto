@@ -8,6 +8,7 @@ import java.util.Map;
 @lombok.NoArgsConstructor
 public class ApiDistributionDataModel {
     
+    public int apiCollectionId;
     public String url;
     public String method;
     public int windowSize;
