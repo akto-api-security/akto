@@ -13,12 +13,23 @@ public class ThreatUtils {
 
     public static void createIndexIfAbsent(String accountId, MongoClient mongoClient) {
         MongoDatabase database = mongoClient.getDatabase(accountId);
-        MongoCollection<Document> coll = database.getCollection(MongoDBCollection.ThreatDetection.MALICIOUS_EVENTS, Document.class);
 
-        if (coll == null) {
-            database.createCollection(MongoDBCollection.ThreatDetection.MALICIOUS_EVENTS);
-            coll = database.getCollection(MongoDBCollection.ThreatDetection.MALICIOUS_EVENTS, Document.class);
+        MongoCursor<String> stringMongoCursor = database.listCollectionNames().cursor();
+        boolean maliciousEventCollectionExists = false;
+
+        while (stringMongoCursor.hasNext()) {
+            String collectionName = stringMongoCursor.next();
+            if(collectionName.equalsIgnoreCase(MongoDBCollection.ThreatDetection.MALICIOUS_EVENTS)) {
+                maliciousEventCollectionExists = true;
+                break;
+            }
         }
+
+        if (!maliciousEventCollectionExists) {
+            database.createCollection(MongoDBCollection.ThreatDetection.MALICIOUS_EVENTS);
+        }
+
+        MongoCollection<Document> coll = database.getCollection(MongoDBCollection.ThreatDetection.MALICIOUS_EVENTS, Document.class);
 
         Set<String> existingIndexes = new HashSet<>();
         try (MongoCursor<Document> cursor = coll.listIndexes().iterator()) {
