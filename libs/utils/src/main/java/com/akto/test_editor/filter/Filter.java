@@ -14,6 +14,7 @@ import com.akto.dao.context.Context;
 import com.akto.dao.test_editor.TestEditorEnums;
 import com.akto.dao.test_editor.TestEditorEnums.ExtractOperator;
 import com.akto.dao.test_editor.TestEditorEnums.OperandTypes;
+import com.akto.data_actor.DataActor;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.RawApi;
 import com.akto.dto.billing.FeatureAccess;
@@ -176,10 +177,9 @@ public class Filter {
         boolean querySetUpdated = false;
         String operationPrompt = "";
         try {
-            int accountId = Context.accountId.get();
+            int accountId = DataActor.actualAccountId;
             FeatureAccess featureAccess = UsageMetricUtils.getFeatureAccessSaas(accountId, TestExecutorModifier._AKTO_GPT_AI);
             if (featureAccess.getIsGranted()) {
-
 
                 if (querySet instanceof String) {
                     String query = (String) querySet;

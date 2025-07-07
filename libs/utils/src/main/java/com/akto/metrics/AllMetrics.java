@@ -1,14 +1,12 @@
 package com.akto.metrics;
 
 import com.akto.dao.context.Context;
-import com.akto.dao.metrics.MetricDataDao;
-import com.akto.data_actor.ClientActor;
 import com.akto.data_actor.DataActor;
-import com.akto.data_actor.DataActorFactory;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.metrics.MetricData;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.usage.OrgUtils;
 import com.akto.util.http_util.CoreHTTPClient;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
@@ -22,11 +20,10 @@ import java.util.concurrent.TimeUnit;
 
 public class AllMetrics {
 
-    public void init(LogDb module, boolean pgMetrics, DataActor dataActor){
+    public void init(LogDb module, boolean pgMetrics, DataActor dataActor, int accountId) {
         this.dataActor = dataActor;
-        int accountId = Context.accountId.get();
 
-        Organization organization = DataActorFactory.fetchInstance().fetchOrganization(accountId);
+        Organization organization = OrgUtils.getOrganizationCached(accountId);
         String orgId = organization.getId();
 
         if(LogDb.RUNTIME.equals(module)){

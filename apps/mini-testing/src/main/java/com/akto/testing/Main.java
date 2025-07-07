@@ -37,6 +37,7 @@ import com.akto.test_editor.execution.Executor;
 import com.akto.testing.kafka_utils.ConsumerUtil;
 import com.akto.testing.kafka_utils.Producer;
 import com.akto.testing.kafka_utils.TestingConfigurations;
+import com.akto.usage.OrgUtils;
 import com.akto.util.Constants;
 import com.akto.store.SampleMessageStore;
 import com.akto.store.TestingUtil;
@@ -366,6 +367,7 @@ public class Main {
 
         int accountId = accountSettings.getId();
         Context.accountId.set(accountId);
+        DataActor.actualAccountId = accountId;
         GetRunningTestsStatus.getRunningTests().getStatusOfRunningTests();
 
           BasicDBObject currentTestInfo = null;
@@ -376,7 +378,7 @@ public class Main {
         if(currentTestInfo != null){
             try {
                 loggerMaker.infoAndAddToDb("Tests were already running on this machine, thus resuming the test for account: "+ accountId, LogDb.TESTING);
-                Organization organization = dataActor.fetchOrganization(accountId);
+                Organization organization = OrgUtils.getOrganizationCached(accountId);
                 FeatureAccess featureAccess = UsageMetricUtils.getFeatureAccess(organization, MetricTypes.TEST_RUNS);
                 SyncLimit syncLimit = featureAccess.fetchSyncLimit();
                 String testingRunSummaryId = currentTestInfo.getString("summaryId");
@@ -627,7 +629,7 @@ public class Main {
                     }
                 }
 
-                Organization organization = dataActor.fetchOrganization(accountId);
+                Organization organization = OrgUtils.getOrganizationCached(accountId);
                 FeatureAccess featureAccess = UsageMetricUtils.getFeatureAccess(organization, MetricTypes.TEST_RUNS);
                 SyncLimit syncLimit = featureAccess.fetchSyncLimit();
                 Executor.clearRoleCache();
