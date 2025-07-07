@@ -1941,4 +1941,13 @@ public class StartTestAction extends UserAction {
         Map<String, String> issuesDescriptionMap) {
         this.issuesDescriptionMap = issuesDescriptionMap;
     }
+
+    public int getSelectedSlackWebhook() {
+        return selectedSlackWebhook;
+    }
+
+    public void setSelectedSlackWebhook(int selectedSlackWebhook) {
+        this.selectedSlackWebhook = selectedSlackWebhook;
+
+    }
 }
