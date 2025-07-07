@@ -590,11 +590,13 @@ function ApiCollections(props) {
         }
         actions.push(
             {
-                content: `Remove collection${func.addPlurality(selectedResources.length)}`,
-                onAction: () => handleCollectionsAction(selectedResources.filter(v => !defaultApiGroups.includes(v)), api.deleteMultipleCollections, "deleted")
+                content: `Delete collection${func.addPlurality(selectedResources.length)}`,
+                onAction: () => {
+                    const deleteConfirmationMessage = `Are you sure, you want to delete collection${func.addPlurality(selectedResources.length)}?`
+                    func.showConfirmationModal(deleteConfirmationMessage, "Delete", () => handleCollectionsAction(selectedResources.filter(v => !defaultApiGroups.includes(v)), api.deleteMultipleCollections, "deleted"))
+                }
             }
         )
-
 
         const apiCollectionShareRenderItem = (item) => {
             const { id, name, login, role } = item;
