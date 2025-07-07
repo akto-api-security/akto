@@ -2432,19 +2432,6 @@ public class InitializerListener implements ServletContextListener {
                 }
 
                 setDashboardMode();
-                updateGlobalAktoVersion();
-
-                AccountTask.instance.executeTask(new Consumer<Account>() {
-                    @Override
-                    public void accept(Account account) {
-                        AccountSettingsDao.instance.getStats();
-                        Intercom.setToken(System.getenv("INTERCOM_TOKEN"));
-                        setDashboardVersionForAccount();
-                    }
-                }, "context-initializer");
-
-                SingleTypeInfo.init();
-
                 int now = Context.now();
                 if (runJobFunctions || runJobFunctionsAnyway) {
 
