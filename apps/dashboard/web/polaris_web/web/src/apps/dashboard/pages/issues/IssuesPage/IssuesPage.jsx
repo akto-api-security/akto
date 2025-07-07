@@ -543,6 +543,7 @@ function IssuesPage() {
                             method: item?.id?.apiInfoKey?.method,
                             url: item?.id?.apiInfoKey?.url,
                             id: JSON.stringify(item?.id),
+                            issueDescription: item?.description,
                             jiraIssueUrl: item?.jiraIssueUrl || "",
                         }],
                     })
@@ -556,6 +557,7 @@ function IssuesPage() {
                         method: item?.id?.apiInfoKey?.method,
                         url: item?.id?.apiInfoKey?.url,
                         id: JSON.stringify(item?.id),
+                        issueDescription: item?.description,
                         jiraIssueUrl: item?.jiraIssueUrl || ""
                     })
                     existingIssue.numberOfEndpoints += 1
