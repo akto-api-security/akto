@@ -2,8 +2,12 @@ package com.akto.runtime.utils;
 
 import java.io.BufferedReader;
 import java.io.File;
-import java.io.FileReader;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.util.*;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
 
 import org.apache.kafka.clients.consumer.ConsumerConfig;
@@ -131,13 +135,15 @@ public class Utils {
     private static final Set<String> DEBUG_HOSTS_SET = initializeDebugHostsSet();
     private static volatile Set<String> DEBUG_URLS_SET = initializeDebugUrlsSet();
     private static final String DEBUG_URLS_FILE_PATH = "/app/debug-urls.txt";
+    private static final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
+
     static {
         startDebugUrlsFileWatcher();
     }
+    private static volatile Set<String> lastFileUrls = null;
+
     private static void startDebugUrlsFileWatcher() {
-        Thread watcherThread = new Thread(() -> {
-            Set<String> lastFileUrls = null;
-            while (true) {
+        scheduler.scheduleAtFixedRate(() -> {
                 try {
                     Set<String> fileUrls = readDebugUrlsFromFile();
                     if (fileUrls != null && !fileUrls.isEmpty()) {
@@ -150,16 +156,7 @@ public class Utils {
                 } catch (Exception e) {
                     logger.errorAndAddToDb(e, "Failed to read debug URLs from file: " + e.getMessage());
                 }
-                try {
-                    Thread.sleep(30000); // 30 seconds
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                    break;
-                }
-            }
-        });
-        watcherThread.setDaemon(true);
-        watcherThread.start();
+        }, 0, 30, TimeUnit.SECONDS);
     }
 
     private static Set<String> readDebugUrlsFromFile() {
@@ -167,7 +164,7 @@ public class Utils {
         if (!file.exists()) {
             return null;
         }
-        try (BufferedReader br = new BufferedReader(new FileReader(file))) {
+        try (BufferedReader br = Files.newBufferedReader(file.toPath(), StandardCharsets.UTF_8)) {
             Set<String> urls = new HashSet<>();
             String line;
             while ((line = br.readLine()) != null) {
