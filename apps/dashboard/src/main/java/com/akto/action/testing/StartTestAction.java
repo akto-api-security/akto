@@ -846,25 +846,31 @@ public class StartTestAction extends UserAction {
     private Map<String, String> prepareIssueDescriptionMap(ObjectId latestTestingSummaryId,
         List<TestingRunResult> testingRunResults) {
 
-        if (testingRunResults == null || testingRunResults.isEmpty()) {
+        try {
+
+            if (testingRunResults == null || testingRunResults.isEmpty()) {
+                return Collections.emptyMap();
+            }
+
+            Map<TestingIssuesId, TestingRunResult> idToResultMap = new HashMap<>();
+            for (TestingRunResult result : testingRunResults) {
+                TestingIssuesId id = getTestingIssueIdFromRunResult(result);
+                idToResultMap.put(id, result);
+            }
+
+            List<TestingRunIssues> issues = TestingRunIssuesDao.instance.findAll(
+                Filters.and(
+                    Filters.eq(TestingRunIssues.LATEST_TESTING_RUN_SUMMARY_ID, latestTestingSummaryId),
+                    Filters.in("_id", idToResultMap.keySet())
+                ),
+                Projections.include("_id", TestingRunIssues.DESCRIPTION)
+            );
+
+            return com.akto.action.testing.Utils.mapIssueDescriptions(issues, idToResultMap);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in preparing issue description map: " + e.getMessage());
             return Collections.emptyMap();
         }
-
-        Map<TestingIssuesId, TestingRunResult> idToResultMap = new HashMap<>();
-        for (TestingRunResult result : testingRunResults) {
-            TestingIssuesId id = getTestingIssueIdFromRunResult(result);
-            idToResultMap.put(id, result);
-        }
-
-        List<TestingRunIssues> issues = TestingRunIssuesDao.instance.findAll(
-            Filters.and(
-                Filters.eq(TestingRunIssues.LATEST_TESTING_RUN_SUMMARY_ID, latestTestingSummaryId),
-                Filters.in("_id", idToResultMap.keySet())
-            ),
-            Projections.include("_id", TestingRunIssues.DESCRIPTION)
-        );
-
-        return com.akto.action.testing.Utils.mapIssueDescriptions(issues, idToResultMap);
     }
 
     public static void removeTestingRunResultsByIssues(List<TestingRunResult> testingRunResults,

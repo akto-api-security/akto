@@ -725,18 +725,24 @@ public class IssuesAction extends UserAction {
     private Map<String, String> prepareIssueDescriptionMap(List<TestingRunIssues> issues,
         List<TestingRunResult> testingRunResults) {
 
-        if (testingRunResults == null || testingRunResults.isEmpty()) {
+        try {
+
+            if (testingRunResults == null || testingRunResults.isEmpty()) {
+                return Collections.emptyMap();
+            }
+
+            Map<TestingIssuesId, TestingRunResult> idToResultMap = new HashMap<>();
+            for (TestingRunResult result : testingRunResults) {
+                TestingIssuesId id = new TestingIssuesId(result.getApiInfoKey(), TestErrorSource.AUTOMATED_TESTING,
+                    result.getTestSubType());
+                idToResultMap.put(id, result);
+            }
+
+            return Utils.mapIssueDescriptions(issues, idToResultMap);
+        } catch (Exception e) {
+            logger.errorAndAddToDb(e, "Error while preparing issue description map");
             return Collections.emptyMap();
         }
-
-        Map<TestingIssuesId, TestingRunResult> idToResultMap = new HashMap<>();
-        for (TestingRunResult result : testingRunResults) {
-            TestingIssuesId id = new TestingIssuesId(result.getApiInfoKey(), TestErrorSource.AUTOMATED_TESTING,
-                result.getTestSubType());
-            idToResultMap.put(id, result);
-        }
-
-        return Utils.mapIssueDescriptions(issues, idToResultMap);
     }
 
     List<TestingIssuesId> issuesIds;
