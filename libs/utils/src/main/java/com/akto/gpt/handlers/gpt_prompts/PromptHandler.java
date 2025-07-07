@@ -18,7 +18,7 @@ import org.json.JSONObject;
 
 public abstract class PromptHandler {
 
-    private static final LoggerMaker logger = new LoggerMaker(PromptHandler.class, LogDb.DASHBOARD);
+    private static final LoggerMaker logger = new LoggerMaker(PromptHandler.class, LogDb.TESTING);
     private static final String OLLAMA_MODEL = "llama3:8b";
     private static final Double temperature = 0.1;
     private static final int max_tokens = 4000;
