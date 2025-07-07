@@ -48,7 +48,6 @@ public class Main {
 
     // this sync threshold time is used for deleting sample data
     public static final int sync_threshold_time = 120;
-    public static int actualAccountId;
 
     private static int debugPrintCounter = 500;
     private static void printL(Object o) {
@@ -182,7 +181,6 @@ public class Main {
             kafkaBrokerUrl = "127.0.0.1:29092";
         }
         String groupIdConfig =  System.getenv("AKTO_KAFKA_GROUP_ID_CONFIG");
-        String instanceType =  System.getenv("AKTO_INSTANCE_TYPE");
         boolean syncImmediately = false;
         boolean fetchAllSTI = true;
         Map<Integer, AccountInfo> accountInfoMap =  new HashMap<>();
@@ -199,7 +197,7 @@ public class Main {
             loggerMaker.errorAndAddToDb("error fetch account settings, exiting process");
             System.exit(0);
         }
-        actualAccountId = aSettings.getId();
+        DataActor.actualAccountId = aSettings.getId();
         loggerMaker.infoAndAddToDb("Fetched account settings for account ", LogDb.RUNTIME);
 
         DataControlFetcher.init(dataActor);
@@ -229,7 +227,7 @@ public class Main {
 
         final boolean checkPg = aSettings != null && aSettings.isRedactPayload();
 
-        AllMetrics.instance.init(LogDb.RUNTIME, checkPg, dataActor);
+        AllMetrics.instance.init(LogDb.RUNTIME, checkPg, dataActor, DataActor.actualAccountId);
         HttpCallParser.init();
         loggerMaker.infoAndAddToDb("All metrics initialized", LogDb.RUNTIME);
 
@@ -378,7 +376,7 @@ public class Main {
         loggerMaker.info("Scheduling MCP Sync Job");
         APIConfig finalApiConfig = apiConfig;
         scheduler.scheduleAtFixedRate(() -> {
-            Context.accountId.set(actualAccountId);
+            Context.accountId.set(DataActor.actualAccountId);
             try {
                 loggerMaker.infoAndAddToDb("Executing MCP Tools Sync job");
                 McpToolsSyncJobExecutor.INSTANCE.runJob(finalApiConfig);

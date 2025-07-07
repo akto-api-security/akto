@@ -26,6 +26,7 @@ import com.akto.dto.usage.MetricTypes;
 import com.akto.dto.usage.UsageMetric;
 import com.akto.dto.usage.UsageMetricInfo;
 import com.akto.mixpanel.AktoMixpanel;
+import com.akto.usage.OrgUtils;
 import com.akto.util.DashboardMode;
 import com.akto.util.EmailAccountName;
 import com.akto.util.UsageUtils;
@@ -123,7 +124,7 @@ public class UsageMetricUtils {
     public static void syncUsageMetricWithMixpanel(UsageMetric usageMetric) {
         try {
             int accountId = usageMetric.getAccountId();
-            Organization organization = dataActor.fetchOrganization(accountId);
+            Organization organization = OrgUtils.getOrganizationCached(accountId);
 
             if (organization == null) {
                 return;
@@ -154,7 +155,7 @@ public class UsageMetricUtils {
         try {
             UsageMetric usageMetric = usageMetrics.get(0);
             int accountId = usageMetric.getAccountId();
-            Organization organization = dataActor.fetchOrganization(accountId);
+            Organization organization = OrgUtils.getOrganizationCached(accountId);
 
             if (organization == null) {
                 return;
@@ -236,7 +237,7 @@ public class UsageMetricUtils {
             if (!DashboardMode.isMetered() && !RuntimeMode.isHybridDeployment()) {
                 return featureAccess;
             }
-            Organization organization = dataActor.fetchOrganization(accountId);
+            Organization organization = OrgUtils.getOrganizationCached(accountId);
             featureAccess = getFeatureAccess(organization, metricType);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error in fetching usage metric", LogDb.DASHBOARD);
@@ -280,7 +281,7 @@ public class UsageMetricUtils {
             if (!DashboardMode.isMetered()) {
                 return featureAccess;
             }
-            Organization organization = dataActor.fetchOrganization(accountId);
+            Organization organization = OrgUtils.getOrganizationCached(accountId);
             if (organization == null) {
                 return featureAccess;
             }

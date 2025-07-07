@@ -1,6 +1,5 @@
 package com.akto.test_editor;
 
-import com.akto.dao.context.Context;
 import com.akto.data_actor.DataActor;
 import com.akto.data_actor.DataActorFactory;
 import com.akto.dto.billing.Organization;
@@ -13,8 +12,8 @@ public class OrgUtils {
 
     public static BasicDBObject getBillingTokenForAuth() {
         BasicDBObject bDObject;
-        int accountId = Context.accountId.get();
-        Organization organization = dataActor.fetchOrganization(accountId);
+        int accountId = DataActor.actualAccountId;
+        Organization organization = com.akto.usage.OrgUtils.getOrganizationCached(accountId);
         if (organization == null) {
             return new BasicDBObject("error", "organization not found");
         }
