@@ -33,24 +33,39 @@ const transform = {
             <td colSpan={'100%'} style={{padding: '0px !important'}}>
                 {urls.map((ele,index)=>{
                 const borderStyle = index < (urls.length - 1) ? {borderBlockEndWidth : 1} : {}
-                return( 
+                const jiraKey = ele?.jiraIssueUrl && ele.jiraIssueUrl.length > 0 ?  /[^/]*$/.exec(ele.jiraIssueUrl)[0] : ""
+                return(
                     <Box padding={"2"} paddingInlineEnd={"4"} paddingInlineStart={"3"} key={index}
                     borderColor="border-subdued" {...borderStyle}>
-                    <HorizontalStack gap={24} wrap={false}>
-                        <Box paddingInlineStart={10}>
-                        <IssuesCheckbox id={ele.id}/>
-                        </Box>
-                        <Link monochrome onClick={() => this.getNextUrl(JSON.parse(ele.id), isCompliancePage)} removeUnderline >
-                            {testingTransform.getUrlComp(ele.url)}
-                        </Link>
-                        <Box maxWidth="250px" paddingInlineStart="3">
-                        <TooltipText
-                            text={ele.issueDescription}
-                            tooltip={ele.issueDescription}
-                            textProps={{ color: "subdued"}}
-                            />
-                        </Box>
-                    </HorizontalStack>
+                        <HorizontalStack gap={24} wrap={false}>
+                            <Box paddingInlineStart={10}>
+                                <IssuesCheckbox id={ele.id}/>
+                            </Box>
+                            <HorizontalStack gap={"4"}>
+                                <Link monochrome onClick={() => this.getNextUrl(JSON.parse(ele.id), isCompliancePage)} removeUnderline >
+                                    {testingTransform.getUrlComp(ele.url)}
+                                </Link>
+                                <Box maxWidth="250px" paddingInlineStart="3">
+                                  <TooltipText
+                                      text={ele.issueDescription}
+                                      tooltip={ele.issueDescription}
+                                      textProps={{ color: "subdued"}}
+                                      />
+                                  </Box>
+                                {jiraKey &&
+                                    <Tag>
+                                        <HorizontalStack gap={1}>
+                                            <Avatar size="extraSmall" shape='round' source="/public/logo_jira.svg" />
+                                            <Link url={ele?.jiraIssueUrl} target="_blank">
+                                                <Text>
+                                                    {jiraKey}
+                                              </Text>
+                                            </Link>
+                                        </HorizontalStack>
+                                    </Tag>
+                                }
+                            </HorizontalStack>
+                        </HorizontalStack>
                     </Box>
                 )
                 })}
@@ -96,6 +111,7 @@ const transform = {
                         url: `${urlObj.method} ${urlObj.url}`,
                         id: urlObj.id,
                         issueDescription: urlObj.issueDescription
+                        jiraIssueUrl: urlObj.jiraIssueUrl || ""
                     })), isCompliancePage)
                 }
             }))

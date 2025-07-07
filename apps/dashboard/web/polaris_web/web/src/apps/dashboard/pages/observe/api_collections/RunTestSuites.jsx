@@ -1,11 +1,10 @@
-import { VerticalStack, Modal, TextField, Button, Text, HorizontalStack, Collapsible, Badge, Pagination, TextContainer, Icon, Scrollable, Checkbox, Box, Tooltip, Card, MediaCard } from "@shopify/polaris";
-import { TickMinor, CancelMajor, SearchMinor } from "@shopify/polaris-icons";
-import { useEffect, useRef, useState } from "react";
+import { VerticalStack, TextField, Button, Text, Scrollable, } from "@shopify/polaris";
+import {  CancelMajor } from "@shopify/polaris-icons";
+import { useEffect, useState } from "react";
 import "./run_test_suites.css"
-import { createTestName } from "./Utils"
 import RunTestSuiteRow from "./RunTestSuiteRow";
 import testingApi from "../../testing/api";
-import func from "../../../../../util/func";
+import func from "@/util/func";
 
 function RunTestSuites({ testRun, setTestRun, apiCollectionName, activeFromTesting, setTestSuiteIds, testSuiteIds,setTestNameSuiteModal,testNameSuiteModal }) {
 
@@ -31,6 +30,11 @@ function RunTestSuites({ testRun, setTestRun, apiCollectionName, activeFromTesti
             return { name: testSuiteItem.name, tests: testSuiteItem.subCategoryList, id: testSuiteItem.hexId }
         })
 
+        const newDurationTestSuites = testSuitesFromBackend?.filter(testSuiteItem => testSuiteItem.suiteType === "DURATION").map((testSuiteItem) => {
+            idsNameMap[testSuiteItem.hexId] = testSuiteItem.name;
+            return { name: testSuiteItem.name, tests: testSuiteItem.subCategoryList, id: testSuiteItem.hexId }
+        })
+
         const severityOrder = {"Critical": 0,"High": 1,"Medium": 2,"Low": 3}
         const severityTestSuites = testSuitesFromBackend?.filter(testSuiteItem => testSuiteItem.suiteType === "SEVERITY").sort((a, b) => severityOrder[a.name] - severityOrder[b.name]).map((testSuiteItem) => {
             idsNameMap[testSuiteItem.hexId] = testSuiteItem.name;
@@ -47,14 +51,16 @@ function RunTestSuites({ testRun, setTestRun, apiCollectionName, activeFromTesti
                 !func.deepArrayComparison(prev?.owaspTop10List?.testSuite||[],newOwaspTop10TestSuites) ||
                 !func.deepArrayComparison(prev?.testingMethods?.testSuite||[], newTestingMethodsTestSuites) ||
                 !func.deepArrayComparison(prev?.custom?.testSuite||[], fetchedData) ||
-                !func.deepArrayComparison(prev?.severity?.testSuite||[], severityTestSuites)
+                !func.deepArrayComparison(prev?.severity?.testSuite||[], severityTestSuites) ||
+                !func.deepArrayComparison(prev?.duration?.testSuite||[], newDurationTestSuites)
             ) {
                 return {
                     ...prev,
                     owaspTop10List: { rowName: "OWASP top 10", testSuite: newOwaspTop10TestSuites },
                     testingMethods: { rowName: "Testing Methods", testSuite: newTestingMethodsTestSuites },
                     custom: { rowName: "Custom", testSuite: fetchedData },
-                    severity: { rowName: "Severity", testSuite: severityTestSuites }
+                    severity: { rowName: "Severity", testSuite: severityTestSuites },
+                    duration: { rowName: "Duration", testSuite: newDurationTestSuites }
                 };
             }
             return prev;
