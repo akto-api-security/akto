@@ -3,6 +3,7 @@ package com.akto.gpt.handlers.gpt_prompts;
 import com.akto.data_actor.DataActorFactory;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.util.Pair;
 import com.mongodb.BasicDBObject;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -23,8 +24,7 @@ public abstract class PromptHandler {
     private static final int max_tokens = 4000;
     private static final Object llmLock = new Object();
     private static final int CHUNK_SIZE = 3000; // Increase it to 10000
-    private static final Pattern textExtractorPattern = Pattern.compile("\\*\\*\\*\\*\\s*(.*?)\\s*\\*\\*\\*\\*",
-        Pattern.DOTALL);
+    private static final String CONTEXT_DELIMITER = "****";
 
     /**
      * Process the input query data and return a String response.
@@ -50,42 +50,6 @@ public abstract class PromptHandler {
             return resp;
         }
     }
-
-//    private List<BasicDBObject> callLLMWithContextBreakdown(BasicDBObject queryData) throws Exception {
-//        if (queryData.getBoolean(TestExecutorModifier._IS_EXTERNAL_CONTEXT_IN_OPERATION, false)) {
-//            String originalOperation = queryData.getString(TestExecutorModifier._OPERATION);
-//            if (StringUtils.isNotEmpty(originalOperation)) {
-//                String externalContext = getContext(originalOperation);
-//                if (StringUtils.isNotBlank(externalContext)) {
-//                    List<String> chunks = splitIntoChunks(externalContext);
-//                    List<BasicDBObject> responses = new ArrayList<>();
-//                    if (chunks.size() > 1) {
-//                        for (String chunk : chunks) {
-//                            BasicDBObject queryDataCopy = (BasicDBObject) queryData.copy();
-//                            queryDataCopy.put(TestExecutorModifier._OPERATION, replaceContext(originalOperation, chunk));
-//                            responses.add(callLLM(queryDataCopy));
-//                        }
-//                        return responses;
-//                    }
-//                }
-//            }
-//        } else {
-//            String originalRequest = queryData.getString(TestExecutorModifier._REQUEST);
-//            if (StringUtils.isNotEmpty(originalRequest)) {
-//                List<String> chunks = splitIntoChunks(originalRequest);
-//                List<BasicDBObject> responses = new ArrayList<>();
-//                if (chunks.size() > 1) {
-//                    for (String chunk : chunks) {
-//                        BasicDBObject queryDataCopy = (BasicDBObject) queryData.copy();
-//                        queryDataCopy.put(TestExecutorModifier._REQUEST, chunk);
-//                        responses.add(callLLM(queryDataCopy));
-//                    }
-//                    return responses;
-//                }
-//            }
-//        }
-//        return Collections.singletonList(callLLM(queryData));
-//    }
 
     private List<BasicDBObject> callLLMWithContextBreakdown(BasicDBObject queryData) throws Exception {
         String key = queryData.getBoolean(TestExecutorModifier._IS_EXTERNAL_CONTEXT_IN_OPERATION, false)
@@ -134,45 +98,27 @@ public abstract class PromptHandler {
     }
 
     private String getContext(String text) {
-        int first = text.indexOf("****");
-        int last = text.lastIndexOf("****");
+        int start = text.indexOf(CONTEXT_DELIMITER);
+        int end = text.lastIndexOf(CONTEXT_DELIMITER);
 
-        if (first == -1 || last == -1 || first == last) {
+        if (start < 0 || end < 0 || start >= end) {
             return null;
         }
 
-        int start = first + 4;
-        return text.substring(start, last).trim();
+        return text.substring(start + CONTEXT_DELIMITER.length(), end).trim();
     }
 
     private String replaceContext(String text, String context) {
-        Matcher matcher = textExtractorPattern.matcher(text);
 
-        String extracted = null;
-        while (matcher.find()) {
-            extracted = matcher.replaceFirst(context);
+        int start = text.indexOf(CONTEXT_DELIMITER);
+        int end = text.lastIndexOf(CONTEXT_DELIMITER);
+
+        if (start < 0 || end < 0 || start >= end) {
+            return text;
         }
-        return extracted;
-    }
 
-//    private BasicDBObject aggregateResponses(List<BasicDBObject> responses) {
-//        if (responses == null || responses.isEmpty()) {
-//            return new BasicDBObject();
-//        }
-//
-//        if (responses.size() == 1) {
-//            return responses.get(0);
-//        }
-//
-//        BasicDBObject aggregated = new BasicDBObject();
-//        for (BasicDBObject response : responses) {
-//            for (String key : response.keySet()) {
-//                Object value = response.get(key);
-//                aggregated.put(key, value);
-//            }
-//        }
-//        return aggregated;
-//    }
+        return text.substring(0, start) + context + text.substring(end + CONTEXT_DELIMITER.length());
+    }
 
     private BasicDBObject aggregateResponses(List<BasicDBObject> responses) {
         if (responses == null || responses.isEmpty()) {
