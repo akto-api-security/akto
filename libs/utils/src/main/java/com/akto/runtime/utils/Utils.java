@@ -32,6 +32,14 @@ public class Utils {
         }
     }
 
+    public static void printUrlDebugLog(Object o){
+        if( o == null ){
+            return;
+        }
+        logger.warn(o.toString());
+    }
+
+
     public static Properties configProperties(String kafkaBrokerUrl, String groupIdConfig, int maxPollRecordsConfig) {
         Properties properties = new Properties();
         properties.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, kafkaBrokerUrl);

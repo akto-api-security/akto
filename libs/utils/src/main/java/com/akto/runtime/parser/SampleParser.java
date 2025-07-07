@@ -1,6 +1,7 @@
 package com.akto.runtime.parser;
 
 import static com.akto.runtime.utils.Utils.printL;
+import static com.akto.runtime.utils.Utils.printUrlDebugLog;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -13,8 +14,7 @@ import com.akto.dto.HttpRequestParams;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.TrafficProducerLog;
-import com.akto.log.LoggerMaker;
-import com.akto.log.LoggerMaker.LogDb;
+import com.akto.runtime.utils.Utils;
 import com.akto.util.HttpRequestResponseUtils;
 import com.akto.util.JSONUtils;
 import com.google.gson.Gson;
@@ -33,6 +33,9 @@ public class SampleParser {
             List<String> headerValues = new ArrayList<>();
             headerValues.add(tagsMap.get(tagName));
             httpRequestParams.getHeaders().put("x-akto-k8s-"+ tagName, headerValues);
+        }
+        if(Utils.printDebugUrlLog(httpRequestParams.getURL())) {
+            printUrlDebugLog("Injecting K8 Pod Tags in Headers: " + tagsMap + " for URL: " + httpRequestParams.getURL());
         }
     }
 
@@ -80,7 +83,11 @@ public class SampleParser {
         // JSON string of K8 POD tags
         String tags = (String) json.getOrDefault("tag", "");
         if(!tags.isEmpty()){
-            printL("K8 Pod Tags" + tags + "Host:" + requestHeaders.getOrDefault("host", new ArrayList<>()) + "Url:" + url);
+            String tagLog = "K8 Pod Tags: " + tags + " Host: " + requestHeaders.getOrDefault("host", new ArrayList<>()) + " Url: " + url;
+            printL(tagLog);
+            if (!Utils.printDebugHostLog(null).isEmpty() || Utils.printDebugUrlLog(url)) {
+                printUrlDebugLog(tagLog);
+            }
             injectTagsInHeaders(requestParams, tags);
         }
 
