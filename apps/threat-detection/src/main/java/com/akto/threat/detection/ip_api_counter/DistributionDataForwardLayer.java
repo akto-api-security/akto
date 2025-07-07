@@ -19,6 +19,7 @@ import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
 import com.akto.ProtoMessageUtils;
 import com.akto.dao.context.Context;
 import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ApiDistributionDataRequestPayload;
 import com.akto.threat.detection.cache.ApiCountCacheLayer;
 import com.akto.threat.detection.cache.CounterCache;
@@ -29,7 +30,7 @@ import io.lettuce.core.RedisClient;
 public class DistributionDataForwardLayer {
     
     private static final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
-    private static final LoggerMaker logger = new LoggerMaker(DistributionDataForwardLayer.class);
+    private static final LoggerMaker logger = new LoggerMaker(DistributionDataForwardLayer.class, LogDb.THREAT_DETECTION);
     private static CounterCache cache;
     private final DistributionCalculator distributionCalculator;
     private final CloseableHttpClient httpClient;
@@ -66,9 +67,13 @@ public class DistributionDataForwardLayer {
                 String redisKey = RedisKeyInfo.API_DISTRIBUTION_DATA_LAST_SENT_PREFIX + windowSize;
                 long lastSuccessfulUpdateTs = cache.get(redisKey);
                 long currentEpochMin = Context.now() / 60;
+                // - Align the current time to the nearest window size. 12:03 will align to 12:00 for a 5-minute window.
                 long currentAlignedWindowEnd = (currentEpochMin / windowSize) * windowSize;
 
+                // - Determine the safe window end to ensure only completed windows are processed.
                 long safeWindowEnd = currentAlignedWindowEnd - windowSize;
+
+                // - Start from lastSuccessfulUpdateTs or 60 minutes before.
                 long windowStart = Math.max(lastSuccessfulUpdateTs + windowSize, safeWindowEnd - 60);
 
                 for (long i = windowStart; i <= safeWindowEnd; i += windowSize) {
@@ -131,7 +136,7 @@ public class DistributionDataForwardLayer {
                             logger.info("Sent distribution data for windowSize={} windowStart={}", windowSize, i);
                             cache.set(redisKey, i);
                         } catch (Exception e) {
-                            logger.error("Failed to send distribution for windowSize {} windowStart {}: {}", windowSize, windowStart, e.getMessage());
+                            logger.errorAndAddToDb(e, "Failed to send distribution for windowSize: " + windowSize + " windowStart: " + windowStart);
                             return;
                         }
                     } else {

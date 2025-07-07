@@ -8,6 +8,17 @@ import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class DistributionCalculator {
+    /**
+     * frequencyBuckets example structure:
+     * {
+     *   "5|1625254800": { // 5-minute window starting at epoch 1625254800
+     *     "123:/api/v1/resource:GET": { // API key
+     *       "b1": 5, // 5 users called this API in bucket b1 (1-10 requests)
+     *       "b2": 2  // 2 users called this API in bucket b2 (11-50 requests)
+     *     }
+     *   }
+     * }
+     */
 
     private static Map<String, Map<String, Map<String, Integer>>> frequencyBuckets;
     private static CmsCounterLayer cmsCounterLayer;
@@ -30,6 +41,9 @@ public class DistributionCalculator {
         cmsCounterLayer.increment(cmsKey, String.valueOf(currentEpochMin));
 
         for (int windowSize : Arrays.asList(5, 15, 30)) {
+            // Tumbling windows of 5, 15, and 30 minutes
+            // 12:00, 12:05, 12:10, etc.
+            // Requests coming in at 12:02, 12:03 will be counted in the 12:00 window
             long windowEnd = ((currentEpochMin - 1) / windowSize + 1) * windowSize;
             long windowStart = windowEnd - windowSize + 1;
             String compositeKey = windowSize + "|" + windowStart;
@@ -58,6 +72,10 @@ public class DistributionCalculator {
         }
     }
 
+    /**
+     * Get the total count of IP|API calls made in the specified time range.
+     * Example Output: Count of IP|API calls in 5 minutes.
+     */
     private long getCountInRange(String key, long startEpochMin, long endEpochMin) {
         long sum = 0;
         for (long ts = startEpochMin; ts <= endEpochMin; ts++) {
