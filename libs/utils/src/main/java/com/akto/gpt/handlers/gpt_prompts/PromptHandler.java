@@ -3,13 +3,10 @@ package com.akto.gpt.handlers.gpt_prompts;
 import com.akto.data_actor.DataActorFactory;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
-import com.akto.util.Pair;
 import com.mongodb.BasicDBObject;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import javax.validation.ValidationException;
 import org.apache.commons.lang3.StringUtils;
 import org.json.JSONArray;
@@ -23,7 +20,7 @@ public abstract class PromptHandler {
     private static final Double temperature = 0.1;
     private static final int max_tokens = 4000;
     private static final Object llmLock = new Object();
-    private static final int CHUNK_SIZE = 3000; // Increase it to 10000
+    private static final int CHUNK_SIZE = 10000; // Increase it to 10000
     private static final String CONTEXT_DELIMITER = "****";
 
     /**
