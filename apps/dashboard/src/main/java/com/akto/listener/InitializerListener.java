@@ -2426,25 +2426,6 @@ public class InitializerListener implements ServletContextListener {
                     }
                 } while (!connectedToMongo);
 
-                if (DashboardMode.isOnPremDeployment()) {
-                    Context.accountId.set(1_000_000);
-                    logger.debugAndAddToDb("Dashboard started at " + Context.now());
-                }
-
-                setDashboardMode();
-                updateGlobalAktoVersion();
-
-                AccountTask.instance.executeTask(new Consumer<Account>() {
-                    @Override
-                    public void accept(Account account) {
-                        AccountSettingsDao.instance.getStats();
-                        Intercom.setToken(System.getenv("INTERCOM_TOKEN"));
-                        setDashboardVersionForAccount();
-                    }
-                }, "context-initializer");
-
-                SingleTypeInfo.init();
-
                 int now = Context.now();
                 if (runJobFunctions || runJobFunctionsAnyway) {
 
