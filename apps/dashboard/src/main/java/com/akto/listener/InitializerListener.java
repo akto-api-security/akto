@@ -2453,24 +2453,13 @@ public class InitializerListener implements ServletContextListener {
                     AccountTask.instance.executeTask(new Consumer<Account>() {
                         @Override
                         public void accept(Account account) {
-                            runInitializerFunctions();
+                            DaoInit.createIndices();
                         }
                     }, "context-initializer-secondary");
-                    logger.warn("Started webhook schedulers", LogDb.DASHBOARD);
-                    setUpWebhookScheduler();
-                    logger.warn("Started traffic alert schedulers", LogDb.DASHBOARD);
-                    setUpTrafficAlertScheduler();
-                    logger.warn("Started daily schedulers", LogDb.DASHBOARD);
-                    setUpDailyScheduler();
-                    if (DashboardMode.isMetered()) {
-                        setupUsageScheduler();
-                    }
                     updateSensitiveInfoInApiInfo.setUpSensitiveMapInApiInfoScheduler();
                     syncCronInfo.setUpUpdateCronScheduler();
                     setUpTestEditorTemplatesScheduler();
                     JobsCron.instance.jobsScheduler(JobExecutorType.DASHBOARD);
-                    updateApiGroupsForAccounts(); 
-                    setupAutomatedApiGroupsScheduler();
                     if(runJobFunctionsAnyway) {
                         crons.trafficAlertsScheduler();
                         // crons.insertHistoricalDataJob();
@@ -2479,6 +2468,8 @@ public class InitializerListener implements ServletContextListener {
                         // }
 
                         // trimCappedCollectionsJob();
+                        updateApiGroupsForAccounts(); 
+                        setupAutomatedApiGroupsScheduler();
                         setUpPiiAndTestSourcesScheduler();
                         cleanInventoryJobRunner();
                         setUpDefaultPayloadRemover();
