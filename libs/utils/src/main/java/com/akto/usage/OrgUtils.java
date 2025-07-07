@@ -45,14 +45,15 @@ public class OrgUtils {
         if (cached != null) {
                 if (now - cached.getCachedAt() < CACHE_DURATION) {
                         return cached.getOrganization();
-                } else {
-                        orgCache.remove(accountId);
                 }
         }
 
         Organization organization = dataActor.fetchOrganization(accountId);
 
         if (organization == null) {
+                if(cached!= null) {
+                        return cached.getOrganization();
+                }
                 return null;
         }
 
