@@ -23,9 +23,9 @@ public class DefaultTestSuitesDao extends AccountsContextDao<DefaultTestSuites> 
 
     public static final DefaultTestSuitesDao instance = new DefaultTestSuitesDao();
 
-    public static Map<String, Map<String, List<String>>> getDefaultTestSuitesMap(boolean isFirstTime, long lastUpdatedDefaultTestSuite) {
+    public static Map<String, Map<String, List<String>>> getDefaultTestSuitesMap(boolean isFirstTime, long lastUpdatedDefaultTestSuite, boolean addedNewCategory) {
         List<YamlTemplate> yamlTemplateList;
-        if (!isFirstTime) {
+        if (!isFirstTime && !addedNewCategory) {
             yamlTemplateList = YamlTemplateDao.instance.findAll(Filters.gt(YamlTemplate.CREATED_AT, lastUpdatedDefaultTestSuite), Projections.include(Constants.ID, YamlTemplate.INFO, YamlTemplate.SETTINGS));
         } else {
             yamlTemplateList = YamlTemplateDao.instance.findAll(Filters.empty(), Projections.include(Constants.ID, YamlTemplate.INFO, YamlTemplate.SETTINGS));
@@ -122,11 +122,14 @@ public class DefaultTestSuitesDao extends AccountsContextDao<DefaultTestSuites> 
             allTestSuitesTemplates.addAll(defaultTestSuite.getSubCategoryList());
         }
 
-        if(yamlTemplatesCount == allTestSuitesTemplates.size()) {
+        int countOfDefaultTestSuites = DefaultTestSuites.countOfDefaultTestSuites();
+        boolean addedNewCategory = defaultTestSuites.size() != countOfDefaultTestSuites;
+
+        if(yamlTemplatesCount == allTestSuitesTemplates.size() && addedNewCategory) {
             return;
         }
 
-        Map<String, Map<String, List<String>>> defaultTestSuitesMap = getDefaultTestSuitesMap(isFirstTime, lastUpdatedDefaultTestSuite);
+        Map<String, Map<String, List<String>>> defaultTestSuitesMap = getDefaultTestSuitesMap(isFirstTime, lastUpdatedDefaultTestSuite, addedNewCategory);
 
         for(DefaultTestSuites.DefaultSuitesType defaultSuitesType : DefaultTestSuites.DefaultSuitesType.values()) {
             Map<String, List<String>> defaultSuiteMap = defaultTestSuitesMap.get(defaultSuitesType.name());

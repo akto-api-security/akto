@@ -11,6 +11,14 @@ public class DefaultTestSuites extends TestSuites {
     public static final String SUITE_TYPE = "suiteType";
     private DefaultSuitesType suiteType;
 
+    private static final Map<String, Integer> testSuitesPerType = new HashMap<>();
+    static {
+        testSuitesPerType.put(DefaultSuitesType.OWASP.name(), 10);
+        testSuitesPerType.put(DefaultSuitesType.TESTING_METHODS.name(), 2);
+        testSuitesPerType.put(DefaultSuitesType.SEVERITY.name(), 4);
+        testSuitesPerType.put(DefaultSuitesType.DURATION.name(), 2);
+    }
+
     public DefaultTestSuites() {}
 
     public DefaultTestSuites(int createdAt, String createdBy, int lastUpdated, String name, List<String> subCategoryList, DefaultSuitesType suiteType) {
@@ -45,5 +53,10 @@ public class DefaultTestSuites extends TestSuites {
 
     public void setSuiteType(DefaultSuitesType suiteType) {
         this.suiteType = suiteType;
+    }
+
+    public static int countOfDefaultTestSuites() {
+        return testSuitesPerType.values().stream()
+            .reduce(0, Integer::sum);
     }
 }
