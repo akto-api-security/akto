@@ -110,7 +110,7 @@ const transform = {
                     collapsibleRow: transform.getIssuesPageCollapsibleRow(issue.urls.map(urlObj => ({
                         url: `${urlObj.method} ${urlObj.url}`,
                         id: urlObj.id,
-                        issueDescription: urlObj.issueDescription
+                        issueDescription: urlObj.issueDescription,
                         jiraIssueUrl: urlObj.jiraIssueUrl || ""
                     })), isCompliancePage)
                 }
