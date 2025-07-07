@@ -20,7 +20,7 @@ public abstract class PromptHandler {
     private static final Double temperature = 0.1;
     private static final int max_tokens = 4000;
     private static final Object llmLock = new Object();
-    private static final int CHUNK_SIZE = 10000; // Increase it to 10000
+    private static final int CHUNK_SIZE = 10000;
     private static final String CONTEXT_DELIMITER = "****";
 
     /**
