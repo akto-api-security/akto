@@ -82,18 +82,19 @@ public class SampleParser {
 
         // JSON string of K8 POD tags
         String tags = (String) json.getOrDefault("tag", "");
+        HttpResponseParams httpResponseParams = new HttpResponseParams(
+                type,statusCode, status, responseHeaders, payload, requestParams, time, accountId, isPending, source, message, sourceIP, destIP, direction, tags
+        );
         if(!tags.isEmpty()){
             String tagLog = "K8 Pod Tags: " + tags + " Host: " + requestHeaders.getOrDefault("host", new ArrayList<>()) + " Url: " + url;
             printL(tagLog);
-            if (!Utils.printDebugHostLog(null).isEmpty() || Utils.printDebugUrlLog(url)) {
+            if ((Utils.printDebugHostLog(httpResponseParams) != null) || Utils.printDebugUrlLog(url)) {
                 printUrlDebugLog(tagLog);
             }
             injectTagsInHeaders(requestParams, tags);
         }
 
-        return new HttpResponseParams(
-                type,statusCode, status, responseHeaders, payload, requestParams, time, accountId, isPending, source, message, sourceIP, destIP, direction, tags
-        );
+        return httpResponseParams;
 
     }
 
