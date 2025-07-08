@@ -144,7 +144,7 @@ jobs:
                   "fields": [
                     {
                       "title": "Services Deployed",
-                      "value": "${{ github.event.inputs.mini-runtime == 'true' && 'Mini-Runtime ✅\\\n' || '' }}${{ github.event.inputs.mini-testing == 'true' && 'Mini-Testing ✅\\\n' || '' }}${{ github.event.inputs.testing-db-layer == 'true' && 'Testing-Db-Layer ✅' || '' }}",
+                      "value": "${{ github.event.inputs.mini-runtime == 'true' && 'Mini-Runtime ✅\\n' || '' }}${{ github.event.inputs.mini-testing == 'true' && 'Mini-Testing ✅\\n' || '' }}${{ github.event.inputs.testing-db-layer == 'true' && 'Testing-Db-Layer ✅' || '' }}",
                       "short": false
                     }
                   ]
