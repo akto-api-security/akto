@@ -17,13 +17,8 @@ import com.akto.log.LoggerMaker.LogDb;
 import com.akto.hybrid_runtime.APICatalogSync;
 import com.akto.data_actor.DataActor;
 import com.akto.data_actor.DataActorFactory;
-import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.*;
 import org.bson.conversions.Bson;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-
 import java.util.*;
 
 import static com.akto.hybrid_runtime.APICatalogSync.createUrlTemplate;
@@ -40,18 +35,18 @@ public class AktoPolicyNew {
 
     private DataActor dataActor = DataActorFactory.fetchInstance();
 
-    private static final LoggerMaker loggerMaker = new LoggerMaker(AktoPolicyNew.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(AktoPolicyNew.class, LogDb.RUNTIME);
 
     public void fetchFilters() {
         this.filters = dataActor.fetchRuntimeFilters();
-        loggerMaker.infoAndAddToDb("Fetched " + filters.size() + " filters from db", LogDb.RUNTIME);
+        loggerMaker.infoAndAddToDb("Fetched " + filters.size() + " filters from db");
     }
 
     public AktoPolicyNew() {
     }
 
     public void buildFromDb(boolean fetchAllSTI) {
-        loggerMaker.infoAndAddToDb("AktoPolicyNew.buildFromDB(), fetchAllSti: " + fetchAllSTI, LogDb.RUNTIME);
+        loggerMaker.infoAndAddToDb("AktoPolicyNew.buildFromDB(), fetchAllSti: " + fetchAllSTI);
         fetchFilters();
 
         AccountSettings accountSettings = dataActor.fetchAccountSettings();
@@ -99,23 +94,23 @@ public class AktoPolicyNew {
                 Map<Integer, FilterSampleData> filterSampleDataMap = filterSampleDataMapToApiInfo.get(apiInfo.getId());
                 fillApiInfoInCatalog(apiInfo, filterSampleDataMap);
             } catch (Exception e) {
-                loggerMaker.errorAndAddToDb(e.getMessage() + " " + e.getCause(), LogDb.RUNTIME);
+                loggerMaker.errorAndAddToDb(e, "Error filling ApiInfo in catalog for apiInfo: " + apiInfo + ". Message: " + e.getMessage());
             }
         }
-        loggerMaker.infoAndAddToDb("Built AktoPolicyNew", LogDb.RUNTIME);
+        loggerMaker.infoAndAddToDb("Built AktoPolicyNew");
     }
 
     public void syncWithDb() {
-        loggerMaker.infoAndAddToDb("Syncing with db", LogDb.RUNTIME);
+        loggerMaker.infoAndAddToDb("Syncing with db");
         List<ApiInfo> apiInfoList = getUpdates(apiInfoCatalogMap);
-        loggerMaker.infoAndAddToDb("Writing to db: " + "writesForApiInfoSize="+ apiInfoList.size(), LogDb.RUNTIME);
+        loggerMaker.infoAndAddToDb("Writing to db: " + "writesForApiInfoSize="+ apiInfoList.size());
         try {
             if (apiInfoList.size() > 0) {
-                loggerMaker.infoAndAddToDb("Writing to db: " + "writesForApiInfoSize="+apiInfoList.size(), LogDb.RUNTIME);
+                loggerMaker.infoAndAddToDb("Writing to db: " + "writesForApiInfoSize="+apiInfoList.size());
                 dataActor.bulkWriteApiInfo(apiInfoList);
             }
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(e.toString(), LogDb.RUNTIME);
+            loggerMaker.errorAndAddToDb(e, "Error writing to db in syncWithDb: " + e.getMessage());
         }
 
     }
