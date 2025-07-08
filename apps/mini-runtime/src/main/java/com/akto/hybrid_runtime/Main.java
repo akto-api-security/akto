@@ -83,7 +83,7 @@ public class Main {
                 }
             }
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("error in try collection" + e, LogDb.RUNTIME);
+            loggerMaker.errorAndAddToDb(e, "error in try collection" + e);
         }
 
         return ret;
@@ -177,7 +177,7 @@ public class Main {
         String kafkaBrokerUrl = "kafka1:19092"; //System.getenv("AKTO_KAFKA_BROKER_URL");
         String isKubernetes = System.getenv("IS_KUBERNETES");
         if (isKubernetes != null && isKubernetes.equalsIgnoreCase("true")) {
-            loggerMaker.infoAndAddToDb("is_kubernetes: true", LogDb.RUNTIME);
+            loggerMaker.infoAndAddToDb("is_kubernetes: true");
             kafkaBrokerUrl = "127.0.0.1:29092";
         }
         String groupIdConfig =  System.getenv("AKTO_KAFKA_GROUP_ID_CONFIG");
@@ -198,17 +198,17 @@ public class Main {
             System.exit(0);
         }
         DataActor.actualAccountId = aSettings.getId();
-        loggerMaker.infoAndAddToDb("Fetched account settings for account ", LogDb.RUNTIME);
+        loggerMaker.infoAndAddToDb("Fetched account settings for account ");
 
         DataControlFetcher.init(dataActor);
 
         aSettings = dataActor.fetchAccountSettings();
         ModuleInfoWorker.init(ModuleInfo.ModuleType.MINI_RUNTIME, dataActor, customMiniRuntimeServiceName);
-        loggerMaker.setModuleId(customMiniRuntimeServiceName);
+        LoggerMaker.setModuleId(customMiniRuntimeServiceName);
         //DaoInit.init(new ConnectionString(mongoURI));
         // DictionaryFilter.readDictionaryBinary();
 
-        loggerMaker.infoAndAddToDb("Runtime starting at " + Context.now() + "....", LogDb.RUNTIME);
+        loggerMaker.infoAndAddToDb("Runtime starting at " + Context.now() + "....");
 
         dataActor.modifyHybridSaasSetting(RuntimeMode.isHybridDeployment());
 
@@ -229,7 +229,7 @@ public class Main {
 
         AllMetrics.instance.init(LogDb.RUNTIME, checkPg, dataActor, DataActor.actualAccountId);
         HttpCallParser.init();
-        loggerMaker.infoAndAddToDb("All metrics initialized", LogDb.RUNTIME);
+        loggerMaker.infoAndAddToDb("All metrics initialized");
 
         dataActor.modifyHybridSaasSetting(RuntimeMode.isHybridDeployment());
 
@@ -255,7 +255,7 @@ public class Main {
                 } catch (InterruptedException e) {
                     e.printStackTrace();
                 } catch (Error e){
-                    loggerMaker.errorAndAddToDb("Error in main thread: "+ e.getMessage(), LogDb.RUNTIME);
+                    loggerMaker.errorAndAddToDb("Error in main thread: "+ e.getMessage());
                 }
             }
         });
@@ -293,10 +293,10 @@ public class Main {
                 if (checkPg) {
                     int records = clientLayer.fetchTotalRecords();
                     AllMetrics.instance.setTotalSampleDataCount(records);
-                    loggerMaker.infoAndAddToDb("Total number of records in postgres: " + records, LogDb.RUNTIME);
+                    loggerMaker.infoAndAddToDb("Total number of records in postgres: " + records);
                     long dbSizeInMb = clientLayer.fetchTotalSize();
                     AllMetrics.instance.setPgDataSizeInMb(dbSizeInMb);
-                    loggerMaker.infoAndAddToDb("Postgres size: " + dbSizeInMb + " MB", LogDb.RUNTIME);
+                    loggerMaker.infoAndAddToDb("Postgres size: " + dbSizeInMb + " MB");
                 }
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb(e, "Failed to get total number of records from postgres");
@@ -354,7 +354,7 @@ public class Main {
                                     }
 
                                 } catch (Exception e) {
-                                    loggerMaker.errorAndAddToDb(e, "Error while parsing traffic producer log kafka message " + e, LogDb.RUNTIME);
+                                    loggerMaker.errorAndAddToDb(e, "Error while parsing traffic producer log kafka message " + e);
                                     continue;
                                 }
                             }
@@ -388,7 +388,7 @@ public class Main {
 
         try {
             main.consumer.subscribe(Arrays.asList(topicName, "har_"+topicName));
-            loggerMaker.infoAndAddToDb("Consumer subscribed", LogDb.RUNTIME);
+            loggerMaker.infoAndAddToDb("Consumer subscribed");
             while (true) {
                 ConsumerRecords<String, String> records = main.consumer.poll(Duration.ofMillis(10000));
                 try {
@@ -430,7 +430,7 @@ public class Main {
                             loggerMaker.infoAndAddToDb("Found debug url: " + requestParams.getURL());
                         }
                     } catch (Exception e) {
-                        loggerMaker.errorAndAddToDb(e, "Error while parsing kafka message " + e, LogDb.RUNTIME);
+                        loggerMaker.errorAndAddToDb(e, "Error while parsing kafka message " + e);
                         continue;
                     }
                     String accountId = httpResponseParams.getAccountId();
@@ -456,7 +456,7 @@ public class Main {
         } catch (Exception e) {
             exceptionOnCommitSync.set(true);
             printL(e);
-            loggerMaker.errorAndAddToDb("Error in main runtime: " + e.getMessage(),LogDb.RUNTIME);
+            loggerMaker.errorAndAddToDb(e, "Error in main runtime: " + e.getMessage());
             e.printStackTrace();
             System.exit(0);
         } finally {
@@ -473,7 +473,7 @@ public class Main {
             try {
                 accountIdInt = Integer.parseInt(accountId);
             } catch (Exception ignored) {
-                loggerMaker.errorAndAddToDb("Account id not string", LogDb.RUNTIME);
+                loggerMaker.errorAndAddToDb("Account id not string");
                 continue;
             }
 
@@ -482,15 +482,15 @@ public class Main {
             AccountInfo accountInfo = accountInfoMap.computeIfAbsent(accountIdInt, k -> new AccountInfo());
 
             if ((Context.now() - accountInfo.lastEstimatedCountTime) > 60*60) {
-                loggerMaker.infoAndAddToDb("current time: " + Context.now() + " lastEstimatedCountTime: " + accountInfo.lastEstimatedCountTime, LogDb.RUNTIME);
+                loggerMaker.infoAndAddToDb("current time: " + Context.now() + " lastEstimatedCountTime: " + accountInfo.lastEstimatedCountTime);
                 accountInfo.lastEstimatedCountTime = Context.now();
                 accountInfo.estimatedCount = dataActor.fetchEstimatedDocCount();
                 accountInfo.setAccountSettings(dataActor.fetchAccountSettings());
-                loggerMaker.infoAndAddToDb("STI Estimated count: " + accountInfo.estimatedCount, LogDb.RUNTIME);
+                loggerMaker.infoAndAddToDb("STI Estimated count: " + accountInfo.estimatedCount);
             }
 
             if (!isDashboardInstance && accountInfo.estimatedCount> 20_000_000) {
-                loggerMaker.infoAndAddToDb("STI count is greater than 20M, skipping", LogDb.RUNTIME);
+                loggerMaker.infoAndAddToDb("STI count is greater than 20M, skipping");
                 continue;
             }
 
@@ -500,7 +500,7 @@ public class Main {
                         apiConfig.getSync_threshold_time(), fetchAllSTI
                 );
                 httpCallParserMap.put(accountId, parser);
-                loggerMaker.infoAndAddToDb("New parser created for account: " + accountId, LogDb.RUNTIME);
+                loggerMaker.infoAndAddToDb("New parser created for account: " + accountId);
             }
 
             HttpCallParser parser = httpCallParserMap.get(accountId);
@@ -509,29 +509,29 @@ public class Main {
                 List<HttpResponseParams> accWiseResponse = responseParamsToAccountMap.get(accountId);
 
                 accWiseResponse = filterBasedOnHeaders(accWiseResponse, accountInfo.accountSettings);
-                loggerMaker.infoAndAddToDb("Initiating sync function for account: " + accountId, LogDb.RUNTIME);
+                loggerMaker.infoAndAddToDb("Initiating sync function for account: " + accountId);
                 parser.syncFunction(accWiseResponse, syncImmediately, fetchAllSTI, accountInfo.accountSettings);
-                loggerMaker.debugInfoAddToDb("Sync function completed for account: " + accountId, LogDb.RUNTIME);
+                loggerMaker.debugInfoAddToDb("Sync function completed for account: " + accountId);
 
                 // send to central kafka
                 if (kafkaProducer != null) {
-                    loggerMaker.infoAndAddToDb("Sending " + accWiseResponse.size() +" records to context analyzer", LogDb.RUNTIME);
+                    loggerMaker.infoAndAddToDb("Sending " + accWiseResponse.size() +" records to context analyzer");
                     for (HttpResponseParams httpResponseParams: accWiseResponse) {
                         try {
-                            loggerMaker.debugInfoAddToDb("Sending to kafka data for account: " + httpResponseParams.getAccountId(), LogDb.RUNTIME);
+                            loggerMaker.debugInfoAddToDb("Sending to kafka data for account: " + httpResponseParams.getAccountId());
                             kafkaProducer.send(httpResponseParams.getOrig(), centralKafkaTopicName);
                         } catch (Exception e) {
                             // force close it
-                            loggerMaker.errorAndAddToDb("Closing kafka: " + e.getMessage(), LogDb.RUNTIME);
+                            loggerMaker.errorAndAddToDb(e, "Closing kafka: " + e.getMessage());
                             kafkaProducer.close();
-                            loggerMaker.infoAndAddToDb("Successfully closed kafka", LogDb.RUNTIME);
+                            loggerMaker.infoAndAddToDb("Successfully closed kafka");
                         }
                     }
                 } else {
-                    loggerMaker.errorAndAddToDb("Kafka producer is null", LogDb.RUNTIME);
+                    loggerMaker.error("Kafka producer is null");
                 }
             } catch (Exception e) {
-                loggerMaker.errorAndAddToDb(e.toString(), LogDb.RUNTIME);
+                loggerMaker.errorAndAddToDb(e, "Error in handleResponseParams: " + e.toString());
             }
         }
     }
@@ -638,7 +638,7 @@ public class Main {
         try {
             runtimeVersion.updateVersion(AccountSettings.API_RUNTIME_VERSION, dataActor);
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("error while updating dashboard version: " + e.getMessage(), LogDb.RUNTIME);
+            loggerMaker.errorAndAddToDb(e, "error while updating dashboard version: " + e.getMessage());
         }
 
         initFromRuntime(account.getId());
@@ -665,7 +665,7 @@ public class Main {
             RuntimeVersion runtimeVersion = new RuntimeVersion();
             runtimeVersion.updateVersion(AccountSettings.API_RUNTIME_VERSION, dataActor);
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("error while updating dashboard version: " + e.getMessage(), LogDb.RUNTIME);
+            loggerMaker.errorAndAddToDb(e, "error while updating dashboard version: " + e.getMessage());
         }
         createIndices();
     }
