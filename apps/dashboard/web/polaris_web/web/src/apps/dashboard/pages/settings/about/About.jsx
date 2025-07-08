@@ -45,6 +45,7 @@ function About() {
     })
     const [modalOpen, setModalOpen] = useState(false)
     const [deleteMaliciousEventsModal, setDeleteMaliciousEventsModal] = useState(false)
+    const [disableMalEventButton, setDisableMalEventButton] = useState(false)
 
     const initialUrlsList = settingFunctions.getRedundantUrlOptions()
     const [selectedUrlList, setSelectedUrlsList] = useState([])
@@ -388,6 +389,7 @@ function About() {
         setDeleteMaliciousEventsModal(false)
         await settingRequests.deleteAllMaliciousEvents().then(() => {
             func.setToast(true, false, "Deleting malicious events - may take a few minutes.")
+            setDisableMalEventButton(true)
         }).catch(() => {
             func.setToast(true, true, "Something went wrong. Please try again.")
         })
@@ -428,7 +430,7 @@ function About() {
             <VerticalStack gap={2}>
                 <Text color='subdued' variant='bodyMd'>Delete all malicious events</Text>
                 <Box width='80px'>
-                    <Button onClick={() => setDeleteMaliciousEventsModal(true)}>Delete</Button>
+                    <Button disabled={disableMalEventButton} onClick={() => setDeleteMaliciousEventsModal(true)}>Delete</Button>
                 </Box>
             </VerticalStack>
 
