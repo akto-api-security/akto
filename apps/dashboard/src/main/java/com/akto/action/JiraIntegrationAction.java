@@ -1284,7 +1284,7 @@ public String createGeneralJiraTicket() {
                     }
                     addActionError(error);
                 } catch (Exception e) {
-                    // ignore
+                    
                 }
             }
             return Action.ERROR.toUpperCase();
@@ -1298,7 +1298,6 @@ public String createGeneralJiraTicket() {
 
         if (actionItemType != null && !actionItemType.isEmpty()) {
             try {
-                // Get the current account ID dynamically from Context
                 Integer currentAccountId = Context.accountId.get();
                 
                 String updateKey = "jiraTicketUrlMap." + actionItemType;
@@ -1306,7 +1305,6 @@ public String createGeneralJiraTicket() {
                 BasicDBObject filter = new BasicDBObject("_id", currentAccountId);
                 BasicDBObject update = new BasicDBObject("$set", new BasicDBObject(updateKey, jiraTicketUrl));
 
-                // Update the document with the dynamic account ID
                 AccountSettingsDao.instance.updateOne(filter, update);
 
                 loggerMaker.infoAndAddToDb(
