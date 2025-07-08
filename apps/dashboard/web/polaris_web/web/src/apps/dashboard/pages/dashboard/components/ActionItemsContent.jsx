@@ -41,7 +41,6 @@ const resourceName = {
 
 const JIRA_INTEGRATION_URL = "/dashboard/settings/integrations/jira";
 
-
 export const ActionItemsContent = () => {
     const [showFlyout, setShowFlyout] = useState(false);
     const [selectedItem, setSelectedItem] = useState(null);
@@ -55,17 +54,9 @@ export const ActionItemsContent = () => {
     const [selectedActionItem, setSelectedActionItem] = useState(null);
     const [adminSettings, setAdminSettings] = useState(null);
     const [jiraTicketUrlMap, setJiraTicketUrlMap] = useState({});
-
     const [fetchedData, setFetchedData] = useState(null);
 
     const setToastConfig = Store(state => state.setToastConfig);
-    const setToast = (isActive, isError, message) => {
-        setToastConfig({
-            isActive: isActive,
-            isError: isError,
-            message: message
-        });
-    };
 
     const handleJiraIntegration = (actionItem) => {
         const integrated = Boolean(window?.JIRA_INTEGRATED);
@@ -88,7 +79,7 @@ export const ActionItemsContent = () => {
             }
             setModalActive(true);
         }).catch((error) => {
-            setToast(true, true, 'Error fetching Jira integration settings.');
+            window.location.href = JIRA_INTEGRATION_URL;
         });
     };
 
@@ -113,37 +104,45 @@ export const ActionItemsContent = () => {
         </Box>
     );
 
-    const JiraCell = ({ actionItemType, actionItemObj }) => {
+    const JiraCell = ({ actionItemType, actionItemObj, jiraTicketUrlMap }) => {
         const jiraTicketUrl = jiraTicketUrlMap[actionItemType];
         const jiraKey = jiraTicketUrl && jiraTicketUrl.length > 0 ? jiraTicketUrl.split('/').pop() : "";
 
-        if (jiraKey) {
-            return (
-                <Tag
-                    onClick={e => {
-                        e.stopPropagation();
-                        window.open(jiraTicketUrl, '_blank');
-                    }}
-                >
-                    <HorizontalStack gap="1">
-                        <Avatar size="extraSmall" shape="round" source="/public/logo_jira.svg" />
-                        <Text color="base">{jiraKey}</Text>
-                    </HorizontalStack>
-                </Tag>
-            );
-        }
-
         return (
-            <div
-                onClick={e => {
-                    e.stopPropagation();
-                    handleJiraIntegration(actionItemObj);
+            <Box 
+                style={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    justifyContent: 'center',
+                    minHeight: '32px',
+                    width: '100%'
                 }}
-                style={{ cursor: 'pointer' }}
-                title="Create Jira Ticket"
             >
-                <Avatar size="extraSmall" shape="round" source="/public/logo_jira.svg" />
-            </div>
+                {jiraKey ? (
+                    <Tag
+                        onClick={e => {
+                            e.stopPropagation();
+                            window.location.href = jiraTicketUrl;
+                        }}
+                    >
+                        <HorizontalStack gap="1" align="center">
+                            <Avatar size="extraSmall" shape="round" source="/public/logo_jira.svg" />
+                            <Text color="base" variant="bodySm">{jiraKey}</Text>
+                        </HorizontalStack>
+                    </Tag>
+                ) : (
+                    <div
+                        onClick={e => {
+                            e.stopPropagation();
+                            handleJiraIntegration(actionItemObj);
+                        }}
+                        style={{ cursor: 'pointer' }}
+                        title="Create Jira Ticket"
+                    >
+                        <Avatar size="extraSmall" shape="round" source="/public/logo_jira.svg" />
+                    </div>
+                )}
+            </Box>
         );
     };
 
@@ -171,10 +170,11 @@ export const ActionItemsContent = () => {
             description: description,
             actionItemType: actionItemType,
             actions: (
-                <HorizontalStack gap="2" align="start">
+                <HorizontalStack gap="2" align="center">
                     <JiraCell
                         actionItemType={actionItemType}
                         actionItemObj={actionItemObj}
+                        jiraTicketUrlMap={jiraTicketUrlMap}
                     />
                     <Box minWidth="16px" />
                 </HorizontalStack>
@@ -191,9 +191,13 @@ export const ActionItemsContent = () => {
                 {
                     content: jiraTicketUrl ? 'View Jira Ticket' : 'Create Jira Ticket',
                     icon: jiraTicketUrl ? ExternalMinor : undefined,
-                    url: jiraTicketUrl ? jiraTicketUrl : undefined,
-                    external: Boolean(jiraTicketUrl),
-                    onAction: jiraTicketUrl ? undefined : () => handleJiraIntegration(item.actionItemObj || item),
+                    onAction: () => {
+                        if (jiraTicketUrl) {
+                            window.location.href = jiraTicketUrl;
+                        } else {
+                            handleJiraIntegration(item.actionItemObj || item);
+                        }
+                    },
                 }
             ]
         }];
@@ -225,7 +229,6 @@ export const ActionItemsContent = () => {
 
         } catch (error) {
             console.error("Error fetching action items data:", error);
-            setToast(true, true, 'Failed to fetch action items.');
             setActionItems([]);
         }
     };
@@ -314,7 +317,6 @@ export const ActionItemsContent = () => {
                 )
             ];
 
-
             setActionItems(dynamicActionItems.filter(item => item.count > 0));
 
             if (SensitiveAndUnauthenticatedValue > 0) {
@@ -335,11 +337,11 @@ export const ActionItemsContent = () => {
             setActionItems([]);
         }
 
-    }, [fetchedData]);
+    }, [fetchedData, jiraTicketUrlMap]);
 
     const handleSaveJiraAction = () => {
         if (!selectedActionItem) {
-            setToast(true, true, 'No action item selected.');
+            window.location.href = JIRA_INTEGRATION_URL;
             return;
         }
 
@@ -354,13 +356,13 @@ export const ActionItemsContent = () => {
             actionItemType: actionItemType || ''
         }).then((res) => {
             if (res?.errorMessage) {
-                setToast(true, true, res.errorMessage);
+                window.location.href = JIRA_INTEGRATION_URL;
             } else {
-                setToast(true, false, 'Jira ticket created.');
+                // Refresh data to show updated Jira ticket status
                 fetchAllData();
             }
         }).catch((error) => {
-            setToast(true, true, 'Error creating Jira ticket.');
+            window.location.href = JIRA_INTEGRATION_URL;
         });
     };
 
@@ -389,7 +391,7 @@ export const ActionItemsContent = () => {
 
             <Box maxWidth="100%" style={{ overflowX: 'hidden' }}>
                 <GithubSimpleTable
-                    key="table"
+                    key={`table-${JSON.stringify(jiraTicketUrlMap)}`}
                     data={actionItems}
                     resourceName={resourceName}
                     headers={actionItemsHeaders}

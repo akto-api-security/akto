@@ -1298,17 +1298,19 @@ public String createGeneralJiraTicket() {
 
         if (actionItemType != null && !actionItemType.isEmpty()) {
             try {
-                // FIXED: Update the existing document with _id: 1000000 instead of creating new one
+                // Get the current account ID dynamically from Context
+                Integer currentAccountId = Context.accountId.get();
+                
                 String updateKey = "jiraTicketUrlMap." + actionItemType;
 
-                BasicDBObject filter = new BasicDBObject("_id", 1000000);
+                BasicDBObject filter = new BasicDBObject("_id", currentAccountId);
                 BasicDBObject update = new BasicDBObject("$set", new BasicDBObject(updateKey, jiraTicketUrl));
 
-                // Use the correct collection name and ensure we're updating the existing document
+                // Update the document with the dynamic account ID
                 AccountSettingsDao.instance.updateOne(filter, update);
 
                 loggerMaker.infoAndAddToDb(
-                    "Jira ticket URL stored under _id:1000000 for action item type: " + actionItemType +
+                    "Jira ticket URL stored under _id:" + currentAccountId + " for action item type: " + actionItemType +
                     ", URL: " + jiraTicketUrl, LoggerMaker.LogDb.DASHBOARD
                 );
             } catch (Exception e) {
