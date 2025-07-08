@@ -16,412 +16,433 @@ import issuesApi from '../../issues/api';
 import Store from '../../../store';
 
 const actionItemsHeaders = [
-    { title: '', value: 'priority', type: 'text' },
-    { title: 'Action Item', value: 'actionItem', type: 'text' },
-    { title: 'Team', value: 'team', type: 'text' },
-    { title: 'Efforts', value: 'effort', type: 'text' },
-    { title: 'Why It Matters', value: 'whyItMatters', type: 'text' },
-    { title: 'Action', value: 'actions', type: 'action' }
+{ title: '', value: 'priority', type: 'text' },
+{ title: 'Action Item', value: 'actionItem', type: 'text' },
+{ title: 'Team', value: 'team', type: 'text' },
+{ title: 'Efforts', value: 'effort', type: 'text' },
+{ title: 'Why It Matters', value: 'whyItMatters', type: 'text' },
+{ title: 'Action', value: 'actions', type: 'action' }
 ];
 
 const ACTION_ITEM_TYPES = {
-    HIGH_RISK_APIS: 'HIGH_RISK_APIS',
-    SENSITIVE_DATA_ENDPOINTS: 'SENSITIVE_DATA_ENDPOINTS',
-    UNAUTHENTICATED_APIS: 'UNAUTHENTICATED_APIS',
-    THIRD_PARTY_APIS: 'THIRD_PARTY_APIS',
-    HIGH_RISK_THIRD_PARTY: 'HIGH_RISK_THIRD_PARTY',
-    SHADOW_APIS: 'SHADOW_APIS',
-    CRITICAL_SENSITIVE_UNAUTH: 'CRITICAL_SENSITIVE_UNAUTH'
+HIGH_RISK_APIS: 'HIGH_RISK_APIS',
+SENSITIVE_DATA_ENDPOINTS: 'SENSITIVE_DATA_ENDPOINTS',
+UNAUTHENTICATED_APIS: 'UNAUTHENTICATED_APIS',
+THIRD_PARTY_APIS: 'THIRD_PARTY_APIS',
+HIGH_RISK_THIRD_PARTY: 'HIGH_RISK_THIRD_PARTY',
+SHADOW_APIS: 'SHADOW_APIS',
+CRITICAL_SENSITIVE_UNAUTH: 'CRITICAL_SENSITIVE_UNAUTH'
 };
 
 const resourceName = {
-    singular: 'action item',
-    plural: 'action items'
+singular: 'action item',
+plural: 'action items'
 };
 
 const JIRA_INTEGRATION_URL = "/dashboard/settings/integrations/jira";
 
 export const ActionItemsContent = () => {
-    const [showFlyout, setShowFlyout] = useState(false);
-    const [selectedItem, setSelectedItem] = useState(null);
-    const [actionItems, setActionItems] = useState([]);
-    const [criticalCardData, setCriticalCardData] = useState(null);
-    const [modalActive, setModalActive] = useState(false);
-    const [projId, setProjId] = useState('');
-    const [issueType, setIssueType] = useState('');
-    const [issueId, setIssueId] = useState('');
-    const [jiraProjectMaps, setJiraProjectMaps] = useState({});
-    const [selectedActionItem, setSelectedActionItem] = useState(null);
-    const [adminSettings, setAdminSettings] = useState(null);
-    const [jiraTicketUrlMap, setJiraTicketUrlMap] = useState({});
-    const [fetchedData, setFetchedData] = useState(null);
+const [showFlyout, setShowFlyout] = useState(false);
+const [selectedItem, setSelectedItem] = useState(null);
+const [actionItems, setActionItems] = useState([]);
+const [criticalCardData, setCriticalCardData] = useState(null);
+const [modalActive, setModalActive] = useState(false);
+const [projId, setProjId] = useState('');
+const [issueType, setIssueType] = useState('');
+const [issueId, setIssueId] = useState('');
+const [jiraProjectMaps, setJiraProjectMaps] = useState({});
+const [selectedActionItem, setSelectedActionItem] = useState(null);
+const [adminSettings, setAdminSettings] = useState(null);
+const [jiraTicketUrlMap, setJiraTicketUrlMap] = useState({});
+const [fetchedData, setFetchedData] = useState(null);
 
-    const setToastConfig = Store(state => state.setToastConfig);
+const setToastConfig = Store(state => state.setToastConfig);
 
-    const handleJiraIntegration = (actionItem) => {
-        const integrated = Boolean(window?.JIRA_INTEGRATED);
+const handleJiraIntegration = (actionItem) => {
+    const integrated = Boolean(window?.JIRA_INTEGRATED);
 
-        if (!integrated) {
-            window.location.href = JIRA_INTEGRATION_URL;
-            return;
+    if (!integrated) {
+        window.location.href = JIRA_INTEGRATION_URL;
+        return;
+    }
+
+    setSelectedActionItem(actionItem);
+    setIssueId(actionItem.id);
+
+    settingFunctions.fetchJiraIntegration().then((jirIntegration) => {
+        if (jirIntegration.projectIdsMap && Object.keys(jirIntegration.projectIdsMap).length > 0) {
+            setJiraProjectMaps(jirIntegration.projectIdsMap);
+            setProjId(Object.keys(jirIntegration.projectIdsMap)[0]);
+        } else {
+            setProjId(jirIntegration.projId);
+            setIssueType(jirIntegration.issueType);
         }
+        setModalActive(true);
+    }).catch((error) => {
+        window.location.href = JIRA_INTEGRATION_URL;
+    });
+};
 
-        setSelectedActionItem(actionItem);
-        setIssueId(actionItem.id);
+const handleCardClick = (actionItem) => {
+    setSelectedItem(actionItem);
+    setShowFlyout(true);
+};
 
-        settingFunctions.fetchJiraIntegration().then((jirIntegration) => {
-            if (jirIntegration.projectIdsMap && Object.keys(jirIntegration.projectIdsMap).length > 0) {
-                setJiraProjectMaps(jirIntegration.projectIdsMap);
-                setProjId(Object.keys(jirIntegration.projectIdsMap)[0]);
-            } else {
-                setProjId(jirIntegration.projId);
-                setIssueType(jirIntegration.issueType);
-            }
-            setModalActive(true);
-        }).catch((error) => {
-            window.location.href = JIRA_INTEGRATION_URL;
-        });
-    };
+const buildTruncatableCell = (tooltip, text, maxWidth = '400px', fontWeight = 'regular') => (
+    <Box style={{ 
+        minWidth: 0, 
+        flex: 1, 
+        maxWidth,
+        display: 'flex',
+        alignItems: 'center',
+        height: '100%',
+        padding: '8px 0'
+    }}>
+        <div style={{
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            width: '100%'
+        }}>
+            <TooltipText
+                tooltip={tooltip}
+                text={text}
+                textProps={{ variant: 'bodyMd', fontWeight: fontWeight }}
+            />
+        </div>
+    </Box>
+);
 
-    const handleCardClick = (actionItem) => {
-        setSelectedItem(actionItem);
-        setShowFlyout(true);
-    };
+const JiraCell = ({ actionItemType, actionItemObj, jiraTicketUrlMap }) => {
+    const jiraTicketUrl = jiraTicketUrlMap[actionItemType];
+    const jiraKey = jiraTicketUrl && jiraTicketUrl.length > 0 ? jiraTicketUrl.split('/').pop() : "";
 
-    const buildTruncatableCell = (tooltip, text, maxWidth = '400px', fontWeight = 'regular') => (
-        <Box style={{ minWidth: 0, flex: 1, maxWidth }}>
-            <div style={{
-                whiteSpace: 'nowrap',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis'
-            }}>
-                <TooltipText
-                    tooltip={tooltip}
-                    text={text}
-                    textProps={{ variant: 'bodyMd', fontWeight: fontWeight }}
-                />
-            </div>
+    return (
+        <Box 
+            style={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                justifyContent: 'center',
+                height: '40px',
+                width: '100%',
+                padding: '8px 0'
+            }}
+        >
+            {jiraKey ? (
+                <Tag
+                    onClick={e => {
+                        e.stopPropagation();
+                        window.location.href = jiraTicketUrl;
+                    }}
+                >
+                    <HorizontalStack gap="1" align="center">
+                        <Avatar size="extraSmall" shape="round" source="/public/logo_jira.svg" />
+                        <Text color="base" variant="bodySm">{jiraKey}</Text>
+                    </HorizontalStack>
+                </Tag>
+            ) : (
+                <div
+                    onClick={e => {
+                        e.stopPropagation();
+                        handleJiraIntegration(actionItemObj);
+                    }}
+                    style={{ 
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        padding: '4px'
+                    }}
+                    title="Create Jira Ticket"
+                >
+                    <Avatar size="extraSmall" shape="round" source="/public/logo_jira.svg" />
+                </div>
+            )}
         </Box>
     );
+};
 
-    const JiraCell = ({ actionItemType, actionItemObj, jiraTicketUrlMap }) => {
-        const jiraTicketUrl = jiraTicketUrlMap[actionItemType];
-        const jiraKey = jiraTicketUrl && jiraTicketUrl.length > 0 ? jiraTicketUrl.split('/').pop() : "";
-
-        return (
-            <Box 
-                style={{ 
-                    display: 'flex', 
-                    alignItems: 'center', 
-                    justifyContent: 'center',
-                    minHeight: '32px',
-                    width: '100%'
-                }}
-            >
-                {jiraKey ? (
-                    <Tag
-                        onClick={e => {
-                            e.stopPropagation();
-                            window.location.href = jiraTicketUrl;
-                        }}
-                    >
-                        <HorizontalStack gap="1" align="center">
-                            <Avatar size="extraSmall" shape="round" source="/public/logo_jira.svg" />
-                            <Text color="base" variant="bodySm">{jiraKey}</Text>
-                        </HorizontalStack>
-                    </Tag>
-                ) : (
-                    <div
-                        onClick={e => {
-                            e.stopPropagation();
-                            handleJiraIntegration(actionItemObj);
-                        }}
-                        style={{ cursor: 'pointer' }}
-                        title="Create Jira Ticket"
-                    >
-                        <Avatar size="extraSmall" shape="round" source="/public/logo_jira.svg" />
-                    </div>
-                )}
-            </Box>
-        );
+const createActionItem = (id, priority, title, description, team, effort, count, actionItemType) => {
+    const actionItemObj = {
+        id,
+        title,
+        description,
+        actionItemType,
+        team,
+        effort,
+        count
     };
 
-    const createActionItem = (id, priority, title, description, team, effort, count, actionItemType) => {
-        const actionItemObj = {
-            id,
-            title,
-            description,
-            actionItemType,
-            team,
-            effort,
-            count
-        };
-
-        return {
-            id,
-            priority: <Badge status={priority === 'P1' ? 'critical' : 'attention'}>{priority}</Badge>,
-            priorityComp: <Badge status={priority === 'P1' ? 'critical' : 'attention'}>{priority}</Badge>,
-            actionItem: buildTruncatableCell(title, title, '400px', 'medium'),
-            team: buildTruncatableCell(team, team, '200px'),
-            effort: buildTruncatableCell(effort, effort, '100px'),
-            whyItMatters: buildTruncatableCell(description, description),
-            displayName: title,
-            title: title,
-            description: description,
-            actionItemType: actionItemType,
-            actions: (
+    return {
+        id,
+        priority: (
+            <Box style={{ display: 'flex', alignItems: 'center', height: '40px', padding: '8px 0' }}>
+                <Badge status={priority === 'P1' ? 'critical' : 'attention'}>{priority}</Badge>
+            </Box>
+        ),
+        priorityComp: <Badge status={priority === 'P1' ? 'critical' : 'attention'}>{priority}</Badge>,
+        actionItem: buildTruncatableCell(title, title, '400px', 'medium'),
+        team: buildTruncatableCell(team, team, '200px'),
+        effort: buildTruncatableCell(effort, effort, '100px'),
+        whyItMatters: buildTruncatableCell(description, description),
+        displayName: title,
+        title: title,
+        description: description,
+        actionItemType: actionItemType,
+        actions: (
+            <Box style={{ display: 'flex', alignItems: 'center', height: '40px', padding: '8px 0' }}>
                 <HorizontalStack gap="2" align="center">
                     <JiraCell
                         actionItemType={actionItemType}
                         actionItemObj={actionItemObj}
                         jiraTicketUrlMap={jiraTicketUrlMap}
                     />
-                    <Box minWidth="16px" />
                 </HorizontalStack>
-            ),
-            count: count,
-            actionItemObj: actionItemObj
-        };
+            </Box>
+        ),
+        count: count,
+        actionItemObj: actionItemObj
     };
+};
 
-    function getActions(item) {
-        const jiraTicketUrl = jiraTicketUrlMap[item?.actionItemType];
-        return [{
-            items: [
-                {
-                    content: jiraTicketUrl ? 'View Jira Ticket' : 'Create Jira Ticket',
-                    icon: jiraTicketUrl ? ExternalMinor : undefined,
-                    onAction: () => {
-                        if (jiraTicketUrl) {
-                            window.location.href = jiraTicketUrl;
-                        } else {
-                            handleJiraIntegration(item.actionItemObj || item);
-                        }
-                    },
-                }
-            ]
-        }];
+function getActions(item) {
+    const jiraTicketUrl = jiraTicketUrlMap[item?.actionItemType];
+    return [{
+        items: [
+            {
+                content: jiraTicketUrl ? 'View Jira Ticket' : 'Create Jira Ticket',
+                icon: jiraTicketUrl ? ExternalMinor : undefined,
+                onAction: () => {
+                    if (jiraTicketUrl) {
+                        window.location.href = jiraTicketUrl;
+                    } else {
+                        handleJiraIntegration(item.actionItemObj || item);
+                    }
+                },
+            }
+        ]
+    }];
+}
+
+const fetchAllData = async () => {
+    const endTimestamp = func.timeNow();
+    const startTimestamp = func.timeNow() - 3600 * 24 * 7;
+    try {
+        const [
+            apiStats,
+            countMapResp,
+            SensitiveAndUnauthenticatedValue,
+            highRiskThirdPartyValue,
+            shadowApisValue,
+            AdminSettings
+        ] = await Promise.all([
+            api.fetchApiStats(startTimestamp, endTimestamp),
+            observeApi.fetchCountMapOfApis(),
+            api.fetchSensitiveAndUnauthenticatedValue(),
+            api.fetchHighRiskThirdPartyValue(),
+            api.fetchShadowApisValue(),
+            api.fetchAdminSettings()
+        ]);
+
+        setAdminSettings(AdminSettings);
+        setJiraTicketUrlMap(AdminSettings?.accountSettings?.jiraTicketUrlMap || {});
+        setFetchedData({ apiStats, countMapResp, SensitiveAndUnauthenticatedValue, highRiskThirdPartyValue, shadowApisValue });
+
+    } catch (error) {
+        console.error("Error fetching action items data:", error);
+        setActionItems([]);
+    }
+};
+
+useEffect(() => {
+    fetchAllData();
+}, []);
+
+useEffect(() => {
+    if (!fetchedData) return;
+
+    const { apiStats, countMapResp, SensitiveAndUnauthenticatedValue, highRiskThirdPartyValue, shadowApisValue } = fetchedData;
+
+    const sensitiveDataCount = countMapResp?.totalApisCount || 0;
+
+    if (apiStats?.apiStatsEnd && apiStats?.apiStatsStart) {
+        const { apiStatsEnd, apiStatsStart } = apiStats;
+
+        const highRiskCount = Object.entries(apiStatsEnd.riskScoreMap || {})
+            .filter(([score]) => parseInt(score) > 3)
+            .reduce((total, [, count]) => total + count, 0);
+
+        const unauthenticatedCount = apiStatsEnd.authTypeMap?.UNAUTHENTICATED || 0;
+        const thirdPartyDiff = (apiStatsEnd.accessTypeMap?.THIRD_PARTY || 0) - (apiStatsStart.accessTypeMap?.THIRD_PARTY || 0);
+
+        const dynamicActionItems = [
+            createActionItem(
+                '1',
+                'P1',
+                `${highRiskCount} APIs with risk score more than 3`,
+                "Creates multiple attack vectors for malicious actors",
+                "Security Team",
+                "Medium",
+                highRiskCount,
+                ACTION_ITEM_TYPES.HIGH_RISK_APIS
+            ),
+            createActionItem(
+                '2',
+                'P1',
+                `${sensitiveDataCount} Endpoints exposing PII or confidential information`,
+                "Violates data privacy regulations (GDPR, CCPA) and risks customer trust",
+                "Development",
+                "Medium",
+                sensitiveDataCount,
+                ACTION_ITEM_TYPES.SENSITIVE_DATA_ENDPOINTS
+            ),
+            createActionItem(
+                '3',
+                'P1',
+                `${unauthenticatedCount} APIs lacking proper authentication controls`,
+                "Easy target for unauthorized access and data exfiltration",
+                "Security Team",
+                "Medium",
+                unauthenticatedCount,
+                ACTION_ITEM_TYPES.UNAUTHENTICATED_APIS
+            ),
+            createActionItem(
+                '4',
+                'P2',
+                `${Math.max(0, thirdPartyDiff)} Third-party APIs frequently invoked or newly integrated within last 7 days`,
+                "New integrations may introduce unvetted security risks",
+                "Integration Team",
+                "Low",
+                Math.max(0, thirdPartyDiff),
+                ACTION_ITEM_TYPES.THIRD_PARTY_APIS
+            ),
+            createActionItem(
+                '5',
+                'P1',
+                `${highRiskThirdPartyValue} External APIs with high risk scores requiring attention`,
+                "Supply chain vulnerabilities that can compromise entire systems",
+                "Security Team",
+                "High",
+                highRiskThirdPartyValue,
+                ACTION_ITEM_TYPES.HIGH_RISK_THIRD_PARTY
+            ),
+            createActionItem(
+                '6',
+                'P2',
+                `${shadowApisValue} Undocumented APIs discovered in the system`,
+                "Unmonitored attack surface with unknown security posture",
+                "API Governance",
+                "High",
+                shadowApisValue,
+                ACTION_ITEM_TYPES.SHADOW_APIS
+            )
+        ];
+
+        setActionItems(dynamicActionItems.filter(item => item.count > 0));
+
+        if (SensitiveAndUnauthenticatedValue > 0) {
+            setCriticalCardData({
+                id: 'p0-critical',
+                priority: 'P0',
+                title: `${SensitiveAndUnauthenticatedValue} APIs returning sensitive data without encryption or proper authorization`,
+                description: 'Potential data breach with regulatory and compliance implications',
+                team: 'Security & Development',
+                effort: 'High',
+                count: SensitiveAndUnauthenticatedValue,
+                actionItemType: ACTION_ITEM_TYPES.CRITICAL_SENSITIVE_UNAUTH
+            });
+        } else {
+            setCriticalCardData(null);
+        }
+    } else {
+        setActionItems([]);
     }
 
-    const fetchAllData = async () => {
-        const endTimestamp = func.timeNow();
-        const startTimestamp = func.timeNow() - 3600 * 24 * 7;
-        try {
-            const [
-                apiStats,
-                countMapResp,
-                SensitiveAndUnauthenticatedValue,
-                highRiskThirdPartyValue,
-                shadowApisValue,
-                AdminSettings
-            ] = await Promise.all([
-                api.fetchApiStats(startTimestamp, endTimestamp),
-                observeApi.fetchCountMapOfApis(),
-                api.fetchSensitiveAndUnauthenticatedValue(),
-                api.fetchHighRiskThirdPartyValue(),
-                api.fetchShadowApisValue(),
-                api.fetchAdminSettings()
-            ]);
+}, [fetchedData, jiraTicketUrlMap]);
 
-            setAdminSettings(AdminSettings);
-            setJiraTicketUrlMap(AdminSettings?.accountSettings?.jiraTicketUrlMap || {});
-            setFetchedData({ apiStats, countMapResp, SensitiveAndUnauthenticatedValue, highRiskThirdPartyValue, shadowApisValue });
+const handleSaveJiraAction = () => {
+    if (!selectedActionItem) {
+        window.location.href = JIRA_INTEGRATION_URL;
+        return;
+    }
 
-        } catch (error) {
-            console.error("Error fetching action items data:", error);
-            setActionItems([]);
-        }
-    };
+    setModalActive(false);
+    const { title, displayName, description, actionItemType } = selectedActionItem;
 
-    useEffect(() => {
-        fetchAllData();
-    }, []);
-
-    useEffect(() => {
-        if (!fetchedData) return;
-
-        const { apiStats, countMapResp, SensitiveAndUnauthenticatedValue, highRiskThirdPartyValue, shadowApisValue } = fetchedData;
-
-        const sensitiveDataCount = countMapResp?.totalApisCount || 0;
-
-        if (apiStats?.apiStatsEnd && apiStats?.apiStatsStart) {
-            const { apiStatsEnd, apiStatsStart } = apiStats;
-
-            const highRiskCount = Object.entries(apiStatsEnd.riskScoreMap || {})
-                .filter(([score]) => parseInt(score) > 3)
-                .reduce((total, [, count]) => total + count, 0);
-
-            const unauthenticatedCount = apiStatsEnd.authTypeMap?.UNAUTHENTICATED || 0;
-            const thirdPartyDiff = (apiStatsEnd.accessTypeMap?.THIRD_PARTY || 0) - (apiStatsStart.accessTypeMap?.THIRD_PARTY || 0);
-
-            const dynamicActionItems = [
-                createActionItem(
-                    '1',
-                    'P1',
-                    `${highRiskCount} APIs with risk score more than 3`,
-                    "Creates multiple attack vectors for malicious actors",
-                    "Security Team",
-                    "Medium",
-                    highRiskCount,
-                    ACTION_ITEM_TYPES.HIGH_RISK_APIS
-                ),
-                createActionItem(
-                    '2',
-                    'P1',
-                    `${sensitiveDataCount} Endpoints exposing PII or confidential information`,
-                    "Violates data privacy regulations (GDPR, CCPA) and risks customer trust",
-                    "Development",
-                    "Medium",
-                    sensitiveDataCount,
-                    ACTION_ITEM_TYPES.SENSITIVE_DATA_ENDPOINTS
-                ),
-                createActionItem(
-                    '3',
-                    'P1',
-                    `${unauthenticatedCount} APIs lacking proper authentication controls`,
-                    "Easy target for unauthorized access and data exfiltration",
-                    "Security Team",
-                    "Medium",
-                    unauthenticatedCount,
-                    ACTION_ITEM_TYPES.UNAUTHENTICATED_APIS
-                ),
-                createActionItem(
-                    '4',
-                    'P2',
-                    `${Math.max(0, thirdPartyDiff)} Third-party APIs frequently invoked or newly integrated within last 7 days`,
-                    "New integrations may introduce unvetted security risks",
-                    "Integration Team",
-                    "Low",
-                    Math.max(0, thirdPartyDiff),
-                    ACTION_ITEM_TYPES.THIRD_PARTY_APIS
-                ),
-                createActionItem(
-                    '5',
-                    'P1',
-                    `${highRiskThirdPartyValue} External APIs with high risk scores requiring attention`,
-                    "Supply chain vulnerabilities that can compromise entire systems",
-                    "Security Team",
-                    "High",
-                    highRiskThirdPartyValue,
-                    ACTION_ITEM_TYPES.HIGH_RISK_THIRD_PARTY
-                ),
-                createActionItem(
-                    '6',
-                    'P2',
-                    `${shadowApisValue} Undocumented APIs discovered in the system`,
-                    "Unmonitored attack surface with unknown security posture",
-                    "API Governance",
-                    "High",
-                    shadowApisValue,
-                    ACTION_ITEM_TYPES.SHADOW_APIS
-                )
-            ];
-
-            setActionItems(dynamicActionItems.filter(item => item.count > 0));
-
-            if (SensitiveAndUnauthenticatedValue > 0) {
-                setCriticalCardData({
-                    id: 'p0-critical',
-                    priority: 'P0',
-                    title: `${SensitiveAndUnauthenticatedValue} APIs returning sensitive data without encryption or proper authorization`,
-                    description: 'Potential data breach with regulatory and compliance implications',
-                    team: 'Security & Development',
-                    effort: 'High',
-                    count: SensitiveAndUnauthenticatedValue,
-                    actionItemType: ACTION_ITEM_TYPES.CRITICAL_SENSITIVE_UNAUTH
-                });
-            } else {
-                setCriticalCardData(null);
-            }
+    issuesApi.createGeneralJiraTicket({
+        title: title || displayName || 'Action Item',
+        description: description || '',
+        projId,
+        issueType,
+        actionItemType: actionItemType || ''
+    }).then((res) => {
+        if (res?.errorMessage) {
+            window.location.href = JIRA_INTEGRATION_URL;
         } else {
-            setActionItems([]);
+            // Refresh data to show updated Jira ticket status
+            fetchAllData();
         }
+    }).catch((error) => {
+        window.location.href = JIRA_INTEGRATION_URL;
+    });
+};
 
-    }, [fetchedData, jiraTicketUrlMap]);
-
-    const handleSaveJiraAction = () => {
-        if (!selectedActionItem) {
-            window.location.href = JIRA_INTEGRATION_URL;
-            return;
-        }
-
-        setModalActive(false);
-        const { title, displayName, description, actionItemType } = selectedActionItem;
-
-        issuesApi.createGeneralJiraTicket({
-            title: title || displayName || 'Action Item',
-            description: description || '',
-            projId,
-            issueType,
-            actionItemType: actionItemType || ''
-        }).then((res) => {
-            if (res?.errorMessage) {
-                window.location.href = JIRA_INTEGRATION_URL;
-            } else {
-                // Refresh data to show updated Jira ticket status
-                fetchAllData();
-            }
-        }).catch((error) => {
-            window.location.href = JIRA_INTEGRATION_URL;
-        });
-    };
-
-    const ActionItemCardWrapper = ({ cardObj, onButtonClick }) => {
-        return (
-            <div onClick={() => handleCardClick(cardObj)} style={{ cursor: 'pointer' }}>
-                <ActionItemCard
-                    cardObj={cardObj}
-                    onButtonClick={() => onButtonClick(cardObj)}
-                    jiraTicketUrlMap={jiraTicketUrlMap}
-                />
-            </div>
-        );
-    };
-
+const ActionItemCardWrapper = ({ cardObj, onButtonClick }) => {
     return (
-        <VerticalStack gap="5">
-            {criticalCardData && (
-                <Box maxWidth="300px">
-                    <ActionItemCardWrapper
-                        cardObj={criticalCardData}
-                        onButtonClick={handleJiraIntegration}
-                    />
-                </Box>
-            )}
+        <div onClick={() => handleCardClick(cardObj)} style={{ cursor: 'pointer' }}>
+            <ActionItemCard
+                cardObj={cardObj}
+                onButtonClick={() => onButtonClick(cardObj)}
+                jiraTicketUrlMap={jiraTicketUrlMap}
+            />
+        </div>
+    );
+};
 
-            <Box maxWidth="100%" style={{ overflowX: 'hidden' }}>
-                <GithubSimpleTable
-                    key={`table-${JSON.stringify(jiraTicketUrlMap)}`}
-                    data={actionItems}
-                    resourceName={resourceName}
-                    headers={actionItemsHeaders}
-                    headings={actionItemsHeaders}
-                    useNewRow={true}
-                    condensedHeight={true}
-                    hideQueryField={true}
-                    hidePagination={true}
-                    hasZebraStriping={true}
-                    getActions={getActions}
-                    hasRowActions={true}
-                    defaultSortField="priority"
-                    defaultSortDirection="asc"
-                    emptyStateMessage="No action items found"
+return (
+    <VerticalStack gap="5">
+        {criticalCardData && (
+            <Box maxWidth="300px">
+                <ActionItemCardWrapper
+                    cardObj={criticalCardData}
+                    onButtonClick={handleJiraIntegration}
                 />
             </Box>
+        )}
 
-            <JiraTicketCreationModal
-                activator={null}
-                modalActive={modalActive}
-                setModalActive={setModalActive}
-                handleSaveAction={handleSaveJiraAction}
-                jiraProjectMaps={jiraProjectMaps}
-                setProjId={setProjId}
-                setIssueType={setIssueType}
-                projId={projId}
-                issueType={issueType}
-                issueId={issueId}
-                isAzureModal={false}
+        <Box maxWidth="100%" style={{ overflowX: 'hidden' }}>
+            <GithubSimpleTable
+                key={`table-${JSON.stringify(jiraTicketUrlMap)}`}
+                data={actionItems}
+                resourceName={resourceName}
+                headers={actionItemsHeaders}
+                headings={actionItemsHeaders}
+                useNewRow={true}
+                condensedHeight={true}
+                hideQueryField={true}
+                hidePagination={true}
+                hasZebraStriping={true}
+                getActions={getActions}
+                hasRowActions={true}
+                defaultSortField="priority"
+                defaultSortDirection="asc"
+                emptyStateMessage="No action items found"
             />
-        </VerticalStack>
-    );
+        </Box>
+
+        <JiraTicketCreationModal
+            activator={null}
+            modalActive={modalActive}
+            setModalActive={setModalActive}
+            handleSaveAction={handleSaveJiraAction}
+            jiraProjectMaps={jiraProjectMaps}
+            setProjId={setProjId}
+            setIssueType={setIssueType}
+            projId={projId}
+            issueType={issueType}
+            issueId={issueId}
+            isAzureModal={false}
+        />
+    </VerticalStack>
+);
 };
