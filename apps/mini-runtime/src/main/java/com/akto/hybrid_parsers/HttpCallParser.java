@@ -96,7 +96,7 @@ public class HttpCallParser {
                     try {
                         sendTrafficMetricsToTelemetry(metrics);
                     } catch (Exception e) {
-                        loggerMaker.errorAndAddToDb("Error while sending traffic_metrics data to prometheus", LogDb.RUNTIME);
+                        loggerMaker.errorAndAddToDb(e, "Error while sending traffic_metrics data to prometheus");
                     }
                 }
             }
@@ -162,11 +162,11 @@ public class HttpCallParser {
                 flag = true;
                 break;
             } catch (Exception e) {
-                loggerMaker.errorAndAddToDb("Error while inserting apiCollection, trying again " + i + " " + e.getMessage(), LogDb.RUNTIME);
+                loggerMaker.errorAndAddToDb(e, "Error while inserting apiCollection, trying again " + i + " " + e.getMessage());
             }
         }
         if (flag) { // flag tells if we were successfully able to insert collection
-            loggerMaker.infoAndAddToDb("Using collectionId=" + id + " for " + host, LogDb.RUNTIME);
+            loggerMaker.infoAndAddToDb("Using collectionId=" + id + " for " + host);
             return id;
         } else {
             throw new Exception("Not able to insert");
@@ -352,15 +352,15 @@ public class HttpCallParser {
     }
 
     public void syncTrafficMetricsWithDB() {
-        loggerMaker.infoAndAddToDb("Starting syncing traffic metrics", LogDb.RUNTIME);
+        loggerMaker.infoAndAddToDb("Starting syncing traffic metrics");
         try {
             syncTrafficMetricsWithDBHelper();
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("Error while updating traffic metrics: " + e.getMessage(), LogDb.RUNTIME);
+            loggerMaker.errorAndAddToDb(e, "Error while updating traffic metrics: " + e.getMessage());
         } finally {
             trafficMetricsMap = new HashMap<>();
         }
-        loggerMaker.infoAndAddToDb("Finished syncing traffic metrics", LogDb.RUNTIME);
+        loggerMaker.infoAndAddToDb("Finished syncing traffic metrics");
     }
 
     public void syncTrafficMetricsWithDBHelper() {
@@ -416,16 +416,16 @@ public class HttpCallParser {
         try {
             response =  client.newCall(request).execute();
         } catch (IOException e) {
-            loggerMaker.errorAndAddToDb("Error while executing request " + request.url() + ": " + e.getMessage(), LogDb.RUNTIME);
+            loggerMaker.errorAndAddToDb(e, "Error while executing request " + request.url() + ": " + e.getMessage());
         } finally {
             if (response != null) {
                 response.close();
             }
         }
         if (response!= null && response.isSuccessful()) {
-            loggerMaker.infoAndAddToDb("Updated traffic_metrics", LogDb.RUNTIME);
+            loggerMaker.infoAndAddToDb("Updated traffic_metrics");
         } else {
-            loggerMaker.infoAndAddToDb("Traffic_metrics not sent", LogDb.RUNTIME);
+            loggerMaker.infoAndAddToDb("Traffic_metrics not sent");
         }
     }
 
@@ -603,7 +603,7 @@ public class HttpCallParser {
 
                     hostNameToIdMap.put(key, apiCollectionId);
                 } catch (Exception e) {
-                    loggerMaker.errorAndAddToDb("Failed to create collection for host : " + hostName, LogDb.RUNTIME);
+                    loggerMaker.errorAndAddToDb(e, "Failed to create collection for host : " + hostName);
                     createCollectionSimpleForVpc(vxlanId, vpcId, tagList);
                     hostNameToIdMap.put(NON_HOSTNAME_KEY + vxlanId, vxlanId);
                     apiCollectionId = httpResponseParam.requestParams.getApiCollectionId();
@@ -733,7 +733,7 @@ public class HttpCallParser {
                     }
 
                 } catch(Exception e){
-                    loggerMaker.errorAndAddToDb(e, "Error while ignoring content-type redundant samples " + e.toString(), LogDb.RUNTIME);
+                    loggerMaker.errorAndAddToDb(e, "Error while ignoring content-type redundant samples " + e.toString());
                 }
 
             }
@@ -776,7 +776,7 @@ public class HttpCallParser {
                 filteredResponseParams.add(mcpResponseParams);
             } else {
                 filteredResponseParams.addAll(responseParamsList);
-                loggerMaker.infoAndAddToDb("Adding " + responseParamsList.size() + "new graphql endpoints in inventory",LogDb.RUNTIME);
+                loggerMaker.infoAndAddToDb("Adding " + responseParamsList.size() + "new graphql endpoints in inventory");
             }
 
             if (httpResponseParam.getSource().equals(HttpResponseParams.Source.MIRRORING)) {
@@ -786,7 +786,7 @@ public class HttpCallParser {
 
         }
         int filteredSize = filteredResponseParams.size();
-        loggerMaker.debugInfoAddToDb("Filtered " + (originalSize - filteredSize) + " responses", LogDb.RUNTIME);
+        loggerMaker.debugInfoAddToDb("Filtered " + (originalSize - filteredSize) + " responses");
         return filteredResponseParams;
     }
 
@@ -831,8 +831,8 @@ public class HttpCallParser {
             }
         }
 
-        loggerMaker.debugInfoAddToDb("URLs: " + urlSet.toString(), LogDb.RUNTIME);
-        loggerMaker.infoAndAddToDb("added " + count + " urls", LogDb.RUNTIME);
+        loggerMaker.debugInfoAddToDb("URLs: " + urlSet.toString());
+        loggerMaker.infoAndAddToDb("added " + count + " urls");
         return ret;
     }
 
