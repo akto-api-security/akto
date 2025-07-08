@@ -1298,30 +1298,31 @@ public String createGeneralJiraTicket() {
 
         if (actionItemType != null && !actionItemType.isEmpty()) {
             try {
+                // FIXED: Update the existing document with _id: 1000000 instead of creating new one
                 String updateKey = "jiraTicketUrlMap." + actionItemType;
 
                 BasicDBObject filter = new BasicDBObject("_id", 1000000);
                 BasicDBObject update = new BasicDBObject("$set", new BasicDBObject(updateKey, jiraTicketUrl));
 
-                AccountSettingsDao.instance.updateOne("AccountSettings", filter, update);
+                // Use the correct collection name and ensure we're updating the existing document
+                AccountSettingsDao.instance.updateOne(filter, update);
 
                 loggerMaker.infoAndAddToDb(
                     "Jira ticket URL stored under _id:1000000 for action item type: " + actionItemType +
                     ", URL: " + jiraTicketUrl, LoggerMaker.LogDb.DASHBOARD
                 );
-    } catch (Exception e) {
-        loggerMaker.errorAndAddToDb(
-            "Error storing Jira ticket URL: " + e.getMessage(), LoggerMaker.LogDb.DASHBOARD
-        );
-    }
-}
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb(
+                    "Error storing Jira ticket URL: " + e.getMessage(), LoggerMaker.LogDb.DASHBOARD
+                );
+            }
+        }
     } catch (Exception e) {
         return Action.ERROR.toUpperCase();
     }
 
     return Action.SUCCESS.toUpperCase();
 }
-
 
 public String getTitle() {
     return title;

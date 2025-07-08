@@ -1,15 +1,46 @@
-import { Avatar, Badge, Box, Button, Card, Divider, HorizontalStack, Icon, Text, VerticalStack, Popover, OptionList, Tag } from '@shopify/polaris'
+import { Avatar, Badge, Box, Button, Card, Divider, HorizontalStack, Icon, Text, VerticalStack, Popover, OptionList, Tag, Link } from '@shopify/polaris'
 
 import React, { useState } from 'react'
 import { TeamMajor, ToolsMajor, EmailMajor } from "@shopify/polaris-icons"
 import TooltipText from '../../../components/shared/TooltipText'
 
 function ActionItemCard(props) {
-    const { cardObj, onButtonClick } = props;
+    const { cardObj, onButtonClick, jiraTicketUrlMap = {} } = props;
     
-    const handleJiraClick = (e) => {
-        e.stopPropagation();
-        onButtonClick(cardObj);
+    const jiraTicketUrl = jiraTicketUrlMap[cardObj.actionItemType];
+    const jiraKey = jiraTicketUrl && jiraTicketUrl.length > 0 ? jiraTicketUrl.split('/').pop() : "";
+    
+    const renderJiraComponent = () => {
+        if (jiraKey) {
+            return (
+                <Tag onClick={(e) => {
+                    e.stopPropagation();
+                    window.open(jiraTicketUrl, '_blank');
+                }}>
+                    <HorizontalStack gap="1">
+                        <Avatar size="extraSmall" shape="round" source="/public/logo_jira.svg" />
+                        <Text color="base">
+                            {jiraKey}
+                        </Text>
+                    </HorizontalStack>
+                </Tag>
+            );
+        }
+
+        return (
+            <div 
+                onClick={(e) => {
+                    e.stopPropagation();
+                    if (onButtonClick) {
+                        onButtonClick(cardObj);
+                    }
+                }}
+                style={{ cursor: 'pointer' }}
+                title="Create Jira Ticket"
+            >
+                <Avatar size="extraSmall" shape="round" source="/public/logo_jira.svg" />
+            </div>
+        );
     };
     
     return (
@@ -19,14 +50,15 @@ function ActionItemCard(props) {
                     e.target.closest('.Polaris-Button') ||
                     e.target.closest('.Polaris-Popover') ||
                     e.target.closest('.Polaris-Tag') ||
-                    e.target.closest('.Polaris-Modal-CloseButton')
+                    e.target.closest('.Polaris-Modal-CloseButton') ||
+                    e.target.closest('.jira-button') ||
+                    e.target.closest('.jira-link')
                 ) {
                     return;
                 }
                 if (e.cancelBubble) {
                     return;
                 }
-                onButtonClick(cardObj);
             }}
             style={{cursor: 'pointer'}}
         >
@@ -58,41 +90,13 @@ function ActionItemCard(props) {
                     </HorizontalStack>
                 </HorizontalStack>
                 <Divider />
-                    <HorizontalStack gap={"3"} align="space-between" wrap={false}>
-                        <Box className="action-item-card-actions">
-                            <HorizontalStack gap={"2"}>
-                                <button
-                                    className="Polaris-Modal-CloseButton"
-                                    onClick={handleJiraClick}
-                                    title={window?.JIRA_INTEGRATED ? 'Create Jira Ticket' : 'Integrate Jira'}
-                                >
-                                    <Box className='reduce-size'>
-                                        <Avatar size="extraSmall" shape="square" source="/public/logo_jira.svg" />
-                                    </Box>
-                                </button>
-                            </HorizontalStack>
+                <HorizontalStack gap={"3"} align="space-between" wrap={false}>
+                    <Box className="action-item-card-actions">
+                        <HorizontalStack gap={"2"}>
+                            {renderJiraComponent()}
+                        </HorizontalStack>
                     </Box>
                     <Box>
-                        {/* TODO: Re-enable assign task functionality in future iteration */}
-                        {/* {assignedUser ? (
-                            <Tag onRemove={() => setSelectedUser([])}>
-                                {assignedUser.label}
-                            </Tag>
-                        ) : (
-                            <Popover
-                                active={popoverActive}
-                                activator={activator}
-                                onClose={() => setPopoverActive(false)}
-                                autofocusTarget="first-node"
-                            >
-                                <OptionList
-                                    title="Assign to"
-                                    onChange={handleUserSelect}
-                                    options={users}
-                                    selected={selectedUser}
-                                />
-                            </Popover>
-                        )} */}
                     </Box>
                 </HorizontalStack>
             </VerticalStack>
