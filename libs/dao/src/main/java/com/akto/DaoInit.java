@@ -471,5 +471,6 @@ public class DaoInit {
         JobsDao.instance.createIndicesIfAbsent();
         BidirectionalSyncSettingsDao.instance.createIndicesIfAbsent();
         MetricDataDao.instance.createIndicesIfAbsent();
+        SensitiveSampleDataDao.instance.createIndicesIfAbsent();
     }
 }

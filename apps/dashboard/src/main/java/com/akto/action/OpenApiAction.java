@@ -30,7 +30,7 @@ import com.akto.utils.Utils;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
-
+import com.mongodb.client.model.InsertManyOptions;
 import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.Updates;
 import com.mongodb.client.result.InsertOneResult;
@@ -119,7 +119,7 @@ public class OpenApiAction extends UserAction implements ServletResponseAware {
             loggerMaker.debugAndAddToDb("Initialize openAPI", LogDb.DASHBOARD);
 
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(e,"ERROR while downloading openApi file " + e, LogDb.DASHBOARD);
+            loggerMaker.errorAndAddToDb(e,"ERROR while downloading openApi file " + e);
             return ERROR.toUpperCase();
         }
 
@@ -177,35 +177,29 @@ public class OpenApiAction extends UserAction implements ServletResponseAware {
             )
         );
 
+        // In case of quick start menu
         if (source == null && apiInfoWithSource == null) {
-            addActionError("Source is null");
-            return ERROR.toUpperCase();
+            loggerMaker.debugAndAddToDb("No source found, setting source to OPEN_API");
+            source = Source.OPEN_API;
         }
 
         executorService.schedule(new Runnable() {
             public void run() {
                 Context.accountId.set(accountId);
 
-
-                if (apiInfoWithSource == null) {
+                if (apiInfoWithSource == null && !Source.OPEN_API.equals(source)) {
                     loggerMaker.debugAndAddToDb("Starting to add sources to existing STIs and ApiInfos", LogDb.DASHBOARD);
-
                     Bson sourceUpdate = Updates.set(SingleTypeInfo.SOURCES + "." + source, new BasicDBObject("timestamp", Context.now()) );
-
                     Bson apiCollectionIdFilterForStis = Filters.eq(SingleTypeInfo._API_COLLECTION_ID, apiCollectionId);
                     SingleTypeInfoDao.instance.updateManyNoUpsert(apiCollectionIdFilterForStis, sourceUpdate);
-
                     Bson apiCollectionIdFilterForApiInfos = Filters.eq(ApiInfo.ID_API_COLLECTION_ID, apiCollectionId);
                     ApiInfoDao.instance.updateManyNoUpsert(apiCollectionIdFilterForApiInfos, sourceUpdate);
-
                     loggerMaker.debugAndAddToDb("Starting to process openAPI file", LogDb.DASHBOARD);
                 } else {
                     loggerMaker.debugAndAddToDb("No need to add sources to STIs and ApiInfos", LogDb.DASHBOARD);
                 }
 
-                SwaggerFileUpload fileUpload = FileUploadsDao.instance.getSwaggerMCollection().find(Filters.eq(Constants.ID, new ObjectId(fileUploadId))).first();
                 String title = OPEN_API + " ";
-        
                 try {
                     ParseOptions options = new ParseOptions();
                     options.setResolve(true);
@@ -217,7 +211,12 @@ public class OpenApiAction extends UserAction implements ServletResponseAware {
                     } else {
                         title += Context.now();
                     }
-                    ParserResult parsedSwagger = Parser.convertOpenApiToAkto(openAPI, fileUploadId);
+                    boolean useHost = false;
+                    if (Source.OPEN_API.equals(source)) {
+                        useHost = true;
+                    }
+
+                    ParserResult parsedSwagger = Parser.convertOpenApiToAkto(openAPI, fileUploadId, useHost);
                     List<FileUploadError> fileErrors = parsedSwagger.getFileErrors();
 
                     List<SwaggerUploadLog> messages = parsedSwagger.getUploadLogs();
@@ -231,9 +230,23 @@ public class OpenApiAction extends UserAction implements ServletResponseAware {
                             .mapToObj(i -> finalMessages.subList(i * chunkSize, Math.min(finalMessages.size(), (i + 1) * chunkSize)))
                             .collect(Collectors.toList());
 
-                    for(List<SwaggerUploadLog> chunk : chunkedLists){
-                        loggerMaker.infoAndAddToDb("Inserting chunk of size " + chunk.size(), LogDb.DASHBOARD);
+                    if (Source.OPEN_API.equals(source)) {
+                        for (List<SwaggerUploadLog> chunk : chunkedLists) {
+                            loggerMaker.debugAndAddToDb("Inserting chunk of size " + chunk.size(), LogDb.DASHBOARD);
+                            FileUploadLogsDao.instance.getSwaggerMCollection().insertMany(chunk,
+                                    new InsertManyOptions().ordered(true));
+                        }
+                        loggerMaker.debugAndAddToDb("Inserted " + chunkedLists.size() + " chunks of logs",
+                                LogDb.DASHBOARD);
 
+                        FileUploadsDao.instance.updateOne(Filters.eq(Constants.ID, new ObjectId(fileUploadId)),
+                                Updates.combine(
+                                        Updates.set("uploadStatus", FileUpload.UploadStatus.SUCCEEDED),
+                                        Updates.set("collectionName", title),
+                                        Updates.set("errors", fileErrors),
+                                        Updates.set("count", parsedSwagger.getTotalCount())));
+                        loggerMaker.debugAndAddToDb("Finished processing openAPI file", LogDb.DASHBOARD);
+                    }else {
                         List<String> stringMessages = messages.stream()
                                 .map(SwaggerUploadLog::getAktoFormat)
                                 .collect(Collectors.toList());
@@ -251,11 +264,10 @@ public class OpenApiAction extends UserAction implements ServletResponseAware {
                         } catch (Exception e) {
                             throw new RuntimeException(e);
                         }
-
                     }
 
                 } catch (Exception e) {
-                    loggerMaker.errorAndAddToDb(e, "ERROR while parsing openAPI file", LogDb.DASHBOARD);
+                    loggerMaker.errorAndAddToDb(e, "ERROR while parsing openAPI file");
                     FileUploadsDao.instance.updateOne(Filters.eq(Constants.ID, new ObjectId(fileUploadId)), Updates.combine(
                             Updates.set("uploadStatus", FileUpload.UploadStatus.FAILED),
                             Updates.set("fatalError", e.getMessage())
@@ -391,7 +403,7 @@ public class OpenApiAction extends UserAction implements ServletResponseAware {
                 FileUploadsDao.instance.getSwaggerMCollection().updateOne(Filters.eq("_id", new ObjectId(uploadId)), new BasicDBObject("$set", new BasicDBObject("ingestionComplete", true).append("markedForDeletion", true)), new UpdateOptions().upsert(false));
                 loggerMaker.debugAndAddToDb("Ingestion complete for " + swaggerFileUpload.getId().toString(), LogDb.DASHBOARD);
             } catch (Exception e) {
-                loggerMaker.errorAndAddToDb(e,"Error pushing data to kafka", LogDb.DASHBOARD);
+                loggerMaker.errorAndAddToDb(e,"Error pushing data to kafka");
             }
         }).start();
 
