@@ -41,6 +41,7 @@ function GithubServerTable(props) {
   };
 
   const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), values.ranges[5])
+  const [hideFilter, setHideFilter] = useState(false)
 
   const filtersMap = PersistStore(state => state.filtersMap)
   const setFiltersMap = PersistStore(state => state.setFiltersMap)
@@ -316,7 +317,12 @@ function GithubServerTable(props) {
             dispatch={(dateObj) => handleDateChange(dateObj, key)}
             initialDispatch={currDateRange}
             ranges={values.ranges}
-            setPopoverState={() => {}} 
+            setPopoverState={() => {
+                setHideFilter(true)
+                setTimeout(() => {
+                    setHideFilter(false)
+                }, 10)
+            }}
           />,
           pinned: true
         })
@@ -478,6 +484,7 @@ function GithubServerTable(props) {
                 loading={props.loading || false}
                 selected={props?.selected}
                 onSelect={(x) => handleTabChange(x)}
+                hideFilters={hideFilter}
               ></IndexFilters>
               {props?.bannerComp?.selected === props?.selected ? props?.bannerComp?.comp : null}
               <div className={tableHeightClass}>
