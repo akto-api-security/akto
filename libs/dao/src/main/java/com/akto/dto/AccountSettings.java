@@ -506,4 +506,8 @@ public class AccountSettings {
     public Map<String, String> getJiraTicketUrlMap() {
         return this.jiraTicketUrlMap;
     }
+
+    public void setJiraTicketUrlMap(Map<String, String> jiraTicketUrlMap) {
+        this.jiraTicketUrlMap = jiraTicketUrlMap;
+    }
 }
