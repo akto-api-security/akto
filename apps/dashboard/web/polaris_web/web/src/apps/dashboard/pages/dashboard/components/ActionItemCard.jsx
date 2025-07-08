@@ -17,21 +17,24 @@ function ActionItemCard(props) {
                     display: 'flex', 
                     alignItems: 'center', 
                     justifyContent: 'flex-start',
-                    minHeight: '32px'
+                    minHeight: '20px' 
                 }}
             >
                 {jiraKey ? (
-                    <Tag onClick={(e) => {
-                        e.stopPropagation();
-                        window.open(jiraTicketUrl, '_blank');
-                    }}>
-                        <HorizontalStack gap="1" align="center">
-                            <Avatar size="extraSmall" shape="round" source="/public/logo_jira.svg" />
-                            <Text color="base">
+                    <HorizontalStack gap="1" align="center">
+                        <Avatar size="extraSmall" shape="round" source="/public/logo_jira.svg" />
+                        <Link 
+                            url={jiraTicketUrl} 
+                            target="_blank"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                            }}
+                        >
+                            <Text color="base" variant="bodySm">
                                 {jiraKey}
                             </Text>
-                        </HorizontalStack>
-                    </Tag>
+                        </Link>
+                    </HorizontalStack>
                 ) : (
                     <div
                         onClick={(e) => {
@@ -107,9 +110,15 @@ function ActionItemCard(props) {
                     <Divider />
                     <HorizontalStack gap={"3"} align="space-between" wrap={false}>
                         <Box className="action-item-card-actions">
-                            <HorizontalStack gap={"2"}>
+                            <div style={{ 
+                                display: 'inline-block',
+                                padding: '2px 8px',  
+                                backgroundColor: '#f6f6f7',
+                                borderRadius: '4px',
+                                border: '1px solid #e1e3e5'
+                            }}>
                                 {renderJiraComponent()}
-                            </HorizontalStack>
+                            </div>
                         </Box>
                         <Box>
                         </Box>

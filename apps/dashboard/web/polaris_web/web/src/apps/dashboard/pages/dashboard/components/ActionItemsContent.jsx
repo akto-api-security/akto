@@ -96,7 +96,8 @@ const buildTruncatableCell = (tooltip, text, maxWidth = '400px', fontWeight = 'r
         display: 'flex',
         alignItems: 'center',
         height: '100%',
-        padding: '8px 0'
+        padding: '2px 0',  // Reduced padding
+        maxHeight: '40px'  // Added max height
     }}>
         <div style={{
             whiteSpace: 'nowrap',
@@ -123,23 +124,30 @@ const JiraCell = ({ actionItemType, actionItemObj, jiraTicketUrlMap }) => {
                 display: 'flex', 
                 alignItems: 'center', 
                 justifyContent: 'center',
-                height: '40px',
+                height: '24px',  
                 width: '100%',
-                padding: '8px 0'
+                padding: '2px 0'  
             }}
         >
             {jiraKey ? (
-                <Tag
-                    onClick={e => {
-                        e.stopPropagation();
-                        window.location.href = jiraTicketUrl;
-                    }}
-                >
+                <div style={{ 
+                    display: 'inline-block',
+                    padding: '2px 6px',  
+                    backgroundColor: '#f6f6f7',
+                    borderRadius: '4px',
+                    border: '1px solid #e1e3e5'
+                }}>
                     <HorizontalStack gap="1" align="center">
                         <Avatar size="extraSmall" shape="round" source="/public/logo_jira.svg" />
-                        <Text color="base" variant="bodySm">{jiraKey}</Text>
+                        <Link 
+                            url={jiraTicketUrl} 
+                            target="_blank"
+                            onClick={e => e.stopPropagation()}
+                        >
+                            <Text color="base" variant="bodySm">{jiraKey}</Text>
+                        </Link>
                     </HorizontalStack>
-                </Tag>
+                </div>
             ) : (
                 <div
                     onClick={e => {
@@ -151,7 +159,7 @@ const JiraCell = ({ actionItemType, actionItemObj, jiraTicketUrlMap }) => {
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        padding: '4px'
+                        padding: '2px'  
                     }}
                     title="Create Jira Ticket"
                 >
@@ -176,7 +184,7 @@ const createActionItem = (id, priority, title, description, team, effort, count,
     return {
         id,
         priority: (
-            <Box style={{ display: 'flex', alignItems: 'center', height: '40px', padding: '8px 0' }}>
+            <Box style={{ display: 'flex', alignItems: 'center', height: '24px', padding: '2px 0' }}>
                 <Badge status={priority === 'P1' ? 'critical' : 'attention'}>{priority}</Badge>
             </Box>
         ),
@@ -190,7 +198,7 @@ const createActionItem = (id, priority, title, description, team, effort, count,
         description: description,
         actionItemType: actionItemType,
         actions: (
-            <Box style={{ display: 'flex', alignItems: 'center', height: '40px', padding: '8px 0' }}>
+            <Box style={{ display: 'flex', alignItems: 'center', height: '24px', padding: '2px 0' }}>
                 <HorizontalStack gap="2" align="center">
                     <JiraCell
                         actionItemType={actionItemType}
@@ -379,7 +387,6 @@ const handleSaveJiraAction = () => {
         if (res?.errorMessage) {
             window.location.href = JIRA_INTEGRATION_URL;
         } else {
-            // Refresh data to show updated Jira ticket status
             fetchAllData();
         }
     }).catch((error) => {
@@ -400,6 +407,7 @@ const ActionItemCardWrapper = ({ cardObj, onButtonClick }) => {
 };
 
 return (
+
     <VerticalStack gap="5">
         {criticalCardData && (
             <Box maxWidth="300px">
@@ -443,6 +451,14 @@ return (
             issueId={issueId}
             isAzureModal={false}
         />
+
+        {/* <FlyLayout
+            show={showFlyout}
+            setShow={setShowFlyout}
+            title="Action item details"
+            components={[<ActionItemDetails item={selectedItem} />]}
+        /> */}
     </VerticalStack>
+    
 );
 };
