@@ -6,43 +6,50 @@ import TooltipText from '../../../components/shared/TooltipText'
 
 function ActionItemCard(props) {
     const { cardObj, onButtonClick, jiraTicketUrlMap = {} } = props;
-    
+
     const jiraTicketUrl = jiraTicketUrlMap[cardObj.actionItemType];
     const jiraKey = jiraTicketUrl && jiraTicketUrl.length > 0 ? jiraTicketUrl.split('/').pop() : "";
-    
-    const renderJiraComponent = () => {
-        if (jiraKey) {
-            return (
-                <Tag onClick={(e) => {
-                    e.stopPropagation();
-                    window.open(jiraTicketUrl, '_blank');
-                }}>
-                    <HorizontalStack gap="1">
-                        <Avatar size="extraSmall" shape="round" source="/public/logo_jira.svg" />
-                        <Text color="base">
-                            {jiraKey}
-                        </Text>
-                    </HorizontalStack>
-                </Tag>
-            );
-        }
 
+    const renderJiraComponent = () => {
         return (
-            <div 
-                onClick={(e) => {
-                    e.stopPropagation();
-                    if (onButtonClick) {
-                        onButtonClick(cardObj);
-                    }
+            <Box 
+                style={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    justifyContent: 'flex-start',
+                    minHeight: '32px'
                 }}
-                style={{ cursor: 'pointer' }}
-                title="Create Jira Ticket"
             >
-                <Avatar size="extraSmall" shape="round" source="/public/logo_jira.svg" />
-            </div>
+                {jiraKey ? (
+                    <Tag onClick={(e) => {
+                        e.stopPropagation();
+                        window.open(jiraTicketUrl, '_blank');
+                    }}>
+                        <HorizontalStack gap="1" align="center">
+                            <Avatar size="extraSmall" shape="round" source="/public/logo_jira.svg" />
+                            <Text color="base">
+                                {jiraKey}
+                            </Text>
+                        </HorizontalStack>
+                    </Tag>
+                ) : (
+                    <div
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            if (onButtonClick) {
+                                onButtonClick(cardObj);
+                            }
+                        }}
+                        style={{ cursor: 'pointer' }}
+                        title="Create Jira Ticket"
+                    >
+                        <Avatar size="extraSmall" shape="round" source="/public/logo_jira.svg" />
+                    </div>
+                )}
+            </Box>
         );
     };
-    
+
     return (
         <div
             onClick={e => {
@@ -60,47 +67,55 @@ function ActionItemCard(props) {
                     return;
                 }
             }}
-            style={{cursor: 'pointer'}}
+            style={{ cursor: 'pointer' }}
         >
-        <Card padding={"5"}>
-            <VerticalStack gap={"3"}>
-                <Box width='30px'>
-                    <Badge status="critical-strong-experimental">P0</Badge>
-                </Box>
-                <Box maxWidth="220px">
-                    <TooltipText 
-                        tooltip={cardObj.title} 
-                        text={cardObj.title} 
-                        textProps={{variant: 'headingSm'}} 
-                    />
-                    <TooltipText 
-                        tooltip={cardObj.description} 
-                        text={cardObj.description} 
-                        textProps={{variant: 'bodyMd', color: 'subdued'}} 
-                    />
-                </Box>
-                <HorizontalStack gap={"2"}>
-                    <HorizontalStack gap={"1"}>
-                        <Box><Icon source={TeamMajor} color="subdued" /></Box>
-                        <Text variant='bodyMd'>{cardObj.team}</Text>
-                    </HorizontalStack>
-                    <HorizontalStack gap={"1"}>
-                        <Box><Icon source={ToolsMajor} color="subdued" /></Box>
-                        <Text variant='bodyMd'>{cardObj.effort}</Text>
-                    </HorizontalStack>
-                </HorizontalStack>
-                <Divider />
-                <HorizontalStack gap={"3"} align="space-between" wrap={false}>
-                    <Box className="action-item-card-actions">
-                        <HorizontalStack gap={"2"}>
-                            {renderJiraComponent()}
+            <Card padding={"5"}>
+                <VerticalStack gap={"3"}>
+                    <Box width='30px'>
+                        <Badge status={cardObj.priority === 'P0' ? 'critical-strong-experimental' :
+                            cardObj.priority === 'P1' ? 'critical' :
+                                cardObj.priority === 'P2' ? 'attention' :
+                                    cardObj.priority === 'P3' ? 'warning' :
+                                        cardObj.priority === 'P4' ? 'info' :
+                                            cardObj.priority === 'P5' ? 'success' :
+                                                'new'}>
+                            {cardObj.priority}
+                        </Badge>
+                    </Box>
+                    <Box maxWidth="220px">
+                        <TooltipText
+                            tooltip={cardObj.title}
+                            text={cardObj.title}
+                            textProps={{ variant: 'headingSm' }}
+                        />
+                        <TooltipText
+                            tooltip={cardObj.description}
+                            text={cardObj.description}
+                            textProps={{ variant: 'bodyMd', color: 'subdued' }}
+                        />
+                    </Box>
+                    <HorizontalStack gap={"2"}>
+                        <HorizontalStack gap={"1"}>
+                            <Box><Icon source={TeamMajor} color="subdued" /></Box>
+                            <Text variant='bodyMd'>{cardObj.team}</Text>
                         </HorizontalStack>
-                    </Box>
-                    <Box>
-                    </Box>
-                </HorizontalStack>
-            </VerticalStack>
-        </Card>
+                        <HorizontalStack gap={"1"}>
+                            <Box><Icon source={ToolsMajor} color="subdued" /></Box>
+                            <Text variant='bodyMd'>{cardObj.effort}</Text>
+                        </HorizontalStack>
+                    </HorizontalStack>
+                    <Divider />
+                    <HorizontalStack gap={"3"} align="space-between" wrap={false}>
+                        <Box className="action-item-card-actions">
+                            <HorizontalStack gap={"2"}>
+                                {renderJiraComponent()}
+                            </HorizontalStack>
+                        </Box>
+                        <Box>
+                        </Box>
+                    </HorizontalStack>
+                </VerticalStack>
+            </Card>
         </div>
     )
 }
