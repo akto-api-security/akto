@@ -13,7 +13,7 @@ import {
   Text,
   Link} from '@shopify/polaris';
 import { GithubRow} from './rows/GithubRow';
-import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
+import { useState, useCallback, useEffect, useMemo, useRef, useReducer } from 'react';
 import "./style.css"
 import transform from '../../pages/observe/transform';
 import DropdownSearch from '../shared/DropdownSearch';
@@ -25,6 +25,9 @@ import { debounce } from 'lodash';
 import { useNavigate,  useSearchParams } from 'react-router-dom';
 import TableStore from './TableStore';
 import func from '../../../../util/func';
+import values from "@/util/values"
+import { produce } from 'immer';
+import DateRangePicker from '../layouts/DateRangePicker';
 
 function GithubServerTable(props) {
 
@@ -36,6 +39,8 @@ function GithubServerTable(props) {
     newSearchParams.set(key, value);
     setSearchParams(newSearchParams);
   };
+
+  const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), values.ranges[5])
 
   const filtersMap = PersistStore(state => state.filtersMap)
   const setFiltersMap = PersistStore(state => state.setFiltersMap)
@@ -119,7 +124,8 @@ function GithubServerTable(props) {
   },[currentPageKey])
 
   useEffect(() => {
-    updateQueryParams("filters",tableFunc.getPrettifiedFilter(appliedFilters))
+    const tempFilters = appliedFilters.filter((filter) => !filter?.key?.includes("dateRange"))
+    updateQueryParams("filters",tableFunc.getPrettifiedFilter(tempFilters))
   },[appliedFilters])
 
   async function fetchData(searchVal, tempFilters = []) {
@@ -221,12 +227,14 @@ function GithubServerTable(props) {
       });
     }
     setPage(0);
-    let tempFilters = filtersMap
-    tempFilters[currentPageKey]= {
-      filters: temp,
-      sort: pageFiltersMap?.sort || []
+    if(!key.includes("dateRange")){
+      let tempFilters = filtersMap
+      tempFilters[currentPageKey]= {
+        filters: temp,
+        sort: pageFiltersMap?.sort || []
+      }
+      setFiltersMap(tempFilters);
     }
-    setFiltersMap(tempFilters);
     setAppliedFilters(temp);
   }, [appliedFilters, props.disambiguateLabel, handleRemoveAppliedFilter, setFiltersMap, currentPageKey, pageFiltersMap]);
 
@@ -257,8 +265,14 @@ function GithubServerTable(props) {
     return formatFilters(props.filters);
   }, [props.filters, appliedFilters]);
 
+  const handleDateChange = (dateObj, filterKey) => {
+    dispatchCurrDateRange({type: "update", period: dateObj.period, title: dateObj.title, alias: dateObj.alias})
+    let obj = dateObj.period.period;
+    handleFilterStatusChange(filterKey + "_dateRange", obj)
+  }
+
   function formatFilters(filters) {
-    return filters 
+    let formattedFilters = filters
       .map((filter) => {
         return {
           key: filter.key,
@@ -293,6 +307,22 @@ function GithubServerTable(props) {
           pinned: true
         }
       })
+    if(props?.calendarFilterKeys && Object.keys(props?.calendarFilterKeys).length > 0){
+      Object.keys(props?.calendarFilterKeys).forEach((key) => {
+        formattedFilters.push({
+          key: key + "_dateRange",
+          label: props?.calendarFilterKeys[key],
+          filter: <DateRangePicker
+            dispatch={(dateObj) => handleDateChange(dateObj, key)}
+            initialDispatch={currDateRange}
+            ranges={values.ranges}
+            setPopoverState={() => {}} 
+          />,
+          pinned: true
+        })
+      })
+    }
+    return formattedFilters;
   }
 
   const handleFiltersClearAll = useCallback(() => {

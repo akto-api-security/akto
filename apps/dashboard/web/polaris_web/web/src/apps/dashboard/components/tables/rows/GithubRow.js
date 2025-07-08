@@ -12,7 +12,7 @@ import {
     Icon
 } from '@shopify/polaris';
 import {
-    HorizontalDotsMinor, ChevronDownMinor, ChevronUpMinor, ChevronRightMinor
+    HorizontalDotsMinor, ChevronDownMinor, ChevronRightMinor
 } from '@shopify/polaris-icons';
 import { useNavigate } from "react-router-dom";
 import { useState, useEffect } from 'react';
