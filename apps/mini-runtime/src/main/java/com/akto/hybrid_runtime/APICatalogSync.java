@@ -116,7 +116,7 @@ public class APICatalogSync {
                 processResponse(requestTemplate, iter.next(), deletedInfo);
             } catch (Exception e) {
                 e.printStackTrace();
-                loggerMaker.errorAndAddToDb("processResponse: " + e.getMessage(), LogDb.RUNTIME);
+                loggerMaker.errorAndAddToDb(e, "processResponse: " + e.getMessage());
             }
         }
     }
@@ -183,7 +183,7 @@ public class APICatalogSync {
             }
 
         } catch (JsonParseException e) {
-            loggerMaker.errorAndAddToDb("Failed to parse json payload " + e.getMessage(), LogDb.RUNTIME);
+            loggerMaker.errorAndAddToDb(e, "Failed to parse json payload " + e.getMessage());
         }
     }
 
@@ -698,7 +698,7 @@ public class APICatalogSync {
                 return null;
             }
         } catch(Exception e) {
-            loggerMaker.errorAndAddToDb("Error while creating a new URL object: " + e.getMessage(), LogDb.RUNTIME);
+            loggerMaker.errorAndAddToDb(e, "Error while creating a new URL object: " + e.getMessage());
         }
 
         return urlTemplate;
@@ -778,7 +778,7 @@ public class APICatalogSync {
                 iterator.remove();
             }
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(e.toString(), LogDb.RUNTIME);
+            loggerMaker.errorAndAddToDb(e, "Error in createRequestTemplates: " + e.getMessage());
         }
 
         return ret;
@@ -817,7 +817,7 @@ public class APICatalogSync {
 
             }
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(e.toString(),LogDb.RUNTIME);
+            loggerMaker.errorAndAddToDb(e, "Error in processKnownStaticURLs: " + e.getMessage());
         }
     }
 
@@ -901,7 +901,7 @@ public class APICatalogSync {
                     String redactedSample = RedactSampleData.redactIfRequired(s, accountLevelRedact, apiCollectionLevelRedact);
                     finalSamples.add(redactedSample);
                 } catch (Exception e) {
-                    loggerMaker.errorAndAddToDb(e,"Error while redacting data 1" , LogDb.RUNTIME)
+                    loggerMaker.errorAndAddToDb(e,"Error while redacting data 1" )
                     ;
                 }
             }
@@ -1152,7 +1152,7 @@ public class APICatalogSync {
                         Updates.set(SingleTypeInfo._DOMAIN, Domain.RANGE.name())
                 )
         );
-        loggerMaker.infoAndAddToDb("RangeUpdateResult for clearValuesInDb function = " + "match count: " + rangeUpdateResult.getMatchedCount() + ", modify count: " + rangeUpdateResult.getModifiedCount(), LogDb.RUNTIME);
+        loggerMaker.infoAndAddToDb("RangeUpdateResult for clearValuesInDb function = " + "match count: " + rangeUpdateResult.getMatchedCount() + ", modify count: " + rangeUpdateResult.getModifiedCount());
 
         // any update
         UpdateResult anyUpdateResult = SingleTypeInfoDao.instance.updateMany(
@@ -1166,13 +1166,13 @@ public class APICatalogSync {
                 )
         );
 
-        loggerMaker.infoAndAddToDb("AnyUpdateResult for clearValuesInDb function = " + "match count: " + anyUpdateResult.getMatchedCount() + ", modify count: " + anyUpdateResult.getModifiedCount(), LogDb.RUNTIME);
+        loggerMaker.infoAndAddToDb("AnyUpdateResult for clearValuesInDb function = " + "match count: " + anyUpdateResult.getMatchedCount() + ", modify count: " + anyUpdateResult.getModifiedCount());
     }
 
     public void buildFromDB(boolean calcDiff, boolean fetchAllSTI) {
 
-        loggerMaker.infoAndAddToDb("Started building from dB with calcDiff " + calcDiff + " fetchAllSTI: " + fetchAllSTI, LogDb.RUNTIME);
-        loggerMaker.infoAndAddToDb("Fetching STIs: " + fetchAllSTI, LogDb.RUNTIME);
+        loggerMaker.infoAndAddToDb("Started building from dB with calcDiff " + calcDiff + " fetchAllSTI: " + fetchAllSTI);
+        loggerMaker.infoAndAddToDb("Fetching STIs: " + fetchAllSTI);
         List<SingleTypeInfo> allParams;
         /*
          * This fetches all STIs in batches of 100, filtered by host headers.
@@ -1186,15 +1186,15 @@ public class APICatalogSync {
         if (allParams.size() > 0) {
             lastStiFetchTs = allParams.get(allParams.size() - 1).getTimestamp();
         }
-        loggerMaker.infoAndAddToDb("Fetched STIs count: " + allParams.size(), LogDb.RUNTIME);
-        loggerMaker.infoAndAddToDb("Starting building dbState", LogDb.RUNTIME);
+        loggerMaker.infoAndAddToDb("Fetched STIs count: " + allParams.size());
+        loggerMaker.infoAndAddToDb("Starting building dbState");
         this.dbState = build(allParams, existingAPIsInDb);
-        loggerMaker.infoAndAddToDb("Done building dbState", LogDb.RUNTIME);
+        loggerMaker.infoAndAddToDb("Done building dbState");
 
         // todo: discuss
         //this.sensitiveParamInfoBooleanMap = new HashMap<>();
         List<SensitiveParamInfo> sensitiveParamInfos = dataActor.getUnsavedSensitiveParamInfos();
-        loggerMaker.infoAndAddToDb("Done fetching sensitiveParamInfos", LogDb.RUNTIME);
+        loggerMaker.infoAndAddToDb("Done fetching sensitiveParamInfos");
         for (SensitiveParamInfo sensitiveParamInfo: sensitiveParamInfos) {
             this.sensitiveParamInfoBooleanMap.put(sensitiveParamInfo, false);
         }
@@ -1203,11 +1203,11 @@ public class APICatalogSync {
         advancedFilterMap = FilterYamlTemplateDao.instance.fetchFilterConfig(false, advancedFilterTemplates, true);
 
         try {
-            loggerMaker.infoAndAddToDb("Started clearing values in db ", LogDb.RUNTIME);
+            loggerMaker.infoAndAddToDb("Started clearing values in db ");
             clearValuesInDB();
-            loggerMaker.infoAndAddToDb("Finished clearing values in db ", LogDb.RUNTIME);
+            loggerMaker.infoAndAddToDb("Finished clearing values in db ");
         } catch (Exception e) {
-            loggerMaker.infoAndAddToDb("Error while clearing values in db: " + e.getMessage(), LogDb.RUNTIME);
+            loggerMaker.infoAndAddToDb("Error while clearing values in db: " + e.getMessage());
         }
 
         mergedUrls = dataActor.fetchMergedUrls();
@@ -1298,7 +1298,7 @@ public class APICatalogSync {
                 }
                 keyTypes.getOccurrences().put(param.getSubType(), param);
             } catch (Exception e) {
-                loggerMaker.errorAndAddToDb("ERROR while parsing url param position: " + p, LogDb.RUNTIME);
+                loggerMaker.errorAndAddToDb(e, "ERROR while parsing url param position: " + p);
             }
             return;
         }
@@ -1344,7 +1344,7 @@ public class APICatalogSync {
                 fillExistingAPIsInDb(param, existingAPIsInDb);
             } catch (Exception e) {
                 e.printStackTrace();
-                loggerMaker.errorAndAddToDb("Error while building from db: " + e.getMessage(), LogDb.RUNTIME);
+                loggerMaker.errorAndAddToDb(e, "Error while building from db: " + e.getMessage());
             }
         }
 
@@ -1415,7 +1415,7 @@ public class APICatalogSync {
     final static int DB_REFRESH_CYCLE = 15 * 60; // 15 minutes
 
     public void syncWithDB(boolean syncImmediately, boolean fetchAllSTI, SyncLimit syncLimit) {
-        loggerMaker.infoAndAddToDb("Started sync with db! syncImmediately="+syncImmediately + " fetchAllSTI="+fetchAllSTI, LogDb.RUNTIME);
+        loggerMaker.infoAndAddToDb("Started sync with db! syncImmediately="+syncImmediately + " fetchAllSTI="+fetchAllSTI);
         List<Object> writesForParams = new ArrayList<>();
         List<Object> writesForSensitiveSampleData = new ArrayList<>();
         List<Object> writesForTraffic = new ArrayList<>();
@@ -1520,7 +1520,7 @@ public class APICatalogSync {
 
         }
 
-        loggerMaker.infoAndAddToDb("adding " + writesForParams.size() + " updates for params", LogDb.RUNTIME);
+        loggerMaker.infoAndAddToDb("adding " + writesForParams.size() + " updates for params");
         int from = 0;
         int batch = 10000;
 
@@ -1539,13 +1539,13 @@ public class APICatalogSync {
 
         aktoPolicyNew.syncWithDb();
 
-        loggerMaker.infoAndAddToDb("adding " + writesForTraffic.size() + " updates for traffic", LogDb.RUNTIME);
+        loggerMaker.infoAndAddToDb("adding " + writesForTraffic.size() + " updates for traffic");
         if(writesForTraffic.size() > 0) {
             dataActor.bulkWriteTrafficInfo(writesForTraffic);
         }
 
 
-        loggerMaker.infoAndAddToDb("adding " + writesForSampleData.size() + " updates for samples", LogDb.RUNTIME);
+        loggerMaker.infoAndAddToDb("adding " + writesForSampleData.size() + " updates for samples");
         if(writesForSampleData.size() > 0) {
             dataActor.bulkWriteSampleData(writesForSampleData);
         }
@@ -1560,10 +1560,10 @@ public class APICatalogSync {
 
         int now = Context.now();
         if (lastBuildFromDb + DB_REFRESH_CYCLE < now) {
-            loggerMaker.infoAndAddToDb("starting build from db inside syncWithDb at : " + now, LogDb.RUNTIME);
+            loggerMaker.infoAndAddToDb("starting build from db inside syncWithDb at : " + now);
             buildFromDB(true, fetchAllSTI);
             now = Context.now();
-            loggerMaker.infoAndAddToDb("Finished syncing with db at : " + now, LogDb.RUNTIME);
+            loggerMaker.infoAndAddToDb("Finished syncing with db at : " + now);
             lastBuildFromDb = now;
         }
     }
@@ -1631,7 +1631,7 @@ public class APICatalogSync {
                     }
                     finalSamples.add(redactedSample);
                 } catch (Exception e) {
-                    loggerMaker.errorAndAddToDb(e,"Error while redacting data" , LogDb.RUNTIME)
+                    loggerMaker.errorAndAddToDb(e,"Error while redacting data" )
                     ;
                 }
             }
@@ -1669,7 +1669,7 @@ public class APICatalogSync {
                 AllMetrics.instance.setPostgreSampleDataInsertLatency(System.currentTimeMillis() - start);
 
             } catch (Exception e) {
-                loggerMaker.errorAndAddToDb(e, "unable to insert sample data in postgres", LogDb.RUNTIME);
+                loggerMaker.errorAndAddToDb(e, "unable to insert sample data in postgres");
             }
         }
 
@@ -1742,7 +1742,7 @@ public class APICatalogSync {
                     try{
                         String exampleStr = (String) example;
                         String s = RedactSampleData.redactDataTypes(exampleStr);
-                        loggerMaker.infoAndAddToDb("redacted data, updated sample is " + s, LogDb.RUNTIME);
+                        loggerMaker.infoAndAddToDb("redacted data, updated sample is " + s);
                         updatedSampleData.add(s);
                     } catch (Exception e) {
                         ;

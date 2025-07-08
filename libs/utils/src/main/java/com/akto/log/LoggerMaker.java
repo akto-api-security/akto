@@ -50,10 +50,14 @@ public class LoggerMaker {
     protected static final Logger internalLogger = LoggerFactory.getLogger(LoggerMaker.class);
     private static final boolean shouldNotSendTestingLogs = System.getenv("BLOCK_LOGS") != null && System.getenv("BLOCK_LOGS").equals("true");
 
-    private String moduleId = "";
+    private static String moduleId = "";
 
-    public void setModuleId(String moduleId) {
-        this.moduleId = moduleId;
+    public static void setModuleId(String moduleId) {
+        if (moduleId == null) {
+            LoggerMaker.moduleId = "";
+        } else {
+            LoggerMaker.moduleId = moduleId;
+        }
     }
 
     static {
@@ -99,24 +103,18 @@ public class LoggerMaker {
         scheduler2.scheduleAtFixedRate(new Runnable() {
             @Override
             public void run() {
-                String cliTestIds = System.getenv("TEST_IDS");
-                if(cliTestIds==null && Context.accountId.get() == 1_000_000){
-                    updateAccountSettings();
-                }
+                updateAccountSettings();
             }
-        }, 0, 2, TimeUnit.MINUTES);
+        }, 0, 5, TimeUnit.MINUTES);
     }
-
 
     private static void updateAccountSettings() {
         try {
             internalLogger.info("Running updateAccountSettings....................................");
-            Context.accountId.set(1_000_000);
-            accountSettings = dataActor.fetchAccountSettingsForAccount(1_000_000);
+            accountSettings = dataActor.fetchAccountSettings();
         } catch (Exception e) {
             e.printStackTrace();
         }
-
     }
 
     @Deprecated
@@ -180,6 +178,10 @@ public class LoggerMaker {
 
     public void errorAndAddToDb(Exception e, String err) {
         errorAndAddToDb(e, err, this.db);
+    }
+
+    public void debugInfoAddToDb(String info) {
+        debugInfoAddToDb(info, this.db);
     }
 
     public void debugInfoAddToDb(String info, LogDb db) {
