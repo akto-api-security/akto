@@ -1070,9 +1070,14 @@ public class Utils {
         Map<String, List<String>> headers = response.getHeaders();
 
         if (isEventStream(headers)) {
+            StringBuilder responseBuilder = new StringBuilder();
+            headers.entrySet().stream()
+                .flatMap(entry -> entry.getValue().stream()
+                    .map(value -> entry.getKey() + ": " + value + "\n"))
+                .forEach(responseBuilder::append);
             String responseBody = response.getJsonResponseBody();
             if (responseBody != null && !responseBody.isEmpty()) {
-                return buildEventStream(responseBody);
+                return responseBuilder.append(buildEventStream(responseBody)).toString();
             }
         }
         return null;
