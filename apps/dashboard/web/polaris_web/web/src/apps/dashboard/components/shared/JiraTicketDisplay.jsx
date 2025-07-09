@@ -1,9 +1,9 @@
 import { Box, Tag, HorizontalStack, Avatar, Link, Button, Text } from '@shopify/polaris';
-import React from 'react';
+
 
 function JiraTicketDisplay({ jiraTicketUrl, jiraKey, onButtonClick, ariaLabel }) {
     return (
-        <Box>
+        <Box onClick={(e) => e.stopPropagation()}>
             {jiraKey && jiraTicketUrl ? (
                 <Tag>
                     <HorizontalStack gap={1}>
@@ -16,10 +16,7 @@ function JiraTicketDisplay({ jiraTicketUrl, jiraKey, onButtonClick, ariaLabel })
             ) : (
                 <Button
                     plain
-                    onClick={e => {
-                        e.stopPropagation();
-                        onButtonClick?.();
-                    }}
+                    onClick={onButtonClick} 
                     aria-label={ariaLabel || "Create Jira ticket"}
                 >
                     <Avatar size="extraSmall" shape="round" source="/public/logo_jira.svg" />
@@ -29,4 +26,4 @@ function JiraTicketDisplay({ jiraTicketUrl, jiraKey, onButtonClick, ariaLabel })
     );
 }
 
-export default JiraTicketDisplay; 
+export default JiraTicketDisplay;
