@@ -508,7 +508,7 @@ public class HttpCallParser {
 
         // Update the tags in-memory for the apiCollection
         if(Utils.printDebugUrlLog(httpResponseParams.getRequestParams().getURL()) || (Utils.printDebugHostLog(httpResponseParams) != null)) {
-            loggerMaker.warn("Updating tags in-memory for apiCollectionId: " + apiCollectionId + " with hostNameMapKey: " + hostNameMapKey
+            loggerMaker.infoAndAddToDb("Updating tags in-memory for apiCollectionId: " + apiCollectionId + " with hostNameMapKey: " + hostNameMapKey
                     + " url: " + httpResponseParams.getRequestParams().getURL() + " and tags: " + httpResponseParams.getTags());
         }
 
@@ -600,6 +600,11 @@ public class HttpCallParser {
                 try {
 
                     apiCollectionId = createCollectionBasedOnHostName(id, hostName, tagList);
+                    if(Utils.printDebugUrlLog(httpResponseParam.getRequestParams().getURL()) || (Utils.printDebugHostLog(httpResponseParam) != null)) {
+                        loggerMaker.infoAndAddToDb("Created collection: " + apiCollectionId + " with hostNameMapKey: " + hostName 
+                            + " url: " + httpResponseParam.getRequestParams().getURL() + " and tags: " + httpResponseParam.getTags()
+                        );
+                    }
 
                     hostNameToIdMap.put(key, apiCollectionId);
                 } catch (Exception e) {
