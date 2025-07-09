@@ -40,7 +40,7 @@ public class Utils {
         if( o == null ){
             return;
         }
-        logger.warn(o.toString());
+        logger.infoAndAddToDb(o.toString());
     }
 
 
@@ -140,7 +140,7 @@ public class Utils {
         return cookieMap;
     }
 
-    private static final Set<String> DEBUG_HOSTS_SET = initializeDebugHostsSet();
+    private static volatile Set<String> DEBUG_HOSTS_SET = initializeDebugHostsSet();
     private static volatile Set<String> DEBUG_URLS_SET = initializeDebugUrlsSet();
     private static final String DEBUG_URLS_FILE_PATH = "/app/debug-urls.txt";
     private static final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
@@ -157,6 +157,7 @@ public class Utils {
                     if (fileUrls != null && !fileUrls.isEmpty()) {
                         if (lastFileUrls == null || !lastFileUrls.equals(fileUrls)) {
                             DEBUG_URLS_SET = fileUrls;
+                            DEBUG_HOSTS_SET = fileUrls;
                             logger.infoAndAddToDb("DEBUG_URLS updated from file: " + DEBUG_URLS_SET.toString());
                             lastFileUrls = new HashSet<>(fileUrls);
                         }
