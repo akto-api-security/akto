@@ -20,13 +20,11 @@ import DateRangeFilter from "../../../components/layouts/DateRangeFilter.jsx";
 import { produce } from "immer";
 import "./style.css"
 import transform from "../transform.js";
-import SummaryInfo from "./SummaryInfo.jsx";
 import useTable from "../../../components/tables/TableContext.js";
 import values from "@/util/values";
 import SpinnerCentered from "../../../components/progress/SpinnerCentered.jsx";
 import TableStore from "../../../components/tables/TableStore.js";
 import CriticalFindingsGraph from "./CriticalFindingsGraph.jsx";
-import CriticalUnsecuredAPIsOverTimeGraph from "./CriticalUnsecuredAPIsOverTimeGraph.jsx";
 import settingFunctions from "../../settings/module.js";
 import JiraTicketCreationModal from "../../../components/shared/JiraTicketCreationModal.jsx";
 import testingApi from "../../testing/api.js"
@@ -520,8 +518,8 @@ function CompliancePage() {
                             method: item?.id?.apiInfoKey?.method,
                             url: item?.id?.apiInfoKey?.url,
                             id: JSON.stringify(item?.id),
+                            jiraIssueUrl: item?.jiraIssueUrl || "",
                         }],
-                        urlsKey: ['']
                     })
                 } else {
                     const existingIssue = uniqueIssuesMap.get(key)

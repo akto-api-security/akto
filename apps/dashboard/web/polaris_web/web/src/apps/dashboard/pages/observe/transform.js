@@ -485,12 +485,16 @@ const transform = {
     prettifyCollectionsData(newData, isLoading){
         const prettifyData = newData.map((c)=>{
             let calcCoverage = '0%';
-            if(c.urlsCount > 0){
-                if(c.urlsCount < c.testedEndpoints){
-                    calcCoverage= '100%'
-                }else{
-                    calcCoverage =  Math.ceil((c.testedEndpoints * 100)/c.urlsCount) + '%'
+            if(!c.isOutOfTestingScope){
+                if(c.urlsCount > 0){
+                    if(c.urlsCount < c.testedEndpoints){
+                        calcCoverage= '100%'
+                    }else{
+                        calcCoverage =  Math.ceil((c.testedEndpoints * 100)/c.urlsCount) + '%'
+                    }
                 }
+            }else{
+                calcCoverage = 'N/A'
             }
             const loadingComp = <Text color="subdued" variant="bodyMd">...</Text>
             return{
@@ -521,6 +525,7 @@ const transform = {
         let totalUrl = 0;
         let sensitiveInRes = 0;
         let totalTested = 0 ;
+        let totalAllowedForTesting = 0;
 
         collectionsData?.forEach((c) =>{
             if (c.hasOwnProperty('type') && c.type === 'API_GROUP') {
@@ -530,11 +535,15 @@ const transform = {
                 return
             }
             totalUrl += c.urlsCount ;
-            totalTested += c.testedEndpoints;
+            if(!c.isOutOfTestingScope){
+                totalTested += c.testedEndpoints;
+                totalAllowedForTesting += c.urlsCount;
+                return
+            }
         })
 
         return {
-            totalEndpoints:totalUrl , totalTestedEndpoints: totalTested, totalSensitiveEndpoints: sensitiveInRes
+            totalEndpoints:totalUrl , totalTestedEndpoints: totalTested, totalSensitiveEndpoints: sensitiveInRes, totalAllowedForTesting: totalAllowedForTesting,
         }
     },
 

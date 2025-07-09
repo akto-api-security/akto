@@ -6,14 +6,10 @@ import com.akto.dto.ApiInfo;
 import com.akto.dto.SensitiveSampleData;
 import com.akto.dto.testing.TestingEndpoints;
 import com.akto.dto.type.SingleTypeInfo;
-import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.Filters;
-import com.mongodb.client.model.Indexes;
 
 import java.util.HashMap;
 import java.util.Map;
-
-import org.bson.Document;
 
 import org.bson.conversions.Bson;
 

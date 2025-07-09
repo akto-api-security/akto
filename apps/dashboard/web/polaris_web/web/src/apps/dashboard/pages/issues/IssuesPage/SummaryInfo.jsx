@@ -57,12 +57,13 @@ const SummaryInfo = ({ startTimestamp, endTimestamp }) => {
             smoothChartComponent: (<SmoothAreaChart tickPositions={openIssues} />)
         },
         {
-            title: 'Critical',
+            title: 'Critical/High',
             data: criticalIssues[criticalIssues.length-1],
             variant: 'heading2xl',
             color: 'critical',
             byLineComponent: observeFunc.generateByLineComponent(criticalIssuesDelta, func.timeDifference(startTimestamp, endTimestamp)),
-            smoothChartComponent: (<SmoothAreaChart tickPositions={criticalIssues} />)
+            smoothChartComponent: (<SmoothAreaChart tickPositions={criticalIssues} />),
+            tooltipContent: "Total number of CRITICAL + HIGH severity open issues"
         },
         {
             title: 'Test Coverage',

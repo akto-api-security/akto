@@ -380,6 +380,7 @@ function HomeDashboard() {
             totalAPIs = apiStats.totalAPIs
         }
         const apisTestedInLookBackPeriod = apiStats.apisTestedInLookBackPeriod
+        const apisInScopeForTesting = apiStats?.totalInScopeForTestingApis || apisTestedInLookBackPeriod
 
         if (totalAPIs && totalAPIs > 0 && totalRiskScore) {
             const tempRiskScore = totalRiskScore / totalAPIs
@@ -388,8 +389,8 @@ function HomeDashboard() {
             setApiRiskScore(0)
         }
 
-        if (totalAPIs && totalAPIs > 0 && apisTestedInLookBackPeriod) {
-            const testCoverage = 100 * apisTestedInLookBackPeriod / totalAPIs
+        if (apisInScopeForTesting && apisInScopeForTesting> 0 && apisTestedInLookBackPeriod) {
+            const testCoverage = 100 * apisTestedInLookBackPeriod / apisInScopeForTesting
             setTestCoverage(parseFloat(testCoverage.toFixed(2)))
         } else {
             setTestCoverage(0)
