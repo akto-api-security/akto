@@ -89,13 +89,15 @@ public abstract class PromptHandler {
         JSONObject payload = new JSONObject();
         payload.put("model", model);
         payload.put("prompt", prompt);
-        payload.put("temperature", temperature);
-        payload.put("max_tokens", maxTokens);
-        payload.put("top_p", 0.9); // Added top_p
-        payload.put("top_k", 50); // Added top_k
-        payload.put("repeat_penalty", 1.1); // Penalize repetitions
-        payload.put("presence_penalty", 0.6); // Discourage new topic jumps
-        payload.put("frequency_penalty", 0.0); // Don't punish frequency
+        JSONObject options = new JSONObject();
+        options.put("temperature", temperature);
+        options.put("num_predict", maxTokens);
+        options.put("top_p", 0.9); // Added top_p
+        options.put("top_k", 50); // Added top_k
+        options.put("repeat_penalty", 1.1); // Penalize repetitions
+        options.put("presence_penalty", 0.6); // Discourage new topic jumps
+        options.put("frequency_penalty", 0.0); // Don't punish frequency
+        payload.put("options", options);
         payload.put("stream", false);
 
         RequestBody body = RequestBody.create(payload.toString(), mediaType);
