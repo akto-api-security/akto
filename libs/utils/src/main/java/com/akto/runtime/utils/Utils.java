@@ -40,7 +40,7 @@ public class Utils {
         if( o == null ){
             return;
         }
-        logger.warn(o.toString());
+        logger.infoAndAddToDb(o.toString());
     }
 
 
