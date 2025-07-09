@@ -4,16 +4,24 @@ import com.akto.data_actor.DataActorFactory;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.mongodb.BasicDBObject;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import javax.validation.ValidationException;
+import org.apache.commons.lang3.StringUtils;
+import org.json.JSONArray;
+import org.json.JSONException;
 import org.json.JSONObject;
 
 public abstract class PromptHandler {
 
-    private static final LoggerMaker logger = new LoggerMaker(PromptHandler.class, LogDb.DASHBOARD);
+    private static final LoggerMaker logger = new LoggerMaker(PromptHandler.class, LogDb.TESTING);
     private static final String OLLAMA_MODEL = "llama3:8b";
     private static final Double temperature = 0.1;
     private static final int max_tokens = 4000;
     private static final Object llmLock = new Object();
+    private static final int CHUNK_SIZE = 10000;
+    private static final String CONTEXT_DELIMITER = "****";
 
     /**
      * Process the input query data and return a String response.
@@ -21,10 +29,12 @@ public abstract class PromptHandler {
     public BasicDBObject handle(BasicDBObject queryData) {
         try {
             validate(queryData);
-            String prompt = getPrompt(queryData);
-            String rawResponse = call(prompt, OLLAMA_MODEL, temperature, max_tokens);
-            BasicDBObject resp = processResponse(rawResponse);
-            return resp;
+            //String prompt = getPrompt(queryData);
+            //String rawResponse = call(prompt, OLLAMA_MODEL, temperature, max_tokens);
+            //BasicDBObject resp = processResponse(rawResponse);
+            //return resp;
+            List<BasicDBObject> responses = callLLMWithContextBreakdown(queryData);
+            return aggregateResponses(responses);
         } catch (ValidationException exception) {
             logger.error("Validation error: " + exception.getMessage());
             BasicDBObject resp = new BasicDBObject();
@@ -36,6 +46,111 @@ public abstract class PromptHandler {
             resp.put("error", "Internal server error" + e.getMessage());
             return resp;
         }
+    }
+
+    private List<BasicDBObject> callLLMWithContextBreakdown(BasicDBObject queryData) throws Exception {
+        String key = queryData.getBoolean(TestExecutorModifier._IS_EXTERNAL_CONTEXT_IN_OPERATION, false)
+            ? TestExecutorModifier._OPERATION
+            : TestExecutorModifier._REQUEST;
+
+        String originalValue = queryData.getString(key);
+
+        if (StringUtils.isNotEmpty(originalValue)) {
+            String valueToSplit = key.equals(TestExecutorModifier._OPERATION)
+                ? getContext(originalValue)
+                : originalValue;
+
+            if (StringUtils.isNotBlank(valueToSplit)) {
+                List<String> chunks = splitIntoChunks(valueToSplit);
+                if (chunks.size() > 1) {
+                    List<BasicDBObject> responses = new ArrayList<>();
+                    for (String chunk : chunks) {
+                        BasicDBObject queryDataCopy = (BasicDBObject) queryData.copy();
+                        queryDataCopy.put(key, key.equals(TestExecutorModifier._OPERATION)
+                            ? replaceContext(originalValue, chunk)
+                            : chunk);
+                        responses.add(callLLM(queryDataCopy));
+                    }
+                    return responses;
+                }
+            }
+        }
+
+        return Collections.singletonList(callLLM(queryData));
+    }
+
+    private BasicDBObject callLLM(BasicDBObject queryData) throws Exception {
+        String prompt = getPrompt(queryData);
+        String rawResponse = call(prompt, OLLAMA_MODEL, temperature, max_tokens);
+        return processResponse(rawResponse);
+    }
+
+    private static List<String> splitIntoChunks(String text) {
+        List<String> chunks = new ArrayList<>();
+        int length = text.length();
+        for (int i = 0; i < length; i += CHUNK_SIZE) {
+            chunks.add(text.substring(i, Math.min(length, i + CHUNK_SIZE)));
+        }
+        return chunks;
+    }
+
+    private String getContext(String text) {
+        int start = text.indexOf(CONTEXT_DELIMITER);
+        int end = text.lastIndexOf(CONTEXT_DELIMITER);
+
+        if (start < 0 || end < 0 || start >= end) {
+            return null;
+        }
+
+        return text.substring(start + CONTEXT_DELIMITER.length(), end).trim();
+    }
+
+    private String replaceContext(String text, String context) {
+
+        int start = text.indexOf(CONTEXT_DELIMITER);
+        int end = text.lastIndexOf(CONTEXT_DELIMITER);
+
+        if (start < 0 || end < 0 || start >= end) {
+            return text;
+        }
+
+        return text.substring(0, start) + context + text.substring(end + CONTEXT_DELIMITER.length());
+    }
+
+    private BasicDBObject aggregateResponses(List<BasicDBObject> responses) {
+        if (responses == null || responses.isEmpty()) {
+            return new BasicDBObject();
+        }
+
+        if (responses.size() == 1) {
+            return responses.get(0);
+        }
+        BasicDBObject aggregated = new BasicDBObject();
+
+        for (BasicDBObject response : responses) {
+            for (String key : response.keySet()) {
+                Object newValue = response.get(key);
+                Object existingValue = aggregated.get(key);
+
+                if (existingValue == null) {
+                    aggregated.put(key, newValue);
+                } else if (existingValue instanceof JSONArray && newValue instanceof JSONArray) {
+                    JSONArray existingArray = (JSONArray) existingValue;
+                    JSONArray newArray = (JSONArray) newValue;
+                    for (int i = 0; i < newArray.length(); i++) {
+                        try {
+                            existingArray.put(newArray.get(i));
+                        } catch (JSONException e) {
+                            logger.error("Error merging JSONArrays for key: " + key + ", value: " + newValue, e);
+                        }
+                    }
+                } else {
+                    aggregated.put(key, newValue);
+                }
+            }
+        }
+
+        return aggregated;
     }
 
     /**
