@@ -1200,13 +1200,7 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
             TICKET_SYNC_JOB_RECURRING_INTERVAL_SECONDS
         );
     }
-public String getActionItemType() {
-    return actionItemType;
-}
 
-public void setActionItemType(String actionItemType) {
-    this.actionItemType = actionItemType;
-}
 
 public String createGeneralJiraTicket() {
     jiraIntegration = JiraIntegrationDao.instance.findOne(new BasicDBObject());
@@ -1215,36 +1209,60 @@ public String createGeneralJiraTicket() {
         return ERROR.toUpperCase();
     }
 
-    String title = getTitle();
-    String description = getDescription();
+    try {
+        BasicDBObject reqPayload = createGeneralTicketPayload();
+        OriginalHttpRequest request = buildJiraRequest(reqPayload);
+        OriginalHttpResponse response = executeJiraRequest(request);
+        String jiraTicketUrl = processJiraResponse(response);
+        
+        if (actionItemType != null && !actionItemType.isEmpty()) {
+            storeTicketUrlInAccountSettings(jiraTicketUrl);
+        }
+        
+        return Action.SUCCESS.toUpperCase();
+        
+    } catch (Exception e) {
+        loggerMaker.errorAndAddToDb(
+            "Error creating general Jira ticket: " + e.getMessage(), 
+            LoggerMaker.LogDb.DASHBOARD
+        );
+        return Action.ERROR.toUpperCase();
+    }
+}
 
-    BasicDBObject reqPayload = new BasicDBObject();
+private BasicDBObject createGeneralTicketPayload() {
     BasicDBObject fields = new BasicDBObject();
-    fields.put("summary", title);
+    
+    fields.put("summary", getTitle());
+    fields.put("description", createAdfDocument(getDescription()));
+    fields.put("project", new BasicDBObject("key", projId));
+    fields.put("issuetype", new BasicDBObject("id", issueType));
+    
+    BasicDBObject reqPayload = new BasicDBObject();
+    reqPayload.put("fields", fields);
+    return reqPayload;
+}
 
-    BasicDBObject adfDescription = new BasicDBObject();
-    adfDescription.put("type", "doc");
-    adfDescription.put("version", 1);
-
+private BasicDBObject createAdfDocument(String content) {
+    BasicDBObject doc = new BasicDBObject();
+    doc.put("type", "doc");
+    doc.put("version", 1);
+    
     BasicDBList contentList = new BasicDBList();
     BasicDBObject paragraph = new BasicDBObject();
     paragraph.put("type", "paragraph");
-
+    
     BasicDBList paragraphContent = new BasicDBList();
-    BasicDBObject textNode = new BasicDBObject();
-    textNode.put("type", "text");
-    textNode.put("text", description);
-    paragraphContent.add(textNode);
-
+    paragraphContent.add(new BasicDBObject("type", "text").append("text", content));
+    
     paragraph.put("content", paragraphContent);
     contentList.add(paragraph);
-    adfDescription.put("content", contentList);
+    doc.put("content", contentList);
+    
+    return doc;
+}
 
-    fields.put("description", adfDescription);
-    fields.put("project", new BasicDBObject("key", projId));
-    fields.put("issuetype", new BasicDBObject("id", issueType));
-    reqPayload.put("fields", fields);
-
+private OriginalHttpRequest buildJiraRequest(BasicDBObject payload) {
     String url = jiraIntegration.getBaseUrl() + CREATE_ISSUE_ENDPOINT;
     String authHeader = Base64.getEncoder().encodeToString(
         (jiraIntegration.getUserEmail() + ":" + jiraIntegration.getApiToken()).getBytes()
@@ -1252,76 +1270,80 @@ public String createGeneralJiraTicket() {
 
     Map<String, List<String>> headers = new HashMap<>();
     headers.put("Authorization", Collections.singletonList("Basic " + authHeader));
+    headers.put("Content-Type", Collections.singletonList("application/json"));
 
-    OriginalHttpRequest request = new OriginalHttpRequest(
-        url, "", "POST", reqPayload.toString(), headers, ""
+    return new OriginalHttpRequest(
+        url, "", "POST", payload.toString(), headers, ""
     );
+}
 
-    try {
-        OriginalHttpResponse response = ApiExecutor.sendRequest(
-            request, true, null, false, new ArrayList<>()
-        );
+private OriginalHttpResponse executeJiraRequest(OriginalHttpRequest request) throws Exception {
+    return ApiExecutor.sendRequest(request, true, null, false, new ArrayList<>());
+}
 
-        String responsePayload = response.getBody();
+private String processJiraResponse(OriginalHttpResponse response) throws Exception {
+    String responsePayload = response.getBody();
 
-        if (response.getStatusCode() > 201 || responsePayload == null) {
-            loggerMaker.errorAndAddToDb(
-                "error while creating general jira issue, url not accessible, requestbody " +
-                request.getBody() + " ,responsebody " + response.getBody() +
-                " ,responsestatus " + response.getStatusCode(), LoggerMaker.LogDb.DASHBOARD
-            );
-
-            if (responsePayload != null) {
-                try {
-                    BasicDBObject obj = BasicDBObject.parse(responsePayload);
-                    List<String> errorMessages = (List) obj.get("errorMessages");
-                    String error;
-                    if (errorMessages.size() == 0) {
-                        BasicDBObject errObj = BasicDBObject.parse(obj.getString("errors"));
-                        error = errObj.getString("project");
-                    } else {
-                        error = errorMessages.get(0);
-                    }
-                    addActionError(error);
-                } catch (Exception e) {
-                    
-                }
-            }
-            return Action.ERROR.toUpperCase();
-        }
-
-        BasicDBObject payloadObj = BasicDBObject.parse(responsePayload);
-        this.jiraTicketKey = payloadObj.getString("key");
-
-        String jiraTicketUrl = jiraIntegration.getBaseUrl() + "/browse/" + this.jiraTicketKey;
-        setJiraTicketUrl(jiraTicketUrl);
-
-        if (actionItemType != null && !actionItemType.isEmpty()) {
-            try {
-                Integer currentAccountId = Context.accountId.get();
-                
-                String updateKey = "jiraTicketUrlMap." + actionItemType;
-
-                BasicDBObject filter = new BasicDBObject("_id", currentAccountId);
-                BasicDBObject update = new BasicDBObject("$set", new BasicDBObject(updateKey, jiraTicketUrl));
-
-                AccountSettingsDao.instance.updateOne(filter, update);
-
-                loggerMaker.infoAndAddToDb(
-                    "Jira ticket URL stored under _id:" + currentAccountId + " for action item type: " + actionItemType +
-                    ", URL: " + jiraTicketUrl, LoggerMaker.LogDb.DASHBOARD
-                );
-            } catch (Exception e) {
-                loggerMaker.errorAndAddToDb(
-                    "Error storing Jira ticket URL: " + e.getMessage(), LoggerMaker.LogDb.DASHBOARD
-                );
-            }
-        }
-    } catch (Exception e) {
-        return Action.ERROR.toUpperCase();
+    if (response.getStatusCode() > 201 || responsePayload == null) {
+        handleJiraError(response, responsePayload);
     }
 
-    return Action.SUCCESS.toUpperCase();
+    BasicDBObject payloadObj = BasicDBObject.parse(responsePayload);
+    this.jiraTicketKey = payloadObj.getString("key");
+    String url = jiraIntegration.getBaseUrl() + "/browse/" + this.jiraTicketKey;
+    setJiraTicketUrl(url);
+    return url;
+}
+
+private void handleJiraError(OriginalHttpResponse response, String responsePayload) throws Exception {
+    loggerMaker.errorAndAddToDb(
+        "Jira API error - Status: " + response.getStatusCode() + 
+        " | Response: " + responsePayload, 
+        LoggerMaker.LogDb.DASHBOARD
+    );
+
+    String error = "Jira API returned error status";
+    if (responsePayload != null) {
+        try {
+            BasicDBObject obj = BasicDBObject.parse(responsePayload);
+            List<String> errorMessages = (List<String>) obj.get("errorMessages");
+            if (errorMessages != null && !errorMessages.isEmpty()) {
+                error = errorMessages.get(0);
+            } else {
+                BasicDBObject errors = (BasicDBObject) obj.get("errors");
+                if (errors != null && !errors.isEmpty()) {
+                    error = errors.toString();
+                }
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(
+                "Error parsing Jira error: " + e.getMessage(), 
+                LoggerMaker.LogDb.DASHBOARD
+            );
+        }
+    }
+    
+    addActionError(error);
+    throw new Exception(error);
+}
+
+private void storeTicketUrlInAccountSettings(String jiraTicketUrl) {
+    if (actionItemType == null || actionItemType.isEmpty()) return;
+
+    try {
+        Integer accountId = Context.accountId.get();
+        String updateKey = "jiraTicketUrlMap." + actionItemType;
+
+        BasicDBObject filter = new BasicDBObject("_id", accountId);
+        BasicDBObject update = new BasicDBObject("$set", new BasicDBObject(updateKey, jiraTicketUrl));
+
+        AccountSettingsDao.instance.updateOne(filter, update);
+    } catch (Exception e) {
+        loggerMaker.errorAndAddToDb(
+            "Error storing Jira URL: " + e.getMessage(), 
+            LoggerMaker.LogDb.DASHBOARD
+        );
+    }
 }
 
 public String getTitle() {
@@ -1346,5 +1368,13 @@ public String getJiraTicketUrl() {
 
 public void setJiraTicketUrl(String jiraTicketUrl) {
     this.jiraTicketUrl = jiraTicketUrl;
+}
+
+public String getActionItemType() {
+    return actionItemType;
+}
+
+public void setActionItemType(String actionItemType) {
+    this.actionItemType = actionItemType;
 }
 }
