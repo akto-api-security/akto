@@ -11,6 +11,7 @@ import { useNavigate } from 'react-router-dom';
 import { handleJiraIntegration as handleJiraIntegrationUtil } from '../../../../../util/handleJiraIntegration'
 import { createActionItem as createActionItemUtil } from '../../../../../util/createActionItem';
 import { fetchAllData as fetchAllDataUtil } from '../../../../../util/fetchAllData';
+import JiraTicketDisplay from '../../../components/shared/JiraTicketDisplay';
 
 const actionItemsHeaders = [
     { title: '', value: 'priority', type: 'text' },
@@ -72,22 +73,26 @@ export const ActionItemsContent = () => {
     function getActions(item) {
         const actionSource = item?.actionItemObj || item;
         const jiraTicketUrl = jiraTicketUrlMap[actionSource?.actionItemType];
+        const jiraKey = jiraTicketUrl?.split('/').pop() || "";
+
         return [{
-            items: [
-                {
-                    content: jiraTicketUrl ? 'View Jira Ticket' : 'Create Jira Ticket',
-                    icon: jiraTicketUrl ? ExternalMinor : undefined,
-                    onAction: () => {
-                        if (jiraTicketUrl) {
-                            window.location.href = jiraTicketUrl;
-                        } else {
-                            handleJiraIntegration(actionSource);
-                        }
-                    },
-                }
-            ]
+            items: [{
+                content: (
+                    <JiraTicketDisplay
+                        jiraTicketUrl={jiraTicketUrl}
+                        jiraKey={jiraKey}
+                        onButtonClick={() => handleJiraIntegration(actionSource)}
+                        ariaLabel={jiraTicketUrl ? `View Jira ticket ${jiraKey}` : 'Create Jira ticket'}
+                    />
+                ),
+                onAction: jiraTicketUrl
+                    ? () => window.open(jiraTicketUrl, '_blank')
+                    : () => handleJiraIntegration(actionSource),
+                accessibilityLabel: jiraTicketUrl ? `View Jira ticket ${jiraKey}` : 'Create Jira ticket',
+            }]
         }];
     }
+
 
     const fetchAllData = async () => {
         try {
