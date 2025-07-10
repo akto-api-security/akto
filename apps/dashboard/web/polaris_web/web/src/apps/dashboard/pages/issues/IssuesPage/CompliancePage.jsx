@@ -28,6 +28,7 @@ import CriticalFindingsGraph from "./CriticalFindingsGraph.jsx";
 import settingFunctions from "../../settings/module.js";
 import JiraTicketCreationModal from "../../../components/shared/JiraTicketCreationModal.jsx";
 import testingApi from "../../testing/api.js"
+import issuesFunctions from '@/apps/dashboard/pages/issues/module';
 
 const sortOptions = [
     { label: 'Severity', value: 'severity asc', directionLabel: 'Highest', sortKey: 'severity', columnIndex: 2 },
@@ -262,9 +263,11 @@ function CompliancePage() {
     filtersOptions = func.getCollectionFilters(filtersOptions)
 
     const handleSaveJiraAction = () => {
+        const jiraMetaData = issuesFunctions.prepareAdditionalIssueFieldsJiraMetaData()
+
         setToast(true, false, "Please wait while we create your Jira ticket.")
         setJiraModalActive(false)
-        api.bulkCreateJiraTickets(selectedIssuesItems, window.location.origin, projId, issueType).then((res) => {
+        api.bulkCreateJiraTickets(selectedIssuesItems, window.location.origin, projId, issueType, jiraMetaData).then((res) => {
             if(res?.errorMessage) {
                 setToast(true, false, res?.errorMessage)
             } else {
@@ -461,6 +464,14 @@ function CompliancePage() {
         setLoading(false)
     }
   }, [subCategoryMap, apiCollectionMap])
+
+    useEffect(() => {
+        // Fetch jira integration field metadata
+        if (window.JIRA_INTEGRATED === 'true') {
+            issuesFunctions.fetchCreateIssueFieldMetaData()
+        }
+    }, [])
+  
 
     const onSelectCompliance = (compliance) => {
         setComplianceView(compliance)

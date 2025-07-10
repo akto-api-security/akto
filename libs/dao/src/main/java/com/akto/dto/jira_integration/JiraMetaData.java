@@ -5,6 +5,9 @@ import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+
+import java.util.Map;
+
 import org.bson.types.ObjectId;
 
 @Getter
@@ -20,4 +23,5 @@ public class JiraMetaData {
     private String issueDescription;
     private TestingIssuesId testingIssueId;
     private ObjectId testSummaryId;
+    private Map<String, Object> additionalIssueFields;
 }
