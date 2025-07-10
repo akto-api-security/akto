@@ -1,9 +1,34 @@
-import { Modal, Text, VerticalStack } from '@shopify/polaris'
-import React, { useState } from 'react'
+import { FormLayout, Modal, Text, TextField, VerticalStack } from '@shopify/polaris'
+import React, { useEffect, useState } from 'react'
 import DropdownSearch from './DropdownSearch'
+import IssuesStore from '@/apps/dashboard/pages/issues/issuesStore';
+import issuesFunctions from '@/apps/dashboard/pages/issues/module';
+
+const DisplayJiraCreateIssueFields = ({ displayJiraIssueFieldMetadata }) => {
+
+    return (
+        <FormLayout>
+            {displayJiraIssueFieldMetadata.map((field, idx) => {               
+                const customFieldURI = field.schema?.custom || ""
+                const fieldConfiguration = issuesFunctions.getJiraFieldConfigurations(customFieldURI)
+                const FieldComponent = fieldConfiguration.getComponent
+                
+                return (
+                    <div key={field.fieldId || idx}>
+                        <FieldComponent field={field}/>
+                    </div>
+                )
+            })}
+        </FormLayout>
+    )
+}
 
 const JiraTicketCreationModal = ({ activator, modalActive, setModalActive, handleSaveAction, jiraProjectMaps, setProjId, setIssueType, projId, issueType, issueId, isAzureModal }) => {
     const [isCreatingTicket, setIsCreatingTicket] = useState(false)
+    const [displayJiraIssueFieldMetadata, setDisplayJiraIssueFieldMetadata] = useState([])
+
+    const createJiraIssueFieldMetaData = IssuesStore((state) => state.createJiraIssueFieldMetaData)
+    const setDisplayJiraIssueFieldValues = IssuesStore((state) => state.setDisplayJiraIssueFieldValues)
 
     const getValueFromIssueType = (projId, issueId) => {
         if(Object.keys(jiraProjectMaps).length > 0 && projId.length > 0 && issueId.length > 0){
@@ -14,7 +39,33 @@ const JiraTicketCreationModal = ({ activator, modalActive, setModalActive, handl
         }
         return issueType    
     }
-    
+
+    useEffect(() => {
+        if (!isAzureModal && projId && issueType) {
+            // Ignore fields that are sent by akto
+            const ignoreFields = ["summary", "issueType", "project", "labels", "description"]
+
+            const initialFieldMetaData = createJiraIssueFieldMetaData?.[projId]?.[issueType] || [];
+
+            const filteredFieldMetaData = initialFieldMetaData.filter(field => {
+                const isRequired = field.required === true; // filter out fields that are not required  
+                const hasNoDefault = field.hasDefaultValue === false; // filter out fields that have default values
+                const isNotIgnored = !ignoreFields.includes(field.key); // filter out fields that are sent by akto
+                return isRequired && hasNoDefault && isNotIgnored;
+            });
+            setDisplayJiraIssueFieldMetadata(filteredFieldMetaData);
+
+            const initialValues = filteredFieldMetaData.reduce((acc, field) => {
+                const customFieldURI = field.schema?.custom || "";
+                const fieldConfiguration = issuesFunctions.getJiraFieldConfigurations(customFieldURI);
+
+                acc[field.fieldId] = fieldConfiguration.initialValue; //default value for each field
+                return acc;
+            }, {});
+            setDisplayJiraIssueFieldValues(initialValues);
+        }
+    }, [isAzureModal, projId, issueType])
+
     return (
         <Modal
             activator={activator}
@@ -60,6 +111,12 @@ const JiraTicketCreationModal = ({ activator, modalActive, setModalActive, handl
                         preSelected={issueType}
                         value={isAzureModal ? issueType : getValueFromIssueType(projId, issueType)}
                     />  
+                    
+                    {!isAzureModal && projId && issueType && displayJiraIssueFieldMetadata.length > 0 && (
+                        <DisplayJiraCreateIssueFields 
+                            displayJiraIssueFieldMetadata={displayJiraIssueFieldMetadata} 
+                        />
+                    )}
                 </VerticalStack>
             </Modal.Section>
         </Modal>

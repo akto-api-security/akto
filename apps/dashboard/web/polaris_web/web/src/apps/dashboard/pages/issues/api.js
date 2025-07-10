@@ -58,6 +58,13 @@ export default {
             data: {issuesIds, aktoDashboardHost, projId, issueType}
         })
     },
+    fetchCreateJiraIssueFieldMetaData() {
+        return request({
+            url: 'api/fetchCreateJiraIssueFieldMetaData',
+            method: 'post',
+            data: {}
+        })
+    },
     createAzureBoardsWorkItem(testingIssuesId, projectName, workItemType, aktoDashboardHostName) {
         return request({
             url: 'api/createAzureBoardsWorkItem',
