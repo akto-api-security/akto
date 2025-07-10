@@ -12,6 +12,7 @@ import { handleJiraIntegration as handleJiraIntegrationUtil } from '../../../../
 import { createActionItem as createActionItemUtil } from '../../../../../util/createActionItem';
 import { fetchAllData as fetchAllDataUtil } from '../../../../../util/fetchAllData';
 import JiraTicketDisplay from '../../../components/shared/JiraTicketDisplay';
+import ActionItemDetails from './ActionItemDetails';
 
 const actionItemsHeaders = [
     { title: '', value: 'priority', type: 'text' },
@@ -49,6 +50,8 @@ export const ActionItemsContent = () => {
     const [selectedActionItem, setSelectedActionItem] = useState(null);
     const [jiraTicketUrlMap, setJiraTicketUrlMap] = useState({});
     const [fetchedData, setFetchedData] = useState(null);
+    const [showFlyout, setShowFlyout] = useState(false);
+    const [selectedItem, setSelectedItem] = useState(null);
 
     const handleJiraIntegration = (actionItem) => {
         handleJiraIntegrationUtil(
@@ -93,6 +96,17 @@ export const ActionItemsContent = () => {
         }];
     }
 
+    const handleCardClick = (item) => {
+        setSelectedItem(item);
+        console.log('Card clicked item:', item);
+        setShowFlyout(true);
+    };
+
+    const handleRowClick = (item) => {
+    console.log('Row clicked item:', item); 
+    setSelectedItem(item);
+    setShowFlyout(true);
+};
 
     const fetchAllData = async () => {
         try {
@@ -205,18 +219,30 @@ export const ActionItemsContent = () => {
                     cardObj={criticalCardData}
                     onButtonClick={handleJiraIntegration}
                     jiraTicketUrlMap={jiraTicketUrlMap}
+                    onCardClick={handleCardClick}
                 />
             )}
-
             <Box maxWidth="100%" style={{ overflowX: 'hidden' }}>
                 <ActionItemsTable
                     data={actionItems}
                     headers={actionItemsHeaders}
                     getActions={getActions}
                     jiraTicketUrlMap={jiraTicketUrlMap}
+                    onRowClick={handleRowClick}
                 />
             </Box>
-
+            <FlyLayout
+                show={showFlyout}
+                setShow={setShowFlyout}
+                title="Action item details"
+                components={[
+                    <ActionItemDetails
+                        item={selectedItem}
+                        jiraTicketUrlMap={jiraTicketUrlMap}
+                        onJiraButtonClick={handleJiraIntegration}
+                    />
+                ]}
+            />
             <JiraTicketCreationModal
                 activator={null}
                 modalActive={modalActive}

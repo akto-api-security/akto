@@ -4,9 +4,10 @@ import JiraTicketDisplay from '../apps/dashboard/components/shared/JiraTicketDis
 import { ExternalMinor } from '@shopify/polaris-icons';
 
 export function createActionItem(id, priority, title, description, team, effort, count, actionItemType, jiraTicketUrlMap, handleJiraIntegration) {
-    const actionItemObj = { id, title, description, actionItemType, team, effort, count };
+    const actionItemObj = { id, title, description, actionItemType, team, effort, count, priority };
     return {
         id,
+        priority,
         priority: (
             <Box style={{ display: 'flex', alignItems: 'center', height: '24px', padding: '2px 0' }}>
                 <Badge status={priority === 'P1' ? 'critical' : 'attention'}>{priority}</Badge>
