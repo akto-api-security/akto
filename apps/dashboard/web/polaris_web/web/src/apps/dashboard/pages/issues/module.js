@@ -63,6 +63,11 @@ const issuesFunctions = {
 
         const additionalIssueFields = { mandatoryCreateJiraIssueFields: mandatoryCreateJiraIssueFieldsList }
         return additionalIssueFields;
+    },
+    prepareAdditionalIssueFieldsJiraMetaData: () => {
+        const additionalIssueFields = issuesFunctions.prepareAdditionalIssueFields();
+        const jiraMetaData = { additionalIssueFields: additionalIssueFields };
+        return jiraMetaData;
     }
 }
 

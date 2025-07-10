@@ -1031,6 +1031,11 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
                 String hostname = url.getHost();
                 String endpoint = url.getPath();
 
+                Map<String, Object> additionalFields = null;
+                if (this.jiraMetaData != null && this.jiraMetaData.getAdditionalIssueFields() != null) {
+                    additionalFields = this.jiraMetaData.getAdditionalIssueFields();
+                }
+
                 jiraMetaData = new JiraMetaData(
                         info.getName(),
                         "Host - "+hostname,
@@ -1039,7 +1044,7 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
                         info.getDescription(),
                         testingIssuesId,
                         null,
-                        null
+                        additionalFields
                 );
 
             } catch (Exception e) {
