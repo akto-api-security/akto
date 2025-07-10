@@ -408,10 +408,22 @@ public class Executor {
                 String request = com.akto.test_editor.Utils.buildRequestIHttpFormat(rawApi);
 
                 String operationPrompt = "";
-                if (key.equals(com.akto.test_editor.Utils._MAGIC)) {
+                boolean isMagicContext = false;
+                // for $magic_context - no request is passed as context.
+                if (key.equals(com.akto.test_editor.Utils.MAGIC_CONTEXT)) {
                     operationPrompt = value.toString();
-                } else if (key.toString().startsWith(com.akto.test_editor.Utils._MAGIC)) {
-                    operationPrompt = key.toString().replace(com.akto.test_editor.Utils._MAGIC, "").trim();
+                    isMagicContext = true;
+                } else if (key.toString().startsWith(com.akto.test_editor.Utils.MAGIC_CONTEXT)) {
+                    operationPrompt = key.toString().replace(com.akto.test_editor.Utils.MAGIC_CONTEXT, "").trim();
+                    isMagicContext = true;
+                }
+
+                if (!isMagicContext) {
+                    if (key.equals(com.akto.test_editor.Utils._MAGIC)) {
+                        operationPrompt = value.toString();
+                    } else if (key.toString().startsWith(com.akto.test_editor.Utils._MAGIC)) {
+                        operationPrompt = key.toString().replace(com.akto.test_editor.Utils._MAGIC, "").trim();
+                    }
                 }
 
                 if (!operationPrompt.isEmpty()) {
@@ -419,7 +431,10 @@ public class Executor {
                     String operation = operationTypeLower + ": " + operationPrompt;
 
                     BasicDBObject queryData = new BasicDBObject();
-                    queryData.put(TestExecutorModifier._REQUEST, request);
+                    if (!isMagicContext) {
+                        queryData.put(TestExecutorModifier._REQUEST, request);
+                    }
+                    queryData.put(TestExecutorModifier._IS_EXTERNAL_CONTEXT_IN_OPERATION, isMagicContext);
                     queryData.put(TestExecutorModifier._OPERATION, operation);
                     BasicDBObject generatedData = new TestExecutorModifier().handle(queryData);
                     generatedOperationKeyValuePairs = parseGeneratedKeyValues(generatedData, operationTypeLower, value);
