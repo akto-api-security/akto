@@ -153,6 +153,28 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
     return SUCCESS.toUpperCase();
   }
 
+  public String deleteAllMaliciousEvents() {
+    HttpPost post = new HttpPost(
+            String.format("%s/api/dashboard/delete_all_malicious_events", this.getBackendUrl()));
+    post.addHeader("Authorization", "Bearer " + this.getApiToken());
+    post.addHeader("Content-Type", "application/json");
+
+    Map<String, Object> body = new HashMap<>();
+    String msg = objectMapper.valueToTree(body).toString();
+
+    StringEntity requestEntity = new StringEntity(msg, ContentType.APPLICATION_JSON);
+    post.setEntity(requestEntity);
+
+    try (CloseableHttpResponse resp = this.httpClient.execute(post)) {
+      String responseBody = EntityUtils.toString(resp.getEntity());
+    } catch (Exception e) {
+      e.printStackTrace();
+      return ERROR.toUpperCase();
+    }
+
+    return SUCCESS.toUpperCase();
+  }
+
   public List<SuspectSampleData> getSampleData() {
     return sampleData;
   }
