@@ -1,5 +1,7 @@
 package com.akto.test_editor;
 
+import com.akto.dto.OriginalHttpResponse;
+import com.akto.util.HttpRequestResponseUtils;
 import java.io.IOException;
 import java.net.URI;
 import java.util.ArrayList;
@@ -9,6 +11,7 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
@@ -45,6 +48,7 @@ import okhttp3.Request;
 import okhttp3.RequestBody;
 import okhttp3.Response;
 import okhttp3.ResponseBody;
+import org.apache.commons.collections.MapUtils;
 
 public class Utils {
 
@@ -972,21 +976,8 @@ public class Utils {
         }
         String responseBody = rawApi.getResponse().getJsonResponseBody();
         if (responseBody != null && !responseBody.isEmpty()) {
-            String contentType = null;
-        
-            if (headers.containsKey("content-type")) {
-                contentType = headers.get("content-type").get(0);
-            }
-        
-            if (contentType != null && contentType.toLowerCase().contains("text/event-stream")) {
-                String[] events = responseBody.split("event:");
-                if (events.length > 2) {
-                    for (int i = events.length - 2; i < events.length; i++) {           
-                        responseBuilder.append("\n").append("event:").append(events[i].trim());
-                    }
-                } else {
-                    responseBuilder.append("\n").append(responseBody);
-                }
+            if (isEventStream(headers)) {
+                responseBuilder.append(buildEventStream(responseBody));
             } else {
                 responseBuilder.append("\n").append(responseBody);
             }
@@ -995,6 +986,7 @@ public class Utils {
     }
 
     public final static String _MAGIC = "$magic";
+    public final static String MAGIC_CONTEXT = "$magic_context";
 
     public static RawApi modifyRawApiPayload(RawApi rawApi, String keyPath, Object value) {
         try {
@@ -1060,4 +1052,47 @@ public class Utils {
         return rawApi;
     }
 
+    public static boolean isEventStream(Map<String, List<String>> headers) {
+        if (MapUtils.isEmpty(headers)) {
+            return false;
+        }
+
+        return headers.entrySet().stream()
+            .filter(entry -> entry.getKey().equalsIgnoreCase(HttpRequestResponseUtils.CONTENT_TYPE))
+            .flatMap(entry -> entry.getValue().stream())
+            .anyMatch(s -> s.toLowerCase().contains(HttpRequestResponseUtils.TEXT_EVENT_STREAM_CONTENT_TYPE));
+    }
+
+    public static String buildEventStreamResponseIHttpFormat(OriginalHttpResponse response) {
+        if (response == null) {
+            return null;
+        }
+        Map<String, List<String>> headers = response.getHeaders();
+
+        if (isEventStream(headers)) {
+            StringBuilder responseBuilder = new StringBuilder();
+            headers.entrySet().stream()
+                .flatMap(entry -> entry.getValue().stream()
+                    .map(value -> entry.getKey() + ": " + value + "\n"))
+                .forEach(responseBuilder::append);
+            String responseBody = response.getJsonResponseBody();
+            if (responseBody != null && !responseBody.isEmpty()) {
+                return responseBuilder.append(buildEventStream(responseBody)).toString();
+            }
+        }
+        return null;
+    }
+
+    private static String buildEventStream(String responseBody) {
+        StringBuilder responseBuilder = new StringBuilder();
+        String[] events = responseBody.split("event:");
+        if (events.length > 2) {
+            for (int i = events.length - 2; i < events.length; i++) {
+                responseBuilder.append("\n").append("event:").append(events[i].trim());
+            }
+        } else {
+            responseBuilder.append("\n").append(responseBody);
+        }
+        return responseBuilder.toString();
+    }
 }

@@ -95,7 +95,7 @@ public class ApiExecutor {
         byte[] grpcBody = null;
         try {
             response = call.execute();
-            
+
             ResponseBody responseBody = null;
             if (nonTestingContext) {
                 responseBody = response.body();
@@ -451,20 +451,20 @@ public class ApiExecutor {
         List<ConditionsType> emptyList = new ArrayList<>();
 
         Utils.modifyHeaderOperations(originalHttpRequest, 
-            headerConditions.getOrDefault(TestEditorEnums.NonTerminalExecutorDataOperands.MODIFY_HEADER.name(), emptyList), 
+            headerConditions.getOrDefault(TestEditorEnums.NonTerminalExecutorDataOperands.MODIFY_HEADER.name(), emptyList),
             headerConditions.getOrDefault(TestEditorEnums.NonTerminalExecutorDataOperands.ADD_HEADER.name(), emptyList),
             headerConditions.getOrDefault(TestEditorEnums.TerminalExecutorDataOperands.DELETE_HEADER.name(), emptyList)
         );
 
         Utils.modifyBodyOperations(originalHttpRequest, 
-            payloadConditions.getOrDefault(TestEditorEnums.NonTerminalExecutorDataOperands.MODIFY_BODY_PARAM.name(), emptyList), 
+            payloadConditions.getOrDefault(TestEditorEnums.NonTerminalExecutorDataOperands.MODIFY_BODY_PARAM.name(), emptyList),
             payloadConditions.getOrDefault(TestEditorEnums.NonTerminalExecutorDataOperands.ADD_BODY_PARAM.name(), emptyList),
             payloadConditions.getOrDefault(TestEditorEnums.TerminalExecutorDataOperands.DELETE_BODY_PARAM.name(), emptyList)
         );
 
         // modify query params as well from payload conditions only, not handling query conditions separately for now
         Utils.modifyQueryOperations(originalHttpRequest, 
-            payloadConditions.getOrDefault(TestEditorEnums.NonTerminalExecutorDataOperands.MODIFY_BODY_PARAM.name(), emptyList), 
+            payloadConditions.getOrDefault(TestEditorEnums.NonTerminalExecutorDataOperands.MODIFY_BODY_PARAM.name(), emptyList),
             emptyList,
             payloadConditions.getOrDefault(TestEditorEnums.TerminalExecutorDataOperands.DELETE_BODY_PARAM.name(), emptyList)
         );
