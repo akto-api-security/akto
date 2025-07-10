@@ -73,6 +73,8 @@ import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.RequestBody;
 import okhttp3.Response;
+
+import org.apache.kafka.common.protocol.types.Field.Str;
 import org.apache.struts2.interceptor.ServletRequestAware;
 import org.bson.Document;
 import org.bson.conversions.Bson;
@@ -103,7 +105,10 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
     private static final String CREATE_ISSUE_ENDPOINT = "/rest/api/3/issue";
     private static final String CREATE_ISSUE_ENDPOINT_BULK = "/rest/api/3/issue/bulk";
     private static final String ATTACH_FILE_ENDPOINT = "/attachments";
+    private static final String PROJECT_SEARCH_ENDPOINT = "/rest/api/3/project/search";
     private static final String ISSUE_STATUS_ENDPOINT = "/rest/api/3/project/%s/statuses";
+    private static final String FIELDS_SEARCH_ENDPOINT = "/rest/api/3/field/search"; //https://developer.atlassian.com/cloud/jira/platform/rest/v3/api-group-issue-fields/#api-rest-api-3-field-search-get
+    private static final String CREATE_ISSUE_FIELD_METADATA_ENDPOINT = "/rest/api/3/issue/createmeta/%s/issuetypes/%s"; //https://developer.atlassian.com/cloud/jira/platform/rest/v3/api-group-issues/#api-rest-api-3-issue-createmeta-projectidorkey-issuetypes-issuetypeid-get
     private static final LoggerMaker loggerMaker = new LoggerMaker(ApiExecutor.class, LogDb.DASHBOARD);
 
     private static final int TICKET_SYNC_JOB_RECURRING_INTERVAL_SECONDS = 3600;
@@ -536,6 +541,272 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
         return Action.SUCCESS.toUpperCase();
     }
 
+    Map<String, Map<String, BasicDBList>> createIssueFieldMetaData;
+
+    public String fetchCreateIssueFieldMetaData() {
+
+        JiraIntegration jiraIntegration = JiraIntegrationDao.instance.findOne(new BasicDBObject());
+        if(jiraIntegration == null) {
+            addActionError("Jira is not integrated.");
+            return ERROR.toUpperCase();
+        }
+
+        Map<String, List<BasicDBObject>> projectIdsMap = jiraIntegration.getProjectIdsMap();
+        if (projectIdsMap == null || projectIdsMap.isEmpty()) {
+            return Action.SUCCESS.toUpperCase();
+        }
+
+        //Base url
+        String baseUrl = jiraIntegration.getBaseUrl();
+
+        // Setup authentication
+        String apiToken = jiraIntegration.getApiToken();
+        String userEmail = jiraIntegration.getUserEmail();
+        Map<String, List<String>> headers = new HashMap<>();
+        String authHeader = Base64.getEncoder().encodeToString((userEmail + ":" + apiToken).getBytes());
+        headers.put("Authorization", Collections.singletonList("Basic " + authHeader));
+
+        /*
+         * Fetch project ids
+         * Required for performing field search across only Akto integrated JIRA projects. We only store project keys.
+         */
+        List<String> projectKeys = new ArrayList<>(projectIdsMap.keySet());
+        List<String> projectIds = new ArrayList<>();
+        loggerMaker.infoAndAddToDb("Fetching project metadata for project keys: " + projectKeys);
+
+        try {
+            int startAt = 0;
+            String requestUrl = baseUrl + PROJECT_SEARCH_ENDPOINT;
+
+            // Build the static query parameters for the request
+            String queryParamsFormatString = "?startAt=%s";
+            String keyQueryParams = projectKeys.stream()
+                    .map(key -> "keys=" + key)
+                    .collect(Collectors.joining("&", "&", ""));
+
+            while (true) {
+                String queryParams = String.format(queryParamsFormatString, startAt) + keyQueryParams;
+                OriginalHttpRequest request = new OriginalHttpRequest(requestUrl, queryParams, "GET", "", headers, "");
+                OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, new ArrayList<>());
+
+                String responsePayload = response.getBody();
+
+                if (response.getStatusCode() > 201 || responsePayload == null) {
+                    loggerMaker.errorAndAddToDb("Error while fetching project metdata. Response code: " + response.getStatusCode());
+                    break;
+                }
+
+                BasicDBObject payloadObj;
+                try {
+                    payloadObj =  BasicDBObject.parse(responsePayload);
+
+                    BasicDBList values  = (BasicDBList) payloadObj.get("values");
+                    if (values != null){
+                        for (Object valueObj : values) {
+                            if (valueObj == null) continue;
+                            BasicDBObject value = (BasicDBObject) valueObj;
+                            String id = value.getString("id");
+                            if (id == null || id.isEmpty()) {
+                                continue; 
+                            }
+                            projectIds.add(id);
+                        }
+                    }
+                    
+                    Boolean isLast = payloadObj.getBoolean("isLast", true);
+
+                    if (isLast == false) {
+                        int maxResults = payloadObj.getInt("maxResults", 50);
+                        startAt += maxResults; 
+                    } else {
+                        break;
+                    }
+                } catch(Exception e) {
+                    loggerMaker.errorAndAddToDb(e, "Error while parsing project metadata payload");
+                }
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error while fetching project metadata");
+        }
+
+        if(projectIds.size() != projectKeys.size()) {
+            loggerMaker.errorAndAddToDb("Project ids search failed");
+            return Action.ERROR.toUpperCase();
+        }
+
+        loggerMaker.infoAndAddToDb("Project ids search completed. Ids found: " + projectIds);
+
+        /*
+         * Fetch all fields from Jira across all projects
+         * Required for filtering out fields that are not unscreenable
+         */
+        Map<String, BasicDBObject> allFieldsMap = new HashMap<>();
+        loggerMaker.infoAndAddToDb("Performing field search across all JIRA projects" );
+
+        try {
+            int startAt = 0;
+            String requestUrl = baseUrl + FIELDS_SEARCH_ENDPOINT;
+
+            // Build the static query parameters for the request
+            String queryParamsFormatString = "?expand=isUnscreenable&startAt=%s";
+            String projectIdsQueryParams = projectIds.stream()
+                    .map(key -> "projectIds=" + key)
+                    .collect(Collectors.joining("&", "&", ""));
+
+            while (true) {
+                String queryParams = String.format(queryParamsFormatString, startAt, projectIdsQueryParams);
+                OriginalHttpRequest request = new OriginalHttpRequest(requestUrl, queryParams, "GET", "", headers, "");
+                OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, new ArrayList<>());
+
+                String responsePayload = response.getBody();
+
+                if (response.getStatusCode() > 201 || responsePayload == null) {
+                    loggerMaker.errorAndAddToDb("Error while fetching field search. Response code: " + response.getStatusCode());
+                    break;
+                }
+
+                BasicDBObject payloadObj;
+                try {
+                    payloadObj =  BasicDBObject.parse(responsePayload);
+                    
+                    BasicDBList values  = (BasicDBList) payloadObj.get("values");
+                    if (values != null) {
+                        for (Object valueObj : values) {
+                            if (valueObj == null) continue;
+                            BasicDBObject value = (BasicDBObject) valueObj;
+                            String id = value.getString("id");
+                            if (id == null || id.isEmpty()) {
+                                continue; 
+                            }
+                            allFieldsMap.put(id, value);
+                        }
+                    }
+                    
+                    Boolean isLast = payloadObj.getBoolean("isLast", true);
+
+                    if (isLast == false) {
+                        int maxResults = payloadObj.getInt("maxResults", 50);
+                        startAt += maxResults; 
+                    } else {
+                        break;
+                    }
+                    
+                } catch(Exception e) {
+                    loggerMaker.errorAndAddToDb(e, "Error while parsing field search payload");
+                    break;
+                }
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error while performing field search");
+        }
+
+        loggerMaker.infoAndAddToDb("Field search completed. Number of fields found: " + allFieldsMap.size());
+
+        createIssueFieldMetaData = new HashMap<>();
+
+        /*
+         * Fetch fields for a given project and issue type combination
+         */
+
+        for (Map.Entry<String, List<BasicDBObject>> entry : projectIdsMap.entrySet()) {
+            String projectKey = entry.getKey();
+            List<BasicDBObject> issueTypes = entry.getValue();
+
+            Map<String, BasicDBList> fieldsForProject = new HashMap<>();
+
+            loggerMaker.infoAndAddToDb("Fetching fields for project: " + projectKey);
+
+            // Fetch field for issue type
+            for (BasicDBObject issueTypeObj : issueTypes) {
+                if (issueTypeObj == null) continue;
+                String issueId = issueTypeObj.getString("issueId");
+                String issueType = issueTypeObj.getString("issueType");
+
+                if (issueId == null || issueType == null) continue;
+                
+                BasicDBList fieldsForIssueType = new BasicDBList();
+
+                loggerMaker.infoAndAddToDb("Fetching fields for issueType: " + issueType);
+
+                try {
+                    String requestUrl = String.format(baseUrl + CREATE_ISSUE_FIELD_METADATA_ENDPOINT, projectKey, issueId);
+                    OriginalHttpRequest request = new OriginalHttpRequest(requestUrl, "", "GET", "", headers, "");
+
+                    OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false,new ArrayList<>());
+                    String responsePayload = response.getBody();
+
+                    if (response.getStatusCode() > 201 || responsePayload == null) {
+                        loggerMaker.errorAndAddToDb(String.format("Error while fetching issue fields. %s %s Response Code %d", projectKey, issueType, response.getStatusCode()));
+                        continue;
+                    }
+
+                    BasicDBObject payloadObj;
+                    try {
+                        payloadObj = BasicDBObject.parse(responsePayload);
+                        BasicDBList issueFields = (BasicDBList) payloadObj.get("fields");
+
+                        if (issueFields == null) continue;
+
+                        List<String> initialFieldNames = new ArrayList<>();
+                        List<String> processedFieldNames = new ArrayList<>();
+                        
+                        for (Object issueField : issueFields) {
+                            if (issueField == null) continue;
+
+                            BasicDBObject issueFieldBasicDBObject = (BasicDBObject) issueField;
+                            String fieldId = issueFieldBasicDBObject.getString("fieldId");
+                            String fieldName = issueFieldBasicDBObject.getString("name");
+                            Boolean isRequired = issueFieldBasicDBObject.getBoolean("required", false);
+                            if (fieldId == null || fieldName == null) continue;
+
+                            initialFieldNames.add(fieldName);
+                            processedFieldNames.add(fieldName);
+
+                            // check if fieldId is present in fieldsMap
+                            if (allFieldsMap.containsKey(fieldId)) {
+                                // get the field value from fieldsMap
+                                BasicDBObject fieldValue = allFieldsMap.get(fieldId);
+                                Boolean isUnscreenable = fieldValue.getBoolean("isUnscreenable", true);
+                                // if unscreenable is false, remove the field from processedFieldNames
+                                if (isUnscreenable == false) {
+                                    processedFieldNames.remove(fieldName);
+                                    continue;
+                                }
+                            }
+
+                            String type = "";
+                            String system = "";
+                            String custom = "";
+                            BasicDBObject issueFieldSchema = (BasicDBObject) issueFieldBasicDBObject.get("schema");
+                            if (issueFieldSchema != null) {
+                                type = issueFieldSchema.getString("type", "");
+                                system = issueFieldSchema.getString("system", "");
+                                custom = issueFieldSchema.getString("custom", "");
+                            }
+
+                            loggerMaker.infoAndAddToDb(String.format("Field name: %s, Required: %s, Type: %s, System: %s, Custom: %s", fieldName, isRequired, type, system, custom));
+                            fieldsForIssueType.add(issueFieldBasicDBObject);
+                        }
+
+                        //Print the initial and processed field names
+                        loggerMaker.infoAndAddToDb("Fields: " + initialFieldNames);
+                        loggerMaker.infoAndAddToDb("Fields after filtering out unscreenable fields: " + processedFieldNames);
+                    } catch (Exception e) {
+                        loggerMaker.errorAndAddToDb(e, "Error while parsing issue fields response for project: " + projectKey + ", issueType: " + issueType);
+                    }
+                } catch (Exception e) {
+                    loggerMaker.errorAndAddToDb(e, "Error while fetching issue fields for project: " + projectKey + ", issueType: " + issueType);
+                }
+
+                fieldsForProject.put(issueId, fieldsForIssueType);
+            }
+
+            createIssueFieldMetaData.put(projectKey, fieldsForProject);
+        }
+
+        return Action.SUCCESS.toUpperCase();
+    }
+
     public String createIssue() {
 
         BasicDBObject reqPayload = new BasicDBObject();
@@ -767,6 +1038,7 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
                         aktoDashboardHost+"/dashboard/issues?result="+testingRunResult.getId().toHexString(),
                         info.getDescription(),
                         testingIssuesId,
+                        null,
                         null
                 );
 
@@ -934,6 +1206,25 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
 
         fields.put("description", description);
 
+        Map<String, Object> additionalIssueFields = jiraMetaData.getAdditionalIssueFields();
+        if (additionalIssueFields != null) {
+            Object fieldsObj = additionalIssueFields.get("mandatoryCreateJiraIssueFields");
+
+            if (fieldsObj != null && fieldsObj instanceof List) {
+                List<?> mandatoryCreateJiraIssueFields = (List<?>) fieldsObj;
+                for (Object fieldObj : mandatoryCreateJiraIssueFields) {
+                    if (fieldObj instanceof Map<?, ?>) {
+                        Map<?, ?> mandatoryField = (Map<?, ?>) fieldObj;
+                        String fieldName = (String) mandatoryField.get("fieldId");
+                        String fieldValue = (String) mandatoryField.get("fieldValue");
+                        // Add to fields object
+
+                        if (fieldName == null) continue;
+                        fields.put(fieldName, fieldValue);
+                    }
+            }
+            }
+        }
         return fields;
     }
 
@@ -1052,6 +1343,14 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
     @Override
     public void setServletRequest(HttpServletRequest request) {
         this.dashboardUrl = com.akto.utils.Utils.createDashboardUrlFromRequest(request);
+    }
+
+    public Map<String, Map<String, BasicDBList>> getCreateIssueFieldMetaData() {
+        return createIssueFieldMetaData;
+    }
+
+    public void setCreateIssueFieldMetaData(Map<String, Map<String, BasicDBList>> createIssueFieldMetaData) {
+        this.createIssueFieldMetaData = createIssueFieldMetaData;
     }
 
     private void addAktoHostUrl() {
