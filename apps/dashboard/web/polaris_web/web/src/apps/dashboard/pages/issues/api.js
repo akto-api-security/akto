@@ -71,5 +71,12 @@ export default {
             method: 'post',
             data: {testingIssuesIdList, projectName, workItemType, aktoDashboardHostName}
         })
+    },
+    createGeneralJiraTicket(payload) {
+        return request({
+            url: 'api/createGeneralJiraTicket',
+            method: 'post',
+            data: payload
+        })
     }
 }
