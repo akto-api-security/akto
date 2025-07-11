@@ -87,7 +87,6 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
 
     const [miniTestingServiceNames, setMiniTestingServiceNames] = useState([])
     const [slackChannels, setSlackChannels] = useState([])
-    const emptyCondition = { data: { key: '', value: '' }, operator: { 'type': 'ADD_HEADER' } }
     const [conditions, dispatchConditions] = useReducer(produce((draft, action) => func.conditionsReducer(draft, action)), []);
 
     const localCategoryMap = LocalStore.getState().categoryMap
@@ -125,7 +124,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                         if (!slackName ) {
                             slackName = 'Slack Webhook';
                         } else if ( /^https?:\/\//i.test(slackName)){
-                            slackName = prettifyUrl(token.name)
+                            slackName = token.name.replace(/^https?:\/\//i, '').replace(/\/$/, '');
                         }
                         return {
                             label: slackName,
@@ -330,7 +329,8 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                 value: x.name,
                 author: x.author,
                 nature: x?.attributes?.nature?._name || "",
-                severity: x?.superCategory?.severity?._name || ""
+                severity: x?.superCategory?.severity?._name || "",
+                duration: x?.attributes?.duration?._name || ""
             }
             ret[x.superCategory.name].all.push(obj)
             ret[x.superCategory.name].selected.push(obj)

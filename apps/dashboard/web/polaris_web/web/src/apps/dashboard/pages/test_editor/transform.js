@@ -43,6 +43,7 @@ const convertFunc = {
                 inactive: test.inactive,
                 severity: test?.superCategory?.severity?._name || "",
                 nature : test?.attributes?.nature?._name || "",
+                duration: test?.attributes?.duration?._name || "",
                 value: test.name,
                 isCustom: test?.templateSource?._name === "CUSTOM" || false,
                 author: test?.author || "",

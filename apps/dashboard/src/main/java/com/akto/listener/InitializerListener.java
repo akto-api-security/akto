@@ -1693,7 +1693,7 @@ public class InitializerListener implements ServletContextListener {
                 Filters.eq("_id", UnauthenticatedEndpoint.UNAUTHENTICATED_GROUP_ID));
 
         if (collection == null) {
-            logger.debugAndAddToDb("AccountId: " + Context.accountId.get() + " Creating unauthenticated api group.", LogDb.DASHBOARD);
+            logger.warnAndAddToDb("AccountId: " + Context.accountId.get() + " Creating unauthenticated api group.", LogDb.DASHBOARD);
             ApiCollection unauthenticatedApisGroup = new ApiCollection(UnauthenticatedEndpoint.UNAUTHENTICATED_GROUP_ID,
                     "Unauthenticated APIs", Context.now(), new HashSet<>(), null, 0, false, false);
 
@@ -1705,7 +1705,9 @@ public class InitializerListener implements ServletContextListener {
 
             ApiCollectionsDao.instance.insertOne(unauthenticatedApisGroup);
         }else{
+            int startTime = Context.now();
             ApiCollectionUsers.computeCollectionsForCollectionId(collection.getConditions(), collection.getId());
+            logger.warnAndAddToDb("AccountId: " + Context.accountId.get() + " Computed unauthenticated api group in " + (Context.now() - startTime) + " seconds", LogDb.DASHBOARD);
         }
 
     }
@@ -1714,7 +1716,7 @@ public class InitializerListener implements ServletContextListener {
         ApiCollection collection = ApiCollectionsDao.instance
                 .findOne(Filters.eq("_id", 111111121));
         if (collection == null) {
-            logger.debugAndAddToDb("AccountId: " + Context.accountId.get() + " Creating all apis group.", LogDb.DASHBOARD);
+            logger.warnAndAddToDb("AccountId: " + Context.accountId.get() + " Creating all apis group.", LogDb.DASHBOARD);
             ApiCollection allApisGroup = new ApiCollection(111_111_121, "All Apis", Context.now(), new HashSet<>(),
                     null, 0, false, false);
 
@@ -1726,7 +1728,9 @@ public class InitializerListener implements ServletContextListener {
 
             ApiCollectionsDao.instance.insertOne(allApisGroup);
         }else{
+            int startTime = Context.now();
             ApiCollectionUsers.computeCollectionsForCollectionId(collection.getConditions(), collection.getId());
+            logger.warnAndAddToDb("AccountId: " + Context.accountId.get() + " Computed ALL apis group in " + (Context.now() - startTime) + " seconds", LogDb.DASHBOARD);
         }
 
     }
@@ -2452,20 +2456,21 @@ public class InitializerListener implements ServletContextListener {
                             runInitializerFunctions();
                         }
                     }, "context-initializer-secondary");
-
-                    updateApiGroupsForAccounts(); 
+                    logger.warn("Started webhook schedulers", LogDb.DASHBOARD);
+                    setUpWebhookScheduler();
+                    logger.warn("Started traffic alert schedulers", LogDb.DASHBOARD);
+                    setUpTrafficAlertScheduler();
+                    logger.warn("Started daily schedulers", LogDb.DASHBOARD);
+                    setUpDailyScheduler();
                     if (DashboardMode.isMetered()) {
                         setupUsageScheduler();
                     }
                     updateSensitiveInfoInApiInfo.setUpSensitiveMapInApiInfoScheduler();
                     syncCronInfo.setUpUpdateCronScheduler();
                     setUpTestEditorTemplatesScheduler();
-                    setUpWebhookScheduler();
-                    setupAutomatedApiGroupsScheduler();
-                    setUpDailyScheduler();
-                    setUpTrafficAlertScheduler();
                     JobsCron.instance.jobsScheduler(JobExecutorType.DASHBOARD);
-
+                    updateApiGroupsForAccounts(); 
+                    setupAutomatedApiGroupsScheduler();
                     if(runJobFunctionsAnyway) {
                         crons.trafficAlertsScheduler();
                         // crons.insertHistoricalDataJob();
@@ -3370,9 +3375,9 @@ public class InitializerListener implements ServletContextListener {
         // backward compatibility
         try {
             setBackwardCompatibilities(backwardCompatibility);
-            logger.infoAndAddToDb("Backward compatibilities set for " + Context.accountId.get(), LogDb.DASHBOARD);
+            logger.warnAndAddToDb("Backward compatibilities set for " + Context.accountId.get(), LogDb.DASHBOARD);
             insertPiiSources();
-            logger.infoAndAddToDb("PII sources inserted set for " + Context.accountId.get(), LogDb.DASHBOARD);
+            logger.warnAndAddToDb("PII sources inserted set for " + Context.accountId.get(), LogDb.DASHBOARD);
 
             // AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
             // dropSampleDataIfEarlierNotDroped(accountSettings);
