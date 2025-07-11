@@ -132,6 +132,7 @@ function SingleTestRunPage() {
   const [workflowTest, setWorkflowTest] = useState(false);
   const [secondaryPopover, setSecondaryPopover] = useState(false)
   const setErrorsObject = TestingStore((state) => state.setErrorsObject)
+  const setTestingEndpointsApisList = TestingStore((state) => state.setTestingEndpointsApisList)
   const currentTestingRuns = []
   const [updateTable, setUpdateTable] = useState("")
   const [testRunResultsCount, setTestRunResultsCount] = useState({})
@@ -275,6 +276,11 @@ function SingleTestRunPage() {
     }
   })
 
+  const populateTestingEndpointsApisList = (apiEndpoints) => {
+    const testingEndpointsApisList = transform.prepareTestingEndpointsApisList(apiEndpoints)
+    setTestingEndpointsApisList(testingEndpointsApisList)
+  } 
+
   const populateApiNameFilterChoices = async (testingRun) => {
     if (testingRun?.testingEndpoints) {
       const {testingEndpoints} = testingRun;
@@ -289,6 +295,10 @@ function SingleTestRunPage() {
             if (response?.apiInfoList) {
               const limitedEndpoints = response.apiInfoList.slice(
                   0, 5000);
+
+              const limitedEndpointsIds = limitedEndpoints.map(endpoint => endpoint.id);
+              populateTestingEndpointsApisList(limitedEndpointsIds);
+
               apiEndpoints = getApiEndpointsMap(limitedEndpoints, testingEndpoints.type);
             }
           } catch (error) {
@@ -298,6 +308,7 @@ function SingleTestRunPage() {
       } else if (testingEndpoints.type === "CUSTOM"
           && testingEndpoints.apisList) {
         const limitedApis = testingEndpoints.apisList.slice(0, 5000);
+        populateTestingEndpointsApisList(limitedApis);
         apiEndpoints = getApiEndpointsMap(limitedApis, testingEndpoints.type);
       }
 
