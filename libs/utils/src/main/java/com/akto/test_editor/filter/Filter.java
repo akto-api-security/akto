@@ -263,7 +263,7 @@ public class Filter {
         }
         Set<String> s2 = new HashSet<>(newMatches);
 
-        if (operand == "and") {
+        if (operand.equals("and")) {
             s1.retainAll(s2);
         } else {
             s1.addAll(s2);

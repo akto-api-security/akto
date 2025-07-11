@@ -206,7 +206,7 @@ public class ConfigParser {
         }
 
         // skip parent node checks if it was the first node
-        if (parentNodeType == "_ETHER_") {
+        if (parentNodeType.equals("_ETHER_")) {
             return configParserValidationResult;
         }
 

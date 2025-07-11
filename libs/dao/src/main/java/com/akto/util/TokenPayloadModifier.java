@@ -28,7 +28,7 @@ public class TokenPayloadModifier {
             Map<String, List<String>> headers = request.getHeaders();
             List<String> cookieList = headers.getOrDefault("cookie", new ArrayList<>());
             String k = key.toLowerCase().trim();
-            if (value == null || value == "null") {
+            if (value == null || value.equals("null")) {
                 headers.remove(k);
                 CookieTransformer.modifyCookie(cookieList, key, value);
             } else {
