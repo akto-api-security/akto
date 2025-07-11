@@ -1,9 +1,13 @@
 package com.akto.action;
 
 
+import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.ApiInfoDao;
+import com.akto.dto.ApiCollection;
 import com.akto.dto.ApiInfo;
+import com.akto.util.Constants;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Projections;
 
 import java.util.List;
 
@@ -32,6 +36,15 @@ public class ApiInfoAction extends UserAction {
     public String fetchApiInfo(){
         Bson filter = ApiInfoDao.getFilter(url, method, apiCollectionId);
         this.apiInfo = ApiInfoDao.instance.findOne(filter);
+        if(this.apiInfo == null){
+            // case of slash missing in first character of url
+            // search for url having no leading slash
+            if (url != null && url.startsWith("/")) {
+                String urlWithoutLeadingSlash = url.substring(1);
+                filter = ApiInfoDao.getFilter(urlWithoutLeadingSlash, method, apiCollectionId);
+                this.apiInfo = ApiInfoDao.instance.findOne(filter);   
+            }
+        }
         return SUCCESS.toUpperCase();
     }
 

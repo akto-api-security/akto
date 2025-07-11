@@ -75,6 +75,15 @@ public class DashboardRouter implements ARouter {
             });
 
         router
+                .post("/delete_all_malicious_events")
+                .blockingHandler(ctx -> {
+                    threatActorService.deleteAllMaliciousEvents(
+                        ctx.get("accountId")
+                    );
+                    ctx.response().setStatusCode(200).end();
+                });
+
+        router
             .post("/list_threat_actors")
             .blockingHandler(ctx -> {
                 RequestBody reqBody = ctx.body();

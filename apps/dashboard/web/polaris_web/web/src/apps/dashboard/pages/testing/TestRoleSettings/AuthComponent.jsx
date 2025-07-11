@@ -21,7 +21,8 @@ import HardCoded from '../user_config/HardCoded';
 import JsonRecording from '../user_config/JsonRecording';
 import Dropdown from '../../../components/layouts/Dropdown';
 import TlsAuth from '../user_config/TlsAuth';
-import { HARDCODED, LOGIN_REQUEST, TLS_AUTH } from "./TestRoleConstants"; 
+import SampleDataAuth from '../user_config/SampleDataAuth';
+import { HARDCODED, LOGIN_REQUEST, SAMPLE_DATA, TLS_AUTH } from "./TestRoleConstants"; 
 
 
 
@@ -48,6 +49,7 @@ const AuthComponent = ({
   const [headerValue, setHeaderValue] = useState("");
   const [automationType, setAutomationType] = useState("LOGIN_STEP_BUILDER");
   const [hardCodeAuthInfo, setHardCodeAuthInfo] = useState({ authParams: [] });
+  const [sampleDataAuthInfo, setSampleDataAuthInfo] = useState({ authParams: [] });
   const [tlsAuthInfo, setTlsAuthInfo] = useState({authParams:[]})
 
   const automationOptions = [
@@ -81,6 +83,13 @@ const AuthComponent = ({
     }));
   };
 
+  const setSampleDataInfo = (obj) => {
+    setSampleDataAuthInfo((prev) => ({
+      ...prev,
+      authParams: obj.authParams,
+    }));
+  };
+
   const handleCancel = () => {
 
     setShowAuthComponent(false);
@@ -88,6 +97,7 @@ const AuthComponent = ({
     setHeaderKey("");
     setHeaderValue("");
     setHardCodeAuthInfo({ authParams: [] });
+    setSampleDataAuthInfo ({authParams: []});
     setAuthMechanism(null);
     setHardcodedOpen(true);
     setEditableDocs(-1);
@@ -160,14 +170,35 @@ const AuthComponent = ({
         func.setToast(true, true, "Request data cannot be empty!");
       }
     } else if (openAuth === TLS_AUTH) {
-                const currentAutomationType = TLS_AUTH;
-                const authParamData = tlsAuthInfo.authParams
-                if(editableDoc > -1){
-                    resp = await api.updateAuthInRole(initialItems.name, apiCond, editableDoc, authParamData, currentAutomationType)
-                }else{
-                    resp = await api.addAuthToRole(initialItems.name, apiCond, authParamData, currentAutomationType, null)
-                }
-            }
+        const currentAutomationType = TLS_AUTH;
+        const authParamData = tlsAuthInfo.authParams
+        if(editableDoc > -1){
+            resp = await api.updateAuthInRole(initialItems.name, apiCond, editableDoc, authParamData, currentAutomationType)
+        }else{
+            resp = await api.addAuthToRole(initialItems.name, apiCond, authParamData, currentAutomationType, null)
+        }
+    } else if (openAuth == SAMPLE_DATA) {
+        const currentAutomationType = SAMPLE_DATA;
+        const authParamData = sampleDataAuthInfo.authParams;
+        if (editableDoc > -1) {
+          resp = await api.updateAuthInRole(
+            initialItems.name,
+            apiCond,
+            editableDoc,
+            authParamData,
+            currentAutomationType
+          );
+        } else {
+          resp = await api.addAuthToRole(
+            initialItems.name,
+            apiCond,
+            authParamData,
+            currentAutomationType,
+            null
+          );
+        }
+
+    }
     handleCancel();
     await saveAction(true, resp.selectedRole.authWithCondList);
     func.setToast(true, false, "Auth mechanism added to role successfully.");
@@ -206,6 +237,30 @@ const AuthComponent = ({
               showOnlyApi={true}
               extractInformation={true}
               setInformation={setHardCodedInfo}
+            />
+          </Collapsible>
+        </LegacyStack>
+
+        <LegacyStack vertical>
+          <Button
+            id={"sample-data-token-expand-button"}
+            onClick={() => setOpenAuth(SAMPLE_DATA)}
+            ariaExpanded={checkOpenAuth(SAMPLE_DATA)}
+            icon={checkOpenAuth(SAMPLE_DATA) ? ChevronDownMinor : ChevronRightMinor}
+            ariaControls="sample-data"
+          >
+            From traffic
+          </Button>
+          <Collapsible
+            open={checkOpenAuth(SAMPLE_DATA)}
+            id="sample-data"
+            transition={{ duration: "500ms", timingFunction: "ease-in-out" }}
+            expandOnPrint
+          >
+            <SampleDataAuth
+              showOnlyApi={true}
+              extractInformation={true}
+              setInformation={setSampleDataInfo}
             />
           </Collapsible>
         </LegacyStack>

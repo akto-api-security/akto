@@ -13,7 +13,7 @@ public class ApiStats {
     private int totalAPIs = 0;
     private int apisTestedInLookBackPeriod = 0;
     private float totalRiskScore = 0;
-
+    private int totalInScopeForTestingApis = 0;
 
     public ApiStats(int timestamp, Map<Integer, Integer> riskScoreMap, Map<ApiInfo.ApiType, Integer> apiTypeMap,
                     Map<ApiInfo.AuthType, Integer> authTypeMap, Map<ApiInfo.ApiAccessType, Integer> accessTypeMap,
@@ -145,5 +145,13 @@ public class ApiStats {
 
     public void setTimestamp(int timestamp) {
         this.timestamp = timestamp;
+    }
+
+    public int getTotalInScopeForTestingApis() {
+        return totalInScopeForTestingApis;
+    }
+
+    public void setTotalInScopeForTestingApis(int totalInScopeForTestingApis) {
+        this.totalInScopeForTestingApis = totalInScopeForTestingApis;
     }
 }

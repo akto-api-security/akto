@@ -10,5 +10,7 @@ public class MongoDBCollection {
         "splunk_integration_config";
     public static final String ACTOR_INFO =
         "actor_info";
+    public static final String API_DISTRIBUTION_DATA =
+      "api_distribution_data";
   }
 }

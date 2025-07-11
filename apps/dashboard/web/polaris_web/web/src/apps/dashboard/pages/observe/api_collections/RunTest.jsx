@@ -50,7 +50,8 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
         sendMsTeamsAlert: false,
         cleanUpTestingResources: false,
         autoTicketingDetails: initialAutoTicketingDetails,
-        miniTestingServiceName: ""
+        miniTestingServiceName: "",
+        slackChannel: ""
     }
     const navigate = useNavigate()
 
@@ -85,7 +86,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
     const [teamsTestingWebhookIntegrated, setTeamsTestingWebhookIntegrated] = useState(false)
 
     const [miniTestingServiceNames, setMiniTestingServiceNames] = useState([])
-    const emptyCondition = { data: { key: '', value: '' }, operator: { 'type': 'ADD_HEADER' } }
+    const [slackChannels, setSlackChannels] = useState([])
     const [conditions, dispatchConditions] = useReducer(produce((draft, action) => func.conditionsReducer(draft, action)), []);
 
     const localCategoryMap = LocalStore.getState().categoryMap
@@ -117,6 +118,19 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
             settingsApi.fetchJiraIntegration()]).then(([slackResp, teamsResp, jiraResp]) => {
                 const apiTokenList = slackResp.apiTokenList
                 setSlackIntegrated(apiTokenList && apiTokenList.length > 0)
+                setSlackChannels(apiTokenList.map(token => {
+                    let slackName = token.name;
+                        // Check if name is missing or is a URL
+                        if (!slackName ) {
+                            slackName = 'Slack Webhook';
+                        } else if ( /^https?:\/\//i.test(slackName)){
+                            slackName = token.name.replace(/^https?:\/\//i, '').replace(/\/$/, '');
+                        }
+                        return {
+                            label: slackName,
+                            value: token.id
+                        }
+                }))
 
                 const webhookPresent = teamsResp.webhookPresent
                 if (webhookPresent) {
@@ -273,6 +287,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                     startTimestamp: testIdConfig?.scheduleTimestamp,
                     runTypeParentLabel: testRunType,
                     miniTestingServiceName: testIdConfig?.miniTestingServiceName || "",
+                    slackChannel: testIdConfig?.slackChannel || "",
                 }));
                 setTestSuiteIds(testIdConfig?.testingRunConfig?.testSuiteIds || [])
                 setTestNameSuiteModal(testIdConfig?.name||"")
@@ -314,7 +329,8 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                 value: x.name,
                 author: x.author,
                 nature: x?.attributes?.nature?._name || "",
-                severity: x?.superCategory?.severity?._name || ""
+                severity: x?.superCategory?.severity?._name || "",
+                duration: x?.attributes?.duration?._name || ""
             }
             ret[x.superCategory.name].all.push(obj)
             ret[x.superCategory.name].selected.push(obj)
@@ -545,7 +561,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
     }
 
     async function handleRun() {
-        const { startTimestamp, recurringDaily, recurringMonthly, recurringWeekly, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, cleanUpTestingResources, miniTestingServiceName } = testRun
+        const { startTimestamp, recurringDaily, recurringMonthly, recurringWeekly, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, cleanUpTestingResources, miniTestingServiceName, slackChannel } = testRun
         let {testName} = testRun;
         const autoTicketingDetails = jiraProjectMap ? testRun.autoTicketingDetails : null;
         const collectionId = parseInt(apiCollectionId)
@@ -593,9 +609,9 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
         }
 
         if (filtered || selectedResourcesForPrimaryAction?.length > 0) {
-            await observeApi.scheduleTestForCustomEndpoints(apiInfoKeyList, startTimestamp, recurringDaily, recurringWeekly, recurringMonthly, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, "TESTING_UI", testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, finalAdvancedConditions, cleanUpTestingResources, testMode? []: testSuiteIds, (miniTestingServiceName || miniTestingServiceNames?.[0]?.value), autoTicketingDetails)
+            await observeApi.scheduleTestForCustomEndpoints(apiInfoKeyList, startTimestamp, recurringDaily, recurringWeekly, recurringMonthly, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, "TESTING_UI", testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, finalAdvancedConditions, cleanUpTestingResources, testMode? []: testSuiteIds, (miniTestingServiceName || miniTestingServiceNames?.[0]?.value), (slackChannel || slackChannels?.[0]?.value) ,autoTicketingDetails)
         } else {
-            await observeApi.scheduleTestForCollection(collectionId, startTimestamp, recurringDaily, recurringWeekly, recurringMonthly, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, finalAdvancedConditions, cleanUpTestingResources, testMode? []: testSuiteIds, (miniTestingServiceName || miniTestingServiceNames?.[0]?.value), autoTicketingDetails)
+            await observeApi.scheduleTestForCollection(collectionId, startTimestamp, recurringDaily, recurringWeekly, recurringMonthly, selectedTests, testName, testRunTime, maxConcurrentRequests, overriddenTestAppUrl, testRoleId, continuousTesting, sendSlackAlert, sendMsTeamsAlert, finalAdvancedConditions, cleanUpTestingResources, testMode? []: testSuiteIds, (miniTestingServiceName || miniTestingServiceNames?.[0]?.value), (slackChannel || slackChannels?.[0]?.value), autoTicketingDetails)
         }
 
         setActive(false)
@@ -749,6 +765,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
             jiraProjectMap={jiraProjectMap}
             generateLabelForJiraIntegration={generateLabelForJiraIntegration}
             miniTestingServiceNames={miniTestingServiceNames}
+            slackChannels={slackChannels}
         />
     )
 
