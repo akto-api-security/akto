@@ -97,9 +97,11 @@ public class ApiInfoDao extends AccountsContextDaoWithRbac<ApiInfo>{
 
     public void updateLastTestedField(ApiInfoKey apiInfoKey){
         instance.getMCollection().updateOne(
-            getFilter(apiInfoKey), 
-            Updates.set(ApiInfo.LAST_TESTED, Context.now())
-        );
+            getFilter(apiInfoKey),
+                Updates.combine(
+                        Updates.set(ApiInfo.LAST_TESTED, Context.now()),
+                        Updates.inc(ApiInfo.LAST_TESTED_COUNT, 1)
+                ));
     }
 
     public Map<Integer,Integer> getCoverageCount(){

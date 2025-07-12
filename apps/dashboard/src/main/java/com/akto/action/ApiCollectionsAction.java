@@ -4,8 +4,16 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 import com.akto.action.observe.InventoryAction;
+import com.akto.action.testing.StartTestAction;
+import com.akto.dao.testing.TestingRunResultDao;
+import com.akto.dao.testing.VulnerableTestingRunResultDao;
 import com.akto.dto.*;
+import com.akto.dto.test_run_findings.TestingIssuesId;
+import com.akto.dto.test_run_findings.TestingRunIssues;
+import com.akto.dto.testing.TestResult;
+import com.akto.dto.testing.TestingRunResult;
 import com.akto.util.Pair;
+import com.akto.util.enums.GlobalEnums;
 import lombok.Getter;
 import org.bson.conversions.Bson;
 
@@ -74,6 +82,18 @@ public class ApiCollectionsAction extends UserAction {
     int highRiskThirdPartyEndpointsCount;
     @Getter
     int shadowApisCount;
+    @Getter
+    int criticalVulnCount;
+    @Getter
+    int notTestedEndpointsCount;
+    @Getter
+    int onlyOnceTestedEndpointsCount;
+    @Getter
+    int buaCategoryCount;
+    @Getter
+    int skippedTestsCount;
+    @Getter
+    int misConfiguredTestsCount;
 
     public List<ApiInfoKey> getApiList() {
         return apiList;
@@ -1015,6 +1035,105 @@ public class ApiCollectionsAction extends UserAction {
         }
         return Action.SUCCESS.toUpperCase();
     }
+
+    public String fetchCriticalVulnCount(){
+
+        String severityToFetch = "CRITICAL";
+        List<GlobalEnums.TestRunIssueStatus> allowedStatus = Arrays.asList(GlobalEnums.TestRunIssueStatus.OPEN);
+        List<TestingRunIssues> criticalIssues = TestingRunIssuesDao.instance.findAll(
+                Filters.and(
+                        Filters.eq(TestingRunIssues.KEY_SEVERITY, severityToFetch),
+                        Filters.in(TestingRunIssues.TEST_RUN_ISSUES_STATUS, allowedStatus)
+                )
+        );
+
+        if(criticalIssues != null && !criticalIssues.isEmpty()) {
+            this.criticalVulnCount = criticalIssues.size();
+        } else {
+            this.criticalVulnCount = 0;
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+
+
+    public String fetchNotTestedAPICount() {
+
+        List<ApiInfo> apiInfoList = ApiInfoDao.instance.findAll(
+            Filters.or(
+                Filters.exists(ApiInfo.LAST_TESTED, false),
+                Filters.eq(ApiInfo.LAST_TESTED, "")
+        ));
+
+        if(apiInfoList != null && !apiInfoList.isEmpty()) {
+            this.notTestedEndpointsCount = apiInfoList.size();
+        } else {
+            this.notTestedEndpointsCount = 0;
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String fetchOnlyOnceTestedAPICount() {
+
+        List<ApiInfo> apiInfoList = ApiInfoDao.instance.findAll(
+                Filters.and(
+                        Filters.exists(ApiInfo.LAST_TESTED_COUNT, true),
+                        Filters.eq(ApiInfo.LAST_TESTED_COUNT, 1)
+                ));
+
+        if(apiInfoList != null && !apiInfoList.isEmpty()) {
+            this.onlyOnceTestedEndpointsCount = apiInfoList.size();
+        } else {
+            this.onlyOnceTestedEndpointsCount = 0;
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String fetchBUACategoryCount(){
+
+        //correct this - get payload from UI as it is in fetchAllissues
+        List<String> filterSubCategory = Arrays.asList(
+            "CSRF_LOGIN_ATTACK",
+            "ADD_JKU_TO_JWT",
+            "REMOVE_TOKENS",
+            "REPLACE_CSRF",
+            "JWT_INVALID_SIGNATURE",
+            "REMOVE_CSRF",
+            "JWT_NONE_ALGO"
+        );
+        List<TestingRunIssues> testingRunIssues = TestingRunIssuesDao.instance.findAll(
+                Filters.and(
+                Filters.in("_id" + "."
+                        + TestingIssuesId.TEST_SUB_CATEGORY, filterSubCategory),
+                        Filters.eq(TestingIssuesId.TEST_RUN_ISSUE_STATUS, "OPEN"))
+        );
+
+        if(testingRunIssues != null && !testingRunIssues.isEmpty()) {
+            this.buaCategoryCount = testingRunIssues.size();
+        } else {
+            this.buaCategoryCount = 0;
+        }
+
+        return Action.SUCCESS.toUpperCase();
+    }
+
+
+    public String fetchSkippedTestsCount(){
+
+        List<Bson> filterList = new ArrayList<>();
+        filterList.add(Filters.eq(TestingRunResult.VULNERABLE, false));
+        filterList.add(Filters.in(TestingRunResultDao.ERRORS_KEY, TestResult.TestError.getErrorsToSkipTests()));
+
+        this.skippedTestsCount = VulnerableTestingRunResultDao.instance.countFromDb(Filters.and(filterList), true);
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String fetchMisConfiguredTestsCount(){
+
+        this.misConfiguredTestsCount = VulnerableTestingRunResultDao.instance.countFromDb(Filters.eq(TestingRunResult.REQUIRES_CONFIG, true), true);
+        return Action.SUCCESS.toUpperCase();
+    }
+
 
     public List<ApiCollection> getApiCollections() {
         return this.apiCollections;

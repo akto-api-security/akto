@@ -75,8 +75,8 @@ jobs:
           cd apps/dashboard
 
           if [[ "${{ github.event.inputs.data_ingestion}}" == "true" ]]; then
-            cd ../data-ingestion-service
-            docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/data-ingestion-service:$IMAGE_TAG_DATA_INGESTION -t $ECR_REGISTRY/data-ingestion-service:$IMAGE_TAG_DATA_INGESTION_2 . --push
+            cd ../mini-runtime-service
+            docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/mini-runtime-service:$IMAGE_TAG_DATA_INGESTION -t $ECR_REGISTRY/mini-runtime-service:$IMAGE_TAG_DATA_INGESTION_2 . --push
           fi
 
       - name: Configure AWS Credentials for ECR

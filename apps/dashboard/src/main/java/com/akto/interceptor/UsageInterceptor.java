@@ -79,16 +79,16 @@ public class UsageInterceptor extends AbstractInterceptor {
                      * if the feature doesn't exist in the entitlements map,
                      * then the user is unauthorized to access the feature
                      */
-                    if (!featureAccess.getIsGranted()) {
-                        ((ActionSupport) invocation.getAction())
-                                .addActionError("This feature is not available in your plan.");
-                        return UNAUTHORIZED;
-                    }
-                    if (featureAccess.checkInvalidAccess()) {
-                        ((ActionSupport) invocation.getAction())
-                                .addActionError("You have exceeded the limit of this feature.");
-                        return UNAUTHORIZED;
-                    }
+//                    if (!featureAccess.getIsGranted()) {
+//                        ((ActionSupport) invocation.getAction())
+//                                .addActionError("This feature is not available in your plan.");
+//                        return UNAUTHORIZED;
+//                    }
+//                    if (featureAccess.checkInvalidAccess()) {
+//                        ((ActionSupport) invocation.getAction())
+//                                .addActionError("You have exceeded the limit of this feature.");
+//                        return UNAUTHORIZED;
+//                    }
 
                 }
             }
