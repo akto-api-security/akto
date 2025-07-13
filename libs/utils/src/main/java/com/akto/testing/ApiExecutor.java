@@ -267,6 +267,13 @@ public class ApiExecutor {
         return replaceHostFromConfig(url, testingRunConfig);
     }
 
+    public static OriginalHttpResponse sendRequestByProtocol(OriginalHttpRequest request, boolean followRedirects, TestingRunConfig testingRunConfig, boolean debug, List<TestingRunResult.TestLog> testLogs, boolean skipSSRFCheck) throws Exception {
+        if (isJsonRpcRequest(request)) {
+            return sendRequestWithSse(request, followRedirects, testingRunConfig, debug, testLogs, skipSSRFCheck);
+        }
+        return sendRequest(request, followRedirects, testingRunConfig, debug, testLogs, skipSSRFCheck);
+    }
+
     public static OriginalHttpResponse sendRequest(OriginalHttpRequest request, boolean followRedirects, TestingRunConfig testingRunConfig, boolean debug, List<TestingRunResult.TestLog> testLogs, boolean skipSSRFCheck) throws Exception {
         // don't lowercase url because query params will change and will result in incorrect request
 
@@ -647,14 +654,15 @@ public class ApiExecutor {
         if (uri.getScheme() == null || uri.getHost() == null) {
             throw new IllegalArgumentException("URL must be absolute with scheme and host for SSE: " + url);
         }
+        request.setUrl(url);
         String host = uri.getScheme() + "://" + uri.getHost() + (uri.getPort() != -1 ? ":" + uri.getPort() : "");
         SseSession session = openSseSession(host);
 
         // Add sessionId as query param to actual request
-        String endpoint = session.endpoint;
-        if (!endpoint.startsWith("/")) endpoint = "/" + endpoint;
-        String newUrl = host + endpoint;
-        request.setUrl(newUrl);
+        String[] queryParam = session.endpoint.split("\\?");
+        if (queryParam.length > 1) {
+            request.setQueryParams(queryParam[1]);
+        }
 
         // Send actual request
         OriginalHttpResponse resp = sendRequest(request, followRedirects, testingRunConfig, debug, testLogs, skipSSRFCheck);
