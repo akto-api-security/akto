@@ -714,4 +714,27 @@ public class Utils {
 
         return testResult;
     }
+
+    /**
+     * Escapes a string for safe use in JavaScript context.
+     * This method handles quotes, backslashes, and other special characters
+     * that could lead to XSS vulnerabilities when embedded in JavaScript strings.
+     * 
+     * @param input the string to escape
+     * @return the escaped string safe for JavaScript embedding, or empty string if input is null
+     */
+    public static String escapeForJavaScript(String input) {
+        if (input == null) {
+            return "";
+        }
+        return input.replace("\\", "\\\\")
+                   .replace("'", "\\'")
+                   .replace("\"", "\\\"")
+                   .replace("\n", "\\n")
+                   .replace("\r", "\\r")
+                   .replace("\t", "\\t")
+                   .replace("\b", "\\b")
+                   .replace("\f", "\\f")
+                   .replace("</", "<\\/");  // Prevent </script> tag injection
+    }
 }
