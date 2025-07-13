@@ -25,7 +25,8 @@ import {
   RefreshMajor,
   CustomersMinor,
   PlusMinor,
-  SettingsMinor
+  SettingsMinor,
+  ViewMajor
 } from '@shopify/polaris-icons';
 import api from "../api";
 import observeApi from "../../observe/api";
@@ -49,6 +50,7 @@ import { produce } from "immer"
 import GithubServerTable from "../../../components/tables/GithubServerTable";
 import RunTest from '../../observe/api_collections/RunTest';
 import TableStore from '../../../components/tables/TableStore'
+import TestingRunEndpointsModal from './TestingRunEndpointsModal';
 let sortOptions = [
   { label: 'Severity', value: 'severity asc', directionLabel: 'Highest severity', sortKey: 'total_severity', columnIndex: 3 },
   { label: 'Severity', value: 'severity desc', directionLabel: 'Lowest severity', sortKey: 'total_severity', columnIndex: 3 },
@@ -130,6 +132,7 @@ function SingleTestRunPage() {
   const [workflowTest, setWorkflowTest] = useState(false);
   const [secondaryPopover, setSecondaryPopover] = useState(false)
   const setErrorsObject = TestingStore((state) => state.setErrorsObject)
+  const setTestingEndpointsApisList = TestingStore((state) => state.setTestingEndpointsApisList)
   const currentTestingRuns = []
   const [updateTable, setUpdateTable] = useState("")
   const [testRunResultsCount, setTestRunResultsCount] = useState({})
@@ -273,6 +276,11 @@ function SingleTestRunPage() {
     }
   })
 
+  const populateTestingEndpointsApisList = (apiEndpoints) => {
+    const testingEndpointsApisList = transform.prepareTestingEndpointsApisList(apiEndpoints)
+    setTestingEndpointsApisList(testingEndpointsApisList)
+  } 
+
   const populateApiNameFilterChoices = async (testingRun) => {
     if (testingRun?.testingEndpoints) {
       const {testingEndpoints} = testingRun;
@@ -287,6 +295,10 @@ function SingleTestRunPage() {
             if (response?.apiInfoList) {
               const limitedEndpoints = response.apiInfoList.slice(
                   0, 5000);
+
+              const limitedEndpointsIds = limitedEndpoints.map(endpoint => endpoint.id);
+              populateTestingEndpointsApisList(limitedEndpointsIds);
+
               apiEndpoints = getApiEndpointsMap(limitedEndpoints, testingEndpoints.type);
             }
           } catch (error) {
@@ -296,6 +308,7 @@ function SingleTestRunPage() {
       } else if (testingEndpoints.type === "CUSTOM"
           && testingEndpoints.apisList) {
         const limitedApis = testingEndpoints.apisList.slice(0, 5000);
+        populateTestingEndpointsApisList(limitedApis);
         apiEndpoints = getApiEndpointsMap(limitedApis, testingEndpoints.type);
       }
 
@@ -620,6 +633,8 @@ function SingleTestRunPage() {
   }
   
   const [activeFromTesting, setActiveFromTesting] = useState(false)
+  
+  const [showTestingEndpointsModal, setShowTestingEndpointsModal] = useState(false)
 
   const resultTable = (
     <>
@@ -638,6 +653,12 @@ function SingleTestRunPage() {
         testRunType={testingRunResultSummariesObj?.testingRunType} 
         disabled={window.USER_ROLE === "GUEST"}
         shouldDisable={selectedTestRun.type === "CI_CD" || selectedTestRun.type === "RECURRING"}
+      />
+      <TestingRunEndpointsModal
+        key={"testing-endpoints-modal"}
+        showTestingEndpointsModal={showTestingEndpointsModal}
+        setShowTestingEndpointsModal={setShowTestingEndpointsModal}
+        testingEndpoints={testingRunResultSummariesObj?.testingRun?.testingEndpoints}
       />
       <GithubServerTable
         key={"table"}
@@ -877,6 +898,11 @@ function SingleTestRunPage() {
   moreActionsList.push({
     title: 'More',
     items: [
+      {
+        content: 'See APIs',
+        icon: ViewMajor,
+        onAction: () => { setShowTestingEndpointsModal(true) }
+      },
       {
         content: 'Re-Calculate Issues Count',
         icon: RefreshMajor,

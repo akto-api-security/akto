@@ -21,6 +21,7 @@ import TestingStore from "./testingStore";
 import IssuesCheckbox from "../issues/IssuesPage/IssuesCheckbox";
 import { CellType } from "@/apps/dashboard/components/tables/rows/GithubRow";
 import LocalStore from "../../../main/LocalStorageStore";
+import GetPrettifyEndpoint from "@/apps/dashboard/pages/observe/GetPrettifyEndpoint";
 
 let headers = [
     {
@@ -1284,6 +1285,16 @@ getMissingConfigs(testResults){
       testSuiteIds:testMode? [] : testSuiteIds,
       autoTicketingDetails: autoTicketingDetails,
     }
+  },
+  prepareTestingEndpointsApisList(apiEndpoints) {
+    const collectionsMap = PersistStore.getState().collectionsMap;
+    const testingEndpointsApisList = apiEndpoints.map(api => ({
+      ...api,
+      id: api.method + "###" + api.url + "###" + api.apiCollectionId + "###" + Math.random(),
+      apiEndpointComp: <GetPrettifyEndpoint method={api.method} url={api.url} isNew={false} maxWidth="15vw" />,
+      apiCollectionName: collectionsMap?.[api.apiCollectionId] || ""
+    }));
+    return testingEndpointsApisList;
   }
 }
 
