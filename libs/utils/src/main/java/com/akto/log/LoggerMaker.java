@@ -212,9 +212,6 @@ public class LoggerMaker {
         String infoMessage = "acc: " + accountId + ", " + info;
         logger.info(infoMessage);
         try{
-            if(shouldNotSendLogs){
-                return;
-            }   
             insert(infoMessage, "info",db);
         } catch (Exception e){
 
@@ -249,6 +246,11 @@ public class LoggerMaker {
     }
     
     private void insert(String info, String key, LogDb db) {
+
+        if(shouldNotSendLogs){
+            return;
+        }  
+
         if (moduleId == null) {
             moduleId = "";
         }
