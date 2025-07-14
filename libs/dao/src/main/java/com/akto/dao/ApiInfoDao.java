@@ -234,6 +234,11 @@ public class ApiInfoDao extends AccountsContextDaoWithRbac<ApiInfo>{
         int totalApis = 0;
         int apisTestedInLookBackPeriod = 0;
         float totalRiskScore = 0;
+        int apisInScopeForTesting = 0;
+
+        Map<Integer,Boolean> collectionsMap = ApiCollectionsDao.instance.findAll(collectionFilter, Projections.include(ApiCollection.ID, ApiCollection.IS_OUT_OF_TESTING_SCOPE))
+            .stream()
+            .collect(Collectors.toMap(ApiCollection::getId, ApiCollection::getIsOutOfTestingScope));
 
         // we need only end timestamp filter because data needs to be till end timestamp while start timestamp is for calculating delta
         Bson filter = Filters.and(collectionFilter,
@@ -253,9 +258,10 @@ public class ApiInfoDao extends AccountsContextDaoWithRbac<ApiInfo>{
         } catch (Exception e){
         }
         MongoCursor<ApiInfo> cursor = instance.getMCollection().find(filter).cursor();
-
+        boolean isOutOfTestingScope = false;
         while(cursor.hasNext()) {
             ApiInfo apiInfo = cursor.next();
+            isOutOfTestingScope = collectionsMap.getOrDefault(apiInfo.getId().getApiCollectionId(), false);
             if (apiInfo.getDiscoveredTimestamp() <= startTimestamp) {
                 apiInfo.addStats(apiStatsStart);
                 apiStatsStart.setTotalAPIs(apiStatsStart.getTotalAPIs()+1);
@@ -265,7 +271,10 @@ public class ApiInfoDao extends AccountsContextDaoWithRbac<ApiInfo>{
             apiInfo.addStats(apiStatsEnd);
             totalApis += 1;
             totalRiskScore += apiInfo.getRiskScore();
-            if (apiInfo.getLastTested() > (Context.now() - 30 * 24 * 60 * 60)) apisTestedInLookBackPeriod += 1;
+            if(!isOutOfTestingScope){
+                if (apiInfo.getLastTested() > (Context.now() - 30 * 24 * 60 * 60)) apisTestedInLookBackPeriod += 1;
+                apisInScopeForTesting += 1;
+            }
             String severity = apiInfo.findSeverity();
             apiStatsEnd.addSeverityCount(severity);
         }
@@ -274,6 +283,7 @@ public class ApiInfoDao extends AccountsContextDaoWithRbac<ApiInfo>{
         apiStatsEnd.setTotalAPIs(totalApis);
         apiStatsEnd.setApisTestedInLookBackPeriod(apisTestedInLookBackPeriod);
         apiStatsEnd.setTotalRiskScore(totalRiskScore);
+        apiStatsEnd.setTotalInScopeForTestingApis(apisInScopeForTesting);
 
         return new Pair<>(apiStatsStart, apiStatsEnd);
     }

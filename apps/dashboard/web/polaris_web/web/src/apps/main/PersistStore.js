@@ -87,7 +87,7 @@ let persistStore = (set, get) => ({
     },
     setAllCollections: (allCollections) => {
         try {
-            const optimizedCollections = allCollections.map(({ id, displayName, urlsCount, deactivated, type, automated, startTs, hostName, name, description, envType }) => ({
+            const optimizedCollections = allCollections.map(({ id, displayName, urlsCount, deactivated, type, automated, startTs, hostName, name, description, envType, isOutOfTestingScope }) => ({
                 id,
                 displayName,
                 urlsCount,
@@ -98,7 +98,8 @@ let persistStore = (set, get) => ({
                 hostName,
                 name,
                 description,
-                envType
+                envType,
+                isOutOfTestingScope,
             }));
             set({ allCollections: optimizedCollections });
         } catch (error) {

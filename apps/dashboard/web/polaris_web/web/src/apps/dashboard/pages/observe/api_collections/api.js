@@ -28,5 +28,12 @@ export default {
             method: 'post',
             data: {apiCollectionId}
         })
-    }
+    },
+    toggleCollectionsOutOfTestScope(apiCollectionIds, currentIsOutOfTestingScopeVal){
+        return request({
+            url: '/api/toggleCollectionsOutOfTestScope',
+            method: 'post',
+            data: { apiCollectionIds, currentIsOutOfTestingScopeVal }
+        })
+    },
 }

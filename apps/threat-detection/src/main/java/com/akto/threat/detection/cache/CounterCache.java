@@ -24,4 +24,8 @@ public interface CounterCache {
   void set(String key, long val);
 
   void removeMembersFromSortedSet(String sortedSet, long startRange, long endRange);
+
+  void setBytesWithExpiry(String key, byte[] value, int expirySeconds);
+
+  byte[] fetchDataBytes(String key);
 }

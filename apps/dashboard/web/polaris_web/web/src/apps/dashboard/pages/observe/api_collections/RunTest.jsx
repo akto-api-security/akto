@@ -87,7 +87,6 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
 
     const [miniTestingServiceNames, setMiniTestingServiceNames] = useState([])
     const [slackChannels, setSlackChannels] = useState([])
-    const emptyCondition = { data: { key: '', value: '' }, operator: { 'type': 'ADD_HEADER' } }
     const [conditions, dispatchConditions] = useReducer(produce((draft, action) => func.conditionsReducer(draft, action)), []);
 
     const localCategoryMap = LocalStore.getState().categoryMap
@@ -125,7 +124,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                         if (!slackName ) {
                             slackName = 'Slack Webhook';
                         } else if ( /^https?:\/\//i.test(slackName)){
-                            slackName = prettifyUrl(token.name)
+                            slackName = token.name.replace(/^https?:\/\//i, '').replace(/\/$/, '');
                         }
                         return {
                             label: slackName,
@@ -247,20 +246,6 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
 
                 handleAddSettings(parentAdvanceSettingsConfig);
             
-                const getRecurringContext = (periodInSeconds) => {
-                    if (periodInSeconds === 86400) return "Daily"
-                    else if (periodInSeconds === (86400 * 30)) return "Monthly"
-                    else if (periodInSeconds === (86400 * 7)) return "Weekly"
-                    else if (periodInSeconds === -1) return "Continuously"
-                    else return "Once"
-                }
-
-                const getRunTypeLabel = (runType, periodInSeconds) => {
-                    if (!runType || runType === "CI_CD" || runType === "ONE_TIME") return "Once";
-                    else if (runType === "RECURRING") return getRecurringContext(periodInSeconds)
-                    else if (runType === "CONTINUOUS_TESTING") return "Continuously";
-                }
-
                 const hourOfTest = func.getHourFromEpoch(testIdConfig.scheduleTimestamp)
                 const hourLabel = func.getFormattedHoursUsingLabel(hourOfTest, hourlyTimes, nowLabel)
 
@@ -274,14 +259,14 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                     testRoleId: testIdConfig.testingRunConfig.testRoleId,
                     testRunTimeLabel: (testIdConfig.testRunTime === -1) ? "30 minutes" : getLabel(testRunTimeOptions, testIdConfig.testRunTime.toString())?.label,
                     testRoleLabel: getLabel(testRolesArr, testIdConfig?.testingRunConfig?.testRoleId)?.label,
-                    runTypeLabel: getRunTypeLabel(testRunType, testIdConfig?.periodInSeconds),
+                    runTypeLabel: func.getRunTypeLabel(testRunType, testIdConfig?.periodInSeconds),
                     testName: testIdConfig.name,
                     sendSlackAlert: testIdConfig?.sendSlackAlert,
                     sendMsTeamsAlert: testIdConfig?.sendMsTeamsAlert,
-                    recurringDaily: getRecurringContext(testIdConfig?.periodInSeconds) === "Daily",
-                    recurringMonthly: getRecurringContext(testIdConfig?.periodInSeconds) === "Monthly",
-                    recurringWeekly: getRecurringContext(testIdConfig?.periodInSeconds) === "Weekly",
-                    continuousTesting: getRecurringContext(testIdConfig?.periodInSeconds) === "Continuously",
+                    recurringDaily: func.getRecurringContext(testIdConfig?.periodInSeconds) === "Daily",
+                    recurringMonthly: func.getRecurringContext(testIdConfig?.periodInSeconds) === "Monthly",
+                    recurringWeekly: func.getRecurringContext(testIdConfig?.periodInSeconds) === "Weekly",
+                    continuousTesting: func.getRecurringContext(testIdConfig?.periodInSeconds) === "Continuously",
                     autoTicketingDetails: testIdConfig?.testingRunConfig?.autoTicketingDetails || initialAutoTicketingDetails,
                     hourlyLabel: hourLabel.label,
                     scheduleTimestamp: testIdConfig?.scheduleTimestamp,
@@ -330,7 +315,8 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                 value: x.name,
                 author: x.author,
                 nature: x?.attributes?.nature?._name || "",
-                severity: x?.superCategory?.severity?._name || ""
+                severity: x?.superCategory?.severity?._name || "",
+                duration: x?.attributes?.duration?._name || ""
             }
             ret[x.superCategory.name].all.push(obj)
             ret[x.superCategory.name].selected.push(obj)
