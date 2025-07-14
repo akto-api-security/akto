@@ -54,6 +54,12 @@
             <artifactId>jetty-servlets</artifactId>
             <version>9.4.44.v20210927</version>
         </dependency>
+
+        <dependency>
+            <groupId>com.akto.apps.mini-runtime</groupId>
+            <artifactId>mini-runtime</artifactId>
+            <version>${project.version}</version>
+        </dependency>
         
        
     </dependencies>

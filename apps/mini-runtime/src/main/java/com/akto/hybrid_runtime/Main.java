@@ -125,6 +125,10 @@ public class Main {
         }
     }
 
+    static APIConfig apiConfig = null;
+    static boolean fetchAllSTI = true;
+    static boolean syncImmediately = false;
+
     // REFERENCE: https://www.oreilly.com/library/view/kafka-the-definitive/9781491936153/ch04.html (But how do we Exit?)
     public static void main(String[] args) {
         //String mongoURI = System.getenv("AKTO_MONGO_CONN");;
@@ -138,8 +142,8 @@ public class Main {
         }
         String groupIdConfig =  System.getenv("AKTO_KAFKA_GROUP_ID_CONFIG");
         String instanceType =  System.getenv("AKTO_INSTANCE_TYPE");
-        boolean syncImmediately = false;
-        boolean fetchAllSTI = true;
+
+
         Map<Integer, AccountInfo> accountInfoMap =  new HashMap<>();
 
         boolean isDashboardInstance = instanceType != null && instanceType.equals("DASHBOARD");
@@ -166,7 +170,7 @@ public class Main {
 
         dataActor.modifyHybridSaasSetting(RuntimeMode.isHybridDeployment());
 
-        APIConfig apiConfig = null;
+
         try {
             apiConfig = dataActor.fetchApiConfig(configName);;
         } catch (Exception e) {
@@ -444,5 +448,125 @@ public class Main {
         SingleTypeInfoDao.instance.createIndicesIfAbsent();
         SensitiveSampleDataDao.instance.createIndicesIfAbsent();
         SampleDataDao.instance.createIndicesIfAbsent();
+    }
+
+    public static long lastSyncOffsetMRS = 0;
+
+    public static void processData(Queue<String> data) {
+        Map<Integer, AccountInfo> accountInfoMap =  new HashMap<>();
+        String instanceType =  System.getenv("AKTO_INSTANCE_TYPE");
+        boolean isDashboardInstance = instanceType != null && instanceType.equals("DASHBOARD");
+        Map<Integer, Integer> logSentMap = new HashMap<>();
+        Map<String, HttpCallParser> httpCallParserMap = new HashMap<>();
+        try {
+            if (data == null || data.isEmpty()) {
+                loggerMaker.errorAndAddToDb("Received empty data in processData", LogDb.RUNTIME);
+            }else{
+                Map<String, List<HttpResponseParams>> responseParamsToAccountMap = new HashMap<>();
+                for(String dataRecord: data) {
+                    if (dataRecord == null || dataRecord.isEmpty()) {
+                        loggerMaker.errorAndAddToDb("Received empty data in processData", LogDb.RUNTIME);
+
+                    }else{
+                        HttpResponseParams httpResponseParams;
+                        try {
+
+                            Utils.printL(data);
+                            lastSyncOffsetMRS++;
+
+                            if (lastSyncOffsetMRS % 100 == 0) {
+                                logger.info("Committing offset at position: " + lastSyncOffsetMRS);
+                            }
+
+                            httpResponseParams = HttpCallParser.parseKafkaMessage(dataRecord);
+                        } catch (Exception e) {
+                            loggerMaker.errorAndAddToDb(e, "Error while parsing kafka message " + e, LogDb.RUNTIME);
+                            continue;
+                        }
+
+                        String accountId = httpResponseParams.getAccountId();
+                        if (!responseParamsToAccountMap.containsKey(accountId)) {
+                            responseParamsToAccountMap.put(accountId, new ArrayList<>());
+                        }
+                        responseParamsToAccountMap.get(accountId).add(httpResponseParams);
+                    }
+                }
+
+                for (String accountId: responseParamsToAccountMap.keySet()) {
+                    int accountIdInt;
+                    try {
+                        accountIdInt = Integer.parseInt(accountId);
+                    } catch (Exception ignored) {
+                        loggerMaker.errorAndAddToDb("Account id not string", LogDb.RUNTIME);
+                        continue;
+                    }
+
+                    Context.accountId.set(accountIdInt);
+
+                    AccountInfo accountInfo = accountInfoMap.get(accountIdInt);
+                    if (accountInfo == null) {
+                        accountInfo = new AccountInfo();
+                        accountInfoMap.put(accountIdInt, accountInfo);
+                    }
+
+                    if ((Context.now() - accountInfo.lastEstimatedCountTime) > 60*60) {
+                        loggerMaker.infoAndAddToDb("current time: " + Context.now() + " lastEstimatedCountTime: " + accountInfo.lastEstimatedCountTime, LogDb.RUNTIME);
+                        accountInfo.lastEstimatedCountTime = Context.now();
+                        accountInfo.estimatedCount = dataActor.fetchEstimatedDocCount();
+                        accountInfo.setAccountSettings(dataActor.fetchAccountSettings());
+                        loggerMaker.infoAndAddToDb("STI Estimated count: " + accountInfo.estimatedCount, LogDb.RUNTIME);
+                    }
+
+                    if (!isDashboardInstance && accountInfo.estimatedCount> 20_000_000) {
+                        loggerMaker.infoAndAddToDb("STI count is greater than 20M, skipping", LogDb.RUNTIME);
+                        continue;
+                    }
+
+                    if (UsageMetricUtils.checkActiveEndpointOverage(accountIdInt)) {
+                        int now = Context.now();
+                        int lastSent = logSentMap.getOrDefault(accountIdInt, 0);
+                        if (now - lastSent > LoggerMaker.LOG_SAVE_INTERVAL) {
+                            logSentMap.put(accountIdInt, now);
+                            loggerMaker.infoAndAddToDb("Active endpoint overage detected for account " + accountIdInt
+                                    + ". Ingestion stopped " + now, LogDb.RUNTIME);
+                        }
+                        continue;
+                    }
+
+                    if (!httpCallParserMap.containsKey(accountId)) {
+                        HttpCallParser parser = new HttpCallParser(
+                                apiConfig.getUserIdentifier(), apiConfig.getThreshold(), apiConfig.getSync_threshold_count(),
+                                apiConfig.getSync_threshold_time(), fetchAllSTI
+                        );
+                        httpCallParserMap.put(accountId, parser);
+                        loggerMaker.infoAndAddToDb("New parser created for account: " + accountId, LogDb.RUNTIME);
+                    }
+
+                    HttpCallParser parser = httpCallParserMap.get(accountId);
+
+                    if (isDashboardInstance) {
+                        syncImmediately = true;
+                        fetchAllSTI = false;
+                    }
+
+                    try {
+                        List<HttpResponseParams> accWiseResponse = responseParamsToAccountMap.get(accountId);
+
+                        accWiseResponse = filterBasedOnHeaders(accWiseResponse, accountInfo.accountSettings);
+                        loggerMaker.infoAndAddToDb("Initiating sync function for account: " + accountId, LogDb.RUNTIME);
+                        parser.syncFunction(accWiseResponse, syncImmediately, fetchAllSTI, accountInfo.accountSettings);
+                        loggerMaker.debugInfoAddToDb("Sync function completed for account: " + accountId, LogDb.RUNTIME);
+
+                    } catch (Exception e) {
+                        loggerMaker.errorAndAddToDb(e.toString(), LogDb.RUNTIME);
+                    }
+                }
+
+            }
+
+
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error processing data: " + e.getMessage(), LogDb.RUNTIME);
+        }
     }
 }

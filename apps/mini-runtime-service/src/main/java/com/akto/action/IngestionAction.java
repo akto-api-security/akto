@@ -3,6 +3,7 @@ package com.akto.action;
 import java.util.Base64;
 import java.util.List;
 
+import com.akto.hybrid_runtime.Main;
 import com.akto.log.LoggerMaker;
 import com.auth0.jwt.JWT;
 import com.auth0.jwt.interfaces.DecodedJWT;
@@ -35,7 +36,7 @@ public class IngestionAction extends ActionSupport {
         this.result = result;
     }
 
-    private static Queue<Object> queue = new LinkedList<>();
+    private static Queue<String> queue = new LinkedList<>();
     private static final int ACCOUNT_ID_TO_ADD_DEFAULT_DATA = getAccountId();
 
     public String ingestData() {
@@ -53,8 +54,15 @@ public class IngestionAction extends ActionSupport {
                     payload.setPath("/");
                 }
 
-                //KafkaUtils.insertData(payload);
+                KafkaUtils.insertData(payload);
                 queue.add(payload);
+
+
+                if (queue.size() > 100) {
+                    Main.processData(queue);
+                    queue.clear();
+                }
+
                 result = "succes";
                 printLogs("Data has been inserted to Queue in MRS.");
             }
