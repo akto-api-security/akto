@@ -50,7 +50,9 @@ import { produce } from "immer"
 import GithubServerTable from "../../../components/tables/GithubServerTable";
 import RunTest from '../../observe/api_collections/RunTest';
 import TableStore from '../../../components/tables/TableStore'
+import issuesFunctions from '@/apps/dashboard/pages/issues/module';
 import TestingRunEndpointsModal from './TestingRunEndpointsModal';
+
 let sortOptions = [
   { label: 'Severity', value: 'severity asc', directionLabel: 'Highest severity', sortKey: 'total_severity', columnIndex: 3 },
   { label: 'Severity', value: 'severity desc', directionLabel: 'Lowest severity', sortKey: 'total_severity', columnIndex: 3 },
@@ -480,6 +482,10 @@ function SingleTestRunPage() {
       }
     }
 
+    // Fetch jira integration field metadata
+    if (window.JIRA_INTEGRATED === 'true') {
+      issuesFunctions.fetchCreateIssueFieldMetaData()
+    }
   }, []);
 
   const promotedBulkActions = () => {
