@@ -168,6 +168,14 @@ const api = {
             method: 'post',
             data: {sourceCodeType}
         })
+    },
+
+    initiateCrawler(hostname, username, password) {
+        return request({
+            url: '/api/initiateCrawler',
+            method: 'post',
+            data: {hostname, username, password}
+        })
     }
 }
 

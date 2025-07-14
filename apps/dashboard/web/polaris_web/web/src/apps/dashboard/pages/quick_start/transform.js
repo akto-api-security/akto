@@ -12,6 +12,7 @@ import func from "@/util/func"
 import AddOnComponenet from "./components/shared/AddOnComponenet"
 import BitBucketSource from "./components/BitBucketSource"
 import GithubSource from "./components/GithubSource"
+import AktoJax from "./components/AktoJax"
 
 const mirroringObj = {
     icon: '/public/aws.svg',
@@ -190,6 +191,15 @@ const burpObj = {
     docsUrl: 'https://docs.akto.io/traffic-connector/manual/burp-suite',
     key: "BURP",
     component : <BurpSource/>
+}
+
+const aktoJaxObj = {
+    icon: '/public/aktojax.svg',
+    label: "AktoJax",
+    text: "You can deploy Akto's crawler on your machine to automatically scan and collect API endpoints and traffic data.",   
+    docsUrl: 'https://docs.akto.io/traffic-connector/crawler/aktojax',
+    key: "AKTOJAX",
+    component : <AktoJax />
 }
 
 const dockerObj = {
@@ -1069,6 +1079,11 @@ const quickStartFunc = {
             burpObj, postmanObj, harFileUploadObj, openApiObj, wsdlApiObj, graphqlApiIObj
         ];
 
+        // Crawler
+        const crawler = [
+            aktoJaxObj
+        ];
+
         // Akto SDK
         const aktoSdk = [
             goObj, javaObj, nodejsObj, pythonObj
@@ -1089,6 +1104,7 @@ const quickStartFunc = {
             "GCP Services": gcpServices,
             "Azure Services": azureServices,
             "Manual": manual,
+            "Crawler": crawler,
             "Akto SDK": aktoSdk,
             "Virtual Machines": vm,
             "Source Code": sourceCode,
@@ -1113,7 +1129,7 @@ const quickStartFunc = {
             openApiObj, beanStalkObj, eksObj, dockerObj, envoyObj,
             harFileUploadObj, kongObj, tcpObj, mirroringObj, hybridSaasObj, apiInventoryFromSourceCodeObj,
             ebpfObj, ebpfMTLSObj, istioObj, pythonObj, awsApiGatewayObj, awsLambdaObj,
-            apigeeObj, azureObj, cloudflareObj, f5Obj, goObj, haproxyObj, javaObj, kongmeshObj, layer7Obj, nodejsObj, openshiftObj, threescaleObj, githubObj, gitlabObj, bitbucketObj
+            apigeeObj, azureObj, cloudflareObj, f5Obj, goObj, haproxyObj, javaObj, kongmeshObj, layer7Obj, nodejsObj, openshiftObj, threescaleObj, githubObj, gitlabObj, bitbucketObj, aktoJaxObj
         ]
         return connectorsList
     },
