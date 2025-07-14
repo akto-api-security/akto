@@ -1,26 +1,24 @@
 import issuesApi from "@/apps/dashboard/pages/issues/api"
 import IssuesStore from '@/apps/dashboard/pages/issues/issuesStore';
 import { TextField } from "@shopify/polaris";
+import DropdownSearch from "../../components/shared/DropdownSearch";
 
 const setCreateJiraIssueFieldMetaData = IssuesStore.getState().setCreateJiraIssueFieldMetaData;
 const updateDisplayJiraIssueFieldValues = IssuesStore.getState().updateDisplayJiraIssueFieldValues;
+const displayJiraIssueFieldValues = IssuesStore.getState().displayJiraIssueFieldValues;
 
 const issuesFunctions = {
-    getJiraFieldConfigurations: (customFieldURI) => {
-        // Custom field types in JIRA - https://support.atlassian.com/jira-cloud-administration/docs/custom-fields-types-in-company-managed-projects/
-
-        // Handle field value changes
+    getJiraFieldConfigurations: (customFieldURI, allowedValues) => {
         const handleFieldChange = (fieldId, value) => {
             updateDisplayJiraIssueFieldValues(fieldId, value)
-        }
+        } 
+       
 
         switch (customFieldURI) {
             case "com.atlassian.jira.plugin.system.customfieldtypes:textfield":
                 return {
                     initialValue: "",
                     getComponent: ({ field }) => {
-                        const displayJiraIssueFieldValues = IssuesStore((state) => state.displayJiraIssueFieldValues)
-                    
                         return (
                             <TextField
                                 key={field?.fieldId || ""}
@@ -33,20 +31,42 @@ const issuesFunctions = {
                             />)
                     }
                 }
+            case "com.atlassian.jira.plugin.system.customfieldtypes:select":
+            case "com.atlassian.jira.plugin.system.customfieldtypes:radiobuttons":
+                return {
+                    initialValue: allowedValues.length > 0 ? allowedValues[0].id : "",
+                    getComponent: ({field}) => {
+                        return (
+                            <DropdownSearch
+                                allowMultiple={customFieldURI.includes("select")}
+                                optionsList={allowedValues.map((option) => ({
+                                    label: option?.value,
+                                    value: option.id
+                                }))}
+                                setSelected={(value) => handleFieldChange(field?.fieldId, value)}
+                                value={displayJiraIssueFieldValues[field?.fieldId] || ""}
+                                preSelected={[]}
+                                label={field?.name || ""}
+                                placeholder={`Select an option for the field ${field?.name || ""}`}
+                            />
+                        )
+                    } 
+                }
             default:
                 return {
-                    getComponent: ({ field }) => { return null },
-                    initialValue: ""
+                    getComponent: ({ field }) => { return null }
                 }
         }
     },
     fetchCreateIssueFieldMetaData: async () => {
         try {
-
-            const response = await issuesApi.fetchCreateJiraIssueFieldMetaData()
-            if (response && response.createIssueFieldMetaData) {
-                const metaData = response.createIssueFieldMetaData;
-                setCreateJiraIssueFieldMetaData(metaData);
+            if(IssuesStore.getState().createJiraIssueFieldMetaData && Object.keys(IssuesStore.getState().createJiraIssueFieldMetaData).length === 0) {
+                const response = await issuesApi.fetchCreateJiraIssueFieldMetaData()
+                if (response && Object.keys(response).length > 0) {
+                    setCreateJiraIssueFieldMetaData(response);
+                }
+            }else{
+                return IssuesStore.getState().createJiraIssueFieldMetaData;
             }
         } catch (error) {
         } 

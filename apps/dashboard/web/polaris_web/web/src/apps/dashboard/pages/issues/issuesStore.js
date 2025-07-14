@@ -1,5 +1,5 @@
 import {create} from "zustand"
-import {devtools} from "zustand/middleware"
+import {createJSONStorage, devtools, persist} from "zustand/middleware"
 
 let issuesStore = (set)=>({
     createJiraIssueFieldMetaData: {},
@@ -13,9 +13,17 @@ let issuesStore = (set)=>({
                 [fieldId]: value
             }
         })),
+
+    resetStore: () => {
+        set({
+            createJiraIssueFieldMetaData: {},
+            displayJiraIssueFieldValues: {}
+        })
+    },  
 })
 
 issuesStore = devtools(issuesStore)
+issuesStore = persist(issuesStore, {name: 'Akto-jira-custom-fields', storage: createJSONStorage(() => sessionStorage)})
 const IssuesStore = create(issuesStore)
 export default IssuesStore
 
