@@ -560,16 +560,16 @@ public class ApiExecutor {
     private static boolean isJsonRpcRequest(OriginalHttpRequest request) {
         try {
             String body = request.getBody();
-            if (body == null) return false;
-            JsonNode node = objectMapper.readTree(body);
-            return node.has("jsonrpc") && node.has("id");
+            if (StringUtils.isEmpty(body)) {
+                return false;
+            }
+            return body.contains("jsonrpc") && body.contains("id");
         } catch (Exception e) {
             return false;
         }
     }
 
     private static class SseSession {
-        String sessionId;
         String endpoint;
         List<String> messages = new ArrayList<>();
         Response response; // Store the OkHttp Response for cleanup
