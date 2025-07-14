@@ -649,7 +649,7 @@ const transform = {
     let finalDataSubCategories = [], promises = [], categories = [];
     let testSourceConfigs = []
     const limit = 50;
-    for(var i = 0 ; i < 25; i++){
+    for(var i = 0 ; i < 40; i++){
       promises.push(
         api.fetchAllSubCategories(fetchActive, type, i * limit, limit)
       )
