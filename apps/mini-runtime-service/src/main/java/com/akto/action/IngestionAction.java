@@ -6,6 +6,9 @@ import com.akto.dto.HttpRequestParams;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.log.LoggerMaker;
+import com.akto.runtime.utils.Utils;
+import com.akto.util.HttpRequestResponseUtils;
+import com.akto.util.JSONUtils;
 import com.auth0.jwt.JWT;
 import com.auth0.jwt.interfaces.DecodedJWT;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -18,6 +21,9 @@ import org.apache.commons.lang3.StringUtils;
 import com.akto.utils.IngestDataBatch;
 import com.opensymphony.xwork2.Action;
 import com.opensymphony.xwork2.ActionSupport;
+import org.apache.commons.lang3.math.NumberUtils;
+import static com.akto.runtime.utils.Utils.printL;
+import static com.akto.runtime.utils.Utils.printUrlDebugLog;
 
 @lombok.Getter
 @lombok.Setter
@@ -39,7 +45,7 @@ public class IngestionAction extends ActionSupport {
         this.result = result;
     }
 
-    private static Queue<HttpResponseParams> queue = new LinkedList<>();
+    public static Queue<HttpResponseParams> trafficDiscoveryQueue = new LinkedList<>();
     private static final int ACCOUNT_ID_TO_ADD_DEFAULT_DATA = getAccountId();
     private static long lastInsertionTime = System.currentTimeMillis();
 
@@ -58,21 +64,8 @@ public class IngestionAction extends ActionSupport {
                     payload.setPath("/");
                 }
 
-               // KafkaUtils.insertData(payload);
                 HttpResponseParams responseParams = parseIngestDataBatchToHttpResponseParams(payload);
-                queue.add(responseParams);
-
-                long currentTime = System.currentTimeMillis();
-                com.akto.hybrid_runtime.Main.processData(queue);
-                // Check if queue size > 100 or 5 seconds have passed since last insertion
-//                if (queue.size() > 100 || (currentTime - lastInsertionTime > 5000 && queue.size() >= 100)) {
-//                    com.akto.hybrid_runtime.Main.processData(queue);
-//                    queue.clear();
-//                    lastInsertionTime = currentTime;
-//                } else {
-//                    lastInsertionTime = currentTime;
-//                }
-
+                trafficDiscoveryQueue.add(responseParams);
                 result = "success";
                 loggerMaker.info("Data has been inserted to Queue in MRS.");
             }
@@ -85,42 +78,82 @@ public class IngestionAction extends ActionSupport {
 
     private final static ObjectMapper mapper = new ObjectMapper();
 
-    public static HttpResponseParams parseIngestDataBatchToHttpResponseParams(IngestDataBatch payload) throws JsonProcessingException {
-        HttpRequestParams requestParams = new HttpRequestParams();
-        requestParams.setMethod(payload.getMethod());
-        requestParams.setUrl(payload.getPath());
+    public static HttpResponseParams parseIngestDataBatchToHttpResponseParams(IngestDataBatch payloadData) throws JsonProcessingException {
 
-      //  requestParams.setBody(payload.getRequestBody());
+        String method = payloadData.getMethod();
+        String url = payloadData.getPath();
+        String type = payloadData.getType();
+        Map<String,List<String>> requestHeaders = OriginalHttpRequest.buildHeadersMap(payloadData.getRequestHeaders());
 
-        HttpResponseParams responseParams = new HttpResponseParams();
-        responseParams.setRequestParams(requestParams);
-        responseParams.setPayload(payload.getResponsePayload());
-        responseParams.setStatusCode(Integer.parseInt(payload.getStatusCode()));
-        responseParams.setAccountId(payload.getAkto_account_id());
-        responseParams.setSourceIP(payload.getIp());
-        responseParams.setDestIP(payload.getDestIp());
-        responseParams.setTime(Integer.parseInt(payload.getTime()));
-        responseParams.setType(payload.getType());
+        String rawRequestPayload = payloadData.getRequestPayload();
+        String requestPayload = HttpRequestResponseUtils.rawToJsonString(rawRequestPayload,requestHeaders);
 
 
-        Map<String,List<String>> requestHeaders = OriginalHttpRequest.buildHeadersMap(payload.getRequestHeaders());
-        Map<String, List<String>> responseHeaders = OriginalHttpRequest.buildHeadersMap(payload.getResponseHeaders());
-        requestHeaders.put("x-forwarded-for", Collections.singletonList(payload.getIp()));
+        String apiCollectionIdStr = (payloadData.getAkto_vxlan_id() != null ? payloadData.getAkto_vxlan_id() : "0");
+        int apiCollectionId = 0;
+        if (NumberUtils.isDigits(apiCollectionIdStr)) {
+            apiCollectionId = NumberUtils.toInt(apiCollectionIdStr, 0);
+        }
 
-        Map<String, List<String>> mergedHeaders = new HashMap<>(requestHeaders);
-        responseHeaders.forEach((key, value) -> mergedHeaders.merge(key, value, (v1, v2) -> {
-            List<String> mergedList = new ArrayList<>(v1);
-            mergedList.addAll(v2);
-            return mergedList;
-        }));
-        responseParams.setHeaders(mergedHeaders);
+        HttpRequestParams requestParams = new HttpRequestParams(
+                method,url,type, requestHeaders, requestPayload, apiCollectionId
+        );
 
-        return responseParams;
+        int statusCode = Integer.parseInt(payloadData.getStatusCode());
+        String status = payloadData.getStatus();
+        Map<String,List<String>> responseHeaders = OriginalHttpRequest.buildHeadersMap(payloadData.getResponseHeaders());
+        String payload = payloadData.getResponsePayload();
+        payload = HttpRequestResponseUtils.rawToJsonString(payload, responseHeaders);
+        payload = JSONUtils.parseIfJsonP(payload);
+        int time = Integer.parseInt(payloadData.getTime());
+        String accountId = payloadData.getAkto_account_id();
+        String sourceIP = payloadData.getIp();
+        String destIP = payloadData.getDestIp() != null ? payloadData.getDestIp() : "";
+        String direction = payloadData.getDirection()!= null ? payloadData.getDirection() : "";
+
+
+        String isPendingStr = payloadData.getIs_pending()!= null ? payloadData.getIs_pending() : "false";
+        boolean isPending = !isPendingStr.toLowerCase().equals("false");
+        String sourceStr = payloadData.getSource()!= null ? payloadData.getSource() : HttpResponseParams.Source.OTHER.name();
+        HttpResponseParams.Source source = HttpResponseParams.Source.valueOf(sourceStr);
+
+        // JSON string of K8 POD tags
+        String tags = payloadData.getTag() != null ? payloadData.getTag() : "";
+        HttpResponseParams httpResponseParams = new HttpResponseParams(
+                type,statusCode, status, responseHeaders, payload, requestParams, time, accountId, isPending, source, mapper.writeValueAsString(payloadData), sourceIP, destIP, direction, tags
+        );
+        if(!tags.isEmpty()){
+            String tagLog = "K8 Pod Tags: " + tags + " Host: " + requestHeaders.getOrDefault("host", new ArrayList<>()) + " Url: " + url;
+            printL(tagLog);
+            if ((Utils.printDebugHostLog(httpResponseParams) != null) || Utils.printDebugUrlLog(url)) {
+                printUrlDebugLog(tagLog);
+            }
+            injectTagsInHeaders(requestParams, tags);
+        }
+
+        return httpResponseParams;
+    }
+
+    private static final Gson gson = new Gson();
+    private static void injectTagsInHeaders(HttpRequestParams httpRequestParams, String tagsJson){
+        if(tagsJson == null || tagsJson.isEmpty()){
+            return;
+        }
+
+        Map<String, String> tagsMap = gson.fromJson(tagsJson, Map.class);
+        for (String tagName: tagsMap.keySet()){
+            List<String> headerValues = new ArrayList<>();
+            headerValues.add(tagsMap.get(tagName));
+            httpRequestParams.getHeaders().put("x-akto-k8s-"+ tagName, headerValues);
+        }
+        if(Utils.printDebugUrlLog(httpRequestParams.getURL())) {
+            printUrlDebugLog("Injecting K8 Pod Tags in Headers: " + tagsMap + " for URL: " + httpRequestParams.getURL());
+        }
     }
 
     public static int getAccountId() {
         try {
-            String token = System.getenv("DATABASE_ABSTRACTOR_SERVICE_TOKEN");
+            String token = "eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoiaW52aXRlX3VzZXIiLCJhY2NvdW50SWQiOjE3NDg4MDU3NTQsImlhdCI6MTc1MjQ5NzA4NiwiZXhwIjoxNzY4Mzk0Njg2fQ.Z8tu1eOv9LQVpiMQp6L_P-VIyNtODAJIUtNWNOidwZ-AFcj1SBtJTc0G05UAoVxOCE1MsZQwOpbLB3Ci_b7S7OYco40opx3GumKLmOcTChplvGR8tMOEjut7B-j--y99r9g0i0UhCiuk64yDmVjBcLKRiX_0J9GBgMcy14lkFeIQQ5o6FnAXxQd27agireZPR6qQb0PZku5V_b-5E9Am65cLwmUmqyRzSshn1aL1RgXUb1Fo93x-XLtyn4UpYgSvCZEAyhzKMRc9HDH4UvW8Z44ctm25rGb8OAklTrhwfsoNQZoDPgoiffayCBFzEt1x9wmzCy3U0zFNZdiZgGyOPw";
             DecodedJWT jwt = JWT.decode(token);
             String payload = jwt.getPayload();
             byte[] decodedBytes = Base64.getUrlDecoder().decode(payload);
