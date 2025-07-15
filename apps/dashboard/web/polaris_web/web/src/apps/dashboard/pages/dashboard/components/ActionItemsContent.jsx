@@ -1,17 +1,18 @@
-import { VerticalStack, Box } from '@shopify/polaris'
-import { ExternalMinor } from '@shopify/polaris-icons'
-import { useEffect, useState } from 'react'
-import FlyLayout from '../../../components/layouts/FlyLayout'
-import GridRows from '../../../components/shared/GridRows'
-import JiraTicketCreationModal from '../../../components/shared/JiraTicketCreationModal'
-import issuesApi from '../../issues/api';
+import { VerticalStack, Box } from '@shopify/polaris';
+import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import FlyLayout from '../../../components/layouts/FlyLayout';
+import GridRows from '../../../components/shared/GridRows';
+import JiraTicketCreationModal from '../../../components/shared/JiraTicketCreationModal';
+import JiraTicketDisplay from '../../../components/shared/JiraTicketDisplay';
 import ActionItemsTable from './ActionItemsTable';
 import CriticalActionItemCard from './CriticalActionItemCard';
-import { useNavigate } from 'react-router-dom';
-import { handleJiraIntegration as handleJiraIntegrationUtil } from '../../../../../util/handleJiraIntegration'
+import issuesApi from '../../issues/api';
+import api from '../api';
+import observeApi from '../../observe/api';
 import { createActionItem as createActionItemUtil } from '../../../../../util/createActionItem';
-import { fetchAllData as fetchAllDataUtil } from '../../../../../util/fetchAllData';
-import JiraTicketDisplay from '../../../components/shared/JiraTicketDisplay';
+import func from '../../../../../util/func';
+import settingsModule from '../../settings/module'; 
 
 const actionItemsHeaders = [
     { title: '', value: 'priority', type: 'text' },
@@ -33,10 +34,6 @@ const ACTION_ITEM_TYPES = {
 };
 
 const JIRA_INTEGRATION_URL = "/dashboard/settings/integrations/jira";
-const PRIORITY_P1 = 'P1';
-const PRIORITY_P2 = 'P2';
-const PRIORITY_P0 = 'P0';
-const CRITICAL_CARD_ID = 'p0-critical';
 
 export const ActionItemsContent = () => {
     const navigate = useNavigate();
@@ -50,16 +47,26 @@ export const ActionItemsContent = () => {
     const [jiraTicketUrlMap, setJiraTicketUrlMap] = useState({});
     const [fetchedData, setFetchedData] = useState(null);
 
-    const handleJiraIntegration = (actionItem) => {
-        handleJiraIntegrationUtil(
-            actionItem,
-            navigate,
-            setSelectedActionItem,
-            setJiraProjectMaps,
-            setProjId,
-            setIssueType,
-            setModalActive
-        );
+    const handleJiraIntegration = async (actionItem) => {
+        const integrated = Boolean(window?.JIRA_INTEGRATED);
+        if (!integrated) {
+            navigate(JIRA_INTEGRATION_URL);
+            return;
+        }
+        setSelectedActionItem(actionItem);
+        try {
+            const jirIntegration = await settingsModule.fetchJiraIntegration();
+            if (jirIntegration.projectIdsMap && Object.keys(jirIntegration.projectIdsMap).length > 0) {
+                setJiraProjectMaps(jirIntegration.projectIdsMap);
+                setProjId(Object.keys(jirIntegration.projectIdsMap)[0]);
+            } else {
+                setProjId(jirIntegration.projId);
+                setIssueType(jirIntegration.issueType);
+            }
+            setModalActive(true);
+        } catch (e) {
+            console.error("Error fetching Jira integration details:", e); 
+        }
     };
 
     const createActionItem = (
@@ -70,7 +77,7 @@ export const ActionItemsContent = () => {
         );
     };
 
-    function getActions(item) {
+    const getActions = (item) => {
         const actionSource = item?.actionItemObj || item;
         const jiraTicketUrl = jiraTicketUrlMap[actionSource?.actionItemType];
         const jiraKey = jiraTicketUrl?.split('/').pop() || "";
@@ -91,14 +98,49 @@ export const ActionItemsContent = () => {
                 accessibilityLabel: jiraTicketUrl ? `View Jira ticket ${jiraKey}` : 'Create Jira ticket',
             }]
         }];
-    }
-
+    };
 
     const fetchAllData = async () => {
+        const endTimestamp = func.timeNow();
+        const startTimestamp = endTimestamp - 3600 * 24 * 7;
+
         try {
-            await fetchAllDataUtil(setJiraTicketUrlMap, setFetchedData, setActionItems);
+            const results = await Promise.allSettled([ 
+                api.fetchApiStats(startTimestamp, endTimestamp),
+                observeApi.fetchCountMapOfApis(),
+                api.fetchSensitiveAndUnauthenticatedValue(),
+                api.fetchHighRiskThirdPartyValue(),
+                api.fetchShadowApisValue(),
+                settingsModule.fetchAdminInfo() 
+            ]);
+
+            const [
+                apiStatsResult,
+                countMapRespResult,
+                sensitiveAndUnauthenticatedValueResult,
+                highRiskThirdPartyValueResult,
+                shadowApisValueResult,
+                adminSettingsResult
+            ] = results;
+
+            const apiStats = apiStatsResult.status === 'fulfilled' ? apiStatsResult.value : null;
+            const countMapResp = countMapRespResult.status === 'fulfilled' ? countMapRespResult.value : null;
+            const SensitiveAndUnauthenticatedValue = sensitiveAndUnauthenticatedValueResult.status === 'fulfilled' ? sensitiveAndUnauthenticatedValueResult.value : 0;
+            const highRiskThirdPartyValue = highRiskThirdPartyValueResult.status === 'fulfilled' ? highRiskThirdPartyValueResult.value : 0;
+            const shadowApisValue = shadowApisValueResult.status === 'fulfilled' ? shadowApisValueResult.value : 0;
+            const adminSettings = adminSettingsResult.status === 'fulfilled' ? adminSettingsResult.value.resp : {}; 
+
+            results.forEach((result, index) => {
+                if (result.status === 'rejected') {
+                    console.error(`Error fetching data for promise at index ${index}:`, result.reason);
+                }
+            });
+
+            setJiraTicketUrlMap(adminSettings?.jiraTicketUrlMap || {});
+            setFetchedData({ apiStats, countMapResp, SensitiveAndUnauthenticatedValue, highRiskThirdPartyValue, shadowApisValue });
         } catch (error) {
-            console.error('Failed to fetch action items:', error);
+            console.error("Unexpected error in fetchAllData:", error);
+            setActionItems([]);
         }
     };
 
@@ -134,22 +176,22 @@ export const ActionItemsContent = () => {
         const thirdPartyDiff = (apiStatsEnd.accessTypeMap?.THIRD_PARTY || 0) - (apiStatsStart.accessTypeMap?.THIRD_PARTY || 0);
 
         const items = [
-            createActionItem('1', PRIORITY_P1, `${highRiskCount} APIs with risk score more than 3`,
+            createActionItem('1', 'P1', `${highRiskCount} APIs with risk score more than 3`,
                 "Creates multiple attack vectors for malicious actors", "Security Team", "Medium", highRiskCount, ACTION_ITEM_TYPES.HIGH_RISK_APIS),
 
-            createActionItem('2', PRIORITY_P1, `${sensitiveDataCount} Endpoints exposing PII or confidential information`,
+            createActionItem('2', 'P1', `${sensitiveDataCount} Endpoints exposing PII or confidential information`,
                 "Violates data privacy regulations (GDPR, CCPA) and risks customer trust", "Development", "Medium", sensitiveDataCount, ACTION_ITEM_TYPES.SENSITIVE_DATA_ENDPOINTS),
 
-            createActionItem('3', PRIORITY_P1, `${unauthenticatedCount} APIs lacking proper authentication controls`,
+            createActionItem('3', 'P1', `${unauthenticatedCount} APIs lacking proper authentication controls`,
                 "Easy target for unauthorized access and data exfiltration", "Security Team", "Medium", unauthenticatedCount, ACTION_ITEM_TYPES.UNAUTHENTICATED_APIS),
 
-            createActionItem('4', PRIORITY_P2, `${Math.max(0, thirdPartyDiff)} Third-party APIs frequently invoked or newly integrated within last 7 days`,
+            createActionItem('4', 'P2', `${Math.max(0, thirdPartyDiff)} Third-party APIs frequently invoked or newly integrated within last 7 days`,
                 "New integrations may introduce unvetted security risks", "Integration Team", "Low", Math.max(0, thirdPartyDiff), ACTION_ITEM_TYPES.THIRD_PARTY_APIS),
 
-            createActionItem('5', PRIORITY_P1, `${highRiskThirdPartyValue} External APIs with high risk scores requiring attention`,
+            createActionItem('5', 'P1', `${highRiskThirdPartyValue} External APIs with high risk scores requiring attention`,
                 "Supply chain vulnerabilities that can compromise entire systems", "Security Team", "High", highRiskThirdPartyValue, ACTION_ITEM_TYPES.HIGH_RISK_THIRD_PARTY),
 
-            createActionItem('6', PRIORITY_P2, `${shadowApisValue} Undocumented APIs discovered in the system`,
+            createActionItem('6', 'P2', `${shadowApisValue} Undocumented APIs discovered in the system`,
                 "Unmonitored attack surface with unknown security posture", "API Governance", "High", shadowApisValue, ACTION_ITEM_TYPES.SHADOW_APIS)
         ];
 
@@ -157,8 +199,8 @@ export const ActionItemsContent = () => {
 
         if (SensitiveAndUnauthenticatedValue > 0) {
             setCriticalCardData({
-                id: CRITICAL_CARD_ID,
-                priority: PRIORITY_P0,
+                id: 'p0-critical',
+                priority: 'P0',
                 title: `${SensitiveAndUnauthenticatedValue} APIs returning sensitive data without encryption or proper authorization`,
                 description: 'Potential data breach with regulatory and compliance implications',
                 team: 'Security & Development',
