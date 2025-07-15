@@ -267,8 +267,18 @@ public class ApiExecutor {
         return replaceHostFromConfig(url, testingRunConfig);
     }
 
-    public static OriginalHttpResponse sendRequest(OriginalHttpRequest request, boolean followRedirects, TestingRunConfig testingRunConfig, boolean debug, List<TestingRunResult.TestLog> testLogs, boolean skipSSRFCheck) throws Exception {
+    public static OriginalHttpResponse sendRequest(OriginalHttpRequest request, boolean followRedirects,
+        TestingRunConfig testingRunConfig, boolean debug, List<TestingRunResult.TestLog> testLogs,
+        boolean skipSSRFCheck) throws Exception {
+        return sendRequest(request, followRedirects, testingRunConfig, debug, testLogs, skipSSRFCheck, false);
+    }
+
+    private static OriginalHttpResponse sendRequest(OriginalHttpRequest request, boolean followRedirects, TestingRunConfig testingRunConfig, boolean debug, List<TestingRunResult.TestLog> testLogs, boolean skipSSRFCheck, boolean jsonRpcCheck) throws Exception {
         // don't lowercase url because query params will change and will result in incorrect request
+
+        if (!jsonRpcCheck && isJsonRpcRequest(request)) {
+            return sendRequestWithSse(request, followRedirects, testingRunConfig, debug, testLogs, skipSSRFCheck);
+        }
 
         if(testingRunConfig != null && testingRunConfig.getConfigsAdvancedSettings() != null && !testingRunConfig.getConfigsAdvancedSettings().isEmpty()){
             calculateFinalRequestFromAdvancedSettings(request, testingRunConfig.getConfigsAdvancedSettings());
@@ -553,16 +563,17 @@ public class ApiExecutor {
     private static boolean isJsonRpcRequest(OriginalHttpRequest request) {
         try {
             String body = request.getBody();
-            if (body == null) return false;
+            if (body == null) {
+                return false;
+            }
             JsonNode node = objectMapper.readTree(body);
-            return node.has("jsonrpc") && node.has("id");
+            return node.has("jsonrpc") && node.has("id") && node.has("method");
         } catch (Exception e) {
             return false;
         }
     }
 
     private static class SseSession {
-        String sessionId;
         String endpoint;
         List<String> messages = new ArrayList<>();
         Response response; // Store the OkHttp Response for cleanup
@@ -647,17 +658,18 @@ public class ApiExecutor {
         if (uri.getScheme() == null || uri.getHost() == null) {
             throw new IllegalArgumentException("URL must be absolute with scheme and host for SSE: " + url);
         }
+        request.setUrl(url);
         String host = uri.getScheme() + "://" + uri.getHost() + (uri.getPort() != -1 ? ":" + uri.getPort() : "");
         SseSession session = openSseSession(host);
 
         // Add sessionId as query param to actual request
-        String endpoint = session.endpoint;
-        if (!endpoint.startsWith("/")) endpoint = "/" + endpoint;
-        String newUrl = host + endpoint;
-        request.setUrl(newUrl);
+        String[] queryParam = session.endpoint.split("\\?");
+        if (queryParam.length > 1) {
+            request.setQueryParams(queryParam[1]);
+        }
 
         // Send actual request
-        OriginalHttpResponse resp = sendRequest(request, followRedirects, testingRunConfig, debug, testLogs, skipSSRFCheck);
+        OriginalHttpResponse resp = sendRequest(request, followRedirects, testingRunConfig, debug, testLogs, skipSSRFCheck, true);
 
         if (resp.getStatusCode() >= 400) {
             if (session.readerThread != null) {
