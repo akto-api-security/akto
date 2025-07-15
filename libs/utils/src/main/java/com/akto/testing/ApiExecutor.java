@@ -563,10 +563,11 @@ public class ApiExecutor {
     private static boolean isJsonRpcRequest(OriginalHttpRequest request) {
         try {
             String body = request.getBody();
-            if (StringUtils.isEmpty(body)) {
+            if (body == null) {
                 return false;
             }
-            return body.contains("jsonrpc") && body.contains("id");
+            JsonNode node = objectMapper.readTree(body);
+            return node.has("jsonrpc") && node.has("id") && node.has("method");
         } catch (Exception e) {
             return false;
         }
