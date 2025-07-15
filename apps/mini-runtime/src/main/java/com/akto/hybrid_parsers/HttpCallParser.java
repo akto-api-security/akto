@@ -77,6 +77,8 @@ public class HttpCallParser {
     private static final String trafficMetricsUrl = "https://logs.akto.io/traffic-metrics";
     private static final String NON_HOSTNAME_KEY = "null" + " "; // used for collections created without hostnames
 
+    private static final List<Integer> INPROCESS_ADVANCED_FILTERS_ACCOUNTS = Arrays.asList(1736798101, 1718042191);
+
     // Using default timeouts [10 seconds], as this is a slow API.
     private static final OkHttpClient client = CoreHTTPClient.client.newBuilder().build();
     
@@ -223,13 +225,12 @@ public class HttpCallParser {
     }
 
     public static FILTER_TYPE applyTrafficFilterInProcess(HttpResponseParams responseParam){
-        // Block filter: Ignore ip host, localhost, kubernetes host etc.
 
         FILTER_TYPE filterType = FILTER_TYPE.UNCHANGED;
         String hostName = getHeaderValue(responseParam.getRequestParams().getHeaders(), "host");
         String contentType = getHeaderValue(responseParam.getRequestParams().getHeaders(), "content-type");
 
-        // Block traffic filter.
+        // Block filter: Ignore ip host, localhost, kubernetes host etc.
         if (responseParam.getStatusCode() > 400 || isBlockedHost(hostName) || isBlockedContentType(contentType)) {
             filterType = FILTER_TYPE.BLOCKED;
             return filterType;
@@ -294,7 +295,16 @@ public class HttpCallParser {
 
     public static Pair<HttpResponseParams,FILTER_TYPE> applyAdvancedFilters(HttpResponseParams responseParams, Map<String, List<ExecutorNode>> executorNodesMap,  Map<String,FilterConfig> filterMap){
         if (filterMap != null && !filterMap.isEmpty()) {
-            FILTER_TYPE filterType = applyTrafficFilterInProcess(responseParams);
+            FILTER_TYPE filterType = FILTER_TYPE.UNCHANGED; 
+
+            if (Context.accountId.get() != null && INPROCESS_ADVANCED_FILTERS_ACCOUNTS.contains(Context.accountId.get())){
+
+                filterType = applyTrafficFilterInProcess(responseParams);
+            }else{
+
+                filterType = isValidResponseParam(responseParams, filterMap,  executorNodesMap);
+            }
+
             if(filterType.equals(FILTER_TYPE.BLOCKED)){
                 return new Pair<HttpResponseParams,FilterConfig.FILTER_TYPE>(null, FILTER_TYPE.BLOCKED);
             }else{
