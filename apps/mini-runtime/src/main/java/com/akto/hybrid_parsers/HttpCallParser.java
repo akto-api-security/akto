@@ -297,7 +297,7 @@ public class HttpCallParser {
         if (filterMap != null && !filterMap.isEmpty()) {
             FILTER_TYPE filterType = FILTER_TYPE.UNCHANGED; 
 
-            if (Context.accountId.get() != null && INPROCESS_ADVANCED_FILTERS_ACCOUNTS.contains(Context.accountId.get())){
+            if (INPROCESS_ADVANCED_FILTERS_ACCOUNTS.contains(DataActor.actualAccountId)) {
 
                 filterType = applyTrafficFilterInProcess(responseParams);
             }else{
