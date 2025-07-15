@@ -743,7 +743,7 @@ public class Main {
 
         }
         Map<String, HttpCallParser> httpCallParserMap = new HashMap<>();
-        String configName = "STAGING";
+        String configName = System.getenv("AKTO_CONFIG_NAME");
         APIConfig apiConfig = dataActor.fetchApiConfig(configName);
         if (apiConfig == null) {
             apiConfig = new APIConfig(configName,"access-token", 1, 10_000_000, sync_threshold_time); // this sync threshold time is used for deleting sample data
