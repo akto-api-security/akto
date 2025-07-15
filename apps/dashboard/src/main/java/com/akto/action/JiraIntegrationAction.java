@@ -950,7 +950,7 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
         contentList.add(buildContentDetails("Issue link - Akto dashboard", jiraMetaData.getIssueUrl()));
         contentList.add(buildContentDetails(jiraMetaData.getIssueDescription(), null));
 
-        BasicDBObject fields = buildPayloadForJiraTicket(summary, this.issueType, this.projId, contentList,jiraMetaData.getAdditionalIssueFields());
+        BasicDBObject fields = buildPayloadForJiraTicket(summary, this.projId, this.issueType, contentList,jiraMetaData.getAdditionalIssueFields());
         fields.put("labels", new String[] {JobConstants.TICKET_LABEL_AKTO_SYNC});
         return fields;
     }
