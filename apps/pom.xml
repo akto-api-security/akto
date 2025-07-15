@@ -52,6 +52,17 @@
             </modules>
         </profile>
         <profile>
+            <id>mini-runtime-service</id>
+            <activation>
+                <file>
+                    <exists>mini-runtime-service/pom.xml</exists>
+                </file>
+            </activation>
+            <modules>
+                <module>mini-runtime-service</module>
+            </modules>
+        </profile>
+        <profile>
             <id>database-abstractor</id>
             <activation>
                 <file>

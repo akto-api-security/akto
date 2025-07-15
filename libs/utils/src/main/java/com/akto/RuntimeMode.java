@@ -5,8 +5,8 @@ public enum RuntimeMode {
     NORMAL, HYBRID;
 
     public static RuntimeMode getRuntimeMode(){
-        String runtimeMode = System.getenv("RUNTIME_MODE");
-        if("hybrid".equalsIgnoreCase(runtimeMode)){
+        String runtimeMode = "hybrid";
+        if(1==1){
             return HYBRID;
         }
         return NORMAL;
