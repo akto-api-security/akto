@@ -7,15 +7,13 @@ import issuesFunctions from '@/apps/dashboard/pages/issues/module';
 const DisplayJiraCreateIssueFields = ({ displayJiraIssueFieldMetadata }) => {
     return (
         <FormLayout>
-            {displayJiraIssueFieldMetadata.map((field, idx) => {               
-                const customFieldURI = field.schema?.custom || ""
-                const allowedValues = field.allowedValues || [];
-                const fieldConfiguration = issuesFunctions.getJiraFieldConfigurations(customFieldURI, allowedValues)
+            {displayJiraIssueFieldMetadata.map((field, idx) => {     
+                const fieldConfiguration = issuesFunctions.getJiraFieldConfigurations(field)
                 const FieldComponent = fieldConfiguration.getComponent
                 
                 return (
                     <div key={field.fieldId || idx}>
-                        <FieldComponent field={field}/>
+                        <FieldComponent />
                     </div>
                 )
             })}
@@ -55,8 +53,7 @@ const JiraTicketCreationModal = ({ activator, modalActive, setModalActive, handl
             setDisplayJiraIssueFieldMetadata(filteredFieldMetaData);
 
             const initialValues = filteredFieldMetaData.reduce((acc, field) => {
-                const customFieldURI = field.schema?.custom || "";
-                const fieldConfiguration = issuesFunctions.getJiraFieldConfigurations(customFieldURI, []);
+                const fieldConfiguration = issuesFunctions.getJiraFieldConfigurations();
 
                 acc[field.fieldId] = fieldConfiguration.initialValue; //default value for each field
                 return acc;

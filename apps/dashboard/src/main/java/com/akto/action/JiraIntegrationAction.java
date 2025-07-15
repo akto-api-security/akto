@@ -952,6 +952,9 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
 
         BasicDBObject fields = buildPayloadForJiraTicket(summary, this.projId, this.issueType, contentList,jiraMetaData.getAdditionalIssueFields());
         fields.put("labels", new String[] {JobConstants.TICKET_LABEL_AKTO_SYNC});
+        fields.put("description", description);
+        
+         
         return fields;
     }
 

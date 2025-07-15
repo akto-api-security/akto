@@ -86,21 +86,26 @@ public class Utils {
         fields.put("description", new BasicDBObject("type", "doc").append("version", 1).append("content", contentList));
 
         if (additionalIssueFields != null) {
-            Object fieldsObj = additionalIssueFields.get("mandatoryCreateJiraIssueFields");
-
-            if (fieldsObj != null && fieldsObj instanceof List) {
-                List<?> mandatoryCreateJiraIssueFields = (List<?>) fieldsObj;
-                for (Object fieldObj : mandatoryCreateJiraIssueFields) {
-                    if (fieldObj instanceof Map<?, ?>) {
-                        Map<?, ?> mandatoryField = (Map<?, ?>) fieldObj;
-                        String fieldName = (String) mandatoryField.get("fieldId");
-                        String fieldValue = (String) mandatoryField.get("fieldValue");
-                        // Add to fields object
-
-                        if (fieldName == null) continue;
-                        fields.put(fieldName, fieldValue);
+            try {
+                Object fieldsObj = additionalIssueFields.get("mandatoryCreateJiraIssueFields");
+                if (fieldsObj != null && fieldsObj instanceof List) {
+                    List<?> mandatoryCreateJiraIssueFields = (List<?>) fieldsObj;
+                    for (Object fieldObj : mandatoryCreateJiraIssueFields) {
+                        if (fieldObj instanceof Map<?, ?>) {
+                            Map<?, ?> mandatoryField = (Map<?, ?>) fieldObj;
+                            Object fieldName = mandatoryField.get("fieldId");
+                            if (fieldName == null || !(fieldName instanceof String)) {
+                                continue;
+                            }
+                            String fieldNameStr = (String) fieldName;
+                            Object fieldValue = mandatoryField.get("fieldValue");
+                            fields.put(fieldNameStr, fieldValue);
+                        }
                     }
-            }
+                }
+
+            } catch (Exception e) {
+                e.printStackTrace();
             }
         }
         return fields;

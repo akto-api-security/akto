@@ -1,14 +1,18 @@
 import issuesApi from "@/apps/dashboard/pages/issues/api"
 import IssuesStore from '@/apps/dashboard/pages/issues/issuesStore';
 import { TextField } from "@shopify/polaris";
-import DropdownSearch from "../../components/shared/DropdownSearch";
+import DropdownSearch from "@/apps/dashboard/components/shared/DropdownSearch";
 
 const setCreateJiraIssueFieldMetaData = IssuesStore.getState().setCreateJiraIssueFieldMetaData;
 const updateDisplayJiraIssueFieldValues = IssuesStore.getState().updateDisplayJiraIssueFieldValues;
-const displayJiraIssueFieldValues = IssuesStore.getState().displayJiraIssueFieldValues;
 
 const issuesFunctions = {
-    getJiraFieldConfigurations: (customFieldURI, allowedValues) => {
+    getJiraFieldConfigurations: (field) => {
+        const customFieldURI = field?.schema?.custom || "";
+        const allowedValues = field?.allowedValues || [];
+        const fieldId = field?.fieldId || "";
+        const fieldName = field?.name || "";
+
         const handleFieldChange = (fieldId, value) => {
             updateDisplayJiraIssueFieldValues(fieldId, value)
         } 
@@ -18,13 +22,14 @@ const issuesFunctions = {
             case "com.atlassian.jira.plugin.system.customfieldtypes:textfield":
                 return {
                     initialValue: "",
-                    getComponent: ({ field }) => {
+                    getComponent: () => {
+                        const displayJiraIssueFieldValues = IssuesStore(state => state.displayJiraIssueFieldValues);
                         return (
                             <TextField
-                                key={field?.fieldId || ""}
-                                label={field?.name || ""}
-                                value={displayJiraIssueFieldValues[field?.fieldId] || ""}
-                                onChange={(value) => handleFieldChange(field?.fieldId, value)}
+                                key={fieldId}
+                                label={fieldName}
+                                value={displayJiraIssueFieldValues[fieldId] || ""}
+                                onChange={(value) => handleFieldChange(fieldId, value)}
                                 maxLength={255}
                                 showCharacterCount
                                 requiredIndicator
@@ -32,29 +37,50 @@ const issuesFunctions = {
                     }
                 }
             case "com.atlassian.jira.plugin.system.customfieldtypes:select":
-            case "com.atlassian.jira.plugin.system.customfieldtypes:radiobuttons":
+            case "com.atlassian.jira.plugin.system.customfieldtypes:multiselect":
+            case "com.atlassian.jira.plugin.system.customfieldtypes:radiobuttons": {
+                const isMultiSelect = customFieldURI.includes("multiselect");
+
+                const firstAllowedOption = {
+                    value: allowedValues.length > 0 ? allowedValues[0].value :  "",
+                }
+                
+                const initialFieldState = isMultiSelect ? [ firstAllowedOption ] : firstAllowedOption;
+                const preSelected = [ firstAllowedOption.value ];
+              
                 return {
-                    initialValue: allowedValues.length > 0 ? allowedValues[0].id : "",
-                    getComponent: ({field}) => {
+                    initialValue: initialFieldState,
+                    getComponent: () => {
+
                         return (
                             <DropdownSearch
-                                allowMultiple={customFieldURI.includes("select")}
+                                allowMultiple={customFieldURI.includes("multiselect")}
                                 optionsList={allowedValues.map((option) => ({
                                     label: option?.value,
-                                    value: option.id
+                                    value: option?.value
                                 }))}
-                                setSelected={(value) => handleFieldChange(field?.fieldId, value)}
-                                value={displayJiraIssueFieldValues[field?.fieldId] || ""}
-                                preSelected={[]}
-                                label={field?.name || ""}
-                                placeholder={`Select an option for the field ${field?.name || ""}`}
+                                setSelected={(selectedOption) => {
+                                    if (customFieldURI.includes("multiselect")) {
+                                        const updateFieldValue = selectedOption.map((option) => ({ value: option }));
+                                        handleFieldChange(fieldId, updateFieldValue);
+                                     } else {
+                                        const updateFieldValue = { value: selectedOption };
+                                        handleFieldChange(fieldId, updateFieldValue);
+                                    }
+                                }}
+                                value={""}
+                                preSelected={preSelected}
+                                label={fieldName}
+                                placeholder={`Select an option for the field ${fieldName}`}
+                                textfieldRequiredIndicator={true}
                             />
                         )
                     } 
                 }
+            }
             default:
                 return {
-                    getComponent: ({ field }) => { return null }
+                    getComponent: () => { return null }
                 }
         }
     },
