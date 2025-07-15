@@ -1,5 +1,6 @@
 package com.akto.action;
 
+import java.nio.file.DirectoryStream.Filter;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -975,10 +976,11 @@ public class ApiCollectionsAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
+    @Setter
+    private boolean showUrls;
     public String fetchSensitiveAndUnauthenticatedValue(){
 
         List<ApiInfo> sensitiveEndpoints = ApiInfoDao.instance.findAll(Filters.eq(ApiInfo.IS_SENSITIVE, true));
-
         for(ApiInfo apiInfo: sensitiveEndpoints) {
             if(apiInfo.getAllAuthTypesFound() != null && !apiInfo.getAllAuthTypesFound().isEmpty()) {
                 for(Set<ApiInfo.AuthType> authType: apiInfo.getAllAuthTypesFound()) {
@@ -992,26 +994,25 @@ public class ApiCollectionsAction extends UserAction {
     }
 
     public String fetchHighRiskThirdPartyValue(){
-
-        List<ApiInfo> highRiskEndpoints = ApiInfoDao.instance.findAll(
-                Filters.and(
-                        Filters.gte(ApiInfo.RISK_SCORE, 4),
-                        Filters.in(ApiInfo.API_ACCESS_TYPES, ApiInfo.ApiAccessType.THIRD_PARTY)
-                )
+        Bson filterQ = UsageMetricCalculator.excludeDemosAndDeactivated(ApiInfo.ID_API_COLLECTION_ID);
+        Bson filter = Filters.and(
+            filterQ,
+            Filters.gte(ApiInfo.RISK_SCORE, 4),
+            Filters.in(ApiInfo.API_ACCESS_TYPES, ApiInfo.ApiAccessType.THIRD_PARTY)
         );
-        this.highRiskThirdPartyEndpointsCount = highRiskEndpoints.size();
+        if(!showUrls){
+            this.highRiskThirdPartyEndpointsCount  = (int) ApiInfoDao.instance.count(filter);
+        }
         return Action.SUCCESS.toUpperCase();
     }
 
     public String fetchShadowApisValue(){
 
-        ApiCollection shadowApisCollection;
-        shadowApisCollection = ApiCollectionsDao.instance.findByName(AKTO_DISCOVERED_APIS_COLLECTION);
-
+        ApiCollection shadowApisCollection = ApiCollectionsDao.instance.findByName(AKTO_DISCOVERED_APIS_COLLECTION);
         if(shadowApisCollection != null) {
-            this.shadowApisCount = shadowApisCollection.getUrls().size();
-        } else {
-            this.shadowApisCount = 0;
+            if(!showUrls) {
+                this.shadowApisCount = (int) ApiInfoDao.instance.count(Filters.eq(ApiInfo.ID_API_COLLECTION_ID, shadowApisCollection.getId()));
+            }
         }
         return Action.SUCCESS.toUpperCase();
     }
