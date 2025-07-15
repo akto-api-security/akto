@@ -35,6 +35,8 @@ public class LoggerMaker {
         System.setProperty("org.slf4j.simpleLogger.log.org.mongodb", "ERROR");
         System.setProperty("org.slf4j.simpleLogger.log.io.netty", "ERROR");
         System.setProperty("org.slf4j.simpleLogger.log.org.flywaydb", "ERROR");
+        System.setProperty("org.slf4j.simpleLogger.showDateTime", "true");
+        System.setProperty("org.slf4j.simpleLogger.dateTimeFormat", "yyyy-MM-dd HH:mm:ss");
     }
 
     public static final int LOG_SAVE_INTERVAL = 60*60; // 1 hour
@@ -48,7 +50,7 @@ public class LoggerMaker {
     private static final DataActor dataActor = DataActorFactory.fetchInstance();
 
     protected static final Logger internalLogger = LoggerFactory.getLogger(LoggerMaker.class);
-    private static final boolean shouldNotSendTestingLogs = System.getenv("BLOCK_LOGS") != null && System.getenv("BLOCK_LOGS").equals("true");
+    private static final boolean shouldNotSendLogs = System.getenv("BLOCK_LOGS") != null && System.getenv("BLOCK_LOGS").equals("true");
 
     private static String moduleId = "";
 
@@ -210,9 +212,6 @@ public class LoggerMaker {
         String infoMessage = "acc: " + accountId + ", " + info;
         logger.info(infoMessage);
         try{
-            if(db == LogDb.TESTING && shouldNotSendTestingLogs){
-                return;
-            }   
             insert(infoMessage, "info",db);
         } catch (Exception e){
 
@@ -247,6 +246,11 @@ public class LoggerMaker {
     }
     
     private void insert(String info, String key, LogDb db) {
+
+        if(shouldNotSendLogs){
+            return;
+        }  
+
         if (moduleId == null) {
             moduleId = "";
         }
