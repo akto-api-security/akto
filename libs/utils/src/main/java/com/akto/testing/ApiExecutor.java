@@ -277,7 +277,7 @@ public class ApiExecutor {
         // don't lowercase url because query params will change and will result in incorrect request
 
         if (!jsonRpcCheck && isJsonRpcRequest(request)) {
-            return sendRequestWithSse(request, followRedirects, testingRunConfig, debug, testLogs, skipSSRFCheck);
+            return sendRequestWithSse(request, followRedirects, testingRunConfig, debug, testLogs, skipSSRFCheck, false);
         }
 
         if(testingRunConfig != null && testingRunConfig.getConfigsAdvancedSettings() != null && !testingRunConfig.getConfigsAdvancedSettings().isEmpty()){
@@ -651,19 +651,33 @@ public class ApiExecutor {
         throw new Exception("Timeout waiting for SSE message with id=" + id);
     }
 
-    public static OriginalHttpResponse sendRequestWithSse(OriginalHttpRequest request, boolean followRedirects, TestingRunConfig testingRunConfig, boolean debug, List<TestingRunResult.TestLog> testLogs, boolean skipSSRFCheck) throws Exception {
+    public static OriginalHttpResponse sendRequestWithSse(OriginalHttpRequest request, boolean followRedirects,
+        TestingRunConfig testingRunConfig, boolean debug, List<TestingRunResult.TestLog> testLogs,
+        boolean skipSSRFCheck, boolean overrideMessageEndpoint) throws Exception {
         // Always use prepareUrl to get the absolute URL
         String url = prepareUrl(request, testingRunConfig);
         URI uri = new URI(url);
         if (uri.getScheme() == null || uri.getHost() == null) {
             throw new IllegalArgumentException("URL must be absolute with scheme and host for SSE: " + url);
         }
-        request.setUrl(url);
         String host = uri.getScheme() + "://" + uri.getHost() + (uri.getPort() != -1 ? ":" + uri.getPort() : "");
         SseSession session = openSseSession(host);
 
+        if (StringUtils.isEmpty(session.endpoint)) {
+            closeSseSession(session);
+            throw new Exception("Failed to open SSE session as endpoint not found");
+        }
+
+        request.setUrl(url);
+
         // Add sessionId as query param to actual request
         String[] queryParam = session.endpoint.split("\\?");
+        // for cases where MCP tools are discovered by Akto, we need to override/add the message endpoint with the actual one we received from the sse stream
+        if (overrideMessageEndpoint) {
+            if (queryParam.length > 0) {
+                request.setUrl(host + queryParam[0]);
+            }
+        }
         if (queryParam.length > 1) {
             request.setQueryParams(queryParam[1]);
         }
@@ -672,13 +686,7 @@ public class ApiExecutor {
         OriginalHttpResponse resp = sendRequest(request, followRedirects, testingRunConfig, debug, testLogs, skipSSRFCheck, true);
 
         if (resp.getStatusCode() >= 400) {
-            if (session.readerThread != null) {
-                session.readerThread.interrupt();
-                session.readerThread.join(); // Wait for thread to finish
-            }
-            if (session.response != null) {
-                session.response.close(); // Now it's safe
-            }
+            closeSseSession(session);
             return resp;
         }
 
@@ -691,18 +699,21 @@ public class ApiExecutor {
             sseMsg = waitForMatchingSseMessage(session, id, 30000); // 30s timeout
 
         } finally {
-            if (session.readerThread != null) {
-                session.readerThread.interrupt();
-                session.readerThread.join(); // Wait for thread to finish
-            }
-            if (session.response != null) {
-                session.response.close(); // Now it's safe
-            }
+            closeSseSession(session);
         }
 
-        // Return SSE message as JSON (not as a string)
         JsonNode sseJson = objectMapper.readTree(sseMsg);
         String jsonBody = objectMapper.writeValueAsString(sseJson);
         return new OriginalHttpResponse(jsonBody, resp.getHeaders(), resp.getStatusCode());
+    }
+
+    private static void closeSseSession(SseSession session) throws InterruptedException {
+        if (session.readerThread != null) {
+            session.readerThread.interrupt();
+            session.readerThread.join();
+        }
+        if (session.response != null) {
+            session.response.close();
+        }
     }
 }

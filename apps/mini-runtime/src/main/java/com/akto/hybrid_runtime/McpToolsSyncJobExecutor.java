@@ -306,7 +306,7 @@ public class McpToolsSyncJobExecutor {
     }
 
     private OriginalHttpRequest createRequest(String host, String mcpMethod, String mcpMethodRequestJson) {
-        return new OriginalHttpRequest(mcpMethod,
+        return new OriginalHttpRequest("",
             null,
             HttpMethod.POST.name(),
             mcpMethodRequestJson,
@@ -322,7 +322,7 @@ public class McpToolsSyncJobExecutor {
     private String sendRequest(OriginalHttpRequest request) throws Exception {
         try {
             OriginalHttpResponse response = ApiExecutor.sendRequestWithSse(request, true, null, false,
-                new ArrayList<>(), false);
+                new ArrayList<>(), false, true);
             return response.getBody();
         } catch (Exception e) {
             logger.error("Error while making request to MCP server.", e);
