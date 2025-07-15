@@ -981,23 +981,32 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
 
         Map<String, Object> additionalIssueFields = jiraMetaData.getAdditionalIssueFields();
         if (additionalIssueFields != null) {
-            Object fieldsObj = additionalIssueFields.get("mandatoryCreateJiraIssueFields");
+            try {
+                Object fieldsObj = additionalIssueFields.get("mandatoryCreateJiraIssueFields");
 
-            if (fieldsObj != null && fieldsObj instanceof List) {
-                List<?> mandatoryCreateJiraIssueFields = (List<?>) fieldsObj;
-                for (Object fieldObj : mandatoryCreateJiraIssueFields) {
-                    if (fieldObj instanceof Map<?, ?>) {
-                        Map<?, ?> mandatoryField = (Map<?, ?>) fieldObj;
-                        String fieldName = (String) mandatoryField.get("fieldId");
-                        String fieldValue = (String) mandatoryField.get("fieldValue");
-                        // Add to fields object
+                if (fieldsObj != null && fieldsObj instanceof List) {
+                    List<?> mandatoryCreateJiraIssueFields = (List<?>) fieldsObj;
+                    for (Object fieldObj : mandatoryCreateJiraIssueFields) {
+                        if (fieldObj instanceof Map<?, ?>) {
+                            Map<?, ?> mandatoryField = (Map<?, ?>) fieldObj;
+                            Object fieldName = mandatoryField.get("fieldId");
+                            if (fieldName == null || !(fieldName instanceof String)) {
+                                continue;
+                            }
 
-                        if (fieldName == null) continue;
-                        fields.put(fieldName, fieldValue);
+                            String fieldNameStr = (String) fieldName;
+                            Object fieldValue = mandatoryField.get("fieldValue");
+                            // Add to fields object
+                            fields.put(fieldNameStr, fieldValue);
+                        }
                     }
-            }
+                }
+
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb(e, "Error while processing additional issue fields: ");
             }
         }
+         
         return fields;
     }
 
