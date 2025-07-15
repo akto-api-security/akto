@@ -200,7 +200,6 @@ function RepoSelector({ handleClickRepo, selectedConnection }) {
                 repoNameAzure: newRepoNameAzure,
                 privateToken: githubAccessToken
             }).then(async (res) => {
-                console.log("data from checkreporead: ", res);
                 if (res.success) {
                     setInvalidInput(false);
                     await handleClickRepo(newRepoName, project, null, githubAccessToken, newRepoNameAzure);
@@ -347,7 +346,6 @@ function RepositoryInitializer({ agentType }: { agentType: string }) {
                 }
                 : {};
         
-        console.log(data);
         if (Object.keys(data).length === 0) return;
         if(accessToken !== null) {
             data['accessToken'] = accessToken;
