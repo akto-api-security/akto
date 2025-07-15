@@ -58,6 +58,12 @@ public class Main {
     }   
 
     public static boolean isOnprem = false;
+    static long lastLogSyncOffsetMRS;
+    static boolean syncImmediately = false;
+    static boolean fetchAllSTI = true;
+    static Map<Integer, AccountInfo> accountInfoMap =  new HashMap<>();
+
+    static boolean isDashboardInstance = false;
 
     public static boolean tryForCollectionName(String message) {
         boolean ret = false;
@@ -690,18 +696,11 @@ public class Main {
         return properties;
     }
 
-    static long lastLogSyncOffsetMRS;
-    static boolean syncImmediately = false;
-    static boolean fetchAllSTI = true;
-    static Map<Integer, AccountInfo> accountInfoMap =  new HashMap<>();
 
-    static boolean isDashboardInstance = false;
 
-    public static void processData(Queue<HttpResponseParams> data) {
-        if (isDashboardInstance) {
-            syncImmediately = true;
-            fetchAllSTI = false;
-        }
+    public static void processData(List<HttpResponseParams> data) {
+        syncImmediately = true;
+        fetchAllSTI = false;
         Map<String, List<HttpResponseParams>> responseParamsToAccountMap = new HashMap<>();
 
         for(HttpResponseParams payload : data) {
