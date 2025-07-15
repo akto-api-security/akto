@@ -12,6 +12,7 @@ import com.akto.dao.testing.TestingRunResultDao;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dto.Config.AktoHostUrlConfig;
 import com.akto.dto.Config.ConfigType;
+import com.akto.dto.AccountSettings;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.jira_integration.*;
@@ -1281,13 +1282,9 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
 
     private void storeTicketUrlInAccountSettings(String jiraTicketUrl) {
         try {
-            Integer accountId = Context.accountId.get();
-            String updateKey = "jiraTicketUrlMap." + actionItemType;
-
-            BasicDBObject filter = new BasicDBObject("_id", accountId);
-            BasicDBObject update = new BasicDBObject("$set", new BasicDBObject(updateKey, jiraTicketUrl));
-
-            AccountSettingsDao.instance.updateOne(filter, update);
+            AccountSettingsDao.instance.updateOneNoUpsert(AccountSettingsDao.generateFilter(),
+                Updates.set(AccountSettings.JIRA_TICKET_URL_MAP + "." + this.actionItemType, jiraTicketUrl)
+            );
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error storing Jira URL: " + e.getMessage(), LoggerMaker.LogDb.DASHBOARD);
         }

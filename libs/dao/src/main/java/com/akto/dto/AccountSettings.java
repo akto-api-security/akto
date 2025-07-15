@@ -489,19 +489,6 @@ public class AccountSettings {
     public void setThreatPolicies(List<TestLibrary>  threatPolicies) {
         this.threatPolicies = threatPolicies;
     }
-    public void setJiraTicketUrl(String actionItemType, String jiraTicketUrl) {
-        if (this.jiraTicketUrlMap == null) {
-            this.jiraTicketUrlMap = new HashMap<>();
-        }
-        this.jiraTicketUrlMap.put(actionItemType, jiraTicketUrl);
-    }
-
-    public String getJiraTicketUrl(String actionItemType) {
-        if (this.jiraTicketUrlMap == null) {
-            return null;
-        }
-        return this.jiraTicketUrlMap.get(actionItemType);
-    }
 
     public Map<String, String> getJiraTicketUrlMap() {
         return this.jiraTicketUrlMap;
