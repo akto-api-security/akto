@@ -2,10 +2,10 @@ package com.akto.testing;
 
 import com.akto.dao.context.Context;
 import com.akto.dao.test_editor.TestEditorEnums;
-import com.akto.dto.OriginalHttpRequest;
-import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.CollectionConditions.ConditionsType;
 import com.akto.dto.CollectionConditions.TestConfigsAdvancedSettings;
+import com.akto.dto.OriginalHttpRequest;
+import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.testing.TLSAuthParam;
 import com.akto.dto.testing.TestingRunConfig;
 import com.akto.dto.testing.TestingRunResult;
@@ -17,21 +17,34 @@ import com.akto.metrics.AllMetrics;
 import com.akto.util.Constants;
 import com.akto.util.HttpRequestResponseUtils;
 import com.akto.util.grpc.ProtoBufUtils;
-
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import kotlin.Pair;
-import okhttp3.*;
-import okio.BufferedSink;
-
-import org.apache.commons.lang3.StringUtils;
-
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Base64;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Scanner;
+import kotlin.Pair;
+import okhttp3.Call;
+import okhttp3.Headers;
+import okhttp3.MediaType;
+import okhttp3.MultipartBody;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.RequestBody;
+import okhttp3.Response;
+import okhttp3.ResponseBody;
+import okio.BufferedSink;
+import org.apache.commons.lang3.StringUtils;
 
 public class ApiExecutor {
     private static final LoggerMaker loggerMaker = new LoggerMaker(ApiExecutor.class, LogDb.TESTING);
@@ -277,7 +290,7 @@ public class ApiExecutor {
         // don't lowercase url because query params will change and will result in incorrect request
 
         if (!jsonRpcCheck && isJsonRpcRequest(request)) {
-            return sendRequestWithSse(request, followRedirects, testingRunConfig, debug, testLogs, skipSSRFCheck);
+            return sendRequestWithSse(request, followRedirects, testingRunConfig, debug, testLogs, skipSSRFCheck, false);
         }
 
         if(testingRunConfig != null && testingRunConfig.getConfigsAdvancedSettings() != null && !testingRunConfig.getConfigsAdvancedSettings().isEmpty()){
@@ -651,19 +664,33 @@ public class ApiExecutor {
         throw new Exception("Timeout waiting for SSE message with id=" + id);
     }
 
-    public static OriginalHttpResponse sendRequestWithSse(OriginalHttpRequest request, boolean followRedirects, TestingRunConfig testingRunConfig, boolean debug, List<TestingRunResult.TestLog> testLogs, boolean skipSSRFCheck) throws Exception {
+    public static OriginalHttpResponse sendRequestWithSse(OriginalHttpRequest request, boolean followRedirects,
+        TestingRunConfig testingRunConfig, boolean debug, List<TestingRunResult.TestLog> testLogs,
+        boolean skipSSRFCheck, boolean overrideMessageEndpoint) throws Exception {
         // Always use prepareUrl to get the absolute URL
         String url = prepareUrl(request, testingRunConfig);
         URI uri = new URI(url);
         if (uri.getScheme() == null || uri.getHost() == null) {
             throw new IllegalArgumentException("URL must be absolute with scheme and host for SSE: " + url);
         }
-        request.setUrl(url);
         String host = uri.getScheme() + "://" + uri.getHost() + (uri.getPort() != -1 ? ":" + uri.getPort() : "");
         SseSession session = openSseSession(host);
 
+        if (StringUtils.isEmpty(session.endpoint)) {
+            closeSseSession(session);
+            throw new Exception("Failed to open SSE session as endpoint not found");
+        }
+
         // Add sessionId as query param to actual request
         String[] queryParam = session.endpoint.split("\\?");
+        // for cases where MCP tools are discovered by Akto, we need to override the endpoint as at this point of time we are unaware for the message endpoint.
+        if (overrideMessageEndpoint) {
+            if (queryParam.length > 0) {
+                request.setUrl(host + queryParam[0]);
+            }
+        } else {
+            request.setUrl(url);
+        }
         if (queryParam.length > 1) {
             request.setQueryParams(queryParam[1]);
         }
@@ -672,13 +699,7 @@ public class ApiExecutor {
         OriginalHttpResponse resp = sendRequest(request, followRedirects, testingRunConfig, debug, testLogs, skipSSRFCheck, true);
 
         if (resp.getStatusCode() >= 400) {
-            if (session.readerThread != null) {
-                session.readerThread.interrupt();
-                session.readerThread.join(); // Wait for thread to finish
-            }
-            if (session.response != null) {
-                session.response.close(); // Now it's safe
-            }
+            closeSseSession(session);
             return resp;
         }
 
@@ -691,18 +712,21 @@ public class ApiExecutor {
             sseMsg = waitForMatchingSseMessage(session, id, 30000); // 30s timeout
 
         } finally {
-            if (session.readerThread != null) {
-                session.readerThread.interrupt();
-                session.readerThread.join(); // Wait for thread to finish
-            }
-            if (session.response != null) {
-                session.response.close(); // Now it's safe
-            }
+            closeSseSession(session);
         }
 
-        // Return SSE message as JSON (not as a string)
         JsonNode sseJson = objectMapper.readTree(sseMsg);
         String jsonBody = objectMapper.writeValueAsString(sseJson);
         return new OriginalHttpResponse(jsonBody, resp.getHeaders(), resp.getStatusCode());
+    }
+
+    private static void closeSseSession(SseSession session) throws InterruptedException {
+        if (session.readerThread != null) {
+            session.readerThread.interrupt();
+            session.readerThread.join();
+        }
+        if (session.response != null) {
+            session.response.close();
+        }
     }
 }
