@@ -672,7 +672,7 @@ public class ApiExecutor {
 
         // Add sessionId as query param to actual request
         String[] queryParam = session.endpoint.split("\\?");
-        // for cases where MCP tools are discovered by Akto, we need to override the endpoint as at this point of time we are unaware for the message endpoint.
+        // for cases where MCP tools are discovered by Akto, we need to override/add the message endpoint with the actual one we received from the sse stream
         if (overrideMessageEndpoint) {
             if (queryParam.length > 0) {
                 request.setUrl(host + queryParam[0]);
