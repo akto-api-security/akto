@@ -74,7 +74,7 @@ public class ApiNodeExecutor extends NodeExecutor {
                     Thread.sleep(sleep);
                 }
 
-                response = ApiExecutor.sendRequestByProtocol(request, followRedirects, null, debug, testLogs, Main.SKIP_SSRF_CHECK);
+                response = ApiExecutor.sendRequest(request, followRedirects, null, debug, testLogs, Main.SKIP_SSRF_CHECK);
 
                 int statusCode = response.getStatusCode();
 
