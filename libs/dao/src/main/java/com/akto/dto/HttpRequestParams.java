@@ -118,4 +118,20 @@ public class HttpRequestParams {
     public void setApiCollectionId(int apiCollectionId) {
         this.apiCollectionId = apiCollectionId;
     }
+
+    public void setMethod(String method) {
+        this.method = method;
+    }
+
+    public String getUrl() {
+        return url;
+    }
+
+    public String getType() {
+        return type;
+    }
+
+    public void setType(String type) {
+        this.type = type;
+    }
 }
