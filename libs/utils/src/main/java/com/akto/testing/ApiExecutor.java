@@ -681,6 +681,8 @@ public class ApiExecutor {
             throw new Exception("Failed to open SSE session as endpoint not found");
         }
 
+        request.setUrl(url);
+
         // Add sessionId as query param to actual request
         String[] queryParam = session.endpoint.split("\\?");
         // for cases where MCP tools are discovered by Akto, we need to override the endpoint as at this point of time we are unaware for the message endpoint.
@@ -688,8 +690,6 @@ public class ApiExecutor {
             if (queryParam.length > 0) {
                 request.setUrl(host + queryParam[0]);
             }
-        } else {
-            request.setUrl(url);
         }
         if (queryParam.length > 1) {
             request.setQueryParams(queryParam[1]);
