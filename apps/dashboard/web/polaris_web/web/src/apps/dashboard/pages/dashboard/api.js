@@ -112,15 +112,7 @@ const api = {
             method: 'post',
             data: {}
         })
-    },
-
-    fetchAdminSettings() {
-        return request({
-            url: '/api/fetchAdminSettings',
-            method: 'post',
-            data: {}
-        })
-    },
+    }
 }
 
 export default api;

@@ -1,8 +1,8 @@
-import { Avatar, Badge, Box, Button, Card, Divider, HorizontalStack, Icon, Text, VerticalStack, Tag, Link } from '@shopify/polaris'
+import {  Badge, Box, Card, Divider, HorizontalStack, Icon, Text, VerticalStack } from '@shopify/polaris'
 import { TeamMajor, ToolsMajor } from "@shopify/polaris-icons"
 import TooltipText from '../../../components/shared/TooltipText'
-import React, { useMemo } from 'react'
 import JiraTicketDisplay from '../../../components/shared/JiraTicketDisplay';
+import func from '@/utils/func'
 
 function ActionItemCard(props) {
     const { cardObj, onButtonClick, jiraTicketUrlMap = {} } = props;
@@ -11,24 +11,11 @@ function ActionItemCard(props) {
     const jiraKey = jiraTicketUrl && jiraTicketUrl.length > 0
         ? /[^/]*$/.exec(jiraTicketUrl)[0]
         : "";
-
-    const getPriorityStatus = (priority) => {
-        const statusMap = {
-            P0: 'critical-strong-experimental',
-            P1: 'critical',
-            P2: 'attention',
-            P3: 'warning',
-            P4: 'info',
-            P5: 'success'
-        };
-        return statusMap[priority] || 'new';
-    };
-
     return (
         <Card padding="5">
             <VerticalStack gap="3">
                 <Box width="30px">
-                    <Badge status={getPriorityStatus(cardObj.priority)}>
+                    <Badge status={func.getPriorityStatus(cardObj.priority)}>
                         {cardObj.priority}
                     </Badge>
                 </Box>

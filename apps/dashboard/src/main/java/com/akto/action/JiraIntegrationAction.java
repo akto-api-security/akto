@@ -31,6 +31,7 @@ import com.akto.test_editor.Utils;
 import com.akto.testing.ApiExecutor;
 import com.akto.util.Constants;
 import com.akto.util.DashboardMode;
+import com.akto.util.Pair;
 import com.akto.util.enums.GlobalEnums;
 import com.akto.util.enums.GlobalEnums.TicketSource;
 import com.akto.util.http_util.CoreHTTPClient;
@@ -40,6 +41,9 @@ import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.*;
 import com.opensymphony.xwork2.Action;
+
+import lombok.Setter;
+
 import java.io.File;
 import java.net.URL;
 import java.util.*;
@@ -52,15 +56,20 @@ import java.util.stream.Collectors;
 import javax.servlet.http.HttpServletRequest;
 import okhttp3.*;
 
+import org.apache.commons.lang3.StringUtils;
 import org.apache.struts2.interceptor.ServletRequestAware;
 import org.bson.Document;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
+
 import com.akto.dao.AccountSettingsDao;
 
 import static com.akto.utils.jira.Utils.buildApiToken;
 import static com.akto.utils.jira.Utils.buildBasicRequest;
-import static com.akto.utils.jira.Utils.retryWithoutGzipRequest;;
+import static com.akto.utils.jira.Utils.retryWithoutGzipRequest;
+import static com.akto.utils.jira.Utils.handleError;
+import static com.akto.utils.jira.Utils.getJiraTicketUrlPair;
+import static com.akto.utils.jira.Utils.buildPayloadForJiraTicket;
 
 public class JiraIntegrationAction extends UserAction implements ServletRequestAware {
 
@@ -80,6 +89,7 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
 
     private String dashboardUrl;
 
+    @Setter
     private String actionItemType;
 
     private Map<String,List<BasicDBObject>> projectAndIssueMap;
@@ -100,9 +110,10 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
             .writeTimeout(60, TimeUnit.SECONDS)
             .build();
 
+    @Setter
     private String title;
+    @Setter
     private String description;
-    private String jiraTicketUrl;
 
     public String testIntegration() {
 
@@ -610,29 +621,16 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
             String responsePayload = response.getBody();
             if (response.getStatusCode() > 201 || responsePayload == null) {
                 loggerMaker.errorAndAddToDb("error while creating jira issue, url not accessible, requestbody " + request.getBody() + " ,responsebody " + response.getBody() + " ,responsestatus " + response.getStatusCode(), LoggerMaker.LogDb.DASHBOARD);
-                if (responsePayload != null) {
-                    try {
-                        BasicDBObject obj = BasicDBObject.parse(responsePayload);
-                        List<String> errorMessages = (List) obj.get("errorMessages");
-                        String error;
-                        if (errorMessages.size() == 0) {
-                            BasicDBObject errObj = BasicDBObject.parse(obj.getString("errors"));
-                            error = errObj.getString("project");
-                        } else {
-                            error = errorMessages.get(0);
-                        }
-                        addActionError(error);
-                    } catch (Exception e) {
-                        // TODO: handle exception
-                    }
+                String error = handleError(responsePayload);
+                if (error != null) {
+                    addActionError("Error while creating jira issue: " + error);
                 }
                 return Action.ERROR.toUpperCase();
             }
-            BasicDBObject payloadObj;
             try {
-                payloadObj =  BasicDBObject.parse(responsePayload);
-                this.jiraTicketKey = payloadObj.getString("key");
-                jiraTicketUrl = jiraIntegration.getBaseUrl() + "/browse/" + this.jiraTicketKey;
+                Pair<String, String> pair = getJiraTicketUrlPair(responsePayload, jiraIntegration.getBaseUrl());
+                this.jiraTicketKey = pair.getSecond();
+                jiraTicketUrl = pair.getFirst();
             } catch(Exception e) {
                 loggerMaker.errorAndAddToDb(e, "error making jira issue url " + e.getMessage(), LoggerMaker.LogDb.DASHBOARD);
                 return Action.ERROR.toUpperCase();
@@ -872,24 +870,10 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
                                 + request.getBody() + " ,response body " + response.getBody() + " ,response status " + response.getStatusCode(),
                         LoggerMaker.LogDb.DASHBOARD);
 
-                // TODO: This is a duplicated function remove it.
-                if (responsePayload != null) {
-                    try {
-                        BasicDBObject obj = BasicDBObject.parse(responsePayload);
-                        List<String> errorMessages = (List) obj.get("errorMessages");
-                        String error;
-                        if (errorMessages.size() == 0) {
-                            BasicDBObject errObj = BasicDBObject.parse(obj.getString("errors"));
-                            error = errObj.getString("project");
-                        } else {
-                            error = errorMessages.get(0);
-                        }
-                        addActionError(error);
-                    } catch (Exception e) {
-                        // Handle exception
-                    }
+                String error = handleError(responsePayload);
+                if (error != null) {
+                    addActionError("Error while creating Jira issues in bulk: " + error);
                 }
-
                 return Action.ERROR.toUpperCase();
             }
 
@@ -948,7 +932,6 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
     }
 
     private BasicDBObject jiraTicketPayloadCreator(JiraMetaData jiraMetaData) {
-        BasicDBObject fields = new BasicDBObject();
         String endpoint = jiraMetaData.getEndPointStr().replace("Endpoint - ", "");
         String truncatedEndpoint = endpoint;
         if(endpoint.length() > 30) {
@@ -958,52 +941,16 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
         String endpointMethod = jiraMetaData.getTestingIssueId().getApiInfoKey().getMethod().name();
 
         // issue title
-        fields.put("summary", "Akto Report - " + jiraMetaData.getIssueTitle() + " (" + endpointMethod + " - " + truncatedEndpoint + ")");
-
-        // Issue type (TASK)
-        BasicDBObject issueTypeObj = new BasicDBObject();
-        issueTypeObj.put("id", this.issueType);
-        fields.put("issuetype", issueTypeObj);
-        fields.put("labels", new String[] {JobConstants.TICKET_LABEL_AKTO_SYNC});
-
-
-        // Project ID
-        BasicDBObject project = new BasicDBObject();
-        project.put("key", this.projId);
-        fields.put("project", project);
-
-        // Issue description
-        BasicDBObject description = new BasicDBObject();
-        description.put("type", "doc");
-        description.put("version", 1);
+        String summary = "Akto Report - " + jiraMetaData.getIssueTitle() + " (" + endpointMethod + " - " + truncatedEndpoint + ")";
+        
         BasicDBList contentList = new BasicDBList();
         contentList.add(buildContentDetails(jiraMetaData.getHostStr(), null));
         contentList.add(buildContentDetails(jiraMetaData.getEndPointStr(), null));
         contentList.add(buildContentDetails("Issue link - Akto dashboard", jiraMetaData.getIssueUrl()));
         contentList.add(buildContentDetails(jiraMetaData.getIssueDescription(), null));
-        description.put("content", contentList);
 
-        fields.put("description", description);
-
-        Map<String, Object> additionalIssueFields = jiraMetaData.getAdditionalIssueFields();
-        if (additionalIssueFields != null) {
-            Object fieldsObj = additionalIssueFields.get("mandatoryCreateJiraIssueFields");
-
-            if (fieldsObj != null && fieldsObj instanceof List) {
-                List<?> mandatoryCreateJiraIssueFields = (List<?>) fieldsObj;
-                for (Object fieldObj : mandatoryCreateJiraIssueFields) {
-                    if (fieldObj instanceof Map<?, ?>) {
-                        Map<?, ?> mandatoryField = (Map<?, ?>) fieldObj;
-                        String fieldName = (String) mandatoryField.get("fieldId");
-                        String fieldValue = (String) mandatoryField.get("fieldValue");
-                        // Add to fields object
-
-                        if (fieldName == null) continue;
-                        fields.put(fieldName, fieldValue);
-                    }
-            }
-            }
-        }
+        BasicDBObject fields = buildPayloadForJiraTicket(summary, this.issueType, this.projId, contentList,jiraMetaData.getAdditionalIssueFields());
+        fields.put("labels", new String[] {JobConstants.TICKET_LABEL_AKTO_SYNC});
         return fields;
     }
 
@@ -1271,180 +1218,78 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
         );
     }
 
-
-public String createGeneralJiraTicket() {
-    jiraIntegration = JiraIntegrationDao.instance.findOne(new BasicDBObject());
-    if (jiraIntegration == null) {
-        addActionError("Jira is not integrated.");
-        return ERROR.toUpperCase();
-    }
-
-    try {
-        BasicDBObject reqPayload = createGeneralTicketPayload();
-        OriginalHttpRequest request = buildJiraRequest(reqPayload);
-        OriginalHttpResponse response = executeJiraRequest(request);
-        String jiraTicketUrl = processJiraResponse(response);
-        
-        if (actionItemType != null && !actionItemType.isEmpty()) {
-            storeTicketUrlInAccountSettings(jiraTicketUrl);
+    public String createGeneralJiraTicket() {
+        jiraIntegration = JiraIntegrationDao.instance.findOne(new BasicDBObject());
+        if (jiraIntegration == null) {
+            addActionError("Jira is not integrated.");
+            return ERROR.toUpperCase();
         }
-        
-        return Action.SUCCESS.toUpperCase();
-        
-    } catch (Exception e) {
-        loggerMaker.errorAndAddToDb(
-            "Error creating general Jira ticket: " + e.getMessage(), 
-            LoggerMaker.LogDb.DASHBOARD
-        );
-        return Action.ERROR.toUpperCase();
-    }
-}
 
-private BasicDBObject createGeneralTicketPayload() {
-    BasicDBObject fields = new BasicDBObject();
-    
-    fields.put("summary", getTitle());
-    fields.put("description", createAdfDocument(getDescription()));
-    fields.put("project", new BasicDBObject("key", projId));
-    fields.put("issuetype", new BasicDBObject("id", issueType));
-    
-    BasicDBObject reqPayload = new BasicDBObject();
-    reqPayload.put("fields", fields);
-    return reqPayload;
-}
-
-private BasicDBObject createAdfDocument(String content) {
-    BasicDBObject doc = new BasicDBObject();
-    doc.put("type", "doc");
-    doc.put("version", 1);
-    
-    BasicDBList contentList = new BasicDBList();
-    BasicDBObject paragraph = new BasicDBObject();
-    paragraph.put("type", "paragraph");
-    
-    BasicDBList paragraphContent = new BasicDBList();
-    paragraphContent.add(new BasicDBObject("type", "text").append("text", content));
-    
-    paragraph.put("content", paragraphContent);
-    contentList.add(paragraph);
-    doc.put("content", contentList);
-    
-    return doc;
-}
-
-private OriginalHttpRequest buildJiraRequest(BasicDBObject payload) {
-    String url = jiraIntegration.getBaseUrl() + CREATE_ISSUE_ENDPOINT;
-    String authHeader = Base64.getEncoder().encodeToString(
-        (jiraIntegration.getUserEmail() + ":" + jiraIntegration.getApiToken()).getBytes()
-    );
-
-    Map<String, List<String>> headers = new HashMap<>();
-    headers.put("Authorization", Collections.singletonList("Basic " + authHeader));
-    headers.put("Content-Type", Collections.singletonList("application/json"));
-
-    return new OriginalHttpRequest(
-        url, "", "POST", payload.toString(), headers, ""
-    );
-}
-
-private OriginalHttpResponse executeJiraRequest(OriginalHttpRequest request) throws Exception {
-    return ApiExecutor.sendRequest(request, true, null, false, new ArrayList<>());
-}
-
-private String processJiraResponse(OriginalHttpResponse response) throws Exception {
-    String responsePayload = response.getBody();
-
-    if (response.getStatusCode() > 201 || responsePayload == null) {
-        handleJiraError(response, responsePayload);
-    }
-
-    BasicDBObject payloadObj = BasicDBObject.parse(responsePayload);
-    this.jiraTicketKey = payloadObj.getString("key");
-    String url = jiraIntegration.getBaseUrl() + "/browse/" + this.jiraTicketKey;
-    setJiraTicketUrl(url);
-    return url;
-}
-
-private void handleJiraError(OriginalHttpResponse response, String responsePayload) throws Exception {
-    loggerMaker.errorAndAddToDb(
-        "Jira API error - Status: " + response.getStatusCode() + 
-        " | Response: " + responsePayload, 
-        LoggerMaker.LogDb.DASHBOARD
-    );
-
-    String error = "Jira API returned error status";
-    if (responsePayload != null) {
         try {
-            BasicDBObject obj = BasicDBObject.parse(responsePayload);
-            List<String> errorMessages = (List<String>) obj.get("errorMessages");
-            if (errorMessages != null && !errorMessages.isEmpty()) {
-                error = errorMessages.get(0);
-            } else {
-                BasicDBObject errors = (BasicDBObject) obj.get("errors");
-                if (errors != null && !errors.isEmpty()) {
-                    error = errors.toString();
+            BasicDBList contentList = new BasicDBList();
+            contentList.add(buildContentDetails(this.description, null));
+            BasicDBObject fields = buildPayloadForJiraTicket(this.title, this.projId, this.issueType, contentList, null);
+
+            BasicDBObject reqPayload = new BasicDBObject();
+            reqPayload.put("fields", fields);
+            Request.Builder requestBuilder = buildBasicRequest(
+                jiraIntegration.getBaseUrl() + CREATE_ISSUE_ENDPOINT,
+                jiraIntegration.getUserEmail(),
+                jiraIntegration.getApiToken(),
+                false
+            );
+            RequestBody body = RequestBody.create(
+                reqPayload.toJson(),
+                MediaType.parse("application/json")
+            );
+            Request request = requestBuilder.post(body).build();
+            Response response = null;
+            Call call = client.newCall(request);
+            String responsePayload = null;
+            try {
+                response = call.execute();
+                responsePayload = response.body().string();
+
+                if (response.code() > 201 || responsePayload == null) {
+                    String error = handleError(responsePayload);
+                    if (error != null) {
+                        addActionError("Error while creating Jira issue: " + error);
+                    }
+                    return Action.ERROR.toUpperCase();
                 }
+
+                Pair<String, String> pair = getJiraTicketUrlPair(responsePayload, jiraIntegration.getBaseUrl());
+                this.jiraTicketKey = pair.getSecond();
+                String jiraTicketUrl = pair.getFirst();
+                if (!StringUtils.isEmpty(this.actionItemType)) {
+                    storeTicketUrlInAccountSettings(jiraTicketUrl);
+                }
+
+            } catch (Exception e) {
+                // TODO: handle exception
             }
+            return Action.SUCCESS.toUpperCase();
+            
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(
-                "Error parsing Jira error: " + e.getMessage(), 
+                "Error creating general Jira ticket: " + e.getMessage(), 
                 LoggerMaker.LogDb.DASHBOARD
             );
+            return Action.ERROR.toUpperCase();
         }
     }
-    
-    addActionError(error);
-    throw new Exception(error);
-}
 
-private void storeTicketUrlInAccountSettings(String jiraTicketUrl) {
-    if (actionItemType == null || actionItemType.isEmpty()) return;
+    private void storeTicketUrlInAccountSettings(String jiraTicketUrl) {
+        try {
+            Integer accountId = Context.accountId.get();
+            String updateKey = "jiraTicketUrlMap." + actionItemType;
 
-    try {
-        Integer accountId = Context.accountId.get();
-        String updateKey = "jiraTicketUrlMap." + actionItemType;
+            BasicDBObject filter = new BasicDBObject("_id", accountId);
+            BasicDBObject update = new BasicDBObject("$set", new BasicDBObject(updateKey, jiraTicketUrl));
 
-        BasicDBObject filter = new BasicDBObject("_id", accountId);
-        BasicDBObject update = new BasicDBObject("$set", new BasicDBObject(updateKey, jiraTicketUrl));
-
-        AccountSettingsDao.instance.updateOne(filter, update);
-    } catch (Exception e) {
-        loggerMaker.errorAndAddToDb(
-            "Error storing Jira URL: " + e.getMessage(), 
-            LoggerMaker.LogDb.DASHBOARD
-        );
+            AccountSettingsDao.instance.updateOne(filter, update);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error storing Jira URL: " + e.getMessage(), LoggerMaker.LogDb.DASHBOARD);
+        }
     }
-}
-
-public String getTitle() {
-    return title;
-}
-
-public void setTitle(String title) {
-    this.title = title;
-}
-
-public String getDescription() {
-    return description;
-}
-
-public void setDescription(String description) {
-    this.description = description;
-}
-
-public String getJiraTicketUrl() {
-    return jiraTicketUrl;
-}
-
-public void setJiraTicketUrl(String jiraTicketUrl) {
-    this.jiraTicketUrl = jiraTicketUrl;
-}
-
-public String getActionItemType() {
-    return actionItemType;
-}
-
-public void setActionItemType(String actionItemType) {
-    this.actionItemType = actionItemType;
-}
 }
