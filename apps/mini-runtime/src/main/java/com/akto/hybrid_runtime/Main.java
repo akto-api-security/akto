@@ -345,6 +345,8 @@ public class Main {
 
                                     if (trafficProducerLog.getLogType() != null && trafficProducerLog.getLogType().equalsIgnoreCase("ERROR")) {
                                         loggerMaker.errorAndAddToDb(message);
+                                    } else if (trafficProducerLog.getLogType() != null && trafficProducerLog.getLogType().equalsIgnoreCase("DEBUG")) {
+                                        loggerMaker.debug(message);
                                     } else {
                                         loggerMaker.infoAndAddToDb(message);
                                     }
@@ -449,6 +451,7 @@ public class Main {
                     syncImmediately,
                     centralKafkaTopicName);
                 AllMetrics.instance.setRuntimeProcessLatency(System.currentTimeMillis()-start);
+                loggerMaker.info("Processed " + responseParamsToAccountMap.size() + " accounts in " + (System.currentTimeMillis()-start) + " ms");
             }
 
         } catch (WakeupException ignored) {
