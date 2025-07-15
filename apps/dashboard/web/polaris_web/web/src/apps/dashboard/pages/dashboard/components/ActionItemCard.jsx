@@ -2,7 +2,7 @@ import {  Badge, Box, Card, Divider, HorizontalStack, Icon, Text, VerticalStack 
 import { TeamMajor, ToolsMajor } from "@shopify/polaris-icons"
 import TooltipText from '../../../components/shared/TooltipText'
 import JiraTicketDisplay from '../../../components/shared/JiraTicketDisplay';
-import func from '@/utils/func'
+import func from '@/util/func'
 
 function ActionItemCard(props) {
     const { cardObj, onButtonClick, jiraTicketUrlMap = {} } = props;
