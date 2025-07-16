@@ -58,6 +58,12 @@ public class Main {
     }   
 
     public static boolean isOnprem = false;
+    static long lastLogSyncOffsetMRS;
+    static boolean syncImmediately = false;
+    static boolean fetchAllSTI = true;
+    static Map<Integer, AccountInfo> accountInfoMap =  new HashMap<>();
+
+    static boolean isDashboardInstance = false;
 
     public static boolean tryForCollectionName(String message) {
         boolean ret = false;
@@ -692,4 +698,72 @@ public class Main {
 
         return properties;
     }
+
+
+
+    public static void processData(List<HttpResponseParams> data) {
+        syncImmediately = true;
+        fetchAllSTI = false;
+        Map<String, List<HttpResponseParams>> responseParamsToAccountMap = new HashMap<>();
+
+        for(HttpResponseParams payload : data) {
+           try {
+               printL(payload.toString());
+
+               lastLogSyncOffsetMRS++;
+               //TODO: test this
+               if (DataControlFetcher.stopIngestionFromKafka()) {
+                   continue;
+               }
+
+               if (lastLogSyncOffsetMRS % 100 == 0) {
+                   loggerMaker.info("Committing offset at position: " + lastLogSyncOffsetMRS);
+               }
+
+               if (tryForCollectionName(payload.toString())) {
+                   continue;
+               }
+
+
+               HttpRequestParams requestParams = payload.getRequestParams();
+               String debugHost = Utils.printDebugHostLog(payload);
+               if (debugHost != null) {
+                   loggerMaker.infoAndAddToDb("Found debug host: " + debugHost + " in url: " + requestParams.getMethod() + " " + requestParams.getURL());
+               }
+               if (Utils.printDebugUrlLog(requestParams.getURL())) {
+                   loggerMaker.infoAndAddToDb("Found debug url: " + requestParams.getURL());
+               }
+           } catch (Exception e) {
+               loggerMaker.errorAndAddToDb(e, "Error while parsing kafka message " + e);
+               continue;
+           }
+
+            String accountId = payload.getAccountId();
+            if (!responseParamsToAccountMap.containsKey(accountId)) {
+                responseParamsToAccountMap.put(accountId, new ArrayList<>());
+            }
+            responseParamsToAccountMap.get(accountId).add(payload);
+
+        }
+        Map<String, HttpCallParser> httpCallParserMap = new HashMap<>();
+        String configName = System.getenv("AKTO_CONFIG_NAME");
+        APIConfig apiConfig = dataActor.fetchApiConfig(configName);
+        if (apiConfig == null) {
+            apiConfig = new APIConfig(configName,"access-token", 1, 10_000_000, sync_threshold_time); // this sync threshold time is used for deleting sample data
+        }
+
+        String centralKafkaTopicName = AccountSettings.DEFAULT_CENTRAL_KAFKA_TOPIC_NAME;
+        long start = System.currentTimeMillis();
+        handleResponseParams(responseParamsToAccountMap,
+                accountInfoMap,
+                isDashboardInstance,
+                httpCallParserMap,
+                apiConfig,
+                fetchAllSTI,
+                syncImmediately,
+                centralKafkaTopicName);
+        AllMetrics.instance.setRuntimeProcessLatency(System.currentTimeMillis()-start);
+
+    }
+
 }
