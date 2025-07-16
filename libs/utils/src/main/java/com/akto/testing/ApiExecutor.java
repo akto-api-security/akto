@@ -373,7 +373,7 @@ public class ApiExecutor {
         return sendRequest(request, followRedirects, testingRunConfig, debug, false, testLogs, skipSSRFCheck);
     }
 
-    public static OriginalHttpResponse sendRequest(OriginalHttpRequest request, boolean followRedirects,
+    private static OriginalHttpResponse sendRequest(OriginalHttpRequest request, boolean followRedirects,
         TestingRunConfig testingRunConfig, boolean debug, boolean jsonRpcCheck, List<TestingRunResult.TestLog> testLogs,
         boolean skipSSRFCheck) throws Exception {
         // don't lowercase url because query params will change and will result in incorrect request
