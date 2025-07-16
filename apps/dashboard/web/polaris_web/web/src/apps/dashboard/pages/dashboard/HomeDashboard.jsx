@@ -34,6 +34,7 @@ function HomeDashboard() {
     const [showBannerComponent, setShowBannerComponent] = useState(false)
     const [testSummaryInfo, setTestSummaryInfo] = useState([])
     const [selectedTab, setSelectedTab] = useState(0);
+    const [actionItemsCount, setActionItemsCount] = useState(0);
 
     const handleTabChange = useCallback(
         (selectedTabIndex) => setSelectedTab(selectedTabIndex),
@@ -48,7 +49,14 @@ function HomeDashboard() {
         },
         {
             id: 'analytics',
-            content: 'Analysis',
+            content: (
+                <span>
+                    Analysis{' '}
+                    {actionItemsCount > 0 && (
+                        <Badge status="new">{actionItemsCount > 10 ? '10+' : actionItemsCount}</Badge>
+                    )}
+                </span>
+            ),
             panelID: 'analytics-content',
         },
     ];
@@ -738,7 +746,13 @@ function HomeDashboard() {
     const tabsComponent = (
         <VerticalStack gap="4" key="tabs-stack">
             <LegacyTabs tabs={tabs} selected={selectedTab} onSelect={handleTabChange} />
-            {selectedTab === 0 ? dashboardComp : <ActionItemsContent />}
+            {selectedTab === 0 && (
+                <>
+                    {dashboardComp}
+                    <ActionItemsContent onCountChange={setActionItemsCount} />
+                </>
+            )}
+            {selectedTab === 1 && <ActionItemsContent onCountChange={setActionItemsCount} />}
         </VerticalStack>
     )
 
