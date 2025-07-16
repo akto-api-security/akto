@@ -18,9 +18,15 @@ public class InitializerListener implements ServletContextListener {
     private ScheduledExecutorService scheduler;
 
     public static long lastProcessingTime = System.currentTimeMillis();
-    private int processingQueueThreshold = Integer.parseInt(System.getenv("AKTO_TRAFFIC_QUEUE_THRESHOLD"));; // Threshold for processing the queue
-    private int inactiveQueueProcessingTime = Integer.parseInt(System.getenv("AKTO_INACTIVE_QUEUE_PROCESSING_TIME")); // Time after which to process the queue if inactive
-    private int jobInterval = Integer.parseInt(System.getenv("AKTO_TRAFFIC_PROCESSING_JOB_INTERVAL")); // Interval for the scheduled job
+    private int processingQueueThreshold = System.getenv("AKTO_TRAFFIC_QUEUE_THRESHOLD") != null && !System.getenv("AKTO_TRAFFIC_QUEUE_THRESHOLD").isEmpty()
+            ? Integer.parseInt(System.getenv("AKTO_TRAFFIC_QUEUE_THRESHOLD"))
+            : 100;  // Threshold for processing the queue
+    private int inactiveQueueProcessingTime = System.getenv("AKTO_INACTIVE_QUEUE_PROCESSING_TIME") != null && !System.getenv("AKTO_INACTIVE_QUEUE_PROCESSING_TIME").isEmpty()
+            ? Integer.parseInt(System.getenv("AKTO_INACTIVE_QUEUE_PROCESSING_TIME"))
+            : 5000; // Time after which to process the queue if inactive
+    private int jobInterval = System.getenv("AKTO_TRAFFIC_PROCESSING_JOB_INTERVAL") != null && !System.getenv("AKTO_TRAFFIC_PROCESSING_JOB_INTERVAL").isEmpty()
+            ? Integer.parseInt(System.getenv("AKTO_TRAFFIC_PROCESSING_JOB_INTERVAL"))
+            : 10; // Interval for the scheduled job
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(InitializerListener.class, LoggerMaker.LogDb.RUNTIME);
     private static boolean processingStarted = false;
