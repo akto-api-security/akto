@@ -674,12 +674,11 @@ public class ApiExecutor {
         String[] queryParam = session.endpoint.split("\\?");
         // for cases where MCP tools are discovered by Akto, we need to override/add the message endpoint with the actual one we received from the sse stream
         if (overrideMessageEndpoint) {
-            if (queryParam.length > 0) {
-                request.setUrl(host + queryParam[0]);
+            request.setUrl(host + session.endpoint);
+        } else {
+            if (queryParam.length > 1) {
+                request.setQueryParams(queryParam[1]);
             }
-        }
-        if (queryParam.length > 1) {
-            request.setQueryParams(queryParam[1]);
         }
 
         // Send actual request
