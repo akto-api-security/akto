@@ -297,9 +297,6 @@ public class ApiExecutor {
     }
 
     public static OriginalHttpResponse sendRequest(OriginalHttpRequest request, boolean followRedirects, TestingRunConfig testingRunConfig, boolean debug, List<TestingRunResult.TestLog> testLogs, boolean skipSSRFCheck, boolean useTestingRunConfig) throws Exception {
-        if (isJsonRpcRequest(request)) {
-            return sendRequestWithSse(request, followRedirects, testingRunConfig, debug, testLogs, skipSSRFCheck);
-        }
         if(useTestingRunConfig) {
             return sendRequest(request, followRedirects, testingRunConfig, debug, testLogs, skipSSRFCheck);
         }else{
@@ -308,8 +305,6 @@ public class ApiExecutor {
             runConfig.setConfigsAdvancedSettings(testingRunConfig.getConfigsAdvancedSettings());
             return sendRequest(request, followRedirects, runConfig, debug, testLogs, skipSSRFCheck);
         }
-
-        
     }
     
     private static final List<Integer> BACK_OFF_LIMITS = new ArrayList<>(Arrays.asList(1, 2, 5));
@@ -372,8 +367,20 @@ public class ApiExecutor {
         }
     }
 
-    public static OriginalHttpResponse sendRequest(OriginalHttpRequest request, boolean followRedirects, TestingRunConfig testingRunConfig, boolean debug, List<TestingRunResult.TestLog> testLogs, boolean skipSSRFCheck) throws Exception {
+    public static OriginalHttpResponse sendRequest(OriginalHttpRequest request, boolean followRedirects,
+        TestingRunConfig testingRunConfig, boolean debug, List<TestingRunResult.TestLog> testLogs,
+        boolean skipSSRFCheck) throws Exception {
+        return sendRequest(request, followRedirects, testingRunConfig, debug, true, testLogs, skipSSRFCheck);
+    }
+
+    public static OriginalHttpResponse sendRequest(OriginalHttpRequest request, boolean followRedirects,
+        TestingRunConfig testingRunConfig, boolean debug, boolean jsonRpcCheck, List<TestingRunResult.TestLog> testLogs,
+        boolean skipSSRFCheck) throws Exception {
         // don't lowercase url because query params will change and will result in incorrect request
+
+        if (!jsonRpcCheck && isJsonRpcRequest(request)) {
+            return sendRequestWithSse(request, followRedirects, testingRunConfig, debug, testLogs, skipSSRFCheck, false);
+        }
 
         if(testingRunConfig != null && testingRunConfig.getConfigsAdvancedSettings() != null && !testingRunConfig.getConfigsAdvancedSettings().isEmpty()){
             calculateFinalRequestFromAdvancedSettings(request, testingRunConfig.getConfigsAdvancedSettings());
@@ -591,9 +598,11 @@ public class ApiExecutor {
     private static boolean isJsonRpcRequest(OriginalHttpRequest request) {
         try {
             String body = request.getBody();
-            if (body == null) return false;
+            if (body == null) {
+                return false;
+            }
             JsonNode node = objectMapper.readTree(body);
-            return node.has("jsonrpc") && node.has("id");
+            return node.has("jsonrpc") && node.has("id") && node.has("method");
         } catch (Exception e) {
             return false;
         }
@@ -706,7 +715,9 @@ public class ApiExecutor {
         throw new Exception("Timeout waiting for SSE message with id=" + id);
     }
 
-    public static OriginalHttpResponse sendRequestWithSse(OriginalHttpRequest request, boolean followRedirects, TestingRunConfig testingRunConfig, boolean debug, List<TestingRunResult.TestLog> testLogs, boolean skipSSRFCheck) throws Exception {
+    public static OriginalHttpResponse sendRequestWithSse(OriginalHttpRequest request, boolean followRedirects,
+        TestingRunConfig testingRunConfig, boolean debug, List<TestingRunResult.TestLog> testLogs,
+        boolean skipSSRFCheck, boolean overrideMessageEndpoint) throws Exception {
         // Always use prepareUrl to get the absolute URL
         String url = prepareUrl(request, testingRunConfig);
         URI uri = new URI(url);
@@ -717,10 +728,15 @@ public class ApiExecutor {
         SseSession session = openSseSession(host, debug);
 
         // Add sessionId as query param to actual request
-        String endpoint = session.endpoint;
-        if (!endpoint.startsWith("/")) endpoint = "/" + endpoint;
-        String newUrl = host + endpoint;
-        request.setUrl(newUrl);
+        String[] queryParam = session.endpoint.split("\\?");
+        if (overrideMessageEndpoint) {
+            request.setUrl(host + session.endpoint);
+        } else {
+            request.setUrl(url);
+            if (queryParam.length > 1) {
+                request.setQueryParams(queryParam[1]);
+            }
+        }
 
         // Send actual request
         OriginalHttpResponse resp = sendRequest(request, followRedirects, testingRunConfig, debug, testLogs, skipSSRFCheck);
