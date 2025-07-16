@@ -48,7 +48,7 @@ export const ActionItemsContent = () => {
     const [fetchedData, setFetchedData] = useState(null);
 
     const handleJiraIntegration = async (actionItem) => {
-        const integrated = Boolean(window?.JIRA_INTEGRATED);
+        const integrated = window.JIRA_INTEGRATED === 'true'
         if (!integrated) {
             navigate(JIRA_INTEGRATION_URL);
             return;
@@ -65,7 +65,6 @@ export const ActionItemsContent = () => {
             }
             setModalActive(true);
         } catch (e) {
-            console.error("Error fetching Jira integration details:", e); 
         }
     };
 
