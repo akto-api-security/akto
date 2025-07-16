@@ -370,7 +370,7 @@ public class ApiExecutor {
     public static OriginalHttpResponse sendRequest(OriginalHttpRequest request, boolean followRedirects,
         TestingRunConfig testingRunConfig, boolean debug, List<TestingRunResult.TestLog> testLogs,
         boolean skipSSRFCheck) throws Exception {
-        return sendRequest(request, followRedirects, testingRunConfig, debug, true, testLogs, skipSSRFCheck);
+        return sendRequest(request, followRedirects, testingRunConfig, debug, false, testLogs, skipSSRFCheck);
     }
 
     public static OriginalHttpResponse sendRequest(OriginalHttpRequest request, boolean followRedirects,
@@ -739,7 +739,7 @@ public class ApiExecutor {
         }
 
         // Send actual request
-        OriginalHttpResponse resp = sendRequest(request, followRedirects, testingRunConfig, debug, testLogs, skipSSRFCheck);
+        OriginalHttpResponse resp = sendRequest(request, followRedirects, testingRunConfig, debug, true, testLogs, skipSSRFCheck);
 
         if (resp.getStatusCode() >= 400) {
             if (session.readerThread != null) {
