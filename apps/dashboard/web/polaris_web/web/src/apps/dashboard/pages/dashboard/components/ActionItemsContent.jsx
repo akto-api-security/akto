@@ -8,10 +8,7 @@ import JiraTicketDisplay from '../../../components/shared/JiraTicketDisplay';
 import ActionItemsTable from './ActionItemsTable';
 import CriticalActionItemCard from './CriticalActionItemCard';
 import issuesApi from '../../issues/api';
-import api from '../api';
-import observeApi from '../../observe/api';
 import { createActionItem as createActionItemUtil } from '../../../../../util/createActionItem';
-import func from '../../../../../util/func';
 import settingsModule from '../../settings/module'; 
 
 const actionItemsHeaders = [
@@ -35,7 +32,7 @@ const ACTION_ITEM_TYPES = {
 
 const JIRA_INTEGRATION_URL = "/dashboard/settings/integrations/jira";
 
-export const ActionItemsContent = () => {
+export const ActionItemsContent = ({ actionItemsData, onCountChange }) => {
     const navigate = useNavigate();
     const [actionItems, setActionItems] = useState([]);
     const [criticalCardData, setCriticalCardData] = useState(null);
@@ -45,7 +42,6 @@ export const ActionItemsContent = () => {
     const [jiraProjectMaps, setJiraProjectMaps] = useState({});
     const [selectedActionItem, setSelectedActionItem] = useState(null);
     const [jiraTicketUrlMap, setJiraTicketUrlMap] = useState({});
-    const [fetchedData, setFetchedData] = useState(null);
 
     const handleJiraIntegration = async (actionItem) => {
         const integrated = window.JIRA_INTEGRATED === 'true'
@@ -99,81 +95,20 @@ export const ActionItemsContent = () => {
         }];
     };
 
-    const fetchAllData = async () => {
-        const endTimestamp = func.timeNow();
-        const startTimestamp = endTimestamp - 3600 * 24 * 7;
-
-        try {
-            const results = await Promise.allSettled([ 
-                api.fetchApiStats(startTimestamp, endTimestamp),
-                observeApi.fetchCountMapOfApis(),
-                api.fetchSensitiveAndUnauthenticatedValue(),
-                api.fetchHighRiskThirdPartyValue(),
-                api.fetchShadowApisValue(),
-                settingsModule.fetchAdminInfo() 
-            ]);
-
-            const [
-                apiStatsResult,
-                countMapRespResult,
-                sensitiveAndUnauthenticatedValueResult,
-                highRiskThirdPartyValueResult,
-                shadowApisValueResult,
-                adminSettingsResult
-            ] = results;
-
-            const apiStats = apiStatsResult.status === 'fulfilled' ? apiStatsResult.value : null;
-            const countMapResp = countMapRespResult.status === 'fulfilled' ? countMapRespResult.value : null;
-            const SensitiveAndUnauthenticatedValue = sensitiveAndUnauthenticatedValueResult.status === 'fulfilled' ? sensitiveAndUnauthenticatedValueResult.value : 0;
-            const highRiskThirdPartyValue = highRiskThirdPartyValueResult.status === 'fulfilled' ? highRiskThirdPartyValueResult.value : 0;
-            const shadowApisValue = shadowApisValueResult.status === 'fulfilled' ? shadowApisValueResult.value : 0;
-            const adminSettings = adminSettingsResult.status === 'fulfilled' ? adminSettingsResult.value.resp : {}; 
-
-            results.forEach((result, index) => {
-                if (result.status === 'rejected') {
-                    console.error(`Error fetching data for promise at index ${index}:`, result.reason);
-                }
-            });
-
-            setJiraTicketUrlMap(adminSettings?.jiraTicketUrlMap || {});
-            setFetchedData({ apiStats, countMapResp, SensitiveAndUnauthenticatedValue, highRiskThirdPartyValue, shadowApisValue });
-        } catch (error) {
-            console.error("Unexpected error in fetchAllData:", error);
-            setActionItems([]);
-        }
-    };
-
     useEffect(() => {
-        fetchAllData();
-    }, []);
-
-    useEffect(() => {
-        if (!fetchedData) return;
-
+        if (!actionItemsData) return;
         const {
-            apiStats,
-            countMapResp,
-            SensitiveAndUnauthenticatedValue,
+            highRiskCount,
+            sensitiveDataCount,
+            unauthenticatedCount,
+            thirdPartyDiff,
             highRiskThirdPartyValue,
-            shadowApisValue
-        } = fetchedData;
-
-        const sensitiveDataCount = countMapResp?.totalApisCount || 0;
-
-        if (!(apiStats?.apiStatsEnd && apiStats?.apiStatsStart)) {
-            setActionItems([]);
-            return;
-        }
-
-        const { apiStatsEnd, apiStatsStart } = apiStats;
-
-        const highRiskCount = Object.entries(apiStatsEnd.riskScoreMap || {})
-            .filter(([score]) => parseInt(score) > 3)
-            .reduce((total, [, count]) => total + count, 0);
-
-        const unauthenticatedCount = apiStatsEnd.authTypeMap?.UNAUTHENTICATED || 0;
-        const thirdPartyDiff = (apiStatsEnd.accessTypeMap?.THIRD_PARTY || 0) - (apiStatsStart.accessTypeMap?.THIRD_PARTY || 0);
-
+            shadowApisValue,
+            SensitiveAndUnauthenticatedValue,
+            jiraTicketUrlMap: ticketMap
+        } = actionItemsData;
+        setJiraTicketUrlMap(ticketMap || {});
+        
         const items = [
             createActionItem('1', 'P1', `${highRiskCount} APIs with risk score more than 3`,
                 "Creates multiple attack vectors for malicious actors", "Security Team", "Medium", highRiskCount, ACTION_ITEM_TYPES.HIGH_RISK_APIS),
@@ -194,9 +129,11 @@ export const ActionItemsContent = () => {
                 "Unmonitored attack surface with unknown security posture", "API Governance", "High", shadowApisValue, ACTION_ITEM_TYPES.SHADOW_APIS)
         ];
 
-        setActionItems(items.filter(item => item.count > 0));
-
+        const filteredItems = items.filter(item => item.count > 0);
+        setActionItems(filteredItems);
+        let totalCount = filteredItems.length;
         if (SensitiveAndUnauthenticatedValue > 0) {
+            totalCount += 1;
             setCriticalCardData({
                 id: 'p0-critical',
                 priority: 'P0',
@@ -210,8 +147,10 @@ export const ActionItemsContent = () => {
         } else {
             setCriticalCardData(null);
         }
-
-    }, [fetchedData, jiraTicketUrlMap]);
+        if (onCountChange) {
+            onCountChange(totalCount);
+        }
+    }, [actionItemsData, jiraTicketUrlMap, onCountChange]);
 
     const handleSaveJiraAction = () => {
         if (!selectedActionItem) {
@@ -232,7 +171,7 @@ export const ActionItemsContent = () => {
             if (res?.errorMessage) {
                 navigate(JIRA_INTEGRATION_URL);
             } else {
-                fetchAllData();
+                // No need to refetch data here as it's passed as a prop
             }
         }).catch(() => {
             navigate(JIRA_INTEGRATION_URL);
