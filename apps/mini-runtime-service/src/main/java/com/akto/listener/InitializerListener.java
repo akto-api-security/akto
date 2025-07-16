@@ -18,19 +18,25 @@ public class InitializerListener implements ServletContextListener {
     private ScheduledExecutorService scheduler;
 
     public static long lastProcessingTime = System.currentTimeMillis();
-    public int processingQueueThreshold = 100; // Threshold for processing the queue
+    private int processingQueueThreshold = Integer.parseInt(System.getenv("AKTO_TRAFFIC_QUEUE_THRESHOLD"));; // Threshold for processing the queue
+    private int inactiveQueueProcessingTime = Integer.parseInt(System.getenv("AKTO_INACTIVE_QUEUE_PROCESSING_TIME")); // Time after which to process the queue if inactive
+    private int jobInterval = Integer.parseInt(System.getenv("AKTO_TRAFFIC_PROCESSING_JOB_INTERVAL")); // Interval for the scheduled job
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(InitializerListener.class, LoggerMaker.LogDb.RUNTIME);
-    private static final ReentrantLock mutex = new ReentrantLock();
+    private static boolean processingStarted = false;
     @Override
     public void contextInitialized(ServletContextEvent sce) {
         scheduler = Executors.newSingleThreadScheduledExecutor();
         scheduler.scheduleAtFixedRate(() -> {
             try {
-                mutex.lock();
+                if(processingStarted) {
+                    loggerMaker.info("Processing already started, skipping traffic discovery queue processing.");
+                    return;
+                }
+                processingStarted = true; // Set the flag to indicate processing has started
                 long currentTime = System.currentTimeMillis();
                 if (IngestionAction.trafficDiscoveryQueue.size() > processingQueueThreshold
-                        || (currentTime - lastProcessingTime > 5000 && !IngestionAction.trafficDiscoveryQueue.isEmpty())
+                        || (currentTime - lastProcessingTime > inactiveQueueProcessingTime && !IngestionAction.trafficDiscoveryQueue.isEmpty())
                         ) {
                     loggerMaker.info("Processing traffic discovery queue with size: " + IngestionAction.trafficDiscoveryQueue.size());
 
@@ -40,10 +46,7 @@ public class InitializerListener implements ServletContextListener {
                         for (int i = 0; i < size; i++) {
                             toProcess.add(IngestionAction.trafficDiscoveryQueue.poll());
                             loggerMaker.info("Processing element " + (i + 1) + " from traffic discovery queue");
-                        }
-                        // Remove processed elements
-                        for (int i = 0; i < size; i++) {
-                            IngestionAction.trafficDiscoveryQueue.remove(0);
+                            IngestionAction.trafficDiscoveryQueue.remove(0); //Remove processed elements from the queue
                         }
                     }
                     com.akto.hybrid_runtime.Main.processData(toProcess);
@@ -56,9 +59,9 @@ public class InitializerListener implements ServletContextListener {
             } catch (Exception e) {
                 loggerMaker.info("Error processing traffic discovery queue: " + e.getMessage());
             } finally {
-                mutex.unlock();
+                processingStarted = false; // Reset the flag after processing
             }
-        }, 0, 1, TimeUnit.SECONDS);
+        }, 0, jobInterval, TimeUnit.MILLISECONDS);
     }
 
     @Override
