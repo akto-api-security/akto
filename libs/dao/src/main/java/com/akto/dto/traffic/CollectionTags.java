@@ -133,7 +133,7 @@ public class CollectionTags {
 
     public static List<CollectionTags> getUniqueTags(ApiCollection apiCollection, List<CollectionTags> tags) {
         if(tags == null || tags.isEmpty()) {
-            return Collections.emptyList();
+            return new ArrayList<>();
         }
 
         List<String> ignoreList = Arrays.asList("pod-template-hash");
