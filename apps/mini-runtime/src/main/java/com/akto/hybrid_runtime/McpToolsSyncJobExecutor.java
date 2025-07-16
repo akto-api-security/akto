@@ -97,18 +97,23 @@ public class McpToolsSyncJobExecutor {
         eligibleCollections.forEach(apiCollection -> {
             logger.info("Starting MCP sync for apiCollectionId: {} and hostname: {}", apiCollection.getId(),
                 apiCollection.getHostName());
-            Set<String> normalizedSampleDataSet = getNormalizedSampleData(apiCollection.getId());
-            List<HttpResponseParams> initResponseList = initializeMcpServerCapabilities(apiCollection,
-                normalizedSampleDataSet);
-            List<HttpResponseParams> toolsResponseList = handleMcpToolsDiscovery(apiCollection,
-                normalizedSampleDataSet);
-            List<HttpResponseParams> resourcesResponseList = handleMcpResourceDiscovery(apiCollection,
-                normalizedSampleDataSet);
-            processResponseParams(apiConfig, new ArrayList<HttpResponseParams>() {{
-                addAll(initResponseList);
-                addAll(toolsResponseList);
-                addAll(resourcesResponseList);
-            }});
+            try {
+                Set<String> normalizedSampleDataSet = getNormalizedSampleData(apiCollection.getId());
+                List<HttpResponseParams> initResponseList = initializeMcpServerCapabilities(apiCollection,
+                    normalizedSampleDataSet);
+                List<HttpResponseParams> toolsResponseList = handleMcpToolsDiscovery(apiCollection,
+                    normalizedSampleDataSet);
+                List<HttpResponseParams> resourcesResponseList = handleMcpResourceDiscovery(apiCollection,
+                    normalizedSampleDataSet);
+                List<HttpResponseParams> responseParamsToProcess = new ArrayList<>();
+                responseParamsToProcess.addAll(initResponseList);
+                responseParamsToProcess.addAll(toolsResponseList);
+                responseParamsToProcess.addAll(resourcesResponseList);
+                processResponseParams(apiConfig, responseParamsToProcess);
+            } catch (Exception e) {
+                logger.error("Error while running MCP sync job for apiCollectionId: {} and hostname: {}",
+                    apiCollection.getId(), apiCollection.getHostName(), e);
+            }
         });
     }
 
