@@ -170,11 +170,11 @@ const api = {
         })
     },
 
-    initiateCrawler(hostname, username, password) {
+    initiateCrawler(hostname, username, password, apiKey, dashboardUrl) {
         return request({
             url: '/api/initiateCrawler',
             method: 'post',
-            data: {hostname, username, password}
+            data: {hostname, username, password, apiKey, dashboardUrl}
         })
     }
 }

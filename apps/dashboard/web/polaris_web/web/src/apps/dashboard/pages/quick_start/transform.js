@@ -195,7 +195,7 @@ const burpObj = {
 
 const aktoJaxObj = {
     icon: '/public/aktojax.svg',
-    label: "AktoJax",
+    label: "AktoJax - (DAST)",
     text: "You can deploy Akto's crawler on your machine to automatically scan and collect API endpoints and traffic data.",   
     docsUrl: 'https://docs.akto.io/traffic-connector/crawler/aktojax',
     key: "AKTOJAX",
@@ -1097,6 +1097,7 @@ const quickStartFunc = {
 
         return {
             "Hybrid SaaS": hybridSaas,
+            "DAST": crawler,
             "Kubernetes": kubernetes,
             "API Gateways": apiGateways,
             "Mirroring": mirroring,
@@ -1104,7 +1105,6 @@ const quickStartFunc = {
             "GCP Services": gcpServices,
             "Azure Services": azureServices,
             "Manual": manual,
-            "Crawler": crawler,
             "Akto SDK": aktoSdk,
             "Virtual Machines": vm,
             "Source Code": sourceCode,

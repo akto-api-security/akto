@@ -1,4 +1,4 @@
-import { Button, ButtonGroup, Checkbox, Text, TextField, VerticalStack } from '@shopify/polaris';
+import { Button, ButtonGroup, Checkbox, HorizontalStack, Text, TextField, VerticalStack } from '@shopify/polaris';
 import React, { useState } from 'react'
 import InformationBannerComponent from './shared/InformationBannerComponent';
 import PasswordTextField from '../../../components/layouts/PasswordTextField';
@@ -14,6 +14,7 @@ const AktoJax = () => {
     const [requireAuth, setRequireAuth] = useState(false)
     const [email, setEmail] = useState('')
     const [password, setPassword] = useState('')
+    const [apiKey, setApiKey] = useState('')
 
     const goToDocs = () => {
         window.open("https://docs.akto.io/traffic-connector/crawler/aktojax")
@@ -31,7 +32,7 @@ const AktoJax = () => {
         }
 
         setLoading(true)
-        api.initiateCrawler(hostname, email, password).then((res) => {
+        api.initiateCrawler(hostname, email, password, apiKey, window.location.origin).then((res) => {
             func.setToast(true, false, "Crawler initiated successfully. Please check your dashboard for updates.")
         }).catch((err) => {
             console.error("Error initiating crawler:", err)
@@ -57,6 +58,12 @@ const AktoJax = () => {
 
             <VerticalStack gap="2">
                 <TextField label="Enter your website URL" value={hostname} type='url' onChange={(value) => setHostname(value)} placeholder='https://example.com' />
+                <PasswordTextField label={
+                    <HorizontalStack gap={1}>
+                        <Text>Enter your</Text>
+                        <Button plain onClick={() => window.open(window.location.origin + "/dashboard/settings/integrations/akto_apis")}> Akto X-API-Key</Button>
+                    </HorizontalStack>
+                } setField={setApiKey} onFunc={true} field={apiKey}/>
 
                 <Checkbox label="This site requires login?" checked={requireAuth} onChange={() => setRequireAuth(!requireAuth)} />
 

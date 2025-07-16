@@ -21,6 +21,8 @@ public class AktoJaxAction extends UserAction {
     private String hostname;
     private String username;
     private String password;
+    private String apiKey;
+    private String dashboardUrl;
 
     private String crawlerData;
 
@@ -61,6 +63,8 @@ public class AktoJaxAction extends UserAction {
             requestBody.put("hostname", hostname);
             requestBody.put("username", username);
             requestBody.put("password", password);
+            requestBody.put("apiKey", apiKey);
+            requestBody.put("dashboardUrl", dashboardUrl);
             requestBody.put("collectionId", collectionId);
 
             String reqData = requestBody.toString();
@@ -138,5 +142,21 @@ public class AktoJaxAction extends UserAction {
 
     public void setApiCollectionId(String apiCollectionId) {
         this.apiCollectionId = apiCollectionId;
+    }
+
+    public String getApiKey() {
+        return apiKey;
+    }
+
+    public void setApiKey(String apiKey) {
+        this.apiKey = apiKey;
+    }
+
+    public String getDashboardUrl() {
+        return dashboardUrl;
+    }
+
+    public void setDashboardUrl(String dashboardUrl) {
+        this.dashboardUrl = dashboardUrl;
     }
 }
