@@ -379,7 +379,7 @@ public class McpToolsSyncJobExecutor {
         return null;
     }
 
-    public static Set<String> getNormalizedSampleData(int apiCollectionId) {
+    private static Set<String> getNormalizedSampleData(int apiCollectionId) {
         List<SampleData> sampleDataList = DataActorFactory.fetchInstance().fetchSampleData(
             new HashSet<>(Collections.singletonList(apiCollectionId)), 0);
 
