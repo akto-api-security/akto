@@ -195,10 +195,10 @@ const burpObj = {
 
 const aktoJaxObj = {
     icon: '/public/aktojax.svg',
-    label: "AktoJax - (DAST)",
-    text: "You can deploy Akto's crawler on your machine to automatically scan and collect API endpoints and traffic data.",   
-    docsUrl: 'https://docs.akto.io/traffic-connector/crawler/aktojax',
-    key: "AKTOJAX",
+    label: "Akto DAST",
+    text: "You can deploy Akto's DAST on your machine to automatically scan and collect API endpoints and traffic data.",   
+    docsUrl: 'https://docs.akto.io/traffic-connector/dast/aktodast',
+    key: "AKTODAST",
     component : <AktoJax />
 }
 

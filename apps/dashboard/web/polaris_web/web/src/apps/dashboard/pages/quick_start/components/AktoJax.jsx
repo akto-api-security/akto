@@ -6,8 +6,6 @@ import api from '../api';
 import func from "@/util/func"
 
 const AktoJax = () => {
-
-    const [allowCrawl, setAllowCrawl] = useState(true)
     const [loading, setLoading] = useState(false)
 
     const [hostname, setHostname] = useState('')
@@ -17,7 +15,7 @@ const AktoJax = () => {
     const [apiKey, setApiKey] = useState('')
 
     const goToDocs = () => {
-        window.open("https://docs.akto.io/traffic-connector/crawler/aktojax")
+        window.open("https://docs.akto.io/traffic-connector/dast/aktodast")
     }
 
     const primaryAction = () => {
@@ -36,7 +34,7 @@ const AktoJax = () => {
             func.setToast(true, false, "Crawler initiated successfully. Please check your dashboard for updates.")
         }).catch((err) => {
             console.error("Error initiating crawler:", err)
-            func.setToast(true, false, "An error occurred while initiating the crawler. Please try again later.")
+            func.setToast(true, true, "An error occurred while initiating the crawler. Please try again later.")
         }).finally(() => {
             setLoading(false)
             setHostname('')
@@ -49,10 +47,10 @@ const AktoJax = () => {
     return (
         <div className='card-items'>
             <Text variant='bodyMd'>
-                Use our crawler to capture traffic and instantly send it to your dashboard for real-time insights. If you want to scale up and get more accurate data, we recommend integrating with AWS or GCP traffic mirroring. This ensures smooth, automated data collection with minimal noise and maximum accuracy.
+                Use our DAST to capture traffic and instantly send it to your dashboard for real-time insights. If you want to scale up and get more accurate data, we recommend integrating with AWS or GCP traffic mirroring. This ensures smooth, automated data collection with minimal noise and maximum accuracy.
             </Text>
 
-            <InformationBannerComponent docsUrl="https://docs.akto.io/traffic-connector/crawler/aktojax"
+            <InformationBannerComponent docsUrl="https://docs.akto.io/traffic-connector/dast/aktodast"
                     content="Please ensure the pre-requisites " 
             />
 
@@ -75,9 +73,8 @@ const AktoJax = () => {
                     </>
                 }
 
-                <Checkbox label="Allow Akto to crawl your website." checked={allowCrawl} onChange={() => setAllowCrawl(!allowCrawl)} />
                 <ButtonGroup>
-                    <Button onClick={primaryAction} primary disabled={!allowCrawl || hostname?.length == 0} loading={loading}>Crawl</Button>
+                    <Button onClick={primaryAction} primary disabled={hostname?.length == 0} loading={loading}>Crawl</Button>
                     <Button onClick={goToDocs}>Go to docs</Button>
                 </ButtonGroup>
             </VerticalStack>
