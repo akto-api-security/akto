@@ -77,6 +77,8 @@ public class HttpCallParser {
     private static final String trafficMetricsUrl = "https://logs.akto.io/traffic-metrics";
     private static final String NON_HOSTNAME_KEY = "null" + " "; // used for collections created without hostnames
 
+    private static final List<Integer> INPROCESS_ADVANCED_FILTERS_ACCOUNTS = Arrays.asList(1736798101, 1718042191);
+
     // Using default timeouts [10 seconds], as this is a slow API.
     private static final OkHttpClient client = CoreHTTPClient.client.newBuilder().build();
     
@@ -210,7 +212,41 @@ public class HttpCallParser {
         return syncLimit;
     }
 
-      public static FILTER_TYPE isValidResponseParam(HttpResponseParams responseParam, Map<String, FilterConfig> filterMap, Map<String, List<ExecutorNode>> executorNodesMap){
+    public static boolean isBlockedHost(String hostName) {
+        if (hostName == null) return false;
+        hostName = hostName.toLowerCase();
+        return hostName.matches("(?:\\b\\d{1,3}(?:\\.\\d{1,3}){3}.*|.*localhost.*|kubernetes.default.svc)");
+    }
+
+    public static boolean isBlockedContentType(String contentType) {
+        if (contentType == null || contentType.isEmpty()) return false;
+        contentType = contentType.toLowerCase();
+        return contentType.contains("html") || contentType.contains("text/html");
+    }
+
+    public static FILTER_TYPE applyTrafficFilterInProcess(HttpResponseParams responseParam){
+
+        FILTER_TYPE filterType = FILTER_TYPE.UNCHANGED;
+        String hostName = getHeaderValue(responseParam.getRequestParams().getHeaders(), "host");
+        String contentType = getHeaderValue(responseParam.getRequestParams().getHeaders(), "content-type");
+
+        // Block filter: Ignore ip host, localhost, kubernetes host etc.
+        if (responseParam.getStatusCode() > 400 || isBlockedHost(hostName) || isBlockedContentType(contentType)) {
+            filterType = FILTER_TYPE.BLOCKED;
+            return filterType;
+        }
+
+        // Modify host header to Kubernetes Service filter
+        // TODO: Make this generic or customer specific
+        String serviceName = getHeaderValue(responseParam.getRequestParams().getHeaders(), "x-akto-k8s-catalog.agoda.com/component");
+        if (serviceName != null && serviceName.length() > 0){
+            responseParam.getRequestParams().getHeaders().put("host", Arrays.asList(hostName + "-" + serviceName));
+            filterType = FILTER_TYPE.MODIFIED;
+        }
+        return filterType;
+    }
+
+    public static FILTER_TYPE isValidResponseParam(HttpResponseParams responseParam, Map<String, FilterConfig> filterMap, Map<String, List<ExecutorNode>> executorNodesMap){
         FILTER_TYPE filterType = FILTER_TYPE.UNCHANGED;
         String message = responseParam.getOrig();
         RawApi rawApi = RawApi.buildFromMessage(message);
@@ -259,7 +295,16 @@ public class HttpCallParser {
 
     public static Pair<HttpResponseParams,FILTER_TYPE> applyAdvancedFilters(HttpResponseParams responseParams, Map<String, List<ExecutorNode>> executorNodesMap,  Map<String,FilterConfig> filterMap){
         if (filterMap != null && !filterMap.isEmpty()) {
-            FILTER_TYPE filterType = isValidResponseParam(responseParams, filterMap, executorNodesMap);
+            FILTER_TYPE filterType = FILTER_TYPE.UNCHANGED; 
+
+            if (INPROCESS_ADVANCED_FILTERS_ACCOUNTS.contains(DataActor.actualAccountId)) {
+
+                filterType = applyTrafficFilterInProcess(responseParams);
+            }else{
+
+                filterType = isValidResponseParam(responseParams, filterMap,  executorNodesMap);
+            }
+
             if(filterType.equals(FILTER_TYPE.BLOCKED)){
                 return new Pair<HttpResponseParams,FilterConfig.FILTER_TYPE>(null, FILTER_TYPE.BLOCKED);
             }else{
