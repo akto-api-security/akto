@@ -1305,7 +1305,6 @@ public class StartTestAction extends UserAction {
                 if (editableTestingRunConfig.getOverriddenTestAppUrl() != null && !editableTestingRunConfig.getOverriddenTestAppUrl().equals(existingTestingRunConfig.getOverriddenTestAppUrl())) {
                     updates.add(Updates.set(TestingRunConfig.OVERRIDDEN_TEST_APP_URL, editableTestingRunConfig.getOverriddenTestAppUrl()));
                 }
-
                 if (editableTestingRunConfig.getAutoTicketingDetails() != null && validateAutoTicketingDetails(
                     editableTestingRunConfig.getAutoTicketingDetails())) {
                     updates.add(Updates.set(TestingRunConfig.AUTO_TICKETING_DETAILS,
@@ -1345,6 +1344,10 @@ public class StartTestAction extends UserAction {
                                 Updates.set(TestingRun.SEND_SLACK_ALERT, editableTestingRunConfig.getSendSlackAlert()));
                     }
 
+                    if(editableTestingRunConfig.getSelectedSlackChannelId() != 0 && editableTestingRunConfig.getSelectedSlackChannelId() != existingTestingRun.getSelectedSlackChannelId()){
+                        updates.add(Updates.set(TestingRun.SELECTED_SLACK_CHANNEL_ID, editableTestingRunConfig.getSelectedSlackChannelId()));
+                    }
+
                     if (existingTestingRun.getSendMsTeamsAlert() != editableTestingRunConfig.getSendMsTeamsAlert()) {
                         updates.add(
                                 Updates.set(TestingRun.SEND_MS_TEAMS_ALERT,
@@ -1358,7 +1361,8 @@ public class StartTestAction extends UserAction {
                     if (existingTestingRun.getPeriodInSeconds() != periodInSeconds && periodInSeconds != 0) {
                         updates.add(Updates.set(TestingRun.PERIOD_IN_SECONDS, periodInSeconds));
                     }
-                    if(editableTestingRunConfig.getScheduleTimestamp() > 0){
+                    if((editableTestingRunConfig.getScheduleTimestamp() - Context.now()) >= -60){
+                        // 60 because maximum request time is 60 seconds and by default we want scheduled time stamp to be greater than current time.
                         updates.add(
                             Updates.combine(
                                 Updates.set(TestingRun.SCHEDULE_TIMESTAMP, editableTestingRunConfig.getScheduleTimestamp()),
