@@ -1269,7 +1269,7 @@ getMissingConfigs(testResults){
     return {
       configsAdvancedSettings:settings,
       testRoleId: testRun.testRoleId,
-      testSubCategoryList: testSuiteIds?.length == 0? selectedTests : [],
+      testSubCategoryList: testSuiteIds?.length === 0? selectedTests : [],
       overriddenTestAppUrl: testRun.hasOverriddenTestAppUrl ? testRun.overriddenTestAppUrl : "",
       maxConcurrentRequests: testRun.maxConcurrentRequests,
       testingRunHexId: hexId,
@@ -1284,6 +1284,7 @@ getMissingConfigs(testResults){
       miniTestingServiceName: testRun.miniTestingServiceName,
       testSuiteIds:testMode? [] : testSuiteIds,
       autoTicketingDetails: autoTicketingDetails,
+      selectedSlackChannelId: testRun?.slackChannel || 0,
     }
   },
   prepareTestingEndpointsApisList(apiEndpoints) {
