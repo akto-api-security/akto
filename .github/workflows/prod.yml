@@ -22,6 +22,10 @@ on:
         type: boolean
         default: true
         description: Testing-Db-Layer
+      mini-runtime-service:
+        type: boolean
+        default: true
+        description: Mini-Runtime-Service
 
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
@@ -96,6 +100,13 @@ jobs:
             docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/$REGISTRY_ALIAS/akto-api-security-testing-db-layer:$IMAGE_TAG -t $ECR_REGISTRY/$REGISTRY_ALIAS/akto-api-security-testing-db-layer:$IMAGE_TAG1 -t $ECR_REGISTRY/$REGISTRY_ALIAS/akto-api-security-testing-db-layer:$IMAGE_TAG2 -t $ECR_REGISTRY/$REGISTRY_ALIAS/akto-api-security-testing-db-layer:$IMAGE_TAG3 . --push
             echo "::set-output name=image::$ECR_REGISTRY/akto-api-security-testing-db-layer:$IMAGE_TAG3"
           fi
+          
+          if [[ "${{ github.event.inputs.mini-runtime-service}}" == "true" ]]; then
+            cd ../mini-runtime-service
+            docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/$REGISTRY_ALIAS/akto-api-security-mini-runtime-service:$IMAGE_TAG -t $ECR_REGISTRY/$REGISTRY_ALIAS/akto-api-security-mini-runtime-service:$IMAGE_TAG1 -t $ECR_REGISTRY/$REGISTRY_ALIAS/akto-api-security-mini-runtime-service:$IMAGE_TAG2 -t $ECR_REGISTRY/$REGISTRY_ALIAS/akto-api-security-mini-runtime-service:$IMAGE_TAG3 . --push
+            echo "::set-output name=image::$ECR_REGISTRY/akto-api-security-mini-runtime-service:$IMAGE_TAG3"
+          fi
+          
 
       - name: DockerHub login
         env:
@@ -131,6 +142,12 @@ jobs:
             cd ../testing-db-layer
             docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/testing-db-layer:$IMAGE_TAG -t $ECR_REGISTRY/testing-db-layer:$IMAGE_TAG1 -t $ECR_REGISTRY/testing-db-layer:$IMAGE_TAG2 -t $ECR_REGISTRY/testing-db-layer:$IMAGE_TAG3 . --push
           fi
+          
+          if [[ "${{ github.event.inputs.mini-runtime-service }}" == "true" ]]; then
+            cd ../mini-runtime-service
+            docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/mini-runtime-service:$IMAGE_TAG -t $ECR_REGISTRY/mini-runtime-service:$IMAGE_TAG1 -t $ECR_REGISTRY/mini-runtime-service:$IMAGE_TAG2 -t $ECR_REGISTRY/mini-runtime-service:$IMAGE_TAG3 . --push
+          fi
+
       - name: Send Github release notification to Slack
         id: slack
         uses: slackapi/slack-github-action@v1.23.0
