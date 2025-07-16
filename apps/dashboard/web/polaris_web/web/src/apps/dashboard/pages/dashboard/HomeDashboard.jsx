@@ -27,6 +27,7 @@ import CriticalUnsecuredAPIsOverTimeGraph from '../issues/IssuesPage/CriticalUns
 import CriticalFindingsGraph from '../issues/IssuesPage/CriticalFindingsGraph';
 import values from "@/util/values";
 import { ActionItemsContent } from './components/ActionItemsContent';
+import { fetchActionItemsData } from './components/actionItemsTransform';
 
 function HomeDashboard() {
 
@@ -35,6 +36,7 @@ function HomeDashboard() {
     const [testSummaryInfo, setTestSummaryInfo] = useState([])
     const [selectedTab, setSelectedTab] = useState(0);
     const [actionItemsCount, setActionItemsCount] = useState(0);
+    const [actionItemsData, setActionItemsData] = useState(null);
 
     const handleTabChange = useCallback(
         (selectedTabIndex) => setSelectedTab(selectedTabIndex),
@@ -52,7 +54,7 @@ function HomeDashboard() {
             content: (
                 <span>
                     Analysis{' '}
-                    {actionItemsCount > 0 && (
+                    {selectedTab === 0 && actionItemsCount > 0 && (
                         <Badge status="new">{actionItemsCount > 10 ? '10+' : actionItemsCount}</Badge>
                     )}
                 </span>
@@ -208,6 +210,23 @@ function HomeDashboard() {
     useEffect(() => {
         fetchData()
     }, [startTimestamp, endTimestamp])
+
+    useEffect(() => {
+        async function getActionItemsDataAndCount() {
+            const data = await fetchActionItemsData();
+            setActionItemsData(data);
+            let count = 0;
+            if (data.highRiskCount > 0) count++;
+            if (data.sensitiveDataCount > 0) count++;
+            if (data.unauthenticatedCount > 0) count++;
+            if (Math.max(0, data.thirdPartyDiff) > 0) count++;
+            if (data.highRiskThirdPartyValue > 0) count++;
+            if (data.shadowApisValue > 0) count++;
+            if (data.SensitiveAndUnauthenticatedValue > 0) count++;
+            setActionItemsCount(count);
+        }
+        getActionItemsDataAndCount();
+    }, [startTimestamp, endTimestamp]);
 
     function buildIssuesSummary(findTotalIssuesResp) {
         if (findTotalIssuesResp && findTotalIssuesResp.totalIssuesCount) {
@@ -749,10 +768,9 @@ function HomeDashboard() {
             {selectedTab === 0 && (
                 <>
                     {dashboardComp}
-                    <ActionItemsContent onCountChange={setActionItemsCount} />
                 </>
             )}
-            {selectedTab === 1 && <ActionItemsContent onCountChange={setActionItemsCount} />}
+            {selectedTab === 1 && <ActionItemsContent actionItemsData={actionItemsData} />}
         </VerticalStack>
     )
 
