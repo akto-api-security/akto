@@ -40,6 +40,7 @@ import io.swagger.oas.inflector.examples.models.Example;
 import io.swagger.oas.inflector.processors.JsonNodeExampleSerializer;
 import io.swagger.util.Json;
 import io.swagger.v3.oas.models.media.Schema;
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -387,18 +388,21 @@ public class McpToolsSyncJobExecutor {
         sampleDataList.stream()
             .map(d -> d.getId().getUrl())
             .forEach(url -> {
-                int toolsIndex = url.indexOf("tools");
-                int resourcesIndex = url.indexOf("resources");
-                int initializeIndex = url.indexOf("initialize");
+                try {
+                    String path = new URI(url).getPath();
+                    int toolsIndex = path.indexOf("tools");
+                    int resourcesIndex = path.indexOf("resources");
+                    int initializeIndex = path.indexOf("initialize");
 
-                if (toolsIndex != -1) {
-                    result.add(url.substring(toolsIndex));
-                } else if (resourcesIndex != -1) {
-                    result.add(url.substring(resourcesIndex));
-                } else if (initializeIndex != -1) {
-                    result.add(url.substring(initializeIndex));
-                } else {
-                    result.add(url);
+                    if (toolsIndex != -1) {
+                        result.add(path.substring(toolsIndex));
+                    } else if (resourcesIndex != -1) {
+                        result.add(path.substring(resourcesIndex));
+                    } else if (initializeIndex != -1) {
+                        result.add(path.substring(initializeIndex));
+                    }
+                } catch (Exception e) {
+                    logger.error("Error while normalizing sample data URL: {}", url, e);
                 }
             });
         return result;
