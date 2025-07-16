@@ -35,7 +35,7 @@ const ACTION_ITEM_TYPES = {
 
 const JIRA_INTEGRATION_URL = "/dashboard/settings/integrations/jira";
 
-export const ActionItemsContent = () => {
+export const ActionItemsContent = ({ onCountChange }) => {
     const navigate = useNavigate();
     const [actionItems, setActionItems] = useState([]);
     const [criticalCardData, setCriticalCardData] = useState(null);
@@ -46,6 +46,7 @@ export const ActionItemsContent = () => {
     const [selectedActionItem, setSelectedActionItem] = useState(null);
     const [jiraTicketUrlMap, setJiraTicketUrlMap] = useState({});
     const [fetchedData, setFetchedData] = useState(null);
+    const [totalActionItemsCount, setTotalActionItemsCount] = useState(0);
 
     const handleJiraIntegration = async (actionItem) => {
         const integrated = window.JIRA_INTEGRATED === 'true'
@@ -148,6 +149,12 @@ export const ActionItemsContent = () => {
     }, []);
 
     useEffect(() => {
+        if (onCountChange) {
+            onCountChange(totalActionItemsCount);
+        }
+    }, [totalActionItemsCount, onCountChange]);
+
+    useEffect(() => {
         if (!fetchedData) return;
 
         const {
@@ -162,6 +169,7 @@ export const ActionItemsContent = () => {
 
         if (!(apiStats?.apiStatsEnd && apiStats?.apiStatsStart)) {
             setActionItems([]);
+            setTotalActionItemsCount(0);
             return;
         }
 
@@ -194,9 +202,13 @@ export const ActionItemsContent = () => {
                 "Unmonitored attack surface with unknown security posture", "API Governance", "High", shadowApisValue, ACTION_ITEM_TYPES.SHADOW_APIS)
         ];
 
-        setActionItems(items.filter(item => item.count > 0));
+        const filteredItems = items.filter(item => item.count > 0);
+        setActionItems(filteredItems);
+
+        let totalCount = filteredItems.length;
 
         if (SensitiveAndUnauthenticatedValue > 0) {
+            totalCount += 1;
             setCriticalCardData({
                 id: 'p0-critical',
                 priority: 'P0',
@@ -210,6 +222,8 @@ export const ActionItemsContent = () => {
         } else {
             setCriticalCardData(null);
         }
+
+        setTotalActionItemsCount(totalCount);
 
     }, [fetchedData, jiraTicketUrlMap]);
 
