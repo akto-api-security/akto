@@ -10,7 +10,7 @@ import SampleDetails from "./components/SampleDetails";
 import threatDetectionRequests from "./api";
 import tempFunc from "./dummyData";
 import NormalSampleDetails from "./components/NormalSampleDetails";
-import { HorizontalGrid, VerticalStack } from "@shopify/polaris";
+import { HorizontalGrid, VerticalStack, HorizontalStack, Popover, Button, ActionList, Box, Icon, FileMinor } from "@shopify/polaris";
 import TopThreatTypeChart from "./components/TopThreatTypeChart";
 import api from "./api";
 import threatDetectionFunc from "./transform";
@@ -78,6 +78,7 @@ function ThreatDetectionPage() {
     const [showNewTab, setShowNewTab] = useState(false)
     const [subCategoryCount, setSubCategoryCount] = useState([]);
     const [severityCountMap, setSeverityCountMap] = useState([]);
+    const [moreActions, setMoreActions] = useState(false);
 
     const threatFiltersMap = SessionStore((state) => state.threatFiltersMap);
 
@@ -173,6 +174,40 @@ function ThreatDetectionPage() {
 
     ]
 
+    const secondaryActionsComp = (
+        <HorizontalStack gap={2}>
+            <Popover
+                active={moreActions}
+                activator={(
+                    <Button onClick={() => setMoreActions(!moreActions)} disclosure removeUnderline>
+                        More Actions
+                    </Button>
+                )}
+                autofocusTarget="first-node"
+                onClose={() => { setMoreActions(false) }}
+            >
+                <Popover.Pane fixed>
+                    <ActionList
+                        actionRole="menuitem"
+                        sections={
+                            [
+                                {
+                                    title: 'Export',
+                                    items: [
+                                        {
+                                            content: 'Export as CSV',
+                                            onAction: () => exportCsv(),
+                                            prefix: <Box><Icon source={FileMinor} /></Box>
+                                        }
+                                    ]
+                                },
+                            ]
+                        }
+                    />
+                </Popover.Pane>
+            </Popover>
+        </HorizontalStack>
+    )
     return <PageWithMultipleCards
         title={
             <TitleWithInfo
@@ -183,6 +218,7 @@ function ThreatDetectionPage() {
         isFirstPage={true}
         primaryAction={<DateRangeFilter initialDispatch={currDateRange} dispatch={(dateObj) => dispatchCurrDateRange({ type: "update", period: dateObj.period, title: dateObj.title, alias: dateObj.alias })} />}
         components={components}
+        secondaryActions={secondaryActionsComp}
     />
 }
 
