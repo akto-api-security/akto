@@ -1090,33 +1090,6 @@ public class ApiCollectionsAction extends UserAction {
         return Action.SUCCESS.toUpperCase();
     }
 
-//    public String fetchBUACategoryCount(){
-//
-//        //correct this - get payload from UI as it is in fetchAllissues
-//        List<String> filterSubCategory = Arrays.asList(
-//                "CSRF_LOGIN_ATTACK",
-//                "ADD_JKU_TO_JWT",
-//                "REMOVE_TOKENS",
-//                "REPLACE_CSRF",
-//                "JWT_INVALID_SIGNATURE",
-//                "REMOVE_CSRF",
-//                "JWT_NONE_ALGO"
-//        );
-//        List<TestingRunIssues> testingRunIssues = TestingRunIssuesDao.instance.findAll(
-//                Filters.and(
-//                        Filters.in("_id" + "."
-//                                + TestingIssuesId.TEST_SUB_CATEGORY, filterSubCategory),
-//                        Filters.eq(TestingIssuesId.TEST_RUN_ISSUE_STATUS, "OPEN"))
-//        );
-//
-//        if(testingRunIssues != null && !testingRunIssues.isEmpty()) {
-//            this.buaCategoryCount = testingRunIssues.size();
-//        } else {
-//            this.buaCategoryCount = 0;
-//        }
-//
-//        return Action.SUCCESS.toUpperCase();
-//    }
 
 
     public String fetchSkippedTestsCount(){
