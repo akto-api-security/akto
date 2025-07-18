@@ -1948,29 +1948,7 @@
         </action>
 
 
-        <action name="api/getCriticalVulnCount" class="com.akto.action.ApiCollectionsAction" method="fetchCriticalVulnCount">
-            <interceptor-ref name="json"/>
-            <interceptor-ref name="defaultStack" />
-            <interceptor-ref name="roleAccessInterceptor">
-                <param name="featureLabel">API_COLLECTIONS</param>
-                <param name="accessType">READ</param>
-            </interceptor-ref>
-            <result name="FORBIDDEN" type="json">
-                <param name="statusCode">403</param>
-                <param name="ignoreHierarchy">false</param>
-                <param name="includeProperties">^actionErrors.*</param>
-            </result>
-            <result name="SUCCESS"  type="json">
-                <param name="root">criticalVulnCount</param>
-            </result>
-            <result name="ERROR" type="json">
-                <param name="statusCode">422</param>
-                <param name="ignoreHierarchy">false</param>
-                <param name="includeProperties">^actionErrors.*</param>
-            </result>
-        </action>
-
-        <action name="api/getNotTestedAPICount" class="com.akto.action.ApiCollectionsAction" method="fetchNotTestedAPICount">
+        <action name="api/getNotTestedAPICount" class="com.akto.action.observe.InventoryAction" method="fetchNotTestedAPICount">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
@@ -1992,7 +1970,7 @@
             </result>
         </action>
 
-        <action name="api/getOnlyOnceTestedAPICount" class="com.akto.action.ApiCollectionsAction" method="fetchOnlyOnceTestedAPICount">
+        <action name="api/getOnlyOnceTestedAPICount" class="com.akto.action.observe.InventoryAction" method="fetchOnlyOnceTestedAPICount">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
@@ -2014,29 +1992,7 @@
             </result>
         </action>
 
-        <action name="api/getBUACategoryCount" class="com.akto.action.ApiCollectionsAction" method="fetchBUACategoryCount">
-            <interceptor-ref name="json"/>
-            <interceptor-ref name="defaultStack" />
-            <interceptor-ref name="roleAccessInterceptor">
-                <param name="featureLabel">API_COLLECTIONS</param>
-                <param name="accessType">READ</param>
-            </interceptor-ref>
-            <result name="FORBIDDEN" type="json">
-                <param name="statusCode">403</param>
-                <param name="ignoreHierarchy">false</param>
-                <param name="includeProperties">^actionErrors.*</param>
-            </result>
-            <result name="SUCCESS"  type="json">
-                <param name="root">buaCategoryCount</param>
-            </result>
-            <result name="ERROR" type="json">
-                <param name="statusCode">422</param>
-                <param name="ignoreHierarchy">false</param>
-                <param name="includeProperties">^actionErrors.*</param>
-            </result>
-        </action>
-
-        <action name="api/getSkippedTestsCount" class="com.akto.action.ApiCollectionsAction" method="fetchSkippedTestsCount">
+        <action name="api/getSkippedTestsCount" class="com.akto.action.testing.StartTestAction" method="fetchSkippedTestsCount">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
@@ -2058,7 +2014,7 @@
             </result>
         </action>
 
-        <action name="api/getMisConfiguredTestsCount" class="com.akto.action.ApiCollectionsAction" method="fetchMisConfiguredTestsCount">
+        <action name="api/getMisConfiguredTestsCount" class="com.akto.action.testing.StartTestAction" method="fetchMisConfiguredTestsCount">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">

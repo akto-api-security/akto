@@ -100,7 +100,7 @@ public class ApiInfoDao extends AccountsContextDaoWithRbac<ApiInfo>{
                 getFilter(apiInfoKey),
                 Updates.combine(
                         Updates.set(ApiInfo.LAST_TESTED, Context.now()),
-                        Updates.inc(ApiInfo.LAST_TESTED_COUNT, 1)
+                        Updates.inc(ApiInfo.TOTAL_TESTED_COUNT, 1)
                 ));
     }
 

@@ -38,6 +38,8 @@ import com.google.gson.Gson;
 import com.mongodb.client.model.*;
 import com.mongodb.client.result.InsertOneResult;
 import com.opensymphony.xwork2.Action;
+import lombok.Getter;
+import lombok.Setter;
 import org.apache.commons.lang3.StringUtils;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
@@ -89,6 +91,15 @@ public class StartTestAction extends UserAction {
     private Map<String, String> issuesDescriptionMap;
 
     private static final Gson gson = new Gson();
+
+    @Getter
+    int skippedTestsCount;
+
+    @Getter
+    int misConfiguredTestsCount;
+
+    @Setter
+    private boolean showUrls;
 
     Set<Integer> deactivatedCollections = UsageMetricCalculator.getDeactivated();
 
@@ -1531,6 +1542,18 @@ public class StartTestAction extends UserAction {
     private TestingIssuesId getTestingIssueIdFromRunResult(TestingRunResult runResult) {
         return new TestingIssuesId(runResult.getApiInfoKey(), TestErrorSource.AUTOMATED_TESTING,
             runResult.getTestSubType());
+    }
+
+    public String fetchSkippedTestsCount(){
+
+        this.skippedTestsCount = (int) TestingRunResultDao.instance.count(Filters.in(TestingRunResult.VULNERABLE, false));
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String fetchMisConfiguredTestsCount(){
+
+        this.misConfiguredTestsCount = VulnerableTestingRunResultDao.instance.countFromDb(Filters.eq(TestingRunResult.REQUIRES_CONFIG, false), true);
+        return Action.SUCCESS.toUpperCase();
     }
 
 
