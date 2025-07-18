@@ -20,6 +20,7 @@ public class TestFilterModifier extends TestExecutorModifier {
                 .append(operation)
                 .append("\n----------------------------------------\n\n")
                 .append("Strict rules:\n")
+                .append("- Do not output any other json or text other than the one specified in the expected output.\n")
                 .append("- If you're unable to do the operation, return only this word: " + _NOT_FOUND + "\n\n")
                 .append("Expected Output:\n")
                 .append("- A JSON object with operation and value data.\n")
