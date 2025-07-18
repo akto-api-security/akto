@@ -10,6 +10,7 @@ import com.akto.dto.HttpResponseParams.Source;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.traffic.CollectionTags;
+import com.akto.dto.traffic.SampleData;
 import com.akto.hybrid_parsers.HttpCallParser;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
@@ -39,11 +40,14 @@ import io.swagger.oas.inflector.examples.models.Example;
 import io.swagger.oas.inflector.processors.JsonNodeExampleSerializer;
 import io.swagger.util.Json;
 import io.swagger.v3.oas.models.media.Schema;
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.http.HttpStatus;
@@ -93,18 +97,27 @@ public class McpToolsSyncJobExecutor {
         eligibleCollections.forEach(apiCollection -> {
             logger.info("Starting MCP sync for apiCollectionId: {} and hostname: {}", apiCollection.getId(),
                 apiCollection.getHostName());
-            List<HttpResponseParams> initResponseList = initializeMcpServerCapabilities(apiCollection);
-            List<HttpResponseParams> toolsResponseList = handleMcpToolsDiscovery(apiCollection);
-            List<HttpResponseParams> resourcesResponseList =  handleMcpResourceDiscovery(apiCollection);
-            processResponseParams(apiConfig, new ArrayList<HttpResponseParams>() {{
-                addAll(initResponseList);
-                addAll(toolsResponseList);
-                addAll(resourcesResponseList);
-            }});
+            try {
+                Set<String> normalizedSampleDataSet = getNormalizedSampleData(apiCollection.getId());
+                List<HttpResponseParams> initResponseList = initializeMcpServerCapabilities(apiCollection,
+                    normalizedSampleDataSet);
+                List<HttpResponseParams> toolsResponseList = handleMcpToolsDiscovery(apiCollection,
+                    normalizedSampleDataSet);
+                List<HttpResponseParams> resourcesResponseList = handleMcpResourceDiscovery(apiCollection,
+                    normalizedSampleDataSet);
+                List<HttpResponseParams> responseParamsToProcess = new ArrayList<>();
+                responseParamsToProcess.addAll(initResponseList);
+                responseParamsToProcess.addAll(toolsResponseList);
+                responseParamsToProcess.addAll(resourcesResponseList);
+                processResponseParams(apiConfig, responseParamsToProcess);
+            } catch (Exception e) {
+                logger.error("Error while running MCP sync job for apiCollectionId: {} and hostname: {}",
+                    apiCollection.getId(), apiCollection.getHostName(), e);
+            }
         });
     }
 
-    private List<HttpResponseParams> initializeMcpServerCapabilities(ApiCollection apiCollection) {
+    private List<HttpResponseParams> initializeMcpServerCapabilities(ApiCollection apiCollection, Set<String> normalizedSampleDataSet) {
         String host = apiCollection.getHostName();
         List<HttpResponseParams> responseParamsList = new ArrayList<>();
         try {
@@ -130,7 +143,9 @@ public class McpToolsSyncJobExecutor {
                 return Collections.emptyList();
             }
             mcpServerCapabilities = initializeResult.getCapabilities();
-            responseParamsList.add(responsePair.getSecond());
+            if (!normalizedSampleDataSet.contains(McpSchema.METHOD_INITIALIZE)) {
+                responseParamsList.add(responsePair.getSecond());
+            }
         } catch (Exception e) {
             logger.error("Error while initializing MCP server capabilities for hostname: {}", host, e);
         }
@@ -138,7 +153,8 @@ public class McpToolsSyncJobExecutor {
         return responseParamsList;
     }
 
-    private List<HttpResponseParams> handleMcpToolsDiscovery(ApiCollection apiCollection) {
+    private List<HttpResponseParams> handleMcpToolsDiscovery(ApiCollection apiCollection,
+        Set<String> normalizedSampleDataSet) {
         String host = apiCollection.getHostName();
 
         List<HttpResponseParams> responseParamsList = new ArrayList<>();
@@ -151,7 +167,8 @@ public class McpToolsSyncJobExecutor {
             Pair<JSONRPCResponse, HttpResponseParams> toolsListResponsePair = getMcpMethodResponse(
                 host, McpSchema.METHOD_TOOLS_LIST, MCP_TOOLS_LIST_REQUEST_JSON, apiCollection);
 
-            if (toolsListResponsePair.getSecond() != null) {
+            if (toolsListResponsePair.getSecond() != null && !normalizedSampleDataSet.contains(
+                McpSchema.METHOD_TOOLS_LIST)) {
                 responseParamsList.add(toolsListResponsePair.getSecond());
             }
             logger.debug("Received tools/list response. Processing tools.....");
@@ -165,6 +182,10 @@ public class McpToolsSyncJobExecutor {
                 String toolsCallRequestHeaders = buildHeaders(host);
 
                 for (Tool tool : toolsResult.getTools()) {
+                    if (normalizedSampleDataSet.contains(McpSchema.METHOD_TOOLS_CALL + "/" + tool.getName())) {
+                        logger.debug("Skipping tool {} as it is already present in the db.", tool.getName());
+                        continue;
+                    }
                     JSONRPCRequest request = new JSONRPCRequest(
                         McpSchema.JSONRPC_VERSION,
                         McpSchema.METHOD_TOOLS_CALL,
@@ -192,7 +213,8 @@ public class McpToolsSyncJobExecutor {
         return responseParamsList;
     }
 
-    private List<HttpResponseParams> handleMcpResourceDiscovery(ApiCollection apiCollection) {
+    private List<HttpResponseParams> handleMcpResourceDiscovery(ApiCollection apiCollection,
+        Set<String> normalizedSampleDataSet) {
         String host = apiCollection.getHostName();
 
         List<HttpResponseParams> responseParamsList = new ArrayList<>();
@@ -204,7 +226,8 @@ public class McpToolsSyncJobExecutor {
             Pair<JSONRPCResponse, HttpResponseParams> resourcesListResponsePair = getMcpMethodResponse(
                 host, McpSchema.METHOD_RESOURCES_LIST, MCP_RESOURCE_LIST_REQUEST_JSON, apiCollection);
 
-            if (resourcesListResponsePair.getSecond() != null) {
+            if (resourcesListResponsePair.getSecond() != null && !normalizedSampleDataSet.contains(
+                McpSchema.METHOD_RESOURCES_LIST)) {
                 responseParamsList.add(resourcesListResponsePair.getSecond());
             }
             logger.debug("Received resources/list response. Processing resources.....");
@@ -218,6 +241,10 @@ public class McpToolsSyncJobExecutor {
                 String toolsCallRequestHeaders = buildHeaders(host);
 
                 for (Resource resource : resourcesResult.getResources()) {
+                    if (normalizedSampleDataSet.contains(McpSchema.METHOD_RESOURCES_READ + "/" + resource.getUri())) {
+                        logger.debug("Skipping resource {} as it is already present in the db.", resource.getUri());
+                        continue;
+                    }
                     JSONRPCRequest request = new JSONRPCRequest(
                         McpSchema.JSONRPC_VERSION,
                         McpSchema.METHOD_RESOURCES_READ,
@@ -356,6 +383,34 @@ public class McpToolsSyncJobExecutor {
             logger.error("Error while parsing MCP message.");
         }
         return null;
+    }
+
+    private static Set<String> getNormalizedSampleData(int apiCollectionId) {
+        List<SampleData> sampleDataList = DataActorFactory.fetchInstance().fetchSampleData(
+            new HashSet<>(Collections.singletonList(apiCollectionId)), 0);
+
+        Set<String> result = new HashSet<>();
+        sampleDataList.stream()
+            .map(d -> d.getId().getUrl())
+            .forEach(url -> {
+                try {
+                    String path = new URI(url).getPath();
+                    int toolsIndex = path.indexOf("tools");
+                    int resourcesIndex = path.indexOf("resources");
+                    int initializeIndex = path.indexOf("initialize");
+
+                    if (toolsIndex != -1) {
+                        result.add(path.substring(toolsIndex));
+                    } else if (resourcesIndex != -1) {
+                        result.add(path.substring(resourcesIndex));
+                    } else if (initializeIndex != -1) {
+                        result.add(path.substring(initializeIndex));
+                    }
+                } catch (Exception e) {
+                    logger.error("Error while normalizing sample data URL: {}", url, e);
+                }
+            });
+        return result;
     }
 }
 
