@@ -12,6 +12,7 @@ const issuesFunctions = {
         const allowedValues = field?.allowedValues || [];
         const fieldId = field?.fieldId || "";
         const fieldName = field?.name || "";
+        const isFieldRequired = field?.required || false;
 
         const handleFieldChange = (fieldId, value) => {
             updateDisplayJiraIssueFieldValues(fieldId, value)
@@ -32,14 +33,15 @@ const issuesFunctions = {
                                 onChange={(value) => handleFieldChange(fieldId, value)}
                                 maxLength={255}
                                 showCharacterCount
-                                requiredIndicator
+                                requiredIndicator={isFieldRequired}
                             />)
                     }
                 }
             case "com.atlassian.jira.plugin.system.customfieldtypes:select":
             case "com.atlassian.jira.plugin.system.customfieldtypes:multiselect":
+            case "com.atlassian.jira.plugin.system.customfieldtypes:multicheckboxes":
             case "com.atlassian.jira.plugin.system.customfieldtypes:radiobuttons": {
-                const isMultiSelect = customFieldURI.includes("multiselect");
+                const isMultiSelect = customFieldURI.includes("multiselect") || customFieldURI.includes("multicheckboxes");
 
                 const firstAllowedOption = {
                     value: allowedValues.length > 0 ? allowedValues[0].value :  "",
@@ -54,13 +56,13 @@ const issuesFunctions = {
 
                         return (
                             <DropdownSearch
-                                allowMultiple={customFieldURI.includes("multiselect")}
+                                allowMultiple={isMultiSelect}
                                 optionsList={allowedValues.map((option) => ({
                                     label: option?.value,
                                     value: option?.value
                                 }))}
                                 setSelected={(selectedOption) => {
-                                    if (customFieldURI.includes("multiselect")) {
+                                    if (isMultiSelect) {
                                         const updateFieldValue = selectedOption.map((option) => ({ value: option }));
                                         handleFieldChange(fieldId, updateFieldValue);
                                      } else {
@@ -72,7 +74,7 @@ const issuesFunctions = {
                                 preSelected={preSelected}
                                 label={fieldName}
                                 placeholder={`Select an option for the field ${fieldName}`}
-                                textfieldRequiredIndicator={true}
+                                textfieldRequiredIndicator={isFieldRequired}
                             />
                         )
                     } 
