@@ -4,17 +4,22 @@ import { Button, HorizontalGrid, HorizontalStack, TextField, VerticalStack } fro
 import { DeleteMinor } from "@shopify/polaris-icons"
 import Dropdown from '../../../../components/layouts/Dropdown';
 
+export const operatorTypeOptions = {
+    "ADD_HEADER": { heading: "Add Header", status: "info" },
+    "ADD_BODY_PARAM": { heading: "Add Body Param", status: "info" },
+    "MODIFY_HEADER": { heading: "Modify Header", status: "warning" },
+    "MODIFY_BODY_PARAM": { heading: "Modify Body Param", status: "warning" },
+    "DELETE_HEADER": { heading: "Delete Header", status: "critical" },
+    "DELETE_BODY_PARAM": { heading: "Delete Body Param", status: "critical" }
+};
+
+const menuItems = Object.keys(operatorTypeOptions).map(key => ({
+    value: key,
+    label: operatorTypeOptions[key].heading,
+}));
+
 function AdvancedSettingsComponent({ dispatchConditions, conditions, hideButton }) {
     const emptyCondition = { data: { key: '', value: '' }, operator: { 'type': 'ADD_HEADER' } }
-
-    const operatorTypeOptions = [
-        { value: "ADD_HEADER", label: "Add Header" },
-        { value: "ADD_BODY_PARAM", label: "Add Body Param" },
-        { value: "MODIFY_HEADER", label: "Modify Header" },
-        { value: "MODIFY_BODY_PARAM", label: "Modify Body Param" },
-        { value: "DELETE_HEADER", label: "Delete Header" },
-        { value: "DELETE_BODY_PARAM", label: "Delete Body Param" }
-    ];
 
     const handleTypeSelected = (type, index) => {
         dispatchConditions({ type: "update", index: index, key: 'operator', obj: { "type": type } })
@@ -38,7 +43,7 @@ function AdvancedSettingsComponent({ dispatchConditions, conditions, hideButton 
 
     const [showAdvancedSettings, setShowAdvancedSettings] = useState(hideButton ? hideButton : false)
     const getLabel = (val) => {
-        return operatorTypeOptions.filter((x) => x.value === val)[0].label
+        return menuItems.filter((x) => x.value === val)[0].label
     }
 
     return (
@@ -54,7 +59,7 @@ function AdvancedSettingsComponent({ dispatchConditions, conditions, hideButton 
                                             <Button plain removeUnderline size="medium">AND</Button>
                                             <Dropdown
                                                 id={`operator-type-${index}`}
-                                                menuItems={operatorTypeOptions}
+                                                menuItems={menuItems}
                                                 initial={() => getLabel(condition?.operator?.type)}
                                                 selected={(type) => handleTypeSelected(type, index)}
                                             />

@@ -1,11 +1,13 @@
 package com.akto.action;
 
+import java.nio.file.DirectoryStream.Filter;
 import java.util.*;
 import java.util.stream.Collectors;
 
 import com.akto.action.observe.InventoryAction;
 import com.akto.dto.*;
 import com.akto.util.Pair;
+import lombok.Getter;
 import org.bson.conversions.Bson;
 
 import com.akto.action.observe.Utils;
@@ -46,6 +48,9 @@ import com.mongodb.client.model.UnwindOptions;
 import com.mongodb.client.model.UpdateOptions;
 import com.opensymphony.xwork2.Action;
 
+import lombok.Setter;
+import static com.akto.util.Constants.AKTO_DISCOVERED_APIS_COLLECTION;
+
 public class ApiCollectionsAction extends UserAction {
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(ApiCollectionsAction.class, LogDb.DASHBOARD);
@@ -64,6 +69,12 @@ public class ApiCollectionsAction extends UserAction {
     List<ApiInfoKey> apiList;
     private BasicDBObject response;
     private boolean hasUsageEndpoints;
+    @Getter
+    int sensitiveUnauthenticatedEndpointsCount;
+    @Getter
+    int highRiskThirdPartyEndpointsCount;
+    @Getter
+    int shadowApisCount;
 
     public List<ApiInfoKey> getApiList() {
         return apiList;
@@ -161,7 +172,7 @@ public class ApiCollectionsAction extends UserAction {
         List<Bson> pipeLine = new ArrayList<>();
         pipeLine.add(Aggregates.project(Projections.fields(
             Projections.computed(ApiCollection.URLS_COUNT, new BasicDBObject("$size", new BasicDBObject("$ifNull", Arrays.asList("$urls", Collections.emptyList())))),
-            Projections.include(ApiCollection.ID, ApiCollection.NAME, ApiCollection.HOST_NAME, ApiCollection._TYPE, ApiCollection.TAGS_STRING, ApiCollection._DEACTIVATED,ApiCollection.START_TS, ApiCollection.AUTOMATED, ApiCollection.DESCRIPTION, ApiCollection.USER_ENV_TYPE)
+            Projections.include(ApiCollection.ID, ApiCollection.NAME, ApiCollection.HOST_NAME, ApiCollection._TYPE, ApiCollection.TAGS_STRING, ApiCollection._DEACTIVATED,ApiCollection.START_TS, ApiCollection.AUTOMATED, ApiCollection.DESCRIPTION, ApiCollection.USER_ENV_TYPE, ApiCollection.IS_OUT_OF_TESTING_SCOPE)
         )));
 
         try {
@@ -689,6 +700,38 @@ public class ApiCollectionsAction extends UserAction {
         return Action.SUCCESS.toUpperCase();
     }
 
+    @Setter
+    private boolean currentIsOutOfTestingScopeVal;
+
+    public String toggleCollectionsOutOfTestScope(){
+        try{
+            if(this.apiCollectionIds ==null || this.apiCollectionIds.isEmpty()){
+                addActionError("No collections provided");
+                return ERROR.toUpperCase();
+            }
+            List<Integer> accessibleCollectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
+            if(accessibleCollectionIds != null){
+                this.apiCollectionIds.removeIf(id -> !accessibleCollectionIds.contains(id));
+            }
+            if(this.apiCollectionIds.isEmpty()){
+                addActionError("No accessible collections provided");
+                return ERROR.toUpperCase();
+            }
+            ApiCollectionsDao.instance.updateMany(
+                Filters.in(ApiCollection.ID, this.apiCollectionIds),
+                Updates.set(ApiCollection.IS_OUT_OF_TESTING_SCOPE, !this.currentIsOutOfTestingScopeVal)
+            );
+            response = new BasicDBObject();
+            response.put("success", true);
+
+            return SUCCESS.toUpperCase();
+
+        } catch(Exception e){
+            addActionError("Error marking collections as Out of Test Scope");
+            return ERROR.toUpperCase();
+        }
+    }
+
     public String fetchCustomerEndpoints(){
         try {
             ApiCollection juiceShop = ApiCollectionsDao.instance.findByName("juice_shop_demo");
@@ -933,6 +976,47 @@ public class ApiCollectionsAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
+    @Setter
+    private boolean showUrls;
+    public String fetchSensitiveAndUnauthenticatedValue(){
+
+        List<ApiInfo> sensitiveEndpoints = ApiInfoDao.instance.findAll(Filters.eq(ApiInfo.IS_SENSITIVE, true));
+        for(ApiInfo apiInfo: sensitiveEndpoints) {
+            if(apiInfo.getAllAuthTypesFound() != null && !apiInfo.getAllAuthTypesFound().isEmpty()) {
+                for(Set<ApiInfo.AuthType> authType: apiInfo.getAllAuthTypesFound()) {
+                    if(authType.contains(ApiInfo.AuthType.UNAUTHENTICATED)) {
+                        this.sensitiveUnauthenticatedEndpointsCount++;
+                    }
+                }
+            }
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String fetchHighRiskThirdPartyValue(){
+        Bson filterQ = UsageMetricCalculator.excludeDemosAndDeactivated(ApiInfo.ID_API_COLLECTION_ID);
+        Bson filter = Filters.and(
+            filterQ,
+            Filters.gte(ApiInfo.RISK_SCORE, 4),
+            Filters.in(ApiInfo.API_ACCESS_TYPES, ApiInfo.ApiAccessType.THIRD_PARTY)
+        );
+        if(!showUrls){
+            this.highRiskThirdPartyEndpointsCount  = (int) ApiInfoDao.instance.count(filter);
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String fetchShadowApisValue(){
+
+        ApiCollection shadowApisCollection = ApiCollectionsDao.instance.findByName(AKTO_DISCOVERED_APIS_COLLECTION);
+        if(shadowApisCollection != null) {
+            if(!showUrls) {
+                this.shadowApisCount = (int) ApiInfoDao.instance.count(Filters.eq(ApiInfo.ID_API_COLLECTION_ID, shadowApisCollection.getId()));
+            }
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
     public List<ApiCollection> getApiCollections() {
         return this.apiCollections;
     }
@@ -1056,4 +1140,5 @@ public class ApiCollectionsAction extends UserAction {
     public void setResetEnvTypes(boolean resetEnvTypes) {
         this.resetEnvTypes = resetEnvTypes;
     }
+
 }

@@ -45,6 +45,7 @@ function GithubSimpleTable(props) {
         lastColumnSticky = {props?.lastColumnSticky}
         isMultipleItemsSelected={props?.isMultipleItemsSelected}
         emptyStateMarkup={props?.emptyStateMarkup}
+        calendarFilterKeys={props?.calendarFilterKeys}
     />
 
 }

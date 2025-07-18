@@ -86,6 +86,13 @@ const headings = [
         value: "author",
         showFilter: true,
         filterKey: "author",
+    },
+    {
+        title: "Duration",
+        text: "Duration",
+        value: "duration",
+        showFilter: true,
+        filterKey: "duration",
     }
 ];
 
@@ -129,7 +136,8 @@ function TestsTablePage() {
                         useBadge={false}
                     />) 
                 : "-",
-                compliance: value?.compliance
+                compliance: value?.compliance,
+                duration: value?.duration || "-",
             }
             if (value.isCustom) {
                 if (value?.inactive === true) {

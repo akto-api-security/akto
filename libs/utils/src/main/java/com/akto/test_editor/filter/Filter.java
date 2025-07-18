@@ -1,5 +1,6 @@
 package com.akto.test_editor.filter;
 
+import com.akto.gpt.handlers.gpt_prompts.TestValidatorModifier;
 import java.util.*;
 
 import com.akto.log.LoggerMaker;
@@ -30,6 +31,7 @@ public class Filter {
     private static final LoggerMaker loggerMaker = new LoggerMaker(Filter.class, LogDb.TESTING);
     
     private static boolean isTestingContext = true;
+    private static final String INVALID_QS_ = "invalid_" + Context.now();
 
     public Filter() {
         this.filterAction = new FilterAction();
@@ -41,13 +43,13 @@ public class Filter {
         String operationTypeLower = filterActionRequest.getOperand().toLowerCase();
         String operation = "";
         Object newQuerySet = querySet;
+        boolean querySetUpdated = false;
+        String operationPrompt = "";
+
         try {
             int accountId = Context.accountId.get();
             FeatureAccess featureAccess = UsageMetricUtils.getFeatureAccessSaas(accountId, TestExecutorModifier._AKTO_GPT_AI);
             if (featureAccess.getIsGranted()) {
-
-
-                String operationPrompt = "";
                 if (querySet instanceof String) {
                     String query = (String) querySet;
                     if (query.startsWith(Utils._MAGIC)) {
@@ -77,10 +79,18 @@ public class Filter {
                     RawApi rawApi = filterActionRequest.fetchRawApiBasedOnContext();
                     String ogRequest = Utils.buildRequestIHttpFormat(rawApi);
                     String response = Utils.buildResponseIHttpFormat(rawApi);
-                    String request = ogRequest + "\n\n" + response;
-                    queryData.put(TestExecutorModifier._REQUEST, request);
+
                     queryData.put(TestExecutorModifier._OPERATION, operation);
-                    BasicDBObject generatedData = new TestFilterModifier().handle(queryData);
+                    BasicDBObject generatedData;
+                    if (filterActionRequest.isValidationContext()) {
+                        queryData.put(TestExecutorModifier._REQUEST, response);
+                        generatedData = new TestValidatorModifier().handle(queryData);
+                    } else {
+                        String request = ogRequest + "\n\n" + response;
+                        queryData.put(TestExecutorModifier._REQUEST, request);
+                        generatedData = new TestFilterModifier().handle(queryData);
+                    }
+
                     if (generatedData.containsKey(operationTypeLower)) {
                         Object generatedQuerySet = generatedData.get(operationTypeLower);
                         if (generatedQuerySet instanceof JSONArray) {
@@ -93,14 +103,19 @@ public class Filter {
                         } else {
                             newQuerySet = generatedQuerySet;
                         }
+                        querySetUpdated = true;
                     }
+
+                    if(!querySetUpdated && !operationPrompt.isEmpty()){
+                        newQuerySet = INVALID_QS_;
+                     }
                 } 
             }
 
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "error invoking operation " + operationTypeLower + " " + e.getMessage());
         }
-
+        
         return newQuerySet;
     }
 
@@ -248,7 +263,7 @@ public class Filter {
         }
         Set<String> s2 = new HashSet<>(newMatches);
 
-        if (operand == "and") {
+        if (operand.equals("and")) {
             s1.retainAll(s2);
         } else {
             s1.addAll(s2);
