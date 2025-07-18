@@ -5,8 +5,15 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 import com.akto.action.observe.InventoryAction;
+import com.akto.dao.testing.TestingRunResultDao;
+import com.akto.dao.testing.VulnerableTestingRunResultDao;
 import com.akto.dto.*;
+import com.akto.dto.test_run_findings.TestingIssuesId;
+import com.akto.dto.test_run_findings.TestingRunIssues;
+import com.akto.dto.testing.TestResult;
+import com.akto.dto.testing.TestingRunResult;
 import com.akto.util.Pair;
+import com.akto.util.enums.GlobalEnums;
 import lombok.Getter;
 import org.bson.conversions.Bson;
 
@@ -75,7 +82,6 @@ public class ApiCollectionsAction extends UserAction {
     int highRiskThirdPartyEndpointsCount;
     @Getter
     int shadowApisCount;
-
     public List<ApiInfoKey> getApiList() {
         return apiList;
     }
