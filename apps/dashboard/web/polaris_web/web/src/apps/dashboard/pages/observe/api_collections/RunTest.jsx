@@ -273,7 +273,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                     startTimestamp: testIdConfig?.scheduleTimestamp,
                     runTypeParentLabel: testRunType,
                     miniTestingServiceName: testIdConfig?.miniTestingServiceName || "",
-                    slackChannel: testIdConfig?.slackChannel || "",
+                    slackChannel: testIdConfig?.selectedSlackChannelId || 0,
                 }));
                 setTestSuiteIds(testIdConfig?.testingRunConfig?.testSuiteIds || [])
                 setTestNameSuiteModal(testIdConfig?.name||"")
@@ -712,7 +712,6 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
         await testingApi.modifyTestingRunConfig(testIdConfig?.testingRunConfig?.id, editableConfigObject).then(() => {
             func.setToast(true, false, "Modified testing run config successfully")
             setShowEditableSettings(false)
-            window.location.reload()
         })
         if(activeFromTesting){
             toggleRunTest();
@@ -937,7 +936,6 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                             {!openConfigurations ? <RunTestSuites
                                 testRun={testRun}
                                 setTestRun={setTestRun}
-                                handleRun={handleRun}
                                 handleRemoveAll={handleRemoveAll}
                                 apiCollectionName={apiCollectionName}
                                 setTestMode={setTestMode}

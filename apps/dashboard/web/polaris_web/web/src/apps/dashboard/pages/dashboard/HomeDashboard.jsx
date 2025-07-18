@@ -3,7 +3,7 @@ import api from './api';
 import func from '@/util/func';
 import observeFunc from "../observe/transform"
 import PageWithMultipleCards from "../../components/layouts/PageWithMultipleCards"
-import { Box, DataTable, HorizontalGrid, HorizontalStack, Icon, Link, Scrollable, Text, VerticalStack, LegacyTabs, Badge, Avatar } from '@shopify/polaris';
+import { Box, DataTable, HorizontalGrid, HorizontalStack, Icon, Link, Scrollable, Text, VerticalStack, LegacyTabs, Badge } from '@shopify/polaris';
 import observeApi from "../observe/api"
 import testingTransform from "../testing/transform"
 import StackedChart from '../../components/charts/StackedChart';
@@ -12,7 +12,7 @@ import testingApi from "../testing/api"
 import PersistStore from '../../../main/PersistStore';
 import { DashboardBanner } from './components/DashboardBanner';
 import SummaryCard from './new_components/SummaryCard';
-import { ArrowUpMinor, ArrowDownMinor, EmailMinor, EmailMajor, ChevronDownMinor } from '@shopify/polaris-icons';
+import { ArrowUpMinor, ArrowDownMinor } from '@shopify/polaris-icons';
 import TestSummaryCardsList from './new_components/TestSummaryCardsList';
 import InfoCard from './new_components/InfoCard';
 import ProgressBarChart from './new_components/ProgressBarChart';
@@ -27,6 +27,7 @@ import CriticalUnsecuredAPIsOverTimeGraph from '../issues/IssuesPage/CriticalUns
 import CriticalFindingsGraph from '../issues/IssuesPage/CriticalFindingsGraph';
 import values from "@/util/values";
 import { ActionItemsContent } from './components/ActionItemsContent';
+import { fetchActionItemsData } from './components/actionItemsTransform';
 
 function HomeDashboard() {
 
@@ -34,6 +35,8 @@ function HomeDashboard() {
     const [showBannerComponent, setShowBannerComponent] = useState(false)
     const [testSummaryInfo, setTestSummaryInfo] = useState([])
     const [selectedTab, setSelectedTab] = useState(0);
+    const [actionItemsCount, setActionItemsCount] = useState(0);
+    const [actionItemsData, setActionItemsData] = useState(null);
 
     const handleTabChange = useCallback(
         (selectedTabIndex) => setSelectedTab(selectedTabIndex),
@@ -48,7 +51,14 @@ function HomeDashboard() {
         },
         {
             id: 'analytics',
-            content: 'Analysis',
+            content: (
+                <HorizontalStack gap={"1"}>
+                    <Text>Analysis</Text>
+                    {actionItemsCount > 0 && (
+                        <Badge status="new">{actionItemsCount > 10 ? '10+' : actionItemsCount}</Badge>
+                    )}
+                </HorizontalStack>
+            ),
             panelID: 'analytics-content',
         },
     ];
@@ -200,6 +210,20 @@ function HomeDashboard() {
     useEffect(() => {
         fetchData()
     }, [startTimestamp, endTimestamp])
+
+    async function getActionItemsDataAndCount() {
+        const data = await fetchActionItemsData();
+        setActionItemsData(data);
+        let count = 0;
+        Object.values(data).forEach((val) => {
+            if (val > 0) count++;
+        });
+        setActionItemsCount(count);
+    }
+
+    useEffect(() => {
+        getActionItemsDataAndCount();
+    }, []);
 
     function buildIssuesSummary(findTotalIssuesResp) {
         if (findTotalIssuesResp && findTotalIssuesResp.totalIssuesCount) {
@@ -738,7 +762,7 @@ function HomeDashboard() {
     const tabsComponent = (
         <VerticalStack gap="4" key="tabs-stack">
             <LegacyTabs tabs={tabs} selected={selectedTab} onSelect={handleTabChange} />
-            {selectedTab === 0 ? dashboardComp : <ActionItemsContent />}
+            {selectedTab === 0 ? dashboardComp : <ActionItemsContent actionItemsData={actionItemsData} />}
         </VerticalStack>
     )
 
