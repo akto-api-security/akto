@@ -60,7 +60,7 @@ public class McpToolsSyncJobExecutor {
     private static final String MCP_TOOLS_LIST_REQUEST_JSON =
         "{\"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"" + McpSchema.METHOD_TOOLS_LIST + "\", \"params\": {}}";
     private static final String MCP_RESOURCE_LIST_REQUEST_JSON =
-        "{\"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"" + McpSchema.METHOD_RESOURCES_TEMPLATES_LIST + "\", \"params\": {}}";
+        "{\"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"" + McpSchema.METHOD_RESOURCES_LIST + "\", \"params\": {}}";
     private static final String LOCAL_IP = "127.0.0.1";
     private ServerCapabilities mcpServerCapabilities = null;
 
