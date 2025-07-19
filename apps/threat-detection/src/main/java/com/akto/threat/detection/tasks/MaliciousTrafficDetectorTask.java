@@ -42,9 +42,9 @@ import com.akto.proto.generated.threat_detection.message.malicious_event.event_t
 import com.akto.proto.generated.threat_detection.message.malicious_event.v1.MaliciousEventKafkaEnvelope;
 import com.akto.proto.generated.threat_detection.message.malicious_event.v1.MaliciousEventMessage;
 import com.akto.proto.generated.threat_detection.message.sample_request.v1.SampleMaliciousRequest;
-import com.akto.proto.generated.threat_detection.message.sample_request.v1.SampleRequestKafkaEnvelope;
 import com.akto.proto.generated.threat_detection.message.sample_request.v1.SchemaConformanceError;
 import com.akto.proto.http_response_param.v1.HttpResponseParam;
+import com.akto.proto.http_response_param.v1.StringList;
 import com.akto.rules.TestPlugin;
 import com.akto.test_editor.filter.data_operands_impl.ValidationResult;
 import com.akto.threat.detection.cache.ApiCountCacheLayer;
@@ -54,6 +54,7 @@ import com.akto.threat.detection.constants.RedisKeyInfo;
 import com.akto.threat.detection.ip_api_counter.DistributionCalculator;
 import com.akto.threat.detection.kafka.KafkaProtoProducer;
 import com.akto.threat.detection.smart_event_detector.window_based.WindowBasedThresholdNotifier;
+import com.akto.threat.detection.utils.ThreatDetector;
 import com.akto.threat.detection.utils.Utils;
 import com.akto.util.Constants;
 import com.akto.util.HttpRequestResponseUtils;
@@ -95,6 +96,7 @@ public class MaliciousTrafficDetectorTask implements Task {
   private static Map<String, Object> varMap = new HashMap<>();
   private static Supplier<String> lazyToString;
   private DistributionCalculator distributionCalculator;
+  private ThreatDetector threatDetector = new ThreatDetector();
   private boolean apiDistributionEnabled;
 
   public MaliciousTrafficDetectorTask(
@@ -154,6 +156,9 @@ public class MaliciousTrafficDetectorTask implements Task {
             try {
               for (ConsumerRecord<String, byte[]> record : records) {
                 HttpResponseParam httpResponseParam = HttpResponseParam.parseFrom(record.value());
+                if(ignoreTrafficFilter(httpResponseParam)){
+                  continue;
+                }
                 processRecord(httpResponseParam);
               }
 
@@ -167,6 +172,17 @@ public class MaliciousTrafficDetectorTask implements Task {
             }
           }
         });
+  }
+
+  private boolean ignoreTrafficFilter(HttpResponseParam responseParam) {
+    Map<String, StringList> headers = responseParam.getRequestHeadersMap();
+    if (headers.get("x-akto-ignore") != null) {
+      return true;
+    }
+
+    List<String> hosts = headers.get("host");
+    if (hosts == null || hosts.isEmpty()) return false;
+    return hosts.contains(Constants.AKTO_THREAT_PROTECTION_BACKEND_URL);
   }
 
   private Map<String, FilterConfig> getFilters() {
@@ -290,6 +306,7 @@ public class MaliciousTrafficDetectorTask implements Task {
       }else {
 
         hasPassedFilter = validateFilterForRequest(apiFilter, rawApi, apiInfoKey);
+        hasPassedFilter = hasPassedFilter || threatDetector.applyFilter(apiFilter, responseParam);
       }
 
       // If a request passes any of the filter, then it's a malicious request,

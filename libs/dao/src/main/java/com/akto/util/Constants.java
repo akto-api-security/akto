@@ -15,6 +15,7 @@ public class Constants {
     public static final String TIMESTAMP = "timestamp";
 
     public static final String AWS_REGION = "AWS_REGION";
+    public static final String AKTO_THREAT_PROTECTION_BACKEND_URL = "https://tbs.akto.io";
     public static final String AKTO_THREAT_DETECTION_CACHE_PREFIX = "akto:threat:schema:";
 
     public static final String AWS_ACCOUNT_ID = "AWS_ACCOUNT_ID";
