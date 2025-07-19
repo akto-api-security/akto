@@ -41,7 +41,7 @@ public class ThreatDetector {
     }
 
     public boolean isLFiThreat(HttpResponseParams httpResponseParams) {
-        // TOOD: .get() is expensive , optimize it
+        // TODO: .get() is expensive, optimize it
         return lfiTrie.containsMatch(httpResponseParams.getOriginalMsg().get());
     }
 }
