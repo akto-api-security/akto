@@ -182,7 +182,7 @@ public class MaliciousTrafficDetectorTask implements Task {
 
     List<String> hosts = headers.get("host");
     if (hosts == null || hosts.isEmpty()) return false;
-    return hosts.contains(Constants.AKTO_THREAT_PROTECTION_BACKEND_URL);
+    return hosts.contains(Constants.AKTO_THREAT_PROTECTION_BACKEND_HOST);
   }
 
   private Map<String, FilterConfig> getFilters() {
@@ -303,10 +303,10 @@ public class MaliciousTrafficDetectorTask implements Task {
         errors = RequestValidator.validate(responseParam, apiSchema, apiInfoKey.toString());
         hasPassedFilter = errors != null && !errors.isEmpty();
 
+      }else if(apiFilter.getId().equals(ThreatDetector.LFI_FILTER_ID)) {
+        hasPassedFilter = threatDetector.applyFilter(apiFilter, responseParam);
       }else {
-
         hasPassedFilter = validateFilterForRequest(apiFilter, rawApi, apiInfoKey);
-        hasPassedFilter = hasPassedFilter || threatDetector.applyFilter(apiFilter, responseParam);
       }
 
       // If a request passes any of the filter, then it's a malicious request,

@@ -12,7 +12,7 @@ import com.akto.dto.monitoring.FilterConfig;
 public class ThreatDetector {
 
     private static final String LFI_OS_FILES_DATA = "/lfi-os-files.data";
-    private static final String LFI_FILTER_ID = "LocalFileInclusionLFIRFI";
+    public static final String LFI_FILTER_ID = "LocalFileInclusionLFIRFI";
     private Trie lfiTrie;
 
     public ThreatDetector() throws Exception {
