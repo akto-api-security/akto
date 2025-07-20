@@ -22,6 +22,7 @@ import IssuesCheckbox from "../issues/IssuesPage/IssuesCheckbox";
 import { CellType } from "@/apps/dashboard/components/tables/rows/GithubRow";
 import LocalStore from "../../../main/LocalStorageStore";
 import GetPrettifyEndpoint from "@/apps/dashboard/pages/observe/GetPrettifyEndpoint";
+import JiraTicketDisplay from "../../components/shared/JiraTicketDisplay";
 
 let headers = [
     {
@@ -339,7 +340,7 @@ const transform = {
     })
     return testRuns;
     },
-    prepareTestRunResult : (hexId, data, subCategoryMap, subCategoryFromSourceConfigMap, issuesDescriptionMap) => {
+    prepareTestRunResult : (hexId, data, subCategoryMap, subCategoryFromSourceConfigMap, issuesDescriptionMap, jiraIssuesMapForResults) => {
       let obj = {};
       obj['id'] = data.hexId;
       obj['name'] = func.getRunResultSubCategory(data, subCategoryFromSourceConfigMap, subCategoryMap, "testName")
@@ -372,12 +373,18 @@ const transform = {
         }
       }
 
+      if (jiraIssuesMapForResults && Object.keys(jiraIssuesMapForResults).length > 0) {
+        if (jiraIssuesMapForResults[testingRunResultHexId]) {
+          obj['jiraIssueUrl'] = jiraIssuesMapForResults[testingRunResultHexId];
+        }
+      }
+
       return obj;
     },
-    prepareTestRunResults : (hexId, testingRunResults, subCategoryMap, subCategoryFromSourceConfigMap, issuesDescriptionMap) => {
+    prepareTestRunResults : (hexId, testingRunResults, subCategoryMap, subCategoryFromSourceConfigMap, issuesDescriptionMap, jiraIssuesMapForResults) => {
       let testRunResults = []
       testingRunResults.forEach((data) => {
-        let obj = transform.prepareTestRunResult(hexId, data, subCategoryMap, subCategoryFromSourceConfigMap, issuesDescriptionMap);
+        let obj = transform.prepareTestRunResult(hexId, data, subCategoryMap, subCategoryFromSourceConfigMap, issuesDescriptionMap, jiraIssuesMapForResults);
         if(obj['name'] && obj['testCategory']){
           testRunResults.push(obj);
         }
@@ -839,6 +846,7 @@ getCollapsibleRow(urls, severity) {
       <tr style={{background: "#FAFBFB", borderLeft: borderStyle, padding: '0px !important', borderTop: '1px solid #dde0e4'}}>
         <td colSpan={8} style={{padding: '0px !important', width: '100%'}}>
           {urls.map((ele,index)=>{
+            const jiraKey = ele?.jiraIssueUrl && ele?.jiraIssueUrl?.length > 0 ? ele.jiraIssueUrl?.split('/').pop() : "";
             const borderStyle = index < (urls.length - 1) ? {borderBlockEndWidth : 1} : {}
             return(
               <Box
@@ -855,6 +863,7 @@ getCollapsibleRow(urls, severity) {
                     <Link monochrome onClick={() => history.navigate(ele.nextUrl)} removeUnderline>
                       {transform.getUrlComp(ele.url)}
                     </Link>
+                    {ele.jiraIssueUrl && <JiraTicketDisplay jiraTicketUrl={ele.jiraIssueUrl} jiraKey={jiraKey} />}
                     <Box maxWidth="250px" paddingInlineStart="3">
                       <TooltipText
                         text={ele.issueDescription}
@@ -939,7 +948,7 @@ getPrettifiedTestRunResults(testRunResults){
     if(testRunResultsObj.hasOwnProperty(key)){
       let endTimestamp = Math.max(test.endTimestamp, testRunResultsObj[key].endTimestamp)
       let urls = testRunResultsObj[key].urls
-      urls.push({url: test.url, nextUrl: test.nextUrl, testRunResultsId: test.id, statusCode: statusCode, responseBody: responseBody, issueDescription: test.description})
+      urls.push({url: test.url, nextUrl: test.nextUrl, testRunResultsId: test.id, statusCode: statusCode, responseBody: responseBody, issueDescription: test.description, jiraIssueUrl: test.jiraIssueUrl})
       let obj = {
         ...test,
         urls: urls,
@@ -951,7 +960,7 @@ getPrettifiedTestRunResults(testRunResults){
       delete obj["errorsList"]
       testRunResultsObj[key] = obj
     }else{
-      let urls = [{url: test.url, nextUrl: test.nextUrl, testRunResultsId: test.id, statusCode: statusCode, responseBody: responseBody, issueDescription: test.description}]
+      let urls = [{url: test.url, nextUrl: test.nextUrl, testRunResultsId: test.id, statusCode: statusCode, responseBody: responseBody, issueDescription: test.description, jiraIssueUrl: test.jiraIssueUrl}]
       let obj={
         ...test,
         urls:urls,
