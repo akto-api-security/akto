@@ -93,7 +93,6 @@ public class MaliciousTrafficDetectorTask implements Task {
 
   private static final HttpRequestParams requestParams = new HttpRequestParams();
   private static final HttpResponseParams responseParams = new HttpResponseParams();
-  private static Map<String, Object> varMap = new HashMap<>();
   private static Supplier<String> lazyToString;
   private DistributionCalculator distributionCalculator;
   private ThreatDetector threatDetector = new ThreatDetector();
@@ -198,23 +197,7 @@ public class MaliciousTrafficDetectorTask implements Task {
     return apiFilters;
   }
 
-  private boolean validateFilterForRequest(
-      FilterConfig apiFilter, RawApi rawApi, ApiInfo.ApiInfoKey apiInfoKey) {
-    try {
-      varMap.clear();
-      String filterExecutionLogId = "";
-      ValidationResult res =
-          TestPlugin.validateFilter(
-              apiFilter.getFilter().getNode(), rawApi, apiInfoKey, varMap, filterExecutionLogId);
 
-      return res.getIsValid();
-    } catch (Exception e) {
-      logger.errorAndAddToDb("Error in validateFilterForRequest " + e.getMessage());
-      e.printStackTrace();
-    }
-
-    return false;
-  }
 
   private String getApiSchema(int apiCollectionId) {
     String apiSchema = null;
@@ -303,10 +286,8 @@ public class MaliciousTrafficDetectorTask implements Task {
         errors = RequestValidator.validate(responseParam, apiSchema, apiInfoKey.toString());
         hasPassedFilter = errors != null && !errors.isEmpty();
 
-      }else if(apiFilter.getId().equals(ThreatDetector.LFI_FILTER_ID)) {
-        hasPassedFilter = threatDetector.applyFilter(apiFilter, responseParam);
       }else {
-        hasPassedFilter = validateFilterForRequest(apiFilter, rawApi, apiInfoKey);
+        hasPassedFilter = threatDetector.applyFilter(apiFilter, responseParam, rawApi, apiInfoKey);
       }
 
       // If a request passes any of the filter, then it's a malicious request,
