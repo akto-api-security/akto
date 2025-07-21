@@ -1,6 +1,5 @@
 package com.akto.action;
 
-import java.nio.file.DirectoryStream.Filter;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -287,9 +286,6 @@ public class ApiCollectionsAction extends UserAction {
     public String deleteMultipleCollections() {
         List<Integer> apiCollectionIds = new ArrayList<>();
         for(ApiCollection apiCollection: this.apiCollections) {
-            if(apiCollection.getId() == 0) {
-                continue;
-            }
             apiCollectionIds.add(apiCollection.getId());
         }
 
