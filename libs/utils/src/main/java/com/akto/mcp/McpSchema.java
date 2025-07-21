@@ -1,20 +1,24 @@
 package com.akto.mcp;
 
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import lombok.Data;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 public final class McpSchema {
-    private static final Logger logger = LoggerFactory.getLogger(McpSchema.class);
+    private static final LoggerMaker logger = new LoggerMaker(McpSchema.class, LogDb.RUNTIME);
     private McpSchema() {}
     public static final String LATEST_PROTOCOL_VERSION = "2024-11-05";
     public static final String JSONRPC_VERSION = "2.0";
@@ -42,7 +46,35 @@ public final class McpSchema {
     public static final String MCP_NOTIFICATIONS_CANCELLED_METHOD = "notifications/cancelled";
     public static final String MCP_NOTIFICATIONS_PROGRESS_METHOD = "notifications/progress";
     public static final String MCP_NOTIFICATIONS_RESOURCES_UPDATED_METHOD = "notifications/resources/updated";
-    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+
+    public static final Set<String> MCP_METHOD_SET = Collections.unmodifiableSet(new HashSet<>(Arrays.asList(
+        McpSchema.METHOD_TOOLS_LIST,
+        McpSchema.METHOD_TOOLS_CALL,
+        McpSchema.METHOD_PROMPT_LIST,
+        McpSchema.METHOD_PROMPT_GET,
+        McpSchema.METHOD_RESOURCES_LIST,
+        McpSchema.METHOD_RESOURCES_READ,
+        McpSchema.METHOD_RESOURCES_TEMPLATES_LIST,
+        McpSchema.METHOD_PING,
+        McpSchema.METHOD_INITIALIZE,
+        McpSchema.MCP_NOTIFICATIONS_CANCELLED_METHOD,
+        McpSchema.METHOD_COMPLETION_COMPLETE,
+        McpSchema.METHOD_NOTIFICATION_INITIALIZED,
+        McpSchema.METHOD_LOGGING_SET_LEVEL,
+        McpSchema.METHOD_RESOURCES_SUBSCRIBE,
+        McpSchema.METHOD_RESOURCES_UNSUBSCRIBE,
+        McpSchema.METHOD_SAMPLING_CREATE_MESSAGE,
+        McpSchema.METHOD_ROOTS_LIST,
+        McpSchema.METHOD_NOTIFICATION_MESSAGE,
+        McpSchema.MCP_NOTIFICATIONS_PROGRESS_METHOD,
+        McpSchema.METHOD_NOTIFICATION_PROMPTS_LIST_CHANGED,
+        McpSchema.METHOD_NOTIFICATION_RESOURCES_LIST_CHANGED,
+        McpSchema.MCP_NOTIFICATIONS_RESOURCES_UPDATED_METHOD,
+        McpSchema.METHOD_NOTIFICATION_ROOTS_LIST_CHANGED,
+        McpSchema.METHOD_NOTIFICATION_TOOLS_LIST_CHANGED
+    )));
+
+
     public static final class ErrorCodes {
         public static final int PARSE_ERROR = -32700;
         public static final int INVALID_REQUEST = -32600;
