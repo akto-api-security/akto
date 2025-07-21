@@ -1,9 +1,10 @@
-import { Button, ButtonGroup, Checkbox, HorizontalStack, Text, TextField, VerticalStack } from '@shopify/polaris';
+import { Box, Button, ButtonGroup, Checkbox, Divider, HorizontalStack, Text, TextField, VerticalStack } from '@shopify/polaris';
 import React, { useState } from 'react'
 import InformationBannerComponent from './shared/InformationBannerComponent';
 import PasswordTextField from '../../../components/layouts/PasswordTextField';
 import api from '../api';
 import func from "@/util/func"
+import AktoDastOptions from './AktoDastOptions';
 
 const AktoJax = () => {
     const [loading, setLoading] = useState(false)
@@ -34,7 +35,7 @@ const AktoJax = () => {
             func.setToast(true, false, "Crawler initiated successfully. Please check your dashboard for updates.")
         }).catch((err) => {
             console.error("Error initiating crawler:", err)
-            func.setToast(true, true, "An error occurred while initiating the crawler. Please try again later.")
+            func.setToast(true, true, "Ensure that your DAST module is hosted correctly.")
         }).finally(() => {
             setLoading(false)
             setHostname('')
@@ -53,6 +54,10 @@ const AktoJax = () => {
             <InformationBannerComponent docsUrl="https://docs.akto.io/traffic-connector/dast/aktodast"
                     content="Please ensure the pre-requisites " 
             />
+
+            <AktoDastOptions />
+
+            <Box paddingBlockStart={3}><Divider /></Box>
 
             <VerticalStack gap="2">
                 <TextField label="Enter your website URL" value={hostname} type='url' onChange={(value) => setHostname(value)} placeholder='https://example.com' />
