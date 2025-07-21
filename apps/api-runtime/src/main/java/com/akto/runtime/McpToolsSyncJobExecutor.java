@@ -218,7 +218,7 @@ public class McpToolsSyncJobExecutor {
             if (resourcesResult != null && !CollectionUtils.isEmpty(resourcesResult.getResources())) {
                 int id = 2;
                 String urlWithQueryParams = resourcesListResponsePair.getSecond().getRequestParams().getURL();
-                String toolsCallRequestHeaders = buildHeaders(host);
+                String resourcesReadRequestHeaders = buildHeaders(host);
 
                 for (Resource resource : resourcesResult.getResources()) {
                     JSONRPCRequest request = new JSONRPCRequest(
@@ -230,7 +230,7 @@ public class McpToolsSyncJobExecutor {
 
                     HttpResponseParams readResourceHttpResponseParams = convertToAktoFormat(apiCollection.getId(),
                         urlWithQueryParams,
-                        toolsCallRequestHeaders,
+                        resourcesReadRequestHeaders,
                         HttpMethod.POST.name(),
                         mapper.writeValueAsString(request),
                         new OriginalHttpResponse("", Collections.emptyMap(), HttpStatus.SC_OK));
