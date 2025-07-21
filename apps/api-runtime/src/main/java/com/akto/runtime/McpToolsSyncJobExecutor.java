@@ -324,7 +324,7 @@ public class McpToolsSyncJobExecutor {
     private String sendRequest(OriginalHttpRequest request) throws Exception {
         try {
             OriginalHttpResponse response = ApiExecutor.sendRequestWithSse(request, true, null, false,
-                new ArrayList<>(), false);
+                new ArrayList<>(), false, true);
             return response.getBody();
         } catch (Exception e) {
             logger.error("Error while making request to MCP server.", e);
