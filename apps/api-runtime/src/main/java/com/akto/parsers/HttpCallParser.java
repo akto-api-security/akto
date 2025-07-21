@@ -147,10 +147,7 @@ public class HttpCallParser {
             Updates.setOnInsert("urls", new HashSet<>())
         );
 
-        if (isMcpRequest) {
-            String tag = "MCP Server";
-            updates = Updates.combine(updates, Updates.setOnInsert("userSetEnvType", tag));
-        }
+        updates = getUpdatesIfMcpCollection(isMcpRequest, updates);
 
 
         ApiCollectionsDao.instance.getMCollection().updateOne(
@@ -180,10 +177,7 @@ public class HttpCallParser {
                     Updates.setOnInsert("urls", new HashSet<>())
                 );
 
-                if (isMcpRequest) {
-                    updates = Updates.combine(updates,
-                        Updates.set(ApiCollection.TAGS_STRING, Collections.singletonList(getMcpServerTag())));
-                }
+                updates = getUpdatesIfMcpCollection(isMcpRequest, updates);
 
                 ApiCollection createdCollection = ApiCollectionsDao.instance.getMCollection()
                     .findOneAndUpdate(Filters.eq(ApiCollection.HOST_NAME, host), updates, updateOptions);
@@ -772,5 +766,15 @@ public class HttpCallParser {
 
     private CollectionTags getMcpServerTag() {
         return new CollectionTags(Context.now(), Constants.AKTO_MCP_SERVER_TAG, "MCP Server", TagSource.KUBERNETES);
+    }
+
+    private Bson getUpdatesIfMcpCollection(boolean isMcpRequest, Bson updates) {
+        if (!isMcpRequest) {
+            return updates;
+        }
+
+        updates = Updates.combine(updates,
+            Updates.set(ApiCollection.TAGS_STRING, Collections.singletonList(getMcpServerTag())));
+        return updates;
     }
 }
