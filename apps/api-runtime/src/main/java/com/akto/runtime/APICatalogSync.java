@@ -291,9 +291,12 @@ public class APICatalogSync {
 
     }
 
-
     public static ApiMergerResult tryMergeURLsInCollection(int apiCollectionId, Boolean urlRegexMatchingEnabled, boolean mergeUrlsBasic, BloomFilter<CharSequence> existingAPIsInDb, boolean ignoreCaseInsensitiveApis, boolean mergeUrlsOnVersions) {
         ApiCollection apiCollection = ApiCollectionsDao.instance.getMeta(apiCollectionId);
+
+        if (apiCollection != null && apiCollection.isMcpCollection()) {
+            return new ApiMergerResult(new HashMap<>());
+        }
 
         Bson filterQ = null;
         if (apiCollection != null && apiCollection.getHostName() == null) {
