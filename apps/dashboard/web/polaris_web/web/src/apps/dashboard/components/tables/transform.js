@@ -55,20 +55,39 @@ const tableFunc = {
 
           return {value:final2Data,total:tempData.length, fullDataIds: tempData.map((x) => {return {id: x?.id}})}
         }
-          let singleFilterData = tempData
-          Object.keys(filters).forEach((filterKey)=>{
-            singleFilterData = props.data;
+
+        // actually apply filters for table filter
+        let singleFilterData = tempData
+        Object.keys(filters).forEach((filterKey)=>{
+          singleFilterData = props.data;
+
+          if(filterKey.includes('dateRange')){
+            const dataKey = filterKey.split('_')[0];
+            const startTs = filters[filterKey].since ? Date.parse(filters[filterKey].since)/1000 : 0;
+            const endTs = filters[filterKey].until ? Date.parse(filters[filterKey].until)/1000 : 0;
+
+            singleFilterData = singleFilterData.filter((value) => {
+              if(value[dataKey] && value[dataKey] >= startTs && value[dataKey] <= endTs){
+                return true;
+              }
+              return false;
+            })
+          }else{
             let filterSet = new Set(filters[filterKey]);
             if(filterSet.size!==0){
               singleFilterData = singleFilterData.filter((value) => {
                   return [].concat(value[filterKey]).filter(v => filterSet.has(v)).length > 0
                 })
             }
-            tempData = tempData.filter(value => singleFilterData.includes(value));
-          })
-          tempData = tempData.filter((value) => {
-            return func.findInObjectValue(value, queryValue.toLowerCase(), ['id', 'time', 'icon', 'order', 'conditions']);
-          })
+          }
+          tempData = tempData.filter(value => singleFilterData.includes(value));
+        })
+
+
+        // used for search query
+        tempData = tempData.filter((value) => {
+          return func.findInObjectValue(value, queryValue.toLowerCase(), ['id', 'time', 'icon', 'order', 'conditions']);
+        })
 
           tempData = func.sortFunc(tempData, dataSortKey, sortOrder, props?.treeView !== undefined ? true : false)
           if(props.getFilteredItems){
@@ -88,13 +107,13 @@ const tableFunc = {
       const combined = [...filterArray1, ...filterArray2];
       const mergedByKey = combined.reduce((acc, {key, value}) => {
         if (acc[key]) {
-          if(key === 'dateRange'){
+          if(key.includes('dateRange')){
             acc[key].value = this.mergeTimeRanges(acc[key].value, value)
           }else{
             acc[key].value = [...new Set([...value,...acc[key].value ])];
           }
         } else {
-          if(key === 'dateRange'){
+          if(key.includes('dateRange')){
             acc[key] = {key, value}
           }else{
             acc[key] = { key, value: [...value] };

@@ -51,6 +51,9 @@ public class ApiCollection {
     public static final String _DEACTIVATED = "deactivated";
     boolean deactivated;
 
+    public static final String IS_OUT_OF_TESTING_SCOPE = "isOutOfTestingScope";
+    boolean isOutOfTestingScope;
+
     public static final String AUTOMATED = "automated";
     boolean automated;
 
@@ -221,6 +224,14 @@ public class ApiCollection {
 
     public void setDeactivated(boolean deactivated) {
         this.deactivated = deactivated;
+    }
+
+    public boolean getIsOutOfTestingScope(){
+        return isOutOfTestingScope;
+    }
+
+    public void setIsOutOfTestingScope(boolean isOutOfTestingScope){
+        this.isOutOfTestingScope = isOutOfTestingScope;
     }
 
     // to be used in front end

@@ -46,7 +46,23 @@ public class GlobalEnums {
         IIM("IIM", Severity.HIGH, "Improper Inventory Management (IIM)", "Improper Inventory Management"),
         INJECT("INJECT", Severity.MEDIUM, "Injection Attacks (INJECT)", "Injection Attacks"),
         INPUT("INPUT", Severity.MEDIUM, "Input Validation (INPUT)", "Input Validation"),
-        LLM("LLM",Severity.HIGH,"LLM (Large Language Models) Top 10","LLM");
+        LLM("LLM",Severity.HIGH,"LLM (Large Language Models) Top 10","LLM"),
+        MCP("MCP", Severity.HIGH, "Model Context Protocol (MCP) Security", "MCP"),
+        MCP_AUTH("MCP_AUTH", Severity.HIGH, "Model Context Protocol (MCP) Security - Broken Authentication", "MCP_AUTH"),
+        MCP_INPUT_VALIDATION("MCP_INPUT_VALIDATION", Severity.HIGH, "Model Context Protocol (MCP) Security - Input Validation", "MCP_INPUT_VALIDATION"),
+        MCP_DOS("MCP_DOS", Severity.HIGH, "Model Context Protocol (MCP) Security - Denial of Service", "MCP_DOS"),
+        MCP_SENSITIVE_DATA_LEAKAGE("MCP_SENSITIVE_DATA_LEAKAGE", Severity.HIGH, "Model Context Protocol (MCP) Security - Sensitive Data Leakage", "MCP_SENSITIVE_DATA_LEAKAGE"),
+        LLM01("LLM01", Severity.HIGH, "LLM01 - Prompt Injection", "LLM01"),
+        LLM02("LLM02", Severity.HIGH, "LLM02 - Sensitive Information Disclosure", "LLM02"),
+        LLM03("LLM03", Severity.HIGH, "LLM03 - Supply Chain", "LLM03"),
+        LLM04("LLM04", Severity.HIGH, "LLM04 - Data and Model Poisoning", "LLM04"),
+        LLM05("LLM05", Severity.HIGH, "LLM05 - Improper Output Handling", "LLM05"),
+        LLM06("LLM06", Severity.HIGH, "LLM06 - Excessive Agency", "LLM06"),
+        LLM07("LLM07", Severity.HIGH, "LLM07 - System Prompt Leakage", "LLM07"),
+        LLM08("LLM08", Severity.HIGH, "LLM08 - Vector and Embedding Weaknesses", "LLM08"),
+        LLM09("LLM09", Severity.HIGH, "LLM09 - Misinformation", "LLM09"),
+        LLM10("LLM10", Severity.HIGH, "LLM10 - Unbounded Consumption", "LLM10");
+
 
         private final String name;
         private final Severity severity;

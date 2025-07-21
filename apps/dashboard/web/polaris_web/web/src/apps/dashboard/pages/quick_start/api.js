@@ -130,11 +130,11 @@ const api = {
         })
     },
 
-    fetchRuntimeHelmCommand() {
+    fetchRuntimeHelmCommand(expiryTimeInMonth) {
         return request({
             url: '/api/fetchRuntimeHelmCommand',
             method: 'post',
-            data: {}
+            data: {expiryTimeInMonth}
         })
     },
 
@@ -167,6 +167,14 @@ const api = {
             url: '/api/fetchCodeAnalysisRepos',
             method: 'post',
             data: {sourceCodeType}
+        })
+    },
+
+    initiateCrawler(hostname, username, password, apiKey, dashboardUrl) {
+        return request({
+            url: '/api/initiateCrawler',
+            method: 'post',
+            data: {hostname, username, password, apiKey, dashboardUrl}
         })
     }
 }

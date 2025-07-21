@@ -287,7 +287,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             if (pendingInviteCode != null && pendingInviteCode.getInviteeEmailId().equals(email)) {
                 PendingInviteCodesDao.instance.getMCollection().deleteOne(filter);
                 if(user != null){
-                    AccountAction.addUserToExistingAccount(email, pendingInviteCode.getAccountId());
+                    AccountAction.addUserToExistingAccount(email, pendingInviteCode.getAccountId(), pendingInviteCode.getInviteeRole());
                 }
                 createUserAndRedirect(email, name, auth0SignupInfo, pendingInviteCode.getAccountId(), Config.ConfigType.AUTH0.toString(), pendingInviteCode.getInviteeRole());
 
@@ -1036,7 +1036,7 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
             props.put("method", method);
 
             SlackAlerts newUserJoiningAlert = new NewUserJoiningAlert(userEmail);
-            SlackSender.sendAlert(accountId, newUserJoiningAlert);
+            SlackSender.sendAlert(accountId, newUserJoiningAlert, null);
 
             AktoMixpanel aktoMixpanel = new AktoMixpanel();
             aktoMixpanel.sendEvent(distinct_id, "SIGNUP_SUCCEEDED", props);

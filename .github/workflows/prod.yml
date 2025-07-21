@@ -99,7 +99,7 @@ jobs:
         if: ${{github.event.inputs.skipTests== 'True' }}
         run: mvn package -Dakto-image-tag=${{ github.event.inputs.release_version }} -Dakto-build-time=$(eval "date +%s") -Dakto-release-version=${{github.event.inputs.release_version}} -DskipTests
       - name: Send mvn notification to Slack
-        id: slack
+        id: slack-mvn
         if: ${{github.event.inputs.skipTests== 'True' }}
         uses: slackapi/slack-github-action@v1.23.0
         with:

@@ -35,9 +35,13 @@ import com.akto.util.enums.GlobalEnums.TestErrorSource;
 import com.akto.utils.DeleteTestRunUtils;
 import com.akto.utils.Utils;
 import com.google.gson.Gson;
+import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.*;
 import com.mongodb.client.result.InsertOneResult;
 import com.opensymphony.xwork2.Action;
+
+import lombok.Getter;
+
 import org.apache.commons.lang3.StringUtils;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
@@ -47,6 +51,8 @@ import java.util.*;
 import java.util.concurrent.*;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+
+import static com.akto.action.testing.Utils.buildIssueMetaDataMap;
 
 public class StartTestAction extends UserAction {
 
@@ -86,6 +92,8 @@ public class StartTestAction extends UserAction {
 
     private AutoTicketingDetails autoTicketingDetails;
 
+    private Map<String, String> issuesDescriptionMap;
+
     private static final Gson gson = new Gson();
 
     Set<Integer> deactivatedCollections = UsageMetricCalculator.getDeactivated();
@@ -117,7 +125,7 @@ public class StartTestAction extends UserAction {
     private boolean sendSlackAlert = false;
     private boolean sendMsTeamsAlert = false;
 
-    private TestingRun createTestingRun(int scheduleTimestamp, int periodInSeconds, String miniTestingServiceName) {
+    private TestingRun createTestingRun(int scheduleTimestamp, int periodInSeconds, String miniTestingServiceName, int selectedSlackChannelId) {
         User user = getSUser();
 
         if (!StringUtils.isEmpty(this.overriddenTestAppUrl)) {
@@ -177,10 +185,11 @@ public class StartTestAction extends UserAction {
 
         return new TestingRun(scheduleTimestamp, user.getLogin(),
                 testingEndpoints, testIdConfig, State.SCHEDULED, periodInSeconds, testName, this.testRunTime,
-                this.maxConcurrentRequests, this.sendSlackAlert, this.sendMsTeamsAlert, miniTestingServiceName);
+                this.maxConcurrentRequests, this.sendSlackAlert, this.sendMsTeamsAlert, miniTestingServiceName,selectedSlackChannelId);
     }
 
     String selectedMiniTestingServiceName;
+    int selectedSlackWebhook;
     private List<String> selectedTests;
     private List<TestConfigsAdvancedSettings> testConfigsAdvancedSettings;
 
@@ -225,7 +234,7 @@ public class StartTestAction extends UserAction {
         }
         if (localTestingRun == null) {
             try {
-                localTestingRun = createTestingRun(scheduleTimestamp, getPeriodInSeconds(recurringDaily, recurringWeekly, recurringMonthly), selectedMiniTestingServiceName);
+                localTestingRun = createTestingRun(scheduleTimestamp, getPeriodInSeconds(recurringDaily, recurringWeekly, recurringMonthly), selectedMiniTestingServiceName, selectedSlackWebhook);
                 // pass boolean from ui, which will tell if testing is coniinuous on new endpoints
                 if (this.continuousTesting) {
                     localTestingRun.setPeriodInSeconds(-1);
@@ -621,7 +630,7 @@ public class StartTestAction extends UserAction {
         
     );
 
-    private List<Bson> prepareTestRunResultsFilters(ObjectId testingRunResultSummaryId, QueryMode queryMode) {
+    private List<Bson> prepareTestRunResultsFilters(ObjectId testingRunResultSummaryId, QueryMode queryMode, boolean ignoreVulnerableInResults) {
         List<Bson> filterList = new ArrayList<>();
         filterList.add(Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, testingRunResultSummaryId));
 
@@ -632,14 +641,16 @@ public class StartTestAction extends UserAction {
             }
         }
 
+        Bson vulnerableTestFilter = ignoreVulnerableInResults ? vulnerableFilter : Filters.eq(TestingRunResult.VULNERABLE, true);
+
         if(queryMode == null) {
             if(fetchOnlyVulnerable) {
-                filterList.add(vulnerableFilter);
+                filterList.add(vulnerableTestFilter);
             }
         } else {
             switch (queryMode) {
                 case VULNERABLE:
-                    filterList.add(vulnerableFilter);
+                    filterList.add(vulnerableTestFilter);
                     break;
                 case SKIPPED_EXEC_API_REQUEST_FAILED:
                     filterList.add(Filters.eq(TestingRunResult.VULNERABLE, false));
@@ -698,7 +709,7 @@ public class StartTestAction extends UserAction {
         Context.accountId.set(accountId);
         Map<String, Integer> resultantMap = new HashMap<>();
 
-        List<Bson> filterList =  prepareTestRunResultsFilters(testingRunResultSummaryId, queryMode);
+        List<Bson> filterList =  prepareTestRunResultsFilters(testingRunResultSummaryId, queryMode, true);
         int count = VulnerableTestingRunResultDao.instance.countFromDb(Filters.and(filterList), queryMode.equals(QueryMode.VULNERABLE));
         resultantMap.put(queryMode.toString(), count);
 
@@ -779,6 +790,9 @@ public class StartTestAction extends UserAction {
     private Map<TestError, String> errorEnums = new HashMap<>();
     private long issueslistCount;
 
+    @Getter
+    private Map<String, String> jiraIssuesMapForResults;
+
     public String fetchTestingRunResults() {
         ObjectId testingRunResultSummaryId;
         try {
@@ -788,20 +802,11 @@ public class StartTestAction extends UserAction {
             return ERROR.toUpperCase();
         }
 
-
         if (testingRunResultSummaryHexId != null) loggerMaker.debugAndAddToDb("fetchTestingRunResults called for hexId=" + testingRunResultSummaryHexId);
         if (queryMode != null) loggerMaker.debugAndAddToDb("fetchTestingRunResults called for queryMode="+queryMode);
 
         int timeNow = Context.now();
-        Bson ignoredIssuesFilters = Filters.and(
-                Filters.in(TestingRunIssues.TEST_RUN_ISSUES_STATUS, "IGNORED"),
-                Filters.in(TestingRunIssues.LATEST_TESTING_RUN_SUMMARY_ID, testingRunResultSummaryId)
-        );
-        List<TestingRunIssues> issueslist = TestingRunIssuesDao.instance.findAll(ignoredIssuesFilters, Projections.include("_id"));
-        this.issueslistCount = issueslist.size();
-        loggerMaker.debugAndAddToDb("[" + (Context.now() - timeNow) + "] Fetched testing run issues of size: " + issueslist.size(), LogDb.DASHBOARD);
-
-        List<Bson> testingRunResultFilters = prepareTestRunResultsFilters(testingRunResultSummaryId, queryMode);
+        List<Bson> testingRunResultFilters = prepareTestRunResultsFilters(testingRunResultSummaryId, queryMode, false);
 
         if(queryMode == QueryMode.SKIPPED_EXEC || queryMode == QueryMode.SKIPPED_EXEC_NEED_CONFIG){
             TestError[] testErrors = TestResult.TestError.values();
@@ -822,9 +827,12 @@ public class StartTestAction extends UserAction {
             this.testingRunResults = VulnerableTestingRunResultDao.instance
                     .fetchLatestTestingRunResultWithCustomAggregations(filters, pageLimit, skip, sortStage, testingRunResultSummaryId, queryMode.equals(QueryMode.VULNERABLE));
             loggerMaker.debugAndAddToDb("[" + (Context.now() - timeNow) + "] Fetched testing run results of size: " + testingRunResults.size(), LogDb.DASHBOARD);
-
+            BasicDBObject issueMetaDataMap = prepareIssueMetaDataMap(testingRunResults);
             timeNow = Context.now();
-            removeTestingRunResultsByIssues(testingRunResults, issueslist, false);
+            removeTestingRunResultsByIssues(testingRunResults, (Map<String, String>) issueMetaDataMap.get("statuses"));
+            this.issuesDescriptionMap = (Map<String, String>) issueMetaDataMap.get("descriptions");
+            this.issueslistCount = issueMetaDataMap.getInt("count");
+            this.jiraIssuesMapForResults = (Map<String, String>) issueMetaDataMap.get("jiraIssues");
             loggerMaker.debugAndAddToDb("[" + (Context.now() - timeNow) + "] Removed ignored issues from testing run results. Current size of testing run results: " + testingRunResults.size(), LogDb.DASHBOARD);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "error in fetchLatestTestingRunResult: " + e);
@@ -836,40 +844,44 @@ public class StartTestAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
-    public static void removeTestingRunResultsByIssues(List<TestingRunResult> testingRunResults,
-                                                       List<TestingRunIssues> testingRunIssues,
-                                                       boolean retainByIssues) {
-        long startTime = System.currentTimeMillis();
+    private BasicDBObject prepareIssueMetaDataMap(List<TestingRunResult> testingRunResults) {
+        BasicDBObject issueMetaDataMap = new BasicDBObject();
+        try {
+            if (testingRunResults == null || testingRunResults.isEmpty()) {
+                return issueMetaDataMap;
+            }
 
-        Set<String> issuesSet = new HashSet<>();
-        for (TestingRunIssues issue : testingRunIssues) {
-            String apiInfoKeyString = issue.getId().getApiInfoKey().toString();
-            String key = apiInfoKeyString + "|" + issue.getId().getTestSubCategory();
-            issuesSet.add(key);
+            Map<TestingIssuesId, TestingRunResult> idToResultMap = new HashMap<>();
+            for (TestingRunResult result : testingRunResults) {
+                TestingIssuesId id = getTestingIssueIdFromRunResult(result);
+                idToResultMap.put(id, result);
+            }
+
+            List<TestingRunIssues> issues = TestingRunIssuesDao.instance.findAll(
+                Filters.and(
+                    Filters.in(Constants.ID, idToResultMap.keySet())
+                ),
+                Projections.include(TestingRunIssues.TEST_RUN_ISSUES_STATUS, TestingRunIssues.DESCRIPTION, TestingRunIssues.JIRA_ISSUE_URL)
+            );
+
+            return buildIssueMetaDataMap(issues, idToResultMap);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in preparing issue description map: " + e.getMessage());
+            return issueMetaDataMap;
         }
-        loggerMaker.debugAndAddToDb("Total issues to be removed from TestingRunResults list: " + issuesSet.size(), LogDb.DASHBOARD);
+    }
 
+    public static void removeTestingRunResultsByIssues(List<TestingRunResult> testingRunResults, Map<String, String> ignoredResults) {
         Iterator<TestingRunResult> resultIterator = testingRunResults.iterator();
-
         while (resultIterator.hasNext()) {
             TestingRunResult result = resultIterator.next();
-            String apiInfoKeyString = result.getApiInfoKey().toString();
-            String resultKey = apiInfoKeyString + "|" + result.getTestSubType();
-
-            boolean matchFound = issuesSet.contains(resultKey);
-
+            String resultHexId = result.getHexId();
             if (!result.isIgnoredResult()) {
-                if (retainByIssues && !matchFound) {
-                    resultIterator.remove();
-                } else if (!retainByIssues && matchFound) {
+                if (ignoredResults.containsKey(resultHexId)) {
                     resultIterator.remove();
                 }
             }
         }
-
-        long endTime = System.currentTimeMillis();
-        long duration = endTime - startTime;
-        loggerMaker.debugAndAddToDb("[" + Instant.now() + "] Removed elements from TestingRunResults list in " + duration + " ms", LogDb.DASHBOARD);
     }
 
     private Map<String, List<String>> reportFilterList;
@@ -1079,9 +1091,9 @@ public class StartTestAction extends UserAction {
         ArrayList<Bson> filters = new ArrayList<>();
         filters.addAll(prepareFilters(startTimestamp, endTimestamp));
         filters.addAll(getTableFilters());
-        
+
         long totalCount = TestingRunDao.instance.getMCollection().countDocuments(Filters.and(filters));
-        
+
         ArrayList<Bson> filterForCicd = new ArrayList<>(filters); // Create a copy of filters
         filterForCicd.add(getTestingRunTypeFilter(TestingRunType.CI_CD));
         long cicdCount = TestingRunDao.instance.getMCollection().countDocuments(Filters.and(filterForCicd));
@@ -1099,7 +1111,7 @@ public class StartTestAction extends UserAction {
 
         long scheduleCount = totalCount - oneTimeCount - cicdCount - continuousTestsCount;
 
-        
+
         result.put("allTestRuns", totalCount);
         result.put("oneTime", oneTimeCount);
         result.put("scheduled", scheduleCount);
@@ -1203,7 +1215,7 @@ public class StartTestAction extends UserAction {
     private CurrentTestsStatus currentTestsStatus;
 
     public String getCurrentTestStateStatus(){
-        // polling api 
+        // polling api
         try {
             List<TestingRunResultSummary> runningTrrs = TestingRunResultSummariesDao.instance.getCurrentRunningTestsSummaries();
             int totalRunningTests = 0;
@@ -1271,7 +1283,6 @@ public class StartTestAction extends UserAction {
                 if (editableTestingRunConfig.getOverriddenTestAppUrl() != null && !editableTestingRunConfig.getOverriddenTestAppUrl().equals(existingTestingRunConfig.getOverriddenTestAppUrl())) {
                     updates.add(Updates.set(TestingRunConfig.OVERRIDDEN_TEST_APP_URL, editableTestingRunConfig.getOverriddenTestAppUrl()));
                 }
-
                 if (editableTestingRunConfig.getAutoTicketingDetails() != null && validateAutoTicketingDetails(
                     editableTestingRunConfig.getAutoTicketingDetails())) {
                     updates.add(Updates.set(TestingRunConfig.AUTO_TICKETING_DETAILS,
@@ -1311,6 +1322,10 @@ public class StartTestAction extends UserAction {
                                 Updates.set(TestingRun.SEND_SLACK_ALERT, editableTestingRunConfig.getSendSlackAlert()));
                     }
 
+                    if(editableTestingRunConfig.getSelectedSlackChannelId() != 0 && editableTestingRunConfig.getSelectedSlackChannelId() != existingTestingRun.getSelectedSlackChannelId()){
+                        updates.add(Updates.set(TestingRun.SELECTED_SLACK_CHANNEL_ID, editableTestingRunConfig.getSelectedSlackChannelId()));
+                    }
+
                     if (existingTestingRun.getSendMsTeamsAlert() != editableTestingRunConfig.getSendMsTeamsAlert()) {
                         updates.add(
                                 Updates.set(TestingRun.SEND_MS_TEAMS_ALERT,
@@ -1324,7 +1339,8 @@ public class StartTestAction extends UserAction {
                     if (existingTestingRun.getPeriodInSeconds() != periodInSeconds && periodInSeconds != 0) {
                         updates.add(Updates.set(TestingRun.PERIOD_IN_SECONDS, periodInSeconds));
                     }
-                    if(editableTestingRunConfig.getScheduleTimestamp() > 0){
+                    if((editableTestingRunConfig.getScheduleTimestamp() - Context.now()) >= -60){
+                        // 60 because maximum request time is 60 seconds and by default we want scheduled time stamp to be greater than current time.
                         updates.add(
                             Updates.combine(
                                 Updates.set(TestingRun.SCHEDULE_TIMESTAMP, editableTestingRunConfig.getScheduleTimestamp()),
@@ -1336,6 +1352,8 @@ public class StartTestAction extends UserAction {
                     if(editableTestingRunConfig.getMiniTestingServiceName() != null && !editableTestingRunConfig.getMiniTestingServiceName().isEmpty()){
                         updates.add(Updates.set(TestingRun.MINI_TESTING_SERVICE_NAME, editableTestingRunConfig.getMiniTestingServiceName()));
                     }
+
+                    updates.add(Updates.set(TestingRun.SELECTED_SLACK_CHANNEL_ID, editableTestingRunConfig.getSelectedSlackChannelId()));
 
                     if (!updates.isEmpty()) {
                         TestingRunDao.instance.updateOne(
@@ -1371,7 +1389,7 @@ public class StartTestAction extends UserAction {
                         Filters.and(
                             Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, summaryObjectId),
                             vulnerableFilter
-                        ), 
+                        ),
                         Projections.include(TestingRunResult.API_INFO_KEY, TestingRunResult.TEST_SUB_TYPE),
                         isStoredInVulnerableCollection
                     );
@@ -1379,29 +1397,29 @@ public class StartTestAction extends UserAction {
                     if(testingRunResults.isEmpty()){
                         return;
                     }
-            
+
                     Set<TestingIssuesId> issuesIds = new HashSet<>();
                     Map<TestingIssuesId, ObjectId> mapIssueToResultId = new HashMap<>();
                     Set<ObjectId> ignoredResults = new HashSet<>();
                     for(TestingRunResult runResult: testingRunResults){
-                        TestingIssuesId issuesId = new TestingIssuesId(runResult.getApiInfoKey(), TestErrorSource.AUTOMATED_TESTING , runResult.getTestSubType());
+                        TestingIssuesId issuesId = getTestingIssueIdFromRunResult(runResult);
                         issuesIds.add(issuesId);
                         mapIssueToResultId.put(issuesId, runResult.getId());
                         ignoredResults.add(runResult.getId());
                     }
-            
+
                     List<TestingRunIssues> issues = TestingRunIssuesDao.instance.findAll(
                         Filters.and(
                             Filters.in(Constants.ID, issuesIds),
                             Filters.eq(TestingRunIssues.TEST_RUN_ISSUES_STATUS, GlobalEnums.TestRunIssueStatus.OPEN)
                         ), Projections.include(TestingRunIssues.KEY_SEVERITY)
                     );
-            
+
                     Map<String, Integer> totalCountIssues = new HashMap<>();
                     totalCountIssues.put("HIGH", 0);
                     totalCountIssues.put("MEDIUM", 0);
                     totalCountIssues.put("LOW", 0);
-            
+
                     for(TestingRunIssues runIssue: issues){
                         int initCount = totalCountIssues.getOrDefault(runIssue.getSeverity().name(), 0);
                         totalCountIssues.put(runIssue.getSeverity().name(), initCount + 1);
@@ -1410,13 +1428,13 @@ public class StartTestAction extends UserAction {
                             ignoredResults.remove(resId);
                         }
                     }
-            
+
                     // update testing run result summary
                     TestingRunResultSummariesDao.instance.updateOne(
                         Filters.eq(Constants.ID, summaryObjectId),
                         Updates.set(TestingRunResultSummary.COUNT_ISSUES, totalCountIssues)
                     );
-            
+
                     // update testing run results, by setting them isIgnored true
                     if(isStoredInVulnerableCollection){
                         VulnerableTestingRunResultDao.instance.updateMany(
@@ -1486,6 +1504,11 @@ public class StartTestAction extends UserAction {
             }
         }
         return SUCCESS.toUpperCase();
+    }
+
+    private TestingIssuesId getTestingIssueIdFromRunResult(TestingRunResult runResult) {
+        return new TestingIssuesId(runResult.getApiInfoKey(), TestErrorSource.AUTOMATED_TESTING,
+            runResult.getTestSubType());
     }
 
 
@@ -1749,7 +1772,7 @@ public class StartTestAction extends UserAction {
     public void setTestingRunType(TestingRunType testingRunType) {
         this.testingRunType = testingRunType;
     }
-    
+
     public Map<String, Integer> getIssuesSummaryInfoMap() {
         return issuesSummaryInfoMap;
     }
@@ -1893,5 +1916,23 @@ public class StartTestAction extends UserAction {
 
     public void setSelectedMiniTestingServiceName(String selectedMiniTestingServiceName) {
         this.selectedMiniTestingServiceName = selectedMiniTestingServiceName;
+    }
+
+    public Map<String, String> getIssuesDescriptionMap() {
+        return issuesDescriptionMap;
+    }
+
+    public void setIssuesDescriptionMap(
+        Map<String, String> issuesDescriptionMap) {
+        this.issuesDescriptionMap = issuesDescriptionMap;
+    }
+
+    public int getSelectedSlackWebhook() {
+        return selectedSlackWebhook;
+    }
+
+    public void setSelectedSlackWebhook(int selectedSlackWebhook) {
+        this.selectedSlackWebhook = selectedSlackWebhook;
+
     }
 }

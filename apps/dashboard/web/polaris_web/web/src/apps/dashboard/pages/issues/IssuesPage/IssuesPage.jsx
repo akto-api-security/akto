@@ -31,6 +31,8 @@ import settingFunctions from "../../settings/module.js";
 import JiraTicketCreationModal from "../../../components/shared/JiraTicketCreationModal.jsx";
 import testingApi from "../../testing/api.js"
 import { saveAs } from 'file-saver'
+import issuesFunctions from '@/apps/dashboard/pages/issues/module';
+
 
 const sortOptions = [
     { label: 'Severity', value: 'severity asc', directionLabel: 'Highest', sortKey: 'severity', columnIndex: 2 },
@@ -279,9 +281,11 @@ function IssuesPage() {
         }
 
     const handleSaveJiraAction = () => {
+        const jiraMetaData = issuesFunctions.prepareAdditionalIssueFieldsJiraMetaData()
+
         setToast(true, false, "Please wait while we create your Jira ticket.")
         setJiraModalActive(false)
-        api.bulkCreateJiraTickets(selectedIssuesItems, window.location.origin, projId, issueType).then((res) => {
+        api.bulkCreateJiraTickets(selectedIssuesItems, window.location.origin, projId, issueType, jiraMetaData).then((res) => {
             if(res?.errorMessage) {
                 setToast(true, false, res?.errorMessage)
             } else {
@@ -486,6 +490,14 @@ function IssuesPage() {
     }
   }, [subCategoryMap, apiCollectionMap])
 
+    useEffect(() => {
+        // Fetch jira integration field metadata
+        if (window.JIRA_INTEGRATED === 'true') {
+            issuesFunctions.fetchCreateIssueFieldMetaData()
+        }
+    }, [])
+
+
 
     const fetchTableData = async (sortKey, sortOrder, skip, limit, filters, filterOperators, queryValue) => {
         setTableLoading(true)
@@ -543,8 +555,9 @@ function IssuesPage() {
                             method: item?.id?.apiInfoKey?.method,
                             url: item?.id?.apiInfoKey?.url,
                             id: JSON.stringify(item?.id),
+                            issueDescription: item?.description,
+                            jiraIssueUrl: item?.jiraIssueUrl || "",
                         }],
-                        urlsKey: ['']
                     })
                 } else {
                     const existingIssue = uniqueIssuesMap.get(key)
@@ -556,6 +569,8 @@ function IssuesPage() {
                         method: item?.id?.apiInfoKey?.method,
                         url: item?.id?.apiInfoKey?.url,
                         id: JSON.stringify(item?.id),
+                        issueDescription: item?.description,
+                        jiraIssueUrl: item?.jiraIssueUrl || ""
                     })
                     existingIssue.numberOfEndpoints += 1
                 }
@@ -594,7 +609,6 @@ function IssuesPage() {
         let filterCompliance = filters?.compliance || []
         const activeCollections = (filters?.activeCollections !== undefined && filters?.activeCollections.length > 0) ? filters?.activeCollections[0] : initialValForResponseFilter;
         const apiCollectionId = filters?.apiCollectionId || []
-        const tagsId = filters?.tagsId || []
         let filterCollectionsId = (apiCollectionId || []).concat(filters?.collectionIds || [])
         let filterSubCategory = []
         filters?.issueCategory?.forEach((issue) => {
@@ -603,13 +617,10 @@ function IssuesPage() {
         if(filters?.issueName !== undefined && filters?.issueName.length > 0){
             filterSubCategory = filterSubCategory.concat(filters?.issueName)
         }
-        let issueItem = []
+        let issueItems = []
 
         await api.fetchIssues(0, 20000, filterStatus, filterCollectionsId, filterSeverity, filterSubCategory, "severity", -1, startTimestamp, endTimestamp, activeCollections, filterCompliance).then((issuesDataRes) => {
-            const uniqueIssuesMap = new Map()
-            issuesDataRes.issues.forEach(item => {
-                const key = `${item?.id?.testSubCategory}|${item?.severity}|${item?.unread.toString()}`
-                if (!uniqueIssuesMap.has(key)){
+            issuesDataRes.issues.forEach((item) => {
                     const issue = {
                         id: item?.id,
                         severityVal: func.toSentenceCase(item?.severity),
@@ -620,26 +631,15 @@ function IssuesPage() {
                         creationTime: func.prettifyEpoch(item?.creationTime),
                         issueStatus: item?.unread.toString() === 'false' ? "read" : "unread",
                         domainVal:[(hostNameMap[item?.id?.apiInfoKey?.apiCollectionId] !== null ? hostNameMap[item?.id?.apiInfoKey?.apiCollectionId] : apiCollectionMap[item?.id?.apiInfoKey?.apiCollectionId])],
-                        urls:[`${item?.id?.apiInfoKey?.method} ${item?.id?.apiInfoKey?.url}`]
+                        url:`${item?.id?.apiInfoKey?.method} ${item?.id?.apiInfoKey?.url}`
                     }
-                    uniqueIssuesMap.set(key, issue)
-                }
-                else {
-                    const existingIssue = uniqueIssuesMap.get(key)
-                    const domain = (hostNameMap[item?.id?.apiInfoKey?.apiCollectionId] !== null ? hostNameMap[item?.id?.apiInfoKey?.apiCollectionId] : apiCollectionMap[item?.id?.apiInfoKey?.apiCollectionId])
-                    if (!existingIssue.domainVal.includes(domain)) {
-                        existingIssue.domainVal.push(domain)
-                    }
-                    existingIssue.urls.push(`${item?.id?.apiInfoKey?.method} ${item?.id?.apiInfoKey?.url}`)
-                    existingIssue.numberOfEndpoints += 1
-                }
-            })
-            issueItem = Array.from(uniqueIssuesMap.values())
-            
+                    issueItems.push(issue)
+                })
+
         }).catch((e) => {
             func.setToast(true, true, e.message)
         })
-        return issueItem;
+        return issueItems;
 
     }
     
@@ -653,7 +653,7 @@ function IssuesPage() {
                     .map(x => [x.text, x.textValue ? x.textValue : x.value])
                     .filter(x => x[0]?.length > 0)
             ),
-            URLs: "urls"
+            URL: "url"
         };
 
 

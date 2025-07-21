@@ -1,9 +1,9 @@
-import React, { useEffect, useReducer, useState } from 'react'
+import React, { useEffect, useReducer, useState, useCallback } from 'react'
 import api from './api';
 import func from '@/util/func';
 import observeFunc from "../observe/transform"
 import PageWithMultipleCards from "../../components/layouts/PageWithMultipleCards"
-import { Box, DataTable, HorizontalGrid, HorizontalStack, Icon, Link, Scrollable, Text, VerticalStack } from '@shopify/polaris';
+import { Box, DataTable, HorizontalGrid, HorizontalStack, Icon, Link, Scrollable, Text, VerticalStack, LegacyTabs, Badge } from '@shopify/polaris';
 import observeApi from "../observe/api"
 import testingTransform from "../testing/transform"
 import StackedChart from '../../components/charts/StackedChart';
@@ -25,12 +25,44 @@ import TooltipText from '../../components/shared/TooltipText';
 import transform from '../observe/transform';
 import CriticalUnsecuredAPIsOverTimeGraph from '../issues/IssuesPage/CriticalUnsecuredAPIsOverTimeGraph';
 import CriticalFindingsGraph from '../issues/IssuesPage/CriticalFindingsGraph';
+import values from "@/util/values";
+import { ActionItemsContent } from './components/ActionItemsContent';
+import { fetchActionItemsData } from './components/actionItemsTransform';
 
 function HomeDashboard() {
 
     const [loading, setLoading] = useState(true);
     const [showBannerComponent, setShowBannerComponent] = useState(false)
     const [testSummaryInfo, setTestSummaryInfo] = useState([])
+    const [selectedTab, setSelectedTab] = useState(0);
+    const [actionItemsCount, setActionItemsCount] = useState(0);
+    const [actionItemsData, setActionItemsData] = useState(null);
+
+    const handleTabChange = useCallback(
+        (selectedTabIndex) => setSelectedTab(selectedTabIndex),
+        [],
+    );
+
+    const tabs = [
+        {
+            id: 'home',
+            content: 'Home',
+            panelID: 'home-content',
+        },
+        {
+            id: 'analytics',
+            content: (
+                <HorizontalStack gap={"1"}>
+                    <Text>Analysis</Text>
+                    {actionItemsCount > 0 && (
+                        <Badge status="new">{actionItemsCount > 10 ? '10+' : actionItemsCount}</Badge>
+                    )}
+                </HorizontalStack>
+            ),
+            panelID: 'analytics-content',
+        },
+    ];
+
 
     const allCollections = PersistStore(state => state.allCollections)
     const hostNameMap = PersistStore(state => state.hostNameMap)
@@ -49,14 +81,10 @@ function HomeDashboard() {
     const [oldTotalApis, setOldTotalApis] = useState(0)
     const [oldTestCoverage, setOldTestCoverage] = useState(0)
     const [oldRiskScore, setOldRiskScore] = useState(0)
-    const initialStartTimestamp = func.timeNow() - 60 * 60 * 24
-    const initialEndTimestamp = func.timeNow()
     const [showTestingComponents, setShowTestingComponents] = useState(false)
     const [customRiskScoreAvg, setCustomRiskScoreAvg] = useState(0)
 
-    const tempVal = { alias: "custom", title: "Custom", period: { since: new Date(initialStartTimestamp * 1000), until: new Date(initialEndTimestamp * 1000) } }
-
-    const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), tempVal);
+    const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), values.ranges[2]);
 
     const getTimeEpoch = (key) => {
         return Math.floor(Date.parse(currDateRange.period[key]) / 1000)
@@ -85,6 +113,11 @@ function HomeDashboard() {
             "text": 0,
             "color": "#68B3D0",
             "filterKey": "Third Party"
+        },
+        "Need more data": {
+            "text": 0,
+            "color": "#FFB3B3",
+            "filterKey": "Need more data"
         }
     });
 
@@ -137,7 +170,8 @@ function HomeDashboard() {
             api.findTotalIssues(startTimestamp, endTimestamp),
             api.fetchApiStats(startTimestamp, endTimestamp),
             api.fetchEndpointsCount(startTimestamp, endTimestamp),
-            testingApi.fetchSeverityInfoForIssues({}, [], 0)
+            testingApi.fetchSeverityInfoForIssues({}, [], 0),
+            api.getApiInfoForMissingData(0, endTimestamp)
         ];
 
         let results = await Promise.allSettled(apiPromises);
@@ -147,6 +181,9 @@ function HomeDashboard() {
         let apisStatsResp = results[2].status === 'fulfilled' ? results[2].value : {}
         let fetchEndpointsCountResp = results[3].status === 'fulfilled' ? results[3].value : {}
         let issueSeverityMap = results[4].status === 'fulfilled' ? results[4].value : {}
+        let missingApiInfoData = results[5].status === 'fulfilled' ? results[5].value : {}
+        const totalRedundantApis = missingApiInfoData?.redundantApiInfoKeys || 0  
+        const totalMissingApis = missingApiInfoData?.totalMissing|| 0 
 
         setShowBannerComponent(!userEndpoints)
 
@@ -154,10 +191,10 @@ function HomeDashboard() {
         // TODO: Fix apiStats API to return the correct total apis
         buildMetrics(apisStatsResp.apiStatsEnd, fetchEndpointsCountResp)
         testSummaryData()
-        mapAccessTypes(apisStatsResp)
-        mapAuthTypes(apisStatsResp)
-        buildAuthTypesData(apisStatsResp.apiStatsEnd)
-        buildSetRiskScoreData(apisStatsResp.apiStatsEnd) //todo
+        mapAccessTypes(apisStatsResp, totalMissingApis, totalRedundantApis, missingApiInfoData?.accessTypeNotCalculated || 0)
+        mapAuthTypes(apisStatsResp, totalMissingApis, totalRedundantApis, (missingApiInfoData?.authNotCalculated || 0))
+        buildAPITypesData(apisStatsResp.apiStatsEnd, totalMissingApis, totalRedundantApis, (missingApiInfoData?.apiTypeMissing || 0))
+        buildSetRiskScoreData(apisStatsResp.apiStatsEnd, Math.max(0, totalMissingApis - totalRedundantApis)) //todo
         getCollectionsWithCoverage()
         buildSeverityMap(issueSeverityMap.severityInfo)
         buildIssuesSummary(findTotalIssuesResp)
@@ -173,6 +210,20 @@ function HomeDashboard() {
     useEffect(() => {
         fetchData()
     }, [startTimestamp, endTimestamp])
+
+    async function getActionItemsDataAndCount() {
+        const data = await fetchActionItemsData();
+        setActionItemsData(data);
+        let count = 0;
+        Object.values(data).forEach((val) => {
+            if (val > 0) count++;
+        });
+        setActionItemsCount(count);
+    }
+
+    useEffect(() => {
+        getActionItemsDataAndCount();
+    }, []);
 
     function buildIssuesSummary(findTotalIssuesResp) {
         if (findTotalIssuesResp && findTotalIssuesResp.totalIssuesCount) {
@@ -216,6 +267,7 @@ function HomeDashboard() {
             totalAPIs = apiStats.totalAPIs
         }
         const apisTestedInLookBackPeriod = apiStats.apisTestedInLookBackPeriod
+        const apisInScopeForTesting = apiStats?.totalInScopeForTestingApis || apisTestedInLookBackPeriod
 
         if (totalAPIs && totalAPIs > 0 && totalRiskScore) {
             const tempRiskScore = totalRiskScore / totalAPIs
@@ -224,8 +276,8 @@ function HomeDashboard() {
             setApiRiskScore(0)
         }
 
-        if (totalAPIs && totalAPIs > 0 && apisTestedInLookBackPeriod) {
-            const testCoverage = 100 * apisTestedInLookBackPeriod / totalAPIs
+        if (apisInScopeForTesting && apisInScopeForTesting> 0 && apisTestedInLookBackPeriod) {
+            const testCoverage = 100 * apisTestedInLookBackPeriod / apisInScopeForTesting
             setTestCoverage(parseFloat(testCoverage.toFixed(2)))
         } else {
             setTestCoverage(0)
@@ -265,18 +317,21 @@ function HomeDashboard() {
         )
     }
 
-    const runTestEmptyCardComponent = <Text alignment='center' color='subdued'>There’s no data to show. <Link url="/dashboard/testing" target='_blank'>Run test</Link> to get data populated. </Text>
+    const runTestEmptyCardComponent = <Text alignment='center' color='subdued'>There's no data to show. <Link url="/dashboard/testing" target='_blank'>Run test</Link> to get data populated. </Text>
 
-    function mapAccessTypes(apiStats) {
+    function mapAccessTypes(apiStats, missingCount, redundantCount, apiTypeMissing) {
         if (!apiStats) return
         const apiStatsEnd = apiStats.apiStatsEnd
         const apiStatsStart = apiStats.apiStatsStart
+
+        const countMissing = apiTypeMissing  + missingCount - redundantCount
 
         const accessTypeMapping = {
             "PUBLIC": "External",
             "PRIVATE": "Internal",
             "PARTNER": "Partner",
-            "THIRD_PARTY": "Third Party"
+            "THIRD_PARTY": "Third Party",
+            "NEED_MORE_DATA": "Need more data"
         };
 
         for (const [key, value] of Object.entries(apiStatsEnd.accessTypeMap)) {
@@ -286,11 +341,17 @@ function HomeDashboard() {
                 accessTypeMap[mappedKey].dataTableComponent = generateChangeComponent((value - apiStatsStart.accessTypeMap[key]), false);
             }
         }
+        // Handle missing access types
+        if(countMissing > 0) {
+            accessTypeMap["Need more data"].text = countMissing;
+            accessTypeMap["Need more data"].dataTableComponent = generateChangeComponent(0, false);
+        }
+        
         setAccessTypeMap(accessTypeMap)
     }
 
 
-    function mapAuthTypes(apiStats) {
+    function mapAuthTypes(apiStats, missingCount, redundantCount, authTypeMissing) {
         const apiStatsEnd = apiStats.apiStatsEnd
         const apiStatsStart = apiStats.apiStatsStart
         const convertKey = (key) => {
@@ -323,24 +384,40 @@ function HomeDashboard() {
             };
         });
 
+        const countMissing = authTypeMissing + missingCount - redundantCount
+
+        if(countMissing > 0) {
+            authMap["Need more data"] = {
+                "text": countMissing,
+                "color": "#EFE3FF",
+                "filterKey": "Need more data",
+                "dataTableComponent": generateChangeComponent(0, false) // No change component for missing auth types
+            };
+        }
+
+        
         setAuthMap(authMap)
     }
 
 
-    function buildAuthTypesData(apiStats) {
+    function buildAPITypesData(apiStats, missingCount, redundantCount, apiTypeMissing) {
         // Initialize the data with default values for all API types
         const data = [
             ["REST", apiStats.apiTypeMap.REST || 0], // Use the value from apiTypeMap or 0 if not available
             ["GraphQL", apiStats.apiTypeMap.GRAPHQL || 0],
             ["gRPC", apiStats.apiTypeMap.GRPC || 0],
-            ["SOAP", apiStats.apiTypeMap.SOAP || 0]
+            ["SOAP", apiStats.apiTypeMap.SOAP || 0],
         ];
+        const countMissing = apiTypeMissing - (missingCount + redundantCount)
+        if(missingCount > 0) {
+            data.push(["Need more data", countMissing]);
+        }
 
         setApiTypesData([{ data: data, color: "#D6BBFB" }])
     }
 
-    function buildSetRiskScoreData(apiStats) {
-        const totalApisCount = apiStats.totalAPIs
+    function buildSetRiskScoreData(apiStats, missingCount) {
+        const totalApisCount = apiStats.totalAPIs + (missingCount || 0);
 
         let tempScore = 0, tempTotal = 0
         Object.keys(apiStats.riskScoreMap).forEach((x) => {
@@ -360,7 +437,7 @@ function HomeDashboard() {
         const sumOfRiskScores = Object.values(apiStats.riskScoreMap).reduce((acc, value) => acc + value, 0);
 
         // Calculate the additional APIs that should be added to risk score "0"
-        const additionalAPIsForZero = totalApisCount - sumOfRiskScores;
+        const additionalAPIsForZero = totalApisCount - sumOfRiskScores - missingCount;
         apiStats.riskScoreMap["0"] = apiStats.riskScoreMap["0"] ? apiStats.riskScoreMap["0"] : 0
         if (additionalAPIsForZero > 0) apiStats.riskScoreMap["0"] += additionalAPIsForZero;
 
@@ -386,6 +463,16 @@ function HomeDashboard() {
             }
         });
 
+        if(missingCount > 0){
+            result.push({
+                "badgeValue": "N/A",
+                "progressValue": (missingCount / totalApisCount) * 100 + "%",
+                "text": missingCount,
+                "topColor": "#DDE0E4",
+                "backgroundColor": "#F6F7F8",
+                "badgeColor": "subdued"
+            })
+        }
         setRiskScoreData(result)
     }
 
@@ -589,7 +676,7 @@ function HomeDashboard() {
                 defaultChartOptions={defaultChartOptions}
                 text="true"
                 yAxisTitle="Number of APIs"
-                width={40}
+                width={Object.keys(apiTypesData).length > 4 ? "25" : "40"}
                 gap={10}
                 showGridLines={true}
                 customXaxis={
@@ -629,26 +716,57 @@ function HomeDashboard() {
     />
 
     const gridComponents = showTestingComponents ?
-        [criticalUnsecuredAPIsOverTime, vulnerableApisBySeverityComponent, criticalFindings, apisByRiskscoreComponent, apisByAccessTypeComponent, apisByAuthTypeComponent, apisByTypeComponent, newDomainsComponent] :
-        [apisByRiskscoreComponent, apisByAccessTypeComponent, apisByAuthTypeComponent, apisByTypeComponent, newDomainsComponent, criticalUnsecuredAPIsOverTime, vulnerableApisBySeverityComponent, criticalFindings]
+        [
+            {id: 'critical-apis', component: criticalUnsecuredAPIsOverTime},
+            {id: 'vulnerable-apis', component: vulnerableApisBySeverityComponent},
+            {id: 'critical-findings', component: criticalFindings},
+            {id: 'risk-score', component: apisByRiskscoreComponent},
+            {id: 'access-type', component: apisByAccessTypeComponent},
+            {id: 'auth-type', component: apisByAuthTypeComponent},
+            {id: 'api-type', component: apisByTypeComponent},
+            {id: 'new-domains', component: newDomainsComponent}
+        ] :
+        [
+            {id: 'risk-score', component: apisByRiskscoreComponent},
+            {id: 'access-type', component: apisByAccessTypeComponent},
+            {id: 'auth-type', component: apisByAuthTypeComponent},
+            {id: 'api-type', component: apisByTypeComponent},
+            {id: 'new-domains', component: newDomainsComponent},
+            {id: 'critical-apis', component: criticalUnsecuredAPIsOverTime},
+            {id: 'vulnerable-apis', component: vulnerableApisBySeverityComponent},
+            {id: 'critical-findings', component: criticalFindings}
+        ]
 
     const gridComponent = (
         <HorizontalGrid gap={5} columns={2}>
-            {gridComponents}
+            {gridComponents.map(({id, component}) => (
+                <div key={id}>{component}</div>
+            ))}
         </HorizontalGrid>
     )
 
-    const components = [summaryComp, testSummaryCardsList, gridComponent]
+    const components = [
+        {id: 'summary', component: summaryComp},
+        {id: 'test-summary', component: testSummaryCardsList},
+        {id: 'grid', component: gridComponent}
+    ]
 
     const dashboardComp = (
         <VerticalStack gap={4}>
-            {components.map((component) => {
-                return component
-            })}
+            {components.map(({id, component}) => (
+                <div key={id}>{component}</div>
+            ))}
         </VerticalStack>
     )
 
-    const pageComponents = [showBannerComponent ? <DashboardBanner key="dashboardBanner" /> : dashboardComp]
+    const tabsComponent = (
+        <VerticalStack gap="4" key="tabs-stack">
+            <LegacyTabs tabs={tabs} selected={selectedTab} onSelect={handleTabChange} />
+            {selectedTab === 0 ? dashboardComp : <ActionItemsContent actionItemsData={actionItemsData} />}
+        </VerticalStack>
+    )
+
+    const pageComponents = [showBannerComponent ? <DashboardBanner key="dashboardBanner" /> : tabsComponent]
 
     return (
         <Box>
@@ -661,7 +779,7 @@ function HomeDashboard() {
                     }
                     isFirstPage={true}
                     components={pageComponents}
-                    primaryAction={<DateRangeFilter initialDispatch={currDateRange} dispatch={(dateObj) => dispatchCurrDateRange({ type: "update", period: dateObj.period, title: dateObj.title, alias: dateObj.alias })} />}
+                    primaryAction={<DateRangeFilter initialDispatch={currDateRange} dispatch={(dateObj) => dispatchCurrDateRange({ type: "update", period: dateObj.period, title: dateObj.title, alias: dateObj.alias })} disabled={selectedTab === 1} />}
                 />
             }
 
