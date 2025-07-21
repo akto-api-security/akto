@@ -399,7 +399,7 @@ public class ApiCollection {
 
     public boolean isMcpCollection() {
         if (!CollectionUtils.isEmpty(this.getTagsList())) {
-            return this.getTagsList().stream().anyMatch(t -> Constants.MCP_SERVER_TAG.equals(t.getKeyName()));
+            return this.getTagsList().stream().anyMatch(t -> Constants.AKTO_MCP_SERVER_TAG.equals(t.getKeyName()));
         }
         return false;
     }
