@@ -79,18 +79,6 @@ public class APICatalogSync {
 
     public static Set<MergedUrls> mergedUrls;
 
-    /* Note: We have hardcoded the logic of not merging URLs for MCP Server.
-    The apiCollectionId - -1 has nothing to do with this.
-    Since we do not know the collectionId for MCP Server, we have set it to -1.
-    */
-    private static final Set<MergedUrls> MERGED_URLS_FOR_MCP = new HashSet<>(Arrays.asList(
-        new MergedUrls("tools/call/STRING", "POST", -1),
-        new MergedUrls("tools/call/INTEGER", "POST", -1),
-        new MergedUrls("tools/call/FLOAT", "POST", -1),
-        new MergedUrls("tools/call/OBJECT_ID", "POST", -1),
-        new MergedUrls("tools/call/VERSIONED", "POST", -1)
-    ));
-
     public Map<String, FilterConfig> advancedFilterMap =  new HashMap<>();
 
     /* Note: We have hardcoded the logic of not merging URLs for MCP Server.
