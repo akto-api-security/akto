@@ -48,13 +48,19 @@ public class ThreatDetector {
 
     public boolean applyFilter(FilterConfig threatFilter, HttpResponseParams httpResponseParams, RawApi rawApi,
             ApiInfoKey apiInfoKey) {
-        if (threatFilter.getId().equals(LFI_FILTER_ID)) {
-            return isLFiThreat(httpResponseParams);
+        try {
+            if (threatFilter.getId().equals(LFI_FILTER_ID)) {
+                return isLFiThreat(httpResponseParams);
+            }
+            if (threatFilter.getId().equals(SQL_INJECTION_FILTER_ID)) {
+                return isSqliThreat(httpResponseParams);
+            }
+            return validateFilterForRequest(threatFilter, rawApi, apiInfoKey);
+        } catch (Exception e) {
+            logger.errorAndAddToDb(e, "Error in applyFilter " + e.getMessage());
+            return false;
         }
-        if (threatFilter.getId().equals(SQL_INJECTION_FILTER_ID)) {
-            return isSqliThreat(httpResponseParams);
-        }
-        return validateFilterForRequest(threatFilter, rawApi, apiInfoKey);
+
     }
 
     private boolean validateFilterForRequest(
@@ -75,12 +81,12 @@ public class ThreatDetector {
     }
 
     public boolean isSqliThreat(HttpResponseParams httpResponseParams) {
-        
-        if(SQLParse.isSQLi(httpResponseParams.getRequestParams().getURL())){
+
+        if (SQLParse.isSQLi(httpResponseParams.getRequestParams().getURL())) {
             return true;
         }
 
-        if(SQLParse.isSQLi(httpResponseParams.getRequestParams().getPayload())){
+        if (SQLParse.isSQLi(httpResponseParams.getRequestParams().getPayload())) {
             return true;
         }
 
