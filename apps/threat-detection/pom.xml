@@ -19,13 +19,27 @@
             <id>confluent</id>
             <url>https://packages.confluent.io/maven/</url>
         </repository>
+		<repository>
+		    <id>jitpack.io</id>
+		    <url>https://jitpack.io</url>
+		</repository>
     </repositories>
 
     <dependencies>
         <dependency>
+	        <groupId>com.github.Kanatoko</groupId>
+	        <artifactId>libinjection-Java</artifactId>
+	        <version>master-SNAPSHOT</version>
+	    </dependency>
+        <dependency>
             <groupId>org.apache.commons</groupId>
             <artifactId>commons-lang3</artifactId>
             <version>3.12.0</version>
+        </dependency>
+        <dependency>
+            <groupId>org.ahocorasick</groupId>
+            <artifactId>ahocorasick</artifactId>
+            <version>0.6.3</version> 
         </dependency>
         <dependency>
             <groupId>com.akto.libs.dao</groupId>
