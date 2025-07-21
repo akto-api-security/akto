@@ -15,8 +15,17 @@ const AktoJax = () => {
     const [password, setPassword] = useState('')
     const [apiKey, setApiKey] = useState('')
 
+    const [outscopeUrls, setOutscopeUrls] = useState('');
+    const [maxPageVisits, setMaxPageVisits] = useState('');
+    const [domLoadTimeout, setDomLoadTimeout] = useState('');
+    const [waitAfterEvent, setWaitAfterEvent] = useState('');
+    const [enableJsRendering, setEnableJsRendering] = useState(true);
+    const [parseSoapServices, setParseSoapServices] = useState(true);
+    const [parseRestServices, setParseRestServices] = useState(true);
+    const [clickExternalLinks, setClickExternalLinks] = useState(false);
+
     const goToDocs = () => {
-        window.open("https://docs.akto.io/traffic-connector/dast/aktodast")
+        window.open("https://docs.akto.io/dast/akto-dast")
     }
 
     const primaryAction = () => {
@@ -51,11 +60,28 @@ const AktoJax = () => {
                 Use our DAST to capture traffic and instantly send it to your dashboard for real-time insights. If you want to scale up and get more accurate data, we recommend integrating with AWS or GCP traffic mirroring. This ensures smooth, automated data collection with minimal noise and maximum accuracy.
             </Text>
 
-            <InformationBannerComponent docsUrl="https://docs.akto.io/traffic-connector/dast/aktodast"
+            <InformationBannerComponent docsUrl="https://docs.akto.io/dast/akto-dast"
                     content="Please ensure the pre-requisites " 
             />
 
-            <AktoDastOptions />
+            <AktoDastOptions
+                outscopeUrls={outscopeUrls}
+                setOutscopeUrls={setOutscopeUrls}
+                maxPageVisits={maxPageVisits}
+                setMaxPageVisits={setMaxPageVisits}
+                domLoadTimeout={domLoadTimeout}
+                setDomLoadTimeout={setDomLoadTimeout}
+                waitAfterEvent={waitAfterEvent}
+                setWaitAfterEvent={setWaitAfterEvent}
+                enableJsRendering={enableJsRendering}
+                setEnableJsRendering={setEnableJsRendering}
+                parseSoapServices={parseSoapServices}
+                setParseSoapServices={setParseSoapServices}
+                parseRestServices={parseRestServices}
+                setParseRestServices={setParseRestServices}
+                clickExternalLinks={clickExternalLinks}
+                setClickExternalLinks={setClickExternalLinks}
+            />
 
             <Box paddingBlockStart={3}><Divider /></Box>
 

@@ -197,7 +197,7 @@ const aktoJaxObj = {
     icon: '/public/aktojax.svg',
     label: "Akto DAST",
     text: "You can deploy Akto's DAST on your machine to automatically scan and collect API endpoints and traffic data.",   
-    docsUrl: 'https://docs.akto.io/traffic-connector/dast/aktodast',
+    docsUrl: 'https://docs.akto.io/dast/akto-dast',
     key: "AKTODAST",
     component : <AktoJax />
 }

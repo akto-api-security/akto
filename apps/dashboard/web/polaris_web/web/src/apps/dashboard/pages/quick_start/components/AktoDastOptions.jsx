@@ -1,40 +1,34 @@
 import { Box, Checkbox, HorizontalStack, Text, TextField, VerticalStack } from '@shopify/polaris'
 import React, { useState } from 'react'
 
-const AktoDastOptions = () => {
-    const [crawlingPageLimit, setCrawlingPageLimit] = useState('');
-    const [maxPageVisits, setMaxPageVisits] = useState('');
-    const [domLoadTimeout, setDomLoadTimeout] = useState('');
-    const [waitAfterEvent, setWaitAfterEvent] = useState('');
-    const [enableJsRendering, setEnableJsRendering] = useState(false);
-    const [parseSoapServices, setParseSoapServices] = useState(false);
-    const [parseRestServices, setParseRestServices] = useState(false);
-    const [clickExternalLinks, setClickExternalLinks] = useState(false);
+const AktoDastOptions = ({ outscopeUrls, setOutscopeUrls, maxPageVisits, setMaxPageVisits, domLoadTimeout, setDomLoadTimeout, waitAfterEvent, setWaitAfterEvent, enableJsRendering, setEnableJsRendering, parseSoapServices, setParseSoapServices, parseRestServices, setParseRestServices, clickExternalLinks, setClickExternalLinks }) => {
 
     return (
         <VerticalStack gap={4}>
             <Text variant='headingMd'>Akto DAST Options</Text>
 
-            <HorizontalStack gap={2}>
+            <HorizontalStack gap={2} wrap={false}>
                 <TextField
-                    label="Crawling page limit"
-                    placeholder="9"
-                    value={crawlingPageLimit}
-                    onChange={(value) => setCrawlingPageLimit(value)}
+                    label="Outscope URLs"
+                    placeholder="Regex for URLs to exclude from the scan (eg: https://example.com/.*, https://another-example.com/.*)"
+                    value={outscopeUrls}
+                    onChange={(value) => setOutscopeUrls(value)}
                 />
 
                 <TextField
                     label="Maximum page visits"
                     placeholder="2"
+                    type='number'
                     value={maxPageVisits}
                     onChange={(value) => setMaxPageVisits(value)}
                 />
             </HorizontalStack>
 
-            <HorizontalStack gap={2}>
+            <HorizontalStack gap={2} wrap={false}>
                 <TextField
                     label="DOM load timeout (ms)"
                     placeholder="3000"
+                    type='number'
                     value={domLoadTimeout}
                     onChange={(value) => setDomLoadTimeout(value)}
                 />
@@ -42,12 +36,13 @@ const AktoDastOptions = () => {
                 <TextField
                     label="Wait after event (ms)"
                     placeholder="2000"
+                    type='number'
                     value={waitAfterEvent}
                     onChange={(value) => setWaitAfterEvent(value)}
                 />
             </HorizontalStack>
 
-            <VerticalStack gap={2}>
+            <VerticalStack gap={2} wrap={false}>
                 <HorizontalStack gap={3} wrap={false}>
                     <Checkbox
                         label="Enable JavaScript rendering"
