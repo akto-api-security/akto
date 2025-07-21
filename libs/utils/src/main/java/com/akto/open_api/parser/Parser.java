@@ -41,7 +41,7 @@ public class Parser {
     private static final LoggerMaker loggerMaker = new LoggerMaker(Parser.class, LogDb.DASHBOARD);
     private static final ObjectMapper mapper = new ObjectMapper();
 
-    public static ParserResult convertOpenApiToAkto(OpenAPI openAPI, String uploadId) {
+    public static ParserResult convertOpenApiToAkto(OpenAPI openAPI, String uploadId, boolean useHost ) {
 
         List<FileUploadError> fileLevelErrors = new ArrayList<>();
         List<SwaggerUploadLog> uploadLogs = new ArrayList<>();
@@ -208,7 +208,8 @@ public class Parser {
 
                     String requestHeadersString = "";
                     URL url = new URL(path);
-                    String urlPath = url.getPath();
+                    // without host/server.
+                    String urlPath = url.getPath() + (url.getQuery() != null ? "?" + url.getQuery() : "");
                     // Get the domain (including scheme)
                     requestHeaders.putIfAbsent("Host", url.getHost());
                     if (requestHeaders != null && !requestHeaders.isEmpty()) {
@@ -322,7 +323,11 @@ public class Parser {
                     }
 
                     messageObject.put(mKeys.akto_account_id, Context.accountId.get().toString());
-                    messageObject.put(mKeys.path, urlPath);
+                    if(useHost){
+                        messageObject.put(mKeys.path, path);
+                    } else {
+                        messageObject.put(mKeys.path, urlPath);
+                    }
                     messageObject.put(mKeys.method, method.toString().toUpperCase());
                     messageObject.put(mKeys.requestHeaders, requestHeadersString);
                     messageObject.put(mKeys.requestPayload, requestString);

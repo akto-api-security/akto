@@ -8,6 +8,7 @@ public class SlackWebhook {
     int id;
 
     String webhook;
+    String slackWebhookName;
     int smallerDuration;
     int largerDuration;
     int timestamp;
@@ -19,7 +20,7 @@ public class SlackWebhook {
     public SlackWebhook() {
     }
 
-    public SlackWebhook(int id, String webhook, int smallerDuration, int largerDuration, int timestamp, String userEmail, String dashboardUrl, int lastSentTimestamp, int frequencyInSeconds) {
+    public SlackWebhook(int id, String webhook, int smallerDuration, int largerDuration, int timestamp, String userEmail, String dashboardUrl, int lastSentTimestamp, int frequencyInSeconds, String slackWebhookName) {
         this.id = id;
         this.webhook = webhook;
         this.smallerDuration = smallerDuration;
@@ -29,6 +30,7 @@ public class SlackWebhook {
         this.dashboardUrl = dashboardUrl;
         this.lastSentTimestamp = lastSentTimestamp;
         this.frequencyInSeconds = frequencyInSeconds;
+        this.slackWebhookName = slackWebhookName;
     }
 
     public int getId() {
@@ -101,6 +103,14 @@ public class SlackWebhook {
 
     public void setFrequencyInSeconds(int frequencyInSeconds) {
         this.frequencyInSeconds = frequencyInSeconds;
+    }
+
+    public String getSlackWebhookName() {
+        return slackWebhookName;
+    }
+
+    public void setSlackWebhookName(String slackWebhookName) {
+        this.slackWebhookName = slackWebhookName;
     }
 
     @Override

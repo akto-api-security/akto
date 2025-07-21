@@ -306,12 +306,13 @@ public class AccountAction extends UserAction {
         return user;
     }
 
-    public static User addUserToExistingAccount(String email, int accountId){
+    public static User addUserToExistingAccount(String email, int accountId, String invitedRole){
         Account account = AccountsDao.instance.findOne(eq("_id", accountId));
         UsersDao.addNewAccount(email, account);
-        //RBACDao.instance.insertOne(new RBAC(user.getId(), RBAC.Role.MEMBER, accountId));
+        User user = UsersDao.instance.findOne(eq(User.LOGIN, email));
+        RBACDao.instance.insertOne(new RBAC(user.getId(), invitedRole, accountId));
         Context.accountId.set(accountId);
-        return UsersDao.instance.findOne(eq(User.LOGIN, email));
+        return user;
     }
 
     private static void intializeCollectionsForTheAccount(int newAccountId) {

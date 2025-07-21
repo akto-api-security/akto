@@ -15,6 +15,7 @@ public class Constants {
     public static final String TIMESTAMP = "timestamp";
 
     public static final String AWS_REGION = "AWS_REGION";
+    public static final String AKTO_THREAT_PROTECTION_BACKEND_HOST = "tbs.akto.io";
     public static final String AKTO_THREAT_DETECTION_CACHE_PREFIX = "akto:threat:schema:";
 
     public static final String AWS_ACCOUNT_ID = "AWS_ACCOUNT_ID";
@@ -51,5 +52,6 @@ public class Constants {
     public final static String _AKTO = "AKTO";
 
     public final static String DEFAULT_AKTO_DASHBOARD_URL = "https://app.akto.io";
+    public static final String AKTO_DISCOVERED_APIS_COLLECTION = "shadow_apis";
     public static final String AKTO_MCP_SERVER_TAG = "mcp-server";
 }

@@ -194,11 +194,12 @@ public class Main {
         APIConfig finalApiConfig = apiConfig;
         scheduler.scheduleAtFixedRate(() -> {
             try {
+                loggerMaker.info("Starting MCP sync job..");
                 AccountTask.instance.executeTask(t -> {
                     loggerMaker.info("Starting MCP sync job");
                     McpToolsSyncJobExecutor.INSTANCE.runJob(finalApiConfig);
                 }, "mcp-tools-sync");
-                loggerMaker.info("Finished MCP sync job");
+                loggerMaker.info("Finished MCP sync job..");
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb("Error in MCP tools sync job: " + e.getMessage(), LogDb.RUNTIME);
             }

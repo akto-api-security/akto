@@ -83,7 +83,7 @@ public class ApiTokenAction extends UserAction implements ServletRequestAware {
         List<SlackWebhook> slackWebhooks = SlackWebhooksDao.instance.findAll(new BasicDBObject());
         for(SlackWebhook sw: slackWebhooks) {
             ApiToken slackToken = 
-                new ApiToken(sw.getId(), Context.accountId.get(), sw.getWebhook(), sw.getWebhook(), 
+                new ApiToken(sw.getId(), Context.accountId.get(), sw.getSlackWebhookName(), sw.getWebhook(),
                 sw.getId(), sw.getUserEmail(), Utility.SLACK);
                 
             apiTokenList.add(slackToken);
@@ -97,7 +97,7 @@ public class ApiTokenAction extends UserAction implements ServletRequestAware {
         List<SlackWebhook> slackWebhooks = SlackWebhooksDao.instance.findAll(new BasicDBObject());
         for(SlackWebhook sw: slackWebhooks) {
             ApiToken slackToken = 
-                new ApiToken(sw.getId(), Context.accountId.get(), sw.getWebhook(), sw.getWebhook(), 
+                new ApiToken(sw.getId(), Context.accountId.get(), sw.getSlackWebhookName(), sw.getWebhook(), 
                 sw.getId(), sw.getUserEmail(), Utility.SLACK);
                 
             apiTokenList.add(slackToken);
@@ -108,8 +108,9 @@ public class ApiTokenAction extends UserAction implements ServletRequestAware {
 
     private String error;
     private String webhookUrl;
+    private String webhookName;
     private String dashboardUrl;
-    private int frequencyInSeconds; 
+    private int frequencyInSeconds;
     public int getFrequencyInSeconds() {
         return frequencyInSeconds;
     }
@@ -133,7 +134,7 @@ public class ApiTokenAction extends UserAction implements ServletRequestAware {
 
             setFrequencyInSeconds(24*60*60); // set initially to one day
 
-            SlackWebhook newWebhook = new SlackWebhook(now, webhookUrl, 1, 1, now, getSUser().getLogin(), dashboardUrl,now,frequencyInSeconds);
+            SlackWebhook newWebhook = new SlackWebhook(now, webhookUrl, 1, 1, now, getSUser().getLogin(), dashboardUrl,now,frequencyInSeconds, webhookName);
             this.apiTokenId = SlackWebhooksDao.instance.insertOne(newWebhook).getInsertedId().asInt32().getValue();
         }
 
@@ -183,6 +184,14 @@ public class ApiTokenAction extends UserAction implements ServletRequestAware {
 
     public void setTokenUtility(ApiToken.Utility tokenUtility) {
         this.tokenUtility = tokenUtility;
+    }
+
+    public String getWebhookName() {
+        return webhookName;
+    }
+
+    public void setWebhookName(String webhookName) {
+        this.webhookName = webhookName;
     }
 
     @Override

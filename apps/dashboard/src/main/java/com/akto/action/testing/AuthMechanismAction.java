@@ -13,6 +13,7 @@ import com.akto.dto.testing.LoginFlowParams;
 import com.akto.dto.testing.LoginFlowResponse;
 import com.akto.dto.testing.LoginRequestAuthParam;
 import com.akto.dto.testing.RequestData;
+import com.akto.dto.testing.SampleDataAuthParam;
 import com.akto.dto.testing.TestingRun;
 import com.akto.dto.testing.WorkflowTestResult;
 import com.akto.dto.testing.WorkflowTestingEndpoints;
@@ -77,7 +78,17 @@ public class AuthMechanismAction extends UserAction {
 
                 authParams.add(new LoginRequestAuthParam(param.getWhere(), param.getKey(), param.getValue(), param.getShowHeader()));
             }
-        }
+        } else if (type.equals(LoginFlowEnums.AuthMechanismTypes.SAMPLE_DATA.toString())) {
+
+            for (AuthParamData param: authParamData) {
+                if (!param.validate()) {
+                    addActionError("Key, Value, Location can't be empty");
+                    return ERROR.toUpperCase();
+                }
+
+                authParams.add(new SampleDataAuthParam(param.getWhere(), param.getKey(), param.getValue(), param.getShowHeader()));
+            }
+        } 
         AuthMechanism authMechanism = new AuthMechanism(authParams, requestData, type, null);
 
         AuthMechanismsDao.instance.insertOne(authMechanism);
@@ -88,7 +99,8 @@ public class AuthMechanismAction extends UserAction {
         List<AuthParam> authParams = new ArrayList<>();
 
         if (type.equals(LoginFlowEnums.AuthMechanismTypes.HARDCODED.toString()) ||
-                type.equals(LoginFlowEnums.AuthMechanismTypes.TLS_AUTH.toString())) {
+                type.equals(LoginFlowEnums.AuthMechanismTypes.TLS_AUTH.toString()) ||
+                type.equals(LoginFlowEnums.AuthMechanismTypes.SAMPLE_DATA.toString())) {
             addActionError("Invalid Type Value");
             return ERROR.toUpperCase();
         }
@@ -121,6 +133,7 @@ public class AuthMechanismAction extends UserAction {
         List<AuthParam> authParams = new ArrayList<>();
 
         if (type.equals(LoginFlowEnums.AuthMechanismTypes.HARDCODED.toString()) ||
+                type.equals(LoginFlowEnums.AuthMechanismTypes.SAMPLE_DATA.toString()) ||
                 type.equals(LoginFlowEnums.AuthMechanismTypes.TLS_AUTH.toString())) {
             addActionError("Invalid Type Value");
             return ERROR.toUpperCase();

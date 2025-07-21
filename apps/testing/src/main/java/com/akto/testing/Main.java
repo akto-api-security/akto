@@ -1044,7 +1044,7 @@ public class Main {
         SlackAlerts apiTestStatusAlert = new APITestStatusAlert(alertData);
 
         if (testingRun.getSendSlackAlert()) {
-            SlackSender.sendAlert(accountId, apiTestStatusAlert);
+            SlackSender.sendAlert(accountId, apiTestStatusAlert, testingRun.getSelectedSlackChannelId());
         }
 
         if(testingRun.getSendMsTeamsAlert() ){

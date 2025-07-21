@@ -137,4 +137,16 @@ public class RedisBackedCounterCache implements CounterCache {
     throw new UnsupportedOperationException("Unimplemented method 'removeMembersFromSortedSet'");
   }
 
+  @Override
+  public void setBytesWithExpiry(String key, byte[] value, int expirySeconds) {
+    // TODO Auto-generated method stub
+    throw new UnsupportedOperationException("Unimplemented method 'setBytesWithExpiry'");
+  }
+
+  @Override
+  public byte[] fetchDataBytes(String key) {
+    // TODO Auto-generated method stub
+    throw new UnsupportedOperationException("Unimplemented method 'fetchDataBytes'");
+  }
+
 }

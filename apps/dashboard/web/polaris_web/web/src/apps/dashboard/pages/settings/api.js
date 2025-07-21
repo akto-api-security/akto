@@ -205,11 +205,11 @@ const settingRequests = {
             data: {id}
         })
     },
-    addSlackWebhook(webhookUrl) {
+    addSlackWebhook(webhookUrl, webhookName) {
         return request({
             url: '/api/addSlackWebhook',
             method: 'post',
-            data: {webhookUrl}
+            data: {webhookUrl, webhookName}
         })
     },
     deleteSlackWebhook(apiTokenId) {
@@ -658,6 +658,13 @@ const settingRequests = {
     async downloadSamplePdf() {
         return await request({
             url: '/api/downloadSamplePdf',
+            method: 'post',
+            data: {}
+        })
+    },
+    async deleteAllMaliciousEvents() {
+        return await request({
+            url: '/api/deleteAllMaliciousEvents',
             method: 'post',
             data: {}
         })
