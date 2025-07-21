@@ -9,15 +9,18 @@ import ActionItemsTable from './ActionItemsTable';
 import CriticalActionItemCard from './CriticalActionItemCard';
 import issuesApi from '../../issues/api';
 import { createActionItem as createActionItemUtil } from '../../../../../util/createActionItem';
-import settingsModule from '../../settings/module'; 
+import settingsModule from '../../settings/module';
+import ActionItemDetails from './ActionItemDetails';
+import { fetchAllActionItemsApiInfo } from './actionItemsTransform'; 
 
 const actionItemsHeaders = [
     { title: '', value: 'priority', type: 'text' },
-    { title: 'Action Item', value: 'actionItem', type: 'text' },
-    { title: 'Team', value: 'team', type: 'text' },
-    { title: 'Efforts', value: 'effort', type: 'text' },
-    { title: 'Why It Matters', value: 'whyItMatters', type: 'text' },
-    { title: 'Action', value: 'actions', type: 'action' }
+    { title: 'Action Item', value: 'actionItem', type: 'text', maxWidth: '180px' },
+    { title: 'Description', value: 'descriptionCol', type: 'text', maxWidth: '220px' },
+    { title: 'Team', value: 'team', type: 'text', maxWidth: '110px' },
+    { title: 'Efforts', value: 'effort', type: 'text', maxWidth: '90px' },
+    { title: 'Why It Matters', value: 'whyItMatters', type: 'text', maxWidth: '200px' },
+    { title: 'Action', value: 'actions', type: 'action', maxWidth: '70px' }
 ];
 
 const ACTION_ITEM_TYPES = {
@@ -42,6 +45,27 @@ export const ActionItemsContent = ({ actionItemsData, onCountChange }) => {
     const [jiraProjectMaps, setJiraProjectMaps] = useState({});
     const [selectedActionItem, setSelectedActionItem] = useState(null);
     const [jiraTicketUrlMap, setJiraTicketUrlMap] = useState({});
+    const [showFlyout, setShowFlyout] = useState(false);
+    const [selectedItem, setSelectedItem] = useState(null);
+    const [allApiInfo, setAllApiInfo] = useState(null);
+    const [apiInfoLoading, setApiInfoLoading] = useState(false);
+
+    useEffect(() => {
+        const fetchApiInfo = async () => {
+            setApiInfoLoading(true);
+            try {
+                const apiData = await fetchAllActionItemsApiInfo();
+                setAllApiInfo(apiData);
+            } catch (error) {
+                console.error('Error fetching API info:', error);
+                setAllApiInfo(null);
+            } finally {
+                setApiInfoLoading(false);
+            }
+        };
+
+        fetchApiInfo();
+    }, []); 
 
     const handleJiraIntegration = async (actionItem) => {
         const integrated = window.JIRA_INTEGRATED === 'true'
@@ -61,14 +85,15 @@ export const ActionItemsContent = ({ actionItemsData, onCountChange }) => {
             }
             setModalActive(true);
         } catch (e) {
+            console.error("Error fetching Jira integration settings:", e);
         }
     };
 
     const createActionItem = (
-        id, priority, title, description, team, effort, count, actionItemType
+        id, priority, title, description, team, effort, count, actionItemType, jiraTicketUrlMap, handleJiraIntegration, whyItMatters
     ) => {
         return createActionItemUtil(
-            id, priority, title, description, team, effort, count, actionItemType, jiraTicketUrlMap, handleJiraIntegration
+            id, priority, title, description, team, effort, count, actionItemType, jiraTicketUrlMap, handleJiraIntegration, whyItMatters
         );
     };
 
@@ -95,6 +120,16 @@ export const ActionItemsContent = ({ actionItemsData, onCountChange }) => {
         }];
     };
 
+    const handleCardClick = (item) => {
+        setSelectedItem(item);
+        setShowFlyout(true);
+    };
+    
+    const handleRowClick = (item) => {
+        setSelectedItem(item);
+        setShowFlyout(true);
+    };
+
     useEffect(() => {
         if (!actionItemsData) return;
         const {
@@ -102,46 +137,41 @@ export const ActionItemsContent = ({ actionItemsData, onCountChange }) => {
             sensitiveDataCount,
             unauthenticatedCount,
             thirdPartyDiff,
-            highRiskThirdPartyValue,
-            shadowApisValue,
-            SensitiveAndUnauthenticatedValue,
+            highRiskThirdPartyCount,
+            shadowApisCount,
+            sensitiveAndUnauthenticatedCount,
             jiraTicketUrlMap: ticketMap
         } = actionItemsData;
         setJiraTicketUrlMap(ticketMap || {});
-        
+
         const items = [
-            createActionItem('1', 'P1', `${highRiskCount} APIs with risk score more than 3`,
-                "Creates multiple attack vectors for malicious actors", "Security Team", "Medium", highRiskCount, ACTION_ITEM_TYPES.HIGH_RISK_APIS),
+            createActionItem('1', 'P1', 'High-risk APIs', `${highRiskCount} APIs with risk score more than 3`, "Security Team", "Medium", highRiskCount, ACTION_ITEM_TYPES.HIGH_RISK_APIS, jiraTicketUrlMap, handleJiraIntegration, "Creates multiple attack vectors for malicious actors"),
 
-            createActionItem('2', 'P1', `${sensitiveDataCount} Endpoints exposing PII or confidential information`,
-                "Violates data privacy regulations (GDPR, CCPA) and risks customer trust", "Development", "Medium", sensitiveDataCount, ACTION_ITEM_TYPES.SENSITIVE_DATA_ENDPOINTS),
+            createActionItem('2', 'P1', 'APIs returning sensitive data', `${sensitiveDataCount} Endpoints exposing PII or confidential information`, "Development", "Medium", sensitiveDataCount, ACTION_ITEM_TYPES.SENSITIVE_DATA_ENDPOINTS, jiraTicketUrlMap, handleJiraIntegration, "Violates data privacy regulations (GDPR, CCPA) and risks customer trust"),
 
-            createActionItem('3', 'P1', `${unauthenticatedCount} APIs lacking proper authentication controls`,
-                "Easy target for unauthorized access and data exfiltration", "Security Team", "Medium", unauthenticatedCount, ACTION_ITEM_TYPES.UNAUTHENTICATED_APIS),
+            createActionItem('3', 'P1', 'Missing authentication methods', `${unauthenticatedCount} APIs lacking proper authentication controls`, "Security Team", "Medium", unauthenticatedCount, ACTION_ITEM_TYPES.UNAUTHENTICATED_APIS, jiraTicketUrlMap, handleJiraIntegration, "Easy target for unauthorized access and data exfiltration"),
 
-            createActionItem('4', 'P2', `${Math.max(0, thirdPartyDiff)} Third-party APIs frequently invoked or newly integrated within last 7 days`,
-                "New integrations may introduce unvetted security risks", "Integration Team", "Low", Math.max(0, thirdPartyDiff), ACTION_ITEM_TYPES.THIRD_PARTY_APIS),
+            createActionItem('4', 'P1', 'Recently active third-party APIs', `${Math.max(0, thirdPartyDiff)} Third-party APIs frequently invoked or newly integrated within last 7 days`, "Integration Team", "Low", Math.max(0, thirdPartyDiff), ACTION_ITEM_TYPES.THIRD_PARTY_APIS, jiraTicketUrlMap, handleJiraIntegration, "New integrations may introduce unvetted security risks"),
 
-            createActionItem('5', 'P1', `${highRiskThirdPartyValue} External APIs with high risk scores requiring attention`,
-                "Supply chain vulnerabilities that can compromise entire systems", "Security Team", "High", highRiskThirdPartyValue, ACTION_ITEM_TYPES.HIGH_RISK_THIRD_PARTY),
+            createActionItem('5', 'P1', 'High-risk third-party APIs', `${highRiskThirdPartyCount} External APIs with high risk scores requiring attention`, "Security Team", "High", highRiskThirdPartyCount, ACTION_ITEM_TYPES.HIGH_RISK_THIRD_PARTY, jiraTicketUrlMap, handleJiraIntegration, "Supply chain vulnerabilities that can compromise entire systems"),
 
-            createActionItem('6', 'P2', `${shadowApisValue} Undocumented APIs discovered in the system`,
-                "Unmonitored attack surface with unknown security posture", "API Governance", "High", shadowApisValue, ACTION_ITEM_TYPES.SHADOW_APIS)
+            createActionItem('6', 'P1', 'Shadow APIs', `${shadowApisCount} Undocumented APIs discovered in the system`, "API Governance", "High", shadowApisCount, ACTION_ITEM_TYPES.SHADOW_APIS, jiraTicketUrlMap, handleJiraIntegration, "Unmonitored attack surface with unknown security posture")
         ];
 
         const filteredItems = items.filter(item => item.count > 0);
         setActionItems(filteredItems);
         let totalCount = filteredItems.length;
-        if (SensitiveAndUnauthenticatedValue > 0) {
+        if (sensitiveAndUnauthenticatedCount > 0) {
             totalCount += 1;
             setCriticalCardData({
                 id: 'p0-critical',
                 priority: 'P0',
-                title: `${SensitiveAndUnauthenticatedValue} APIs returning sensitive data without encryption or proper authorization`,
-                description: 'Potential data breach with regulatory and compliance implications',
+                staticTitle: 'APIs returning sensitive data',
+                title: 'APIs returning sensitive data',
+                description: `${sensitiveAndUnauthenticatedCount} APIs returning sensitive data without encryption or proper authorization`,
                 team: 'Security & Development',
                 effort: 'High',
-                count: SensitiveAndUnauthenticatedValue,
+                count: sensitiveAndUnauthenticatedCount,
                 actionItemType: ACTION_ITEM_TYPES.CRITICAL_SENSITIVE_UNAUTH
             });
         } else {
@@ -173,7 +203,8 @@ export const ActionItemsContent = ({ actionItemsData, onCountChange }) => {
             } else {
                 // No need to refetch data here as it's passed as a prop
             }
-        }).catch(() => {
+        }).catch((error) => {
+            console.error("Error creating Jira ticket:", error);
             navigate(JIRA_INTEGRATION_URL);
         });
     };
@@ -185,6 +216,7 @@ export const ActionItemsContent = ({ actionItemsData, onCountChange }) => {
                     cardObj={criticalCardData}
                     onButtonClick={handleJiraIntegration}
                     jiraTicketUrlMap={jiraTicketUrlMap}
+                    onCardClick={handleCardClick}
                 />
             )}
 
@@ -194,8 +226,24 @@ export const ActionItemsContent = ({ actionItemsData, onCountChange }) => {
                     headers={actionItemsHeaders}
                     getActions={getActions}
                     jiraTicketUrlMap={jiraTicketUrlMap}
+                    onRowClick={handleRowClick}
                 />
             </Box>
+
+            <FlyLayout
+                show={showFlyout}
+                setShow={setShowFlyout}
+                title="Action item details"
+                components={[
+                    <ActionItemDetails
+                        item={selectedItem}
+                        jiraTicketUrlMap={jiraTicketUrlMap}
+                        onJiraButtonClick={handleJiraIntegration}
+                        allApiInfo={allApiInfo} 
+                        apiInfoLoading={apiInfoLoading} 
+                    />
+                ]}
+            />
 
             <JiraTicketCreationModal
                 activator={null}

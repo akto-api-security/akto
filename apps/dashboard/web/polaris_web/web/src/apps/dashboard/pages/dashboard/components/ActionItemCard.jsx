@@ -50,7 +50,7 @@ function ActionItemCard(props) {
                     <JiraTicketDisplay
                         jiraTicketUrl={jiraTicketUrl}
                         jiraKey={jiraKey}
-                        onButtonClick={() => onButtonClick?.(cardObj)}
+                        onButtonClick={(e) => onButtonClick?.(e, cardObj)}
                     />
                 </HorizontalStack>
             </VerticalStack>

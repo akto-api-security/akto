@@ -75,6 +75,12 @@ public class ApiCollectionsAction extends UserAction {
     int highRiskThirdPartyEndpointsCount;
     @Getter
     int shadowApisCount;
+    @Getter
+    List<ApiInfo> sensitiveUnauthenticatedEndpointsApiInfo = new ArrayList<>();
+    @Getter
+    List<ApiInfo> highRiskThirdPartyEndpointsApiInfo = new ArrayList<>();
+    @Getter
+    List<ApiInfo> shadowApisApiInfo = new ArrayList<>();
 
     public List<ApiInfoKey> getApiList() {
         return apiList;
@@ -977,15 +983,23 @@ public class ApiCollectionsAction extends UserAction {
     }
 
     @Setter
-    private boolean showUrls;
-    public String fetchSensitiveAndUnauthenticatedValue(){
+    private boolean showApiInfo;
+
+    public String fetchSensitiveAndUnauthenticatedValue() {
 
         List<ApiInfo> sensitiveEndpoints = ApiInfoDao.instance.findAll(Filters.eq(ApiInfo.IS_SENSITIVE, true));
-        for(ApiInfo apiInfo: sensitiveEndpoints) {
-            if(apiInfo.getAllAuthTypesFound() != null && !apiInfo.getAllAuthTypesFound().isEmpty()) {
-                for(Set<ApiInfo.AuthType> authType: apiInfo.getAllAuthTypesFound()) {
-                    if(authType.contains(ApiInfo.AuthType.UNAUTHENTICATED)) {
+
+        this.sensitiveUnauthenticatedEndpointsApiInfo.clear();
+        this.sensitiveUnauthenticatedEndpointsCount = 0;
+
+        for (ApiInfo apiInfo : sensitiveEndpoints) {
+            if (apiInfo.getAllAuthTypesFound() != null && !apiInfo.getAllAuthTypesFound().isEmpty()) {
+                for (Set<ApiInfo.AuthType> authType : apiInfo.getAllAuthTypesFound()) {
+                    if (authType.contains(ApiInfo.AuthType.UNAUTHENTICATED)) {
                         this.sensitiveUnauthenticatedEndpointsCount++;
+                        if (this.showApiInfo) {
+                            this.sensitiveUnauthenticatedEndpointsApiInfo.add(apiInfo);
+                        }
                     }
                 }
             }
@@ -993,29 +1007,44 @@ public class ApiCollectionsAction extends UserAction {
         return Action.SUCCESS.toUpperCase();
     }
 
-    public String fetchHighRiskThirdPartyValue(){
-        Bson filterQ = UsageMetricCalculator.excludeDemosAndDeactivated(ApiInfo.ID_API_COLLECTION_ID);
-        Bson filter = Filters.and(
-            filterQ,
-            Filters.gte(ApiInfo.RISK_SCORE, 4),
-            Filters.in(ApiInfo.API_ACCESS_TYPES, ApiInfo.ApiAccessType.THIRD_PARTY)
+    public String fetchHighRiskThirdPartyValue() {
+        List<ApiInfo> highRiskEndpoints = ApiInfoDao.instance.findAll(
+                Filters.and(
+                        Filters.gte(ApiInfo.RISK_SCORE, 4),
+                        Filters.in(ApiInfo.API_ACCESS_TYPES, ApiInfo.ApiAccessType.THIRD_PARTY)
+                )
         );
-        if(!showUrls){
-            this.highRiskThirdPartyEndpointsCount  = (int) ApiInfoDao.instance.count(filter);
+
+        this.highRiskThirdPartyEndpointsCount = highRiskEndpoints.size();
+        this.highRiskThirdPartyEndpointsApiInfo.clear();
+
+        if (this.showApiInfo) {
+            this.highRiskThirdPartyEndpointsApiInfo.addAll(highRiskEndpoints);
         }
+
         return Action.SUCCESS.toUpperCase();
     }
 
-    public String fetchShadowApisValue(){
-
+    public String fetchShadowApisValue() {
         ApiCollection shadowApisCollection = ApiCollectionsDao.instance.findByName(AKTO_DISCOVERED_APIS_COLLECTION);
-        if(shadowApisCollection != null) {
-            if(!showUrls) {
-                this.shadowApisCount = (int) ApiInfoDao.instance.count(Filters.eq(ApiInfo.ID_API_COLLECTION_ID, shadowApisCollection.getId()));
+
+        this.shadowApisApiInfo.clear();
+
+        if (shadowApisCollection != null) {
+            this.shadowApisCount = shadowApisCollection.getUrls().size();
+            if (this.showApiInfo) {
+                List<ApiInfo> shadowApiInfos = ApiInfoDao.instance.findAll(
+                    Filters.eq(ApiInfo.ID_API_COLLECTION_ID, shadowApisCollection.getId())
+                );
+                this.shadowApisApiInfo.addAll(shadowApiInfos);
             }
+        } else {
+            this.shadowApisCount = 0;
         }
+
         return Action.SUCCESS.toUpperCase();
     }
+
 
     public List<ApiCollection> getApiCollections() {
         return this.apiCollections;
