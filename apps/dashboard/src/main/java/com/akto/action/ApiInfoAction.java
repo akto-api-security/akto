@@ -20,6 +20,7 @@ import java.util.List;
 
 import org.bson.BsonDocument;
 import org.bson.conversions.Bson;
+import com.akto.dto.type.URLMethods.Method;
 
 public class ApiInfoAction extends UserAction {
     @Override
@@ -127,6 +128,11 @@ public class ApiInfoAction extends UserAction {
             ApiInfo apiInfo = ApiInfoDao.instance.findOne(ApiInfoDao.getFilter(url, method, collectionId));
             if (apiInfo != null) {
                 result.add(apiInfo);
+            } else {
+                ApiInfo.ApiInfoKey apiInfoKey = new ApiInfo.ApiInfoKey(collectionId, url, Method.fromString(method));
+                ApiInfo minimalApiInfo = new ApiInfo();
+                minimalApiInfo.setId(apiInfoKey);
+                result.add(minimalApiInfo);
             }
         }
         apiInfos = result;

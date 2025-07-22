@@ -22,17 +22,17 @@ const ACTION_ITEM_TYPES = {
 const getIssueLabel = (actionItemType) => {
     switch (actionItemType) {
         case ACTION_ITEM_TYPES.HIGH_RISK_APIS:
-            return 'High Risk';
+            return 'High Risk APIs';
         case ACTION_ITEM_TYPES.SENSITIVE_DATA_ENDPOINTS:
-            return 'Sensitive';
+            return 'Sensitive Data';
         case ACTION_ITEM_TYPES.UNAUTHENTICATED_APIS:
-            return 'Unauthenticated';
+            return 'Unauthenticated APIs';
         case ACTION_ITEM_TYPES.THIRD_PARTY_APIS:
-            return 'Third-Party';
+            return 'Third-Party APIs';
         case ACTION_ITEM_TYPES.HIGH_RISK_THIRD_PARTY:
             return 'High-Risk Third-Party';
         case ACTION_ITEM_TYPES.SHADOW_APIS:
-            return 'Shadow';
+            return 'Shadow APIs';
         case ACTION_ITEM_TYPES.CRITICAL_SENSITIVE_UNAUTH:
             return 'Sensitive, Unauthenticated';
         default:
