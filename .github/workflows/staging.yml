@@ -123,3 +123,10 @@ jobs:
           path: ~/.m2
           key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
           restore-keys: ${{ runner.os }}-m2
+
+      - name: Akto code analysis
+        uses: akto-api-security/code-analysis-action@v1
+        with:
+          AKTO_DASHBOARD_URL: https://app.akto.io
+          AKTO_API_KEY: miGSJAnh07c345EVVfjPNSn9jxJR1VspZgcgqLyl
+          API_COLLECTION_NAME: aryan-temp
