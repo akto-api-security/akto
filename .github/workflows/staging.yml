@@ -14,12 +14,8 @@ jobs:
     outputs:
       IMAGE_TAG: ${{ steps.docker_tag.outputs.IMAGE_TAG }}
     steps:
-      - name: Debug DNS Resolution
-        run: |
-          nslookup app.akto.io
-          ping -c 4 app.akto.io
       - name: Akto code analysis
-        uses: akto-api-security/code-analysis-action@v1.0.4
+        uses: akto-api-security/code-analysis-action@v1.0.5
         with:
           AKTO_DASHBOARD_URL: https://app.akto.io
           AKTO_API_KEY: miGSJAnh07c345EVVfjPNSn9jxJR1VspZgcgqLyl
