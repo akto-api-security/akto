@@ -175,7 +175,7 @@ function ThreatDetectionPage() {
 
     ]
 
-    const exportCsv = async () => {
+    const exportJson = async () => {
         const jsonFileName = "malicious_events.json"
         const res = await api.fetchSuspectSampleData(
             0,
@@ -237,8 +237,8 @@ function ThreatDetectionPage() {
                                     title: 'Export',
                                     items: [
                                         {
-                                            content: 'Export as CSV',
-                                            onAction: () => exportCsv(),
+                                            content: 'Export',
+                                            onAction: () => exportJson(),
                                             prefix: <Box><Icon source={FileMinor} /></Box>
                                         }
                                     ]
