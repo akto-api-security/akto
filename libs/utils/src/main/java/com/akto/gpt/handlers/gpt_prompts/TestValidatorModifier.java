@@ -22,6 +22,7 @@ public class TestValidatorModifier extends TestExecutorModifier {
             .append("Strict evaluation rules:\n")
             .append("- If the response clearly reflects the operation, return a JSON object containing the correct operation key and value.\n")
             .append("- Only use one of the approved JSON keys listed below:\n")
+            .append("- The values below are example values and must be replaced with the actual values from the response.\n")
             .append("  { \"contains_either\": [\"param1, param2\"] }\n")
             .append("  { \"not_contains_either\": [\"param1, param2\"] }\n")
             .append("  { \"contains_all\": [\"param1\"] }\n")
