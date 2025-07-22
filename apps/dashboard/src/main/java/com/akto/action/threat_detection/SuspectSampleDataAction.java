@@ -24,7 +24,6 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
   List<SuspectSampleData> sampleData;
   List<DashboardMaliciousEvent> maliciousEvents;
   int skip;
-  int limit;
   static final int LIMIT = 50;
   List<String> ips;
   List<String> urls;
@@ -86,7 +85,7 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
     Map<String, Object> body = new HashMap<String, Object>() {
       {
         put("skip", skip);
-        put("limit", limit > 0 ? limit : LIMIT);
+        put("limit", LIMIT);
         put("sort", sort);
         put("filter", filter);
       }
@@ -117,11 +116,8 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
                             smr.getDetectedAt(),
                             smr.getType(),
                             smr.getRefId(),
-                            smr.getCategory(),
                             smr.getSubCategory(),
-                            smr.getEventTypeVal(),
-                            smr.getPayload(),
-                            smr.getMetadata()))
+                            smr.getEventTypeVal()))
                     .collect(Collectors.toList());
                 this.total = m.getTotal();
               });
@@ -195,14 +191,9 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
     this.skip = skip;
   }
 
-  public int getLimit() {
-    return limit > 0 ? limit : LIMIT;
+  public static int getLimit() {
+    return LIMIT;
   }
-
-  public void setLimit(int limit) {
-    this.limit = limit;
-  }
-
 
   public List<String> getIps() {
     return ips;
