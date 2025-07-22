@@ -28,7 +28,14 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.Gson;
 import com.mongodb.BasicDBObject;
 
+import java.util.concurrent.ConcurrentHashMap;
+
 public class KafkaUtils {
+    // Local cache for environment variables
+    private static final Map<String, String> envCache = new ConcurrentHashMap<>();
+    private static String getCachedEnv(String key) {
+        return envCache.computeIfAbsent(key, System::getenv);
+    }
     
     private final static ObjectMapper mapper = new ObjectMapper();
     private static final Gson gson = new Gson();
@@ -56,14 +63,14 @@ public class KafkaUtils {
 
     public void initKafkaConsumer() {
         System.out.println("kafka init consumer called");
-        String topicName = System.getenv("AKTO_KAFKA_TOPIC_NAME");
-        String kafkaBrokerUrl = System.getenv("AKTO_KAFKA_BROKER_URL"); // kafka1:19092
-        String isKubernetes = System.getenv("IS_KUBERNETES");
+        String topicName = getCachedEnv("AKTO_KAFKA_TOPIC_NAME");
+        String kafkaBrokerUrl = getCachedEnv("AKTO_KAFKA_BROKER_URL"); // kafka1:19092
+        String isKubernetes = getCachedEnv("IS_KUBERNETES");
         if (isKubernetes != null && isKubernetes.equalsIgnoreCase("true")) {
             kafkaBrokerUrl = "127.0.0.1:29092";
         }
-        String groupIdConfig =  System.getenv("AKTO_KAFKA_GROUP_ID_CONFIG");
-        int maxPollRecordsConfig = Integer.parseInt(System.getenv("AKTO_KAFKA_MAX_POLL_RECORDS_CONFIG"));
+        String groupIdConfig =  getCachedEnv("AKTO_KAFKA_GROUP_ID_CONFIG");
+        int maxPollRecordsConfig = Integer.parseInt(getCachedEnv("AKTO_KAFKA_MAX_POLL_RECORDS_CONFIG"));
 
         Properties properties = configProperties(kafkaBrokerUrl, groupIdConfig, maxPollRecordsConfig);
         this.consumer = new KafkaConsumer<>(properties);
@@ -125,9 +132,9 @@ public class KafkaUtils {
     }
 
     public void initKafkaProducer() {
-        String kafkaBrokerUrl = System.getenv("AKTO_KAFKA_BROKER_URL");
-        int batchSize = Integer.parseInt(System.getenv("AKTO_KAFKA_PRODUCER_BATCH_SIZE"));
-        int kafkaLingerMS = Integer.parseInt(System.getenv("AKTO_KAFKA_PRODUCER_LINGER_MS"));
+        String kafkaBrokerUrl = getCachedEnv("AKTO_KAFKA_BROKER_URL");
+        int batchSize = Integer.parseInt(getCachedEnv("AKTO_KAFKA_PRODUCER_BATCH_SIZE"));
+        int kafkaLingerMS = Integer.parseInt(getCachedEnv("AKTO_KAFKA_PRODUCER_LINGER_MS"));
         kafkaProducer = new Kafka(kafkaBrokerUrl, kafkaLingerMS, batchSize);
         logger.info("Kafka Producer Init " + Context.now());
     }
@@ -209,17 +216,19 @@ public class KafkaUtils {
     }
 
     public boolean isReadEnabled() {
-        if (System.getenv("KAFKA_READ_ENABLED") == null) {
+        String readEnabled = getCachedEnv("KAFKA_READ_ENABLED");
+        if (readEnabled == null) {
             return false;
         }
-        return System.getenv("KAFKA_READ_ENABLED").equalsIgnoreCase("true");
+        return readEnabled.equalsIgnoreCase("true");
     }
 
     public boolean isWriteEnabled() {
-        if (System.getenv("KAFKA_WRITE_ENABLED") == null) {
+        String writeEnabled = getCachedEnv("KAFKA_WRITE_ENABLED");
+        if (writeEnabled == null) {
             return false;
         }
-        return System.getenv("KAFKA_WRITE_ENABLED").equalsIgnoreCase("true");
+        return writeEnabled.equalsIgnoreCase("true");
     }
 
     public void insertData(List<BulkUpdates> writes, String triggerMethod, int accountId) {
@@ -227,6 +236,10 @@ public class KafkaUtils {
     }
 
     public void insertDataSecondary(Object writes, String triggerMethod, int accountId) {
+        String skipSecondaryData = getCachedEnv("SKIP_SECONDARY_DATA");
+        if (skipSecondaryData != null && skipSecondaryData.equalsIgnoreCase("true")) {
+            return;
+        }
         insertDataCore(writes, triggerMethod, accountId, "AKTO_KAFKA_TOPIC_NAME_SECONDARY", "akto.secondary.trafficdata", "kafka insertDataSecondary");
     }
 
@@ -241,8 +254,8 @@ public class KafkaUtils {
 
     public void insertDataCore(Object writes, String triggerMethod, int accountId, String topicEnvVar, String defaultTopic, String errorContext) {
         try {
-            // Retrieve topic name from environment variable or use default if specified
-            String topicName = System.getenv(topicEnvVar);
+            // Retrieve topic name from local cache or use default if specified
+            String topicName = getCachedEnv(topicEnvVar);
             if (topicName == null) {
                 if (defaultTopic != null) {
                     topicName = defaultTopic;
@@ -260,5 +273,4 @@ public class KafkaUtils {
             loggerMaker.errorAndAddToDb(e, "Error in " + errorContext + " " + e.toString());
         }
     }
-
 }
