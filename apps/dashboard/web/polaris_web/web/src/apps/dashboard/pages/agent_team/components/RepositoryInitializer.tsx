@@ -20,7 +20,7 @@ const getProjectObj = (connection: string) => {
                     placeholder: "Enter repository name",
                 }
             }
-        case 'BIT_BUCKET':
+        case 'BITBUCKET':
             return {
                 "1": {
                     label: "Workspace/Team Name",
@@ -31,7 +31,7 @@ const getProjectObj = (connection: string) => {
                     placeholder: "Enter repository name",
                 }
             }
-        case 'AZURE_DEVOPS':
+        case 'AZUREDEVOPS':
             return {
                 "1": {
                     label: "Organization Name",
@@ -76,7 +76,7 @@ async function checkRepoReadAccess({ platform, projectName, repoName, repoNameAz
          * URL Format: https://api.bitbucket.org/2.0/repositories/{workspace}/{repo_slug}
          * API Docs: https://developer.atlassian.com/cloud/bitbucket/rest/api-group-repositories/#api-repositories-workspace-repo-slug-get
         */
-        case 'bit_bucket':
+        case 'bitbucket':
           url = `https://api.bitbucket.org/2.0/repositories/${projectName}/${repoName}`;
           headers = privateToken
             ? {
@@ -89,7 +89,7 @@ async function checkRepoReadAccess({ platform, projectName, repoName, repoNameAz
          * URL Format: https://dev.azure.com/{organization}/{project}/_apis/git/repositories/{repositoryName}?api-version=4.1
          * API Docs: https://learn.microsoft.com/en-us/rest/api/azure/devops/git/repositories/get?view=azure-devops-rest-4.1&tabs=HTTP
         */
-        case 'azure_devops':
+        case 'azuredevops':
             url = `https://dev.azure.com/${projectName}/${repoName}/_apis/git/repositories/${repoNameAzure}?api-version=4.1`;
             headers = privateToken 
               ? {
@@ -223,7 +223,7 @@ function RepoSelector({ handleClickRepo, selectedConnection }) {
     const projectObj = getProjectObj(selectedConnection);
     
 
-    const isAzureDevops = (selectedConnection === 'AZURE_DEVOPS');
+    const isAzureDevops = (selectedConnection === 'AZUREDEVOPS');
     const isGitLab = (selectedConnection === 'GITLAB');
 
     return (
@@ -341,8 +341,8 @@ function RepositoryInitializer({ agentType }: { agentType: string }) {
                 ? {
                     sourceCodeType: selectedConnection,
                     repository: repo,
-                    ...(project && {project: project}),
-                    ...(repoNameAzure && { repositoryNameAzure: repoNameAzure})
+                    project: project,
+                    repoNameAzure: repoNameAzure
                 }
                 : {};
         
@@ -368,16 +368,16 @@ function RepositoryInitializer({ agentType }: { agentType: string }) {
             onClickFunc: () => handleClick('GITHUB')
         },
         {
-            id: 'BIT_BUCKET',
+            id: 'BITBUCKET',
             logo: '/public/bitbucket.svg',
             text: 'Continue with BitBucket',
-            onClickFunc: () => handleClick('BIT_BUCKET')
+            onClickFunc: () => handleClick('BITBUCKET')
         },
         {
-            id: 'AZURE_DEVOPS',
+            id: 'AZUREDEVOPS',
             logo: '/public/azure.svg',
             text: 'Continue with AzureDevops',
-            onClickFunc: () => handleClick('AZURE_DEVOPS')
+            onClickFunc: () => handleClick('AZUREDEVOPS')
         },
         {
             id: 'GITLAB',

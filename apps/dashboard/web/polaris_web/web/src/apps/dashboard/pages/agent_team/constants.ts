@@ -2,7 +2,7 @@ import api from "./components/finalctas/api"
 import { intermediateStore } from "./intermediate.store";
 
 const STEPS_PER_AGENT_ID = {
-    "FIND_VULNERABILITIES_FROM_SOURCE_CODE": 5,
+    "FIND_VULNERABILITIES_FROM_SOURCE_CODE": 4,
     "FIND_APIS_FROM_SOURCE_CODE": 4,
     "FIND_SENSITIVE_DATA_TYPES": 1,
     "CREATE_TEST_TEMPLATES": 1,
@@ -28,7 +28,7 @@ export const preRequisitesMap = {
     }
 }
 
-const vulnerableKeys = ["IS_UNAUTHENTICATED", "DDOS", "BOLA", "INPUT_VALIDATION"];
+const vulnerableKeys = ["IS_UNAUTHENTICATED", "DDOS", "BOLA", "INPUT_VALIDATION", "SQL_INJECTION", "SSRF", "NO_SQL_INJECTION", "COMMAND_INJECTION"];
 
 export const outputKeys = {
     "FIND_VULNERABILITIES_FROM_SOURCE_CODE": vulnerableKeys
@@ -78,24 +78,11 @@ export function structuredOutputFormat (output: any, agentType: string | undefin
                         return output
                     }
                 case "3":{
-                    let respArr= output.map((item: any) => {
-                        let splitArr = item.split(" - ")
-                        return {
-                            "type": splitArr[1],
-                            "file_path": splitArr[splitArr.length - 1]
-                        }
-                    })
-                    const obj = {
-                        authMethods: respArr
-                    }
-                    return obj
-                }
-                case "4": {
                     const outputOptions = intermediateStore.getState().outputOptions?.outputOptions !== undefined ? intermediateStore.getState().outputOptions?.outputOptions : intermediateStore.getState().outputOptions;
                     let valueSelectedSet = new Set(output);
                     let selectedOptions = outputOptions.filter((x: any) => valueSelectedSet.has(x?.value));
                     const obj = {
-                        authMechanisms: selectedOptions
+                        middlewares: selectedOptions
                     }
                     return obj
                 }
