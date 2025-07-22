@@ -661,7 +661,8 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
 
                     try {
                         String requestUrl = String.format(baseUrl + CREATE_ISSUE_FIELD_METADATA_ENDPOINT, projectKey, issueId);
-                        OriginalHttpRequest request = new OriginalHttpRequest(requestUrl, "", "GET", "", headers, "");
+                        String queryParams = "maxResults=200";
+                        OriginalHttpRequest request = new OriginalHttpRequest(requestUrl, queryParams, "GET", "", headers, "");
                         OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false,new ArrayList<>());
                         String responsePayload = response.getBody();
 
