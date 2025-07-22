@@ -10,7 +10,8 @@ import SampleDetails from "./components/SampleDetails";
 import threatDetectionRequests from "./api";
 import tempFunc from "./dummyData";
 import NormalSampleDetails from "./components/NormalSampleDetails";
-import { HorizontalGrid, VerticalStack, HorizontalStack, Popover, Button, ActionList, Box, Icon, FileMinor } from "@shopify/polaris";
+import { HorizontalGrid, VerticalStack, HorizontalStack, Popover, Button, ActionList, Box, Icon} from "@shopify/polaris";
+import { FileMinor } from '@shopify/polaris-icons';
 import TopThreatTypeChart from "./components/TopThreatTypeChart";
 import api from "./api";
 import threatDetectionFunc from "./transform";
@@ -173,6 +174,47 @@ function ThreatDetectionPage() {
             
 
     ]
+
+    const exportCsv = async () => {
+        const jsonFileName = "malicious_events.json"
+        const res = await api.fetchSuspectSampleData(
+            0,
+            [],
+            [],
+            [],
+            [],
+            {detectedAt: -1},
+            startTimestamp,
+            endTimestamp,
+            2000
+        );
+        // Transform to match the mongoDB format
+        let jsonData = (res?.maliciousEvents || []).map(ev => ({
+            _id: ev.id, // or whatever unique id you have
+            actor: ev.actor,
+            category: ev.category,
+            country: ev.country,
+            detectedAt: { $numberLong: String(ev.timestamp) || String(ev.detectedAt) },
+            eventType: ev.eventType,
+            filterId: ev.filterId,
+            latestApiCollectionId: ev.apiCollectionId || ev.latestApiCollectionId,
+            latestApiEndpoint: ev.url || ev.latestApiEndpoint,
+            latestApiIp: ev.ip || ev.latestApiIp,
+            latestApiMethod: ev.method || ev.latestApiMethod,
+            subCategory: ev.subCategory,
+            type: ev.type,
+            refId: ev.refId,
+            severity: ev.severity,
+            latestApiOrig: ev.payload || ev.latestApiOrig,
+            metadata: ev.metadata,
+        }));
+
+        let blob = new Blob([JSON.stringify(jsonData, null, 2)], {
+            type: "application/json;charset=UTF-8"
+        });
+        saveAs(blob, jsonFileName);
+        func.setToast(true, false, "JSON exported successfully");
+    }
 
     const secondaryActionsComp = (
         <HorizontalStack gap={2}>
