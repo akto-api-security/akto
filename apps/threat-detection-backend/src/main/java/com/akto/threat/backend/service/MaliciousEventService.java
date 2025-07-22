@@ -211,6 +211,7 @@ public class MaliciousEventService {
                 .setType(evt.getType())
                 .setRefId(evt.getRefId())
                 .setEventTypeVal(evt.getEventType().toString())
+                .setMetadata(evt.getMetadata())
                 .build());
       }
       return ListMaliciousRequestsResponse.newBuilder()
