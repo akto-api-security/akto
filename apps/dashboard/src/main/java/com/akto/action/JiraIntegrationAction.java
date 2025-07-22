@@ -102,6 +102,7 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
     private static final String ATTACH_FILE_ENDPOINT = "/attachments";
     private static final String ISSUE_STATUS_ENDPOINT = "/rest/api/3/project/%s/statuses";
     private static final String CREATE_ISSUE_FIELD_METADATA_ENDPOINT = "/rest/api/3/issue/createmeta/%s/issuetypes/%s"; //https://developer.atlassian.com/cloud/jira/platform/rest/v3/api-group-issues/#api-rest-api-3-issue-createmeta-projectidorkey-issuetypes-issuetypeid-get
+    private static final String FIELD_SEARCH_ENDPOINT = "/rest/api/3/field/search";
     private static final LoggerMaker loggerMaker = new LoggerMaker(ApiExecutor.class, LogDb.DASHBOARD);
 
     private static final int TICKET_SYNC_JOB_RECURRING_INTERVAL_SECONDS = 3600;
@@ -521,11 +522,127 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
         Map<String, List<String>> headers = new HashMap<>();
         String authHeader = Base64.getEncoder().encodeToString((jiraIntegration.getUserEmail() + ":" +  jiraIntegration.getApiToken()).getBytes());
         headers.put("Authorization", Collections.singletonList("Basic " + authHeader));
-        createIssueFieldMetaData = new HashMap<>();
 
-        List<Future<Map.Entry<String, Map<String, BasicDBList>>>> futures = new ArrayList<>();
         int accountId = Context.accountId.get();
+        
+        int total = 0;
+        int startAt = 0;
+        int maxResults = 50;
+        String fieldSearchRequestUrl = baseUrl + FIELD_SEARCH_ENDPOINT;
+        String queryParamsFormatStr = "startAt=%d&expand=isUnscreenable&expand=isLocked";
+        Map<String, BasicDBObject> fieldSearchMap = new HashMap<>();
+        List<Future<Map<String, BasicDBObject>>> fieldSearchFutures = new ArrayList<>();
 
+        // Initial request to get the total number of fields and the first page of results
+        try {
+            String queryParams = String.format(queryParamsFormatStr, startAt);
+            OriginalHttpRequest request = new OriginalHttpRequest(fieldSearchRequestUrl, queryParams, "GET", "", headers, "");
+            loggerMaker.infoAndAddToDb("Performing jira field search request: " + request.getUrl() + "?" + queryParams);
+
+            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false,new ArrayList<>());
+            String responsePayload = response.getBody();
+
+            if (response.getStatusCode() > 201 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb(String.format("Error while making jira field search request. Response Code %d", response.getStatusCode()));
+                return Action.ERROR.toUpperCase();
+            }
+
+            BasicDBObject payloadObj;
+            try {
+                payloadObj = BasicDBObject.parse(responsePayload);
+                total = payloadObj.getInt("total", 0);
+
+                BasicDBList values = (BasicDBList) payloadObj.get("values");
+                if (values != null) {
+                    for (Object valueObj : values) {
+                        if (valueObj == null)
+                            continue;
+                        BasicDBObject value = (BasicDBObject) valueObj;
+                        String id = value.getString("id", "");
+                        if (id == null || id.isEmpty()) {
+                            continue;
+                        }
+                        fieldSearchMap.put(id, value);
+                    }
+                }
+
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb(e, "Error while parsing jira field search results.");
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error while making jira field search request. ");
+        }
+
+        // Fetch the remaining fields search pages in parallel
+        while (true) {
+            startAt += maxResults;
+            if (startAt >= total) {
+                break;
+            }
+            
+            String queryParams = String.format(queryParamsFormatStr, startAt);
+            OriginalHttpRequest request = new OriginalHttpRequest(fieldSearchRequestUrl, queryParams, "GET", "", headers, "");
+
+            fieldSearchFutures.add(multiFieldPool.submit(() -> {
+                Context.accountId.set(accountId);
+                Map<String, BasicDBObject> paginatedFieldSearchMap = new HashMap<>();
+
+                try {
+                    loggerMaker.infoAndAddToDb("Performing jira field search request: " + request.getUrl() + "?" + queryParams);
+
+                    OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, new ArrayList<>());
+                    String responsePayload = response.getBody();
+
+                    if (response.getStatusCode() > 201 || responsePayload == null) {
+                        loggerMaker.errorAndAddToDb(
+                                String.format("Error while making jira field search request. Response Code %d",
+                                        response.getStatusCode()));
+                    } else {
+                        BasicDBObject payloadObj;
+                        try {
+                            payloadObj = BasicDBObject.parse(responsePayload);
+
+                            BasicDBList values = (BasicDBList) payloadObj.get("values");
+                            if (values != null) {
+                                for (Object valueObj : values) {
+                                    if (valueObj == null)
+                                        continue;
+                                    BasicDBObject value = (BasicDBObject) valueObj;
+                                    String id = value.getString("id", "");
+                                    if (id == null || id.isEmpty()) {
+                                        continue;
+                                    }
+                                    paginatedFieldSearchMap.put(id, value);
+                                }
+                            }
+
+                        } catch (Exception e) {
+                            loggerMaker.errorAndAddToDb(e, "Error while parsing jira field search results.");
+                        }
+                    }
+                } catch (Exception e) {
+                    loggerMaker.errorAndAddToDb(e, "Error while making jira field search request. ");
+                }
+                
+                return paginatedFieldSearchMap;
+            }));
+        }
+        
+        // Wait for all tasks to finish and fill the field search map
+        for (Future<Map<String, BasicDBObject>> future : fieldSearchFutures) {
+            try {
+                Map<String, BasicDBObject> paginatedFieldSearchMap = future.get(60, TimeUnit.SECONDS);
+                if (paginatedFieldSearchMap != null) {
+                    fieldSearchMap.putAll(paginatedFieldSearchMap);
+                }
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb(e, "Error waiting for Jira field search task");
+            }
+        }
+
+        createIssueFieldMetaData = new HashMap<>();
+        List<Future<Map.Entry<String, Map<String, BasicDBList>>>> futures = new ArrayList<>();
+        
         for (Map.Entry<String, List<BasicDBObject>> entry : projectIdsMap.entrySet()) {
             String projectKey = entry.getKey();
             List<BasicDBObject> issueTypes = entry.getValue();
@@ -565,9 +682,23 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
                                 BasicDBObject issueFieldBasicDBObject = (BasicDBObject) issueField;
                                 String fieldId = issueFieldBasicDBObject.getString("fieldId");
                                 String fieldName = issueFieldBasicDBObject.getString("name");
-                                Boolean isRequired = issueFieldBasicDBObject.getBoolean("required", false);
-                                if (fieldId == null || fieldName == null || !isRequired) continue;
+                                
+                                if (fieldId == null || fieldName == null) continue;
 
+                                // check if fieldId is present in fieldSearchMap
+                                if (fieldSearchMap.containsKey(fieldId)) {
+                                    Boolean ignoreField = false;
+                                    BasicDBObject fieldValue = fieldSearchMap.get(fieldId);
+                                    if (fieldValue == null) ignoreField = true;
+                                    else {
+                                        Boolean isUnscreenable = fieldValue.getBoolean("isUnscreenable", false);
+                                        Boolean isLocked = fieldValue.getBoolean("isLocked", false);
+                                        if (isUnscreenable == true || isLocked == true) ignoreField = true;
+                                    }
+
+                                    if (ignoreField) continue;
+                                }
+                                
                                 fieldsForIssueType.add(issueFieldBasicDBObject);
                             }
                         } catch (Exception e) {
