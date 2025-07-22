@@ -16,7 +16,7 @@ jobs:
       IMAGE_TAG: ${{ steps.docker_tag.outputs.IMAGE_TAG }}
     steps:
       - name: Akto code analysis
-        uses: akto-api-security/code-analysis-action@v1.0.3
+        uses: akto-api-security/code-analysis-action@v1.0.4
         with:
           AKTO_DASHBOARD_URL: https://app.akto.io
           AKTO_API_KEY: miGSJAnh07c345EVVfjPNSn9jxJR1VspZgcgqLyl
