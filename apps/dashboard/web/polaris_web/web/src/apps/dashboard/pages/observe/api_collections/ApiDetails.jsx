@@ -1,5 +1,5 @@
 import LayoutWithTabs from "../../../components/layouts/LayoutWithTabs"
-import { Box, Button, Popover, Modal, Tooltip, ActionList, VerticalStack, HorizontalStack, Tag, Text } from "@shopify/polaris"
+import { Box, Button, Popover, Modal, Tooltip, ActionList, VerticalStack, HorizontalStack, Tag, Text, LegacyCard, IndexTable, Pagination } from "@shopify/polaris"
 import FlyLayout from "../../../components/layouts/FlyLayout";
 import GithubCell from "../../../components/tables/cells/GithubCell";
 import SampleDataList from "../../../components/shared/SampleDataList";
@@ -16,7 +16,9 @@ import PersistStore from "../../../../main/PersistStore";
 import values from "@/util/values";
 import gptApi from "../../../components/aktoGpt/api";
 import GraphMetric from '../../../components/GraphMetric'
-
+import IssuesApi from "../../issues/api";
+import GithubServerTable from "../../../components/tables/GithubServerTable";
+import transformIssues from "../../issues/transform";
 import { HorizontalDotsMinor, FileMinor } from "@shopify/polaris-icons"
 import LocalStore from "../../../../main/LocalStorageStore";
 import InlineEditableText from "../../../components/shared/InlineEditableText";
@@ -76,14 +78,27 @@ function ApiDetails(props) {
     const [editableDescription, setEditableDescription] = useState(description)
     const [useLocalSubCategoryData, setUseLocalSubCategoryData] = useState(false)
     const [apiCallStats, setApiCallStats] = useState([]); 
-    const [apiCallDistribution, setApiCallDistribution] = useState([]); // New state for distribution data
+    const [apiCallDistribution, setApiCallDistribution] = useState([]);
     const endTs = func.timeNow();
     const [startTime, setStartTime] = useState(endTs - statsOptions[6].value)
     const [hasApiStats, setHasApiStats] = useState(false);
     const [hasApiDistribution, setHasApiDistribution] = useState(false);
     const apiStatsAvailableRef = useRef(false);
     const apiDistributionAvailableRef = useRef(false);
+    const [filteredIssues, setFilteredIssues] = useState([]);
+    const [issuesPage, setIssuesPage] = useState(0);
+    const issuesPageLimit = 10;
+    const apiCollectionMap = PersistStore(state => state.collectionsMap);
+    const hostNameMap = PersistStore.getState().hostNameMap;
 
+    const issuesTableHeaders = [
+        { title: "Severity", value: "severity", id: "severity" },
+        { title: "Issue Name", value: "issueName", id: "issueName" },
+        { title: "Category", value: "category", id: "category" },
+        { title: "Domains", value: "domains", id: "domains" },
+        { title: "Compliance", value: "compliance", id: "compliance" },
+        { title: "Discovered", value: "creationTime", id: "creationTime" }
+    ];
 
     const statusFunc = getStatus ? getStatus : (x) => {
         try {
@@ -423,58 +438,6 @@ function ApiDetails(props) {
         return options;
     };
 
-    const distributionChartOptions = {
-        chart: {
-            type: 'column',
-            marginTop: 10,
-            marginBottom: 70,
-            marginRight: 10,
-        },
-        xAxis: {
-            title: {
-                text: 'API Call Frequency',
-                style: {
-                    fontSize: '12px',
-                },
-            },
-            gridLineWidth: 0,
-            labels: {
-                style: {
-                    fontSize: '12px',
-                },
-                enabled: true,
-            },
-            tickmarkPlacement: 'on',
-            tickWidth: 1,
-            tickLength: 5,
-        },
-        yAxis: {
-            title: {
-                text: 'Number of Users',
-                style: {
-                    fontSize: '12px',
-                },
-            },
-            gridLineWidth: 0,
-        },
-        plotOptions: {
-            column: {
-                pointPadding: 0.05,
-                groupPadding: 0.1,
-                borderWidth: 0,
-            },
-        },
-        tooltip: {
-            formatter: function () {
-                const binRange = this.point?.binRange || [Math.floor(this.x) - 15, Math.floor(this.x) + 15];
-                return `<b>${this.y}</b> users made calls in range <b>${binRange[0]} to ${binRange[1] - 1}</b>`;
-            },
-        },
-        title: { text: null },
-        subtitle: { text: null },
-        legend: { enabled: false },
-    };
-
     const distributionBoxplotOptions = {
         chart: {
             type: 'boxplot',
@@ -571,6 +534,50 @@ function ApiDetails(props) {
             />
         </Box>,
     }
+
+    const paginatedIssues = filteredIssues.slice(
+        issuesPage * issuesPageLimit,
+        (issuesPage + 1) * issuesPageLimit
+    );
+
+    const IssuesTab = {
+        id: 'issues',
+        content: 'Issues',
+        component: (
+            <Box paddingBlockStart={"4"}>
+                <LegacyCard>
+                    <IndexTable
+                        resourceName={{ singular: "issue", plural: "issues" }}
+                        itemCount={filteredIssues.length}
+                        headings={issuesTableHeaders}
+                        selectable={false}
+                    >
+                        {paginatedIssues.map((issue, index) => (
+                            <IndexTable.Row id={issue.key || index} key={issue.key || index} position={index}>
+                                {issuesTableHeaders.map(header => (
+                                    <IndexTable.Cell key={header.value}>
+                                        {issue[header.value]}
+                                    </IndexTable.Cell>
+                                ))}
+                            </IndexTable.Row>
+                        ))}
+                    </IndexTable>
+                    <LegacyCard.Section>
+                        <HorizontalStack align="center">
+                            <Pagination
+                                label={`Showing ${issuesPage * issuesPageLimit + 1}-${Math.min((issuesPage + 1) * issuesPageLimit, filteredIssues.length)} of ${filteredIssues.length}`}
+                                hasPrevious={issuesPage > 0}
+                                onPrevious={() => setIssuesPage(p => p - 1)}
+                                hasNext={filteredIssues.length > (issuesPage + 1) * issuesPageLimit}
+                                onNext={() => setIssuesPage(p => p + 1)}
+                            />
+                        </HorizontalStack>
+                    </LegacyCard.Section>
+                </LegacyCard>
+            </Box>
+        ),
+    };
+
     const ApiCallStatsTab = {
         id: 'api-call-stats',
         content: 'API Call Stats',
@@ -730,12 +737,88 @@ function ApiDetails(props) {
         </HorizontalStack>
     )
 
+    const hasIssues = apiDetail?.severityObj && Object.values(apiDetail.severityObj).some(count => count > 0);
+    
+    const [selectedTabId, setSelectedTabId] = useState('values');
+    const subCategoryMap = LocalStore(state => state.subCategoryMap);
+
+    useEffect(() => {
+        if (selectedTabId === 'issues' && hasIssues && apiDetail?.apiCollectionId) {
+            IssuesApi.fetchIssues(
+                0, 100, ["OPEN"], [apiDetail.apiCollectionId],
+                null, null, null, null, null, null, true, null
+            ).then(async (resp) => {
+                const rawFilteredIssues = (resp.issues || []).filter(issue =>
+                    issue.id?.apiInfoKey &&
+                    issue.id.apiInfoKey.method === apiDetail.method &&
+                    issue.id.apiInfoKey.url === apiDetail.endpoint &&
+                    issue.id.apiInfoKey.apiCollectionId === apiDetail.apiCollectionId
+                );
+
+                const uniqueIssuesMap = new Map();
+
+                (rawFilteredIssues || []).forEach(item => {
+                    const key = `${item?.id?.testSubCategory}|${item?.severity}`;
+                    if (!uniqueIssuesMap.has(key)) {
+                        uniqueIssuesMap.set(key, {
+                            id: item?.id,
+                            severity: func.toSentenceCase(item?.severity),
+                            compliance: Object.keys(subCategoryMap[item?.id?.testSubCategory]?.compliance?.mapComplianceToListClauses || {}),
+                            severityType: item?.severity,
+                            issueName: item?.id?.testSubCategory,
+                            category: item?.id?.testSubCategory,
+                            numberOfEndpoints: 1,
+                            creationTime: item?.creationTime,
+                            issueStatus: item?.unread.toString(),
+                            testRunName: "Test Run",
+                            domains: [(hostNameMap[item?.id?.apiInfoKey?.apiCollectionId] || apiCollectionMap[item?.id?.apiInfoKey?.apiCollectionId])],
+                            urls: [{
+                                method: item?.id?.apiInfoKey?.method,
+                                url: item?.id?.apiInfoKey?.url,
+                                id: JSON.stringify(item?.id),
+                                issueDescription: item?.description,
+                                jiraIssueUrl: item?.jiraIssueUrl || "",
+                            }],
+                        });
+                    } else {
+                        const existingIssue = uniqueIssuesMap.get(key);
+                        const domain = (hostNameMap[item?.id?.apiInfoKey?.apiCollectionId] || apiCollectionMap[item?.id?.apiInfoKey?.apiCollectionId]);
+                        if (domain && !existingIssue.domains.includes(domain)) {
+                            existingIssue.domains.push(domain);
+                        }
+                        existingIssue.urls.push({
+                            method: item?.id?.apiInfoKey?.method,
+                            url: item?.id?.apiInfoKey?.url,
+                            id: JSON.stringify(item?.id),
+                            issueDescription: item?.description,
+                            jiraIssueUrl: item?.jiraIssueUrl || "",
+                        });
+                        existingIssue.numberOfEndpoints += 1;
+                    }
+                });
+
+                const groupedIssues = Array.from(uniqueIssuesMap.values());
+                const tableData = await transformIssues.convertToIssueTableData(groupedIssues, subCategoryMap);
+
+                setFilteredIssues(tableData);
+                console.log("Filtered Issues:", tableData);
+
+            });
+        }
+    }, [selectedTabId, hasIssues, apiDetail, subCategoryMap]);
+
     const components = [
         headingComp,
         <LayoutWithTabs
             key="tabs"
-            tabs={[ValuesTab, SchemaTab, ApiCallStatsTab, DependencyTab]}
-            currTab={() => { }}
+            tabs={[
+                ValuesTab,
+                SchemaTab,
+                ...(hasIssues ? [IssuesTab] : []),
+                ApiCallStatsTab,
+                DependencyTab
+            ]}
+            currTab={(tab) => setSelectedTabId(tab.id)}
             disabledTabs={disabledTabs}
         />
     ]
