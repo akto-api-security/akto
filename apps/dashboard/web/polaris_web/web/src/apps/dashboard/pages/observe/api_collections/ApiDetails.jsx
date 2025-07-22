@@ -801,7 +801,6 @@ function ApiDetails(props) {
                 const tableData = await transformIssues.convertToIssueTableData(groupedIssues, subCategoryMap);
 
                 setFilteredIssues(tableData);
-                console.log("Filtered Issues:", tableData);
 
             });
         }
