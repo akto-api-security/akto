@@ -176,7 +176,15 @@ const api = {
             method: 'post',
             data: {hostname, username, password, apiKey, dashboardUrl}
         })
-    }
+    },
+
+    initiateMCPScan(serverUrl, authKey, authValue, dashboardUrl) {
+        return request({
+            url: '/api/initiateMCPScan',
+            method: 'post',
+            data: {serverUrl, authKey, authValue, dashboardUrl}
+        })
+    },
 }
 
 export default api
