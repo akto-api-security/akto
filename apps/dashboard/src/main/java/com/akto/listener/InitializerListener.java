@@ -51,7 +51,6 @@ import org.apache.commons.lang3.EnumUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
-import org.checkerframework.common.returnsreceiver.qual.This;
 import org.json.JSONObject;
 
 import com.akto.DaoInit;
@@ -253,7 +252,6 @@ import com.slack.api.Slack;
 import com.slack.api.util.http.SlackHttpClient;
 import com.slack.api.webhook.WebhookResponse;
 
-import io.intercom.api.Intercom;
 import okhttp3.OkHttpClient;
 
 public class InitializerListener implements ServletContextListener {
@@ -261,7 +259,7 @@ public class InitializerListener implements ServletContextListener {
     private static final LoggerMaker logger = new LoggerMaker(InitializerListener.class, LogDb.DASHBOARD);
 
     private static final CacheLoggerMaker cacheLoggerMaker = new CacheLoggerMaker(InitializerListener.class);
-    ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
+    private static final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
     public static final boolean isSaas = "true".equals(System.getenv("IS_SAAS"));
 
     private static final int THREE_HOURS = 3*60*60;
@@ -384,7 +382,7 @@ public class InitializerListener implements ServletContextListener {
                                 trafficUpdates.updateAlertSentTs(alertMap);
                             }
                         } catch (Exception e) {
-                            logger.errorAndAddToDb(e,"Error while running traffic alerts: " + e.getMessage(), LogDb.DASHBOARD);
+                            logger.errorAndAddToDb(e,"Error while running traffic alerts: " + e.getMessage());
                         }
                     }
                 }, "traffic-alerts-scheduler");
@@ -663,7 +661,7 @@ public class InitializerListener implements ServletContextListener {
         try {
             return convertStreamToString(InitializerListener.class.getResourceAsStream("/" + fileName));
         } catch (Exception e) {
-            logger.errorAndAddToDb(e, "Exception while reading content locally: " + fileUrl, LogDb.DASHBOARD);
+            logger.errorAndAddToDb(e, "Exception while reading content locally: " + fileUrl);
             return null;
         }
     }
@@ -2445,6 +2443,8 @@ public class InitializerListener implements ServletContextListener {
                     setUpDailyScheduler();
                     logger.warn("Started token generator scheduler", LogDb.DASHBOARD);
                     tokenGeneratorCron.tokenGeneratorScheduler();
+                    logger.warn("Started test template scheduler", LogDb.DASHBOARD);
+                    setUpTestEditorTemplatesScheduler();
                     if (DashboardMode.isMetered()) {
                         setupUsageScheduler();
                     }
@@ -2458,7 +2458,6 @@ public class InitializerListener implements ServletContextListener {
                         // trimCappedCollectionsJob();
                         updateSensitiveInfoInApiInfo.setUpSensitiveMapInApiInfoScheduler();
                         syncCronInfo.setUpUpdateCronScheduler();
-                        setUpTestEditorTemplatesScheduler();
                         JobsCron.instance.jobsScheduler(JobExecutorType.DASHBOARD);
                         updateApiGroupsForAccounts(); 
                         setupAutomatedApiGroupsScheduler();
@@ -2469,7 +2468,6 @@ public class InitializerListener implements ServletContextListener {
                         crons.deleteTestRunsScheduler();
                         setUpUpdateCustomCollections();
                         setUpFillCollectionIdArrayJob();
-                                               
 
                         CleanInventory.cleanInventoryJobRunner();
 
