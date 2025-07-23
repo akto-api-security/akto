@@ -193,6 +193,8 @@ public class MaliciousEventService {
       List<ListMaliciousRequestsResponse.MaliciousEvent> maliciousEvents = new ArrayList<>();
       while (cursor.hasNext()) {
         MaliciousEventModel evt = cursor.next();
+        String metadata = evt.getMetadata() != null ? evt.getMetadata() : "";
+
         maliciousEvents.add(
             ListMaliciousRequestsResponse.MaliciousEvent.newBuilder()
                 .setActor(evt.getActor())
@@ -211,6 +213,7 @@ public class MaliciousEventService {
                 .setType(evt.getType())
                 .setRefId(evt.getRefId())
                 .setEventTypeVal(evt.getEventType().toString())
+                .setMetadata(metadata)
                 .build());
       }
       return ListMaliciousRequestsResponse.newBuilder()
