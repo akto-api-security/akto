@@ -29,7 +29,7 @@ import static com.akto.task.Cluster.callDibs;
 public class TokenGeneratorCron {
     
     private static final LoggerMaker loggerMaker = new LoggerMaker(SyncCron.class, LogDb.DASHBOARD);
-    ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
+    private static final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
 
     public void tokenGeneratorScheduler() {
         scheduler.scheduleAtFixedRate(new Runnable() {
