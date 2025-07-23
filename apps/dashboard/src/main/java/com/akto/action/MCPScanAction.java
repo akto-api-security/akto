@@ -49,7 +49,7 @@ public class MCPScanAction extends UserAction {
             //create api collection using collectionId if it does not exist
             createdCollection = ApiCollectionsDao.instance.findOne(Filters.eq(ApiCollection.ID, collectionId));
             if (createdCollection != null) {
-                loggerMaker.info("ApiCollection already exists for host: " + hostName, LogDb    .DASHBOARD);
+                loggerMaker.info("ApiCollection already exists for host: " + hostName, LogDb.DASHBOARD);
             } else {
                 loggerMaker.info("Creating ApiCollection for host: " + hostName, LogDb.DASHBOARD);  
                 createdCollection = new ApiCollection(collectionId, hostName, Context.now(),new HashSet<>(), hostName, 0, false, true);
