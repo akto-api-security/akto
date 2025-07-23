@@ -12,7 +12,9 @@ import func from "@/util/func"
 import AddOnComponenet from "./components/shared/AddOnComponenet"
 import BitBucketSource from "./components/BitBucketSource"
 import GithubSource from "./components/GithubSource"
-import AktoJax from "./components/AktoJax"
+import AktoJax from "./components/AktoJax"  
+import McpScan from "./components/McpScan" 
+
 
 const mirroringObj = {
     icon: '/public/aws.svg',
@@ -200,6 +202,15 @@ const aktoJaxObj = {
     docsUrl: 'https://docs.akto.io/dast/akto-dast',
     key: "AKTODAST",
     component : <AktoJax />
+}
+
+const mcpScanObj = {    
+    icon: '/public/mcp.svg',
+    label: "MCP Import",
+    text: "You can use Akto's MCP import to capture traffic and instantly send it to your dashboard for real-time insights.",   
+    docsUrl: 'https://docs.akto.io/mcp-scan',
+    key: "MCP_SCAN",
+    component : <McpScan/>
 }
 
 const dockerObj = {
@@ -1084,6 +1095,11 @@ const quickStartFunc = {
             aktoJaxObj
         ];
 
+        // MCP Scan
+        const mcpScan = [
+            mcpScanObj
+        ];
+
         // Akto SDK
         const aktoSdk = [
             goObj, javaObj, nodejsObj, pythonObj
@@ -1097,6 +1113,7 @@ const quickStartFunc = {
 
         return {
             "Hybrid SaaS": hybridSaas,
+            "MCP Scan": mcpScan,
             "DAST": crawler,
             "Kubernetes": kubernetes,
             "API Gateways": apiGateways,
@@ -1126,7 +1143,7 @@ const quickStartFunc = {
         // Combine all categories into connectorsList
         const connectorsList = [
             gcpObj, kubernetesObj, fargateObj, nginxObj, burpObj, postmanObj,
-            openApiObj, beanStalkObj, eksObj, dockerObj, envoyObj,
+            openApiObj, beanStalkObj, eksObj, dockerObj, envoyObj, mcpScanObj,
             harFileUploadObj, kongObj, tcpObj, mirroringObj, hybridSaasObj, apiInventoryFromSourceCodeObj,
             ebpfObj, ebpfMTLSObj, istioObj, pythonObj, awsApiGatewayObj, awsLambdaObj,
             apigeeObj, azureObj, cloudflareObj, f5Obj, goObj, haproxyObj, javaObj, kongmeshObj, layer7Obj, nodejsObj, openshiftObj, threescaleObj, githubObj, gitlabObj, bitbucketObj, aktoJaxObj
