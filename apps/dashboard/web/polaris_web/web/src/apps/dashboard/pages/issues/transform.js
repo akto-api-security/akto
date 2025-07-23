@@ -5,6 +5,7 @@ import api from "./api"
 import testingTransform from "../testing/transform.js"
 import { history } from "@/util/history";
 import IssuesCheckbox from "./IssuesPage/IssuesCheckbox.jsx"
+import TooltipText from "../../components/shared/TooltipText.jsx"
 
 const transform = {
     sortIssues: (issueItem, sortKey, sortOrder) => {
@@ -33,7 +34,7 @@ const transform = {
                 {urls.map((ele,index)=>{
                 const borderStyle = index < (urls.length - 1) ? {borderBlockEndWidth : 1} : {}
                 const jiraKey = ele?.jiraIssueUrl && ele.jiraIssueUrl.length > 0 ?  /[^/]*$/.exec(ele.jiraIssueUrl)[0] : ""
-                return( 
+                return(
                     <Box padding={"2"} paddingInlineEnd={"4"} paddingInlineStart={"3"} key={index}
                     borderColor="border-subdued" {...borderStyle}>
                         <HorizontalStack gap={24} wrap={false}>
@@ -44,7 +45,14 @@ const transform = {
                                 <Link monochrome onClick={() => this.getNextUrl(JSON.parse(ele.id), isCompliancePage)} removeUnderline >
                                     {testingTransform.getUrlComp(ele.url)}
                                 </Link>
-                                {jiraKey && 
+                                <Box maxWidth="250px" paddingInlineStart="3">
+                                  <TooltipText
+                                      text={ele.issueDescription}
+                                      tooltip={ele.issueDescription}
+                                      textProps={{ color: "subdued"}}
+                                      />
+                                  </Box>
+                                {jiraKey &&
                                     <Tag>
                                         <HorizontalStack gap={1}>
                                             <Avatar size="extraSmall" shape='round' source="/public/logo_jira.svg" />
@@ -102,6 +110,7 @@ const transform = {
                     collapsibleRow: transform.getIssuesPageCollapsibleRow(issue.urls.map(urlObj => ({
                         url: `${urlObj.method} ${urlObj.url}`,
                         id: urlObj.id,
+                        issueDescription: urlObj.issueDescription,
                         jiraIssueUrl: urlObj.jiraIssueUrl || ""
                     })), isCompliancePage)
                 }

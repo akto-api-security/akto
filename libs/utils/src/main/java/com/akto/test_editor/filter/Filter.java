@@ -86,7 +86,7 @@ public class Filter {
                         queryData.put(TestExecutorModifier._REQUEST, response);
                         generatedData = new TestValidatorModifier().handle(queryData);
                     } else {
-                        String request = ogRequest + "\n\n" + response;
+                        String request = "Request payload: \n" + ogRequest + "\n\nResponse payload: \n" + response;
                         queryData.put(TestExecutorModifier._REQUEST, request);
                         generatedData = new TestFilterModifier().handle(queryData);
                     }
@@ -263,7 +263,7 @@ public class Filter {
         }
         Set<String> s2 = new HashSet<>(newMatches);
 
-        if (operand == "and") {
+        if (operand.equals("and")) {
             s1.retainAll(s2);
         } else {
             s1.addAll(s2);

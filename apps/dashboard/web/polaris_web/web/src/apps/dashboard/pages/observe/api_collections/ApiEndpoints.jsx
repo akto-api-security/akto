@@ -1,5 +1,5 @@
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards"
-import { Text, HorizontalStack, Button, Popover, Modal, IndexFiltersMode, VerticalStack, Box, Checkbox, TextField, ActionList, Icon } from "@shopify/polaris"
+import { Text, HorizontalStack, Button, Popover, Modal, IndexFiltersMode, VerticalStack, Box, Checkbox, ActionList, Icon } from "@shopify/polaris"
 import api from "../api"
 import { useEffect, useState } from "react"
 import func from "@/util/func"
@@ -111,7 +111,6 @@ const headings = [
         isText: true,
         type: CellType.TEXT,
         sortActive: true,
-        
     },
     {
         text: 'Last Tested',
@@ -655,6 +654,9 @@ function ApiEndpoints(props) {
     }
 
     function disambiguateLabel(key, value) {
+        if(key.includes("dateRange")){
+            return new Date(Date.parse(value.since)).toDateString() + " - " + new Date(Date.parse(value.until)).toDateString();
+        }
         switch (key) {
             case "parameterisedEndpoint":
                 return func.convertToDisambiguateLabelObj(value, null, 1)
@@ -1041,6 +1043,11 @@ function ApiEndpoints(props) {
         promotedBulkActions={promotedBulkActions}
         loading={tableLoading || loading}
         setSelectedResourcesForPrimaryAction={setSelectedResourcesForPrimaryAction}
+        calendarFilterKeys={{
+            "lastTested": "Last Tested",
+            "lastSeenTs": "Last Seen",
+            "detectedTs": "Discovered timestamp",
+        }}
     />,
     <ApiDetails
         key="api-details"
@@ -1136,14 +1143,6 @@ function ApiEndpoints(props) {
       const handleTitleChange = (value) => {
         setEditableTitle(value);
       };
-
-      const handleKeyDown = (event) => {
-        if (event.key === 'Enter') {
-          handleSaveClick();
-        } else if (event.key === 'Escape') {
-            setIsEditing(false);
-        }
-      }
 
     const handleSaveDescription = () => {
         // Check for special characters
