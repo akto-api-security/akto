@@ -208,7 +208,7 @@ const mcpScanObj = {
     icon: '/public/mcp.svg',
     label: "MCP Import",
     text: "You can use Akto's MCP import to capture traffic and instantly send it to your dashboard for real-time insights.",   
-    docsUrl: 'https://docs.akto.io/mcp-scan',
+    docsUrl: 'https://docs.akto.io/mcp-import',
     key: "MCP_SCAN",
     component : <McpScan/>
 }
@@ -1113,7 +1113,7 @@ const quickStartFunc = {
 
         return {
             "Hybrid SaaS": hybridSaas,
-            "MCP Scan": mcpScan,
+            "MCP Security": mcpScan,
             "DAST": crawler,
             "Kubernetes": kubernetes,
             "API Gateways": apiGateways,
