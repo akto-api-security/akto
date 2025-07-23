@@ -41,7 +41,6 @@ public class Utils {
     //Caching for Account Wise Jira Integration Issue Creation Fields
     private static final ConcurrentHashMap<Integer, Pair<Map<String, Map<String, BasicDBList>>, Integer>> accountWiseJiraFieldsMap = new ConcurrentHashMap<>();
     private static final int EXPIRY_TIME = 30 * 60; // 30 minutes
-    //private static final int EXPIRY_TIME = 30; // 15 seconds 
 
     // Thread pool for making calls to jira in parallel
     private static final ExecutorService multiFieldPool = Executors.newFixedThreadPool(10);
@@ -381,18 +380,18 @@ public class Utils {
 
         if (additionalIssueFields != null) {
             try {
-                Object fieldsObj = additionalIssueFields.get("mandatoryCreateJiraIssueFields");
+                Object fieldsObj = additionalIssueFields.get("customIssueFields");
                 if (fieldsObj != null && fieldsObj instanceof List) {
-                    List<?> mandatoryCreateJiraIssueFields = (List<?>) fieldsObj;
-                    for (Object fieldObj : mandatoryCreateJiraIssueFields) {
+                    List<?> customIssueFields = (List<?>) fieldsObj;
+                    for (Object fieldObj : customIssueFields) {
                         if (fieldObj instanceof Map<?, ?>) {
-                            Map<?, ?> mandatoryField = (Map<?, ?>) fieldObj;
-                            Object fieldName = mandatoryField.get("fieldId");
+                            Map<?, ?> customIssueField = (Map<?, ?>) fieldObj;
+                            Object fieldName = customIssueField.get("fieldId");
                             if (fieldName == null || !(fieldName instanceof String)) {
                                 continue;
                             }
                             String fieldNameStr = (String) fieldName;
-                            Object fieldValue = mandatoryField.get("fieldValue");
+                            Object fieldValue = customIssueField.get("fieldValue");
                             fields.put(fieldNameStr, fieldValue);
                         }
                     }
