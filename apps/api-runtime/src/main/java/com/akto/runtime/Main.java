@@ -4,6 +4,7 @@ import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
 
 import com.akto.DaoInit;
@@ -29,9 +30,6 @@ import com.mongodb.client.model.Updates;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.kafka.clients.consumer.*;
 import org.apache.kafka.common.errors.WakeupException;
-import org.apache.kafka.common.serialization.StringDeserializer;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 public class Main {
@@ -40,7 +38,6 @@ public class Main {
     public static final String VXLAN_ID = "vxlanId";
     public static final String VPC_CIDR = "vpc_cidr";
     public static final String ACCOUNT_ID = "account_id";
-    private static final Logger logger = LoggerFactory.getLogger(Main.class);
     private static final LoggerMaker loggerMaker = new LoggerMaker(Main.class);
 
     // this sync threshold time is used for deleting sample data
@@ -70,7 +67,7 @@ public class Main {
 
                 if (json.containsKey(VPC_CIDR)) {
                     List<String> cidrList = (List<String>) json.get(VPC_CIDR);
-                    logger.info("cidrList: " + cidrList);
+                    loggerMaker.info("cidrList: " + cidrList);
                     // For old deployments, we won't receive ACCOUNT_ID. If absent, we assume 1_000_000.
                     String accountIdStr = (String) (json.get(ACCOUNT_ID));
                     int accountId = StringUtils.isNumeric(accountIdStr) ? Integer.parseInt(accountIdStr) : 1_000_000;
@@ -121,7 +118,7 @@ public class Main {
         public void setAccountSettings(AccountSettings accountSettings) {
             this.accountSettings = accountSettings;
             if (accountSettings != null) {
-                logger.info("Received " + accountSettings.convertApiCollectionNameMapperToRegex().size() + " apiCollectionNameMappers");
+                loggerMaker.info("Received " + accountSettings.convertApiCollectionNameMapperToRegex().size() + " apiCollectionNameMappers");
             }
         }
     }
@@ -194,6 +191,20 @@ public class Main {
             }
         });
 
+        APIConfig finalApiConfig = apiConfig;
+        scheduler.scheduleAtFixedRate(() -> {
+            try {
+                loggerMaker.info("Starting MCP sync job..");
+                AccountTask.instance.executeTask(t -> {
+                    loggerMaker.info("Starting MCP sync job");
+                    McpToolsSyncJobExecutor.INSTANCE.runJob(finalApiConfig);
+                }, "mcp-tools-sync");
+                loggerMaker.info("Finished MCP sync job..");
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb("Error in MCP tools sync job: " + e.getMessage(), LogDb.RUNTIME);
+            }
+        }, 0, 24, TimeUnit.HOURS);
+
         Map<String, HttpCallParser> httpCallParserMap = new HashMap<>();
 
         // sync infra metrics thread
@@ -224,7 +235,7 @@ public class Main {
                         lastSyncOffset++;
 
                         if (lastSyncOffset % 100 == 0) {
-                            logger.info("Committing offset at position: " + lastSyncOffset);
+                            loggerMaker.info("Committing offset at position: " + lastSyncOffset);
                         }
 
                         httpResponseParams = HttpCallParser.parseKafkaMessage(r.value());
@@ -239,58 +250,13 @@ public class Main {
                     responseParamsToAccountMap.get(accountId).add(httpResponseParams);
                 }
 
-                for (String accountId: responseParamsToAccountMap.keySet()) {
-                    int accountIdInt;
-                    try {
-                        accountIdInt = Integer.parseInt(accountId);
-                    } catch (Exception ignored) {
-                        loggerMaker.errorAndAddToDb("Account id not string", LogDb.RUNTIME);
-                        continue;
-                    }
-
-                    Context.accountId.set(accountIdInt);
-
-                    AccountInfo accountInfo = accountInfoMap.get(accountIdInt);
-                    if (accountInfo == null) {
-                        accountInfo = new AccountInfo();
-                        accountInfoMap.put(accountIdInt, accountInfo);
-                    }
-
-                    if ((Context.now() - accountInfo.lastEstimatedCountTime) > 60*60) {
-                        loggerMaker.infoAndAddToDb("current time: " + Context.now() + " lastEstimatedCountTime: " + accountInfo.lastEstimatedCountTime, LogDb.RUNTIME);
-                        accountInfo.lastEstimatedCountTime = Context.now();
-                        accountInfo.estimatedCount = SingleTypeInfoDao.instance.getMCollection().estimatedDocumentCount();
-                        accountInfo.setAccountSettings(AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter()));
-                        loggerMaker.infoAndAddToDb("STI Estimated count: " + accountInfo.estimatedCount, LogDb.RUNTIME);
-                    }
-
-                    if (!isDashboardInstance && accountInfo.estimatedCount> 20_000_000) {
-                        loggerMaker.infoAndAddToDb("STI count is greater than 20M, skipping", LogDb.RUNTIME);
-                        continue;
-                    }
-
-                    if (!httpCallParserMap.containsKey(accountId)) {
-                        HttpCallParser parser = new HttpCallParser(
-                                apiConfig.getUserIdentifier(), apiConfig.getThreshold(), apiConfig.getSync_threshold_count(),
-                                apiConfig.getSync_threshold_time(), fetchAllSTI
-                        );
-                        httpCallParserMap.put(accountId, parser);
-                        loggerMaker.infoAndAddToDb("New parser created for account: " + accountId, LogDb.RUNTIME);
-                    }
-
-                    HttpCallParser parser = httpCallParserMap.get(accountId);
-
-                    try {
-                        List<HttpResponseParams> accWiseResponse = responseParamsToAccountMap.get(accountId);
-
-                        accWiseResponse = filterBasedOnHeaders(accWiseResponse, accountInfo.accountSettings);
-                        loggerMaker.infoAndAddToDb("Initiating sync function for account: " + accountId, LogDb.RUNTIME);
-                        parser.syncFunction(accWiseResponse, syncImmediately, fetchAllSTI, accountInfo.accountSettings);
-                        loggerMaker.debugInfoAddToDb("Sync function completed for account: " + accountId, LogDb.RUNTIME);
-                    } catch (Exception e) {
-                        loggerMaker.errorAndAddToDb(e.toString(), LogDb.RUNTIME);
-                    }
-                }
+                handleResponseParams(responseParamsToAccountMap,
+                    accountInfoMap,
+                    isDashboardInstance,
+                    httpCallParserMap,
+                    apiConfig,
+                    fetchAllSTI,
+                    syncImmediately);
             }
 
         } catch (WakeupException ignored) {
@@ -303,6 +269,60 @@ public class Main {
             System.exit(0);
         } finally {
             main.consumer.close();
+        }
+    }
+
+    public static void handleResponseParams(Map<String, List<HttpResponseParams>> responseParamsToAccountMap,
+        Map<Integer, AccountInfo> accountInfoMap, boolean isDashboardInstance,
+        Map<String, HttpCallParser> httpCallParserMap, APIConfig apiConfig, boolean fetchAllSTI,
+        boolean syncImmediately) {
+        for (String accountId: responseParamsToAccountMap.keySet()) {
+            int accountIdInt;
+            try {
+                accountIdInt = Integer.parseInt(accountId);
+            } catch (Exception ignored) {
+                loggerMaker.errorAndAddToDb("Account id not string", LogDb.RUNTIME);
+                continue;
+            }
+
+            Context.accountId.set(accountIdInt);
+
+            AccountInfo accountInfo = accountInfoMap.computeIfAbsent(accountIdInt, k -> new AccountInfo());
+
+            if ((Context.now() - accountInfo.lastEstimatedCountTime) > 60*60) {
+                loggerMaker.infoAndAddToDb("current time: " + Context.now() + " lastEstimatedCountTime: " + accountInfo.lastEstimatedCountTime, LogDb.RUNTIME);
+                accountInfo.lastEstimatedCountTime = Context.now();
+                accountInfo.estimatedCount = SingleTypeInfoDao.instance.getMCollection().estimatedDocumentCount();
+                accountInfo.setAccountSettings(AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter()));
+                loggerMaker.infoAndAddToDb("STI Estimated count: " + accountInfo.estimatedCount, LogDb.RUNTIME);
+            }
+
+            if (!isDashboardInstance && accountInfo.estimatedCount> 20_000_000) {
+                loggerMaker.infoAndAddToDb("STI count is greater than 20M, skipping", LogDb.RUNTIME);
+                continue;
+            }
+
+            if (!httpCallParserMap.containsKey(accountId)) {
+                HttpCallParser parser = new HttpCallParser(
+                        apiConfig.getUserIdentifier(), apiConfig.getThreshold(), apiConfig.getSync_threshold_count(),
+                        apiConfig.getSync_threshold_time(), fetchAllSTI
+                );
+                httpCallParserMap.put(accountId, parser);
+                loggerMaker.infoAndAddToDb("New parser created for account: " + accountId, LogDb.RUNTIME);
+            }
+
+            HttpCallParser parser = httpCallParserMap.get(accountId);
+
+            try {
+                List<HttpResponseParams> accWiseResponse = responseParamsToAccountMap.get(accountId);
+
+                accWiseResponse = filterBasedOnHeaders(accWiseResponse, accountInfo.accountSettings);
+                loggerMaker.infoAndAddToDb("Initiating sync function for account: " + accountId, LogDb.RUNTIME);
+                parser.syncFunction(accWiseResponse, syncImmediately, fetchAllSTI, accountInfo.accountSettings);
+                loggerMaker.debugInfoAddToDb("Sync function completed for account: " + accountId, LogDb.RUNTIME);
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb(e.toString(), LogDb.RUNTIME);
+            }
         }
     }
 
@@ -396,7 +416,6 @@ public class Main {
         }
 
         isOnprem = dashboardMode.equalsIgnoreCase(DashboardMode.ON_PREM.name());
-
     }
 
     public static void initializeRuntimeHelper() {

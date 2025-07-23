@@ -24,6 +24,7 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
   List<SuspectSampleData> sampleData;
   List<DashboardMaliciousEvent> maliciousEvents;
   int skip;
+  int limit;
   static final int LIMIT = 50;
   List<String> ips;
   List<String> urls;
@@ -85,7 +86,7 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
     Map<String, Object> body = new HashMap<String, Object>() {
       {
         put("skip", skip);
-        put("limit", LIMIT);
+        put("limit", limit > 0 ? limit : LIMIT);
         put("sort", sort);
         put("filter", filter);
       }
@@ -116,8 +117,11 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
                             smr.getDetectedAt(),
                             smr.getType(),
                             smr.getRefId(),
+                            smr.getCategory(),
                             smr.getSubCategory(),
-                            smr.getEventTypeVal()))
+                            smr.getEventTypeVal(),
+                            smr.getPayload(),
+                            smr.getMetadata()))
                     .collect(Collectors.toList());
                 this.total = m.getTotal();
               });
@@ -153,6 +157,28 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
     return SUCCESS.toUpperCase();
   }
 
+  public String deleteAllMaliciousEvents() {
+    HttpPost post = new HttpPost(
+            String.format("%s/api/dashboard/delete_all_malicious_events", this.getBackendUrl()));
+    post.addHeader("Authorization", "Bearer " + this.getApiToken());
+    post.addHeader("Content-Type", "application/json");
+
+    Map<String, Object> body = new HashMap<>();
+    String msg = objectMapper.valueToTree(body).toString();
+
+    StringEntity requestEntity = new StringEntity(msg, ContentType.APPLICATION_JSON);
+    post.setEntity(requestEntity);
+
+    try (CloseableHttpResponse resp = this.httpClient.execute(post)) {
+      String responseBody = EntityUtils.toString(resp.getEntity());
+    } catch (Exception e) {
+      e.printStackTrace();
+      return ERROR.toUpperCase();
+    }
+
+    return SUCCESS.toUpperCase();
+  }
+
   public List<SuspectSampleData> getSampleData() {
     return sampleData;
   }
@@ -169,9 +195,14 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
     this.skip = skip;
   }
 
-  public static int getLimit() {
-    return LIMIT;
+  public int getLimit() {
+    return limit > 0 ? limit : LIMIT;
   }
+
+  public void setLimit(int limit) {
+    this.limit = limit;
+  }
+
 
   public List<String> getIps() {
     return ips;
