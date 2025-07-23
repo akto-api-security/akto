@@ -83,7 +83,7 @@ public class ClientActor extends DataActor {
             BasicDBObject basicDBObject = BasicDBObject.parse(decodedPayload);
             int accId = (int) basicDBObject.getInt("accountId");
             System.out.println("checkaccount accountId log " + accId);
-            return accId == 1000000;
+            return accId == 1000000 || accId == 1752722331;
         } catch (Exception e) {
             System.out.println("checkaccount error" + e.getStackTrace());
         }
