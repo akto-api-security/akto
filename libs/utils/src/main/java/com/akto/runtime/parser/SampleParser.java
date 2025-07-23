@@ -69,7 +69,12 @@ public class SampleParser {
         String payload = (String) json.get("responsePayload");
         payload = HttpRequestResponseUtils.rawToJsonString(payload, responseHeaders);
         payload = JSONUtils.parseIfJsonP(payload);
-        int time = Integer.parseInt(json.get("time").toString());
+        int time;
+        try {
+            time = Integer.parseInt(json.get("time").toString());
+        } catch (Exception e) {
+            time = Context.now();
+        }
         String accountId = (String) json.get("akto_account_id");
         String sourceIP = (String) json.get("ip");
         String destIP = (String) json.getOrDefault("destIp", "");
