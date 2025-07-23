@@ -88,9 +88,11 @@ public class MCPScanAction extends UserAction {
                     authHeader = "\"" + authKey + "\": \"" + authValue + "\"";
                 } else {
                     authHeader = "";
-                }             
+                }           
+                int accountId = Context.accountId.get();  
                 executorService.schedule(new Runnable() {
                     public void run() {
+                        Context.accountId.set(accountId);
                         loggerMaker.info("Starting MCP sync job");
                         McpToolsSyncJobExecutor.INSTANCE.runJobforCollection(createdCollection, apiConfig, authHeader);
                     }
