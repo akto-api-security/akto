@@ -2443,6 +2443,8 @@ public class InitializerListener implements ServletContextListener {
                     setUpTrafficAlertScheduler();
                     logger.warn("Started daily schedulers", LogDb.DASHBOARD);
                     setUpDailyScheduler();
+                    logger.warn("Started token generator scheduler", LogDb.DASHBOARD);
+                    tokenGeneratorCron.tokenGeneratorScheduler();
                     if (DashboardMode.isMetered()) {
                         setupUsageScheduler();
                     }
@@ -2464,7 +2466,6 @@ public class InitializerListener implements ServletContextListener {
                         cleanInventoryJobRunner();
                         setUpDefaultPayloadRemover();
                         setUpDependencyFlowScheduler();
-                        tokenGeneratorCron.tokenGeneratorScheduler();
                         crons.deleteTestRunsScheduler();
                         setUpUpdateCustomCollections();
                         setUpFillCollectionIdArrayJob();
