@@ -106,6 +106,13 @@ public class InviteUserAction extends UserAction{
 
     @Override
     public String execute() {
+        inviteeEmail = inviteeEmail != null ? inviteeEmail.toLowerCase() : null;
+
+        if(inviteeEmail == null) {
+            addActionError("Invalid email");
+            return ERROR.toUpperCase();
+        }
+
         int user_id = getSUser().getId();
         loggerMaker.debugAndAddToDb(user_id + " inviting " + inviteeEmail);
 

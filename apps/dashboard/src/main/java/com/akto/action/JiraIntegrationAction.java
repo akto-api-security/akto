@@ -80,7 +80,7 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
     private String issueType;
     private JiraIntegration jiraIntegration;
     private JiraMetaData jiraMetaData;
-    
+
     private String jiraTicketKey;
 
     private String origReq;
@@ -861,7 +861,7 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
 
         // issue title
         String summary = "Akto Report - " + jiraMetaData.getIssueTitle() + " (" + endpointMethod + " - " + truncatedEndpoint + ")";
-        
+
         BasicDBList contentList = new BasicDBList();
         contentList.add(buildContentDetails(jiraMetaData.getHostStr(), null));
         contentList.add(buildContentDetails(jiraMetaData.getEndPointStr(), null));
@@ -870,7 +870,6 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
 
         BasicDBObject fields = buildPayloadForJiraTicket(summary, this.projId, this.issueType, contentList,jiraMetaData.getAdditionalIssueFields());
         fields.put("labels", new String[] {JobConstants.TICKET_LABEL_AKTO_SYNC});
-    fields.put("description", description);
         return fields;
     }
 
@@ -1189,10 +1188,10 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
                 // TODO: handle exception
             }
             return Action.SUCCESS.toUpperCase();
-            
+
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(
-                "Error creating general Jira ticket: " + e.getMessage(), 
+                "Error creating general Jira ticket: " + e.getMessage(),
                 LoggerMaker.LogDb.DASHBOARD
             );
             return Action.ERROR.toUpperCase();

@@ -1,5 +1,6 @@
 package com.akto.runtime;
 
+import com.akto.mcp.McpSchema;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
@@ -76,10 +77,14 @@ public class APICatalogSync {
 
     public static final Pattern VERSION_PATTERN = Pattern.compile("\\bv([1-9][0-9]?|100)\\b");
 
-
     public static Set<MergedUrls> mergedUrls;
 
     public Map<String, FilterConfig> advancedFilterMap =  new HashMap<>();
+
+    /* Note: We have hardcoded the logic of not merging URLs for MCP Server.
+        The apiCollectionId - -1 has nothing to do with this.
+        Since we do not know the collectionId for MCP Server, we have set it to -1.
+    */
 
     public APICatalogSync(String userIdentifier,int thresh, boolean fetchAllSTI) {
         this(userIdentifier, thresh, fetchAllSTI, true);
@@ -286,9 +291,12 @@ public class APICatalogSync {
 
     }
 
-
     public static ApiMergerResult tryMergeURLsInCollection(int apiCollectionId, Boolean urlRegexMatchingEnabled, boolean mergeUrlsBasic, BloomFilter<CharSequence> existingAPIsInDb, boolean ignoreCaseInsensitiveApis, boolean mergeUrlsOnVersions) {
         ApiCollection apiCollection = ApiCollectionsDao.instance.getMeta(apiCollectionId);
+
+        if (apiCollection != null && apiCollection.isMcpCollection()) {
+            return new ApiMergerResult(new HashMap<>());
+        }
 
         Bson filterQ = null;
         if (apiCollection != null && apiCollection.getHostName() == null) {
@@ -804,18 +812,7 @@ public class APICatalogSync {
 
         URLTemplate urlTemplate = new URLTemplate(tokens, newTypes, newUrl.getMethod());
 
-        try {
-            for(MergedUrls mergedUrl : mergedUrls) {
-                if(mergedUrl.getUrl().equals(urlTemplate.getTemplateString()) &&
-                   mergedUrl.getMethod().equals(urlTemplate.getMethod().name())) {
-                    return null;
-                }
-            }
-        } catch(Exception e) {
-            loggerMaker.errorAndAddToDb("Error while creating a new URL object: " + e.getMessage(), LogDb.RUNTIME);
-        }
-
-        return urlTemplate;
+        return getMergedUrlTemplate(urlTemplate);
     }
 
 
@@ -880,23 +877,29 @@ public class APICatalogSync {
 
         if (templatizedStrTokens <= 1) {
             URLTemplate urlTemplate = new URLTemplate(newTokens, newTypes, newUrl.getMethod());
+            return getMergedUrlTemplate(urlTemplate);
+        }
+        return null;
+    }
 
-            try {
-                for(MergedUrls mergedUrl : mergedUrls) {
-                    if(mergedUrl.getUrl().equals(urlTemplate.getTemplateString()) &&
-                            mergedUrl.getMethod().equals(urlTemplate.getMethod().name())) {
-                        return null;
-                    }
+    public static URLTemplate getMergedUrlTemplate(URLTemplate urlTemplate) {
+        try {
+            for(MergedUrls mergedUrl : mergedUrls) {
+                if(mergedUrl.getUrl().equals(urlTemplate.getTemplateString()) &&
+                    mergedUrl.getMethod().equals(urlTemplate.getMethod().name())) {
+                    return null;
                 }
-            } catch(Exception e) {
-                loggerMaker.errorAndAddToDb("Error while creating a new URL object: " + e.getMessage(), LogDb.RUNTIME);
             }
 
-            return urlTemplate;
+            String mergedUrlString = urlTemplate.getTemplateString();
+            if (McpSchema.MCP_METHOD_SET.stream().anyMatch(mergedUrlString::contains)) {
+                return null;
+            }
+        } catch(Exception e) {
+            loggerMaker.errorAndAddToDb("Error while creating a new URL object: " + e.getMessage(), LogDb.RUNTIME);
         }
 
-        return null;
-
+        return urlTemplate;
     }
 
     public static void mergeUrlsAndSave(int apiCollectionId, Boolean urlRegexMatchingEnabled, boolean mergeUrlsBasic, BloomFilter<CharSequence> existingAPIsInDb,boolean ignoreCaseInsensitiveApis, boolean mergeUrlsOnVersions) {

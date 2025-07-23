@@ -17,6 +17,7 @@ import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.testing.GenericTestResult;
 import com.akto.dto.testing.TestingRunResult;
 import com.akto.dto.type.SingleTypeInfo;
+import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 
 public class Utils {
@@ -80,6 +81,31 @@ public class Utils {
             }
         }
         return finalResult;
+    }
+
+    public static BasicDBObject buildIssueMetaDataMap(List<TestingRunIssues> issues, Map<TestingIssuesId, TestingRunResult> idToResultMap){
+        BasicDBObject issueMetaDataMap = new BasicDBObject();
+        Map<String, String> descriptionMap = new HashMap<>();
+        Map<String, String> jiraIssueMap = new HashMap<>();
+        Map<String, String> statusMap = new HashMap<>();
+        for (TestingRunIssues issue : issues) {
+            TestingRunResult result = idToResultMap.get(issue.getId());
+            if (StringUtils.isNotBlank(issue.getDescription())) {
+                descriptionMap.put(result.getHexId(), issue.getDescription());
+            }
+            if (StringUtils.isNotBlank(issue.getJiraIssueUrl())) {
+                jiraIssueMap.put(result.getHexId(), issue.getJiraIssueUrl());
+            }
+            if(issue.getTestRunIssueStatus().name().equals("IGNORED")){
+                statusMap.put(result.getHexId(), issue.getTestRunIssueStatus().name());
+            }
+            
+        }
+        issueMetaDataMap.put("descriptions", descriptionMap);
+        issueMetaDataMap.put("jiraIssues", jiraIssueMap);
+        issueMetaDataMap.put("statuses", statusMap);
+        issueMetaDataMap.put("count", statusMap.size());
+        return issueMetaDataMap;
     }
 
 }
