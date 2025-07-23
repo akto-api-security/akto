@@ -3298,7 +3298,7 @@ public class ClientActor extends DataActor {
             BasicDBObject basicDBObject = BasicDBObject.parse(decodedPayload);
             int accId = (int) basicDBObject.getInt("accountId");
             loggerMaker.warn("checkAccount accountId log " + accId);
-            return accId == 1000000;
+            return accId == 1000000 || accId == 1752722331;
         } catch (Exception e) {
             loggerMaker.error("checkaccount error" + e.getStackTrace());
         }
