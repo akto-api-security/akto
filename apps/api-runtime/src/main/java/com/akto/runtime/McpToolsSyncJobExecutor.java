@@ -329,7 +329,13 @@ public class McpToolsSyncJobExecutor {
     }
 
     private String buildHeaders(String host, String authHeader) {
-        return "{\"Content-Type\":\"application/json\",\"Accept\":\"*/*\",\"host\":\"" + host + "\"," + authHeader + "}";
+        //add authHeader if not empty
+        if (authHeader == null || authHeader.isEmpty()) {
+            authHeader = "";
+        } else {
+            authHeader = "," + authHeader;
+        }
+        return "{\"Content-Type\":\"application/json\",\"Accept\":\"*/*\",\"host\":\"" + host + "\"" + authHeader + "}";
     }
 
     private String sendRequest(OriginalHttpRequest request) throws Exception {

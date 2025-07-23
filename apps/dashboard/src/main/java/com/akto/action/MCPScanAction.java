@@ -3,6 +3,9 @@ package com.akto.action;
 import java.net.URL;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 import org.bson.conversions.Bson;
 import com.akto.dao.ApiCollectionsDao;
@@ -11,10 +14,10 @@ import com.akto.dto.APIConfig;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.traffic.CollectionTags;
 import com.akto.dto.traffic.CollectionTags.TagSource;
+import com.akto.listener.InitializerListener;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.runtime.McpToolsSyncJobExecutor;
-import com.akto.util.AccountTask;
 import com.akto.util.Constants;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.FindOneAndUpdateOptions;
@@ -28,12 +31,11 @@ public class MCPScanAction extends UserAction {
     private String dashboardUrl;
     private String authKey;
     private String authValue;
-
     private String apiCollectionId;
-
     private ApiCollection createdCollection;
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(MCPScanAction.class, LoggerMaker.LogDb.DASHBOARD);
+    private static final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
 
     public String initiateMCPScan() {
         try {
@@ -86,13 +88,14 @@ public class MCPScanAction extends UserAction {
                     authHeader = "\"" + authKey + "\": \"" + authValue + "\"";
                 } else {
                     authHeader = "";
-                }
-                AccountTask.instance.executeTask(t -> {
-                    loggerMaker.info("Starting MCP sync job");
+                }             
+                executorService.schedule(new Runnable() {
+                    public void run() {
+                        loggerMaker.info("Starting MCP sync job");
+                        McpToolsSyncJobExecutor.INSTANCE.runJobforCollection(createdCollection, apiConfig, authHeader);
+                    }
+                }, 0, TimeUnit.SECONDS);
 
-                    McpToolsSyncJobExecutor.INSTANCE.runJobforCollection(createdCollection, apiConfig, authHeader);
-                }, "mcp-tools-sync");
-                loggerMaker.info("Finished MCP sync job..");
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb("Error in MCP tools sync job: " + e.getMessage(), LogDb.RUNTIME);
                 return Action.ERROR.toUpperCase();
