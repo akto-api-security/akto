@@ -17,7 +17,6 @@ import values from "@/util/values";
 import gptApi from "../../../components/aktoGpt/api";
 import GraphMetric from '../../../components/GraphMetric'
 import IssuesApi from "../../issues/api";
-import GithubServerTable from "../../../components/tables/GithubServerTable";
 import transformIssues from "../../issues/transform";
 import { HorizontalDotsMinor, FileMinor } from "@shopify/polaris-icons"
 import LocalStore from "../../../../main/LocalStorageStore";
@@ -87,6 +86,8 @@ function ApiDetails(props) {
     const apiDistributionAvailableRef = useRef(false);
     const [filteredIssues, setFilteredIssues] = useState([]);
     const [issuesPage, setIssuesPage] = useState(0);
+    const [loadingIssues, setLoadingIssues] = useState(false);
+    const [selectedTabId, setSelectedTabId] = useState('values');
     const issuesPageLimit = 10;
     const apiCollectionMap = PersistStore(state => state.collectionsMap);
     const hostNameMap = PersistStore.getState().hostNameMap;
@@ -535,6 +536,72 @@ function ApiDetails(props) {
         </Box>,
     }
 
+    const fetchIssuesData = async (apiCollectionId, endpoint, method) => {
+        try {
+            setLoadingIssues(true);
+            const resp = await IssuesApi.fetchIssues(
+                0, 100, ["OPEN"], [apiCollectionId],
+                null, null, null, null, null, null, true, null
+            );
+            const rawFilteredIssues = (resp.issues || []).filter(issue =>
+                issue.id?.apiInfoKey &&
+                issue.id.apiInfoKey.method === method &&
+                issue.id.apiInfoKey.url === endpoint &&
+                issue.id.apiInfoKey.apiCollectionId === apiCollectionId
+            );
+            const uniqueIssuesMap = new Map();
+            rawFilteredIssues.forEach(item => {
+                const key = `${item?.id?.testSubCategory}|${item?.severity}`;
+                const domain = hostNameMap[item?.id?.apiInfoKey?.apiCollectionId] || 
+                              apiCollectionMap[item?.id?.apiInfoKey?.apiCollectionId];
+                if (!uniqueIssuesMap.has(key)) {
+                    uniqueIssuesMap.set(key, {
+                        id: item?.id,
+                        severity: func.toSentenceCase(item?.severity),
+                        compliance: Object.keys(localSubCategoryMap[item?.id?.testSubCategory]?.compliance?.mapComplianceToListClauses || {}),
+                        severityType: item?.severity,
+                        issueName: item?.id?.testSubCategory,
+                        category: item?.id?.testSubCategory,
+                        numberOfEndpoints: 1,
+                        creationTime: item?.creationTime,
+                        issueStatus: item?.unread.toString(),
+                        testRunName: "Test Run",
+                        domains: domain ? [domain] : [],
+                        urls: [{
+                            method: item?.id?.apiInfoKey?.method,
+                            url: item?.id?.apiInfoKey?.url,
+                            id: JSON.stringify(item?.id),
+                            issueDescription: item?.description,
+                            jiraIssueUrl: item?.jiraIssueUrl || "",
+                        }],
+                    });
+                } else {
+                    const existingIssue = uniqueIssuesMap.get(key);
+                    if (domain && !existingIssue.domains.includes(domain)) {
+                        existingIssue.domains.push(domain);
+                    }
+                    existingIssue.urls.push({
+                        method: item?.id?.apiInfoKey?.method,
+                        url: item?.id?.apiInfoKey?.url,
+                        id: JSON.stringify(item?.id),
+                        issueDescription: item?.description,
+                        jiraIssueUrl: item?.jiraIssueUrl || "",
+                    });
+                    existingIssue.numberOfEndpoints += 1;
+                }
+            });
+            const groupedIssues = Array.from(uniqueIssuesMap.values());
+            const tableData = await transformIssues.convertToIssueTableData(groupedIssues, localSubCategoryMap);
+            setFilteredIssues(tableData);
+        } catch (error) {
+            console.error("Error fetching issues:", error);
+            setFilteredIssues([]);
+        } finally {
+            setLoadingIssues(false);
+        }
+    };
+
+    const hasIssues = apiDetail?.severityObj && Object.values(apiDetail.severityObj).some(count => count > 0);
     const paginatedIssues = filteredIssues.slice(
         issuesPage * issuesPageLimit,
         (issuesPage + 1) * issuesPageLimit
@@ -551,9 +618,14 @@ function ApiDetails(props) {
                         itemCount={filteredIssues.length}
                         headings={issuesTableHeaders}
                         selectable={false}
+                        loading={loadingIssues}
                     >
                         {paginatedIssues.map((issue, index) => (
-                            <IndexTable.Row id={issue.key || index} key={issue.key || index} position={index}>
+                            <IndexTable.Row 
+                                id={issue.key || index} 
+                                key={issue.key || index} 
+                                position={index}
+                            >
                                 {issuesTableHeaders.map(header => (
                                     <IndexTable.Cell key={header.value}>
                                         {issue[header.value]}
@@ -562,17 +634,19 @@ function ApiDetails(props) {
                             </IndexTable.Row>
                         ))}
                     </IndexTable>
-                    <LegacyCard.Section>
-                        <HorizontalStack align="center">
-                            <Pagination
-                                label={`Showing ${issuesPage * issuesPageLimit + 1}-${Math.min((issuesPage + 1) * issuesPageLimit, filteredIssues.length)} of ${filteredIssues.length}`}
-                                hasPrevious={issuesPage > 0}
-                                onPrevious={() => setIssuesPage(p => p - 1)}
-                                hasNext={filteredIssues.length > (issuesPage + 1) * issuesPageLimit}
-                                onNext={() => setIssuesPage(p => p + 1)}
-                            />
-                        </HorizontalStack>
-                    </LegacyCard.Section>
+                    {filteredIssues.length > issuesPageLimit && (
+                        <LegacyCard.Section>
+                            <HorizontalStack align="center">
+                                <Pagination
+                                    label={`Showing ${issuesPage * issuesPageLimit + 1}-${Math.min((issuesPage + 1) * issuesPageLimit, filteredIssues.length)} of ${filteredIssues.length}`}
+                                    hasPrevious={issuesPage > 0}
+                                    onPrevious={() => setIssuesPage(p => p - 1)}
+                                    hasNext={filteredIssues.length > (issuesPage + 1) * issuesPageLimit}
+                                    onNext={() => setIssuesPage(p => p + 1)}
+                                />
+                            </HorizontalStack>
+                        </LegacyCard.Section>
+                    )}
                 </LegacyCard>
             </Box>
         ),
@@ -737,74 +811,11 @@ function ApiDetails(props) {
         </HorizontalStack>
     )
 
-    const hasIssues = apiDetail?.severityObj && Object.values(apiDetail.severityObj).some(count => count > 0);
-    
-    const [selectedTabId, setSelectedTabId] = useState('values');
-    const subCategoryMap = LocalStore(state => state.subCategoryMap);
-
     useEffect(() => {
         if (selectedTabId === 'issues' && hasIssues && apiDetail?.apiCollectionId) {
-            IssuesApi.fetchIssues(
-                0, 100, ["OPEN"], [apiDetail.apiCollectionId],
-                null, null, null, null, null, null, true, null
-            ).then(async (resp) => {
-                const rawFilteredIssues = (resp.issues || []).filter(issue =>
-                    issue.id?.apiInfoKey &&
-                    issue.id.apiInfoKey.method === apiDetail.method &&
-                    issue.id.apiInfoKey.url === apiDetail.endpoint &&
-                    issue.id.apiInfoKey.apiCollectionId === apiDetail.apiCollectionId
-                );
-
-                const uniqueIssuesMap = new Map();
-
-                (rawFilteredIssues || []).forEach(item => {
-                    const key = `${item?.id?.testSubCategory}|${item?.severity}`;
-                    if (!uniqueIssuesMap.has(key)) {
-                        uniqueIssuesMap.set(key, {
-                            id: item?.id,
-                            severity: func.toSentenceCase(item?.severity),
-                            compliance: Object.keys(subCategoryMap[item?.id?.testSubCategory]?.compliance?.mapComplianceToListClauses || {}),
-                            severityType: item?.severity,
-                            issueName: item?.id?.testSubCategory,
-                            category: item?.id?.testSubCategory,
-                            numberOfEndpoints: 1,
-                            creationTime: item?.creationTime,
-                            issueStatus: item?.unread.toString(),
-                            testRunName: "Test Run",
-                            domains: [(hostNameMap[item?.id?.apiInfoKey?.apiCollectionId] || apiCollectionMap[item?.id?.apiInfoKey?.apiCollectionId])],
-                            urls: [{
-                                method: item?.id?.apiInfoKey?.method,
-                                url: item?.id?.apiInfoKey?.url,
-                                id: JSON.stringify(item?.id),
-                                issueDescription: item?.description,
-                                jiraIssueUrl: item?.jiraIssueUrl || "",
-                            }],
-                        });
-                    } else {
-                        const existingIssue = uniqueIssuesMap.get(key);
-                        const domain = (hostNameMap[item?.id?.apiInfoKey?.apiCollectionId] || apiCollectionMap[item?.id?.apiInfoKey?.apiCollectionId]);
-                        if (domain && !existingIssue.domains.includes(domain)) {
-                            existingIssue.domains.push(domain);
-                        }
-                        existingIssue.urls.push({
-                            method: item?.id?.apiInfoKey?.method,
-                            url: item?.id?.apiInfoKey?.url,
-                            id: JSON.stringify(item?.id),
-                            issueDescription: item?.description,
-                            jiraIssueUrl: item?.jiraIssueUrl || "",
-                        });
-                        existingIssue.numberOfEndpoints += 1;
-                    }
-                });
-
-                const groupedIssues = Array.from(uniqueIssuesMap.values());
-                const tableData = await transformIssues.convertToIssueTableData(groupedIssues, subCategoryMap);
-
-                setFilteredIssues(tableData);
-
-            });
+            fetchIssuesData(apiDetail.apiCollectionId, apiDetail.endpoint, apiDetail.method);
         }
-    }, [selectedTabId, hasIssues, apiDetail, subCategoryMap]);
+    }, [selectedTabId, hasIssues, apiDetail, localSubCategoryMap]);
 
     const components = [
         headingComp,
