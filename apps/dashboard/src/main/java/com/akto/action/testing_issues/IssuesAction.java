@@ -44,6 +44,8 @@ import com.mongodb.client.model.*;
 import com.mongodb.client.result.InsertOneResult;
 import com.opensymphony.xwork2.Action;
 
+import lombok.Getter;
+import lombok.Setter;
 import org.apache.commons.lang3.StringUtils;
 import org.bson.Document;
 import org.bson.conversions.Bson;
@@ -84,6 +86,11 @@ public class IssuesAction extends UserAction {
     private Map<Integer,Map<String,Integer>> severityInfo = new HashMap<>();
 
     private Map<String, String> issuesDescriptionMap;
+
+    int vulnCount;
+
+    @Setter
+    private boolean showUrls;
 
     private static final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
 
@@ -842,6 +849,30 @@ public class IssuesAction extends UserAction {
     }
 
 
+    List<String> vulnerabilityType;
+
+    public String fetchVulnCount(){
+        if (vulnerabilityType == null) {
+            addActionError("Vulnerability type cannot be null");
+            return ERROR.toUpperCase();
+        }
+        List<GlobalEnums.TestRunIssueStatus> allowedStatus = Arrays.asList(GlobalEnums.TestRunIssueStatus.OPEN);
+        Bson filterQ = UsageMetricCalculator.excludeDemosAndDeactivated(ApiInfo.ID_API_COLLECTION_ID);
+
+        Bson filter = Filters.and(
+                filterQ,
+                Filters.eq(TestingRunIssues.KEY_SEVERITY, vulnerabilityType),
+                Filters.in(TestingRunIssues.TEST_RUN_ISSUES_STATUS, allowedStatus)
+        );
+
+        if(!showUrls) {
+            this.vulnCount = (int) TestingRunIssuesDao.instance.count(filter);
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+
+
     public List<TestingRunIssues> getIssues() {
         return issues;
     }
@@ -1132,5 +1163,29 @@ public class IssuesAction extends UserAction {
 
     public void setIssuesDescriptionMap(Map<String, String> issuesDescriptionMap) {
         this.issuesDescriptionMap = issuesDescriptionMap;
+    }
+
+    public int getVulnCount() {
+        return vulnCount;
+    }
+
+    public void setVulnCount(int vulnCount) {
+        this.vulnCount = vulnCount;
+    }
+
+    public boolean isShowUrls() {
+        return showUrls;
+    }
+
+    public void setShowUrls(boolean showUrls) {
+        this.showUrls = showUrls;
+    }
+
+    public List<String> getVulnerabilityType() {
+        return vulnerabilityType;
+    }
+
+    public void setVulnerabilityType(List<String> vulnerabilityType) {
+        this.vulnerabilityType = vulnerabilityType;
     }
 }
