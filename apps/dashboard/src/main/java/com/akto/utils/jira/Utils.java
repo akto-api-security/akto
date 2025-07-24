@@ -130,15 +130,18 @@ public class Utils {
         Remediation remediation) {
         List<BasicDBObject> contentList = new ArrayList<>();
 
-        if (yamlTemplate == null) {
-            return contentList;
-        }
+
 
         try {
-            Info info = yamlTemplate.getInfo();
-
             contentList.add(addHeading(3, "Overview"));
             addTextSection(contentList, 4, "Severity", issue.getSeverity().name());
+            addListSection(contentList, 3, "Timelines (UTC)", getIssueTimelines(issue));
+
+            if (yamlTemplate == null) {
+                return contentList;
+            }
+
+            Info info = yamlTemplate.getInfo();
 
             if (info != null) {
                 addTextSection(contentList, 4, "Impact", info.getImpact());
@@ -153,7 +156,6 @@ public class Utils {
                     : remediation != null ? remediation.getRemediationText() : "No remediation provided.";
                 addTextSection(contentList, 3, "Remediation", remediationText);
             }
-            addListSection(contentList, 3, "Timelines (UTC)", getIssueTimelines(issue));
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e,
                 "Error while adding additional issue details in Jira Payload: " + e.getMessage(),
