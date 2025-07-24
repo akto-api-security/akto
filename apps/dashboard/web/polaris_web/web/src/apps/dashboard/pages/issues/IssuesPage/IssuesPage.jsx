@@ -26,12 +26,16 @@ import values from "@/util/values";
 import SpinnerCentered from "../../../components/progress/SpinnerCentered.jsx";
 import TableStore from "../../../components/tables/TableStore.js";
 import CriticalFindingsGraph from "./CriticalFindingsGraph.jsx";
-import CriticalUnsecuredAPIsOverTimeGraph from "./CriticalUnsecuredAPIsOverTimeGraph.jsx";
+import AllUnsecuredAPIsOverTimeGraph from "./AllUnsecuredAPIsOverTimeGraph.jsx";
+import ApisWithMostOpenIsuuesGraph from './ApisWithMostOpenIsuuesGraph.jsx';
+import IssuesByCollection from './IssuesByCollection.jsx';
+import CriticalUnresolvedApisByAge from './CriticalUnresolvedApisByAge.jsx';
 import settingFunctions from "../../settings/module.js";
 import JiraTicketCreationModal from "../../../components/shared/JiraTicketCreationModal.jsx";
 import testingApi from "../../testing/api.js"
 import { saveAs } from 'file-saver'
 import issuesFunctions from '@/apps/dashboard/pages/issues/module';
+import apiCollectionsApi from "../../observe/api";
 
 
 const sortOptions = [
@@ -680,9 +684,14 @@ function IssuesPage() {
             />
 
             <HorizontalGrid gap={5} columns={2} key={"critical-issues-graph-detail"}>
-                <CriticalUnsecuredAPIsOverTimeGraph startTimestamp={startTimestamp} endTimestamp={endTimestamp} linkText={""} linkUrl={""} />
+                <CriticalUnresolvedApisByAge />
                 <CriticalFindingsGraph startTimestamp={startTimestamp} endTimestamp={endTimestamp} linkText={""} linkUrl={""} />
             </HorizontalGrid>
+            <HorizontalGrid columns={2} gap={4}>
+                <ApisWithMostOpenIsuuesGraph />
+                <IssuesByCollection />
+            </HorizontalGrid>
+            <AllUnsecuredAPIsOverTimeGraph startTimestamp={startTimestamp} endTimestamp={endTimestamp} linkText={""} linkUrl={""} />
 
             <GithubServerTable
                 key={key}

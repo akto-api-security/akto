@@ -16,6 +16,13 @@ import {TestrunsBannerComponent} from "./TestrunsBannerComponent";
 import useTable from "../../../components/tables/TableContext";
 import PersistStore from "../../../../main/PersistStore";
 import TitleWithInfo from "@/apps/dashboard/components/shared/TitleWithInfo";
+import ApiCollectionCoverageGraph from "./ApiCollectionCoverageGraph";
+import ApisTestedOverTimeGraph from './ApisTestedOverTimeGraph';
+import TestRunOverTimeGraph from './TestRunOverTimeGraph';
+import dashboardApi from "../../dashboard/api";
+import observeApi from "../../observe/api";
+import TestSummaryInfo from "./TestSummaryInfo";
+import LastTwoWeeksApiTestCoverageChart from './LastTwoWeeksApiTestCoverageChart';
 /*
   {
     text:"", // req. -> The text to be shown wherever the header is being shown
@@ -390,7 +397,42 @@ if (showOnlyTable) {
   return coreTable
 }
 
-const components = !hasUserInitiatedTestRuns ? [<SummaryCardComponent key={"summary"}/>,<TestrunsBannerComponent key={"banner-comp"}/>, coreTable] : [<SummaryCardComponent key={"summary"}/>, coreTable]
+const components = !hasUserInitiatedTestRuns
+  ? [
+      <TestSummaryInfo key={"test-summary-info"} />,
+      <SummaryCardComponent key={"summary"} />,
+      <TestrunsBannerComponent key={"banner-comp"} />,
+      <Box paddingBlockEnd={4} key={"graphs-container"}>
+        <HorizontalGrid columns={2} gap={4}>
+          <ApiCollectionCoverageGraph />
+          <ApisTestedOverTimeGraph showOnlyTable={showOnlyTable} scopeApiCollectionIds={scopeApiCollectionIds} />
+        </HorizontalGrid>
+        <Box paddingBlockStart={4}>
+          <HorizontalGrid columns={2} gap={4}>
+            <TestRunOverTimeGraph showOnlyTable={showOnlyTable} scopeApiCollectionIds={scopeApiCollectionIds} />
+            <LastTwoWeeksApiTestCoverageChart />
+          </HorizontalGrid>
+        </Box>
+      </Box>,
+      coreTable
+    ]
+  : [
+      <TestSummaryInfo key={"test-summary-info"} />,
+      <SummaryCardComponent key={"summary"} />,
+      <Box paddingBlockEnd={4} key={"graphs-container"}>
+        <HorizontalGrid columns={2} gap={4}>
+          <ApiCollectionCoverageGraph />
+          <ApisTestedOverTimeGraph showOnlyTable={showOnlyTable} scopeApiCollectionIds={scopeApiCollectionIds} />
+        </HorizontalGrid>
+        <Box paddingBlockStart={4}>
+          <HorizontalGrid columns={2} gap={4}>
+            <TestRunOverTimeGraph showOnlyTable={showOnlyTable} scopeApiCollectionIds={scopeApiCollectionIds} />
+            <LastTwoWeeksApiTestCoverageChart />
+          </HorizontalGrid>
+        </Box>
+      </Box>,
+      coreTable
+    ];
   return (
     <PageWithMultipleCards
       title={

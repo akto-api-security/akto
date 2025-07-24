@@ -597,5 +597,19 @@ export default {
             method: 'post',
             data: { content }
         })
-    }
+    },
+    async getCoverageInfoForCollections(){
+        return await request({
+            url: '/api/getCoverageInfoForCollections',
+            method: 'post',
+            data:{},
+        })
+    },
+    async getAllCollectionsBasic() {
+        return await request({
+            url: '/api/getAllCollectionsBasic',
+            method: 'post',
+            data: {}
+        })
+    },
 }
