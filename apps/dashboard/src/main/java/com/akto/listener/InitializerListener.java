@@ -328,8 +328,8 @@ public class InitializerListener implements ServletContextListener {
                             trafficUpdates.populate(deactivatedHosts);
 
                             boolean slackWebhookFound = true;
-                            List<SlackWebhook> listWebhooks = SlackWebhooksDao.instance.findAll(new BasicDBObject());
-                            if (listWebhooks == null || listWebhooks.isEmpty()) {
+                            SlackWebhook listWebhook = SlackWebhooksDao.instance.findOne(Filters.empty());
+                            if (listWebhook == null) {
                                 logger.debugAndAddToDb("No slack webhooks found", LogDb.DASHBOARD);
                                 slackWebhookFound = false;
                             }
@@ -363,12 +363,11 @@ public class InitializerListener implements ServletContextListener {
 
                             if (thresholdSeconds > 0) {
                                 Map<AlertType, AlertResult> alertMap = trafficUpdates.createAlerts(thresholdSeconds, deactivatedHosts);
-                                if (slackWebhookFound && listWebhooks != null && !listWebhooks.isEmpty()) {
-                                    SlackWebhook webhook = listWebhooks.get(0);
-                                    logger.debugAndAddToDb("Slack Webhook found: " + webhook.getWebhook(),
+                                if (slackWebhookFound && listWebhook != null) {
+                                    logger.debugAndAddToDb("Slack Webhook found: " + listWebhook.getWebhook(),
                                             LogDb.DASHBOARD);
-                                    trafficUpdates.sendSlackAlerts(webhook.getWebhook(),
-                                            getMetricsUrl(webhook.getDashboardUrl()), thresholdSeconds,
+                                    trafficUpdates.sendSlackAlerts(listWebhook.getWebhook(),
+                                            getMetricsUrl(listWebhook.getDashboardUrl()), thresholdSeconds,
                                             alertMap);
                                 }
 
@@ -992,17 +991,15 @@ public class InitializerListener implements ServletContextListener {
                     AccountTask.instance.executeTask(new Consumer<Account>() {
                         @Override
                         public void accept(Account t) {
-                            List<SlackWebhook> listWebhooks = SlackWebhooksDao.instance.findAll(new BasicDBObject());
-                            if (listWebhooks == null || listWebhooks.isEmpty()) {
+                            SlackWebhook slackWebhook = SlackWebhooksDao.instance.findOne(Filters.empty());
+                            if (slackWebhook == null) {
                                 return;
                             }
 
-                    OkHttpClient httpClient = CoreHTTPClient.client.newBuilder().build();
-                    SlackHttpClient slackHttpClient = new SlackHttpClient(httpClient);
-                    Slack slack = Slack.getInstance(slackHttpClient);
-
-                    for (SlackWebhook slackWebhook : listWebhooks) {
-                        int now = Context.now();
+                            OkHttpClient httpClient = CoreHTTPClient.client.newBuilder().build();
+                            SlackHttpClient slackHttpClient = new SlackHttpClient(httpClient);
+                            Slack slack = Slack.getInstance(slackHttpClient);
+                            int now = Context.now();
                         // logger.debug("debugSlack: " + slackWebhook.getLastSentTimestamp() + " " + slackWebhook.getFrequencyInSeconds() + " " +now );
 
                                 if(slackWebhook.getFrequencyInSeconds()==0) {
@@ -1012,7 +1009,7 @@ public class InitializerListener implements ServletContextListener {
                                 boolean shouldSend = ( slackWebhook.getLastSentTimestamp() + slackWebhook.getFrequencyInSeconds() ) <= now ;
 
                                 if(!shouldSend){
-                                    continue;
+                                    return;
                                 }
 
                                 logger.debugAndAddToDb(slackWebhook.toString(), LogDb.DASHBOARD);
@@ -1051,7 +1048,7 @@ public class InitializerListener implements ServletContextListener {
                                     e.printStackTrace();
                                     logger.errorAndAddToDb(e, "Error while sending slack alert: " + e.getMessage(), LogDb.DASHBOARD);
                                 }
-                            }
+                            
                         }
                     }, "setUpDailyScheduler");
                 } catch (Exception ex) {
