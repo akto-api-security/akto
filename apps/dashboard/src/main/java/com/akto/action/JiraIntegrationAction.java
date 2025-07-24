@@ -14,7 +14,6 @@ import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dto.Config.AktoHostUrlConfig;
 import com.akto.dto.Config.ConfigType;
 import com.akto.dto.AccountSettings;
-import com.akto.dto.HttpResponseParams;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.jira_integration.*;
@@ -35,7 +34,6 @@ import com.akto.test_editor.Utils;
 import com.akto.testing.ApiExecutor;
 import com.akto.util.Constants;
 import com.akto.util.DashboardMode;
-import com.akto.util.HttpRequestResponseUtils;
 import com.akto.util.Pair;
 import com.akto.util.enums.GlobalEnums;
 import com.akto.util.enums.GlobalEnums.TicketSource;
@@ -52,7 +50,6 @@ import java.util.function.Function;
 import lombok.Setter;
 
 import java.io.File;
-import java.net.URL;
 import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -65,7 +62,6 @@ import okhttp3.*;
 
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.kafka.common.protocol.types.Field.Str;
 import org.apache.struts2.interceptor.ServletRequestAware;
 import org.bson.Document;
 import org.bson.conversions.Bson;
@@ -76,10 +72,10 @@ import com.akto.dao.AccountSettingsDao;
 import static com.akto.utils.jira.Utils.buildAdditionalIssueFieldsForJira;
 import static com.akto.utils.jira.Utils.buildApiToken;
 import static com.akto.utils.jira.Utils.buildBasicRequest;
-import static com.akto.utils.jira.Utils.retryWithoutGzipRequest;
-import static com.akto.utils.jira.Utils.handleError;
-import static com.akto.utils.jira.Utils.getJiraTicketUrlPair;
 import static com.akto.utils.jira.Utils.buildPayloadForJiraTicket;
+import static com.akto.utils.jira.Utils.getJiraTicketUrlPair;
+import static com.akto.utils.jira.Utils.handleError;
+import static com.akto.utils.jira.Utils.retryWithoutGzipRequest;
 
 public class JiraIntegrationAction extends UserAction implements ServletRequestAware {
 
