@@ -6,7 +6,7 @@ import StackedChart from '../../../components/charts/StackedChart';
 import api from '../api';
 import PersistStore from '../../../../main/PersistStore';
 
-const TESTED_COLOR = '#6BADD7'; 
+const TESTED_COLOR = '#007F5F'; 
 const UNTESTED_COLOR = '#FD8D3C'; 
 
 const splitLabel = (label, maxLen = 20) => {
