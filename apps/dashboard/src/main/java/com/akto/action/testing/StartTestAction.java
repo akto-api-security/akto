@@ -1544,15 +1544,9 @@ public class StartTestAction extends UserAction {
             runResult.getTestSubType());
     }
 
-    public String fetchSkippedTestsCount(){
-
-        this.skippedTestsCount = (int) TestingRunResultDao.instance.count(Filters.in(TestingRunResult.VULNERABLE, false));
-        return Action.SUCCESS.toUpperCase();
-    }
-
     public String fetchMisConfiguredTestsCount(){
 
-        this.misConfiguredTestsCount = VulnerableTestingRunResultDao.instance.countFromDb(Filters.eq(TestingRunResult.REQUIRES_CONFIG, false), true);
+        this.misConfiguredTestsCount = VulnerableTestingRunResultDao.instance.countFromDb(Filters.eq(TestingRunResult.REQUIRES_CONFIG, false), false);
         return Action.SUCCESS.toUpperCase();
     }
 

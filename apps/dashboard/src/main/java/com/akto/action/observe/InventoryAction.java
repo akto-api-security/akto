@@ -1157,7 +1157,7 @@ public class InventoryAction extends UserAction {
         );
 
         if(!showUrls) {
-            this.notTestedEndpointsCount = (int) TestingRunIssuesDao.instance.count(filter);
+            this.notTestedEndpointsCount = (int) ApiInfoDao.instance.count(filter);
         }
 
         return Action.SUCCESS.toUpperCase();
@@ -1175,7 +1175,7 @@ public class InventoryAction extends UserAction {
         );
 
         if(!showUrls) {
-            this.notTestedEndpointsCount = (int) TestingRunIssuesDao.instance.count(filter);
+            this.notTestedEndpointsCount = (int) ApiInfoDao.instance.count(filter);
         }
 
         return Action.SUCCESS.toUpperCase();
