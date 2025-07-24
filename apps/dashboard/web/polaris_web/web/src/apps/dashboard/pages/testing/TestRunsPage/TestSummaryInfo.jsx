@@ -6,7 +6,6 @@ import api from '../api';
 
 const TestSummaryInfo = () => {
   const [metrics, setMetrics] = useState({
-    totalApis: 0,
     totalApisTested: 0,
     testCoveragePercent: '0%',
     totalTestRuns: 0,
@@ -18,9 +17,6 @@ const TestSummaryInfo = () => {
     async function fetchMetrics() {
       setLoading(true);
       try {
-        const endpointsResp = await dashboardApi.fetchEndpointsCount(0, 0);
-        const totalApis = endpointsResp?.newCount || 0;
-
         const allTimeStart = 0;
         const allTimeEnd = Math.floor(Date.now() / 1000) + 86400;
         const resp = await api.fetchTestingDetails(
@@ -35,6 +31,7 @@ const TestSummaryInfo = () => {
           null
         );
         let totalApisTested = 0;
+        let totalApis = 0;
         if (
           resp.testingRuns &&
           Array.isArray(resp.testingRuns) &&
@@ -45,23 +42,19 @@ const TestSummaryInfo = () => {
             if (summary && typeof summary.totalApis === 'number') {
               totalApisTested += summary.totalApis;
             }
+            if (summary && typeof summary.totalApisInCollection === 'number') {
+              totalApis += summary.totalApisInCollection;
+            }
           });
         }
-
         let testCoveragePercent = '0%';
         if (totalApis > 0) {
-          testCoveragePercent = Math.ceil((totalApisTested * 100) / totalApis) + '%';
+          testCoveragePercent = ((totalApisTested * 100) / totalApis).toFixed(2) + '%';
         }
-
         let totalTestRuns = 0;
         if (resp.testingRuns && Array.isArray(resp.testingRuns)) {
-          totalTestRuns = resp.testingRuns.filter(run => {
-            if (run.summaryState) return run.summaryState === "COMPLETED";
-            if (run.state) return run.state === "COMPLETED";
-            return false;
-          }).length;
+          totalTestRuns = resp.testingRuns.length;
         }
-
         const summaryInfo = await api.getSummaryInfo(allTimeStart, allTimeEnd);
         let totalCriticalIssues = 0;
         if (summaryInfo && summaryInfo.CRITICAL) {
@@ -69,9 +62,7 @@ const TestSummaryInfo = () => {
         } else if (summaryInfo && summaryInfo.countIssues && summaryInfo.countIssues.CRITICAL) {
           totalCriticalIssues = summaryInfo.countIssues.CRITICAL;
         }
-
         setMetrics({
-          totalApis,
           totalApisTested,
           testCoveragePercent,
           totalTestRuns,
@@ -86,11 +77,12 @@ const TestSummaryInfo = () => {
 
   const summaryInfo = [
     {
-      title: 'Total APIs',
-      data: metrics.totalApis,
+      title: 'Critical Issues',
+      data: metrics.totalCriticalIssues,
       variant: 'heading2xl',
+      color: 'critical',
       smoothChartComponent: null,
-      tooltipContent: 'Total number of unique APIs discovered in your inventory.'
+      tooltipContent: 'Total number of CRITICAL issues detected in all test runs.'
     },
     {
       title: 'APIs Tested',
@@ -98,7 +90,7 @@ const TestSummaryInfo = () => {
       variant: 'heading2xl',
       color: 'success',
       smoothChartComponent: null,
-      tooltipContent: 'Number of unique APIs that have been tested at least once.'
+      tooltipContent: 'Number of APIs that have been tested at least once.'
     },
     {
       title: 'Test Coverage',
@@ -114,14 +106,6 @@ const TestSummaryInfo = () => {
       variant: 'heading2xl',
       smoothChartComponent: null,
       tooltipContent: 'Total number of test runs executed.'
-    },
-    {
-      title: 'Critical Issues',
-      data: metrics.totalCriticalIssues,
-      variant: 'heading2xl',
-      color: 'critical',
-      smoothChartComponent: null,
-      tooltipContent: 'Total number of CRITICAL issues detected in all test runs.'
     },
   ];
 

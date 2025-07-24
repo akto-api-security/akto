@@ -321,6 +321,7 @@ const SummaryCardComponent = () =>{
   return(
     <LegacyCard>
       <LegacyCard.Section title={<Text fontWeight="regular" variant="bodySm" color="subdued">Vulnerabilities</Text>}>
+        <Box paddingBlockStart={1} />
         <HorizontalStack align="space-between">
           <Text fontWeight="semibold" variant="bodyMd">Found {totalVulnerabilities} vulnerabilities in total</Text>
           <Button plain monochrome icon={iconSource} onClick={() => setCollapsible(!collapsible)} />
@@ -339,7 +340,19 @@ const SummaryCardComponent = () =>{
                   chartSize={190}
               />
             </HorizontalGrid>
-
+            {/* Add the graphs below with increased vertical gap */}
+            <Box paddingBlockStart={5}>
+              <HorizontalGrid columns={2} gap={4}>
+                <ApiCollectionCoverageGraph />
+                <ApisTestedOverTimeGraph />
+              </HorizontalGrid>
+              <Box paddingBlockStart={5}>
+                <HorizontalGrid columns={2} gap={4}>
+                  <TestRunOverTimeGraph />
+                  <LastTwoWeeksApiTestCoverageChart />
+                </HorizontalGrid>
+              </Box>
+            </Box>
           </LegacyCard.Subsection>
         </Collapsible>
         : null }
@@ -399,38 +412,14 @@ if (showOnlyTable) {
 
 const components = !hasUserInitiatedTestRuns
   ? [
-      <TestSummaryInfo key={"test-summary-info"} />,
-      <SummaryCardComponent key={"summary"} />,
+      <TestSummaryInfo key={"test-summary-info"} />, 
+      <SummaryCardComponent key={"summary"} />, 
       <TestrunsBannerComponent key={"banner-comp"} />,
-      <Box paddingBlockEnd={4} key={"graphs-container"}>
-        <HorizontalGrid columns={2} gap={4}>
-          <ApiCollectionCoverageGraph />
-          <ApisTestedOverTimeGraph showOnlyTable={showOnlyTable} scopeApiCollectionIds={scopeApiCollectionIds} />
-        </HorizontalGrid>
-        <Box paddingBlockStart={4}>
-          <HorizontalGrid columns={2} gap={4}>
-            <TestRunOverTimeGraph showOnlyTable={showOnlyTable} scopeApiCollectionIds={scopeApiCollectionIds} />
-            <LastTwoWeeksApiTestCoverageChart />
-          </HorizontalGrid>
-        </Box>
-      </Box>,
       coreTable
     ]
   : [
-      <TestSummaryInfo key={"test-summary-info"} />,
-      <SummaryCardComponent key={"summary"} />,
-      <Box paddingBlockEnd={4} key={"graphs-container"}>
-        <HorizontalGrid columns={2} gap={4}>
-          <ApiCollectionCoverageGraph />
-          <ApisTestedOverTimeGraph showOnlyTable={showOnlyTable} scopeApiCollectionIds={scopeApiCollectionIds} />
-        </HorizontalGrid>
-        <Box paddingBlockStart={4}>
-          <HorizontalGrid columns={2} gap={4}>
-            <TestRunOverTimeGraph showOnlyTable={showOnlyTable} scopeApiCollectionIds={scopeApiCollectionIds} />
-            <LastTwoWeeksApiTestCoverageChart />
-          </HorizontalGrid>
-        </Box>
-      </Box>,
+      <TestSummaryInfo key={"test-summary-info"} />, 
+      <SummaryCardComponent key={"summary"} />, 
       coreTable
     ];
   return (

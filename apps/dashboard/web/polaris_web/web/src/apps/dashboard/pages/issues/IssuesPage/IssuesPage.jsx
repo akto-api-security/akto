@@ -36,6 +36,7 @@ import testingApi from "../../testing/api.js"
 import { saveAs } from 'file-saver'
 import issuesFunctions from '@/apps/dashboard/pages/issues/module';
 import apiCollectionsApi from "../../observe/api";
+import IssuesGraphsGroup from "./IssuesGraphsGroup.jsx";
 
 
 const sortOptions = [
@@ -683,15 +684,19 @@ function IssuesPage() {
                 endTimestamp={endTimestamp}
             />
 
-            <HorizontalGrid gap={5} columns={2} key={"critical-issues-graph-detail"}>
-                <CriticalUnresolvedApisByAge />
-                <CriticalFindingsGraph startTimestamp={startTimestamp} endTimestamp={endTimestamp} linkText={""} linkUrl={""} />
-            </HorizontalGrid>
-            <HorizontalGrid columns={2} gap={4}>
-                <ApisWithMostOpenIsuuesGraph />
-                <IssuesByCollection />
-            </HorizontalGrid>
-            <AllUnsecuredAPIsOverTimeGraph startTimestamp={startTimestamp} endTimestamp={endTimestamp} linkText={""} linkUrl={""} />
+            <IssuesGraphsGroup heading="Vulnerability & Issue Insights">
+              {[
+                <HorizontalGrid gap={5} columns={2} key="critical-issues-graph-detail">
+                  <CriticalUnresolvedApisByAge />
+                  <CriticalFindingsGraph startTimestamp={startTimestamp} endTimestamp={endTimestamp} linkText={""} linkUrl={""} />
+                </HorizontalGrid>,
+                <HorizontalGrid columns={2} gap={4} key="open-issues-graphs">
+                  <ApisWithMostOpenIsuuesGraph />
+                  <IssuesByCollection />
+                </HorizontalGrid>,
+                <AllUnsecuredAPIsOverTimeGraph key="unsecured-over-time" startTimestamp={startTimestamp} endTimestamp={endTimestamp} linkText={""} linkUrl={""} />
+              ]}
+            </IssuesGraphsGroup>
 
             <GithubServerTable
                 key={key}

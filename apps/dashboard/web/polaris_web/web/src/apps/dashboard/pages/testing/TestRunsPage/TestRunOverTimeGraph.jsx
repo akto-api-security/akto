@@ -47,18 +47,13 @@ const TestRunOverTimeGraph = ({ showOnlyTable = false, scopeApiCollectionIds = n
             null
           );
 
-          let completedRuns = [];
+          let runCount = 0;
           if (response.testingRuns && Array.isArray(response.testingRuns)) {
-            completedRuns = response.testingRuns.filter(run => {
-
-              if (run.summaryState) return run.summaryState === "COMPLETED";
-              if (run.state) return run.state === "COMPLETED";
-              return false;
-            });
+            runCount = response.testingRuns.length;
           }
           weeklyData.push({
             week: `W${5-week}`,
-            count: completedRuns.length,
+            count: runCount,
             weekStart: weekStart.toLocaleDateString(),
             weekEnd: weekEnd.toLocaleDateString()
           });
@@ -124,35 +119,45 @@ const TestRunOverTimeGraph = ({ showOnlyTable = false, scopeApiCollectionIds = n
     return `${this.y} Test Runs`;
   };
 
-  const testingGraph = (chartData && chartData.length > 0 && chartData[0].data.length > 0) ? (
-    <InfoCard
-      component={
-        <LineChart
-          type="line"
-          height={280}
-          data={chartData}
-          yAxisTitle="Test Runs"
-          text={true}
-          showGridLines={true}
-          noGap={false}
-          width={40}
-          defaultChartOptions={defaultChartOptions}
-          tooltipFormatter={tooltipFormatter}
-          color="#6D3BEF"
-          exportingDisabled={true} 
-        />
-      }
-      title="Test Runs Over Time"
-      titleToolTip="Track test run activity over the last 5 weeks, showing the number of test runs per week."
-      linkText=""
-      linkUrl=""
-    />
-  ) : (
-    <EmptyCard 
-      title="Test Runs Over Time" 
-      subTitleComponent={showTestingComponents ? emptyCardComponent : <Text alignment='center' color='subdued'>Loading...</Text>} 
-    />
-  );
+  const allZero =
+    chartData &&
+    chartData.length > 0 &&
+    chartData[0].data.length > 0 &&
+    chartData[0].data.every(([_, count]) => count === 0);
+
+  const testingGraph =
+    chartData &&
+    chartData.length > 0 &&
+    chartData[0].data.length > 0 &&
+    !allZero ? (
+      <InfoCard
+        component={
+          <LineChart
+            type="line"
+            height={280}
+            data={chartData}
+            yAxisTitle="Test Runs"
+            text={true}
+            showGridLines={true}
+            noGap={false}
+            width={40}
+            defaultChartOptions={defaultChartOptions}
+            tooltipFormatter={tooltipFormatter}
+            color="#6D3BEF"
+            exportingDisabled={true} 
+          />
+        }
+        title="Test Runs Over Time"
+        titleToolTip="Track test run activity over the last 5 weeks, showing the number of test runs per week."
+        linkText=""
+        linkUrl=""
+      />
+    ) : (
+      <EmptyCard 
+        title="Test Runs Over Time" 
+        subTitleComponent={showTestingComponents ? emptyCardComponent : <Text alignment='center' color='subdued'>Loading...</Text>} 
+      />
+    );
 
   return testingGraph;
 };
