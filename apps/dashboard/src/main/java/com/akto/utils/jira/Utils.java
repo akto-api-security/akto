@@ -130,8 +130,6 @@ public class Utils {
         Remediation remediation) {
         List<BasicDBObject> contentList = new ArrayList<>();
 
-
-
         try {
             contentList.add(addHeading(3, "Overview"));
             addTextSection(contentList, 4, "Severity", issue.getSeverity().name());
@@ -142,7 +140,6 @@ public class Utils {
             }
 
             Info info = yamlTemplate.getInfo();
-
             if (info != null) {
                 addTextSection(contentList, 4, "Impact", info.getImpact());
                 addListSection(contentList, 4, "Tags", info.getTags());
@@ -161,7 +158,6 @@ public class Utils {
                 "Error while adding additional issue details in Jira Payload: " + e.getMessage(),
                 LoggerMaker.LogDb.DASHBOARD);
         }
-
         return contentList;
     }
 
