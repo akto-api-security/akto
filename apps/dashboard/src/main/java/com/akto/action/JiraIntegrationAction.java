@@ -8,11 +8,13 @@ import com.akto.dao.JiraIntegrationDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dao.testing.BidirectionalSyncSettingsDao;
+import com.akto.dao.testing.RemediationsDao;
 import com.akto.dao.testing.TestingRunResultDao;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dto.Config.AktoHostUrlConfig;
 import com.akto.dto.Config.ConfigType;
 import com.akto.dto.AccountSettings;
+import com.akto.dto.HttpResponseParams;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.jira_integration.*;
@@ -22,6 +24,7 @@ import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.testing.BidirectionalSyncSettings;
+import com.akto.dto.testing.Remediation;
 import com.akto.dto.testing.TestResult;
 import com.akto.dto.testing.TestingRunResult;
 import com.akto.jobs.JobScheduler;
@@ -32,6 +35,7 @@ import com.akto.test_editor.Utils;
 import com.akto.testing.ApiExecutor;
 import com.akto.util.Constants;
 import com.akto.util.DashboardMode;
+import com.akto.util.HttpRequestResponseUtils;
 import com.akto.util.Pair;
 import com.akto.util.enums.GlobalEnums;
 import com.akto.util.enums.GlobalEnums.TicketSource;
@@ -43,6 +47,8 @@ import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.*;
 import com.opensymphony.xwork2.Action;
 
+import java.net.URI;
+import java.util.function.Function;
 import lombok.Setter;
 
 import java.io.File;
@@ -57,7 +63,9 @@ import java.util.stream.Collectors;
 import javax.servlet.http.HttpServletRequest;
 import okhttp3.*;
 
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.kafka.common.protocol.types.Field.Str;
 import org.apache.struts2.interceptor.ServletRequestAware;
 import org.bson.Document;
 import org.bson.conversions.Bson;
@@ -65,6 +73,7 @@ import org.bson.types.ObjectId;
 
 import com.akto.dao.AccountSettingsDao;
 
+import static com.akto.utils.jira.Utils.buildAdditionalIssueFieldsForJira;
 import static com.akto.utils.jira.Utils.buildApiToken;
 import static com.akto.utils.jira.Utils.buildBasicRequest;
 import static com.akto.utils.jira.Utils.retryWithoutGzipRequest;
@@ -110,6 +119,8 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
             .readTimeout(60, TimeUnit.SECONDS)
             .writeTimeout(60, TimeUnit.SECONDS)
             .build();
+
+    private static final String REMEDIATION_INFO_URL = "tests-library-master/remediation/%s.md";
 
     @Setter
     private String title;
@@ -606,7 +617,15 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
             addActionError("Jira is not integrated.");
             return ERROR.toUpperCase();
         }
-        BasicDBObject fields = jiraTicketPayloadCreator(jiraMetaData);
+
+        TestingRunIssues testingRunIssues = TestingRunIssuesDao.instance.findOne(
+            Filters.eq(Constants.ID, jiraMetaData.getTestingIssueId()));
+        YamlTemplate yamlTemplate = YamlTemplateDao.instance.findOne(
+            Filters.eq(Constants.ID, jiraMetaData.getTestingIssueId().getTestSubCategory()));
+        Remediation remediation = RemediationsDao.instance.findOne(
+            Filters.eq(Constants.ID,
+                getRemediationId(jiraMetaData.getTestingIssueId().getTestSubCategory())));
+        BasicDBObject fields = jiraTicketPayloadCreator(jiraMetaData, testingRunIssues, yamlTemplate, remediation);
 
         reqPayload.put("fields", fields);
 
@@ -749,28 +768,35 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
         }
 
         List<JiraMetaData> jiraMetaDataList = new ArrayList<>();
-        Bson projection = Projections.include(YamlTemplate.INFO);
         List<String> testingSubCategories = new ArrayList<>();
         for(TestingIssuesId testingIssuesId : issuesIds) {
             testingSubCategories.add(testingIssuesId.getTestSubCategory());
         }
-        List<YamlTemplate> yamlTemplateList = YamlTemplateDao.instance.findAll(Filters.in("_id", testingSubCategories), projection);
-        Map<String, Info> testSubTypeToInfoMap = new HashMap<>();
+        List<YamlTemplate> yamlTemplateList = YamlTemplateDao.instance.findAll(Filters.in("_id", testingSubCategories));
+        Map<String, YamlTemplate> testSubTypeToYamlTemplateMap = new HashMap<>();
         for(YamlTemplate yamlTemplate : yamlTemplateList) {
             if(yamlTemplate == null || yamlTemplate.getInfo() == null) {
                 loggerMaker.errorAndAddToDb("ERROR: YamlTemplate or YamlTemplate.info is null", LogDb.DASHBOARD);
                 continue;
             }
             Info info = yamlTemplate.getInfo();
-            testSubTypeToInfoMap.put(info.getSubCategory(), info);
+            testSubTypeToYamlTemplateMap.put(info.getSubCategory(), yamlTemplate);
         }
 
         List<TestingRunResult> testingRunResultList = new ArrayList<>();
         int existingIssues = 0;
-        List<TestingRunIssues> testingRunIssuesList = TestingRunIssuesDao.instance.findAll(Filters.and(
-                Filters.in("_id", issuesIds),
-                Filters.exists("jiraIssueUrl", true)
-        ));
+        List<TestingRunIssues> testingRunIssuesList = TestingRunIssuesDao.instance.findAll(
+            Filters.in("_id", issuesIds)
+        );
+
+        Map<TestingIssuesId, TestingRunIssues> issuesEligibleForJiraMap = testingRunIssuesList.stream()
+            .filter(issue -> StringUtils.isBlank(issue.getJiraIssueUrl()))
+            .collect(Collectors.toMap(TestingRunIssues::getId, Function.identity()));
+
+        testingRunIssuesList = testingRunIssuesList.stream().filter(
+            issue -> StringUtils.isNotBlank(issue.getJiraIssueUrl())
+        ).collect(Collectors.toList());
+
         Set<TestingIssuesId> testingRunIssueIds = new HashSet<>();
         for (TestingRunIssues testingRunIssues : testingRunIssuesList) {
             testingRunIssueIds.add(testingRunIssues.getId());
@@ -782,7 +808,7 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
                 continue;
             }
 
-            Info info = testSubTypeToInfoMap.get(testingIssuesId.getTestSubCategory());
+            Info info = testSubTypeToYamlTemplateMap.get(testingIssuesId.getTestSubCategory()).getInfo();
 
             TestingRunResult testingRunResult = TestingRunResultDao.instance.findOne(Filters.and(
                     Filters.in(TestingRunResult.TEST_SUB_TYPE, testingIssuesId.getTestSubCategory()),
@@ -800,7 +826,7 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
             try {
                 String inputUrl = testingIssuesId.getApiInfoKey().getUrl();
 
-                URL url = new URL(inputUrl);
+                URI url = new URI(inputUrl);
                 String hostname = url.getHost();
                 String endpoint = url.getPath();
 
@@ -841,8 +867,14 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
             return Action.SUCCESS.toUpperCase();
         }
 
+        Map<String, Remediation> remediationMap = getRemediationMap(testingSubCategories);
+
         for (JiraMetaData jiraMetaData : jiraMetaDataList) {
-            BasicDBObject fields = jiraTicketPayloadCreator(jiraMetaData);
+            TestingIssuesId issuesId = jiraMetaData.getTestingIssueId();
+            BasicDBObject fields = jiraTicketPayloadCreator(jiraMetaData,
+                issuesEligibleForJiraMap.get(issuesId),
+                testSubTypeToYamlTemplateMap.get(issuesId.getTestSubCategory()),
+                remediationMap.get(getRemediationId(issuesId.getTestSubCategory())));
 
             // Prepare the issue object
             BasicDBObject issueObject = new BasicDBObject();
@@ -932,7 +964,8 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
         return Action.SUCCESS.toUpperCase();
     }
 
-    private BasicDBObject jiraTicketPayloadCreator(JiraMetaData jiraMetaData) {
+    private BasicDBObject jiraTicketPayloadCreator(JiraMetaData jiraMetaData, TestingRunIssues issue,
+        YamlTemplate yamlTemplate, Remediation remediation) {
         String endpoint = jiraMetaData.getEndPointStr().replace("Endpoint - ", "");
         String truncatedEndpoint = endpoint;
         if(endpoint.length() > 30) {
@@ -950,9 +983,31 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
         contentList.add(buildContentDetails("Issue link - Akto dashboard", jiraMetaData.getIssueUrl()));
         contentList.add(buildContentDetails(jiraMetaData.getIssueDescription(), null));
 
+        List<BasicDBObject> additionalFields = buildAdditionalIssueFieldsForJira(yamlTemplate, issue, remediation);
+        if (!CollectionUtils.isEmpty(additionalFields)) {
+            contentList.addAll(additionalFields);
+        }
+
         BasicDBObject fields = buildPayloadForJiraTicket(summary, this.projId, this.issueType, contentList,jiraMetaData.getAdditionalIssueFields());
         fields.put("labels", new String[] {JobConstants.TICKET_LABEL_AKTO_SYNC});
         return fields;
+    }
+
+    private Map<String, Remediation> getRemediationMap(List<String> testingSubCategories) {
+        List<Remediation> remediationList = RemediationsDao.instance.findAll(
+            Filters.in(Constants.ID,
+                testingSubCategories.stream().map(this::getRemediationId)
+                    .collect(Collectors.toList())));
+
+        return remediationList.stream()
+            .collect(Collectors.toMap(
+                Remediation::getid,
+                Function.identity()
+            ));
+    }
+
+    private String getRemediationId(String testSubCategory) {
+        return String.format(REMEDIATION_INFO_URL, testSubCategory);
     }
 
     public String getBaseUrl() {
