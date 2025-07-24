@@ -44,8 +44,6 @@ import com.mongodb.client.model.*;
 import com.mongodb.client.result.InsertOneResult;
 import com.opensymphony.xwork2.Action;
 
-import lombok.Getter;
-import lombok.Setter;
 import org.apache.commons.lang3.StringUtils;
 import org.bson.Document;
 import org.bson.conversions.Bson;
@@ -89,8 +87,9 @@ public class IssuesAction extends UserAction {
 
     int vulnCount;
 
-    @Setter
+    int buaCategoryCount;
     private boolean showUrls;
+    List<String> vulnerabilityType;
 
     private static final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
 
@@ -849,8 +848,6 @@ public class IssuesAction extends UserAction {
     }
 
 
-    List<String> vulnerabilityType;
-
     public String fetchVulnCount(){
         if (vulnerabilityType == null) {
             addActionError("Vulnerability type cannot be null");
@@ -868,6 +865,24 @@ public class IssuesAction extends UserAction {
         if(!showUrls) {
             this.vulnCount = (int) TestingRunIssuesDao.instance.count(filter);
         }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+        public String fetchBUACategoryCount(){
+
+        List<TestingRunIssues> testingRunIssues = TestingRunIssuesDao.instance.findAll(
+                Filters.and(
+                        Filters.in("_id" + "."
+                                + TestingIssuesId.TEST_SUB_CATEGORY, filterSubCategory),
+                        Filters.eq(TestingIssuesId.TEST_RUN_ISSUE_STATUS, "OPEN"))
+        );
+
+        if(testingRunIssues != null && !testingRunIssues.isEmpty()) {
+            this.buaCategoryCount = testingRunIssues.size();
+        } else {
+            this.buaCategoryCount = 0;
+        }
+
         return Action.SUCCESS.toUpperCase();
     }
 
@@ -1187,5 +1202,13 @@ public class IssuesAction extends UserAction {
 
     public void setVulnerabilityType(List<String> vulnerabilityType) {
         this.vulnerabilityType = vulnerabilityType;
+    }
+
+    public int getBuaCategoryCount() {
+        return buaCategoryCount;
+    }
+
+    public void setBuaCategoryCount(int buaCategoryCount) {
+        this.buaCategoryCount = buaCategoryCount;
     }
 }
