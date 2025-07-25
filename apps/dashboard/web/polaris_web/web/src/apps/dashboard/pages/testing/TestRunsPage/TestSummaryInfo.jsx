@@ -3,8 +3,9 @@ import SummaryCard from '../../dashboard/new_components/SummaryCard';
 import SmoothAreaChart from '../../dashboard/new_components/SmoothChart';
 import dashboardApi from '../../dashboard/api';
 import api from '../api';
+import TitleWithInfo from "@/apps/dashboard/components/shared/TitleWithInfo";
 
-const TestSummaryInfo = () => {
+const TestSummaryInfo = ({ severityMap = {} }) => {
   const [metrics, setMetrics] = useState({
     totalApisTested: 0,
     testCoveragePercent: '0%',
@@ -39,6 +40,7 @@ const TestSummaryInfo = () => {
         ) {
           resp.testingRuns.forEach(run => {
             const summary = resp.latestTestingRunResultSummaries[run.hexId];
+            console.log('SUMMARY FOR RUN', run.hexId, summary); // <-- log the summary object
             if (summary && typeof summary.totalApis === 'number') {
               totalApisTested += summary.totalApis;
             }
@@ -75,7 +77,21 @@ const TestSummaryInfo = () => {
     fetchMetrics();
   }, []);
 
+  const totalVulnerabilities =
+    (parseInt(severityMap?.CRITICAL?.text) || 0) +
+    (parseInt(severityMap?.HIGH?.text) || 0) +
+    (parseInt(severityMap?.MEDIUM?.text) || 0) +
+    (parseInt(severityMap?.LOW?.text) || 0);
+
   const summaryInfo = [
+    {
+      title: 'Total vulnerabilities',
+      data: totalVulnerabilities,
+      variant: 'heading2xl',
+      color: 'critical',
+      smoothChartComponent: null,
+      tooltipContent: 'Total number of vulnerabilities (all severities) found in all test runs.'
+    },
     {
       title: 'Critical Issues',
       data: metrics.totalCriticalIssues,

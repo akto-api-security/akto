@@ -7,7 +7,7 @@ import api from '../api';
 import PersistStore from '../../../../main/PersistStore';
 
 const TESTED_COLOR = '#007F5F'; 
-const UNTESTED_COLOR = '#FD8D3C'; 
+const UNTESTED_COLOR = '#E4E5E7'; 
 
 const splitLabel = (label, maxLen = 20) => {
   if (label.length <= maxLen) return label;

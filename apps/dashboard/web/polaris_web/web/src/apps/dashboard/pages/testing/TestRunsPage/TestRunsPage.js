@@ -23,6 +23,7 @@ import dashboardApi from "../../dashboard/api";
 import observeApi from "../../observe/api";
 import TestSummaryInfo from "./TestSummaryInfo";
 import LastTwoWeeksApiTestCoverageChart from './LastTwoWeeksApiTestCoverageChart';
+import InfoCard from '../../dashboard/new_components/InfoCard';
 /*
   {
     text:"", // req. -> The text to be shown wherever the header is being shown
@@ -164,8 +165,8 @@ const [selected, setSelected] = useState(initialTabIdx)
 const tableCountObj = func.getTabsCount(definedTableTabs, {}, initialCount)
 const tableTabs = func.getTableTabsContent(definedTableTabs, tableCountObj, setCurrentTab, currentTab, tabsInfo)
 
-const [severityMap, setSeverityMap] = useState({})
-const [subCategoryInfo, setSubCategoryInfo] = useState({})
+const [severityMap, setSeverityMap] = useState({});
+const [subCategoryInfo, setSubCategoryInfo] = useState({});
 const [collapsible, setCollapsible] = useState(true)
 const [hasUserInitiatedTestRuns, setHasUserInitiatedTestRuns] = useState(false)
 
@@ -304,7 +305,7 @@ const [hasUserInitiatedTestRuns, setHasUserInitiatedTestRuns] = useState(false)
   useEffect(()=>{
     fetchTotalCount()
     fetchCountsMap()
-    fetchSummaryInfo()
+    fetchSummaryInfo() 
   },[currDateRange])
 
   const handleSelectedTab = (selectedIndex) => {
@@ -317,30 +318,57 @@ const [hasUserInitiatedTestRuns, setHasUserInitiatedTestRuns] = useState(false)
 
 const iconSource = collapsible ? ChevronUpMinor : ChevronDownMinor
 const SummaryCardComponent = () =>{
-  let totalVulnerabilities = severityMap?.CRITICAL?.text + severityMap?.HIGH?.text + severityMap?.MEDIUM?.text + severityMap?.LOW?.text
+  const hasSeverityData = Object.values(severityMap).some(s => s.text > 0);
+  const hasSubCategoryData = Object.values(subCategoryInfo).some(v => {
+    if (typeof v === 'number') return v > 0;
+    if (typeof v === 'object' && v !== null) {
+      return Object.values(v).some(val => typeof val === 'number' && val > 0);
+    }
+    return false;
+  });
+
   return(
     <LegacyCard>
-      <LegacyCard.Section title={<Text fontWeight="regular" variant="bodySm" color="subdued">Vulnerabilities</Text>}>
-        <Box paddingBlockStart={1} />
+      <LegacyCard.Section title={<Text fontWeight="regular" variant="bodySm" color="subdued"></Text>}>
         <HorizontalStack align="space-between">
-          <Text fontWeight="semibold" variant="bodyMd">Found {totalVulnerabilities} vulnerabilities in total</Text>
+          <Text fontWeight="semibold" variant="bodyMd">Found  vulnerabilities in total</Text>
           <Button plain monochrome icon={iconSource} onClick={() => setCollapsible(!collapsible)} />
         </HorizontalStack>
-        {totalVulnerabilities > 0 ? 
+        <Box paddingBlockStart={4} />
         <Collapsible open={collapsible} transition={{duration: '500ms', timingFunction: 'ease-in-out'}}>
           <LegacyCard.Subsection>
-            <Box paddingBlockStart={3}><Divider/></Box>
-            <HorizontalGrid columns={2} gap={6}>
-              <ChartypeComponent chartSize={190} navUrl={"/dashboard/issues/"} data={subCategoryInfo} title={"Categories"} isNormal={true} boxHeight={'250px'}/>
-              <ChartypeComponent
-                  data={severityMap}
-                  navUrl={"/dashboard/issues/"} title={"Severity"} isNormal={true} boxHeight={'250px'} dataTableWidth="250px" boxPadding={8}
-                  pieInnerSize="50%"
-                  chartOnLeft={false}
-                  chartSize={190}
-              />
-            </HorizontalGrid>
-            {/* Add the graphs below with increased vertical gap */}
+            {(hasSeverityData || hasSubCategoryData) && (
+              <HorizontalGrid columns={2} gap={6}>
+                {hasSeverityData ? (
+                  <InfoCard
+                    component={
+                      <ChartypeComponent
+                        data={severityMap}
+                        navUrl={"/dashboard/issues/"} title={"Severity"} isNormal={true} boxHeight={'250px'} dataTableWidth="250px" boxPadding={8}
+                        pieInnerSize="50%"
+                        chartOnLeft={false}
+                        chartSize={190}
+                      />
+                    }
+                    title="Issues by Severity"
+                    titleToolTip="Severity and count of issues per test run"
+                    linkText=""
+                    linkUrl=""
+                  />
+                ) : null}
+                {hasSubCategoryData ? (
+                  <InfoCard
+                    component={
+                      <ChartypeComponent chartSize={190} navUrl={"/dashboard/issues/"} data={subCategoryInfo} title={"Categories"} isNormal={true} boxHeight={'250px'} />
+                    }
+                    title="Issues by Categories"
+                    titleToolTip="Breakdown of issues by category"
+                    linkText=""
+                    linkUrl=""
+                  />
+                ) : null}
+              </HorizontalGrid>
+            )}
             <Box paddingBlockStart={5}>
               <HorizontalGrid columns={2} gap={4}>
                 <ApiCollectionCoverageGraph />
@@ -355,7 +383,6 @@ const SummaryCardComponent = () =>{
             </Box>
           </LegacyCard.Subsection>
         </Collapsible>
-        : null }
       </LegacyCard.Section>
     </LegacyCard>
   )
@@ -412,13 +439,13 @@ if (showOnlyTable) {
 
 const components = !hasUserInitiatedTestRuns
   ? [
-      <TestSummaryInfo key={"test-summary-info"} />, 
+      <TestSummaryInfo key={"test-summary-info"} severityMap={severityMap} />, 
       <SummaryCardComponent key={"summary"} />, 
       <TestrunsBannerComponent key={"banner-comp"} />,
       coreTable
     ]
   : [
-      <TestSummaryInfo key={"test-summary-info"} />, 
+      <TestSummaryInfo key={"test-summary-info"} severityMap={severityMap} />, 
       <SummaryCardComponent key={"summary"} />, 
       coreTable
     ];

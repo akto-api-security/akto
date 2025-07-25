@@ -33,7 +33,7 @@ const IssuesByCollection = () => {
         const barGraphData = top5.map(({ name, issueCount }) => ({
           text: name,
           value: issueCount,
-          color: '#3A82F7',
+          color: '#FED3D1',
         }));
         setBarData(barGraphData);
       } catch (e) {

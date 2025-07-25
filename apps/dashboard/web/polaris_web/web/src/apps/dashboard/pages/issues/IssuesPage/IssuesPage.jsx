@@ -684,7 +684,7 @@ function IssuesPage() {
                 endTimestamp={endTimestamp}
             />
 
-            <IssuesGraphsGroup heading="Vulnerability & Issue Insights">
+            <IssuesGraphsGroup heading="Issues summary">
               {[
                 <HorizontalGrid gap={5} columns={2} key="critical-issues-graph-detail">
                   <CriticalUnresolvedApisByAge />
