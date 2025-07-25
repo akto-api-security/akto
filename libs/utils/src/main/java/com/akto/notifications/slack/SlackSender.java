@@ -1,10 +1,8 @@
 package com.akto.notifications.slack;
 
 import com.akto.dao.context.Context;
-import com.akto.dao.notifications.SlackWebhooksDao;
 import com.akto.dto.notifications.SlackWebhook;
 import com.akto.log.LoggerMaker;
-import com.mongodb.BasicDBObject;
 import com.slack.api.Slack;
 import com.slack.api.webhook.WebhookResponse;
 
@@ -17,6 +15,10 @@ public class SlackSender {
     private static final ExecutorService executor = Executors.newFixedThreadPool(3);
 
     public static void sendAlert(int accountId, SlackAlerts alert) {
+        sendAlert(accountId, alert, 0, null);
+    }
+
+    public static void sendAlert(int accountId, SlackAlerts alert, int slackWebhookId, List<SlackWebhook> listWebhooks) {
         executor.submit(() -> {
             Context.accountId.set(accountId);
 
@@ -24,14 +26,22 @@ public class SlackSender {
             if(alert == null || alert.toJson().isEmpty()) return;
             String payload = alert.toJson();
             SlackAlertType alertType = alert.getALERT_TYPE();
-
-            // Get slack webhook url
-            List<SlackWebhook> listWebhooks = SlackWebhooksDao.instance.findAll(new BasicDBObject());
             if(listWebhooks == null || listWebhooks.isEmpty()) {
                 loggerMaker.infoAndAddToDb("Slack Alert Type: " + alertType + " Info: " + "No slack webhook found.");
                 return;
             }
-            String webhookUrl = listWebhooks.get(0).getWebhook();
+            String webhookUrl = "";
+            if(slackWebhookId > 0){
+                webhookUrl = listWebhooks.stream()
+                        .filter(webhook -> webhook.getId() == slackWebhookId)
+                        .map(SlackWebhook::getWebhook)
+                        .findFirst()
+                        .orElse("");
+            }
+
+            if(webhookUrl.isEmpty()) {
+                webhookUrl = getDefaultSlackWebhook(listWebhooks);
+            }   
 
             // Try to send alert
             Slack slack = Slack.getInstance();
@@ -69,4 +79,13 @@ public class SlackSender {
         });
     }
 
+    public static String getDefaultSlackWebhook(List<SlackWebhook> listWebhooks) {
+        String webhookUrl ="";
+        if (listWebhooks == null || listWebhooks.isEmpty()) {
+            loggerMaker.infoAndAddToDb(" No slack webhook found.");
+        } else {
+            webhookUrl = listWebhooks.get(0).getWebhook();
+        }
+        return webhookUrl;
+    }
 }
