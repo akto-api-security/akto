@@ -74,7 +74,6 @@ public class ApiCollectionsAction extends UserAction {
     int highRiskThirdPartyEndpointsCount;
     @Getter
     int shadowApisCount;
-
     public List<ApiInfoKey> getApiList() {
         return apiList;
     }

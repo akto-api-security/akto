@@ -37,6 +37,8 @@ import io.swagger.v3.oas.models.Paths;
 import io.swagger.v3.oas.models.servers.Server;
 import io.swagger.v3.parser.core.models.SwaggerParseResult;
 
+import lombok.Getter;
+import lombok.Setter;
 import org.bson.Document;
 import org.bson.conversions.Bson;
 
@@ -57,6 +59,15 @@ public class InventoryAction extends UserAction {
 
     //     return Action.SUCCESS.toUpperCase();
     // }
+
+    @Getter
+    int notTestedEndpointsCount;
+
+    @Getter
+    int onlyOnceTestedEndpointsCount;
+
+    @Setter
+    private boolean showUrls;
 
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(InventoryAction.class, LogDb.DASHBOARD);
@@ -1137,6 +1148,38 @@ public class InventoryAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
+    public String fetchNotTestedAPICount() {
+        Bson filterQ = UsageMetricCalculator.excludeDemosAndDeactivated(ApiInfo.ID_API_COLLECTION_ID);
+
+        Bson filter = Filters.and(
+                filterQ,
+                Filters.exists(ApiInfo.LAST_TESTED, false)
+        );
+
+        if(!showUrls) {
+            this.notTestedEndpointsCount = (int) ApiInfoDao.instance.count(filter);
+        }
+
+        return Action.SUCCESS.toUpperCase();
+    }
+
+
+    public String fetchOnlyOnceTestedAPICount() {
+
+        Bson filterQ = UsageMetricCalculator.excludeDemosAndDeactivated(ApiInfo.ID_API_COLLECTION_ID);
+
+        Bson filter = Filters.and(
+                filterQ,
+                Filters.exists(ApiInfo.LAST_TESTED, true),
+                Filters.eq(ApiInfo.TOTAL_TESTED_COUNT, 1)
+        );
+
+        if(!showUrls) {
+            this.notTestedEndpointsCount = (int) ApiInfoDao.instance.count(filter);
+        }
+
+        return Action.SUCCESS.toUpperCase();
+    }
 
     public String getSortKey() {
         return this.sortKey;
