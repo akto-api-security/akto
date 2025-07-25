@@ -125,7 +125,7 @@ public class Utils {
         return fields;
     }
 
-    public static List<BasicDBObject> buildAdditionalIssueFieldsForJira(YamlTemplate yamlTemplate,
+    public static List<BasicDBObject> buildAdditionalIssueFieldsForJira(Info info,
         TestingRunIssues issue,
         Remediation remediation) {
         List<BasicDBObject> contentList = new ArrayList<>();
@@ -135,11 +135,6 @@ public class Utils {
             addTextSection(contentList, 4, "Severity", issue.getSeverity().name());
             addListSection(contentList, 3, "Timelines (UTC)", getIssueTimelines(issue));
 
-            if (yamlTemplate == null) {
-                return contentList;
-            }
-
-            Info info = yamlTemplate.getInfo();
             if (info != null) {
                 addTextSection(contentList, 4, "Impact", info.getImpact());
                 addListSection(contentList, 4, "Tags", info.getTags());

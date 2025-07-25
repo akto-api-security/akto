@@ -617,11 +617,13 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
         TestingRunIssues testingRunIssues = TestingRunIssuesDao.instance.findOne(
             Filters.eq(Constants.ID, jiraMetaData.getTestingIssueId()));
         YamlTemplate yamlTemplate = YamlTemplateDao.instance.findOne(
-            Filters.eq(Constants.ID, jiraMetaData.getTestingIssueId().getTestSubCategory()));
+            Filters.eq(Constants.ID, jiraMetaData.getTestingIssueId().getTestSubCategory()),
+            Projections.include(YamlTemplate.INFO));
         Remediation remediation = RemediationsDao.instance.findOne(
             Filters.eq(Constants.ID,
                 getRemediationId(jiraMetaData.getTestingIssueId().getTestSubCategory())));
-        BasicDBObject fields = jiraTicketPayloadCreator(jiraMetaData, testingRunIssues, yamlTemplate, remediation);
+        BasicDBObject fields = jiraTicketPayloadCreator(jiraMetaData, testingRunIssues, yamlTemplate.getInfo(),
+            remediation);
 
         reqPayload.put("fields", fields);
 
@@ -764,19 +766,20 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
         }
 
         List<JiraMetaData> jiraMetaDataList = new ArrayList<>();
+        Bson projection = Projections.include(YamlTemplate.INFO);
         List<String> testingSubCategories = new ArrayList<>();
         for(TestingIssuesId testingIssuesId : issuesIds) {
             testingSubCategories.add(testingIssuesId.getTestSubCategory());
         }
-        List<YamlTemplate> yamlTemplateList = YamlTemplateDao.instance.findAll(Filters.in("_id", testingSubCategories));
-        Map<String, YamlTemplate> testSubTypeToYamlTemplateMap = new HashMap<>();
+        List<YamlTemplate> yamlTemplateList = YamlTemplateDao.instance.findAll(Filters.in("_id", testingSubCategories), projection);
+        Map<String, Info> testSubTypeToInfoMap = new HashMap<>();
         for(YamlTemplate yamlTemplate : yamlTemplateList) {
             if(yamlTemplate == null || yamlTemplate.getInfo() == null) {
                 loggerMaker.errorAndAddToDb("ERROR: YamlTemplate or YamlTemplate.info is null", LogDb.DASHBOARD);
                 continue;
             }
             Info info = yamlTemplate.getInfo();
-            testSubTypeToYamlTemplateMap.put(info.getSubCategory(), yamlTemplate);
+            testSubTypeToInfoMap.put(info.getSubCategory(), info);
         }
 
         List<TestingRunResult> testingRunResultList = new ArrayList<>();
@@ -804,7 +807,7 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
                 continue;
             }
 
-            Info info = testSubTypeToYamlTemplateMap.get(testingIssuesId.getTestSubCategory()).getInfo();
+            Info info = testSubTypeToInfoMap.get(testingIssuesId.getTestSubCategory());
 
             TestingRunResult testingRunResult = TestingRunResultDao.instance.findOne(Filters.and(
                     Filters.in(TestingRunResult.TEST_SUB_TYPE, testingIssuesId.getTestSubCategory()),
@@ -869,7 +872,7 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
             TestingIssuesId issuesId = jiraMetaData.getTestingIssueId();
             BasicDBObject fields = jiraTicketPayloadCreator(jiraMetaData,
                 issuesEligibleForJiraMap.get(issuesId),
-                testSubTypeToYamlTemplateMap.get(issuesId.getTestSubCategory()),
+                testSubTypeToInfoMap.get(issuesId.getTestSubCategory()),
                 remediationMap.get(getRemediationId(issuesId.getTestSubCategory())));
 
             // Prepare the issue object
@@ -961,7 +964,7 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
     }
 
     private BasicDBObject jiraTicketPayloadCreator(JiraMetaData jiraMetaData, TestingRunIssues issue,
-        YamlTemplate yamlTemplate, Remediation remediation) {
+        Info info, Remediation remediation) {
         String endpoint = jiraMetaData.getEndPointStr().replace("Endpoint - ", "");
         String truncatedEndpoint = endpoint;
         if(endpoint.length() > 30) {
@@ -979,7 +982,7 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
         contentList.add(buildContentDetails("Issue link - Akto dashboard", jiraMetaData.getIssueUrl()));
         contentList.add(buildContentDetails(jiraMetaData.getIssueDescription(), null));
 
-        List<BasicDBObject> additionalFields = buildAdditionalIssueFieldsForJira(yamlTemplate, issue, remediation);
+        List<BasicDBObject> additionalFields = buildAdditionalIssueFieldsForJira(info, issue, remediation);
         if (!CollectionUtils.isEmpty(additionalFields)) {
             contentList.addAll(additionalFields);
         }
