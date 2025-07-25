@@ -14,7 +14,6 @@ import com.akto.dto.billing.SyncLimit;
 import com.akto.dto.test_editor.TestConfig;
 import com.akto.dto.test_editor.TestingRunPlayground;
 import com.akto.dto.monitoring.ModuleInfo;
-import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.testing.*;
 import com.akto.dto.testing.TestingEndpoints.Operator;
 import com.akto.dto.testing.TestingRun.State;
@@ -28,11 +27,6 @@ import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.metrics.AllMetrics;
 import com.akto.metrics.ModuleInfoWorker;
-import com.akto.mixpanel.AktoMixpanel;
-import com.akto.notifications.slack.APITestStatusAlert;
-import com.akto.notifications.slack.NewIssuesModel;
-import com.akto.notifications.slack.SlackAlerts;
-import com.akto.notifications.slack.SlackSender;
 import com.akto.test_editor.execution.Executor;
 import com.akto.testing.kafka_utils.ConsumerUtil;
 import com.akto.testing.kafka_utils.Producer;
@@ -42,13 +36,10 @@ import com.akto.util.Constants;
 import com.akto.store.SampleMessageStore;
 import com.akto.store.TestingUtil;
 import com.akto.util.DashboardMode;
-import com.akto.util.EmailAccountName;
-import com.akto.util.enums.GlobalEnums;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.*;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
-import org.json.JSONObject;
 
 import static com.akto.testing.Utils.readJsonContentFromFile;
 
@@ -684,151 +675,5 @@ public class Main {
         List<ApiInfo.ApiInfoKey> endpoints = dataActor.fetchLatestEndpointsForTesting(st, et, apiCollectionId);
         CustomTestingEndpoints newEps = new CustomTestingEndpoints(endpoints, Operator.AND);
         tr.setTestingEndpoints(newEps);
-    }
-
-    private static void raiseMixpanelEvent(ObjectId summaryId, TestingRun testingRun, int accountId) {
-        TestingRunResultSummary testingRunResultSummary = dataActor.fetchTestingRunResultSummary(summaryId.toHexString());
-        int totalApis = testingRunResultSummary.getTotalApis();
-
-        String testType = "ONE_TIME";
-        if(testingRun.getPeriodInSeconds()>0)
-        {
-            testType = "SCHEDULED DAILY";
-        }
-        if (testingRunResultSummary.getMetadata() != null) {
-            testType = "CI_CD";
-        }
-
-        Setup setup = dataActor.fetchSetup();
-
-        String dashboardMode = "saas";
-        if (setup != null) {
-            dashboardMode = setup.getDashboardMode();
-        }
-
-        String userEmail = testingRun.getUserEmail();
-        String distinct_id = userEmail + "_" + dashboardMode.toUpperCase();
-
-        EmailAccountName emailAccountName = new EmailAccountName(userEmail);
-        String accountName = emailAccountName.getAccountName();
-
-        JSONObject props = new JSONObject();
-        props.put("Email ID", userEmail);
-        props.put("Dashboard Mode", dashboardMode);
-        props.put("Account Name", accountName);
-        props.put("Test type", testType);
-        props.put("Total APIs tested", totalApis);
-
-        if (testingRun.getTestIdConfig() > 1) {
-            TestingRunConfig testingRunConfig = dataActor.findTestingRunConfig(testingRun.getTestIdConfig());
-            if (testingRunConfig != null && testingRunConfig.getTestSubCategoryList() != null) {
-                props.put("Total Tests", testingRunConfig.getTestSubCategoryList().size());
-                props.put("Tests Ran", testingRunConfig.getTestSubCategoryList());
-            }
-        }
-
-        Bson filters = Filters.and(
-            Filters.eq("latestTestingRunSummaryId", summaryId),
-            Filters.eq("testRunIssueStatus", "OPEN")
-        );
-        List<TestingRunIssues> testingRunIssuesList = dataActor.fetchOpenIssues(summaryId.toHexString());
-
-        Map<String, Integer> apisAffectedCount = new HashMap<>();
-        int newIssues = 0;
-        Map<String, Integer> severityCount = new HashMap<>();
-        for (TestingRunIssues testingRunIssues: testingRunIssuesList) {
-            String key = testingRunIssues.getSeverity().toString();
-            if (!severityCount.containsKey(key)) {
-                severityCount.put(key, 0);
-            }
-
-            int issuesSeverityCount = severityCount.get(key);
-            severityCount.put(key, issuesSeverityCount+1);
-
-            String testSubCategory = testingRunIssues.getId().getTestSubCategory();
-            int totalApisAffected = apisAffectedCount.getOrDefault(testSubCategory, 0)+1;
-
-            apisAffectedCount.put(
-                    testSubCategory,
-                    totalApisAffected
-            );
-
-            if(testingRunIssues.getCreationTime() > testingRunResultSummary.getStartTimestamp()) {
-                newIssues++;
-            }
-        }
-
-        testingRunIssuesList.sort(Comparator.comparing(TestingRunIssues::getSeverity));
-
-        List<NewIssuesModel> newIssuesModelList = new ArrayList<>();
-        for(TestingRunIssues testingRunIssues : testingRunIssuesList) {
-            if(testingRunIssues.getCreationTime() > testingRunResultSummary.getStartTimestamp()) {
-                String testRunResultId;
-                if(newIssuesModelList.size() <= 5) {
-
-
-
-                    Bson filterForRunResult = Filters.and(
-                            Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, testingRunIssues.getLatestTestingRunSummaryId()),
-                            Filters.eq(TestingRunResult.TEST_SUB_TYPE, testingRunIssues.getId().getTestSubCategory()),
-                            Filters.eq(TestingRunResult.API_INFO_KEY, testingRunIssues.getId().getApiInfoKey())
-                    );
-                    TestingRunResult testingRunResult = dataActor.fetchTestingRunResults(filterForRunResult);
-                    testRunResultId = testingRunResult.getHexId();
-                } else testRunResultId = "";
-
-                String issueCategory = testingRunIssues.getId().getTestSubCategory();
-                newIssuesModelList.add(new NewIssuesModel(
-                        issueCategory,
-                        testRunResultId,
-                        apisAffectedCount.get(issueCategory),
-                        testingRunIssues.getCreationTime()
-                ));
-            }
-        }
-
-        props.put("Vulnerabilities Found", testingRunIssuesList.size());
-
-        Iterator<Map.Entry<String, Integer>> iterator = severityCount.entrySet().iterator();
-        while(iterator.hasNext()) {
-            Map.Entry<String, Integer> entry = iterator.next();
-            props.put(entry.getKey() + " Vulnerabilities", entry.getValue());
-        }
-
-        long nextTestRun = testingRun.getPeriodInSeconds() == 0 ? 0 : ((long) testingRun.getScheduleTimestamp() + (long) testingRun.getPeriodInSeconds());
-
-        String collection = null;
-        TestingEndpoints testingEndpoints = testingRun.getTestingEndpoints();
-        if(testingEndpoints.getType().equals(TestingEndpoints.Type.COLLECTION_WISE)) {
-            CollectionWiseTestingEndpoints collectionWiseTestingEndpoints = (CollectionWiseTestingEndpoints) testingEndpoints;
-            int apiCollectionId = collectionWiseTestingEndpoints.getApiCollectionId();
-            ApiCollection apiCollection = dataActor.fetchApiCollectionMeta(apiCollectionId);
-            collection = apiCollection.getName();
-        }
-
-        long currentTime = Context.now();
-        long startTimestamp = testingRunResultSummary.getStartTimestamp();
-        long scanTimeInSeconds = Math.abs(currentTime - startTimestamp);
-
-        SlackAlerts apiTestStatusAlert = new APITestStatusAlert(
-                testingRun.getName(),
-                severityCount.getOrDefault(GlobalEnums.Severity.HIGH.name(), 0),
-                severityCount.getOrDefault(GlobalEnums.Severity.MEDIUM.name(), 0),
-                severityCount.getOrDefault(GlobalEnums.Severity.LOW.name(), 0),
-                testingRunIssuesList.size(),
-                newIssues,
-                totalApis,
-                collection,
-                scanTimeInSeconds,
-                testType,
-                nextTestRun,
-                newIssuesModelList,
-                testingRun.getHexId(),
-                summaryId.toHexString()
-        );
-        SlackSender.sendAlert(accountId, apiTestStatusAlert);
-
-        AktoMixpanel aktoMixpanel = new AktoMixpanel();
-        aktoMixpanel.sendEvent(distinct_id, "Test executed", props);
     }
 }
