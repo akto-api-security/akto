@@ -331,7 +331,7 @@ const SummaryCardComponent = () =>{
     <LegacyCard>
       <LegacyCard.Section title={<Text fontWeight="regular" variant="bodySm" color="subdued"></Text>}>
         <HorizontalStack align="space-between">
-          <Text fontWeight="semibold" variant="bodyMd">Found  vulnerabilities in total</Text>
+          <Text fontWeight="semibold" variant="bodyMd">Test results summary</Text>
           <Button plain monochrome icon={iconSource} onClick={() => setCollapsible(!collapsible)} />
         </HorizontalStack>
         <Box paddingBlockStart={4} />

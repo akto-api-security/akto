@@ -108,14 +108,14 @@ const TestSummaryInfo = ({ severityMap = {} }) => {
       smoothChartComponent: null,
       tooltipContent: 'Number of APIs that have been tested at least once.'
     },
-    {
-      title: 'Test Coverage',
-      data: metrics.testCoveragePercent,
-      variant: 'heading2xl',
-      color: 'warning',
-      smoothChartComponent: null,
-      tooltipContent: 'Percentage of total APIs that have been tested.'
-    },
+    // {
+    //   title: 'Test Coverage',
+    //   data: metrics.testCoveragePercent,
+    //   variant: 'heading2xl',
+    //   color: 'warning',
+    //   smoothChartComponent: null,
+    //   tooltipContent: 'Percentage of total APIs that have been tested.'
+    // },
     {
       title: 'Total Test Runs',
       data: metrics.totalTestRuns,
