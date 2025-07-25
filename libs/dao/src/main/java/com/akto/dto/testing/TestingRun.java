@@ -3,6 +3,9 @@ package com.akto.dto.testing;
 import org.bson.codecs.pojo.annotations.BsonIgnore;
 import org.bson.types.ObjectId;
 
+import lombok.Getter;
+import lombok.Setter;
+
 public class TestingRun {
 
     private ObjectId id;
@@ -24,6 +27,16 @@ public class TestingRun {
     private int maxConcurrentRequests;
     private String triggeredBy;
     public static final String TRIGGERED_BY = "triggeredBy";
+
+    public static final String SEND_SLACK_ALERT = "sendSlackAlert";
+    @Getter
+    @Setter
+    private boolean sendSlackAlert = false;
+    
+    public static final String SELECTED_SLACK_CHANNEL_ID = "selectedSlackChannelId";
+    @Getter
+    @Setter
+    private int selectedSlackChannelId;
 
     public static final String _API_COLLECTION_ID = "testingEndpoints.apiCollectionId";
     public static final String _API_COLLECTION_ID_IN_LIST = "testingEndpoints.apisList.apiCollectionId";
