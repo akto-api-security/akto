@@ -1693,11 +1693,10 @@
             </result>
         </action>
 
-         <action name="api/getSlackWebhooks" class="com.akto.action.LLMAction" method="fetchSlackWebhooks">
+         <action name="api/getSlackWebhooks" class="com.akto.action.DbAction" method="fetchSlackWebhooks">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <result name="SUCCESS" type="json">
-                <param name="root">slackWebhooks</param>
             </result>
             <result name="ERROR" type="json">
                 <param name="statusCode">422</param>
