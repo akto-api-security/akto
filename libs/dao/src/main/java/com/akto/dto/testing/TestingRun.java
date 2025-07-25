@@ -1,8 +1,10 @@
 package com.akto.dto.testing;
 
-import com.akto.dto.ApiCollection;
 import org.bson.codecs.pojo.annotations.BsonIgnore;
 import org.bson.types.ObjectId;
+
+import lombok.Getter;
+import lombok.Setter;
 
 public class TestingRun {
 
@@ -39,6 +41,11 @@ public class TestingRun {
 
     public static final String MINI_TESTING_SERVICE_NAME = "miniTestingServiceName";
     private String miniTestingServiceName;
+
+    public static final String SELECTED_SLACK_CHANNEL_ID = "selectedSlackChannelId";
+    @Getter
+    @Setter
+    private int selectedSlackChannelId;
 
     public enum TestingRunType{
         ONE_TIME, RECURRING, CI_CD, CONTINUOUS_TESTING
