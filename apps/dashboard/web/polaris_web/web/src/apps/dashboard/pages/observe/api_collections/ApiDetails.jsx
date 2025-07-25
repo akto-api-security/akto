@@ -591,6 +591,12 @@ function ApiDetails(props) {
                 }
             });
             const groupedIssues = Array.from(uniqueIssuesMap.values());
+            const severityOrder = { CRITICAL: 0, HIGH: 1, MEDIUM: 2, LOW: 3 };
+            groupedIssues.sort((a, b) => {
+                const aSeverity = (a.severityType || '').toUpperCase();
+                const bSeverity = (b.severityType || '').toUpperCase();
+                return (severityOrder[aSeverity] ?? 99) - (severityOrder[bSeverity] ?? 99);
+            });
             const tableData = await transformIssues.convertToIssueTableData(groupedIssues, localSubCategoryMap);
             setFilteredIssues(tableData);
         } catch (error) {
