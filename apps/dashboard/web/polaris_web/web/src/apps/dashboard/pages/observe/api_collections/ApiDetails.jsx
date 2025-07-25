@@ -628,7 +628,32 @@ function ApiDetails(props) {
                             >
                                 {issuesTableHeaders.map(header => (
                                     <IndexTable.Cell key={header.value}>
-                                        {issue[header.value]}
+                                        <Box
+                                            onClick={async (e) => {
+                                                e.stopPropagation();
+                                                if (!issue.id || !issue.id[0]) return;
+                                                setLoadingIssues(true);
+                                                try {
+                                                    const resp = await IssuesApi.fetchTestingRunResult(JSON.parse(issue.id[0]));
+                                                    const hexId = resp?.testingRunResult?.hexId;
+                                                    if (hexId) {
+                                                        const url = `/dashboard/reports/issues?result=${hexId}`;
+                                                        window.open(url, '_blank');
+                                                    } else {
+                                                        func.setToast(true, true, 'Could not find test run result.');
+                                                    }
+                                                } catch (e) {
+                                                    func.setToast(true, true, 'Failed to fetch test run result.');
+                                                } finally {
+                                                    setLoadingIssues(false);
+                                                }
+                                            }}
+                                            style={{ cursor: 'pointer', width: '100%' }}
+                                            onMouseOver={e => e.currentTarget.style.background = '#f4f6f8'}
+                                            onMouseOut={e => e.currentTarget.style.background = ''}
+                                        >
+                                            {issue[header.value]}
+                                        </Box>
                                     </IndexTable.Cell>
                                 ))}
                             </IndexTable.Row>
