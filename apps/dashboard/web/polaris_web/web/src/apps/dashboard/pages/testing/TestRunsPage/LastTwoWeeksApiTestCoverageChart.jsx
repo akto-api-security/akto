@@ -74,7 +74,7 @@ const LastTwoWeeksApiTestCoverageChart = () => {
         justifyContent="center" 
         width="100%" 
         height="100%"
-        padding="4"
+        padding="2"
       >
         <ChartypeComponent
           data={donutData}
