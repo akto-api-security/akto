@@ -1,11 +1,13 @@
 package com.akto.dto;
 
+import com.akto.util.Constants;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+import org.apache.commons.collections.CollectionUtils;
 import org.bson.codecs.pojo.annotations.BsonId;
 import org.bson.codecs.pojo.annotations.BsonIgnore;
 
@@ -393,5 +395,12 @@ public class ApiCollection {
         }
 
         this.tagsList.addAll(tagsList);
+    }
+
+    public boolean isMcpCollection() {
+        if (!CollectionUtils.isEmpty(this.getTagsList())) {
+            return this.getTagsList().stream().anyMatch(t -> Constants.AKTO_MCP_SERVER_TAG.equals(t.getKeyName()));
+        }
+        return false;
     }
 }

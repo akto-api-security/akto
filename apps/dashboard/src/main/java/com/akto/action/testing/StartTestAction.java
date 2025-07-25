@@ -35,6 +35,7 @@ import com.akto.util.enums.GlobalEnums.TestErrorSource;
 import com.akto.utils.DeleteTestRunUtils;
 import com.akto.utils.Utils;
 import com.google.gson.Gson;
+import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.*;
 import com.mongodb.client.result.InsertOneResult;
 import com.opensymphony.xwork2.Action;
@@ -43,11 +44,12 @@ import org.apache.commons.lang3.StringUtils;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 
-import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+
+import static com.akto.action.testing.Utils.buildIssueMetaDataMap;
 
 public class StartTestAction extends UserAction {
 
@@ -628,7 +630,7 @@ public class StartTestAction extends UserAction {
         
     );
 
-    private List<Bson> prepareTestRunResultsFilters(ObjectId testingRunResultSummaryId, QueryMode queryMode) {
+    private List<Bson> prepareTestRunResultsFilters(ObjectId testingRunResultSummaryId, QueryMode queryMode, boolean ignoreVulnerableInResults) {
         List<Bson> filterList = new ArrayList<>();
         filterList.add(Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, testingRunResultSummaryId));
 
@@ -639,14 +641,16 @@ public class StartTestAction extends UserAction {
             }
         }
 
+        Bson vulnerableTestFilter = ignoreVulnerableInResults ? vulnerableFilter : Filters.eq(TestingRunResult.VULNERABLE, true);
+
         if(queryMode == null) {
             if(fetchOnlyVulnerable) {
-                filterList.add(vulnerableFilter);
+                filterList.add(vulnerableTestFilter);
             }
         } else {
             switch (queryMode) {
                 case VULNERABLE:
-                    filterList.add(vulnerableFilter);
+                    filterList.add(vulnerableTestFilter);
                     break;
                 case SKIPPED_EXEC_API_REQUEST_FAILED:
                     filterList.add(Filters.eq(TestingRunResult.VULNERABLE, false));
@@ -705,7 +709,7 @@ public class StartTestAction extends UserAction {
         Context.accountId.set(accountId);
         Map<String, Integer> resultantMap = new HashMap<>();
 
-        List<Bson> filterList =  prepareTestRunResultsFilters(testingRunResultSummaryId, queryMode);
+        List<Bson> filterList =  prepareTestRunResultsFilters(testingRunResultSummaryId, queryMode, true);
         int count = VulnerableTestingRunResultDao.instance.countFromDb(Filters.and(filterList), queryMode.equals(QueryMode.VULNERABLE));
         resultantMap.put(queryMode.toString(), count);
 
@@ -786,6 +790,9 @@ public class StartTestAction extends UserAction {
     private Map<TestError, String> errorEnums = new HashMap<>();
     private long issueslistCount;
 
+    @Getter
+    private Map<String, String> jiraIssuesMapForResults;
+
     public String fetchTestingRunResults() {
         ObjectId testingRunResultSummaryId;
         try {
@@ -799,16 +806,7 @@ public class StartTestAction extends UserAction {
         if (queryMode != null) loggerMaker.debugAndAddToDb("fetchTestingRunResults called for queryMode="+queryMode);
 
         int timeNow = Context.now();
-        Bson ignoredIssuesFilters = Filters.and(
-                Filters.in(TestingRunIssues.TEST_RUN_ISSUES_STATUS, "IGNORED"),
-                Filters.in(TestingRunIssues.LATEST_TESTING_RUN_SUMMARY_ID, testingRunResultSummaryId)
-        );
-        List<TestingRunIssues> issueslist = TestingRunIssuesDao.instance.findAll(ignoredIssuesFilters,
-            Projections.include("_id"));
-        this.issueslistCount = issueslist.size();
-        loggerMaker.debugAndAddToDb("[" + (Context.now() - timeNow) + "] Fetched testing run issues of size: " + issueslist.size(), LogDb.DASHBOARD);
-
-        List<Bson> testingRunResultFilters = prepareTestRunResultsFilters(testingRunResultSummaryId, queryMode);
+        List<Bson> testingRunResultFilters = prepareTestRunResultsFilters(testingRunResultSummaryId, queryMode, false);
 
         if(queryMode == QueryMode.SKIPPED_EXEC || queryMode == QueryMode.SKIPPED_EXEC_NEED_CONFIG){
             TestError[] testErrors = TestResult.TestError.values();
@@ -829,10 +827,12 @@ public class StartTestAction extends UserAction {
             this.testingRunResults = VulnerableTestingRunResultDao.instance
                     .fetchLatestTestingRunResultWithCustomAggregations(filters, pageLimit, skip, sortStage, testingRunResultSummaryId, queryMode.equals(QueryMode.VULNERABLE));
             loggerMaker.debugAndAddToDb("[" + (Context.now() - timeNow) + "] Fetched testing run results of size: " + testingRunResults.size(), LogDb.DASHBOARD);
-
+            BasicDBObject issueMetaDataMap = prepareIssueMetaDataMap(testingRunResults);
             timeNow = Context.now();
-            removeTestingRunResultsByIssues(testingRunResults, issueslist, false);
-            this.issuesDescriptionMap = prepareIssueDescriptionMap(testingRunResultSummaryId, testingRunResults);
+            removeTestingRunResultsByIssues(testingRunResults, (Map<String, String>) issueMetaDataMap.get("statuses"));
+            this.issuesDescriptionMap = (Map<String, String>) issueMetaDataMap.get("descriptions");
+            this.issueslistCount = issueMetaDataMap.getInt("count");
+            this.jiraIssuesMapForResults = (Map<String, String>) issueMetaDataMap.get("jiraIssues");
             loggerMaker.debugAndAddToDb("[" + (Context.now() - timeNow) + "] Removed ignored issues from testing run results. Current size of testing run results: " + testingRunResults.size(), LogDb.DASHBOARD);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "error in fetchLatestTestingRunResult: " + e);
@@ -844,13 +844,11 @@ public class StartTestAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
-    private Map<String, String> prepareIssueDescriptionMap(ObjectId latestTestingSummaryId,
-        List<TestingRunResult> testingRunResults) {
-
+    private BasicDBObject prepareIssueMetaDataMap(List<TestingRunResult> testingRunResults) {
+        BasicDBObject issueMetaDataMap = new BasicDBObject();
         try {
-
             if (testingRunResults == null || testingRunResults.isEmpty()) {
-                return Collections.emptyMap();
+                return issueMetaDataMap;
             }
 
             Map<TestingIssuesId, TestingRunResult> idToResultMap = new HashMap<>();
@@ -861,53 +859,29 @@ public class StartTestAction extends UserAction {
 
             List<TestingRunIssues> issues = TestingRunIssuesDao.instance.findAll(
                 Filters.and(
-                    Filters.eq(TestingRunIssues.LATEST_TESTING_RUN_SUMMARY_ID, latestTestingSummaryId),
-                    Filters.in("_id", idToResultMap.keySet())
+                    Filters.in(Constants.ID, idToResultMap.keySet())
                 ),
-                Projections.include("_id", TestingRunIssues.DESCRIPTION)
+                Projections.include(TestingRunIssues.TEST_RUN_ISSUES_STATUS, TestingRunIssues.DESCRIPTION, TestingRunIssues.JIRA_ISSUE_URL)
             );
 
-            return com.akto.action.testing.Utils.mapIssueDescriptions(issues, idToResultMap);
+            return buildIssueMetaDataMap(issues, idToResultMap);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error in preparing issue description map: " + e.getMessage());
-            return Collections.emptyMap();
+            return issueMetaDataMap;
         }
     }
 
-    public static void removeTestingRunResultsByIssues(List<TestingRunResult> testingRunResults,
-                                                       List<TestingRunIssues> testingRunIssues,
-                                                       boolean retainByIssues) {
-        long startTime = System.currentTimeMillis();
-
-        Set<String> issuesSet = new HashSet<>();
-        for (TestingRunIssues issue : testingRunIssues) {
-            String apiInfoKeyString = issue.getId().getApiInfoKey().toString();
-            String key = apiInfoKeyString + "|" + issue.getId().getTestSubCategory();
-            issuesSet.add(key);
-        }
-        loggerMaker.debugAndAddToDb("Total issues to be removed from TestingRunResults list: " + issuesSet.size(), LogDb.DASHBOARD);
-
+    public static void removeTestingRunResultsByIssues(List<TestingRunResult> testingRunResults, Map<String, String> ignoredResults) {
         Iterator<TestingRunResult> resultIterator = testingRunResults.iterator();
-
         while (resultIterator.hasNext()) {
             TestingRunResult result = resultIterator.next();
-            String apiInfoKeyString = result.getApiInfoKey().toString();
-            String resultKey = apiInfoKeyString + "|" + result.getTestSubType();
-
-            boolean matchFound = issuesSet.contains(resultKey);
-
+            String resultHexId = result.getHexId();
             if (!result.isIgnoredResult()) {
-                if (retainByIssues && !matchFound) {
-                    resultIterator.remove();
-                } else if (!retainByIssues && matchFound) {
+                if (ignoredResults.containsKey(resultHexId)) {
                     resultIterator.remove();
                 }
             }
         }
-
-        long endTime = System.currentTimeMillis();
-        long duration = endTime - startTime;
-        loggerMaker.debugAndAddToDb("[" + Instant.now() + "] Removed elements from TestingRunResults list in " + duration + " ms", LogDb.DASHBOARD);
     }
 
     private Map<String, List<String>> reportFilterList;

@@ -2,6 +2,7 @@ package com.akto.action;
 
 import com.akto.ApiRequest;
 import com.akto.dao.ApiCollectionsDao;
+import com.akto.dao.context.Context;
 import com.akto.dto.ApiCollection;
 import com.akto.log.LoggerMaker;
 import com.akto.utils.Utils;
@@ -66,6 +67,7 @@ public class AktoJaxAction extends UserAction {
             requestBody.put("apiKey", apiKey);
             requestBody.put("dashboardUrl", dashboardUrl);
             requestBody.put("collectionId", collectionId);
+            requestBody.put("accountId", Context.accountId.get());
 
             String reqData = requestBody.toString();
             JsonNode node = ApiRequest.postRequest(new HashMap<>(), url, reqData);

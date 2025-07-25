@@ -15,8 +15,11 @@ public class DashboardMaliciousEvent {
   private long timestamp;
   private String type;
   private String refId;
+  private String category;
   private String subCategory;
   private String eventType;
+  private String payload;
+  private String metadata;
 
   public DashboardMaliciousEvent() {}
 
@@ -32,8 +35,11 @@ public class DashboardMaliciousEvent {
       long timestamp,
       String type,
       String refId,
+      String category,
       String subCategory,
-      String eventType) {
+      String eventType,
+      String payload,
+      String metadata) {
     this.id = id;
     this.actor = actor;
     this.filter_id = filter;
@@ -45,8 +51,11 @@ public class DashboardMaliciousEvent {
     this.timestamp = timestamp;
     this.type = type;
     this.refId = refId;
+    this.category = category;
     this.subCategory = subCategory;
     this.eventType = eventType;
+    this.payload = payload;
+    this.metadata = metadata;
   }
 
   public String getId() {
@@ -137,6 +146,14 @@ public class DashboardMaliciousEvent {
     this.refId = refId;
   }
 
+  public String getCategory() {
+    return category;
+  }
+
+  public void setCategory(String category) {
+    this.category = category;
+  }
+
   public String getSubCategory() {
     return subCategory;
   }
@@ -151,6 +168,22 @@ public class DashboardMaliciousEvent {
 
   public void setEventType(String eventType) {
     this.eventType = eventType;
+  }
+
+  public String getPayload() {
+    return payload;
+  }
+
+  public void setPayload(String payload) {
+    this.payload = payload;
+  }
+
+  public String getMetadata() {
+    return metadata;
+  }
+
+  public void setMetadata(String metadata) {
+    this.metadata = metadata;
   }
 
 }
