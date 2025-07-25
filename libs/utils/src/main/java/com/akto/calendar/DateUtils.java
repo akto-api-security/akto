@@ -3,10 +3,14 @@ package com.akto.calendar;
 import com.akto.dao.context.Context;
 import com.akto.util.DateUtils.TrackingPeriod;
 
+import java.text.SimpleDateFormat;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
+import java.util.Date;
+import java.util.Locale;
+import java.util.TimeZone;
 
 public class DateUtils {
 
@@ -71,5 +75,12 @@ public class DateUtils {
         LocalDate localEndDate = LocalDate.parse(Integer.toString(endDate),DateTimeFormatter.ofPattern("yyyyMMdd"));
 
         return localStartDate.until(localEndDate, ChronoUnit.DAYS) + 1;
+    }
+
+    public static String convertToUtcLocaleDate(long epochTime) {
+        Date date = new Date(epochTime);
+        SimpleDateFormat formatter = new SimpleDateFormat("MMM dd, yyyy", Locale.US);
+        formatter.setTimeZone(TimeZone.getTimeZone("UTC"));
+        return formatter.format(date);
     }
 }
