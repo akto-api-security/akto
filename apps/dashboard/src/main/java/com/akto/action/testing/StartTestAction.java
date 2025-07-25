@@ -39,7 +39,6 @@ import com.mongodb.client.model.*;
 import com.mongodb.client.result.InsertOneResult;
 import com.opensymphony.xwork2.Action;
 import lombok.Getter;
-import lombok.Setter;
 import org.apache.commons.lang3.StringUtils;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
@@ -93,13 +92,7 @@ public class StartTestAction extends UserAction {
     private static final Gson gson = new Gson();
 
     @Getter
-    int skippedTestsCount;
-
-    @Getter
     int misConfiguredTestsCount;
-
-    @Setter
-    private boolean showUrls;
 
     Set<Integer> deactivatedCollections = UsageMetricCalculator.getDeactivated();
 
@@ -1545,8 +1538,7 @@ public class StartTestAction extends UserAction {
     }
 
     public String fetchMisConfiguredTestsCount(){
-
-        this.misConfiguredTestsCount = VulnerableTestingRunResultDao.instance.countFromDb(Filters.eq(TestingRunResult.REQUIRES_CONFIG, false), false);
+        this.misConfiguredTestsCount = (int) TestingRunResultDao.instance.count(Filters.eq(TestingRunResult.REQUIRES_CONFIG, true));
         return Action.SUCCESS.toUpperCase();
     }
 
