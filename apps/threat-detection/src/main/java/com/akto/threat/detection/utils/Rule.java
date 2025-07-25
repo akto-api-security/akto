@@ -7,4 +7,6 @@ public class Rule {
     public String severity;
     public int score;
     public String regexString;
+
+    // TODO: ? Add rule type(trie or regex) and evaluation logic. 
 }

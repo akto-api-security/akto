@@ -2,11 +2,22 @@ package com.akto.threat.detection.utils;
 
 import java.util.*;
 import java.util.regex.*;
+
+
+import java.util.function.Supplier;
+
+import com.akto.dto.HttpRequestParams;
+import com.akto.dto.HttpResponseParams;
+import com.google.common.hash.BloomFilter;
+import java.nio.charset.StandardCharsets;
+import com.google.common.hash.Funnels;
 import java.util.concurrent.*;
 
 public class CRSEvaluator {
     private List<Rule> rules = new ArrayList<>();
     private List<Pattern> compiledRules = new ArrayList<>();
+    private BloomFilter<String> benignRequestParamsBloomFilter = BloomFilter
+            .create(Funnels.stringFunnel(StandardCharsets.UTF_8), 10_000_000, 0.001);
     private ExecutorService executor;
     private RuleSetLoader ruleSetLoader;
 
@@ -26,31 +37,89 @@ public class CRSEvaluator {
         return Executors.newFixedThreadPool(nThreads);
     }
 
-    public boolean evaluate(String input) {
-        for (int i = 0; i < compiledRules.size(); i++) {
-                Pattern pattern = compiledRules.get(i);
-                if (pattern.matcher(input).find()) {
-                    Rule rule = rules.get(i);
-                    // System.out.println("Matched Rule ID: " + rule.id);
-                    // System.out.println("Message: " + rule.message);
-                    // System.out.println("Severity: " + rule.severity);
-                    return true;
-                }
-        }
-                return false;
+    public boolean wasRequestAlreadyAnalysed(HttpResponseParams httpResponseParams) {
+
+        // TODO: Optimize ? maybe we need to check for only the params that are not in
+        // the bloom filter
+        // Instead of the whole request.
+
+        if (!benignRequestParamsBloomFilter.mightContain(httpResponseParams.getRequestParams().getURL())) {
+            return false;
         }
 
+        for (Map.Entry<String, List<String>> entry : httpResponseParams.getHeaders().entrySet()) {
+            if (!benignRequestParamsBloomFilter.mightContain(entry.getKey())) {
+                return false;
+            }
+            for (String value : entry.getValue()) {
+                if (!benignRequestParamsBloomFilter.mightContain(value)) {
+                    return false;
+                }
+            }
+        }
+
+        if (!benignRequestParamsBloomFilter.mightContain(httpResponseParams.getRequestParams().getPayload())) {
+            return false;
+        }
+        return true;
+
+    }
+
+    private void addRequestToBloomFilter(HttpResponseParams httpResponseParams) {
+
+        // Put URL into the bloom filter.
+        // TODO: verify query params are included or not
+        benignRequestParamsBloomFilter.put(httpResponseParams.getRequestParams().getURL());
+
+        // Put header keys and values into the bloom filter
+        for (Map.Entry<String, List<String>> entry : httpResponseParams.getHeaders().entrySet()) {
+            benignRequestParamsBloomFilter.put(entry.getKey());
+            for (String value : entry.getValue()) {
+                benignRequestParamsBloomFilter.put(value);
+            }
+        }
+
+        // TODO: Whole payload as string vs individual fields. What is better?
+        benignRequestParamsBloomFilter.put(httpResponseParams.getRequestParams().getPayload());
+    }
+
+    public boolean evaluate(HttpResponseParams httpResponseParams) {
+
+        if (wasRequestAlreadyAnalysed(httpResponseParams)) {
+            return false;
+        }
+
+        String input = httpResponseParams.getOriginalMsg().get();
+
+        for (int i = 0; i < compiledRules.size(); i++) {
+            Pattern pattern = compiledRules.get(i);
+            if (pattern.matcher(input).find()) {
+                Rule rule = rules.get(i);
+                System.out.println("Matched Rule ID: " + rule.id);
+                System.out.println("Message: " + rule.message);
+                System.out.println("Severity: " + rule.severity);
+                return true;
+            }
+        }
+        addRequestToBloomFilter(httpResponseParams);
+        return false;
+    }
 
     public static void main(String[] args) {
         RuleSetLoader loader = new RuleSetLoader("/RCE.conf");
         CRSEvaluator evaluator = new CRSEvaluator(loader);
 
         String test1 = "curl -X POST http://example.com -d 'id=1; rm -rf /'";
+        String test2 = "GET /app?cmd=;ls %20-al HTTP/1.1";
         String test = hugeString();
+
+
         final long targetOps = 1_000;
+        HttpResponseParams httpResponseParams = createHttpResponseParams();
         long start = System.nanoTime();
         for (int ops = 0; ops < targetOps; ops++) {
-            evaluator.evaluate(test);
+            boolean result = evaluator.evaluate(httpResponseParams);
+
         }
         long end = System.nanoTime();
 
@@ -65,36 +134,61 @@ public class CRSEvaluator {
         System.out.printf("Total time for %d operations: %.2f ms%n", targetOps, durationMs);
         System.out.printf("Operations per second: %.2f%n", opsPerSec);
         System.out.printf("Average time per operation: %.2f us%n", avgTimePerOpUs);
-      
+
+    }
+
+    public static HttpResponseParams createHttpResponseParams() {
+        HttpResponseParams httpResponseParams = new HttpResponseParams();
+        httpResponseParams.setOriginalMsg(hugeStringSupplier());
+        httpResponseParams.setRequestParams(new HttpRequestParams(
+                "https://portalapps.insperity.com/HSAEnrollment/contribution/new?CID=k7MKeZC9ac18A1lpkb7KlA",
+                "POST",
+                "HTTP/1.1",
+                headerListMap(),
+                hugeString(),
+                123132));
+        return httpResponseParams;
+    }
+
+    public static Map<String, List<String>> headerListMap() {
+        Map<String, List<String>> headerListMap = new HashMap<>();
+        headersMap().forEach((key, value) -> headerListMap.put(key, Collections.singletonList(value)));
+        return headerListMap;
+    }
+
+    public static Map<String, String> headersMap() {
+        Map<String, String> headers = new HashMap<>();
+        headers.put("accept-encoding", "gzip, deflate, br, zstd");
+        headers.put("accept-language", "en-US,en;q=0.9");
+        headers.put("accept", "application/json, text/plain, */*");
+        headers.put("adrum", "isAjax:true");
+        headers.put("companyid", "k7MKeZC9ac18A1lpkb7KlA");
+        headers.put("connection", "keep-alive");
+        headers.put("content-length", "38285");
+        headers.put("content-type", "application/json");
+        // headers.put("cookie",
+                // "_ga_GWHNRBN7C4=GS2.1.s1751293712$o1$g1$t1751297472$j60$l0$h841241629; _gid=GA1.2.573515384.1753017067; _ga=GA1.1.1643935729.1751998030; _ga_S0XMRY9KFM=GS2.1.s1753017067$o3$g1$t1753017084$j43$l0$h0; ESC5ReSync=True; ADRUM=s=1753101908565&r=https%3A%2F%2Fportal.insperity.com%2Fpcms%2Fbenefits%3F0; NSC_XE_ENA_QpsubmBqqt_efgbvmu_WJQ=ffffffff09f5144b45525d5f4f58455e445a4a42378b; FedAuth=77u/PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0idXRmLTgiPz48U2VjdXJpdHlDb250ZXh0VG9rZW4gcDE6SWQ9Il8yNmZlZGI1ZS1hOWE4LTRhMjMtODM2OS1kOTQ5MmRkMTBkODUtMDU4Nzk5QjBDODVEMzQ1QUYxREY3QUM3RkVCNEQ1NTciIHhtbG5zOnAxPSJodHRwOi8vZG9jcy5vYXNpcy1vcGVuLm9yZy93c3MvMjAwNC8wMS9vYXNpcy0yMDA0MDEtd3NzLXdzc2VjdXJpdHktdXRpbGl0eS0xLjAueHNkIiB4bWxucz0iaHR0cDovL2RvY3Mub2FzaXMtb3Blbi5vcmcvd3Mtc3gvd3Mtc2VjdXJlY29udmVyc2F0aW9uLzIwMDUxMiI+PElkZW50aWZpZXI+dXJuOnV1aWQ6OWQxMzg1NGYtZTJiNy00Y2ZmLTlhNGEtNjU5MDBlNTVlNjJjPC9JZGVudGlmaWVyPjxDb29raWUgeG1sbnM9Imh0dHA6Ly9zY2hlbWFzLm1pY3Jvc29mdC5jb20vd3MvMjAwNi8wNS9zZWN1cml0eSI+L1cxd1U4bndEOXpmaWYxdTZ4WUVxMDRUeHlURkVSbExSVkNuRWpmZjNHbGdoOUptRUo5WDR3alRvTmpiVFFaQ3NDTnpCUURTRVhBTko3NHh3MXFUOTdGaVV1VWRPNktDeTNUTXk0QWF4Y1RqdlJxRG5wbDZBNUJqNXdlYnZWUGNHcWdBV2hvdVhpa3BqRnhNZ2VCbjd6V0IvV1ZGbldNSndNQjVQMGhiMDFkUUtuRVZxRVErL0dFU1V5ekhyNU1tdm1TZGhXcVJDdHpKMDRYL3BRRFRiMFJOWlNWWjBZaHJNSHNUOG5EaG1xV3ozZ2lxUytoMEsrbU40S09WSXhocFdXbHpPYXl0bnJuWWI5THRveS9Za1ZxWVNEUm5RelNUMjRvZDlrbUY2Sm1RdjJTckI0MjMxWkxqeU5aNHU2SWxNQ1NrcE5UaW84V2lyT2piV01KNkpJUWRlM0lzN2I3UERidTc1S0NaS09QM3BqQmN1akV1b3JvdmZlKy93Y1ZZKzR5dlBRNlJDb0JYdFhadHhIcG50YzJmYlpPalk4RzJqNzFiTjEyQzJLTXlPL21hVGF0cTd5WTc1elhQRVBnREVicU5CSzRjSFhmaCtkOEF5MW1LRHBYZ0V6ZjJXRUg3MDV6anlDckFnT2xNdzFrSHZXQzVOUVh3ZDVqdVB0Wkt3RURRUVZwKzJPanNObm5XaHJVNWxJelk2Z0pPbFByQWNQcU1tVkxVQkxUOEhuWlZEc1hGZEVCd0FTdkYxM3FIZWJ4R1Z4a3pmOTJIdHRTRUJTeVN5Qlp0VldHU2FCK1l0dVEyZVZMZ05jcjE4RzdFUGFaTjl0eUhlUHZJdXFNNnAzODJmQ1ZMTEE4dUljc0dzZmtXUkRRQ0I1S3R1YUNKU3NpWTQ2UFV2eU8wRC9MdG0vTCt4cG5zYkwvQVRvOERLYStKbm1yK2dRRFJhUVVzMHNGVkZ4SzVKaDY0Q3VZbUhHZ2FxRHZPK211MHl1b081K0lPa1pmcjJZZWdoczBqOVpPVjd4TTdTWCtnR3FsL3FtOFZuc2U5cHdObzd5NDJOM3hjdzUzUzJIMjRjU0luZWVLeGlsNTVaMm14aDdKWnJGamJOUVF5ZUFBVFkzc2dKNytISFJvQS9CbGJQNlRNMWhrcEJ4eUVJRmF2KzJqcmFIR0V4WlhpVXdRS21NSG9OenVEVVdhYWovT0hYVW1PbDBteDV5NnlhWDY0L3JmY2NzSy9STGQxSTRHZy9TSnVMeWswNmNwYnpsN1loN3dvRzBXdStQYkVxMFg0TlEvbUh2dWZwQmk5MjQrRFZSV1ZiaGhHNnlhTFRBbTh2OHVRellWVHBCYkY1dmNsRkxRWHpSeW5tcWtBVWV2VFA4T2cxU0I5NTdjc2NOVE5pNUI4S1pN; FedAuth1=MUpPR3M0bmxXZUFCVGoxOXZtaXhTbGUvK3dTT2VFaTBpMG50M0dSRWczdjM1alBYZXRiQSttUWZSeEJ5UkNXMjljZ2F2SXpLWTJNVElNbmZaczlKc2E2R1c2NGVpWUw0ZzMrTnQwRngvUGJtSEFYZTRlRXBwYzErMlY3NG1URE03TTZ1MTBIVW13eU0rd0pDT3JNaVRKVWxLeTJNVzJPTGhHcUNnRFFjamN6b1VsN3FqNWtQbWlkLzJhNFFLQXdiWGZFS3hBaXA1djlLRytkNlNYUTkxaHlpWThZMTVWSDhwOTZQeTVzYWFWQVJlbmxDRnUwZ2VYRG5nLzJwV1ViOUN6cy82RXg0VkdxOGpHWmgvK3c4bUVmaktnZEZXVjh6ZmtLUHFDVTRPMWlCUkMvZDBWZDg4dHZLNm5lanpLLytDQVc2VkZKM1BHM3I1Y1BMT0VBZEdCSjlmV0lua2tMeXN6NzJ3V0pZREFKdFZobHhkb0lYTVBGMXJwWkFnbWpITEJRSk1ZZmhldG10aDwvQ29va2llPjwvU2VjdXJpdHlDb250ZXh0VG9rZW4+; SameSite=None; PCMSJwtBody=eyJhbGciOiJSUzI1NiIsImtpZCI6IjNCQ0Q3OTEzODc5Q0VBRDZDQkMwMzFDRDBBNkMwMDAxRDg1OEJDQjkiLCJ4NXQiOiJPODE1RTRlYzZ0Ykx3REhOQ213QUFkaFl2TGsiLCJ0eXAiOiJKV1QifQ.eyJNYXN0ZXJQZXJzb25JZCI6IjEyMjc5NDgyIiwiQWltc1BlcnNvbklkIjoiNDc3Mzc5MiIsIkFwcFNlY1VzZXJJZCI6IjI1NTE0NTYiLCJSb2xlcyI6IjIwMSwyMjMsMzQwLDM0MSwzNDQsMzQ1LDQzNyw0MzgsNDM5LDQ0MCw0NDMsNDQ0LDQ1OCw0NjAsNDYxLDQ2Miw0NjMsNTE1LDUxNiw1OTAsNjI0LDY0Myw2NzksNjgwLDY4MSw3MDgsNzUyLDc4NSIsIk1hcmtldFNlZ21lbnRzIjoiRW1lcmdpbmcgR3Jvd3RoICg1MCAtIDk5IEVFcykiLCJMYW5kaW5nUGFnZSI6IiIsIlByZWZlcnJlZEZpcnN0TmFtZSI6IktFTExJIiwiRmlyc3ROYW1lIjoiS0VMTEkiLCJMYXN0TmFtZSI6IkJPWUVSUyIsIklzQ29ycCI6IkZhbHNlIiwiQ29tcGFuaWVzIjoiNjEwMzUwMCIsIm5iZiI6MTc1MzEwMTkyMSwiZXhwIjoxNzUzMTAzNzIxLCJpYXQiOjE3NTMxMDE5MjEsImlzcyI6ImFwaS5wb3J0YWwuaW5zcGVyaXR5LmNvbS9hdXRoL3Rva2VuIiwiYXVkIjoiYXBpLnBvcnRhbC5pbnNwZXJpdHkuY29tIn0");
+        headers.put("host", "portalapps.insperity.com");
+        headers.put("origin", "https://portalapps.insperity.com");
+        headers.put("referer",
+                "https://portalapps.insperity.com/HSAEnrollment/contribution/new?CID=k7MKeZC9ac18A1lpkb7KlA");
+        headers.put("sec-ch-ua-mobile", "?0");
+        headers.put("sec-ch-ua-platform", "\"macOS\"");
+        headers.put("sec-ch-ua", "\"Google Chrome\";v=\"137\", \"Chromium\";v=\"137\", \"Not/A)Brand\";v=\"24\"");
+        headers.put("sec-fetch-dest", "empty");
+        headers.put("sec-fetch-mode", "cors");
+        headers.put("sec-fetch-site", "same-origin");
+        headers.put("user-agent",
+                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36");
+        return headers;
+    }
+
+    public static Supplier<String> hugeStringSupplier() {
+        return () -> hugeString();
     }
 
     public static String hugeString() {
-        String t = "POST /HSAEnrollment/api/Audit HTTP/1.1\n" + //
-                "\n" + //
-                "accept-encoding: gzip, deflate, br, zstd\n" + //
-                "accept-language: en-US,en;q=0.9\n" + //
-                "accept: application/json, text/plain, */*\n" + //
-                "adrum: isAjax:true\n" + //
-                "companyid: k7MKeZC9ac18A1lpkb7KlA\n" + //
-                "connection: keep-alive\n" + //
-                "content-length: 38285\n" + //
-                "content-type: application/json\n" + //
-                "cookie: _ga_GWHNRBN7C4=GS2.1.s1751293712$o1$g1$t1751297472$j60$l0$h841241629; _gid=GA1.2.573515384.1753017067; _ga=GA1.1.1643935729.1751998030; _ga_S0XMRY9KFM=GS2.1.s1753017067$o3$g1$t1753017084$j43$l0$h0; ESC5ReSync=True; ADRUM=s=1753101908565&r=https%3A%2F%2Fportal.insperity.com%2Fpcms%2Fbenefits%3F0; NSC_XE_ENA_QpsubmBqqt_efgbvmu_WJQ=ffffffff09f5144b45525d5f4f58455e445a4a42378b; FedAuth=77u/PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0idXRmLTgiPz48U2VjdXJpdHlDb250ZXh0VG9rZW4gcDE6SWQ9Il8yNmZlZGI1ZS1hOWE4LTRhMjMtODM2OS1kOTQ5MmRkMTBkODUtMDU4Nzk5QjBDODVEMzQ1QUYxREY3QUM3RkVCNEQ1NTciIHhtbG5zOnAxPSJodHRwOi8vZG9jcy5vYXNpcy1vcGVuLm9yZy93c3MvMjAwNC8wMS9vYXNpcy0yMDA0MDEtd3NzLXdzc2VjdXJpdHktdXRpbGl0eS0xLjAueHNkIiB4bWxucz0iaHR0cDovL2RvY3Mub2FzaXMtb3Blbi5vcmcvd3Mtc3gvd3Mtc2VjdXJlY29udmVyc2F0aW9uLzIwMDUxMiI+PElkZW50aWZpZXI+dXJuOnV1aWQ6OWQxMzg1NGYtZTJiNy00Y2ZmLTlhNGEtNjU5MDBlNTVlNjJjPC9JZGVudGlmaWVyPjxDb29raWUgeG1sbnM9Imh0dHA6Ly9zY2hlbWFzLm1pY3Jvc29mdC5jb20vd3MvMjAwNi8wNS9zZWN1cml0eSI+L1cxd1U4bndEOXpmaWYxdTZ4WUVxMDRUeHlURkVSbExSVkNuRWpmZjNHbGdoOUptRUo5WDR3alRvTmpiVFFaQ3NDTnpCUURTRVhBTko3NHh3MXFUOTdGaVV1VWRPNktDeTNUTXk0QWF4Y1RqdlJxRG5wbDZBNUJqNXdlYnZWUGNHcWdBV2hvdVhpa3BqRnhNZ2VCbjd6V0IvV1ZGbldNSndNQjVQMGhiMDFkUUtuRVZxRVErL0dFU1V5ekhyNU1tdm1TZGhXcVJDdHpKMDRYL3BRRFRiMFJOWlNWWjBZaHJNSHNUOG5EaG1xV3ozZ2lxUytoMEsrbU40S09WSXhocFdXbHpPYXl0bnJuWWI5THRveS9Za1ZxWVNEUm5RelNUMjRvZDlrbUY2Sm1RdjJTckI0MjMxWkxqeU5aNHU2SWxNQ1NrcE5UaW84V2lyT2piV01KNkpJUWRlM0lzN2I3UERidTc1S0NaS09QM3BqQmN1akV1b3JvdmZlKy93Y1ZZKzR5dlBRNlJDb0JYdFhadHhIcG50YzJmYlpPalk4RzJqNzFiTjEyQzJLTXlPL21hVGF0cTd5WTc1elhQRVBnREVicU5CSzRjSFhmaCtkOEF5MW1LRHBYZ0V6ZjJXRUg3MDV6anlDckFnT2xNdzFrSHZXQzVOUVh3ZDVqdVB0Wkt3RURRUVZwKzJPanNObm5XaHJVNWxJelk2Z0pPbFByQWNQcU1tVkxVQkxUOEhuWlZEc1hGZEVCd0FTdkYxM3FIZWJ4R1Z4a3pmOTJIdHRTRUJTeVN5Qlp0VldHU2FCK1l0dVEyZVZMZ05jcjE4RzdFUGFaTjl0eUhlUHZJdXFNNnAzODJmQ1ZMTEE4dUljc0dzZmtXUkRRQ0I1S3R1YUNKU3NpWTQ2UFV2eU8wRC9MdG0vTCt4cG5zYkwvQVRvOERLYStKbm1yK2dRRFJhUVVzMHNGVkZ4SzVKaDY0Q3VZbUhHZ2FxRHZPK211MHl1b081K0lPa1pmcjJZZWdoczBqOVpPVjd4TTdTWCtnR3FsL3FtOFZuc2U5cHdObzd5NDJOM3hjdzUzUzJIMjRjU0luZWVLeGlsNTVaMm14aDdKWnJGamJOUVF5ZUFBVFkzc2dKNytISFJvQS9CbGJQNlRNMWhrcEJ4eUVJRmF2KzJqcmFIR0V4WlhpVXdRS21NSG9OenVEVVdhYWovT0hYVW1PbDBteDV5NnlhWDY0L3JmY2NzSy9STGQxSTRHZy9TSnVMeWswNmNwYnpsN1loN3dvRzBXdStQYkVxMFg0TlEvbUh2dWZwQmk5MjQrRFZSV1ZiaGhHNnlhTFRBbTh2OHVRellWVHBCYkY1dmNsRkxRWHpSeW5tcWtBVWV2VFA4T2cxU0I5NTdjc2NOVE5pNUI4S1pN; FedAuth1=MUpPR3M0bmxXZUFCVGoxOXZtaXhTbGUvK3dTT2VFaTBpMG50M0dSRWczdjM1alBYZXRiQSttUWZSeEJ5UkNXMjljZ2F2SXpLWTJNVElNbmZaczlKc2E2R1c2NGVpWUw0ZzMrTnQwRngvUGJtSEFYZTRlRXBwYzErMlY3NG1URE03TTZ1MTBIVW13eU0rd0pDT3JNaVRKVWxLeTJNVzJPTGhHcUNnRFFjamN6b1VsN3FqNWtQbWlkLzJhNFFLQXdiWGZFS3hBaXA1djlLRytkNlNYUTkxaHlpWThZMTVWSDhwOTZQeTVzYWFWQVJlbmxDRnUwZ2VYRG5nLzJwV1ViOUN6cy82RXg0VkdxOGpHWmgvK3c4bUVmaktnZEZXVjh6ZmtLUHFDVTRPMWlCUkMvZDBWZDg4dHZLNm5lanpLLytDQVc2VkZKM1BHM3I1Y1BMT0VBZEdCSjlmV0lua2tMeXN6NzJ3V0pZREFKdFZobHhkb0lYTVBGMXJwWkFnbWpITEJRSk1ZZmhldG10aDwvQ29va2llPjwvU2VjdXJpdHlDb250ZXh0VG9rZW4+; SameSite=None; PCMSJwtBody=eyJhbGciOiJSUzI1NiIsImtpZCI6IjNCQ0Q3OTEzODc5Q0VBRDZDQkMwMzFDRDBBNkMwMDAxRDg1OEJDQjkiLCJ4NXQiOiJPODE1RTRlYzZ0Ykx3REhOQ213QUFkaFl2TGsiLCJ0eXAiOiJKV1QifQ.eyJNYXN0ZXJQZXJzb25JZCI6IjEyMjc5NDgyIiwiQWltc1BlcnNvbklkIjoiNDc3Mzc5MiIsIkFwcFNlY1VzZXJJZCI6IjI1NTE0NTYiLCJSb2xlcyI6IjIwMSwyMjMsMzQwLDM0MSwzNDQsMzQ1LDQzNyw0MzgsNDM5LDQ0MCw0NDMsNDQ0LDQ1OCw0NjAsNDYxLDQ2Miw0NjMsNTE1LDUxNiw1OTAsNjI0LDY0Myw2NzksNjgwLDY4MSw3MDgsNzUyLDc4NSIsIk1hcmtldFNlZ21lbnRzIjoiRW1lcmdpbmcgR3Jvd3RoICg1MCAtIDk5IEVFcykiLCJMYW5kaW5nUGFnZSI6IiIsIlByZWZlcnJlZEZpcnN0TmFtZSI6IktFTExJIiwiRmlyc3ROYW1lIjoiS0VMTEkiLCJMYXN0TmFtZSI6IkJPWUVSUyIsIklzQ29ycCI6IkZhbHNlIiwiQ29tcGFuaWVzIjoiNjEwMzUwMCIsIm5iZiI6MTc1MzEwMTkyMSwiZXhwIjoxNzUzMTAzNzIxLCJpYXQiOjE3NTMxMDE5MjEsImlzcyI6ImFwaS5wb3J0YWwuaW5zcGVyaXR5LmNvbS9hdXRoL3Rva2VuIiwiYXVkIjoiYXBpLnBvcnRhbC5pbnNwZXJpdHkuY29tIn0\n"
-                + //
-                "host: portalapps.insperity.com\n" + //
-                "origin: https://portalapps.insperity.com\n" + //
-                "referer: https://portalapps.insperity.com/HSAEnrollment/contribution/new?CID=k7MKeZC9ac18A1lpkb7KlA\n"
-                + //
-                "sec-ch-ua-mobile: ?0\n" + //
-                "sec-ch-ua-platform: \"macOS\"\n" + //
-                "sec-ch-ua: \"Google Chrome\";v=\"137\", \"Chromium\";v=\"137\", \"Not/A)Brand\";v=\"24\"\n" + //
-                "sec-fetch-dest: empty\n" + //
-                "sec-fetch-mode: cors\n" + //
-                "sec-fetch-site: same-origin\n" + //
-                "user-agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36\n"
-                + //
-                "\n" + //
-                "{\n" + //
+        String t = "{\n" + //
                 "  \"action\": \"Page_Load\",\n" + //
                 "  \"auditGroupId\": \"ba072cda-08f5-4275-8ef6-c2591a0a1ab6\",\n" + //
                 "  \"auditSequenceNumber\": 2,\n" + //
