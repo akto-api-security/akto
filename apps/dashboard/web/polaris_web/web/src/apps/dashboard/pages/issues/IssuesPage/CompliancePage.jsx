@@ -263,7 +263,14 @@ function CompliancePage() {
     filtersOptions = func.getCollectionFilters(filtersOptions)
 
     const handleSaveJiraAction = () => {
-        const jiraMetaData = issuesFunctions.prepareAdditionalIssueFieldsJiraMetaData()
+        let jiraMetaData;
+        try {
+            jiraMetaData = issuesFunctions.prepareAdditionalIssueFieldsJiraMetaData(projId, issueType);
+        } catch (error) {
+            setToast(true, true, "Please fill all required fields before creating a Jira ticket.");
+            resetResourcesSelected()
+            return;
+        }
 
         setToast(true, false, "Please wait while we create your Jira ticket.")
         setJiraModalActive(false)

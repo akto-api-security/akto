@@ -12,16 +12,18 @@ const issuesFunctions = {
         const allowedValues = field?.allowedValues || [];
         const fieldId = field?.fieldId || "";
         const fieldName = field?.name || "";
+        const isFieldRequired = field?.required || false;
+        const hasDefaultValue = field?.hasDefaultValue || false;
+        const defaultValue = field?.defaultValue || null;
 
         const handleFieldChange = (fieldId, value) => {
             updateDisplayJiraIssueFieldValues(fieldId, value)
         } 
-       
 
         switch (customFieldURI) {
             case "com.atlassian.jira.plugin.system.customfieldtypes:textfield":
                 return {
-                    initialValue: "",
+                    initialValue: hasDefaultValue ? defaultValue : "",
                     getComponent: () => {
                         const displayJiraIssueFieldValues = IssuesStore(state => state.displayJiraIssueFieldValues);
                         return (
@@ -32,35 +34,42 @@ const issuesFunctions = {
                                 onChange={(value) => handleFieldChange(fieldId, value)}
                                 maxLength={255}
                                 showCharacterCount
-                                requiredIndicator
+                                requiredIndicator={isFieldRequired}
                             />)
                     }
                 }
             case "com.atlassian.jira.plugin.system.customfieldtypes:select":
             case "com.atlassian.jira.plugin.system.customfieldtypes:multiselect":
+            case "com.atlassian.jira.plugin.system.customfieldtypes:multicheckboxes":
             case "com.atlassian.jira.plugin.system.customfieldtypes:radiobuttons": {
-                const isMultiSelect = customFieldURI.includes("multiselect");
-
-                const firstAllowedOption = {
-                    value: allowedValues.length > 0 ? allowedValues[0].value :  "",
+                const processDefaults = (defaultValue, isMultiSelect, emptyInitialValue) => { 
+                    if (isMultiSelect) {
+                        return Array.isArray(defaultValue)
+                            ? defaultValue.map(item => ({ value: item.value }))
+                            : emptyInitialValue;
+                    } else {
+                        return defaultValue?.value ? { value: defaultValue.value } : emptyInitialValue
+                    }
                 }
                 
-                const initialFieldState = isMultiSelect ? [ firstAllowedOption ] : firstAllowedOption;
-                const preSelected = [ firstAllowedOption.value ];
-              
+                const isMultiSelect = customFieldURI.includes("multiselect") || customFieldURI.includes("multicheckboxes");
+                const emptyInitialValue = isMultiSelect ? [] : null;
+                const initialFieldState = hasDefaultValue ? processDefaults(defaultValue, isMultiSelect, emptyInitialValue) : emptyInitialValue;
+                const preSelected = Array.isArray(initialFieldState) ? initialFieldState.map(item => item.value) : [ initialFieldState?.value ]
+                
                 return {
                     initialValue: initialFieldState,
                     getComponent: () => {
 
                         return (
                             <DropdownSearch
-                                allowMultiple={customFieldURI.includes("multiselect")}
+                                allowMultiple={isMultiSelect}
                                 optionsList={allowedValues.map((option) => ({
                                     label: option?.value,
                                     value: option?.value
                                 }))}
                                 setSelected={(selectedOption) => {
-                                    if (customFieldURI.includes("multiselect")) {
+                                    if (isMultiSelect) {
                                         const updateFieldValue = selectedOption.map((option) => ({ value: option }));
                                         handleFieldChange(fieldId, updateFieldValue);
                                      } else {
@@ -68,11 +77,10 @@ const issuesFunctions = {
                                         handleFieldChange(fieldId, updateFieldValue);
                                     }
                                 }}
-                                value={""}
                                 preSelected={preSelected}
                                 label={fieldName}
                                 placeholder={`Select an option for the field ${fieldName}`}
-                                textfieldRequiredIndicator={true}
+                                textfieldRequiredIndicator={isFieldRequired}
                             />
                         )
                     } 
@@ -80,6 +88,7 @@ const issuesFunctions = {
             }
             default:
                 return {
+                    initialValue: null,
                     getComponent: () => { return null }
                 }
         }
@@ -97,21 +106,44 @@ const issuesFunctions = {
         } catch (error) {
         } 
     },
-    prepareAdditionalIssueFields: () => {
-        const mandatoryCreateJiraIssueFields = IssuesStore.getState().displayJiraIssueFieldValues;
-        const mandatoryCreateJiraIssueFieldsList = Object.keys(mandatoryCreateJiraIssueFields).reduce((acc, fieldId) => {
+    prepareCustomIssueFields: (projId, issueType) => {
+        const createJiraIssueFieldMetaData = IssuesStore.getState().createJiraIssueFieldMetaData;
+
+        const issueTypeFieldMetaDataList = createJiraIssueFieldMetaData?.[projId]?.[issueType] || [];
+        const issueTypeFieldMetaDataMap = issueTypeFieldMetaDataList.reduce((acc, field) => {
+            acc[field.fieldId] = field
+            return acc;
+        }, {});
+
+        const displayJiraIssueFieldValues = IssuesStore.getState().displayJiraIssueFieldValues;
+        const customIssueFields = Object.keys(displayJiraIssueFieldValues).reduce((acc, fieldId) => {
+            const fieldMetaData = issueTypeFieldMetaDataMap[fieldId];
+            const fieldConfiguration = issuesFunctions.getJiraFieldConfigurations(fieldMetaData);
+            const fieldInitialValue = fieldConfiguration.initialValue;
+            const fieldCurrentValue = displayJiraIssueFieldValues[fieldId];
+
+            if (fieldMetaData) {
+                const isRequired = fieldMetaData.required || false;
+                const hasDefaultValue = fieldMetaData.hasDefaultValue || false;
+                
+                // Fail validation if the field is required but has no value
+                if (isRequired && !hasDefaultValue && (fieldCurrentValue === fieldInitialValue)) {
+                    throw new Error();
+                }
+            }
+
             acc.push({
                 fieldId: fieldId,
-                fieldValue: mandatoryCreateJiraIssueFields[fieldId]
+                fieldValue: fieldCurrentValue
             });
             return acc;
         }, []);
 
-        const additionalIssueFields = { mandatoryCreateJiraIssueFields: mandatoryCreateJiraIssueFieldsList }
-        return additionalIssueFields;
+        return customIssueFields;
     },
-    prepareAdditionalIssueFieldsJiraMetaData: () => {
-        const additionalIssueFields = issuesFunctions.prepareAdditionalIssueFields();
+    prepareAdditionalIssueFieldsJiraMetaData: (projId, issueType) => {
+        const customIssueFields = issuesFunctions.prepareCustomIssueFields(projId, issueType);
+        const additionalIssueFields = { customIssueFields: customIssueFields };
         const jiraMetaData = { additionalIssueFields: additionalIssueFields };
         return jiraMetaData;
     }
