@@ -785,7 +785,10 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
         List<TestingRunResult> testingRunResultList = new ArrayList<>();
         int existingIssues = 0;
         List<TestingRunIssues> testingRunIssuesList = TestingRunIssuesDao.instance.findAll(
-            Filters.in("_id", issuesIds)
+            Filters.in("_id", issuesIds),
+            Projections.include(Constants.ID, TestingRunIssues.JIRA_ISSUE_URL,
+                TestingRunIssues.TEST_RUN_ISSUES_STATUS, TestingRunIssues.LAST_UPDATED, TestingRunIssues.CREATION_TIME,
+                TestingRunIssues.KEY_SEVERITY, TestingRunIssues.IGNORE_REASON)
         );
 
         Map<TestingIssuesId, TestingRunIssues> issuesEligibleForJiraMap = testingRunIssuesList.stream()

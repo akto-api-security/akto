@@ -4,9 +4,7 @@ import com.akto.calendar.DateUtils;
 import com.akto.dao.JiraIntegrationDao;
 import com.akto.dto.jira_integration.JiraIntegration;
 import com.akto.dto.test_editor.Info;
-import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.test_run_findings.TestingRunIssues;
-import com.akto.dto.testing.ComplianceInfo;
 import com.akto.dto.testing.ComplianceMapping;
 import com.akto.dto.testing.Remediation;
 import com.akto.log.LoggerMaker;
@@ -16,7 +14,6 @@ import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
-import io.swagger.models.auth.In;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.Collections;
@@ -126,8 +123,7 @@ public class Utils {
     }
 
     public static List<BasicDBObject> buildAdditionalIssueFieldsForJira(Info info,
-        TestingRunIssues issue,
-        Remediation remediation) {
+        TestingRunIssues issue, Remediation remediation) {
         List<BasicDBObject> contentList = new ArrayList<>();
 
         try {
