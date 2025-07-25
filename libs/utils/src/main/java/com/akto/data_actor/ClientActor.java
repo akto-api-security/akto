@@ -10,6 +10,7 @@ import com.akto.dto.jobs.JobStatus;
 import com.akto.dto.jobs.ScheduleType;
 import com.akto.dto.metrics.MetricData;
 import com.akto.dto.monitoring.ModuleInfo;
+import com.akto.dto.notifications.SlackWebhook;
 import com.akto.dto.settings.DataControlSettings;
 import com.akto.testing.ApiExecutor;
 import com.auth0.jwt.JWT;
@@ -63,6 +64,8 @@ import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
+import com.slack.api.Slack;
+
 import org.bson.BsonReader;
 import org.bson.Document;
 import org.bson.codecs.Codec;
@@ -3944,5 +3947,36 @@ public class ClientActor extends DataActor {
             loggerMaker.errorAndAddToDb(e, "Exception in getLLMResponse." , LoggerMaker.LogDb.TESTING);
         }
         return null;
+    }
+
+    public List<SlackWebhook> fetchSlackWebhooks() {
+        Map<String, List<String>> headers = buildHeaders();
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/getSlackWebhooks", "", "POST",  "", headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb("non 2xx response in fetchSlackWebhooks", LoggerMaker.LogDb.TESTING);
+                return new ArrayList<>();
+            }
+            BasicDBObject payloadObj;
+            try {
+                payloadObj = BasicDBObject.parse(responsePayload);
+                BasicDBList webhooksList = (BasicDBList) payloadObj.get("slackWebhooks");
+                List<SlackWebhook> slackWebhooks = new ArrayList<>();
+                for (Object webhookObj : webhooksList) {
+                    BasicDBObject obj2 = (BasicDBObject) webhookObj;
+                    SlackWebhook slackWebhook = objectMapper.readValue(obj2.toJson(), SlackWebhook.class);
+                    slackWebhooks.add(slackWebhook);
+                }
+                return slackWebhooks;  
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb("error in fetchSlackWebhooks" + e, LoggerMaker.LogDb.TESTING);
+                return new ArrayList<>();
+            }
+        }catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in fetchSlackWebhooks" + e, LoggerMaker.LogDb.TESTING);
+            return new ArrayList<>();
+        }
     }
 }

@@ -14,12 +14,14 @@ import com.akto.bulk_update_util.ApiInfoBulkUpdate;
 import com.akto.dao.*;
 import com.akto.dao.filter.MergedUrlsDao;
 import com.akto.dao.metrics.MetricDataDao;
+import com.akto.dao.notifications.SlackWebhooksDao;
 import com.akto.dao.settings.DataControlSettingsDao;
 import com.akto.dao.testing.config.TestSuiteDao;
 import com.akto.dependency_analyser.DependencyAnalyserUtils;
 import com.akto.dto.*;
 import com.akto.dto.filter.MergedUrls;
 import com.akto.dto.metrics.MetricData;
+import com.akto.dto.notifications.SlackWebhook;
 import com.akto.dto.settings.DataControlSettings;
 import com.akto.dto.testing.config.TestSuites;
 import com.mongodb.client.model.*;
@@ -1172,4 +1174,9 @@ public class DbLayer {
                         Updates.set(TestingRunPlayground.TESTING_RUN_RESULT, testingRunPlayground.getTestingRunResult())));
     }
 
+    public static List<SlackWebhook> fetchSlackWebhooks() {
+        return SlackWebhooksDao.instance.findAll(
+            Filters.empty()
+        );
+    }
 }
