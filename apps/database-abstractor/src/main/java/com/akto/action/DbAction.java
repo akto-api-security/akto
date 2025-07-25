@@ -18,6 +18,7 @@ import com.akto.dto.graph.SvcToSvcGraphEdge;
 import com.akto.dto.graph.SvcToSvcGraphNode;
 import com.akto.dto.metrics.MetricData;
 import com.akto.dto.monitoring.ModuleInfo;
+import com.akto.dto.notifications.SlackWebhook;
 import com.akto.dto.runtime_filters.RuntimeFilter;
 import com.akto.dto.settings.DataControlSettings;
 import com.akto.dto.test_editor.TestingRunPlayground;
@@ -59,6 +60,9 @@ import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.opensymphony.xwork2.Action;
 import com.opensymphony.xwork2.ActionSupport;
+
+import lombok.Getter;
+
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.*;
@@ -3748,6 +3752,19 @@ public class DbAction extends ActionSupport {
             }
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error in fetchRerunTestingRunResultSummary: " + e, LogDb.DB_ABS);
+            return ERROR.toUpperCase();
+        }
+        return SUCCESS.toUpperCase();
+    }
+
+    @Getter
+    List<SlackWebhook> slackWebhooks;
+
+    public String fetchSlackWebhooks() {
+        try {
+            this.slackWebhooks = DbLayer.fetchSlackWebhooks();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error in fetchSlackWebhooks: " + e, LogDb.DB_ABS);
             return ERROR.toUpperCase();
         }
         return SUCCESS.toUpperCase();
