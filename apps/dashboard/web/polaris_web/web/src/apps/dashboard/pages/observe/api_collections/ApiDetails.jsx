@@ -628,7 +628,7 @@ function ApiDetails(props) {
                             >
                                 {issuesTableHeaders.map(header => (
                                     <IndexTable.Cell key={header.value}>
-                                        <div
+                                        <Box
                                             onClick={async (e) => {
                                                 e.stopPropagation();
                                                 if (!issue.id || !issue.id[0]) return;
@@ -653,7 +653,7 @@ function ApiDetails(props) {
                                             onMouseOut={e => e.currentTarget.style.background = ''}
                                         >
                                             {issue[header.value]}
-                                        </div>
+                                        </Box>
                                     </IndexTable.Cell>
                                 ))}
                             </IndexTable.Row>
