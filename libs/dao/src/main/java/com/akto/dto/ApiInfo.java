@@ -33,6 +33,7 @@ public class ApiInfo {
     private Map<String, Integer> violations;
     public static final String LAST_SEEN = "lastSeen";
     public static final String LAST_TESTED = "lastTested";
+    public static final String TOTAL_TESTED_COUNT = "totalTestedCount";
     private int lastSeen;
     private int lastTested;
     public static final String IS_SENSITIVE = "isSensitive";

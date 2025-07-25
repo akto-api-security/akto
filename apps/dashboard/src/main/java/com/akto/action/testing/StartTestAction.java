@@ -39,14 +39,11 @@ import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.*;
 import com.mongodb.client.result.InsertOneResult;
 import com.opensymphony.xwork2.Action;
-
 import lombok.Getter;
-
 import org.apache.commons.lang3.StringUtils;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 
-import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.regex.Pattern;
@@ -95,6 +92,9 @@ public class StartTestAction extends UserAction {
     private Map<String, String> issuesDescriptionMap;
 
     private static final Gson gson = new Gson();
+
+    @Getter
+    int misConfiguredTestsCount;
 
     Set<Integer> deactivatedCollections = UsageMetricCalculator.getDeactivated();
 
@@ -1509,6 +1509,11 @@ public class StartTestAction extends UserAction {
     private TestingIssuesId getTestingIssueIdFromRunResult(TestingRunResult runResult) {
         return new TestingIssuesId(runResult.getApiInfoKey(), TestErrorSource.AUTOMATED_TESTING,
             runResult.getTestSubType());
+    }
+
+    public String fetchMisConfiguredTestsCount(){
+        this.misConfiguredTestsCount = (int) TestingRunResultDao.instance.count(Filters.eq(TestingRunResult.REQUIRES_CONFIG, true));
+        return Action.SUCCESS.toUpperCase();
     }
 
 
