@@ -1697,7 +1697,7 @@
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <result name="SUCCESS" type="json">
-                <param name="root">llmResponsePayload</param>
+                <param name="root">slackWebhooks</param>
             </result>
             <result name="ERROR" type="json">
                 <param name="statusCode">422</param>
