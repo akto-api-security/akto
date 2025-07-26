@@ -32,11 +32,12 @@ public class SlackSender {
             }
             String webhookUrl = "";
             if(slackWebhookId > 0){
-                webhookUrl = listWebhooks.stream()
-                        .filter(webhook -> webhook.getId() == slackWebhookId)
-                        .map(SlackWebhook::getWebhook)
-                        .findFirst()
-                        .orElse("");
+                for(Object webhook : listWebhooks) {
+                    if(((SlackWebhook)webhook).getId() == slackWebhookId) {
+                        webhookUrl = ((SlackWebhook)webhook).getWebhook();
+                        break;
+                    }
+                }
             }
 
             if(webhookUrl.isEmpty()) {
