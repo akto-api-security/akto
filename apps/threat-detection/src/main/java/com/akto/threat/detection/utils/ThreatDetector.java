@@ -121,7 +121,7 @@ public class ThreatDetector {
 
     public boolean isSSRFThreat(HttpResponseParams httpResponseParams) {
         // TODO: .get() is expensive, optimize it
-        return osCommandInjectionTrie.containsMatch(httpResponseParams.getOriginalMsg().get());
+        return ssrfTrie.containsMatch(httpResponseParams.getOriginalMsg().get());
     }
 
 }

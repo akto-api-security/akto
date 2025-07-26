@@ -11,6 +11,16 @@
 
 http://instance-data/latest/
 http://169.254.169.254/latest/
+http://metadata.google.internal
+http://internal-service
+file:///etc/passwd
+dict://127.0.0.1:80
+http://evil.com@localhost
+http://evil.com#@localhost
+http://2130706433
+http://0177.0.0.1
+http://0x7f000001
+http://169.254.169.254
 
 # Common evasion techniques:
 http://2852039166/latest/
