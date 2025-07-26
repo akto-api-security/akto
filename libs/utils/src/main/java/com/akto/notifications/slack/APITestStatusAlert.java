@@ -4,6 +4,7 @@ import com.akto.dao.notifications.SlackWebhooksDao;
 import com.akto.dto.notifications.SlackWebhook;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
+import com.mongodb.client.model.Projections;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -21,6 +22,7 @@ public class APITestStatusAlert extends SlackAlerts {
      * This constructor initializes a new daily test status alert with detailed api testing metrics.
      *
      * @param title The name of the API collection.
+     * @param critical The total number of critical severity issues.
      * @param high The total number of high severity issues.
      * @param medium The total number of medium severity issues.
      * @param low The total number of low severity issues.
@@ -37,18 +39,23 @@ public class APITestStatusAlert extends SlackAlerts {
      */
     public APITestStatusAlert(String title, int high, int medium, int low, int vulnerableApis, int newIssues, int totalApis, String collection, long scanTimeInSeconds, String testType, long nextTestRun, List<NewIssuesModel> newIssuesList, String viewOnAktoURL, String exportReportUrl) {
         super(API_TEST_STATUS_ALERT);
-        init(title, high, medium, low, vulnerableApis, newIssues, totalApis, collection, scanTimeInSeconds, testType, nextTestRun, newIssuesList, viewOnAktoURL, exportReportUrl);
+        init(title, 0, high, medium, low, vulnerableApis, newIssues, totalApis, collection, scanTimeInSeconds, testType, nextTestRun, newIssuesList, viewOnAktoURL, exportReportUrl);
     }
+
+    public APITestStatusAlert(String title, int critical, int high, int medium, int low, int vulnerableApis, int newIssues, int totalApis, String collection, long scanTimeInSeconds, String testType, long nextTestRun, List<NewIssuesModel> newIssuesList, String viewOnAktoURL, String exportReportUrl) {
+        super(API_TEST_STATUS_ALERT);
+        init(title, critical, high, medium, low, vulnerableApis, newIssues, totalApis, collection, scanTimeInSeconds, testType, nextTestRun, newIssuesList, viewOnAktoURL, exportReportUrl);
+    }
+
 
     private HorizontalFieldModel horizontalFieldModel;
     private List<FieldsModel> fieldsModelList;
     private List<NewIssuesModel> newIssuesModelList;
     private List<ActionButtonModel> actionButtonModelList;
     private String dashboardUrl;
-    private void init(String title, int high, int medium, int low, int vulnerableApis, int newIssues, int totalApis, String collection, long scanTimeInSeconds, String testType, long nextTestRun, List<NewIssuesModel> newIssuesList, String viewOnAktoURL, String exportReportUrl) {
-        List<SlackWebhook> listWebhooks = SlackWebhooksDao.instance.findAll(new BasicDBObject());
-        if(listWebhooks != null && !listWebhooks.isEmpty()) {
-            SlackWebhook slackWebhook = listWebhooks.get(0);
+    private void init(String title, int critical, int high, int medium, int low, int vulnerableApis, int newIssues, int totalApis, String collection, long scanTimeInSeconds, String testType, long nextTestRun, List<NewIssuesModel> newIssuesList, String viewOnAktoURL, String exportReportUrl) {
+        SlackWebhook slackWebhook = SlackWebhooksDao.instance.findOne(new BasicDBObject(), Projections.include("dashboardUrl"));
+        if(slackWebhook != null) {
             dashboardUrl = slackWebhook.getDashboardUrl();
         } else {
             dashboardUrl = "app.akto.io";
@@ -58,7 +65,7 @@ public class APITestStatusAlert extends SlackAlerts {
         this.title = "✅ Test run on " + title;
 
         Map<String, Integer> horizontalField = new HashMap<>();
-        horizontalField.put("High", high);
+        horizontalField.put("High", critical + high);
         horizontalField.put("Medium", medium);
         horizontalField.put("Low", low);
         horizontalFieldModel = new HorizontalFieldModel(horizontalField);

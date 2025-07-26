@@ -2235,6 +2235,7 @@ public class DbAction extends ActionSupport {
 
         SlackAlerts apiTestStatusAlert = new APITestStatusAlert(
                 testingRun.getName(),
+                totalCountIssues.getOrDefault(GlobalEnums.Severity.CRITICAL.name(), 0),
                 totalCountIssues.getOrDefault(GlobalEnums.Severity.HIGH.name(), 0),
                 totalCountIssues.getOrDefault(GlobalEnums.Severity.MEDIUM.name(), 0),
                 totalCountIssues.getOrDefault(GlobalEnums.Severity.LOW.name(), 0),
@@ -2249,7 +2250,7 @@ public class DbAction extends ActionSupport {
                 testingRun.getHexId(),
                 summaryId
         );
-        SlackSender.sendAlert(accountId, apiTestStatusAlert);
+        SlackSender.sendAlert(accountId, apiTestStatusAlert, testingRun.getSelectedSlackChannelId());
     }
 
     public String createCollectionSimpleForVpc() {
