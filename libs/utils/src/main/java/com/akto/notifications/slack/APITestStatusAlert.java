@@ -22,6 +22,7 @@ public class APITestStatusAlert extends SlackAlerts {
      * This constructor initializes a new daily test status alert with detailed api testing metrics.
      *
      * @param title The name of the API collection.
+     * @param critical The total number of critical severity issues.
      * @param high The total number of high severity issues.
      * @param medium The total number of medium severity issues.
      * @param low The total number of low severity issues.
@@ -64,8 +65,7 @@ public class APITestStatusAlert extends SlackAlerts {
         this.title = "✅ Test run on " + title;
 
         Map<String, Integer> horizontalField = new HashMap<>();
-        horizontalField.put("Critical", critical);
-        horizontalField.put("High", high);
+        horizontalField.put("High", critical + high);
         horizontalField.put("Medium", medium);
         horizontalField.put("Low", low);
         horizontalFieldModel = new HorizontalFieldModel(horizontalField);
