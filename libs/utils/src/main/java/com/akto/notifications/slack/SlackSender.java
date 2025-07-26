@@ -4,7 +4,8 @@ import com.akto.dao.context.Context;
 import com.akto.dao.notifications.SlackWebhooksDao;
 import com.akto.dto.notifications.SlackWebhook;
 import com.akto.log.LoggerMaker;
-import com.mongodb.BasicDBObject;
+import com.akto.util.Constants;
+import com.mongodb.client.model.Filters;
 import com.slack.api.Slack;
 import com.slack.api.webhook.WebhookResponse;
 
@@ -17,6 +18,10 @@ public class SlackSender {
     private static final ExecutorService executor = Executors.newFixedThreadPool(3);
 
     public static void sendAlert(int accountId, SlackAlerts alert) {
+        sendAlert(accountId, alert, 0);
+    }
+    
+    public static void sendAlert(int accountId, SlackAlerts alert, int slackChannelId) {
         executor.submit(() -> {
             Context.accountId.set(accountId);
 
@@ -25,13 +30,15 @@ public class SlackSender {
             String payload = alert.toJson();
             SlackAlertType alertType = alert.getALERT_TYPE();
 
-            // Get slack webhook url
-            List<SlackWebhook> listWebhooks = SlackWebhooksDao.instance.findAll(new BasicDBObject());
-            if(listWebhooks == null || listWebhooks.isEmpty()) {
-                loggerMaker.infoAndAddToDb("Slack Alert Type: " + alertType + " Info: " + "No slack webhook found.");
-                return;
+            String webhookUrl = "";
+            if(slackChannelId > 0) {
+                SlackWebhook listWebhook = SlackWebhooksDao.instance.findOne(Constants.ID, slackChannelId);
+                webhookUrl = listWebhook.getWebhook();
+            } 
+            if(webhookUrl == null || webhookUrl.isEmpty()) {
+                List<SlackWebhook> listWebhooks = SlackWebhooksDao.instance.findAll(Filters.empty());
+                webhookUrl = getDefaultSlackWebhook(listWebhooks);
             }
-            String webhookUrl = listWebhooks.get(0).getWebhook();
 
             // Try to send alert
             Slack slack = Slack.getInstance();
@@ -67,6 +74,16 @@ public class SlackSender {
 
             loggerMaker.errorAndAddToDb("Slack Alert Type: " + alertType + " Error: " + "Failed to send Alert after multiple retries.");
         });
+    }
+
+    public static String getDefaultSlackWebhook(List<SlackWebhook> listWebhooks) {
+        String webhookUrl ="";
+        if (listWebhooks == null || listWebhooks.isEmpty()) {
+            loggerMaker.infoAndAddToDb(" No slack webhook found.");
+        } else {
+            webhookUrl = listWebhooks.get(0).getWebhook();
+        }
+        return webhookUrl;
     }
 
 }
