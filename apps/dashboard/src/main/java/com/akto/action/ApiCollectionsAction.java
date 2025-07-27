@@ -6,7 +6,10 @@ import java.util.stream.Collectors;
 import com.akto.action.observe.InventoryAction;
 import com.akto.dto.*;
 import com.akto.util.Pair;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
 import lombok.Getter;
+
 import org.bson.conversions.Bson;
 
 import com.akto.action.observe.Utils;
@@ -53,6 +56,7 @@ import static com.akto.util.Constants.AKTO_DISCOVERED_APIS_COLLECTION;
 public class ApiCollectionsAction extends UserAction {
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(ApiCollectionsAction.class, LogDb.DASHBOARD);
+    private static ObjectMapper objectMapper = new ObjectMapper();
 
     List<ApiCollection> apiCollections = new ArrayList<>();
     Map<Integer,Integer> testedEndpointsMaps = new HashMap<>();
@@ -180,11 +184,15 @@ public class ApiCollectionsAction extends UserAction {
             }
         } catch(Exception e){
         }
-        MongoCursor<ApiCollection> cursor = ApiCollectionsDao.instance.getMCollection().aggregate(pipeLine, ApiCollection.class).cursor();
+        MongoCursor<BasicDBObject> cursor = ApiCollectionsDao.instance.getMCollection().aggregate(pipeLine, BasicDBObject.class).cursor();
         while(cursor.hasNext()){
             try {
-                ApiCollection apiCollection = cursor.next();
-                this.apiCollections.add(apiCollection);
+                BasicDBObject basicDBObject = cursor.next();
+                int apiCollectionId = basicDBObject.getInt(Constants.ID);
+                basicDBObject.remove(Constants.ID);  
+                ApiCollection collection = objectMapper.convertValue(basicDBObject, ApiCollection.class);
+                collection.setId(apiCollectionId);
+                this.apiCollections.add(collection);
             } catch (Exception e) {
                 e.printStackTrace();
             }   
