@@ -189,9 +189,20 @@ public class ApiCollectionsAction extends UserAction {
             try {
                 BasicDBObject basicDBObject = cursor.next();
                 int apiCollectionId = basicDBObject.getInt(Constants.ID);
-                basicDBObject.remove(Constants.ID);  
+                List<BasicDBObject> tagsListDb = (List<BasicDBObject>) basicDBObject.get(ApiCollection.TAGS_STRING);
+                List<CollectionTags> tagsList = new ArrayList<>();
+                if(tagsListDb != null) {
+                    for(BasicDBObject tagDb : tagsListDb) {
+                        tagDb.removeField("_t");
+                        CollectionTags tag = objectMapper.convertValue(tagDb, CollectionTags.class);
+                        tagsList.add(tag);
+                    }
+                }
+                basicDBObject.remove(Constants.ID);
+                basicDBObject.remove(ApiCollection.TAGS_STRING);
                 ApiCollection collection = objectMapper.convertValue(basicDBObject, ApiCollection.class);
                 collection.setId(apiCollectionId);
+                collection.setTagsList(tagsList);
                 this.apiCollections.add(collection);
             } catch (Exception e) {
                 e.printStackTrace();
