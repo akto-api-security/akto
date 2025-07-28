@@ -102,26 +102,47 @@ public class ThreatDetector {
             return true;
         }
 
-        if (SQLParse.isSQLi(httpResponseParams.getRequestParams().getPayload())) {
+        if (SQLParse.isSQLi(httpResponseParams.getRequestParams().getHeaders().toString())) {
             return true;
         }
 
-        return SQLParse.isSQLi(httpResponseParams.getRequestParams().getHeaders().toString());
+        return SQLParse.isSQLi(httpResponseParams.getRequestParams().getPayload());
     }
 
     public boolean isLFiThreat(HttpResponseParams httpResponseParams) {
-        // TODO: .get() is expensive, optimize it
-        return lfiTrie.containsMatch(httpResponseParams.getOriginalMsg().get());
+        if (lfiTrie.containsMatch(httpResponseParams.getRequestParams().getURL())) {
+            return true;
+        }
+
+        if (lfiTrie.containsMatch(httpResponseParams.getRequestParams().getHeaders().toString())) {
+            return true;
+        }
+
+        return lfiTrie.containsMatch(httpResponseParams.getRequestParams().getPayload());
     }
 
     public boolean isOsCommandInjectionThreat(HttpResponseParams httpResponseParams) {
-        // TODO: .get() is expensive, optimize it
-        return osCommandInjectionTrie.containsMatch(httpResponseParams.getOriginalMsg().get());
+        if (osCommandInjectionTrie.containsMatch(httpResponseParams.getRequestParams().getURL())) {
+            return true;
+        }
+
+        if (osCommandInjectionTrie.containsMatch(httpResponseParams.getRequestParams().getHeaders().toString())) {
+            return true;
+        }
+
+        return osCommandInjectionTrie.containsMatch(httpResponseParams.getRequestParams().getPayload());
     }
 
     public boolean isSSRFThreat(HttpResponseParams httpResponseParams) {
-        // TODO: .get() is expensive, optimize it
-        return ssrfTrie.containsMatch(httpResponseParams.getOriginalMsg().get());
+        if (ssrfTrie.containsMatch(httpResponseParams.getRequestParams().getURL())) {
+            return true;
+        }
+
+        if (ssrfTrie.containsMatch(httpResponseParams.getRequestParams().getHeaders().toString())) {
+            return true;
+        }
+
+        return ssrfTrie.containsMatch(httpResponseParams.getRequestParams().getPayload());
     }
 
 }
