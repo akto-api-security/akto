@@ -1,4 +1,4 @@
-import { Button, ButtonGroup, LegacyCard, Text, DataTable, VerticalStack, Popover, TextField, DatePicker } from "@shopify/polaris"
+import { Button, ButtonGroup, LegacyCard, Text, DataTable, VerticalStack, Box, HorizontalStack, Popover, TextField, DatePicker} from "@shopify/polaris"
 import settingRequests from "../api";
 import func from "@/util/func";
 import LogsContainer from "./LogsContainer";
@@ -17,9 +17,9 @@ const Logs = () => {
     })
     const [ loading, setLoading ] = useState(false)
     const [ moduleInfos, setModuleInfos ] = useState([])
-    const [dateRangePopoverActive, setDateRangePopoverActive] = useState(false)
     const logGroupSelected = logs.logGroup !== ''
     const hasAccess = func.checkUserValidForIntegrations()
+    const [dateRangePopoverActive, setDateRangePopoverActive] = useState(false)
 
     const [dateRange, setDateRange] = useState({
         alias: "last5mins",
@@ -30,22 +30,9 @@ const Logs = () => {
         }
     });
 
-    const [customDateTime, setCustomDateTime] = useState({
-        startDate: "",
-        endDate: "",
-        startTime: "",
-        endTime: ""
-    });
-
-    const [calendarDate, setCalendarDate] = useState({
-        month: new Date().getMonth(),
-        year: new Date().getFullYear()
-    });
-
-    const [selectedCalendarRange, setSelectedCalendarRange] = useState({
-        start: new Date(),
-        end: new Date()
-    });
+    const [customDateTime, setCustomDateTime] = useState({ startDate: "", endDate: "", startTime: "", endTime: "" });
+    const [calendarDate, setCalendarDate] = useState({ month: new Date().getMonth(), year: new Date().getFullYear() });
+    const [selectedCalendarRange, setSelectedCalendarRange] = useState({ start: new Date(), end: new Date() });
 
     const logGroupOptions = [
         { label: "Runtime", value: "RUNTIME" },
@@ -121,7 +108,7 @@ const Logs = () => {
             fetchModuleInfo()
         }
     }, [logs.logGroup,dateRange])
-
+    
     const exportLogsCsv = () => {
         let headers = ['timestamp', 'log'];
         let csv = headers.join(",")+"\r\n"
@@ -189,51 +176,17 @@ const Logs = () => {
     ]);
 
     return (
-        <VerticalStack>
+        <VerticalStack gap="5">
             <style>
-            {`
-                .popover-container {
-                    padding: 20px;
-                    width: 100%;
-                    max-width: 600px;
-                    background: #fff;
-                    border-radius: 8px;
-                    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-                }
-                .calendar-wrapper {
-                    border: 1px solid #e1e3e5;
-                    border-radius: 8px;
-                    background: #fff;
-                    padding: 16px;
-                    margin-bottom: 20px;
-                }
-                .custom-date-time {
-                    display: flex;
-                    flex-wrap: wrap;
-                    align-items: center;
-                    gap: 10px;
-                    margin-bottom: 20px;
-                }
-                .to-separator {
-                    font-weight: bold;
-                    color: #6d7175;
-                    margin: 22px 0px 0px 0px;
-                }
-                .actions {
-                    display: flex;
-                    justify-content: flex-end;
-                    border-top: 1px solid #e1e3e5;
-                    padding-top: 12px;
-                    gap: 8px;
-                }
-                .Polaris-DatePicker {
-                    display: flex !important;
-                    gap: 20px;
-                }
-                .Polaris-DatePicker__MonthContainer {
-                    width: auto !important;
-                }
-            `}
+                {`
+                    .Polaris-DatePicker {
+                        display: flex !important;
+                        gap: 20px;
+                    }
+                    .Polaris-DatePicker__MonthContainer {
+                        width: auto !important;
+                    }
+                `}
             </style>
             <LegacyCard
                 sectioned
@@ -248,53 +201,72 @@ const Logs = () => {
                 </Text>
                 <br />
 
-                <div style={{ display: "grid", gridTemplateColumns: "auto max-content max-content", gap: "10px" }}>
-                    <Dropdown menuItems={logGroupOptions} initial="Dashboard" selected={handleSelectLogGroup} />
-
-                    <Popover active={dateRangePopoverActive} activator={<Button onClick={toggleDateRangePopover} disabled={!logGroupSelected}>{dateRange.title}</Button>} onClose={() => setDateRangePopoverActive(false)}>
-                        <div className="popover-container">
-                        <div className="calendar-wrapper">
-                            <DatePicker
-                            month={calendarDate.month}
-                            year={calendarDate.year}
-                            selected={selectedCalendarRange}
-                            onMonthChange={handleCalendarMonthChange}
-                            onChange={handleCalendarChange}
-                            allowRange
-                            multiMonth
-                            />
+                <Box paddingBlockStart="4">
+                    <HorizontalStack gap="3" wrap>
+                        <div style={{ minWidth: '500px', maxWidth: '600px', width: '100%' }}>
+                            <Dropdown menuItems={logGroupOptions} initial="Dashboard" selected={handleSelectLogGroup} />
                         </div>
 
-                        <div className="custom-date-time">
-                            <TextField label="Start Time" type="time" value={customDateTime.startTime} onChange={(value) => handleCustomDateTimeChange("startTime", value)} />
-                            <span className="to-separator">to</span>
-                            <TextField label="End Time" type="time" value={customDateTime.endTime} onChange={(value) => handleCustomDateTimeChange("endTime", value)} />
-                        </div>
+                        <Popover
+                            active={dateRangePopoverActive}
+                            activator={
+                                <Button onClick={toggleDateRangePopover} disabled={!logGroupSelected}>
+                                {dateRange.title}
+                                </Button>
+                            }
+                            onClose={() => setDateRangePopoverActive(false)}
+                        >
+                            <div style={{ padding: '20px', width: '600px', background: '#fff', borderRadius: '8px', boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)' }}>
+                                <div style={{ border: '1px solid #e1e3e5', borderRadius: '8px', background: '#fff', padding: '16px', marginBottom: '20px' }}>
+                                    <DatePicker
+                                        month={calendarDate.month}
+                                        year={calendarDate.year}
+                                        selected={selectedCalendarRange}
+                                        onMonthChange={handleCalendarMonthChange}
+                                        onChange={handleCalendarChange}
+                                        allowRange
+                                        multiMonth
+                                    />
+                                </div>
+                                <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
+                                    <TextField
+                                        label="Start Time"
+                                        type="time"
+                                        value={customDateTime.startTime}
+                                        onChange={(value) => handleCustomDateTimeChange("startTime", value)}
+                                    />
+                                    <span style={{ fontWeight: 'bold', color: '#6d7175', margin: '22px 0px 0px 0px' }}>to</span>
+                                    <TextField
+                                        label="End Time"
+                                        type="time"
+                                        value={customDateTime.endTime}
+                                        onChange={(value) => handleCustomDateTimeChange("endTime", value)}
+                                    />
+                                </div>
+                                <div style={{ display: 'flex', justifyContent: 'flex-end', borderTop: '1px solid #e1e3e5', paddingTop: '12px', gap: '8px' }}>
+                                    <ButtonGroup>
+                                        <Button onClick={handleCancelCustomDateTime}>Cancel</Button>
+                                        <Button primary onClick={handleApplyCustomDateTime}>Apply</Button>
+                                    </ButtonGroup>
+                                </div>
+                            </div>
+                        </Popover>
 
-                        <div className="actions">
-                            <ButtonGroup>
-                            <Button onClick={handleCancelCustomDateTime}>Cancel</Button>
-                            <Button primary onClick={handleApplyCustomDateTime}>Apply</Button>
-                            </ButtonGroup>
-                        </div>
-                        </div>
-                    </Popover>
+                        <Button onClick={handleRefresh} disabled={!logGroupSelected} primary>Refresh</Button>
+                    </HorizontalStack>
+                </Box>
 
-                    <Button onClick={handleRefresh} disabled={!logGroupSelected} primary>Refresh</Button>
-                </div>
-              
-                <br />
-
-                {
+                <Box paddingBlockStart="4">
+                    {
                     logGroupSelected ? 
                         // loading ? <SpinnerCentered/> : <LogsContainer logs={logs} />  
                         <LogsContainer logs={logs} />  
                         : <Text variant="bodyMd">Select log group to fetch logs</Text>
                 }
+                </Box>
             </LegacyCard>
 
-            
-                {moduleInfos && moduleInfos.length > 0 ? (
+             {moduleInfos && moduleInfos.length > 0 ? (
                     <LegacyCard sectioned title="Module Information">
 
                     <DataTable
