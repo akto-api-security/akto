@@ -1,5 +1,9 @@
 package com.akto.jobs.executors;
 
+import static com.akto.jira.Utils.buildAdditionalIssueFieldsForJira;
+import static com.akto.jira.Utils.getRemediationId;
+import static com.akto.jira.Utils.getRemediationMap;
+
 import com.akto.dao.ConfigsDao;
 import com.akto.dao.JiraIntegrationDao;
 import com.akto.dao.context.Context;
@@ -19,8 +23,10 @@ import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.testing.GenericTestResult;
 import com.akto.dto.testing.MultiExecTestResult;
+import com.akto.dto.testing.Remediation;
 import com.akto.dto.testing.TestResult;
 import com.akto.dto.testing.TestingRunResult;
+import com.akto.jira.Utils;
 import com.akto.jobs.JobExecutor;
 import com.akto.jobs.utils.JobConstants;
 import com.akto.log.LoggerMaker;
@@ -40,6 +46,8 @@ import com.mongodb.client.model.Updates;
 
 import okhttp3.*;
 
+import org.apache.commons.collections.CollectionUtils;
+import org.apache.kafka.common.protocol.types.Field.Str;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 
@@ -97,6 +105,7 @@ public class JiraTicketJobExecutor extends JobExecutor<AutoTicketParams> {
         }
 
         Map<String, Info> infoMap = fetchYamlInfoMap(issues);
+        Map<String, Remediation> remediationMap = fetchRemediations(issues);
 
         List<JiraMetaData> batchMetaList = new ArrayList<>();
 
@@ -136,7 +145,9 @@ public class JiraTicketJobExecutor extends JobExecutor<AutoTicketParams> {
                     info.getDescription(),
                     id,
                     summaryId,
-                    null
+                    null,
+                    infoMap.get(id.getTestSubCategory()),
+                    issue
                 );
             } catch (Exception e) {
                 logger.error("Error parsing URL for issue {}: {}", id, e.getMessage(), e);
@@ -146,14 +157,14 @@ public class JiraTicketJobExecutor extends JobExecutor<AutoTicketParams> {
             batchMetaList.add(meta);
 
             if (batchMetaList.size() == BATCH_SIZE) {
-                processJiraBatch(batchMetaList, issueType, projId, jira);
+                processJiraBatch(batchMetaList, issueType, projId, jira, remediationMap);
                 batchMetaList.clear();
                 updateJobHeartbeat(job);
             }
         }
 
         if (!batchMetaList.isEmpty()) {
-            processJiraBatch(batchMetaList, issueType, projId, jira);
+            processJiraBatch(batchMetaList, issueType, projId, jira, remediationMap);
             updateJobHeartbeat(job);
         }
     }
@@ -199,8 +210,9 @@ public class JiraTicketJobExecutor extends JobExecutor<AutoTicketParams> {
         return YamlTemplateDao.instance.fetchTestInfoMap(Filters.in(YamlTemplateDao.ID, subCategories));
     }
 
-    private void processJiraBatch(List<JiraMetaData> batch, String issueType, String projId, JiraIntegration jira) throws Exception {
-        BasicDBObject payload = buildJiraPayload(batch, issueType, projId);
+    private void processJiraBatch(List<JiraMetaData> batch, String issueType, String projId, JiraIntegration jira,
+        Map<String, Remediation> remediationMap) throws Exception {
+        BasicDBObject payload = buildJiraPayload(batch, issueType, projId, remediationMap);
         List<String> createdKeys = sendJiraBulkCreate(jira, payload, batch, projId);
         logger.info("Created {} Jira issues out of {} Akto issues", createdKeys.size(), batch.size());
         List<TestingRunResult> results = fetchRunResults(batch);
@@ -223,10 +235,11 @@ public class JiraTicketJobExecutor extends JobExecutor<AutoTicketParams> {
         return results;
     }
 
-    private BasicDBObject buildJiraPayload(List<JiraMetaData> metaList, String issueType, String projId) {
+    private BasicDBObject buildJiraPayload(List<JiraMetaData> metaList, String issueType, String projId,
+        Map<String, Remediation> remediationMap) {
         BasicDBList issueUpdates = new BasicDBList();
         for (JiraMetaData meta : metaList) {
-            BasicDBObject fields = jiraTicketPayloadCreator(meta, issueType, projId);
+            BasicDBObject fields = jiraTicketPayloadCreator(meta, issueType, projId, remediationMap);
             BasicDBObject issueObject = new BasicDBObject("fields", fields);
             issueUpdates.add(issueObject);
         }
@@ -347,7 +360,8 @@ public class JiraTicketJobExecutor extends JobExecutor<AutoTicketParams> {
         }
     }
 
-    private BasicDBObject jiraTicketPayloadCreator(JiraMetaData meta, String issueType, String projId) {
+    private BasicDBObject jiraTicketPayloadCreator(JiraMetaData meta, String issueType, String projId,
+        Map<String, Remediation> remediationMap) {
         BasicDBObject fields = new BasicDBObject();
         String method = meta.getTestingIssueId().getApiInfoKey().getMethod().name();
         String endpoint = meta.getEndPointStr().replace("Endpoint - ", "");
@@ -364,6 +378,12 @@ public class JiraTicketJobExecutor extends JobExecutor<AutoTicketParams> {
         contentList.add(buildContentDetails(meta.getEndPointStr(), null));
         contentList.add(buildContentDetails("Issue link - Akto dashboard", meta.getIssueUrl()));
         contentList.add(buildContentDetails(meta.getIssueDescription(), null));
+
+        List<BasicDBObject> additionalFields = buildAdditionalIssueFieldsForJira(meta.getTestInfo(), meta.getIssue(),
+            remediationMap.get(getRemediationId(meta.getTestingIssueId().getTestSubCategory())));
+        if (!CollectionUtils.isEmpty(additionalFields)) {
+            contentList.addAll(additionalFields);
+        }
 
         BasicDBObject description = new BasicDBObject("type", "doc").append("version", 1).append("content", contentList);
         fields.put("description", description);
@@ -384,5 +404,13 @@ public class JiraTicketJobExecutor extends JobExecutor<AutoTicketParams> {
         contentInner.add(inner);
         content.put("content", contentInner);
         return content;
+    }
+
+    private Map<String, Remediation> fetchRemediations(List<TestingRunIssues> issues) {
+        List<String> subCategories = issues.stream()
+            .map(i -> i.getId().getTestSubCategory())
+            .map(Utils::getRemediationId)
+            .collect(Collectors.toList());
+        return getRemediationMap(subCategories);
     }
 }

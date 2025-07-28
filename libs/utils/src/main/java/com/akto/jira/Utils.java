@@ -1,13 +1,15 @@
-package com.akto.utils.jira;
+package com.akto.jira;
 
 import com.akto.calendar.DateUtils;
 import com.akto.dao.JiraIntegrationDao;
+import com.akto.dao.testing.RemediationsDao;
 import com.akto.dto.jira_integration.JiraIntegration;
 import com.akto.dto.test_editor.Info;
 import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.testing.ComplianceMapping;
 import com.akto.dto.testing.Remediation;
 import com.akto.log.LoggerMaker;
+import com.akto.util.Constants;
 import com.akto.util.Pair;
 import com.akto.util.enums.GlobalEnums.TestRunIssueStatus;
 import com.mongodb.BasicDBList;
@@ -19,6 +21,8 @@ import java.util.Base64;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import okhttp3.Request;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.collections.MapUtils;
@@ -27,6 +31,7 @@ import org.apache.commons.lang3.StringUtils;
 public class Utils {
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(Utils.class, LoggerMaker.LogDb.DASHBOARD);
+    private static final String REMEDIATION_INFO_URL = "tests-library-master/remediation/%s.md";
 
     public static String buildApiToken(String apiKey){
         if (StringUtils.isEmpty(apiKey)) {
@@ -222,5 +227,22 @@ public class Utils {
                         Collections.singletonList(
                             new BasicDBObject("type", "text").append("text", StringUtils.defaultString(text, ""))))
             ));
+    }
+
+    public static Map<String, Remediation> getRemediationMap(List<String> testingSubCategories) {
+        List<Remediation> remediationList = RemediationsDao.instance.findAll(
+            Filters.in(Constants.ID,
+                testingSubCategories.stream().map(Utils::getRemediationId)
+                    .collect(Collectors.toList())));
+
+        return remediationList.stream()
+            .collect(Collectors.toMap(
+                Remediation::getid,
+                Function.identity()
+            ));
+    }
+
+    public static String getRemediationId(String testSubCategory) {
+        return String.format(REMEDIATION_INFO_URL, testSubCategory);
     }
 }

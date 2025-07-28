@@ -1,5 +1,6 @@
 package com.akto.action;
 
+import static com.akto.jira.Utils.getRemediationMap;
 import static com.akto.utils.Utils.createRequestFile;
 import static com.akto.utils.Utils.getTestResultFromTestingRunResult;
 
@@ -69,13 +70,14 @@ import org.bson.types.ObjectId;
 
 import com.akto.dao.AccountSettingsDao;
 
-import static com.akto.utils.jira.Utils.buildAdditionalIssueFieldsForJira;
-import static com.akto.utils.jira.Utils.buildApiToken;
-import static com.akto.utils.jira.Utils.buildBasicRequest;
-import static com.akto.utils.jira.Utils.buildPayloadForJiraTicket;
-import static com.akto.utils.jira.Utils.getJiraTicketUrlPair;
-import static com.akto.utils.jira.Utils.handleError;
-import static com.akto.utils.jira.Utils.retryWithoutGzipRequest;
+import static com.akto.jira.Utils.buildAdditionalIssueFieldsForJira;
+import static com.akto.jira.Utils.buildApiToken;
+import static com.akto.jira.Utils.buildBasicRequest;
+import static com.akto.jira.Utils.buildPayloadForJiraTicket;
+import static com.akto.jira.Utils.getJiraTicketUrlPair;
+import static com.akto.jira.Utils.handleError;
+import static com.akto.jira.Utils.retryWithoutGzipRequest;
+import static com.akto.jira.Utils.getRemediationId;
 
 public class JiraIntegrationAction extends UserAction implements ServletRequestAware {
 
@@ -115,8 +117,6 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
             .readTimeout(60, TimeUnit.SECONDS)
             .writeTimeout(60, TimeUnit.SECONDS)
             .build();
-
-    private static final String REMEDIATION_INFO_URL = "tests-library-master/remediation/%s.md";
 
     @Setter
     private String title;
@@ -993,23 +993,6 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
         BasicDBObject fields = buildPayloadForJiraTicket(summary, this.projId, this.issueType, contentList,jiraMetaData.getAdditionalIssueFields());
         fields.put("labels", new String[] {JobConstants.TICKET_LABEL_AKTO_SYNC});
         return fields;
-    }
-
-    private Map<String, Remediation> getRemediationMap(List<String> testingSubCategories) {
-        List<Remediation> remediationList = RemediationsDao.instance.findAll(
-            Filters.in(Constants.ID,
-                testingSubCategories.stream().map(this::getRemediationId)
-                    .collect(Collectors.toList())));
-
-        return remediationList.stream()
-            .collect(Collectors.toMap(
-                Remediation::getid,
-                Function.identity()
-            ));
-    }
-
-    private String getRemediationId(String testSubCategory) {
-        return String.format(REMEDIATION_INFO_URL, testSubCategory);
     }
 
     public String getBaseUrl() {
