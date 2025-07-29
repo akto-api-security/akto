@@ -186,7 +186,9 @@ public class Main {
             loggerMaker.infoAndAddToDb("is_kubernetes: true");
             kafkaBrokerUrl = "127.0.0.1:29092";
         }
-        String groupIdConfig =  System.getenv("AKTO_KAFKA_GROUP_ID_CONFIG");
+        String groupIdConfig =  System.getenv("AKTO_KAFKA_GROUP_ID_CONFIG") != null
+                ? System.getenv("AKTO_KAFKA_GROUP_ID_CONFIG")
+                : "asdf";
         boolean syncImmediately = false;
         boolean fetchAllSTI = true;
         Map<Integer, AccountInfo> accountInfoMap =  new HashMap<>();
@@ -196,7 +198,9 @@ public class Main {
             syncImmediately = true;
             fetchAllSTI = false;
         }
-        int maxPollRecordsConfig = Integer.parseInt(System.getenv("AKTO_KAFKA_MAX_POLL_RECORDS_CONFIG"));
+        int maxPollRecordsConfig = Integer.parseInt(System.getenv("AKTO_KAFKA_MAX_POLL_RECORDS_CONFIG") != null
+                ? System.getenv("AKTO_KAFKA_MAX_POLL_RECORDS_CONFIG")
+                : "100");
 
         AccountSettings aSettings = dataActor.fetchAccountSettings();
         if (aSettings == null) {
