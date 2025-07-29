@@ -17,6 +17,7 @@ import com.akto.dto.TrafficProducerLog;
 import com.akto.runtime.utils.Utils;
 import com.akto.util.HttpRequestResponseUtils;
 import com.akto.util.JSONUtils;
+import com.alibaba.fastjson2.JSON;
 import com.google.gson.Gson;
 
 public class SampleParser {
@@ -41,7 +42,7 @@ public class SampleParser {
 
     public static HttpResponseParams parseSampleMessage(String message) throws Exception {
                 //convert java object to JSON format
-        Map<String, Object> json = gson.fromJson(message, new com.google.gson.reflect.TypeToken<Map<String, Object>>(){}.getType());
+        Map<String, Object> json = JSON.parseObject(message);
 
         String method = (String) json.get("method");
         String url = (String) json.get("path");
