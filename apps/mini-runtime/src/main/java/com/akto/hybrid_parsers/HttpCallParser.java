@@ -231,7 +231,7 @@ public class HttpCallParser {
         String contentType = getHeaderValue(responseParam.getRequestParams().getHeaders(), "content-type");
 
         // Block filter: Ignore ip host, localhost, kubernetes host etc.
-        if (responseParam.getStatusCode() > 400 || isBlockedHost(hostName) || isBlockedContentType(contentType)) {
+        if (responseParam.getStatusCode() >= 400 || isBlockedHost(hostName) || isBlockedContentType(contentType)) {
             filterType = FILTER_TYPE.BLOCKED;
             return filterType;
         }
