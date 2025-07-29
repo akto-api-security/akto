@@ -442,7 +442,7 @@ const components = !hasUserInitiatedTestRuns
       coreTable
     ]
   : [
-      <TestSummaryInfo key={"test-summary-info"} severityMap={severityMap} />, 
+      // <TestSummaryInfo key={"test-summary-info"} severityMap={severityMap} />, 
       <SummaryCardComponent key={"summary"} />, 
       coreTable
     ];
