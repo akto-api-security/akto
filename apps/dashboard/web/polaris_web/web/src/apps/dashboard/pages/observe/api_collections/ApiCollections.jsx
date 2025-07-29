@@ -202,6 +202,12 @@ function convertToCollectionData(c) {
 
 const convertToNewData = (collectionsArr, sensitiveInfoMap, severityInfoMap, coverageMap, trafficInfoMap, riskScoreMap, isLoading) => {
 
+    // Ensure collectionsArr is an array
+    if (!Array.isArray(collectionsArr)) {
+        console.error("collectionsArr is not an array:", collectionsArr);
+        return { prettify: [], normal: [] };
+    }
+
     const newData = collectionsArr.map((c) => {
         if(c.deactivated){
             c.rowStatus = 'critical'
@@ -227,6 +233,7 @@ const convertToNewData = (collectionsArr, sensitiveInfoMap, severityInfoMap, cov
     const prettifyData = transform.prettifyCollectionsData(newData, isLoading)
     return { prettify: prettifyData, normal: newData }
 }
+
 
 function ApiCollections(props) {
 
@@ -314,11 +321,11 @@ function ApiCollections(props) {
     // similarly call sensitive and severityInfo
 
     async function fetchData() {
-
-        // first api call to get only collections name and collection id
-        setLoading(true)
-        const apiCollectionsResp = await api.getAllCollectionsBasic();
-        setLoading(false)
+        try {
+            // first api call to get only collections name and collection id
+            setLoading(true)
+            const apiCollectionsResp = await api.getAllCollectionsBasic();
+            setLoading(false)
 
         if(customCollectionDataFilter){
             apiCollectionsResp.apiCollections = (apiCollectionsResp.apiCollections || []).filter(customCollectionDataFilter)
@@ -452,8 +459,36 @@ function ApiCollections(props) {
         setHasUsageEndpoints(hasUserEndpoints)
         setCoverageMap(coverageInfo)
 
-        dataObj = convertToNewData(tmp, sensitiveInfo.sensitiveInfoMap, severityObj, coverageInfo, trafficInfo, riskScoreObj?.riskScoreMap, false);
+        // Ensure all parameters are defined before calling convertToNewData
+        const sensitiveInfoMap = sensitiveInfo?.sensitiveInfoMap || {};
+        const severityInfoMap = severityObj || {};
+        const coverageMap = coverageInfo || {};
+        const trafficInfoMap = trafficInfo || {};
+        const riskScoreMap = riskScoreObj?.riskScoreMap || {};
+        
+        console.log("Parameters for convertToNewData:", {
+            tmp: tmp?.length,
+            sensitiveInfoMap: Object.keys(sensitiveInfoMap).length,
+            severityInfoMap: Object.keys(severityInfoMap).length,
+            coverageMap: Object.keys(coverageMap).length,
+            trafficInfoMap: Object.keys(trafficInfoMap).length,
+            riskScoreMap: Object.keys(riskScoreMap).length
+        });
+        
+        // Ensure tmp is defined and is an array
+        if (!Array.isArray(tmp)) {
+            console.error("tmp is not an array:", tmp);
+            return;
+        }
+        
+        dataObj = convertToNewData(tmp, sensitiveInfoMap, severityInfoMap, coverageMap, trafficInfoMap, riskScoreMap, false);
         setNormalData(dataObj.normal)
+
+        // Ensure dataObj.prettify exists
+        if (!dataObj.prettify) {
+            console.error("dataObj.prettify is undefined");
+            return;
+        }
 
         // Separate active and deactivated collections
         const deactivatedCollectionsCopy = dataObj.prettify.filter(c => c.deactivated).map((c)=>{
@@ -462,6 +497,21 @@ function ApiCollections(props) {
             }
             return c
         });
+
+        const collectionMap = new Map(dataObj.prettify.map(c => [c.id, c]));
+        const untrackedCollections = Object.entries(uningestedApiCountInfo || {})
+            .filter(([_, count]) => count > 0)
+            .map(([collectionId, untrackedCount]) => {
+                const collection = collectionMap.get(parseInt(collectionId));
+                return collection ? {
+                    ...collection,
+                    urlsCount: untrackedCount,
+                    rowStatus: 'critical',
+                    disableClick: true,
+                    deactivated: true
+                } : null;
+            })
+            .filter(Boolean);
         setDeactivateCollections(JSON.parse(JSON.stringify(deactivatedCollectionsCopy)));
         
         // Process uningested API data
@@ -485,24 +535,13 @@ function ApiCollections(props) {
         tmp.groups = allGroupsForTmp;
         tmp.custom = tmp.all.filter(x => !tmp.hostname.includes(x) && !x.deactivated && !tmp.groups.includes(x));
         tmp.deactivated = deactivatedCollectionsCopy
-        
-        // Create untracked collections data
-        const untrackedCollections = dataObj.prettify.filter(c => !c.deactivated).map((c) => {
-            const untrackedCount = uningestedApiCountInfo[c.id] || 0;
-            if (untrackedCount > 0) {
-                return {
-                    ...c,
-                    urlsCount: untrackedCount,
-                    displayName: c.displayName,
-                    rowStatus: 'critical',
-                    disableClick: true
-                };
-            }
-            return null;
-        }).filter(c => c !== null);
-        tmp['Untracked APIs'] = untrackedCollections;
+        tmp.untracked_apis = untrackedCollections
         
         setData(tmp);
+        } catch (error) {
+            console.error("Error in fetchData:", error);
+            setLoading(false);
+        }
     }
 
     function disambiguateLabel(key, value) {

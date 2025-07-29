@@ -45,31 +45,6 @@ public class UningestedApiOverageDao extends AccountsContextDao<UningestedApiOve
             UningestedApiOverage.URL
         ));
     }
-
-    public static Bson generateFilter() {
-        return Filters.eq("_id", Context.accountId.get());
-    }
-
-    public static Bson generateFilter(int accountId) {
-        Context.accountId.set(accountId);
-        return Filters.empty();
-    }
-
-    public static Bson generateFilter(int accountId, int apiCollectionId) {
-        Context.accountId.set(accountId);
-        return Filters.and(
-            Filters.eq(UningestedApiOverage.API_COLLECTION_ID, apiCollectionId)
-        );
-    }
-
-    public List<UningestedApiOverage> findByAccountId(int accountId) {
-        return findAll(generateFilter(accountId));
-    }
-
-    public List<UningestedApiOverage> findByAccountIdAndCollection(int accountId, int apiCollectionId) {
-        return findAll(generateFilter(accountId, apiCollectionId));
-    }
-
     public boolean exists(int apiCollectionId, String urlType, URLMethods.Method method, String url) {
         Bson filter = Filters.and(
             Filters.eq(UningestedApiOverage.API_COLLECTION_ID, apiCollectionId),
