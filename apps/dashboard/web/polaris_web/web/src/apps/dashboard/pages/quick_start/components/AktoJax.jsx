@@ -44,7 +44,6 @@ const AktoJax = () => {
             func.setToast(true, false, "Crawler initiated successfully. Please check your dashboard for updates.")
         }).catch((err) => {
             console.error("Error initiating crawler:", err)
-            func.setToast(true, true, "Ensure that your DAST module is hosted correctly.")
         }).finally(() => {
             setLoading(false)
             setHostname('')
