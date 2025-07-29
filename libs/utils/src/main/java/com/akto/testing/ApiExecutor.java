@@ -24,6 +24,7 @@ import kotlin.Pair;
 import okhttp3.*;
 import okio.BufferedSink;
 
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 
 import java.io.IOException;
@@ -276,7 +277,7 @@ public class ApiExecutor {
     private static OriginalHttpResponse sendRequest(OriginalHttpRequest request, boolean followRedirects, TestingRunConfig testingRunConfig, boolean debug, List<TestingRunResult.TestLog> testLogs, boolean skipSSRFCheck, boolean jsonRpcCheck) throws Exception {
         // don't lowercase url because query params will change and will result in incorrect request
 
-        if (!jsonRpcCheck && isJsonRpcRequest(request)) {
+        if (!jsonRpcCheck && shouldInitiateSSEStream(request)) {
             return sendRequestWithSse(request, followRedirects, testingRunConfig, debug, testLogs, skipSSRFCheck, false);
         }
 
@@ -714,5 +715,18 @@ public class ApiExecutor {
         if (session.response != null) {
             session.response.close();
         }
+    }
+
+    private static boolean shouldInitiateSSEStream(OriginalHttpRequest request) {
+        if (isJsonRpcRequest(request)) {
+            Map<String, List<String>> headers = request.getHeaders();
+            return headers.entrySet().stream()
+                .filter(
+                    entry -> HttpRequestResponseUtils.HEADER_ACCEPT.equalsIgnoreCase(entry.getKey())
+                        && !CollectionUtils.isEmpty(entry.getValue()))
+                .flatMap(entry -> entry.getValue().stream())
+                .noneMatch(value -> value.contains(HttpRequestResponseUtils.TEXT_EVENT_STREAM_CONTENT_TYPE));
+        }
+        return false;
     }
 }
