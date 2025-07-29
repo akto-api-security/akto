@@ -226,8 +226,18 @@ public class MaliciousTrafficDetectorTask implements Task {
     return apiSchema;
   }
 
+  private boolean ignoreTraffic(HttpResponseParam record) {
+    if (record.getPath().contains("/api/threat_detection")) {
+      return true;
+    }
+
+    return false;
+  }
 
   private void processRecord(HttpResponseParam record) throws Exception {
+    if (ignoreTraffic(record)) {
+      return;
+    }
     HttpResponseParams responseParam = buildHttpResponseParam(record);
     String actor = this.threatConfigEvaluator.getActorId(responseParam);
 
