@@ -325,6 +325,10 @@ public class ClientActor extends DataActor {
         bulkWrite(writesForTestingRunIssues, "/bulkWriteTestingRunIssues", "writesForTestingRunIssues");
     }
 
+    public void bulkWriteOverageInfo(List<Object> writesForOverageInfo) {
+        bulkWrite(writesForOverageInfo, "/bulkWriteOverageInfo", "writesForOverageInfo");
+    }
+
     public List<Integer> fetchDeactivatedCollections(){
         List<Integer> ids = new ArrayList<>();
 

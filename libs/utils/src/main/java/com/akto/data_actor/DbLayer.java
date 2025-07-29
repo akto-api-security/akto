@@ -45,7 +45,6 @@ import com.akto.dao.testing.TestingRunResultDao;
 import com.akto.dao.testing.TestingRunResultSummariesDao;
 import com.akto.dao.testing.WorkflowTestResultsDao;
 import com.akto.dao.testing.WorkflowTestsDao;
-import com.akto.dao.testing.config.TestCollectionPropertiesDao;
 import com.akto.dao.testing.config.TestScriptsDao;
 import com.akto.dao.testing.sources.TestSourceConfigsDao;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
@@ -84,6 +83,8 @@ import com.akto.dto.type.URLMethods.Method;
 import com.akto.dto.usage.MetricTypes;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.dao.billing.UningestedApiOverageDao;
+import com.akto.dto.billing.UningesetedApiOverage;
 import com.akto.usage.UsageMetricCalculator;
 import com.akto.usage.UsageMetricHandler;
 import com.akto.util.Constants;
@@ -200,6 +201,13 @@ public class DbLayer {
         loggerMaker.infoAndAddToDb(String.format("Matched records : %s", result.getMatchedCount()), LogDb.TESTING);
         loggerMaker.infoAndAddToDb(String.format("inserted counts : %s", result.getInsertedCount()), LogDb.TESTING);
         loggerMaker.infoAndAddToDb(String.format("Modified counts : %s", result.getModifiedCount()), LogDb.TESTING);
+    }
+
+    public static void bulkWriteOverageInfo(List<WriteModel<UningesetedApiOverage>> writeModelList) {
+        BulkWriteResult result = UningestedApiOverageDao.instance.bulkWrite(writeModelList,
+                new BulkWriteOptions().ordered(false));
+        loggerMaker.infoAndAddToDb(String.format("OverageInfo bulk write - Matched: %s, Inserted: %s, Modified: %s", 
+            result.getMatchedCount(), result.getInsertedCount(), result.getModifiedCount()), LogDb.RUNTIME);
     }
 
     public static TestSourceConfig findTestSourceConfig(String subType){

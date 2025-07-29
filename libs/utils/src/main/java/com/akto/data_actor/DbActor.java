@@ -33,6 +33,7 @@ import com.akto.dto.testing.WorkflowTestResult;
 import com.akto.dto.testing.sources.TestSourceConfig;
 import com.akto.dto.traffic.CollectionTags;
 import com.akto.dto.traffic.SampleData;
+import com.akto.dto.billing.UningesetedApiOverage;
 import com.akto.dto.traffic.TrafficInfo;
 import com.akto.dto.traffic_metrics.TrafficMetrics;
 import com.akto.dto.type.SingleTypeInfo;
@@ -134,6 +135,15 @@ public class DbActor extends DataActor {
             writes.add(write);
         }
         DbLayer.bulkWriteTestingRunIssues(writes);
+    }
+
+    public void bulkWriteOverageInfo(List<Object> writesForOverageInfo) {
+        ArrayList<WriteModel<UningesetedApiOverage>> writes = new ArrayList<>();
+        for (Object obj : writesForOverageInfo) {
+            WriteModel<UningesetedApiOverage> write = (WriteModel<UningesetedApiOverage>) obj;
+            writes.add(write);
+        }
+        DbLayer.bulkWriteOverageInfo(writes);
     }
 
     public TestSourceConfig findTestSourceConfig(String subType){
