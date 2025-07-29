@@ -146,6 +146,10 @@ public class DbActor extends DataActor {
         DbLayer.bulkWriteOverageInfo(writes);
     }
 
+    public boolean overageApisExists(int apiCollectionId, String urlType, String methodAndUrl) {
+        return com.akto.dao.billing.UningestedApiOverageDao.instance.exists(apiCollectionId, urlType, methodAndUrl);
+    }
+
     public TestSourceConfig findTestSourceConfig(String subType){
         return DbLayer.findTestSourceConfig(subType);
     }

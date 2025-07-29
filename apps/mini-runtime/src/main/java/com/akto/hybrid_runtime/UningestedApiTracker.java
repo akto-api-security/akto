@@ -1,10 +1,14 @@
 package com.akto.hybrid_runtime;
 
-import com.akto.dao.billing.UningestedApiOverageDao;
+import com.akto.data_actor.DataActorFactory;
 import com.akto.dto.billing.UningesetedApiOverage;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.mongodb.client.model.InsertOneModel;
+import com.mongodb.client.model.WriteModel;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -16,10 +20,10 @@ public class UningestedApiTracker {
     private static final LoggerMaker loggerMaker = new LoggerMaker(UningestedApiTracker.class, LogDb.RUNTIME);
     
     // Local cache to avoid frequent DB checks
-    private static final ConcurrentHashMap<String, Boolean> overageCache = new ConcurrentHashMap<>();
+    private static final ConcurrentHashMap<String, Boolean> overageApisCache = new ConcurrentHashMap<>();
     
     // Batch operations for DB writes
-    private static final ConcurrentHashMap<String, UningesetedApiOverage> pendingOverageInfo = new ConcurrentHashMap<>();
+    private static final ConcurrentHashMap<String, UningesetedApiOverage> pendingOverageApisInfo = new ConcurrentHashMap<>();
     
     // Counter for batch size
     private static final AtomicInteger batchCounter = new AtomicInteger(0);
@@ -28,11 +32,7 @@ public class UningestedApiTracker {
     private static final int BATCH_SIZE = 100;
     
     // Sync interval in seconds
-    private static final int SYNC_INTERVAL = 60; // 1 minute
-    
-    // Instance ID for tracking which runtime instance created the record
-    private static final String INSTANCE_ID = System.getenv("INSTANCE_ID") != null ? 
-        System.getenv("INSTANCE_ID") : "unknown";
+    private static final int SYNC_INTERVAL = 120; // 1 minute
     
     private static final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
     
@@ -62,13 +62,13 @@ public class UningestedApiTracker {
         String cacheKey = generateCacheKey(apiCollectionId, urlType, methodAndUrl);
         
         // Check if already recorded in cache
-        if (overageCache.containsKey(cacheKey)) {
+        if (overageApisCache.containsKey(cacheKey)) {
             return;
         }
         
         // Check if already exists in DB
-        if (UningestedApiOverageDao.instance.exists(apiCollectionId, urlType, methodAndUrl)) {
-            overageCache.put(cacheKey, true);
+        if (DataActorFactory.fetchInstance().overageApisExists(apiCollectionId, urlType, methodAndUrl)) {
+            overageApisCache.put(cacheKey, true);
             return;
         }
         
@@ -78,8 +78,8 @@ public class UningestedApiTracker {
         );
         
         // Add to pending batch
-        pendingOverageInfo.put(cacheKey, uningesetedApiOverage);
-        overageCache.put(cacheKey, true);
+        pendingOverageApisInfo.put(cacheKey, uningesetedApiOverage);
+        overageApisCache.put(cacheKey, true);
         
         // Log the overage
         loggerMaker.infoAndAddToDb(String.format("Overage recorded -  Collection: %d, Type: %s, " +
@@ -102,28 +102,32 @@ public class UningestedApiTracker {
      * Sync pending overage info with database
      */
     private static void syncWithDB() {
-        if (pendingOverageInfo.isEmpty()) {
+        if (pendingOverageApisInfo.isEmpty()) {
             return;
         }
         
         try {
-            // Create indices if they don't exist
-            UningestedApiOverageDao.instance.createIndicesIfAbsent();
-            
-            // Insert all pending records
-            for (UningesetedApiOverage uningesetedApiOverage : pendingOverageInfo.values()) {
+            // Prepare bulk write operations
+            List<Object> bulkWrites = new ArrayList<>();
+            for (UningesetedApiOverage uningesetedApiOverage : pendingOverageApisInfo.values()) {
                 try {
-                    UningestedApiOverageDao.instance.insertOne(uningesetedApiOverage);
+                    WriteModel<UningesetedApiOverage> writeModel = new InsertOneModel<>(uningesetedApiOverage);
+                    bulkWrites.add(writeModel);
                 } catch (Exception e) {
-                    loggerMaker.errorAndAddToDb(e, "Failed to insert overage info: " + e.getMessage());
+                    loggerMaker.errorAndAddToDb(e, "Failed to prepare overage info for bulk write: " + e.getMessage());
                 }
             }
             
-            int insertedCount = pendingOverageInfo.size();
+            // Perform bulk write
+            if (!bulkWrites.isEmpty()) {
+                DataActorFactory.fetchInstance().bulkWriteOverageInfo(bulkWrites);
+            }
+            
+            int insertedCount = pendingOverageApisInfo.size();
             loggerMaker.infoAndAddToDb("Synced " + insertedCount + " overage records to database");
             
             // Clear pending records and reset counter
-            pendingOverageInfo.clear();
+            pendingOverageApisInfo.clear();
             batchCounter.set(0);
             
         } catch (Exception e) {
@@ -134,21 +138,12 @@ public class UningestedApiTracker {
     /**
      * Get overage statistics for an account
      */
-    public static long getOverageCount(int accountId) {
-        try {
-            return UningestedApiOverageDao.instance.count(UningestedApiOverageDao.generateFilter(accountId));
-        } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(e, "Failed to get overage count: " + e.getMessage());
-            return 0;
-        }
-    }
-    
     /**
      * Clear cache for testing purposes
      */
     public static void clearCache() {
-        overageCache.clear();
-        pendingOverageInfo.clear();
+        overageApisCache.clear();
+        pendingOverageApisInfo.clear();
         batchCounter.set(0);
     }
     
@@ -156,13 +151,13 @@ public class UningestedApiTracker {
      * Get cache size for monitoring
      */
     public static int getCacheSize() {
-        return overageCache.size();
+        return overageApisCache.size();
     }
     
     /**
      * Get pending batch size for monitoring
      */
     public static int getPendingBatchSize() {
-        return pendingOverageInfo.size();
+        return pendingOverageApisInfo.size();
     }
 } 
