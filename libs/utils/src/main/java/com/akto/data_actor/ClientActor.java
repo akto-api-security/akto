@@ -334,9 +334,9 @@ public class ClientActor extends DataActor {
         BasicDBObject obj = new BasicDBObject();
         obj.put("apiCollectionId", apiCollectionId);
         obj.put("urlType", urlType);
-        obj.put("method", method);
+        obj.put("method", method.name());
         obj.put("url", url);
-        OriginalHttpRequest request = new OriginalHttpRequest(url + "/overageApisExists", "", "GET", obj.toString(), headers, "");
+        OriginalHttpRequest request = new OriginalHttpRequest(ClientActor.url + "/overageApisExists", "", "GET", obj.toString(), headers, "");
         try {
             OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
             String responsePayload = response.getBody();
