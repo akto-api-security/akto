@@ -2442,6 +2442,7 @@ public class InitializerListener implements ServletContextListener {
                     tokenGeneratorCron.tokenGeneratorScheduler();
                     logger.warn("Started test template scheduler", LogDb.DASHBOARD);
                     setUpTestEditorTemplatesScheduler();
+                    JobsCron.instance.jobsScheduler(JobExecutorType.DASHBOARD);
                     if (DashboardMode.isMetered()) {
                         setupUsageScheduler();
                     }
@@ -2455,8 +2456,7 @@ public class InitializerListener implements ServletContextListener {
                         // trimCappedCollectionsJob();
                         updateSensitiveInfoInApiInfo.setUpSensitiveMapInApiInfoScheduler();
                         syncCronInfo.setUpUpdateCronScheduler();
-                        JobsCron.instance.jobsScheduler(JobExecutorType.DASHBOARD);
-                        updateApiGroupsForAccounts(); 
+                        updateApiGroupsForAccounts();
                         setupAutomatedApiGroupsScheduler();
                         setUpPiiAndTestSourcesScheduler();
                         cleanInventoryJobRunner();
