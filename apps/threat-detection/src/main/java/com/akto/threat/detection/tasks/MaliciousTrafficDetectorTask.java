@@ -179,6 +179,10 @@ public class MaliciousTrafficDetectorTask implements Task {
       return true;
     }
 
+    if (responseParam.getPath().contains("/api/threat_detection")) {
+      return true;
+    }
+
     List<String> hosts = headers.get("host");
     if (hosts == null || hosts.isEmpty()) return false;
     return hosts.contains(Constants.AKTO_THREAT_PROTECTION_BACKEND_HOST);
@@ -226,18 +230,7 @@ public class MaliciousTrafficDetectorTask implements Task {
     return apiSchema;
   }
 
-  private boolean ignoreTraffic(HttpResponseParam record) {
-    if (record.getPath().contains("/api/threat_detection")) {
-      return true;
-    }
-
-    return false;
-  }
-
   private void processRecord(HttpResponseParam record) throws Exception {
-    if (ignoreTraffic(record)) {
-      return;
-    }
     HttpResponseParams responseParam = buildHttpResponseParam(record);
     String actor = this.threatConfigEvaluator.getActorId(responseParam);
 
