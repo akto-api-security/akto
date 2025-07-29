@@ -32,7 +32,7 @@ import com.akto.dto.testing.sources.TestSourceConfig;
 import com.akto.dto.threat_detection.ApiHitCountInfo;
 import com.akto.dto.traffic.CollectionTags;
 import com.akto.dto.traffic.SampleData;
-import com.akto.dto.billing.UningesetedApiOverage;
+import com.akto.dto.billing.UningestedApiOverage;
 import com.akto.dto.traffic.SuspectSampleData;
 import com.akto.dto.traffic.TrafficInfo;
 import com.akto.dto.traffic_metrics.TrafficMetrics;
@@ -136,14 +136,14 @@ public class DbActor extends DataActor {
         DbLayer.bulkWriteTestingRunIssues(writes);
     }
 
-    public boolean overageApisExists(int apiCollectionId, String urlType, String methodAndUrl) {
-        return com.akto.dao.billing.UningestedApiOverageDao.instance.exists(apiCollectionId, urlType, methodAndUrl);
+    public boolean overageApisExists(int apiCollectionId, String urlType, Method method, String url) {
+        return com.akto.dao.billing.UningestedApiOverageDao.instance.exists(apiCollectionId, urlType, method, url);
     }
 
     public void bulkWriteOverageInfo(List<Object> writesForOverageInfo) {
-        ArrayList<WriteModel<UningesetedApiOverage>> writes = new ArrayList<>();
+        ArrayList<WriteModel<UningestedApiOverage>> writes = new ArrayList<>();
         for (Object obj : writesForOverageInfo) {
-            WriteModel<UningesetedApiOverage> write = (WriteModel<UningesetedApiOverage>) obj;
+            WriteModel<UningestedApiOverage> write = (WriteModel<UningestedApiOverage>) obj;
             writes.add(write);
         }
         DbLayer.bulkWriteOverageInfo(writes);

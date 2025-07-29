@@ -308,12 +308,13 @@ public class ClientActor extends DataActor {
         bulkWrite(writesForTestingRunIssues, "/bulkWriteTestingRunIssues", "writesForTestingRunIssues");
     }
 
-    public boolean overageApisExists(int apiCollectionId, String urlType, String methodAndUrl) {
+    public boolean overageApisExists(int apiCollectionId, String urlType, URLMethods.Method method, String url) {
         Map<String, List<String>> headers = buildHeaders();
         BasicDBObject obj = new BasicDBObject();
         obj.put("apiCollectionId", apiCollectionId);
         obj.put("urlType", urlType);
-        obj.put("methodAndUrl", methodAndUrl);
+        obj.put("method", method);
+        obj.put("url", url);
         OriginalHttpRequest request = new OriginalHttpRequest(url + "/overageApisExists", "", "GET", obj.toString(), headers, "");
         try {
             OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);

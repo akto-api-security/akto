@@ -105,7 +105,7 @@ import com.akto.dto.usage.MetricTypes;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.dao.billing.UningestedApiOverageDao;
-import com.akto.dto.billing.UningesetedApiOverage;
+import com.akto.dto.billing.UningestedApiOverage;
 import com.akto.usage.UsageMetricCalculator;
 import com.akto.usage.UsageMetricHandler;
 import com.akto.util.Constants;
@@ -295,7 +295,7 @@ public class DbLayer {
         loggerMaker.infoAndAddToDb(String.format("Modified counts : %s", result.getModifiedCount()), LogDb.TESTING);
     }
 
-    public static void bulkWriteOverageInfo(List<WriteModel<UningesetedApiOverage>> writeModelList) {
+    public static void bulkWriteOverageInfo(List<WriteModel<UningestedApiOverage>> writeModelList) {
         BulkWriteResult result = UningestedApiOverageDao.instance.bulkWrite(writeModelList,
                 new BulkWriteOptions().ordered(false));
         loggerMaker.infoAndAddToDb(String.format("OverageInfo bulk write - Matched: %s, Inserted: %s, Modified: %s",

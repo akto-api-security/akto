@@ -10,7 +10,7 @@ import com.akto.dto.*;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.billing.Tokens;
-import com.akto.dto.billing.UningesetedApiOverage;
+import com.akto.dto.billing.UningestedApiOverage;
 import com.akto.dto.bulk_updates.BulkUpdates;
 import com.akto.dto.bulk_updates.UpdatePayload;
 import com.akto.dto.dependency_flow.Node;
@@ -1060,13 +1060,14 @@ public class DbAction extends ActionSupport {
     public String bulkWriteOverageInfo() {
         try {
             loggerMaker.infoAndAddToDb("bulkWriteOverageInfo called");
-            ArrayList<WriteModel<UningesetedApiOverage>> writes = new ArrayList<>();
+            ArrayList<WriteModel<UningestedApiOverage>> writes = new ArrayList<>();
             for (BulkUpdates bulkUpdate: writesForOverageInfo) {
                 // Create filter for the document
                 Bson filters = Filters.and(
-                    Filters.eq("apiCollectionId", bulkUpdate.getFilters().get("apiCollectionId")),
-                    Filters.eq("urlType", bulkUpdate.getFilters().get("urlType")),
-                    Filters.eq("methodAndUrl", bulkUpdate.getFilters().get("methodAndUrl"))
+                    Filters.eq(UningestedApiOverage.API_COLLECTION_ID, bulkUpdate.getFilters().get(UningestedApiOverage.API_COLLECTION_ID)),
+                    Filters.eq(UningestedApiOverage.URL_TYPE, bulkUpdate.getFilters().get(UningestedApiOverage.URL_TYPE)),
+                    Filters.eq(UningestedApiOverage.METHOD, bulkUpdate.getFilters().get(UningestedApiOverage.METHOD)),
+                    Filters.eq(UningestedApiOverage.URL, bulkUpdate.getFilters().get(UningestedApiOverage.URL))
                 );
 
                 List<String> updatePayloadList = bulkUpdate.getUpdates();
