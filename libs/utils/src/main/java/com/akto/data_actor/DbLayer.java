@@ -104,6 +104,8 @@ import com.akto.dto.upload.SwaggerFileUpload;
 import com.akto.dto.usage.MetricTypes;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.dao.billing.UningestedApiOverageDao;
+import com.akto.dto.billing.UningesetedApiOverage;
 import com.akto.usage.UsageMetricCalculator;
 import com.akto.usage.UsageMetricHandler;
 import com.akto.util.Constants;
@@ -291,6 +293,17 @@ public class DbLayer {
         loggerMaker.infoAndAddToDb(String.format("Matched records : %s", result.getMatchedCount()), LogDb.TESTING);
         loggerMaker.infoAndAddToDb(String.format("inserted counts : %s", result.getInsertedCount()), LogDb.TESTING);
         loggerMaker.infoAndAddToDb(String.format("Modified counts : %s", result.getModifiedCount()), LogDb.TESTING);
+    }
+
+    public static void bulkWriteOverageInfo(List<WriteModel<UningesetedApiOverage>> writeModelList) {
+        BulkWriteResult result = UningestedApiOverageDao.instance.bulkWrite(writeModelList,
+                new BulkWriteOptions().ordered(false));
+        loggerMaker.infoAndAddToDb(String.format("OverageInfo bulk write - Matched: %s, Inserted: %s, Modified: %s",
+            result.getMatchedCount(), result.getInsertedCount(), result.getModifiedCount()), LogDb.RUNTIME);
+    }
+
+    public static boolean overageApisExists(int apiCollectionId, String urlType, String methodAndUrl) {
+        return UningestedApiOverageDao.instance.exists(apiCollectionId, urlType, methodAndUrl);
     }
 
     public static TestSourceConfig findTestSourceConfig(String subType){
@@ -501,7 +514,7 @@ public class DbLayer {
         return tags;
     }
 
-    public static void createCollectionSimpleForVpc(int vxlanId, String vpcId, List<CollectionTags> tags) { 
+    public static void createCollectionSimpleForVpc(int vxlanId, String vpcId, List<CollectionTags> tags) {
         UpdateOptions updateOptions = new UpdateOptions();
         updateOptions.upsert(true);
 
@@ -628,7 +641,7 @@ public class DbLayer {
 
     public static TestingRunResultSummary createTRRSummaryIfAbsent(String testingRunHexId, int start) {
         ObjectId testingRunId = new ObjectId(testingRunHexId);
-        
+
         // since the extra field is not used in mini-testing explicitly, we can just update the summary here
         // it is only used in dashboard for querying data from new collection
 
@@ -703,7 +716,7 @@ public class DbLayer {
             }
 
             String validatedMiniTestingName = validateAndGetMiniTestingService(
-                testingRun.getMiniTestingServiceName(), 
+                testingRun.getMiniTestingServiceName(),
                 miniTestingName
             );
 
@@ -743,8 +756,8 @@ public class DbLayer {
             TestingRunResultSummary trrs = TestingRunResultSummariesDao.instance.findOne(
                 filter,
                 Projections.include(
-                    TestingRunResultSummary.TESTING_RUN_ID, 
-                    ID, 
+                    TestingRunResultSummary.TESTING_RUN_ID,
+                    ID,
                     TestingRunResultSummary.ORIGINAL_TESTING_RUN_SUMMARY_ID
                 )
             );
@@ -772,7 +785,7 @@ public class DbLayer {
             }
 
             String validatedMiniTestingName = validateAndGetMiniTestingService(
-                testingRun.getMiniTestingServiceName(), 
+                testingRun.getMiniTestingServiceName(),
                 miniTestingName
             );
 
@@ -1123,7 +1136,7 @@ public class DbLayer {
                             skip,
                             Projections.exclude("testResults.originalMessage", "testResults.nodeResultMap"));
         }
-        
+
     }
 
     public static List<TestRoles> fetchTestRoles() {
@@ -1501,7 +1514,7 @@ public class DbLayer {
         Bson delFilterQ = Filters.and(filterQ, Filters.eq(DependencyNode.METHOD_REQ, reqMethod));
         return DependencyNodeDao.instance.findAll(delFilterQ);
     }
-    
+
     public static TestingRunResultSummary findLatestTestingRunResultSummary(Bson filter){
         return TestingRunResultSummariesDao.instance.findLatestOne(filter);
     }
@@ -1526,7 +1539,7 @@ public class DbLayer {
         }
 
         BulkWriteOptions options = new BulkWriteOptions().ordered(false).bypassDocumentValidation(true);
-        List<WriteModel<SvcToSvcGraphEdge>> bulkList = new ArrayList<>();    
+        List<WriteModel<SvcToSvcGraphEdge>> bulkList = new ArrayList<>();
         UpdateOptions updateOptions = new UpdateOptions().upsert(true).bypassDocumentValidation(true);
         for(SvcToSvcGraphEdge edge: edges) {
             Bson updates = Updates.combine(
@@ -1554,7 +1567,7 @@ public class DbLayer {
         UpdateOptions updateOptions = new UpdateOptions().upsert(true).bypassDocumentValidation(true);
 
         BulkWriteOptions options = new BulkWriteOptions().ordered(false).bypassDocumentValidation(true);
-        List<WriteModel<SvcToSvcGraphNode>> bulkList = new ArrayList<>();    
+        List<WriteModel<SvcToSvcGraphNode>> bulkList = new ArrayList<>();
         for(SvcToSvcGraphNode node: nodes) {
             Bson updates = Updates.combine(
                 Updates.setOnInsert(SvcToSvcGraphEdge.TYPE, node.getType().toString()),
@@ -1630,7 +1643,7 @@ public class DbLayer {
                     Filters.eq("method", apiHitCountInfo.getMethod()),
                     Filters.eq("ts", apiHitCountInfo.getTs())
                 );
-                
+
                 // Use updateOne with upsert instead of insertOne to ensure uniqueness
                 updates.add(new UpdateOneModel<>(
                     filter,

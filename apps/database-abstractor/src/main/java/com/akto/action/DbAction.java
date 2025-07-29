@@ -10,6 +10,7 @@ import com.akto.dto.*;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.billing.Tokens;
+import com.akto.dto.billing.UningesetedApiOverage;
 import com.akto.dto.bulk_updates.BulkUpdates;
 import com.akto.dto.bulk_updates.UpdatePayload;
 import com.akto.dto.dependency_flow.Node;
@@ -102,6 +103,7 @@ public class DbAction extends ActionSupport {
     List<BulkUpdates> writesForTrafficMetrics;
     List<BulkUpdates> writesForTestingRunIssues;
     List<BulkUpdates> writesForSuspectSampleData;
+    List<BulkUpdates> writesForOverageInfo;
     List<DependencyNode> dependencyNodeList;
     TestScript testScript;
     String openApiSchema;
@@ -116,6 +118,14 @@ public class DbAction extends ActionSupport {
 
     public void setWritesForTestingRunIssues(List<BulkUpdates> writesForTestingRunIssues) {
         this.writesForTestingRunIssues = writesForTestingRunIssues;
+    }
+
+    public List<BulkUpdates> getWritesForOverageInfo() {
+        return writesForOverageInfo;
+    }
+
+    public void setWritesForOverageInfo(List<BulkUpdates> writesForOverageInfo) {
+        this.writesForOverageInfo = writesForOverageInfo;
     }
 
     String subType;
@@ -616,7 +626,7 @@ public class DbAction extends ActionSupport {
                             }
                         }
                     }
-    
+
                     if (isDeleteWrite) {
                         writes.add(
                                 new DeleteOneModel<>(Filters.and(filters), new DeleteOptions())
@@ -629,7 +639,7 @@ public class DbAction extends ActionSupport {
                 }
 
                 loggerMaker.infoAndAddToDb(String.format("Consumer data: %d ignored: %d writes: %d", writesForSti.size(), ignoreCount, writes.size()));
-    
+
                 if (writes != null && !writes.isEmpty()) {
                     DbLayer.bulkWriteSingleTypeInfo(writes);
                 }
@@ -682,7 +692,7 @@ public class DbAction extends ActionSupport {
                             Filters.eq("_id.url", url));
                     List<String> updatePayloadList = bulkUpdate.getUpdates();
                     SampleDataLogs.printLog(apiCollectionId, method, url);
-    
+
                     List<Bson> updates = new ArrayList<>();
                     for (String payload: updatePayloadList) {
                         Map<String, Object> json = gson.fromJson(payload, Map.class);
@@ -1001,7 +1011,7 @@ public class DbAction extends ActionSupport {
                         } else if (field.equals(TestingRunIssues.KEY_SEVERITY)) {
 
                             /*
-                             * Fixing severity temp. here, 
+                             * Fixing severity temp. here,
                              * cause the info. from mini-testing always contains HIGH.
                              * To be fixed in mini-testing.
                              */
@@ -1043,6 +1053,55 @@ public class DbAction extends ActionSupport {
                     kafkaUtils.insertDataSecondary(writesForTestingRunIssues, "bulkWriteTestingRunIssues", Context.accountId.get());
                 }
                 return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String bulkWriteOverageInfo() {
+        try {
+            loggerMaker.infoAndAddToDb("bulkWriteOverageInfo called");
+            ArrayList<WriteModel<UningesetedApiOverage>> writes = new ArrayList<>();
+            for (BulkUpdates bulkUpdate: writesForOverageInfo) {
+                // Create filter for the document
+                Bson filters = Filters.and(
+                    Filters.eq("apiCollectionId", bulkUpdate.getFilters().get("apiCollectionId")),
+                    Filters.eq("urlType", bulkUpdate.getFilters().get("urlType")),
+                    Filters.eq("methodAndUrl", bulkUpdate.getFilters().get("methodAndUrl"))
+                );
+
+                List<String> updatePayloadList = bulkUpdate.getUpdates();
+                List<Bson> updates = new ArrayList<>();
+
+                for (String payload: updatePayloadList) {
+                    Map<String, Object> json = gson.fromJson(payload, Map.class);
+                    String field = (String) json.get("field");
+                    Object val = json.get("val");
+                    String op = (String) json.get("op");
+
+                    if ("setOnInsert".equals(op)) {
+                        updates.add(Updates.setOnInsert(field, val));
+                    } else if ("set".equals(op)) {
+                        updates.add(Updates.set(field, val));
+                    }
+                }
+
+                if (!updates.isEmpty()) {
+                    writes.add(
+                        new UpdateOneModel<>(filters, Updates.combine(updates), new UpdateOptions().upsert(true))
+                    );
+                }
+            }
+            DbLayer.bulkWriteOverageInfo(writes);
+        } catch (Exception e) {
+            String err = "Error: ";
+            if (e != null && e.getStackTrace() != null && e.getStackTrace().length > 0) {
+                err = String.format("Error: %s\nStackTrace: %s", e.getMessage(), e.getStackTrace()[0]);
+            } else {
+                err = String.format("Err msg: %s\nStackTrace not available", err);
+                e.printStackTrace();
+            }
+            System.out.println(err);
+            return Action.ERROR.toUpperCase();
         }
         return Action.SUCCESS.toUpperCase();
     }
@@ -2375,6 +2434,16 @@ public class DbAction extends ActionSupport {
         return Action.SUCCESS.toUpperCase();
     }
 
+    public String overageApisExists() {
+        try {
+            exists = DbLayer.overageApisExists(apiCollectionId, url, methodVal);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in overageApisExists " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
     List<DependencyNode> dependencyNodes;
 
     public List<DependencyNode> getDependencyNodes() {
@@ -3455,7 +3524,7 @@ public class DbAction extends ActionSupport {
     public void setWritesForSuspectSampleData(List<BulkUpdates> writesForSuspectSampleData) {
         this.writesForSuspectSampleData = writesForSuspectSampleData;
     }
-    
+
     public List<YamlTemplate> getActiveAdvancedFilters() {
         return activeAdvancedFilters;
     }
@@ -3584,7 +3653,7 @@ public class DbAction extends ActionSupport {
     public void setRemoveZeroLevel(boolean removeZeroLevel) {
         this.removeZeroLevel = removeZeroLevel;
     }
-    
+
     public void setFilter(Bson filter) {
         this.filter = filter;
     }
@@ -3592,7 +3661,7 @@ public class DbAction extends ActionSupport {
     public TestScript getTestScript() {
         return testScript;
     }
-    
+
     public String getOperator() {
         return operator;
     }
@@ -3661,7 +3730,7 @@ public class DbAction extends ActionSupport {
     public void setIds(List<String> ids) {
         this.ids = ids;
     }
-    
+
     public String getOpenApiSchema() {
         return openApiSchema;
     }
