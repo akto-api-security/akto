@@ -2,13 +2,15 @@ package com.akto.hybrid_runtime;
 
 import com.akto.data_actor.DataActorFactory;
 import com.akto.dto.billing.UningesetedApiOverage;
+import com.akto.dto.bulk_updates.BulkUpdates;
+import com.akto.dto.bulk_updates.UpdatePayload;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
-import com.mongodb.client.model.InsertOneModel;
-import com.mongodb.client.model.WriteModel;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -107,12 +109,27 @@ public class UningestedApiTracker {
         }
         
         try {
-            // Prepare bulk write operations
+            // Prepare bulk write operations using BulkUpdates
             List<Object> bulkWrites = new ArrayList<>();
             for (UningesetedApiOverage uningesetedApiOverage : pendingOverageApisInfo.values()) {
                 try {
-                    WriteModel<UningesetedApiOverage> writeModel = new InsertOneModel<>(uningesetedApiOverage);
-                    bulkWrites.add(writeModel);
+                    // Create filter map for the document
+                    Map<String, Object> filters = new HashMap<>();
+                    filters.put(UningesetedApiOverage.API_COLLECTION_ID, uningesetedApiOverage.getApiCollectionId());
+                    filters.put(UningesetedApiOverage.URL_TYPE, uningesetedApiOverage.getUrlType());
+                    filters.put(UningesetedApiOverage.METHOD_AND_URL, uningesetedApiOverage.getMethodAndUrl());
+                    
+                    // Create updates list
+                    ArrayList<String> updates = new ArrayList<>();
+                    
+                    // Add timestamp update
+                    UpdatePayload timestampUpdate = new UpdatePayload(UningesetedApiOverage.TIMESTAMP, uningesetedApiOverage.getTimestamp(), "setOnInsert");
+                    updates.add(timestampUpdate.toString());
+                    
+                    // Create BulkUpdates object
+                    BulkUpdates bulkUpdate = new BulkUpdates(filters, updates);
+                    bulkWrites.add(bulkUpdate);
+                    
                 } catch (Exception e) {
                     loggerMaker.errorAndAddToDb(e, "Failed to prepare overage info for bulk write: " + e.getMessage());
                 }

@@ -8,6 +8,7 @@ import com.akto.dto.*;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.billing.Tokens;
+import com.akto.dto.billing.UningesetedApiOverage;
 import com.akto.dto.bulk_updates.BulkUpdates;
 import com.akto.dto.bulk_updates.UpdatePayload;
 import com.akto.dto.filter.MergedUrls;
@@ -78,6 +79,7 @@ public class DbAction extends ActionSupport {
     List<BulkUpdates> writesForTrafficInfo;
     List<BulkUpdates> writesForTrafficMetrics;
     List<BulkUpdates> writesForTestingRunIssues;
+    List<BulkUpdates> writesForOverageInfo;
     List<DependencyNode> dependencyNodeList;
     TestScript testScript;
 
@@ -817,6 +819,55 @@ public class DbAction extends ActionSupport {
                 System.out.println(err);
                 return Action.ERROR.toUpperCase();
             }
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String bulkWriteOverageInfo() {
+        try {
+            System.out.println("bulkWriteOverageInfo called");
+            ArrayList<WriteModel<UningesetedApiOverage>> writes = new ArrayList<>();
+            for (BulkUpdates bulkUpdate: writesForOverageInfo) {
+                // Create filter for the document
+                Bson filters = Filters.and(
+                    Filters.eq("apiCollectionId", bulkUpdate.getFilters().get("apiCollectionId")),
+                    Filters.eq("urlType", bulkUpdate.getFilters().get("urlType")),
+                    Filters.eq("methodAndUrl", bulkUpdate.getFilters().get("methodAndUrl"))
+                );
+                
+                List<String> updatePayloadList = bulkUpdate.getUpdates();
+                List<Bson> updates = new ArrayList<>();
+                
+                for (String payload: updatePayloadList) {
+                    Map<String, Object> json = gson.fromJson(payload, Map.class);
+                    String field = (String) json.get("field");
+                    Object val = json.get("val");
+                    String op = (String) json.get("op");
+                    
+                    if ("setOnInsert".equals(op)) {
+                        updates.add(Updates.setOnInsert(field, val));
+                    } else if ("set".equals(op)) {
+                        updates.add(Updates.set(field, val));
+                    }
+                }
+                
+                if (!updates.isEmpty()) {
+                    writes.add(
+                        new UpdateOneModel<>(filters, Updates.combine(updates), new UpdateOptions().upsert(true))
+                    );
+                }
+            }
+            DbLayer.bulkWriteOverageInfo(writes);
+        } catch (Exception e) {
+            String err = "Error: ";
+            if (e != null && e.getStackTrace() != null && e.getStackTrace().length > 0) {
+                err = String.format("Error: %s\nStackTrace: %s", e.getMessage(), e.getStackTrace()[0]);
+            } else {
+                err = String.format("Err msg: %s\nStackTrace not available", err);
+                e.printStackTrace();
+            }
+            System.out.println(err);
+            return Action.ERROR.toUpperCase();
         }
         return Action.SUCCESS.toUpperCase();
     }
@@ -1950,6 +2001,14 @@ public class DbAction extends ActionSupport {
 
     public void setWritesForTrafficMetrics(List<BulkUpdates> writesForTrafficMetrics) {
         this.writesForTrafficMetrics = writesForTrafficMetrics;
+    }
+
+    public List<BulkUpdates> getWritesForOverageInfo() {
+        return writesForOverageInfo;
+    }
+
+    public void setWritesForOverageInfo(List<BulkUpdates> writesForOverageInfo) {
+        this.writesForOverageInfo = writesForOverageInfo;
     }
 
     public int getLastFetchTimestamp() {
