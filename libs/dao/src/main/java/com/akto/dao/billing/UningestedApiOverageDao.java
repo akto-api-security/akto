@@ -6,8 +6,15 @@ import com.akto.dto.billing.UningesetedApiOverage;
 import com.mongodb.client.model.Indexes;
 import org.bson.conversions.Bson;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Aggregates;
+import com.mongodb.client.model.Accumulators;
+import com.mongodb.client.MongoCursor;
+import com.mongodb.BasicDBObject;
 
 import java.util.List;
+import java.util.Map;
+import java.util.HashMap;
+import java.util.ArrayList;
 
 public class UningestedApiOverageDao extends AccountsContextDao<UningesetedApiOverage> {
 
@@ -68,5 +75,29 @@ public class UningestedApiOverageDao extends AccountsContextDao<UningesetedApiOv
             Filters.eq(UningesetedApiOverage.URL_TYPE, urlType)
         );
         return findOne(filter) != null;
+    }
+
+    public Map<Integer, Integer> getCountByCollection() {
+        Map<Integer, Integer> countMap = new HashMap<>();
+        
+        List<Bson> pipeline = new ArrayList<>();
+        pipeline.add(Aggregates.group(
+            "$" + UningesetedApiOverage.API_COLLECTION_ID,
+            Accumulators.sum("count", 1)
+        ));
+        
+        MongoCursor<BasicDBObject> cursor = getMCollection().aggregate(pipeline, BasicDBObject.class).cursor();
+        while (cursor.hasNext()) {
+            try {
+                BasicDBObject result = cursor.next();
+                int apiCollectionId = result.getInt("_id");
+                int count = result.getInt("count");
+                countMap.put(apiCollectionId, count);
+            } catch (Exception e) {
+                // Log error silently since LoggerMaker is not available in this module
+            }
+        }
+        
+        return countMap;
     }
 } 

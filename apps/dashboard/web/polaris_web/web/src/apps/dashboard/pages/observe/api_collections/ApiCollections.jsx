@@ -235,7 +235,7 @@ function ApiCollections(props) {
     const userRole = window.USER_ROLE
 
     const navigate = useNavigate();
-    const [data, setData] = useState({'all': [], 'hostname':[], 'groups': [], 'custom': [], 'deactivated': []})
+    const [data, setData] = useState({'all': [], 'hostname':[], 'groups': [], 'custom': [], 'deactivated': [], 'Untracked APIs': []})
     const [active, setActive] = useState(false);
     const [loading, setLoading] = useState(false)
           
@@ -253,7 +253,7 @@ function ApiCollections(props) {
 
     // const dummyData = dummyJson;
 
-    const definedTableTabs = ['All', 'Hostname', 'Groups', 'Custom', 'Deactivated']
+    const definedTableTabs = ['All', 'Hostname', 'Groups', 'Custom', 'Deactivated', 'Untracked APIs']
 
     const { tabsInfo, selectItems } = useTable()
     const tableSelectedTab = PersistStore.getState().tableSelectedTab[window.location.pathname]
@@ -270,6 +270,7 @@ function ApiCollections(props) {
     const setSamples = ObserveStore(state => state.setSamples)
     const setSelectedUrl = ObserveStore(state => state.setSelectedUrl)
     const [deactivateCollections, setDeactivateCollections] = useState([])
+    const [uningestedApiCountMap, setUningestedApiCountMap] = useState({})
 
     const resetFunc = () => {
         setInventoryFlyout(false)
@@ -358,6 +359,7 @@ function ApiCollections(props) {
             api.getCoverageInfoForCollections(),
             api.getLastTrafficSeen(),
             collectionApi.fetchCountForHostnameDeactivatedCollections(),
+            collectionApi.fetchCountForUningestedApis(),
             dashboardApi.fetchEndpointsCount(0, 0)
         ];
         if(shouldCallHeavyApis){
@@ -379,7 +381,8 @@ function ApiCollections(props) {
         // let coverageInfo = dummyData.coverageMap
         let trafficInfo = results[1].status === 'fulfilled' ? results[1].value : {};
         let deactivatedCountInfo = results[2].status === 'fulfilled' ? results[2].value : {};
-        let fetchEndpointsCountResp = results[3].status === 'fulfilled' ? results[3].value : {}
+        let uningestedApiCountInfo = results[3].status === 'fulfilled' ? results[3].value : {};
+        let fetchEndpointsCountResp = results[4].status === 'fulfilled' ? results[4].value : {}
 
         let riskScoreObj = lastFetchedResp
         let sensitiveInfo = lastFetchedSensitiveResp
@@ -421,7 +424,7 @@ function ApiCollections(props) {
         let usersCollectionList = []
         let userList = []
 
-        const index = !shouldCallHeavyApis ? 4 : 7
+        const index = !shouldCallHeavyApis ? 5 : 8
 
         if(userRole === 'ADMIN') {
             if(results[index]?.status === "fulfilled") {
@@ -461,6 +464,9 @@ function ApiCollections(props) {
         });
         setDeactivateCollections(JSON.parse(JSON.stringify(deactivatedCollectionsCopy)));
         
+        // Process uningested API data
+        setUningestedApiCountMap(uningestedApiCountInfo || {});
+        
         // Calculate summary data only for active collections
         const summary = transform.getSummaryData(dataObj.normal)
         summary.totalCriticalEndpoints = riskScoreObj.criticalUrls;
@@ -479,6 +485,23 @@ function ApiCollections(props) {
         tmp.groups = allGroupsForTmp;
         tmp.custom = tmp.all.filter(x => !tmp.hostname.includes(x) && !x.deactivated && !tmp.groups.includes(x));
         tmp.deactivated = deactivatedCollectionsCopy
+        
+        // Create untracked collections data
+        const untrackedCollections = dataObj.prettify.filter(c => !c.deactivated).map((c) => {
+            const untrackedCount = uningestedApiCountInfo[c.id] || 0;
+            if (untrackedCount > 0) {
+                return {
+                    ...c,
+                    urlsCount: untrackedCount,
+                    displayName: c.displayName,
+                    rowStatus: 'critical',
+                    disableClick: true
+                };
+            }
+            return null;
+        }).filter(c => c !== null);
+        tmp['Untracked APIs'] = untrackedCollections;
+        
         setData(tmp);
     }
 
