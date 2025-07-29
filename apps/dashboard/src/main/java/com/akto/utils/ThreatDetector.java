@@ -4,7 +4,6 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -21,6 +20,7 @@ import org.bson.conversions.Bson;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.RawApi;
 import com.akto.ProtoMessageUtils;
+import com.akto.action.threat_detection.AbstractThreatDetectionAction;
 import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.SampleDataDao;
 import com.akto.dao.context.Context;
@@ -33,23 +33,16 @@ import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.monitoring.FilterConfig;
 import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.traffic.SampleData;
-import com.akto.dto.type.URLMethods.Method;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.parsers.HttpCallParser;
 import com.akto.proto.generated.threat_detection.message.malicious_event.event_type.v1.EventType;
-import com.akto.proto.generated.threat_detection.message.malicious_event.v1.MaliciousEventKafkaEnvelope;
 import com.akto.proto.generated.threat_detection.message.malicious_event.v1.MaliciousEventMessage;
 import com.akto.proto.generated.threat_detection.message.sample_request.v1.Metadata;
-import com.akto.proto.generated.threat_detection.message.sample_request.v1.SampleMaliciousRequest;
-import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ListMaliciousRequestsResponse.MaliciousEvent;
 import com.akto.proto.generated.threat_detection.service.malicious_alert_service.v1.RecordMaliciousEventRequest;
 import com.akto.rules.TestPlugin;
 import com.akto.test_editor.filter.data_operands_impl.ValidationResult;
 import com.client9.libinjection.SQLParse;
-import com.mongodb.BasicDBObject;
-import com.mongodb.client.FindIterable;
-import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
 
@@ -72,27 +65,55 @@ public class ThreatDetector {
     ThreatDetector threatDetector;
     private final CloseableHttpClient httpClient;
     private static final PoolingHttpClientConnectionManager connManager = new PoolingHttpClientConnectionManager();
+    AbstractThreatDetectionAction action = new AbstractThreatDetectionAction();
 
     public ThreatDetector() throws Exception {
         lfiTrie = generateTrie(LFI_OS_FILES_DATA);
         osCommandInjectionTrie = generateTrie(OS_COMMAND_INJECTION_DATA);
         ssrfTrie = generateTrie(SSRF_DATA);
-        List<YamlTemplate> templates = dataActor.fetchFilterYamlTemplates();
-        apiFilters = FilterYamlTemplateDao.fetchFilterConfig(false, templates, false);
-        try {
-            threatDetector = new ThreatDetector();                
-        } catch (Exception e) {
-            threatDetector = null;
-        }
+        // try {
+        //     threatDetector = new ThreatDetector();                
+        // } catch (Exception e) {
+        //     threatDetector = null;
+        // }
         this.httpClient = HttpClients.custom()
         .setConnectionManager(connManager)
         .setKeepAliveStrategy((response, context) -> 30_000)
         .build();
     }
 
+    // public static void main(String[] args) throws InterruptedException {
+    //     String mongoURI = "mongodb://localhost:27017"; //System.getenv("AKTO_MONGO_CONN");
+    //     ReadPreference readPreference = ReadPreference.primary();
+    //     WriteConcern writeConcern = WriteConcern.W1;
+    //     DaoInit.init(new ConnectionString(mongoURI), readPreference, writeConcern);
+
+    //     boolean connectedToMongo = false;
+    //     do {
+    //         connectedToMongo = MCollection.checkConnection();
+    //         try {
+    //             Thread.sleep(1000);
+    //         } catch (InterruptedException e) {
+    //             throw new RuntimeException(e);
+    //         }
+    //     } while (!connectedToMongo);
+
+    //     ThreatDetector threatDetector;
+    //     try {
+    //         threatDetector = new ThreatDetector();
+    //         threatDetector.triggerFunc();
+    //     } catch (Exception e) {
+    //         // TODO: handle exception
+    //     }
+    // }
+
     public void triggerFunc() {
+        List<YamlTemplate> templates = dataActor.fetchFilterYamlTemplates();
+        apiFilters = FilterYamlTemplateDao.fetchFilterConfig(false, templates, false);
         Bson projections = Projections.include("_id");
-        List<ApiCollection> apiCollectionList = ApiCollectionsDao.instance.findAll(new BasicDBObject(), projections);
+        List<ApiCollection> apiCollectionList = ApiCollectionsDao.instance.findAll(Filters.and(
+            Filters.exists("hostName", true),
+            Filters.ne("type", "API_GROUP")), projections);
 
         for (ApiCollection apiCollection: apiCollectionList) {
             runOnSamples(apiCollection.getId());
@@ -101,11 +122,14 @@ public class ThreatDetector {
     }
 
     public void runOnSamples(int apiCollectionId) {
+        if (apiCollectionId == 0 || apiCollectionId == 1111111111) {
+            return;
+        }
         int batchSize = 100;
         int skip = 0;
         Bson projection = Projections.fields(
                 Projections.include("_id"),
-                Projections.slice("samples", 1)  // Only fetch the first element of the samples array
+                Projections.slice("samples", 1)
         );
 
         while (true) {
@@ -133,9 +157,8 @@ public class ThreatDetector {
                     } catch (Exception e) {
                         continue;
                     }
-                    boolean resp = threatDetector.applyFilter(apiFilter, httpResponseParams, rawApi, apiInfoKey);
+                    boolean resp = applyFilter(apiFilter, httpResponseParams, rawApi, apiInfoKey);
                     if (resp) {
-                        Metadata metadata = Metadata.newBuilder().setCountryCode("XY").build();
                         MaliciousEventMessage evt = buildMaliciousEventMessage(apiFilter, httpResponseParams, apiCollectionId, sd);
                         forwardMaliciousEvent(evt);
                     }
@@ -174,8 +197,8 @@ public class ThreatDetector {
                 RecordMaliciousEventRequest.newBuilder().setMaliciousEvent(evt);
 
             RecordMaliciousEventRequest maliciousEventRequest = reqBuilder.build();
-            String url = System.getenv("AKTO_THREAT_PROTECTION_BACKEND_URL");
-            String token = System.getenv("AKTO_THREAT_PROTECTION_BACKEND_TOKEN");
+            String url = "https://tbs.akto.io";
+            String token = action.getApiToken();
             ProtoMessageUtils.toString(maliciousEventRequest)
                 .ifPresent(
                     msg -> {

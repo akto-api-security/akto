@@ -45,7 +45,10 @@ function About() {
     })
     const [modalOpen, setModalOpen] = useState(false)
     const [deleteMaliciousEventsModal, setDeleteMaliciousEventsModal] = useState(false)
+    const [triggerThreatDetectionModal, setTriggerThreatDetectionModal] = useState(false)
+
     const [disableMalEventButton, setDisableMalEventButton] = useState(false)
+    const [disableThreatDetectionSampleButton, setDisableThreatDetectionSampleButton] = useState(false)
 
     const initialUrlsList = settingFunctions.getRedundantUrlOptions()
     const [selectedUrlList, setSelectedUrlsList] = useState([])
@@ -395,6 +398,16 @@ function About() {
         })
     }
 
+    const triggerThreatDetectionOnSampleData = async() => {
+        setTriggerThreatDetectionModal(false)
+        // await settingRequests.deleteAllMaliciousEvents().then(() => {
+        //     func.setToast(true, false, "Deleting malicious events - may take a few minutes.")
+        //     setDisableThreatDetectionSampleButton(true)
+        // }).catch(() => {
+        //     func.setToast(true, true, "Something went wrong. Please try again.")
+        // })
+    }
+
     const redundantUrlComp = (
         <VerticalStack gap={"4"}>
             <Box width='220px'>
@@ -434,6 +447,13 @@ function About() {
                 </Box>
             </VerticalStack>
 
+            <VerticalStack gap={2}>
+                <Text color='subdued' variant='bodyMd'>Run Threat Detection On Sample Data</Text>
+                <Box width='80px'>
+                    <Button disabled={disableThreatDetectionSampleButton} onClick={() => setTriggerThreatDetectionModal(true)}>Delete</Button>
+                </Box>
+            </VerticalStack>
+
             <Modal
                 open={deleteMaliciousEventsModal}
                 primaryAction={{
@@ -455,6 +475,21 @@ function About() {
                         <Text>Are you sure you want to proceed?</Text>
                     </VerticalStack>
                 </Modal.Section>
+            </Modal>
+
+            <Modal
+                open={triggerThreatDetectionModal}
+                primaryAction={{
+                    content: "Yes, Trigger Threat Process On Sample Data",
+                    onAction: triggerThreatDetectionOnSampleData
+                }}
+                secondaryActions={[{
+                    content: "Cancel",
+                    onAction: () => {setTriggerThreatDetectionModal(false)}
+                }]}
+                title="⚠️ Confirm"
+                onClose={() => {setTriggerThreatDetectionModal(false)}}
+            >
             </Modal>
         </VerticalStack>
     )
