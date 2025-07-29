@@ -2,7 +2,8 @@ package com.akto.dao.billing;
 
 import com.akto.dao.AccountsContextDao;
 import com.akto.dao.context.Context;
-import com.akto.dto.billing.UningesetedApiOverage;
+import com.akto.dto.billing.UningestedApiOverage;
+import com.akto.dto.type.URLMethods;
 import com.mongodb.client.model.Indexes;
 import org.bson.conversions.Bson;
 import com.mongodb.client.model.Filters;
@@ -16,7 +17,7 @@ import java.util.Map;
 import java.util.HashMap;
 import java.util.ArrayList;
 
-public class UningestedApiOverageDao extends AccountsContextDao<UningesetedApiOverage> {
+public class UningestedApiOverageDao extends AccountsContextDao<UningestedApiOverage> {
 
     public static final UningestedApiOverageDao instance = new UningestedApiOverageDao();
 
@@ -28,19 +29,20 @@ public class UningestedApiOverageDao extends AccountsContextDao<UningesetedApiOv
     }
 
     @Override
-    public Class<UningesetedApiOverage> getClassT() {
-        return UningesetedApiOverage.class;
+    public Class<UningestedApiOverage> getClassT() {
+        return UningestedApiOverage.class;
     }
 
     public void createIndicesIfAbsent() {
         // Create index on accountId for efficient queries
-        getMCollection().createIndex(Indexes.ascending(UningesetedApiOverage.API_COLLECTION_ID));
+        getMCollection().createIndex(Indexes.ascending(UningestedApiOverage.API_COLLECTION_ID));
         
         // Create compound index on accountId, apiCollectionId, url, method for deduplication
         getMCollection().createIndex(Indexes.ascending(
-            UningesetedApiOverage.API_COLLECTION_ID,
-            UningesetedApiOverage.URL_TYPE,
-            UningesetedApiOverage.METHOD_AND_URL
+            UningestedApiOverage.API_COLLECTION_ID,
+            UningestedApiOverage.URL_TYPE,
+            UningestedApiOverage.METHOD,
+            UningestedApiOverage.URL
         ));
     }
 
@@ -56,23 +58,24 @@ public class UningestedApiOverageDao extends AccountsContextDao<UningesetedApiOv
     public static Bson generateFilter(int accountId, int apiCollectionId) {
         Context.accountId.set(accountId);
         return Filters.and(
-            Filters.eq(UningesetedApiOverage.API_COLLECTION_ID, apiCollectionId)
+            Filters.eq(UningestedApiOverage.API_COLLECTION_ID, apiCollectionId)
         );
     }
 
-    public List<UningesetedApiOverage> findByAccountId(int accountId) {
+    public List<UningestedApiOverage> findByAccountId(int accountId) {
         return findAll(generateFilter(accountId));
     }
 
-    public List<UningesetedApiOverage> findByAccountIdAndCollection(int accountId, int apiCollectionId) {
+    public List<UningestedApiOverage> findByAccountIdAndCollection(int accountId, int apiCollectionId) {
         return findAll(generateFilter(accountId, apiCollectionId));
     }
 
-    public boolean exists(int apiCollectionId, String urlType, String methodAndUrl) {
+    public boolean exists(int apiCollectionId, String urlType, URLMethods.Method method, String url) {
         Bson filter = Filters.and(
-            Filters.eq(UningesetedApiOverage.API_COLLECTION_ID, apiCollectionId),
-            Filters.eq(UningesetedApiOverage.METHOD_AND_URL, methodAndUrl),
-            Filters.eq(UningesetedApiOverage.URL_TYPE, urlType)
+            Filters.eq(UningestedApiOverage.API_COLLECTION_ID, apiCollectionId),
+            Filters.eq(UningestedApiOverage.METHOD, method),
+            Filters.eq(UningestedApiOverage.URL, url),
+            Filters.eq(UningestedApiOverage.URL_TYPE, urlType)
         );
         return findOne(filter) != null;
     }
@@ -82,7 +85,7 @@ public class UningestedApiOverageDao extends AccountsContextDao<UningesetedApiOv
         
         List<Bson> pipeline = new ArrayList<>();
         pipeline.add(Aggregates.group(
-            "$" + UningesetedApiOverage.API_COLLECTION_ID,
+            "$" + UningestedApiOverage.API_COLLECTION_ID,
             Accumulators.sum("count", 1)
         ));
         
