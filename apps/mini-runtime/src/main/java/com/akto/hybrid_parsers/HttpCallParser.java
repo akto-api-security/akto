@@ -795,7 +795,7 @@ public class HttpCallParser {
 
             Pair<HttpResponseParams,FILTER_TYPE> temp = applyAdvancedFilters(httpResponseParam, executorNodesMap, apiCatalogSync.advancedFilterMap);
             HttpResponseParams param = temp.getFirst();
-            if(param == null){
+            if(param == null || temp.getSecond().equals(FILTER_TYPE.UNCHANGED)){
                 if(param == null && httpResponseParam != null && httpResponseParam.getRequestParams() != null){
                     loggerMaker.infoAndAddToDb("blocked api " + httpResponseParam.getRequestParams().getURL() + " " + httpResponseParam.getRequestParams().getApiCollectionId() + " " + httpResponseParam.getRequestParams().getMethod());
                     if (Utils.printDebugUrlLog(httpResponseParam.getRequestParams().getURL())) {
