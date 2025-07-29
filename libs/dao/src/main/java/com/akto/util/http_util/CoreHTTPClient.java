@@ -81,6 +81,44 @@ public class CoreHTTPClient {
 
     private static void initialize() {
 
+        /*
+         * Dev: Use this to test. https://mitmproxy.org/
+         * Ref: https://docs.oracle.com/javase/8/docs/technotes/guides/net/proxies.html ,
+         * system properties for proxy.
+         */
+        String httpProxyHost = Util.getEnvironmentVariable("HTTP_PROXY_HOST");
+        String httpProxyPort = Util.getEnvironmentVariable("HTTP_PROXY_PORT");
+        String httpsProxyHost = Util.getEnvironmentVariable("HTTPS_PROXY_HOST");
+        String httpsProxyPort = Util.getEnvironmentVariable("HTTPS_PROXY_PORT");
+        String httpNonProxyHosts = Util.getEnvironmentVariable("HTTP_NON_PROXY_HOSTS");
+        String httpsNonProxyHosts = Util.getEnvironmentVariable("HTTPS_NON_PROXY_HOSTS");
+        // proxy for http requests.
+        if (httpProxyHost != null && !httpProxyHost.isEmpty()) {
+            System.setProperty("http.proxyHost", httpProxyHost);
+            logger.warn("http.proxyHost: {}", System.getProperty("http.proxyHost"));
+        }
+        if (httpProxyPort != null && !httpProxyPort.isEmpty()) {
+            System.setProperty("http.proxyPort", httpProxyPort);
+            logger.warn("http.proxyPort: {}", System.getProperty("http.proxyPort"));
+        }
+        // proxy for https requests.
+        if (httpsProxyHost != null && !httpsProxyHost.isEmpty()) {
+            System.setProperty("https.proxyHost", httpsProxyHost);
+            logger.warn("https.proxyHost: {}", System.getProperty("https.proxyHost"));
+        }
+        if (httpsProxyPort != null && !httpsProxyPort.isEmpty()) {
+            System.setProperty("https.proxyPort", httpsProxyPort);
+            logger.warn("https.proxyPort: {}", System.getProperty("https.proxyPort"));
+        }
+        if (httpNonProxyHosts != null && !httpNonProxyHosts.isEmpty()) {
+            System.setProperty("http.nonProxyHosts", httpNonProxyHosts);
+            logger.warn("http.nonProxyHosts: {}", System.getProperty("http.nonProxyHosts"));
+        }
+        if (httpsNonProxyHosts != null && !httpsNonProxyHosts.isEmpty()) {
+            System.setProperty("https.nonProxyHosts", httpsNonProxyHosts);
+            logger.warn("https.nonProxyHosts: {}", System.getProperty("https.nonProxyHosts"));
+        }
+
         String proxyURI = Util.getEnvironmentVariable("PROXY_URI");
         if (proxyURI == null || proxyURI.isEmpty()) {
             return;
@@ -107,7 +145,7 @@ public class CoreHTTPClient {
             String infoMessage = String.format(
                     "Found the following PROXY URI: protocol: %s host: %s port: %d userInfo: %s", url.getProtocol(),
                     host, port, userInfo);
-            logger.info(infoMessage);
+            logger.warn(infoMessage);
         } catch (Exception e) {
             logger.error("Unable to parse proxy URI" + e.getMessage());
             return;
