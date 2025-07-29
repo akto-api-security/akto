@@ -302,8 +302,8 @@ public class DbLayer {
             result.getMatchedCount(), result.getInsertedCount(), result.getModifiedCount()), LogDb.RUNTIME);
     }
 
-    public static boolean overageApisExists(int apiCollectionId, String urlType, String methodAndUrl) {
-        return UningestedApiOverageDao.instance.exists(apiCollectionId, urlType, methodAndUrl);
+    public static boolean overageApisExists(int apiCollectionId, String urlType, Method method, String url) {
+        return UningestedApiOverageDao.instance.exists(apiCollectionId, urlType, method, url);
     }
 
     public static TestSourceConfig findTestSourceConfig(String subType){

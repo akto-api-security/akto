@@ -203,6 +203,7 @@ public class DbAction extends ActionSupport {
     int ts;
     Set<Integer> apiCollectionIdsSet;
     String url;
+    private String urlType;
     URLMethods.Method method;
     String methodVal;
     String key;
@@ -2437,7 +2438,7 @@ public class DbAction extends ActionSupport {
 
     public String overageApisExists() {
         try {
-            exists = DbLayer.overageApisExists(apiCollectionId, url, methodVal);
+            exists = DbLayer.overageApisExists(apiCollectionId, this.urlType, method, url);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error in overageApisExists " + e.toString());
             return Action.ERROR.toUpperCase();
@@ -3858,5 +3859,9 @@ public class DbAction extends ActionSupport {
 
     public void setTestingRunResultId(String testingRunResultId) {
         this.testingRunResultId = testingRunResultId;
+    }
+
+    public void setUrlType(String urlType) {
+        this.urlType = urlType;
     }
 }
