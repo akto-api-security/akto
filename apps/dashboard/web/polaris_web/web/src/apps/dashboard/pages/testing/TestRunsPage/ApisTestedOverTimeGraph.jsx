@@ -46,7 +46,7 @@ const ApisTestedOverTimeGraph = ({ showOnlyTable = false, scopeApiCollectionIds 
             null,
             null,
             0,
-            1000,
+            20000,
             weekFilters,
             null,
             null
