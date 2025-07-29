@@ -226,12 +226,12 @@ public class HttpCallParser {
 
     public static FILTER_TYPE applyTrafficFilterInProcess(HttpResponseParams responseParam){
 
-        FILTER_TYPE filterType = FILTER_TYPE.UNCHANGED;
+        FILTER_TYPE filterType = FILTER_TYPE.ALLOWED;
         String hostName = getHeaderValue(responseParam.getRequestParams().getHeaders(), "host");
         String contentType = getHeaderValue(responseParam.getRequestParams().getHeaders(), "content-type");
 
         // Block filter: Ignore ip host, localhost, kubernetes host etc.
-        if (responseParam.getStatusCode() > 400 || isBlockedHost(hostName) || isBlockedContentType(contentType)) {
+        if (responseParam.getStatusCode() >= 400 || isBlockedHost(hostName) || isBlockedContentType(contentType)) {
             filterType = FILTER_TYPE.BLOCKED;
             return filterType;
         }
