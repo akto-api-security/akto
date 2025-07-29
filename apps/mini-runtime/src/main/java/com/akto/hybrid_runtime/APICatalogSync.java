@@ -1462,7 +1462,8 @@ public class APICatalogSync {
                             UningestedApiTracker.recordOverage(
                                 apiCollectionId,
                                 "STATIC",
-                                urlStatic.getFullString()
+                                urlStatic.getMethod(),
+                                urlStatic.getUrl()
                             );
                             staticUrlIterator.remove();
                             if (Utils.printDebugUrlLog(checkString)) {
@@ -1483,13 +1484,12 @@ public class APICatalogSync {
                             + urlTemplate.getMethod().name();
                     if (!existingAPIsInDb.mightContain(checkString)) {
                         if (syncLimit.updateUsageLeftAndCheckSkip()) {
-                            String methodUrl = urlTemplate.getTemplateString() + " "
-                                    + urlTemplate.getMethod().name();
                             // Record overage information
                             UningestedApiTracker.recordOverage(
                                 apiCollectionId,
                                 "TEMPLATE",
-                                methodUrl
+                                urlTemplate.getMethod(),
+                                urlTemplate.getTemplateString()
                             );
                             templateUrlIterator.remove();
                             if (Utils.printDebugUrlLog(checkString)) {

@@ -147,7 +147,7 @@ public abstract class DataActor {
 
     public abstract void bulkWriteOverageInfo(List<Object> writesForOverageInfo);
 
-    public abstract boolean overageApisExists(int apiCollectionId, String urlType, String methodAndUrl);
+    public abstract boolean overageApisExists(int apiCollectionId, String urlType, URLMethods.Method method, String url);
 
     public abstract TestSourceConfig findTestSourceConfig(String subType);
 
