@@ -9,68 +9,39 @@ import PersistStore from '../../../../main/PersistStore';
 const TESTED_COLOR = '#007F5F'; 
 const UNTESTED_COLOR = '#E4E5E7'; 
 
-const splitLabel = (label, maxLen = 20) => {
-  if (label.length <= maxLen) return label;
-  const parts = [];
-  let str = label;
-  while (str.length > maxLen) {
-    parts.push(str.slice(0, maxLen));
-    str = str.slice(maxLen);
-  }
-  if (str) parts.push(str);
-  return parts.join('\n');
-};
-
 const ApiCollectionCoverageGraph = () => {
   const [chartData, setChartData] = useState([]);
-  const [categories, setCategories] = useState([]);
+  const [collectionNames, setCollectionNames] = useState([]);
   const [showTestingComponents, setShowTestingComponents] = useState(false);
 
   const fetchCoverageData = async () => {
     setShowTestingComponents(false);
     try {
       const coverageInfo = await api.getCoverageInfoForCollections();
-      const allCollectionsArr = PersistStore.getState().allCollections;
-
-      const userCollectionsArr = allCollectionsArr.filter(
-        c => !c.deactivated && !c.automated
-      );
-
-      const top5 = userCollectionsArr
-        .filter(c => c.urlsCount > 0)
+      const userCollections = PersistStore.getState().allCollections
+        .filter(c => !c.deactivated && !c.automated && c.urlsCount > 0)
         .sort((a, b) => b.urlsCount - a.urlsCount)
         .slice(0, 5);
 
-      const results = top5.map(col => {
-        const testedCount = Math.min(coverageInfo[col.id] || 0, col.urlsCount);
-        const untestedCount = Math.max(col.urlsCount - testedCount, 0);
-        return {
-          name: col.displayName,
-          tested: testedCount,
-          untested: untestedCount
-        };
-      });
+      const results = userCollections.map(col => ({
+        name: col.displayName,
+        tested: Math.min(coverageInfo[col.id] || 0, col.urlsCount),
+        untested: Math.max(col.urlsCount - Math.min(coverageInfo[col.id] || 0, col.urlsCount), 0)
+      }));
 
-      const collectionNames = results.map(item => splitLabel(item.name, 20));
-      setCategories(collectionNames);
-
-      const testedData = results.map((item, index) => [index, item.tested]);
-      const untestedData = results.map((item, index) => [index, item.untested]);
-
-      const stackedChartData = [
+      setCollectionNames(results.map(item => item.name));
+      setChartData([
         {
           name: 'Tested',
-          data: testedData,
+          data: results.map((item, index) => [index, item.tested]),
           color: TESTED_COLOR
         },
         {
           name: 'Untested',
-          data: untestedData,
+          data: results.map((item, index) => [index, item.untested]),
           color: UNTESTED_COLOR
         }
-      ];
-
-      setChartData(stackedChartData);
+      ]);
       setShowTestingComponents(true);
     } catch (error) {
       console.error('Error fetching coverage data:', error);
@@ -82,34 +53,6 @@ const ApiCollectionCoverageGraph = () => {
     fetchCoverageData();
   }, []);
 
-  const customXAxis = {
-    type: 'category',
-    categories: categories,
-    visible: true,
-    gridLineWidth: 0
-  };
-
-  const defaultChartOptions = { 
-    legend: {
-      enabled: false, 
-      align: 'right',
-      verticalAlign: 'top',
-      layout: 'vertical',
-      floating: true,
-      x: -10,
-      y: 10,
-      itemMarginTop: 4,
-      itemMarginBottom: 4
-    }
-
-  };
-
-  const emptyCardComponent = (
-    <Text alignment='center' color='subdued'>
-      No collections found with API endpoints.
-    </Text>
-  );
-
   const coverageGraph = (chartData && chartData.length > 0) ? (
     <InfoCard
       component={
@@ -120,10 +63,27 @@ const ApiCollectionCoverageGraph = () => {
           yAxisTitle="Number of APIs"
           text={true}
           showGridLines={true}
-          customXaxis={customXAxis}
+          customXaxis={{
+            type: 'category',
+            categories: collectionNames,
+            visible: true,
+            gridLineWidth: 0
+          }}
           noGap={false}
           width={40}
-          defaultChartOptions={defaultChartOptions}
+          defaultChartOptions={{
+            legend: {
+              enabled: false, 
+              align: 'right',
+              verticalAlign: 'top',
+              layout: 'vertical',
+              floating: true,
+              x: -10,
+              y: 10,
+              itemMarginTop: 4,
+              itemMarginBottom: 4
+            }
+          }}
           exportingDisabled={true}
         />
       }
@@ -135,7 +95,11 @@ const ApiCollectionCoverageGraph = () => {
   ) : (
     <EmptyCard 
       title="API Collection Coverage" 
-      subTitleComponent={showTestingComponents ? emptyCardComponent : <Text alignment='center' color='subdued'>Loading...</Text>} 
+      subTitleComponent={
+        showTestingComponents ? 
+          <Text alignment='center' color='subdued'>No collections found with API endpoints.</Text> : 
+          <Text alignment='center' color='subdued'>Loading...</Text>
+      } 
     />
   );
 

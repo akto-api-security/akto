@@ -22,7 +22,7 @@ import TestRunOverTimeGraph from './TestRunOverTimeGraph';
 import dashboardApi from "../../dashboard/api";
 import observeApi from "../../observe/api";
 import TestSummaryInfo from "./TestSummaryInfo";
-import LastTwoWeeksApiTestCoverageChart from './LastTwoWeeksApiTestCoverageChart';
+
 import InfoCard from '../../dashboard/new_components/InfoCard';
 /*
   {
@@ -331,7 +331,7 @@ const SummaryCardComponent = () =>{
     <LegacyCard>
       <LegacyCard.Section title={<Text fontWeight="regular" variant="bodySm" color="subdued"></Text>}>
         <HorizontalStack align="space-between">
-          <Text fontWeight="semibold" variant="bodyMd">Found  vulnerabilities in total</Text>
+          <Text fontWeight="semibold" variant="bodyMd">Test results summary</Text>
           <Button plain monochrome icon={iconSource} onClick={() => setCollapsible(!collapsible)} />
         </HorizontalStack>
         <Box paddingBlockStart={4} />
@@ -372,13 +372,10 @@ const SummaryCardComponent = () =>{
             <Box paddingBlockStart={5}>
               <HorizontalGrid columns={2} gap={4}>
                 <ApiCollectionCoverageGraph />
-                <ApisTestedOverTimeGraph />
+                <TestRunOverTimeGraph />
               </HorizontalGrid>
               <Box paddingBlockStart={5}>
-                <HorizontalGrid columns={2} gap={4}>
-                  <TestRunOverTimeGraph />
-                  <LastTwoWeeksApiTestCoverageChart />
-                </HorizontalGrid>
+                <ApisTestedOverTimeGraph />
               </Box>
             </Box>
           </LegacyCard.Subsection>
