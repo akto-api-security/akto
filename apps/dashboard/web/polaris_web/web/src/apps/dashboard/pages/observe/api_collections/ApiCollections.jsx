@@ -466,15 +466,6 @@ function ApiCollections(props) {
         const trafficInfoMap = trafficInfo || {};
         const riskScoreMap = riskScoreObj?.riskScoreMap || {};
         
-        console.log("Parameters for convertToNewData:", {
-            tmp: tmp?.length,
-            sensitiveInfoMap: Object.keys(sensitiveInfoMap).length,
-            severityInfoMap: Object.keys(severityInfoMap).length,
-            coverageMap: Object.keys(coverageMap).length,
-            trafficInfoMap: Object.keys(trafficInfoMap).length,
-            riskScoreMap: Object.keys(riskScoreMap).length
-        });
-        
         // Ensure tmp is defined and is an array
         if (!Array.isArray(tmp)) {
             console.error("tmp is not an array:", tmp);

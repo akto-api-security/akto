@@ -26,12 +26,16 @@ import values from "@/util/values";
 import SpinnerCentered from "../../../components/progress/SpinnerCentered.jsx";
 import TableStore from "../../../components/tables/TableStore.js";
 import CriticalFindingsGraph from "./CriticalFindingsGraph.jsx";
-import CriticalUnsecuredAPIsOverTimeGraph from "./CriticalUnsecuredAPIsOverTimeGraph.jsx";
+import AllUnsecuredAPIsOverTimeGraph from "./AllUnsecuredAPIsOverTimeGraph.jsx";
+import ApisWithMostOpenIsuuesGraph from './ApisWithMostOpenIsuuesGraph.jsx';
+import IssuesByCollection from './IssuesByCollection.jsx';
+import CriticalUnresolvedApisByAge from './CriticalUnresolvedApisByAge.jsx';
 import settingFunctions from "../../settings/module.js";
 import JiraTicketCreationModal from "../../../components/shared/JiraTicketCreationModal.jsx";
 import testingApi from "../../testing/api.js"
 import { saveAs } from 'file-saver'
 import issuesFunctions from '@/apps/dashboard/pages/issues/module';
+import IssuesGraphsGroup from "./IssuesGraphsGroup.jsx";
 
 
 const sortOptions = [
@@ -180,6 +184,7 @@ function IssuesPage() {
     const [projectToWorkItemsMap, setProjectToWorkItemsMap] = useState({})
     const [projectId, setProjectId] = useState('')
     const [workItemType, setWorkItemType] = useState('')
+    const [issuesByApis, setIssuesByApis] = useState({});
 
     const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), values.ranges[5])
 
@@ -247,6 +252,12 @@ function IssuesPage() {
     useEffect(() => {
         setKey(!key)
     }, [startTimestamp, endTimestamp])
+
+    useEffect(() => {
+        if (selectedTab.toUpperCase() === 'OPEN') {
+            setKey(!key)
+        }
+    }, [])
 
     const [searchParams, setSearchParams] = useSearchParams();
     const resultId = searchParams.get("result")
@@ -465,6 +476,16 @@ function IssuesPage() {
         resetResourcesSelected();
     }
 
+    const fetchIssuesByApisData = async () => {
+        await api.fetchIssuesByApis().then((res) => {
+            if (res && res.countByAPIs) {
+                setIssuesByApis(res.countByAPIs)
+            } else {
+                setIssuesByApis({})
+            }
+        })
+    }
+
     const infoItems = [
         {
             title: "Triage",
@@ -490,8 +511,10 @@ function IssuesPage() {
     }
   }, [subCategoryMap, apiCollectionMap])
 
+
     useEffect(() => {
         // Fetch jira integration field metadata
+        fetchIssuesByApisData()
         if (window.JIRA_INTEGRATED === 'true') {
             issuesFunctions.fetchCreateIssueFieldMetaData()
         }
@@ -679,10 +702,19 @@ function IssuesPage() {
                 endTimestamp={endTimestamp}
             />
 
-            <HorizontalGrid gap={5} columns={2} key={"critical-issues-graph-detail"}>
-                <CriticalUnsecuredAPIsOverTimeGraph startTimestamp={startTimestamp} endTimestamp={endTimestamp} linkText={""} linkUrl={""} />
-                <CriticalFindingsGraph startTimestamp={startTimestamp} endTimestamp={endTimestamp} linkText={""} linkUrl={""} />
-            </HorizontalGrid>
+            <IssuesGraphsGroup heading="Issues summary">
+              {[
+                <HorizontalGrid gap={5} columns={2} key="critical-issues-graph-detail">
+                  <CriticalUnresolvedApisByAge />
+                  <CriticalFindingsGraph startTimestamp={startTimestamp} endTimestamp={endTimestamp} linkText={""} linkUrl={""} />
+                </HorizontalGrid>,
+                <HorizontalGrid columns={2} gap={4} key="open-issues-graphs">
+                  <ApisWithMostOpenIsuuesGraph issuesData={issuesByApis} />
+                  <IssuesByCollection collectionsData={issuesByApis} />
+                </HorizontalGrid>,
+                <AllUnsecuredAPIsOverTimeGraph key="unsecured-over-time" startTimestamp={startTimestamp} endTimestamp={endTimestamp} linkText={""} linkUrl={""} />
+              ]}
+            </IssuesGraphsGroup>
 
             <GithubServerTable
                 key={key}

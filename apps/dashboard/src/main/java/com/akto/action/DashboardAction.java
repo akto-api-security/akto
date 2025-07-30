@@ -8,10 +8,12 @@ import java.util.regex.Pattern;
 import com.akto.dao.*;
 import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dto.*;
+import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.rbac.UsersCollectionsList;
 import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.type.SingleTypeInfo;
+import com.akto.dto.type.URLMethods.Method;
 import com.akto.util.enums.GlobalEnums;
 import com.mongodb.client.model.*;
 import org.bson.conversions.Bson;
@@ -29,6 +31,8 @@ import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.MongoCursor;
 import com.opensymphony.xwork2.Action;
+
+import lombok.Setter;
 
 import static com.akto.dto.test_run_findings.TestingRunIssues.KEY_SEVERITY;
 
@@ -170,6 +174,38 @@ public class DashboardAction extends UserAction {
         response.put("epochKey", result);
         response.put("issuesTrend", severityWiseTrendData);
 
+        return SUCCESS.toUpperCase();
+    }
+    public String fetchIssuesByApis() {
+        response = new BasicDBObject();
+        List<Bson> pipeLine = new ArrayList<>();
+        Bson filterQ = UsageMetricCalculator.excludeDemosAndDeactivated(TestingRunIssues.ID_API_COLLECTION_ID);
+        pipeLine.add(
+            Aggregates.match(Filters.and(
+                Filters.eq(TestingRunIssues.TEST_RUN_ISSUES_STATUS, GlobalEnums.TestRunIssueStatus.OPEN),
+                filterQ
+            ))
+        );
+         BasicDBObject groupedId = new BasicDBObject(SingleTypeInfo._URL, "$" + TestingRunIssues.ID_URL)
+                                                    .append(SingleTypeInfo._METHOD, "$" + TestingRunIssues.ID_METHOD)
+                                                    .append(SingleTypeInfo._API_COLLECTION_ID,  "$" + TestingRunIssues.ID_API_COLLECTION_ID);
+        pipeLine.add(Aggregates.group(
+            groupedId,
+            Accumulators.sum("count", 1)
+        ));
+        MongoCursor<BasicDBObject> issuesCursor = TestingRunIssuesDao.instance.getMCollection().aggregate(pipeLine, BasicDBObject.class).cursor();
+        Map<ApiInfoKey, Integer> countByAPIs = new HashMap<>();
+        while (issuesCursor.hasNext()) {
+            BasicDBObject issue = issuesCursor.next();
+            BasicDBObject id = (BasicDBObject) issue.get("_id");
+            ApiInfoKey key = new ApiInfoKey(
+                id.getInt(SingleTypeInfo._API_COLLECTION_ID),
+                id.getString(SingleTypeInfo._URL),
+                Method.valueOf(id.getString(SingleTypeInfo._METHOD))
+            );
+            countByAPIs.put(key, issue.getInt("count"));
+        }
+        response.put("countByAPIs", countByAPIs);
         return SUCCESS.toUpperCase();
     }
 
