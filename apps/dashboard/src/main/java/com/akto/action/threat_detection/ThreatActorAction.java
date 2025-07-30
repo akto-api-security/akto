@@ -66,7 +66,6 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
   String actor;
   String filterId;
 
-  private final CloseableHttpClient httpClient;
 
   public static final String CLOUDFLARE_WAF_BASE_URL = "https://api.cloudflare.com/client/v4";
 
@@ -77,13 +76,13 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
 
   public ThreatActorAction() {
     super();
-    this.httpClient = HttpClients.createDefault();
   }
 
   public String getActorsCountPerCounty() {
-    HttpPost post = new HttpPost(String.format("%s/api/dashboard/get_actors_count_per_country", this.getBackendUrl()));
-    post.addHeader("Authorization", "Bearer " + this.getApiToken());
-    post.addHeader("Content-Type", "application/json");
+    String requestUrl = String.format("%s/api/dashboard/get_actors_count_per_country", this.getBackendUrl());
+    Map<String, List<String>> headers = new HashMap<>();
+    headers.put("Authorization", Collections.singletonList("Bearer " + this.getApiToken()));
+    headers.put("Content-Type", Collections.singletonList("application/json"));
 
     if(startTs == 0 || endTs == 0) {
       startTs = Context.now() - 1 * 24 * 60 * 60; // default to last 1 day
@@ -98,11 +97,10 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
     };
     String msg = objectMapper.valueToTree(body).toString();
 
-    StringEntity requestEntity = new StringEntity(msg, ContentType.APPLICATION_JSON);
-    post.setEntity(requestEntity);
-
-    try (CloseableHttpResponse resp = this.httpClient.execute(post)) {
-      String responseBody = EntityUtils.toString(resp.getEntity());
+    OriginalHttpRequest request = new OriginalHttpRequest(requestUrl, "", "POST", msg, headers, "application/json");
+    try {
+      OriginalHttpResponse resp = ApiExecutor.sendRequest(request, true, null, false, null);
+      String responseBody = resp.getBody();
 
       ProtoMessageUtils.<ThreatActorByCountryResponse>toProtoMessage(
               ThreatActorByCountryResponse.class, responseBody)
@@ -122,12 +120,16 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
   }
 
   public String fetchThreatActorFilters() {
-    HttpGet get = new HttpGet(String.format("%s/api/dashboard/fetch_filters_for_threat_actors", this.getBackendUrl()));
-    get.addHeader("Authorization", "Bearer " + this.getApiToken());
-    get.addHeader("Content-Type", "application/json");
+    String requestUrl = String.format("%s/api/dashboard/fetch_filters_for_threat_actors", this.getBackendUrl());
+    Map<String, List<String>> headers = new HashMap<>();
+    headers.put("Authorization", Collections.singletonList("Bearer " + this.getApiToken()));
+    headers.put("Content-Type", Collections.singletonList("application/json"));
 
-    try (CloseableHttpResponse resp = this.httpClient.execute(get)) {
-      String responseBody = EntityUtils.toString(resp.getEntity());
+    OriginalHttpRequest request = new OriginalHttpRequest(requestUrl, "", "GET", "", headers, "application/json");
+
+    try {
+      OriginalHttpResponse resp = ApiExecutor.sendRequest(request, true, null, false, null);  
+      String responseBody = resp.getBody();
 
       ProtoMessageUtils.<ThreatActorFilterResponse>toProtoMessage(
           ThreatActorFilterResponse.class, responseBody)
@@ -145,10 +147,10 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
   }
 
   public String fetchThreatActors() {
-    HttpPost post =
-        new HttpPost(String.format("%s/api/dashboard/list_threat_actors", this.getBackendUrl()));
-    post.addHeader("Authorization", "Bearer " + this.getApiToken());
-    post.addHeader("Content-Type", "application/json");
+    String requestUrl = String.format("%s/api/dashboard/list_threat_actors", this.getBackendUrl());
+    Map<String, List<String>> headers = new HashMap<>();
+    headers.put("Authorization", Collections.singletonList("Bearer " + this.getApiToken()));
+    headers.put("Content-Type", Collections.singletonList("application/json"));
     Map<String, Object> filter = new HashMap<>();
 
     if(this.latestAttack != null && !this.latestAttack.isEmpty()){
@@ -173,11 +175,11 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
         };
     String msg = objectMapper.valueToTree(body).toString();
 
-    StringEntity requestEntity = new StringEntity(msg, ContentType.APPLICATION_JSON);
-    post.setEntity(requestEntity);
+    OriginalHttpRequest request = new OriginalHttpRequest(requestUrl, "", "POST", msg, headers, "application/json");
 
-    try (CloseableHttpResponse resp = this.httpClient.execute(post)) {
-      String responseBody = EntityUtils.toString(resp.getEntity());
+    try {
+      OriginalHttpResponse resp = ApiExecutor.sendRequest(request, true, null, false, null);
+      String responseBody = resp.getBody();
 
       ProtoMessageUtils.<ListThreatActorResponse>toProtoMessage(
               ListThreatActorResponse.class, responseBody)
@@ -211,10 +213,10 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
   }
 
   public String fetchAggregateMaliciousRequests() {
-    HttpPost post =
-        new HttpPost(String.format("%s/api/dashboard/fetchAggregateMaliciousRequests", this.getBackendUrl()));
-    post.addHeader("Authorization", "Bearer " + this.getApiToken());
-    post.addHeader("Content-Type", "application/json");
+    String requestUrl = String.format("%s/api/dashboard/fetchAggregateMaliciousRequests", this.getBackendUrl());
+    Map<String, List<String>> headers = new HashMap<>();
+    headers.put("Authorization", Collections.singletonList("Bearer " + this.getApiToken()));
+    headers.put("Content-Type", Collections.singletonList("application/json"));
 
     Map<String, Object> body =
         new HashMap<String, Object>() {
@@ -226,12 +228,11 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
           }
         };
     String msg = objectMapper.valueToTree(body).toString();
+    OriginalHttpRequest request = new OriginalHttpRequest(requestUrl, "", "POST", msg, headers, "application/json");
 
-    StringEntity requestEntity = new StringEntity(msg, ContentType.APPLICATION_JSON);
-    post.setEntity(requestEntity);
-
-    try (CloseableHttpResponse resp = this.httpClient.execute(post)) {
-      String responseBody = EntityUtils.toString(resp.getEntity());
+    try {
+      OriginalHttpResponse resp = ApiExecutor.sendRequest(request, true, null, false, null);
+      String responseBody = resp.getBody();
 
       ProtoMessageUtils.<FetchMaliciousEventsResponse>toProtoMessage(
         FetchMaliciousEventsResponse.class, responseBody)
@@ -473,10 +474,10 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
     }
 
     public boolean sendModifyThreatActorStatusToBackend(String ip) {
-        HttpPost post =
-                new HttpPost(String.format("%s/api/dashboard/modifyThreatActorStatus", this.getBackendUrl()));
-        post.addHeader("Authorization", "Bearer " + this.getApiToken());
-        post.addHeader("Content-Type", "application/json");
+        String requestUrl = String.format("%s/api/dashboard/modifyThreatActorStatus", this.getBackendUrl());
+        Map<String, List<String>> headers = new HashMap<>();
+        headers.put("Authorization", Collections.singletonList("Bearer " + this.getApiToken()));
+        headers.put("Content-Type", Collections.singletonList("application/json"));
 
         Map<String, Object> body =
                 new HashMap<String, Object>() {
@@ -487,11 +488,11 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
                     }
                 };
         String msg = objectMapper.valueToTree(body).toString();
+        OriginalHttpRequest request = new OriginalHttpRequest(requestUrl, "", "POST", msg, headers, "application/json");
 
-        StringEntity requestEntity = new StringEntity(msg, ContentType.APPLICATION_JSON);
-        post.setEntity(requestEntity);
-
-        try (CloseableHttpResponse response = this.httpClient.execute(post)) {
+        try {
+            OriginalHttpResponse resp = ApiExecutor.sendRequest(request, true, null, false, null);
+            String responseBody = resp.getBody();
             loggerMaker.debugAndAddToDb("updated threat actor status");
         } catch (Exception e) {
             e.printStackTrace();
@@ -545,10 +546,10 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
   }
 
     public String sendIntegrationDataToThreatBackend() {
-      HttpPost post =
-          new HttpPost(String.format("%s/api/dashboard/addSplunkIntegration", this.getBackendUrl()));
-      post.addHeader("Authorization", "Bearer " + this.getApiToken());
-      post.addHeader("Content-Type", "application/json");
+      String requestUrl = String.format("%s/api/dashboard/addSplunkIntegration", this.getBackendUrl());
+      Map<String, List<String>> headers = new HashMap<>();
+      headers.put("Authorization", Collections.singletonList("Bearer " + this.getApiToken()));
+      headers.put("Content-Type", Collections.singletonList("application/json"));
   
       Map<String, Object> body =
           new HashMap<String, Object>() {
@@ -559,11 +560,11 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
           };
       String msg = objectMapper.valueToTree(body).toString();
   
-      StringEntity requestEntity = new StringEntity(msg, ContentType.APPLICATION_JSON);
-      post.setEntity(requestEntity);
+      OriginalHttpRequest request = new OriginalHttpRequest(requestUrl, "", "POST", msg, headers, "application/json");
   
-      try (CloseableHttpResponse resp = this.httpClient.execute(post)) {
-        String responseBody = EntityUtils.toString(resp.getEntity());
+      try {
+        OriginalHttpResponse resp = ApiExecutor.sendRequest(request, true, null, false, null);  
+        String responseBody = resp.getBody();
   
         ProtoMessageUtils.<FetchMaliciousEventsResponse>toProtoMessage(
           FetchMaliciousEventsResponse.class, responseBody)

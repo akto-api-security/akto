@@ -1,5 +1,9 @@
 package com.akto.action.threat_detection;
 
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 import org.apache.http.client.methods.CloseableHttpResponse;
@@ -11,8 +15,11 @@ import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
 import org.apache.http.util.EntityUtils;
 
+import com.akto.dto.OriginalHttpRequest;
+import com.akto.dto.OriginalHttpResponse;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.testing.ApiExecutor;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 public class ThreatConfigurationAction extends AbstractThreatDetectionAction {
@@ -26,7 +33,6 @@ public ThreatConfiguration getThreatConfiguration() {
 public void setThreatConfiguration(ThreatConfiguration threatConfiguration) {
     this.threatConfiguration = threatConfiguration;
 }
-  private final CloseableHttpClient httpClient;
 
 
 
@@ -36,18 +42,19 @@ public void setThreatConfiguration(ThreatConfiguration threatConfiguration) {
 
   public ThreatConfigurationAction() {
     super();
-    this.httpClient = HttpClients.createDefault();
   }
 
   public String fetchThreatConfiguration() {
-    HttpGet get =
-        new HttpGet(
-            String.format("%s/api/dashboard/get_threat_configuration", this.getBackendUrl()));
-    get.addHeader("Authorization", "Bearer " + this.getApiToken());
-    get.addHeader("Content-Type", "application/json");
+    String requestUrl = String.format("%s/api/dashboard/get_threat_configuration", this.getBackendUrl());
+    Map<String, List<String>> headers = new HashMap<>();
+    headers.put("Authorization", Collections.singletonList("Bearer " + this.getApiToken()));
+    headers.put("Content-Type", Collections.singletonList("application/json"));
 
-    try (CloseableHttpResponse resp = this.httpClient.execute(get)) {
-      String responseBody = EntityUtils.toString(resp.getEntity());
+    OriginalHttpRequest request = new OriginalHttpRequest(requestUrl, "", "GET", "", headers, "application/json");
+
+    try {
+      OriginalHttpResponse resp = ApiExecutor.sendRequest(request, true, null, false, null);  
+      String responseBody = resp.getBody();
       this.threatConfiguration = objectMapper.readValue(responseBody, ThreatConfiguration.class);
 
     } catch (Exception e) {
@@ -60,21 +67,22 @@ public void setThreatConfiguration(ThreatConfiguration threatConfiguration) {
   }
 
   public String modifyThreatConfiguration() {
-    HttpPost post =
-        new HttpPost(
-            String.format("%s/api/dashboard/modify_threat_configuration", this.getBackendUrl()));
-    post.addHeader("Authorization", "Bearer " + this.getApiToken());
-    post.addHeader("Content-Type", "application/json");
+    String requestUrl = String.format("%s/api/dashboard/modify_threat_configuration", this.getBackendUrl());
+    Map<String, List<String>> headers = new HashMap<>();
+    headers.put("Authorization", Collections.singletonList("Bearer " + this.getApiToken()));
+    headers.put("Content-Type", Collections.singletonList("application/json"));
+    String json;
     try {
-      String json = objectMapper.writeValueAsString(this.threatConfiguration);
-      post.setEntity(new StringEntity(json, ContentType.APPLICATION_JSON));
+      json = objectMapper.writeValueAsString(this.threatConfiguration);
     } catch (Exception e) {
       e.printStackTrace();
       loggerMaker.errorAndAddToDb("Error while modifying threat configuration" + e.getStackTrace());
       return ERROR.toUpperCase();
     }
-    try (CloseableHttpResponse resp = this.httpClient.execute(post)) {
-      String responseBody = EntityUtils.toString(resp.getEntity());
+    OriginalHttpRequest request = new OriginalHttpRequest(requestUrl, "", "POST", json, headers, "application/json");
+    try {
+      OriginalHttpResponse resp = ApiExecutor.sendRequest(request, true, null, false, null);
+      String responseBody = resp.getBody();
       this.threatConfiguration = objectMapper.readValue(responseBody, ThreatConfiguration.class);
 
       return SUCCESS.toUpperCase();

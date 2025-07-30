@@ -2,6 +2,8 @@ package com.akto.action.threat_detection;
 
 import com.akto.ProtoMessageUtils;
 import com.akto.dao.monitoring.FilterYamlTemplateDao;
+import com.akto.dto.OriginalHttpRequest;
+import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.monitoring.FilterConfig;
 import com.akto.dto.test_editor.Category;
 import com.akto.dto.test_editor.Info;
@@ -12,8 +14,11 @@ import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.Li
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatActivityTimelineResponse;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatCategoryWiseCountResponse;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatSeverityWiseCountResponse;
+import com.akto.testing.ApiExecutor;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.DailyActorsCountResponse.ActorsCount;
 import com.fasterxml.jackson.databind.ObjectMapper;
+
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -41,13 +46,12 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
   int startTs;
   int endTs;
 
-  private final CloseableHttpClient httpClient;
+  
 
   private final ObjectMapper objectMapper = new ObjectMapper();
 
   public ThreatApiAction() {
     super();
-    this.httpClient = HttpClients.createDefault();
   }
 
   private Map<String, String> getCategoryDisplayNames() {
@@ -83,10 +87,10 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
   }
 
   public String fetchThreatCategoryCount() {
-    HttpPost post = new HttpPost(
-        String.format("%s/api/dashboard/get_subcategory_wise_count", this.getBackendUrl()));
-    post.addHeader("Authorization", "Bearer " + this.getApiToken());
-    post.addHeader("Content-Type", "application/json");
+    String requestUrl = String.format("%s/api/dashboard/get_subcategory_wise_count", this.getBackendUrl());
+    Map<String, List<String>> headers = new HashMap<>();
+    headers.put("Authorization", Collections.singletonList("Bearer " + this.getApiToken()));
+    headers.put("Content-Type", Collections.singletonList("application/json"));
 
     Map<String, Object> body = new HashMap<String, Object>() {
       {
@@ -95,11 +99,12 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
       }
     };
     String msg = objectMapper.valueToTree(body).toString();
-    StringEntity requestEntity = new StringEntity(msg, ContentType.APPLICATION_JSON);
-    post.setEntity(requestEntity);
+    OriginalHttpRequest request = new OriginalHttpRequest(requestUrl, "", "POST", msg, headers, "application/json");
+  
 
-    try (CloseableHttpResponse resp = this.httpClient.execute(post)) {
-      String responseBody = EntityUtils.toString(resp.getEntity());
+    try {
+      OriginalHttpResponse resp = ApiExecutor.sendRequest(request, true, null, false, null);  
+      String responseBody = resp.getBody();
 
       ProtoMessageUtils.<ThreatCategoryWiseCountResponse>toProtoMessage(
           ThreatCategoryWiseCountResponse.class, responseBody)
@@ -125,11 +130,11 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
   }
 
   public String fetchCountBySeverity() {
-    HttpPost post = new HttpPost(
-        String.format("%s/api/dashboard/get_severity_wise_count", this.getBackendUrl()));
+    String requestUrl = String.format("%s/api/dashboard/get_severity_wise_count", this.getBackendUrl());
 
-    post.addHeader("Authorization", "Bearer " + this.getApiToken());
-    post.addHeader("Content-Type", "application/json");
+    Map<String, List<String>> headers = new HashMap<>();
+    headers.put("Authorization", Collections.singletonList("Bearer " + this.getApiToken()));
+    headers.put("Content-Type", Collections.singletonList("application/json"));
 
     Map<String, Object> body = new HashMap<String, Object>() {
       {
@@ -138,11 +143,11 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
       }
     };
     String msg = objectMapper.valueToTree(body).toString();
-    StringEntity requestEntity = new StringEntity(msg, ContentType.APPLICATION_JSON);
-    post.setEntity(requestEntity);
+    OriginalHttpRequest request = new OriginalHttpRequest(requestUrl, "", "POST", msg, headers, "application/json");
 
-    try (CloseableHttpResponse resp = this.httpClient.execute(post)) {
-      String responseBody = EntityUtils.toString(resp.getEntity());
+    try {
+      OriginalHttpResponse resp = ApiExecutor.sendRequest(request, true, null, false, null);  
+      String responseBody = resp.getBody();
 
       ProtoMessageUtils.<ThreatSeverityWiseCountResponse>toProtoMessage(
         ThreatSeverityWiseCountResponse.class, responseBody)
@@ -164,9 +169,10 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
   }
 
   public String getDailyThreatActorsCount() {
-    HttpPost post = new HttpPost(String.format("%s/api/dashboard/get_daily_actor_count", this.getBackendUrl()));
-    post.addHeader("Authorization", "Bearer " + this.getApiToken());
-    post.addHeader("Content-Type", "application/json");
+    String requestUrl = String.format("%s/api/dashboard/get_daily_actor_count", this.getBackendUrl());
+    Map<String, List<String>> headers = new HashMap<>();
+    headers.put("Authorization", Collections.singletonList("Bearer " + this.getApiToken()));
+    headers.put("Content-Type", Collections.singletonList("application/json"));
 
     Map<String, Object> body = new HashMap<String, Object>() {
       {
@@ -176,11 +182,11 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
     };
     String msg = objectMapper.valueToTree(body).toString();
 
-    StringEntity requestEntity = new StringEntity(msg, ContentType.APPLICATION_JSON);
-    post.setEntity(requestEntity);
+    OriginalHttpRequest request = new OriginalHttpRequest(requestUrl, "", "POST", msg, headers, "application/json");
 
-    try (CloseableHttpResponse resp = this.httpClient.execute(post)) {
-      String responseBody = EntityUtils.toString(resp.getEntity());
+    try {
+      OriginalHttpResponse resp = ApiExecutor.sendRequest(request, true, null, false, null);  
+      String responseBody = resp.getBody();
 
       ProtoMessageUtils.<DailyActorsCountResponse>toProtoMessage(
         DailyActorsCountResponse.class, responseBody)
@@ -202,9 +208,10 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
   }
 
   public String getThreatActivityTimeline() {
-    HttpPost post = new HttpPost(String.format("%s/api/dashboard/get_threat_activity_timeline", this.getBackendUrl()));
-    post.addHeader("Authorization", "Bearer " + this.getApiToken());
-    post.addHeader("Content-Type", "application/json");
+    String requestUrl = String.format("%s/api/dashboard/get_threat_activity_timeline", this.getBackendUrl());
+      Map<String, List<String>> headers = new HashMap<>();
+      headers.put("Authorization", Collections.singletonList("Bearer " + this.getApiToken()));
+      headers.put("Content-Type", Collections.singletonList("application/json"));
 
     Map<String, Object> body = new HashMap<String, Object>() {
       {
@@ -214,11 +221,11 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
     };
     String msg = objectMapper.valueToTree(body).toString();
 
-    StringEntity requestEntity = new StringEntity(msg, ContentType.APPLICATION_JSON);
-    post.setEntity(requestEntity);
+    OriginalHttpRequest request = new OriginalHttpRequest(requestUrl, "", "POST", msg, headers, "application/json");
 
-    try (CloseableHttpResponse resp = this.httpClient.execute(post)) {
-      String responseBody = EntityUtils.toString(resp.getEntity());
+    try {
+      OriginalHttpResponse resp = ApiExecutor.sendRequest(request, true, null, false, null);  
+      String responseBody = resp.getBody();
 
       ProtoMessageUtils.<ThreatActivityTimelineResponse>toProtoMessage(
         ThreatActivityTimelineResponse.class, responseBody)
@@ -245,9 +252,11 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
   }
 
   public String fetchThreatApis() {
-    HttpPost post = new HttpPost(String.format("%s/api/dashboard/list_threat_apis", this.getBackendUrl()));
-    post.addHeader("Authorization", "Bearer " + this.getApiToken());
-    post.addHeader("Content-Type", "application/json");
+    String requestUrl = String.format("%s/api/dashboard/list_threat_apis", this.getBackendUrl());
+      
+    Map<String, List<String>> headers = new HashMap<>();
+    headers.put("Authorization", Collections.singletonList("Bearer " + this.getApiToken()));
+    headers.put("Content-Type", Collections.singletonList("application/json"));
 
     Map<String, Object> body = new HashMap<String, Object>() {
       {
@@ -258,11 +267,11 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
     };
     String msg = objectMapper.valueToTree(body).toString();
 
-    StringEntity requestEntity = new StringEntity(msg, ContentType.APPLICATION_JSON);
-    post.setEntity(requestEntity);
+    OriginalHttpRequest request = new OriginalHttpRequest(requestUrl, "", "POST", msg, headers, "application/json");
 
-    try (CloseableHttpResponse resp = this.httpClient.execute(post)) {
-      String responseBody = EntityUtils.toString(resp.getEntity());
+    try {
+      OriginalHttpResponse resp = ApiExecutor.sendRequest(request, true, null, false, null);  
+      String responseBody = resp.getBody();
 
       ProtoMessageUtils.<ListThreatApiResponse>toProtoMessage(
           ListThreatApiResponse.class, responseBody)
