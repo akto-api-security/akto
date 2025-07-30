@@ -28,7 +28,7 @@ import com.slack.api.Slack;
 public class LoggerMaker {
     
     static {
-        System.setProperty(SimpleLogger.DEFAULT_LOG_LEVEL_KEY, System.getenv().getOrDefault("AKTO_LOG_LEVEL", "WARN"));
+        System.setProperty(SimpleLogger.DEFAULT_LOG_LEVEL_KEY, System.getenv().getOrDefault("AKTO_LOG_LEVEL", "OFF"));
         System.out.printf("AKTO_LOG_LEVEL is set to: %s \n", System.getProperty(SimpleLogger.DEFAULT_LOG_LEVEL_KEY));
         System.setProperty("org.slf4j.simpleLogger.log.org.apache.kafka", "ERROR");
         System.setProperty("org.slf4j.simpleLogger.log.io.lettuce", "ERROR");
@@ -36,6 +36,11 @@ public class LoggerMaker {
         System.setProperty("org.slf4j.simpleLogger.log.io.netty", "ERROR");
         System.setProperty("org.slf4j.simpleLogger.log.org.flywaydb", "ERROR");
         System.setProperty("org.slf4j.simpleLogger.showDateTime", "true");
+        System.setProperty("org.slf4j.simpleLogger.com.akto.utils.RedactSampleData", "OFF");
+        System.setProperty("org.slf4j.simpleLogger.com.akto.testing.ApiExecutor", "OFF");
+        System.setProperty("org.slf4j.simpleLogger.com.akto.hybrid_runtime.APICatalogSync", "OFF");
+        System.setProperty("org.slf4j.simpleLogger.com.akto.hyrbrid_parsers.HttpCallParser", "OFF");
+        System.setProperty("org.slf4j.simpleLogger.com.akto.hybrid_runtime.MergeLogicLocal", "OFF");
         System.setProperty("org.slf4j.simpleLogger.dateTimeFormat", "yyyy-MM-dd HH:mm:ss");
     }
 
@@ -127,7 +132,11 @@ public class LoggerMaker {
 
     public LoggerMaker(Class<?> c, LogDb db) {
         aClass = c;
-        logger = LoggerFactory.getLogger(c);
+        if (c.getSimpleName().equalsIgnoreCase("Main") || c.getSimpleName().contains("kafka")) {
+            logger = LoggerFactory.getLogger(c);
+        } else {
+            logger = org.slf4j.helpers.NOPLogger.NOP_LOGGER;
+        }
         this.db = db;
     }
 
