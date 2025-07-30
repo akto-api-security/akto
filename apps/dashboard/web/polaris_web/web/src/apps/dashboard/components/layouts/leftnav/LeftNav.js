@@ -54,7 +54,7 @@ export default function LeftNav() {
 
     const accountOptions = Object.keys(accounts).map(accountId => ({
         label: accounts[accountId],
-        value: accountId
+        value: String(accountId)
     }));
 
     let reportsSubNavigationItems = [
@@ -92,7 +92,7 @@ export default function LeftNav() {
                                     <Dropdown
                                         id={`select-account`}
                                         menuItems={accountOptions}
-                                        initial={() => accounts[activeAccount]}
+                                        initial={String(activeAccount)}
                                         selected={(type) => handleAccountChange(type)}
                                     />
                                 </Box>
