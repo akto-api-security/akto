@@ -25,6 +25,7 @@ import java.io.InputStream;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -545,7 +546,10 @@ public class ApiExecutor {
         } else if (contentType.contains(HttpRequestResponseUtils.FORM_URL_ENCODED_CONTENT_TYPE)) {
             if(payload.startsWith("{")) {
                 payload = HttpRequestResponseUtils.jsonToFormUrlEncoded(payload);
-                body = RequestBody.create(payload, MediaType.parse(contentType));
+                body = RequestBody.create(
+                    MediaType.parse(HttpRequestResponseUtils.FORM_URL_ENCODED_CONTENT_TYPE),
+                    payload.getBytes(StandardCharsets.UTF_8)
+                );
             }
         } else if (contentType.contains(HttpRequestResponseUtils.GRPC_CONTENT_TYPE)) {
             try {
