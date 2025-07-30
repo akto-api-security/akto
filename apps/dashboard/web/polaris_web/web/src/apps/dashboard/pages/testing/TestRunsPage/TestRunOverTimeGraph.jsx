@@ -21,6 +21,7 @@ const TestRunOverTimeGraph = ({ showOnlyTable = false }) => {
         tempData.push(dataPoint);
       })
     });
+    tempData.sort((a, b) => a[0] - b[0]); // Sort by timestamp
 
     setChartData([{
         name: 'Test Runs',
