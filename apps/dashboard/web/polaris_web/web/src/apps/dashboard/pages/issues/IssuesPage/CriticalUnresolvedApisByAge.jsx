@@ -4,6 +4,7 @@ import BarGraph from '../../../components/charts/BarGraph';
 import dashboardApi from '../../dashboard/api.js';
 import EmptyCard from '../../dashboard/new_components/EmptyCard';
 import { Text } from '@shopify/polaris';
+import func from '@/util/func.js';
 
 const AGE_BUCKETS = [
   '<7 days',
@@ -18,36 +19,22 @@ const CriticalUnresolvedApisByAge = () => {
   useEffect(() => {
     async function fetchUnresolvedHighSeverityIssuesByAge() {
       try {
-        const now = Math.floor(Date.now() / 1000);
+        const now = func.timeNow();
         const thirtyDaysAgo = now - (30 * 24 * 60 * 60);
 
         const trendResp = await dashboardApi.fetchCriticalIssuesTrend(thirtyDaysAgo, now);
         const { issuesTrend, epochKey } = trendResp;
 
-        let buckets = {
-          '<7 days': 0,
-          '7-14 days': 0,
-          '15-30 days': 0,
-          '>30 days': 0
-        };
+        let buckets = AGE_BUCKETS.reduce((acc, bucket) => {
+          acc[bucket] = 0;
+          return acc;
+        }, {});
 
-        const currentTime = Math.floor(Date.now() / 1000);
-
+        const currentTime = func.timeNow();
+        // time is 30 days ago so it will come weekOfYear
         const criticalData = issuesTrend.CRITICAL || {};
         Object.entries(criticalData).forEach(([dateKey, count]) => {
-          const [year, timeUnit] = dateKey.split('_');
-          let creationTime;
-          if (epochKey === 'dayOfYear') {
-            const date = new Date(parseInt(year), 0, parseInt(timeUnit));
-            creationTime = Math.floor(date.getTime() / 1000);
-          } else if (epochKey === 'weekOfYear') {
-            const date = new Date(parseInt(year), 0, 1 + (parseInt(timeUnit) - 1) * 7);
-            creationTime = Math.floor(date.getTime() / 1000);
-          } else {
-            const date = new Date(parseInt(year), parseInt(timeUnit) - 1, 1);
-            creationTime = Math.floor(date.getTime() / 1000);
-          }
-          
+          const creationTime = func.getEpochMillis(dateKey, epochKey) / 1000; // Convert to seconds
           const ageDays = (currentTime - creationTime) / (60 * 60 * 24);
           if (ageDays < 7) buckets['<7 days'] += count;
           else if (ageDays < 15) buckets['7-14 days'] += count;
@@ -58,7 +45,7 @@ const CriticalUnresolvedApisByAge = () => {
         const barGraphData = AGE_BUCKETS.map(bucket => ({
           text: bucket,
           value: buckets[bucket],
-          color: '#8B5CF4',
+          color: '#DF2909',
         }));
         setBarData(barGraphData);
       } catch (e) {

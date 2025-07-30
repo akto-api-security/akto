@@ -35,7 +35,6 @@ import JiraTicketCreationModal from "../../../components/shared/JiraTicketCreati
 import testingApi from "../../testing/api.js"
 import { saveAs } from 'file-saver'
 import issuesFunctions from '@/apps/dashboard/pages/issues/module';
-import apiCollectionsApi from "../../observe/api";
 import IssuesGraphsGroup from "./IssuesGraphsGroup.jsx";
 
 
@@ -185,8 +184,7 @@ function IssuesPage() {
     const [projectToWorkItemsMap, setProjectToWorkItemsMap] = useState({})
     const [projectId, setProjectId] = useState('')
     const [workItemType, setWorkItemType] = useState('')
-    const [openIssuesData, setOpenIssuesData] = useState([])
-    const [collectionsData, setCollectionsData] = useState([])
+    const [issuesByApis, setIssuesByApis] = useState({});
 
     const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), values.ranges[5])
 
@@ -256,7 +254,7 @@ function IssuesPage() {
     }, [startTimestamp, endTimestamp])
 
     useEffect(() => {
-        if (selectedTab.toUpperCase() === 'OPEN' && openIssuesData.length === 0) {
+        if (selectedTab.toUpperCase() === 'OPEN') {
             setKey(!key)
         }
     }, [])
@@ -478,6 +476,16 @@ function IssuesPage() {
         resetResourcesSelected();
     }
 
+    const fetchIssuesByApisData = async () => {
+        await api.fetchIssuesByApis().then((res) => {
+            if (res && res.countByAPIs) {
+                setIssuesByApis(res.countByAPIs)
+            } else {
+                setIssuesByApis({})
+            }
+        })
+    }
+
     const infoItems = [
         {
             title: "Triage",
@@ -503,26 +511,15 @@ function IssuesPage() {
     }
   }, [subCategoryMap, apiCollectionMap])
 
+
     useEffect(() => {
         // Fetch jira integration field metadata
+        fetchIssuesByApisData()
         if (window.JIRA_INTEGRATED === 'true') {
             issuesFunctions.fetchCreateIssueFieldMetaData()
         }
     }, [])
 
-    useEffect(() => {
-        async function fetchCollectionsData() {
-            try {
-                const collectionsResp = await apiCollectionsApi.getAllCollectionsBasic();
-                const collections = (collectionsResp.apiCollections || []).filter(c => !c.deactivated && !c.automated);
-                setCollectionsData(collections);
-            } catch (e) {
-                console.error('Error fetching collections data:', e);
-                setCollectionsData([]);
-            }
-        }
-        fetchCollectionsData();
-    }, [])
 
 
     const fetchTableData = async (sortKey, sortOrder, skip, limit, filters, filterOperators, queryValue) => {
@@ -561,10 +558,6 @@ function IssuesPage() {
         let issueItem = []
 
         await api.fetchIssues(skip, limit, filterStatus, filterCollectionsId, filterSeverity, filterSubCategory, sortKey, sortOrder, startTimestamp, endTimestamp, activeCollections, filterCompliance).then((issuesDataRes) => {
-            if (selectedTab.toUpperCase() === 'OPEN') {
-                setOpenIssuesData(issuesDataRes.issues || [])
-            }
-            
             const uniqueIssuesMap = new Map()
             issuesDataRes.issues.forEach(item => {
                 const key = `${item?.id?.testSubCategory}|${item?.severity}|${item?.unread.toString()}`
@@ -716,8 +709,8 @@ function IssuesPage() {
                   <CriticalFindingsGraph startTimestamp={startTimestamp} endTimestamp={endTimestamp} linkText={""} linkUrl={""} />
                 </HorizontalGrid>,
                 <HorizontalGrid columns={2} gap={4} key="open-issues-graphs">
-                  <ApisWithMostOpenIsuuesGraph issuesData={openIssuesData} collectionsData={collectionsData} />
-                  <IssuesByCollection collectionsData={collectionsData} />
+                  <ApisWithMostOpenIsuuesGraph issuesData={issuesByApis} />
+                  <IssuesByCollection collectionsData={issuesByApis} />
                 </HorizontalGrid>,
                 <AllUnsecuredAPIsOverTimeGraph key="unsecured-over-time" startTimestamp={startTimestamp} endTimestamp={endTimestamp} linkText={""} linkUrl={""} />
               ]}

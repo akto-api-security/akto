@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import InfoCard from '../../dashboard/new_components/InfoCard';
-import api from '../api';
+import api from "../../dashboard/api"
 import func from '@/util/func';
 import LineChart from '../../../components/charts/LineChart';
 import EmptyCard from '../../dashboard/new_components/EmptyCard';
@@ -12,13 +12,12 @@ const AllUnsecuredAPIsOverTimeGraph = () => {
   useEffect(() => {
     async function fetchMonthlySeverityCounts() {
       try {
-        const now = Date.now() / 1000;
-        const twelveMonthsAgo = now - (365 * 24 * 60 * 60); 
-        
-        const resp = await api.fetchMonthlyIssuesTrend(Math.floor(twelveMonthsAgo), Math.floor(now));
+        const now = func.timeNow();
+        const allSevArr = func.getAktoSeverities();
+
+        const resp = await api.fetchCriticalIssuesTrend(0, now, allSevArr);
         const issuesTrend = resp.issuesTrend || {};
         
-        const allSevArr = func.getAktoSeverities();
         const currentDate = new Date();
         const last12Months = [];
         

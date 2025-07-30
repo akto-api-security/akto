@@ -598,18 +598,11 @@ export default {
             data: { content }
         })
     },
-    async getCoverageInfoForCollections(){
-        return await request({
-            url: '/api/getCoverageInfoForCollections',
-            method: 'post',
-            data:{},
-        })
-    },
-    async getAllCollectionsBasic() {
-        return await request({
-            url: '/api/getAllCollectionsBasic',
+    allTestsCountsRanges() {
+        return request({
+            url: '/api/fetchTestingRunsRanges',
             method: 'post',
             data: {}
         })
-    },
+    }
 }

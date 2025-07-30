@@ -8,10 +8,12 @@ import java.util.regex.Pattern;
 import com.akto.dao.*;
 import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dto.*;
+import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.rbac.UsersCollectionsList;
 import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.type.SingleTypeInfo;
+import com.akto.dto.type.URLMethods.Method;
 import com.akto.util.enums.GlobalEnums;
 import com.mongodb.client.model.*;
 import org.bson.conversions.Bson;
@@ -29,6 +31,8 @@ import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.MongoCursor;
 import com.opensymphony.xwork2.Action;
+
+import lombok.Setter;
 
 import static com.akto.dto.test_run_findings.TestingRunIssues.KEY_SEVERITY;
 
@@ -172,75 +176,36 @@ public class DashboardAction extends UserAction {
 
         return SUCCESS.toUpperCase();
     }
-
-    public String fetchMonthlyIssuesTrend() {
-        Map<String, Map<String, Integer>> severityWiseTrendData = new HashMap<>();
+    public String fetchIssuesByApis() {
         response = new BasicDBObject();
-        if (endTimeStamp == 0)
-            endTimeStamp = Context.now();
-        long monthsBetween = (endTimeStamp - startTimeStamp) / (Constants.ONE_DAY_TIMESTAMP * 30);
-
-        List<String> allSeverities = Arrays.asList("LOW", "MEDIUM", "HIGH", "CRITICAL");
-
-        Set<Integer> demoCollections = new HashSet<>();
-        demoCollections.addAll(deactivatedCollections);
-
-        List<GlobalEnums.TestRunIssueStatus> allowedStatus = Arrays.asList(GlobalEnums.TestRunIssueStatus.OPEN);
-        Bson issuesFilter = Filters.and(
-                Filters.in(KEY_SEVERITY, allSeverities),
-                Filters.gte(TestingRunIssues.CREATION_TIME, startTimeStamp),
-                Filters.lte(TestingRunIssues.CREATION_TIME, endTimeStamp),
-                Filters.in(TestingRunIssues.TEST_RUN_ISSUES_STATUS, allowedStatus),
-                Filters.nin(TestingRunIssues.ID_API_COLLECTION_ID, demoCollections));
-
-        List<Bson> pipeline = new ArrayList<>();
-        pipeline.add(Aggregates.match(issuesFilter));
-
-        try {
-            List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(),
-                    Context.accountId.get());
-            if (collectionIds != null) {
-                pipeline.add(Aggregates.match(Filters.in(SingleTypeInfo._COLLECTION_IDS, collectionIds)));
-            }
-        } catch (Exception e) {
-        }
-
-        BasicDBObject groupedId = new BasicDBObject(SingleTypeInfo._URL, "$" + TestingRunIssues.ID_URL)
-                .append(SingleTypeInfo._METHOD, "$" + TestingRunIssues.ID_METHOD)
-                .append(SingleTypeInfo._API_COLLECTION_ID, "$" + TestingRunIssues.ID_API_COLLECTION_ID)
-                .append(KEY_SEVERITY, "$" + KEY_SEVERITY);
-
-        String result = GroupByTimeRange.groupByAllRange(monthsBetween, pipeline, TestingRunIssues.CREATION_TIME,
-                "count", 30, groupedId);
-        MongoCursor<BasicDBObject> issuesCursor = TestingRunIssuesDao.instance.getMCollection()
-                .aggregate(pipeline, BasicDBObject.class).cursor();
-
+        List<Bson> pipeLine = new ArrayList<>();
+        Bson filterQ = UsageMetricCalculator.excludeDemosAndDeactivated(TestingRunIssues.ID_API_COLLECTION_ID);
+        pipeLine.add(
+            Aggregates.match(Filters.and(
+                Filters.eq(TestingRunIssues.TEST_RUN_ISSUES_STATUS, GlobalEnums.TestRunIssueStatus.OPEN),
+                filterQ
+            ))
+        );
+         BasicDBObject groupedId = new BasicDBObject(SingleTypeInfo._URL, "$" + TestingRunIssues.ID_URL)
+                                                    .append(SingleTypeInfo._METHOD, "$" + TestingRunIssues.ID_METHOD)
+                                                    .append(SingleTypeInfo._API_COLLECTION_ID,  "$" + TestingRunIssues.ID_API_COLLECTION_ID);
+        pipeLine.add(Aggregates.group(
+            groupedId,
+            Accumulators.sum("count", 1)
+        ));
+        MongoCursor<BasicDBObject> issuesCursor = TestingRunIssuesDao.instance.getMCollection().aggregate(pipeLine, BasicDBObject.class).cursor();
+        Map<ApiInfoKey, Integer> countByAPIs = new HashMap<>();
         while (issuesCursor.hasNext()) {
-            BasicDBObject basicDBObject = issuesCursor.next();
-            BasicDBObject o = (BasicDBObject) basicDBObject.get("_id");
-            String severity = o.getString(KEY_SEVERITY, GlobalEnums.Severity.LOW.name());
-            Map<String, Integer> trendData = severityWiseTrendData.computeIfAbsent(severity, k -> new HashMap<>());
-            int epochVal = 0;
-            if (result.equals("month")) {
-                epochVal = o.getInt("month");
-            } else if (result.equals("dayOfYear")) {
-                String dateString = o.getString(result);
-                DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
-                LocalDate localDate = LocalDate.parse(dateString, formatter);
-                epochVal = localDate.getMonthValue();
-            } else {
-                epochVal = o.getInt(result);
-            }
-            int year = o.getInt("year");
-            String date = year + "_" + epochVal;
-            int count = trendData.getOrDefault(date, 0);
-            trendData.put(date, count + 1);
-            count = this.trendData.getOrDefault(date, 0);
-            this.trendData.put(date, count + 1);
+            BasicDBObject issue = issuesCursor.next();
+            BasicDBObject id = (BasicDBObject) issue.get("_id");
+            ApiInfoKey key = new ApiInfoKey(
+                id.getInt(SingleTypeInfo._API_COLLECTION_ID),
+                id.getString(SingleTypeInfo._URL),
+                Method.valueOf(id.getString(SingleTypeInfo._METHOD))
+            );
+            countByAPIs.put(key, issue.getInt("count"));
         }
-        response.put("epochKey", result);
-        response.put("issuesTrend", severityWiseTrendData);
-
+        response.put("countByAPIs", countByAPIs);
         return SUCCESS.toUpperCase();
     }
 

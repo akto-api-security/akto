@@ -1,49 +1,39 @@
 import React, { useEffect, useState } from 'react';
 import InfoCard from '../../dashboard/new_components/InfoCard';
 import BarGraph from '../../../components/charts/BarGraph';
-import apiCollectionsApi from '../../observe/api';
-import api from '../api';
 import EmptyCard from '../../dashboard/new_components/EmptyCard';
 import { Text } from '@shopify/polaris';
+import PersistStore from '../../../../main/PersistStore';
 
-const IssuesByCollection = ({ collectionsData = [] }) => {
+const IssuesByCollection = ({ collectionsData }) => {
   const [barData, setBarData] = useState([]);
+  const apiCollectionMap = PersistStore.getState().collectionsMap;  
+
+  function processCollectionsData() {
+    let tempBarData = [];
+    if (!collectionsData || collectionsData.length === 0) {
+      setBarData([]);
+      return;
+    }
+    const collectionIssuesCount = {};
+    Object.keys(collectionsData).forEach(key => {
+      const apiSplit = key.split(' ');
+      const collectionId = apiSplit[0];
+      let count = collectionIssuesCount[collectionId] || 0;
+      collectionIssuesCount[collectionId] = count + 1;
+    });
+    Object.keys(collectionIssuesCount).sort((a, b) => collectionIssuesCount[b] - collectionIssuesCount[a]).slice(0, 5).forEach((collectionId) => {
+      tempBarData.push({
+        text: apiCollectionMap[collectionId] || `Collection ${collectionId}`,
+        value: collectionIssuesCount[collectionId],
+        color: '#B692F6',
+      });
+    });
+    setBarData(tempBarData);
+  }
 
   useEffect(() => {
-    async function fetchCollectionsIssueCounts() {
-      try {
-        const collections = collectionsData;
-        const severityResp = await apiCollectionsApi.getSeverityInfoForCollections();
-        const severityInfo = severityResp || {};
-        const data = collections.map(c => {
-          const sev = severityInfo[c.id] || {};
-          const totalIssues = Object.values(sev).reduce((sum, v) => {
-            if (v === null || v === undefined || typeof v !== 'number' || isNaN(v)) {
-              return sum;
-            }
-            return sum + v;
-          }, 0);
-          return {
-            name: c.displayName || c.name,
-            issueCount: totalIssues
-          };
-        });
-        const top5 = data.sort((a, b) => b.issueCount - a.issueCount).slice(0, 5);
-        const barGraphData = top5.map(({ name, issueCount }) => ({
-          text: name,
-          value: issueCount,
-          color: '#FED3D1',
-        }));
-        setBarData(barGraphData);
-      } catch (e) {
-        setBarData([]);
-        console.error('Error fetching collection issue counts:', e);
-      }
-    }
-    
-    if (collectionsData.length > 0) {
-      fetchCollectionsIssueCounts();
-    }
+    processCollectionsData();
   }, [collectionsData]);
 
   return (
