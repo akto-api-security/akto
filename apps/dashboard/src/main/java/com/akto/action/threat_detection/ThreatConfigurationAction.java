@@ -26,6 +26,7 @@ public ThreatConfiguration getThreatConfiguration() {
 public void setThreatConfiguration(ThreatConfiguration threatConfiguration) {
     this.threatConfiguration = threatConfiguration;
 }
+// TODO: remove this, use API Executor.
   private final CloseableHttpClient httpClient;
 
 
