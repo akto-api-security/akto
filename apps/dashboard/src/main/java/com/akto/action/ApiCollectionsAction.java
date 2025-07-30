@@ -1028,11 +1028,11 @@ public class ApiCollectionsAction extends UserAction {
                 .append("method", "$_id." + TestingIssuesId.API_KEY_INFO + "." + ApiInfoKey.METHOD))
         ));
         
-        // Filter to only include groups with more than 1 unique URL+Method combination
+        // Filter to only include groups with more than the threshold of unique URL+Method combinations
         pipeline.add(Aggregates.match(Filters.expr(
             new BasicDBObject("$gt", Arrays.asList(
                 new BasicDBObject("$size", "$urlMethodPairs"), 
-                1
+                URL_METHOD_PAIR_THRESHOLD
             ))
         )));
         
