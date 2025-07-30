@@ -20,7 +20,7 @@ const ApiCollectionCoverageGraph = () => {
     try {
       const coverageInfo = await api.getCoverageInfoForCollections();
 
-      const sortedCollections = allCollections
+      const sortedCollections = allCollections.filter(col => col?.type !== "API_GROUP")
         .map(col => {
           const tested = Math.min(coverageInfo[col.id] || 0, col.urlsCount);
           const ratio = col.urlsCount > 0 ? tested / col.urlsCount : 0;
