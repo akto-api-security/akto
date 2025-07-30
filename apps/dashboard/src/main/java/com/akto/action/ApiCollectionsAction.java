@@ -1081,11 +1081,11 @@ public class ApiCollectionsAction extends UserAction {
             Accumulators.addToSet("testSubCategories", "$_id." + TestingIssuesId.TEST_SUB_CATEGORY)
         ));
         
-        // Filter to only include groups with more than 2 unique test subcategories
+        // Filter to only include groups with more than the minimum unique test subcategories
         pipeline.add(Aggregates.match(Filters.expr(
             new BasicDBObject("$gt", Arrays.asList(
                 new BasicDBObject("$size", "$testSubCategories"), 
-                2
+                MIN_UNIQUE_TEST_SUBCATEGORIES
             ))
         )));
         
