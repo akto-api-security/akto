@@ -2575,14 +2575,17 @@ public class DbAction extends ActionSupport {
         this.batchLogDb = batchLogDb;
     }
     
-    public String recieveLogs(){
+    public String receiveLogs(){
         try{
+            if (batchLogDb == null || batchLogDb.isEmpty()) {
+                loggerMaker.errorAndAddToDb("batchLogDb is null or empty", LogDb.RUNTIME);
+                return Action.ERROR.toUpperCase();
+            }
             if (logs != null && !logs.isEmpty()) {
                 for (Log log : logs) {
-                    // Replace with your actual processing logic
                     Log dbLog = new Log(log.getLog(), log.getKey(), log.getTimestamp());
                     switch (batchLogDb) {
-                        case "TESTING":
+                        case "TESTING":;
                             DbLayer.insertTestingLog(dbLog);
                             break;
                         case "RUNTIME":
@@ -2592,13 +2595,14 @@ public class DbAction extends ActionSupport {
                             DbLayer.insertAnalyserLog(dbLog);
                             break;
                         default:
+                            loggerMaker.errorAndAddToDb("Unrecognized batchLogDb value: " + batchLogDb, LogDb.RUNTIME);
                             break;
                     }
                 }
             } 
             return Action.SUCCESS.toUpperCase();
         } catch (Exception e){
-            loggerMaker.errorAndAddToDb(e, "Error while recieveLogs " + e.toString());
+            loggerMaker.errorAndAddToDb(e, "Error while receiveLogs " + e.toString());
             return Action.ERROR.toUpperCase();
         }
     }
