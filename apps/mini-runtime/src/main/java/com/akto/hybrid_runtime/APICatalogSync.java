@@ -1458,6 +1458,13 @@ public class APICatalogSync {
                     String checkString = apiCollectionId + " " + urlStatic.getFullString();
                     if (!existingAPIsInDb.mightContain(checkString)) {
                         if (syncLimit.updateUsageLeftAndCheckSkip()) {
+                            // Record overage information
+                            UningestedApiTracker.recordOverage(
+                                apiCollectionId,
+                                "STATIC",
+                                urlStatic.getMethod(),
+                                urlStatic.getUrl()
+                            );
                             staticUrlIterator.remove();
                             if (Utils.printDebugUrlLog(checkString)) {
                                 loggerMaker.infoAndAddToDb("Found debug url in updateUsageLeftAndCheckSkip skip " + checkString);
@@ -1477,6 +1484,13 @@ public class APICatalogSync {
                             + urlTemplate.getMethod().name();
                     if (!existingAPIsInDb.mightContain(checkString)) {
                         if (syncLimit.updateUsageLeftAndCheckSkip()) {
+                            // Record overage information
+                            UningestedApiTracker.recordOverage(
+                                apiCollectionId,
+                                "TEMPLATE",
+                                urlTemplate.getMethod(),
+                                urlTemplate.getTemplateString()
+                            );
                             templateUrlIterator.remove();
                             if (Utils.printDebugUrlLog(checkString)) {
                                 loggerMaker.infoAndAddToDb("Found debug url in updateUsageLeftAndCheckSkip skip " + checkString);

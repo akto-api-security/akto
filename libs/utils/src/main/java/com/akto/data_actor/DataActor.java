@@ -145,6 +145,10 @@ public abstract class DataActor {
 
     public abstract void bulkWriteTestingRunIssues(List<Object> writesForTestingRunIssues);
 
+    public abstract void bulkWriteOverageInfo(List<Object> writesForOverageInfo);
+
+    public abstract boolean overageApisExists(int apiCollectionId, String urlType, URLMethods.Method method, String url);
+
     public abstract TestSourceConfig findTestSourceConfig(String subType);
 
     public abstract void updateTestingRunAndMarkCompleted(String testingRunId, int scheduleTs);
