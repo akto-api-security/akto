@@ -6,14 +6,13 @@ import api from '../api';
 import EmptyCard from '../../dashboard/new_components/EmptyCard';
 import { Text } from '@shopify/polaris';
 
-const IssuesByCollection = () => {
+const IssuesByCollection = ({ collectionsData = [] }) => {
   const [barData, setBarData] = useState([]);
 
   useEffect(() => {
     async function fetchCollectionsIssueCounts() {
       try {
-        const collectionsResp = await apiCollectionsApi.getAllCollectionsBasic();
-        const collections = (collectionsResp.apiCollections || []).filter(c => !c.deactivated && !c.automated);
+        const collections = collectionsData;
         const severityResp = await apiCollectionsApi.getSeverityInfoForCollections();
         const severityInfo = severityResp || {};
         const data = collections.map(c => {
@@ -41,8 +40,11 @@ const IssuesByCollection = () => {
         console.error('Error fetching collection issue counts:', e);
       }
     }
-    fetchCollectionsIssueCounts();
-  }, []);
+    
+    if (collectionsData.length > 0) {
+      fetchCollectionsIssueCounts();
+    }
+  }, [collectionsData]);
 
   return (
     (barData.length > 0 && barData.every(item => item.value === 0)) ? (

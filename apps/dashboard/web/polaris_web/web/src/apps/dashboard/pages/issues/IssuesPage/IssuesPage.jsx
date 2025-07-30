@@ -185,6 +185,8 @@ function IssuesPage() {
     const [projectToWorkItemsMap, setProjectToWorkItemsMap] = useState({})
     const [projectId, setProjectId] = useState('')
     const [workItemType, setWorkItemType] = useState('')
+    const [openIssuesData, setOpenIssuesData] = useState([])
+    const [collectionsData, setCollectionsData] = useState([])
 
     const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), values.ranges[5])
 
@@ -252,6 +254,12 @@ function IssuesPage() {
     useEffect(() => {
         setKey(!key)
     }, [startTimestamp, endTimestamp])
+
+    useEffect(() => {
+        if (selectedTab.toUpperCase() === 'OPEN' && openIssuesData.length === 0) {
+            setKey(!key)
+        }
+    }, [])
 
     const [searchParams, setSearchParams] = useSearchParams();
     const resultId = searchParams.get("result")
@@ -502,6 +510,19 @@ function IssuesPage() {
         }
     }, [])
 
+    useEffect(() => {
+        async function fetchCollectionsData() {
+            try {
+                const collectionsResp = await apiCollectionsApi.getAllCollectionsBasic();
+                const collections = (collectionsResp.apiCollections || []).filter(c => !c.deactivated && !c.automated);
+                setCollectionsData(collections);
+            } catch (e) {
+                console.error('Error fetching collections data:', e);
+                setCollectionsData([]);
+            }
+        }
+        fetchCollectionsData();
+    }, [])
 
 
     const fetchTableData = async (sortKey, sortOrder, skip, limit, filters, filterOperators, queryValue) => {
@@ -540,6 +561,10 @@ function IssuesPage() {
         let issueItem = []
 
         await api.fetchIssues(skip, limit, filterStatus, filterCollectionsId, filterSeverity, filterSubCategory, sortKey, sortOrder, startTimestamp, endTimestamp, activeCollections, filterCompliance).then((issuesDataRes) => {
+            if (selectedTab.toUpperCase() === 'OPEN') {
+                setOpenIssuesData(issuesDataRes.issues || [])
+            }
+            
             const uniqueIssuesMap = new Map()
             issuesDataRes.issues.forEach(item => {
                 const key = `${item?.id?.testSubCategory}|${item?.severity}|${item?.unread.toString()}`
@@ -691,8 +716,8 @@ function IssuesPage() {
                   <CriticalFindingsGraph startTimestamp={startTimestamp} endTimestamp={endTimestamp} linkText={""} linkUrl={""} />
                 </HorizontalGrid>,
                 <HorizontalGrid columns={2} gap={4} key="open-issues-graphs">
-                  <ApisWithMostOpenIsuuesGraph />
-                  <IssuesByCollection />
+                  <ApisWithMostOpenIsuuesGraph issuesData={openIssuesData} collectionsData={collectionsData} />
+                  <IssuesByCollection collectionsData={collectionsData} />
                 </HorizontalGrid>,
                 <AllUnsecuredAPIsOverTimeGraph key="unsecured-over-time" startTimestamp={startTimestamp} endTimestamp={endTimestamp} linkText={""} linkUrl={""} />
               ]}

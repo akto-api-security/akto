@@ -85,5 +85,12 @@ export default {
             method: 'post',
             data: payload
         })
+    },
+    fetchMonthlyIssuesTrend(startTimeStamp, endTimeStamp) {
+        return request({
+            url: 'api/fetchMonthlyIssuesTrend',
+            method: 'post',
+            data: {startTimeStamp, endTimeStamp}
+        })
     }
 }
