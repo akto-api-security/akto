@@ -156,10 +156,10 @@ const Logs = () => {
                 fetchLogsFromDb(startDateTime.getTime(), endDateTime.getTime(), true);
             }
             } else {
-               func.setToast("Start date/time must be before end date/time");
+               func.setToast(true,true,"Start date/time must be before end date/time");
             }
         } else {
-            func.setToast("Please fill in all date and time fields");
+            func.setToast(true,true,"Please fill in all date and time fields");
         }
     };
 
