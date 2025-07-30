@@ -2438,8 +2438,6 @@ public class InitializerListener implements ServletContextListener {
                     }, "context-initializer-secondary");
                     updateSensitiveInfoInApiInfo.setUpSensitiveMapInApiInfoScheduler();
                     syncCronInfo.setUpUpdateCronScheduler();
-                    setUpTestEditorTemplatesScheduler();
-                    JobsCron.instance.jobsScheduler(JobExecutorType.DASHBOARD);
                     if(runJobFunctionsAnyway) {
                         crons.trafficAlertsScheduler();
                         // crons.insertHistoricalDataJob();
@@ -2449,6 +2447,8 @@ public class InitializerListener implements ServletContextListener {
 
                         // trimCappedCollectionsJob();
                         updateApiGroupsForAccounts(); 
+                        setUpTestEditorTemplatesScheduler();
+                        JobsCron.instance.jobsScheduler(JobExecutorType.DASHBOARD);
                         setupAutomatedApiGroupsScheduler();
                         setUpPiiAndTestSourcesScheduler();
                         cleanInventoryJobRunner();

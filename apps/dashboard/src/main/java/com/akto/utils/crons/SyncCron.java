@@ -17,15 +17,13 @@ import com.akto.dto.AccountSettings;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
-import com.akto.task.Cluster;
 import com.akto.util.AccountTask;
 import com.akto.util.LastCronRunInfo;
 import com.akto.utils.RiskScoreOfCollections;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.Updates;
-
-import static com.akto.task.Cluster.callDibs;
+import static com.akto.utils.crons.UpdateSensitiveInfoInApiInfo.allowedAccounts;
 
 public class SyncCron {
     private static final LoggerMaker loggerMaker = new LoggerMaker(SyncCron.class, LogDb.DASHBOARD);
@@ -34,16 +32,14 @@ public class SyncCron {
     public void setUpUpdateCronScheduler() {
         scheduler.scheduleAtFixedRate(new Runnable() {
             public void run() {
-
-                Context.accountId.set(1000_000);
-                boolean dibs = callDibs(Cluster.SYNC_CRON_INFO, 300, 60);
-                if(!dibs){
-                    loggerMaker.debugAndAddToDb("Cron for updating new parameters, new endpoints and severity score dibs not acquired, thus skipping cron", LogDb.DASHBOARD);
-                    return;
-                }
                 AccountTask.instance.executeTask(new Consumer<Account>() {
                     @Override
                     public void accept(Account t) {
+                        if (!allowedAccounts.contains(t.getId())) {
+                            loggerMaker.debugAndAddToDb("Skipping risk info mapping for account: " + t.getId(), LogDb.DASHBOARD);
+                            return;
+                        }
+                        loggerMaker.warnAndAddToDb("Cron for mapping risk info picked up by " + t.getId(), LogDb.DASHBOARD);
                         AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
                         LastCronRunInfo lastRunTimerInfo = accountSettings.getLastUpdatedCronInfo();
                         loggerMaker.debugAndAddToDb("Cron for updating new parameters, new endpoints and severity score picked up " + accountSettings.getId(), LogDb.DASHBOARD);
