@@ -179,7 +179,7 @@ public class MaliciousTrafficDetectorTask implements Task {
       return true;
     }
 
-    if (responseParam.getPath().contains("/api/threat_detection")) {
+    if (responseParam.getPath().contains("/api/threat_detection") || responseParam.getPath().contains("/api/dashboard")) {
       return true;
     }
 
