@@ -122,6 +122,8 @@ public class ApiCollectionsAction extends UserAction {
 
     private Map<Integer, Integer> deactivatedHostnameCountMap;
 
+    private Map<Integer, Integer> uningestedApiCountMap;
+
     public String getCountForHostnameDeactivatedCollections(){
         this.deactivatedHostnameCountMap = new HashMap<>();
         if(deactivatedCollections == null || deactivatedCollections.isEmpty()){
@@ -143,6 +145,16 @@ public class ApiCollectionsAction extends UserAction {
         this.deactivatedHostnameCountMap = ApiCollectionsDao.instance.buildEndpointsCountToApiCollectionMap(
             Filters.in(SingleTypeInfo._COLLECTION_IDS, deactivatedIds)
         );
+        return SUCCESS.toUpperCase();
+    }
+
+    public String getCountForUningestedApis(){
+        this.uningestedApiCountMap = new HashMap<>();
+        try {
+            this.uningestedApiCountMap = com.akto.dao.billing.UningestedApiOverageDao.instance.getCountByCollection();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error fetching uningested API counts", LogDb.DASHBOARD);
+        }
         return SUCCESS.toUpperCase();
     }
 
@@ -1126,6 +1138,10 @@ public class ApiCollectionsAction extends UserAction {
 
     public Map<Integer, Integer> getDeactivatedHostnameCountMap() {
         return deactivatedHostnameCountMap;
+    }
+
+    public Map<Integer, Integer> getUningestedApiCountMap() {
+        return uningestedApiCountMap;
     }
 
     public void setDescription(String description) {
