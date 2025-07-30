@@ -173,6 +173,77 @@ public class DashboardAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
+    public String fetchMonthlyIssuesTrend() {
+        Map<String, Map<String, Integer>> severityWiseTrendData = new HashMap<>();
+        response = new BasicDBObject();
+        if (endTimeStamp == 0)
+            endTimeStamp = Context.now();
+        long monthsBetween = (endTimeStamp - startTimeStamp) / (Constants.ONE_DAY_TIMESTAMP * 30);
+
+        List<String> allSeverities = Arrays.asList("LOW", "MEDIUM", "HIGH", "CRITICAL");
+
+        Set<Integer> demoCollections = new HashSet<>();
+        demoCollections.addAll(deactivatedCollections);
+
+        List<GlobalEnums.TestRunIssueStatus> allowedStatus = Arrays.asList(GlobalEnums.TestRunIssueStatus.OPEN);
+        Bson issuesFilter = Filters.and(
+                Filters.in(KEY_SEVERITY, allSeverities),
+                Filters.gte(TestingRunIssues.CREATION_TIME, startTimeStamp),
+                Filters.lte(TestingRunIssues.CREATION_TIME, endTimeStamp),
+                Filters.in(TestingRunIssues.TEST_RUN_ISSUES_STATUS, allowedStatus),
+                Filters.nin(TestingRunIssues.ID_API_COLLECTION_ID, demoCollections));
+
+        List<Bson> pipeline = new ArrayList<>();
+        pipeline.add(Aggregates.match(issuesFilter));
+
+        try {
+            List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(),
+                    Context.accountId.get());
+            if (collectionIds != null) {
+                pipeline.add(Aggregates.match(Filters.in(SingleTypeInfo._COLLECTION_IDS, collectionIds)));
+            }
+        } catch (Exception e) {
+        }
+
+        BasicDBObject groupedId = new BasicDBObject(SingleTypeInfo._URL, "$" + TestingRunIssues.ID_URL)
+                .append(SingleTypeInfo._METHOD, "$" + TestingRunIssues.ID_METHOD)
+                .append(SingleTypeInfo._API_COLLECTION_ID, "$" + TestingRunIssues.ID_API_COLLECTION_ID)
+                .append(KEY_SEVERITY, "$" + KEY_SEVERITY);
+
+        String result = GroupByTimeRange.groupByAllRange(monthsBetween, pipeline, TestingRunIssues.CREATION_TIME,
+                "count", 30, groupedId);
+        MongoCursor<BasicDBObject> issuesCursor = TestingRunIssuesDao.instance.getMCollection()
+                .aggregate(pipeline, BasicDBObject.class).cursor();
+
+        while (issuesCursor.hasNext()) {
+            BasicDBObject basicDBObject = issuesCursor.next();
+            BasicDBObject o = (BasicDBObject) basicDBObject.get("_id");
+            String severity = o.getString(KEY_SEVERITY, GlobalEnums.Severity.LOW.name());
+            Map<String, Integer> trendData = severityWiseTrendData.computeIfAbsent(severity, k -> new HashMap<>());
+            int epochVal = 0;
+            if (result.equals("month")) {
+                epochVal = o.getInt("month");
+            } else if (result.equals("dayOfYear")) {
+                String dateString = o.getString(result);
+                DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+                LocalDate localDate = LocalDate.parse(dateString, formatter);
+                epochVal = localDate.getMonthValue();
+            } else {
+                epochVal = o.getInt(result);
+            }
+            int year = o.getInt("year");
+            String date = year + "_" + epochVal;
+            int count = trendData.getOrDefault(date, 0);
+            trendData.put(date, count + 1);
+            count = this.trendData.getOrDefault(date, 0);
+            this.trendData.put(date, count + 1);
+        }
+        response.put("epochKey", result);
+        response.put("issuesTrend", severityWiseTrendData);
+
+        return SUCCESS.toUpperCase();
+    }
+
     public String fetchIssuesTrend(){
         if(endTimeStamp == 0){
             endTimeStamp = Context.now() ;
