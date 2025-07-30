@@ -2557,6 +2557,52 @@ public class DbAction extends ActionSupport {
         return Action.SUCCESS.toUpperCase();
     }
 
+    private List<Log> logs;
+    private String batchLogDb;
+    // Getter and setter for Struts 2 to populate
+    public List<Log> getLogs() {
+        return logs;
+    }
+    public void setLogs(List<Log> logs) {
+        this.logs = logs;
+    }
+
+    public String getBatchLogDb(){
+        return batchLogDb;
+    }
+
+    public void setBatchLogDb(String batchLogDb){
+        this.batchLogDb = batchLogDb;
+    }
+    
+    public String recieveLogs(){
+        try{
+            if (logs != null && !logs.isEmpty()) {
+                for (Log log : logs) {
+                    // Replace with your actual processing logic
+                    Log dbLog = new Log(log.getLog(), log.getKey(), log.getTimestamp());
+                    switch (batchLogDb) {
+                        case "TESTING":
+                            DbLayer.insertTestingLog(dbLog);
+                            break;
+                        case "RUNTIME":
+                            DbLayer.insertRuntimeLog(dbLog);
+                            break;
+                        case "ANALYSER":
+                            DbLayer.insertAnalyserLog(dbLog);
+                            break;
+                        default:
+                            break;
+                    }
+                }
+            } 
+            return Action.SUCCESS.toUpperCase();
+        } catch (Exception e){
+            loggerMaker.errorAndAddToDb(e, "Error while recieveLogs " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+    }
+
     public List<CustomDataTypeMapper> getCustomDataTypes() {
         return customDataTypes;
     }

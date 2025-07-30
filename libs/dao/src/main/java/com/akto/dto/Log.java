@@ -17,6 +17,7 @@ public class Log {
     @BsonIgnore
     private String hexId;
     public String getHexId() {
+        if(this.id == null) return null; 
         return this.id.toHexString();
     }
 
