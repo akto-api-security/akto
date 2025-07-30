@@ -308,6 +308,39 @@ public class ClientActor extends DataActor {
         bulkWrite(writesForTestingRunIssues, "/bulkWriteTestingRunIssues", "writesForTestingRunIssues");
     }
 
+    public boolean overageApisExists(int apiCollectionId, String urlType, URLMethods.Method method, String url) {
+        Map<String, List<String>> headers = buildHeaders();
+        BasicDBObject obj = new BasicDBObject();
+        obj.put("apiCollectionId", apiCollectionId);
+        obj.put("urlType", urlType);
+        obj.put("method", method);
+        obj.put("url", url);
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/overageApisExists", "", "GET", obj.toString(), headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb("invalid response in overageExists", LoggerMaker.LogDb.RUNTIME);
+                return false;
+            }
+            BasicDBObject payloadObj;
+            try {
+                payloadObj = BasicDBObject.parse(responsePayload);
+                return payloadObj.getBoolean("exists", false);
+            } catch(Exception e) {
+                loggerMaker.errorAndAddToDb("error extracting response in overageExists" + e, LoggerMaker.LogDb.RUNTIME);
+                return false;
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in overageExists" + e, LoggerMaker.LogDb.RUNTIME);
+            return false;
+        }
+    }
+
+    public void bulkWriteOverageInfo(List<Object> writesForOverageInfo) {
+        bulkWrite(writesForOverageInfo, "/bulkWriteOverageInfo", "writesForOverageInfo");
+    }
+
     public List<Integer> fetchDeactivatedCollections(){
         List<Integer> ids = new ArrayList<>();
 
