@@ -70,6 +70,7 @@ public class SendMaliciousEventsToBackend extends AbstractKafkaConsumerTask<byte
                           new HttpPost(
                               String.format("%s/api/threat_detection/record_malicious_event", url));
                       req.addHeader("Authorization", "Bearer " + token);
+                      req.addHeader("x-akto-ignore", "true");
                       req.setEntity(requestEntity);
                       try {
                         logger.debugAndAddToDb("sending malicious event to threat backend for url " + evt.getLatestApiEndpoint() + " filterId " + evt.getFilterId() + " eventType " + evt.getEventType().toString());

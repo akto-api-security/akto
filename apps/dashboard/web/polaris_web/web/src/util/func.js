@@ -425,7 +425,12 @@ prettifyEpoch(epoch) {
   },
   epochToDateTime(timestamp) {
     var date = new Date(timestamp * 1000);
-    return date.toLocaleString('en-US',{timeZone: window.TIME_ZONE === 'Us/Pacific' ? 'America/Los_Angeles' : window.TIME_ZONE});
+
+    const timezone = (!window.TIME_ZONE || window.TIME_ZONE.trim() === '' || window.TIME_ZONE === 'Us/Pacific')
+    ? 'America/Los_Angeles'
+    : window.TIME_ZONE;
+
+    return date.toLocaleString('en-US',{timeZone: timezone});
   },
   getFormattedDate(epoch) {
     const date = new Date(epoch * 1000)

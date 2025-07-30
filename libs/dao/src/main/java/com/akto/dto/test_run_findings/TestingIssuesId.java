@@ -21,6 +21,7 @@ public class TestingIssuesId {
     private ApiInfoKey apiInfoKey;
     private TestErrorSource testErrorSource;
     public static final String TEST_SUB_CATEGORY = "testSubCategory";
+    public static final String TEST_RUN_ISSUE_STATUS = "testRunIssueStatus";
     // ?? enum in db
     private String testSubCategory;
     public static final String TEST_CATEGORY_FROM_SOURCE_CONFIG = "testCategoryFromSourceConfig";

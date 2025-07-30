@@ -44,6 +44,8 @@ import com.mongodb.client.model.*;
 import com.mongodb.client.result.InsertOneResult;
 import com.opensymphony.xwork2.Action;
 
+import lombok.Getter;
+
 import org.apache.commons.lang3.StringUtils;
 import org.bson.Document;
 import org.bson.conversions.Bson;
@@ -84,6 +86,10 @@ public class IssuesAction extends UserAction {
     private Map<Integer,Map<String,Integer>> severityInfo = new HashMap<>();
 
     private Map<String, String> issuesDescriptionMap;
+
+    @Getter
+    int buaCategoryCount;
+    
 
     private static final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
 
@@ -839,6 +845,12 @@ public class IssuesAction extends UserAction {
         }
         TestingRunIssuesDao.instance.updateOneNoUpsert(Filters.eq(Constants.ID, issueId), Updates.set(TestingRunIssues.DESCRIPTION, description));
         return SUCCESS.toUpperCase();
+    }
+
+    public String fetchBUACategoryCount(){
+        Bson filter = createFilters(true);
+        this.buaCategoryCount = (int) TestingRunIssuesDao.instance.count(filter);
+        return Action.SUCCESS.toUpperCase();
     }
 
 
