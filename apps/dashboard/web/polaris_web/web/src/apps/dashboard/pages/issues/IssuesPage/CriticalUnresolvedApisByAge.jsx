@@ -20,9 +20,7 @@ const CriticalUnresolvedApisByAge = () => {
     async function fetchUnresolvedHighSeverityIssuesByAge() {
       try {
         const now = func.timeNow();
-        const thirtyDaysAgo = now - (30 * 24 * 60 * 60);
-
-        const trendResp = await dashboardApi.fetchCriticalIssuesTrend(thirtyDaysAgo, now);
+        const trendResp = await dashboardApi.fetchCriticalIssuesTrend(0, now, ["CRITICAL"]);
         const { issuesTrend, epochKey } = trendResp;
 
         let buckets = AGE_BUCKETS.reduce((acc, bucket) => {
