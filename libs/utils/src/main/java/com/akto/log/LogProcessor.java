@@ -26,7 +26,7 @@ public class LogProcessor {
     private static final int THREAD_POOL_SIZE = 100; // Number of threads
     private static final long WAIT_TIME_SECONDS = 10; // Wait 10 seconds for remaining logs
     private static final Gson gson = new Gson();
-    private static final String LOG_ENDPOINT = ClientActor.CYBORG_URL + "/api/sendLogs"; 
+    private static final String LOG_ENDPOINT = ClientActor.CYBORG_URL + "/api/receiveLogs"; 
     private static final LoggerMaker loggerMaker = new LoggerMaker(LogProcessor.class);
     private final ExecutorService threadPool = Executors.newFixedThreadPool(THREAD_POOL_SIZE);  // Instance Variable
     private final LoggerMaker.LogDb logDb; // Store LogDb type
