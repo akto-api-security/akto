@@ -1,5 +1,6 @@
 package com.akto.log;
 
+import com.akto.log.LogProcessor;
 import com.akto.RuntimeMode;
 import com.akto.dao.*;
 import com.akto.dao.context.Context;
@@ -53,6 +54,13 @@ public class LoggerMaker {
     private static final boolean shouldNotSendLogs = System.getenv("BLOCK_LOGS") != null && System.getenv("BLOCK_LOGS").equals("true");
 
     private static String moduleId = "";
+
+    // Define static LogProcessor instances for all LogDb types
+    private static final LogProcessor testingLogProcessor = new LogProcessor(LogDb.TESTING);
+    private static final LogProcessor runtimeLogProcessor = new LogProcessor(LogDb.RUNTIME);
+    private static final LogProcessor dashboardLogProcessor = new LogProcessor(LogDb.DASHBOARD);
+    private static final LogProcessor analyserLogProcessor = new LogProcessor(LogDb.ANALYSER);
+    private static final LogProcessor billingLogProcessor = new LogProcessor(LogDb.BILLING);
 
     public static void setModuleId(String moduleId) {
         if (moduleId == null) {
@@ -246,7 +254,6 @@ public class LoggerMaker {
     }
     
     private void insert(String info, String key, LogDb db) {
-
         if(shouldNotSendLogs){
             return;
         }  
@@ -261,19 +268,34 @@ public class LoggerMaker {
         if(checkUpdate() && db!=null){
             switch(db){
                 case TESTING:
-                    dataActor.insertTestingLog(log);
+                    // dataActor.insertTestingLog(log);
+                    if (testingLogProcessor.getCacheSize() <= 10000) {
+                        testingLogProcessor.addLog(log);
+                    }
                     break;
                 case RUNTIME: 
-                    dataActor.insertRuntimeLog(log);
+                    // dataActor.insertRuntimeLog(log);
+                    if (runtimeLogProcessor.getCacheSize() <= 10000) {
+                        runtimeLogProcessor.addLog(log);
+                    }
                     break;
                 case DASHBOARD: 
-                    DashboardLogsDao.instance.insertOne(log);
+                    // DashboardLogsDao.instance.insertOne(log);
+                    if (dashboardLogProcessor.getCacheSize() <= 10000) {
+                        dashboardLogProcessor.addLog(log);
+                    }
                     break;
                 case ANALYSER:
-                    dataActor.insertAnalyserLog(log);
+                    // dataActor.insertAnalyserLog(log);
+                    if (analyserLogProcessor.getCacheSize() <= 10000) {
+                        analyserLogProcessor.addLog(log);
+                    }
                     break;
                 case BILLING:
-                    BillingLogsDao.instance.insertOne(log);
+                    // BillingLogsDao.instance.insertOne(log);
+                    if (billingLogProcessor.getCacheSize() <= 10000) {
+                        billingLogProcessor.addLog(log);
+                    }
                     break;
                 default:
                     break;
