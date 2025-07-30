@@ -132,11 +132,7 @@ public class LoggerMaker {
 
     public LoggerMaker(Class<?> c, LogDb db) {
         aClass = c;
-        if (c.getSimpleName().equalsIgnoreCase("Main") || c.getSimpleName().contains("kafka")) {
-            logger = LoggerFactory.getLogger(c);
-        } else {
-            logger = org.slf4j.helpers.NOPLogger.NOP_LOGGER;
-        }
+        logger = LoggerFactory.getLogger(c);
         this.db = db;
     }
 
