@@ -400,7 +400,7 @@ function ApiCollections(props) {
 
         if(shouldCallHeavyApis){
             if(results[5]?.status === "fulfilled"){
-                const res = results[4].value
+                const res = results[5].value
                 riskScoreObj = {
                     criticalUrls: res.criticalEndpointsCount,
                     riskScoreMap: res.riskScoreOfCollectionsMap
@@ -408,7 +408,7 @@ function ApiCollections(props) {
             }
 
             if(results[6]?.status === "fulfilled"){
-                const res = results[5].value
+                const res = results[6].value
                 sensitiveInfo ={ 
                     sensitiveUrls: res.sensitiveUrlsInResponse,
                     sensitiveInfoMap: res.sensitiveSubtypesInCollection
@@ -416,7 +416,7 @@ function ApiCollections(props) {
             }
 
             if(results[7]?.status === "fulfilled"){
-                const res = results[6].value
+                const res = results[7].value
                 severityObj = res
             }
 
