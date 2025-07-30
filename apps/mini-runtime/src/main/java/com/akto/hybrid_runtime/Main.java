@@ -29,7 +29,6 @@ import com.google.gson.Gson;
 import org.apache.kafka.clients.consumer.*;
 import org.apache.kafka.common.Metric;
 import org.apache.kafka.common.MetricName;
-import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.errors.WakeupException;
 import org.apache.kafka.common.serialization.StringDeserializer;
 
@@ -181,7 +180,7 @@ public class Main {
         //String mongoURI = System.getenv("AKTO_MONGO_CONN");;
         String configName = System.getenv("AKTO_CONFIG_NAME");
         String topicName = getTopicName();
-        String kafkaBrokerUrl = System.getenv("AKTO_KAFKA_BROKER_URL");
+        String kafkaBrokerUrl = "kafka1:19092"; //System.getenv("AKTO_KAFKA_BROKER_URL");
         String isKubernetes = System.getenv("IS_KUBERNETES");
         if (isKubernetes != null && isKubernetes.equalsIgnoreCase("true")) {
             loggerMaker.infoAndAddToDb("is_kubernetes: true");
@@ -401,32 +400,9 @@ public class Main {
 
         try {
             main.consumer.subscribe(Arrays.asList(topicName, "har_"+topicName));
-                    try {
-            // Subscribe to the topic
-            main.consumer.subscribe(Collections.singletonList("akto.api.logs"));
-            
-            // Attempt to get assigned partitions to verify subscription
-            Set<TopicPartition> assignedPartitions = main.consumer.assignment();
-            
-            // Poll once to trigger partition assignment
-            main.consumer.poll(Duration.ofMillis(1000));
-            
-            // Get assigned partitions after poll
-            assignedPartitions = main.consumer.assignment();
-            
-            if (assignedPartitions.isEmpty()) {
-                loggerMaker.error("Subscription failed: No partitions assigned for topic {}", "akto.api.logs");
-                throw new RuntimeException("No partitions assigned for topic " + "akto.api.logs");
-            }
-            
-            loggerMaker.info("Subscription successful. Assigned partitions: {}", assignedPartitions);
-            
-        } catch (Exception e) {
-            loggerMaker.error("Subscription verification failed: {}", e.getMessage());
-        }
             loggerMaker.infoAndAddToDb("Consumer subscribed");
             while (true) {
-                ConsumerRecords<String, String> records = main.consumer.poll(Duration.ofMillis(100));
+                ConsumerRecords<String, String> records = main.consumer.poll(Duration.ofMillis(10000));
                 try {
                     main.consumer.commitSync();
                 } catch (Exception e) {
@@ -501,7 +477,6 @@ public class Main {
         }
     }
 
-    
     public static void handleResponseParams(Map<String, List<HttpResponseParams>> responseParamsToAccountMap,
         Map<Integer, AccountInfo> accountInfoMap, boolean isDashboardInstance,
         Map<String, HttpCallParser> httpCallParserMap, APIConfig apiConfig, boolean fetchAllSTI,
@@ -724,12 +699,6 @@ public class Main {
         properties.put(ConsumerConfig.GROUP_ID_CONFIG, groupIdConfig);
         properties.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
         properties.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, false);
-        properties.put("request.timeout.ms", 500);
-        properties.put("reconnect.backoff.ms", 10);
-        properties.put("reconnect.backoff.max.ms", 50);
-        properties.put("retry.backoff.ms", 10);
-        properties.put("session.timeout.ms", 3000);
-        properties.put("heartbeat.interval.ms", 1000);
 
         return properties;
     }
