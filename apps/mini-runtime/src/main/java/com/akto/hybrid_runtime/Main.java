@@ -180,7 +180,7 @@ public class Main {
         //String mongoURI = System.getenv("AKTO_MONGO_CONN");;
         String configName = System.getenv("AKTO_CONFIG_NAME");
         String topicName = getTopicName();
-        String kafkaBrokerUrl = "kafka1:19092"; //System.getenv("AKTO_KAFKA_BROKER_URL");
+        String kafkaBrokerUrl = System.getenv("AKTO_KAFKA_BROKER_URL");
         String isKubernetes = System.getenv("IS_KUBERNETES");
         if (isKubernetes != null && isKubernetes.equalsIgnoreCase("true")) {
             loggerMaker.infoAndAddToDb("is_kubernetes: true");
@@ -401,78 +401,87 @@ public class Main {
         try {
             main.consumer.subscribe(Arrays.asList(topicName, "har_"+topicName));
             loggerMaker.infoAndAddToDb("Consumer subscribed");
+            System.out.println("Consumer subscribed to topic: " + topicName);
             while (true) {
                 ConsumerRecords<String, String> records = main.consumer.poll(Duration.ofMillis(10000));
+                System.out.println("Fetched " + records.count() + " records from kafka");
                 try {
-                    main.consumer.commitSync();
+                    main.consumer.commitAsync();
+                    System.out.println("Committed offset at position: " + lastSyncOffset);
                 } catch (Exception e) {
+                    System.err.println("Error while committing offset: " + e.getMessage());
                     throw e;
                 }
-                long start = System.currentTimeMillis();
-                // TODO: what happens if exception
-                Map<String, List<HttpResponseParams>> responseParamsToAccountMap = new HashMap<>();
-                for (ConsumerRecord<String,String> r: records) {
-                    HttpResponseParams httpResponseParams;
-                    try {
+                // long start = System.currentTimeMillis();
+                // // TODO: what happens if exception
+                // Map<String, List<HttpResponseParams>> responseParamsToAccountMap = new HashMap<>();
+                // for (ConsumerRecord<String,String> r: records) {
+                //     HttpResponseParams httpResponseParams;
+                //     try {
                          
-                        printL(r.value());
-                        AllMetrics.instance.setRuntimeKafkaRecordCount(1);
-                        AllMetrics.instance.setRuntimeKafkaRecordSize(r.value().length());
+                //         printL(r.value());
+                //         AllMetrics.instance.setRuntimeKafkaRecordCount(1);
+                //         AllMetrics.instance.setRuntimeKafkaRecordSize(r.value().length());
 
-                        lastSyncOffset++;
-                        if (DataControlFetcher.stopIngestionFromKafka()) {
-                            continue;
-                        }
+                //         lastSyncOffset++;
+                //         if (DataControlFetcher.stopIngestionFromKafka()) {
+                //             continue;
+                //         }
 
-                        if (lastSyncOffset % 100 == 0) {
-                            loggerMaker.info("Committing offset at position: " + lastSyncOffset);
-                        }
+                //         if (lastSyncOffset % 100 == 0) {
+                //             System.out.println("Committing offset at position: " + lastSyncOffset);
+                //         }
 
-                        if (tryForCollectionName(r.value())) {
-                            continue;
-                        }
+                //         // if (tryForCollectionName(r.value())) {
+                //         //     continue;
+                //         // }
 
-                        httpResponseParams = HttpCallParser.parseKafkaMessage(r.value());
-                        HttpRequestParams requestParams = httpResponseParams.getRequestParams();
-                        String debugHost = Utils.printDebugHostLog(httpResponseParams);
-                        if (debugHost != null) {
-                            loggerMaker.infoAndAddToDb("Found debug host: " + debugHost + " in url: " + requestParams.getMethod() + " " + requestParams.getURL());
-                        }
-                        if (Utils.printDebugUrlLog(requestParams.getURL())) {
-                            loggerMaker.infoAndAddToDb("Found debug url: " + requestParams.getURL());
-                        }
-                    } catch (Exception e) {
-                        loggerMaker.errorAndAddToDb(e, "Error while parsing kafka message " + e);
-                        continue;
-                    }
-                    String accountId = httpResponseParams.getAccountId();
-                    if (!responseParamsToAccountMap.containsKey(accountId)) {
-                        responseParamsToAccountMap.put(accountId, new ArrayList<>());
-                    }
-                    responseParamsToAccountMap.get(accountId).add(httpResponseParams);
-                }
+                //         // httpResponseParams = HttpCallParser.parseKafkaMessage(r.value());
+                //         // HttpRequestParams requestParams = httpResponseParams.getRequestParams();
+                //         // String debugHost = Utils.printDebugHostLog(httpResponseParams);
+                //         // if (debugHost != null) {
+                //         //     loggerMaker.infoAndAddToDb("Found debug host: " + debugHost + " in url: " + requestParams.getMethod() + " " + requestParams.getURL());
+                //         // }
+                //         // if (Utils.printDebugUrlLog(requestParams.getURL())) {
+                //         //     loggerMaker.infoAndAddToDb("Found debug url: " + requestParams.getURL());
+                //         // }
+                //     } catch (Exception e) {
+                //         loggerMaker.errorAndAddToDb(e, "Error while parsing kafka message " + e);
+                //         continue;
+                //     }
+                //     // String accountId = httpResponseParams.getAccountId();
+                //     // if (!responseParamsToAccountMap.containsKey(accountId)) {
+                //     //     responseParamsToAccountMap.put(accountId, new ArrayList<>());
+                //     // }
+                //     // responseParamsToAccountMap.get(accountId).add(httpResponseParams);
+                // }
 
-                handleResponseParams(responseParamsToAccountMap,
-                    accountInfoMap,
-                    isDashboardInstance,
-                    httpCallParserMap,
-                    apiConfig,
-                    fetchAllSTI,
-                    syncImmediately,
-                    centralKafkaTopicName);
-                AllMetrics.instance.setRuntimeProcessLatency(System.currentTimeMillis()-start);
-                loggerMaker.info("Processed " + responseParamsToAccountMap.size() + " accounts in " + (System.currentTimeMillis()-start) + " ms");
+                // // handleResponseParams(responseParamsToAccountMap,
+                // //     accountInfoMap,
+                // //     isDashboardInstance,
+                // //     httpCallParserMap,
+                // //     apiConfig,
+                // //     fetchAllSTI,
+                // //     syncImmediately,
+                // //     centralKafkaTopicName);
+                // // AllMetrics.instance.setRuntimeProcessLatency(System.currentTimeMillis()-start);
+                // loggerMaker.info("Processed " + responseParamsToAccountMap.size() + " accounts in " + (System.currentTimeMillis()-start) + " ms");
             }
 
         } catch (WakeupException ignored) {
           // nothing to catch. This exception is called from the shutdown hook.
+          System.out.println("Kafka consumer closed");
+          System.exit(0);
+          throw ignored;
         } catch (Exception e) {
+            System.out.println("Exception in main runtime: finall " + e.getMessage());
             exceptionOnCommitSync.set(true);
             printL(e);
             loggerMaker.errorAndAddToDb(e, "Error in main runtime: " + e.getMessage());
             e.printStackTrace();
             System.exit(0);
         } finally {
+            System.out.println("Closing consumer *************************");
             main.consumer.close();
         }
     }
