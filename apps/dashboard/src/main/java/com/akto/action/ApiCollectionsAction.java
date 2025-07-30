@@ -86,6 +86,8 @@ public class ApiCollectionsAction extends UserAction {
     }
 
     boolean redacted;
+    int URL_METHOD_PAIR_THRESHOLD = 1;
+    int MIN_UNIQUE_TEST_SUBCATEGORIES = 2;
     
     public List<ApiCollection> fillApiCollectionsUrlCount(List<ApiCollection> apiCollections, Bson filter) {
 	int tsRandom = Context.now();
