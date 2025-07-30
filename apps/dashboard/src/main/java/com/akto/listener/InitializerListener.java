@@ -2429,13 +2429,6 @@ public class InitializerListener implements ServletContextListener {
                 if (runJobFunctions || runJobFunctionsAnyway) {
 
                     logger.debug("Starting init functions and scheduling jobs at " + now);
-
-                    AccountTask.instance.executeTask(new Consumer<Account>() {
-                        @Override
-                        public void accept(Account account) {
-                            DaoInit.createIndices();
-                        }
-                    }, "context-initializer-secondary");
                     updateSensitiveInfoInApiInfo.setUpSensitiveMapInApiInfoScheduler();
                     syncCronInfo.setUpUpdateCronScheduler();
                     if(runJobFunctionsAnyway) {
