@@ -39,8 +39,8 @@ public class Producer {
             String messageString = singleTestPayload.toString();
             try {
                 int waitStart = Context.now();
-                while (throttleNumber.get() > 500 && (Context.now() - waitStart) < Constants.MAX_WAIT_FOR_SLEEP) {
-                    Thread.sleep(2000);
+                while (throttleNumber.get() > 10000 && (Context.now() - waitStart) < Constants.MAX_WAIT_FOR_SLEEP) {
+                    Thread.sleep(1000);
                 }
             } catch (Exception e) {
                 e.printStackTrace();
