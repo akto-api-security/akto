@@ -37,9 +37,6 @@ export default function Header() {
     const setDashboardCategory = PersistStore.getState().setDashboardCategory
     const navigate = useNavigate()
 
-    console.log("Dashboard Category:", dashboardCategory);
-    
-
     const username = Store((state) => state.username)
     const resetAll = PersistStore(state => state.resetAll)
     const resetStore = LocalStore(state => state.resetStore)
@@ -235,7 +232,7 @@ export default function Header() {
                                         { value: "API Security", label: "API Security", id: "api-security" },
                                         { value: "MCP Security", label: "MCP Security", id: "mcp-security" },
                                         { value: "Gen AI", label: "Gen AI", id: "gen-ai" },
-                                        { value: "Threat Protection", label: "Threat Protection", id: "threat-protection" },
+                                        { value: "Threat Detection", label: "Threat Detection", id: "threat-detection" },
                                     ]}
                                     initial={dashboardCategory || "API Security"}
                                     selected={(value) => {setDashboardCategory(value)}}
