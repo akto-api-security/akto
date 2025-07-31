@@ -1,4 +1,4 @@
-import { TopBar, Icon, Text, ActionList, Modal, TextField, HorizontalStack, Box, Avatar, VerticalStack, Button, Scrollable } from '@shopify/polaris';
+import { TopBar, Icon, Text, ActionList, Modal, TextField, HorizontalStack, Box, Avatar, VerticalStack, Button, Scrollable, Link } from '@shopify/polaris';
 import { NotificationMajor, CustomerPlusMajor, LogOutMinor, NoteMinor, ResourcesMajor, UpdateInventoryMajor, PageMajor, DynamicSourceMajor, PhoneMajor, ChatMajor, SettingsMajor } from '@shopify/polaris-icons';
 import { useState, useCallback, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -13,6 +13,7 @@ import { debounce } from 'lodash';
 import LocalStore from '../../../../main/LocalStorageStore';
 import SessionStore from '../../../../main/SessionStore';
 import IssuesStore from '../../../pages/issues/issuesStore';
+import Dropdown from '../Dropdown';
 
 function ContentWithIcon({icon,text, isAvatar= false}) {
     return(
@@ -32,7 +33,12 @@ export default function Header() {
     const [newAccount, setNewAccount] = useState('')
     const [showCreateAccount, setShowCreateAccount] = useState(false)
     const { currentTestsObj, clearPollingInterval } = usePolling();
+    const dashboardCategory = PersistStore.getState().dashboardCategory;
+    const setDashboardCategory = PersistStore.getState().setDashboardCategory
     const navigate = useNavigate()
+
+    console.log("Dashboard Category:", dashboardCategory);
+    
 
     const username = Store((state) => state.username)
     const resetAll = PersistStore(state => state.resetAll)
@@ -216,6 +222,28 @@ export default function Header() {
             <TopBar
                 showNavigationToggle
                 userMenu={userMenuMarkup}
+                contextControl={
+                    <Box paddingInlineStart={3} paddingInlineEnd={3}>
+                        <HorizontalStack gap={4} wrap={false}>
+                            <div style={{ cursor: 'pointer' }} onClick={() => window.location.href = "/dashboard/observe/inventory"} className='logo'>
+                                <img src="/public/akto_name_with_logo.svg" alt="Akto Logo" style={{ maxWidth: '78px' }} />
+                            </div>
+
+                            <Box minWidth='150px'>
+                                <Dropdown
+                                    menuItems={[
+                                        { value: "API Security", label: "API Security", id: "api-security" },
+                                        { value: "MCP Security", label: "MCP Security", id: "mcp-security" },
+                                        { value: "Gen AI", label: "Gen AI", id: "gen-ai" },
+                                        { value: "Threat Protection", label: "Threat Protection", id: "threat-protection" },
+                                    ]}
+                                    initial={dashboardCategory || "API Security"}
+                                    selected={(value) => {setDashboardCategory(value)}}
+                                />
+                            </Box>
+                        </HorizontalStack>
+                    </Box>
+                }
                 searchField={searchFieldMarkup}
                 searchResultsVisible={searchValue.length > 0}
                 searchResults={searchResultsMarkup}
