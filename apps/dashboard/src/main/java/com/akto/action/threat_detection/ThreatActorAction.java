@@ -66,6 +66,7 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
   String actor;
   String filterId;
 
+  // TODO: remove this, use API Executor.
   private final CloseableHttpClient httpClient;
 
   public static final String CLOUDFLARE_WAF_BASE_URL = "https://api.cloudflare.com/client/v4";
