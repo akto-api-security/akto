@@ -1,5 +1,5 @@
 import LayoutWithTabs from "../../../components/layouts/LayoutWithTabs"
-import { Box, Button, Popover, Modal, Tooltip, ActionList, VerticalStack, HorizontalStack, Tag, Text, LegacyCard, IndexTable, Pagination } from "@shopify/polaris"
+import { Box, Button, Popover, Modal, Tooltip, ActionList, VerticalStack, HorizontalStack, Tag, Text, LegacyCard } from "@shopify/polaris"
 import FlyLayout from "../../../components/layouts/FlyLayout";
 import GithubCell from "../../../components/tables/cells/GithubCell";
 import SampleDataList from "../../../components/shared/SampleDataList";
@@ -8,7 +8,7 @@ import api from "../api";
 import ApiSchema from "./ApiSchema";
 import dashboardFunc from "../../transform";
 import AktoGptLayout from "../../../components/aktoGpt/AktoGptLayout";
-import func from "@/util/func"
+import func from "@/util/func" 
 import transform from "../transform";
 import ApiDependency from "./ApiDependency";
 import RunTest from "./RunTest";
@@ -16,13 +16,12 @@ import PersistStore from "../../../../main/PersistStore";
 import values from "@/util/values";
 import gptApi from "../../../components/aktoGpt/api";
 import GraphMetric from '../../../components/GraphMetric'
-import IssuesApi from "../../issues/api";
-import transformIssues from "../../issues/transform";
 import { HorizontalDotsMinor, FileMinor } from "@shopify/polaris-icons"
 import LocalStore from "../../../../main/LocalStorageStore";
 import InlineEditableText from "../../../components/shared/InlineEditableText";
 import GridRows from "../../../components/shared/GridRows";
 import Dropdown from "../../../components/layouts/Dropdown";
+import ApiIssuesTab from "./ApiIssuesTab";
 
 import Highcharts from 'highcharts';
 import HighchartsMore from 'highcharts/highcharts-more';
@@ -57,7 +56,7 @@ function TechCard(props){
 }
 
 function ApiDetails(props) {
-    const { showDetails, setShowDetails, apiDetail, headers, getStatus, isGptActive } = props
+    const { showDetails, setShowDetails, apiDetail, headers, getStatus, isGptActive, collectionIssuesData } = props
 
     const localCategoryMap = LocalStore.getState().categoryMap
     const localSubCategoryMap = LocalStore.getState().subCategoryMap
@@ -84,22 +83,9 @@ function ApiDetails(props) {
     const [hasApiDistribution, setHasApiDistribution] = useState(false);
     const apiStatsAvailableRef = useRef(false);
     const apiDistributionAvailableRef = useRef(false);
-    const [filteredIssues, setFilteredIssues] = useState([]);
-    const [issuesPage, setIssuesPage] = useState(0);
-    const [loadingIssues, setLoadingIssues] = useState(false);
     const [selectedTabId, setSelectedTabId] = useState('values');
-    const issuesPageLimit = 10;
     const apiCollectionMap = PersistStore(state => state.collectionsMap);
     const hostNameMap = PersistStore.getState().hostNameMap;
-
-    const issuesTableHeaders = [
-        { title: "Severity", value: "severity", id: "severity" },
-        { title: "Issue Name", value: "issueName", id: "issueName" },
-        { title: "Category", value: "category", id: "category" },
-        { title: "Domains", value: "domains", id: "domains" },
-        { title: "Compliance", value: "compliance", id: "compliance" },
-        { title: "Discovered", value: "creationTime", id: "creationTime" }
-    ];
 
     const statusFunc = getStatus ? getStatus : (x) => {
         try {
@@ -439,6 +425,58 @@ function ApiDetails(props) {
         return options;
     };
 
+    const distributionChartOptions = {
+        chart: {
+            type: 'column',
+            marginTop: 10,
+            marginBottom: 70,
+            marginRight: 10,
+        },
+        xAxis: {
+            title: {
+                text: 'API Call Frequency',
+                style: {
+                    fontSize: '12px',
+                },
+            },
+            gridLineWidth: 0,
+            labels: {
+                style: {
+                    fontSize: '12px',
+                },
+                enabled: true,
+            },
+            tickmarkPlacement: 'on',
+            tickWidth: 1,
+            tickLength: 5,
+        },
+        yAxis: {
+            title: {
+                text: 'Number of Users',
+                style: {
+                    fontSize: '12px',
+                },
+            },
+            gridLineWidth: 0,
+        },
+        plotOptions: {
+            column: {
+                pointPadding: 0.05,
+                groupPadding: 0.1,
+                borderWidth: 0,
+            },
+        },
+        tooltip: {
+            formatter: function () {
+                const binRange = this.point?.binRange || [Math.floor(this.x) - 15, Math.floor(this.x) + 15];
+                return `<b>${this.y}</b> users made calls in range <b>${binRange[0]} to ${binRange[1] - 1}</b>`;
+            },
+        },
+        title: { text: null },
+        subtitle: { text: null },
+        legend: { enabled: false },
+    };
+
     const distributionBoxplotOptions = {
         chart: {
             type: 'boxplot',
@@ -536,152 +574,14 @@ function ApiDetails(props) {
         </Box>,
     }
 
-    const fetchIssuesData = async (apiCollectionId, endpoint, method) => {
-        try {
-            setLoadingIssues(true);
-            const resp = await IssuesApi.fetchIssues(
-                0, 100, ["OPEN"], [apiCollectionId],
-                null, null, null, null, null, null, true, null
-            );
-            const rawFilteredIssues = (resp.issues || []).filter(issue =>
-                issue.id?.apiInfoKey &&
-                issue.id.apiInfoKey.method === method &&
-                issue.id.apiInfoKey.url === endpoint &&
-                issue.id.apiInfoKey.apiCollectionId === apiCollectionId
-            );
-            const uniqueIssuesMap = new Map();
-            rawFilteredIssues.forEach(item => {
-                const key = `${item?.id?.testSubCategory}|${item?.severity}`;
-                const domain = hostNameMap[item?.id?.apiInfoKey?.apiCollectionId] || 
-                              apiCollectionMap[item?.id?.apiInfoKey?.apiCollectionId];
-                if (!uniqueIssuesMap.has(key)) {
-                    uniqueIssuesMap.set(key, {
-                        id: item?.id,
-                        severity: func.toSentenceCase(item?.severity),
-                        compliance: Object.keys(localSubCategoryMap[item?.id?.testSubCategory]?.compliance?.mapComplianceToListClauses || {}),
-                        severityType: item?.severity,
-                        issueName: item?.id?.testSubCategory,
-                        category: item?.id?.testSubCategory,
-                        numberOfEndpoints: 1,
-                        creationTime: item?.creationTime,
-                        issueStatus: item?.unread.toString(),
-                        testRunName: "Test Run",
-                        domains: domain ? [domain] : [],
-                        urls: [{
-                            method: item?.id?.apiInfoKey?.method,
-                            url: item?.id?.apiInfoKey?.url,
-                            id: JSON.stringify(item?.id),
-                            issueDescription: item?.description,
-                            jiraIssueUrl: item?.jiraIssueUrl || "",
-                        }],
-                    });
-                } else {
-                    const existingIssue = uniqueIssuesMap.get(key);
-                    if (domain && !existingIssue.domains.includes(domain)) {
-                        existingIssue.domains.push(domain);
-                    }
-                    existingIssue.urls.push({
-                        method: item?.id?.apiInfoKey?.method,
-                        url: item?.id?.apiInfoKey?.url,
-                        id: JSON.stringify(item?.id),
-                        issueDescription: item?.description,
-                        jiraIssueUrl: item?.jiraIssueUrl || "",
-                    });
-                    existingIssue.numberOfEndpoints += 1;
-                }
-            });
-            const groupedIssues = Array.from(uniqueIssuesMap.values());
-            const severityOrder = { CRITICAL: 0, HIGH: 1, MEDIUM: 2, LOW: 3 };
-            groupedIssues.sort((a, b) => {
-                const aSeverity = (a.severityType || '').toUpperCase();
-                const bSeverity = (b.severityType || '').toUpperCase();
-                return (severityOrder[aSeverity] ?? 99) - (severityOrder[bSeverity] ?? 99);
-            });
-            const tableData = await transformIssues.convertToIssueTableData(groupedIssues, localSubCategoryMap);
-            setFilteredIssues(tableData);
-        } catch (error) {
-            console.error("Error fetching issues:", error);
-            setFilteredIssues([]);
-        } finally {
-            setLoadingIssues(false);
-        }
-    };
-
     const hasIssues = apiDetail?.severityObj && Object.values(apiDetail.severityObj).some(count => count > 0);
-    const paginatedIssues = filteredIssues.slice(
-        issuesPage * issuesPageLimit,
-        (issuesPage + 1) * issuesPageLimit
-    );
 
     const IssuesTab = {
         id: 'issues',
         content: 'Issues',
-        component: (
-            <Box paddingBlockStart={"4"}>
-                <LegacyCard>
-                    <IndexTable
-                        resourceName={{ singular: "issue", plural: "issues" }}
-                        itemCount={filteredIssues.length}
-                        headings={issuesTableHeaders}
-                        selectable={false}
-                        loading={loadingIssues}
-                    >
-                        {paginatedIssues.map((issue, index) => (
-                            <IndexTable.Row 
-                                id={issue.key || index} 
-                                key={issue.key || index} 
-                                position={index}
-                            >
-                                {issuesTableHeaders.map(header => (
-                                    <IndexTable.Cell key={header.value}>
-                                        <Box
-                                            onClick={async (e) => {
-                                                e.stopPropagation();
-                                                if (!issue.id || !issue.id[0]) return;
-                                                setLoadingIssues(true);
-                                                try {
-                                                    const resp = await IssuesApi.fetchTestingRunResult(JSON.parse(issue.id[0]));
-                                                    const hexId = resp?.testingRunResult?.hexId;
-                                                    if (hexId) {
-                                                        const url = `/dashboard/reports/issues?result=${hexId}`;
-                                                        window.open(url, '_blank');
-                                                    } else {
-                                                        func.setToast(true, true, 'Could not find test run result.');
-                                                    }
-                                                } catch (e) {
-                                                    func.setToast(true, true, 'Failed to fetch test run result.');
-                                                } finally {
-                                                    setLoadingIssues(false);
-                                                }
-                                            }}
-                                            style={{ cursor: 'pointer', width: '100%' }}
-                                            onMouseOver={e => e.currentTarget.style.background = '#f4f6f8'}
-                                            onMouseOut={e => e.currentTarget.style.background = ''}
-                                        >
-                                            {issue[header.value]}
-                                        </Box>
-                                    </IndexTable.Cell>
-                                ))}
-                            </IndexTable.Row>
-                        ))}
-                    </IndexTable>
-                    {filteredIssues.length > issuesPageLimit && (
-                        <LegacyCard.Section>
-                            <HorizontalStack align="center">
-                                <Pagination
-                                    label={`Showing ${issuesPage * issuesPageLimit + 1}-${Math.min((issuesPage + 1) * issuesPageLimit, filteredIssues.length)} of ${filteredIssues.length}`}
-                                    hasPrevious={issuesPage > 0}
-                                    onPrevious={() => setIssuesPage(p => p - 1)}
-                                    hasNext={filteredIssues.length > (issuesPage + 1) * issuesPageLimit}
-                                    onNext={() => setIssuesPage(p => p + 1)}
-                                />
-                            </HorizontalStack>
-                        </LegacyCard.Section>
-                    )}
-                </LegacyCard>
-            </Box>
-        ),
+        component: <ApiIssuesTab apiDetail={apiDetail} collectionIssuesData={collectionIssuesData} />,
     };
+
 
     const ApiCallStatsTab = {
         id: 'api-call-stats',
@@ -841,12 +741,6 @@ function ApiDetails(props) {
             </VerticalStack>
         </HorizontalStack>
     )
-
-    useEffect(() => {
-        if (selectedTabId === 'issues' && hasIssues && apiDetail?.apiCollectionId) {
-            fetchIssuesData(apiDetail.apiCollectionId, apiDetail.endpoint, apiDetail.method);
-        }
-    }, [selectedTabId, hasIssues, apiDetail, localSubCategoryMap]);
 
     const components = [
         headingComp,
