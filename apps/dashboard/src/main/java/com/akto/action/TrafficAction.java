@@ -42,6 +42,7 @@ import lombok.Setter;
 public class TrafficAction {
     
     private static final LoggerMaker loggerMaker = new LoggerMaker(TrafficAction.class);
+
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     int apiCollectionId;
