@@ -1,6 +1,9 @@
 package com.akto.threat.detection.utils;
 
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.RawApiMetadata;
@@ -48,8 +51,17 @@ public class Utils {
         if (!redisEnabled) {
             return false;
         }
-
         return apiDistributionEnabled;
+    }
+
+    public static String getThreatProtectionBackendUrl() {
+        return System.getenv("AKTO_THREAT_PROTECTION_BACKEND_URL");
+    }
+
+    public static Map<String, List<String>> buildHeaders() {
+        Map<String, List<String>> headers = new HashMap<>();
+        headers.put("Authorization", Collections.singletonList("Bearer " + System.getenv("AKTO_THREAT_PROTECTION_BACKEND_TOKEN")));
+        return headers;
     }
 
 }

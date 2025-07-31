@@ -597,5 +597,12 @@ export default {
             method: 'post',
             data: { content }
         })
+    },
+    allTestsCountsRanges() {
+        return request({
+            url: '/api/fetchTestingRunsRanges',
+            method: 'post',
+            data: {}
+        })
     }
 }

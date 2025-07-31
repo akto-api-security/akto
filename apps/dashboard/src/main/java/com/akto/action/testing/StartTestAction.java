@@ -29,6 +29,7 @@ import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.usage.UsageMetricCalculator;
 import com.akto.util.Constants;
+import com.akto.util.GroupByTimeRange;
 import com.akto.util.enums.GlobalEnums;
 import com.akto.util.enums.GlobalEnums.Severity;
 import com.akto.util.enums.GlobalEnums.TestErrorSource;
@@ -36,6 +37,7 @@ import com.akto.utils.DeleteTestRunUtils;
 import com.akto.utils.Utils;
 import com.google.gson.Gson;
 import com.mongodb.BasicDBObject;
+import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.*;
 import com.mongodb.client.result.InsertOneResult;
 import com.opensymphony.xwork2.Action;
@@ -1514,6 +1516,39 @@ public class StartTestAction extends UserAction {
     public String fetchMisConfiguredTestsCount(){
         this.misConfiguredTestsCount = (int) TestingRunResultDao.instance.count(Filters.eq(TestingRunResult.REQUIRES_CONFIG, true));
         return Action.SUCCESS.toUpperCase();
+    }
+
+    @Getter
+    Map<String, Integer> allTestsCountsRanges;
+
+    public String fetchTestingRunsRanges(){
+        allTestsCountsRanges = new HashMap<>();
+        try {
+            List<Bson> pipeLine = new ArrayList<>();
+            pipeLine.add(
+                Aggregates.match(Filters.eq(TestingRunResultSummary.STATE, State.COMPLETED.toString()))
+            );
+            pipeLine.add(Aggregates.sort(
+                Sorts.descending(TestingRunResultSummary.START_TIMESTAMP)
+            ));
+
+            GroupByTimeRange.groupByWeek(pipeLine, TestingRunResultSummary.START_TIMESTAMP, "totalTests", new BasicDBObject());
+            MongoCursor<BasicDBObject> cursor = TestingRunResultSummariesDao.instance.getMCollection().aggregate(pipeLine, BasicDBObject.class).cursor();
+            while (cursor.hasNext()) {
+                BasicDBObject document = cursor.next();
+                if(document.isEmpty()) continue;
+                BasicDBObject id = (BasicDBObject) document.get("_id");
+                String key = id.getInt("year") + "_" + id.getInt("weekOfYear");
+                allTestsCountsRanges.put(key, document.getInt("totalTests"));
+            }
+            cursor.close();
+        } catch (Exception e) {
+            // TODO: handle exception
+            e.printStackTrace();
+        }
+        
+
+        return SUCCESS.toUpperCase();
     }
 
 

@@ -39,6 +39,7 @@ import lombok.Setter;
 public class TrafficAction {
     
     private static final LoggerMaker loggerMaker = new LoggerMaker(TrafficAction.class);
+    // TODO: remove this, use API Executor.
     private final CloseableHttpClient httpClient = HttpClients.createDefault();
     private final ObjectMapper objectMapper = new ObjectMapper();
 

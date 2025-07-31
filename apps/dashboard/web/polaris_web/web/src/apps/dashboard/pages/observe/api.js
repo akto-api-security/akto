@@ -919,6 +919,13 @@ export default {
                 limit: 1000
             }
         })
+    },
+    allApisTestedRanges() {
+        return request({
+            url: '/api/fetchTestedApisRanges',
+            method: 'post',
+            data: {}
+        })
     }
 
 }

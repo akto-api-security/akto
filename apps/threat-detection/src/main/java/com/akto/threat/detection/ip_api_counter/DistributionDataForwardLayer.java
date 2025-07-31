@@ -1,29 +1,26 @@
 package com.akto.threat.detection.ip_api_counter;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
-import org.apache.http.client.methods.HttpPost;
-import org.apache.http.entity.ContentType;
-import org.apache.http.entity.StringEntity;
-import org.apache.http.impl.client.CloseableHttpClient;
-import org.apache.http.impl.client.HttpClients;
-import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
-
 import com.akto.ProtoMessageUtils;
 import com.akto.dao.context.Context;
+import com.akto.dto.OriginalHttpRequest;
+import com.akto.dto.OriginalHttpResponse;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ApiDistributionDataRequestPayload;
+import com.akto.testing.ApiExecutor;
 import com.akto.threat.detection.cache.ApiCountCacheLayer;
 import com.akto.threat.detection.cache.CounterCache;
 import com.akto.threat.detection.constants.RedisKeyInfo;
+import com.akto.threat.detection.utils.Utils;
 
 import io.lettuce.core.RedisClient;
 
@@ -33,8 +30,6 @@ public class DistributionDataForwardLayer {
     private static final LoggerMaker logger = new LoggerMaker(DistributionDataForwardLayer.class, LogDb.THREAT_DETECTION);
     private static CounterCache cache;
     private final DistributionCalculator distributionCalculator;
-    private final CloseableHttpClient httpClient;
-    private static final PoolingHttpClientConnectionManager connManager = new PoolingHttpClientConnectionManager();
 
     public DistributionDataForwardLayer(RedisClient redisClient, DistributionCalculator distributionCalculator) {
         if (redisClient != null) {
@@ -43,12 +38,6 @@ public class DistributionDataForwardLayer {
             cache = null;
         }
         this.distributionCalculator = distributionCalculator;
-        connManager.setMaxTotal(100);
-        connManager.setDefaultMaxPerRoute(100);
-        this.httpClient = HttpClients.custom()
-            .setConnectionManager(connManager)
-            .setKeepAliveStrategy((response, context) -> 30_000)
-            .build();
     }
 
     public void sendLastFiveMinuteDistributionData() {
@@ -112,25 +101,22 @@ public class DistributionDataForwardLayer {
                         try {
                             ApiDistributionDataRequestPayload payload = ApiDistributionDataRequestPayload.newBuilder().addAllDistributionData(batch).build();
 
-                            String url = System.getenv("AKTO_THREAT_PROTECTION_BACKEND_URL");
-                            String token = System.getenv("AKTO_THREAT_PROTECTION_BACKEND_TOKEN");
                             ProtoMessageUtils.toString(payload)
                                 .ifPresent(
                                     msg -> {
-                                      StringEntity requestEntity =
-                                          new StringEntity(msg, ContentType.APPLICATION_JSON);
-                                      HttpPost req =
-                                          new HttpPost(
-                                              String.format("%s/api/threat_detection/save_api_distribution_data", url));
-                                      req.addHeader("Authorization", "Bearer " + token);
-                                      req.setEntity(requestEntity);
+                                    Map<String, List<String>> headers = Utils.buildHeaders();
+                                    headers.put("Content-Type", Collections.singletonList("application/json"));
+                                    OriginalHttpRequest request = new OriginalHttpRequest(Utils.getThreatProtectionBackendUrl() + "/api/threat_detection/save_api_distribution_data", "","POST", msg, headers, "");
                                       try {
-                                        this.httpClient.execute(req);
-                                      } catch (IOException e) {
+                                        OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+                                        String responsePayload = response.getBody();
+                                        if (response.getStatusCode() != 200 || responsePayload == null) {
+                                        logger.errorAndAddToDb("non 2xx response in save_api_distribution_data");
+                                        }
+                                      } catch (Exception e) {
                                         logger.errorAndAddToDb("error sending api distribution data " + e.getMessage());
                                         e.printStackTrace();
                                       }
-                
                                     });
 
                             logger.info("Sent distribution data for windowSize={} windowStart={}", windowSize, i);

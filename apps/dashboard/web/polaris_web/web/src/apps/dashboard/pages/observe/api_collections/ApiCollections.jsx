@@ -399,24 +399,24 @@ function ApiCollections(props) {
         }
 
         if(shouldCallHeavyApis){
-            if(results[4]?.status === "fulfilled"){
-                const res = results[4].value
+            if(results[5]?.status === "fulfilled"){
+                const res = results[5].value
                 riskScoreObj = {
                     criticalUrls: res.criticalEndpointsCount,
                     riskScoreMap: res.riskScoreOfCollectionsMap
                 }
             }
 
-            if(results[5]?.status === "fulfilled"){
-                const res = results[5].value
+            if(results[6]?.status === "fulfilled"){
+                const res = results[6].value
                 sensitiveInfo ={ 
                     sensitiveUrls: res.sensitiveUrlsInResponse,
                     sensitiveInfoMap: res.sensitiveSubtypesInCollection
                 }
             }
 
-            if(results[6]?.status === "fulfilled"){
-                const res = results[6].value
+            if(results[7]?.status === "fulfilled"){
+                const res = results[7].value
                 severityObj = res
             }
 
@@ -465,15 +465,6 @@ function ApiCollections(props) {
         const coverageMap = coverageInfo || {};
         const trafficInfoMap = trafficInfo || {};
         const riskScoreMap = riskScoreObj?.riskScoreMap || {};
-        
-        console.log("Parameters for convertToNewData:", {
-            tmp: tmp?.length,
-            sensitiveInfoMap: Object.keys(sensitiveInfoMap).length,
-            severityInfoMap: Object.keys(severityInfoMap).length,
-            coverageMap: Object.keys(coverageMap).length,
-            trafficInfoMap: Object.keys(trafficInfoMap).length,
-            riskScoreMap: Object.keys(riskScoreMap).length
-        });
         
         // Ensure tmp is defined and is an array
         if (!Array.isArray(tmp)) {

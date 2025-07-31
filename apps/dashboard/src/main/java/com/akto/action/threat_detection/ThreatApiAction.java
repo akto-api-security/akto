@@ -41,6 +41,7 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
   int startTs;
   int endTs;
 
+  // TODO: remove this, use API Executor.
   private final CloseableHttpClient httpClient;
 
   private final ObjectMapper objectMapper = new ObjectMapper();

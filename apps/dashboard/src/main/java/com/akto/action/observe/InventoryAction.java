@@ -24,6 +24,7 @@ import com.akto.parsers.HttpCallParser;
 import com.akto.runtime.APICatalogSync;
 import com.akto.runtime.Main;
 import com.akto.util.Constants;
+import com.akto.util.GroupByTimeRange;
 import com.akto.utils.AccountHTTPCallParserAktoPolicyInfo;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.MongoCursor;
@@ -1179,6 +1180,36 @@ public class InventoryAction extends UserAction {
         }
 
         return Action.SUCCESS.toUpperCase();
+    }
+
+    public String fetchTestedApisRanges(){
+        response = new BasicDBObject();
+         try {
+            List<Bson> pipeLine = new ArrayList<>();
+            pipeLine.add(Aggregates.sort(
+                Sorts.descending(ApiInfo.LAST_TESTED)
+            ));
+            pipeLine.add(
+                Aggregates.match(Filters.gt(ApiInfo.LAST_TESTED, 0))
+            );
+
+            GroupByTimeRange.groupByWeek(pipeLine, ApiInfo.LAST_TESTED, "totalApisTested", new BasicDBObject());
+            MongoCursor<BasicDBObject> cursor = ApiInfoDao.instance.getMCollection().aggregate(pipeLine, BasicDBObject.class).cursor();
+            while (cursor.hasNext()) {
+                BasicDBObject document = cursor.next();
+                if(document.isEmpty()) continue;
+                BasicDBObject id = (BasicDBObject) document.get("_id");
+                String key = id.getInt("year") + "_" + id.getInt("weekOfYear");
+                response.put(key, document.getInt("totalApisTested"));
+            }
+            cursor.close();
+        } catch (Exception e) {
+            // TODO: handle exception
+            e.printStackTrace();
+        }
+        
+
+        return SUCCESS.toUpperCase();
     }
 
     public String getSortKey() {
