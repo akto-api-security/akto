@@ -3979,4 +3979,29 @@ public class ClientActor extends DataActor {
             return new ArrayList<>();
         }
     }
+
+    @Override
+    public boolean transmitLogsBatch(List<Log> batch, LogDb logDb) {
+        BasicDBObject obj = new BasicDBObject();
+        obj.put("logs", batch);
+        obj.put("batchLogDb", logDb.toString()); 
+
+        Map<String, List<String>> headers = buildHeaders();
+        String objString = gson.toJson(obj);
+        
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/transmitLogsBatch", "", "POST", objString, headers, "");
+        try{   
+            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);           
+            if(response.getStatusCode() != 200){
+                // loggerMaker.errorAndAddToDb("non 200 response in sendLogBatch: " + response.getStatusCode(), LoggerMaker.LogDb.RUNTIME);
+                System.out.print("non 200 response in sendLogBatch: " + response.getStatusCode());
+                return false;
+            }
+            return true;
+        } catch(Exception e){
+            // loggerMaker.errorAndAddToDb("Error in sendLogBatch: " + e.getMessage(), LoggerMaker.LogDb.RUNTIME);
+            System.out.println("Error in sendLogBatch: " + e.getMessage());
+            return false;
+        }
+    }
 }

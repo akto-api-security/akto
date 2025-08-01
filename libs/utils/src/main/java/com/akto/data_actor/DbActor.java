@@ -39,6 +39,7 @@ import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods.Method;
 import com.akto.dto.usage.MetricTypes;
 import com.akto.jobs.JobScheduler;
+import com.akto.log.LoggerMaker.LogDb;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.WriteModel;
 
@@ -626,5 +627,35 @@ public class DbActor extends DataActor {
 
     @Override
     public void updateModuleInfo(ModuleInfo moduleInfo) {
+    }
+    
+    @Override
+    public boolean transmitLogsBatch(List<Log> batch, LogDb logDb) {
+        try {
+            if (batch == null || batch.isEmpty()) {
+                // loggerMaker.infoAndAddToDb("No logs to insert for " + logDb, LogDb.DASHBOARD);
+                return true;
+            }
+            String batchLogDb;
+            switch (logDb) {
+                case TESTING:
+                    batchLogDb = "TESTING";
+                    break;
+                case RUNTIME:
+                    batchLogDb = "RUNTIME";
+                    break;
+                case ANALYSER:
+                    batchLogDb = "ANALYSER";
+                    break;
+                default:
+                    // loggerMaker.errorAndAddToDb("Unrecognized logDb value: " + logDb, LogDb.DASHBOARD);
+                    return false;
+            }
+            DbLayer.bulkInsertLogs(batch, batchLogDb);
+            return true;
+        } catch (Exception e) {
+            // loggerMaker.errorAndAddToDb("Error in transmitLogsBatch for " + logDb + ": " + e.getMessage(), LogDb.DASHBOARD);
+            return false;
+        }
     }
 }

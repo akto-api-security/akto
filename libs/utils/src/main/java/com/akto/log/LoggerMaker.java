@@ -269,33 +269,23 @@ public class LoggerMaker {
             switch(db){
                 case TESTING:
                     // dataActor.insertTestingLog(log);
-                    if (testingLogProcessor.getCacheSize() <= 10000) {
-                        testingLogProcessor.addLog(log);
-                    }
+                    testingLogProcessor.addLog(log);
                     break;
                 case RUNTIME: 
                     // dataActor.insertRuntimeLog(log);
-                    if (runtimeLogProcessor.getCacheSize() <= 10000) {
-                        runtimeLogProcessor.addLog(log);
-                    }
+                    runtimeLogProcessor.addLog(log);
                     break;
                 case DASHBOARD: 
                     // DashboardLogsDao.instance.insertOne(log);
-                    if (dashboardLogProcessor.getCacheSize() <= 10000) {
-                        dashboardLogProcessor.addLog(log);
-                    }
+                    dashboardLogProcessor.addLog(log);
                     break;
                 case ANALYSER:
                     // dataActor.insertAnalyserLog(log);
-                    if (analyserLogProcessor.getCacheSize() <= 10000) {
-                        analyserLogProcessor.addLog(log);
-                    }
+                    analyserLogProcessor.addLog(log);
                     break;
                 case BILLING:
                     // BillingLogsDao.instance.insertOne(log);
-                    if (billingLogProcessor.getCacheSize() <= 10000) {
-                        billingLogProcessor.addLog(log);
-                    }
+                    billingLogProcessor.addLog(log);
                     break;
                 default:
                     break;
