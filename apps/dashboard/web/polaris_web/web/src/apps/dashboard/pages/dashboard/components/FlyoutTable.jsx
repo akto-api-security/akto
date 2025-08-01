@@ -178,7 +178,7 @@ function FlyoutTable({ actionItemType, count, allApiInfo, apiInfoLoading }) {
     };
 
     const getHeaders = () => {
-        if (actionItemType === ACTION_ITEM_TYPES.SENSITIVE_DATA_ENDPOINTS) {
+        if (actionItemType === ACTION_ITEM_TYPES.SENSITIVE_DATA_ENDPOINTS || actionItemType === ACTION_ITEM_TYPES.CRITICAL_SENSITIVE_UNAUTH) {
             return [
                 { text: 'Endpoint', title: 'Endpoint', value: 'endpoint', maxWidth: '300px' },
                 { text: 'Sensitive Params', title: 'Sensitive Params', value: 'sensitiveParams', isText: CellType.TEXT, maxWidth: '200px' },
