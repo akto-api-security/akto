@@ -166,8 +166,8 @@ export const ActionItemsContent = ({ actionItemsData, onCountChange }) => {
             setCriticalCardData({
                 id: 'p0-critical',
                 priority: 'P0',
-                staticTitle: 'APIs returning sensitive data',
-                title: 'APIs returning sensitive data',
+                staticTitle: 'Sensitive data without proper controls',
+                title: 'Sensitive data without proper controls',
                 description: `${sensitiveAndUnauthenticatedCount} APIs returning sensitive data without encryption or proper authorization`,
                 team: 'Security & Development',
                 effort: 'High',

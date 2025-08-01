@@ -3,7 +3,7 @@ import ApiEndpointsTable from './ApiEndpointsTable';
 import { CellType } from "@/apps/dashboard/components/tables/rows/GithubRow";
 import GetPrettifyEndpoint from "@/apps/dashboard/pages/observe/GetPrettifyEndpoint";
 import observeApi from '../../observe/api';
-import { Box } from '@shopify/polaris';
+import { Box, Badge } from '@shopify/polaris';
 import TooltipText from '@/apps/dashboard/components/shared/TooltipText';
 import transform from "@/apps/dashboard/pages/observe/transform";
 import func from "@/util/func";
@@ -129,7 +129,8 @@ function FlyoutTable({ actionItemType, count, allApiInfo, apiInfoLoading }) {
                         endpoint: <Box maxWidth="250px">
                                 <GetPrettifyEndpoint url={url} method={method} />
                             </Box>,
-                        riskScore: api.riskScore ?? '-',
+                        riskScore: api.riskScore !== null && api.riskScore !== undefined ? 
+                            <Badge status={transform.getStatus(api.riskScore)} size="small">{api.riskScore}</Badge> : '-',
                         issues: <Box maxWidth="150px"><TooltipText tooltip={issuesText} text={issuesText} /></Box>,
                         hostname: <Box maxWidth="120px"><TooltipText tooltip={hostnameText} text={hostnameText} /></Box>,
                         accessType: <Box maxWidth="120px"><TooltipText tooltip={accessTypeText} text={accessTypeText} /></Box>,
@@ -176,19 +177,39 @@ function FlyoutTable({ actionItemType, count, allApiInfo, apiInfoLoading }) {
         return authTypes;
     };
 
-    const headers = [
-        { text: 'Endpoint', title: 'Endpoint', value: 'endpoint', maxWidth: '300px' },
-        { text: 'Risk Score', title: 'Risk Score', value: 'riskScore', isText: CellType.TEXT },
-        { text: 'Issues', title: 'Issues', value: 'issues', isText: CellType.TEXT, maxWidth: '150px' },
-        { text: 'Hostname', title: 'Hostname', value: 'hostname', isText: CellType.TEXT, maxWidth: '200px' },
-        { text: 'Access Type', title: 'Access Type', value: 'accessType', isText: CellType.TEXT, maxWidth: '120px' },
-        { text: 'Auth Type', title: 'Auth Type', value: 'authType', isText: CellType.TEXT, maxWidth: '120px' },
-        { text: 'Sensitive Params', title: 'Sensitive Params', value: 'sensitiveParams', isText: CellType.TEXT, maxWidth: '200px' },
-        { text: 'Last Seen', title: 'Last Seen', value: 'lastSeen', isText: CellType.TEXT },
-        { text: 'Discovered At', title: 'Discovered At', value: 'discoveredAt', isText: CellType.TEXT },
-        { text: 'Last Tested', title: 'Last Tested', value: 'lastTested', isText: CellType.TEXT },
-        { text: 'Collection', title: 'Collection', value: 'collection', isText: CellType.TEXT, maxWidth: '150px' },
-    ];
+    const getHeaders = () => {
+        if (actionItemType === ACTION_ITEM_TYPES.SENSITIVE_DATA_ENDPOINTS) {
+            return [
+                { text: 'Endpoint', title: 'Endpoint', value: 'endpoint', maxWidth: '300px' },
+                { text: 'Sensitive Params', title: 'Sensitive Params', value: 'sensitiveParams', isText: CellType.TEXT, maxWidth: '200px' },
+                { text: 'Risk Score', title: 'Risk Score', value: 'riskScore', isText: CellType.TEXT },
+                { text: 'Issues', title: 'Issues', value: 'issues', isText: CellType.TEXT, maxWidth: '150px' },
+                { text: 'Hostname', title: 'Hostname', value: 'hostname', isText: CellType.TEXT, maxWidth: '200px' },
+                { text: 'Access Type', title: 'Access Type', value: 'accessType', isText: CellType.TEXT, maxWidth: '120px' },
+                { text: 'Auth Type', title: 'Auth Type', value: 'authType', isText: CellType.TEXT, maxWidth: '120px' },
+                { text: 'Last Seen', title: 'Last Seen', value: 'lastSeen', isText: CellType.TEXT },
+                { text: 'Discovered At', title: 'Discovered At', value: 'discoveredAt', isText: CellType.TEXT },
+                { text: 'Last Tested', title: 'Last Tested', value: 'lastTested', isText: CellType.TEXT },
+                { text: 'Collection', title: 'Collection', value: 'collection', isText: CellType.TEXT, maxWidth: '150px' },
+            ];
+        } else {
+            return [
+                { text: 'Endpoint', title: 'Endpoint', value: 'endpoint', maxWidth: '300px' },
+                { text: 'Risk Score', title: 'Risk Score', value: 'riskScore', isText: CellType.TEXT },
+                { text: 'Issues', title: 'Issues', value: 'issues', isText: CellType.TEXT, maxWidth: '150px' },
+                { text: 'Hostname', title: 'Hostname', value: 'hostname', isText: CellType.TEXT, maxWidth: '200px' },
+                { text: 'Access Type', title: 'Access Type', value: 'accessType', isText: CellType.TEXT, maxWidth: '120px' },
+                { text: 'Auth Type', title: 'Auth Type', value: 'authType', isText: CellType.TEXT, maxWidth: '120px' },
+                { text: 'Sensitive Params', title: 'Sensitive Params', value: 'sensitiveParams', isText: CellType.TEXT, maxWidth: '200px' },
+                { text: 'Last Seen', title: 'Last Seen', value: 'lastSeen', isText: CellType.TEXT },
+                { text: 'Discovered At', title: 'Discovered At', value: 'discoveredAt', isText: CellType.TEXT },
+                { text: 'Last Tested', title: 'Last Tested', value: 'lastTested', isText: CellType.TEXT },
+                { text: 'Collection', title: 'Collection', value: 'collection', isText: CellType.TEXT, maxWidth: '150px' },
+            ];
+        }
+    };
+
+    const headers = getHeaders();
 
     return (
         <ApiEndpointsTable
