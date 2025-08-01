@@ -1,11 +1,16 @@
 package com.akto.action.threat_detection;
 
 import com.akto.ProtoMessageUtils;
+import com.akto.dto.OriginalHttpRequest;
+import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.traffic.SuspectSampleData;
 import com.akto.dto.type.URLMethods;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchAlertFiltersResponse;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ListMaliciousRequestsResponse;
+import com.akto.testing.ApiExecutor;
 import com.fasterxml.jackson.databind.ObjectMapper;
+
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -36,21 +41,20 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
   int startTimestamp, endTimestamp;
   List<String> types;
 
-  // TODO: remove this, use API Executor.
-  private final CloseableHttpClient httpClient;
 
   private final ObjectMapper objectMapper = new ObjectMapper();
 
   public SuspectSampleDataAction() {
     super();
-    this.httpClient = HttpClients.createDefault();
+
   }
 
   public String fetchSampleData() {
-    HttpPost post = new HttpPost(
-        String.format("%s/api/dashboard/list_malicious_requests", this.getBackendUrl()));
-    post.addHeader("Authorization", "Bearer " + this.getApiToken());
-    post.addHeader("Content-Type", "application/json");
+    String requestUrl = String.format("%s/api/dashboard/list_malicious_requests", this.getBackendUrl());
+
+    Map<String, List<String>> headers = new HashMap<>();
+    headers.put("Authorization", Collections.singletonList("Bearer " + this.getApiToken()));
+    headers.put("Content-Type", Collections.singletonList("application/json"));
 
     Map<String, Object> filter = new HashMap<>();
     if (this.ips != null && !this.ips.isEmpty()) {
@@ -92,13 +96,13 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
         put("filter", filter);
       }
     };
+
     String msg = objectMapper.valueToTree(body).toString();
+    OriginalHttpRequest request = new OriginalHttpRequest(requestUrl, "", "POST", msg, headers, "application/json");
 
-    StringEntity requestEntity = new StringEntity(msg, ContentType.APPLICATION_JSON);
-    post.setEntity(requestEntity);
-
-    try (CloseableHttpResponse resp = this.httpClient.execute(post)) {
-      String responseBody = EntityUtils.toString(resp.getEntity());
+    try {
+      OriginalHttpResponse resp = ApiExecutor.sendRequest(request, true, null, false, null);
+      String responseBody = resp.getBody();
 
       ProtoMessageUtils.<ListMaliciousRequestsResponse>toProtoMessage(
           ListMaliciousRequestsResponse.class, responseBody)
@@ -135,12 +139,16 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
   }
 
   public String fetchFilters() {
-    HttpGet get = new HttpGet(String.format("%s/api/dashboard/fetch_filters", this.getBackendUrl()));
-    get.addHeader("Authorization", "Bearer " + this.getApiToken());
-    get.addHeader("Content-Type", "application/json");
+    String requestUrl = String.format("%s/api/dashboard/fetch_filters", this.getBackendUrl());
+    Map<String, List<String>> headers = new HashMap<>();
+    headers.put("Authorization", Collections.singletonList("Bearer " + this.getApiToken()));
+    headers.put("Content-Type", Collections.singletonList("application/json"));
 
-    try (CloseableHttpResponse resp = this.httpClient.execute(get)) {
-      String responseBody = EntityUtils.toString(resp.getEntity());
+    OriginalHttpRequest request = new OriginalHttpRequest(requestUrl, "", "GET", "", headers, "application/json");
+
+    try {
+      OriginalHttpResponse resp = ApiExecutor.sendRequest(request, true, null, false, null);  
+      String responseBody = resp.getBody();
 
       ProtoMessageUtils.<FetchAlertFiltersResponse>toProtoMessage(
           FetchAlertFiltersResponse.class, responseBody)
@@ -159,19 +167,19 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
   }
 
   public String deleteAllMaliciousEvents() {
-    HttpPost post = new HttpPost(
-            String.format("%s/api/dashboard/delete_all_malicious_events", this.getBackendUrl()));
-    post.addHeader("Authorization", "Bearer " + this.getApiToken());
-    post.addHeader("Content-Type", "application/json");
+    String requestUrl = String.format("%s/api/dashboard/delete_all_malicious_events", this.getBackendUrl());
+    Map<String, List<String>> headers = new HashMap<>();
+    headers.put("Authorization", Collections.singletonList("Bearer " + this.getApiToken()));
+    headers.put("Content-Type", Collections.singletonList("application/json"));
 
     Map<String, Object> body = new HashMap<>();
     String msg = objectMapper.valueToTree(body).toString();
 
-    StringEntity requestEntity = new StringEntity(msg, ContentType.APPLICATION_JSON);
-    post.setEntity(requestEntity);
+    OriginalHttpRequest request = new OriginalHttpRequest(requestUrl, "", "POST", msg, headers, "application/json");
 
-    try (CloseableHttpResponse resp = this.httpClient.execute(post)) {
-      String responseBody = EntityUtils.toString(resp.getEntity());
+    try {
+      OriginalHttpResponse resp = ApiExecutor.sendRequest(request, true, null, false, null);
+      String responseBody = resp.getBody();
     } catch (Exception e) {
       e.printStackTrace();
       return ERROR.toUpperCase();

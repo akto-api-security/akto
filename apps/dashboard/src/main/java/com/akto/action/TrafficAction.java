@@ -19,6 +19,8 @@ import com.akto.dao.SensitiveSampleDataDao;
 import com.akto.dao.TrafficInfoDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.threat_detection.ApiHitCountInfoDao;
+import com.akto.dto.OriginalHttpRequest;
+import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.SensitiveSampleData;
 import com.akto.dto.threat_detection.ApiHitCountInfo;
 import com.akto.dto.ApiInfo.ApiInfoKey;
@@ -28,6 +30,7 @@ import com.akto.dto.type.SingleTypeInfo;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchApiDistributionDataResponse;
+import com.akto.testing.ApiExecutor;
 import com.akto.util.Constants;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mongodb.client.model.Filters;
@@ -39,8 +42,7 @@ import lombok.Setter;
 public class TrafficAction {
     
     private static final LoggerMaker loggerMaker = new LoggerMaker(TrafficAction.class);
-    // TODO: remove this, use API Executor.
-    private final CloseableHttpClient httpClient = HttpClients.createDefault();
+
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     int apiCollectionId;
@@ -170,11 +172,12 @@ public class TrafficAction {
 
     public String fetchIpLevelApiCallStats() {
         try {
-
             AbstractThreatDetectionAction action = new AbstractThreatDetectionAction();
-            HttpPost post = new HttpPost(String.format("%s/api/threat_detection/fetch_api_distribution_data", action.getBackendUrl()));
-            post.addHeader("Authorization", "Bearer " + action.getApiToken());
-            post.addHeader("Content-Type", "application/json");
+            String requestUrl = String.format("%s/api/threat_detection/fetch_api_distribution_data", action.getBackendUrl());
+
+            Map<String, List<String>> headers = new HashMap<>();
+            headers.put("Authorization", Collections.singletonList("Bearer " + action.getApiToken()));
+            headers.put("Content-Type", Collections.singletonList("application/json"));
 
             Map<String, Object> body = new HashMap<String, Object>() {{
                 put("apiCollectionId", apiCollectionId);
@@ -186,29 +189,26 @@ public class TrafficAction {
             }};
         
             String msg = objectMapper.valueToTree(body).toString();
-            StringEntity requestEntity = new StringEntity(msg, ContentType.APPLICATION_JSON);
-            post.setEntity(requestEntity);
-
-            try (CloseableHttpResponse resp = this.httpClient.execute(post)) {
-                String responseBody = EntityUtils.toString(resp.getEntity());
-
-                ProtoMessageUtils.<FetchApiDistributionDataResponse>toProtoMessage(
-                    FetchApiDistributionDataResponse.class, responseBody)
-                    .ifPresent(proto -> {
-                        this.bucketStats = proto.getBucketStatsList().stream()
-                            .map(pb -> {
-                                Map<String, Object> stat = new HashMap<>();
-                                stat.put("bucketLabel", pb.getBucketLabel());
-                                if (pb.hasMin()) stat.put("min", pb.getMin());
-                                if (pb.hasMax()) stat.put("max", pb.getMax());
-                                if (pb.hasP25()) stat.put("p25", pb.getP25());
-                                if (pb.hasP50()) stat.put("p50", pb.getP50());
-                                if (pb.hasP75()) stat.put("p75", pb.getP75());
-                                return stat;
-                            })
-                            .collect(Collectors.toList());
-                    });
-
+            OriginalHttpRequest request = new OriginalHttpRequest(requestUrl, "", "POST", msg, headers, "application/json");
+            try{
+                OriginalHttpResponse resp = ApiExecutor.sendRequest(request, true, null, false, null);
+                String responseBody = resp.getBody();
+                    ProtoMessageUtils.<FetchApiDistributionDataResponse>toProtoMessage(
+                        FetchApiDistributionDataResponse.class, responseBody)
+                        .ifPresent(proto -> {
+                            this.bucketStats = proto.getBucketStatsList().stream()
+                                .map(pb -> {
+                                    Map<String, Object> stat = new HashMap<>();
+                                    stat.put("bucketLabel", pb.getBucketLabel());
+                                    if (pb.hasMin()) stat.put("min", pb.getMin());
+                                    if (pb.hasMax()) stat.put("max", pb.getMax());
+                                    if (pb.hasP25()) stat.put("p25", pb.getP25());
+                                    if (pb.hasP50()) stat.put("p50", pb.getP50());
+                                    if (pb.hasP75()) stat.put("p75", pb.getP75());
+                                    return stat;
+                                })
+                                .collect(Collectors.toList());
+                        });
             } catch (Exception e) {
                 e.printStackTrace();
                 return Action.ERROR.toUpperCase();
