@@ -13,7 +13,8 @@ export async function fetchActionItemsData() {
         api.fetchSensitiveAndUnauthenticatedValue(true),
         api.fetchHighRiskThirdPartyValue(true),
         api.fetchShadowApisValue(true),
-        settingsModule.fetchAdminInfo()
+        settingsModule.fetchAdminInfo(),
+        api.fetchApiInfosWithCustomFilter('AUTH_TYPES', 0, 0, '')
     ]);
 
     const [
@@ -22,15 +23,17 @@ export async function fetchActionItemsData() {
         sensitiveAndUnauthenticatedValueResult,
         highRiskThirdPartyValueResult,
         shadowApisValueResult,
-        adminSettingsResult
+        adminSettingsResult,
+        unauthenticatedApisResult 
     ] = results;
-    
+
     const apiStats = apiStatsResult.status === 'fulfilled' ? apiStatsResult.value : null;
     const countMapResp = countMapRespResult.status === 'fulfilled' ? countMapRespResult.value : null;
     const sensitiveAndUnauthenticatedCount = sensitiveAndUnauthenticatedValueResult.status === 'fulfilled' ? sensitiveAndUnauthenticatedValueResult.value.sensitiveUnauthenticatedEndpointsCount || 0 : 0;
     const highRiskThirdPartyCount = highRiskThirdPartyValueResult.status === 'fulfilled' ? highRiskThirdPartyValueResult.value.highRiskThirdPartyEndpointsCount || 0 : 0;
     const shadowApisCount = shadowApisValueResult.status === 'fulfilled' ? shadowApisValueResult.value.shadowApisCount || 0 : 0;
     const adminSettings = adminSettingsResult.status === 'fulfilled' ? adminSettingsResult.value.resp : {};
+    const unauthenticatedApis = unauthenticatedApisResult.status === 'fulfilled' ? unauthenticatedApisResult.value : { apiInfos: [] };
 
     const jiraTicketUrlMap = adminSettings?.jiraTicketUrlMap || {};
 
@@ -38,12 +41,18 @@ export async function fetchActionItemsData() {
     let unauthenticatedCount = 0;
     let thirdPartyDiff = 0;
     let sensitiveDataCount = countMapResp?.totalApisCount || 0;
+
     if (apiStats?.apiStatsEnd && apiStats?.apiStatsStart) {
         const { apiStatsEnd, apiStatsStart } = apiStats;
+
         highRiskCount = Object.entries(apiStatsEnd.riskScoreMap || {})
             .filter(([score]) => parseInt(score) > 3)
             .reduce((total, [, count]) => total + count, 0);
-        unauthenticatedCount = apiStatsEnd.authTypeMap?.UNAUTHENTICATED || 0;
+
+        unauthenticatedCount = Array.isArray(unauthenticatedApis.apiInfos)
+            ? unauthenticatedApis.apiInfos.length
+            : 0;
+
         thirdPartyDiff = (apiStatsEnd.accessTypeMap?.THIRD_PARTY || 0) - (apiStatsStart.accessTypeMap?.THIRD_PARTY || 0);
     }
 
