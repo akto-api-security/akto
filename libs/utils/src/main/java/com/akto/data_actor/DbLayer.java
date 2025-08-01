@@ -1676,4 +1676,43 @@ public class DbLayer {
     public static List<SlackWebhook> fetchSlackWebhooks() {
         return SlackWebhooksDao.instance.findAll(Filters.empty());
     }
+
+    public static void bulkInsertLogs(List<Log> logs, String batchLogDb){
+        List<WriteModel<Log>> operations = new ArrayList<>();
+        for (Log log : logs) {
+            operations.add(new InsertOneModel<>(log));
+        }
+        try{
+            BulkWriteResult result;
+            switch (batchLogDb) {
+                case "TESTING":
+                    result = LogsDao.instance.getMCollection().bulkWrite(operations, new BulkWriteOptions().ordered(false));
+                    break;
+                case "RUNTIME":
+                    result = RuntimeLogsDao.instance.getMCollection().bulkWrite(operations, new BulkWriteOptions().ordered(false));
+                    break;
+                case "ANALYSER":
+                    result = AnalyserLogsDao.instance.getMCollection().bulkWrite(operations, new BulkWriteOptions().ordered(false));
+                    break;
+                default:
+                    System.out.println("Unrecognized batchLogDb value: " + batchLogDb);
+                    throw new IllegalArgumentException("Unrecognized batchLogDb value: " + batchLogDb);    
+            }
+            // Verify insertion success
+            if (result.wasAcknowledged()) {
+                int expected = logs.size();
+                int inserted = result.getInsertedCount();
+                if (inserted == expected) {
+                    System.out.println("Successfully inserted " + expected + " logs to " + batchLogDb + " DB ");
+                } else {    
+                    System.out.println("Partially inserted " + inserted + " of " + expected + " logs " + " to " +  batchLogDb + " DB " );
+                }
+            } else {
+                System.out.println("Not acknowledged");
+            }
+        } catch (Exception e){
+            System.out.println("Bulk write to " + batchLogDb + " failed: " + e.getMessage());
+            throw e; 
+        }
+    }
 }

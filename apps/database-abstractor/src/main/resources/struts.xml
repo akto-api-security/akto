@@ -1705,7 +1705,7 @@
             </result>
         </action>
 
-        <action name="api/receiveLogs" class="com.akto.action.DbAction" method="receiveLogs">
+        <action name="api/transmitLogsBatch" class="com.akto.action.DbAction" method="transmitLogsBatch">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <result name="SUCCESS" type="json">

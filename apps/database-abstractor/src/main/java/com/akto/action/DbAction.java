@@ -2575,30 +2575,21 @@ public class DbAction extends ActionSupport {
         this.batchLogDb = batchLogDb;
     }
     
-    public String receiveLogs(){
+    public String transmitLogsBatch(){
         try{
             if (batchLogDb == null || batchLogDb.isEmpty()) {
                 loggerMaker.errorAndAddToDb("batchLogDb is null or empty", LogDb.RUNTIME);
                 return Action.ERROR.toUpperCase();
             }
+            System.out.println("You have hti: ");
             if (logs != null && !logs.isEmpty()) {
+                List<Log> dblogs = new ArrayList<>();
                 for (Log log : logs) {
                     Log dbLog = new Log(log.getLog(), log.getKey(), log.getTimestamp());
-                    switch (batchLogDb) {
-                        case "TESTING":;
-                            DbLayer.insertTestingLog(dbLog);
-                            break;
-                        case "RUNTIME":
-                            DbLayer.insertRuntimeLog(dbLog);
-                            break;
-                        case "ANALYSER":
-                            DbLayer.insertAnalyserLog(dbLog);
-                            break;
-                        default:
-                            loggerMaker.errorAndAddToDb("Unrecognized batchLogDb value: " + batchLogDb, LogDb.RUNTIME);
-                            break;
-                    }
+                    System.out.println("DB insert is : "+ dbLog);
+                    dblogs.add(dbLog);
                 }
+                DbLayer.bulkInsertLogs(dblogs, batchLogDb);
             } 
             return Action.SUCCESS.toUpperCase();
         } catch (Exception e){
