@@ -1004,17 +1004,18 @@ public class ApiCollectionsAction extends UserAction {
     }
 
     public String fetchHighRiskThirdPartyValue() {
-        List<ApiInfo> highRiskEndpoints = ApiInfoDao.instance.findAll(
-                Filters.and(
-                        Filters.gte(ApiInfo.RISK_SCORE, 4),
-                        Filters.in(ApiInfo.API_ACCESS_TYPES, ApiInfo.ApiAccessType.THIRD_PARTY)
-                )
+        Bson filterQ = UsageMetricCalculator.excludeDemosAndDeactivated(ApiInfo.ID_API_COLLECTION_ID);
+        Bson filter = Filters.and(
+            filterQ,
+            Filters.gte(ApiInfo.RISK_SCORE, 4),
+            Filters.in(ApiInfo.API_ACCESS_TYPES, ApiInfo.ApiAccessType.THIRD_PARTY)
         );
 
-        this.highRiskThirdPartyEndpointsCount = highRiskEndpoints.size();
+        this.highRiskThirdPartyEndpointsCount = (int) ApiInfoDao.instance.count(filter);
         this.highRiskThirdPartyEndpointsApiInfo.clear();
 
         if (this.showApiInfo) {
+            List<ApiInfo> highRiskEndpoints = ApiInfoDao.instance.findAll(filter);
             this.highRiskThirdPartyEndpointsApiInfo.addAll(highRiskEndpoints);
         }
 
@@ -1027,7 +1028,7 @@ public class ApiCollectionsAction extends UserAction {
         this.shadowApisApiInfo.clear();
 
         if (shadowApisCollection != null) {
-            this.shadowApisCount = shadowApisCollection.getUrls().size();
+            this.shadowApisCount = (int) ApiInfoDao.instance.count(Filters.eq(ApiInfo.ID_API_COLLECTION_ID, shadowApisCollection.getId()));
             if (this.showApiInfo) {
                 List<ApiInfo> shadowApiInfos = ApiInfoDao.instance.findAll(
                     Filters.eq(ApiInfo.ID_API_COLLECTION_ID, shadowApisCollection.getId())
