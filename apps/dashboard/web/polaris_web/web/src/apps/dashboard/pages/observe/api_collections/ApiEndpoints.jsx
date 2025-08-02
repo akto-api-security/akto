@@ -31,6 +31,8 @@ import useTable from "../../../components/tables/TableContext"
 import HeadingWithTooltip from "../../../components/shared/HeadingWithTooltip"
 import { SelectSource } from "./SelectSource"
 import InlineEditableText from "../../../components/shared/InlineEditableText"
+import ApiIssuesTab from "./ApiIssuesTab"
+import IssuesApi from "../../issues/api"
 
 const headings = [
     {
@@ -210,6 +212,7 @@ function ApiEndpoints(props) {
     const [showSourceDialog,  setShowSourceDialog] = useState(false)
     const [openAPIfile, setOpenAPIfile] = useState(null)
     const [sourcesBackfilled, setSourcesBackfilled] = useState(false)
+    const [collectionIssuesData, setCollectionIssuesData] = useState([])
 
     const [endpointData, setEndpointData] = useState({"all":[], 'sensitive': [], 'new': [], 'high_risk': [], 'no_auth': [], 'shadow': [], 'zombie': []})
     const [selectedTab, setSelectedTab] = useState("all")
@@ -243,7 +246,6 @@ function ApiEndpoints(props) {
     // the values used here are defined at the server.
     const definedTableTabs = apiCollectionId === 111111999 ? ['All', 'New', 'High risk', 'No auth', 'Shadow'] : ( apiCollectionId === 111111120 ? ['All', 'New', 'Sensitive', 'High risk', 'Shadow'] : ['All', 'New', 'Sensitive', 'High risk', 'No auth', 'Shadow', 'Zombie'] )
 
-
     const { tabsInfo } = useTable()
     const tableCountObj = func.getTabsCount(definedTableTabs, endpointData)
     const tableTabs = func.getTableTabsContent(definedTableTabs, tableCountObj, setSelectedTab, selectedTab, tabsInfo)
@@ -255,6 +257,7 @@ function ApiEndpoints(props) {
         let sensitiveParamsResp;
         let sourceCodeData = {};
         let apiInfoSeverityMap ;
+        let issuesDataResp;
         if (isQueryPage) {
             let apiCollectionData = endpointListFromConditions
             if (Object.keys(endpointListFromConditions).length === 0) {
@@ -285,7 +288,8 @@ function ApiEndpoints(props) {
                 api.fetchApiInfosForCollection(apiCollectionId),
                 api.fetchAPIsFromSourceCode(apiCollectionId),
                 api.loadSensitiveParameters(apiCollectionId),
-                api.getSeveritiesCountPerCollection(apiCollectionId)
+                api.getSeveritiesCountPerCollection(apiCollectionId),
+                IssuesApi.fetchIssues(0, 1000, ["OPEN"], [apiCollectionId], null, null, null, null, null, null, true, null)
             ];
             let results = await Promise.allSettled(apiPromises);
             let stisEndpoints =  results[0].status === 'fulfilled' ? results[0].value : {};
@@ -293,11 +297,13 @@ function ApiEndpoints(props) {
             sourceCodeData = results[2].status === 'fulfilled' ? results[2].value : {};
             sensitiveParamsResp =  results[3].status === 'fulfilled' ? results[3].value : {};
             apiInfoSeverityMap = results[4].status === 'fulfilled' ? results[4].value : {};
+            let issuesDataResp = results[5].status === 'fulfilled' ? results[5].value : {};
             setShowEmptyScreen(stisEndpoints?.list !== undefined && stisEndpoints?.list?.length === 0)
             apiEndpointsInCollection = stisEndpoints?.list !== undefined && stisEndpoints.list.map(x => { return { ...x._id, startTs: x.startTs, changesCount: x.changesCount, shadow: x.shadow ? x.shadow : false } })
             apiInfoListInCollection = apiInfosData.apiInfoList
             unusedEndpointsInCollection = stisEndpoints.unusedEndpoints
             setIsRedacted(apiInfosData.redacted)
+            setCollectionIssuesData(issuesDataResp?.issues || []);
         }
 
         let sensitiveParams = sensitiveParamsResp.data.endpoints
@@ -431,7 +437,6 @@ function ApiEndpoints(props) {
         setApiEndpoints(apiEndpointsInCollection)
         setApiInfoList(apiInfoListInCollection)
         setUnusedEndpoints(unusedEndpointsInCollection)
-
     }
 
     useEffect(() => {
@@ -1056,6 +1061,7 @@ function ApiEndpoints(props) {
         apiDetail={apiDetail}
         headers={transform.getDetailsHeaders()}
         isGptActive={isGptActive}
+        collectionIssuesData={collectionIssuesData}
     />,
     ]
 
