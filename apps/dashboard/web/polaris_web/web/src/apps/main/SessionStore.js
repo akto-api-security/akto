@@ -4,6 +4,7 @@ import { devtools, persist, createJSONStorage } from "zustand/middleware"
 const initialState = {
     threatFiltersMap: {},
     accessToken: null,
+    contextSource: "API",
 };
 
 let sessionStore = (set) => ({
@@ -20,6 +21,13 @@ let sessionStore = (set) => ({
             set({ threatFiltersMap });
         } catch (error) {
             console.error("Error setting threatFiltersMap:", error);
+        }
+    },
+    setContextSource: (contextSource) => {
+        try {
+            set({ contextSource });
+        } catch (error) {
+            console.error("Error setting contextSource:", error);
         }
     },
     resetStore: () => {

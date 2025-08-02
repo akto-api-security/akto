@@ -33,11 +33,11 @@ import com.akto.dto.type.SingleTypeInfo;
 import com.akto.usage.UsageMetricCalculator;
 import com.akto.util.Constants;
 import com.akto.util.GroupByTimeRange;
-import com.akto.util.enums.GlobalEnums;
 import com.akto.util.enums.GlobalEnums.Severity;
 import com.akto.util.enums.GlobalEnums.TestCategory;
 import com.akto.util.enums.GlobalEnums.TestErrorSource;
 import com.akto.util.enums.GlobalEnums.TestRunIssueStatus;
+import com.akto.utils.TestTemplateUtils;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.*;
@@ -542,22 +542,23 @@ public class IssuesAction extends UserAction {
 
     public String fetchAllSubCategories() {
         boolean includeYamlContent = false;
-
+        categories = TestTemplateUtils.getAllTestCategoriesWithinContext(Context.contextSource.get());
+        Bson filters = Filters.in(
+                "info.category", Arrays.asList(categories)
+        );
         switch (mode) {
             case "runTests":
-                categories = GlobalEnums.TestCategory.values();
                 break;
             case "testEditor":
                 includeYamlContent = true;
                 break;
             default:
                 includeYamlContent = true;
-                categories = GlobalEnums.TestCategory.values();
-                testSourceConfigs = TestSourceConfigsDao.instance.findAll(Filters.empty());
+                testSourceConfigs = TestSourceConfigsDao.instance.findAll(filters);
         }
 
         Map<String, TestConfig> testConfigMap = YamlTemplateDao.instance.fetchTestConfigMap(includeYamlContent,
-                fetchOnlyActive, skip, limit, Filters.empty());
+                fetchOnlyActive, skip, limit, filters);
         subCategories = new ArrayList<>();
         for (Map.Entry<String, TestConfig> entry : testConfigMap.entrySet()) {
             try {

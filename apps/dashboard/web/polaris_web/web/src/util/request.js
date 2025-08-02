@@ -99,6 +99,7 @@ service.interceptors.request.use((config) => {
   config.headers['Access-Control-Allow-Origin'] = '*'
   config.headers['Content-Type'] = 'application/json'
   config.headers["access-token"] = SessionStore.getState().accessToken
+  config.headers['x-context-source'] = SessionStore.getState().contextSource || "API"
 
 
   if (window.ACTIVE_ACCOUNT) {
