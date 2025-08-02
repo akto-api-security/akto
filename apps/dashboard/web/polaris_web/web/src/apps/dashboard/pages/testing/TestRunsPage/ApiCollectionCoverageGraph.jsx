@@ -5,6 +5,7 @@ import EmptyCard from '../../dashboard/new_components/EmptyCard';
 import StackedChart from '../../../components/charts/StackedChart';
 import api from '../../observe/api';
 import PersistStore from '../../../../main/PersistStore';
+import { getDashboardCategory, mapLabel } from '../../../../main/labelHelper';
 
 const TESTED_COLOR = '#007F5F'; 
 const UNTESTED_COLOR = '#E4E5E7'; 
@@ -98,14 +99,14 @@ const ApiCollectionCoverageGraph = () => {
           exportingDisabled={true}
         />
       }
-      title="API Collection Coverage"
+      title={mapLabel("API Collection Coverage", getDashboardCategory())}
       titleToolTip="Overview of API testing coverage across your top collections, showing tested vs untested endpoints."
       linkText=""
       linkUrl=""
     />
   ) : (
     <EmptyCard 
-      title="API Collection Coverage" 
+      title={mapLabel("API Collection Coverage", getDashboardCategory())}
       subTitleComponent={
         showTestingComponents ? 
           <Text alignment='center' color='subdued'>No collections found with API endpoints.</Text> : 
