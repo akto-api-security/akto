@@ -41,7 +41,7 @@ public abstract class AccountsContextDaoWithRbac<T> extends MCollection<T>{
 
     protected Bson addRbacFilter(Bson originalQuery) {
         try {
-            if (Context.userId.get() != null && Context.accountId.get() != null) {
+            if ((Context.userId.get() != null || Context.contextSource.get() != null) && Context.accountId.get() != null) {
                 List<Integer> apiCollectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(),
                         Context.accountId.get());
                 if (apiCollectionIds != null) {

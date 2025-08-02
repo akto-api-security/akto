@@ -10,6 +10,7 @@ import com.akto.dto.traffic.CollectionTags;
 import com.akto.util.Constants;
 import com.akto.util.Pair;
 import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
+import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
 
@@ -98,6 +99,9 @@ public class UsersCollectionsList {
         if(source == null) {
             source = CONTEXT_SOURCE.API;
         }
+        if(contextCollectionsMap.isEmpty()) {
+            return;
+        }
         Pair<Integer, CONTEXT_SOURCE> key = new Pair<>(accountId, source);
         contextCollectionsMap.remove(key);
     }
@@ -134,11 +138,10 @@ public class UsersCollectionsList {
                 default:
                     break;
             }
-
-            collectionList = ApiCollectionsDao.instance.findAll(finalFilter, Projections.include(Constants.ID))
-                .stream()
-                .map(ApiCollection::getId)
-                .collect(Collectors.toSet());
+            MongoCursor<ApiCollection> cursor = ApiCollectionsDao.instance.getMCollection().find(finalFilter).projection(Projections.include(Constants.ID)).iterator();
+            while (cursor.hasNext()) {
+                collectionList.add(cursor.next().getId());
+            }
         } else {
             collectionList = collectionIdEntry.getFirst();
         }

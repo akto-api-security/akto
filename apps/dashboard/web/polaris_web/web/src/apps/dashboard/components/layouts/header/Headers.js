@@ -117,6 +117,15 @@ export default function Header() {
         })
     }
 
+    const handleDashboardChange = (value) => {
+        PersistStore.getState().allCollections = [];
+        PersistStore.getState().collectionsMap = {};
+        PersistStore.getState().hostNameMap = {};
+        LocalStore.getState().subCategoryMap = {};
+        LocalStore.getState().categoryMap = {}; 
+        setDashboardCategory(value);
+        window.location.reload();
+    }
 
     function createNewAccount() {
         api.saveToAccount(newAccount).then(resp => {
@@ -235,7 +244,7 @@ export default function Header() {
                                         { value: "Gen AI", label: "Gen AI", id: "gen-ai" },
                                     ]}
                                     initial={dashboardCategory || "API Security"}
-                                    selected={(value) => {setDashboardCategory(value)}}
+                                    selected={handleDashboardChange}
                                 />
                             </Box>
                         </HorizontalStack>

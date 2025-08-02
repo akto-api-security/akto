@@ -6,6 +6,7 @@ import java.util.stream.Collectors;
 import com.akto.action.observe.InventoryAction;
 import com.akto.dto.*;
 import com.akto.util.Pair;
+
 import lombok.Getter;
 import org.bson.conversions.Bson;
 
@@ -159,8 +160,6 @@ public class ApiCollectionsAction extends UserAction {
     }
 
     public String fetchAllCollections() {
-        // remove the cache of context collections for account
-        UsersCollectionsList.deleteContextCollectionsForUser(Context.accountId.get(), Context.contextSource.get()); 
         this.apiCollections = ApiCollectionsDao.instance.findAll(Filters.empty());
         this.apiCollections = fillApiCollectionsUrlCount(this.apiCollections, Filters.empty());
         return Action.SUCCESS.toUpperCase();
