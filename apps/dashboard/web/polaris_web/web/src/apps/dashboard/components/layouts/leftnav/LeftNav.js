@@ -7,7 +7,6 @@ import {
     DiamondAlertMinor,
     StarFilledMinor,
     FinancesMinor,
-    LockFilledMajor,
 } from "@shopify/polaris-icons";
 import {useLocation, useNavigate} from "react-router-dom";
 
@@ -386,13 +385,6 @@ export default function LeftNav() {
 
         return items
     }, [dashboardCategory, leftNavSelected])
-
-
-    useEffect(() => {
-        handleSelect(`dashboard_observe_inventory`);
-        setActive("normal");
-        navigate("/dashboard/observe/inventory");
-    }, [dashboardCategory])
 
     const navigationMarkup = (
         <div className={active}>
