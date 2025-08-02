@@ -28,6 +28,7 @@ import CriticalFindingsGraph from '../issues/IssuesPage/CriticalFindingsGraph';
 import values from "@/util/values";
 import { ActionItemsContent } from './components/ActionItemsContent';
 import { fetchActionItemsData } from './components/actionItemsTransform';
+import { mapLabel } from '../../../main/labelHelper';
 
 function HomeDashboard() {
 
@@ -768,13 +769,15 @@ function HomeDashboard() {
 
     const pageComponents = [showBannerComponent ? <DashboardBanner key="dashboardBanner" /> : tabsComponent]
 
+    const dashboardCategory = PersistStore((state) => state.dashboardCategory) || "API Security"
+
     return (
         <Box>
             {loading ? <SpinnerCentered /> :
                 <PageWithMultipleCards
                     title={
                         <Text variant='headingLg'>
-                            API Security Posture
+                            {mapLabel("API Security Posture", dashboardCategory)}
                         </Text>
                     }
                     isFirstPage={true}

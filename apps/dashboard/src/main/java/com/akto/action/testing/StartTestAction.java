@@ -541,7 +541,7 @@ public class StartTestAction extends UserAction {
         latestTestingRunResultSummaries = TestingRunResultSummariesDao.instance
                 .fetchLatestTestingRunResultSummaries(testingRunHexIds);
 
-        testingRunsCount = TestingRunDao.instance.getMCollection().countDocuments(Filters.and(testingRunFilters));
+        testingRunsCount = TestingRunDao.instance.count(Filters.and(testingRunFilters));
 
         return SUCCESS.toUpperCase();
     }
@@ -578,7 +578,7 @@ public class StartTestAction extends UserAction {
                 limitForTestingRunResultSummary, sort);
         this.testingRun = TestingRunDao.instance.findOne(Filters.eq("_id", testingRunId));
 
-        long cicdCount =  TestingRunDao.instance.getMCollection().countDocuments(
+        long cicdCount =  TestingRunDao.instance.count(
             Filters.and(
                 Filters.eq(Constants.ID, testingRunId),
                 getTestingRunTypeFilter(TestingRunType.CI_CD)
@@ -1094,22 +1094,22 @@ public class StartTestAction extends UserAction {
         filters.addAll(prepareFilters(startTimestamp, endTimestamp));
         filters.addAll(getTableFilters());
 
-        long totalCount = TestingRunDao.instance.getMCollection().countDocuments(Filters.and(filters));
+        long totalCount = TestingRunDao.instance.count(Filters.and(filters));
 
         ArrayList<Bson> filterForCicd = new ArrayList<>(filters); // Create a copy of filters
         filterForCicd.add(getTestingRunTypeFilter(TestingRunType.CI_CD));
-        long cicdCount = TestingRunDao.instance.getMCollection().countDocuments(Filters.and(filterForCicd));
+        long cicdCount = TestingRunDao.instance.count(Filters.and(filterForCicd));
 
         filters.add(getTestingRunTypeFilter(TestingRunType.ONE_TIME));
 
-        long oneTimeCount = TestingRunDao.instance.getMCollection().countDocuments(Filters.and(filters));
+        long oneTimeCount = TestingRunDao.instance.count(Filters.and(filters));
 
         ArrayList<Bson> continuousTestsFilter = new ArrayList<>(); // Create a copy of filters
         continuousTestsFilter.add(getTestingRunTypeFilter(TestingRunType.CONTINUOUS_TESTING));
         continuousTestsFilter.add(Filters.gte(TestingRun.SCHEDULE_TIMESTAMP, startTimestamp));
         continuousTestsFilter.addAll(getTableFilters());
 
-        long continuousTestsCount = TestingRunDao.instance.getMCollection().countDocuments(Filters.and(continuousTestsFilter));
+        long continuousTestsCount = TestingRunDao.instance.count(Filters.and(continuousTestsFilter));
 
         long scheduleCount = totalCount - oneTimeCount - cicdCount - continuousTestsCount;
 

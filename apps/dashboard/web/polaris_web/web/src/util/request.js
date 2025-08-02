@@ -3,6 +3,7 @@ import func from "./func"
 import { history } from './history';
 import SessionStore from '../apps/main/SessionStore';
 import LocalStore from '../apps/main/LocalStorageStore';
+import PersistStore from '../apps/main/PersistStore';
 
 const accessTokenUrl = "/dashboard/accessToken"
 
@@ -99,6 +100,16 @@ service.interceptors.request.use((config) => {
   config.headers['Access-Control-Allow-Origin'] = '*'
   config.headers['Content-Type'] = 'application/json'
   config.headers["access-token"] = SessionStore.getState().accessToken
+  const currentCategory = PersistStore.getState().dashboardCategory || "API Security";
+  let contextSource = "API";
+  if (currentCategory === "API Security") {
+    contextSource = "API";
+  } else if (currentCategory === "MCP Security") {
+    contextSource = "MCP";
+  } else if (currentCategory === "Gen AI") {
+    contextSource = "GEN_AI";
+  }
+  config.headers['x-context-source'] = contextSource;
 
 
   if (window.ACTIVE_ACCOUNT) {

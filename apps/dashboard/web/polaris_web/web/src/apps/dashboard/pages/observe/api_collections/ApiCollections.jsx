@@ -34,6 +34,7 @@ import ReactFlow, {
   
   } from 'react-flow-renderer';
 import SetUserEnvPopupComponent from "./component/SetUserEnvPopupComponent";
+import { getDashboardCategory, mapLabel } from "../../../../main/labelHelper";
   
 const CenterViewType = {
     Table: 0,
@@ -1009,7 +1010,7 @@ function ApiCollections(props) {
             title={
                 <TitleWithInfo 
                     tooltipContent={"Akto automatically groups similar APIs into meaningful collections based on their subdomain names. "}
-                    titleText={"API collections"} 
+                    titleText={mapLabel("API Collections", getDashboardCategory())} 
                     docsUrl={"https://docs.akto.io/api-inventory/concepts"}
                 />
             }
