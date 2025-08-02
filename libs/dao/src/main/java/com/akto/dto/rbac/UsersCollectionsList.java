@@ -94,6 +94,14 @@ public class UsersCollectionsList {
         return collectionList;
     }
 
+    public static void deleteContextCollectionsForUser(int accountId, CONTEXT_SOURCE source) {
+        if(source == null) {
+            source = CONTEXT_SOURCE.API;
+        }
+        Pair<Integer, CONTEXT_SOURCE> key = new Pair<>(accountId, source);
+        contextCollectionsMap.remove(key);
+    }
+
     public static Set<Integer> getContextCollectionsForUser(int accountId, CONTEXT_SOURCE source) {
         if(source == null) {
             source = CONTEXT_SOURCE.API;

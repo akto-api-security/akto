@@ -159,7 +159,9 @@ public class ApiCollectionsAction extends UserAction {
     }
 
     public String fetchAllCollections() {
-        this.apiCollections = ApiCollectionsDao.instance.findAll(new BasicDBObject());
+        // remove the cache of context collections for account
+        UsersCollectionsList.deleteContextCollectionsForUser(Context.accountId.get(), Context.contextSource.get()); 
+        this.apiCollections = ApiCollectionsDao.instance.findAll(Filters.empty());
         this.apiCollections = fillApiCollectionsUrlCount(this.apiCollections, Filters.empty());
         return Action.SUCCESS.toUpperCase();
     }
@@ -180,6 +182,8 @@ public class ApiCollectionsAction extends UserAction {
 
     public String fetchAllCollectionsBasic() {
         List<Bson> pipeLine = new ArrayList<>();
+        // remove the cache of context collections for account
+        UsersCollectionsList.deleteContextCollectionsForUser(Context.accountId.get(), Context.contextSource.get());
         pipeLine.add(Aggregates.project(Projections.fields(
             Projections.computed(ApiCollection.URLS_COUNT, new BasicDBObject("$size", new BasicDBObject("$ifNull", Arrays.asList("$urls", Collections.emptyList())))),
             Projections.include(ApiCollection.ID, ApiCollection.NAME, ApiCollection.HOST_NAME, ApiCollection._TYPE, ApiCollection.TAGS_STRING, ApiCollection._DEACTIVATED,ApiCollection.START_TS, ApiCollection.AUTOMATED, ApiCollection.DESCRIPTION, ApiCollection.USER_ENV_TYPE, ApiCollection.IS_OUT_OF_TESTING_SCOPE)
@@ -279,6 +283,8 @@ public class ApiCollectionsAction extends UserAction {
             );
     
             UsersCollectionsList.deleteCollectionIdsFromCache(userId, accountId);
+            // remove the cache of context collections for account
+            UsersCollectionsList.deleteContextCollectionsForUser(Context.accountId.get(), Context.contextSource.get());
         } catch(Exception e){
         }
         
@@ -345,6 +351,9 @@ public class ApiCollectionsAction extends UserAction {
             int userId = Context.userId.get();
             int accountId = Context.accountId.get();
             UsersCollectionsList.deleteCollectionIdsFromCache(userId, accountId);
+            
+            // remove the cache of context collections for account
+            UsersCollectionsList.deleteContextCollectionsForUser(Context.accountId.get(), Context.contextSource.get());
         } catch (Exception e) {
         }
 
