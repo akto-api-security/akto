@@ -1,27 +1,25 @@
 package com.akto.threat.detection.tasks;
 
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.regex.Pattern;
-
-import org.apache.http.client.methods.CloseableHttpResponse;
-import org.apache.http.client.methods.HttpGet;
-import org.apache.http.impl.client.CloseableHttpClient;
-import org.apache.http.impl.client.HttpClients;
-import org.apache.http.util.EntityUtils;
 
 import com.akto.ProtoMessageUtils;
 import com.akto.dto.HttpResponseParams;
+import com.akto.dto.OriginalHttpRequest;
+import com.akto.dto.OriginalHttpResponse;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ActorId;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatConfiguration;
+import com.akto.testing.ApiExecutor;
 import com.akto.threat.detection.actor.SourceIPActorGenerator;
+import com.akto.threat.detection.utils.Utils;
 
 @lombok.Getter
 @lombok.Setter
 public class ThreatConfigurationEvaluator {
-
-    private final CloseableHttpClient httpClient;
     private static final LoggerMaker logger = new LoggerMaker(ThreatConfiguration.class, LogDb.THREAT_DETECTION);
     private ThreatConfiguration threatConfiguration;
     private int threatConfigurationUpdateIntervalSec = 15 * 60; // 15 minutes
@@ -37,7 +35,6 @@ public class ThreatConfigurationEvaluator {
     }
 
     public ThreatConfigurationEvaluator(ThreatConfiguration threatConfiguration) {
-        this.httpClient = HttpClients.createDefault();
         if (threatConfiguration != null) {
             this.threatConfiguration = threatConfiguration;
             this.threatConfigLastUpdatedAt = (int) (System.currentTimeMillis() / 1000);
@@ -54,27 +51,31 @@ public class ThreatConfigurationEvaluator {
             return this.threatConfiguration;
         }
 
-        String url = System.getenv("AKTO_THREAT_PROTECTION_BACKEND_URL");
-        String token = System.getenv("AKTO_THREAT_PROTECTION_BACKEND_TOKEN");
-
-        HttpGet get = new HttpGet(
-                String.format("%s/api/dashboard/get_threat_configuration", url));
-        get.addHeader("Authorization", "Bearer " + token);
-        get.addHeader("Content-Type", "application/json");
-
-        try (CloseableHttpResponse resp = this.httpClient.execute(get)) {
-            String responseBody = EntityUtils.toString(resp.getEntity());
-            threatConfiguration = ProtoMessageUtils
-                    .<ThreatConfiguration>toProtoMessage(
-                            ThreatConfiguration.class, responseBody)
-                    .orElse(null);
-
-            if (this.threatConfiguration != null) {
-                logger.debug("Fetched threat configuration" + this.threatConfiguration.toString());
+        Map<String, List<String>> headers = Utils.buildHeaders();
+        headers.put("Content-Type", Collections.singletonList("application/json"));
+        OriginalHttpRequest request = new OriginalHttpRequest(Utils.getThreatProtectionBackendUrl() + "/api/dashboard/get_threat_configuration", "","GET", null, headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                logger.errorAndAddToDb("non 2xx response in get_threat_configuration", LoggerMaker.LogDb.RUNTIME);
+                return null;
+            }
+            try {
+                threatConfiguration = ProtoMessageUtils
+                        .<ThreatConfiguration>toProtoMessage(
+                                ThreatConfiguration.class, responsePayload)
+                        .orElse(null);
+                if (this.threatConfiguration != null) {
+                    logger.debug("Fetched threat configuration" + this.threatConfiguration.toString());
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+                logger.error("Error while getting threat configuration" + e.getStackTrace());
             }
         } catch (Exception e) {
             e.printStackTrace();
-            logger.error("Error while getting threat configuration" + e.getStackTrace());
+            logger.error("Error in getThreatConfiguration " + e.getStackTrace());
         }
         this.threatConfigLastUpdatedAt = now;
         return threatConfiguration;
