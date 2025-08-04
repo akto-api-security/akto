@@ -1422,6 +1422,7 @@ public class APICatalogSync {
         List<Object> writesForSampleData = new ArrayList<>();
         List<Object> writesForSensitiveParamInfo = new ArrayList<>();
         Map<Integer, Boolean> apiCollectionToRedactPayload = new HashMap<>();
+        loggerMaker.debug("fetch all collections meta");
         List<ApiCollection> all = dataActor.fetchAllApiCollectionsMeta();
         for(ApiCollection apiCollection: all) {
             apiCollectionToRedactPayload.put(apiCollection.getId(), apiCollection.getRedact());
@@ -1441,6 +1442,7 @@ public class APICatalogSync {
 
         counter++;
         for(int apiCollectionId: this.delta.keySet()) {
+            loggerMaker.infoAndAddToDb("Syncing apiCollectionId: " + apiCollectionId + " counter: " + counter);
             APICatalog deltaCatalog = this.delta.get(apiCollectionId);
 
             /*
@@ -1521,6 +1523,7 @@ public class APICatalogSync {
             //DbUpdateReturn dbUpdateReturn = getDBUpdatesForParams(deltaCatalog, dbCatalog, redact, redactCollectionLevel);
 
             // todo: redactCollectionLevel
+            loggerMaker.debug("Building params writes for apiCollectionId: " + apiCollectionId);
             DbUpdateReturnHybrid dbUpdateReturn = getDBUpdatesForParamsHybrid(deltaCatalog, dbCatalog, redact, redactCollectionLevel);
             writesForParams.addAll(dbUpdateReturn.bulkUpdatesForSingleTypeInfo);
             writesForSensitiveSampleData.addAll(dbUpdateReturn.bulkUpdatesForSampleData);
@@ -1530,7 +1533,9 @@ public class APICatalogSync {
             deltaCatalog.setDeletedInfo(new ArrayList<>());
 
             boolean forceUpdate = syncImmediately || counter % 10 == 0;
+            loggerMaker.debug("Building DB updates writes for sample data for apiCollectionId: " + apiCollectionId + " forceUpdate: " + forceUpdate);
             writesForSampleData.addAll(getDBUpdatesForSampleDataHybrid(apiCollectionId, deltaCatalog,dbCatalog, forceUpdate, redact, redactCollectionLevel));
+            loggerMaker.infoAndAddToDb("done with sample data updates for apiCollectionId: " + apiCollectionId + " sampleData size: " + writesForSampleData.size());
 
         }
 
@@ -1609,6 +1614,41 @@ public class APICatalogSync {
 
         List<BulkUpdates> bulkUpdates = new ArrayList<>();
         List<SampleDataAlt> unfilteredSamples = new ArrayList<>();
+        loggerMaker.infoAndAddToDb("Redacting sample data for apiCollectionId: " + apiCollectionId + " sampleData size: " + sampleData.size());
+        handleSampleDataRedaction(accountLevelRedact, apiCollectionLevelRedact, sampleData, bulkUpdates, unfilteredSamples);
+
+        loggerMaker.infoAndAddToDb("Inserting bulk sample data for apiCollectionId: " + apiCollectionId + " sampleData size: " + sampleData.size());
+
+        if (accountLevelRedact || apiCollectionLevelRedact) {
+            try {
+                long start = System.currentTimeMillis();
+                List<SampleDataAlt> samplesBatch = new ArrayList<>();
+                for (int i = 0; i < unfilteredSamples.size(); i++) {
+                    samplesBatch.add(unfilteredSamples.get(i));
+                    if ((i % 100) == 0) {
+                        clientLayer.bulkInsertSamples(samplesBatch);
+                        samplesBatch = new ArrayList<>();
+                    }
+                }
+                if (!samplesBatch.isEmpty()) {
+                    clientLayer.bulkInsertSamples(samplesBatch);
+                }
+                AllMetrics.instance.setPostgreSampleDataInsertedCount(unfilteredSamples.size());
+                AllMetrics.instance.setPostgreSampleDataInsertLatency(System.currentTimeMillis() - start);
+
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb(e, "unable to insert sample data in postgres");
+            }
+        }
+        
+        loggerMaker.infoAndAddToDb("Inserted bulk sample data for apiCollectionId: " + apiCollectionId + " sampleData size: " + sampleData.size());
+
+
+        return bulkUpdates;
+    }
+
+    private void handleSampleDataRedaction(boolean accountLevelRedact, boolean apiCollectionLevelRedact, List<SampleData> sampleData,
+            List<BulkUpdates> bulkUpdates, List<SampleDataAlt> unfilteredSamples) {
         for (SampleData sample: sampleData) {
             if (sample.getSamples().size() == 0) {
                 continue;
@@ -1664,30 +1704,6 @@ public class APICatalogSync {
             filterMap.put("_id", sample.getId());
             bulkUpdates.add(new BulkUpdates(filterMap, updates));
         }
-
-        if (accountLevelRedact || apiCollectionLevelRedact) {
-            try {
-                long start = System.currentTimeMillis();
-                List<SampleDataAlt> samplesBatch = new ArrayList<>();
-                for (int i = 0; i < unfilteredSamples.size(); i++) {
-                    samplesBatch.add(unfilteredSamples.get(i));
-                    if ((i % 100) == 0) {
-                        clientLayer.bulkInsertSamples(samplesBatch);
-                        samplesBatch = new ArrayList<>();
-                    }
-                }
-                if (!samplesBatch.isEmpty()) {
-                    clientLayer.bulkInsertSamples(samplesBatch);
-                }
-                AllMetrics.instance.setPostgreSampleDataInsertedCount(unfilteredSamples.size());
-                AllMetrics.instance.setPostgreSampleDataInsertLatency(System.currentTimeMillis() - start);
-
-            } catch (Exception e) {
-                loggerMaker.errorAndAddToDb(e, "unable to insert sample data in postgres");
-            }
-        }
-
-        return bulkUpdates;
     }
 
     public DbUpdateReturnHybrid getDBUpdatesForParamsHybrid(APICatalog currentDelta, APICatalog currentState, boolean redactSampleData, boolean collectionLevelRedact) {
