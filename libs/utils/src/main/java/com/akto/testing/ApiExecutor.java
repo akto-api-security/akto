@@ -11,6 +11,7 @@ import com.akto.dto.testing.TestingRunConfig;
 import com.akto.dto.testing.TestingRunResult;
 import com.akto.dto.testing.rate_limit.RateLimitHandler;
 import com.akto.dto.type.URLMethods;
+import com.akto.dto.type.URLMethods.Method;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.metrics.AllMetrics;
@@ -24,7 +25,6 @@ import kotlin.Pair;
 import okhttp3.*;
 import okio.BufferedSink;
 
-import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 
 import java.io.IOException;
@@ -718,15 +718,33 @@ public class ApiExecutor {
     }
 
     private static boolean shouldInitiateSSEStream(OriginalHttpRequest request) {
-        if (isJsonRpcRequest(request)) {
-            Map<String, List<String>> headers = request.getHeaders();
-            return headers.entrySet().stream()
-                .filter(
-                    entry -> HttpRequestResponseUtils.HEADER_ACCEPT.equalsIgnoreCase(entry.getKey())
-                        && !CollectionUtils.isEmpty(entry.getValue()))
-                .flatMap(entry -> entry.getValue().stream())
-                .noneMatch(value -> value.contains(HttpRequestResponseUtils.TEXT_EVENT_STREAM_CONTENT_TYPE));
+        if (!isJsonRpcRequest(request)) {
+            return false;
         }
-        return false;
+
+        if (!Method.POST.name().equalsIgnoreCase(request.getMethod())) {
+            return true;
+        }
+
+        boolean hasEventStream = false;
+        boolean hasApplicationJson = false;
+
+        for (Map.Entry<String, List<String>> entry : request.getHeaders().entrySet()) {
+            if (HttpRequestResponseUtils.HEADER_ACCEPT.equalsIgnoreCase(entry.getKey()) && entry.getValue() != null
+                && !entry.getValue().isEmpty()) {
+                for (String value : entry.getValue()) {
+                    if (HttpRequestResponseUtils.TEXT_EVENT_STREAM_CONTENT_TYPE.equalsIgnoreCase(value)) {
+                        hasEventStream = true;
+                    }
+                    if (HttpRequestResponseUtils.APPLICATION_JSON.equalsIgnoreCase(value)) {
+                        hasApplicationJson = true;
+                    }
+                    if (hasEventStream && hasApplicationJson) {
+                        break;
+                    }
+                }
+            }
+        }
+        return !(hasEventStream && hasApplicationJson);
     }
 }
