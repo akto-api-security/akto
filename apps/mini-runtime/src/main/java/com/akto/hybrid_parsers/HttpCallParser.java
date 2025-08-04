@@ -187,8 +187,9 @@ public class HttpCallParser {
             if ((lastSyncLimitFetch + REFRESH_INTERVAL) >= Context.now()) {
                 return syncLimit;
             }
-            int accountId = DataActor.actualAccountId;
 
+            int accountId = DataActor.actualAccountId;
+            // to:do check for on-prem air gapped deployments
             Organization organization = OrgUtils.getOrganizationCached(accountId);
             FeatureAccess featureAccess = UsageMetricUtils.getFeatureAccess(organization, MetricTypes.ACTIVE_ENDPOINTS);
             syncLimit = featureAccess.fetchSyncLimit();
