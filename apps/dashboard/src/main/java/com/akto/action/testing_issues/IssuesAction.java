@@ -89,6 +89,8 @@ public class IssuesAction extends UserAction {
 
     @Getter
     int buaCategoryCount;
+
+    int URL_METHOD_PAIR_THRESHOLD = 1;
     
 
     private static final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
@@ -851,6 +853,59 @@ public class IssuesAction extends UserAction {
         Bson filter = createFilters(true);
         this.buaCategoryCount = (int) TestingRunIssuesDao.instance.count(filter);
         return Action.SUCCESS.toUpperCase();
+    }
+
+    public String fetchUrlsByIssues() {
+        List<Bson> pipeline = new ArrayList<>();
+
+        // Match only OPEN issues
+        pipeline.add(Aggregates.match(Filters.eq(TestingRunIssues.TEST_RUN_ISSUES_STATUS, GlobalEnums.TestRunIssueStatus.OPEN.name())));
+
+        // Group by testSubCategory and collect unique URL+Method combinations
+        BasicDBObject groupId = new BasicDBObject("testSubCategory", "$_id." + TestingIssuesId.TEST_SUB_CATEGORY);
+        pipeline.add(Aggregates.group(groupId,
+                Accumulators.addToSet("apiInfoKeySet", new BasicDBObject("url", "$_id." + TestingIssuesId.API_KEY_INFO + "." + ApiInfo.ApiInfoKey.URL)
+                        .append("method", "$_id." + TestingIssuesId.API_KEY_INFO + "." + ApiInfo.ApiInfoKey.METHOD)
+                        .append("apiCollectionId", "$_id." + TestingIssuesId.API_KEY_INFO + "." + ApiInfo.ApiInfoKey.API_COLLECTION_ID))
+        ));
+
+        // Filter to only include groups with more than the threshold of unique URL+Method combinations
+        pipeline.add(Aggregates.match(Filters.expr(
+                new BasicDBObject("$gt", Arrays.asList(
+                        new BasicDBObject("$size", "$apiInfoKeySet"),
+                        URL_METHOD_PAIR_THRESHOLD
+                ))
+        )));
+
+        // Project the final result
+        pipeline.add(Aggregates.project(Projections.fields(
+                Projections.include("testSubCategory", "apiInfoKeySet"),
+                Projections.computed("apiInfoKeySetCount", new BasicDBObject("$size", "$apiInfoKeySet"))
+        )));
+
+        // Sort by testSubCategory
+        pipeline.add(Aggregates.sort(Sorts.ascending("testSubCategory")));
+
+        try {
+            MongoCursor<BasicDBObject> cursor = TestingRunIssuesDao.instance.getMCollection()
+                    .aggregate(pipeline, BasicDBObject.class)
+                    .cursor();
+
+            List<BasicDBObject> result = new ArrayList<>();
+            while (cursor.hasNext()) {
+                BasicDBObject doc = cursor.next();
+                result.add(doc);
+            }
+
+            this.response = new BasicDBObject();
+            this.response.put("testSubCategories", result);
+            this.response.put("totalCount", result.size());
+
+            return SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            addActionError("Error fetching URLs by test subcategory");
+            return ERROR.toUpperCase();
+        }
     }
 
 

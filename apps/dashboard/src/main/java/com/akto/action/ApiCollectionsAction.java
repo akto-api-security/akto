@@ -86,8 +86,6 @@ public class ApiCollectionsAction extends UserAction {
     }
 
     boolean redacted;
-    int URL_METHOD_PAIR_THRESHOLD = 1;
-    int MIN_UNIQUE_TEST_SUBCATEGORIES = 2;
     
     public List<ApiCollection> fillApiCollectionsUrlCount(List<ApiCollection> apiCollections, Bson filter) {
 	int tsRandom = Context.now();
@@ -1027,116 +1025,6 @@ public class ApiCollectionsAction extends UserAction {
             }
         }
         return Action.SUCCESS.toUpperCase();
-    }
-
-    public String fetchUrlsByIssues() {
-        List<Bson> pipeline = new ArrayList<>();
-        
-        // Match only OPEN issues
-        pipeline.add(Aggregates.match(Filters.eq(TestingRunIssues.TEST_RUN_ISSUES_STATUS, GlobalEnums.TestRunIssueStatus.OPEN.name())));
-        
-        // Group by testSubCategory and collect unique URL+Method combinations
-        BasicDBObject groupId = new BasicDBObject("testSubCategory", "$_id." + TestingIssuesId.TEST_SUB_CATEGORY);
-        pipeline.add(Aggregates.group(groupId, 
-            Accumulators.addToSet("apiInfoKeySet", new BasicDBObject("url", "$_id." + TestingIssuesId.API_KEY_INFO + "." + ApiInfoKey.URL)
-                .append("method", "$_id." + TestingIssuesId.API_KEY_INFO + "." + ApiInfoKey.METHOD)
-                    .append("apiCollectionId", "$_id." + TestingIssuesId.API_KEY_INFO + "." + ApiInfoKey.API_COLLECTION_ID))
-        ));
-        
-        // Filter to only include groups with more than the threshold of unique URL+Method combinations
-        pipeline.add(Aggregates.match(Filters.expr(
-            new BasicDBObject("$gt", Arrays.asList(
-                new BasicDBObject("$size", "$apiInfoKeySet"), 
-                URL_METHOD_PAIR_THRESHOLD
-            ))
-        )));
-        
-        // Project the final result
-        pipeline.add(Aggregates.project(Projections.fields(
-            Projections.include("testSubCategory", "apiInfoKeySet"),
-            Projections.computed("apiInfoKeySetCount", new BasicDBObject("$size", "$apiInfoKeySet"))
-        )));
-        
-        // Sort by testSubCategory
-        pipeline.add(Aggregates.sort(Sorts.ascending("testSubCategory")));
-        
-        try {
-            MongoCursor<BasicDBObject> cursor = TestingRunIssuesDao.instance.getMCollection()
-                .aggregate(pipeline, BasicDBObject.class)
-                .cursor();
-            
-            List<BasicDBObject> result = new ArrayList<>();
-            while (cursor.hasNext()) {
-                BasicDBObject doc = cursor.next();
-                result.add(doc);
-            }
-            
-            this.response = new BasicDBObject();
-            this.response.put("testSubCategories", result);
-            this.response.put("totalCount", result.size());
-            
-            return SUCCESS.toUpperCase();
-        } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(e, "Error fetching URLs by test subcategory: " + e.getMessage(), LogDb.DASHBOARD);
-            addActionError("Error fetching URLs by test subcategory");
-            return ERROR.toUpperCase();
-        }
-    }
-
-    public String fetchIssuesByUrl() {
-        List<Bson> pipeline = new ArrayList<>();
-        
-        // Match only OPEN issues
-        pipeline.add(Aggregates.match(Filters.eq(TestingRunIssues.TEST_RUN_ISSUES_STATUS, GlobalEnums.TestRunIssueStatus.OPEN.name())));
-        
-        // Group by URL+Method combination and collect unique test subcategories
-        BasicDBObject groupId = new BasicDBObject("url", "$_id." + TestingIssuesId.API_KEY_INFO + "." + ApiInfoKey.URL)
-            .append("method", "$_id." + TestingIssuesId.API_KEY_INFO + "." + ApiInfoKey.METHOD);
-        pipeline.add(Aggregates.group(groupId, 
-            Accumulators.addToSet("testSubCategories", "$_id." + TestingIssuesId.TEST_SUB_CATEGORY)
-        ));
-        
-        // Filter to only include groups with more than the minimum unique test subcategories
-        pipeline.add(Aggregates.match(Filters.expr(
-            new BasicDBObject("$gt", Arrays.asList(
-                new BasicDBObject("$size", "$testSubCategories"), 
-                MIN_UNIQUE_TEST_SUBCATEGORIES
-            ))
-        )));
-        
-        // Project the final result
-        pipeline.add(Aggregates.project(Projections.fields(
-            Projections.include("url", "method", "testSubCategories"),
-            Projections.computed("testSubCategoryCount", new BasicDBObject("$size", "$testSubCategories"))
-        )));
-        
-        // Sort by URL, then by method
-        pipeline.add(Aggregates.sort(Sorts.orderBy(
-            Sorts.ascending("url"), 
-            Sorts.ascending("method")
-        )));
-        
-        try {
-            MongoCursor<BasicDBObject> cursor = TestingRunIssuesDao.instance.getMCollection()
-                .aggregate(pipeline, BasicDBObject.class)
-                .cursor();
-            
-            List<BasicDBObject> result = new ArrayList<>();
-            while (cursor.hasNext()) {
-                BasicDBObject doc = cursor.next();
-                result.add(doc);
-            }
-            
-            this.response = new BasicDBObject();
-            this.response.put("apiInfoKeySet", result);
-            this.response.put("totalCount", result.size());
-            
-            return SUCCESS.toUpperCase();
-        } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(e, "Error fetching test subcategories by URL: " + e.getMessage(), LogDb.DASHBOARD);
-            addActionError("Error fetching test subcategories by URL");
-            return ERROR.toUpperCase();
-        }
     }
 
     public List<ApiCollection> getApiCollections() {
