@@ -4,7 +4,7 @@ import com.akto.mcp.McpSchema;
 import java.security.interfaces.RSAPublicKey;
 import java.util.*;
 import java.util.Map.Entry;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.*;
 import java.util.regex.Pattern;
 
 import com.akto.PayloadEncodeUtil;
@@ -1442,7 +1442,7 @@ public class APICatalogSync {
 
         counter++;
         for(int apiCollectionId: this.delta.keySet()) {
-            loggerMaker.infoAndAddToDb("Syncing apiCollectionId: " + apiCollectionId + " counter: " + counter);
+            loggerMaker.debug("Syncing apiCollectionId: " + apiCollectionId + " counter: " + counter);
             APICatalog deltaCatalog = this.delta.get(apiCollectionId);
 
             /*
@@ -1535,7 +1535,7 @@ public class APICatalogSync {
             boolean forceUpdate = syncImmediately || counter % 10 == 0;
             loggerMaker.debug("Building DB updates writes for sample data for apiCollectionId: " + apiCollectionId + " forceUpdate: " + forceUpdate);
             writesForSampleData.addAll(getDBUpdatesForSampleDataHybrid(apiCollectionId, deltaCatalog,dbCatalog, forceUpdate, redact, redactCollectionLevel));
-            loggerMaker.infoAndAddToDb("done with sample data updates for apiCollectionId: " + apiCollectionId + " sampleData size: " + writesForSampleData.size());
+            loggerMaker.debug("done with sample data updates for apiCollectionId: " + apiCollectionId + " sampleData size: " + writesForSampleData.size());
 
         }
 
@@ -1615,7 +1615,7 @@ public class APICatalogSync {
         List<BulkUpdates> bulkUpdates = new ArrayList<>();
         List<SampleDataAlt> unfilteredSamples = new ArrayList<>();
         loggerMaker.infoAndAddToDb("Redacting sample data for apiCollectionId: " + apiCollectionId + " sampleData size: " + sampleData.size());
-        handleSampleDataRedaction(accountLevelRedact, apiCollectionLevelRedact, sampleData, bulkUpdates, unfilteredSamples);
+        handleSampleDataRedaction(apiCollectionId, accountLevelRedact, apiCollectionLevelRedact, sampleData, bulkUpdates, unfilteredSamples);
 
         loggerMaker.infoAndAddToDb("Inserting bulk sample data for apiCollectionId: " + apiCollectionId + " sampleData size: " + sampleData.size());
 
@@ -1647,9 +1647,26 @@ public class APICatalogSync {
         return bulkUpdates;
     }
 
-    private void handleSampleDataRedaction(boolean accountLevelRedact, boolean apiCollectionLevelRedact, List<SampleData> sampleData,
+    private void handleSampleDataRedaction(int apiCollectionId, boolean accountLevelRedact, boolean apiCollectionLevelRedact, List<SampleData> sampleData,
             List<BulkUpdates> bulkUpdates, List<SampleDataAlt> unfilteredSamples) {
-        for (SampleData sample: sampleData) {
+        int batchSize = 100;
+        for (int i = 0; i < sampleData.size(); i += batchSize) {
+            int end = Math.min(i + batchSize, sampleData.size());
+            List<SampleData> batch = sampleData.subList(i, end);
+            try {
+                runWithTimeout(() -> {
+                    processSampleBatch(batch, accountLevelRedact, apiCollectionLevelRedact, bulkUpdates, unfilteredSamples);
+                    return null;
+                }, 10); // 10 seconds timeout per batch
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb(e, "Batch processing timed out or failed apiCollectionId: " + apiCollectionId + " batch size: " + batch.size());
+            }
+        }
+    }
+
+    private void processSampleBatch(List<SampleData> batch, boolean accountLevelRedact, boolean apiCollectionLevelRedact,
+            List<BulkUpdates> bulkUpdates, List<SampleDataAlt> unfilteredSamples) {
+        for (SampleData sample: batch) {
             if (sample.getSamples().size() == 0) {
                 continue;
             }
@@ -1685,8 +1702,7 @@ public class APICatalogSync {
                     }
                     finalSamples.add(redactedSample);
                 } catch (Exception e) {
-                    loggerMaker.errorAndAddToDb(e,"Error while redacting data" )
-                    ;
+                    loggerMaker.errorAndAddToDb(e,"Error while redacting data" );
                 }
             }
             UpdatePayload updatePayload = new UpdatePayload("samples", finalSamples, "pushEach");
@@ -1916,5 +1932,18 @@ public class APICatalogSync {
 
     public void setMergeUrlsOnVersions(boolean mergeUrlsOnVersions) {
         this.mergeUrlsOnVersions = mergeUrlsOnVersions;
+    }
+
+    public static <T> T runWithTimeout(Callable<T> task, int timeoutSeconds) throws Exception {
+        ExecutorService executor = Executors.newSingleThreadExecutor();
+        Future<T> future = executor.submit(task);
+        try {
+            return future.get(timeoutSeconds, TimeUnit.SECONDS);
+        } catch (TimeoutException e) {
+            future.cancel(true); // Interrupt the thread
+            throw new RuntimeException("Batch timed out and was killed", e);
+        } finally {
+            executor.shutdownNow();
+        }
     }
 }
