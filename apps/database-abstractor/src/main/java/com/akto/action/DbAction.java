@@ -1064,6 +1064,12 @@ public class DbAction extends ActionSupport {
             ArrayList<WriteModel<UningestedApiOverage>> writes = new ArrayList<>();
             for (BulkUpdates bulkUpdate: writesForOverageInfo) {
                 // Create filter for the document
+                if (bulkUpdate.getFilters().get(UningestedApiOverage.METHOD) instanceof String) {
+                    String method = (String) bulkUpdate.getFilters().get(UningestedApiOverage.METHOD);
+                    if (Method.OPTIONS.name().equalsIgnoreCase(method) || "CONNECT".equalsIgnoreCase(method)) {
+                        continue;
+                    }
+                }
                 Bson filters = Filters.and(
                     Filters.eq(UningestedApiOverage.API_COLLECTION_ID, bulkUpdate.getFilters().get(UningestedApiOverage.API_COLLECTION_ID)),
                     Filters.eq(UningestedApiOverage.URL_TYPE, bulkUpdate.getFilters().get(UningestedApiOverage.URL_TYPE)),
