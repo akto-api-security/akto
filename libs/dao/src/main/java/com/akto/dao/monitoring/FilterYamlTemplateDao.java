@@ -1,17 +1,25 @@
 package com.akto.dao.monitoring;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 
 import com.akto.dao.AccountsContextDao;
+import com.akto.dao.context.Context;
 import com.akto.dto.monitoring.FilterConfig;
 import com.akto.dto.test_editor.YamlTemplate;
+import com.akto.util.Pair;
+import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 import com.mongodb.client.model.Filters;
 
 public class FilterYamlTemplateDao extends AccountsContextDao<YamlTemplate> {
 
     public static final FilterYamlTemplateDao instance = new FilterYamlTemplateDao();
+    private static final ConcurrentHashMap<Pair<Integer, CONTEXT_SOURCE>, Pair<Set<String>, Integer>> contextFiltersMap = new ConcurrentHashMap<>();
 
     public Map<String, FilterConfig> fetchFilterConfig(
             boolean includeYamlContent, boolean shouldParseExecutor) {
@@ -43,6 +51,51 @@ public class FilterYamlTemplateDao extends AccountsContextDao<YamlTemplate> {
             }
         }
         return filterConfigMap;
+    }
+
+    public static Set<String> getContextTemplatesForAccount(int accountId, CONTEXT_SOURCE source) {
+        if(source == null) {
+            source = CONTEXT_SOURCE.API;
+        }
+        Pair<Integer, CONTEXT_SOURCE> key = new Pair<>(accountId, source);
+        Pair<Set<String>, Integer> collectionIdEntry = contextFiltersMap.get(key);
+
+        if (collectionIdEntry == null || (Context.now() - collectionIdEntry.getSecond() > 5 * 60)) {
+            Map<String, FilterConfig> configs = FilterYamlTemplateDao.instance.fetchFilterConfig(true, false);
+            Map<String, List<String>> templatesByCategory = new HashMap<>();
+            for(String templateId : configs.keySet()) {
+                if (templateId != null && !templateId.isEmpty()) {
+                    FilterConfig config = configs.get(templateId);
+                    if(config != null && config.getInfo() != null && config.getInfo().getCategory().getName() != null) {
+                        String name = config.getInfo().getCategory().getName();
+                        if(name.toLowerCase().contains("mcp")) {
+                            templatesByCategory.put(CONTEXT_SOURCE.MCP.name(), 
+                                    templatesByCategory.getOrDefault(CONTEXT_SOURCE.MCP.name(), new ArrayList<>()));
+                        } else if(name.toLowerCase().contains("gen")) {
+                            templatesByCategory.put(CONTEXT_SOURCE.GEN_AI.name(), 
+                                    templatesByCategory.getOrDefault(CONTEXT_SOURCE.GEN_AI.name(), new ArrayList<>()));
+                        } else {
+                            templatesByCategory.put(CONTEXT_SOURCE.API.name(), 
+                                    templatesByCategory.getOrDefault(CONTEXT_SOURCE.API.name(), new ArrayList<>()));
+                        }
+                    }
+                }
+            }
+            return templatesByCategory.get(source.name()).stream().collect(Collectors.toSet());
+        } else {
+            return collectionIdEntry.getFirst();
+        }
+    }
+
+    public static void deleteContextCollectionsForUser(int accountId, CONTEXT_SOURCE source) {
+        if(source == null) {
+            source = CONTEXT_SOURCE.API;
+        }
+        if(contextFiltersMap.isEmpty()) {
+            return;
+        }
+        Pair<Integer, CONTEXT_SOURCE> key = new Pair<>(accountId, source);
+        contextFiltersMap.remove(key);
     }
 
     @Override
