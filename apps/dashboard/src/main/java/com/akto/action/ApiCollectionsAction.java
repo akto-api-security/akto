@@ -153,15 +153,15 @@ public class ApiCollectionsAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
-    public String getCountForUningestedApis(){
-        this.uningestedApiCountMap = new HashMap<>();
-        try {
-            this.uningestedApiCountMap = com.akto.dao.billing.UningestedApiOverageDao.instance.getCountByCollection();
-        } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(e, "Error fetching uningested API counts", LogDb.DASHBOARD);
-        }
-        return SUCCESS.toUpperCase();
-    }
+//    public String getCountForUningestedApis(){
+//        this.uningestedApiCountMap = new HashMap<>();
+//        try {
+//            this.uningestedApiCountMap = com.akto.dao.billing.UningestedApiOverageDao.instance.getCountByCollection();
+//        } catch (Exception e) {
+//            loggerMaker.errorAndAddToDb(e, "Error fetching uningested API counts", LogDb.DASHBOARD);
+//        }
+//        return SUCCESS.toUpperCase();
+//    }
 
     public String fetchAllCollections() {
         this.apiCollections = ApiCollectionsDao.instance.findAll(new BasicDBObject());
@@ -1038,22 +1038,23 @@ public class ApiCollectionsAction extends UserAction {
         // Group by testSubCategory and collect unique URL+Method combinations
         BasicDBObject groupId = new BasicDBObject("testSubCategory", "$_id." + TestingIssuesId.TEST_SUB_CATEGORY);
         pipeline.add(Aggregates.group(groupId, 
-            Accumulators.addToSet("urlMethodPairs", new BasicDBObject("url", "$_id." + TestingIssuesId.API_KEY_INFO + "." + ApiInfoKey.URL)
-                .append("method", "$_id." + TestingIssuesId.API_KEY_INFO + "." + ApiInfoKey.METHOD))
+            Accumulators.addToSet("apiInfoKeySet", new BasicDBObject("url", "$_id." + TestingIssuesId.API_KEY_INFO + "." + ApiInfoKey.URL)
+                .append("method", "$_id." + TestingIssuesId.API_KEY_INFO + "." + ApiInfoKey.METHOD)
+                    .append("apiCollectionId", "$_id." + TestingIssuesId.API_KEY_INFO + "." + ApiInfoKey.API_COLLECTION_ID))
         ));
         
         // Filter to only include groups with more than the threshold of unique URL+Method combinations
         pipeline.add(Aggregates.match(Filters.expr(
             new BasicDBObject("$gt", Arrays.asList(
-                new BasicDBObject("$size", "$urlMethodPairs"), 
+                new BasicDBObject("$size", "$apiInfoKeySet"), 
                 URL_METHOD_PAIR_THRESHOLD
             ))
         )));
         
         // Project the final result
         pipeline.add(Aggregates.project(Projections.fields(
-            Projections.include("testSubCategory", "urlMethodPairs"),
-            Projections.computed("urlMethodCount", new BasicDBObject("$size", "$urlMethodPairs"))
+            Projections.include("testSubCategory", "apiInfoKeySet"),
+            Projections.computed("apiInfoKeySetCount", new BasicDBObject("$size", "$apiInfoKeySet"))
         )));
         
         // Sort by testSubCategory
@@ -1127,7 +1128,7 @@ public class ApiCollectionsAction extends UserAction {
             }
             
             this.response = new BasicDBObject();
-            this.response.put("urlMethodPairs", result);
+            this.response.put("apiInfoKeySet", result);
             this.response.put("totalCount", result.size());
             
             return SUCCESS.toUpperCase();

@@ -76,10 +76,6 @@ public class TestingRunIssuesDao extends AccountsContextDaoWithRbac<TestingRunIs
         fieldNames = new String[]{TestingRunIssues.TEST_RUN_ISSUES_STATUS, "_id." + TestingIssuesId.TEST_SUB_CATEGORY};
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, true);
 
-        // Index for fetchIssuesByUrl - improves grouping and sorting by URL+Method
-        fieldNames = new String[]{TestingRunIssues.TEST_RUN_ISSUES_STATUS, "_id." + TestingIssuesId.API_KEY_INFO + "." + ApiInfoKey.URL, 
-            "_id." + TestingIssuesId.API_KEY_INFO + "." + ApiInfoKey.METHOD};
-        MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, true);
     }
 
     private List<Bson> getPipelineForSeverityCount(Bson filter, boolean expandApiGroups, BasicDBObject groupedId) {
