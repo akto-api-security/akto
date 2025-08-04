@@ -33,6 +33,7 @@ import com.akto.dto.type.SingleTypeInfo;
 import com.akto.usage.UsageMetricCalculator;
 import com.akto.util.Constants;
 import com.akto.util.GroupByTimeRange;
+import com.akto.util.enums.GlobalEnums;
 import com.akto.util.enums.GlobalEnums.Severity;
 import com.akto.util.enums.GlobalEnums.TestCategory;
 import com.akto.util.enums.GlobalEnums.TestErrorSource;

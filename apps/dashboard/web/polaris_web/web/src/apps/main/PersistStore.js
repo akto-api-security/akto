@@ -60,7 +60,7 @@ const initialState = {
     trafficAlerts: [],
     sendEventOnLogin: false,
     tableSelectedTab: {},
-    dashboardCategory: '',
+    dashboardCategory: 'API Security',
 };
 
 let persistStore = (set, get) => ({

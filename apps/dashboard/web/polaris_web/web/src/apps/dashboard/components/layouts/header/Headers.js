@@ -118,11 +118,11 @@ export default function Header() {
     }
 
     const handleDashboardChange = (value) => {
-        PersistStore.getState().allCollections = [];
-        PersistStore.getState().collectionsMap = {};
-        PersistStore.getState().hostNameMap = {};
-        LocalStore.getState().subCategoryMap = {};
-        LocalStore.getState().categoryMap = {}; 
+        PersistStore.getState().setAllCollections([]);
+        PersistStore.getState().setCollectionsMap({});
+        PersistStore.getState().setHostNameMap({});
+        LocalStore.getState().setCategoryMap({}); 
+        SessionStore.getState().setThreatFiltersMap({});
         setDashboardCategory(value);
         window.location.reload();
     }
