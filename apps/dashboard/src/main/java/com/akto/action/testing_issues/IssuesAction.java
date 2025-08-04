@@ -858,8 +858,14 @@ public class IssuesAction extends UserAction {
     public String fetchUrlsByIssues() {
         List<Bson> pipeline = new ArrayList<>();
 
-        // Match only OPEN issues
-        pipeline.add(Aggregates.match(Filters.eq(TestingRunIssues.TEST_RUN_ISSUES_STATUS, GlobalEnums.TestRunIssueStatus.OPEN.name())));
+        Bson filterQ = UsageMetricCalculator.excludeDemosAndDeactivated(TestingRunIssues.ID_API_COLLECTION_ID);
+        pipeline.add(
+                Aggregates.match(Filters.and(
+                        Filters.eq(TestingRunIssues.TEST_RUN_ISSUES_STATUS, GlobalEnums.TestRunIssueStatus.OPEN),
+                        filterQ
+                ))
+        );
+
 
         // Group by testSubCategory and collect unique URL+Method combinations
         BasicDBObject groupId = new BasicDBObject("testSubCategory", "$_id." + TestingIssuesId.TEST_SUB_CATEGORY);
