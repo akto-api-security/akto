@@ -43,6 +43,7 @@ import org.bson.types.ObjectId;
 
 import static com.akto.testing.Utils.readJsonContentFromFile;
 
+import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -305,7 +306,9 @@ public class Main {
         return false;
     }
 
-    public static void main(String[] args) throws InterruptedException {
+    public static void main(String[] args) throws InterruptedException, IOException {
+        ServiceInitializer.init();
+
         AccountSettings accountSettings = dataActor.fetchAccountSettings();
         dataActor.modifyHybridTestingSetting(RuntimeMode.isHybridDeployment());
         setupRateLimitWatcher(accountSettings);
