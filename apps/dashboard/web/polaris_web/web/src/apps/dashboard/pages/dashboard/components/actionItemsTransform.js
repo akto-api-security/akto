@@ -88,7 +88,7 @@ export async function fetchAllActionItemsApiInfo() {
     return {
         highRiskApis: [] , // fix this using modifying fetchapiinfostats
         sensitiveDataEndpoints: [] || [], // fix this using modifying fetchapiinfostats
-        unauthenticatedApis: unauthenticatedApis || [], // fix this using modifying fetchapiinfostats
+        unauthenticatedApis: unauthenticatedApis,
         thirdPartyApis: [] || [],// fix this using modifying fetchapiinfostats
         highRiskThirdParty: highRiskThirdPartyApis,
         shadowApis: shadowApis,
