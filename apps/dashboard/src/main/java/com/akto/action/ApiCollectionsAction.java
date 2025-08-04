@@ -49,9 +49,6 @@ import com.opensymphony.xwork2.Action;
 
 import lombok.Setter;
 import static com.akto.util.Constants.AKTO_DISCOVERED_APIS_COLLECTION;
-import com.akto.dto.test_run_findings.TestingRunIssues;
-import com.akto.dto.test_run_findings.TestingIssuesId;
-import com.akto.util.enums.GlobalEnums;
 
 public class ApiCollectionsAction extends UserAction {
 
