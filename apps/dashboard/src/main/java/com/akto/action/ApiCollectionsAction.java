@@ -153,15 +153,15 @@ public class ApiCollectionsAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
-//    public String getCountForUningestedApis(){
-//        this.uningestedApiCountMap = new HashMap<>();
-//        try {
-//            this.uningestedApiCountMap = com.akto.dao.billing.UningestedApiOverageDao.instance.getCountByCollection();
-//        } catch (Exception e) {
-//            loggerMaker.errorAndAddToDb(e, "Error fetching uningested API counts", LogDb.DASHBOARD);
-//        }
-//        return SUCCESS.toUpperCase();
-//    }
+    public String getCountForUningestedApis(){
+        this.uningestedApiCountMap = new HashMap<>();
+        try {
+            this.uningestedApiCountMap = com.akto.dao.billing.UningestedApiOverageDao.instance.getCountByCollection();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error fetching uningested API counts", LogDb.DASHBOARD);
+        }
+        return SUCCESS.toUpperCase();
+    }
 
     public String fetchAllCollections() {
         this.apiCollections = ApiCollectionsDao.instance.findAll(new BasicDBObject());
