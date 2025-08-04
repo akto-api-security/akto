@@ -1654,30 +1654,39 @@ public class APICatalogSync {
         try {
             return future.get(timeoutSeconds, TimeUnit.SECONDS);
         } catch (TimeoutException e) {
-            future.cancel(true); // Interrupt the thread
+            future.cancel(true); 
             throw new RuntimeException("Batch timed out and was killed", e);
         }
     }
 
     private void handleSampleDataRedaction(int apiCollectionId, boolean accountLevelRedact, boolean apiCollectionLevelRedact, List<SampleData> sampleData,
             List<BulkUpdates> bulkUpdates, List<SampleDataAlt> unfilteredSamples) {
-        int batchSize = 5;
+        int batchSize = 100;
         for (int i = 0; i < sampleData.size(); i += batchSize) {
             int end = Math.min(i + batchSize, sampleData.size());
             List<SampleData> batch = sampleData.subList(i, end);
+            int accId = Context.accountId.get();
+            List<SampleData> lastExecutedBatch = new ArrayList<>();
             try {
                 runWithTimeout(() -> {
-                    processSampleBatch(batch, accountLevelRedact, apiCollectionLevelRedact, bulkUpdates, unfilteredSamples);
+                    Context.accountId.set(accId);
+                    processSampleBatch(batch, accountLevelRedact, apiCollectionLevelRedact, bulkUpdates, unfilteredSamples, lastExecutedBatch); // explicitly pass accountId, threads don't share Context.
                     return null;
                 }, 10);
             } catch (Exception e) {
+                // print lastExecutedBatch for debugging
                 loggerMaker.errorAndAddToDb(e, "Batch processing timed out or failed apiCollectionId: " + apiCollectionId + " batch size: " + batch.size());
+                for (SampleData sd : lastExecutedBatch) {
+                    for (String sample : sd.getSamples()) {
+                        loggerMaker.infoAndAddToDb("lastExecutedBatch sample: " + sample);
+                    }
+                }
             }
         }
     }
 
     private void processSampleBatch(List<SampleData> batch, boolean accountLevelRedact, boolean apiCollectionLevelRedact,
-            List<BulkUpdates> bulkUpdates, List<SampleDataAlt> unfilteredSamples) {
+            List<BulkUpdates> bulkUpdates, List<SampleDataAlt> unfilteredSamples, List<SampleData> lastExecutedBatch) {
         for (SampleData sample: batch) {
             if (sample.getSamples().size() == 0) {
                 continue;
@@ -1687,6 +1696,8 @@ public class APICatalogSync {
             ArrayList<String> updates = new ArrayList<>();
             for (String s: sample.getSamples()) {
                 try {
+                    lastExecutedBatch.clear();
+                    lastExecutedBatch.add(sample);
                     String redactedSample = RedactSampleData.redactIfRequired(s, accountLevelRedact, apiCollectionLevelRedact);
                     if (accountLevelRedact || apiCollectionLevelRedact) {
                         Map<String, Object> json = gson.fromJson(redactedSample, Map.class);
@@ -1945,5 +1956,4 @@ public class APICatalogSync {
     public void setMergeUrlsOnVersions(boolean mergeUrlsOnVersions) {
         this.mergeUrlsOnVersions = mergeUrlsOnVersions;
     }
-
 }
