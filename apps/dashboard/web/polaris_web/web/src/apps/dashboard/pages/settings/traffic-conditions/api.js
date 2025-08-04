@@ -56,6 +56,13 @@ const trafficFiltersRequest = {
             method: 'post',
             data: {updateFiltersFlag, permissionValue}
         })
+    },
+    deleteOptionAndSlashApis(deleteAPIsInstantly){
+        return request({
+            url: '/api/deleteOptionAndSlashApis',
+            method: 'post',
+            data: {deleteAPIsInstantly}
+        })
     }
 }
 
