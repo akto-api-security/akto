@@ -181,11 +181,6 @@ public class HttpCallParser {
     private static int lastSyncLimitFetch = 0;
     private static final int REFRESH_INTERVAL = 60 * 10; // 10 minutes.
     private static SyncLimit syncLimit = FeatureAccess.fullAccess.fetchSyncLimit();
-    /*
-     * This is the epoch for August 27, 2024 7:15:31 AM GMT .
-     * Enabling this feature for all users after this timestamp.
-     */
-    private static final int DAY_0_EPOCH = 1724742931;
 
     private SyncLimit fetchSyncLimit() {
         try {
@@ -194,16 +189,10 @@ public class HttpCallParser {
             }
 
             int accountId = DataActor.actualAccountId;
-
-            /*
-             * If a user is using on-prem mini-runtime, no limits would apply there.
-             */
-            if(accountId < DAY_0_EPOCH){
-                return syncLimit;
-            }
-
+            // to:do check for on-prem air gapped deployments
             Organization organization = OrgUtils.getOrganizationCached(accountId);
             FeatureAccess featureAccess = UsageMetricUtils.getFeatureAccess(organization, MetricTypes.ACTIVE_ENDPOINTS);
+            loggerMaker.infoAndAddToDb("Fetching sync limit for accountId: " + accountId + " with usageLimit: " + featureAccess.getUsageLimit() + " and usage: " + featureAccess.getUsage());
             syncLimit = featureAccess.fetchSyncLimit();
             lastSyncLimitFetch = Context.now();
         } catch (Exception e) {
