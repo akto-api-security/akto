@@ -1266,7 +1266,7 @@ getMissingConfigs(testResults){
       };
     });
   },
-  prepareEditableConfigObject(testRun,settings,hexId,testSuiteIds=[],testMode,autoTicketingDetails){
+  prepareEditableConfigObject(testRun,settings,hexId,testSuiteIds=[],autoTicketingDetails){
     const tests = testRun.tests;
     const selectedTests = []
     Object.keys(tests).forEach(category => {
@@ -1291,7 +1291,7 @@ getMissingConfigs(testResults){
       recurringWeekly: testRun.recurringWeekly,
       recurringMonthly: testRun.recurringMonthly,
       miniTestingServiceName: testRun.miniTestingServiceName,
-      testSuiteIds:testMode? [] : testSuiteIds,
+      testSuiteIds: testSuiteIds,
       autoTicketingDetails: autoTicketingDetails,
       selectedSlackChannelId: testRun?.slackChannel || 0,
     }

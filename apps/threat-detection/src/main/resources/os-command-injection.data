@@ -680,12 +680,8 @@ sbin/start-stop-daemon
 |id
 |ping
 |cat
-&id
 &ping
 &cat
-`id`
-`ping`
-`cat`
 $(id)
 $(ping)
 | id

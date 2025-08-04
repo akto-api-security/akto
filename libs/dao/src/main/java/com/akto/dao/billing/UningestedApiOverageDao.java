@@ -59,6 +59,12 @@ public class UningestedApiOverageDao extends AccountsContextDao<UningestedApiOve
         Map<Integer, Integer> countMap = new HashMap<>();
         
         List<Bson> pipeline = new ArrayList<>();
+        
+        // Add a match stage to exclude OPTIONS methods
+        pipeline.add(Aggregates.match(
+            Filters.ne(UningestedApiOverage.METHOD, URLMethods.Method.OPTIONS)
+        ));
+        
         pipeline.add(Aggregates.group(
             "$" + UningestedApiOverage.API_COLLECTION_ID,
             Accumulators.sum("count", 1)

@@ -35,6 +35,7 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
   List<String> subCategory;
   int startTimestamp, endTimestamp;
   List<String> types;
+  List<String> latestAttack;
 
   // TODO: remove this, use API Executor.
   private final CloseableHttpClient httpClient;
@@ -71,6 +72,10 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
 
     if(this.types != null && !this.types.isEmpty()){
       filter.put("types", this.types);
+    }
+
+    if(this.latestAttack != null && !this.latestAttack.isEmpty()){
+      filter.put("latestAttack", this.latestAttack);
     }
 
     Map<String, Integer> time_range = new HashMap<>();
@@ -291,5 +296,13 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
 
   public void setSubCategory(List<String> subCategory) {
     this.subCategory = subCategory;
+  }
+
+  public List<String> getLatestAttack() {
+    return latestAttack;
+  }
+
+  public void setLatestAttack(List<String> latestAttack) {
+    this.latestAttack = latestAttack;
   }
 }

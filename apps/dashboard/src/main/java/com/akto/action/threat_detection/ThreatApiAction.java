@@ -38,6 +38,7 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
   static final int LIMIT = 50;
   long total;
   Map<String, Integer> sort;
+  List<String> latestAttack;
   int startTs;
   int endTs;
 
@@ -250,11 +251,20 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
     post.addHeader("Authorization", "Bearer " + this.getApiToken());
     post.addHeader("Content-Type", "application/json");
 
+    Map<String, Object> filters = new HashMap<>();
+
+    if(this.latestAttack != null && !this.latestAttack.isEmpty()) {
+      filters.put("latestAttack", latestAttack);
+    }
+
     Map<String, Object> body = new HashMap<String, Object>() {
       {
         put("skip", skip);
         put("limit", LIMIT);
         put("sort", sort);
+        if(!filters.isEmpty()) {
+          put("filter", filters);
+        }
       }
     };
     String msg = objectMapper.valueToTree(body).toString();
@@ -365,4 +375,11 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
     this.threatActivityTimelines = threatActivityTimelines;
   }
 
+  public List<String> getLatestAttack() {
+    return latestAttack;
+  }
+
+  public void setLatestAttack(List<String> latestAttack) {
+    this.latestAttack = latestAttack;
+  }
 }

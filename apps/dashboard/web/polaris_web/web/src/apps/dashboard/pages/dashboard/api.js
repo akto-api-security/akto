@@ -90,27 +90,42 @@ const api = {
         })
     },
 
-    fetchSensitiveAndUnauthenticatedValue: async () => {
+    fetchSensitiveAndUnauthenticatedValue: async (showApiInfo) => {
         return await request({
             url: '/api/getSensitiveAndUnauthenticatedValue',
             method: 'post',
-            data: {}
+            data: { showApiInfo}
         })
     },
 
-    fetchHighRiskThirdPartyValue: async () => {
+    fetchHighRiskThirdPartyValue: async (showApiInfo) => {
         return await request({
             url: '/api/getHighRiskThirdPartyValue',
             method: 'post',
-            data: {}
+            data: { showApiInfo}
         })
     },
 
-    fetchShadowApisValue: async () => {
+    fetchShadowApisValue: async (showApiInfo) => {
         return await request({
             url: '/api/getShadowApis',
             method: 'post',
-            data: {}
+            data: { showApiInfo}
+        })
+    },
+    fetchUnauthenticatedApis: async (showApiInfo) => {
+        return await request({
+            url: '/api/fetchAllUnauthenticatedApis',
+            method: 'post',
+            data: { showApiInfo }
+        })
+    },
+
+    fetchActionItemsApiInfo: async (filterType) => {
+        return await request({
+            url: '/api/fetchActionItemsApiInfo',
+            method: 'post',
+            data: { filterType }
         })
     }
 }

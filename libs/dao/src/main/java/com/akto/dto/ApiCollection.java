@@ -157,8 +157,6 @@ public class ApiCollection {
     }
 
     public List<CollectionTags> getEnvType(){
-        if(this.type != null && this.type == Type.API_GROUP) return null;
-        
         if(this.tagsList == null || this.tagsList.isEmpty()){
             CollectionTags envTypeTag = new CollectionTags();
             envTypeTag.setKeyName("envType");

@@ -233,6 +233,14 @@ public class SingleTypeInfo {
             Arrays.asList(Position.RESPONSE_PAYLOAD, Position.RESPONSE_HEADER));
     // make sure to add AKTO subTypes to subTypeMap below
 
+    public static boolean doesNotStartWithSuperType(String input) {
+        if (input == null) return true;
+
+        return Arrays.stream(SuperType.values())
+                .map(Enum::name)
+                .noneMatch(input::startsWith);
+    }
+
     public static class SubType {
         private String name;
         private boolean sensitiveAlways;
