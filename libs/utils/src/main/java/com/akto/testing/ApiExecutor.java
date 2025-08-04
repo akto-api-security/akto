@@ -11,6 +11,7 @@ import com.akto.dto.testing.TestingRunConfig;
 import com.akto.dto.testing.TestingRunResult;
 import com.akto.dto.testing.rate_limit.RateLimitHandler;
 import com.akto.dto.type.URLMethods;
+import com.akto.dto.type.URLMethods.Method;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.metrics.AllMetrics;
@@ -276,7 +277,7 @@ public class ApiExecutor {
     private static OriginalHttpResponse sendRequest(OriginalHttpRequest request, boolean followRedirects, TestingRunConfig testingRunConfig, boolean debug, List<TestingRunResult.TestLog> testLogs, boolean skipSSRFCheck, boolean jsonRpcCheck) throws Exception {
         // don't lowercase url because query params will change and will result in incorrect request
 
-        if (!jsonRpcCheck && isJsonRpcRequest(request)) {
+        if (!jsonRpcCheck && shouldInitiateSSEStream(request)) {
             return sendRequestWithSse(request, followRedirects, testingRunConfig, debug, testLogs, skipSSRFCheck, false);
         }
 
@@ -714,5 +715,36 @@ public class ApiExecutor {
         if (session.response != null) {
             session.response.close();
         }
+    }
+
+    private static boolean shouldInitiateSSEStream(OriginalHttpRequest request) {
+        if (!isJsonRpcRequest(request)) {
+            return false;
+        }
+
+        if (!Method.POST.name().equalsIgnoreCase(request.getMethod())) {
+            return true;
+        }
+
+        boolean hasEventStream = false;
+        boolean hasApplicationJson = false;
+
+        for (Map.Entry<String, List<String>> entry : request.getHeaders().entrySet()) {
+            if (HttpRequestResponseUtils.HEADER_ACCEPT.equalsIgnoreCase(entry.getKey()) && entry.getValue() != null
+                && !entry.getValue().isEmpty()) {
+                for (String value : entry.getValue()) {
+                    if (HttpRequestResponseUtils.TEXT_EVENT_STREAM_CONTENT_TYPE.equalsIgnoreCase(value)) {
+                        hasEventStream = true;
+                    }
+                    if (HttpRequestResponseUtils.APPLICATION_JSON.equalsIgnoreCase(value)) {
+                        hasApplicationJson = true;
+                    }
+                    if (hasEventStream && hasApplicationJson) {
+                        break;
+                    }
+                }
+            }
+        }
+        return !(hasEventStream && hasApplicationJson);
     }
 }
