@@ -1614,10 +1614,10 @@ public class APICatalogSync {
 
         List<BulkUpdates> bulkUpdates = new ArrayList<>();
         List<SampleDataAlt> unfilteredSamples = new ArrayList<>();
-        loggerMaker.infoAndAddToDb("Redacting sample data for apiCollectionId: " + apiCollectionId + " sampleData size: " + sampleData.size());
+        loggerMaker.debug("Redacting sample data for apiCollectionId: " + apiCollectionId + " sampleData size: " + sampleData.size());
         handleSampleDataRedaction(apiCollectionId, accountLevelRedact, apiCollectionLevelRedact, sampleData, bulkUpdates, unfilteredSamples);
 
-        loggerMaker.infoAndAddToDb("Inserting bulk sample data for apiCollectionId: " + apiCollectionId + " sampleData size: " + sampleData.size());
+        loggerMaker.debug("Inserting bulk sample data for apiCollectionId: " + apiCollectionId + " sampleData size: " + sampleData.size());
 
         if (accountLevelRedact || apiCollectionLevelRedact) {
             try {
@@ -1641,7 +1641,7 @@ public class APICatalogSync {
             }
         }
         
-        loggerMaker.infoAndAddToDb("Inserted bulk sample data for apiCollectionId: " + apiCollectionId + " sampleData size: " + sampleData.size());
+        loggerMaker.debug("Inserted bulk sample data for apiCollectionId: " + apiCollectionId + " sampleData size: " + sampleData.size());
 
 
         return bulkUpdates;

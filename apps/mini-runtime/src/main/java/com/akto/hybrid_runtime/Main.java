@@ -406,7 +406,7 @@ public class Main {
                 try {
                     main.consumer.commitSync();
                 } catch (Exception e) {
-                    System.err.println("Error while committing offset: " + e.getMessage());
+                    loggerMaker.errorAndAddToDb(e, "Error while committing offset: " + e.getMessage());
                     throw e;
                 }
                 long start = System.currentTimeMillis();
@@ -426,7 +426,7 @@ public class Main {
                         }
 
                         if (lastSyncOffset % 100 == 0) {
-                            loggerMaker.infoAndAddToDb("Committing offset at position: " + lastSyncOffset);
+                            loggerMaker.info("Committing offset at position: " + lastSyncOffset);
                         }
 
                         if (tryForCollectionName(r.value())) {
@@ -467,18 +467,15 @@ public class Main {
 
         } catch (WakeupException ignored) {
           // nothing to catch. This exception is called from the shutdown hook.
-          System.out.println("Kafka consumer closed");
-          System.exit(0);
-          throw ignored;
+          loggerMaker.error("Kafka consumer closed due to wakeup exception");
         } catch (Exception e) {
-            System.out.println("Exception in main runtime: finall " + e.getMessage());
             exceptionOnCommitSync.set(true);
             printL(e);
             loggerMaker.errorAndAddToDb(e, "Error in main runtime: " + e.getMessage());
             e.printStackTrace();
             System.exit(0);
         } finally {
-            System.out.println("Closing consumer *************************");
+            loggerMaker.warn("Closing kafka consumer for topic: " + topicName);
             main.consumer.close();
         }
     }
