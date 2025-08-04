@@ -1647,9 +1647,21 @@ public class APICatalogSync {
         return bulkUpdates;
     }
 
+    private final ExecutorService batchExecutor = Executors.newSingleThreadExecutor();
+
+    public <T> T runWithTimeout(Callable<T> task, int timeoutSeconds) throws Exception {
+        Future<T> future = batchExecutor.submit(task);
+        try {
+            return future.get(timeoutSeconds, TimeUnit.SECONDS);
+        } catch (TimeoutException e) {
+            future.cancel(true); // Interrupt the thread
+            throw new RuntimeException("Batch timed out and was killed", e);
+        }
+    }
+
     private void handleSampleDataRedaction(int apiCollectionId, boolean accountLevelRedact, boolean apiCollectionLevelRedact, List<SampleData> sampleData,
             List<BulkUpdates> bulkUpdates, List<SampleDataAlt> unfilteredSamples) {
-        int batchSize = 100;
+        int batchSize = 5;
         for (int i = 0; i < sampleData.size(); i += batchSize) {
             int end = Math.min(i + batchSize, sampleData.size());
             List<SampleData> batch = sampleData.subList(i, end);
@@ -1657,7 +1669,7 @@ public class APICatalogSync {
                 runWithTimeout(() -> {
                     processSampleBatch(batch, accountLevelRedact, apiCollectionLevelRedact, bulkUpdates, unfilteredSamples);
                     return null;
-                }, 10); // 10 seconds timeout per batch
+                }, 10);
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb(e, "Batch processing timed out or failed apiCollectionId: " + apiCollectionId + " batch size: " + batch.size());
             }
@@ -1934,16 +1946,4 @@ public class APICatalogSync {
         this.mergeUrlsOnVersions = mergeUrlsOnVersions;
     }
 
-    public static <T> T runWithTimeout(Callable<T> task, int timeoutSeconds) throws Exception {
-        ExecutorService executor = Executors.newSingleThreadExecutor();
-        Future<T> future = executor.submit(task);
-        try {
-            return future.get(timeoutSeconds, TimeUnit.SECONDS);
-        } catch (TimeoutException e) {
-            future.cancel(true); // Interrupt the thread
-            throw new RuntimeException("Batch timed out and was killed", e);
-        } finally {
-            executor.shutdownNow();
-        }
-    }
 }
