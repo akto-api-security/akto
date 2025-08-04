@@ -225,7 +225,7 @@ function AdvancedTrafficFilters() {
             isFirstPage={true}
             divider={true}
             primaryAction={window.USER_NAME && window.USER_NAME.endsWith("@akto.io") ? <Button onClick={() => setTopLevelActive(true)}>Clean up</Button> : null}
-            secondaryActions={<Button onClick={() => setDeleteSlash(true)}>Delete Options & Slash APIs</Button>}
+            secondaryActions={window.USER_NAME && window.USER_NAME.endsWith("@akto.io") ? <Button onClick={() => setDeleteSlash(true)}>Delete Options & Slash APIs</Button> : null}
         />
     )
 }
