@@ -36,11 +36,6 @@ public class LoggerMaker {
         System.setProperty("org.slf4j.simpleLogger.log.io.netty", "ERROR");
         System.setProperty("org.slf4j.simpleLogger.log.org.flywaydb", "ERROR");
         System.setProperty("org.slf4j.simpleLogger.showDateTime", "true");
-        System.setProperty("org.slf4j.simpleLogger.com.akto.utils.RedactSampleData", "OFF");
-        System.setProperty("org.slf4j.simpleLogger.com.akto.testing.ApiExecutor", "OFF");
-        System.setProperty("org.slf4j.simpleLogger.com.akto.hybrid_runtime.APICatalogSync", "OFF");
-        System.setProperty("org.slf4j.simpleLogger.com.akto.hyrbrid_parsers.HttpCallParser", "OFF");
-        System.setProperty("org.slf4j.simpleLogger.com.akto.hybrid_runtime.MergeLogicLocal", "OFF");
         System.setProperty("org.slf4j.simpleLogger.dateTimeFormat", "yyyy-MM-dd HH:mm:ss");
     }
 
