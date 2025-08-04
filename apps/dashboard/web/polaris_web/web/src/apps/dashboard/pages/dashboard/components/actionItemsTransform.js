@@ -70,26 +70,35 @@ export async function fetchAllActionItemsApiInfo() {
         api.fetchSensitiveAndUnauthenticatedValue(true),
         api.fetchHighRiskThirdPartyValue(true),
         api.fetchShadowApisValue(true),
-        api.fetchUnauthenticatedApis(true)
+        api.fetchUnauthenticatedApis(true),
+        api.fetchActionItemsApiInfo('HIGH_RISK'),
+        api.fetchActionItemsApiInfo('SENSITIVE'),
+        api.fetchActionItemsApiInfo('THIRD_PARTY')
     ]);
 
     const [
         sensitiveAndUnauthenticatedValueResult,
         highRiskThirdPartyValueResult,
         shadowApisValueResult,
-        unauthenticatedApisResult 
+        unauthenticatedApisResult,
+        highRiskResult,
+        sensitiveResult,
+        thirdPartyResult
     ] = results;
 
     const sensitiveAndUnauthenticatedApis = sensitiveAndUnauthenticatedValueResult.status === 'fulfilled' ? sensitiveAndUnauthenticatedValueResult?.value?.sensitiveUnauthenticatedEndpointsApiInfo || [] : [];
     const highRiskThirdPartyApis = highRiskThirdPartyValueResult.status === 'fulfilled' ? highRiskThirdPartyValueResult?.value?.highRiskThirdPartyEndpointsApiInfo || [] : [];
     const shadowApis = shadowApisValueResult.status === 'fulfilled' ? shadowApisValueResult?.value?.shadowApisCount || [] : [];
-    const unauthenticatedApis = unauthenticatedApisResult.status === 'fulfilled' ? unauthenticatedApisResult?.value?.unauthenticatedApis || [] : [];
+    const unauthenticatedApis = unauthenticatedApisResult.status === 'fulfilled' ? unauthenticatedApisResult?.value?.unauthenticatedApiList || [] : [];
+    const highRiskApis = highRiskResult.status === 'fulfilled' ? highRiskResult?.value?.response?.apiInfos || [] : [];
+    const sensitiveDataEndpoints = sensitiveResult.status === 'fulfilled' ? sensitiveResult?.value?.response?.apiInfos || [] : [];
+    const thirdPartyApis = thirdPartyResult.status === 'fulfilled' ? thirdPartyResult?.value?.response?.apiInfos || [] : [];
 
     return {
-        highRiskApis: [] , // fix this using modifying fetchapiinfostats
-        sensitiveDataEndpoints: [] || [], // fix this using modifying fetchapiinfostats
+        highRiskApis: highRiskApis,
+        sensitiveDataEndpoints: sensitiveDataEndpoints,
         unauthenticatedApis: unauthenticatedApis,
-        thirdPartyApis: [] || [],// fix this using modifying fetchapiinfostats
+        thirdPartyApis: thirdPartyApis,
         highRiskThirdParty: highRiskThirdPartyApis,
         shadowApis: shadowApis,
         sensitiveAndUnauthenticated: sensitiveAndUnauthenticatedApis,

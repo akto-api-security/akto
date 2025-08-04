@@ -59,16 +59,16 @@ function FlyoutTable({ actionItemType, count, allApiInfo, apiInfoLoading }) {
                 let relevantData = [];
                 switch (actionItemType) {
                     case ACTION_ITEM_TYPES.HIGH_RISK_APIS:
-                        relevantData = allApiInfo.highRiskApis?.apiInfos || [];
+                        relevantData = allApiInfo.highRiskApis || [];
                         break;
                     case ACTION_ITEM_TYPES.SENSITIVE_DATA_ENDPOINTS:
-                        relevantData = allApiInfo.sensitiveDataEndpoints?.apiInfos || [];
+                        relevantData = allApiInfo.sensitiveDataEndpoints || [];
                         break;
                     case ACTION_ITEM_TYPES.UNAUTHENTICATED_APIS:
-                        relevantData = allApiInfo.unauthenticatedApis?.apiInfos || [];
+                        relevantData = allApiInfo.unauthenticatedApis || [];
                         break;
                     case ACTION_ITEM_TYPES.THIRD_PARTY_APIS:
-                        relevantData = allApiInfo.thirdPartyApis?.apiInfos || [];
+                        relevantData = allApiInfo.thirdPartyApis || [];
                         break;
                     case ACTION_ITEM_TYPES.HIGH_RISK_THIRD_PARTY:
                         relevantData = allApiInfo.highRiskThirdParty || [];

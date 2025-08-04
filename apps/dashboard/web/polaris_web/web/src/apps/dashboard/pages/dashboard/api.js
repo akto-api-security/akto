@@ -115,9 +115,17 @@ const api = {
     },
     fetchUnauthenticatedApis: async (showApiInfo) => {
         return await request({
-            url: '/api/fetchUnauthenticatedApis',
+            url: '/api/fetchAllUnauthenticatedApis',
             method: 'post',
             data: { showApiInfo }
+        })
+    },
+
+    fetchActionItemsApiInfo: async (filterType) => {
+        return await request({
+            url: '/api/fetchActionItemsApiInfo',
+            method: 'post',
+            data: { filterType }
         })
     }
 }

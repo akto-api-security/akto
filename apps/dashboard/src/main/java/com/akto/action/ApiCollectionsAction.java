@@ -34,6 +34,7 @@ import com.akto.usage.UsageMetricCalculator;
 import com.akto.usage.UsageMetricHandler;
 import com.akto.util.Constants;
 import com.akto.util.LastCronRunInfo;
+import com.akto.dto.type.URLMethods.Method;
 import com.mongodb.client.model.Accumulators;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.FindOneAndUpdateOptions;
@@ -1044,6 +1045,73 @@ public class ApiCollectionsAction extends UserAction {
         }
 
         return Action.SUCCESS.toUpperCase();
+    }
+
+    private String filterType; 
+    
+    public String fetchActionItemsApiInfo() {
+        Bson filterQ = UsageMetricCalculator.excludeDemosAndDeactivated(ApiInfo.ID_API_COLLECTION_ID);
+        List<ApiInfo> result = new ArrayList<>();
+        
+        switch (filterType) {
+            case "HIGH_RISK":
+                Bson highRiskFilter = Filters.and(
+                    filterQ,
+                    Filters.gt(ApiInfo.RISK_SCORE, 3)
+                );
+                result = ApiInfoDao.instance.findAll(highRiskFilter);
+                break;
+                
+            case "SENSITIVE":
+                Bson sensitiveFilter = SingleTypeInfoDao.instance.filterForSensitiveParamsExcludingUserMarkedSensitive(
+                    null, null, null, null
+                );
+                List<SingleTypeInfo> sensitiveSTIs = SingleTypeInfoDao.instance.findAll(sensitiveFilter);
+                java.util.Set<String> seen = new java.util.HashSet<>();
+                
+                for (SingleTypeInfo sti : sensitiveSTIs) {
+                    int collectionId = sti.getApiCollectionId();
+                    String url = sti.getUrl();
+                    String method = sti.getMethod();
+                    String key = collectionId + "|" + url + "|" + method;
+                    if (seen.contains(key)) continue;
+                    seen.add(key);
+                    ApiInfo apiInfo = ApiInfoDao.instance.findOne(ApiInfoDao.getFilter(url, method, collectionId));
+                    if (apiInfo != null) {
+                        result.add(apiInfo);
+                    } else {
+                        ApiInfo.ApiInfoKey apiInfoKey = new ApiInfo.ApiInfoKey(collectionId, url, Method.fromString(method));
+                        ApiInfo minimalApiInfo = new ApiInfo();
+                        minimalApiInfo.setId(apiInfoKey);
+                        result.add(minimalApiInfo);
+                    }
+                }
+                break;
+                
+            case "THIRD_PARTY":
+                int sevenDaysAgo = (int) (System.currentTimeMillis() / 1000) - 604800; // 7 days in seconds
+                Bson thirdPartyFilter = Filters.and(
+                    filterQ,
+                    Filters.gte(ApiInfo.LAST_SEEN, sevenDaysAgo),
+                    Filters.in(ApiInfo.API_ACCESS_TYPES, ApiInfo.ApiAccessType.THIRD_PARTY)
+                );
+                result = ApiInfoDao.instance.findAll(thirdPartyFilter);
+                break;
+                
+            default:
+                addActionError("Invalid filter type: " + filterType);
+                return Action.ERROR.toUpperCase();
+        }
+        
+        BasicDBObject response = new BasicDBObject();
+        response.put("apiInfos", result);
+        
+        this.response = response;
+        return Action.SUCCESS.toUpperCase();
+    }
+    
+    public void setFilterType(String filterType) {
+        this.filterType = filterType;
     }
 
 
