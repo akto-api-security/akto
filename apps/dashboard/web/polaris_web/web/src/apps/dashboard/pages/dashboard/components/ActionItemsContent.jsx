@@ -2,7 +2,6 @@ import { VerticalStack, Box } from '@shopify/polaris';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import FlyLayout from '../../../components/layouts/FlyLayout';
-import GridRows from '../../../components/shared/GridRows';
 import JiraTicketCreationModal from '../../../components/shared/JiraTicketCreationModal';
 import JiraTicketDisplay from '../../../components/shared/JiraTicketDisplay';
 import ActionItemsTable from './ActionItemsTable';
@@ -140,7 +139,7 @@ export const ActionItemsContent = ({ actionItemsData, onCountChange }) => {
             highRiskThirdPartyCount,
             shadowApisCount,
             sensitiveAndUnauthenticatedCount,
-            jiraTicketUrlMap: ticketMap
+            jiraTicketUrlMap: ticketMap,
         } = actionItemsData;
         setJiraTicketUrlMap(ticketMap || {});
 

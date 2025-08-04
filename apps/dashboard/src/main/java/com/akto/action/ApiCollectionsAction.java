@@ -994,12 +994,8 @@ public class ApiCollectionsAction extends UserAction {
     private boolean showApiInfo;
 
     public String fetchSensitiveAndUnauthenticatedValue() {
-
-        List<ApiInfo> sensitiveEndpoints = ApiInfoDao.instance.findAll(Filters.eq(ApiInfo.IS_SENSITIVE, true));
-
-        this.sensitiveUnauthenticatedEndpointsApiInfo.clear();
-        this.sensitiveUnauthenticatedEndpointsCount = 0;
-
+        Bson filterQ = UsageMetricCalculator.excludeDemosAndDeactivated(ApiInfo.ID_API_COLLECTION_ID);
+        List<ApiInfo> sensitiveEndpoints = ApiInfoDao.instance.findAll(Filters.and(filterQ, Filters.eq(ApiInfo.IS_SENSITIVE, true)));
         for (ApiInfo apiInfo : sensitiveEndpoints) {
             if (apiInfo.getAllAuthTypesFound() != null && !apiInfo.getAllAuthTypesFound().isEmpty()) {
                 for (Set<ApiInfo.AuthType> authType : apiInfo.getAllAuthTypesFound()) {
@@ -1023,12 +1019,11 @@ public class ApiCollectionsAction extends UserAction {
             Filters.in(ApiInfo.API_ACCESS_TYPES, ApiInfo.ApiAccessType.THIRD_PARTY)
         );
 
-        this.highRiskThirdPartyEndpointsCount = (int) ApiInfoDao.instance.count(filter);
-        this.highRiskThirdPartyEndpointsApiInfo.clear();
-
         if (this.showApiInfo) {
-            List<ApiInfo> highRiskEndpoints = ApiInfoDao.instance.findAll(filter);
-            this.highRiskThirdPartyEndpointsApiInfo.addAll(highRiskEndpoints);
+            this.highRiskThirdPartyEndpointsApiInfo = ApiInfoDao.instance.findAll(filter);
+            this.highRiskThirdPartyEndpointsCount = this.highRiskThirdPartyEndpointsApiInfo.size();
+        }else{
+            this.highRiskThirdPartyEndpointsCount = (int) ApiInfoDao.instance.count(filter);
         }
 
         return Action.SUCCESS.toUpperCase();
@@ -1036,19 +1031,16 @@ public class ApiCollectionsAction extends UserAction {
 
     public String fetchShadowApisValue() {
         ApiCollection shadowApisCollection = ApiCollectionsDao.instance.findByName(AKTO_DISCOVERED_APIS_COLLECTION);
-
-        this.shadowApisApiInfo.clear();
-
         if (shadowApisCollection != null) {
-            this.shadowApisCount = (int) ApiInfoDao.instance.count(Filters.eq(ApiInfo.ID_API_COLLECTION_ID, shadowApisCollection.getId()));
+            
             if (this.showApiInfo) {
-                List<ApiInfo> shadowApiInfos = ApiInfoDao.instance.findAll(
+                this.shadowApisApiInfo = ApiInfoDao.instance.findAll(
                     Filters.eq(ApiInfo.ID_API_COLLECTION_ID, shadowApisCollection.getId())
                 );
-                this.shadowApisApiInfo.addAll(shadowApiInfos);
+                this.shadowApisCount = shadowApisApiInfo.size();
+            }else{
+                this.shadowApisCount = (int) ApiInfoDao.instance.count(Filters.eq(ApiInfo.ID_API_COLLECTION_ID, shadowApisCollection.getId()));
             }
-        } else {
-            this.shadowApisCount = 0;
         }
 
         return Action.SUCCESS.toUpperCase();

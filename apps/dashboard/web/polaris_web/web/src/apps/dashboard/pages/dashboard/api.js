@@ -94,7 +94,7 @@ const api = {
         return await request({
             url: '/api/getSensitiveAndUnauthenticatedValue',
             method: 'post',
-            data: { showApiInfo: true}
+            data: { showApiInfo}
         })
     },
 
@@ -102,7 +102,7 @@ const api = {
         return await request({
             url: '/api/getHighRiskThirdPartyValue',
             method: 'post',
-            data: { showApiInfo: true}
+            data: { showApiInfo}
         })
     },
 
@@ -110,17 +110,16 @@ const api = {
         return await request({
             url: '/api/getShadowApis',
             method: 'post',
-            data: { showApiInfo: true}
+            data: { showApiInfo}
         })
     },
-
-    fetchApiInfosWithCustomFilter: async (type, lowerLimitValue, higherLimitValue, fieldName) => {
+    fetchUnauthenticatedApis: async (showApiInfo) => {
         return await request({
-            url: '/api/fetchApiInfosWithCustomFilter',
+            url: '/api/fetchUnauthenticatedApis',
             method: 'post',
-            data: { type, lowerLimitValue, higherLimitValue, fieldName }
+            data: { showApiInfo }
         })
-    },
+    }
 }
 
 export default api;

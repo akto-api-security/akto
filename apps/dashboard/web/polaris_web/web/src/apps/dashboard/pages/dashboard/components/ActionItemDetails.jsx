@@ -1,6 +1,6 @@
-import { Divider, Text, VerticalStack, Icon, Box } from '@shopify/polaris';
+import { Divider, Text, VerticalStack, Box } from '@shopify/polaris';
 import React from 'react';
-import { ClockMajor, TeamMajor, ToolsMajor } from '@shopify/polaris-icons';
+import { TeamMajor, ToolsMajor } from '@shopify/polaris-icons';
 import FlyoutHeadingComponent from '../../../components/shared/FlyoutHeadingComponent';
 import JiraTicketDisplay from '../../../components/shared/JiraTicketDisplay';
 import FlyoutTable from './FlyoutTable';

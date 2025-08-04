@@ -10,11 +10,11 @@ export async function fetchActionItemsData() {
     const results = await Promise.allSettled([
         api.fetchApiStats(startTimestamp, endTimestamp),
         observeApi.fetchCountMapOfApis(),
-        api.fetchSensitiveAndUnauthenticatedValue(true),
-        api.fetchHighRiskThirdPartyValue(true),
-        api.fetchShadowApisValue(true),
+        api.fetchSensitiveAndUnauthenticatedValue(false),
+        api.fetchHighRiskThirdPartyValue(false),
+        api.fetchShadowApisValue(false),
         settingsModule.fetchAdminInfo(),
-        api.fetchApiInfosWithCustomFilter('AUTH_TYPES', 0, 0, '')
+        api.fetchUnauthenticatedApis(false)
     ]);
 
     const [
@@ -33,12 +33,12 @@ export async function fetchActionItemsData() {
     const highRiskThirdPartyCount = highRiskThirdPartyValueResult.status === 'fulfilled' ? highRiskThirdPartyValueResult.value.highRiskThirdPartyEndpointsCount || 0 : 0;
     const shadowApisCount = shadowApisValueResult.status === 'fulfilled' ? shadowApisValueResult.value.shadowApisCount || 0 : 0;
     const adminSettings = adminSettingsResult.status === 'fulfilled' ? adminSettingsResult.value.resp : {};
-    const unauthenticatedApis = unauthenticatedApisResult.status === 'fulfilled' ? unauthenticatedApisResult.value : { apiInfos: [] };
+    const unauthenticatedApis = unauthenticatedApisResult.status === 'fulfilled' ? unauthenticatedApisResult.value.unauthenticatedApis || 0 : 0;
 
     const jiraTicketUrlMap = adminSettings?.jiraTicketUrlMap || {};
 
     let highRiskCount = 0;
-    let unauthenticatedCount = 0;
+    let unauthenticatedCount = unauthenticatedApis;
     let thirdPartyDiff = 0;
     let sensitiveDataCount = countMapResp?.totalApisCount || 0;
 
@@ -48,11 +48,6 @@ export async function fetchActionItemsData() {
         highRiskCount = Object.entries(apiStatsEnd.riskScoreMap || {})
             .filter(([score]) => parseInt(score) > 3)
             .reduce((total, [, count]) => total + count, 0);
-
-        unauthenticatedCount = Array.isArray(unauthenticatedApis.apiInfos)
-            ? unauthenticatedApis.apiInfos.length
-            : 0;
-
         thirdPartyDiff = (apiStatsEnd.accessTypeMap?.THIRD_PARTY || 0) - (apiStatsStart.accessTypeMap?.THIRD_PARTY || 0);
     }
 
@@ -70,21 +65,33 @@ export async function fetchActionItemsData() {
 
 
 export async function fetchAllActionItemsApiInfo() {
-    const highRiskApis = await api.fetchApiInfosWithCustomFilter('RISK_SCORE', 3, 0, 'riskScore');
-    const sensitiveDataEndpoints = await api.fetchApiInfosWithCustomFilter('SENSITIVE', 0, 0, '');
-    const unauthenticatedApis = await api.fetchApiInfosWithCustomFilter('AUTH_TYPES', 0, 0, '');
-    const thirdPartyApis = await api.fetchApiInfosWithCustomFilter('THIRD_PARTY', 0, 0, 'discoveredTimestamp');
-    const highRiskThirdParty = await api.fetchHighRiskThirdPartyValue(true);
-    const shadowApis = await api.fetchShadowApisValue(true);
-    const sensitiveAndUnauthenticated = await api.fetchSensitiveAndUnauthenticatedValue(true);
+
+    const results = await Promise.allSettled([
+        api.fetchSensitiveAndUnauthenticatedValue(true),
+        api.fetchHighRiskThirdPartyValue(true),
+        api.fetchShadowApisValue(true),
+        api.fetchUnauthenticatedApis(true)
+    ]);
+
+    const [
+        sensitiveAndUnauthenticatedValueResult,
+        highRiskThirdPartyValueResult,
+        shadowApisValueResult,
+        unauthenticatedApisResult 
+    ] = results;
+
+    const sensitiveAndUnauthenticatedApis = sensitiveAndUnauthenticatedValueResult.status === 'fulfilled' ? sensitiveAndUnauthenticatedValueResult?.value?.sensitiveUnauthenticatedEndpointsApiInfo || [] : [];
+    const highRiskThirdPartyApis = highRiskThirdPartyValueResult.status === 'fulfilled' ? highRiskThirdPartyValueResult?.value?.highRiskThirdPartyEndpointsApiInfo || [] : [];
+    const shadowApis = shadowApisValueResult.status === 'fulfilled' ? shadowApisValueResult?.value?.shadowApisCount || [] : [];
+    const unauthenticatedApis = unauthenticatedApisResult.status === 'fulfilled' ? unauthenticatedApisResult?.value?.unauthenticatedApis || [] : [];
 
     return {
-        highRiskApis: highRiskApis || [],
-        sensitiveDataEndpoints: sensitiveDataEndpoints || [],
-        unauthenticatedApis: unauthenticatedApis || [],
-        thirdPartyApis: thirdPartyApis || [],
-        highRiskThirdParty: highRiskThirdParty?.highRiskThirdPartyEndpointsApiInfo || [],
-        shadowApis: shadowApis?.shadowApiInfos || [],
-        sensitiveAndUnauthenticated: sensitiveAndUnauthenticated?.sensitiveUnauthenticatedEndpointsApiInfo || [],
+        highRiskApis: [] , // fix this using modifying fetchapiinfostats
+        sensitiveDataEndpoints: [] || [], // fix this using modifying fetchapiinfostats
+        unauthenticatedApis: unauthenticatedApis || [], // fix this using modifying fetchapiinfostats
+        thirdPartyApis: [] || [],// fix this using modifying fetchapiinfostats
+        highRiskThirdParty: highRiskThirdPartyApis,
+        shadowApis: shadowApis,
+        sensitiveAndUnauthenticated: sensitiveAndUnauthenticatedApis,
     };
 }

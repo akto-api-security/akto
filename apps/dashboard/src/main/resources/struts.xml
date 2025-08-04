@@ -1969,7 +1969,7 @@
             </result>
         </action>
 
-        <action name="api/fetchApiInfosWithCustomFilter" class="com.akto.action.ApiInfoAction" method="fetchApiInfosWithCustomFilter">
+        <action name="api/fetchAllUnauthenticatedApis" class="com.akto.action.ApiInfoAction" method="fetchAllUnauthenticatedApis">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
@@ -1982,6 +1982,7 @@
                 <param name="includeProperties">^actionErrors.*</param>
             </result>
             <result name="SUCCESS" type="json">
+                <param name="includeProperties">unauthenticatedApis,unauthenticatedApiList.*</param>
             </result>
             <result name="ERROR" type="json">
                 <param name="statusCode">422</param>
