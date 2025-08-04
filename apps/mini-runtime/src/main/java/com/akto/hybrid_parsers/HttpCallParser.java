@@ -346,7 +346,7 @@ public class HttpCallParser {
         if (syncImmediately || this.sync_count >= syncThresh || (Context.now() - this.last_synced) > this.sync_threshold_time || isHarOrPcap) {
             long startTime = System.currentTimeMillis();
             numberOfSyncs++;
-            loggerMaker.infoAndAddToDb("Starting Syncing API catalog..." + numberOfSyncs);
+            loggerMaker.debug("Starting Syncing API catalog..." + numberOfSyncs);
             List<ApiCollection> apiCollections = dataActor.fetchAllApiCollectionsMeta();
             for (ApiCollection apiCollection: apiCollections) {
                 apiCollectionsMap.put(apiCollection.getId(), apiCollection);
@@ -384,7 +384,7 @@ public class HttpCallParser {
                 }
             }
             long endTime = System.currentTimeMillis();
-            loggerMaker.infoAndAddToDb("Completed Syncing API catalog..." + numberOfSyncs + " " + (endTime - startTime) + " ms");
+            loggerMaker.debug("Completed Syncing API catalog..." + numberOfSyncs + " " + (endTime - startTime) + " ms");
         }
     }
 
