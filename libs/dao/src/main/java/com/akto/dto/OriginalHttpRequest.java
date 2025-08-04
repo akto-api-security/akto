@@ -6,11 +6,13 @@ import com.akto.util.HttpRequestResponseUtils;
 import com.google.gson.Gson;
 import com.mongodb.BasicDBObject;
 
+import java.util.stream.Collectors;
 import lombok.Getter;
 import lombok.Setter;
 import okhttp3.HttpUrl;
 import java.net.URI;
 import java.util.*;
+import org.apache.commons.lang3.StringUtils;
 
 public class OriginalHttpRequest {
 
@@ -242,9 +244,15 @@ public class OriginalHttpRequest {
         Map<String,List<String>> headers = new HashMap<>();
         if (headersFromRequest == null) return headers;
         for (Object k: headersFromRequest.keySet()) {
-            List<String> values = headers.getOrDefault(k,new ArrayList<>());
-            values.add(headersFromRequest.get(k).toString());
-            headers.put(k.toString().toLowerCase(),values);
+            String key = k.toString().toLowerCase();
+            String rawValue = headersFromRequest.get(k).toString();
+
+            List<String> splitValues = Arrays.stream(rawValue.split(","))
+                .map(String::trim)
+                .filter(v -> !StringUtils.isEmpty(v))
+                .collect(Collectors.toList());
+
+            headers.computeIfAbsent(key, x -> new ArrayList<>()).addAll(splitValues);
         }
         return headers;
     }
