@@ -408,7 +408,7 @@ function HomeDashboard() {
             ["gRPC", apiStats.apiTypeMap.GRPC || 0],
             ["SOAP", apiStats.apiTypeMap.SOAP || 0],
         ];
-        const countMissing = apiTypeMissing - (missingCount + redundantCount)
+        const countMissing = apiTypeMissing;
         if(missingCount > 0) {
             data.push(["Need more data", countMissing]);
         }
