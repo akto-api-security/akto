@@ -1447,6 +1447,7 @@ public class APICatalogSync {
         }
 
         counter++;
+        
         for(int apiCollectionId: this.delta.keySet()) {
             loggerMaker.debug("Syncing apiCollectionId: " + apiCollectionId + " counter: " + counter);
             APICatalog deltaCatalog = this.delta.get(apiCollectionId);
@@ -1457,7 +1458,7 @@ public class APICatalogSync {
             demosAndDeactivatedCollections = getDemosAndDeactivated();
 
             if (syncLimit.checkLimit && !demosAndDeactivatedCollections.contains(apiCollectionId)) {
-
+                
                 int deltaUsage = 0;
                 Iterator<Entry<URLStatic, RequestTemplate>> staticUrlIterator = deltaCatalog.getStrictURLToMethods().entrySet().iterator();
                 while (staticUrlIterator.hasNext()) {
@@ -1511,6 +1512,7 @@ public class APICatalogSync {
                 }
 
                 dataActor.updateUsage(MetricTypes.ACTIVE_ENDPOINTS, deltaUsage);
+                loggerMaker.infoAndAddToDb("Syncing done after passing checking limit: " + deltaUsage);
             }
 
             /*

@@ -351,17 +351,17 @@ public class TestExecutor {
                         future.cancel(!Constants.IS_NEW_TESTING_ENABLED);
                     }
                     loggerMaker.infoAndAddToDb("Canceled all running future tasks due to timeout.", LogDb.TESTING);
+                }else{
+                    Thread.sleep(20000); // wait for 20 seconds to ensure all messages are sent
+                    loggerMaker.insertImportantTestingLog("Finished inserting records in kafka, Total records: " + totalRecords.get() + " Unsent records: " + throttleNumber.get());
+                    dbObject.put("PRODUCER_RUNNING", false);
+                    dbObject.put("CONSUMER_RUNNING", true);
+                    writeJsonContentInFile(Constants.TESTING_STATE_FOLDER_PATH, Constants.TESTING_STATE_FILE_NAME, dbObject);
                 }
                 
 
             } catch (Exception e) {
                 throw new RuntimeException(e);
-            }
-            if(!shouldInitOnly && Constants.IS_NEW_TESTING_ENABLED){
-                loggerMaker.insertImportantTestingLog("Finished inserting records in kafka, Total records: " + totalRecords.get());
-                dbObject.put("PRODUCER_RUNNING", false);
-                dbObject.put("CONSUMER_RUNNING", true);
-                writeJsonContentInFile(Constants.TESTING_STATE_FOLDER_PATH, Constants.TESTING_STATE_FILE_NAME, dbObject);
             }
         }
     }
