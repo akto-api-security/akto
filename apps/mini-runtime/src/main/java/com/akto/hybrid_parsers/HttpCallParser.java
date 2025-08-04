@@ -192,6 +192,7 @@ public class HttpCallParser {
             // to:do check for on-prem air gapped deployments
             Organization organization = OrgUtils.getOrganizationCached(accountId);
             FeatureAccess featureAccess = UsageMetricUtils.getFeatureAccess(organization, MetricTypes.ACTIVE_ENDPOINTS);
+            loggerMaker.infoAndAddToDb("Fetching sync limit for accountId: " + accountId + " with usageLimit: " + featureAccess.getUsageLimit() + " and usage: " + featureAccess.getUsage());
             syncLimit = featureAccess.fetchSyncLimit();
             lastSyncLimitFetch = Context.now();
         } catch (Exception e) {
