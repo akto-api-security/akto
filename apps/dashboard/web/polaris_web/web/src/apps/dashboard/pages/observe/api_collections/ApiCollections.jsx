@@ -784,9 +784,7 @@ function ApiCollections(props) {
             )
         }
         const bulkActionsOptions = [...actions];
-        if(selectedTab !== 'groups') {
-            bulkActionsOptions.push(toggleEnvType)
-        }
+        bulkActionsOptions.push(toggleEnvType)
         return bulkActionsOptions
     }
     const updateData = (dataMap) => {
