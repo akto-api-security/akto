@@ -54,6 +54,10 @@ public class ThreatApiService {
       match.append("latestApiEndpoint", new Document("$in", filter.getUrlsList()));
     }
 
+    if (!filter.getLatestAttackList().isEmpty()) {
+      match.append("filterId", new Document("$in", filter.getLatestAttackList()));
+    }
+
     if (filter.hasDetectedAtTimeRange()) {
       long start = filter.getDetectedAtTimeRange().getStart();
       long end = filter.getDetectedAtTimeRange().getEnd();

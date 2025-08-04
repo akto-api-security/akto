@@ -175,6 +175,10 @@ public class MaliciousEventService {
       query.append("subCategory", new Document("$in", filter.getSubCategoryList()));
     }
 
+    if (!filter.getLatestAttackList().isEmpty()) {
+      query.append("filterId", new Document("$in", filter.getLatestAttackList()));
+    }
+
     if (filter.hasDetectedAtTimeRange()) {
       TimeRangeFilter timeRange = filter.getDetectedAtTimeRange();
       long start = timeRange.hasStart() ? timeRange.getStart() : 0;
