@@ -42,6 +42,8 @@ import org.apache.http.impl.client.HttpClients;
 import org.apache.http.util.EntityUtils;
 import org.bson.conversions.Bson;
 
+import static com.akto.action.threat_detection.utils.ThreatsUtils.getTemplates;
+
 public class ThreatActorAction extends AbstractThreatDetectionAction {
 
   List<DashboardThreatActor> actors;
@@ -152,9 +154,9 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
     post.addHeader("Content-Type", "application/json");
     Map<String, Object> filter = new HashMap<>();
 
-    if(this.latestAttack != null && !this.latestAttack.isEmpty()){
-      filter.put("latestAttack", this.latestAttack);
-    }
+    List<String> templates = getTemplates(latestAttack);
+    filter.put("latestAttack", templates);
+
     if(this.country != null && !this.country.isEmpty()){
       filter.put("country", this.country);
     }

@@ -19,6 +19,8 @@ import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
 import org.apache.http.util.EntityUtils;
 
+import static com.akto.action.threat_detection.utils.ThreatsUtils.getTemplates;
+
 public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
 
   List<SuspectSampleData> sampleData;
@@ -74,9 +76,8 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
       filter.put("types", this.types);
     }
 
-    if(this.latestAttack != null && !this.latestAttack.isEmpty()){
-      filter.put("latestAttack", this.latestAttack);
-    }
+    List<String> templates = getTemplates(latestAttack);
+    filter.put("latestAttack", templates);
 
     Map<String, Integer> time_range = new HashMap<>();
     if (this.startTimestamp > 0) {

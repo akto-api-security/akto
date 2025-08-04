@@ -28,6 +28,8 @@ import org.apache.http.impl.client.HttpClients;
 import org.apache.http.util.EntityUtils;
 import org.bson.Document;
 
+import static com.akto.action.threat_detection.utils.ThreatsUtils.getTemplates;
+
 public class ThreatApiAction extends AbstractThreatDetectionAction {
 
   List<DashboardThreatApi> apis;
@@ -253,9 +255,8 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
 
     Map<String, Object> filters = new HashMap<>();
 
-    if(this.latestAttack != null && !this.latestAttack.isEmpty()) {
-      filters.put("latestAttack", latestAttack);
-    }
+    List<String> templates = getTemplates(latestAttack);
+    filters.put("latestAttack", templates);
 
     Map<String, Object> body = new HashMap<String, Object>() {
       {

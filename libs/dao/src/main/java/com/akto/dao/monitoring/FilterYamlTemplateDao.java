@@ -69,19 +69,25 @@ public class FilterYamlTemplateDao extends AccountsContextDao<YamlTemplate> {
                     if(config != null && config.getInfo() != null && config.getInfo().getCategory().getName() != null) {
                         String name = config.getInfo().getCategory().getName();
                         if(name.toLowerCase().contains("mcp")) {
-                            templatesByCategory.put(CONTEXT_SOURCE.MCP.name(), 
-                                    templatesByCategory.getOrDefault(CONTEXT_SOURCE.MCP.name(), new ArrayList<>()));
+                            List<String> list =  templatesByCategory.getOrDefault(CONTEXT_SOURCE.MCP.name(), new ArrayList<>());
+                            list.add(templateId);
+                            templatesByCategory.put(CONTEXT_SOURCE.MCP.name(), list);
                         } else if(name.toLowerCase().contains("gen")) {
-                            templatesByCategory.put(CONTEXT_SOURCE.GEN_AI.name(), 
-                                    templatesByCategory.getOrDefault(CONTEXT_SOURCE.GEN_AI.name(), new ArrayList<>()));
+                            List<String> list =  templatesByCategory.getOrDefault(CONTEXT_SOURCE.GEN_AI.name(), new ArrayList<>());
+                            list.add(templateId);
+                            templatesByCategory.put(CONTEXT_SOURCE.GEN_AI.name(), list);
                         } else {
-                            templatesByCategory.put(CONTEXT_SOURCE.API.name(), 
-                                    templatesByCategory.getOrDefault(CONTEXT_SOURCE.API.name(), new ArrayList<>()));
+                            List<String> list =  templatesByCategory.getOrDefault(CONTEXT_SOURCE.API.name(), new ArrayList<>());
+                            list.add(templateId);
+                            templatesByCategory.put(CONTEXT_SOURCE.API.name(), list);
                         }
                     }
                 }
             }
-            return templatesByCategory.get(source.name()).stream().collect(Collectors.toSet());
+
+            List<String> finalIds = templatesByCategory.getOrDefault(source.name(), new ArrayList<>());
+
+            return finalIds.stream().collect(Collectors.toSet());
         } else {
             return collectionIdEntry.getFirst();
         }
