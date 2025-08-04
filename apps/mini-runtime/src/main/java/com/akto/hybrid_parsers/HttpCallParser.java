@@ -337,8 +337,16 @@ public class HttpCallParser {
 
         this.sync_count += filteredResponseParams.size();
         int syncThresh = numberOfSyncs < 10 ? 10000 : sync_threshold_count;
+        executeCatalogSync(syncImmediately, fetchAllSTI, accountSettings, isHarOrPcap, syncThresh);
+
+    }
+
+    private void executeCatalogSync(boolean syncImmediately, boolean fetchAllSTI, AccountSettings accountSettings,
+            boolean isHarOrPcap, int syncThresh) {
         if (syncImmediately || this.sync_count >= syncThresh || (Context.now() - this.last_synced) > this.sync_threshold_time || isHarOrPcap) {
+            long startTime = System.currentTimeMillis();
             numberOfSyncs++;
+            loggerMaker.infoAndAddToDb("Starting Syncing API catalog..." + numberOfSyncs);
             List<ApiCollection> apiCollections = dataActor.fetchAllApiCollectionsMeta();
             for (ApiCollection apiCollection: apiCollections) {
                 apiCollectionsMap.put(apiCollection.getId(), apiCollection);
@@ -375,8 +383,9 @@ public class HttpCallParser {
                     });
                 }
             }
+            long endTime = System.currentTimeMillis();
+            loggerMaker.infoAndAddToDb("Completed Syncing API catalog..." + numberOfSyncs + " " + (endTime - startTime) + " ms");
         }
-
     }
 
     private List<HttpResponseParams> filterDefaultPayloads(List<HttpResponseParams> filteredResponseParams, Map<String, DefaultPayload> defaultPayloadMap) {
