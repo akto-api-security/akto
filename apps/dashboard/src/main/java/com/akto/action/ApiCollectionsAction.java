@@ -34,6 +34,7 @@ import com.akto.usage.UsageMetricCalculator;
 import com.akto.usage.UsageMetricHandler;
 import com.akto.util.Constants;
 import com.akto.util.LastCronRunInfo;
+import com.akto.dto.type.URLMethods.Method;
 import com.mongodb.client.model.Accumulators;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.FindOneAndUpdateOptions;
@@ -74,6 +75,13 @@ public class ApiCollectionsAction extends UserAction {
     int highRiskThirdPartyEndpointsCount;
     @Getter
     int shadowApisCount;
+    @Getter
+    List<ApiInfo> sensitiveUnauthenticatedEndpointsApiInfo = new ArrayList<>();
+    @Getter
+    List<ApiInfo> highRiskThirdPartyEndpointsApiInfo = new ArrayList<>();
+    @Getter
+    List<ApiInfo> shadowApisApiInfo = new ArrayList<>();
+
     public List<ApiInfoKey> getApiList() {
         return apiList;
     }
@@ -984,15 +992,19 @@ public class ApiCollectionsAction extends UserAction {
     }
 
     @Setter
-    private boolean showUrls;
-    public String fetchSensitiveAndUnauthenticatedValue(){
+    private boolean showApiInfo;
 
-        List<ApiInfo> sensitiveEndpoints = ApiInfoDao.instance.findAll(Filters.eq(ApiInfo.IS_SENSITIVE, true));
-        for(ApiInfo apiInfo: sensitiveEndpoints) {
-            if(apiInfo.getAllAuthTypesFound() != null && !apiInfo.getAllAuthTypesFound().isEmpty()) {
-                for(Set<ApiInfo.AuthType> authType: apiInfo.getAllAuthTypesFound()) {
-                    if(authType.contains(ApiInfo.AuthType.UNAUTHENTICATED)) {
+    public String fetchSensitiveAndUnauthenticatedValue() {
+        Bson filterQ = UsageMetricCalculator.excludeDemosAndDeactivated(ApiInfo.ID_API_COLLECTION_ID);
+        List<ApiInfo> sensitiveEndpoints = ApiInfoDao.instance.findAll(Filters.and(filterQ, Filters.eq(ApiInfo.IS_SENSITIVE, true)));
+        for (ApiInfo apiInfo : sensitiveEndpoints) {
+            if (apiInfo.getAllAuthTypesFound() != null && !apiInfo.getAllAuthTypesFound().isEmpty()) {
+                for (Set<ApiInfo.AuthType> authType : apiInfo.getAllAuthTypesFound()) {
+                    if (authType.contains(ApiInfo.AuthType.UNAUTHENTICATED)) {
                         this.sensitiveUnauthenticatedEndpointsCount++;
+                        if (this.showApiInfo) {
+                            this.sensitiveUnauthenticatedEndpointsApiInfo.add(apiInfo);
+                        }
                     }
                 }
             }
@@ -1000,29 +1012,108 @@ public class ApiCollectionsAction extends UserAction {
         return Action.SUCCESS.toUpperCase();
     }
 
-    public String fetchHighRiskThirdPartyValue(){
+    public String fetchHighRiskThirdPartyValue() {
         Bson filterQ = UsageMetricCalculator.excludeDemosAndDeactivated(ApiInfo.ID_API_COLLECTION_ID);
         Bson filter = Filters.and(
             filterQ,
             Filters.gte(ApiInfo.RISK_SCORE, 4),
             Filters.in(ApiInfo.API_ACCESS_TYPES, ApiInfo.ApiAccessType.THIRD_PARTY)
         );
-        if(!showUrls){
-            this.highRiskThirdPartyEndpointsCount  = (int) ApiInfoDao.instance.count(filter);
+
+        if (this.showApiInfo) {
+            this.highRiskThirdPartyEndpointsApiInfo = ApiInfoDao.instance.findAll(filter);
+            this.highRiskThirdPartyEndpointsCount = this.highRiskThirdPartyEndpointsApiInfo.size();
+        }else{
+            this.highRiskThirdPartyEndpointsCount = (int) ApiInfoDao.instance.count(filter);
         }
+
         return Action.SUCCESS.toUpperCase();
     }
 
-    public String fetchShadowApisValue(){
-
+    public String fetchShadowApisValue() {
         ApiCollection shadowApisCollection = ApiCollectionsDao.instance.findByName(AKTO_DISCOVERED_APIS_COLLECTION);
-        if(shadowApisCollection != null) {
-            if(!showUrls) {
+        if (shadowApisCollection != null) {
+            
+            if (this.showApiInfo) {
+                this.shadowApisApiInfo = ApiInfoDao.instance.findAll(
+                    Filters.eq(ApiInfo.ID_API_COLLECTION_ID, shadowApisCollection.getId())
+                );
+                this.shadowApisCount = shadowApisApiInfo.size();
+            }else{
                 this.shadowApisCount = (int) ApiInfoDao.instance.count(Filters.eq(ApiInfo.ID_API_COLLECTION_ID, shadowApisCollection.getId()));
             }
         }
+
         return Action.SUCCESS.toUpperCase();
     }
+
+    private String filterType; 
+    
+    public String fetchActionItemsApiInfo() {
+        Bson filterQ = UsageMetricCalculator.excludeDemosAndDeactivated(ApiInfo.ID_API_COLLECTION_ID);
+        List<ApiInfo> result = new ArrayList<>();
+        
+        switch (filterType) {
+            case "HIGH_RISK":
+                Bson highRiskFilter = Filters.and(
+                    filterQ,
+                    Filters.gt(ApiInfo.RISK_SCORE, 3)
+                );
+                result = ApiInfoDao.instance.findAll(highRiskFilter);
+                break;
+                
+            case "SENSITIVE":
+                Bson sensitiveFilter = SingleTypeInfoDao.instance.filterForSensitiveParamsExcludingUserMarkedSensitive(
+                    null, null, null, null
+                );
+                List<SingleTypeInfo> sensitiveSTIs = SingleTypeInfoDao.instance.findAll(sensitiveFilter);
+                java.util.Set<String> seen = new java.util.HashSet<>();
+                
+                for (SingleTypeInfo sti : sensitiveSTIs) {
+                    int collectionId = sti.getApiCollectionId();
+                    String url = sti.getUrl();
+                    String method = sti.getMethod();
+                    String key = collectionId + "|" + url + "|" + method;
+                    if (seen.contains(key)) continue;
+                    seen.add(key);
+                    ApiInfo apiInfo = ApiInfoDao.instance.findOne(ApiInfoDao.getFilter(url, method, collectionId));
+                    if (apiInfo != null) {
+                        result.add(apiInfo);
+                    } else {
+                        ApiInfo.ApiInfoKey apiInfoKey = new ApiInfo.ApiInfoKey(collectionId, url, Method.fromString(method));
+                        ApiInfo minimalApiInfo = new ApiInfo();
+                        minimalApiInfo.setId(apiInfoKey);
+                        result.add(minimalApiInfo);
+                    }
+                }
+                break;
+                
+            case "THIRD_PARTY":
+                int sevenDaysAgo = (int) (System.currentTimeMillis() / 1000) - 604800; // 7 days in seconds
+                Bson thirdPartyFilter = Filters.and(
+                    filterQ,
+                    Filters.gte(ApiInfo.LAST_SEEN, sevenDaysAgo),
+                    Filters.in(ApiInfo.API_ACCESS_TYPES, ApiInfo.ApiAccessType.THIRD_PARTY)
+                );
+                result = ApiInfoDao.instance.findAll(thirdPartyFilter);
+                break;
+                
+            default:
+                addActionError("Invalid filter type: " + filterType);
+                return Action.ERROR.toUpperCase();
+        }
+        
+        BasicDBObject response = new BasicDBObject();
+        response.put("apiInfos", result);
+        
+        this.response = response;
+        return Action.SUCCESS.toUpperCase();
+    }
+    
+    public void setFilterType(String filterType) {
+        this.filterType = filterType;
+    }
+
 
     public List<ApiCollection> getApiCollections() {
         return this.apiCollections;
