@@ -62,9 +62,9 @@ public class ThreatDetector {
             if (threatFilter.getId().equals(LFI_FILTER_ID)) {
                 return isLFiThreat(httpResponseParams);
             }
-            if (threatFilter.getId().equals(SQL_INJECTION_FILTER_ID)) {
-                return isSqliThreat(httpResponseParams);
-            }
+            // if (threatFilter.getId().equals(SQL_INJECTION_FILTER_ID)) {
+            //     return isSqliThreat(httpResponseParams);
+            // }
             if (threatFilter.getId().equals(OS_COMMAND_INJECTION_FILTER_ID)) {
                 return isOsCommandInjectionThreat(httpResponseParams); 
             }
