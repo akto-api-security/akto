@@ -121,10 +121,13 @@ export default function Header() {
         PersistStore.getState().setAllCollections([]);
         PersistStore.getState().setCollectionsMap({});
         PersistStore.getState().setHostNameMap({});
+        PersistStore.getState().setLastCalledSensitiveInfo(0);
+        PersistStore.getState().setLastFetchedInfo({ lastRiskScoreInfo: 0, lastSensitiveInfo: 0 });
         LocalStore.getState().setCategoryMap({}); 
         SessionStore.getState().setThreatFiltersMap({});
         setDashboardCategory(value);
         window.location.reload();
+        window.location.href("/dashboard/observe/inventory")
     }
 
     function createNewAccount() {
@@ -244,7 +247,7 @@ export default function Header() {
                                         { value: "Gen AI", label: "Gen AI", id: "gen-ai" },
                                     ]}
                                     initial={dashboardCategory || "API Security"}
-                                    selected={handleDashboardChange}
+                                    selected={(val) => handleDashboardChange(val)}
                                 />
                             </Box>
                         </HorizontalStack>
