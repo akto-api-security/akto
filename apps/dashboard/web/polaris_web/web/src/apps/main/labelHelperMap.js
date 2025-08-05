@@ -6,6 +6,8 @@ export const labelMap = {
     "API Collections": "API Collections",
     "API Collection Coverage": "API Collection Coverage",
     "API collection name": "API Collection Name",
+    "API Testing": "API Testing",
+    "Threat Detection": "API Threat Detection"
   },
   "MCP Security": {
     "API Security Posture": "MCP Security Posture",
@@ -14,13 +16,17 @@ export const labelMap = {
     "API Collections": "MCP Collections",
     "API Collection Coverage": "MCP Collection Coverage",
     "API collection name": "MCP Collection Name",
+    "API Testing": "MCP Security Testing",
+    "Threat Detection": "MCP Protection"
   },
   "Gen AI": {
-    "API Security Posture": "Gen AI Security Posture",
-    "API Discovery": "Gen AI Discovery",
-    "API collections": "Gen AI Collections",
-    "API Collections": "Gen AI Collections",
-    "API Collection Coverage": "Gen AI Collection Coverage",
-    "API collection name": "Gen AI Collection Name",
+    "API Security Posture": "AI Agent Security Posture",
+    "API Discovery": "AI Agent Discovery",
+    "API collections": "AI Agent Collections",
+    "API Collections": "AI Agent Collections",
+    "API Collection Coverage": "AI Agent Collection Coverage",
+    "API collection name": "AI Agent Collection Name",
+    "API Testing": "AI Agent Security Testing",
+    "Threat Detection": "AI Agent Security"
   },
 }
