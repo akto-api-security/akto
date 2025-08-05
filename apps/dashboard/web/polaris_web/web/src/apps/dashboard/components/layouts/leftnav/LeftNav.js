@@ -15,7 +15,7 @@ import PersistStore from "../../../../main/PersistStore";
 import LocalStore from "../../../../main/LocalStorageStore";
 import Store from "../../../store";
 import api from "../../../../signup/api";
-import {useEffect, useMemo, useState} from "react";
+import { useMemo, useState} from "react";
 import func from "@/util/func";
 import Dropdown from "../Dropdown";
 import SessionStore from "../../../../main/SessionStore";
@@ -178,7 +178,7 @@ export default function LeftNav() {
                                 : ""
                         }
                     >
-                        Testing
+                        {mapLabel("API Testing", dashboardCategory)}
                     </Text>
                 ),
                 icon: MarketingFilledMinor,
@@ -294,7 +294,7 @@ export default function LeftNav() {
             ...(window?.STIGG_FEATURE_WISE_ALLOWED?.THREAT_DETECTION?.isGranted ? [{
                     label: (
                         <Text variant="bodyMd" fontWeight="medium">
-                            API Protection
+                            {mapLabel("Threat Detection", dashboardCategory)}
                         </Text>
                     ),
                     icon: DiamondAlertMinor,
