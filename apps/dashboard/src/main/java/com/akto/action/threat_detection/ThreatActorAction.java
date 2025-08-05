@@ -90,10 +90,10 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
     post.addHeader("Authorization", "Bearer " + this.getApiToken());
     post.addHeader("Content-Type", "application/json");
 
-    if(startTs == 0 || endTs == 0) {
-      startTs = Context.now() - 1 * 24 * 60 * 60; // default to last 1 day
-      endTs = Context.now();
+    if(endTs <= 0){
+        endTs = Context.now();
     }
+    startTs = Math.max(startTs, 0);
 
     List<String> templatesContext = getTemplates(this.latestAttack);
 

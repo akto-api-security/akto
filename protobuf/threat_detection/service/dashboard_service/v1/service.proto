@@ -148,6 +148,7 @@ message ListThreatApiResponse {
 message ThreatActorByCountryRequest {
   uint32 start_ts = 1;
   uint32 end_ts = 2;
+  repeated string latest_attack = 3;
 }
 
 message ThreatActorByCountryResponse {
@@ -162,6 +163,7 @@ message ThreatActorByCountryResponse {
 message ThreatCategoryWiseCountRequest {
   uint32 start_ts = 1;
   uint32 end_ts = 2;
+  repeated string latest_attack = 3;
 }
 
 message ThreatActorFilterRequest {
@@ -186,6 +188,7 @@ message ThreatCategoryWiseCountResponse {
 message ThreatSeverityWiseCountRequest {
   uint32 start_ts = 1;
   uint32 end_ts = 2;
+  repeated string latest_attack = 3;
 }
 
 message ThreatSeverityWiseCountResponse {
@@ -200,6 +203,7 @@ message ThreatSeverityWiseCountResponse {
 message DailyActorsCountRequest {
   uint32 start_ts = 1;
   uint32 end_ts = 2;
+  repeated string latest_attack = 3;
 }
 
 message DailyActorsCountResponse {
@@ -215,6 +219,7 @@ message DailyActorsCountResponse {
 message ThreatActivityTimelineRequest {
   uint32 start_ts = 1;
   uint32 end_ts = 2;
+  repeated string latest_attack = 3;
 }
 
 message ThreatActivityTimelineResponse {
