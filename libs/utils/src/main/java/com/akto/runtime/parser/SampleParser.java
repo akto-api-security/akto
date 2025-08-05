@@ -136,7 +136,7 @@ public class SampleParser {
                 }
             }
         } catch (Exception e) {
-            printL("Error decoding gzip encoding: " + e.getMessage());
+            printL("Failed to decompress gzip payload: " + e.getMessage());
         }
         return payload;
     }
