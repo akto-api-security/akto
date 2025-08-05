@@ -241,8 +241,9 @@ function SingleTestRunPage() {
 
       return { ...prev };
     });
+    let updateTable = currentSummary.hexId !== summary.hexId;
     setCurrentSummary(summary);
-    if (!initialCall) {
+    if (!initialCall && updateTable) {
       setUpdateTable(Date.now().toString())
     }
   }
@@ -419,34 +420,40 @@ function SingleTestRunPage() {
             setMissingConfigs(transform.getMissingConfigs(testRunResultsRes))
           }
         })
-        if (!func.deepComparison(copyFilters, filters) || copyUpdateTable !== updateTable) {
-          if(copyUpdateTable !== updateTable){
-            setCopyUpdateTable(updateTable)
-          }else{
-            setCopyFilters(filters)
-          }
-          await api.fetchTestRunResultsCount(localSelectedTestRun.testingRunResultSummaryHexId).then((testCountMap) => {
-            if(testCountMap !== null){
-              localCountMap = JSON.parse(JSON.stringify(testCountMap))  
-            }
-            //Assuming vulnerable count is after removing ignored issues aLL - (OOTHER COUNT + IGNORED)
-            localCountMap['IGNORED_ISSUES'] = ignoredIssueListCount
-            let countOthers = 0;
-            Object.keys(localCountMap).forEach((x) => {
-              if (x !== 'ALL') {
-                countOthers += localCountMap[x]
-              }
-            })
-            localCountMap['SECURED'] = localCountMap['ALL'] >= countOthers ? localCountMap['ALL'] - countOthers : 0
-            const orderedValues = tableTabsOrder.map(key => localCountMap[tableTabMap[key]] || 0)
-            setTestRunResultsCount(orderedValues)
-            setTestRunCountMap(JSON.parse(JSON.stringify(localCountMap)));
-          })
+      }
+      if (!func.deepComparison(copyFilters, filters) || copyUpdateTable !== updateTable) {
+        if(copyUpdateTable !== updateTable){
+          setCopyUpdateTable(updateTable)
+        }else{
+          setCopyFilters(filters)
         }
+        await api.fetchTestRunResultsCount(localSelectedTestRun.testingRunResultSummaryHexId, filters).then((testCountMap) => {
+          if(testCountMap !== null){
+            localCountMap = JSON.parse(JSON.stringify(testCountMap))  
+          }
+          //Assuming vulnerable count is after removing ignored issues aLL - (OTHER COUNT + IGNORED)
+          if(selectedTab === 'vulnerable'){
+            localCountMap['IGNORED_ISSUES'] = ignoredIssueListCount
+          }else{
+            localCountMap['IGNORED_ISSUES'] = testRunCountMap['IGNORED_ISSUES'] || 0
+          }
+          let countOthers = 0;
+          Object.keys(localCountMap).forEach((x) => {
+            if (x !== 'ALL') {
+              countOthers += localCountMap[x]
+            }
+          })
+          localCountMap['SECURED'] = localCountMap['ALL'] >= countOthers ? localCountMap['ALL'] - countOthers : 0
+          const orderedValues = tableTabsOrder.map(key => localCountMap[tableTabMap[key]] || 0)
+          setTestRunResultsCount(orderedValues)
+          setTestRunCountMap(JSON.parse(JSON.stringify(localCountMap)));
+        })
       }
     }
     const key = tableTabMap[selectedTab]
-    const total = (testRunCountMap[key] !== undefined && testRunCountMap[key] !== 0) ? testRunCountMap[key] : localCountMap[key]
+    console.log("key", key)
+    console.log("count", testRunCountMap[key], localCountMap[key], ignoredIssueListCount, totalIgnoredIssuesCount)
+    const total = localCountMap[key]
     fillTempData(testRunResultsRes, selectedTab)
     return { value: transform.getPrettifiedTestRunResults(testRunResultsRes), total: selectedTab === 'ignored_issues' ? totalIgnoredIssuesCount : total }
   }

@@ -1418,6 +1418,7 @@ public class StartTestAction extends UserAction {
                     );
 
                     Map<String, Integer> totalCountIssues = new HashMap<>();
+                    totalCountIssues.put("CRITICAL", 0);
                     totalCountIssues.put("HIGH", 0);
                     totalCountIssues.put("MEDIUM", 0);
                     totalCountIssues.put("LOW", 0);
@@ -1526,7 +1527,7 @@ public class StartTestAction extends UserAction {
         try {
             List<Bson> pipeLine = new ArrayList<>();
             pipeLine.add(
-                Aggregates.match(Filters.eq(TestingRunResultSummary.STATE, State.COMPLETED.toString()))
+                Aggregates.match(Filters.and(Filters.eq(TestingRunResultSummary.STATE, State.COMPLETED.toString()), Filters.gt(TestingRunResultSummary.START_TIMESTAMP, 0)))
             );
             pipeLine.add(Aggregates.sort(
                 Sorts.descending(TestingRunResultSummary.START_TIMESTAMP)

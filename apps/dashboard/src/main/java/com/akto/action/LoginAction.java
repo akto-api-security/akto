@@ -52,6 +52,8 @@ import org.apache.struts2.interceptor.ServletRequestAware;
 import org.apache.struts2.interceptor.ServletResponseAware;
 import org.bson.conversions.Bson;
 
+import static com.akto.action.testing.Utils.recalculateTestingIssuesCount;
+
 // Validates user from the supplied username and password
 // Generates refresh token jwt using the username if valid user
 // Saves the refresh token to db (TODO)
@@ -260,6 +262,20 @@ public class LoginAction implements Action, ServletResponseAware, ServletRequest
                     }
                 } catch (Exception e) {
                     e.printStackTrace();
+                }
+
+                // update issues count and redundant url count on login in every 12 hours
+                if ((tempUser.getLastLoginTs() + 12 * 60 * 60 ) < Context.now()) {
+                    service.submit(() -> {
+                        try {
+                            for (String accountIdStr : user.getAccounts().keySet()) {
+                                int accountId = Integer.parseInt(accountIdStr);
+                                Context.accountId.set(accountId);
+                                recalculateTestingIssuesCount();
+                            }
+                        } catch (Exception e) {
+                        }
+                    });
                 }
 
                 if ((tempUser.getLastLoginTs() + REFRESH_INTERVAL) < Context.now()) {

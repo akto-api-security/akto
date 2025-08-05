@@ -34,12 +34,13 @@ export default {
         })
         return resp        
     },
-    async fetchTestRunResultsCount(testingRunResultSummaryHexId) {
+    async fetchTestRunResultsCount(testingRunResultSummaryHexId, filters) {
         const resp = await request({
             url: '/api/fetchTestRunResultsCount',
             method: 'post',
             data: {
-                testingRunResultSummaryHexId
+                testingRunResultSummaryHexId,
+                filters
             }
         })
         return resp        
