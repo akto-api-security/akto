@@ -52,6 +52,7 @@ public class GlobalEnums {
         MCP_INPUT_VALIDATION("MCP_INPUT_VALIDATION", Severity.HIGH, "Model Context Protocol (MCP) Security - Input Validation", "MCP_INPUT_VALIDATION"),
         MCP_DOS("MCP_DOS", Severity.HIGH, "Model Context Protocol (MCP) Security - Denial of Service", "MCP_DOS"),
         MCP_SENSITIVE_DATA_LEAKAGE("MCP_SENSITIVE_DATA_LEAKAGE", Severity.HIGH, "Model Context Protocol (MCP) Security - Sensitive Data Leakage", "MCP_SENSITIVE_DATA_LEAKAGE"),
+        MCP_CI("MCP_CI", Severity.HIGH, "MCP - Command Injection Attacks", "MCP_CI"),
         LLM01("LLM01", Severity.HIGH, "LLM01 - Prompt Injection", "LLM01"),
         LLM02("LLM02", Severity.HIGH, "LLM02 - Sensitive Information Disclosure", "LLM02"),
         LLM03("LLM03", Severity.HIGH, "LLM03 - Supply Chain", "LLM03"),
