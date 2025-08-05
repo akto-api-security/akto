@@ -3,6 +3,7 @@ package com.akto.action.threat_detection;
 import com.akto.ProtoMessageUtils;
 import com.akto.dao.ConfigsDao;
 import com.akto.dao.context.Context;
+import com.akto.dao.monitoring.FilterYamlTemplateDao;
 import com.akto.dto.Config;
 import com.akto.dto.Config.AwsWafConfig;
 import com.akto.dto.OriginalHttpRequest;
@@ -16,6 +17,7 @@ import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.Th
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatActorFilterResponse;
 import com.akto.testing.ApiExecutor;
 import com.akto.util.Constants;
+import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
@@ -93,10 +95,13 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
       endTs = Context.now();
     }
 
+    List<String> templatesContext = getTemplates(this.latestAttack);
+
     Map<String, Object> body = new HashMap<String, Object>() {
       {
         put("start_ts", startTs);
         put("end_ts", endTs);
+        put("latestAttack", templatesContext);
       }
     };
     String msg = objectMapper.valueToTree(body).toString();
@@ -128,6 +133,8 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
     HttpGet get = new HttpGet(String.format("%s/api/dashboard/fetch_filters_for_threat_actors", this.getBackendUrl()));
     get.addHeader("Authorization", "Bearer " + this.getApiToken());
     get.addHeader("Content-Type", "application/json");
+    int accountId = Context.accountId.get();
+    CONTEXT_SOURCE source = Context.contextSource.get();
 
     try (CloseableHttpResponse resp = this.httpClient.execute(get)) {
       String responseBody = EntityUtils.toString(resp.getEntity());
@@ -137,7 +144,11 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
           .ifPresent(
               msg -> {
                 this.country = msg.getCountriesList();
-                this.latestAttack = msg.getSubCategoriesList();
+                Set<String> allowedTemplates = FilterYamlTemplateDao.getContextTemplatesForAccount(accountId, source);
+                this.latestAttack =
+                    msg.getSubCategoriesList().stream()
+                        .filter(allowedTemplates::contains)
+                        .collect(Collectors.toList());
                 this.actorId = msg.getActorIdList();
               });
     } catch (Exception e) {

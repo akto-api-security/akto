@@ -96,6 +96,7 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
       {
         put("start_ts", startTs);
         put("end_ts", endTs);
+        put("latestAttack", getTemplates(latestAttack));
       }
     };
     String msg = objectMapper.valueToTree(body).toString();
@@ -139,6 +140,7 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
       {
         put("start_ts", startTs);
         put("end_ts", endTs);
+        put("latestAttack", getTemplates(latestAttack));
       }
     };
     String msg = objectMapper.valueToTree(body).toString();
@@ -172,10 +174,13 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
     post.addHeader("Authorization", "Bearer " + this.getApiToken());
     post.addHeader("Content-Type", "application/json");
 
+    List<String> templatesContext = getTemplates(this.latestAttack);
+
     Map<String, Object> body = new HashMap<String, Object>() {
       {
         put("start_ts", startTs);
         put("end_ts", endTs);
+        put("latestAttack", templatesContext);
       }
     };
     String msg = objectMapper.valueToTree(body).toString();
@@ -210,10 +215,13 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
     post.addHeader("Authorization", "Bearer " + this.getApiToken());
     post.addHeader("Content-Type", "application/json");
 
+    List<String> templatesContext = getTemplates(this.latestAttack);
+
     Map<String, Object> body = new HashMap<String, Object>() {
       {
         put("start_ts", startTs);
         put("end_ts", endTs);
+        put("latestAttack", templatesContext);
       }
     };
     String msg = objectMapper.valueToTree(body).toString();

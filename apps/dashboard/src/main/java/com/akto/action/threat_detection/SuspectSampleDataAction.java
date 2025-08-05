@@ -1,14 +1,18 @@
 package com.akto.action.threat_detection;
 
 import com.akto.ProtoMessageUtils;
+import com.akto.dao.context.Context;
+import com.akto.dao.monitoring.FilterYamlTemplateDao;
 import com.akto.dto.traffic.SuspectSampleData;
 import com.akto.dto.type.URLMethods;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchAlertFiltersResponse;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ListMaliciousRequestsResponse;
+import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpGet;
@@ -145,6 +149,9 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
     get.addHeader("Authorization", "Bearer " + this.getApiToken());
     get.addHeader("Content-Type", "application/json");
 
+    int accountId = Context.accountId.get();
+    CONTEXT_SOURCE source = Context.contextSource.get();
+
     try (CloseableHttpResponse resp = this.httpClient.execute(get)) {
       String responseBody = EntityUtils.toString(resp.getEntity());
 
@@ -154,7 +161,11 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
               msg -> {
                 this.ips = msg.getActorsList();
                 this.urls = msg.getUrlsList();
-                this.subCategory = msg.getSubCategoryList();
+                Set<String> allowedTemplates = FilterYamlTemplateDao.getContextTemplatesForAccount(accountId, source);
+                this.subCategory =
+                    msg.getSubCategoryList().stream()
+                        .filter(allowedTemplates::contains)
+                        .collect(Collectors.toList());
               });
     } catch (Exception e) {
       e.printStackTrace();
