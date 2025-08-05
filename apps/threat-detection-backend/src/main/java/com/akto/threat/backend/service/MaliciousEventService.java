@@ -148,9 +148,9 @@ public class MaliciousEventService {
     Map<String, Integer> sort = request.getSortMap();
     ListMaliciousRequestsRequest.Filter filter = request.getFilter();
 
-    if(filter.getLatestAttackList() == null || filter.getLatestAttackList().isEmpty()) {
-      return ListMaliciousRequestsResponse.newBuilder().build();
-    }
+//    if(filter.getLatestAttackList() == null || filter.getLatestAttackList().isEmpty()) {
+//      return ListMaliciousRequestsResponse.newBuilder().build();
+//    }
 
     MongoCollection<MaliciousEventModel> coll =
         this.mongoClient

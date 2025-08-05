@@ -45,9 +45,9 @@ public class ThreatApiService {
     List<Document> base = new ArrayList<>();
     ListThreatApiRequest.Filter filter = request.getFilter();
 
-    if(filter.getLatestAttackList() == null || filter.getLatestAttackList().isEmpty()) {
-      return ListThreatApiResponse.newBuilder().build();
-    }
+//    if(filter.getLatestAttackList() == null || filter.getLatestAttackList().isEmpty()) {
+//      return ListThreatApiResponse.newBuilder().build();
+//    }
 
     Document match = new Document();
     if (!filter.getMethodsList().isEmpty()) {
@@ -131,9 +131,9 @@ public class ThreatApiService {
   public ThreatCategoryWiseCountResponse getSubCategoryWiseCount(
     String accountId, ThreatCategoryWiseCountRequest req) {
 
-    if(req.getLatestAttackList() == null || req.getLatestAttackList().isEmpty()) {
-      return ThreatCategoryWiseCountResponse.newBuilder().build();
-    }
+//    if(req.getLatestAttackList() == null || req.getLatestAttackList().isEmpty()) {
+//      return ThreatCategoryWiseCountResponse.newBuilder().build();
+//    }
 
     loggerMaker.info("getSubCategoryWiseCount start ts " + Context.now());
 
@@ -193,9 +193,9 @@ public class ThreatApiService {
   public ThreatSeverityWiseCountResponse getSeverityWiseCount(
     String accountId, ThreatSeverityWiseCountRequest req) {
 
-    if(req.getLatestAttackList() == null || req.getLatestAttackList().isEmpty()) {
-      return ThreatSeverityWiseCountResponse.newBuilder().build();
-    }
+//    if(req.getLatestAttackList() == null || req.getLatestAttackList().isEmpty()) {
+//      return ThreatSeverityWiseCountResponse.newBuilder().build();
+//    }
 
     loggerMaker.info("getSeverityWiseCount start ts " + Context.now());
 

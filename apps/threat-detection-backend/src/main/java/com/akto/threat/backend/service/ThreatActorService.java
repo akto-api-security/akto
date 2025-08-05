@@ -141,9 +141,9 @@ public class ThreatActorService {
         ListThreatActorsRequest.Filter filter = request.getFilter();
         Document match = new Document();
 
-        if(filter.getLatestAttackList() == null || filter.getLatestAttackList().isEmpty()) {
-            return ListThreatActorResponse.newBuilder().build();
-        }
+//        if(filter.getLatestAttackList() == null || filter.getLatestAttackList().isEmpty()) {
+//            return ListThreatActorResponse.newBuilder().build();
+//        }
 
         // Apply filters
         if (!filter.getActorsList().isEmpty()) match.append("actor", new Document("$in", filter.getActorsList()));
@@ -461,9 +461,9 @@ public class ThreatActorService {
   public ThreatActorByCountryResponse getThreatActorByCountry(
       String accountId, ThreatActorByCountryRequest request) {
 
-      if(request.getLatestAttackList() == null || request.getLatestAttackList().isEmpty()) {
-          return ThreatActorByCountryResponse.newBuilder().build();
-      }
+//      if(request.getLatestAttackList() == null || request.getLatestAttackList().isEmpty()) {
+//          return ThreatActorByCountryResponse.newBuilder().build();
+//      }
 
     MongoCollection<Document> coll =
         this.mongoClient
