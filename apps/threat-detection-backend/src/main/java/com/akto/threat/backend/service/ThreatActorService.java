@@ -148,7 +148,7 @@ public class ThreatActorService {
         // Apply filters
         if (!filter.getActorsList().isEmpty()) match.append("actor", new Document("$in", filter.getActorsList()));
         if (!filter.getLatestIpsList().isEmpty()) match.append("latestApiIp", new Document("$in", filter.getLatestIpsList()));
-        if (!filter.getLatestAttackList().isEmpty()) match.append("subCategory", new Document("$in", filter.getLatestAttackList()));
+        if (!filter.getLatestAttackList().isEmpty()) match.append("filterId", new Document("$in", filter.getLatestAttackList()));
         if (!filter.getCountryList().isEmpty()) match.append("country", new Document("$in", filter.getCountryList()));
         if (filter.hasDetectedAtTimeRange()) {
             match.append("detectedAt", new Document("$gte", filter.getDetectedAtTimeRange().getStart()).append("$lte", filter.getDetectedAtTimeRange().getEnd()));
@@ -169,7 +169,7 @@ public class ThreatActorService {
             .append("latestApiIp", new Document("$first", "$latestApiIp"))
             .append("country", new Document("$first", "$country"))
             .append("discoveredAt", new Document("$first", "$detectedAt"))
-            .append("latestSubCategory", new Document("$first", "$subCategory"))
+            .append("latestSubCategory", new Document("$first", "$filterId"))
         ));
 
         // Facet: count and paginated result
@@ -204,7 +204,7 @@ public class ThreatActorService {
                     activityDataList.add(ActivityData.newBuilder()
                         .setUrl(doc2.getString("latestApiEndpoint"))
                         .setDetectedAt(doc2.getLong("detectedAt"))
-                        .setSubCategory(doc2.getString("subCategory"))
+                        .setSubCategory(doc2.getString("filterId"))
                         .setSeverity(doc2.getString("severity"))
                         .setMethod(doc2.getString("latestApiMethod"))
                         .build());

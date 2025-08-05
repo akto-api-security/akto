@@ -103,7 +103,7 @@ public class MaliciousEventService {
 
     Set<String> latestAttack =
         MaliciousEventService.<String>findDistinctFields(
-            coll, "subCategory", String.class, Filters.empty());
+            coll, "filterId", String.class, Filters.empty());
 
     Set<String> countries =
         MaliciousEventService.<String>findDistinctFields(
@@ -131,7 +131,7 @@ public class MaliciousEventService {
             coll, "latestApiEndpoint", String.class, Filters.empty());
     Set<String> subCategories =
         MaliciousEventService.<String>findDistinctFields(
-            coll, "subCategory", String.class, Filters.empty());
+            coll, "filterId", String.class, Filters.empty());
 
     return FetchAlertFiltersResponse.newBuilder().addAllActors(actors).addAllUrls(urls).addAllSubCategory(subCategories).build();
   }
