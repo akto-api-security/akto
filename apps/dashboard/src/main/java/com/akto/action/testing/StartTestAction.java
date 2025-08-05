@@ -75,6 +75,7 @@ public class StartTestAction extends UserAction {
     private Map<String, String> metadata;
     private String triggeredBy;
     private boolean isTestRunByTestEditor;
+    private String overriddenTestAppUrl;
     private Map<ObjectId, TestingRunResultSummary> latestTestingRunResultSummaries;
     private Map<String, String> sampleDataVsCurlMap;
     private static final LoggerMaker loggerMaker = new LoggerMaker(StartTestAction.class, LogDb.DASHBOARD);
