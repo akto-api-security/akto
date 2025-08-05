@@ -277,13 +277,13 @@ const transform = {
         }
     },
     fillSensitiveParams: (sensitiveParams, apiCollection) => {
-        sensitiveParams = sensitiveParams.reduce((z,e) => {
+        sensitiveParams = sensitiveParams && sensitiveParams.reduce((z,e) => {
             let key = [e.apiCollectionId + "-" + e.url + "-" + e.method]
             z[key] = z[key] || new Set()
             z[key].add(e.subType || {"name": "CUSTOM"})
             return z
         },{})
-        Object.entries(sensitiveParams).forEach(p => {
+        sensitiveParams && Object.entries(sensitiveParams).forEach(p => {
             let apiCollectionIndex = apiCollection.findIndex(e => {
                 return (e.apiCollectionId + "-" + e.url + "-" + e.method) === p[0]
             })

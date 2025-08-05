@@ -38,6 +38,7 @@ import com.akto.util.enums.GlobalEnums.Severity;
 import com.akto.util.enums.GlobalEnums.TestCategory;
 import com.akto.util.enums.GlobalEnums.TestErrorSource;
 import com.akto.util.enums.GlobalEnums.TestRunIssueStatus;
+import com.akto.utils.TestTemplateUtils;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.*;
@@ -544,17 +545,18 @@ public class IssuesAction extends UserAction {
 
     public String fetchAllSubCategories() {
         boolean includeYamlContent = false;
-
+        categories = TestTemplateUtils.getAllTestCategoriesWithinContext(Context.contextSource.get());
+        // Bson filters = Filters.in(
+        //         "info.category", Arrays.asList(categories)
+        // );
         switch (mode) {
             case "runTests":
-                categories = GlobalEnums.TestCategory.values();
                 break;
             case "testEditor":
                 includeYamlContent = true;
                 break;
             default:
                 includeYamlContent = true;
-                categories = GlobalEnums.TestCategory.values();
                 testSourceConfigs = TestSourceConfigsDao.instance.findAll(Filters.empty());
         }
 

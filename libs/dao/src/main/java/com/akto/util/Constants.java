@@ -54,4 +54,5 @@ public class Constants {
     public final static String DEFAULT_AKTO_DASHBOARD_URL = "https://app.akto.io";
     public static final String AKTO_DISCOVERED_APIS_COLLECTION = "shadow_apis";
     public static final String AKTO_MCP_SERVER_TAG = "mcp-server";
+    public static final String AKTO_GEN_AI_TAG = "gen-ai";
 }
