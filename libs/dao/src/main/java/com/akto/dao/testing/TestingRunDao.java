@@ -96,6 +96,7 @@ public class TestingRunDao extends AccountsContextDao<TestingRun> {
                 Context.accountId.get());
         Bson collectionFilter = Filters.or(
                 Filters.in(TestingRun._API_COLLECTION_ID, apiCollectionIds),
+                Filters.in(TestingRun._API_COLLECTION_ID_WORK_FLOW, apiCollectionIds),
                 Filters.in(TestingRun._API_COLLECTION_ID_IN_LIST, apiCollectionIds)
         );
         return Filters.and(q, collectionFilter);

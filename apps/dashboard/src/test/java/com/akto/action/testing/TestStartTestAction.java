@@ -2,22 +2,14 @@ package com.akto.action.testing;
 
 import com.akto.MongoBasedTest;
 import com.akto.action.ApiTokenAction;
-import com.akto.dao.AccountSettingsDao;
-import com.akto.dao.ApiTokensDao;
-import com.akto.dao.RBACDao;
-import com.akto.dao.UsersDao;
+import com.akto.dao.*;
 import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.testing.TestingRunConfigDao;
 import com.akto.dao.testing.TestingRunDao;
 import com.akto.dao.testing.TestingRunResultSummariesDao;
+import com.akto.dto.*;
 import com.akto.dto.testing.config.EditableTestingRunConfig;
-import com.akto.dto.AccountSettings;
-import com.akto.dto.ApiInfo;
-import com.akto.dto.ApiToken;
-import com.akto.dto.RBAC;
-import com.akto.dto.User;
-import com.akto.dto.UserAccountEntry;
 import com.akto.dto.ApiToken.Utility;
 import com.akto.dto.CollectionConditions.ConditionsType;
 import com.akto.dto.CollectionConditions.TestConfigsAdvancedSettings;
@@ -28,6 +20,7 @@ import com.akto.dto.testing.TestingRun.State;
 import com.akto.dto.type.URLMethods;
 import com.akto.filter.UserDetailsFilter;
 import com.akto.util.Constants;
+import com.akto.util.enums.GlobalEnums;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
@@ -57,14 +50,18 @@ public class TestStartTestAction extends MongoBasedTest {
     @Test
     public void testStopAllTests() {
         TestingRunDao.instance.getMCollection().drop();
+        ApiCollectionsDao.instance.getMCollection().drop();
 
         CollectionWiseTestingEndpoints collectionWiseTestingEndpoints = new CollectionWiseTestingEndpoints(1000);
         TestingRun testingRun1 = new TestingRun(Context.now(), "", collectionWiseTestingEndpoints,0, TestingRun.State.SCHEDULED, 0, "test", "", false);
 
-        CustomTestingEndpoints customTestingEndpoints = new CustomTestingEndpoints(Collections.singletonList(new ApiInfo.ApiInfoKey(0, "url", URLMethods.Method.GET)));
+        CustomTestingEndpoints customTestingEndpoints = new CustomTestingEndpoints(Collections.singletonList(new ApiInfo.ApiInfoKey(1000, "url", URLMethods.Method.GET)));
         TestingRun testingRun2 = new TestingRun(Context.now(), "", customTestingEndpoints ,0, TestingRun.State.SCHEDULED, 1, "test", "", false);
 
         WorkflowTestingEndpoints workflowTestingEndpoints = new WorkflowTestingEndpoints();
+        WorkflowTest workflowTest = new WorkflowTest();
+        workflowTest.setApiCollectionId(1000);
+        workflowTestingEndpoints.setWorkflowTest(workflowTest);
         TestingRun testingRun3 = new TestingRun(Context.now(), "",  workflowTestingEndpoints,1, TestingRun.State.SCHEDULED, 0, "test", "", false);
 
         TestingRun testingRun4 = new TestingRun(Context.now(), "", collectionWiseTestingEndpoints,0, TestingRun.State.RUNNING, 0, "test", "", false);
@@ -77,6 +74,14 @@ public class TestStartTestAction extends MongoBasedTest {
                 Filters.eq(TestingRun.STATE, TestingRun.State.SCHEDULED),
                 Filters.eq(TestingRun.STATE, TestingRun.State.RUNNING)
         );
+
+        Context.userId.set(0);
+        Context.contextSource.set(GlobalEnums.CONTEXT_SOURCE.API);
+
+        ApiCollection apiCollection = new ApiCollection();
+        apiCollection.setId(1000);
+        apiCollection.setName("test - test - test");
+        ApiCollectionsDao.instance.insertOne(apiCollection);
 
         List<TestingRun> testingRuns = TestingRunDao.instance.findAll(filter);
         assertEquals(4, testingRuns.size());
@@ -97,6 +102,7 @@ public class TestStartTestAction extends MongoBasedTest {
     @Test
     public void testFetchTestingRunResultSummaries() {
         TestingRunResultSummariesDao.instance.getMCollection().drop();
+        ApiCollectionsDao.instance.getMCollection().drop();
 
         List<TestingRunResultSummary> testingRunResultSummaryList = new ArrayList<>();
         ObjectId testingRunId = new ObjectId();
@@ -129,13 +135,12 @@ public class TestStartTestAction extends MongoBasedTest {
     @Test
     public void testStartTest() {
         TestingRunDao.instance.getMCollection().drop();
+        ApiCollectionsDao.instance.getMCollection().drop();
 
         CollectionWiseTestingEndpoints collectionWiseTestingEndpoints = new CollectionWiseTestingEndpoints(1000);
         TestingRun testingRun = new TestingRun(Context.now(), "", collectionWiseTestingEndpoints,0, TestingRun.State.COMPLETED, 0, "test", "", false);
         TestingRunDao.instance.insertOne(testingRun);
         String testingRunHexId = testingRun.getHexId();
-
-        assertEquals(1,TestingRunDao.instance.findAll(new BasicDBObject()).size());
 
         StartTestAction startTestAction = new StartTestAction();
         Map<String,Object> session = new HashMap<>();
@@ -143,9 +148,18 @@ public class TestStartTestAction extends MongoBasedTest {
         user.setLogin("test@akto.io");
         session.put("user",user);
         startTestAction.setSession(session);
-        Context.userId.set(null);
+        Context.userId.set(user.getId());
         startTestAction.setTestingRunHexId(testingRunHexId);
         startTestAction.startTest();
+
+        Context.contextSource.set(GlobalEnums.CONTEXT_SOURCE.API);
+
+        ApiCollection apiCollection = new ApiCollection();
+        apiCollection.setId(1000);
+        apiCollection.setName("test - test - test");
+        ApiCollectionsDao.instance.insertOne(apiCollection);
+
+        assertEquals(1,TestingRunDao.instance.findAll(new BasicDBObject()).size());
 
         List<TestingRun> testingRuns = TestingRunDao.instance.findAll(new BasicDBObject());
         assertEquals(1,testingRuns.size());
@@ -172,6 +186,7 @@ public class TestStartTestAction extends MongoBasedTest {
         UsersDao.instance.getMCollection().drop();
         AccountSettingsDao.instance.getMCollection().drop();
         TestingRunResultSummariesDao.instance.getMCollection().drop();
+        ApiCollectionsDao.instance.getMCollection().drop();
 
         // create an CICD API token, mock a server request with it and check if it recognizes it.
         
@@ -189,6 +204,9 @@ public class TestStartTestAction extends MongoBasedTest {
         UsersDao.instance.insertOne(user);
 
         user = UsersDao.instance.findOne(Filters.eq(User.LOGIN, login));
+
+        Context.userId.set(user.getId());
+        Context.contextSource.set(GlobalEnums.CONTEXT_SOURCE.API);
 
         RBAC rbac = new RBAC(user.getId(), Role.ADMIN.name(), ACCOUNT_ID);
         RBACDao.instance.insertOne(rbac);
@@ -246,6 +264,10 @@ public class TestStartTestAction extends MongoBasedTest {
         TestingRunDao.instance.insertOne(testingRun);
         String testingRunHexId = testingRun.getHexId();
 
+        ApiCollection apiCollection = new ApiCollection();
+        apiCollection.setId(1000);
+        apiCollection.setName("test - test - test");
+        ApiCollectionsDao.instance.insertOne(apiCollection);
         assertEquals(1, TestingRunDao.instance.findAll(new BasicDBObject()).size());
 
         // trigger startTest API with CICD session.
@@ -253,7 +275,6 @@ public class TestStartTestAction extends MongoBasedTest {
         Map<String,Object> testSession = new HashMap<>();
         testSession.put("utility", Utility.CICD.toString());
         startTestAction.setSession(testSession);
-        Context.userId.set(null);
         startTestAction.setTestingRunHexId(testingRunHexId);
         Map<String, String> metadata = new HashMap<>();
         metadata.put("test", "test");
@@ -275,6 +296,7 @@ public class TestStartTestAction extends MongoBasedTest {
     public void testModifyTestingRunConfig() {
         TestingRunConfigDao.instance.getMCollection().drop();
         TestingRunDao.instance.getMCollection().drop();
+        ApiCollectionsDao.instance.getMCollection().drop();
 
         int testingRunConfigId = UUID.randomUUID().hashCode() & 0xfffffff;
         ObjectId testingRunHexId = new ObjectId();
