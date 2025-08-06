@@ -86,6 +86,7 @@ public class TestExecutor {
 
     public void init(TestingRun testingRun, ObjectId summaryId, SyncLimit syncLimit, boolean shouldInitOnly) {
         totalTestsCount.set(0);
+        PrometheusMetricsHandler.markModuleBusy();
         if (testingRun.getTestIdConfig() != 1) {
             apiWiseInit(testingRun, summaryId, false, new ArrayList<>(), syncLimit, shouldInitOnly);
         } else {
