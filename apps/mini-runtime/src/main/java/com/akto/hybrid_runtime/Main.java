@@ -435,7 +435,7 @@ public class Main {
 
                         httpResponseParams = HttpCallParser.parseKafkaMessage(r.value());
                         if (httpResponseParams == null) {
-                            loggerMaker.error("httpresponse params is null");
+                            loggerMaker.error("httpresponse params was skipped due to invalid json requestBody");
                             continue;
                         }
                         HttpRequestParams requestParams = httpResponseParams.getRequestParams();
