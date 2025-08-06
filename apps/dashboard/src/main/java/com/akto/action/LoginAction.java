@@ -263,20 +263,6 @@ public class LoginAction implements Action, ServletResponseAware, ServletRequest
                     e.printStackTrace();
                 }
 
-                // update redundant url count on login in every 12 hours
-                if ((tempUser.getLastLoginTs() + 12 * 60 * 60 ) < Context.now()) {
-                    service.submit(() -> {
-                        try {
-                            for (String accountIdStr : user.getAccounts().keySet()) {
-                                int accountId = Integer.parseInt(accountIdStr);
-                                Context.accountId.set(accountId);
-                                CleanInventory.deleteApiInfosForMissingSTIs(true);
-                            }
-                        } catch (Exception e) {
-                        }
-                    });
-                }
-
                 if ((tempUser.getLastLoginTs() + REFRESH_INTERVAL) < Context.now()) {
                     service.submit(() -> {
                         try {
