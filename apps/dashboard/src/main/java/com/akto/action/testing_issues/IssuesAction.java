@@ -38,6 +38,7 @@ import com.akto.util.enums.GlobalEnums.Severity;
 import com.akto.util.enums.GlobalEnums.TestCategory;
 import com.akto.util.enums.GlobalEnums.TestErrorSource;
 import com.akto.util.enums.GlobalEnums.TestRunIssueStatus;
+import com.akto.utils.ApiInfoKeyResult;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.*;
@@ -856,46 +857,16 @@ public class IssuesAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
-    public String fetchBUACategoryCount(){
-        Bson filter = createFilters(true);
+    public String fetchBUACategoryCount() {
+        ApiInfoKeyResult result = com.akto.utils.Utils.fetchUniqueApiInfoKeys(
+                TestingRunIssuesDao.instance.getRawCollection(),
+                createFilters(true),
+                "_id.apiInfoKey",
+                this.showApiInfo
+        );
+        this.buaCategoryCount = result.count;
         if (this.showApiInfo) {
-            this.buaCategoryApiInfo = new ArrayList<>();
-            List<ApiInfoKey> apiInfoKeys = new ArrayList<>();
-            List<TestingRunIssues> issues = TestingRunIssuesDao.instance.findAll(filter);
-            for (TestingRunIssues issue : issues) {
-                ApiInfo.ApiInfoKey key = issue.getId().getApiInfoKey();
-                if (key != null) {
-                    apiInfoKeys.add(key);
-                }
-            }
-            if (!apiInfoKeys.isEmpty()) {
-                List<Bson> orFilters = new ArrayList<>();
-                for (ApiInfoKey key : apiInfoKeys) {
-                    orFilters.add(Filters.and(
-                        Filters.eq("_id.apiCollectionId", key.getApiCollectionId()),
-                        Filters.eq("_id.url", key.getUrl()),
-                        Filters.eq("_id.method", key.getMethod().name())
-                    ));
-                }
-                Bson apiInfoFilter = Filters.or(orFilters);
-                List<ApiInfo> foundApiInfos = ApiInfoDao.instance.findAll(apiInfoFilter);
-                Map<ApiInfoKey, ApiInfo> apiInfoMap = new HashMap<>();
-                for (ApiInfo apiInfo : foundApiInfos) {
-                    apiInfoMap.put(apiInfo.getId(), apiInfo);
-                }
-                for (ApiInfoKey key : apiInfoKeys) {
-                    ApiInfo apiInfo = apiInfoMap.get(key);
-                    if (apiInfo != null) {
-                        this.buaCategoryApiInfo.add(apiInfo);
-                    } else {
-                        ApiInfo minimalApiInfo = new ApiInfo(key);
-                        this.buaCategoryApiInfo.add(minimalApiInfo);
-                    }
-                }
-            }
-            this.buaCategoryCount = this.buaCategoryApiInfo.size();
-        } else {
-            this.buaCategoryCount = (int) TestingRunIssuesDao.instance.count(filter);
+            this.buaCategoryApiInfo = result.apiInfoList;
         }
         return Action.SUCCESS.toUpperCase();
     }

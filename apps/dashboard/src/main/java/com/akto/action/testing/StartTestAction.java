@@ -33,6 +33,7 @@ import com.akto.util.GroupByTimeRange;
 import com.akto.util.enums.GlobalEnums;
 import com.akto.util.enums.GlobalEnums.Severity;
 import com.akto.util.enums.GlobalEnums.TestErrorSource;
+import com.akto.utils.ApiInfoKeyResult;
 import com.akto.utils.DeleteTestRunUtils;
 import com.akto.utils.Utils;
 import com.google.gson.Gson;
@@ -1520,25 +1521,16 @@ public class StartTestAction extends UserAction {
             runResult.getTestSubType());
     }
 
-    public String fetchMisConfiguredTestsCount(){
+    public String fetchMisConfiguredTestsCount() {
+       ApiInfoKeyResult result = Utils.fetchUniqueApiInfoKeys(
+                TestingRunResultDao.instance.getRawCollection(),
+                Filters.eq(TestingRunResult.REQUIRES_CONFIG, true),
+                "apiInfoKey",
+                this.showApiInfo
+        );
+        this.misConfiguredTestsCount = result.count;
         if (this.showApiInfo) {
-            this.misConfiguredTestsApiInfo = new ArrayList<>();
-            List<TestingRunResult> results = TestingRunResultDao.instance.findAll(Filters.eq(TestingRunResult.REQUIRES_CONFIG, true));
-            for (TestingRunResult result : results) {
-                ApiInfo.ApiInfoKey key = result.getApiInfoKey();
-                if (key != null) {
-                    ApiInfo apiInfo = ApiInfoDao.instance.findOne(ApiInfoDao.getFilter(key.getUrl(), key.getMethod().name(), key.getApiCollectionId()));
-                    if (apiInfo != null) {
-                        this.misConfiguredTestsApiInfo.add(apiInfo);
-                    } else {
-                        ApiInfo minimalApiInfo = new ApiInfo(key);
-                        this.misConfiguredTestsApiInfo.add(minimalApiInfo);
-                    }
-                }
-            }
-            this.misConfiguredTestsCount = this.misConfiguredTestsApiInfo.size();
-        } else {
-            this.misConfiguredTestsCount = (int) TestingRunResultDao.instance.count(Filters.eq(TestingRunResult.REQUIRES_CONFIG, true));
+            this.misConfiguredTestsApiInfo = result.apiInfoList;
         }
         return Action.SUCCESS.toUpperCase();
     }

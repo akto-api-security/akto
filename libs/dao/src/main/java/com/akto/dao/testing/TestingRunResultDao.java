@@ -16,8 +16,10 @@ import com.akto.util.DbMode;
 import com.akto.util.enums.GlobalEnums;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
+import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.*;
+import org.bson.Document;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 
@@ -261,6 +263,10 @@ public class TestingRunResultDao extends AccountsContextDaoWithRbac<TestingRunRe
 
         fieldNames = new String[]{TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, TestingRunResult.VULNERABLE, TestingRunResult.API_INFO_KEY, TestingRunResult.TEST_SUB_TYPE};
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, false);
+    }
+
+    public MongoCollection<Document> getRawCollection() {
+        return clients[0].getDatabase(getDBName()).getCollection(getCollName(), Document.class);
     }
 
     public void convertToCappedCollection() {

@@ -11,10 +11,7 @@ import com.akto.dao.SampleDataDao;
 import com.akto.dao.SensitiveParamInfoDao;
 import com.akto.dao.SensitiveSampleDataDao;
 import com.akto.dao.SingleTypeInfoDao;
-import com.akto.dto.AccountSettings;
-import com.akto.dto.HttpResponseParams;
-import com.akto.dto.OriginalHttpRequest;
-import com.akto.dto.OriginalHttpResponse;
+import com.akto.dto.*;
 import com.akto.dto.dependency_flow.DependencyFlow;
 import com.akto.dto.testing.*;
 import com.akto.dto.third_party_access.Credential;
@@ -22,6 +19,7 @@ import com.akto.dto.third_party_access.PostmanCredential;
 import com.akto.dto.third_party_access.ThirdPartyAccess;
 import com.akto.dto.traffic.Key;
 import com.akto.dto.type.SingleTypeInfo;
+import com.akto.dto.type.URLMethods;
 import com.akto.dto.upload.FileUploadError;
 import com.akto.listener.KafkaListener;
 import com.akto.listener.RuntimeListener;
@@ -35,10 +33,17 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.google.gson.Gson;
 import com.mongodb.BasicDBObject;
+import com.mongodb.client.MongoCollection;
+import com.mongodb.client.model.Accumulators;
+import com.mongodb.client.model.Aggregates;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Projections;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
+import org.bson.Document;
+import org.bson.conversions.Bson;
+
 import java.io.File;
 import java.net.MalformedURLException;
 import java.net.URISyntaxException;
@@ -713,5 +718,45 @@ public class Utils {
         }
 
         return testResult;
+    }
+
+    public static ApiInfoKeyResult fetchUniqueApiInfoKeys(
+            MongoCollection<Document> collection,
+            Bson matchFilter,
+            String apiInfoKeyPath,
+            boolean showApiInfo
+    ) {
+        List<Bson> pipeline = new ArrayList<>();
+        pipeline.add(Aggregates.match(matchFilter));
+        pipeline.add(Aggregates.project(Projections.include(
+                apiInfoKeyPath + ".apiCollectionId",
+                apiInfoKeyPath + ".url",
+                apiInfoKeyPath + ".method"
+        )));
+        pipeline.add(Aggregates.group(
+                new BasicDBObject("apiCollectionId", "$" + apiInfoKeyPath + ".apiCollectionId")
+                        .append("url", "$" + apiInfoKeyPath + ".url")
+                        .append("method", "$" + apiInfoKeyPath + ".method"),
+                Accumulators.first("apiInfoKey", "$" + apiInfoKeyPath)
+        ));
+
+        Set<ApiInfo.ApiInfoKey> apiInfoKeys = new HashSet<>();
+        List<ApiInfo> apiInfoList = new ArrayList<>();
+        List<Document> results = collection.aggregate(pipeline, Document.class).into(new ArrayList<>());
+        for (Document doc : results) {
+            Document keyDoc = (Document) doc.get("apiInfoKey");
+            if (keyDoc != null) {
+                ApiInfo.ApiInfoKey key = new ApiInfo.ApiInfoKey(
+                        keyDoc.getInteger("apiCollectionId"),
+                        keyDoc.getString("url"),
+                        URLMethods.Method.fromString(keyDoc.getString("method"))
+                );
+                apiInfoKeys.add(key);
+                if (showApiInfo) {
+                    apiInfoList.add(new ApiInfo(key));
+                }
+            }
+        }
+        return new ApiInfoKeyResult(apiInfoKeys.size(), showApiInfo ? apiInfoList : null);
     }
 }
