@@ -40,6 +40,39 @@ public class SampleParser {
         }
     }
 
+    public static boolean isPossiblyIncompleteJson(String json) {
+        if (json == null || json.trim().isEmpty()) return true;
+
+        json = json.trim();
+
+        // Check for unbalanced curly braces
+        int openCurly = 0, openSquare = 0, quoteCount = 0;
+        boolean inString = false;
+
+        for (int i = 0; i < json.length(); i++) {
+            char c = json.charAt(i);
+
+            if (c == '"') {
+                // Skip escaped quotes
+                if (i > 0 && json.charAt(i - 1) == '\\') continue;
+                inString = !inString;
+                quoteCount++;
+            }
+
+            if (!inString) {
+                if (c == '{') openCurly++;
+                else if (c == '}') openCurly--;
+                else if (c == '[') openSquare++;
+                else if (c == ']') openSquare--;
+            }
+
+            if (openCurly < 0 || openSquare < 0) return true; // closing without opening
+        }
+
+        // If we are still inside a string or have unclosed braces
+        return inString || openCurly != 0 || openSquare != 0 || json.endsWith("{") || json.endsWith("[") || json.endsWith(",");
+    }
+
     public static HttpResponseParams parseSampleMessage(String message) throws Exception {
                 //convert java object to JSON format
         Map<String, Object> json = JSON.parseObject(message);
@@ -52,7 +85,15 @@ public class SampleParser {
         String rawRequestPayload = (String) json.get("requestPayload");
         String requestPayload = HttpRequestResponseUtils.rawToJsonString(rawRequestPayload,requestHeaders);
 
+        List<String> contentTypeList = requestHeaders.getOrDefault("content-type", new ArrayList<>());
 
+        String contentTypeHeader = "application/json";
+        if (contentTypeList.size() > 0) {
+            contentTypeHeader = contentTypeList.get(0);
+        }
+        if (contentTypeHeader.equals("application/json") && isPossiblyIncompleteJson(requestPayload)) {
+            return null;
+        }
 
         String apiCollectionIdStr = json.getOrDefault("akto_vxlan_id", "0").toString();
         int apiCollectionId = 0;
