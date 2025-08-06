@@ -23,6 +23,7 @@ import com.akto.password_reset.PasswordResetUtils;
 import com.akto.util.DashboardMode;
 import com.akto.utils.JWT;
 import com.akto.utils.Token;
+import com.akto.utils.jobs.CleanInventory;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.FindOneAndUpdateOptions;
@@ -51,8 +52,6 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.struts2.interceptor.ServletRequestAware;
 import org.apache.struts2.interceptor.ServletResponseAware;
 import org.bson.conversions.Bson;
-
-import static com.akto.action.testing.Utils.recalculateTestingIssuesCount;
 
 // Validates user from the supplied username and password
 // Generates refresh token jwt using the username if valid user
@@ -264,14 +263,14 @@ public class LoginAction implements Action, ServletResponseAware, ServletRequest
                     e.printStackTrace();
                 }
 
-                // update issues count and redundant url count on login in every 12 hours
+                // update redundant url count on login in every 12 hours
                 if ((tempUser.getLastLoginTs() + 12 * 60 * 60 ) < Context.now()) {
                     service.submit(() -> {
                         try {
                             for (String accountIdStr : user.getAccounts().keySet()) {
                                 int accountId = Integer.parseInt(accountIdStr);
                                 Context.accountId.set(accountId);
-                                recalculateTestingIssuesCount();
+                                CleanInventory.deleteApiInfosForMissingSTIs(true);
                             }
                         } catch (Exception e) {
                         }

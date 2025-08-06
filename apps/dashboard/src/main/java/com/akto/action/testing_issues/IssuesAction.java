@@ -1,7 +1,6 @@
 package com.akto.action.testing_issues;
 
 import com.akto.action.UserAction;
-import com.akto.action.testing.Utils;
 import com.akto.dao.HistoricalDataDao;
 import com.akto.dao.RBACDao;
 import com.akto.action.testing.StartTestAction;
@@ -36,7 +35,6 @@ import com.akto.util.GroupByTimeRange;
 import com.akto.util.enums.GlobalEnums;
 import com.akto.util.enums.GlobalEnums.Severity;
 import com.akto.util.enums.GlobalEnums.TestCategory;
-import com.akto.util.enums.GlobalEnums.TestErrorSource;
 import com.akto.util.enums.GlobalEnums.TestRunIssueStatus;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.MongoCursor;
@@ -667,92 +665,6 @@ public class IssuesAction extends UserAction {
     List<String> issueStatusQuery;
     List<TestingRunResult> testingRunResultList;
     private Map<String, List<String>> filters;
-
-    public String fetchIssuesByStatusAndSummaryId() {
-        if(latestTestingRunSummaryId == null || latestTestingRunSummaryId.isEmpty()){
-            addActionError("SummaryId is a required field and cannot be empty.");
-            return ERROR.toUpperCase();
-        }
-        if(!ObjectId.isValid(latestTestingRunSummaryId)){
-            addActionError("SummaryId is not valid");
-            return ERROR.toUpperCase();
-        }
-
-        ObjectId objectId = new ObjectId(latestTestingRunSummaryId);
-
-        Bson triFilters = Filters.and(
-                Filters.in(TestingRunIssues.TEST_RUN_ISSUES_STATUS, issueStatusQuery),
-                Filters.in(TestingRunIssues.LATEST_TESTING_RUN_SUMMARY_ID, objectId)
-        );
-        issues = TestingRunIssuesDao.instance.findAll(triFilters,
-            Projections.include("_id", TestingRunIssues.DESCRIPTION));
-        List<Bson> testingRunResultsFilterList = new ArrayList<>();
-        boolean isStoredInVulnerableCollection = VulnerableTestingRunResultDao.instance.isStoredInVulnerableCollection(objectId, true);
-        for(TestingRunIssues issue: issues) {
-            Bson filter = Filters.empty();
-            if(isStoredInVulnerableCollection){
-                filter = Filters.and(
-                    Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, new ObjectId(latestTestingRunSummaryId)),
-                    Filters.eq(TestingRunResult.API_INFO_KEY, issue.getId().getApiInfoKey()),
-                    Filters.eq(TestingRunResult.TEST_SUB_TYPE, issue.getId().getTestSubCategory())
-                );
-                
-            }else{
-                filter = Filters.and(
-                    Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, new ObjectId(latestTestingRunSummaryId)),
-                    Filters.eq(TestingRunResult.VULNERABLE, true),
-                    Filters.eq(TestingRunResult.API_INFO_KEY, issue.getId().getApiInfoKey()),
-                    Filters.eq(TestingRunResult.TEST_SUB_TYPE, issue.getId().getTestSubCategory())
-                );
-            }
-            testingRunResultsFilterList.add(filter);
-        }
-
-        List<Bson> filtersList = new ArrayList<>();
-        if(!testingRunResultsFilterList.isEmpty()) filtersList.add(Filters.or(testingRunResultsFilterList));
-        Bson filtersForTestingRunResults = Utils.createFiltersForTestingReport(filters);
-        if(!filtersForTestingRunResults.equals(Filters.empty())) filtersList.add(filtersForTestingRunResults);
-        Bson sortStage = StartTestAction.prepareTestingRunResultCustomSorting(sortKey, sortOrder);
-
-        if(filtersList.isEmpty()) {
-            testingRunResultList = new ArrayList<>();
-            return SUCCESS.toUpperCase();
-        }
-
-        if(isStoredInVulnerableCollection){
-            testingRunResultList = VulnerableTestingRunResultDao.instance.fetchLatestTestingRunResultWithCustomAggregations(Filters.and(filtersList), limit, skip, sortStage);
-        }else{
-            testingRunResultList = TestingRunResultDao.instance.fetchLatestTestingRunResultWithCustomAggregations(Filters.and(filtersList), limit, skip, sortStage);
-        }
-
-        this.issuesDescriptionMap = prepareIssueDescriptionMap(issues, testingRunResultList);
-
-        return SUCCESS.toUpperCase();
-    }
-
-    private Map<String, String> prepareIssueDescriptionMap(List<TestingRunIssues> issues,
-        List<TestingRunResult> testingRunResults) {
-
-        try {
-
-            if (testingRunResults == null || testingRunResults.isEmpty()) {
-                return Collections.emptyMap();
-            }
-
-            Map<TestingIssuesId, TestingRunResult> idToResultMap = new HashMap<>();
-            for (TestingRunResult result : testingRunResults) {
-                TestingIssuesId id = new TestingIssuesId(result.getApiInfoKey(), TestErrorSource.AUTOMATED_TESTING,
-                    result.getTestSubType());
-                idToResultMap.put(id, result);
-            }
-
-            return Utils.mapIssueDescriptions(issues, idToResultMap);
-        } catch (Exception e) {
-            logger.errorAndAddToDb(e, "Error while preparing issue description map");
-            return Collections.emptyMap();
-        }
-    }
-
     List<TestingIssuesId> issuesIds;
 
     public String fetchIssuesFromResultIds(){

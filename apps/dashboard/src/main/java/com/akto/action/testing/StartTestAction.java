@@ -33,6 +33,7 @@ import com.akto.util.GroupByTimeRange;
 import com.akto.util.enums.GlobalEnums;
 import com.akto.util.enums.GlobalEnums.Severity;
 import com.akto.util.enums.GlobalEnums.TestErrorSource;
+import com.akto.util.enums.GlobalEnums.TestRunIssueStatus;
 import com.akto.utils.DeleteTestRunUtils;
 import com.akto.utils.Utils;
 import com.google.gson.Gson;
@@ -41,6 +42,8 @@ import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.*;
 import com.mongodb.client.result.InsertOneResult;
 import com.opensymphony.xwork2.Action;
+import com.opensymphony.xwork2.util.ResolverUtil.Test;
+
 import lombok.Getter;
 import org.apache.commons.lang3.StringUtils;
 import org.bson.conversions.Bson;
@@ -707,18 +710,36 @@ public class StartTestAction extends UserAction {
         return sortStage;
     }
 
+    private Bson prepareIgnoredFilterListFromResults(List<Bson> filterList) {
+        List<TestingRunResult> testingRunResults = VulnerableTestingRunResultDao.instance
+                    .findAll(Filters.and(filterList), Projections.include(TestingRunResult.API_INFO_KEY, TestingRunResult.TEST_SUB_TYPE));
+        List<TestingIssuesId> issueIdsList = testingRunResults.stream()
+                .map(testingRunResult -> getTestingIssueIdFromRunResult(testingRunResult))
+                .distinct()
+                .collect(Collectors.toList());
+        return Filters.and(Filters.in(Constants.ID, issueIdsList), Filters.eq(TestingRunIssues.TEST_RUN_ISSUES_STATUS, TestRunIssueStatus.IGNORED));
+    }
+
     private Map<String, Integer> getCountMapForQueryMode(ObjectId testingRunResultSummaryId, QueryMode queryMode, int accountId){
         Context.accountId.set(accountId);
         Map<String, Integer> resultantMap = new HashMap<>();
 
-        List<Bson> filterList =  prepareTestRunResultsFilters(testingRunResultSummaryId, queryMode, true);
-        int count = VulnerableTestingRunResultDao.instance.countFromDb(Filters.and(filterList), queryMode.equals(QueryMode.VULNERABLE));
+        List<Bson> filterList =  prepareTestRunResultsFilters(testingRunResultSummaryId, queryMode, false);
+        int count = 0;
+        if(queryMode.equals(QueryMode.IGNORED_ISSUES)) {
+            // get all vulnerable results with only apiInfoKey, testSubType
+            // find ignored issues count from those id, return count
+            count = (int) TestingRunIssuesDao.instance.count(prepareIgnoredFilterListFromResults(filterList));
+        }else{
+            count = VulnerableTestingRunResultDao.instance.countFromDb(Filters.and(filterList), queryMode.equals(QueryMode.VULNERABLE));
+        }
+        
         resultantMap.put(queryMode.toString(), count);
 
         return resultantMap;
     }
 
-    private final ExecutorService multiExecService = Executors.newFixedThreadPool(5);
+    private final ExecutorService multiExecService = Executors.newFixedThreadPool(6);
 
     Map<String, Integer> testCountMap;
     public String fetchTestRunResultsCount() {
@@ -772,10 +793,6 @@ public class StartTestAction extends UserAction {
     List<TestingRunResult> testingRunResults;
     private boolean fetchOnlyVulnerable;
 
-    public long getIssueslistCount() {
-        return issueslistCount;
-    }
-
     public List<String> getSelectedTestRunResultHexIds() {
         return selectedTestRunResultHexIds;
     }
@@ -785,12 +802,11 @@ public class StartTestAction extends UserAction {
     }
 
     public enum QueryMode {
-        VULNERABLE, SECURED, SKIPPED_EXEC_NEED_CONFIG, SKIPPED_EXEC_NO_ACTION, SKIPPED_EXEC, ALL, SKIPPED_EXEC_API_REQUEST_FAILED;
+        VULNERABLE, SECURED, SKIPPED_EXEC_NEED_CONFIG, SKIPPED_EXEC_NO_ACTION, SKIPPED_EXEC, ALL, SKIPPED_EXEC_API_REQUEST_FAILED, IGNORED_ISSUES;
     }
     private QueryMode queryMode;
 
     private Map<TestError, String> errorEnums = new HashMap<>();
-    private long issueslistCount;
 
     @Getter
     private Map<String, String> jiraIssuesMapForResults;
@@ -821,20 +837,22 @@ public class StartTestAction extends UserAction {
         }
 
         try {
-            int pageLimit = limit <= 0 ? 150 : limit;
+            int pageLimit = queryMode.equals(QueryMode.IGNORED_ISSUES) ? 1000 : limit <= 0 ? 150 : limit;
             Bson sortStage = prepareTestingRunResultCustomSorting(sortKey, sortOrder);
 
             timeNow = Context.now();
             Bson filters = testingRunResultFilters.isEmpty() ? Filters.empty() : Filters.and(testingRunResultFilters);
             this.testingRunResults = VulnerableTestingRunResultDao.instance
-                    .fetchLatestTestingRunResultWithCustomAggregations(filters, pageLimit, skip, sortStage, testingRunResultSummaryId, queryMode.equals(QueryMode.VULNERABLE));
+                    .fetchLatestTestingRunResultWithCustomAggregations(filters, pageLimit, skip, sortStage, testingRunResultSummaryId, queryMode.equals(QueryMode.VULNERABLE) || queryMode.equals(QueryMode.IGNORED_ISSUES));
             loggerMaker.debugAndAddToDb("[" + (Context.now() - timeNow) + "] Fetched testing run results of size: " + testingRunResults.size(), LogDb.DASHBOARD);
-            BasicDBObject issueMetaDataMap = prepareIssueMetaDataMap(testingRunResults);
             timeNow = Context.now();
-            removeTestingRunResultsByIssues(testingRunResults, (Map<String, String>) issueMetaDataMap.get("statuses"));
-            this.issuesDescriptionMap = (Map<String, String>) issueMetaDataMap.get("descriptions");
-            this.issueslistCount = issueMetaDataMap.getInt("count");
-            this.jiraIssuesMapForResults = (Map<String, String>) issueMetaDataMap.get("jiraIssues");
+            if(queryMode.equals(QueryMode.VULNERABLE) || queryMode.equals(QueryMode.IGNORED_ISSUES)) {
+                List<TestRunIssueStatus> ignoreStatuses = queryMode.equals(QueryMode.IGNORED_ISSUES) ? Arrays.asList(TestRunIssueStatus.OPEN, TestRunIssueStatus.FIXED) : Arrays.asList(TestRunIssueStatus.IGNORED);
+                BasicDBObject issueMetaDataMap = prepareIssueMetaDataMap(testingRunResults, ignoreStatuses);
+                removeTestingRunResultsByIssues(testingRunResults, (Map<String, String>) issueMetaDataMap.get("statuses"));
+                this.issuesDescriptionMap = (Map<String, String>) issueMetaDataMap.get("descriptions");
+                this.jiraIssuesMapForResults = (Map<String, String>) issueMetaDataMap.get("jiraIssues");
+            }
             loggerMaker.debugAndAddToDb("[" + (Context.now() - timeNow) + "] Removed ignored issues from testing run results. Current size of testing run results: " + testingRunResults.size(), LogDb.DASHBOARD);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "error in fetchLatestTestingRunResult: " + e);
@@ -846,7 +864,7 @@ public class StartTestAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
-    private BasicDBObject prepareIssueMetaDataMap(List<TestingRunResult> testingRunResults) {
+    private BasicDBObject prepareIssueMetaDataMap(List<TestingRunResult> testingRunResults,List<TestRunIssueStatus> ignoreStatuses) {
         BasicDBObject issueMetaDataMap = new BasicDBObject();
         try {
             if (testingRunResults == null || testingRunResults.isEmpty()) {
@@ -866,7 +884,7 @@ public class StartTestAction extends UserAction {
                 Projections.include(TestingRunIssues.TEST_RUN_ISSUES_STATUS, TestingRunIssues.DESCRIPTION, TestingRunIssues.JIRA_ISSUE_URL)
             );
 
-            return buildIssueMetaDataMap(issues, idToResultMap);
+            return buildIssueMetaDataMap(issues, idToResultMap, ignoreStatuses);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error in preparing issue description map: " + e.getMessage());
             return issueMetaDataMap;
@@ -878,10 +896,8 @@ public class StartTestAction extends UserAction {
         while (resultIterator.hasNext()) {
             TestingRunResult result = resultIterator.next();
             String resultHexId = result.getHexId();
-            if (!result.isIgnoredResult()) {
-                if (ignoredResults.containsKey(resultHexId)) {
-                    resultIterator.remove();
-                }
+            if (ignoredResults.containsKey(resultHexId)) {
+                resultIterator.remove();
             }
         }
     }

@@ -3,7 +3,6 @@ package com.akto.action.testing;
 import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.test_run_findings.TestingRunIssues;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -13,25 +12,13 @@ import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.collections.MapUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.bson.conversions.Bson;
-
-import com.akto.dao.AccountSettingsDao;
-import com.akto.dao.context.Context;
-import com.akto.dao.testing.TestingRunDao;
-import com.akto.dao.testing.TestingRunResultSummariesDao;
-import com.akto.dto.AccountSettings;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.testing.GenericTestResult;
-import com.akto.dto.testing.TestingRun;
 import com.akto.dto.testing.TestingRunResult;
-import com.akto.dto.testing.TestingRunResultSummary;
 import com.akto.dto.type.SingleTypeInfo;
-import com.akto.util.Constants;
+import com.akto.util.enums.GlobalEnums.TestRunIssueStatus;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
-import com.mongodb.client.model.Projections;
-import com.mongodb.client.model.Sorts;
-import com.mongodb.client.model.Updates;
-
 public class Utils {
 
     public static Bson createFiltersForTestingReport(Map<String, List<String>> filterMap){
@@ -96,7 +83,7 @@ public class Utils {
         return finalResult;
     }
 
-    public static BasicDBObject buildIssueMetaDataMap(List<TestingRunIssues> issues, Map<TestingIssuesId, TestingRunResult> idToResultMap){
+    public static BasicDBObject buildIssueMetaDataMap(List<TestingRunIssues> issues, Map<TestingIssuesId, TestingRunResult> idToResultMap, List<TestRunIssueStatus> statusList){
         BasicDBObject issueMetaDataMap = new BasicDBObject();
         Map<String, String> descriptionMap = new HashMap<>();
         Map<String, String> jiraIssueMap = new HashMap<>();
@@ -109,7 +96,7 @@ public class Utils {
             if (StringUtils.isNotBlank(issue.getJiraIssueUrl())) {
                 jiraIssueMap.put(result.getHexId(), issue.getJiraIssueUrl());
             }
-            if(issue.getTestRunIssueStatus().name().equals("IGNORED")){
+            if(issue.getTestRunIssueStatus() != null && (statusList == null || statusList.contains(issue.getTestRunIssueStatus()))) {
                 statusMap.put(result.getHexId(), issue.getTestRunIssueStatus().name());
             }
             
@@ -117,44 +104,6 @@ public class Utils {
         issueMetaDataMap.put("descriptions", descriptionMap);
         issueMetaDataMap.put("jiraIssues", jiraIssueMap);
         issueMetaDataMap.put("statuses", statusMap);
-        issueMetaDataMap.put("count", statusMap.size());
         return issueMetaDataMap;
     }
-
-    public static void 
-    recalculateTestingIssuesCount() {
-        AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter(), Projections.include(AccountSettings.LAST_UPDATED_TESTING_ISSUES_COUNT));
-        int lastUpdatedTime = accountSettings.getLastUpdatedTestingIssuesCount();
-        if (lastUpdatedTime == 0) {
-            lastUpdatedTime = Context.now() - Constants.ONE_MONTH_TIMESTAMP;
-        }
-
-        // get the testing runs, which have scheduled time stamp greater than lastUpdatedTime and state is completed or scheduled
-        List<TestingRun> testingRuns = TestingRunDao.instance.findAll(
-            Filters.and(
-                Filters.gt(TestingRun.SCHEDULE_TIMESTAMP, lastUpdatedTime),
-                Filters.in(TestingRun.STATE, Arrays.asList(TestingRun.State.COMPLETED.toString(), TestingRun.State.SCHEDULED.toString()))
-            ),  Projections.include(Constants.ID)
-        );
-
-        int accountId = Context.accountId.get();
-        StartTestAction action = new StartTestAction();
-
-        for(TestingRun testingRun : testingRuns) {
-            List<TestingRunResultSummary> trrsList = TestingRunResultSummariesDao.instance.findAll(
-                Filters.and(
-                    Filters.eq(TestingRunResultSummary.TESTING_RUN_ID, testingRun.getId()),
-                    Filters.gte(TestingRunResultSummary.START_TIMESTAMP, lastUpdatedTime)
-                ),
-                0,30 , Sorts.descending(TestingRunResultSummary.START_TIMESTAMP), Projections.include(Constants.ID)
-            );
-
-            for(TestingRunResultSummary trrs: trrsList){
-                action.setTestingRunResultSummaryHexId(trrs.getHexId());
-                action.handleRefreshTableCount();
-            }
-        }
-        AccountSettingsDao.instance.updateOne(AccountSettingsDao.generateFilter(), Updates.set(AccountSettings.LAST_UPDATED_TESTING_ISSUES_COUNT, Context.now()));
-    }
-
 }
