@@ -733,7 +733,15 @@ public class Utils {
             boolean showApiInfo
     ) {
         Bson filterQ = UsageMetricCalculator.excludeDemosAndDeactivated(apiInfoKeyPath + ".apiCollectionId");
-        List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
+        List<Integer> collectionIds;
+        try {
+            collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
+            if (collectionIds == null) {
+                return new ApiInfoKeyResult(0, showApiInfo ? new ArrayList<>() : null);
+            }
+        } catch (Exception e) {
+            return new ApiInfoKeyResult(0, showApiInfo ? new ArrayList<>() : null);
+        }
 
         // Combine filters: exclude unwanted, include only allowed
         Bson combinedFilter = Filters.and(
