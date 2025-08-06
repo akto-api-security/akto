@@ -1106,7 +1106,16 @@ public class ApiCollectionsAction extends UserAction {
                 );
                 result = ApiInfoDao.instance.findAll(thirdPartyFilter);
                 break;
-                
+
+            case "NEWLY_DISCOVERED":
+                int oneHourAgo = (int) (System.currentTimeMillis() / 1000) - 3600; // 1 hour in seconds
+                Bson newlyDiscoveredFilter = Filters.and(
+                        filterQ,
+                        Filters.gte(ApiInfo.DISCOVERED_TIMESTAMP, oneHourAgo)
+                );
+                result = ApiInfoDao.instance.findAll(newlyDiscoveredFilter);
+                break;
+
             default:
                 addActionError("Invalid filter type: " + filterType);
                 return Action.ERROR.toUpperCase();

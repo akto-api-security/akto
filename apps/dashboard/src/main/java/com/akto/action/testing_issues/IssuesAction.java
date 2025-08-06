@@ -36,6 +36,7 @@ import com.akto.util.enums.GlobalEnums;
 import com.akto.util.enums.GlobalEnums.Severity;
 import com.akto.util.enums.GlobalEnums.TestCategory;
 import com.akto.util.enums.GlobalEnums.TestRunIssueStatus;
+import com.akto.utils.ApiInfoKeyResult;
 import com.akto.utils.TestTemplateUtils;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.MongoCursor;
@@ -44,6 +45,7 @@ import com.mongodb.client.result.InsertOneResult;
 import com.opensymphony.xwork2.Action;
 
 import lombok.Getter;
+import lombok.Setter;
 
 import org.apache.commons.lang3.StringUtils;
 import org.bson.Document;
@@ -57,6 +59,8 @@ import java.util.concurrent.TimeUnit;
 
 import static com.akto.util.Constants.ID;
 import static com.akto.util.Constants.ONE_DAY_TIMESTAMP;
+import com.akto.dao.ApiInfoDao;
+import com.akto.dto.ApiInfo.ApiInfoKey;
 
 public class IssuesAction extends UserAction {
 
@@ -91,6 +95,10 @@ public class IssuesAction extends UserAction {
 
     int URL_METHOD_PAIR_THRESHOLD = 1;
     
+    @Setter
+    private boolean showApiInfo;
+    @Getter
+    private List<ApiInfo> buaCategoryApiInfo = new ArrayList<>();
 
     private static final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
 
@@ -763,9 +771,17 @@ public class IssuesAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
-    public String fetchBUACategoryCount(){
-        Bson filter = createFilters(true);
-        this.buaCategoryCount = (int) TestingRunIssuesDao.instance.count(filter);
+    public String fetchBUACategoryCount() {
+        ApiInfoKeyResult result = com.akto.utils.Utils.fetchUniqueApiInfoKeys(
+                TestingRunIssuesDao.instance.getRawCollection(),
+                createFilters(true),
+                "_id.apiInfoKey",
+                this.showApiInfo
+        );
+        this.buaCategoryCount = result.count;
+        if (this.showApiInfo) {
+            this.buaCategoryApiInfo = result.apiInfoList;
+        }
         return Action.SUCCESS.toUpperCase();
     }
 

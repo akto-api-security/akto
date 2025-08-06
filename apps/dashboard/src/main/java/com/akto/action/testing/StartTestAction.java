@@ -33,6 +33,8 @@ import com.akto.util.GroupByTimeRange;
 import com.akto.util.enums.GlobalEnums;
 import com.akto.util.enums.GlobalEnums.Severity;
 import com.akto.util.enums.GlobalEnums.TestErrorSource;
+import com.akto.utils.ApiInfoKeyResult;
+import com.akto.util.enums.GlobalEnums.TestRunIssueStatus;
 import com.akto.util.enums.GlobalEnums.TestRunIssueStatus;
 import com.akto.utils.DeleteTestRunUtils;
 import com.akto.utils.Utils;
@@ -45,9 +47,11 @@ import com.opensymphony.xwork2.Action;
 import com.opensymphony.xwork2.util.ResolverUtil.Test;
 
 import lombok.Getter;
+import lombok.Setter;
 import org.apache.commons.lang3.StringUtils;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
+import com.akto.dao.ApiInfoDao;
 
 import java.util.*;
 import java.util.concurrent.*;
@@ -102,6 +106,11 @@ public class StartTestAction extends UserAction {
     int misConfiguredTestsCount;
 
     Set<Integer> deactivatedCollections = UsageMetricCalculator.getDeactivated();
+
+    @Setter
+    private boolean showApiInfo;
+    @Getter
+    private List<ApiInfo> misConfiguredTestsApiInfo = new ArrayList<>();
 
     private static List<ObjectId> getTestingRunListFromSummary(Bson filters){
         Bson projections = Projections.fields(
@@ -733,7 +742,7 @@ public class StartTestAction extends UserAction {
         }else{
             count = VulnerableTestingRunResultDao.instance.countFromDb(Filters.and(filterList), queryMode.equals(QueryMode.VULNERABLE));
         }
-        
+
         resultantMap.put(queryMode.toString(), count);
 
         return resultantMap;
@@ -1530,8 +1539,17 @@ public class StartTestAction extends UserAction {
             runResult.getTestSubType());
     }
 
-    public String fetchMisConfiguredTestsCount(){
-        this.misConfiguredTestsCount = (int) TestingRunResultDao.instance.count(Filters.eq(TestingRunResult.REQUIRES_CONFIG, true));
+    public String fetchMisConfiguredTestsCount() {
+       ApiInfoKeyResult result = Utils.fetchUniqueApiInfoKeys(
+                TestingRunResultDao.instance.getRawCollection(),
+                Filters.eq(TestingRunResult.REQUIRES_CONFIG, true),
+                "apiInfoKey",
+                this.showApiInfo
+        );
+        this.misConfiguredTestsCount = result.count;
+        if (this.showApiInfo) {
+            this.misConfiguredTestsApiInfo = result.apiInfoList;
+        }
         return Action.SUCCESS.toUpperCase();
     }
 
