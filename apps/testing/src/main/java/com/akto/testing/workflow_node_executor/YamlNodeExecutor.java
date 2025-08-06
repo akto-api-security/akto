@@ -139,6 +139,7 @@ public class YamlNodeExecutor extends NodeExecutor {
         List<String> message = new ArrayList<>();
         //String message = null;
         String savedResponses = null;
+        String responseHeaders = null;
         String eventStreamResponse = null;
         int statusCode = 0;
         List<Integer> responseTimeArr = new ArrayList<>();
@@ -193,6 +194,7 @@ public class YamlNodeExecutor extends NodeExecutor {
                 // save response in a list
                 savedResponses = testResponse.getBody();
                 statusCode = testResponse.getStatusCode();
+                responseHeaders = testResponse.getHeaders().toString();
 
                 eventStreamResponse = com.akto.test_editor.Utils.buildEventStreamResponseIHttpFormat(testResponse);
 
@@ -212,6 +214,7 @@ public class YamlNodeExecutor extends NodeExecutor {
         if (savedResponses != null) {
             varMap.put(node.getId() + ".response.body", savedResponses);
             varMap.put(node.getId() + ".response.status_code", String.valueOf(statusCode));
+            varMap.put(node.getId() + ".response.headers", responseHeaders);
         }
 
         if (eventStreamResponse != null) {
