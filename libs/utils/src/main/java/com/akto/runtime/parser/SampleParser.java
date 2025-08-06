@@ -43,34 +43,10 @@ public class SampleParser {
     public static boolean isPossiblyIncompleteJson(String json) {
         if (json == null || json.trim().isEmpty()) return true;
 
-        json = json.trim();
-
-        // Check for unbalanced curly braces
-        int openCurly = 0, openSquare = 0, quoteCount = 0;
-        boolean inString = false;
-
-        for (int i = 0; i < json.length(); i++) {
-            char c = json.charAt(i);
-
-            if (c == '"') {
-                // Skip escaped quotes
-                if (i > 0 && json.charAt(i - 1) == '\\') continue;
-                inString = !inString;
-                quoteCount++;
-            }
-
-            if (!inString) {
-                if (c == '{') openCurly++;
-                else if (c == '}') openCurly--;
-                else if (c == '[') openSquare++;
-                else if (c == ']') openSquare--;
-            }
-
-            if (openCurly < 0 || openSquare < 0) return true; // closing without opening
+        if (json.endsWith("}") || json.endsWith("]")) {
+            return false;
         }
-
-        // If we are still inside a string or have unclosed braces
-        return inString || openCurly != 0 || openSquare != 0 || json.endsWith("{") || json.endsWith("[") || json.endsWith(",");
+        return true;
     }
 
     public static HttpResponseParams parseSampleMessage(String message) throws Exception {
