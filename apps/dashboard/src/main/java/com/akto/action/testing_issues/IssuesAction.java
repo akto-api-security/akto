@@ -60,6 +60,7 @@ import java.util.concurrent.TimeUnit;
 import static com.akto.util.Constants.ID;
 import static com.akto.util.Constants.ONE_DAY_TIMESTAMP;
 import com.akto.dao.ApiInfoDao;
+import com.akto.dto.ApiInfo.ApiInfoKey;
 
 public class IssuesAction extends UserAction {
 
@@ -859,11 +860,31 @@ public class IssuesAction extends UserAction {
         Bson filter = createFilters(true);
         if (this.showApiInfo) {
             this.buaCategoryApiInfo = new ArrayList<>();
+            List<ApiInfoKey> apiInfoKeys = new ArrayList<>();
             List<TestingRunIssues> issues = TestingRunIssuesDao.instance.findAll(filter);
             for (TestingRunIssues issue : issues) {
                 ApiInfo.ApiInfoKey key = issue.getId().getApiInfoKey();
                 if (key != null) {
-                    ApiInfo apiInfo = ApiInfoDao.instance.findOne(ApiInfoDao.getFilter(key.getUrl(), key.getMethod().name(), key.getApiCollectionId()));
+                    apiInfoKeys.add(key);
+                }
+            }
+            if (!apiInfoKeys.isEmpty()) {
+                List<Bson> orFilters = new ArrayList<>();
+                for (ApiInfoKey key : apiInfoKeys) {
+                    orFilters.add(Filters.and(
+                        Filters.eq("_id.apiCollectionId", key.getApiCollectionId()),
+                        Filters.eq("_id.url", key.getUrl()),
+                        Filters.eq("_id.method", key.getMethod().name())
+                    ));
+                }
+                Bson apiInfoFilter = Filters.or(orFilters);
+                List<ApiInfo> foundApiInfos = ApiInfoDao.instance.findAll(apiInfoFilter);
+                Map<ApiInfoKey, ApiInfo> apiInfoMap = new HashMap<>();
+                for (ApiInfo apiInfo : foundApiInfos) {
+                    apiInfoMap.put(apiInfo.getId(), apiInfo);
+                }
+                for (ApiInfoKey key : apiInfoKeys) {
+                    ApiInfo apiInfo = apiInfoMap.get(key);
                     if (apiInfo != null) {
                         this.buaCategoryApiInfo.add(apiInfo);
                     } else {
@@ -1229,21 +1250,5 @@ public class IssuesAction extends UserAction {
 
     public void setIssuesDescriptionMap(Map<String, String> issuesDescriptionMap) {
         this.issuesDescriptionMap = issuesDescriptionMap;
-    }
-
-    public boolean getShowApiInfo() {
-        return showApiInfo;
-    }
-
-    public void setShowApiInfo(boolean showApiInfo) {
-        this.showApiInfo = showApiInfo;
-    }
-
-    public List<ApiInfo> getBuaCategoryApiInfo() {
-        return buaCategoryApiInfo;
-    }
-
-    public void setBuaCategoryApiInfo(List<ApiInfo> buaCategoryApiInfo) {
-        this.buaCategoryApiInfo = buaCategoryApiInfo;
     }
 }
