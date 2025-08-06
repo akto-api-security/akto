@@ -50,12 +50,10 @@ import java.io.IOException;
 import java.util.*;
 import java.util.Map.Entry;
 import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.apache.commons.collections.CollectionUtils;
@@ -344,35 +342,7 @@ public class HttpCallParser {
             }
             SyncLimit syncLimit = fetchSyncLimit();
 
-            final CountDownLatch latch = new CountDownLatch(1);
-            final AtomicReference<Exception> threadException = new AtomicReference<>();
-
-            Thread syncThread = new Thread(() -> {
-                try {
-                    apiCatalogSync.syncWithDB(syncImmediately, fetchAllSTI, syncLimit);
-                } catch (Exception e) {
-                    threadException.set(e);
-                } finally {
-                    latch.countDown();
-                }
-            });
-            syncThread.start();
-
-            boolean completed = false;
-            try {
-                completed = latch.await(5, TimeUnit.MINUTES);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                loggerMaker.errorAndAddToDb("Sync thread interrupted: " + e.getMessage());
-            }
-
-            if (!completed) {
-                loggerMaker.errorAndAddToDb("syncWithDB timed out after 5 minutes");
-                syncThread.interrupt();
-            } else if (threadException.get() != null) {
-                loggerMaker.errorAndAddToDb("Exception in syncWithDB" + threadException.get());
-            }
-
+            apiCatalogSync.syncWithDB(syncImmediately, fetchAllSTI, syncLimit);
 
             if (DataActor.actualAccountId == 1745303931 || DataActor.actualAccountId == 1741069294 || DataActor.actualAccountId == 1749515934) {
                 dependencyAnalyser.dbState = apiCatalogSync.dbState;
