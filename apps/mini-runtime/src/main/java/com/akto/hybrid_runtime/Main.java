@@ -434,6 +434,10 @@ public class Main {
                         }
 
                         httpResponseParams = HttpCallParser.parseKafkaMessage(r.value());
+                        if (httpResponseParams == null) {
+                            loggerMaker.error("httpresponse params is null");
+                            continue;
+                        }
                         HttpRequestParams requestParams = httpResponseParams.getRequestParams();
                         String debugHost = Utils.printDebugHostLog(httpResponseParams);
                         if (debugHost != null) {
