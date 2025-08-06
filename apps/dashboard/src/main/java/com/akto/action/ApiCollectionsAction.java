@@ -181,7 +181,8 @@ public class ApiCollectionsAction extends UserAction {
     private int endTimestamp;
     public String fetchApiStats() {
         Bson filter = UsageMetricCalculator.excludeDemosAndDeactivated(ApiInfo.ID_API_COLLECTION_ID);
-        Pair<ApiStats, ApiStats> result = ApiInfoDao.instance.fetchApiInfoStats(filter, startTimestamp, endTimestamp);
+        Bson collFilter = UsageMetricCalculator.excludeDemosAndDeactivated(Constants.ID);
+        Pair<ApiStats, ApiStats> result = ApiInfoDao.instance.fetchApiInfoStats(collFilter, filter, startTimestamp, endTimestamp);
         apiStatsStart = result.getFirst();
         apiStatsEnd = result.getSecond();
         return SUCCESS.toUpperCase();
