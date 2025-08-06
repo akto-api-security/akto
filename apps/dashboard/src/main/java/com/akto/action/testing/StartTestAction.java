@@ -42,9 +42,11 @@ import com.mongodb.client.model.*;
 import com.mongodb.client.result.InsertOneResult;
 import com.opensymphony.xwork2.Action;
 import lombok.Getter;
+import lombok.Setter;
 import org.apache.commons.lang3.StringUtils;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
+import com.akto.dao.ApiInfoDao;
 
 import java.util.*;
 import java.util.concurrent.*;
@@ -73,9 +75,9 @@ public class StartTestAction extends UserAction {
     private Map<String, String> metadata;
     private String triggeredBy;
     private boolean isTestRunByTestEditor;
+    private String overriddenTestAppUrl;
     private Map<ObjectId, TestingRunResultSummary> latestTestingRunResultSummaries;
     private Map<String, String> sampleDataVsCurlMap;
-    private String overriddenTestAppUrl;
     private static final LoggerMaker loggerMaker = new LoggerMaker(StartTestAction.class, LogDb.DASHBOARD);
     private TestingRunType testingRunType;
     private String searchString;
@@ -99,6 +101,11 @@ public class StartTestAction extends UserAction {
     int misConfiguredTestsCount;
 
     Set<Integer> deactivatedCollections = UsageMetricCalculator.getDeactivated();
+
+    @Setter
+    private boolean showApiInfo;
+    @Getter
+    private List<ApiInfo> misConfiguredTestsApiInfo = new ArrayList<>();
 
     private static List<ObjectId> getTestingRunListFromSummary(Bson filters){
         Bson projections = Projections.fields(
@@ -1514,7 +1521,25 @@ public class StartTestAction extends UserAction {
     }
 
     public String fetchMisConfiguredTestsCount(){
-        this.misConfiguredTestsCount = (int) TestingRunResultDao.instance.count(Filters.eq(TestingRunResult.REQUIRES_CONFIG, true));
+        if (this.showApiInfo) {
+            this.misConfiguredTestsApiInfo = new ArrayList<>();
+            List<TestingRunResult> results = TestingRunResultDao.instance.findAll(Filters.eq(TestingRunResult.REQUIRES_CONFIG, true));
+            for (TestingRunResult result : results) {
+                ApiInfo.ApiInfoKey key = result.getApiInfoKey();
+                if (key != null) {
+                    ApiInfo apiInfo = ApiInfoDao.instance.findOne(ApiInfoDao.getFilter(key.getUrl(), key.getMethod().name(), key.getApiCollectionId()));
+                    if (apiInfo != null) {
+                        this.misConfiguredTestsApiInfo.add(apiInfo);
+                    } else {
+                        ApiInfo minimalApiInfo = new ApiInfo(key);
+                        this.misConfiguredTestsApiInfo.add(minimalApiInfo);
+                    }
+                }
+            }
+            this.misConfiguredTestsCount = this.misConfiguredTestsApiInfo.size();
+        } else {
+            this.misConfiguredTestsCount = (int) TestingRunResultDao.instance.count(Filters.eq(TestingRunResult.REQUIRES_CONFIG, true));
+        }
         return Action.SUCCESS.toUpperCase();
     }
 

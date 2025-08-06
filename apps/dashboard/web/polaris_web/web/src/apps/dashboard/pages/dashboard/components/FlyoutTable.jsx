@@ -16,7 +16,11 @@ const ACTION_ITEM_TYPES = {
     THIRD_PARTY_APIS: 'THIRD_PARTY_APIS',
     HIGH_RISK_THIRD_PARTY: 'HIGH_RISK_THIRD_PARTY',
     SHADOW_APIS: 'SHADOW_APIS',
-    CRITICAL_SENSITIVE_UNAUTH: 'CRITICAL_SENSITIVE_UNAUTH'
+    CRITICAL_SENSITIVE_UNAUTH: 'CRITICAL_SENSITIVE_UNAUTH',
+    ENHANCE_TESTING_COVERAGE: 'ENHANCE_TESTING_COVERAGE',
+    ENABLE_CONTINUOUS_TESTING: 'ENABLE_CONTINUOUS_TESTING',
+    ADDRESS_MISCONFIGURED_TESTS: 'ADDRESS_MISCONFIGURED_TESTS',
+    VULNERABLE_APIS: 'VULNERABLE_APIS',
 };
 
 const getIssueLabel = (actionItemType) => {
@@ -35,6 +39,14 @@ const getIssueLabel = (actionItemType) => {
             return 'Shadow APIs';
         case ACTION_ITEM_TYPES.CRITICAL_SENSITIVE_UNAUTH:
             return 'Sensitive, Unauthenticated';
+        case ACTION_ITEM_TYPES.ENHANCE_TESTING_COVERAGE:
+            return 'Not Tested APIs';
+        case ACTION_ITEM_TYPES.ENABLE_CONTINUOUS_TESTING:
+            return 'Only Once Tested APIs';
+        case ACTION_ITEM_TYPES.ADDRESS_MISCONFIGURED_TESTS:
+            return 'Misconfigured Tests';
+        case ACTION_ITEM_TYPES.VULNERABLE_APIS:
+            return 'Vulnerable APIs';
         default:
             return '-';
     }
@@ -78,6 +90,18 @@ function FlyoutTable({ actionItemType, count, allApiInfo, apiInfoLoading }) {
                         break;
                     case ACTION_ITEM_TYPES.CRITICAL_SENSITIVE_UNAUTH:
                         relevantData = allApiInfo.sensitiveAndUnauthenticated || [];
+                        break;
+                    case ACTION_ITEM_TYPES.ENHANCE_TESTING_COVERAGE:
+                        relevantData = allApiInfo.notTestedEndpointsApiInfo || [];
+                        break;
+                    case ACTION_ITEM_TYPES.ENABLE_CONTINUOUS_TESTING:
+                        relevantData = allApiInfo.onlyOnceTestedEndpointsApiInfo || [];
+                        break;
+                    case ACTION_ITEM_TYPES.ADDRESS_MISCONFIGURED_TESTS:
+                        relevantData = allApiInfo.misConfiguredTestsApiInfo || [];
+                        break;
+                    case ACTION_ITEM_TYPES.VULNERABLE_APIS:
+                        relevantData = allApiInfo.vulnerableApiCountApiInfo || [];
                         break;
                     default:
                         relevantData = [];

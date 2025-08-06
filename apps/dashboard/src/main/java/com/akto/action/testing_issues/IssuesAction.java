@@ -45,6 +45,7 @@ import com.mongodb.client.result.InsertOneResult;
 import com.opensymphony.xwork2.Action;
 
 import lombok.Getter;
+import lombok.Setter;
 
 import org.apache.commons.lang3.StringUtils;
 import org.bson.Document;
@@ -58,6 +59,7 @@ import java.util.concurrent.TimeUnit;
 
 import static com.akto.util.Constants.ID;
 import static com.akto.util.Constants.ONE_DAY_TIMESTAMP;
+import com.akto.dao.ApiInfoDao;
 
 public class IssuesAction extends UserAction {
 
@@ -92,6 +94,10 @@ public class IssuesAction extends UserAction {
 
     int URL_METHOD_PAIR_THRESHOLD = 1;
     
+    @Setter
+    private boolean showApiInfo;
+    @Getter
+    private List<ApiInfo> buaCategoryApiInfo = new ArrayList<>();
 
     private static final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
 
@@ -851,7 +857,25 @@ public class IssuesAction extends UserAction {
 
     public String fetchBUACategoryCount(){
         Bson filter = createFilters(true);
-        this.buaCategoryCount = (int) TestingRunIssuesDao.instance.count(filter);
+        if (this.showApiInfo) {
+            this.buaCategoryApiInfo = new ArrayList<>();
+            List<TestingRunIssues> issues = TestingRunIssuesDao.instance.findAll(filter);
+            for (TestingRunIssues issue : issues) {
+                ApiInfo.ApiInfoKey key = issue.getId().getApiInfoKey();
+                if (key != null) {
+                    ApiInfo apiInfo = ApiInfoDao.instance.findOne(ApiInfoDao.getFilter(key.getUrl(), key.getMethod().name(), key.getApiCollectionId()));
+                    if (apiInfo != null) {
+                        this.buaCategoryApiInfo.add(apiInfo);
+                    } else {
+                        ApiInfo minimalApiInfo = new ApiInfo(key);
+                        this.buaCategoryApiInfo.add(minimalApiInfo);
+                    }
+                }
+            }
+            this.buaCategoryCount = this.buaCategoryApiInfo.size();
+        } else {
+            this.buaCategoryCount = (int) TestingRunIssuesDao.instance.count(filter);
+        }
         return Action.SUCCESS.toUpperCase();
     }
 
@@ -1205,5 +1229,21 @@ public class IssuesAction extends UserAction {
 
     public void setIssuesDescriptionMap(Map<String, String> issuesDescriptionMap) {
         this.issuesDescriptionMap = issuesDescriptionMap;
+    }
+
+    public boolean getShowApiInfo() {
+        return showApiInfo;
+    }
+
+    public void setShowApiInfo(boolean showApiInfo) {
+        this.showApiInfo = showApiInfo;
+    }
+
+    public List<ApiInfo> getBuaCategoryApiInfo() {
+        return buaCategoryApiInfo;
+    }
+
+    public void setBuaCategoryApiInfo(List<ApiInfo> buaCategoryApiInfo) {
+        this.buaCategoryApiInfo = buaCategoryApiInfo;
     }
 }
