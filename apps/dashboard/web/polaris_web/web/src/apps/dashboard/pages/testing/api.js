@@ -34,12 +34,13 @@ export default {
         })
         return resp        
     },
-    async fetchTestRunResultsCount(testingRunResultSummaryHexId) {
+    async fetchTestRunResultsCount(testingRunResultSummaryHexId, filters) {
         const resp = await request({
             url: '/api/fetchTestRunResultsCount',
             method: 'post',
             data: {
-                testingRunResultSummaryHexId
+                testingRunResultSummaryHexId,
+                filters
             }
         })
         return resp        
@@ -487,13 +488,6 @@ export default {
             url: '/api/updateIgnoreTimeForSummaries',
             method: 'post',
             data: {deltaTimeForScheduledSummaries}
-        })
-    },
-    fetchIssuesByStatusAndSummaryId(latestTestingRunSummaryId, issueStatusQuery, sortKey, sortOrder, skip, limit, filters) {
-        return request({
-            url: '/api/fetchIssuesByStatusAndSummaryId',
-            method: 'post',
-            data: { latestTestingRunSummaryId, issueStatusQuery, sortKey, sortOrder, skip, limit, filters }
         })
     },
     modifyTestingRunConfig(testingRunConfigId, editableTestingRunConfig) {
