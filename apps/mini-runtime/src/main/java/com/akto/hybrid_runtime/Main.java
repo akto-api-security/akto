@@ -399,13 +399,14 @@ public class Main {
         }, 0, 24, TimeUnit.HOURS);
 
         try {
-            main.consumer.subscribe(Arrays.asList(topicName, "har_"+topicName));
-            loggerMaker.infoAndAddToDb("Consumer subscribed");
+            main.consumer.subscribe(Arrays.asList(topicName));
+            loggerMaker.infoAndAddToDb("Consumer subscribed to topic: " + topicName);
             while (true) {
                 ConsumerRecords<String, String> records = main.consumer.poll(Duration.ofMillis(10000));
                 try {
                     main.consumer.commitSync();
                 } catch (Exception e) {
+                    loggerMaker.errorAndAddToDb(e, "Error while committing offset: " + e.getMessage());
                     throw e;
                 }
                 long start = System.currentTimeMillis();
@@ -466,6 +467,7 @@ public class Main {
 
         } catch (WakeupException ignored) {
           // nothing to catch. This exception is called from the shutdown hook.
+          loggerMaker.error("Kafka consumer closed due to wakeup exception");
         } catch (Exception e) {
             exceptionOnCommitSync.set(true);
             printL(e);
@@ -473,6 +475,7 @@ public class Main {
             e.printStackTrace();
             System.exit(0);
         } finally {
+            loggerMaker.warn("Closing kafka consumer for topic: " + topicName);
             main.consumer.close();
         }
     }
