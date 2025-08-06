@@ -43,10 +43,10 @@ public class SampleParser {
     public static boolean isPossiblyIncompleteJson(String json) {
         if (json == null || json.trim().isEmpty()) return true;
 
-        if (json.endsWith("}") || json.endsWith("]")) {
-            return false;
+        if (json.startsWith("{") && !json.endsWith("}") || json.endsWith("[") && !json.endsWith("]")) {
+            return true;
         }
-        return true;
+        return false;
     }
 
     public static HttpResponseParams parseSampleMessage(String message) throws Exception {
