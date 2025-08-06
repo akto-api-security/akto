@@ -1193,6 +1193,14 @@ public class InventoryAction extends UserAction {
                 Aggregates.match(Filters.gt(ApiInfo.LAST_TESTED, 0))
             );
 
+            try {
+                List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
+                if(collectionIds != null) {
+                    pipeLine.add(Aggregates.match(Filters.in(SingleTypeInfo._COLLECTION_IDS, collectionIds)));
+                }
+            } catch(Exception e){
+            }
+
             GroupByTimeRange.groupByWeek(pipeLine, ApiInfo.LAST_TESTED, "totalApisTested", new BasicDBObject());
             MongoCursor<BasicDBObject> cursor = ApiInfoDao.instance.getMCollection().aggregate(pipeLine, BasicDBObject.class).cursor();
             while (cursor.hasNext()) {
