@@ -137,6 +137,11 @@ public class AccountSettings {
     public static final String JIRA_TICKET_URL_MAP = "jiraTicketUrlMap";
     private Map<String, String> jiraTicketUrlMap = new HashMap<>();
 
+    @Getter
+    @Setter
+    private int lastUpdatedTestingIssuesCount;
+    public static final String LAST_UPDATED_TESTING_ISSUES_COUNT = "lastUpdatedTestingIssuesCount";
+
     public AccountSettings() {
     }
 

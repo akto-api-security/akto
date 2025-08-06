@@ -39,17 +39,20 @@ public abstract class AccountsContextDaoWithRbac<T> extends MCollection<T>{
 
     abstract public String getFilterKeyString();
 
-    protected Bson addRbacFilter(Bson originalQuery) {
+    protected Bson modifyFilters(Bson originalQuery, boolean ignoreGroupFilter){
         try {
-            if (Context.userId.get() != null && Context.accountId.get() != null) {
+            if ((Context.userId.get() != null || Context.contextSource.get() != null) && Context.accountId.get() != null) {
                 List<Integer> apiCollectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(),
                         Context.accountId.get());
                 if (apiCollectionIds != null) {
                     List<Bson> filters = new ArrayList<>();
                     filters.add(Filters.and(Filters.exists(getFilterKeyString()),
                             Filters.in(getFilterKeyString(), apiCollectionIds)));
-                    filters.add(Filters.and(Filters.exists(SingleTypeInfo._COLLECTION_IDS),
+                    if(!ignoreGroupFilter){
+                        filters.add(Filters.and(Filters.exists(SingleTypeInfo._COLLECTION_IDS),
                             Filters.in(SingleTypeInfo._COLLECTION_IDS, apiCollectionIds)));
+                    }
+                    
                     Bson rbacFilter = Filters.or(filters);
                     return Filters.and(originalQuery, rbacFilter);
                 }
@@ -57,6 +60,14 @@ public abstract class AccountsContextDaoWithRbac<T> extends MCollection<T>{
         } catch (Exception e) {
         }
         return originalQuery;
+    }
+
+    protected Bson countRbacFilter(Bson originalQuery){
+        return modifyFilters(originalQuery, true);
+    }
+
+    protected Bson addRbacFilter(Bson originalQuery) {
+        return modifyFilters(originalQuery, false);
     }
 
     @Override
@@ -115,7 +126,7 @@ public abstract class AccountsContextDaoWithRbac<T> extends MCollection<T>{
 
     @Override
     public long count(Bson q) {
-        Bson filteredQuery = addRbacFilter(q);
+        Bson filteredQuery = countRbacFilter(q);
         return super.count(filteredQuery);
     }
 

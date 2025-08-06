@@ -28,6 +28,7 @@ import CriticalFindingsGraph from '../issues/IssuesPage/CriticalFindingsGraph';
 import values from "@/util/values";
 import { ActionItemsContent } from './components/ActionItemsContent';
 import { fetchActionItemsData } from './components/actionItemsTransform';
+import { mapLabel } from '../../../main/labelHelper';
 
 function HomeDashboard() {
 
@@ -276,8 +277,8 @@ function HomeDashboard() {
             setApiRiskScore(0)
         }
 
-        if (apisInScopeForTesting && apisInScopeForTesting> 0 && apisTestedInLookBackPeriod) {
-            const testCoverage = 100 * apisTestedInLookBackPeriod / apisInScopeForTesting
+        if (totalAPIs && totalAPIs> 0 && apisTestedInLookBackPeriod) {
+            const testCoverage = 100 * apisTestedInLookBackPeriod / totalAPIs
             setTestCoverage(parseFloat(testCoverage.toFixed(2)))
         } else {
             setTestCoverage(0)
@@ -768,13 +769,15 @@ function HomeDashboard() {
 
     const pageComponents = [showBannerComponent ? <DashboardBanner key="dashboardBanner" /> : tabsComponent]
 
+    const dashboardCategory = PersistStore((state) => state.dashboardCategory) || "API Security"
+
     return (
         <Box>
             {loading ? <SpinnerCentered /> :
                 <PageWithMultipleCards
                     title={
                         <Text variant='headingLg'>
-                            API Security Posture
+                            {mapLabel("API Security Posture", dashboardCategory)}
                         </Text>
                     }
                     isFirstPage={true}

@@ -28,6 +28,7 @@ public class TestingRun {
     public static final String TRIGGERED_BY = "triggeredBy";
 
     public static final String _API_COLLECTION_ID = "testingEndpoints.apiCollectionId";
+    public static final String _API_COLLECTION_ID_WORK_FLOW = "testingEndpoints.workflowTest.apiCollectionId";
     public static final String _API_COLLECTION_ID_IN_LIST = "testingEndpoints.apisList.apiCollectionId";
 
     public static final String IS_NEW_TESTING_RUN = "isNewTestRun";
