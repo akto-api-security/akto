@@ -41,7 +41,9 @@ public class SampleParser {
     }
 
     public static boolean isPossiblyIncompleteJson(String json) {
-        if (json == null || json.trim().isEmpty()) return true;
+        if(json == null || json.isEmpty()) {
+            return false;
+        }
 
         if ((json.startsWith("{") && !json.endsWith("}")) || (json.startsWith("[") && !json.endsWith("]"))) {
             return true;
