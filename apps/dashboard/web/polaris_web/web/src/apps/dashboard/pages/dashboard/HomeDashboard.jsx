@@ -277,8 +277,8 @@ function HomeDashboard() {
             setApiRiskScore(0)
         }
 
-        if (apisInScopeForTesting && apisInScopeForTesting> 0 && apisTestedInLookBackPeriod) {
-            const testCoverage = 100 * apisTestedInLookBackPeriod / apisInScopeForTesting
+        if (totalAPIs && totalAPIs> 0 && apisTestedInLookBackPeriod) {
+            const testCoverage = 100 * apisTestedInLookBackPeriod / totalAPIs
             setTestCoverage(parseFloat(testCoverage.toFixed(2)))
         } else {
             setTestCoverage(0)
