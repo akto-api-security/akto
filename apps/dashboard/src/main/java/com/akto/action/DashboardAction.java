@@ -186,6 +186,13 @@ public class DashboardAction extends UserAction {
                 filterQ
             ))
         );
+        try {
+            List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
+            if(collectionIds != null) {
+                pipeLine.add(Aggregates.match(Filters.in(SingleTypeInfo._COLLECTION_IDS, collectionIds)));
+            }
+        } catch(Exception e){
+        }
          BasicDBObject groupedId = new BasicDBObject(SingleTypeInfo._URL, "$" + TestingRunIssues.ID_URL)
                                                     .append(SingleTypeInfo._METHOD, "$" + TestingRunIssues.ID_METHOD)
                                                     .append(SingleTypeInfo._API_COLLECTION_ID,  "$" + TestingRunIssues.ID_API_COLLECTION_ID);
