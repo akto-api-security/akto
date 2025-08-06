@@ -1,7 +1,5 @@
 package com.akto.utils;
 
-import com.mongodb.BasicDBObject;
-
 import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
@@ -45,10 +43,8 @@ public class GzipUtils {
                 byteArrayOutputStream.write(buffer, 0, len);
             }
             String decompressedString = new String(byteArrayOutputStream.toByteArray(), StandardCharsets.UTF_8);
-            System.out.println("Decompressed string: " + decompressedString);
             return decompressedString;
         } catch (Exception e) {
-            System.err.println("Error decompressing and decoding Base64 string: " + e.getMessage());
         }
         return null;
     }
