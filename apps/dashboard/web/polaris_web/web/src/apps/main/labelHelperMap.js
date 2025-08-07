@@ -6,7 +6,7 @@ export const labelMap = {
     "API Collections": "API Collections",
     "API Collection Coverage": "API Collection Coverage",
     "API collection name": "API Collection Name",
-    "API Testing": "API Testing",
+    "API Testing": "API Security Testing",
     "Threat Detection": "API Threat Detection"
   },
   "MCP Security": {
