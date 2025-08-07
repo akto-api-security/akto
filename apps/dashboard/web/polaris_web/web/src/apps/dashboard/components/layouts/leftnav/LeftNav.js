@@ -135,7 +135,7 @@ export default function LeftNav() {
                 selected: leftNavSelected.includes("_observe"),
                 subNavigationItems: [
                     {
-                        label: mapLabel("API Collections", dashboardCategory),
+                        label: "Collections",
                         onClick: () => {
                             navigate("/dashboard/observe/inventory");
                             handleSelect("dashboard_observe_inventory");
@@ -144,7 +144,7 @@ export default function LeftNav() {
                         selected: leftNavSelected === "dashboard_observe_inventory",
                     },
                     {
-                        label: "API Changes",
+                        label: "Recent Changes",
                         onClick: () => {
                             navigate("/dashboard/observe/changes");
                             handleSelect("dashboard_observe_changes");
