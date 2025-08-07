@@ -756,7 +756,7 @@ function SingleTestRunPage() {
     runningTestsComp, <TrendChart key={tempLoading.running} hexId={hexId} setSummary={setSummary} show={true} totalVulnerabilities={tableCountObj.vulnerable} />,
     metadataComponent(), loading ? <SpinnerCentered key="loading" /> : (!workflowTest ? resultTable : workflowTestBuilder)];
 
-  const openVulnerabilityReport = async () => {
+  const openVulnerabilityReport = async (summaryMode = false) => {
     const currentPageKey = "/dashboard/testing/" + selectedTestRun?.id + "/#" + selectedTab
     let selectedFilters = filtersMap[currentPageKey]?.filters || [];
     let filtersObj = {
@@ -769,7 +769,9 @@ function SingleTestRunPage() {
 
     await api.generatePDFReport(filtersObj, []).then((res) => {
       const responseId = res.split("=")[1];
-      window.open('/dashboard/testing/summary/' + responseId.split("}")[0], '_blank');
+      const summaryModeQueryParam = summaryMode === true ? 'summaryMode=true' : '';
+      const redirectUrl = `/dashboard/testing/summary/${responseId.split("}")[0]}?${summaryModeQueryParam}`;
+      window.open(redirectUrl, '_blank');
     })
   }
 
@@ -880,9 +882,14 @@ function SingleTestRunPage() {
   moreActionsList.push({
     title: 'Export', items: [
       {
+        content: 'Export summary report',
+        icon: ReportMinor,
+        onAction: () => openVulnerabilityReport(true)
+      },
+      {
         content: 'Export vulnerability report',
         icon: ReportMinor,
-        onAction: () => openVulnerabilityReport()
+        onAction: () => openVulnerabilityReport(false)
       }
     ]
   })
