@@ -674,16 +674,3 @@ sbin/capsh
 sbin/logsave
 sbin/service
 sbin/start-stop-daemon
-;id
-;ping
-;cat
-|id
-|ping
-|cat
-&ping
-&cat
-$(id)
-$(ping)
-| id
-& id
-: id
