@@ -773,7 +773,7 @@ public class Utils {
             return new ApiInfoKeyResult(count, null);
         }
 
-        int batchSize = 500;
+        int batchSize = 1000;
         int count = 0;
         try (MongoCursor<Document>  cursor = collection.aggregate(pipeline, Document.class).batchSize(batchSize).iterator()) {
             while (cursor.hasNext()) {
