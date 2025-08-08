@@ -741,26 +741,36 @@ public class DbLayer {
     public static TestingRunResultSummary findPendingTestingRunResultSummary(int now, int delta, String miniTestingName) {
         try {
             // Combine filters for better query efficiency
-            Bson filter = Filters.or(
-                Filters.and(
+            Bson filterScheduled = Filters.and(
                     Filters.eq(TestingRun.STATE, TestingRun.State.SCHEDULED),
                     Filters.lte(TestingRunResultSummary.START_TIMESTAMP, now)
-                ),
-                Filters.and(
-                    Filters.eq(TestingRun.STATE, TestingRun.State.RUNNING),
-                    Filters.lte(TestingRunResultSummary.START_TIMESTAMP, now - 5*60),
-                    Filters.gt(TestingRunResultSummary.START_TIMESTAMP, delta)
-                )
             );
 
             TestingRunResultSummary trrs = TestingRunResultSummariesDao.instance.findOne(
-                filter,
-                Projections.include(
-                    TestingRunResultSummary.TESTING_RUN_ID,
-                    ID,
-                    TestingRunResultSummary.ORIGINAL_TESTING_RUN_SUMMARY_ID
-                )
+                    filterScheduled,
+                    Projections.include(
+                            TestingRunResultSummary.TESTING_RUN_ID,
+                            ID,
+                            TestingRunResultSummary.ORIGINAL_TESTING_RUN_SUMMARY_ID
+                    )
             );
+
+            if (trrs == null) {
+                Bson filterRunning = Filters.and(
+                        Filters.eq(TestingRun.STATE, TestingRun.State.RUNNING),
+                        Filters.lte(TestingRunResultSummary.START_TIMESTAMP, now - 5 * 60),
+                        Filters.gt(TestingRunResultSummary.START_TIMESTAMP, delta)
+                );
+
+                trrs = TestingRunResultSummariesDao.instance.findOne(
+                        filterRunning,
+                        Projections.include(
+                                TestingRunResultSummary.TESTING_RUN_ID,
+                                ID,
+                                TestingRunResultSummary.ORIGINAL_TESTING_RUN_SUMMARY_ID
+                        )
+                );
+            }
 
             if (trrs == null) return null;
 
