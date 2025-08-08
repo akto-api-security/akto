@@ -46,6 +46,7 @@ import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 
 import java.io.File;
+import java.net.URI;
 import java.net.URL;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
@@ -72,10 +73,6 @@ public class JiraTicketJobExecutor extends JobExecutor<AutoTicketParams> {
     @Override
     protected void runJob(Job job) throws Exception {
         AutoTicketParams jobParams = paramClass.cast(job.getJobParams());
-        Map<Integer,String> collectionNameMap = ApiCollectionsDao.instance.findAll(
-            Filters.empty()
-        ).stream()
-            .collect(Collectors.toMap(ApiCollection::getId, ApiCollection::getName));
         JiraIntegration jira = loadJiraIntegration();
         ObjectId summaryId = jobParams.getSummaryId();
         String projId = jobParams.getProjectId();
@@ -133,7 +130,13 @@ public class JiraTicketJobExecutor extends JobExecutor<AutoTicketParams> {
             JiraMetaData meta;
             try {
                 String url = issue.getId().getApiInfoKey().getUrl();
-                String host = collectionNameMap.getOrDefault(issue.getId().getApiInfoKey().getApiCollectionId(), "");
+                String host = "";
+                try {
+                    URI uri = new URI(url);
+                    host = uri.getHost();
+                } catch (Exception e) {
+                    // TODO: handle exception
+                }
                 meta = new JiraMetaData(
                     info.getName(),
                     "Host - " + host,
