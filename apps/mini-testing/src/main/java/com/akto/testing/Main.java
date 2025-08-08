@@ -43,6 +43,7 @@ import org.bson.types.ObjectId;
 
 import static com.akto.testing.Utils.readJsonContentFromFile;
 
+import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -62,7 +63,7 @@ public class Main {
     public static boolean SKIP_SSRF_CHECK = ("true".equalsIgnoreCase(System.getenv("SKIP_SSRF_CHECK")) || !DashboardMode.isSaasDeployment());
     public static final boolean IS_SAAS = "true".equalsIgnoreCase(System.getenv("IS_SAAS"));
     
-    public static final String customMiniTestingServiceName;
+    private static final String customMiniTestingServiceName;
     static {
         customMiniTestingServiceName = System.getenv("MINI_TESTING_NAME") == null? "Default_" + UUID.randomUUID().toString().substring(0, 4) : System.getenv("MINI_TESTING_NAME");
     }
@@ -185,7 +186,7 @@ public class Main {
     private static final int LAST_TEST_RUN_EXECUTION_DELTA = 5 * 60;
     private static final int MAX_RETRIES_FOR_FAILED_SUMMARIES = 3;
 
-     private static BasicDBObject checkIfAlreadyTestIsRunningOnMachine(){
+    private static BasicDBObject checkIfAlreadyTestIsRunningOnMachine(){
         // this will return true if consumer is running and this the latest summary of the testing run
         // and also the summary should be in running state
         try {
@@ -218,7 +219,6 @@ public class Main {
             return null;
         }
     }
-
 
     private static void setTestingRunConfig(TestingRun testingRun, TestingRunResultSummary trrs) {
         long timestamp = testingRun.getId().getTimestamp();
@@ -267,7 +267,7 @@ public class Main {
 
     private static boolean matrixAnalyzerRunning = false;
 
-    public static void singleTypeInfoInit(int accountId) {
+    private static void singleTypeInfoInit(int accountId) {
         scheduler.scheduleAtFixedRate(new Runnable() {
             public void run() {
                 List<CustomDataType> customDataTypes = dataActor.fetchCustomDataTypes();
@@ -305,7 +305,40 @@ public class Main {
         return false;
     }
 
-    public static void main(String[] args) throws InterruptedException {
+    public static void main(String[] args) throws InterruptedException, IOException {
+        try {
+            Runtime.getRuntime().addShutdownHook(new Thread() {
+                public void run() {
+                    if (PrometheusMetricsHandler.isModuleBusy()) {
+                        loggerMaker.errorAndAddToDb("Module found busy while shutdown hook was triggered for mini-testing: " + customMiniTestingServiceName);
+                    }
+                    loggerMaker.infoAndAddToDb("Shutdown hook triggered for mini-testing: " + customMiniTestingServiceName);
+                    shutdown();
+                }
+            });
+            runModule();
+        } finally {
+            if (PrometheusMetricsHandler.isModuleBusy()) {
+                loggerMaker.errorAndAddToDb("Module found busy while shutting down mini-testing: " + customMiniTestingServiceName);
+            }
+            loggerMaker.infoAndAddToDb("Shutting down mini-testing: " + customMiniTestingServiceName);
+            shutdown();
+        }
+    }
+
+    private static void shutdown() {
+        try {
+            PrometheusMetricsHandler.shutdownServer();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Exception while performing shutdown tasks");
+        }
+
+        loggerMaker.infoAndAddToDb("Invoking System.exit(0) for mini-testing: " + customMiniTestingServiceName);
+        System.exit(0);
+    }
+
+    private static void runModule() throws InterruptedException, IOException {
+        PrometheusMetricsHandler.init();
         AccountSettings accountSettings = dataActor.fetchAccountSettings();
         dataActor.modifyHybridTestingSetting(RuntimeMode.isHybridDeployment());
         setupRateLimitWatcher(accountSettings);
@@ -417,6 +450,7 @@ public class Main {
         singleTypeInfoInit(accountId);
 
         while (true) {
+            PrometheusMetricsHandler.markModuleIdle();
             int start = Context.now();
             long startDetailed = System.currentTimeMillis();
             int delta = start - 20*60;
@@ -450,7 +484,7 @@ public class Main {
             }
 
             if (handleRerunTestingRunResult(trrs)) {
-                return;
+                continue;
             }
 
             if (testingRun.getState().equals(State.STOPPED)) {
@@ -492,7 +526,7 @@ public class Main {
                     dataActor.updateTestingRun(testingRun.getId().toHexString());
                     dataActor.updateTestRunResultSummary(summaryId.toHexString());
                 }
-                return;
+                continue;
             }
 
             try {
@@ -534,7 +568,7 @@ public class Main {
                                         + testingRunResult.getHexId() + ", TRRS_ID:" + testingRunResultSummary.getHexId()
                                         + (isTestingRunResultRerunCase ? " (rerun case) " : " ")
                                         + " TR_ID:" + testingRun.getHexId(), LogDb.TESTING);
-                                return;
+                                continue;
                             } else {
                                 loggerMaker.infoAndAddToDb("Test run was executed long ago, TRR_ID:"
                                         + testingRunResult.getHexId() + ", TRRS_ID:" + testingRunResultSummary.getHexId()
@@ -561,7 +595,7 @@ public class Main {
                                 runResultSummary = dataActor.fetchTestingRunResultSummary(testingRunResultSummary.getId().toHexString());
                                 if (summary == null) {
                                     loggerMaker.infoAndAddToDb("Skipping because some other thread picked it up, TRRS_ID:" + testingRunResultSummary.getHexId() + " TR_ID:" + testingRun.getHexId(), LogDb.TESTING);
-                                    return;
+                                    continue;
                                 }
                                 GithubUtils.publishGithubComments(runResultSummary);
                             }
@@ -577,12 +611,12 @@ public class Main {
                                 config.setTestingRunResultList(null);
                                 config.setRerunTestingRunResultSummary(null);
                                 loggerMaker.infoAndAddToDb("Deleted for TestingRunResult rerun case for failed testrun TRRS: " + testingRunResultSummary.getId(), LogDb.TESTING);
-                                return;
+                                continue;
                             }
                             TestingRunResultSummary summary = dataActor.markTestRunResultSummaryFailed(testingRunResultSummary.getId().toHexString());
                             if (summary == null) {
                                 loggerMaker.infoAndAddToDb("Skipping because some other thread picked it up, TRRS_ID:" + testingRunResultSummary.getHexId() + " TR_ID:" + testingRun.getHexId(), LogDb.TESTING);
-                                return;
+                                continue;
                             }
                         }
 
