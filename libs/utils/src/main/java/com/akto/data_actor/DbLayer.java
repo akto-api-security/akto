@@ -741,13 +741,13 @@ public class DbLayer {
     public static TestingRunResultSummary findPendingTestingRunResultSummary(int now, int delta, String miniTestingName) {
         try {
             // Combine filters for better query efficiency
-            Bson filter1 = Filters.and(
+            Bson filterScheduled = Filters.and(
                     Filters.eq(TestingRun.STATE, TestingRun.State.SCHEDULED),
                     Filters.lte(TestingRunResultSummary.START_TIMESTAMP, now)
             );
 
             TestingRunResultSummary trrs = TestingRunResultSummariesDao.instance.findOne(
-                    filter1,
+                    filterScheduled,
                     Projections.include(
                             TestingRunResultSummary.TESTING_RUN_ID,
                             ID,
@@ -756,14 +756,14 @@ public class DbLayer {
             );
 
             if (trrs == null) {
-                Bson filter2 = Filters.and(
+                Bson filterRunning = Filters.and(
                         Filters.eq(TestingRun.STATE, TestingRun.State.RUNNING),
                         Filters.lte(TestingRunResultSummary.START_TIMESTAMP, now - 5 * 60),
                         Filters.gt(TestingRunResultSummary.START_TIMESTAMP, delta)
                 );
 
                 trrs = TestingRunResultSummariesDao.instance.findOne(
-                        filter2,
+                        filterRunning,
                         Projections.include(
                                 TestingRunResultSummary.TESTING_RUN_ID,
                                 ID,
