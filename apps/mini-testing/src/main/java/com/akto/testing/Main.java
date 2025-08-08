@@ -327,7 +327,13 @@ public class Main {
     }
 
     private static void shutdown() {
-        PrometheusMetricsHandler.shutdownServer();
+        try {
+            PrometheusMetricsHandler.shutdownServer();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Exception while performing shutdown tasks");
+        }
+
+        loggerMaker.infoAndAddToDb("Invoking System.exit(0) for mini-testing: " + customMiniTestingServiceName);
         System.exit(0);
     }
 
