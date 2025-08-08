@@ -37,6 +37,7 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.google.gson.Gson;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.MongoCollection;
+import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.Accumulators;
 import com.mongodb.client.model.Aggregates;
 import com.mongodb.client.model.Filters;
@@ -743,7 +744,6 @@ public class Utils {
             return new ApiInfoKeyResult(0, showApiInfo ? new ArrayList<>() : null);
         }
 
-        // Combine filters: exclude unwanted, include only allowed
         Bson combinedFilter = Filters.and(
                 matchFilter,
                 filterQ,
@@ -766,21 +766,34 @@ public class Utils {
 
         Set<ApiInfo.ApiInfoKey> apiInfoKeys = new HashSet<>();
         List<ApiInfo> apiInfoList = new ArrayList<>();
-        List<Document> results = collection.aggregate(pipeline, Document.class).into(new ArrayList<>());
-        for (Document doc : results) {
-            Document keyDoc = (Document) doc.get("apiInfoKey");
-            if (keyDoc != null) {
-                ApiInfo.ApiInfoKey key = new ApiInfo.ApiInfoKey(
-                        keyDoc.getInteger("apiCollectionId"),
-                        keyDoc.getString("url"),
-                        URLMethods.Method.fromString(keyDoc.getString("method"))
-                );
-                apiInfoKeys.add(key);
-                if (showApiInfo) {
-                    apiInfoList.add(new ApiInfo(key));
+        if (!showApiInfo) {
+            pipeline.add(Aggregates.count("count"));
+            Document countDoc = collection.aggregate(pipeline, Document.class).first();
+            int count = countDoc != null ? countDoc.getInteger("count", 0) : 0;
+            return new ApiInfoKeyResult(count, null);
+        }
+
+        int batchSize = 500;
+        int count = 0;
+        try (MongoCursor<Document>  cursor = collection.aggregate(pipeline, Document.class).batchSize(batchSize).iterator()) {
+            while (cursor.hasNext()) {
+                for (int i = 0; i < batchSize && cursor.hasNext(); i++) {
+                    Document doc = cursor.next();
+                    Document keyDoc = (Document) doc.get("apiInfoKey");
+                    if (keyDoc != null) {
+                        ApiInfo.ApiInfoKey key = new ApiInfo.ApiInfoKey(
+                                keyDoc.getInteger("apiCollectionId"),
+                                keyDoc.getString("url"),
+                                URLMethods.Method.fromString(keyDoc.getString("method"))
+                        );
+                        if (apiInfoKeys.add(key)) {
+                            apiInfoList.add(new ApiInfo(key));
+                            count++;
+                        }
+                    }
                 }
             }
         }
-        return new ApiInfoKeyResult(apiInfoKeys.size(), showApiInfo ? apiInfoList : null);
+        return new ApiInfoKeyResult(count, apiInfoList);
     }
 }

@@ -1005,18 +1005,37 @@ public class ApiCollectionsAction extends UserAction {
 
     public String fetchSensitiveAndUnauthenticatedValue() {
         Bson filterQ = UsageMetricCalculator.excludeDemosAndDeactivated(ApiInfo.ID_API_COLLECTION_ID);
-        List<ApiInfo> sensitiveEndpoints = ApiInfoDao.instance.findAll(Filters.and(filterQ, Filters.eq(ApiInfo.IS_SENSITIVE, true)));
-        for (ApiInfo apiInfo : sensitiveEndpoints) {
-            if (apiInfo.getAllAuthTypesFound() != null && !apiInfo.getAllAuthTypesFound().isEmpty()) {
-                for (Set<ApiInfo.AuthType> authType : apiInfo.getAllAuthTypesFound()) {
-                    if (authType.contains(ApiInfo.AuthType.UNAUTHENTICATED)) {
-                        this.sensitiveUnauthenticatedEndpointsCount++;
-                        if (this.showApiInfo) {
-                            this.sensitiveUnauthenticatedEndpointsApiInfo.add(apiInfo);
+        int batchSize = 1000;
+        int skip = 0;
+        boolean moreData = true;
+        this.sensitiveUnauthenticatedEndpointsCount = 0;
+        if (this.showApiInfo) {
+            this.sensitiveUnauthenticatedEndpointsApiInfo.clear();
+        }
+
+        while (moreData) {
+            List<ApiInfo> sensitiveEndpoints = ApiInfoDao.instance.findAll(
+                    Filters.and(filterQ, Filters.eq(ApiInfo.IS_SENSITIVE, true)),
+                    skip, batchSize, null, null
+            );
+            if (sensitiveEndpoints.isEmpty()) {
+                moreData = false;
+                break;
+            }
+            for (ApiInfo apiInfo : sensitiveEndpoints) {
+                if (apiInfo.getAllAuthTypesFound() != null && !apiInfo.getAllAuthTypesFound().isEmpty()) {
+                    for (Set<ApiInfo.AuthType> authType : apiInfo.getAllAuthTypesFound()) {
+                        if (authType.contains(ApiInfo.AuthType.UNAUTHENTICATED)) {
+                            this.sensitiveUnauthenticatedEndpointsCount++;
+                            if (this.showApiInfo) {
+                                this.sensitiveUnauthenticatedEndpointsApiInfo.add(apiInfo);
+                            }
+                            break;
                         }
                     }
                 }
             }
+            skip += batchSize;
         }
         return Action.SUCCESS.toUpperCase();
     }
@@ -1024,15 +1043,29 @@ public class ApiCollectionsAction extends UserAction {
     public String fetchHighRiskThirdPartyValue() {
         Bson filterQ = UsageMetricCalculator.excludeDemosAndDeactivated(ApiInfo.ID_API_COLLECTION_ID);
         Bson filter = Filters.and(
-            filterQ,
-            Filters.gte(ApiInfo.RISK_SCORE, 4),
-            Filters.in(ApiInfo.API_ACCESS_TYPES, ApiInfo.ApiAccessType.THIRD_PARTY)
+                filterQ,
+                Filters.gte(ApiInfo.RISK_SCORE, 4),
+                Filters.in(ApiInfo.API_ACCESS_TYPES, ApiInfo.ApiAccessType.THIRD_PARTY)
         );
 
         if (this.showApiInfo) {
-            this.highRiskThirdPartyEndpointsApiInfo = ApiInfoDao.instance.findAll(filter);
-            this.highRiskThirdPartyEndpointsCount = this.highRiskThirdPartyEndpointsApiInfo.size();
-        }else{
+            int batchSize = 1000;
+            int skip = 0;
+            boolean moreData = true;
+            this.highRiskThirdPartyEndpointsApiInfo.clear();
+            int count = 0;
+            while (moreData) {
+                List<ApiInfo> batch = ApiInfoDao.instance.findAll(filter, skip, batchSize, null, null);
+                if (batch.isEmpty()) {
+                    moreData = false;
+                    break;
+                }
+                this.highRiskThirdPartyEndpointsApiInfo.addAll(batch);
+                count += batch.size();
+                skip += batchSize;
+            }
+            this.highRiskThirdPartyEndpointsCount = count;
+        } else {
             this.highRiskThirdPartyEndpointsCount = (int) ApiInfoDao.instance.count(filter);
         }
 
@@ -1042,17 +1075,28 @@ public class ApiCollectionsAction extends UserAction {
     public String fetchShadowApisValue() {
         ApiCollection shadowApisCollection = ApiCollectionsDao.instance.findByName(AKTO_DISCOVERED_APIS_COLLECTION);
         if (shadowApisCollection != null) {
-            
+            Bson filter = Filters.eq(ApiInfo.ID_API_COLLECTION_ID, shadowApisCollection.getId());
             if (this.showApiInfo) {
-                this.shadowApisApiInfo = ApiInfoDao.instance.findAll(
-                    Filters.eq(ApiInfo.ID_API_COLLECTION_ID, shadowApisCollection.getId())
-                );
-                this.shadowApisCount = shadowApisApiInfo.size();
-            }else{
-                this.shadowApisCount = (int) ApiInfoDao.instance.count(Filters.eq(ApiInfo.ID_API_COLLECTION_ID, shadowApisCollection.getId()));
+                int batchSize = 1000;
+                int skip = 0;
+                boolean moreData = true;
+                this.shadowApisApiInfo.clear();
+                int count = 0;
+                while (moreData) {
+                    List<ApiInfo> batch = ApiInfoDao.instance.findAll(filter, skip, batchSize, null, null);
+                    if (batch.isEmpty()) {
+                        moreData = false;
+                        break;
+                    }
+                    this.shadowApisApiInfo.addAll(batch);
+                    count += batch.size();
+                    skip += batchSize;
+                }
+                this.shadowApisCount = count;
+            } else {
+                this.shadowApisCount = (int) ApiInfoDao.instance.count(filter);
             }
         }
-
         return Action.SUCCESS.toUpperCase();
     }
 
@@ -1073,27 +1117,37 @@ public class ApiCollectionsAction extends UserAction {
                 
             case "SENSITIVE":
                 Bson sensitiveFilter = SingleTypeInfoDao.instance.filterForSensitiveParamsExcludingUserMarkedSensitive(
-                    null, null, null, null
+                        null, null, null, null
                 );
-                List<SingleTypeInfo> sensitiveSTIs = SingleTypeInfoDao.instance.findAll(sensitiveFilter);
+                int batchSize = 1000;
+                int skip = 0;
+                boolean moreData = true;
                 java.util.Set<String> seen = new java.util.HashSet<>();
-                
-                for (SingleTypeInfo sti : sensitiveSTIs) {
-                    int collectionId = sti.getApiCollectionId();
-                    String url = sti.getUrl();
-                    String method = sti.getMethod();
-                    String key = collectionId + "|" + url + "|" + method;
-                    if (seen.contains(key)) continue;
-                    seen.add(key);
-                    ApiInfo apiInfo = ApiInfoDao.instance.findOne(ApiInfoDao.getFilter(url, method, collectionId));
-                    if (apiInfo != null) {
-                        result.add(apiInfo);
-                    } else {
-                        ApiInfo.ApiInfoKey apiInfoKey = new ApiInfo.ApiInfoKey(collectionId, url, Method.fromString(method));
-                        ApiInfo minimalApiInfo = new ApiInfo();
-                        minimalApiInfo.setId(apiInfoKey);
-                        result.add(minimalApiInfo);
+
+                while (moreData) {
+                    List<SingleTypeInfo> sensitiveSTIs = SingleTypeInfoDao.instance.findAll(sensitiveFilter, skip, batchSize, null, null);
+                    if (sensitiveSTIs.isEmpty()) {
+                        moreData = false;
+                        break;
                     }
+                    for (SingleTypeInfo sti : sensitiveSTIs) {
+                        int collectionId = sti.getApiCollectionId();
+                        String url = sti.getUrl();
+                        String method = sti.getMethod();
+                        String key = collectionId + "|" + url + "|" + method;
+                        if (seen.contains(key)) continue;
+                        seen.add(key);
+                        ApiInfo apiInfo = ApiInfoDao.instance.findOne(ApiInfoDao.getFilter(url, method, collectionId));
+                        if (apiInfo != null) {
+                            result.add(apiInfo);
+                        } else {
+                            ApiInfo.ApiInfoKey apiInfoKey = new ApiInfo.ApiInfoKey(collectionId, url, com.akto.dto.type.URLMethods.Method.fromString(method));
+                            ApiInfo minimalApiInfo = new ApiInfo();
+                            minimalApiInfo.setId(apiInfoKey);
+                            result.add(minimalApiInfo);
+                        }
+                    }
+                    skip += batchSize;
                 }
                 break;
                 
@@ -1105,15 +1159,6 @@ public class ApiCollectionsAction extends UserAction {
                     Filters.in(ApiInfo.API_ACCESS_TYPES, ApiInfo.ApiAccessType.THIRD_PARTY)
                 );
                 result = ApiInfoDao.instance.findAll(thirdPartyFilter);
-                break;
-
-            case "NEWLY_DISCOVERED":
-                int oneHourAgo = (int) (System.currentTimeMillis() / 1000) - 3600; // 1 hour in seconds
-                Bson newlyDiscoveredFilter = Filters.and(
-                        filterQ,
-                        Filters.gte(ApiInfo.DISCOVERED_TIMESTAMP, oneHourAgo)
-                );
-                result = ApiInfoDao.instance.findAll(newlyDiscoveredFilter);
                 break;
 
             default:
