@@ -1,5 +1,6 @@
 package com.akto.jobs.executors;
 
+import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.ConfigsDao;
 import com.akto.dao.JiraIntegrationDao;
 import com.akto.dao.context.Context;
@@ -8,6 +9,7 @@ import com.akto.dao.testing.TestingRunResultDao;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dto.Config.AktoHostUrlConfig;
 import com.akto.dto.Config.ConfigType;
+import com.akto.dto.ApiCollection;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.jira_integration.JiraIntegration;
@@ -70,7 +72,10 @@ public class JiraTicketJobExecutor extends JobExecutor<AutoTicketParams> {
     @Override
     protected void runJob(Job job) throws Exception {
         AutoTicketParams jobParams = paramClass.cast(job.getJobParams());
-
+        Map<Integer,String> collectionNameMap = ApiCollectionsDao.instance.findAll(
+            Filters.ne(ApiCollection._TYPE, ApiCollection.Type.API_GROUP)
+        ).stream()
+            .collect(Collectors.toMap(ApiCollection::getId, ApiCollection::getName));
         JiraIntegration jira = loadJiraIntegration();
         ObjectId summaryId = jobParams.getSummaryId();
         String projId = jobParams.getProjectId();
@@ -127,11 +132,12 @@ public class JiraTicketJobExecutor extends JobExecutor<AutoTicketParams> {
 
             JiraMetaData meta;
             try {
-                URL url = new URL(id.getApiInfoKey().getUrl());
+                String url = issue.getId().getApiInfoKey().getUrl();
+                String host = collectionNameMap.getOrDefault(issue.getId().getApiInfoKey().getApiCollectionId(), "");
                 meta = new JiraMetaData(
                     info.getName(),
-                    "Host - " + url.getHost(),
-                    url.getPath(),
+                    "Host - " + host,
+                    url,
                     dashboardUrl + "/dashboard/issues?result=" + testingRunResult.getId().toHexString(),
                     info.getDescription(),
                     id,
