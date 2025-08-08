@@ -73,7 +73,7 @@ public class JiraTicketJobExecutor extends JobExecutor<AutoTicketParams> {
     protected void runJob(Job job) throws Exception {
         AutoTicketParams jobParams = paramClass.cast(job.getJobParams());
         Map<Integer,String> collectionNameMap = ApiCollectionsDao.instance.findAll(
-            Filters.ne(ApiCollection._TYPE, ApiCollection.Type.API_GROUP)
+            Filters.empty()
         ).stream()
             .collect(Collectors.toMap(ApiCollection::getId, ApiCollection::getName));
         JiraIntegration jira = loadJiraIntegration();
