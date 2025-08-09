@@ -156,7 +156,7 @@ const Roles = () => {
             primaryAction={{
                 content: 'Create new role',
                 onAction: () => toggleInviteUserModal(),
-                // 'disabled': (isLocalDeploy || userRole !== 'ADMIN')
+                'disabled': (isLocalDeploy || userRole !== 'ADMIN')
             }}
             divider
         >
