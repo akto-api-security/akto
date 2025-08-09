@@ -1166,8 +1166,22 @@ public class InventoryAction extends UserAction {
         );
 
         if (this.showApiInfo) {
-            this.notTestedEndpointsApiInfo = ApiInfoDao.instance.findAll(filter);
-            this.notTestedEndpointsCount = this.notTestedEndpointsApiInfo.size();
+            int batchSize = 1000;
+            int skip = 0;
+            boolean moreData = true;
+            this.notTestedEndpointsApiInfo.clear();
+            int count = 0;
+            while (moreData) {
+                List<ApiInfo> batch = ApiInfoDao.instance.findAll(filter, skip, batchSize, null, null);
+                if (batch.isEmpty()) {
+                    moreData = false;
+                    break;
+                }
+                this.notTestedEndpointsApiInfo.addAll(batch);
+                count += batch.size();
+                skip += batchSize;
+            }
+            this.notTestedEndpointsCount = count;
         } else {
             this.notTestedEndpointsCount = (int) ApiInfoDao.instance.count(filter);
         }
