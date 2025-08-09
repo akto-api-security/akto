@@ -14,7 +14,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import org.bson.conversions.Bson;
@@ -102,18 +101,11 @@ public class RBACDao extends CommonContextDao<RBAC> {
             return true;
         }
         Pair<List<String>, Integer> allowedFeaturesEntry = allowedFeaturesMapForUser.get(key);
-        if (allowedFeaturesEntry == null || (Context.now() - allowedFeaturesEntry.getSecond() > EXPIRY_TIME)) {
-            Bson filterRbac = Filters.and(
-                    Filters.eq(RBAC.USER_ID, userId),
-                    Filters.eq(RBAC.ACCOUNT_ID, accountId));
-
-            RBAC userRbac = RBACDao.instance.findOne(filterRbac, Projections.include(RBAC.ALLOWED_FEATURES_FOR_USER, RBAC.ROLE));
-            if (userRbac != null) {
-                List<String> allowedFeatures = userRbac.getAllowedFeaturesForUser();
-                allowedFeaturesMapForUser.put(key, new Pair<>(allowedFeatures, Context.now()));
-                if(allowedFeatures != null && !allowedFeatures.isEmpty() && allowedFeatures.contains(featureLabel)) {
-                    return true;
-                }
+        if (allowedFeaturesEntry == null || allowedFeaturesEntry.getFirst() == null || (Context.now() - allowedFeaturesEntry.getSecond() > EXPIRY_TIME)) {
+            List<String> allowedFeatures = instance.getAllowedFeaturesForRole(userId, accountId);
+            allowedFeaturesMapForUser.put(key, new Pair<>(allowedFeatures, Context.now()));
+            if(allowedFeatures != null && !allowedFeatures.isEmpty() && allowedFeatures.contains(featureLabel)) {
+                return true;
             }
             return false;
         }
@@ -157,6 +149,29 @@ public class RBACDao extends CommonContextDao<RBAC> {
         }
 
         return new ArrayList<>(apiCollectionsId);
+    }
+
+    public List<String> getAllowedFeaturesForRole(int userId, int accountId) {
+        RBAC rbac = RBACDao.instance.findOne(
+                Filters.and(
+                        eq(RBAC.USER_ID, userId),
+                        eq(RBAC.ACCOUNT_ID, accountId)),
+                Projections.include(RBAC.ALLOWED_FEATURES_FOR_USER, RBAC.ROLE));
+
+        if (RBAC.Role.ADMIN.name().equals(rbac.getRole())) {
+            return RBAC.SPECIAL_FEATURES_FOR_RBAC;
+        }
+
+        String role = rbac.getRole();
+        CustomRole customRole = CustomRoleDao.instance.findRoleByName(role);
+        Set<String> allowedFeatures = new HashSet<>();
+        if (customRole != null) {
+            allowedFeatures.addAll(customRole.getAllowedFeaturesForUser());
+        }
+        if(rbac != null && rbac.getAllowedFeaturesForUser() != null) {
+            allowedFeatures.addAll(rbac.getAllowedFeaturesForUser());
+        }
+        return new ArrayList<>(allowedFeatures);
     }
 
     public HashMap<Integer, List<Integer>> getAllUsersCollections(int accountId) {
