@@ -14,7 +14,11 @@ export async function fetchActionItemsData() {
         api.fetchHighRiskThirdPartyValue(false),
         api.fetchShadowApisValue(false),
         settingsModule.fetchAdminInfo(),
-        api.fetchUnauthenticatedApis(false)
+        api.fetchUnauthenticatedApis(false),
+        api.getNotTestedAPICount(false), 
+        api.getOnlyOnceTestedAPICount(false), 
+        api.getVulnerableApiCount(false), 
+        api.getMisConfiguredTestsCount() 
     ]);
 
     const [
@@ -24,7 +28,11 @@ export async function fetchActionItemsData() {
         highRiskThirdPartyValueResult,
         shadowApisValueResult,
         adminSettingsResult,
-        unauthenticatedApisResult 
+        unauthenticatedApisResult,
+        notTestedApiCountResult, 
+        onlyOnceTestedApiCountResult, 
+        vulnerableApiCountResult, 
+        misConfiguredTestsCountResult 
     ] = results;
 
     const apiStats = apiStatsResult.status === 'fulfilled' ? apiStatsResult.value : null;
@@ -34,13 +42,16 @@ export async function fetchActionItemsData() {
     const shadowApisCount = shadowApisValueResult.status === 'fulfilled' ? shadowApisValueResult.value.shadowApisCount || 0 : 0;
     const adminSettings = adminSettingsResult.status === 'fulfilled' ? adminSettingsResult.value.resp : {};
     const unauthenticatedApis = unauthenticatedApisResult.status === 'fulfilled' ? unauthenticatedApisResult.value.unauthenticatedApis || 0 : 0;
-
     const jiraTicketUrlMap = adminSettings?.jiraTicketUrlMap || {};
 
     let highRiskCount = 0;
     let unauthenticatedCount = unauthenticatedApis;
     let thirdPartyDiff = 0;
     let sensitiveDataCount = countMapResp?.totalApisCount || 0;
+    let notTestedApiCount = notTestedApiCountResult.status === 'fulfilled' ? notTestedApiCountResult.value?.notTestedEndpointsCount || 0 : 0;
+    let onlyOnceTestedApiCount = onlyOnceTestedApiCountResult.status === 'fulfilled' ? onlyOnceTestedApiCountResult.value?.onlyOnceTestedEndpointsCount || 0 : 0;
+    let vulnerableApiCount = vulnerableApiCountResult.status === 'fulfilled' ? vulnerableApiCountResult.value?.buaCategoryCount || 0 : 0;
+    let misConfiguredTestsCount = misConfiguredTestsCountResult.status === 'fulfilled' ? misConfiguredTestsCountResult.value?.misConfiguredTestsCount || 0 : 0;
 
     if (apiStats?.apiStatsEnd && apiStats?.apiStatsStart) {
         const { apiStatsEnd, apiStatsStart } = apiStats;
@@ -59,7 +70,11 @@ export async function fetchActionItemsData() {
         highRiskThirdPartyCount,
         shadowApisCount,
         sensitiveAndUnauthenticatedCount,
-        jiraTicketUrlMap
+        jiraTicketUrlMap,
+        notTestedApiCount,
+        onlyOnceTestedApiCount,
+        vulnerableApiCount,
+        misConfiguredTestsCount
     };
 }
 
@@ -73,7 +88,11 @@ export async function fetchAllActionItemsApiInfo() {
         api.fetchUnauthenticatedApis(true),
         api.fetchActionItemsApiInfo('HIGH_RISK'),
         api.fetchActionItemsApiInfo('SENSITIVE'),
-        api.fetchActionItemsApiInfo('THIRD_PARTY')
+        api.fetchActionItemsApiInfo('THIRD_PARTY'),
+        api.getNotTestedAPICount(true), 
+        api.getOnlyOnceTestedAPICount(true), 
+        api.getMisConfiguredTestsCount(true), 
+        api.getVulnerableApiCount(true) 
     ]);
 
     const [
@@ -83,7 +102,11 @@ export async function fetchAllActionItemsApiInfo() {
         unauthenticatedApisResult,
         highRiskResult,
         sensitiveResult,
-        thirdPartyResult
+        thirdPartyResult,
+        notTestedApiInfoResult, 
+        onlyOnceTestedApiInfoResult, 
+        misConfiguredTestsApiInfoResult, 
+        vulnerableApiCountResult 
     ] = results;
 
     const sensitiveAndUnauthenticatedApis = sensitiveAndUnauthenticatedValueResult.status === 'fulfilled' ? sensitiveAndUnauthenticatedValueResult?.value?.sensitiveUnauthenticatedEndpointsApiInfo || [] : [];
@@ -93,6 +116,10 @@ export async function fetchAllActionItemsApiInfo() {
     const highRiskApis = highRiskResult.status === 'fulfilled' ? highRiskResult?.value?.response?.apiInfos || [] : [];
     const sensitiveDataEndpoints = sensitiveResult.status === 'fulfilled' ? sensitiveResult?.value?.response?.apiInfos || [] : [];
     const thirdPartyApis = thirdPartyResult.status === 'fulfilled' ? thirdPartyResult?.value?.response?.apiInfos || [] : [];
+    const notTestedEndpointsApiInfo = notTestedApiInfoResult.status === 'fulfilled' ? notTestedApiInfoResult.value?.notTestedEndpointsApiInfo || [] : [];
+    const onlyOnceTestedEndpointsApiInfo = onlyOnceTestedApiInfoResult.status === 'fulfilled' ? onlyOnceTestedApiInfoResult.value?.onlyOnceTestedEndpointsApiInfo || [] : [];
+    const misConfiguredTestsApiInfo = misConfiguredTestsApiInfoResult.status === 'fulfilled' ? misConfiguredTestsApiInfoResult.value?.misConfiguredTestsApiInfo || [] : [];
+    const vulnerableApiCountApiInfo = vulnerableApiCountResult.status === 'fulfilled' ? vulnerableApiCountResult.value?.buaCategoryApiInfo || [] : [];
 
     return {
         highRiskApis: highRiskApis,
@@ -102,5 +129,9 @@ export async function fetchAllActionItemsApiInfo() {
         highRiskThirdParty: highRiskThirdPartyApis,
         shadowApis: shadowApis,
         sensitiveAndUnauthenticated: sensitiveAndUnauthenticatedApis,
+        notTestedEndpointsApiInfo,
+        onlyOnceTestedEndpointsApiInfo,
+        misConfiguredTestsApiInfo,
+        vulnerableApiCountApiInfo,
     };
 }

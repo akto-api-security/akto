@@ -1,4 +1,4 @@
-import { ActionList, Avatar, Banner, Box, Button, HorizontalStack, Icon, LegacyCard, Link, Page, Popover, ResourceItem, ResourceList, Text, Modal, TextField } from "@shopify/polaris"
+import { ResourceItem, Text } from "@shopify/polaris"
 
 const usersCollectionRenderItem = (item) => {
     const { id, collectionName } = item;

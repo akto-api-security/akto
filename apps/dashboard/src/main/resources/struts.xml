@@ -790,7 +790,6 @@
                 <param name="includeProperties">^actionErrors.*</param>
             </result>
         </action>
-
         <action name="api/deleteSamlSso" class="com.akto.action.user.AzureSsoAction" method="deleteSamlSso">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
@@ -2026,7 +2025,7 @@
                 <param name="includeProperties">^actionErrors.*</param>
             </result>
             <result name="SUCCESS"  type="json">
-                <param name="root">buaCategoryCount</param>
+                <param name="includeProperties">buaCategoryCount,buaCategoryApiInfo.*</param>
             </result>
             <result name="ERROR" type="json">
                 <param name="statusCode">422</param>
@@ -2049,7 +2048,7 @@
                 <param name="includeProperties">^actionErrors.*</param>
             </result>
             <result name="SUCCESS"  type="json">
-                <param name="root">notTestedEndpointsCount</param>
+                <param name="includeProperties">notTestedEndpointsCount,notTestedEndpointsApiInfo.*</param>
             </result>
             <result name="ERROR" type="json">
                 <param name="statusCode">422</param>
@@ -2071,7 +2070,7 @@
                 <param name="includeProperties">^actionErrors.*</param>
             </result>
             <result name="SUCCESS"  type="json">
-                <param name="root">onlyOnceTestedEndpointsCount</param>
+                <param name="includeProperties">onlyOnceTestedEndpointsCount,onlyOnceTestedEndpointsApiInfo.*</param>
             </result>
             <result name="ERROR" type="json">
                 <param name="statusCode">422</param>
@@ -2079,7 +2078,6 @@
                 <param name="includeProperties">^actionErrors.*</param>
             </result>
         </action>
-
        <action name="api/fetchTestedApisRanges" class="com.akto.action.observe.InventoryAction" method="fetchTestedApisRanges">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
@@ -2115,7 +2113,7 @@
                 <param name="includeProperties">^actionErrors.*</param>
             </result>
             <result name="SUCCESS"  type="json">
-                <param name="root">misConfiguredTestsCount</param>
+                <param name="includeProperties">misConfiguredTestsCount,misConfiguredTestsApiInfo.*</param>
             </result>
             <result name="ERROR" type="json">
                 <param name="statusCode">422</param>
@@ -2869,7 +2867,6 @@
                 <param name="includeProperties">^actionErrors.*</param>
             </result>
         </action>
-
         <action name="api/importPostmanWorkspace" class="com.akto.action.PostmanAction" method="importDataFromPostman">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
@@ -3663,7 +3660,6 @@
                 <param name="includeProperties">^actionErrors.*</param>
             </result>
         </action>
-
         <action name="api/fetchCustomAuthTypes" class="com.akto.action.CustomAuthTypeAction" method="fetchCustomAuthTypes">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
@@ -4461,7 +4457,6 @@
                 <param name="includeProperties">^actionErrors.*</param>
             </result>
         </action>
-
         <action name="api/deleteTestSuite" class="com.akto.action.testing.TestSuiteAction" method="deleteTestSuite">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
@@ -5258,7 +5253,6 @@
                 <param name="includeProperties">^actionErrors.*</param>
             </result>
         </action>
-
         <action name="api/bulkUpdateIssueStatus" class="com.akto.action.testing_issues.IssuesAction" method="bulkUpdateIssueStatus">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
@@ -5853,7 +5847,6 @@
                 <param name="includeProperties">^actionErrors.*</param>
             </result>
         </action>
-
 <!--        currently not being used anywhere-->
         <action name="api/uploadWorkflowJson" class="com.akto.action.testing.WorkflowTestAction" method="uploadWorkflowJson">
             <interceptor-ref name="json"/>
@@ -6632,7 +6625,6 @@
                 <param name="includeProperties">^actionErrors.*</param>
             </result>
         </action>
-
         <action name="api/updateScript" class="com.akto.action.testing.ScriptAction" method="updateScript">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
@@ -7323,7 +7315,6 @@
                 <param name="includeProperties">^actionErrors.*</param>
             </result>
         </action>
-
 <!--        <action name="callback" class="com.akto.action.Auth0CallbackAction">-->
 <!--            <result name="SUCCESS">/pages/login.jsp</result>-->
 <!--        </action>-->
@@ -8112,7 +8103,6 @@
                 <param name="includeProperties">^actionErrors.*</param>
             </result>
         </action>
-
         <action name="api/fetchGlobalVars" class="com.akto.action.DependencyAction" method="fetchGlobalVars">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
@@ -8889,8 +8879,6 @@
                     name="includeProperties">^actionErrors.*</param>
             </result>
         </action>
-
-
         <action name="api/fetchThreatCategoryCount"
             class="com.akto.action.threat_detection.ThreatApiAction"
             method="fetchThreatCategoryCount">
@@ -9460,27 +9448,6 @@
             </result>
         </action>
 
-        <action name="api/fetchIssuesByStatusAndSummaryId" class="com.akto.action.testing_issues.IssuesAction" method="fetchIssuesByStatusAndSummaryId">
-            <interceptor-ref name="json"/>
-            <interceptor-ref name="defaultStack" />
-            <interceptor-ref name="roleAccessInterceptor">
-                <param name="featureLabel">ISSUES</param>
-                <param name="accessType">READ</param>
-            </interceptor-ref>
-
-            <result name="FORBIDDEN" type="json">
-                <param name="statusCode">403</param>
-                <param name="ignoreHierarchy">false</param>
-                <param name="includeProperties">^actionErrors.*</param>
-            </result>
-            <result name="SUCCESS" type="json"/>
-            <result name="ERROR" type="json">
-                <param name="statusCode">422</param>
-                <param name="ignoreHierarchy">false</param>
-                <param name="includeProperties">^actionErrors.*</param>
-            </result>
-        </action>
-
         <action name="api/fetchApiAuditLogsFromDb" class="com.akto.action.settings.ApiAuditLogsAction" method="fetchApiAuditLogsFromDb">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
@@ -9683,7 +9650,6 @@
                  <param name="includeProperties">^actionErrors.*</param>
             </result>
         </action>
-
         <action name="api/getAllAgentRuns" class="com.akto.action.agents.AgentAction" method="getAllAgentRuns">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
@@ -10463,7 +10429,6 @@
                 <param name="includeProperties">^actionErrors.*</param>
             </result>
         </action>
-
         <action name="api/saveEndpointDescription" class="com.akto.action.observe.InventoryAction" method="saveEndpointDescription">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
@@ -10765,6 +10730,37 @@
                 <param name="statusCode">422</param>
                 <param name="ignoreHierarchy">false</param>
                 <param name="includeProperties">^actionErrors.*, ^responses.*</param>
+            </result>
+        </action>
+
+        <action name="api/allowedFeaturesForRBAC" class="com.akto.action.RoleAction" method="allowedFeaturesForRBAC">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">ADMIN_ACTIONS</param>
+                <param name="accessType">READ</param>
+            </interceptor-ref>
+
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result> 
+            <interceptor-ref name="usageInterceptor">
+                <param name="featureLabel">RBAC_FEATURE</param>
+            </interceptor-ref>
+            <result name="UNAUTHORIZED" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="SUCCESS" type="json">
+                <param name="root">allowedFeaturesForRBAC</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
             </result>
         </action>
 

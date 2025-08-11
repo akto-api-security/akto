@@ -1,4 +1,4 @@
-import { VerticalStack, Box } from '@shopify/polaris';
+import { VerticalStack, Box, HorizontalStack } from '@shopify/polaris';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import FlyLayout from '../../../components/layouts/FlyLayout';
@@ -29,7 +29,11 @@ const ACTION_ITEM_TYPES = {
     THIRD_PARTY_APIS: 'THIRD_PARTY_APIS',
     HIGH_RISK_THIRD_PARTY: 'HIGH_RISK_THIRD_PARTY',
     SHADOW_APIS: 'SHADOW_APIS',
-    CRITICAL_SENSITIVE_UNAUTH: 'CRITICAL_SENSITIVE_UNAUTH'
+    CRITICAL_SENSITIVE_UNAUTH: 'CRITICAL_SENSITIVE_UNAUTH',
+    VULNERABLE_APIS: 'VULNERABLE_APIS',
+    ENHANCE_TESTING_COVERAGE: 'ENHANCE_TESTING_COVERAGE',
+    ENABLE_CONTINUOUS_TESTING: 'ENABLE_CONTINUOUS_TESTING',
+    ADDRESS_MISCONFIGURED_TESTS: 'ADDRESS_MISCONFIGURED_TESTS'
 };
 
 const JIRA_INTEGRATION_URL = "/dashboard/settings/integrations/jira";
@@ -37,7 +41,7 @@ const JIRA_INTEGRATION_URL = "/dashboard/settings/integrations/jira";
 export const ActionItemsContent = ({ actionItemsData, onCountChange }) => {
     const navigate = useNavigate();
     const [actionItems, setActionItems] = useState([]);
-    const [criticalCardData, setCriticalCardData] = useState(null);
+    const [criticalCardsData, setCriticalCardsData] = useState([]);
     const [modalActive, setModalActive] = useState(false);
     const [projId, setProjId] = useState('');
     const [issueType, setIssueType] = useState('');
@@ -140,6 +144,10 @@ export const ActionItemsContent = ({ actionItemsData, onCountChange }) => {
             shadowApisCount,
             sensitiveAndUnauthenticatedCount,
             jiraTicketUrlMap: ticketMap,
+            notTestedApiCount,
+            onlyOnceTestedApiCount,
+            vulnerableApiCount,
+            misConfiguredTestsCount,
         } = actionItemsData;
         setJiraTicketUrlMap(ticketMap || {});
 
@@ -154,15 +162,23 @@ export const ActionItemsContent = ({ actionItemsData, onCountChange }) => {
 
             createActionItem('5', 'P1', 'High-risk third-party APIs', `${highRiskThirdPartyCount} External APIs with high risk scores requiring attention`, "Security Team", "High", highRiskThirdPartyCount, ACTION_ITEM_TYPES.HIGH_RISK_THIRD_PARTY, jiraTicketUrlMap, handleJiraIntegration, "Supply chain vulnerabilities that can compromise entire systems"),
 
-            createActionItem('6', 'P1', 'Shadow APIs', `${shadowApisCount} Undocumented APIs discovered in the system`, "API Governance", "High", shadowApisCount, ACTION_ITEM_TYPES.SHADOW_APIS, jiraTicketUrlMap, handleJiraIntegration, "Unmonitored attack surface with unknown security posture")
+            createActionItem('6', 'P1', 'Shadow APIs', `${shadowApisCount} Undocumented APIs discovered in the system`, "API Governance", "High", shadowApisCount, ACTION_ITEM_TYPES.SHADOW_APIS, jiraTicketUrlMap, handleJiraIntegration, "Unmonitored attack surface with unknown security posture"),
+
+            createActionItem('7', 'P1', 'Enhance testing coverage', `${notTestedApiCount} test executions on a single API indicate the need for broader coverage across other APIs`, "QA / Security", "Medium", notTestedApiCount, ACTION_ITEM_TYPES.ENHANCE_TESTING_COVERAGE, jiraTicketUrlMap, handleJiraIntegration, "Helps detect issues across all APIs and prevents blind spots"),
+
+            createActionItem('8', 'P1', 'Enable continuous testing', `${onlyOnceTestedApiCount} APIs are currently tested only once — consider moving them to scheduled testing`, "QA Team", "Medium", onlyOnceTestedApiCount, ACTION_ITEM_TYPES.ENABLE_CONTINUOUS_TESTING, jiraTicketUrlMap, handleJiraIntegration, "Ensures ongoing protection as API behavior and usage evolve"),
+
+            createActionItem('9', 'P2', 'Address misconfigured tests', `${misConfiguredTestsCount} misconfigured tests detected during scans`, "QA Team", "Medium", misConfiguredTestsCount, ACTION_ITEM_TYPES.ADDRESS_MISCONFIGURED_TESTS, jiraTicketUrlMap, handleJiraIntegration, "Improves test coverage and reduces missed vulnerabilities")
         ];
 
         const filteredItems = items.filter(item => item.count > 0);
         setActionItems(filteredItems);
         let totalCount = filteredItems.length;
+        let criticalCardsDataToSet = [];
+        
         if (sensitiveAndUnauthenticatedCount > 0) {
             totalCount += 1;
-            setCriticalCardData({
+            criticalCardsDataToSet.push({
                 id: 'p0-critical',
                 priority: 'P0',
                 staticTitle: 'Sensitive data without proper controls',
@@ -173,9 +189,24 @@ export const ActionItemsContent = ({ actionItemsData, onCountChange }) => {
                 count: sensitiveAndUnauthenticatedCount,
                 actionItemType: ACTION_ITEM_TYPES.CRITICAL_SENSITIVE_UNAUTH
             });
-        } else {
-            setCriticalCardData(null);
         }
+        
+        if (vulnerableApiCount > 0) {
+            totalCount += 1;
+            criticalCardsDataToSet.push({
+                id: 'p0-vulnerable',
+                priority: 'P0',
+                staticTitle: 'Patch critical vulnerabilities immediately',
+                title: 'Patch critical vulnerabilities immediately',
+                description: `${vulnerableApiCount} API flagged with critical severity issues that need immediate attention`,
+                team: 'Security & Development',
+                effort: 'High',
+                count: vulnerableApiCount,
+                actionItemType: ACTION_ITEM_TYPES.VULNERABLE_APIS
+            });
+        }
+        
+        setCriticalCardsData(criticalCardsDataToSet);
         if (onCountChange) {
             onCountChange(totalCount);
         }
@@ -210,13 +241,18 @@ export const ActionItemsContent = ({ actionItemsData, onCountChange }) => {
 
     return (
         <VerticalStack gap="5">
-            {criticalCardData && (
-                <CriticalActionItemCard
-                    cardObj={criticalCardData}
-                    onButtonClick={handleJiraIntegration}
-                    jiraTicketUrlMap={jiraTicketUrlMap}
-                    onCardClick={handleCardClick}
-                />
+            {criticalCardsData.length > 0 && (
+                <HorizontalStack gap="4" align="start">
+                    {criticalCardsData.map((cardData, index) => (
+                        <CriticalActionItemCard
+                            key={cardData.id}
+                            cardObj={cardData}
+                            onButtonClick={handleJiraIntegration}
+                            jiraTicketUrlMap={jiraTicketUrlMap}
+                            onCardClick={handleCardClick}
+                        />
+                    ))}
+                </HorizontalStack>
             )}
 
             <Box maxWidth="100%" style={{ overflowX: 'hidden' }}>

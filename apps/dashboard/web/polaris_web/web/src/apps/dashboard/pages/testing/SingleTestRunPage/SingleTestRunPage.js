@@ -143,7 +143,8 @@ function SingleTestRunPage() {
       "SKIPPED_EXEC_NEED_CONFIG": 0,
       "VULNERABLE": 0,
       "SKIPPED_EXEC_API_REQUEST_FAILED": 0,
-      "SKIPPED_EXEC": 0
+      "SKIPPED_EXEC": 0,
+      "IGNORED_ISSUES": 0
     })  
   const [testMode, setTestMode] = useState(false)
 
@@ -241,8 +242,9 @@ function SingleTestRunPage() {
 
       return { ...prev };
     });
+    let updateTable = currentSummary.hexId !== summary.hexId;
     setCurrentSummary(summary);
-    if (!initialCall) {
+    if (!initialCall && updateTable) {
       setUpdateTable(Date.now().toString())
     }
   }
@@ -373,8 +375,6 @@ function SingleTestRunPage() {
 
   const fetchTableData = async (sortKey, sortOrder, skip, limit, filters, filterOperators, queryValue) => {
     let testRunResultsRes = []
-    let totalIgnoredIssuesCount = 0
-    let ignoredIssueListCount = 0
     let localCountMap = testRunCountMap;
     const { testingRun, workflowTest, testingRunType } = testingRunResultSummariesObj
     if (testingRun === undefined) {
@@ -401,54 +401,42 @@ function SingleTestRunPage() {
     setTestingRunConfigId(testingRun.testingRunConfig?.id || -1)
     setSelectedTestRun(localSelectedTestRun);
     if (localSelectedTestRun.testingRunResultSummaryHexId) {
-      if (selectedTab === 'ignored_issues') {
-        let ignoredTestRunResults = []
-        await api.fetchIssuesByStatusAndSummaryId(localSelectedTestRun.testingRunResultSummaryHexId, ["IGNORED"], sortKey, sortOrder, skip, limit, filters).then((resp) => {
-          const ignoredIssuesTestingResult = resp?.testingRunResultList || [];
-          ignoredTestRunResults = transform.prepareTestRunResults(hexId, ignoredIssuesTestingResult, localSubCategoryMap, subCategoryFromSourceConfigMap, resp?.issuesDescriptionMap, resp?.jiraIssuesMapForResults);
-        })
-        testRunResultsRes = ignoredTestRunResults
-        totalIgnoredIssuesCount = ignoredTestRunResults.length
-      } else {
-        await api.fetchTestingRunResults(localSelectedTestRun.testingRunResultSummaryHexId, tableTabMap[selectedTab], sortKey, sortOrder, skip, limit, filters, queryValue).then(({ testingRunResults, errorEnums, issueslistCount, issuesDescriptionMap, jiraIssuesMapForResults }) => {
-          ignoredIssueListCount = issueslistCount
+      await api.fetchTestingRunResults(localSelectedTestRun.testingRunResultSummaryHexId, tableTabMap[selectedTab], sortKey, sortOrder, skip, limit, filters, queryValue).then(({ testingRunResults, errorEnums, issuesDescriptionMap, jiraIssuesMapForResults }) => {
           testRunResultsRes = transform.prepareTestRunResults(hexId, testingRunResults, localSubCategoryMap, subCategoryFromSourceConfigMap, issuesDescriptionMap, jiraIssuesMapForResults)
           if (selectedTab === 'domain_unreachable' || selectedTab === 'skipped' || selectedTab === 'need_configurations') {
             errorEnums['UNKNOWN_ERROR_OCCURRED'] = "OOPS! Unknown error occurred."
             setErrorsObject(errorEnums)
             setMissingConfigs(transform.getMissingConfigs(testRunResultsRes))
           }
-        })
-        if (!func.deepComparison(copyFilters, filters) || copyUpdateTable !== updateTable) {
-          if(copyUpdateTable !== updateTable){
-            setCopyUpdateTable(updateTable)
-          }else{
-            setCopyFilters(filters)
-          }
-          await api.fetchTestRunResultsCount(localSelectedTestRun.testingRunResultSummaryHexId).then((testCountMap) => {
-            if(testCountMap !== null){
-              localCountMap = JSON.parse(JSON.stringify(testCountMap))  
-            }
-            //Assuming vulnerable count is after removing ignored issues aLL - (OOTHER COUNT + IGNORED)
-            localCountMap['IGNORED_ISSUES'] = ignoredIssueListCount
-            let countOthers = 0;
-            Object.keys(localCountMap).forEach((x) => {
-              if (x !== 'ALL') {
-                countOthers += localCountMap[x]
-              }
-            })
-            localCountMap['SECURED'] = localCountMap['ALL'] >= countOthers ? localCountMap['ALL'] - countOthers : 0
-            const orderedValues = tableTabsOrder.map(key => localCountMap[tableTabMap[key]] || 0)
-            setTestRunResultsCount(orderedValues)
-            setTestRunCountMap(JSON.parse(JSON.stringify(localCountMap)));
-          })
+      })
+      if (!func.deepComparison(copyFilters, filters) || copyUpdateTable !== updateTable) {
+        if(copyUpdateTable !== updateTable){
+          setCopyUpdateTable(updateTable)
+        }else{
+          setCopyFilters(filters)
         }
+        await api.fetchTestRunResultsCount(localSelectedTestRun.testingRunResultSummaryHexId, filters).then((testCountMap) => {
+          if(testCountMap !== null){
+            localCountMap = JSON.parse(JSON.stringify(testCountMap))  
+          }
+          let countOthers = 0;
+          Object.keys(localCountMap).forEach((x) => {
+            if (x !== 'ALL') {
+              countOthers += localCountMap[x]
+            }
+          })
+          localCountMap['SECURED'] = localCountMap['ALL'] >= countOthers ? localCountMap['ALL'] - countOthers : 0
+          localCountMap['VULNERABLE'] = Math.abs(localCountMap['VULNERABLE'] - localCountMap['IGNORED_ISSUES']);
+          const orderedValues = tableTabsOrder.map(key => localCountMap[tableTabMap[key]] || 0)
+          setTestRunResultsCount(orderedValues)
+          setTestRunCountMap(JSON.parse(JSON.stringify(localCountMap)));
+        })
       }
     }
     const key = tableTabMap[selectedTab]
-    const total = (testRunCountMap[key] !== undefined && testRunCountMap[key] !== 0) ? testRunCountMap[key] : localCountMap[key]
+    const total = localCountMap[key]
     fillTempData(testRunResultsRes, selectedTab)
-    return { value: transform.getPrettifiedTestRunResults(testRunResultsRes), total: selectedTab === 'ignored_issues' ? totalIgnoredIssuesCount : total }
+    return { value: transform.getPrettifiedTestRunResults(testRunResultsRes), total: total }
   }
 
   useEffect(() => { handleAddSettings() }, [testingRunConfigSettings])

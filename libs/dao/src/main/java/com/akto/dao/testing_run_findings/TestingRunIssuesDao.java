@@ -2,6 +2,8 @@ package com.akto.dao.testing_run_findings;
 
 import java.util.*;
 
+import com.mongodb.client.MongoCollection;
+import org.bson.Document;
 import org.bson.conversions.Bson;
 
 import com.akto.dao.AccountsContextDaoWithRbac;
@@ -292,6 +294,11 @@ public class TestingRunIssuesDao extends AccountsContextDaoWithRbac<TestingRunIs
         }
 
         return finalMap;
+    }
+
+
+    public MongoCollection<Document> getRawCollection() {
+        return clients[0].getDatabase(getDBName()).getCollection(getCollName(), Document.class);
     }
 
     private TestingRunIssuesDao() {}

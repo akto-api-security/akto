@@ -8,7 +8,11 @@ import com.akto.dto.rbac.*;
 import com.akto.dto.rbac.RbacEnums.Feature;
 import com.akto.dto.rbac.RbacEnums.ReadWriteAccess;
 
+import lombok.Getter;
+import lombok.Setter;
+
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 public class RBAC {
@@ -23,6 +27,18 @@ public class RBAC {
     public static final String ACCOUNT_ID = "accountId";
     private List<Integer> apiCollectionsId;
     public static final String API_COLLECTIONS_ID = "apiCollectionsId";
+
+    public static final String ALLOWED_FEATURES_FOR_USER = "allowedFeaturesForUser";
+
+    @Getter 
+    @Setter
+    private List<String> allowedFeaturesForUser;
+
+    // special features for RBAC, we can add more features here when needed
+    public static final List<String> SPECIAL_FEATURES_FOR_RBAC = Arrays.asList(
+        "THREAT_DETECTION",
+        "AI_AGENTS"
+    );
 
     public enum Role {
         ADMIN("ADMIN",new AdminRoleStrategy()),
@@ -62,6 +78,7 @@ public class RBAC {
         this.role = role;
         this.accountId = accountId;
         this.apiCollectionsId = new ArrayList<>();
+        this.allowedFeaturesForUser = new ArrayList<>();
     }
 
     public RBAC() {

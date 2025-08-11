@@ -127,6 +127,42 @@ const api = {
             method: 'post',
             data: { filterType }
         })
+    },
+
+    getNotTestedAPICount: async (showApiInfo) => {
+        return await request({
+            url: '/api/getNotTestedAPICount',
+            method: 'post',
+            data: { showApiInfo }
+        })
+    },
+
+    getOnlyOnceTestedAPICount: async (showApiInfo) => {
+        return await request({
+            url: '/api/getOnlyOnceTestedAPICount',
+            method: 'post',
+            data: { showApiInfo }
+        })
+    },
+
+    getMisConfiguredTestsCount: async (showApiInfo) => {
+        return await request({
+            url: '/api/getMisConfiguredTestsCount',
+            method: 'post',
+            data: { showApiInfo }
+        })
+    },
+
+    getVulnerableApiCount: async (showApiInfo) => {
+        return await request({
+            url: '/api/getBUACategoryCount',
+            method: 'post',
+            data: {
+                filterSeverity: ["CRITICAL"],
+                filterStatus: ["OPEN"],
+                showApiInfo
+            }
+        })
     }
 }
 

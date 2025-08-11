@@ -70,6 +70,14 @@ public class InventoryAction extends UserAction {
     @Setter
     private boolean showUrls;
 
+    @Getter
+    private List<ApiInfo> notTestedEndpointsApiInfo = new ArrayList<>();
+    @Setter
+    private boolean showApiInfo;
+
+    @Getter
+    private List<ApiInfo> onlyOnceTestedEndpointsApiInfo = new ArrayList<>();
+
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(InventoryAction.class, LogDb.DASHBOARD);
 
@@ -1157,7 +1165,10 @@ public class InventoryAction extends UserAction {
                 Filters.exists(ApiInfo.LAST_TESTED, false)
         );
 
-        if(!showUrls) {
+        if (this.showApiInfo) {
+            this.notTestedEndpointsApiInfo = ApiInfoDao.instance.findAll(filter);
+            this.notTestedEndpointsCount = this.notTestedEndpointsApiInfo.size();
+        } else {
             this.notTestedEndpointsCount = (int) ApiInfoDao.instance.count(filter);
         }
 
@@ -1175,8 +1186,11 @@ public class InventoryAction extends UserAction {
                 Filters.eq(ApiInfo.TOTAL_TESTED_COUNT, 1)
         );
 
-        if(!showUrls) {
-            this.notTestedEndpointsCount = (int) ApiInfoDao.instance.count(filter);
+        if (this.showApiInfo) {
+            this.onlyOnceTestedEndpointsApiInfo = ApiInfoDao.instance.findAll(filter);
+            this.onlyOnceTestedEndpointsCount = this.onlyOnceTestedEndpointsApiInfo.size();
+        } else {
+            this.onlyOnceTestedEndpointsCount = (int) ApiInfoDao.instance.count(filter);
         }
 
         return Action.SUCCESS.toUpperCase();
@@ -1192,6 +1206,14 @@ public class InventoryAction extends UserAction {
             pipeLine.add(
                 Aggregates.match(Filters.gt(ApiInfo.LAST_TESTED, 0))
             );
+
+            try {
+                List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
+                if(collectionIds != null) {
+                    pipeLine.add(Aggregates.match(Filters.in(SingleTypeInfo._COLLECTION_IDS, collectionIds)));
+                }
+            } catch(Exception e){
+            }
 
             GroupByTimeRange.groupByWeek(pipeLine, ApiInfo.LAST_TESTED, "totalApisTested", new BasicDBObject());
             MongoCursor<BasicDBObject> cursor = ApiInfoDao.instance.getMCollection().aggregate(pipeLine, BasicDBObject.class).cursor();

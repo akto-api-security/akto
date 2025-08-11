@@ -1,7 +1,6 @@
 package com.akto.action.testing_issues;
 
 import com.akto.action.UserAction;
-import com.akto.action.testing.Utils;
 import com.akto.dao.HistoricalDataDao;
 import com.akto.dao.RBACDao;
 import com.akto.action.testing.StartTestAction;
@@ -36,8 +35,9 @@ import com.akto.util.GroupByTimeRange;
 import com.akto.util.enums.GlobalEnums;
 import com.akto.util.enums.GlobalEnums.Severity;
 import com.akto.util.enums.GlobalEnums.TestCategory;
-import com.akto.util.enums.GlobalEnums.TestErrorSource;
 import com.akto.util.enums.GlobalEnums.TestRunIssueStatus;
+import com.akto.utils.ApiInfoKeyResult;
+import com.akto.utils.TestTemplateUtils;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.*;
@@ -45,6 +45,7 @@ import com.mongodb.client.result.InsertOneResult;
 import com.opensymphony.xwork2.Action;
 
 import lombok.Getter;
+import lombok.Setter;
 
 import org.apache.commons.lang3.StringUtils;
 import org.bson.Document;
@@ -58,6 +59,8 @@ import java.util.concurrent.TimeUnit;
 
 import static com.akto.util.Constants.ID;
 import static com.akto.util.Constants.ONE_DAY_TIMESTAMP;
+import com.akto.dao.ApiInfoDao;
+import com.akto.dto.ApiInfo.ApiInfoKey;
 
 public class IssuesAction extends UserAction {
 
@@ -92,6 +95,10 @@ public class IssuesAction extends UserAction {
 
     int URL_METHOD_PAIR_THRESHOLD = 1;
     
+    @Setter
+    private boolean showApiInfo;
+    @Getter
+    private List<ApiInfo> buaCategoryApiInfo = new ArrayList<>();
 
     private static final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
 
@@ -544,17 +551,18 @@ public class IssuesAction extends UserAction {
 
     public String fetchAllSubCategories() {
         boolean includeYamlContent = false;
-
+        categories = TestTemplateUtils.getAllTestCategoriesWithinContext(Context.contextSource.get());
+        // Bson filters = Filters.in(
+        //         "info.category", Arrays.asList(categories)
+        // );
         switch (mode) {
             case "runTests":
-                categories = GlobalEnums.TestCategory.values();
                 break;
             case "testEditor":
                 includeYamlContent = true;
                 break;
             default:
                 includeYamlContent = true;
-                categories = GlobalEnums.TestCategory.values();
                 testSourceConfigs = TestSourceConfigsDao.instance.findAll(Filters.empty());
         }
 
@@ -667,92 +675,6 @@ public class IssuesAction extends UserAction {
     List<String> issueStatusQuery;
     List<TestingRunResult> testingRunResultList;
     private Map<String, List<String>> filters;
-
-    public String fetchIssuesByStatusAndSummaryId() {
-        if(latestTestingRunSummaryId == null || latestTestingRunSummaryId.isEmpty()){
-            addActionError("SummaryId is a required field and cannot be empty.");
-            return ERROR.toUpperCase();
-        }
-        if(!ObjectId.isValid(latestTestingRunSummaryId)){
-            addActionError("SummaryId is not valid");
-            return ERROR.toUpperCase();
-        }
-
-        ObjectId objectId = new ObjectId(latestTestingRunSummaryId);
-
-        Bson triFilters = Filters.and(
-                Filters.in(TestingRunIssues.TEST_RUN_ISSUES_STATUS, issueStatusQuery),
-                Filters.in(TestingRunIssues.LATEST_TESTING_RUN_SUMMARY_ID, objectId)
-        );
-        issues = TestingRunIssuesDao.instance.findAll(triFilters,
-            Projections.include("_id", TestingRunIssues.DESCRIPTION));
-        List<Bson> testingRunResultsFilterList = new ArrayList<>();
-        boolean isStoredInVulnerableCollection = VulnerableTestingRunResultDao.instance.isStoredInVulnerableCollection(objectId, true);
-        for(TestingRunIssues issue: issues) {
-            Bson filter = Filters.empty();
-            if(isStoredInVulnerableCollection){
-                filter = Filters.and(
-                    Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, new ObjectId(latestTestingRunSummaryId)),
-                    Filters.eq(TestingRunResult.API_INFO_KEY, issue.getId().getApiInfoKey()),
-                    Filters.eq(TestingRunResult.TEST_SUB_TYPE, issue.getId().getTestSubCategory())
-                );
-                
-            }else{
-                filter = Filters.and(
-                    Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, new ObjectId(latestTestingRunSummaryId)),
-                    Filters.eq(TestingRunResult.VULNERABLE, true),
-                    Filters.eq(TestingRunResult.API_INFO_KEY, issue.getId().getApiInfoKey()),
-                    Filters.eq(TestingRunResult.TEST_SUB_TYPE, issue.getId().getTestSubCategory())
-                );
-            }
-            testingRunResultsFilterList.add(filter);
-        }
-
-        List<Bson> filtersList = new ArrayList<>();
-        if(!testingRunResultsFilterList.isEmpty()) filtersList.add(Filters.or(testingRunResultsFilterList));
-        Bson filtersForTestingRunResults = Utils.createFiltersForTestingReport(filters);
-        if(!filtersForTestingRunResults.equals(Filters.empty())) filtersList.add(filtersForTestingRunResults);
-        Bson sortStage = StartTestAction.prepareTestingRunResultCustomSorting(sortKey, sortOrder);
-
-        if(filtersList.isEmpty()) {
-            testingRunResultList = new ArrayList<>();
-            return SUCCESS.toUpperCase();
-        }
-
-        if(isStoredInVulnerableCollection){
-            testingRunResultList = VulnerableTestingRunResultDao.instance.fetchLatestTestingRunResultWithCustomAggregations(Filters.and(filtersList), limit, skip, sortStage);
-        }else{
-            testingRunResultList = TestingRunResultDao.instance.fetchLatestTestingRunResultWithCustomAggregations(Filters.and(filtersList), limit, skip, sortStage);
-        }
-
-        this.issuesDescriptionMap = prepareIssueDescriptionMap(issues, testingRunResultList);
-
-        return SUCCESS.toUpperCase();
-    }
-
-    private Map<String, String> prepareIssueDescriptionMap(List<TestingRunIssues> issues,
-        List<TestingRunResult> testingRunResults) {
-
-        try {
-
-            if (testingRunResults == null || testingRunResults.isEmpty()) {
-                return Collections.emptyMap();
-            }
-
-            Map<TestingIssuesId, TestingRunResult> idToResultMap = new HashMap<>();
-            for (TestingRunResult result : testingRunResults) {
-                TestingIssuesId id = new TestingIssuesId(result.getApiInfoKey(), TestErrorSource.AUTOMATED_TESTING,
-                    result.getTestSubType());
-                idToResultMap.put(id, result);
-            }
-
-            return Utils.mapIssueDescriptions(issues, idToResultMap);
-        } catch (Exception e) {
-            logger.errorAndAddToDb(e, "Error while preparing issue description map");
-            return Collections.emptyMap();
-        }
-    }
-
     List<TestingIssuesId> issuesIds;
 
     public String fetchIssuesFromResultIds(){
@@ -849,9 +771,17 @@ public class IssuesAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
-    public String fetchBUACategoryCount(){
-        Bson filter = createFilters(true);
-        this.buaCategoryCount = (int) TestingRunIssuesDao.instance.count(filter);
+    public String fetchBUACategoryCount() {
+        ApiInfoKeyResult result = com.akto.utils.Utils.fetchUniqueApiInfoKeys(
+                TestingRunIssuesDao.instance.getRawCollection(),
+                createFilters(true),
+                "_id.apiInfoKey",
+                this.showApiInfo
+        );
+        this.buaCategoryCount = result.count;
+        if (this.showApiInfo) {
+            this.buaCategoryApiInfo = result.apiInfoList;
+        }
         return Action.SUCCESS.toUpperCase();
     }
 
@@ -866,6 +796,13 @@ public class IssuesAction extends UserAction {
                 ))
         );
 
+        try {
+            List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
+            if(collectionIds != null) {
+                pipeline.add(Aggregates.match(Filters.in(SingleTypeInfo._COLLECTION_IDS, collectionIds)));
+            }
+        } catch(Exception e){
+        }
 
         // Group by testSubCategory and collect unique URL+Method combinations
         BasicDBObject groupId = new BasicDBObject("testSubCategory", "$_id." + TestingIssuesId.TEST_SUB_CATEGORY);
