@@ -53,6 +53,7 @@ import java.net.MalformedURLException;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import javax.servlet.http.HttpServletRequest;
@@ -750,34 +751,38 @@ public class Utils {
                 Filters.in(apiInfoKeyPath + ".apiCollectionId", collectionIds)
         );
 
-        List<Bson> pipeline = new ArrayList<>();
-        pipeline.add(Aggregates.match(combinedFilter));
-        pipeline.add(Aggregates.project(Projections.include(
-                apiInfoKeyPath + ".apiCollectionId",
-                apiInfoKeyPath + ".url",
-                apiInfoKeyPath + ".method"
-        )));
-        pipeline.add(Aggregates.group(
-                new BasicDBObject("apiCollectionId", "$" + apiInfoKeyPath + ".apiCollectionId")
-                        .append("url", "$" + apiInfoKeyPath + ".url")
-                        .append("method", "$" + apiInfoKeyPath + ".method"),
-                Accumulators.first("apiInfoKey", "$" + apiInfoKeyPath)
-        ));
+        int totalCount = (int) collection.countDocuments(combinedFilter);
+        int numThreads = Math.max(1, Runtime.getRuntime().availableProcessors());
+        int batchSize = (int) Math.ceil((double) totalCount / numThreads);
 
-        Set<ApiInfo.ApiInfoKey> apiInfoKeys = new HashSet<>();
-        List<ApiInfo> apiInfoList = new ArrayList<>();
-        if (!showApiInfo) {
-            pipeline.add(Aggregates.count("count"));
-            Document countDoc = collection.aggregate(pipeline, Document.class).first();
-            int count = countDoc != null ? countDoc.getInteger("count", 0) : 0;
-            return new ApiInfoKeyResult(count, null);
+        Set<ApiInfo.ApiInfoKey> apiInfoKeys = Collections.synchronizedSet(new HashSet<>());
+        List<ApiInfo> apiInfoList = Collections.synchronizedList(new ArrayList<>());
+        AtomicInteger count = new AtomicInteger(0);
+
+        List<Integer> skips = new ArrayList<>();
+        for (int i = 0; i < numThreads; i++) {
+            skips.add(i * batchSize);
         }
 
-        int batchSize = 1000;
-        int count = 0;
-        try (MongoCursor<Document>  cursor = collection.aggregate(pipeline, Document.class).batchSize(batchSize).iterator()) {
-            while (cursor.hasNext()) {
-                for (int i = 0; i < batchSize && cursor.hasNext(); i++) {
+        skips.parallelStream().forEach(skip -> {
+            List<Bson> pipeline = new ArrayList<>();
+            pipeline.add(Aggregates.match(combinedFilter));
+            pipeline.add(Aggregates.project(Projections.include(
+                    apiInfoKeyPath + ".apiCollectionId",
+                    apiInfoKeyPath + ".url",
+                    apiInfoKeyPath + ".method"
+            )));
+            pipeline.add(Aggregates.group(
+                    new BasicDBObject("apiCollectionId", "$" + apiInfoKeyPath + ".apiCollectionId")
+                            .append("url", "$" + apiInfoKeyPath + ".url")
+                            .append("method", "$" + apiInfoKeyPath + ".method"),
+                    Accumulators.first("apiInfoKey", "$" + apiInfoKeyPath)
+            ));
+            pipeline.add(Aggregates.skip(skip));
+            pipeline.add(Aggregates.limit(batchSize));
+
+            try (MongoCursor<Document> cursor = collection.aggregate(pipeline, Document.class).iterator()) {
+                while (cursor.hasNext()) {
                     Document doc = cursor.next();
                     Document keyDoc = (Document) doc.get("apiInfoKey");
                     if (keyDoc != null) {
@@ -787,13 +792,16 @@ public class Utils {
                                 URLMethods.Method.fromString(keyDoc.getString("method"))
                         );
                         if (apiInfoKeys.add(key)) {
-                            apiInfoList.add(new ApiInfo(key));
-                            count++;
+                            if (showApiInfo) {
+                                apiInfoList.add(new ApiInfo(key));
+                            }
+                            count.incrementAndGet();
                         }
                     }
                 }
             }
-        }
-        return new ApiInfoKeyResult(count, apiInfoList);
+        });
+
+        return new ApiInfoKeyResult(count.get(), showApiInfo ? apiInfoList : null);
     }
 }
