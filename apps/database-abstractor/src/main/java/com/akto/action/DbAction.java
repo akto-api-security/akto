@@ -399,11 +399,11 @@ public class DbAction extends ActionSupport {
 
     public String fetchApiInfos() {
         try {
-            loggerMaker.error("init fetchApiInfos account id: " + accountId);
+            loggerMaker.error("init fetchApiInfos account id: " + Context.accountId.get());
             apiInfos = DbLayer.fetchApiInfos();
         } catch (Exception e) {
             e.printStackTrace();
-            loggerMaker.error("fetchApiInfos account id: " + accountId);
+            loggerMaker.error("fetchApiInfos account id: " + Context.accountId.get());
             loggerMaker.errorAndAddToDb(e, "error in fetchApiInfos " + e.toString());
             return Action.ERROR.toUpperCase();
         }
@@ -1491,10 +1491,10 @@ public class DbAction extends ActionSupport {
 
     public String fetchAllApiCollectionsMeta() {
         try {
-           loggerMaker.error("init fetchAllApiCollectionsMeta account id: " + accountId);
+           loggerMaker.error("init fetchAllApiCollectionsMeta account id: " + Context.accountId.get());
            apiCollections = DbLayer.fetchAllApiCollectionsMeta();
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(e, "Error in fetchAllApiCollectionsMeta " + e.toString());
+            loggerMaker.errorAndAddToDb(e, "Error in fetchAllApiCollectionsMeta " + e.toString() + " " + Context.accountId.get());
             return Action.ERROR.toUpperCase();
         }
         return Action.SUCCESS.toUpperCase();
