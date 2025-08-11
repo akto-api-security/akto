@@ -44,7 +44,6 @@ public class SlackSender {
             Slack slack = Slack.getInstance();
             int attempts = 0;
             final int[] retryDelays = {1000, 5000, 25000};
-            loggerMaker.infoAndAddToDb("Slack Alert Type: " + alertType + " Webhook URL: " + webhookUrl + " Channel ID: " + slackChannelId);
 
             while(attempts < retryDelays.length + 1) {
                 try {
