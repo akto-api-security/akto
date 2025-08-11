@@ -654,13 +654,11 @@ public class ApiExecutor {
         Thread readerThread;
     }
 
-    private static SseSession openSseSession(String host, boolean debug) throws Exception {
+    private static SseSession openSseSession(String host, Headers headers, boolean debug) throws Exception {
         SseSession session = new SseSession();
         OkHttpClient client = new OkHttpClient.Builder().build();
-        // header content type = text/event-stream
-        Headers headers = new Headers.Builder()
-            .add("Accept", "text/event-stream")
-            .build();
+
+        // Use provided headers for the SSE request
         Request request = new Request.Builder().url(host + "/sse").headers(headers).build();
         Call call = client.newCall(request);
         Response response = call.execute();
@@ -730,7 +728,18 @@ public class ApiExecutor {
             throw new IllegalArgumentException("URL must be absolute with scheme and host for SSE: " + url);
         }
         String host = uri.getScheme() + "://" + uri.getHost() + (uri.getPort() != -1 ? ":" + uri.getPort() : "");
-        SseSession session = openSseSession(host, debug);
+
+        // Add headers from the original request to the SSE request
+        Headers.Builder headersBuilder = new Headers.Builder();
+        for (Map.Entry<String, List<String>> entry : request.getHeaders().entrySet()) {
+            for (String value : entry.getValue()) {
+                headersBuilder.add(entry.getKey(), value);
+            }
+        }
+        Headers headers = headersBuilder.build();
+
+        // Open SSE session with headers
+        SseSession session = openSseSession(host, headers, debug);
 
         // Add sessionId as query param to actual request
         String[] queryParam = session.endpoint.split("\\?");
@@ -741,6 +750,12 @@ public class ApiExecutor {
             if (queryParam.length > 1) {
                 request.setQueryParams(queryParam[1]);
             }
+        }
+
+        // Modify sessionId in the query params
+        if (queryParam.length > 1) {
+            String modifiedQueryParams = queryParam[1].replaceFirst("sessionId=[^&]*", "sessionId=" + session.sessionId);
+            request.setQueryParams(modifiedQueryParams);
         }
 
         // Send actual request
