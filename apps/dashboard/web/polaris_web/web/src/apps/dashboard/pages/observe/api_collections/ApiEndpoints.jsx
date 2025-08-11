@@ -33,6 +33,7 @@ import { SelectSource } from "./SelectSource"
 import InlineEditableText from "../../../components/shared/InlineEditableText"
 import ApiIssuesTab from "./ApiIssuesTab"
 import IssuesApi from "../../issues/api"
+import SequencesFlow from "./SequencesFlow"
 
 const headings = [
     {
@@ -244,7 +245,7 @@ function ApiEndpoints(props) {
 
 
     // the values used here are defined at the server.
-    const definedTableTabs = apiCollectionId === 111111999 ? ['All', 'New', 'High risk', 'No auth', 'Shadow'] : ( apiCollectionId === 111111120 ? ['All', 'New', 'Sensitive', 'High risk', 'Shadow'] : ['All', 'New', 'Sensitive', 'High risk', 'No auth', 'Shadow', 'Zombie'] )
+    const definedTableTabs = apiCollectionId === 111111999 ? ['All', 'New', 'High risk', 'No auth', 'Shadow'] : ( apiCollectionId === 111111120 ? ['All', 'New', 'Sensitive', 'High risk', 'Shadow'] : ['All', 'New', 'Sensitive', 'High risk', 'No auth', 'Shadow', 'Zombie', 'Sequences'] )
 
     const { tabsInfo } = useTable()
     const tableCountObj = func.getTabsCount(definedTableTabs, endpointData)
@@ -1083,16 +1084,20 @@ function ApiEndpoints(props) {
                     redirectUrl={"/dashboard/observe/inventory"}
                     learnText={"inventory"}
                     docsUrl={ENDPOINTS_PAGE_DOCS_URL}
-                />] : [
+                />] : selectedTab === "sequences" ? [
+                <SequencesFlow key="sequences-flow" apiCollectionId={apiCollectionId} />
+            ] : [
                 (coverageInfo[apiCollectionId] === 0 || !(coverageInfo.hasOwnProperty(apiCollectionId)) ? <TestrunsBannerComponent key={"testrunsBanner"} onButtonClick={() => setRunTests(true)} isInventory={true}  disabled={collectionsObj?.isOutOfTestingScope || false}/> : null),
-                <div className="apiEndpointsTable" key="table">
-                    {apiEndpointTable}
-                      <Modal large open={isGptScreenActive} onClose={() => setIsGptScreenActive(false)} title="Akto GPT">
-                          <Modal.Section flush>
-                              <AktoGptLayout prompts={prompts} closeModal={() => setIsGptScreenActive(false)} />
-                          </Modal.Section>
-                      </Modal>
-                  </div>,
+                selectedTab !== "sequences" ? (
+                    <div className="apiEndpointsTable" key="table">
+                        {apiEndpointTable}
+                          <Modal large open={isGptScreenActive} onClose={() => setIsGptScreenActive(false)} title="Akto GPT">
+                              <Modal.Section flush>
+                                  <AktoGptLayout prompts={prompts} closeModal={() => setIsGptScreenActive(false)} />
+                              </Modal.Section>
+                          </Modal>
+                      </div>
+                ) : null,
                   <ApiGroupModal
                       key="api-group-modal"
                       showApiGroupModal={showApiGroupModal}
