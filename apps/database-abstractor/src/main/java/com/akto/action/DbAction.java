@@ -401,6 +401,8 @@ public class DbAction extends ActionSupport {
         try {
             apiInfos = DbLayer.fetchApiInfos();
         } catch (Exception e) {
+            e.printStackTrace();
+            loggerMaker.error("fetchApiInfos account id: " + accountId);
             loggerMaker.errorAndAddToDb(e, "error in fetchApiInfos " + e.toString());
             return Action.ERROR.toUpperCase();
         }
@@ -1500,6 +1502,8 @@ public class DbAction extends ActionSupport {
         try {
             apiCollection = DbLayer.fetchApiCollectionMeta(apiCollectionId);
         } catch (Exception e) {
+            e.printStackTrace();
+            loggerMaker.error("fetchApiCollectionMeta account id: " + accountId);
             loggerMaker.errorAndAddToDb(e, "Error in fetchApiCollectionMeta " + e.toString());
             return Action.ERROR.toUpperCase();
         }
