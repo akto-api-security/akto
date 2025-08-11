@@ -1,10 +1,11 @@
+import { getDashboardCategory, mapLabel } from "../../../../../main/labelHelper";
 import { CellType } from "../../../../components/tables/rows/GithubRow";
 
 const endpointHeadings = [
     {
         text: "Endpoint",
         value: "endpointComp",
-        title: "Api endpoints",
+        title: mapLabel("API endpoints", getDashboardCategory()),
         sortActive: true
     },
     {
@@ -86,7 +87,7 @@ const newParametersHeaders = [
     {
         text: "Endpoint",
         value: "endpointComp",
-        title: "Api endpoints",
+        title: mapLabel("API endpoints", getDashboardCategory()),
         sortKey: 'url',
         filterKey: 'url',
         showFilterMenu: true

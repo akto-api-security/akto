@@ -11,6 +11,7 @@ import { createActionItem as createActionItemUtil } from '../../../../../util/cr
 import settingsModule from '../../settings/module';
 import ActionItemDetails from './ActionItemDetails';
 import { fetchAllActionItemsApiInfo } from './actionItemsTransform'; 
+import { getDashboardCategory, mapLabel } from '../../../../main/labelHelper';
 
 const actionItemsHeaders = [
     { title: '', value: 'priority', type: 'text' },
@@ -152,21 +153,21 @@ export const ActionItemsContent = ({ actionItemsData, onCountChange }) => {
         setJiraTicketUrlMap(ticketMap || {});
 
         const items = [
-            createActionItem('1', 'P1', 'High-risk APIs', `${highRiskCount} APIs with risk score more than 3`, "Security Team", "Medium", highRiskCount, ACTION_ITEM_TYPES.HIGH_RISK_APIS, jiraTicketUrlMap, handleJiraIntegration, "Creates multiple attack vectors for malicious actors"),
+            createActionItem('1', 'P1', `High-risk ${mapLabel("APIs", getDashboardCategory())}`, `${highRiskCount} ${mapLabel("APIs", getDashboardCategory())} with risk score more than 3`, "Security Team", "Medium", highRiskCount, ACTION_ITEM_TYPES.HIGH_RISK_APIS, jiraTicketUrlMap, handleJiraIntegration, "Creates multiple attack vectors for malicious actors"),
 
-            createActionItem('2', 'P1', 'APIs returning sensitive data', `${sensitiveDataCount} Endpoints exposing PII or confidential information`, "Development", "Medium", sensitiveDataCount, ACTION_ITEM_TYPES.SENSITIVE_DATA_ENDPOINTS, jiraTicketUrlMap, handleJiraIntegration, "Violates data privacy regulations (GDPR, CCPA) and risks customer trust"),
+            createActionItem('2', 'P1', `${mapLabel("APIs", getDashboardCategory())} returning sensitive data`, `${sensitiveDataCount} ${mapLabel("APIs", getDashboardCategory())} exposing PII or confidential information`, "Development", "Medium", sensitiveDataCount, ACTION_ITEM_TYPES.SENSITIVE_DATA_ENDPOINTS, jiraTicketUrlMap, handleJiraIntegration, "Violates data privacy regulations (GDPR, CCPA) and risks customer trust"),
 
-            createActionItem('3', 'P1', 'Missing authentication methods', `${unauthenticatedCount} APIs lacking proper authentication controls`, "Security Team", "Medium", unauthenticatedCount, ACTION_ITEM_TYPES.UNAUTHENTICATED_APIS, jiraTicketUrlMap, handleJiraIntegration, "Easy target for unauthorized access and data exfiltration"),
+            createActionItem('3', 'P1', 'Missing authentication methods', `${unauthenticatedCount} ${mapLabel("APIs", getDashboardCategory())} lacking proper authentication controls`, "Security Team", "Medium", unauthenticatedCount, ACTION_ITEM_TYPES.UNAUTHENTICATED_APIS, jiraTicketUrlMap, handleJiraIntegration, "Easy target for unauthorized access and data exfiltration"),
 
-            createActionItem('4', 'P1', 'Recently active third-party APIs', `${Math.max(0, thirdPartyDiff)} Third-party APIs frequently invoked or newly integrated within last 7 days`, "Integration Team", "Low", Math.max(0, thirdPartyDiff), ACTION_ITEM_TYPES.THIRD_PARTY_APIS, jiraTicketUrlMap, handleJiraIntegration, "New integrations may introduce unvetted security risks"),
+            createActionItem('4', 'P1', `Recently active third-party ${mapLabel("APIs", getDashboardCategory())}`, `${Math.max(0, thirdPartyDiff)} Third-party ${mapLabel("APIs", getDashboardCategory())} frequently invoked or newly integrated within last 7 days`, "Integration Team", "Low", Math.max(0, thirdPartyDiff), ACTION_ITEM_TYPES.THIRD_PARTY_APIS, jiraTicketUrlMap, handleJiraIntegration, "New integrations may introduce unvetted security risks"),
 
-            createActionItem('5', 'P1', 'High-risk third-party APIs', `${highRiskThirdPartyCount} External APIs with high risk scores requiring attention`, "Security Team", "High", highRiskThirdPartyCount, ACTION_ITEM_TYPES.HIGH_RISK_THIRD_PARTY, jiraTicketUrlMap, handleJiraIntegration, "Supply chain vulnerabilities that can compromise entire systems"),
+            createActionItem('5', 'P1', `High-risk third-party ${mapLabel("APIs", getDashboardCategory())}`, `${highRiskThirdPartyCount} External ${mapLabel("APIs", getDashboardCategory())} with high risk scores requiring attention`, "Security Team", "High", highRiskThirdPartyCount, ACTION_ITEM_TYPES.HIGH_RISK_THIRD_PARTY, jiraTicketUrlMap, handleJiraIntegration, "Supply chain vulnerabilities that can compromise entire systems"),
 
-            createActionItem('6', 'P1', 'Shadow APIs', `${shadowApisCount} Undocumented APIs discovered in the system`, "API Governance", "High", shadowApisCount, ACTION_ITEM_TYPES.SHADOW_APIS, jiraTicketUrlMap, handleJiraIntegration, "Unmonitored attack surface with unknown security posture"),
+            createActionItem('6', 'P1', `Shadow ${mapLabel("APIs", getDashboardCategory())}`, `${shadowApisCount} Undocumented ${mapLabel("APIs", getDashboardCategory())} discovered in the system`, "API Governance", "High", shadowApisCount, ACTION_ITEM_TYPES.SHADOW_APIS, jiraTicketUrlMap, handleJiraIntegration, "Unmonitored attack surface with unknown security posture"),
 
-            createActionItem('7', 'P1', 'Enhance testing coverage', `${notTestedApiCount} test executions on a single API indicate the need for broader coverage across other APIs`, "QA / Security", "Medium", notTestedApiCount, ACTION_ITEM_TYPES.ENHANCE_TESTING_COVERAGE, jiraTicketUrlMap, handleJiraIntegration, "Helps detect issues across all APIs and prevents blind spots"),
+            createActionItem('7', 'P1', 'Enhance testing coverage', `${notTestedApiCount} test executions on a single ${mapLabel("API", getDashboardCategory())} indicate the need for broader coverage across other ${mapLabel("APIs", getDashboardCategory())}`, "QA / Security", "Medium", notTestedApiCount, ACTION_ITEM_TYPES.ENHANCE_TESTING_COVERAGE, jiraTicketUrlMap, handleJiraIntegration, `Helps detect issues across all ${mapLabel("APIs", getDashboardCategory())} and prevents blind spots`),
 
-            createActionItem('8', 'P1', 'Enable continuous testing', `${onlyOnceTestedApiCount} APIs are currently tested only once — consider moving them to scheduled testing`, "QA Team", "Medium", onlyOnceTestedApiCount, ACTION_ITEM_TYPES.ENABLE_CONTINUOUS_TESTING, jiraTicketUrlMap, handleJiraIntegration, "Ensures ongoing protection as API behavior and usage evolve"),
+            createActionItem('8', 'P1', 'Enable continuous testing', `${onlyOnceTestedApiCount} ${mapLabel("APIs", getDashboardCategory())} are currently tested only once — consider moving them to scheduled testing`, "QA Team", "Medium", onlyOnceTestedApiCount, ACTION_ITEM_TYPES.ENABLE_CONTINUOUS_TESTING, jiraTicketUrlMap, handleJiraIntegration, `Ensures ongoing protection as ${mapLabel("API", getDashboardCategory())} behavior and usage evolve`),
 
             createActionItem('9', 'P2', 'Address misconfigured tests', `${misConfiguredTestsCount} misconfigured tests detected during scans`, "QA Team", "Medium", misConfiguredTestsCount, ACTION_ITEM_TYPES.ADDRESS_MISCONFIGURED_TESTS, jiraTicketUrlMap, handleJiraIntegration, "Improves test coverage and reduces missed vulnerabilities")
         ];
