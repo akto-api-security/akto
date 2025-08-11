@@ -399,6 +399,7 @@ public class DbAction extends ActionSupport {
 
     public String fetchApiInfos() {
         try {
+            loggerMaker.error("init fetchApiInfos account id: " + accountId);
             apiInfos = DbLayer.fetchApiInfos();
         } catch (Exception e) {
             e.printStackTrace();
@@ -1490,6 +1491,7 @@ public class DbAction extends ActionSupport {
 
     public String fetchAllApiCollectionsMeta() {
         try {
+           loggerMaker.error("init fetchAllApiCollectionsMeta account id: " + accountId);
            apiCollections = DbLayer.fetchAllApiCollectionsMeta();
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error in fetchAllApiCollectionsMeta " + e.toString());
