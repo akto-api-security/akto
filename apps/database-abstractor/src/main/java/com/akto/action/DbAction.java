@@ -2231,7 +2231,9 @@ public class DbAction extends ActionSupport {
 
         // send slack alert
         try {
+            int timeNow = Context.now();
             sendSlack(trrs, totalCountIssues, Context.accountId.get());
+            loggerMaker.infoAndAddToDb("Slack alert sent successfully for trrs " + trrs.getId() + " accountId " + Context.accountId.get() + " time taken " + (Context.now() - timeNow));
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "error in sending slack alert for testing" + e);
         }
@@ -2241,6 +2243,7 @@ public class DbAction extends ActionSupport {
 
     public static void sendSlack(TestingRunResultSummary trrs, Map<String, Integer> totalCountIssues, int accountId) {
         TestingRun testingRun = DbLayer.findTestingRun(trrs.getTestingRunId().toHexString());
+        loggerMaker.infoAndAddToDb("Trying to send slack alert for trrs " + trrs.getId() + " accountId " + accountId);
 
         if (!testingRun.getSendSlackAlert()) {
             loggerMaker.infoAndAddToDb("Not sending slack alert for trrs " + trrs.getId());
@@ -2299,7 +2302,7 @@ public class DbAction extends ActionSupport {
                 ));
             }
         }
-
+        loggerMaker.infoAndAddToDb("Build slack payload successfully for trrs " + trrs.getId() + " slack channel id " + testingRun.getSelectedSlackChannelId());
         SlackAlerts apiTestStatusAlert = new APITestStatusAlert(
                 testingRun.getName(),
                 totalCountIssues.getOrDefault(GlobalEnums.Severity.CRITICAL.name(), 0),
