@@ -109,6 +109,9 @@ public class RBACDao extends CommonContextDao<RBAC> {
             }
             return false;
         }
+        if(allowedFeaturesEntry.getFirst() == null || allowedFeaturesEntry.getFirst().isEmpty()) {
+            return false;
+        }
         return allowedFeaturesEntry.getFirst().contains(featureLabel);
     }
 
@@ -162,10 +165,13 @@ public class RBACDao extends CommonContextDao<RBAC> {
             return RBAC.SPECIAL_FEATURES_FOR_RBAC;
         }
 
-        String role = rbac.getRole();
+        String role = RBAC.Role.MEMBER.name();
+        if(rbac != null){
+            role = rbac.getRole();
+        }
         CustomRole customRole = CustomRoleDao.instance.findRoleByName(role);
         Set<String> allowedFeatures = new HashSet<>();
-        if (customRole != null) {
+        if (customRole != null && customRole.getAllowedFeaturesForUser() != null && !customRole.getAllowedFeaturesForUser().isEmpty()) {
             allowedFeatures.addAll(customRole.getAllowedFeaturesForUser());
         }
         if(rbac != null && rbac.getAllowedFeaturesForUser() != null) {
