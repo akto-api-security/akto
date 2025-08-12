@@ -819,7 +819,7 @@ function ApiEndpoints(props) {
                                         setShowSequencesFlow(!showSequencesFlow); 
                                         setExportOpen(false); 
                                     },
-                                    prefix: <Box><Icon source={showSequencesFlow ? HideMinor: ViewMinor} /></Box>
+                                    prefix: <Box width="24px"> <Icon source={showSequencesFlow ? HideMinor: ViewMinor} /></Box>
                                 },
                                
                             ]
