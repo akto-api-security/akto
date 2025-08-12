@@ -217,16 +217,32 @@ public class DashboardAction extends UserAction {
 
         //when showIssues == true, also return per-API subCategory issue counts
         if (Boolean.TRUE.equals(this.showIssues)) {
+            Set<ApiInfoKey> apiKeysWithMinIssues = new HashSet<>();
+            for (Map.Entry<ApiInfoKey, Integer> e : countByAPIs.entrySet()) {
+                if (e.getValue() != null && e.getValue() >= 2) {
+                    apiKeysWithMinIssues.add(e.getKey());
+                }
+            }
+
+            if (apiKeysWithMinIssues.isEmpty()) {
+                response.put("issueNamesByAPIs", new ArrayList<BasicDBObject>());
+                return SUCCESS.toUpperCase();
+            }
+
             List<Bson> pipelineIssues = new ArrayList<>(basePipeline);
+            Set<String> urlsFilterSet = new HashSet<>();
+            for (ApiInfoKey key : apiKeysWithMinIssues) urlsFilterSet.add(key.getUrl());
+            pipelineIssues.add(Aggregates.match(Filters.in(TestingRunIssues.ID_URL, urlsFilterSet)));
+
             String subCategoryPath = Constants.ID + "." + TestingIssuesId.TEST_SUB_CATEGORY;
             BasicDBObject groupedIdIssues = new BasicDBObject(SingleTypeInfo._URL, "$" + TestingRunIssues.ID_URL)
                 .append(SingleTypeInfo._METHOD, "$" + TestingRunIssues.ID_METHOD)
-                .append(SingleTypeInfo._API_COLLECTION_ID, "$" + TestingRunIssues.ID_API_COLLECTION_ID)
-                .append("subCategory", "$" + subCategoryPath);
-            pipelineIssues.add(Aggregates.group(groupedIdIssues, Accumulators.sum("count", 1)));
+                .append(SingleTypeInfo._API_COLLECTION_ID, "$" + TestingRunIssues.ID_API_COLLECTION_ID);
+            pipelineIssues.add(Aggregates.group(groupedIdIssues, Accumulators.addToSet("issueNames", "$" + subCategoryPath)));
 
             MongoCursor<BasicDBObject> cursorIssues = TestingRunIssuesDao.instance.getMCollection().aggregate(pipelineIssues, BasicDBObject.class).cursor();
-            Map<ApiInfoKey, Map<String, Integer>> issuesByAPIs = new HashMap<>();
+            Map<ApiInfoKey, List<String>> issueNamesByKey = new HashMap<>();
+            List<BasicDBObject> idDocs = new ArrayList<>();
             while (cursorIssues.hasNext()) {
                 BasicDBObject doc = cursorIssues.next();
                 BasicDBObject gid = (BasicDBObject) doc.get("_id");
@@ -235,13 +251,31 @@ public class DashboardAction extends UserAction {
                     gid.getString(SingleTypeInfo._URL),
                     Method.valueOf(gid.getString(SingleTypeInfo._METHOD))
                 );
-                String subCategory = gid.getString("subCategory");
-                int c = doc.getInt("count", 0);
-                Map<String, Integer> subCatMap = issuesByAPIs.computeIfAbsent(apiKey, k -> new HashMap<>());
-                if (subCategory == null) subCategory = "UNKNOWN";
-                subCatMap.put(subCategory, subCatMap.getOrDefault(subCategory, 0) + c);
+                if (!apiKeysWithMinIssues.contains(apiKey)) continue;
+
+                @SuppressWarnings("unchecked")
+                List<String> names = (List<String>) doc.getOrDefault("issueNames", new ArrayList<String>());
+                List<String> norm = new ArrayList<>();
+                for (String n : names) norm.add(n == null ? "UNKNOWN" : n);
+                issueNamesByKey.put(apiKey, norm);
+
+                BasicDBObject idObj = new BasicDBObject("apiCollectionId", apiKey.getApiCollectionId())
+                        .append("url", apiKey.getUrl())
+                        .append("method", apiKey.getMethod().name());
+                idDocs.add(new BasicDBObject("_id", idObj));
             }
-            response.put("issuesByAPIs", issuesByAPIs);
+
+            List<ApiInfo> apiInfos = ApiInfoDao.getApiInfosFromList(idDocs, -1);
+            Map<ApiInfoKey, ApiInfo> apiInfoByKey = new HashMap<>();
+            for (ApiInfo a : apiInfos) apiInfoByKey.put(a.getId(), a);
+
+            List<BasicDBObject> issueNamesByAPIs = new ArrayList<>();
+            for (Map.Entry<ApiInfoKey, List<String>> e : issueNamesByKey.entrySet()) {
+                ApiInfo ai = apiInfoByKey.get(e.getKey());
+                if (ai == null) continue;
+                issueNamesByAPIs.add(new BasicDBObject("apiInfo", ai).append("issueNames", e.getValue()));
+            }
+            response.put("issueNamesByAPIs", issueNamesByAPIs);
         }
 
         return SUCCESS.toUpperCase();

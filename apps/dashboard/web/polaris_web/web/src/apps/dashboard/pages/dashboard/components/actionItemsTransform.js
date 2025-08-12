@@ -2,10 +2,14 @@ import api from '../api';
 import observeApi from '../../observe/api';
 import settingsModule from '../../settings/module';
 import func from '../../../../../util/func';
+import LocalStore from '../../../../main/LocalStorageStore';
 
 export async function fetchActionItemsData() {
     const endTimestamp = func.timeNow();
     const startTimestamp = endTimestamp - 3600 * 24 * 7;
+
+    const subCategoryMap = LocalStore.getState().subCategoryMap || {};
+    const allSubCategories = Object.keys(subCategoryMap);
 
     const results = await Promise.allSettled([
         api.fetchApiStats(startTimestamp, endTimestamp),
@@ -15,10 +19,13 @@ export async function fetchActionItemsData() {
         api.fetchShadowApisValue(false),
         settingsModule.fetchAdminInfo(),
         api.fetchUnauthenticatedApis(false),
-        api.getNotTestedAPICount(false), 
-        api.getOnlyOnceTestedAPICount(false), 
-        api.getVulnerableApiCount(false), 
-        api.getMisConfiguredTestsCount() 
+        api.getNotTestedAPICount(false),
+        api.getOnlyOnceTestedAPICount(false),
+        api.getVulnerableApiCount(false),
+        api.getMisConfiguredTestsCount(),
+        api.fetchIssuesByApis(),
+        api.fetchUrlsByIssues(false),
+        api.fetchBrokenAuthenticationIssues(allSubCategories, false)
     ]);
 
     const [
@@ -29,10 +36,13 @@ export async function fetchActionItemsData() {
         shadowApisValueResult,
         adminSettingsResult,
         unauthenticatedApisResult,
-        notTestedApiCountResult, 
-        onlyOnceTestedApiCountResult, 
-        vulnerableApiCountResult, 
-        misConfiguredTestsCountResult 
+        notTestedApiCountResult,
+        onlyOnceTestedApiCountResult,
+        vulnerableApiCountResult,
+        misConfiguredTestsCountResult,
+        issuesByApisResult,
+        urlsByIssuesResult,
+        brokenAuthIssuesResult
     ] = results;
 
     const apiStats = apiStatsResult.status === 'fulfilled' ? apiStatsResult.value : null;
@@ -43,6 +53,15 @@ export async function fetchActionItemsData() {
     const adminSettings = adminSettingsResult.status === 'fulfilled' ? adminSettingsResult.value.resp : {};
     const unauthenticatedApis = unauthenticatedApisResult.status === 'fulfilled' ? unauthenticatedApisResult.value.unauthenticatedApis || 0 : 0;
     const jiraTicketUrlMap = adminSettings?.jiraTicketUrlMap || {};
+    const issuesByApis = issuesByApisResult.status === 'fulfilled' ? issuesByApisResult.value : null;
+    const urlsByIssues = urlsByIssuesResult.status === 'fulfilled' ? urlsByIssuesResult.value : null;
+    const brokenAuthIssuesResp = brokenAuthIssuesResult.status === 'fulfilled' ? brokenAuthIssuesResult.value : null;
+    const urlsByIssuesTotalCount = urlsByIssues && typeof urlsByIssues.totalCount === 'number' ? urlsByIssues.totalCount : 0;
+    // Count URLs where value is >= 2
+    let highValueIssuesCount = 0;
+    if (issuesByApis && issuesByApis.countByAPIs && typeof issuesByApis.countByAPIs === 'object') {
+        highValueIssuesCount = Object.values(issuesByApis.countByAPIs).filter(value => value >= 2).length;
+    }
 
     let highRiskCount = 0;
     let unauthenticatedCount = unauthenticatedApis;
@@ -52,6 +71,7 @@ export async function fetchActionItemsData() {
     let onlyOnceTestedApiCount = onlyOnceTestedApiCountResult.status === 'fulfilled' ? onlyOnceTestedApiCountResult.value?.onlyOnceTestedEndpointsCount || 0 : 0;
     let vulnerableApiCount = vulnerableApiCountResult.status === 'fulfilled' ? vulnerableApiCountResult.value?.buaCategoryCount || 0 : 0;
     let misConfiguredTestsCount = misConfiguredTestsCountResult.status === 'fulfilled' ? misConfiguredTestsCountResult.value?.misConfiguredTestsCount || 0 : 0;
+    let brokenAuthIssuesCount = brokenAuthIssuesResp ? brokenAuthIssuesResp.buaCategoryCount || 0 : 0;
 
     if (apiStats?.apiStatsEnd && apiStats?.apiStatsStart) {
         const { apiStatsEnd, apiStatsStart } = apiStats;
@@ -74,12 +94,19 @@ export async function fetchActionItemsData() {
         notTestedApiCount,
         onlyOnceTestedApiCount,
         vulnerableApiCount,
-        misConfiguredTestsCount
+        misConfiguredTestsCount,
+        brokenAuthIssuesCount,
+        highValueIssuesCount, 
+        issuesByApis,
+        urlsByIssues,
+        urlsByIssuesTotalCount
     };
 }
 
 
 export async function fetchAllActionItemsApiInfo() {
+    const subCategoryMap = LocalStore.getState().subCategoryMap || {};
+    const allSubCategories = Object.keys(subCategoryMap);
 
     const results = await Promise.allSettled([
         api.fetchSensitiveAndUnauthenticatedValue(true),
@@ -89,10 +116,13 @@ export async function fetchAllActionItemsApiInfo() {
         api.fetchActionItemsApiInfo('HIGH_RISK'),
         api.fetchActionItemsApiInfo('SENSITIVE'),
         api.fetchActionItemsApiInfo('THIRD_PARTY'),
-        api.getNotTestedAPICount(true), 
-        api.getOnlyOnceTestedAPICount(true), 
-        api.getMisConfiguredTestsCount(true), 
-        api.getVulnerableApiCount(true) 
+        api.getNotTestedAPICount(true),
+        api.getOnlyOnceTestedAPICount(true),
+        api.getMisConfiguredTestsCount(true),
+        api.getVulnerableApiCount(true),
+        api.fetchBrokenAuthenticationIssues(allSubCategories, true),
+        api.fetchIssuesByApis(true),
+        api.fetchUrlsByIssues(true)
     ]);
 
     const [
@@ -103,10 +133,13 @@ export async function fetchAllActionItemsApiInfo() {
         highRiskResult,
         sensitiveResult,
         thirdPartyResult,
-        notTestedApiInfoResult, 
-        onlyOnceTestedApiInfoResult, 
-        misConfiguredTestsApiInfoResult, 
-        vulnerableApiCountResult 
+        notTestedApiInfoResult,
+        onlyOnceTestedApiInfoResult,
+        misConfiguredTestsApiInfoResult,
+        vulnerableApiCountResult,
+        brokenAuthIssuesApiInfoResult,
+        issuesByApisResult,
+        urlsByIssuesResult
     ] = results;
 
     const sensitiveAndUnauthenticatedApis = sensitiveAndUnauthenticatedValueResult.status === 'fulfilled' ? sensitiveAndUnauthenticatedValueResult?.value?.sensitiveUnauthenticatedEndpointsApiInfo || [] : [];
@@ -120,6 +153,21 @@ export async function fetchAllActionItemsApiInfo() {
     const onlyOnceTestedEndpointsApiInfo = onlyOnceTestedApiInfoResult.status === 'fulfilled' ? onlyOnceTestedApiInfoResult.value?.onlyOnceTestedEndpointsApiInfo || [] : [];
     const misConfiguredTestsApiInfo = misConfiguredTestsApiInfoResult.status === 'fulfilled' ? misConfiguredTestsApiInfoResult.value?.misConfiguredTestsApiInfo || [] : [];
     const vulnerableApiCountApiInfo = vulnerableApiCountResult.status === 'fulfilled' ? vulnerableApiCountResult.value?.buaCategoryApiInfo || [] : [];
+    const brokenAuthIssuesApiInfo = brokenAuthIssuesApiInfoResult.status === 'fulfilled' ? brokenAuthIssuesApiInfoResult.value?.buaCategoryApiInfo || [] : [];
+    const issuesByApisForAllActionItems = issuesByApisResult.status === 'fulfilled' ? issuesByApisResult.value : null;
+    const urlsByIssuesForAllActionItems = urlsByIssuesResult.status === 'fulfilled' ? urlsByIssuesResult.value : null;
+
+
+    const multipleIssuesApiInfo = Array.isArray(issuesByApisForAllActionItems?.issueNamesByAPIs)
+        ? issuesByApisForAllActionItems.issueNamesByAPIs
+            .map(item => {
+                const apiInfo = item?.apiInfo;
+                const issueNames = Array.isArray(item?.issueNames) ? item.issueNames : [];
+                const labels = issueNames.map(n => (subCategoryMap?.[n]?.testName) || n).filter(Boolean);
+                return apiInfo ? { ...apiInfo, issueLabels: Array.from(new Set(labels)) } : null;
+            })
+            .filter(Boolean)
+        : [];
 
     return {
         highRiskApis: highRiskApis,
@@ -129,9 +177,12 @@ export async function fetchAllActionItemsApiInfo() {
         highRiskThirdParty: highRiskThirdPartyApis,
         shadowApis: shadowApis,
         sensitiveAndUnauthenticated: sensitiveAndUnauthenticatedApis,
-        notTestedEndpointsApiInfo,
-        onlyOnceTestedEndpointsApiInfo,
-        misConfiguredTestsApiInfo,
-        vulnerableApiCountApiInfo,
+        notTestedEndpointsApiInfo: notTestedEndpointsApiInfo,
+        onlyOnceTestedEndpointsApiInfo: onlyOnceTestedEndpointsApiInfo,
+        misConfiguredTestsApiInfo: misConfiguredTestsApiInfo,
+        vulnerableApiCountApiInfo: vulnerableApiCountApiInfo,
+        brokenAuthIssuesApiInfo: brokenAuthIssuesApiInfo,
+        multipleIssuesApiInfo: multipleIssuesApiInfo,
+        urlsByIssues: urlsByIssuesForAllActionItems,
     };
 }

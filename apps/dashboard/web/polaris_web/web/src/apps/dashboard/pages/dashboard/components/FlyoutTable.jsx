@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import ApiEndpointsTable from './ApiEndpointsTable';
+import issuesTransform from '@/apps/dashboard/pages/issues/transform';
 import { CellType } from "@/apps/dashboard/components/tables/rows/GithubRow";
 import GetPrettifyEndpoint from "@/apps/dashboard/pages/observe/GetPrettifyEndpoint";
 import observeApi from '../../observe/api';
-import { Box, Badge } from '@shopify/polaris';
+import { Box, Badge, Text, Divider } from '@shopify/polaris';
 import TooltipText from '@/apps/dashboard/components/shared/TooltipText';
 import transform from "@/apps/dashboard/pages/observe/transform";
 import func from "@/util/func";
@@ -21,6 +22,9 @@ const ACTION_ITEM_TYPES = {
     ENABLE_CONTINUOUS_TESTING: 'ENABLE_CONTINUOUS_TESTING',
     ADDRESS_MISCONFIGURED_TESTS: 'ADDRESS_MISCONFIGURED_TESTS',
     VULNERABLE_APIS: 'VULNERABLE_APIS',
+    BROKEN_AUTHENTICATION_ISSUES: 'BROKEN_AUTHENTICATION_ISSUES',
+    FREQUENTLY_VULNERABLE_ENDPOINTS: 'FREQUENTLY_VULNERABLE_ENDPOINTS',
+    APIS_WITH_MULTIPLE_ISSUES: 'APIS_WITH_MULTIPLE_ISSUES',
 };
 
 const getIssueLabel = (actionItemType) => {
@@ -47,6 +51,10 @@ const getIssueLabel = (actionItemType) => {
             return 'Misconfigured Tests';
         case ACTION_ITEM_TYPES.VULNERABLE_APIS:
             return 'Vulnerable APIs';
+        case ACTION_ITEM_TYPES.BROKEN_AUTHENTICATION_ISSUES:
+            return 'Broken Authentication Issues';
+        case ACTION_ITEM_TYPES.FREQUENTLY_VULNERABLE_ENDPOINTS:
+            return 'Frequently Vulnerable Endpoints';
         default:
             return '-';
     }
@@ -55,6 +63,7 @@ const getIssueLabel = (actionItemType) => {
 function FlyoutTable({ actionItemType, count, allApiInfo, apiInfoLoading }) {
     const [apiData, setApiData] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [expandedRowIndex, setExpandedRowIndex] = useState(null);
 
     const allCollections = PersistStore(state => state.allCollections);
     const collectionIdToName = func.mapCollectionIdToName(allCollections || []);
@@ -103,6 +112,15 @@ function FlyoutTable({ actionItemType, count, allApiInfo, apiInfoLoading }) {
                     case ACTION_ITEM_TYPES.VULNERABLE_APIS:
                         relevantData = allApiInfo.vulnerableApiCountApiInfo || [];
                         break;
+                    case ACTION_ITEM_TYPES.BROKEN_AUTHENTICATION_ISSUES:
+                        relevantData = allApiInfo.brokenAuthIssuesApiInfo || [];
+                        break;
+                    case ACTION_ITEM_TYPES.FREQUENTLY_VULNERABLE_ENDPOINTS:
+                    relevantData = allApiInfo.multipleIssuesApiInfo || [];
+                    break;
+                    case ACTION_ITEM_TYPES.APIS_WITH_MULTIPLE_ISSUES:
+                    relevantData = allApiInfo.multipleIssuesApiInfo || [];
+                    break;
                     default:
                         relevantData = [];
                 }
@@ -148,7 +166,7 @@ function FlyoutTable({ actionItemType, count, allApiInfo, apiInfoLoading }) {
                         collectionName = collectionIdToName[api.collectionIds] || api.collectionIds;
                     }
 
-                    return {
+                    const baseRow = {
                         id: `${actionItemType}-${index}`,
                         endpoint: <Box maxWidth="250px">
                                 <GetPrettifyEndpoint url={url} method={method} />
@@ -165,6 +183,38 @@ function FlyoutTable({ actionItemType, count, allApiInfo, apiInfoLoading }) {
                         lastTested: lastTestedFormatted,
                         collection: <Box maxWidth="150px"><TooltipText tooltip={collectionName} text={collectionName} /></Box>,
                     };
+
+                    if (actionItemType === ACTION_ITEM_TYPES.FREQUENTLY_VULNERABLE_ENDPOINTS) {
+                        // Add collapsible icon on the left and show issues (transformed) inside
+                        return {
+                            ...baseRow,
+                            name: `${method} ${url}`,
+                            collapsibleRow: (
+                                <tr>
+                                    <td colSpan={'100%'}>
+                                        <Box padding="3">
+                                            {Array.isArray(api.issueLabels) && api.issueLabels.length > 0 ? (
+                                                <Box>
+                                                    {api.issueLabels.map((label, i) => (
+                                                        <React.Fragment key={i}>
+                                                            {i > 0 && <Divider />}
+                                                            <Box padding="2">
+                                                                <Text variant="bodyMd">{label}</Text>
+                                                            </Box>
+                                                        </React.Fragment>
+                                                    ))}
+                                                </Box>
+                                            ) : (
+                                                <Text variant="bodyMd" tone="subdued">No issues found</Text>
+                                            )}
+                                        </Box>
+                                    </td>
+                                </tr>
+                            )
+                        };
+                    }
+
+                    return baseRow;
                 });
 
                 setApiData(transformedData);
@@ -202,6 +252,22 @@ function FlyoutTable({ actionItemType, count, allApiInfo, apiInfoLoading }) {
     };
 
     const getHeaders = () => {
+        if (actionItemType === ACTION_ITEM_TYPES.FREQUENTLY_VULNERABLE_ENDPOINTS) {
+            return [
+                { type: CellType.COLLAPSIBLE, value: 'name', text: '', title: '' },
+                { text: 'Endpoint', title: 'Endpoint', value: 'endpoint', maxWidth: '300px' },
+                { text: 'Risk Score', title: 'Risk Score', value: 'riskScore', isText: CellType.TEXT },
+                { text: 'Issues', title: 'Issues', value: 'issues', isText: CellType.TEXT, maxWidth: '150px' },
+                { text: 'Hostname', title: 'Hostname', value: 'hostname', isText: CellType.TEXT, maxWidth: '200px' },
+                { text: 'Access Type', title: 'Access Type', value: 'accessType', isText: CellType.TEXT, maxWidth: '120px' },
+                { text: 'Auth Type', title: 'Auth Type', value: 'authType', isText: CellType.TEXT, maxWidth: '120px' },
+                { text: 'Sensitive Params', title: 'Sensitive Params', value: 'sensitiveParams', isText: CellType.TEXT, maxWidth: '200px' },
+                { text: 'Last Seen', title: 'Last Seen', value: 'lastSeen', isText: CellType.TEXT },
+                { text: 'Discovered At', title: 'Discovered At', value: 'discoveredAt', isText: CellType.TEXT },
+                { text: 'Last Tested', title: 'Last Tested', value: 'lastTested', isText: CellType.TEXT },
+                { text: 'Collection', title: 'Collection', value: 'collection', isText: CellType.TEXT, maxWidth: '150px' },
+            ];
+        }
         if (actionItemType === ACTION_ITEM_TYPES.SENSITIVE_DATA_ENDPOINTS || actionItemType === ACTION_ITEM_TYPES.CRITICAL_SENSITIVE_UNAUTH) {
             return [
                 { text: 'Endpoint', title: 'Endpoint', value: 'endpoint', maxWidth: '300px' },

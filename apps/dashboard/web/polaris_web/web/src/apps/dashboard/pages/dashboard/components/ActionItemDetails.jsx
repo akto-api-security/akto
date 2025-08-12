@@ -4,6 +4,7 @@ import { TeamMajor, ToolsMajor } from '@shopify/polaris-icons';
 import FlyoutHeadingComponent from '../../../components/shared/FlyoutHeadingComponent';
 import JiraTicketDisplay from '../../../components/shared/JiraTicketDisplay';
 import FlyoutTable from './FlyoutTable';
+import IssuesBySubCategoryFlyout from './IssuesBySubCategoryFlyout';
 
 function ActionItemDetails({ item, jiraTicketUrlMap = {}, onJiraButtonClick, allApiInfo, apiInfoLoading }) {
     if (!item) return null;
@@ -84,12 +85,16 @@ function ActionItemDetails({ item, jiraTicketUrlMap = {}, onJiraButtonClick, all
                     {itemData?.description || itemData?.whyItMatters || 'No additional details available.'}
                 </Text>
             </Box>
-            <FlyoutTable 
-                actionItemType={itemData?.actionItemType} 
-                count={itemData?.count}
-                allApiInfo={allApiInfo} 
-                apiInfoLoading={apiInfoLoading} 
-            />
+            {itemData?.actionItemType === 'BUILD_REMEDIATION_PLAYBOOKS' ? (
+                <IssuesBySubCategoryFlyout urlsByIssues={allApiInfo?.urlsByIssues} />
+            ) : (
+                <FlyoutTable 
+                    actionItemType={itemData?.actionItemType} 
+                    count={itemData?.count}
+                    allApiInfo={allApiInfo} 
+                    apiInfoLoading={apiInfoLoading} 
+                />
+            )}
         </VerticalStack>
     );
 }
