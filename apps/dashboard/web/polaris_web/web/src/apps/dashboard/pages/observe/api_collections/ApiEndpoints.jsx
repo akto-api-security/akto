@@ -6,7 +6,7 @@ import func from "@/util/func"
 import GithubSimpleTable from "../../../components/tables/GithubSimpleTable";
 import {useLocation, useNavigate, useParams } from "react-router-dom"
 import { saveAs } from 'file-saver'
-import {FileMinor} from '@shopify/polaris-icons';
+import {FileMinor, HideMinor, ViewMinor} from '@shopify/polaris-icons';
 import "./api_inventory.css"
 import ApiDetails from "./ApiDetails"
 import UploadFile from "../../../components/shared/UploadFile"
@@ -223,6 +223,7 @@ function ApiEndpoints(props) {
     const [loading, setLoading] = useState(true)
     const [apiDetail, setApiDetail] = useState({})
     const [exportOpen, setExportOpen] = useState(false)
+    const [showSequencesFlow, setShowSequencesFlow] = useState(false)
 
     const filteredEndpoints = ObserveStore(state => state.filteredItems)
     const setFilteredEndpoints = ObserveStore(state => state.setFilteredItems)
@@ -246,7 +247,7 @@ function ApiEndpoints(props) {
 
 
     // the values used here are defined at the server.
-    const definedTableTabs = apiCollectionId === 111111999 ? ['All', 'New', 'High risk', 'No auth', 'Shadow'] : ( apiCollectionId === 111111120 ? ['All', 'New', 'Sensitive', 'High risk', 'Shadow'] : ['All', 'New', 'Sensitive', 'High risk', 'No auth', 'Shadow', 'Zombie', 'Sequences'] )
+    const definedTableTabs = apiCollectionId === 111111999 ? ['All', 'New', 'High risk', 'No auth', 'Shadow'] : ( apiCollectionId === 111111120 ? ['All', 'New', 'Sensitive', 'High risk', 'Shadow'] : ['All', 'New', 'Sensitive', 'High risk', 'No auth', 'Shadow', 'Zombie'] )
 
     const { tabsInfo } = useTable()
     const tableCountObj = func.getTabsCount(definedTableTabs, endpointData)
@@ -810,96 +811,112 @@ function ApiEndpoints(props) {
                 <ActionList
                     sections={[
                         {
-                            title:'Re-Compute',
+                            title: 'Switch view',
                             items: [
                                 {
-                                    content: 'Refresh',
-                                    onAction: () => { handleRefresh(); setExportOpen(false) },
+                                    content: showSequencesFlow ? "Display table view" : "Display graph view",
+                                    onAction: () => { 
+                                        setShowSequencesFlow(!showSequencesFlow); 
+                                        setExportOpen(false); 
+                                    },
+                                    prefix: <Box><Icon source={showSequencesFlow ? HideMinor: ViewMinor} /></Box>
                                 },
-                                isApiGroup ? {
-                                    content: 'Re-compute API Group',
-                                    onAction: () => { computeApiGroup(); setExportOpen(false) },
-                                }: {}
+                               
                             ]
                         },
-                        {
-                            title: 'Upload',
-                            items: [
-                                !isApiGroup &&{
-                                    content: '',
-                                    prefix: (<Box width="160px" >
-                                                <UploadFile
-                                                    fileFormat=".json,.yaml,.yml"
-                                                    fileChanged={file => {uploadOpenApiFile(file); setExportOpen(false)}}
-                                                    tooltipText="Upload openapi file"
-                                                    label={(
-                                                        <div style={{ display: "flex", gap:'6px' }}>
-                                                            <Box>
-                                                                <Icon source={FileMinor} />
-                                                            </Box>
-                                                            <Text>Upload OpenAPI file</Text>
-                                                        </div>
-                                                    )}
-                                                    primary={false} 
-                                                />
-                                            </Box>)
-                                },
-                                !isApiGroup && !(isHostnameCollection)  && {
-                                    content: '',
-                                    prefix:  (<Box width="160px" >
-                                        <UploadFile
-                                            fileFormat=".har"
-                                            fileChanged={file => {handleFileChange(file); setExportOpen(false)}}
-                                            tooltipText="Upload traffic(.har)"
-                                            label={(
-                                                <div style={{ display: "flex", gap:'6px' }}>
-                                                    <Box>
-                                                        <Icon source={FileMinor} />
-                                                    </Box>
-                                                    <Text>Upload har file</Text>
-                                                </div>
-                                            )}
-                                            primary={false} 
-                                        />
-                                    </Box>)
-                                }
-                            ]
-                        },
-                        {
-                            title: 'Export as',
-                            items: [
-                                {
-                                    content: 'OpenAPI spec',
-                                    onAction: () => { (selectedResourcesForPrimaryAction && selectedResourcesForPrimaryAction.length > 0) ? exportOpenApiForSelectedApi() : exportOpenApi()},
-                                },
-                                {
-                                    content: 'Postman',
-                                    onAction: () => { exportPostman(); setExportOpen(false) },
-                                },
-                                {
-                                    content: 'CSV',
-                                    onAction: () => { exportCsv(); setExportOpen(false) },
-                                }
-                            ]
-                        },
-                        {
-                            title: 'Others',
-                            items: [
-                                {
-                                    content: `${showWorkflowTests ? "Hide" : "Show"} workflow tests`,
-                                    onAction: () => { toggleWorkflowTests(); setExportOpen(false) },
-                                },
-                                {
-                                    content: '',
-                                    prefix: <Box paddingInlineStart={"2"}><Checkbox
-                                                label='Redact'
-                                                checked={redacted}
-                                                onChange={() => redactCheckBoxClicked()}
-                                            /></Box>,
-                                    onAction: () => { redactCheckBoxClicked() },
-                                }
-                            ]
-                        }
+                        ...(showSequencesFlow ? [] : [
+                            {
+                                title:'Re-Compute',
+                                items: [
+                                    {
+                                        content: 'Refresh',
+                                        onAction: () => { handleRefresh(); setExportOpen(false) },
+                                    },
+                                    isApiGroup ? {
+                                        content: 'Re-compute API Group',
+                                        onAction: () => { computeApiGroup(); setExportOpen(false) },
+                                    }: {}
+                                ]
+                            },
+                            {
+                                title: 'Upload',
+                                items: [
+                                    !isApiGroup &&{
+                                        content: '',
+                                        prefix: (<Box width="160px" >
+                                                    <UploadFile
+                                                        fileFormat=".json,.yaml,.yml"
+                                                        fileChanged={file => {uploadOpenApiFile(file); setExportOpen(false)}}
+                                                        tooltipText="Upload openapi file"
+                                                        label={(
+                                                            <div style={{ display: "flex", gap:'6px' }}>
+                                                                <Box>
+                                                                    <Icon source={FileMinor} />
+                                                                </Box>
+                                                                <Text>Upload OpenAPI file</Text>
+                                                            </div>
+                                                        )}
+                                                        primary={false} 
+                                                    />
+                                                </Box>)
+                                    },
+                                    !isApiGroup && !(isHostnameCollection)  && {
+                                        content: '',
+                                        prefix:  (<Box width="160px" >
+                                            <UploadFile
+                                                fileFormat=".har"
+                                                fileChanged={file => {handleFileChange(file); setExportOpen(false)}}
+                                                tooltipText="Upload traffic(.har)"
+                                                label={(
+                                                    <div style={{ display: "flex", gap:'6px' }}>
+                                                        <Box>
+                                                            <Icon source={FileMinor} />
+                                                        </Box>
+                                                        <Text>Upload har file</Text>
+                                                    </div>
+                                                )}
+                                                primary={false} 
+                                            />
+                                        </Box>)
+                                    }
+                                ]
+                            },
+                            {
+                                title: 'Export as',
+                                items: [
+                                    {
+                                        content: 'OpenAPI spec',
+                                        onAction: () => { (selectedResourcesForPrimaryAction && selectedResourcesForPrimaryAction.length > 0) ? exportOpenApiForSelectedApi() : exportOpenApi()},
+                                    },
+                                    {
+                                        content: 'Postman',
+                                        onAction: () => { exportPostman(); setExportOpen(false) },
+                                    },
+                                    {
+                                        content: 'CSV',
+                                        onAction: () => { exportCsv(); setExportOpen(false) },
+                                    }
+                                ]
+                            },
+                            {
+                                title: 'Others',
+                                items: [
+                                    {
+                                        content: `${showWorkflowTests ? "Hide" : "Show"} workflow tests`,
+                                        onAction: () => { toggleWorkflowTests(); setExportOpen(false) },
+                                    },
+                                    {
+                                        content: '',
+                                        prefix: <Box paddingInlineStart={"2"}><Checkbox
+                                                    label='Redact'
+                                                    checked={redacted}
+                                                    onChange={() => redactCheckBoxClicked()}
+                                                /></Box>,
+                                        onAction: () => { redactCheckBoxClicked() },
+                                    }
+                                ]
+                            }
+                        ])
                     ]}
                 />
                 </div>
@@ -1085,20 +1102,18 @@ function ApiEndpoints(props) {
                     redirectUrl={"/dashboard/observe/inventory"}
                     learnText={"inventory"}
                     docsUrl={ENDPOINTS_PAGE_DOCS_URL}
-                />] : selectedTab === "sequences" ? [
-                <SequencesFlow key="sequences-flow" apiCollectionId={apiCollectionId} />
+                />] : showSequencesFlow ? [
+                <SequencesFlow key="sequences-flow" apiCollectionId={apiCollectionId}  />
             ] : [
                 (coverageInfo[apiCollectionId] === 0 || !(coverageInfo.hasOwnProperty(apiCollectionId)) ? <TestrunsBannerComponent key={"testrunsBanner"} onButtonClick={() => setRunTests(true)} isInventory={true}  disabled={collectionsObj?.isOutOfTestingScope || false}/> : null),
-                selectedTab !== "sequences" ? (
-                    <div className="apiEndpointsTable" key="table">
-                        {apiEndpointTable}
-                          <Modal large open={isGptScreenActive} onClose={() => setIsGptScreenActive(false)} title="Akto GPT">
-                              <Modal.Section flush>
-                                  <AktoGptLayout prompts={prompts} closeModal={() => setIsGptScreenActive(false)} />
-                              </Modal.Section>
-                          </Modal>
-                      </div>
-                ) : null,
+                <div className="apiEndpointsTable" key="table">
+                    {apiEndpointTable}
+                      <Modal large open={isGptScreenActive} onClose={() => setIsGptScreenActive(false)} title="Akto GPT">
+                          <Modal.Section flush>
+                              <AktoGptLayout prompts={prompts} closeModal={() => setIsGptScreenActive(false)} />
+                          </Modal.Section>
+                      </Modal>
+                  </div>,
                   <ApiGroupModal
                       key="api-group-modal"
                       showApiGroupModal={showApiGroupModal}
