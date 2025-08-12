@@ -72,7 +72,7 @@ const ApiCollectionCoverageGraph = () => {
           type="column"
           height="280px"
           data={chartData}
-          yAxisTitle="Number of APIs"
+          yAxisTitle={`Number of ${mapLabel("APIs", getDashboardCategory())}`}
           text={true}
           showGridLines={true}
           customXaxis={{

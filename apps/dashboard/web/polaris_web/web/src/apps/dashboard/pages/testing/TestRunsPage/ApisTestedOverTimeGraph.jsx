@@ -5,6 +5,7 @@ import EmptyCard from '../../dashboard/new_components/EmptyCard';
 import api from '../../observe/api';
 import func from '@/util/func';
 import LineChart from '../../../components/charts/LineChart';
+import { getDashboardCategory, mapLabel } from '../../../../main/labelHelper';
 
 
 const ApisTestedOverTimeGraph = ({ showOnlyTable = false }) => {
@@ -21,7 +22,7 @@ const ApisTestedOverTimeGraph = ({ showOnlyTable = false }) => {
       tempChartData.push(dataPoint)
     });
     setChartData([{
-      name: 'APIs Tested',
+      name: `${mapLabel("APIs", getDashboardCategory())}  tested`,
       data: tempChartData,
       color: '#6D3BEF'  // Using a consistent color for APIs tested
     }]);
@@ -44,20 +45,20 @@ const ApisTestedOverTimeGraph = ({ showOnlyTable = false }) => {
         <LineChart
           data={chartData}
           height={280}
-          yAxisTitle="APIs Tested"
+          yAxisTitle={`${mapLabel("APIs", getDashboardCategory())} tested`}
           type="line"
           text={true}
           showGridLines={true}
         />
       }
-      title="APIs Tested Over Time"
-      titleToolTip="Track API testing activity over the last 5 weeks, showing the number of APIs tested per week."
+      title={`${mapLabel("APIs", getDashboardCategory())} tested over time`}
+      titleToolTip={`Track ${mapLabel("API", getDashboardCategory())} testing activity over the last 5 weeks, showing the number of ${mapLabel("APIs", getDashboardCategory())} tested per week.`}
       linkText=""
       linkUrl=""
     />
   ) : (
     <EmptyCard 
-      title="APIs Tested Over Time" 
+      title={`${mapLabel("APIs", getDashboardCategory())} tested over time`}
     subTitleComponent={showTestingComponents ? emptyCardComponent : <Text alignment='center' color='subdued'>Loading...</Text>} 
     />
   );

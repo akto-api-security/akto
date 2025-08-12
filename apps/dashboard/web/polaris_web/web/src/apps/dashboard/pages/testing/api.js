@@ -598,5 +598,12 @@ export default {
             method: 'post',
             data: {}
         })
+    },
+    getUniqueHostsTested(testingRunId) {
+        return request({
+            url: '/api/getUniqueHostsTested',
+            method: 'post',
+            data: { testingRunId }
+        })
     }
 }

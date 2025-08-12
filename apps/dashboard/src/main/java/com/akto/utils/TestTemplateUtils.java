@@ -91,7 +91,8 @@ public class TestTemplateUtils {
             GlobalEnums.TestCategory.MCP_AUTH,
             GlobalEnums.TestCategory.MCP_INPUT_VALIDATION,
             GlobalEnums.TestCategory.MCP_DOS,
-            GlobalEnums.TestCategory.MCP_SENSITIVE_DATA_LEAKAGE
+            GlobalEnums.TestCategory.MCP_SENSITIVE_DATA_LEAKAGE,
+            GlobalEnums.TestCategory.MCP
         };
 
         TestCategory[] llmCategories = {
