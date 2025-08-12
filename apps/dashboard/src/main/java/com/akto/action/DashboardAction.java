@@ -12,6 +12,7 @@ import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.rbac.UsersCollectionsList;
 import com.akto.dto.test_run_findings.TestingRunIssues;
+import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods.Method;
 import com.akto.util.enums.GlobalEnums;
@@ -46,6 +47,7 @@ public class DashboardAction extends UserAction {
     private int totalActivities;
     private Map<String,ConnectionInfo> integratedConnectionsInfo = new HashMap<>();
     private String connectionSkipped;
+    private Boolean showIssues;
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(DashboardAction.class, LogDb.DASHBOARD);
 
@@ -178,9 +180,9 @@ public class DashboardAction extends UserAction {
     }
     public String fetchIssuesByApis() {
         response = new BasicDBObject();
-        List<Bson> pipeLine = new ArrayList<>();
+        List<Bson> basePipeline = new ArrayList<>();
         Bson filterQ = UsageMetricCalculator.excludeDemosAndDeactivated(TestingRunIssues.ID_API_COLLECTION_ID);
-        pipeLine.add(
+        basePipeline.add(
             Aggregates.match(Filters.and(
                 Filters.eq(TestingRunIssues.TEST_RUN_ISSUES_STATUS, GlobalEnums.TestRunIssueStatus.OPEN),
                 filterQ
@@ -188,19 +190,18 @@ public class DashboardAction extends UserAction {
         );
         try {
             List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
-            if(collectionIds != null) {
-                pipeLine.add(Aggregates.match(Filters.in(SingleTypeInfo._COLLECTION_IDS, collectionIds)));
+            if (collectionIds != null) {
+                basePipeline.add(Aggregates.match(Filters.in(SingleTypeInfo._COLLECTION_IDS, collectionIds)));
             }
-        } catch(Exception e){
+        } catch (Exception e) {
         }
-         BasicDBObject groupedId = new BasicDBObject(SingleTypeInfo._URL, "$" + TestingRunIssues.ID_URL)
-                                                    .append(SingleTypeInfo._METHOD, "$" + TestingRunIssues.ID_METHOD)
-                                                    .append(SingleTypeInfo._API_COLLECTION_ID,  "$" + TestingRunIssues.ID_API_COLLECTION_ID);
-        pipeLine.add(Aggregates.group(
-            groupedId,
-            Accumulators.sum("count", 1)
-        ));
-        MongoCursor<BasicDBObject> issuesCursor = TestingRunIssuesDao.instance.getMCollection().aggregate(pipeLine, BasicDBObject.class).cursor();
+
+        List<Bson> pipelineCount = new ArrayList<>(basePipeline);
+        BasicDBObject groupedIdCount = new BasicDBObject(SingleTypeInfo._URL, "$" + TestingRunIssues.ID_URL)
+            .append(SingleTypeInfo._METHOD, "$" + TestingRunIssues.ID_METHOD)
+            .append(SingleTypeInfo._API_COLLECTION_ID, "$" + TestingRunIssues.ID_API_COLLECTION_ID);
+        pipelineCount.add(Aggregates.group(groupedIdCount, Accumulators.sum("count", 1)));
+        MongoCursor<BasicDBObject> issuesCursor = TestingRunIssuesDao.instance.getMCollection().aggregate(pipelineCount, BasicDBObject.class).cursor();
         Map<ApiInfoKey, Integer> countByAPIs = new HashMap<>();
         while (issuesCursor.hasNext()) {
             BasicDBObject issue = issuesCursor.next();
@@ -213,6 +214,36 @@ public class DashboardAction extends UserAction {
             countByAPIs.put(key, issue.getInt("count"));
         }
         response.put("countByAPIs", countByAPIs);
+
+        //when showIssues == true, also return per-API subCategory issue counts
+        if (Boolean.TRUE.equals(this.showIssues)) {
+            List<Bson> pipelineIssues = new ArrayList<>(basePipeline);
+            String subCategoryPath = Constants.ID + "." + TestingIssuesId.TEST_SUB_CATEGORY;
+            BasicDBObject groupedIdIssues = new BasicDBObject(SingleTypeInfo._URL, "$" + TestingRunIssues.ID_URL)
+                .append(SingleTypeInfo._METHOD, "$" + TestingRunIssues.ID_METHOD)
+                .append(SingleTypeInfo._API_COLLECTION_ID, "$" + TestingRunIssues.ID_API_COLLECTION_ID)
+                .append("subCategory", "$" + subCategoryPath);
+            pipelineIssues.add(Aggregates.group(groupedIdIssues, Accumulators.sum("count", 1)));
+
+            MongoCursor<BasicDBObject> cursorIssues = TestingRunIssuesDao.instance.getMCollection().aggregate(pipelineIssues, BasicDBObject.class).cursor();
+            Map<ApiInfoKey, Map<String, Integer>> issuesByAPIs = new HashMap<>();
+            while (cursorIssues.hasNext()) {
+                BasicDBObject doc = cursorIssues.next();
+                BasicDBObject gid = (BasicDBObject) doc.get("_id");
+                ApiInfoKey apiKey = new ApiInfoKey(
+                    gid.getInt(SingleTypeInfo._API_COLLECTION_ID),
+                    gid.getString(SingleTypeInfo._URL),
+                    Method.valueOf(gid.getString(SingleTypeInfo._METHOD))
+                );
+                String subCategory = gid.getString("subCategory");
+                int c = doc.getInt("count", 0);
+                Map<String, Integer> subCatMap = issuesByAPIs.computeIfAbsent(apiKey, k -> new HashMap<>());
+                if (subCategory == null) subCategory = "UNKNOWN";
+                subCatMap.put(subCategory, subCatMap.getOrDefault(subCategory, 0) + c);
+            }
+            response.put("issuesByAPIs", issuesByAPIs);
+        }
+
         return SUCCESS.toUpperCase();
     }
 
@@ -467,5 +498,13 @@ public class DashboardAction extends UserAction {
 
     public BasicDBObject getResponse() {
         return response;
+    }
+
+    public Boolean getShowIssues() {
+        return showIssues;
+    }
+
+    public void setShowIssues(Boolean showIssues) {
+        this.showIssues = showIssues;
     }
 }
