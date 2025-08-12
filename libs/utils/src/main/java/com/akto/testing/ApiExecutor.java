@@ -647,19 +647,18 @@ public class ApiExecutor {
 
 
     private static class SseSession {
-        String sessionId;
         String endpoint;
         List<String> messages = new ArrayList<>();
         Response response; // Store the OkHttp Response for cleanup
         Thread readerThread;
     }
 
-    private static SseSession openSseSession(String host, Headers headers, boolean debug) throws Exception {
+    private static SseSession openSseSession(String host, String endpoint, Headers headers, boolean debug) throws Exception {
         SseSession session = new SseSession();
         OkHttpClient client = new OkHttpClient.Builder().build();
 
-        // Use provided headers for the SSE request
-        Request request = new Request.Builder().url(host + "/sse").headers(headers).build();
+        // Use provided endpoint for the SSE request
+        Request request = new Request.Builder().url(host + endpoint).headers(headers).build();
         Call call = client.newCall(request);
         Response response = call.execute();
         if (!response.isSuccessful()) {
@@ -729,6 +728,14 @@ public class ApiExecutor {
         }
         String host = uri.getScheme() + "://" + uri.getHost() + (uri.getPort() != -1 ? ":" + uri.getPort() : "");
 
+        // Use provided SSE endpoint or default to "/sse"
+        String sseEndpoint = "/sse"; // Default SSE endpoint
+        if (request.getHeaders() != null && request.getHeaders().containsKey("x-akto-sse-endpoint")) {
+            sseEndpoint = request.getHeaders().get("x-akto-sse-endpoint").get(0);
+            // Remove the custom header to avoid sending it to the server
+            request.getHeaders().remove("x-akto-sse-endpoint");
+        }
+        
         // Add headers from the original request to the SSE request
         Headers.Builder headersBuilder = new Headers.Builder();
         for (Map.Entry<String, List<String>> entry : request.getHeaders().entrySet()) {
@@ -738,8 +745,8 @@ public class ApiExecutor {
         }
         Headers headers = headersBuilder.build();
 
-        // Open SSE session with headers
-        SseSession session = openSseSession(host, headers, debug);
+        // Open SSE session with dynamic endpoint
+        SseSession session = openSseSession(host, sseEndpoint, headers, debug);
 
         // Add sessionId as query param to actual request
         String[] queryParam = session.endpoint.split("\\?");
@@ -750,12 +757,6 @@ public class ApiExecutor {
             if (queryParam.length > 1) {
                 request.setQueryParams(queryParam[1]);
             }
-        }
-
-        // Modify sessionId in the query params
-        if (queryParam.length > 1) {
-            String modifiedQueryParams = queryParam[1].replaceFirst("sessionId=[^&]*", "sessionId=" + session.sessionId);
-            request.setQueryParams(modifiedQueryParams);
         }
 
         // Send actual request

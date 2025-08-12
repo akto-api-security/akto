@@ -14,7 +14,6 @@ import com.akto.dto.APIConfig;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.traffic.CollectionTags;
 import com.akto.dto.traffic.CollectionTags.TagSource;
-import com.akto.listener.InitializerListener;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.runtime.McpToolsSyncJobExecutor;
@@ -41,6 +40,7 @@ public class MCPScanAction extends UserAction {
         try {
 
             URL parsedUrl = new URL(serverUrl);
+            String sseEndpoint = parsedUrl.getPath() + (parsedUrl.getQuery() != null ? "?" + parsedUrl.getQuery() : "");
             String hostName = parsedUrl.getHost();
             hostName = hostName.toLowerCase();
             hostName = hostName.trim();
@@ -52,7 +52,7 @@ public class MCPScanAction extends UserAction {
                 loggerMaker.info("ApiCollection already exists for host: " + hostName, LogDb.DASHBOARD);
             } else {
                 loggerMaker.info("Creating ApiCollection for host: " + hostName, LogDb.DASHBOARD);  
-                createdCollection = new ApiCollection(collectionId, hostName, Context.now(),new HashSet<>(), hostName, 0, false, true);
+                createdCollection = new ApiCollection(collectionId, hostName, Context.now(), new HashSet<>(), hostName, 0, false, true, sseEndpoint);
                 ApiCollectionsDao.instance.insertOne(createdCollection);
             }
 
@@ -61,11 +61,12 @@ public class MCPScanAction extends UserAction {
                 return Action.ERROR.toUpperCase();
             }
 
-            //update api collection with tags
+            //update api collection with tags and ensure sseCallbackUrl is set
             Bson updates = Updates.combine(
                 Updates.setOnInsert("_id", collectionId),
                 Updates.setOnInsert("startTs", Context.now()),
                 Updates.setOnInsert("urls", new HashSet<>()),
+                Updates.set(ApiCollection.SSE_CALLBACK_URL, sseEndpoint),
                 Updates.set(ApiCollection.TAGS_STRING, 
                 Collections.singletonList(new CollectionTags(Context.now(), Constants.AKTO_MCP_SERVER_TAG, "MCP Server", TagSource.KUBERNETES)))
             );
@@ -88,12 +89,14 @@ public class MCPScanAction extends UserAction {
                     authHeader = "\"" + authKey + "\": \"" + authValue + "\"";
                 } else {
                     authHeader = "";
+                    loggerMaker.info("No authentication credentials provided");
                 }           
                 int accountId = Context.accountId.get();  
                 executorService.schedule(new Runnable() {
                     public void run() {
                         Context.accountId.set(accountId);
-                        loggerMaker.info("Starting MCP sync job");
+                        loggerMaker.info("Starting MCP sync job for collection: {} with host: {} and SSE endpoint: {}", 
+                            createdCollection.getId(), createdCollection.getHostName(), createdCollection.getSseCallbackUrl());
                         McpToolsSyncJobExecutor.INSTANCE.runJobforCollection(createdCollection, apiConfig, authHeader);
                     }
                 }, 0, TimeUnit.SECONDS);
