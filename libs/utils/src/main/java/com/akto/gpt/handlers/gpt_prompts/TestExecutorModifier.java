@@ -117,6 +117,8 @@ public class TestExecutorModifier extends PromptHandler {
                     JSONArray arr = (JSONArray) valueObj;
                     if (arr.length() == 0) continue;
                     resp.put(key, arr);
+                } else if (valueObj instanceof Boolean) {
+                    resp.put(key, Boolean.valueOf(String.valueOf(valueObj)));
                 }
             }
         } catch (Exception e) {

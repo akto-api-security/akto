@@ -144,6 +144,9 @@ public abstract class PromptHandler {
                             logger.error("Error merging JSONArrays for key: " + key + ", value: " + newValue, e);
                         }
                     }
+                } else if (existingValue instanceof Boolean && newValue instanceof Boolean) {
+                    boolean existingBool = Boolean.parseBoolean(String.valueOf(existingValue));
+                    aggregated.put(key, existingBool || Boolean.parseBoolean(String.valueOf(newValue)));
                 } else {
                     aggregated.put(key, newValue);
                 }
