@@ -33,12 +33,13 @@ import { SelectSource } from "./SelectSource"
 import InlineEditableText from "../../../components/shared/InlineEditableText"
 import ApiIssuesTab from "./ApiIssuesTab"
 import IssuesApi from "../../issues/api"
+import { getDashboardCategory, mapLabel } from "../../../../main/labelHelper"
 
 const headings = [
     {
         text: "Endpoint",
         value: "endpointComp",
-        title: "Api endpoints",
+        title: `${mapLabel("API endpoints", getDashboardCategory())}`,
         textValue: "endpoint",
         sortActive: true
     },

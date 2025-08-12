@@ -327,7 +327,7 @@ export default function LeftNav() {
                                 leftNavSelected === "dashboard_threat_activity",
                         },
                         {
-                            label: "APIs Under Threat",
+                            label: `${mapLabel("APIs", dashboardCategory)} Under Threat`,
                             onClick: () => {
                                 navigate("/dashboard/protection/threat-api");
                                 handleSelect("dashboard_threat_api");
@@ -348,7 +348,7 @@ export default function LeftNav() {
                         },
                     ],
                 }] : []),
-                ...(window?.STIGG_FEATURE_WISE_ALLOWED?.AI_AGENTS?.isGranted ? [{
+                ...(window?.STIGG_FEATURE_WISE_ALLOWED?.AI_AGENTS?.isGranted && dashboardCategory!=="MCP Security" ? [{
                 label: (
                     <Text variant="bodyMd" fontWeight="medium">
                         AI Agents
@@ -366,21 +366,19 @@ export default function LeftNav() {
             }] : []),
         ]
 
-        if (dashboardCategory === "API Security") {
-            const exists = items.find(item => item.key === "quick_start")
-            if (!exists) {
-                items.splice(1, 0, {
-                    label: "Quick Start",
-                    icon: AppsFilledMajor,
-                    onClick: () => {
-                        handleSelect("dashboard_quick_start")
-                        navigate("/dashboard/quick-start")
-                        setActive("normal")
-                    },
-                    selected: leftNavSelected === "dashboard_quick_start",
-                    key: "quick_start",
-                })
-            }
+        const exists = items.find(item => item.key === "quick_start")
+        if (!exists) {
+            items.splice(1, 0, {
+                label: "Quick Start",
+                icon: AppsFilledMajor,
+                onClick: () => {
+                    handleSelect("dashboard_quick_start")
+                    navigate("/dashboard/quick-start")
+                    setActive("normal")
+                },
+                selected: leftNavSelected === "dashboard_quick_start",
+                key: "quick_start",
+            })
         }
 
         return items

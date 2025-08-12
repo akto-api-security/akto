@@ -18,6 +18,7 @@ import InfoCard from "../../dashboard/new_components/InfoCard"
 import ChartypeComponent from "../../testing/TestRunsPage/ChartypeComponent"
 import BarGraph from "../../../components/charts/BarGraph"
 import SpinnerCentered from "../../../components/progress/SpinnerCentered"
+import { getDashboardCategory, mapLabel } from "../../../../main/labelHelper"
 
 const headers = [
     {
@@ -48,13 +49,13 @@ const headers = [
         showFilter: true,
     },
     {
-        title: "API response",
+        title: mapLabel("API response", getDashboardCategory()),
         text: "API response",
         value: "response",
         sortActive: true,
     },
     {
-        title: "API request",
+        title: mapLabel("API request", getDashboardCategory()),
         text: "API request",
         value: "request",
         sortActive: true
@@ -273,7 +274,7 @@ function AllSensitiveData() {
 
     const summaryInfoData = [
         {
-            title: 'APIs Affected',
+            title: mapLabel("APIs Affected", getDashboardCategory()),
             data: transform.formatNumberWithCommas(summaryInfo.totalAPIs),
             variant: 'heading2xl',
             color: "critical"
@@ -325,8 +326,8 @@ function AllSensitiveData() {
     const graphComponents = (
         <HorizontalGrid key={"graphs"} gap={"5"} columns={2}>
             <InfoCard
-                title={"APIs by Sensitive data severity"}
-                titleToolTip={"Number of APIs per each category"}
+                title={`${mapLabel("APIs", getDashboardCategory())} by Sensitive data severity`}
+                titleToolTip={`Number of ${mapLabel("APIs", getDashboardCategory())} per each category`}
                 component={
                     <BarGraph
                         data={severityCountMap}
@@ -338,7 +339,7 @@ function AllSensitiveData() {
                             },
                         }}
                         showYAxis={true}
-                        yAxisTitle="Number of APIs"
+                        yAxisTitle={`Number of ${mapLabel("APIs", getDashboardCategory())}`}
                         barWidth={100}
                         barGap={12}
                         showGridLines={true}
