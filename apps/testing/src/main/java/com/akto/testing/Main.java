@@ -190,7 +190,7 @@ public class Main {
 
         return ret;
     }
-    private static final int LAST_TEST_RUN_EXECUTION_DELTA = 5 * 60;
+    private static final int LAST_TEST_RUN_EXECUTION_DELTA = 10 * 60;
     private static final int DEFAULT_DELTA_IGNORE_TIME = 2*60*60;
     private static final int MAX_RETRIES_FOR_FAILED_SUMMARIES = 3;
 
