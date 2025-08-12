@@ -225,6 +225,7 @@ public class ReportAction extends UserAction {
 
             TestingEndpoints testingEndpoints = testingRun.getTestingEndpoints();
             Set<String> uniqueHosts = new HashSet<>();
+            Set<Integer> uniqueApiCollectionIds = new HashSet<>(); 
 
             if (testingEndpoints.getType().equals(TestingEndpoints.Type.COLLECTION_WISE)) {
                 // Handle collection-wise testing endpoints
@@ -249,6 +250,7 @@ public class ReportAction extends UserAction {
                         if (hostname != null && !hostname.isEmpty()) {
                             uniqueHosts.add(hostname);
                         }
+                        uniqueApiCollectionIds.add(apiInfoKey.getApiCollectionId());
                     }
                 }
             } else if (testingEndpoints.getType() == TestingEndpoints.Type.CUSTOM) {
@@ -262,6 +264,17 @@ public class ReportAction extends UserAction {
                         if (hostname != null && !hostname.isEmpty()) {
                             uniqueHosts.add(hostname);
                         }
+                        uniqueApiCollectionIds.add(apiInfoKey.getApiCollectionId());
+                    }
+                }
+            }
+
+            // Get unique hosts from API collections for type: API_GROUP
+            if (uniqueApiCollectionIds.size() > 0) {
+                List<ApiCollection> apiCollections = ApiCollectionsDao.instance.findAll(Filters.in(Constants.ID, uniqueApiCollectionIds), Projections.include(ApiCollection.HOST_NAME));
+                for (ApiCollection apiCollection : apiCollections) {
+                    if (apiCollection.getHostName() != null && !apiCollection.getHostName().isEmpty()) {
+                        uniqueHosts.add(apiCollection.getHostName());
                     }
                 }
             }
