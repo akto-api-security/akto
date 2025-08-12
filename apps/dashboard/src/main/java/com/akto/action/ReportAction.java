@@ -12,7 +12,6 @@ import javax.servlet.http.HttpSession;
 
 import com.akto.dao.testing.sources.TestReportsDao;
 import com.akto.dto.testing.sources.TestReports;
-import com.mongodb.ConnectionString;
 import com.mongodb.MongoCommandException;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
@@ -26,7 +25,6 @@ import org.bson.types.ObjectId;
 import org.json.JSONObject;
 
 import com.akto.ApiRequest;
-import com.akto.DaoInit;
 import com.akto.dao.context.Context;
 import com.akto.dto.User;
 import com.akto.log.LoggerMaker;
@@ -43,7 +41,6 @@ import com.akto.dao.ApiCollectionsDao;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.ApiInfo;
 import com.akto.util.Constants;
-import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 
 
 public class ReportAction extends UserAction {
@@ -212,16 +209,6 @@ public class ReportAction extends UserAction {
 
     @Getter
     private String uniqueHostsTestedForRun;
-
-    public static void main(String[] args) {
-        Context.accountId.set(1000000);
-        DaoInit.init(new ConnectionString("mongodb://localhost:27017"));
-        Context.contextSource.set(CONTEXT_SOURCE.API);
-
-        ReportAction reportAction = new ReportAction();
-        reportAction.setTestingRunId("678621dc639a6a53d1772fad");
-        reportAction.getUniqueHostsTested();
-    }
 
     public String getUniqueHostsTested() {
         if (testingRunId == null || testingRunId.isEmpty()) {
