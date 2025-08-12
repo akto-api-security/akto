@@ -219,7 +219,8 @@ public class ReportAction extends UserAction {
             // Fetch the testing run by ID
             TestingRun testingRun = TestingRunDao.instance.findOne(Filters.eq("_id", new ObjectId(testingRunId)));
             if (testingRun == null || testingRun.getTestingEndpoints() == null) {
-                return "";
+                this.uniqueHostsTestedForRun = "";
+                return SUCCESS.toUpperCase();
             }
 
             TestingEndpoints testingEndpoints = testingRun.getTestingEndpoints();
@@ -238,7 +239,8 @@ public class ReportAction extends UserAction {
                 
                 if (apiCollection != null && apiCollection.getHostName() != null && !apiCollection.getHostName().isEmpty()) {
                     // If collection has hostname, return it
-                    return apiCollection.getHostName();
+                    this.uniqueHostsTestedForRun = apiCollection.getHostName();
+                    return SUCCESS.toUpperCase();
                 } else {
                     // If no hostname, get unique hosts from API info keys
                     List<ApiInfo.ApiInfoKey> apiInfoKeys = testingEndpoints.returnApis();
