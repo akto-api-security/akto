@@ -271,7 +271,7 @@ public class ReportAction extends UserAction {
 
             // Get unique hosts from API collections for type: API_GROUP
             if (uniqueApiCollectionIds.size() > 0) {
-                List<ApiCollection> apiCollections = ApiCollectionsDao.instance.findAll(Filters.in(Constants.ID, uniqueApiCollectionIds), Projections.include(ApiCollection.HOST_NAME));
+                List<ApiCollection> apiCollections = ApiCollectionsDao.instance.findAll(Filters.and(Filters.in(Constants.ID, uniqueApiCollectionIds), Filters.ne(ApiCollection._DEACTIVATED, true)), Projections.include(ApiCollection.HOST_NAME));
                 for (ApiCollection apiCollection : apiCollections) {
                     if (apiCollection.getHostName() != null && !apiCollection.getHostName().isEmpty()) {
                         uniqueHosts.add(apiCollection.getHostName());
