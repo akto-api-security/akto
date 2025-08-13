@@ -25,6 +25,7 @@ import ApiIssuesTab from "./ApiIssuesTab";
 
 import Highcharts from 'highcharts';
 import HighchartsMore from 'highcharts/highcharts-more';
+import { getDashboardCategory, mapLabel } from "../../../../main/labelHelper";
 
 HighchartsMore(Highcharts);
 
@@ -761,7 +762,7 @@ function ApiDetails(props) {
     return (
         <div>
             <FlyLayout
-                title="API details"
+                title={`${mapLabel("API details", getDashboardCategory())}`}
                 show={showDetails}
                 setShow={setShowDetails}
                 components={components}

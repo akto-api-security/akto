@@ -926,6 +926,17 @@ export default {
             method: 'post',
             data: {}
         })
+    },
+
+    async getApiSequences(apiCollectionId) {
+        const resp = await request({
+            url: '/api/getApiSequences',
+            method: 'post',
+            data: {
+                apiCollectionId: apiCollectionId
+            }
+        })
+        return resp
     }
 
 }

@@ -158,15 +158,17 @@ function TestsTablePage() {
             let metaDataObj = {
                 subCategories: [],
             }
-            if ((localSubCategoryMap && Object.keys(localSubCategoryMap).length > 0)) {
-                metaDataObj = {
-                    subCategories: Object.values(localSubCategoryMap),
-                }
-                
-            } else { 
-                metaDataObj = await transform.getAllSubcategoriesData(false, "testEditor")
-            }
+            metaDataObj = await transform.getAllSubcategoriesData(false, "testEditor")
             if (!metaDataObj?.subCategories?.length) return;
+    
+            try {
+                let categories = metaDataObj?.categories || []
+                let categoriesName = categories.map(cat => cat?.name);
+                metaDataObj.subCategories = metaDataObj.subCategories.filter(
+                    (subCategory) => categoriesName.includes(subCategory.superCategory.name)
+                )
+            } catch (error) {
+            }
 
             const obj = convertFunc.mapCategoryToSubcategory(metaDataObj.subCategories);
             const [allData, aktoData, customData, deactivatedData] = mapTestData(obj);
