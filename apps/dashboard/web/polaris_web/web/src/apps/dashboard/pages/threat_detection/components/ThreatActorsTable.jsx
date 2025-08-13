@@ -281,6 +281,16 @@ function ThreatActorTable({ data, currDateRange, handleRowClick }) {
         value: "actorType",
         title: "Actor Type",
       });
+      
+      // Update Latest API header text for MCP Security
+      const latestApiIndex = baseHeaders.findIndex(header => header.value === "latestApi");
+      if (latestApiIndex !== -1) {
+        baseHeaders[latestApiIndex] = {
+          ...baseHeaders[latestApiIndex],
+          text: "Latest Tool Call",
+          title: "Latest Tool Call"
+        };
+      }
     }
 
     return baseHeaders;
