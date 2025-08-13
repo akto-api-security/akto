@@ -102,10 +102,6 @@ public class IssuesAction extends UserAction {
     @Getter
     private List<ApiInfo> buaCategoryApiInfo = new ArrayList<>();
 
-    public boolean isShowTestSubCategories() {
-        return showTestSubCategories;
-    }
-
     public boolean isShowApiInfo() {
         return showApiInfo;
     }

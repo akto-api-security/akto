@@ -4,7 +4,6 @@ import { CellType } from "@/apps/dashboard/components/tables/rows/GithubRow";
 import { Box, HorizontalStack } from "@shopify/polaris";
 import TooltipText from "@/apps/dashboard/components/shared/TooltipText";
 import GetPrettifyEndpoint from "@/apps/dashboard/pages/observe/GetPrettifyEndpoint";
-import testingTransform from "@/apps/dashboard/pages/testing/transform";
 import LocalStore from "@/apps/main/LocalStorageStore";
 
 function IssuesBySubCategoryFlyout({ urlsByIssues }) {
@@ -13,10 +12,9 @@ function IssuesBySubCategoryFlyout({ urlsByIssues }) {
 
   useEffect(() => {
     let isMounted = true;
-    (async () => {
+    (() => {
       setLoading(true);
       try {
-        await testingTransform.setTestMetadata();
         const testSubCategories = urlsByIssues?.testSubCategories || [];
 
         const processed = testSubCategories.map((entry, idx) => {
