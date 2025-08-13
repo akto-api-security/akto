@@ -38,6 +38,11 @@
             <version>4.2.1</version>
         </dependency>
         <dependency>
+            <groupId>com.google.api-client</groupId>
+            <artifactId>google-api-client</artifactId>
+            <version>1.23.0</version>
+        </dependency>
+        <dependency>
             <groupId>com.google.apis</groupId>
             <artifactId>google-api-services-sheets</artifactId>
             <version>v4-rev493-1.23.0</version>
@@ -67,6 +72,12 @@
             <artifactId>javax.servlet-api</artifactId>
             <version>4.0.1</version>
             <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.httpcomponents</groupId>
+            <artifactId>httpclient</artifactId>
+            <version>4.5.13</version>
+            <scope>compile</scope>
         </dependency>
         <dependency>
             <groupId>de.sstoehr</groupId>
