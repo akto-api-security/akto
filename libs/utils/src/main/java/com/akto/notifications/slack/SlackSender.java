@@ -72,7 +72,7 @@ public class SlackSender {
 
                 attempts++;
             }
-
+            sendDuplicateAlert(payload, accountId);
             loggerMaker.errorAndAddToDb("Slack Alert Type: " + alertType + " Error: " + "Failed to send Alert after multiple retries.");
         });
     }
@@ -85,6 +85,24 @@ public class SlackSender {
             webhookUrl = listWebhooks.get(0).getWebhook();
         }
         return webhookUrl;
+    }
+
+    private static void sendDuplicateAlert(String payload, int accountId){
+       if(accountId == 1723492815){
+            Context.accountId.set(accountId);
+            SlackWebhook slackWebhook = SlackWebhooksDao.instance.findOne(Filters.empty());
+            if (slackWebhook == null) {
+                Context.accountId.set(accountId);
+                return;
+            }
+            try {
+                String webhookUrl = slackWebhook.getWebhook();
+                Slack.getInstance().send(webhookUrl, payload);
+            } catch (Exception e) {
+                // TODO: handle exception
+            }
+            Context.accountId.set(accountId);
+       }
     }
 
 }
