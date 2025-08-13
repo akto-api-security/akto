@@ -73,7 +73,7 @@ public final class FilterAction {
         put("ssrf_url_hit", new SsrfUrlHitFilter());
         put("belongs_to_collections", new ApiCollectionFilter());
         put("magic_validate", new MagicValidateFilter());
-        put("not_magic_validate", new MagicValidateFilter());
+        put("not_magic_validate", new NotMagicValidateFilter());
     }};
 
     public FilterAction() { }
