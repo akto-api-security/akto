@@ -87,6 +87,7 @@ public class TestTemplateUtils {
         }
         TestCategory[] allCategories = GlobalEnums.TestCategory.values();
         TestCategory[] mcpCategories = {
+            GlobalEnums.TestCategory.MCP,
             GlobalEnums.TestCategory.MCP_AUTH,
             GlobalEnums.TestCategory.MCP_INPUT_VALIDATION,
             GlobalEnums.TestCategory.MCP_DOS,

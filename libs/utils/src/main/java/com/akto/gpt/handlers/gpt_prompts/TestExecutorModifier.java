@@ -117,6 +117,8 @@ public class TestExecutorModifier extends PromptHandler {
                         continue;
                     }
                     resp.put(key, arr);
+                } else if (valueObj instanceof Boolean) {
+                    resp.put(key, Boolean.valueOf(String.valueOf(valueObj)));
                 }
             }
         } catch (Exception e) {
