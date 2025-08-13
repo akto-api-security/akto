@@ -57,6 +57,7 @@ export const labelMap = {
     "API response": "Tool response",
     "API request": "Tool request",
     "API Risk Score": "MCP Risk Score",
+    "Threat Policy": "Guardrails Policy",
 
   },
   "Gen AI": {

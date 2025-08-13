@@ -8,6 +8,8 @@ import func from "../../../../../util/func";
 import { Badge } from "@shopify/polaris";
 import dayjs from "dayjs";
 import SessionStore from "../../../../main/SessionStore";
+import { isMCPSecurityCategory } from "../../../../main/labelHelper";
+
 const resourceName = {
   singular: "sample",
   plural: "samples",
@@ -133,7 +135,12 @@ function SusDataTable({ currDateRange, rowClicked }) {
         id: x.id,
         actorComp: x.actor?.length > 50 ? `${x.actor.slice(0, 50)}...` : x.actor ,
         endpointComp: (
-          <GetPrettifyEndpoint maxWidth="300px" method={x.method} url={x.url} isNew={false} />
+          <GetPrettifyEndpoint 
+            maxWidth="300px" 
+            {...(!isMCPSecurityCategory() && { method: x.method })}
+            url={x.url} 
+            isNew={false} 
+          />
         ),
         apiCollectionName: collectionsMap[x.apiCollectionId] || "-",
         discoveredTs: dayjs(x.timestamp*1000).format("DD-MM-YYYY HH:mm:ss"),

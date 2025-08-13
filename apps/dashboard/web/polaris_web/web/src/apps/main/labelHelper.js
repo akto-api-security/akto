@@ -19,3 +19,7 @@ export function getDashboardCategory() {
     return "API Security"
   }
 }
+
+export function isMCPSecurityCategory() {
+  return getDashboardCategory() === 'MCP Security';
+}

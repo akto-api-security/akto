@@ -337,7 +337,7 @@ export default function LeftNav() {
                                 leftNavSelected === "dashboard_threat_api",
                         },
                         {
-                            label: "Threat Policy",
+                            label: `${mapLabel("Threat Policy", dashboardCategory)}`,
                             onClick: () => {
                                 navigate("/dashboard/protection/threat-policy");
                                 handleSelect("dashboard_threat_policy");
