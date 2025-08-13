@@ -3,29 +3,15 @@ import ReactFlow, {
   Background,
   MarkerType,
   getBezierPath,
+  Handle,
+  Position
 } from 'react-flow-renderer';
 import 'react-flow-renderer/dist/style.css';
 import api from '../api';
 import { Card, Text, VerticalStack, Box, HorizontalStack } from '@shopify/polaris';
 import GetPrettifyEndpoint from '../GetPrettifyEndpoint';
 
-const initialNodes = [
-  {
-    id: '1',
-    data: { label: 'Start' },
-    position: { x: 250, y: 25 },
-    style: {
-      background: '#5c6ac4',
-      color: 'white',
-      border: 'none',
-      borderRadius: '8px',
-      padding: '10px 15px',
-      fontSize: '14px',
-      fontWeight: '500',
-    },
-  },
-];
-
+const initialNodes = [];
 const initialEdges = [];
 
 // Custom edge component with arrows
@@ -62,8 +48,7 @@ const SequencesEdge = ({ id, sourceX, sourceY, targetX, targetY, sourcePosition,
 
 // Custom node component with colored method names
 const SequencesNode = ({ data }) => {
-  const { method, url, methodColor } = data;
-  
+  const { method, url } = data;
   return (
     <div style={{ 
       background: '#ffffff', 
@@ -73,19 +58,15 @@ const SequencesNode = ({ data }) => {
       minWidth: '200px',
       boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
     }}>
-      <div style={{ 
-        display: 'flex', 
-        flexDirection: 'column', 
-        gap: '4px' 
-      }}>
-        <GetPrettifyEndpoint 
-          method={method} 
-          url={url} 
-          isNew={false}
-          maxWidth="180px"
-          methodBoxWidth="54px"
-        />
-      </div>
+      <Handle type="target" position={Position.Top} id="t" style={{ background: '#555' }} />
+      <GetPrettifyEndpoint
+        method={method}
+        url={url}
+        isNew={false}
+        maxWidth="180px"
+        methodBoxWidth="54px"
+      />
+      <Handle type="source" position={Position.Bottom} id="b" style={{ background: '#555' }} />
     </div>
   );
 };
@@ -103,35 +84,9 @@ function SequencesFlow({ apiCollectionId }) {
     if (apiCollectionId) {
       fetchApiSequences();
     } else {
-      // Test with simple mock data for development
-      console.log('Testing with simple mock data');
-      const testNodes = [
-        {
-          id: '1',
-          type: 'sequencesNode',
-          data: { method: 'GET', url: '/test1' },
-          position: { x: 100, y: 100 }
-        },
-        {
-          id: '2', 
-          type: 'sequencesNode',
-          data: { method: 'POST', url: '/test2' },
-          position: { x: 400, y: 100 }
-        }
-      ];
-      
-      const testEdges = [
-        {
-          id: 'e1-2',
-          source: '1',
-          target: '2',
-          type: 'sequencesEdge',
-          data: { label: 'Test Edge' }
-        }
-      ];
-      
-      setNodes(testNodes);
-      setEdges(testEdges);
+      setNodes([]);
+      setEdges([]);
+      setLoading(false);
     }
   }, [apiCollectionId]);
 
@@ -140,33 +95,13 @@ function SequencesFlow({ apiCollectionId }) {
       setLoading(true);
       const response = await api.getApiSequences(apiCollectionId);
       console.log('API Response:', response);
-      
-      if (response && response.apiSequences) {
+      if (response && Array.isArray(response.apiSequences) && response.apiSequences.length > 0) {
         setApiSequences(response.apiSequences);
         renderSequencesGraph(response.apiSequences);
       } else {
-        // Test with mock data if no real data
-        console.log('No API sequences found, testing with mock data');
-        const mockSequences = [
-          {
-            paths: [
-              "111111999 https://api.example.com/login GET",
-              "111111999 https://api.example.com/auth POST"
-            ],
-            transitionCount: 5,
-            probability: 0.8
-          },
-          {
-            paths: [
-              "111111999 https://api.example.com/auth POST",
-              "111111999 https://api.example.com/dashboard GET"
-            ],
-            transitionCount: 3,
-            probability: 0.6
-          }
-        ];
-        setApiSequences(mockSequences);
-        renderSequencesGraph(mockSequences);
+        setApiSequences([]);
+        setNodes([]);
+        setEdges([]);
       }
     } catch (error) {
       console.error('Error fetching API sequences:', error);
@@ -176,109 +111,49 @@ function SequencesFlow({ apiCollectionId }) {
   };
 
   const renderSequencesGraph = (sequences) => {
-    console.log('renderSequencesGraph called with:', sequences);
-    
-    if (!sequences || sequences.length === 0) {
-      console.log('No sequences found, using initial nodes/edges');
-      setNodes(initialNodes);
-      setEdges(initialEdges);
-      return;
-    }
-
     const newNodes = [];
     const newEdges = [];
     const nodeMap = new Map();
     let nodeId = 1;
+    const createdEdges = new Set();
 
-    // Process all sequences and create nodes
-    sequences.forEach((sequence, sequenceIndex) => {
-      console.log(`Processing sequence ${sequenceIndex}:`, sequence);
-      
-      if (sequence.paths && sequence.paths.length > 0) {
-        // Create nodes for each path in the sequence
-        sequence.paths.forEach((path, pathIndex) => {
-          const nodeKey = path;
-          
-          if (!nodeMap.has(nodeKey)) {
-            // Extract method and URL from path structure "apiCollectionId url method"
-            const pathParts = path.split(' ');
-            const method = pathParts[pathParts.length - 1]; // Last part is method
-            const url = pathParts.slice(1, -1).join(' '); // Middle parts are URL
-            
-            const node = {
-              id: nodeId.toString(),
-              type: 'sequencesNode',
-              data: { 
-                method: method,
-                url: url,
-                transitionCount: sequence.transitionCount,
-                probability: sequence.probability
-              },
-              position: { x: sequenceIndex * 300, y: pathIndex * 200 }, // Simple positioning
-            };
-            newNodes.push(node);
-            nodeMap.set(nodeKey, nodeId.toString());
-            console.log(`Created node ${nodeId} for path:`, path, '->', node);
-            nodeId++;
-          } else {
-            console.log(`Node already exists for path:`, path, '->', nodeMap.get(nodeKey));
-          }
-        });
-      }
-    });
-
-    // Create edges between consecutive paths in each sequence
-    console.log('NodeMap:', nodeMap);
-    console.log('All nodes created:', newNodes.map(n => ({ id: n.id, data: n.data })));
-    
-    const createdEdges = new Set(); // Track created edges to avoid duplicates
-    
-    sequences.forEach((sequence, sequenceIndex) => {
-      if (sequence.paths && sequence.paths.length > 1) {
-        // Create edges between consecutive paths in the sequence
-        for (let i = 0; i < sequence.paths.length - 1; i++) {
-          const sourcePath = sequence.paths[i];
-          const targetPath = sequence.paths[i + 1];
-          const sourceNodeId = nodeMap.get(sourcePath);
-          const targetNodeId = nodeMap.get(targetPath);
-          
-          console.log(`Edge ${i}: ${sourcePath} -> ${targetPath}`);
-          console.log(`Node IDs: ${sourceNodeId} -> ${targetNodeId}`);
-          
-          // Verify that both nodes exist in the nodes array
-          const sourceNodeExists = newNodes.find(n => n.id === sourceNodeId);
-          const targetNodeExists = newNodes.find(n => n.id === targetNodeId);
-          
-          if (sourceNodeExists && targetNodeExists) {
-            const edgeId = `e${sourceNodeId}-${targetNodeId}`;
-            
-            // Check if this edge already exists
-            if (!createdEdges.has(edgeId)) {
-              const edge = {
-                id: edgeId,
-                source: sourceNodeId,
-                target: targetNodeId,
-                type: 'sequencesEdge',
-                animated: false,
-                data: {
-                  label: `${sequence.transitionCount} (${(sequence.probability * 100).toFixed(1)}%)`
-                }
-              };
-              newEdges.push(edge);
-              createdEdges.add(edgeId);
-              console.log('Created edge:', edge);
-            } else {
-              console.log('Edge already exists:', edgeId);
-            }
-          } else {
-            console.log('Missing nodes for edge:', {
-              sourcePath,
-              targetPath,
-              sourceNodeId,
-              targetNodeId,
-              sourceNodeExists: !!sourceNodeExists,
-              targetNodeExists: !!targetNodeExists
+    sequences.forEach((sequence, seqIndex) => {
+      sequence.paths.forEach((path, pathIndex) => {
+        if (!nodeMap.has(path)) {
+          const parts = path.trim().split(' ');
+          const method = parts[parts.length - 1];
+          const url = parts.slice(1, -1).join(' ');
+          nodeMap.set(path, nodeId.toString());
+          newNodes.push({
+            id: nodeId.toString(),
+            type: 'sequencesNode',
+            data: { method, url },
+            position: { x: seqIndex * 300, y: pathIndex * 200 }
+          });
+          nodeId++;
+        }
+      });
+      for (let i = 0; i < sequence.paths.length - 1; i++) {
+        const sourcePath = sequence.paths[i];
+        const targetPath = sequence.paths[i + 1];
+        const sourceId = nodeMap.get(sourcePath);
+        const targetId = nodeMap.get(targetPath);
+        if (sourceId && targetId) {
+          const edgeId = `e${sourceId}-${targetId}`;
+          if (!createdEdges.has(edgeId)) {
+            newEdges.push({
+              id: edgeId,
+              source: sourceId,
+              target: targetId,
+              sourceHandle: 'b',
+              targetHandle: 't',
+              type: 'sequencesEdge',
+              animated: false,
+              data: {
+                label: `${sequence.transitionCount} (${(sequence.probability * 100).toFixed(1)}%)`
+              }
             });
+            createdEdges.add(edgeId);
           }
         }
       }
