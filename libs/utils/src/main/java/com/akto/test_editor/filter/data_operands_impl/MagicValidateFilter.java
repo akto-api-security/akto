@@ -10,7 +10,6 @@ public class MagicValidateFilter extends DataOperandsImpl {
 
     @Override
     public Boolean isValid(DataOperandFilterRequest dataOperandFilterRequest) {
-        // MagicCheckFilter does not perform any validation, always returns true
         BasicDBObject queryData = new BasicDBObject();
         queryData.put(TestExecutorModifier._REQUEST, dataOperandFilterRequest.getData());
 
