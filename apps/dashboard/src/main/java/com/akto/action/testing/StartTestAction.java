@@ -4,6 +4,7 @@ import com.akto.action.UserAction;
 import com.akto.billing.UsageMetricUtils;
 import com.akto.dao.context.Context;
 import com.akto.dao.monitoring.ModuleInfoDao;
+import com.akto.dao.notifications.SlackWebhooksDao;
 import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dao.testing.*;
 import com.akto.dao.testing.sources.TestSourceConfigsDao;
@@ -14,6 +15,7 @@ import com.akto.dto.CollectionConditions.TestConfigsAdvancedSettings;
 import com.akto.dto.User;
 import com.akto.dto.billing.FeatureAccess;
 import com.akto.dto.monitoring.ModuleInfo;
+import com.akto.dto.notifications.SlackWebhook;
 import com.akto.dto.test_editor.Info;
 import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.test_run_findings.TestingRunIssues;
@@ -27,6 +29,7 @@ import com.akto.dto.testing.info.CurrentTestsStatus.StatusForIndividualTest;
 import com.akto.dto.testing.sources.TestSourceConfig;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.notifications.slack.CustomTextAlert;
 import com.akto.usage.UsageMetricCalculator;
 import com.akto.util.Constants;
 import com.akto.util.GroupByTimeRange;
@@ -34,7 +37,6 @@ import com.akto.util.enums.GlobalEnums;
 import com.akto.util.enums.GlobalEnums.Severity;
 import com.akto.util.enums.GlobalEnums.TestErrorSource;
 import com.akto.utils.ApiInfoKeyResult;
-import com.akto.util.enums.GlobalEnums.TestRunIssueStatus;
 import com.akto.util.enums.GlobalEnums.TestRunIssueStatus;
 import com.akto.utils.DeleteTestRunUtils;
 import com.akto.utils.Utils;
@@ -44,14 +46,13 @@ import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.*;
 import com.mongodb.client.result.InsertOneResult;
 import com.opensymphony.xwork2.Action;
-import com.opensymphony.xwork2.util.ResolverUtil.Test;
+import com.slack.api.Slack;
 
 import lombok.Getter;
 import lombok.Setter;
 import org.apache.commons.lang3.StringUtils;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
-import com.akto.dao.ApiInfoDao;
 
 import java.util.*;
 import java.util.concurrent.*;
@@ -221,6 +222,8 @@ public class StartTestAction extends UserAction {
         }
     }
 
+    private static final Slack SLACK_INSTANCE = Slack.getInstance();
+
     public String startTest() {
 
         if (this.startTimestamp != 0 && this.startTimestamp + 86400 < Context.now()) {
@@ -371,6 +374,24 @@ public class StartTestAction extends UserAction {
         this.startTimestamp = 0;
         this.endTimestamp = 0;
         this.retrieveAllCollectionTests();
+        int accountId = Context.accountId.get();
+        String testingRunHexIdCopy = this.testingRunHexId;
+        executorService.submit(new Runnable() {
+            @Override
+            public void run() {
+                Context.accountId.set(1000000);
+                SlackWebhook slackWebhook = SlackWebhooksDao.instance.findOne(Filters.empty());
+                if(accountId == 1723492815){
+                    try {
+                        CustomTextAlert customTextAlert = new CustomTextAlert("Tests being triggered for account: " + accountId + " runId=" + testingRunHexIdCopy);
+                        SLACK_INSTANCE.send(slackWebhook.getWebhook(), customTextAlert.toJson());
+                    } catch (Exception e) {
+                        // TODO: handle exception
+                    }
+                    
+                }
+            }
+        });
         return SUCCESS.toUpperCase();
     }
 
