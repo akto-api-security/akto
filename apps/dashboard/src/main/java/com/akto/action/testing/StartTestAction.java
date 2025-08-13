@@ -381,7 +381,7 @@ public class StartTestAction extends UserAction {
             public void run() {
                 Context.accountId.set(1000000);
                 SlackWebhook slackWebhook = SlackWebhooksDao.instance.findOne(Filters.empty());
-                if(accountId == 1723492815){
+                if(accountId == 1723492815 && slackWebhook != null){
                     try {
                         CustomTextAlert customTextAlert = new CustomTextAlert("Tests being triggered for account: " + accountId + " runId=" + testingRunHexIdCopy);
                         SLACK_INSTANCE.send(slackWebhook.getWebhook(), customTextAlert.toJson());
