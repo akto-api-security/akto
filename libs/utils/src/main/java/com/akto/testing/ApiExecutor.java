@@ -736,16 +736,8 @@ public class ApiExecutor {
             request.getHeaders().remove("x-akto-sse-endpoint");
         }
         
-        // Add headers from the original request to the SSE request
-        Headers.Builder headersBuilder = new Headers.Builder();
-        for (Map.Entry<String, List<String>> entry : request.getHeaders().entrySet()) {
-            for (String value : entry.getValue()) {
-                headersBuilder.add(entry.getKey(), value);
-            }
-        }
-        Headers headers = headersBuilder.build();
-
-        // Open SSE session with dynamic endpoint
+        // Open SSE session with dynamic endpoint and request headers
+        Headers headers = request.toOkHttpHeaders();
         SseSession session = openSseSession(host, sseEndpoint, headers, debug);
 
         // Add sessionId as query param to actual request
