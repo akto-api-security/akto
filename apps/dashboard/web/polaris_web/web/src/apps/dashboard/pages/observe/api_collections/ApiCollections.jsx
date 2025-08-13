@@ -527,7 +527,7 @@ function ApiCollections(props) {
         tmp.groups = allGroupsForTmp;
         tmp.custom = tmp.all.filter(x => !tmp.hostname.includes(x) && !x.deactivated && !tmp.groups.includes(x));
         tmp.deactivated = deactivatedCollectionsCopy
-        tmp.untracked_apis = untrackedCollections
+        tmp.untracked = untrackedCollections
         
         setData(tmp);
         } catch (error) {
