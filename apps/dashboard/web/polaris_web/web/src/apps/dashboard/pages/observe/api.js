@@ -29,12 +29,36 @@ export default {
         return request({
             url: '/api/fetchRecentParams',
             method: 'post',
-            data: {
-                startTimestamp,
-                endTimestamp
-            }
+            data: { startTimestamp, endTimestamp }
         })
     },
+    async fetchAuditData(page, pageSize) {
+        const resp = await request({
+            url: '/api/fetchAuditData',
+            method: 'post',
+            data: { page, pageSize }
+        });
+        return resp;
+    },
+
+    async insertAuditData(markedBy, description) {
+        const resp = await request({
+            url: '/api/insertAuditData',
+            method: 'post',
+            data: { markedBy, description }
+        });
+        return resp;
+    },
+
+    async updateAuditData(_id, markedBy, description) {
+            const resp = await request({
+                url: '/api/updateAuditData',
+                method: 'post',
+                data: { _id, markedBy, description }
+            });
+            return resp;
+        },
+
     async fetchDataTypeNames() {
         const resp = await request({
             url: '/api/fetchDataTypeNames',
