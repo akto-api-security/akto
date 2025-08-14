@@ -6,6 +6,7 @@ import GetPrettifyEndpoint from "../../observe/GetPrettifyEndpoint";
 import func from "../../../../../util/func";
 import PersistStore from "../../../../main/PersistStore";
 import SessionStore from "../../../../main/SessionStore";
+import { isMCPSecurityCategory } from "../../../../main/labelHelper";
 
 const resourceName = {
   singular: "api",
@@ -85,6 +86,23 @@ function ThreatApiTable({ currDateRange, rowClicked }) {
     ]
   }, []);
 
+  const getHeaders = () => {
+    const baseHeaders = [...headers];
+    
+    if (isMCPSecurityCategory()) {
+      const apiIndex = baseHeaders.findIndex(header => header.value === "api");
+      if (apiIndex !== -1) {
+        baseHeaders[apiIndex] = {
+          ...baseHeaders[apiIndex],
+          text: "Tool Name",
+          title: "Tool Name"
+        };
+      }
+    }
+
+    return baseHeaders;
+  };
+
   function disambiguateLabel(key, value) {
     return func.convertToDisambiguateLabelObj(value, null, 2);
   }
@@ -101,12 +119,16 @@ function ThreatApiTable({ currDateRange, rowClicked }) {
     let ret = res?.apis?.map((x) => {
       return {
         ...x,
-        id: `${x.method}-${x.api}`,
+        id:`${x.method}-${x.api}`,
         actorsCount: x.actorsCount,
         requestsCount: x.requestsCount,
         discoveredAt: func.prettifyEpoch(x.discoveredAt),
         api: (
-          <GetPrettifyEndpoint method={x.method} url={x.api} isNew={false} />
+          <GetPrettifyEndpoint 
+            {...(!isMCPSecurityCategory() && { method: x.method })}
+            url={x.api}
+            isNew={false}
+          />
         ),
       };
     });
@@ -142,7 +164,7 @@ function ThreatApiTable({ currDateRange, rowClicked }) {
       key={key}
       onRowClick={(data) => onRowClick(data)}
       pageLimit={50}
-      headers={headers}
+      headers={getHeaders()}
       resourceName={resourceName}
       sortOptions={sortOptions}
       disambiguateLabel={disambiguateLabel}
@@ -153,7 +175,7 @@ function ThreatApiTable({ currDateRange, rowClicked }) {
       hasRowActions={true}
       getActions={() => {}}
       hideQueryField={true}
-      headings={headers}
+      headings={getHeaders()}
       useNewRow={true}
       condensedHeight={true}
     />
