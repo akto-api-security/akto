@@ -17,6 +17,7 @@ import com.akto.dto.TrafficProducerLog;
 import com.akto.runtime.utils.Utils;
 import com.akto.util.HttpRequestResponseUtils;
 import com.akto.util.JSONUtils;
+import com.akto.utils.GzipUtils;
 import com.alibaba.fastjson2.JSON;
 import com.google.gson.Gson;
 
@@ -89,6 +90,11 @@ public class SampleParser {
         String payload = (String) json.get("responsePayload");
         payload = HttpRequestResponseUtils.rawToJsonString(payload, responseHeaders);
         payload = JSONUtils.parseIfJsonP(payload);
+        payload = decodeIfGzipEncoding(payload, responseHeaders);
+        /*
+         * TODO: handle for other encodings if needed, 
+         * Ref: https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Content-Encoding
+         */
         int time;
         try {
             time = Integer.parseInt(json.get("time").toString());
@@ -121,6 +127,39 @@ public class SampleParser {
 
         return httpResponseParams;
 
+    }
+
+    private static final String CONTENT_ENCODING_HEADER = "content-encoding";
+    private static final String _GZIP = "gzip";
+
+    private static List<String> getHeaderIgnoreCase(Map<String, List<String>> headers, String headerName) {
+        for (Map.Entry<String, List<String>> entry : headers.entrySet()) {
+            if (entry.getKey() != null && entry.getKey().equalsIgnoreCase(headerName)) {
+                return entry.getValue();
+            }
+        }
+        return null;
+    }
+
+    public static String decodeIfGzipEncoding(String payload, Map<String, List<String>> headers) {
+        try {
+            if (payload == null || payload.isEmpty())
+                return payload;
+            List<String> contentEncoding = getHeaderIgnoreCase(headers, CONTENT_ENCODING_HEADER);
+            if (contentEncoding != null) {
+                for (String encoding : contentEncoding) {
+                    if (_GZIP.equalsIgnoreCase(encoding)) {
+                        String unzippedPayload = GzipUtils.unzipString(payload);
+                        if (unzippedPayload != null) {
+                            return unzippedPayload;
+                        }
+                    }
+                }
+            }
+        } catch (Exception e) {
+            printL("Failed to decompress gzip payload: " + e.getMessage());
+        }
+        return payload;
     }
 
     public static TrafficProducerLog parseLogMessage(String message) throws Exception {
