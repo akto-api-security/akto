@@ -1,6 +1,8 @@
 package com.akto.mcp;
 
+import com.akto.dao.McpAuditInfoDao;
 import com.akto.dto.HttpResponseParams;
+import com.akto.dto.McpAuditInfo;
 import com.akto.jsonrpc.JsonRpcUtils;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
@@ -82,6 +84,15 @@ public final class McpRequestResponseUtils {
             case McpSchema.METHOD_TOOLS_CALL:
                 if (params != null && StringUtils.isNotBlank(params.getName())) {
                     url = HttpResponseParams.addPathParamToUrl(url, params.getName());
+
+                    // Log the tool detection in audit info
+                    String toolName = params.getName();
+                    McpAuditInfo auditInfo = new McpAuditInfo();
+                    auditInfo.setMarkedBy("System");
+                    auditInfo.setResourceName("Tool detected: " + toolName+" " + url);
+                    auditInfo.setType("Tool");
+                    auditInfo.setLastDetected(Integer.parseInt(String.valueOf(System.currentTimeMillis())));
+                    McpAuditInfoDao.instance.insertOne(auditInfo);
                 }
                 break;
 
