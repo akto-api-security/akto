@@ -81,6 +81,9 @@ public class DbLayerAction extends ActionSupport {
     }
 
     public String bulkInsertSamples() {
+        if (System.getenv().getOrDefault("SKIP_BULK_INSERT", "false").equals("true")) {
+            return SUCCESS.toUpperCase();
+        }
         try {
             List<SampleDataAlt> sampleDataList = new ArrayList<>();
             for (SampleDataAltCopy sampleDataAltCopy: samplesCopy) {

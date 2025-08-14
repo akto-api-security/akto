@@ -301,9 +301,6 @@ public class Main {
                 }
 
                 if (checkPg) {
-                    int records = clientLayer.fetchTotalRecords();
-                    AllMetrics.instance.setTotalSampleDataCount(records);
-                    loggerMaker.infoAndAddToDb("Total number of records in postgres: " + records);
                     long dbSizeInMb = clientLayer.fetchTotalSize();
                     AllMetrics.instance.setPgDataSizeInMb(dbSizeInMb);
                     loggerMaker.infoAndAddToDb("Postgres size: " + dbSizeInMb + " MB");
