@@ -8,7 +8,7 @@ import func from "../../../../../util/func";
 import { Badge } from "@shopify/polaris";
 import dayjs from "dayjs";
 import SessionStore from "../../../../main/SessionStore";
-import { isMCPSecurityCategory } from "../../../../main/labelHelper";
+import { labelMap } from "../../../../main/labelHelperMap";
 
 const resourceName = {
   singular: "sample",
@@ -22,9 +22,9 @@ const headers = [
     title: "Severity",
   },
   {
-    text: "Api Endpoint",
+    text: labelMap[PersistStore.getState().dashboardCategory]["API endpoint"],
     value: "endpointComp",
-    title: "Api Endpoint",
+    title: labelMap[PersistStore.getState().dashboardCategory]["API endpoint"],
   },
   {
     text: "Threat Actor",
@@ -137,7 +137,7 @@ function SusDataTable({ currDateRange, rowClicked }) {
         endpointComp: (
           <GetPrettifyEndpoint 
             maxWidth="300px" 
-            {...(!isMCPSecurityCategory() && { method: x.method })}
+            method={x.method}
             url={x.url} 
             isNew={false} 
           />
@@ -212,23 +212,6 @@ function SusDataTable({ currDateRange, rowClicked }) {
     fillFilters();
   }, []);
 
-  const getHeaders = () => {
-    const baseHeaders = [...headers];
-    
-    if (isMCPSecurityCategory()) {
-      const endpointIndex = baseHeaders.findIndex(header => header.value === "endpointComp");
-      if (endpointIndex !== -1) {
-        baseHeaders[endpointIndex] = {
-          ...baseHeaders[endpointIndex],
-          text: "Tool Name",
-          title: "Tool Name"
-        };
-      }
-    }
-
-    return baseHeaders;
-  };
-
   function disambiguateLabel(key, value) {
     switch (key) {
       case "apiCollectionId":
@@ -244,7 +227,7 @@ function SusDataTable({ currDateRange, rowClicked }) {
       key={key}
       onRowClick={(data) => rowClicked(data)}
       pageLimit={50}
-      headers={getHeaders()}
+      headers={headers}
       resourceName={resourceName}
       sortOptions={sortOptions}
       disambiguateLabel={disambiguateLabel}
@@ -255,7 +238,7 @@ function SusDataTable({ currDateRange, rowClicked }) {
       hasRowActions={true}
       getActions={() => []}
       hideQueryField={true}
-      headings={getHeaders()}
+      headings={headers}
       useNewRow={true}
       condensedHeight={true}
     />

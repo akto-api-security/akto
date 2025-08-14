@@ -5,6 +5,7 @@ import api from "../api"
 import func from '@/util/func';
 import DropdownSearch from "../../../components/shared/DropdownSearch";
 import { useSearchParams } from "react-router-dom";
+import { getDashboardCategory } from "../../../../main/labelHelper";
 
 function FilterComponent() {
     const[searchParams] = useSearchParams()
@@ -13,9 +14,11 @@ function FilterComponent() {
     const [data, setData] = useState({ message: "" })
     const [allData, setAllData] = useState([])
     const [id, setId] = useState("")
+    const shortHand = getDashboardCategory().split(" ")[0].toLowerCase();
     const fetchData = async () => {
         await api.fetchFilterYamlTemplate().then((resp) => {
-            const temp = resp?.templates ? resp?.templates : []
+            let temp = resp?.templates ? resp?.templates : []
+            temp = temp.filter(x => x?.info?.category?.name !== undefined && x?.info?.category?.name?.toLowerCase().includes(shortHand))
             setAllData(temp)
             if (temp.length > 0) {
                 const temp2 = temp[0]
