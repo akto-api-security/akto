@@ -19,7 +19,7 @@ export const getMethod = (url, method) => {
     return method;
 }
 
-function MethodBox({method, methodBoxWidth, url}){
+export function MethodBox({method, methodBoxWidth, url}){
     const finalMethod = getMethod(url, method);
     return (
       <Box width={methodBoxWidth || "64px"}>
