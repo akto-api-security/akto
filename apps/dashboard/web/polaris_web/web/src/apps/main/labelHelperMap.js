@@ -63,7 +63,6 @@ export const labelMap = {
     "Endpoint": "MCP component",
     "Threat Policy": "Guardrails Policy",
     "API Threat Activity": "MCP Threat Activity",
-    "Threat API": "Tools Under Threat",
     "API changes": "Recent MCP components",
     "APIs Tested": "Tools tested",
     "APIs with most open issues": "MCP components with most open issues"
