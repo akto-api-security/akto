@@ -128,6 +128,10 @@ public class Main {
     }
     
     private static void buildProtobufKafkaProducer() {
+        if (DataActor.actualAccountId != 1752208054) {
+            loggerMaker.info("Skipping proto kafka producer init");
+            return;
+        }
         loggerMaker.info("Building protobuf kafka producer...................");
         String kafkaBrokerUrl = "kafka1:19092";
         int batchSize = AccountSettings.DEFAULT_CENTRAL_KAFKA_BATCH_SIZE;
