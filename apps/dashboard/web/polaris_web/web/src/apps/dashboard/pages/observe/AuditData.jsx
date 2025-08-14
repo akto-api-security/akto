@@ -1,5 +1,5 @@
 
-import { Text, HorizontalStack, Badge, Box } from "@shopify/polaris"
+import { Text, HorizontalStack } from "@shopify/polaris"
 import { useEffect, useReducer, useState } from "react"
 import values from "@/util/values";
 import {produce} from "immer"
@@ -12,6 +12,7 @@ import { MethodBox } from "./GetPrettifyEndpoint";
 import { CellType } from "../../components/tables/rows/GithubRow";
 import { CircleTickMajor, CircleCancelMajor } from "@shopify/polaris-icons";
 import settingRequests from "../settings/api";
+import PersistStore from "../../../main/PersistStore";
 
 const headings = [
     {
@@ -20,9 +21,15 @@ const headings = [
         text: 'Type',
     },
     {
-        text: "Resource Name",
+        text: "MCP component name",
         value: "resourceName",
-        title: "Resource Name",
+        title: "MCP component name",
+        type: CellType.TEXT
+    },
+    {
+        text: "Collection name",
+        value: "collectionName",
+        title: "Collection name",
         type: CellType.TEXT
     },
     {
@@ -38,6 +45,7 @@ const headings = [
         text: "Updated",
         value: "updatedTimestampComp",
         sortKey: 'updatedTimestamp',
+        sortActive: true,
         type: CellType.TEXT
     },
     {
@@ -63,10 +71,11 @@ const headings = [
 ]
 
 const sortOptions = [
-    { label: 'Last Detected', value: 'lastDetected desc', directionLabel: 'Newest', sortKey: 'lastDetected', columnIndex: 3 },
     { label: 'Last Detected', value: 'lastDetected asc', directionLabel: 'Oldest', sortKey: 'lastDetected', columnIndex: 3 },
-    { label: 'Updated', value: 'updatedTimestamp desc', directionLabel: 'Newest', sortKey: 'updatedTimestamp', columnIndex: 4 },
+    { label: 'Last Detected', value: 'lastDetected desc', directionLabel: 'Newest', sortKey: 'lastDetected', columnIndex: 3 },
     { label: 'Updated', value: 'updatedTimestamp asc', directionLabel: 'Oldest', sortKey: 'updatedTimestamp', columnIndex: 4 },
+    { label: 'Updated', value: 'updatedTimestamp desc', directionLabel: 'Newest', sortKey: 'updatedTimestamp', columnIndex: 4 },
+   
 ];
 
 let filters = [
@@ -78,6 +87,7 @@ let filters = [
             { label: "Tool", value: "TOOL" },
             { label: "Resource", value: "RESOURCE" },
             { label: "Prompt", value: "PROMPT" },
+            { label: "Server", value: "SERVER" }
         ],
     },
     {
@@ -96,6 +106,12 @@ let filters = [
             { label: "Partner", value: "PARTNER" },
             { label: "Third Party", value: "THIRD_PARTY" }
         ],
+    },
+    {
+        key: 'collectionName',
+        label: 'Collection Name',
+        title: 'Collection Name',
+        choices: [],
     }
 ]
 
@@ -104,29 +120,19 @@ const resourceName = {
     plural: 'audit records',
 };
 
-const convertDataIntoTableFormat = (auditRecord) => {
+const convertDataIntoTableFormat = (auditRecord, collectionName) => {
     let temp = {...auditRecord}
     temp['typeComp'] = (
-        <MethodBox method={""} url={auditRecord?.type || "TOOL"}/>
+        <MethodBox method={""} url={auditRecord?.type.toLowerCase() || "TOOL"}/>
     )
     
-    temp['apiAccessTypesComp'] = temp?.apiAccessTypes && temp?.apiAccessTypes.length > 0 && (
-        <Box maxWidth="200px">
-            <HorizontalStack gap="1" wrap>
-                {temp?.apiAccessTypes && temp?.apiAccessTypes.map((accessType, index) => (
-                    <Badge key={index} status="success" size="slim">
-                        {accessType.toUpperCase()}
-                    </Badge>
-                ))}
-            </HorizontalStack>
-        </Box>
-    )
+    temp['apiAccessTypesComp'] = temp?.apiAccessTypes && temp?.apiAccessTypes.length > 0 && temp?.apiAccessTypes.join(', ') ;
     temp['lastDetectedComp'] = func.prettifyEpoch(temp?.lastDetected)
     temp['updatedTimestampComp'] = func.prettifyEpoch(temp?.updatedTimestamp)
     temp['remarksComp'] = (
-        temp?.remarks === undefined ? <Text variant="headingSm" color="critical">Pending...</Text> : <Text variant="bodyMd">{temp?.remarks}</Text>
+        temp?.remarks === null? <Text variant="headingSm" color="critical">Pending...</Text> : <Text variant="bodyMd">{temp?.remarks}</Text>
     )
-    
+    temp['collectionName'] = collectionName;
     return temp;
 }
 
@@ -140,6 +146,7 @@ function AuditData() {
 
     const startTimestamp = getTimeEpoch("since")
     const endTimestamp = getTimeEpoch("until")
+    const collectionsMap = PersistStore(state => state.collectionsMap)
 
     function disambiguateLabel(key, value) {
         switch (key) {
@@ -147,16 +154,16 @@ function AuditData() {
             case "markedBy":
             case "apiAccessTypes":
                 return func.convertToDisambiguateLabelObj(value, null, 2)
+            case "collectionName":
+                return func.convertToDisambiguateLabelObj(value, collectionsMap, 1)
             default:
                 return value;
         }
     }
 
     const updateAuditData = async (hexId, remarks) => {
-        const res = await api.updateAuditData(hexId, remarks)
-        if (res && res.success) {
-            func.setToast(true, true, "Audit data updated successfully")
-        }
+        await api.updateAuditData(hexId, remarks)
+        window.location.reload();
     }
 
     const getActionsList = (item) => {
@@ -180,12 +187,15 @@ function AuditData() {
         let total = 0;
         let finalFilters = {...filters}
         finalFilters['lastDetected'] = [startTimestamp, endTimestamp]
-        
+        finalFilters['hostCollectionId'] = filters['collectionName'].map(id => parseInt(id)) || Object.keys(collectionsMap).map(id => parseInt(id))
+        delete finalFilters['collectionName']
+
         try {
             const res = await api.fetchAuditData(sortKey, sortOrder, skip, limit, finalFilters, filterOperators)
             if (res && res.auditData) {
                 res.auditData.forEach((auditRecord) => {
-                    const dataObj = convertDataIntoTableFormat(auditRecord)
+                    const collectionName = collectionsMap[auditRecord?.hostCollectionId] || "Unknown Collection";
+                    const dataObj = convertDataIntoTableFormat(auditRecord, collectionName)
                     ret.push(dataObj);
                 })
                 total = res.total || 0;
@@ -203,11 +213,12 @@ function AuditData() {
         if (usersResponse) {
             filters[1].choices = usersResponse.map((user) => ({label: user.login, value: user.login}))
         }
+        filters[3].choices = Object.entries(collectionsMap).map(([id, name]) => ({ label: name, value: id }));
     }
 
     useEffect(() => {
         fillFilters()
-    }, [])
+    }, [collectionsMap])
 
     const primaryActions = (
         <HorizontalStack gap={"2"}>
