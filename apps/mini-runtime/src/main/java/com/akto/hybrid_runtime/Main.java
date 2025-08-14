@@ -27,12 +27,20 @@ import com.akto.testing_db_layer_client.ClientLayer;
 import com.akto.util.DashboardMode;
 import com.google.gson.Gson;
 import org.apache.kafka.clients.consumer.*;
+import org.apache.kafka.clients.producer.*;
 import org.apache.kafka.common.Metric;
 import org.apache.kafka.common.MetricName;
 import org.apache.kafka.common.errors.WakeupException;
 import org.apache.kafka.common.serialization.StringDeserializer;
+import org.apache.kafka.common.serialization.ByteArraySerializer;
+import org.apache.kafka.common.serialization.StringSerializer;
 
 import java.util.concurrent.atomic.AtomicBoolean;
+
+// Import protobuf classes
+import com.akto.proto.generated.threat_detection.message.http_response_param.v1.HttpResponseParam;
+import com.akto.proto.generated.threat_detection.message.http_response_param.v1.StringList;
+import com.google.protobuf.ByteString;
 
 public class Main {
 
@@ -102,6 +110,8 @@ public class Main {
     }
 
     public static Kafka kafkaProducer = null;
+    public static KafkaProducer<String, byte[]> protobufKafkaProducer = null;
+    
     private static void buildKafka() {
         loggerMaker.info("Building kafka...................");
         AccountSettings accountSettings = dataActor.fetchAccountSettings();
@@ -117,6 +127,33 @@ public class Main {
             loggerMaker.info(String.valueOf(accountSettings));
         }
     }
+    
+    private static void buildProtobufKafkaProducer() {
+        loggerMaker.info("Building protobuf kafka producer...................");
+        String kafkaBrokerUrl = "kafka1:19092";
+        int batchSize = AccountSettings.DEFAULT_CENTRAL_KAFKA_BATCH_SIZE;
+        int lingerMS = AccountSettings.DEFAULT_CENTRAL_KAFKA_LINGER_MS;
+        
+        try {
+            Properties kafkaProps = new Properties();
+            kafkaProps.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, kafkaBrokerUrl);
+            kafkaProps.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, ByteArraySerializer.class);
+            kafkaProps.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
+            kafkaProps.put(ProducerConfig.BATCH_SIZE_CONFIG, batchSize);
+            kafkaProps.put(ProducerConfig.LINGER_MS_CONFIG, lingerMS);
+            kafkaProps.put(ProducerConfig.RETRIES_CONFIG, 3);
+            kafkaProps.put(ProducerConfig.REQUEST_TIMEOUT_MS_CONFIG, 5000);
+            kafkaProps.put(ProducerConfig.DELIVERY_TIMEOUT_MS_CONFIG, lingerMS + 5000);
+            kafkaProps.put(ProducerConfig.RETRY_BACKOFF_MS_CONFIG, 100);
+            
+            protobufKafkaProducer = new KafkaProducer<>(kafkaProps);
+            loggerMaker.info("Connected to protobuf kafka producer @ " + Context.now());
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error building protobuf kafka producer: " + e.getMessage());
+        }
+    }
+    
+
 
     public static final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(2);
 
@@ -227,10 +264,15 @@ public class Main {
         String centralKafkaTopicName = AccountSettings.DEFAULT_CENTRAL_KAFKA_TOPIC_NAME;
 
         buildKafka();
+        buildProtobufKafkaProducer();
         scheduler.scheduleAtFixedRate(new Runnable() {
             public void run() {
                 if (kafkaProducer == null || !kafkaProducer.producerReady) {
                     buildKafka();
+                }
+                // Also check protobuf producer
+                if (protobufKafkaProducer == null) {
+                    buildProtobufKafkaProducer();
                 }
             }
         }, 5, 5, TimeUnit.MINUTES);
@@ -266,6 +308,12 @@ public class Main {
                     e.printStackTrace();
                 } catch (Error e){
                     loggerMaker.errorAndAddToDb("Error in main thread: "+ e.getMessage());
+                }
+                
+                // Close protobuf producer
+                if (protobufKafkaProducer != null) {
+                    protobufKafkaProducer.close();
+                    loggerMaker.info("Closed protobuf kafka producer");
                 }
             }
         });
@@ -521,6 +569,16 @@ public class Main {
             try {
                 List<HttpResponseParams> accWiseResponse = responseParamsToAccountMap.get(accountId);
 
+                // send to protobuf kafka topic (separate from central kafka)
+                loggerMaker.infoAndAddToDb("Sending " + accWiseResponse.size() +" records to protobuf kafka topic");
+                for (HttpResponseParams httpResponseParams: accWiseResponse) {
+                    try {
+                        sendToProtobufKafka(httpResponseParams);
+                    } catch (Exception e) {
+                        loggerMaker.errorAndAddToDb(e, "Error sending to protobuf kafka: " + e.getMessage());
+                    }
+                }
+
                 accWiseResponse = filterBasedOnHeaders(accWiseResponse, accountInfo.accountSettings);
                 loggerMaker.infoAndAddToDb("Initiating sync function for account: " + accountId);
                 parser.syncFunction(accWiseResponse, syncImmediately, fetchAllSTI, accountInfo.accountSettings);
@@ -681,6 +739,81 @@ public class Main {
             loggerMaker.errorAndAddToDb(e, "error while updating dashboard version: " + e.getMessage());
         }
         createIndices();
+    }
+    
+    /**
+     * Convert HttpResponseParams to protobuf format and send to akto.api.logs2 topic
+     */
+    private static void sendToProtobufKafka(HttpResponseParams httpResponseParams) {
+        try {
+            if (protobufKafkaProducer == null) {
+                loggerMaker.error("Protobuf Kafka producer is null");
+                return;
+            }
+            
+            // Convert HttpResponseParams to protobuf
+            HttpResponseParam.Builder protobufBuilder = HttpResponseParam.newBuilder();
+            
+            // Set basic fields
+            if (httpResponseParams.getRequestParams() != null) {
+                HttpRequestParams requestParams = httpResponseParams.getRequestParams();
+                protobufBuilder.setMethod(requestParams.getMethod() != null ? requestParams.getMethod() : "");
+                protobufBuilder.setPath(requestParams.getURL() != null ? requestParams.getURL() : "");
+                protobufBuilder.setType(requestParams.getType() != null ? requestParams.getType() : "");
+                protobufBuilder.setRequestPayload(requestParams.getPayload() != null ? requestParams.getPayload() : "");
+                protobufBuilder.setApiCollectionId(requestParams.getApiCollectionId());
+            }
+            
+            protobufBuilder.setStatusCode(httpResponseParams.getStatusCode());
+            protobufBuilder.setStatus(httpResponseParams.getStatus() != null ? httpResponseParams.getStatus() : "");
+            protobufBuilder.setResponsePayload(httpResponseParams.getPayload() != null ? httpResponseParams.getPayload() : "");
+            protobufBuilder.setTime(httpResponseParams.getTime());
+            protobufBuilder.setAktoAccountId(httpResponseParams.getAccountId() != null ? httpResponseParams.getAccountId() : "");
+            protobufBuilder.setIp(httpResponseParams.getSourceIP() != null ? httpResponseParams.getSourceIP() : "");
+            protobufBuilder.setDestIp(httpResponseParams.getDestIP() != null ? httpResponseParams.getDestIP() : "");
+            protobufBuilder.setDirection(httpResponseParams.getDirection() != null ? httpResponseParams.getDirection() : "");
+            protobufBuilder.setIsPending(httpResponseParams.getIsPending());
+            protobufBuilder.setSource(httpResponseParams.getSource() != null ? httpResponseParams.getSource().name() : "");
+            protobufBuilder.setAktoVxlanId(httpResponseParams.getRequestParams() != null ? 
+                String.valueOf(httpResponseParams.getRequestParams().getApiCollectionId()) : "");
+            
+            // Set request headers
+            if (httpResponseParams.getRequestParams() != null && httpResponseParams.getRequestParams().getHeaders() != null) {
+                for (Map.Entry<String, List<String>> entry : httpResponseParams.getRequestParams().getHeaders().entrySet()) {
+                    StringList.Builder stringListBuilder = StringList.newBuilder();
+                    stringListBuilder.addAllValues(entry.getValue());
+                    protobufBuilder.putRequestHeaders(entry.getKey(), stringListBuilder.build());
+                }
+            }
+            
+            // Set response headers
+            if (httpResponseParams.getHeaders() != null) {
+                for (Map.Entry<String, List<String>> entry : httpResponseParams.getHeaders().entrySet()) {
+                    StringList.Builder stringListBuilder = StringList.newBuilder();
+                    stringListBuilder.addAllValues(entry.getValue());
+                    protobufBuilder.putResponseHeaders(entry.getKey(), stringListBuilder.build());
+                }
+            }
+            
+            // Build the protobuf message
+            HttpResponseParam protobufMessage = protobufBuilder.build();
+            byte[] protobufBytes = protobufMessage.toByteArray();
+            
+            // Send to kafka
+            ProducerRecord<String, byte[]> record = new ProducerRecord<>("akto.api.logs2", protobufBytes);
+            protobufKafkaProducer.send(record, (metadata, exception) -> {
+                if (exception != null) {
+                    loggerMaker.errorAndAddToDb(exception, "Error sending protobuf message to kafka: " + exception.getMessage());
+                } else {
+                    loggerMaker.errorAndAddToDb("Successfully sent protobuf message to akto.api.logs2 topic with offset: " + metadata.offset());
+                }
+            });
+
+            loggerMaker.errorAndAddToDb("Finished sending data ");       
+            
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error converting HttpResponseParams to protobuf: " + e.getMessage());
+        }
     }
 
     public static void createIndices() {
