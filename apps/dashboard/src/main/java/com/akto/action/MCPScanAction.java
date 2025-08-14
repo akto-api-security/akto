@@ -7,6 +7,8 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
+import com.akto.dao.McpAuditInfoDao;
+import com.akto.dto.McpAuditInfo;
 import org.bson.conversions.Bson;
 import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.context.Context;
@@ -54,6 +56,14 @@ public class MCPScanAction extends UserAction {
                 loggerMaker.info("Creating ApiCollection for host: " + hostName, LogDb.DASHBOARD);  
                 createdCollection = new ApiCollection(collectionId, hostName, Context.now(), new HashSet<>(), hostName, 0, false, true, sseEndpoint);
                 ApiCollectionsDao.instance.insertOne(createdCollection);
+
+                //New MCP server detected, audit it
+                McpAuditInfo auditInfo = new McpAuditInfo();
+                auditInfo.setMarkedBy("System");
+                auditInfo.setResourceName("MCP Server detected: " + hostName);
+                auditInfo.setType("MCP Server");
+                auditInfo.setLastDetected((int) (System.currentTimeMillis()));
+                McpAuditInfoDao.instance.insertOne(auditInfo);
             }
 
             if(createdCollection == null) {
