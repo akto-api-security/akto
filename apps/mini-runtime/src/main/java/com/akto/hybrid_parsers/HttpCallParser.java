@@ -227,7 +227,7 @@ public class HttpCallParser {
 
         // Modify host header to Kubernetes Service filter
         // TODO: Make this generic or customer specific
-        String serviceName = getHeaderValue(responseParam.getRequestParams().getHeaders(), "x-akto-k8s-catalog.agoda.com/component");
+        String serviceName = getHeaderValue(responseParam.getRequestParams().getHeaders(), "x-akto-k8s-privatecloud.agoda.com/service");
         if (serviceName != null && serviceName.length() > 0){
             responseParam.getRequestParams().getHeaders().put("host", Arrays.asList(hostName + "-" + serviceName));
             filterType = FILTER_TYPE.MODIFIED;
@@ -326,14 +326,24 @@ public class HttpCallParser {
 
         this.sync_count += filteredResponseParams.size();
         int syncThresh = numberOfSyncs < 10 ? 10000 : sync_threshold_count;
+        executeCatalogSync(syncImmediately, fetchAllSTI, accountSettings, isHarOrPcap, syncThresh);
+
+    }
+
+    private void executeCatalogSync(boolean syncImmediately, boolean fetchAllSTI, AccountSettings accountSettings,
+            boolean isHarOrPcap, int syncThresh) {
         if (syncImmediately || this.sync_count >= syncThresh || (Context.now() - this.last_synced) > this.sync_threshold_time || isHarOrPcap) {
+            long startTime = System.currentTimeMillis();
             numberOfSyncs++;
+            loggerMaker.debug("Starting Syncing API catalog..." + numberOfSyncs);
             List<ApiCollection> apiCollections = dataActor.fetchAllApiCollectionsMeta();
             for (ApiCollection apiCollection: apiCollections) {
                 apiCollectionsMap.put(apiCollection.getId(), apiCollection);
             }
             SyncLimit syncLimit = fetchSyncLimit();
+
             apiCatalogSync.syncWithDB(syncImmediately, fetchAllSTI, syncLimit);
+
             if (DataActor.actualAccountId == 1745303931 || DataActor.actualAccountId == 1741069294 || DataActor.actualAccountId == 1749515934) {
                 dependencyAnalyser.dbState = apiCatalogSync.dbState;
                 dependencyAnalyser.syncWithDb();
@@ -364,8 +374,9 @@ public class HttpCallParser {
                     });
                 }
             }
+            long endTime = System.currentTimeMillis();
+            loggerMaker.debug("Completed Syncing API catalog..." + numberOfSyncs + " " + (endTime - startTime) + " ms");
         }
-
     }
 
     private List<HttpResponseParams> filterDefaultPayloads(List<HttpResponseParams> filteredResponseParams, Map<String, DefaultPayload> defaultPayloadMap) {
