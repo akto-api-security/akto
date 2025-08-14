@@ -156,21 +156,22 @@ function TestsTablePage() {
 
     const fetchAllTests = async () => {
         try {
-
+            let categoriesName = Object.keys(categoryMap);
             let metaDataObj = {
                 subCategories: [],
+                categories: []
             }
-            if ((localSubCategoryMap && Object.keys(localSubCategoryMap).length > 0)) {
+            if ((localSubCategoryMap && Object.keys(localSubCategoryMap).length > 0 ) && categoriesName.length > 0) {
                 metaDataObj = {
                     subCategories: Object.values(localSubCategoryMap),
+                    categories: Object.keys(categoryMap)
                 }
                 
             } else { 
                 metaDataObj = await transform.getAllSubcategoriesData(false, "testEditor")
+                categoriesName = metaDataObj?.categories.map(x => x.name)
             }
             if (!metaDataObj?.subCategories?.length) return;
-            const categoriesName = new Set(Object.keys(categoryMap));
-    
             try {
                 metaDataObj.subCategories = metaDataObj.subCategories.filter(
                     (subCategory) => categoriesName.includes(subCategory.superCategory.name)

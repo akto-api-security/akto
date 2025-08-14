@@ -91,6 +91,7 @@ public class AuditDataAction extends UserAction {
                 case "markedBy":
                 case "type":
                 case "resourceName":
+                case "hostCollectionId":
                     filterList.add(Filters.in(key, value));
                     break;
                 case "lastDetected":

@@ -64,7 +64,7 @@ export const labelMap = {
     "API Threat Activity": "MCP Threat Activity",
     "Threat API": "Tools Under Threat",
     "API changes": "Recent MCP components",
-    "APIs Tested": "MCP components tested"
+    "APIs Tested": "Tools tested"
   },
   "Gen AI": {
     "API Security Posture": "AI Agent Security Posture",
