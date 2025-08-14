@@ -29,7 +29,8 @@ export const labelMap = {
     "API Risk Score": "API Risk Score",
     "Endpoint": "Endpoint",
     "API changes": "API changes",
-    "APIs Tested": "APIs Tested"
+    "APIs Tested": "APIs Tested",
+    "APIs with most open issues": "APIs with most open issues"
   },
   "MCP Security": {
     "API Security Posture": "MCP Security Posture",
@@ -64,7 +65,8 @@ export const labelMap = {
     "API Threat Activity": "MCP Threat Activity",
     "Threat API": "Tools Under Threat",
     "API changes": "Recent MCP components",
-    "APIs Tested": "Tools tested"
+    "APIs Tested": "Tools tested",
+    "APIs with most open issues": "MCP components with most open issues"
   },
   "Gen AI": {
     "API Security Posture": "AI Agent Security Posture",
@@ -96,5 +98,6 @@ export const labelMap = {
     "API Risk Score": "API Risk Score",
     "Endpoint": "AI Agent component",
     "API changes": "Recent AI Agent components",
+    "APIs with most open issues": "APIs with most open issues"
   },
 }

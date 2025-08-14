@@ -4,6 +4,7 @@ import BarGraph from '../../../components/charts/BarGraph';
 import observeFunc from '../../observe/transform';
 import EmptyCard from '../../dashboard/new_components/EmptyCard';
 import { Text } from '@shopify/polaris';
+import { getDashboardCategory, mapLabel } from '../../../../main/labelHelper.js'
 
 const ApisWithMostOpenIsuuesGraph = ({ issuesData}) => {
   const [barData, setBarData] = React.useState([]);
@@ -33,12 +34,12 @@ const ApisWithMostOpenIsuuesGraph = ({ issuesData}) => {
   return (
     (barData.length === 0 || barData.every(item => item.value === 0)) ? (
       <EmptyCard
-        title="APIs With Most Open Issues"
+        title={`${mapLabel("APIs with most open issues", getDashboardCategory())}`}
         subTitleComponent={<Text alignment='center' color='subdued'>No open issues found</Text>}
       />
     ) : (
       <InfoCard
-        title="APIs With Most Open Issues"
+        title={`${mapLabel("APIs with most open issues", getDashboardCategory())}`}
         titleToolTip="Top 5 API endpoints with the most unresolved (OPEN) issues."
         component={
           <BarGraph
