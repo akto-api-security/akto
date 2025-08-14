@@ -18,7 +18,11 @@ function FilterComponent() {
     const fetchData = async () => {
         await api.fetchFilterYamlTemplate().then((resp) => {
             let temp = resp?.templates ? resp?.templates : []
-            temp = temp.filter(x => x?.info?.category?.name !== undefined && x?.info?.category?.name?.toLowerCase().includes(shortHand))
+            if(!shortHand.includes("api")){  
+                temp = temp.filter(x => x?.info?.category?.name !== undefined && x?.info?.category?.name?.toLowerCase().includes(shortHand))
+            }else{
+                temp = temp.filter(x => x?.info?.category?.name !== undefined && !x?.info?.category?.name?.toLowerCase().includes("mcp"))
+            }
             setAllData(temp)
             if (temp.length > 0) {
                 const temp2 = temp[0]

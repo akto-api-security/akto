@@ -220,7 +220,7 @@ function ApiChanges() {
         <PageWithMultipleCards
             title={
                 <TitleWithInfo
-                    titleText={"API changes"}
+                    titleText={mapLabel("API changes", getDashboardCategory())}
                     docsUrl={"https://docs.akto.io/api-inventory/concepts/api-changes"}
                     tooltipContent={"Information about endpoints and parameters found in your inventory."}
                 />
