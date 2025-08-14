@@ -34,7 +34,10 @@ const ACTION_ITEM_TYPES = {
     VULNERABLE_APIS: 'VULNERABLE_APIS',
     ENHANCE_TESTING_COVERAGE: 'ENHANCE_TESTING_COVERAGE',
     ENABLE_CONTINUOUS_TESTING: 'ENABLE_CONTINUOUS_TESTING',
-    ADDRESS_MISCONFIGURED_TESTS: 'ADDRESS_MISCONFIGURED_TESTS'
+    ADDRESS_MISCONFIGURED_TESTS: 'ADDRESS_MISCONFIGURED_TESTS',
+    BROKEN_AUTHENTICATION_ISSUES: 'BROKEN_AUTHENTICATION_ISSUES',
+    FREQUENTLY_VULNERABLE_ENDPOINTS: 'FREQUENTLY_VULNERABLE_ENDPOINTS',
+    BUILD_REMEDIATION_PLAYBOOKS: 'BUILD_REMEDIATION_PLAYBOOKS'
 };
 
 const JIRA_INTEGRATION_URL = "/dashboard/settings/integrations/jira";
@@ -149,6 +152,9 @@ export const ActionItemsContent = ({ actionItemsData, onCountChange }) => {
             onlyOnceTestedApiCount,
             vulnerableApiCount,
             misConfiguredTestsCount,
+            brokenAuthIssuesCount,
+            highValueIssuesCount,
+            urlsByIssuesTotalCount,
         } = actionItemsData;
         setJiraTicketUrlMap(ticketMap || {});
 
@@ -169,7 +175,13 @@ export const ActionItemsContent = ({ actionItemsData, onCountChange }) => {
 
             createActionItem('8', 'P1', 'Enable continuous testing', `${onlyOnceTestedApiCount} ${mapLabel("APIs", getDashboardCategory())} are currently tested only once — consider moving them to scheduled testing`, "QA Team", "Medium", onlyOnceTestedApiCount, ACTION_ITEM_TYPES.ENABLE_CONTINUOUS_TESTING, jiraTicketUrlMap, handleJiraIntegration, `Ensures ongoing protection as ${mapLabel("API", getDashboardCategory())} behavior and usage evolve`),
 
-            createActionItem('9', 'P2', 'Address misconfigured tests', `${misConfiguredTestsCount} misconfigured tests detected during scans`, "QA Team", "Medium", misConfiguredTestsCount, ACTION_ITEM_TYPES.ADDRESS_MISCONFIGURED_TESTS, jiraTicketUrlMap, handleJiraIntegration, "Improves test coverage and reduces missed vulnerabilities")
+            createActionItem('9', 'P2', 'Address misconfigured tests', `${misConfiguredTestsCount} misconfigured tests detected during scans`, "QA Team", "Medium", misConfiguredTestsCount, ACTION_ITEM_TYPES.ADDRESS_MISCONFIGURED_TESTS, jiraTicketUrlMap, handleJiraIntegration, "Improves test coverage and reduces missed vulnerabilities"),
+
+            createActionItem('10', 'P1', 'Remediate broken authentication issues', `${brokenAuthIssuesCount} authentication-related issues found across tested APIs`, "Development", "High", brokenAuthIssuesCount, ACTION_ITEM_TYPES.BROKEN_AUTHENTICATION_ISSUES, jiraTicketUrlMap, handleJiraIntegration, "Prevents unauthorized access and ensures proper session handling")
+            ,
+            createActionItem('11', 'P2', 'Remediate frequently vulnerable endpoints', `${highValueIssuesCount} endpoint surfaced repeatedly in test results - track and prioritize for remediation`, "Security Team", "Low", highValueIssuesCount, ACTION_ITEM_TYPES.FREQUENTLY_VULNERABLE_ENDPOINTS, jiraTicketUrlMap, handleJiraIntegration, "Focuses remediation on APIs with recurring issues"),
+
+            createActionItem('12', 'P2', 'Build remediation playbooks for common issues', `${urlsByIssuesTotalCount} common vulnerability types detected that can benefit from standardized remediation steps`, "Security & DevOps", "Low", urlsByIssuesTotalCount, ACTION_ITEM_TYPES.BUILD_REMEDIATION_PLAYBOOKS, jiraTicketUrlMap, handleJiraIntegration, "Reduces response time and improves fix consistency across teams")
         ];
 
         const filteredItems = items.filter(item => item.count > 0);
