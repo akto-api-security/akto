@@ -25,7 +25,9 @@ export async function fetchActionItemsData() {
         api.getMisConfiguredTestsCount(),
         api.fetchIssuesByApis(),
         api.fetchUrlsByIssues(false),
-        api.fetchBrokenAuthenticationIssues(allSubCategories, false)
+        api.fetchBrokenAuthenticationIssues(allSubCategories, false),
+        api.fetchVulnerableApisByCategory("VEM", false),
+        api.fetchVulnerableApisByCategory("MHH", false)
     ]);
 
     const [
@@ -42,7 +44,9 @@ export async function fetchActionItemsData() {
         misConfiguredTestsCountResult,
         issuesByApisResult,
         urlsByIssuesResult,
-        brokenAuthIssuesResult
+        brokenAuthIssuesResult,
+        vemVulnerableApisResult,
+        mhhVulnerableApisResult
     ] = results;
 
     const apiStats = apiStatsResult.status === 'fulfilled' ? apiStatsResult.value : null;
@@ -72,6 +76,8 @@ export async function fetchActionItemsData() {
     let vulnerableApiCount = vulnerableApiCountResult.status === 'fulfilled' ? vulnerableApiCountResult.value?.buaCategoryCount || 0 : 0;
     let misConfiguredTestsCount = misConfiguredTestsCountResult.status === 'fulfilled' ? misConfiguredTestsCountResult.value?.misConfiguredTestsCount || 0 : 0;
     let brokenAuthIssuesCount = brokenAuthIssuesResp ? brokenAuthIssuesResp.buaCategoryCount || 0 : 0;
+    let vemVulnerableApisCount = vemVulnerableApisResult.status === 'fulfilled' ? vemVulnerableApisResult.value?.endpointsCount || 0 : 0;
+    let mhhVulnerableApisCount = mhhVulnerableApisResult.status === 'fulfilled' ? mhhVulnerableApisResult.value?.endpointsCount || 0 : 0;
 
     if (apiStats?.apiStatsEnd && apiStats?.apiStatsStart) {
         const { apiStatsEnd, apiStatsStart } = apiStats;
@@ -99,7 +105,9 @@ export async function fetchActionItemsData() {
         highValueIssuesCount, 
         issuesByApis,
         urlsByIssues,
-        urlsByIssuesTotalCount
+        urlsByIssuesTotalCount,
+        vemVulnerableApisCount,
+        mhhVulnerableApisCount
     };
 }
 
@@ -122,7 +130,9 @@ export async function fetchAllActionItemsApiInfo() {
         api.getVulnerableApiCount(true),
         api.fetchBrokenAuthenticationIssues(allSubCategories, true),
         api.fetchIssuesByApis(true),
-        api.fetchUrlsByIssues(true)
+        api.fetchUrlsByIssues(true),
+        api.fetchVulnerableApisByCategory("VEM", true),
+        api.fetchVulnerableApisByCategory("MHH", true)
     ]);
 
     const [
@@ -139,7 +149,9 @@ export async function fetchAllActionItemsApiInfo() {
         vulnerableApiCountResult,
         brokenAuthIssuesApiInfoResult,
         issuesByApisResult,
-        urlsByIssuesResult
+        urlsByIssuesResult,
+        vemVulnerableApisApiInfoResult,
+        mhhVulnerableApisApiInfoResult
     ] = results;
 
     const sensitiveAndUnauthenticatedApis = sensitiveAndUnauthenticatedValueResult.status === 'fulfilled' ? sensitiveAndUnauthenticatedValueResult?.value?.sensitiveUnauthenticatedEndpointsApiInfo || [] : [];
@@ -156,6 +168,8 @@ export async function fetchAllActionItemsApiInfo() {
     const brokenAuthIssuesApiInfo = brokenAuthIssuesApiInfoResult.status === 'fulfilled' ? brokenAuthIssuesApiInfoResult.value?.buaCategoryApiInfo || [] : [];
     const issuesByApisForAllActionItems = issuesByApisResult.status === 'fulfilled' ? issuesByApisResult.value : null;
     const urlsByIssuesForAllActionItems = urlsByIssuesResult.status === 'fulfilled' ? urlsByIssuesResult.value : null;
+    const vemVulnerableApisApiInfo = vemVulnerableApisApiInfoResult.status === 'fulfilled' ? vemVulnerableApisApiInfoResult.value?.vulnerableApisApiInfo || [] : [];
+    const mhhVulnerableApisApiInfo = mhhVulnerableApisApiInfoResult.status === 'fulfilled' ? mhhVulnerableApisApiInfoResult.value?.vulnerableApisApiInfo || [] : [];
 
 
     const multipleIssuesApiInfo = Array.isArray(issuesByApisForAllActionItems?.issueNamesByAPIs)
@@ -168,7 +182,7 @@ export async function fetchAllActionItemsApiInfo() {
             })
             .filter(Boolean)
         : [];
-
+        
     return {
         highRiskApis: highRiskApis,
         sensitiveDataEndpoints: sensitiveDataEndpoints,
@@ -184,5 +198,7 @@ export async function fetchAllActionItemsApiInfo() {
         brokenAuthIssuesApiInfo: brokenAuthIssuesApiInfo,
         multipleIssuesApiInfo: multipleIssuesApiInfo,
         urlsByIssues: urlsByIssuesForAllActionItems,
+        vemVulnerableApisApiInfo: vemVulnerableApisApiInfo,
+        mhhVulnerableApisApiInfo: mhhVulnerableApisApiInfo,
     };
 }
