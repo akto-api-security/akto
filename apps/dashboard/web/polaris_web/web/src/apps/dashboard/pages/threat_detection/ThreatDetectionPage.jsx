@@ -254,7 +254,7 @@ function ThreatDetectionPage() {
     return <PageWithMultipleCards
         title={
             <TitleWithInfo
-                titleText={"API Threat Activity"}
+                titleText={mapLabel("API Threat Activity", getDashboardCategory())}
                 tooltipContent={"Identify malicious requests with Akto's powerful threat detection capabilities"}
             />
         }

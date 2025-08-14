@@ -8,6 +8,8 @@ import func from "../../../../../util/func";
 import { Badge } from "@shopify/polaris";
 import dayjs from "dayjs";
 import SessionStore from "../../../../main/SessionStore";
+import { isMCPSecurityCategory } from "../../../../main/labelHelper";
+
 const resourceName = {
   singular: "sample",
   plural: "samples",
@@ -133,7 +135,12 @@ function SusDataTable({ currDateRange, rowClicked }) {
         id: x.id,
         actorComp: x.actor?.length > 50 ? `${x.actor.slice(0, 50)}...` : x.actor ,
         endpointComp: (
-          <GetPrettifyEndpoint maxWidth="300px" method={x.method} url={x.url} isNew={false} />
+          <GetPrettifyEndpoint 
+            maxWidth="300px" 
+            {...(!isMCPSecurityCategory() && { method: x.method })}
+            url={x.url} 
+            isNew={false} 
+          />
         ),
         apiCollectionName: collectionsMap[x.apiCollectionId] || "-",
         discoveredTs: dayjs(x.timestamp*1000).format("DD-MM-YYYY HH:mm:ss"),
@@ -205,6 +212,23 @@ function SusDataTable({ currDateRange, rowClicked }) {
     fillFilters();
   }, []);
 
+  const getHeaders = () => {
+    const baseHeaders = [...headers];
+    
+    if (isMCPSecurityCategory()) {
+      const endpointIndex = baseHeaders.findIndex(header => header.value === "endpointComp");
+      if (endpointIndex !== -1) {
+        baseHeaders[endpointIndex] = {
+          ...baseHeaders[endpointIndex],
+          text: "Tool Name",
+          title: "Tool Name"
+        };
+      }
+    }
+
+    return baseHeaders;
+  };
+
   function disambiguateLabel(key, value) {
     switch (key) {
       case "apiCollectionId":
@@ -220,7 +244,7 @@ function SusDataTable({ currDateRange, rowClicked }) {
       key={key}
       onRowClick={(data) => rowClicked(data)}
       pageLimit={50}
-      headers={headers}
+      headers={getHeaders()}
       resourceName={resourceName}
       sortOptions={sortOptions}
       disambiguateLabel={disambiguateLabel}
@@ -231,7 +255,7 @@ function SusDataTable({ currDateRange, rowClicked }) {
       hasRowActions={true}
       getActions={() => []}
       hideQueryField={true}
-      headings={headers}
+      headings={getHeaders()}
       useNewRow={true}
       condensedHeight={true}
     />
