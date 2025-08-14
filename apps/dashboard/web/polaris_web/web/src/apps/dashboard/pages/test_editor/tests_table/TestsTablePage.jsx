@@ -162,7 +162,7 @@ function TestsTablePage() {
             }
             if ((localSubCategoryMap && Object.keys(localSubCategoryMap).length > 0)) {
                 metaDataObj = {
-                    subCategories: Object.values(localSubCategoryMap).filter,
+                    subCategories: Object.values(localSubCategoryMap),
                 }
                 
             } else { 

@@ -1,5 +1,5 @@
 
-import { Text, HorizontalStack, Badge, Box } from "@shopify/polaris"
+import { Text, HorizontalStack } from "@shopify/polaris"
 import { useEffect, useReducer, useState } from "react"
 import values from "@/util/values";
 import {produce} from "immer"
@@ -38,6 +38,7 @@ const headings = [
         text: "Updated",
         value: "updatedTimestampComp",
         sortKey: 'updatedTimestamp',
+        sortActive: true,
         type: CellType.TEXT
     },
     {
@@ -63,10 +64,11 @@ const headings = [
 ]
 
 const sortOptions = [
-    { label: 'Last Detected', value: 'lastDetected desc', directionLabel: 'Newest', sortKey: 'lastDetected', columnIndex: 3 },
     { label: 'Last Detected', value: 'lastDetected asc', directionLabel: 'Oldest', sortKey: 'lastDetected', columnIndex: 3 },
-    { label: 'Updated', value: 'updatedTimestamp desc', directionLabel: 'Newest', sortKey: 'updatedTimestamp', columnIndex: 4 },
+    { label: 'Last Detected', value: 'lastDetected desc', directionLabel: 'Newest', sortKey: 'lastDetected', columnIndex: 3 },
     { label: 'Updated', value: 'updatedTimestamp asc', directionLabel: 'Oldest', sortKey: 'updatedTimestamp', columnIndex: 4 },
+    { label: 'Updated', value: 'updatedTimestamp desc', directionLabel: 'Newest', sortKey: 'updatedTimestamp', columnIndex: 4 },
+   
 ];
 
 let filters = [
@@ -78,6 +80,7 @@ let filters = [
             { label: "Tool", value: "TOOL" },
             { label: "Resource", value: "RESOURCE" },
             { label: "Prompt", value: "PROMPT" },
+            { label: "Server", value: "SERVER" }
         ],
     },
     {
@@ -107,20 +110,10 @@ const resourceName = {
 const convertDataIntoTableFormat = (auditRecord) => {
     let temp = {...auditRecord}
     temp['typeComp'] = (
-        <MethodBox method={""} url={auditRecord?.type || "TOOL"}/>
+        <MethodBox method={""} url={auditRecord?.type.toLowerCase() || "TOOL"}/>
     )
     
-    temp['apiAccessTypesComp'] = temp?.apiAccessTypes && temp?.apiAccessTypes.length > 0 && (
-        <Box maxWidth="200px">
-            <HorizontalStack gap="1" wrap>
-                {temp?.apiAccessTypes && temp?.apiAccessTypes.map((accessType, index) => (
-                    <Badge key={index} status="success" size="slim">
-                        {accessType.toUpperCase()}
-                    </Badge>
-                ))}
-            </HorizontalStack>
-        </Box>
-    )
+    temp['apiAccessTypesComp'] = temp?.apiAccessTypes && temp?.apiAccessTypes.length > 0 && temp?.apiAccessTypes.join(', ') ;
     temp['lastDetectedComp'] = func.prettifyEpoch(temp?.lastDetected)
     temp['updatedTimestampComp'] = func.prettifyEpoch(temp?.updatedTimestamp)
     temp['remarksComp'] = (
@@ -153,10 +146,9 @@ function AuditData() {
     }
 
     const updateAuditData = async (hexId, remarks) => {
-        const res = await api.updateAuditData(hexId, remarks)
-        if (res && res.success) {
-            func.setToast(true, true, "Audit data updated successfully")
-        }
+        await api.updateAuditData(hexId, remarks)
+        func.setToast(true, true, "Audit data updated successfully")
+        window.location.reload();
     }
 
     const getActionsList = (item) => {
