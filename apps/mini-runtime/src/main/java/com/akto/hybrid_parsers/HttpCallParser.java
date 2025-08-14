@@ -227,7 +227,7 @@ public class HttpCallParser {
 
         // Modify host header to Kubernetes Service filter
         // TODO: Make this generic or customer specific
-        String serviceName = getHeaderValue(responseParam.getRequestParams().getHeaders(), "x-akto-k8s-catalog.agoda.com/component");
+        String serviceName = getHeaderValue(responseParam.getRequestParams().getHeaders(), "x-akto-k8s-privatecloud.agoda.com/service");
         if (serviceName != null && serviceName.length() > 0){
             responseParam.getRequestParams().getHeaders().put("host", Arrays.asList(hostName + "-" + serviceName));
             filterType = FILTER_TYPE.MODIFIED;
