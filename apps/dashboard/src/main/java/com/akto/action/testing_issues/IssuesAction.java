@@ -96,9 +96,15 @@ public class IssuesAction extends UserAction {
     int URL_METHOD_PAIR_THRESHOLD = 1;
     
     @Setter
+    private boolean showTestSubCategories;
+    @Setter
     private boolean showApiInfo;
     @Getter
     private List<ApiInfo> buaCategoryApiInfo = new ArrayList<>();
+
+    public boolean isShowApiInfo() {
+        return showApiInfo;
+    }
 
     private static final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
 
@@ -820,7 +826,22 @@ public class IssuesAction extends UserAction {
                 ))
         )));
 
-        // Project the final result
+        if (!showTestSubCategories) {
+            try {
+                long totalCount = TestingRunIssuesDao.instance.getMCollection()
+                        .aggregate(pipeline, BasicDBObject.class)
+                        .into(new ArrayList<>())
+                        .size();
+
+                this.response = new BasicDBObject();
+                this.response.put("totalCount", (int) totalCount);
+                return SUCCESS.toUpperCase();
+            } catch (Exception e) {
+                addActionError("Error counting URLs by test subcategory");
+                return ERROR.toUpperCase();
+            }
+        }
+
         pipeline.add(Aggregates.project(Projections.fields(
                 Projections.include("testSubCategory", "apiInfoKeySet"),
                 Projections.computed("apiInfoKeySetCount", new BasicDBObject("$size", "$apiInfoKeySet"))
