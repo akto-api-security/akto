@@ -8,6 +8,7 @@ import func from "../../../../../util/func";
 import { Badge } from "@shopify/polaris";
 import dayjs from "dayjs";
 import SessionStore from "../../../../main/SessionStore";
+import { labelMap } from "../../../../main/labelHelperMap";
 const resourceName = {
   singular: "sample",
   plural: "samples",
@@ -20,9 +21,9 @@ const headers = [
     title: "Severity",
   },
   {
-    text: "Api Endpoint",
+    text: labelMap[PersistStore.getState().dashboardCategory]["API endpoint"],
     value: "endpointComp",
-    title: "Api Endpoint",
+    title: labelMap[PersistStore.getState().dashboardCategory]["API endpoint"],
   },
   {
     text: "Threat Actor",

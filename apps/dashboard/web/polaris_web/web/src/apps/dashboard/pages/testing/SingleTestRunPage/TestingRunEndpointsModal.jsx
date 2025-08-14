@@ -1,27 +1,28 @@
 import { Modal, EmptySearchResult } from "@shopify/polaris";
-import { useEffect, useState } from "react";
 import GithubSimpleTable from "@/apps/dashboard/components/tables/GithubSimpleTable";
 import { CellType } from "@/apps/dashboard/components/tables/rows/GithubRow"
-import GetPrettifyEndpoint from "@/apps/dashboard/pages/observe/GetPrettifyEndpoint";
 import TestingStore from "../testingStore";
+import PersistStore from "../../../../main/PersistStore";
+import { labelMap } from "../../../../main/labelHelperMap";
+
 
 const TestingEndpointsModal = ({ showTestingEndpointsModal, setShowTestingEndpointsModal }) => {
 
     const testingEndpointsApisList = TestingStore((state) => state.testingEndpointsApisList);
-
+    const dashboardCategory = PersistStore(state => state.dashboardCategory)
     const handleClose = () => {
         setShowTestingEndpointsModal(false);
     }
 
     const resourceName = {
-        singular: 'API endpoint',
-        plural: 'API endpoints',
+        singular: labelMap[dashboardCategory]["API endpoint"],
+        plural: labelMap[dashboardCategory]["API endpoints"],
     };
 
     const headers = [
          {
-            text: 'API endpoint',
-            title: 'API endpoint',
+            text: labelMap[dashboardCategory]["API endpoint"],
+            title: labelMap[dashboardCategory]["API endpoint"],
             value: 'apiEndpointComp'
         },
         {

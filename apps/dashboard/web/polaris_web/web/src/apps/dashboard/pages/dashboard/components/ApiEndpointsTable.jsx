@@ -1,11 +1,14 @@
 import React from 'react';
 import GithubSimpleTable from "@/apps/dashboard/components/tables/GithubSimpleTable";
 import { EmptySearchResult } from "@shopify/polaris";
+import PersistStore from '../../../../main/PersistStore';
+import { labelMap } from '../../../../main/labelHelperMap';
 
 function ApiEndpointsTable({ data, headers, loading, pageLimit = 10, showFooter = true, emptyStateTitle = 'No APIs found', emptyStateDescription = '', ...rest }) {
+    const dashboardCategory = PersistStore(state => state.dashboardCategory)
     const resourceName = {
-        singular: 'API endpoint',
-        plural: 'API endpoints',
+        singular: labelMap[dashboardCategory]["API endpoint"],
+        plural: labelMap[dashboardCategory]["API endpoints"],
     };
 
     const emptyStateMarkup = (

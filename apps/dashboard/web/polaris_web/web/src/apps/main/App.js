@@ -145,7 +145,7 @@ const router = createBrowserRouter([
                             },
                             {
                                 path: "dependency",
-                                element: <DependencyTable/>
+                                element: <DepefndencyTable/>
                             },
                             {
                               path:"test-suite",
