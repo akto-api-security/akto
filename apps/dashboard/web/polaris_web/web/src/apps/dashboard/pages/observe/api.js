@@ -40,11 +40,11 @@ export default {
         });
         return resp;
     },
-    async updateAuditData(id, description) {
+    async updateAuditData(hexId, remarks) {
             const resp = await request({
                 url: '/api/updateAuditData',
                 method: 'post',
-                data: { id, description }
+                data: { hexId, remarks }
             });
             return resp;
         },

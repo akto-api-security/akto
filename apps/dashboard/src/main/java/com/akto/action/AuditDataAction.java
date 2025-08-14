@@ -1,6 +1,7 @@
 package com.akto.action;
 
 import com.akto.dao.McpAuditInfoDao;
+import com.akto.dao.context.Context;
 import com.akto.dto.McpAuditInfo;
 import com.akto.dto.User;
 import com.akto.log.LoggerMaker;
@@ -55,7 +56,7 @@ public class AuditDataAction extends UserAction {
             }
             
            
-            List<Bson> filterList = prepareFilters(filters, filterOperators);
+            List<Bson> filterList = prepareFilters(filters);
             Bson finalFilter = filterList.isEmpty() ? new BasicDBObject() : Filters.and(filterList);
             Bson sort = sortOrder == 1 ? Sorts.ascending(sortKey) : Sorts.descending(sortKey);
             
@@ -73,7 +74,7 @@ public class AuditDataAction extends UserAction {
     /**
      * Common function for handling filters
      */
-    private List<Bson> prepareFilters(Map<String, List> filters, Map<String, String> filterOperators) {
+    private List<Bson> prepareFilters(Map<String, List> filters) {
         List<Bson> filterList = new ArrayList<>();
         
         if (filters == null || filters.isEmpty()) {
@@ -84,22 +85,15 @@ public class AuditDataAction extends UserAction {
         for(Map.Entry<String, List> entry: filters.entrySet()) {
             String key = entry.getKey();
             List value = entry.getValue();
-
             if (value == null || value.size() == 0) continue;
-            String operator = filterOperators != null ? filterOperators.get(key) : null;
 
             switch (key) {
                 case "markedBy":
                 case "type":
                 case "resourceName":
-                    if (operator != null && operator.equals("NOT")) {
-                        filterList.add(Filters.nin(key, value));
-                    } else {
-                        filterList.add(Filters.in(key, value));
-                    }
+                    filterList.add(Filters.in(key, value));
                     break;
                 case "lastDetected":
-                case "updatedTimestamp":
                     if (value.size() >= 2) {
                         filterList.add(Filters.gte(key, value.get(0)));
                         filterList.add(Filters.lte(key, value.get(1)));
@@ -132,7 +126,7 @@ public class AuditDataAction extends UserAction {
 
         try {
             ObjectId id = new ObjectId(hexId);
-            McpAuditInfoDao.instance.updateOne(Filters.eq(Constants.ID, id), Updates.combine(Updates.set("remarks", remarks), Updates.set("markedBy", markedBy)));
+            McpAuditInfoDao.instance.updateOne(Filters.eq(Constants.ID, id), Updates.combine(Updates.set("remarks", remarks), Updates.set("markedBy", markedBy), Updates.set("updatedTimestamp", Context.now())));
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error updating audit data: " + e.getMessage(), LogDb.DASHBOARD);
             return ERROR.toUpperCase();

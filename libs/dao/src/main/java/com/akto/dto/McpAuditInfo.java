@@ -18,10 +18,10 @@ public class McpAuditInfo {
 
     @BsonIgnore
     private String hexId;
-    private String lastDetected;
+    private int lastDetected;
     private String markedBy;
     private String type;
-    private String updatedTimestamp;
+    private int updatedTimestamp;
     private String resourceName;
     private String remarks;
     private Set<ApiInfo.ApiAccessType> apiAccessTypes;
@@ -30,7 +30,7 @@ public class McpAuditInfo {
         return this.id.toHexString();
     }
 
-    public McpAuditInfo(String lastDetected, String markedBy, String type, String updatedTimestamp, String resourceName, String remarks, Set<ApiInfo.ApiAccessType> apiAccessTypes) {
+    public McpAuditInfo(int lastDetected, String markedBy, String type, int updatedTimestamp, String resourceName, String remarks, Set<ApiInfo.ApiAccessType> apiAccessTypes) {
         this.lastDetected = lastDetected;
         this.markedBy = markedBy;
         this.type = type;

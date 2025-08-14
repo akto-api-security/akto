@@ -1,58 +1,65 @@
 
 import { Text, HorizontalStack, Badge, Box } from "@shopify/polaris"
-import { useReducer, useState } from "react"
+import { useEffect, useReducer, useState } from "react"
 import values from "@/util/values";
 import {produce} from "immer"
 import api from "./api"
 import func from "@/util/func"
-import TooltipText from "../../components/shared/TooltipText";
 import DateRangeFilter from "../../components/layouts/DateRangeFilter";
 import PageWithMultipleCards from "../../components/layouts/PageWithMultipleCards";
 import GithubServerTable from "../../components/tables/GithubServerTable";
+import { MethodBox } from "./GetPrettifyEndpoint";
+import { CellType } from "../../components/tables/rows/GithubRow";
+import { CircleTickMajor, CircleCancelMajor } from "@shopify/polaris-icons";
+import settingRequests from "../settings/api";
 
 const headings = [
     {
         title: 'Type',
         value: 'typeComp',
         text: 'Type',
-        textValue: 'type',
-        filterKey: 'type'
     },
     {
         text: "Resource Name",
         value: "resourceName",
         title: "Resource Name",
+        type: CellType.TEXT
     },
     {
         title: 'Last Detected',
         text: "Last Detected",
         value: "lastDetectedComp",
         sortActive: true,
-        sortKey: 'lastDetected'
+        sortKey: 'lastDetected',
+        type: CellType.TEXT
     },
     {
         title: 'Updated',
         text: "Updated",
         value: "updatedTimestampComp",
-        sortKey: 'updatedTimestamp'
+        sortKey: 'updatedTimestamp',
+        type: CellType.TEXT
     },
     {
         title: 'Access Types',
         text: "Access Types",
         value: "apiAccessTypesComp",
-        filterKey: 'apiAccessTypes'
     },
     {
         title: 'Remarks',
         text: "Remarks",
-        value: "remarks"
+        value: "remarksComp"
     },
     {
         title: 'Marked By',
         text: "Marked By",
         value: "markedBy",
-        filterKey: 'markedBy'
+        type: CellType.TEXT
     },
+    {
+        title: '',
+        type: CellType.ACTION,
+    }
 ]
 
 const sortOptions = [
@@ -98,31 +105,26 @@ const resourceName = {
 };
 
 const convertDataIntoTableFormat = (auditRecord) => {
-    let temp = {}
-    const id = auditRecord.id
-    temp['id'] = id
-    temp['resourceName'] = auditRecord.resourceName || "N/A"
-    temp['type'] = auditRecord.type || "N/A"
-    temp['markedBy'] = auditRecord.markedBy || "N/A"
-    temp['lastDetected'] = auditRecord.lastDetected || "N/A"
-    temp['updatedTimestamp'] = auditRecord.updatedTimestamp || "N/A"
-    temp['remarks'] = auditRecord.remarks || "N/A"
-    temp['apiAccessTypes'] = auditRecord.apiAccessTypes || []
-    
+    let temp = {...auditRecord}
     temp['typeComp'] = (
-        
+        <MethodBox method={""} url={auditRecord?.type || "TOOL"}/>
     )
     
-    temp['apiAccessTypesComp'] = (
+    temp['apiAccessTypesComp'] = temp?.apiAccessTypes && temp?.apiAccessTypes.length > 0 && (
         <Box maxWidth="200px">
             <HorizontalStack gap="1" wrap>
-                {temp['apiAccessTypes'].map((accessType, index) => (
+                {temp?.apiAccessTypes && temp?.apiAccessTypes.map((accessType, index) => (
                     <Badge key={index} status="success" size="slim">
-                        {accessType}
+                        {accessType.toUpperCase()}
                     </Badge>
                 ))}
             </HorizontalStack>
         </Box>
+    )
+    temp['lastDetectedComp'] = func.prettifyEpoch(temp?.lastDetected)
+    temp['updatedTimestampComp'] = func.prettifyEpoch(temp?.updatedTimestamp)
+    temp['remarksComp'] = (
+        temp?.remarks === undefined ? <Text variant="headingSm" color="critical">Pending...</Text> : <Text variant="bodyMd">{temp?.remarks}</Text>
     )
     
     return temp;
@@ -150,13 +152,37 @@ function AuditData() {
         }
     }
 
+    const updateAuditData = async (hexId, remarks) => {
+        const res = await api.updateAuditData(hexId, remarks)
+        if (res && res.success) {
+            func.setToast(true, true, "Audit data updated successfully")
+        }
+    }
+
+    const getActionsList = (item) => {
+        return [{title: 'Actions', items: [
+            {
+                content: 'Mark as resolved',
+                icon: CircleTickMajor,
+                onAction: () => {updateAuditData(item.hexId, "Approved")},
+            },
+            {
+                content: 'Disapprove',
+                icon: CircleCancelMajor,
+                onAction: () => {updateAuditData(item.hexId, "Rejected")},
+            }
+        ]}]
+    }
+
     async function fetchData(sortKey, sortOrder, skip, limit, filters, filterOperators, queryValue){
         setLoading(true);
         let ret = []
         let total = 0;
+        let finalFilters = {...filters}
+        finalFilters['lastDetected'] = [startTimestamp, endTimestamp]
         
         try {
-            const res = await api.fetchAuditData(sortKey, sortOrder, skip, limit, filters, filterOperators)
+            const res = await api.fetchAuditData(sortKey, sortOrder, skip, limit, finalFilters, filterOperators)
             if (res && res.auditData) {
                 res.auditData.forEach((auditRecord) => {
                     const dataObj = convertDataIntoTableFormat(auditRecord)
@@ -171,6 +197,17 @@ function AuditData() {
         setLoading(false);
         return {value: ret, total: total};
     }
+
+    const fillFilters = async () => {
+        const usersResponse = await settingRequests.getTeamData()
+        if (usersResponse) {
+            filters[1].choices = usersResponse.map((user) => ({label: user.login, value: user.login}))
+        }
+    }
+
+    useEffect(() => {
+        fillFilters()
+    }, [])
 
     const primaryActions = (
         <HorizontalStack gap={"2"}>
@@ -197,7 +234,7 @@ function AuditData() {
         primaryAction={primaryActions}
         components = {[
             <GithubServerTable
-                key={startTimestamp + endTimestamp}
+                key={startTimestamp + endTimestamp + filters[1].choices.length}
                 headers={headings}
                 resourceName={resourceName} 
                 appliedFilters={[]}
@@ -212,6 +249,8 @@ function AuditData() {
                 condensedHeight={true}
                 pageLimit={20}
                 headings={headings}
+                getActions = {(item) => getActionsList(item)}
+                hasRowActions={true}
             />
         ]}
         />
