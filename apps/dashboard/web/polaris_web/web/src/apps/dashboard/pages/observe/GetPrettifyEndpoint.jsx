@@ -5,20 +5,24 @@ import transform from '../onboarding/transform'
 import observeFunc from "./transform"
 import { getDashboardCategory } from '../../../main/labelHelper'
 
-function MethodBox({method, methodBoxWidth, url}){
+export const getMethod = (url, method) => {
     const category = getDashboardCategory();
-    let finalMethod = method;
     if(category.includes("MCP")){
         if(url.includes("tool")){
-            finalMethod = "TOOL";
+            return "TOOL";
         }else if(url.includes("resource")){
-            finalMethod = "RESOURCE";
+            return "RESOURCE";
         }else if(url.includes("prompt")){
-            finalMethod = "PROMPT";
+            return "PROMPT";
         }
     }
+    return method;
+}
+
+function MethodBox({method, methodBoxWidth, url}){
+    const finalMethod = getMethod(url, method);
     return (
-      <Box width={methodBoxWidth || "54px"}>
+      <Box width={methodBoxWidth || "64px"}>
         <HorizontalStack align="end">
           <span
             style={{
@@ -66,7 +70,7 @@ function GetPrettifyEndpoint({method,url, isNew, maxWidth, methodBoxWidth}){
                   onClick={(e) => {
                     e.stopPropagation();
                     func.copyToClipboard(
-                      method + " " + localUrl,
+                      getMethod(localUrl, method) + " " + localUrl,
                       ref,
                       "URL copied"
                     );
