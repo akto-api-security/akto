@@ -7,6 +7,7 @@ import func from "../../../../../util/func";
 import PersistStore from "../../../../main/PersistStore";
 import SessionStore from "../../../../main/SessionStore";
 import { isMCPSecurityCategory } from "../../../../main/labelHelper";
+import { labelMap } from "../../../../main/labelHelperMap";
 
 const resourceName = {
   singular: "api",
@@ -15,9 +16,9 @@ const resourceName = {
 
 const headers = [
   {
-    text: "Endpoint",
+    text:  labelMap[PersistStore.getState().dashboardCategory]["Endpoint"],
     value: "api",
-    title: "Endpoint",
+    title: labelMap[PersistStore.getState().dashboardCategory]["Endpoint"],
   },
   {
     text: "Malicious Actors",
@@ -86,23 +87,6 @@ function ThreatApiTable({ currDateRange, rowClicked }) {
     ]
   }, []);
 
-  const getHeaders = () => {
-    const baseHeaders = [...headers];
-    
-    if (isMCPSecurityCategory()) {
-      const apiIndex = baseHeaders.findIndex(header => header.value === "api");
-      if (apiIndex !== -1) {
-        baseHeaders[apiIndex] = {
-          ...baseHeaders[apiIndex],
-          text: "Tool Name",
-          title: "Tool Name"
-        };
-      }
-    }
-
-    return baseHeaders;
-  };
-
   function disambiguateLabel(key, value) {
     return func.convertToDisambiguateLabelObj(value, null, 2);
   }
@@ -164,7 +148,7 @@ function ThreatApiTable({ currDateRange, rowClicked }) {
       key={key}
       onRowClick={(data) => onRowClick(data)}
       pageLimit={50}
-      headers={getHeaders()}
+      headers={headers}
       resourceName={resourceName}
       sortOptions={sortOptions}
       disambiguateLabel={disambiguateLabel}
@@ -175,7 +159,7 @@ function ThreatApiTable({ currDateRange, rowClicked }) {
       hasRowActions={true}
       getActions={() => {}}
       hideQueryField={true}
-      headings={getHeaders()}
+      headings={headers}
       useNewRow={true}
       condensedHeight={true}
     />

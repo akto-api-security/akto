@@ -12,6 +12,7 @@ import { flags } from "./flags/index.mjs";
 import { Tooltip, Text } from "@shopify/polaris";
 import { useSearchParams } from "react-router-dom";
 import { isMCPSecurityCategory } from "../../../../main/labelHelper";
+import { labelMap } from "../../../../main/labelHelperMap";
 
 const resourceName = {
   singular: "actor",
@@ -35,8 +36,8 @@ const headers = [
     value: "latestIp",
   },
   {
-    text: "Latest API",
-    title: "Latest API",
+    text: "Latest " + labelMap[PersistStore.getState().dashboardCategory]["API"],
+    title: "Latest " + labelMap[PersistStore.getState().dashboardCategory]["API"],
     value: "latestApi",
   },
   {
@@ -281,16 +282,6 @@ function ThreatActorTable({ data, currDateRange, handleRowClick }) {
         value: "actorType",
         title: "Actor Type",
       });
-      
-      // Update Latest API header text for MCP Security
-      const latestApiIndex = baseHeaders.findIndex(header => header.value === "latestApi");
-      if (latestApiIndex !== -1) {
-        baseHeaders[latestApiIndex] = {
-          ...baseHeaders[latestApiIndex],
-          text: "Latest Tool Call",
-          title: "Latest Tool Call"
-        };
-      }
     }
 
     return baseHeaders;
