@@ -151,13 +151,15 @@ const headings = [
 ]
 
 let headers = JSON.parse(JSON.stringify(headings))
-headers.push({
-    text: 'Method',
-    filterKey: 'method',
-    showFilter: true,
-    textValue: 'method',
-    sortActive: true
-})
+if(!getDashboardCategory().includes("MCP")){
+    headers.push({
+        text: 'Method',
+        filterKey: 'method',
+        showFilter: true,
+        textValue: 'method',
+        sortActive: true
+    })
+}
 
 headers.push({
     text: 'Sensitive params in request',

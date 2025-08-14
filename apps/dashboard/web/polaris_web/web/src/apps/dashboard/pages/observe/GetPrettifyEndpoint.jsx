@@ -3,6 +3,38 @@ import React, { useRef, useState } from 'react'
 import func from '@/util/func'
 import transform from '../onboarding/transform'
 import observeFunc from "./transform"
+import { getDashboardCategory } from '../../../main/labelHelper'
+
+function MethodBox({method, methodBoxWidth, url}){
+    const category = getDashboardCategory();
+    let finalMethod = method;
+    if(category.includes("MCP")){
+        if(url.includes("tool")){
+            finalMethod = "TOOL";
+        }else if(url.includes("resource")){
+            finalMethod = "RESOURCE";
+        }else if(url.includes("prompt")){
+            finalMethod = "PROMPT";
+        }
+    }
+    return (
+      <Box width={methodBoxWidth || "54px"}>
+        <HorizontalStack align="end">
+          <span
+            style={{
+              color: transform.getTextColor(finalMethod),
+              fontSize: "14px",
+              fontWeight: 500,
+              lineHeight: "20px",
+            }}
+          >
+            {finalMethod}
+          </span>
+        </HorizontalStack>
+      </Box>
+    )
+}
+
 function GetPrettifyEndpoint({method,url, isNew, maxWidth, methodBoxWidth}){
     const ref = useRef(null)
     const localUrl = url || "/"
@@ -14,20 +46,7 @@ function GetPrettifyEndpoint({method,url, isNew, maxWidth, methodBoxWidth}){
         onMouseEnter={() => setCopyActive(true)}
         onMouseLeave={() => setCopyActive(false)}
       >
-        <Box width={methodBoxWidth || "54px"}>
-          <HorizontalStack align="end">
-            <span
-              style={{
-                color: transform.getTextColor(method),
-                fontSize: "14px",
-                fontWeight: 500,
-                lineHeight: "20px",
-              }}
-            >
-              {method}
-            </span>
-          </HorizontalStack>
-        </Box>
+        <MethodBox method={method} methodBoxWidth={methodBoxWidth} url={url} />
         <Box width={maxWidth ? maxWidth : "30vw"}>
           <div
             style={{
