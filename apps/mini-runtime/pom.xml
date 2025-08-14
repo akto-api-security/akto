@@ -16,18 +16,6 @@
 
     <dependencies>
         <dependency>
-            <groupId>de.flapdoodle.embed</groupId>
-            <artifactId>de.flapdoodle.embed.mongo</artifactId>
-            <version>3.2.6</version>
-            <scope>test</scope>
-        </dependency>
-
-        <dependency>
-            <groupId>org.apache.commons</groupId>
-            <artifactId>commons-lang3</artifactId>
-            <version>3.12.0</version>
-        </dependency>
-        <dependency>
             <groupId>com.akto.libs.dao</groupId>
             <artifactId>dao</artifactId>
             <version>${project.version}</version>
@@ -36,11 +24,12 @@
             <groupId>com.akto.libs.utils</groupId>
             <artifactId>utils</artifactId>
             <version>${project.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>org.apache.httpcomponents</groupId>
-            <artifactId>httpclient</artifactId>
-            <version>4.5.13</version>
+            <exclusions>
+                <exclusion>
+                    <groupId>com.sendgrid</groupId>
+                    <artifactId>sendgrid-java</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
         <dependency>
             <groupId>org.jetbrains</groupId>
@@ -65,6 +54,12 @@
             <type>test-jar</type>
             <version>${project.version}</version>
             <scope>test</scope>
+            <exclusions>
+                <exclusion>
+                    <groupId>com.sendgrid</groupId>
+                    <artifactId>sendgrid-java</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
 
     </dependencies>
