@@ -28,7 +28,7 @@ export const labelMap = {
     "API request": "API request",
     "API Risk Score": "API Risk Score",
     "Endpoint": "Endpoint",
-
+    "API changes": "API changes",
   },
   "MCP Security": {
     "API Security Posture": "MCP Security Posture",
@@ -62,6 +62,7 @@ export const labelMap = {
     "Threat Policy": "Guardrails Policy",
     "API Threat Activity": "MCP Threat Activity",
     "Threat API": "Tools Under Threat",
+    "API changes": "Recent MCP components",
 
   },
   "Gen AI": {
@@ -93,5 +94,6 @@ export const labelMap = {
     "API request": "API request",
     "API Risk Score": "API Risk Score",
     "Endpoint": "AI Agent component",
+    "API changes": "Recent AI Agent components",
   },
 }
