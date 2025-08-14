@@ -40,7 +40,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 // Import protobuf classes
 import com.akto.proto.generated.threat_detection.message.http_response_param.v1.HttpResponseParam;
 import com.akto.proto.generated.threat_detection.message.http_response_param.v1.StringList;
-import com.google.protobuf.ByteString;
 
 public class Main {
 

@@ -49,10 +49,11 @@
             <version>3.0.0</version>
         </dependency>
         <dependency>
-            <groupId>com.akto.libs.protobuf</groupId>
-            <artifactId>protobuf</artifactId>
-            <version>${project.version}</version>
+            <groupId>com.google.protobuf</groupId>
+            <artifactId>protobuf-java</artifactId>
+            <version>4.29.2</version>
         </dependency>
+
         <dependency>
             <groupId>com.akto.libs.utils</groupId>
             <artifactId>utils</artifactId>
