@@ -45,6 +45,7 @@ import org.bson.conversions.Bson;
 
 import java.net.URI;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Pattern;
 
 public class InventoryAction extends UserAction {
@@ -1167,17 +1168,41 @@ public class InventoryAction extends UserAction {
 
     public String fetchNotTestedAPICount() {
         Bson filterQ = UsageMetricCalculator.excludeDemosAndDeactivated(ApiInfo.ID_API_COLLECTION_ID);
-
         Bson filter = Filters.and(
                 filterQ,
                 Filters.exists(ApiInfo.LAST_TESTED, false)
         );
 
+        int totalCount = (int) ApiInfoDao.instance.count(filter);
+        int numThreads = Math.max(1, Runtime.getRuntime().availableProcessors());
+        int batchSize = (int) Math.ceil((double) totalCount / numThreads);
+
+        this.notTestedEndpointsCount = 0;
         if (this.showApiInfo) {
-            this.notTestedEndpointsApiInfo = ApiInfoDao.instance.findAll(filter);
-            this.notTestedEndpointsCount = this.notTestedEndpointsApiInfo.size();
-        } else {
-            this.notTestedEndpointsCount = (int) ApiInfoDao.instance.count(filter);
+            this.notTestedEndpointsApiInfo.clear();
+        }
+
+        List<Integer> skips = new ArrayList<>();
+        for (int i = 0; i < numThreads; i++) {
+            skips.add(i * batchSize);
+        }
+
+        AtomicInteger count = new AtomicInteger(0);
+        List<ApiInfo> allResults = Collections.synchronizedList(new ArrayList<>());
+
+        skips.parallelStream().forEach(skip -> {
+            List<ApiInfo> batch = ApiInfoDao.instance.findAll(
+                    filter, skip, batchSize, Projections.include(ApiInfo.LAST_TESTED), null
+            );
+            count.addAndGet(batch.size());
+            if (this.showApiInfo) {
+                allResults.addAll(batch);
+            }
+        });
+
+        this.notTestedEndpointsCount = count.get();
+        if (this.showApiInfo) {
+            this.notTestedEndpointsApiInfo.addAll(allResults);
         }
 
         return Action.SUCCESS.toUpperCase();
