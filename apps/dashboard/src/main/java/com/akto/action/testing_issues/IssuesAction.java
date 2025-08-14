@@ -101,6 +101,12 @@ public class IssuesAction extends UserAction {
     private boolean showApiInfo;
     @Getter
     private List<ApiInfo> buaCategoryApiInfo = new ArrayList<>();
+    @Getter
+    private List<ApiInfo> vulnerableApisApiInfo = new ArrayList<>();
+    @Setter
+    String categoryType;
+    @Getter
+    int endpointsCount;
 
     public boolean isShowApiInfo() {
         return showApiInfo;
@@ -872,6 +878,58 @@ public class IssuesAction extends UserAction {
         }
     }
 
+    /**
+     * API to fetch the number of URLs from vulnerable_testing_run_results with testsubtype matching ids from YAML templates where info.category.name is "VEM" and "MHH" as per type provided in request.
+     * Returns count of vulnerable APIs and optionally the full API info objects.
+     */
+
+    public String fetchVulnerableApisByCategory() {
+        try {
+            Bson filterQ = UsageMetricCalculator.excludeDemosAndDeactivated(TestingRunResult.API_INFO_KEY+".apiCollectionId");
+
+            List<YamlTemplate> yamlTemplates = YamlTemplateDao.instance.findAll(
+                    Filters.eq("info.category.name", categoryType)
+            );
+            Set<String> testIds = new HashSet<>();
+            if (yamlTemplates.isEmpty()) {
+                this.addActionError("No YAML templates found with category name '" + categoryType + "'.");
+                return ERROR.toUpperCase();
+            }
+
+            for (YamlTemplate template : yamlTemplates) {
+                testIds.add(template.getId());
+            }
+
+            Bson filter = Filters.and(
+                    filterQ,
+                    Filters.in("testSubType", testIds)
+            );
+            
+            this.endpointsCount = (int) (VulnerableTestingRunResultDao.instance.count(filter));
+            
+            if (showApiInfo) {
+                List<TestingRunResult> vulnerableResults = VulnerableTestingRunResultDao.instance.findAll(filter);
+                this.vulnerableApisApiInfo = new ArrayList<>();
+                Set<ApiInfo.ApiInfoKey> uniqueKeys = new LinkedHashSet<>();
+                for (TestingRunResult result : vulnerableResults) {
+                    if (result.getApiInfoKey() != null) uniqueKeys.add(result.getApiInfoKey());
+                }
+                for (ApiInfo.ApiInfoKey key : uniqueKeys) {
+                    ApiInfo apiInfo = ApiInfoDao.instance.findOne(ApiInfoDao.getFilter(key));
+                    if (apiInfo != null) {
+                        this.vulnerableApisApiInfo.add(apiInfo);
+                    }
+                }
+            }
+            
+            return SUCCESS.toUpperCase();
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            this.addActionError("Error fetching vulnerable apiInfoKey: " + e.getMessage());
+            return ERROR.toUpperCase();
+        }
+    }
 
     public List<TestingRunIssues> getIssues() {
         return issues;
