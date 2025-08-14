@@ -20,6 +20,8 @@ function FilterComponent() {
             let temp = resp?.templates ? resp?.templates : []
             if(!shortHand.includes("api")){  
                 temp = temp.filter(x => x?.info?.category?.name !== undefined && x?.info?.category?.name?.toLowerCase().includes(shortHand))
+            }else{
+                temp = temp.filter(x => x?.info?.category?.name !== undefined && !x?.info?.category?.name?.toLowerCase().includes("mcp"))
             }
             setAllData(temp)
             if (temp.length > 0) {
