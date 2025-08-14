@@ -27,7 +27,7 @@ export const labelMap = {
     "API response": "API response",
     "API request": "API request",
     "API Risk Score": "API Risk Score",
-
+    "APIs with most open issues": "APIs with most open issues"
   },
   "MCP Security": {
     "API Security Posture": "MCP Security Posture",
@@ -57,7 +57,7 @@ export const labelMap = {
     "API response": "Tool response",
     "API request": "Tool request",
     "API Risk Score": "MCP Risk Score",
-
+    "APIs with most open issues": "MCP components with most open issues"
   },
   "Gen AI": {
     "API Security Posture": "AI Agent Security Posture",
@@ -87,6 +87,6 @@ export const labelMap = {
     "API response": "API response",
     "API request": "API request",
     "API Risk Score": "API Risk Score",
-
+    "APIs with most open issues": "APIs with most open issues"
   },
 }

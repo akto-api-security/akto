@@ -33,12 +33,12 @@ const ApisWithMostOpenIsuuesGraph = ({ issuesData}) => {
   return (
     (barData.length === 0 || barData.every(item => item.value === 0)) ? (
       <EmptyCard
-        title="APIs With Most Open Issues"
+        title=${mapLabel('APIs with most open issues', getDashboardCategory())}
         subTitleComponent={<Text alignment='center' color='subdued'>No open issues found</Text>}
       />
     ) : (
       <InfoCard
-        title="APIs With Most Open Issues"
+        title=${mapLabel('APIs with most open issues', getDashboardCategory())}
         titleToolTip="Top 5 API endpoints with the most unresolved (OPEN) issues."
         component={
           <BarGraph
