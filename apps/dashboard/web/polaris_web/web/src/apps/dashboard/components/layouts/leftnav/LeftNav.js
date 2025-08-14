@@ -161,7 +161,7 @@ export default function LeftNav() {
                         },
                         selected: leftNavSelected === "dashboard_observe_sensitive",
                     },
-                    {
+                    ...(dashboardCategory === "MCP Security" ? [{
                         label: "Audit Data",
                         onClick: () => {
                             navigate("/dashboard/observe/audit");
@@ -169,8 +169,7 @@ export default function LeftNav() {
                             setActive("active");
                         },
                         selected: leftNavSelected === "dashboard_observe_audit",
-                        visible: dashboardCategory === "MCP Security"
-                    },
+                    }] : []),
                 ],
                 key: "3",
             },

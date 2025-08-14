@@ -32,29 +32,19 @@ export default {
             data: { startTimestamp, endTimestamp }
         })
     },
-    async fetchAuditData(page, pageSize) {
+    async fetchAuditData(sortKey, sortOrder, skip, limit, filters, filterOperators) {
         const resp = await request({
             url: '/api/fetchAuditData',
             method: 'post',
-            data: { page, pageSize }
+            data: { sortKey, sortOrder, skip, limit, filters, filterOperators }
         });
         return resp;
     },
-
-    async insertAuditData(markedBy, description) {
-        const resp = await request({
-            url: '/api/insertAuditData',
-            method: 'post',
-            data: { markedBy, description }
-        });
-        return resp;
-    },
-
-    async updateAuditData(_id, markedBy, description) {
+    async updateAuditData(id, description) {
             const resp = await request({
                 url: '/api/updateAuditData',
                 method: 'post',
-                data: { _id, markedBy, description }
+                data: { id, description }
             });
             return resp;
         },

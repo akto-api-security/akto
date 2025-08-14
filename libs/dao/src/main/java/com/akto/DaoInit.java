@@ -474,5 +474,6 @@ public class DaoInit {
         BidirectionalSyncSettingsDao.instance.createIndicesIfAbsent();
         MetricDataDao.instance.createIndicesIfAbsent();
         SensitiveSampleDataDao.instance.createIndicesIfAbsent();
+        McpAuditInfoDao.instance.createIndicesIfAbsent();
     }
 }
