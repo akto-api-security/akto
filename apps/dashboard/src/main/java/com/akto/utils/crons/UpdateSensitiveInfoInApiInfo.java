@@ -21,7 +21,15 @@ public class UpdateSensitiveInfoInApiInfo {
     private static final LoggerMaker loggerMaker = new LoggerMaker(UpdateSensitiveInfoInApiInfo.class, LogDb.DASHBOARD);
     public static final List<Integer> allowedAccounts = Arrays.asList(
         1752208054,
-        1751294157
+        1751294157,
+        1669322524,
+        1705869646,
+        1723492815,
+        1724877069,
+        1727251348,
+        1729478227,
+        1737683011,
+        1731351930
     );
 
     ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
