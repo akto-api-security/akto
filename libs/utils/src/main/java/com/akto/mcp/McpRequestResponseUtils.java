@@ -1,6 +1,7 @@
 package com.akto.mcp;
 
 import com.akto.dao.McpAuditInfoDao;
+import com.akto.dao.context.Context;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.McpAuditInfo;
 import com.akto.jsonrpc.JsonRpcUtils;
@@ -80,17 +81,19 @@ public final class McpRequestResponseUtils {
 
         String url = responseParams.getRequestParams().getURL();
 
+        McpAuditInfo auditInfo = null;
+
         switch (mcpJsonRpcModel.getMethod()) {
             case McpSchema.METHOD_TOOLS_CALL:
                 if (params != null && StringUtils.isNotBlank(params.getName())) {
                     url = HttpResponseParams.addPathParamToUrl(url, params.getName());
 
-                    // Log the tool detection in audit info
-                    String toolName = params.getName();
-                    McpAuditInfo auditInfo = new McpAuditInfo(toolName, "MCP Tool", (int) (System.currentTimeMillis()),
-                        responseParams.getRequestParams().getApiCollectionId());
-                    McpAuditInfoDao.instance.insertOne(auditInfo);
-                    McpAuditInfoDao.instance.insertOne(auditInfo);
+                    // Create audit info for MCP Tool call
+                    auditInfo = new McpAuditInfo(
+                            Context.now(), "", "MCP Tool", 0, // updatedTs set to null
+                            params.getName(), "", null,
+                            responseParams.getRequestParams().getApiCollectionId()
+                    );
                 }
                 break;
 
@@ -98,16 +101,21 @@ public final class McpRequestResponseUtils {
                 if (params != null && StringUtils.isNotBlank(params.getUri())) {
                     url = HttpResponseParams.addPathParamToUrl(url, params.getUri());
 
-                    // Log the resource detection in audit info
-                    String resourceName = params.getName();
-                    McpAuditInfo auditInfo = new McpAuditInfo(resourceName, "MCP Resource", (int) (System.currentTimeMillis()),
-                        responseParams.getRequestParams().getApiCollectionId());
-                    McpAuditInfoDao.instance.insertOne(auditInfo);
+                    // Create audit info for MCP Resource read
+                    auditInfo = new McpAuditInfo(
+                            Context.now(), "", "MCP Resource", 0, // updatedTs set to null
+                            params.getName(), "", null,
+                            responseParams.getRequestParams().getApiCollectionId()
+                    );
                 }
                 break;
 
             default:
                 break;
+        }
+
+        if (auditInfo != null) {
+            McpAuditInfoDao.instance.insertOne(auditInfo);
         }
         responseParams.getRequestParams().setUrl(url);
     }

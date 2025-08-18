@@ -41,11 +41,4 @@ public class McpAuditInfo {
         this.apiAccessTypes = apiAccessTypes;
         this.hostCollectionId = hostCollectionId;
     }
-
-    public McpAuditInfo(String resourceName, String type, int lastDetected, int hostCollectionId) {
-        this.resourceName = resourceName;
-        this.type = type;
-        this.lastDetected = lastDetected;
-        this.hostCollectionId = hostCollectionId;
-    }
 }
