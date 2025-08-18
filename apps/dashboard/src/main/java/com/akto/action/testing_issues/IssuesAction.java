@@ -885,45 +885,68 @@ public class IssuesAction extends UserAction {
 
     public String fetchVulnerableApisByCategory() {
         try {
-            Bson filterQ = UsageMetricCalculator.excludeDemosAndDeactivated(TestingRunResult.API_INFO_KEY+".apiCollectionId");
-
-            List<YamlTemplate> yamlTemplates = YamlTemplateDao.instance.findAll(
-                    Filters.eq("info.category.name", categoryType)
+            List<Bson> pipeline = new ArrayList<>();
+            Bson filterQ = UsageMetricCalculator.excludeDemosAndDeactivated(TestingRunIssues.ID_API_COLLECTION_ID);
+            pipeline.add(
+                Aggregates.match(Filters.and(
+                    Filters.eq(TestingRunIssues.TEST_RUN_ISSUES_STATUS, GlobalEnums.TestRunIssueStatus.OPEN),
+                    filterQ
+                ))
             );
-            Set<String> testIds = new HashSet<>();
-            if (yamlTemplates.isEmpty()) {
-                this.addActionError("No YAML templates found with category name '" + categoryType + "'.");
-                return ERROR.toUpperCase();
+            try {
+                List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
+                if (collectionIds != null) {
+                    pipeline.add(Aggregates.match(Filters.in(SingleTypeInfo._COLLECTION_IDS, collectionIds)));
+                }
+            } catch (Exception e) { }
+
+            BasicDBObject groupedId = new BasicDBObject(SingleTypeInfo._URL, "$" + TestingRunIssues.ID_URL)
+                    .append(SingleTypeInfo._METHOD, "$" + TestingRunIssues.ID_METHOD)
+                    .append(SingleTypeInfo._API_COLLECTION_ID, "$" + TestingRunIssues.ID_API_COLLECTION_ID);
+            List<BsonField> groupAccumulators = new ArrayList<>();
+            groupAccumulators.add(Accumulators.addToSet("issueNames", "$" + Constants.ID + "." + TestingIssuesId.TEST_SUB_CATEGORY));
+            pipeline.add(Aggregates.group(groupedId, groupAccumulators.toArray(new BsonField[0])));
+
+            Set<String> categorySubCategories = new HashSet<>();
+            for (YamlTemplate t : YamlTemplateDao.instance.findAll(Filters.eq("info.category.name", categoryType), Projections.include("_id"))) {
+                categorySubCategories.add(t.getId());
             }
 
-            for (YamlTemplate template : yamlTemplates) {
-                testIds.add(template.getId());
-            }
-
-            Bson filter = Filters.and(
-                    filterQ,
-                    Filters.in("testSubType", testIds)
-            );
-            
-            this.endpointsCount = (int) (VulnerableTestingRunResultDao.instance.count(filter));
-            
-            if (showApiInfo) {
-                List<TestingRunResult> vulnerableResults = VulnerableTestingRunResultDao.instance.findAll(filter);
+            if (categorySubCategories.isEmpty()) {
+                this.endpointsCount = 0;
                 this.vulnerableApisApiInfo = new ArrayList<>();
-                Set<ApiInfo.ApiInfoKey> uniqueKeys = new LinkedHashSet<>();
-                for (TestingRunResult result : vulnerableResults) {
-                    if (result.getApiInfoKey() != null) uniqueKeys.add(result.getApiInfoKey());
-                }
-                for (ApiInfo.ApiInfoKey key : uniqueKeys) {
-                    ApiInfo apiInfo = ApiInfoDao.instance.findOne(ApiInfoDao.getFilter(key));
-                    if (apiInfo != null) {
-                        this.vulnerableApisApiInfo.add(apiInfo);
-                    }
-                }
+                return SUCCESS.toUpperCase();
             }
-            
-            return SUCCESS.toUpperCase();
+            List<Bson> pipelineWithMatch = new ArrayList<>(pipeline);
+            pipelineWithMatch.add(Aggregates.addFields(new Field<>(
+                "matched",
+                new BasicDBObject("$gt", Arrays.asList(
+                    new BasicDBObject("$size",
+                        new BasicDBObject("$setIntersection", Arrays.asList("$issueNames", categorySubCategories))
+                    ),
+                    0
+                ))
+            )));
+            pipelineWithMatch.add(Aggregates.match(Filters.eq("matched", true)));
 
+            List<Bson> pipelineForCount = new ArrayList<>(pipelineWithMatch);
+            pipelineForCount.add(Aggregates.count("total"));
+            List<BasicDBObject> countDocs = TestingRunIssuesDao.instance.getMCollection()
+                .aggregate(pipelineForCount, BasicDBObject.class)
+                .into(new ArrayList<>());
+            this.endpointsCount = countDocs.isEmpty() ? 0 : countDocs.get(0).getInt("total", 0);
+
+            if (showApiInfo) {
+                List<Bson> pipelineForIds = new ArrayList<>(pipelineWithMatch);
+                pipelineForIds.add(Aggregates.project(Projections.include("_id")));
+                List<BasicDBObject> idDocs = TestingRunIssuesDao.instance.getMCollection()
+                    .aggregate(pipelineForIds, BasicDBObject.class)
+                    .into(new ArrayList<>());
+                List<ApiInfo> apiInfos = ApiInfoDao.getApiInfosFromList(idDocs, -1);
+                this.vulnerableApisApiInfo = (apiInfos == null) ? new ArrayList<>() : apiInfos;
+            }
+
+            return SUCCESS.toUpperCase();
         } catch (Exception e) {
             e.printStackTrace();
             this.addActionError("Error fetching vulnerable apiInfoKey: " + e.getMessage());
