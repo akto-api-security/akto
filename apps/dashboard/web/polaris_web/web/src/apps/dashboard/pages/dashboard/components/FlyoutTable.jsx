@@ -25,6 +25,8 @@ const ACTION_ITEM_TYPES = {
     BROKEN_AUTHENTICATION_ISSUES: 'BROKEN_AUTHENTICATION_ISSUES',
     FREQUENTLY_VULNERABLE_ENDPOINTS: 'FREQUENTLY_VULNERABLE_ENDPOINTS',
     APIS_WITH_MULTIPLE_ISSUES: 'APIS_WITH_MULTIPLE_ISSUES',
+    VERBOSE_ERROR_MESSAGES: 'VERBOSE_ERROR_MESSAGES',
+    MISSING_SECURITY_HEADERS: 'MISSING_SECURITY_HEADERS',
 };
 
 const getIssueLabel = (actionItemType) => {
@@ -55,6 +57,10 @@ const getIssueLabel = (actionItemType) => {
             return 'Broken Authentication Issues';
         case ACTION_ITEM_TYPES.FREQUENTLY_VULNERABLE_ENDPOINTS:
             return 'Frequently Vulnerable Endpoints';
+        case ACTION_ITEM_TYPES.VERBOSE_ERROR_MESSAGES:
+            return 'Verbose Error Messages';
+        case ACTION_ITEM_TYPES.MISSING_SECURITY_HEADERS:
+            return 'Missing Security Headers';
         default:
             return '-';
     }
@@ -116,11 +122,17 @@ function FlyoutTable({ actionItemType, count, allApiInfo, apiInfoLoading }) {
                         relevantData = allApiInfo.brokenAuthIssuesApiInfo || [];
                         break;
                     case ACTION_ITEM_TYPES.FREQUENTLY_VULNERABLE_ENDPOINTS:
-                    relevantData = allApiInfo.multipleIssuesApiInfo || [];
-                    break;
+                        relevantData = allApiInfo.multipleIssuesApiInfo || [];
+                        break;
                     case ACTION_ITEM_TYPES.APIS_WITH_MULTIPLE_ISSUES:
-                    relevantData = allApiInfo.multipleIssuesApiInfo || [];
-                    break;
+                        relevantData = allApiInfo.multipleIssuesApiInfo || [];
+                        break;
+                    case ACTION_ITEM_TYPES.VERBOSE_ERROR_MESSAGES:
+                        relevantData = allApiInfo.vemVulnerableApisApiInfo || [];
+                        break;
+                    case ACTION_ITEM_TYPES.MISSING_SECURITY_HEADERS:
+                        relevantData = allApiInfo.mhhVulnerableApisApiInfo || [];
+                        break;
                     default:
                         relevantData = [];
                 }
