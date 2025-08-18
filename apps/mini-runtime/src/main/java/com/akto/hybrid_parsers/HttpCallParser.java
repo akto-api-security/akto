@@ -644,7 +644,7 @@ public class HttpCallParser {
 
                     //New MCP server detected, audit it
                     McpAuditInfo auditInfo = new McpAuditInfo(
-                            Context.now(), "", AKTO_MCP_SERVER_TAG , 0, // updatedTs set to null
+                            Context.now(), "", AKTO_MCP_SERVER_TAG , 0,
                             hostName, "", null,
                             apiCollectionId
                     );
