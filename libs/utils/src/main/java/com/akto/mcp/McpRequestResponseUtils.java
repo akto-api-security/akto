@@ -100,7 +100,7 @@ public final class McpRequestResponseUtils {
                 if (params != null && StringUtils.isNotBlank(params.getUri())) {
                     url = HttpResponseParams.addPathParamToUrl(url, params.getUri());
 
-                    // Log the tool detection in audit info
+                    // Log the resource detection in audit info
                     String resourceName = params.getName();
                     McpAuditInfo auditInfo = new McpAuditInfo();
                     auditInfo.setMarkedBy("System");
