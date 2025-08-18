@@ -1,7 +1,8 @@
 package com.akto.mcp;
 
-import com.akto.dao.McpAuditInfoDao;
 import com.akto.dao.context.Context;
+import com.akto.data_actor.DataActor;
+import com.akto.data_actor.DataActorFactory;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.McpAuditInfo;
 import com.akto.jsonrpc.JsonRpcUtils;
@@ -31,6 +32,7 @@ public final class McpRequestResponseUtils {
         McpSchema.METHOD_RESOURCES_READ
     ));
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+    private static DataActor dataActor = DataActorFactory.fetchInstance();
 
     public static HttpResponseParams parseMcpResponseParams(HttpResponseParams responseParams) {
         String requestPayload = responseParams.getRequestParams().getPayload();
@@ -107,7 +109,7 @@ public final class McpRequestResponseUtils {
                     // Create audit info for MCP Resource read
                     auditInfo = new McpAuditInfo(
                             Context.now(), "", AKTO_MCP_RESOURCES_TAG, 0,
-                            params.getName(), "", null,
+                            params.getUri(), "", null,
                             responseParams.getRequestParams().getApiCollectionId()
                     );
                 }
@@ -118,7 +120,7 @@ public final class McpRequestResponseUtils {
         }
 
         if (auditInfo != null) {
-            McpAuditInfoDao.instance.insertOne(auditInfo);
+            dataActor.insertMCPAuditDataLog(auditInfo);
         }
         responseParams.getRequestParams().setUrl(url);
     }

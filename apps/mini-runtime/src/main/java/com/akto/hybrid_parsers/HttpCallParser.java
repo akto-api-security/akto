@@ -2,7 +2,6 @@ package com.akto.hybrid_parsers;
 
 import com.akto.RuntimeMode;
 import com.akto.billing.UsageMetricUtils;
-import com.akto.dao.McpAuditInfoDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.traffic_metrics.TrafficMetricsDao;
 import com.akto.dto.traffic.CollectionTags.TagSource;
@@ -648,7 +647,7 @@ public class HttpCallParser {
                             hostName, "", null,
                             apiCollectionId
                     );
-                    McpAuditInfoDao.instance.insertOne(auditInfo);
+                    dataActor.insertMCPAuditDataLog(auditInfo);
                     hostNameToIdMap.put(key, apiCollectionId);
                 } catch (Exception e) {
                     loggerMaker.errorAndAddToDb(e, "Failed to create collection for host : " + hostName);

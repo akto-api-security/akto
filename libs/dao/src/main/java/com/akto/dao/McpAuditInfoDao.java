@@ -51,16 +51,4 @@ public class McpAuditInfoDao extends AccountsContextDao<McpAuditInfo> {
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, false);
     }
 
-    public List<McpAuditInfo> findMarkedByEmptySortedByLastDetected(int pageNumber, int pageSize) {
-        BasicDBObject sort = new BasicDBObject();
-        // First sort: markedBy empty at top, then by lastDetected descending
-        sort.put("markedBy", 1); // empty string comes first
-        sort.put("lastDetected", -1); // descending order
-        int skip = (pageNumber - 1) * pageSize;
-        return this.getMCollection().find(new BasicDBObject())
-            .sort(sort)
-            .skip(skip)
-            .limit(pageSize)
-            .into(new ArrayList<>());
-    }
 }
