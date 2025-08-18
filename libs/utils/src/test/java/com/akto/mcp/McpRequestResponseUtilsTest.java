@@ -23,6 +23,7 @@ public class McpRequestResponseUtilsTest {
         HttpRequestParams reqParams = new HttpRequestParams();
         reqParams.setPayload(payload);
         reqParams.setUrl(url);
+        reqParams.setApiCollectionId(123456789);
 
         HttpResponseParams responseParams = new HttpResponseParams();
         responseParams.setRequestParams(reqParams);
