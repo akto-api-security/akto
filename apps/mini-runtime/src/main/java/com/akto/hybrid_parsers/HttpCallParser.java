@@ -2,6 +2,7 @@ package com.akto.hybrid_parsers;
 
 import com.akto.RuntimeMode;
 import com.akto.billing.UsageMetricUtils;
+import com.akto.dao.McpAuditInfoDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.traffic_metrics.TrafficMetricsDao;
 import com.akto.dto.traffic.CollectionTags.TagSource;
@@ -61,6 +62,7 @@ import org.apache.commons.collections.CollectionUtils;
 import static com.akto.runtime.RuntimeUtil.matchesDefaultPayload;
 import static com.akto.runtime.utils.Utils.printL;
 import static com.akto.testing.Utils.validateFilter;
+import static com.akto.util.Constants.AKTO_MCP_SERVER_TAG;
 
 public class HttpCallParser {
     private final int sync_threshold_count;
@@ -640,6 +642,13 @@ public class HttpCallParser {
                         );
                     }
 
+                    //New MCP server detected, audit it
+                    McpAuditInfo auditInfo = new McpAuditInfo(
+                            Context.now(), "", AKTO_MCP_SERVER_TAG , 0, // updatedTs set to null
+                            hostName, "", null,
+                            apiCollectionId
+                    );
+                    McpAuditInfoDao.instance.insertOne(auditInfo);
                     hostNameToIdMap.put(key, apiCollectionId);
                 } catch (Exception e) {
                     loggerMaker.errorAndAddToDb(e, "Failed to create collection for host : " + hostName);
