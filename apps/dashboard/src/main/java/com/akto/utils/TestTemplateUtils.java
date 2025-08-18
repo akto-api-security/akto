@@ -87,11 +87,16 @@ public class TestTemplateUtils {
         }
         TestCategory[] allCategories = GlobalEnums.TestCategory.values();
         TestCategory[] mcpCategories = {
-            GlobalEnums.TestCategory.MCP_AUTH,
-            GlobalEnums.TestCategory.MCP_INPUT_VALIDATION,
-            GlobalEnums.TestCategory.MCP_DOS,
-            GlobalEnums.TestCategory.MCP_SENSITIVE_DATA_LEAKAGE,
-            GlobalEnums.TestCategory.MCP
+            TestCategory.MCP_AUTH,
+            TestCategory.MCP_INPUT_VALIDATION,
+            TestCategory.MCP_DOS,
+            TestCategory.MCP_DATA_LEAK,
+            TestCategory.MCP,
+            TestCategory.MCP_TOOL_POISONING,
+            TestCategory.MCP_PROMPT_INJECTION,
+            TestCategory.MCP_PRIVILEGE_ABUSE,
+            TestCategory.MCP_INDIRECT_PROMPT_INJECTION,
+            TestCategory.MCP_MALICIOUS_CODE_EXECUTION,
         };
 
         TestCategory[] llmCategories = {

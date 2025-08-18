@@ -50,11 +50,6 @@ public class GlobalEnums {
         INJECT("INJECT", Severity.MEDIUM, "Injection Attacks (INJECT)", "Injection Attacks"),
         INPUT("INPUT", Severity.MEDIUM, "Input Validation (INPUT)", "Input Validation"),
         LLM("LLM",Severity.HIGH,"LLM (Large Language Models) Top 10","LLM"),
-        MCP("MCP", Severity.HIGH, "Model Context Protocol (MCP) Security", "MCP"),
-        MCP_AUTH("MCP_AUTH", Severity.HIGH, "Model Context Protocol (MCP) Security - Broken Authentication", "MCP_AUTH"),
-        MCP_INPUT_VALIDATION("MCP_INPUT_VALIDATION", Severity.HIGH, "Model Context Protocol (MCP) Security - Input Validation", "MCP_INPUT_VALIDATION"),
-        MCP_DOS("MCP_DOS", Severity.HIGH, "Model Context Protocol (MCP) Security - Denial of Service", "MCP_DOS"),
-        MCP_SENSITIVE_DATA_LEAKAGE("MCP_SENSITIVE_DATA_LEAKAGE", Severity.HIGH, "Model Context Protocol (MCP) Security - Sensitive Data Leakage", "MCP_SENSITIVE_DATA_LEAKAGE"),
         LLM01("LLM01", Severity.HIGH, "LLM01 - Prompt Injection", "LLM01"),
         LLM02("LLM02", Severity.HIGH, "LLM02 - Sensitive Information Disclosure", "LLM02"),
         LLM03("LLM03", Severity.HIGH, "LLM03 - Supply Chain", "LLM03"),
@@ -64,8 +59,17 @@ public class GlobalEnums {
         LLM07("LLM07", Severity.HIGH, "LLM07 - System Prompt Leakage", "LLM07"),
         LLM08("LLM08", Severity.HIGH, "LLM08 - Vector and Embedding Weaknesses", "LLM08"),
         LLM09("LLM09", Severity.HIGH, "LLM09 - Misinformation", "LLM09"),
-        LLM10("LLM10", Severity.HIGH, "LLM10 - Unbounded Consumption", "LLM10");
-
+        LLM10("LLM10", Severity.HIGH, "LLM10 - Unbounded Consumption", "LLM10"),
+        MCP_PROMPT_INJECTION("MCP_PROMPT_INJECTION", Severity.HIGH, "MCP - Prompt Injection", "MCP_PROMPT_INJECTION"),
+        MCP_TOOL_POISONING("MCP_TOOL_POISONING", Severity.HIGH, "MCP - Tool Poisoning", "MCP_TOOL_POISONING"),
+        MCP_PRIVILEGE_ABUSE("MCP_PRIVILEGE_ABUSE", Severity.HIGH, "MCP - Privilege Abuse", "MCP_PRIVILEGE_ABUSE"),
+        MCP_INDIRECT_PROMPT_INJECTION("MCP_INDIRECT_PROMPT_INJECTION", Severity.HIGH, "MCP - Indirect Prompt Injection", "MCP_INDIRECT_PROMPT_INJECTION"),
+        MCP_DATA_LEAK("MCP_DATA_LEAK", Severity.HIGH, "MCP - Data Leak", "MCP_DATA_LEAK"),
+        MCP_DOS("MCP_DOS", Severity.HIGH, "MCP - Denial of Wallet", "MCP_DOS"),
+        MCP_AUTH("MCP_AUTH", Severity.HIGH, "MCP - Broken Authentication", "MCP_AUTH"),
+        MCP_MALICIOUS_CODE_EXECUTION("MCP_MALICIOUS_CODE_EXECUTION", Severity.HIGH, "MCP - Malicious Code Execution", "MCP_MALICIOUS_CODE_EXECUTION"),
+        MCP("MCP", Severity.HIGH, "Model Context Protocol (MCP) Security", "MCP"),
+        MCP_INPUT_VALIDATION("MCP_INPUT_VALIDATION", Severity.HIGH, "MCP - Input Validation", "MCP_INPUT_VALIDATION");
 
         private final String name;
         private final Severity severity;
