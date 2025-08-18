@@ -496,7 +496,9 @@ function ApiCollections(props) {
             .map(([collectionId, untrackedCount]) => {
                 const collection = collectionMap.get(parseInt(collectionId));
                 return collection ? {
-                    ...collection,
+                    id: collection.id,
+                    displayName: collection.displayName,
+                    displayNameComp: collection.displayNameComp,
                     urlsCount: untrackedCount,
                     rowStatus: 'critical',
                     disableClick: true,
