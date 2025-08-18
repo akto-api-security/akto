@@ -90,7 +90,7 @@ public class TestTemplateUtils {
             TestCategory.MCP_AUTH,
             TestCategory.MCP_INPUT_VALIDATION,
             TestCategory.MCP_DOS,
-            TestCategory.MCP_DATA_LEAK,
+            TestCategory.MCP_SENSITIVE_DATA_LEAKAGE,
             TestCategory.MCP,
             TestCategory.MCP_TOOL_POISONING,
             TestCategory.MCP_PROMPT_INJECTION,
