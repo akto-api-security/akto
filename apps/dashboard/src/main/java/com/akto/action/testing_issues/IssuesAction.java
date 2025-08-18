@@ -135,7 +135,7 @@ public class IssuesAction extends UserAction {
 
         if(activeCollections){
             Set<Integer> deactivatedCollections = UsageMetricCalculator.getDeactivated();
-            filters = Filters.and(filters, Filters.nin("_id.apiInfoKey.apiCollectionId", deactivatedCollections));
+            filters = Filters.and(filters, Filters.nin(TestingRunIssues.ID_API_COLLECTION_ID, deactivatedCollections));
         }
 
         Bson combinedFilters = Filters.and(filters, Filters.ne("_id.testErrorSource", "TEST_EDITOR"));
@@ -758,6 +758,13 @@ public class IssuesAction extends UserAction {
         if (issuesIds != null && !issuesIds.isEmpty()) {
             filter = Filters.and(filter, Filters.in(Constants.ID, issuesIds));
         }
+
+        Set<Integer> deactivatedCollections = UsageMetricCalculator.getDeactivated();
+        filter = Filters.and(
+            filter,
+            Filters.nin(TestingRunIssues.ID_API_COLLECTION_ID, deactivatedCollections)
+        );
+
         BasicDBObject groupedId = new BasicDBObject(SingleTypeInfo._API_COLLECTION_ID, "$" + TestingRunIssues.ID_API_COLLECTION_ID)
                 .append(TestingRunIssues.KEY_SEVERITY, "$" + TestingRunIssues.KEY_SEVERITY);
         this.severityInfo = TestingRunIssuesDao.instance.getSeveritiesMapForCollections(filter, false, groupedId);
