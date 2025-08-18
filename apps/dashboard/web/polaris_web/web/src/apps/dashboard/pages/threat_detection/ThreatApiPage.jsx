@@ -12,6 +12,7 @@ import ThreatApiSubcategoryCount from "./components/ThreatApiSubcategoryCount";
 import api from "./api";
 import { HorizontalGrid } from "@shopify/polaris";
 import threatDetectionFunc from "./transform";
+import { getDashboardCategory, mapLabel } from "../../../main/labelHelper";
 function ThreatApiPage() {
   const [loading, setLoading] = useState(false);
   const [categoryCount, setCategoryCount] = useState([]);
@@ -56,7 +57,7 @@ function ThreatApiPage() {
 
   return (
     <PageWithMultipleCards
-      title={<TitleWithInfo titleText={"Threat API"} />}
+      title={<TitleWithInfo titleText={`${mapLabel("APIs", getDashboardCategory())} under Threat`} />}
       isFirstPage={true}
       primaryAction={
         <DateRangeFilter

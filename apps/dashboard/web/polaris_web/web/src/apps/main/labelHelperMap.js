@@ -27,7 +27,10 @@ export const labelMap = {
     "API response": "API response",
     "API request": "API request",
     "API Risk Score": "API Risk Score",
-
+    "Endpoint": "Endpoint",
+    "API changes": "API changes",
+    "APIs Tested": "APIs Tested",
+    "APIs with most open issues": "APIs with most open issues"
   },
   "MCP Security": {
     "API Security Posture": "MCP Security Posture",
@@ -46,18 +49,23 @@ export const labelMap = {
     "Total endpoints": "Total tools",
     "Test your APIs": "Test your MCPs",
     "API Security": "MCP Security",
-    "API endpoint": "MCP tool",
-    "API endpoints": "MCP tools",
+    "API endpoint": "MCP component",
+    "API endpoints": "MCP components",
     "API details": "Tool details",
-    "New endpoints": "New tools",
-    "New sensitive endpoints": "New sensitive tools",
-    "APIs Affected": "Tools Affected",
-    "APIs": "Tools",
-    "API": "Tool",
+    "New endpoints": "New mcp components",
+    "New sensitive endpoints": "New sensitive mcp components",
+    "APIs Affected": "MCP components Affected",
+    "APIs": "MCP components",
+    "API": "MCP component",
     "API response": "Tool response",
     "API request": "Tool request",
-    "API Risk Score": "MCP Risk Score",
-
+    "API Risk Score": "MCP components Risk Score",
+    "Endpoint": "MCP component",
+    "Threat Policy": "Guardrails Policy",
+    "API Threat Activity": "MCP Threat Activity",
+    "API changes": "Recent MCP components",
+    "APIs Tested": "Tools tested",
+    "APIs with most open issues": "MCP components with most open issues"
   },
   "Gen AI": {
     "API Security Posture": "AI Agent Security Posture",
@@ -87,6 +95,8 @@ export const labelMap = {
     "API response": "API response",
     "API request": "API request",
     "API Risk Score": "API Risk Score",
-
+    "Endpoint": "AI Agent component",
+    "API changes": "Recent AI Agent components",
+    "APIs with most open issues": "APIs with most open issues"
   },
 }

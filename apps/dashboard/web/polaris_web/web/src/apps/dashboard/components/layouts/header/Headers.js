@@ -1,5 +1,5 @@
 import { TopBar, Icon, Text, ActionList, Modal, TextField, HorizontalStack, Box, Avatar, VerticalStack, Button, Scrollable } from '@shopify/polaris';
-import { NotificationMajor, CustomerPlusMajor, LogOutMinor, NoteMinor, ResourcesMajor, UpdateInventoryMajor, PageMajor, DynamicSourceMajor, PhoneMajor, ChatMajor, SettingsMajor } from '@shopify/polaris-icons';
+import { NotificationMajor, CustomerPlusMajor, LogOutMinor, NoteMinor, ResourcesMajor, UpdateInventoryMajor, PhoneMajor, ChatMajor, SettingsMajor } from '@shopify/polaris-icons';
 import { useState, useCallback, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Store from '../../../store';
@@ -124,6 +124,7 @@ export default function Header() {
         PersistStore.getState().setLastCalledSensitiveInfo(0);
         PersistStore.getState().setLastFetchedInfo({ lastRiskScoreInfo: 0, lastSensitiveInfo: 0 });
         LocalStore.getState().setCategoryMap({}); 
+        LocalStore.getState().setSubCategoryMap({});
         SessionStore.getState().setThreatFiltersMap({});
         setDashboardCategory(value);
         window.location.reload();
