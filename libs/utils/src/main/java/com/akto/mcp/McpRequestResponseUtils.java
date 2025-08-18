@@ -87,11 +87,9 @@ public final class McpRequestResponseUtils {
 
                     // Log the tool detection in audit info
                     String toolName = params.getName();
-                    McpAuditInfo auditInfo = new McpAuditInfo();
-                    auditInfo.setMarkedBy("System");
-                    auditInfo.setResourceName("Tool detected: " + toolName+" " + url);
-                    auditInfo.setType("Tool");
-                    auditInfo.setLastDetected(Integer.parseInt(String.valueOf(System.currentTimeMillis())));
+                    McpAuditInfo auditInfo = new McpAuditInfo(toolName, "MCP Tool", (int) (System.currentTimeMillis()),
+                        responseParams.getRequestParams().getApiCollectionId());
+                    McpAuditInfoDao.instance.insertOne(auditInfo);
                     McpAuditInfoDao.instance.insertOne(auditInfo);
                 }
                 break;
@@ -102,11 +100,8 @@ public final class McpRequestResponseUtils {
 
                     // Log the resource detection in audit info
                     String resourceName = params.getName();
-                    McpAuditInfo auditInfo = new McpAuditInfo();
-                    auditInfo.setMarkedBy("System");
-                    auditInfo.setResourceName("Resource detected: " + resourceName+" " + url);
-                    auditInfo.setType("Resource");
-                    auditInfo.setLastDetected(Integer.parseInt(String.valueOf(System.currentTimeMillis())));
+                    McpAuditInfo auditInfo = new McpAuditInfo(resourceName, "MCP Resource", (int) (System.currentTimeMillis()),
+                        responseParams.getRequestParams().getApiCollectionId());
                     McpAuditInfoDao.instance.insertOne(auditInfo);
                 }
                 break;

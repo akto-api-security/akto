@@ -58,11 +58,7 @@ public class MCPScanAction extends UserAction {
                 ApiCollectionsDao.instance.insertOne(createdCollection);
 
                 //New MCP server detected, audit it
-                McpAuditInfo auditInfo = new McpAuditInfo();
-                auditInfo.setMarkedBy("System");
-                auditInfo.setResourceName("MCP Server detected: " + hostName);
-                auditInfo.setType("MCP Server");
-                auditInfo.setLastDetected((int) (System.currentTimeMillis()));
+                McpAuditInfo auditInfo = new McpAuditInfo(hostName, "MCP server", (int) (System.currentTimeMillis()), collectionId);
                 McpAuditInfoDao.instance.insertOne(auditInfo);
             }
 
