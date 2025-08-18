@@ -99,6 +99,15 @@ public final class McpRequestResponseUtils {
             case McpSchema.METHOD_RESOURCES_READ:
                 if (params != null && StringUtils.isNotBlank(params.getUri())) {
                     url = HttpResponseParams.addPathParamToUrl(url, params.getUri());
+
+                    // Log the tool detection in audit info
+                    String resourceName = params.getName();
+                    McpAuditInfo auditInfo = new McpAuditInfo();
+                    auditInfo.setMarkedBy("System");
+                    auditInfo.setResourceName("Resource detected: " + resourceName+" " + url);
+                    auditInfo.setType("Resource");
+                    auditInfo.setLastDetected(Integer.parseInt(String.valueOf(System.currentTimeMillis())));
+                    McpAuditInfoDao.instance.insertOne(auditInfo);
                 }
                 break;
 
