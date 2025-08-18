@@ -26,6 +26,8 @@ import com.mongodb.client.model.ReturnDocument;
 import com.mongodb.client.model.Updates;
 import com.opensymphony.xwork2.Action;
 
+import static com.akto.util.Constants.AKTO_MCP_SERVER_TAG;
+
 public class MCPScanAction extends UserAction {
 
     private String serverUrl;
@@ -58,7 +60,11 @@ public class MCPScanAction extends UserAction {
                 ApiCollectionsDao.instance.insertOne(createdCollection);
 
                 //New MCP server detected, audit it
-                McpAuditInfo auditInfo = new McpAuditInfo(hostName, "MCP server", (int) (System.currentTimeMillis()), collectionId);
+                McpAuditInfo auditInfo = new McpAuditInfo(
+                        Context.now(), "", AKTO_MCP_SERVER_TAG , 0, // updatedTs set to null
+                        hostName, "", null,
+                        collectionId
+                );
                 McpAuditInfoDao.instance.insertOne(auditInfo);
             }
 
@@ -74,7 +80,7 @@ public class MCPScanAction extends UserAction {
                 Updates.setOnInsert("urls", new HashSet<>()),
                 Updates.set(ApiCollection.SSE_CALLBACK_URL, sseEndpoint),
                 Updates.set(ApiCollection.TAGS_STRING, 
-                Collections.singletonList(new CollectionTags(Context.now(), Constants.AKTO_MCP_SERVER_TAG, "MCP Server", TagSource.KUBERNETES)))
+                Collections.singletonList(new CollectionTags(Context.now(), AKTO_MCP_SERVER_TAG, "MCP Server", TagSource.KUBERNETES)))
             );
 
             FindOneAndUpdateOptions updateOptions = new FindOneAndUpdateOptions();

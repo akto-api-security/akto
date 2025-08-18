@@ -19,6 +19,9 @@ import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
 
+import static com.akto.util.Constants.AKTO_MCP_RESOURCES_TAG;
+import static com.akto.util.Constants.AKTO_MCP_TOOLS_TAG;
+
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public final class McpRequestResponseUtils {
     private static final LoggerMaker logger = new LoggerMaker(McpRequestResponseUtils.class, LogDb.RUNTIME);
@@ -90,7 +93,7 @@ public final class McpRequestResponseUtils {
 
                     // Create audit info for MCP Tool call
                     auditInfo = new McpAuditInfo(
-                            Context.now(), "", "MCP Tool", 0, // updatedTs set to null
+                            Context.now(), "", AKTO_MCP_TOOLS_TAG, 0, // updatedTs set to null
                             params.getName(), "", null,
                             responseParams.getRequestParams().getApiCollectionId()
                     );
@@ -103,7 +106,7 @@ public final class McpRequestResponseUtils {
 
                     // Create audit info for MCP Resource read
                     auditInfo = new McpAuditInfo(
-                            Context.now(), "", "MCP Resource", 0, // updatedTs set to null
+                            Context.now(), "", AKTO_MCP_RESOURCES_TAG, 0, // updatedTs set to null
                             params.getName(), "", null,
                             responseParams.getRequestParams().getApiCollectionId()
                     );
