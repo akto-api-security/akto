@@ -79,6 +79,7 @@ public class DbAction extends ActionSupport {
     List<BulkUpdates> writesForOverageInfo;
     List<DependencyNode> dependencyNodeList;
     TestScript testScript;
+    McpAuditInfo auditInfo;
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(DbAction.class, LoggerMaker.LogDb.DASHBOARD);
     public List<BulkUpdates> getWritesForTestingRunIssues() {
@@ -1813,6 +1814,17 @@ public class DbAction extends ActionSupport {
 
     public String findLatestTestingRunResultSummary(){
         trrs = DbLayer.findLatestTestingRunResultSummary(filter);
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String insertMCPAuditDataLog() {
+        try {
+            DbLayer.insertMCPAuditDataLog(auditInfo);
+        } catch (Exception e) {
+            e.printStackTrace();
+            loggerMaker.errorAndAddToDb(e, "Error insertMCPAuditDataLog " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
         return Action.SUCCESS.toUpperCase();
     }
 
