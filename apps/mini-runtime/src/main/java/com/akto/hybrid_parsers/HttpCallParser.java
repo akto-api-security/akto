@@ -89,6 +89,16 @@ public class HttpCallParser {
     private DataActor dataActor = DataActorFactory.fetchInstance();
     private Map<Integer, ApiCollection> apiCollectionsMap = new HashMap<>();
 
+    // Pre-compiled patterns for better performance
+    private static final Pattern IP_ADDRESS_PATTERN = Pattern.compile("\\b\\d{1,3}(?:\\.\\d{1,3}){3}.*");
+    
+    // List of ignored host names for fast contains() checks
+    private static final List<String> IGNORE_HOST_NAMES = Arrays.asList(
+        "svc.cluster.local",
+        "localhost", 
+        "kubernetes.default.svc"
+    );
+
     public static void init() {
         trafficMetricsExecutor.scheduleAtFixedRate(new Runnable() {
             @Override
@@ -204,7 +214,14 @@ public class HttpCallParser {
     public static boolean isBlockedHost(String hostName) {
         if (hostName == null) return false;
         hostName = hostName.toLowerCase();
-        return hostName.matches("(?:\\b\\d{1,3}(?:\\.\\d{1,3}){3}.*|.*localhost.*|kubernetes.default.svc)");
+        
+        // Fast IP address check using pre-compiled pattern
+        if (IP_ADDRESS_PATTERN.matcher(hostName).matches()) {
+            return true;
+        }
+        
+        // Fast domain check using the ignore list
+        return IGNORE_HOST_NAMES.stream().anyMatch(hostName::contains);
     }
 
     public static boolean isBlockedContentType(String contentType) {
@@ -232,6 +249,13 @@ public class HttpCallParser {
             responseParam.getRequestParams().getHeaders().put("host", Arrays.asList(hostName + "-" + serviceName));
             filterType = FILTER_TYPE.MODIFIED;
         }
+
+        // Merge am-pc collections
+        if(hostName.contains("am-pc")) {
+            responseParam.getRequestParams().getHeaders().put("host", Arrays.asList("am-pc.ID.am.agoda.is"));
+            filterType = FILTER_TYPE.MODIFIED;
+        }
+
         return filterType;
     }
 
