@@ -93,7 +93,7 @@ public final class McpRequestResponseUtils {
 
                     // Create audit info for MCP Tool call
                     auditInfo = new McpAuditInfo(
-                            Context.now(), "", AKTO_MCP_TOOLS_TAG, 0, // updatedTs set to null
+                            Context.now(), "", AKTO_MCP_TOOLS_TAG, 0,
                             params.getName(), "", null,
                             responseParams.getRequestParams().getApiCollectionId()
                     );
@@ -106,7 +106,7 @@ public final class McpRequestResponseUtils {
 
                     // Create audit info for MCP Resource read
                     auditInfo = new McpAuditInfo(
-                            Context.now(), "", AKTO_MCP_RESOURCES_TAG, 0, // updatedTs set to null
+                            Context.now(), "", AKTO_MCP_RESOURCES_TAG, 0,
                             params.getName(), "", null,
                             responseParams.getRequestParams().getApiCollectionId()
                     );
