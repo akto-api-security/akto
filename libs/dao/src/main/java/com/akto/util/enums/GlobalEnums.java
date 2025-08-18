@@ -65,7 +65,7 @@ public class GlobalEnums {
         MCP_PRIVILEGE_ABUSE("MCP_PRIVILEGE_ABUSE", Severity.HIGH, "MCP - Privilege Abuse", "MCP_PRIVILEGE_ABUSE"),
         MCP_INDIRECT_PROMPT_INJECTION("MCP_INDIRECT_PROMPT_INJECTION", Severity.HIGH, "MCP - Indirect Prompt Injection", "MCP_INDIRECT_PROMPT_INJECTION"),
         MCP_SENSITIVE_DATA_LEAKAGE("MCP_SENSITIVE_DATA_LEAKAGE", Severity.HIGH, "MCP - Data Leak", "MCP_SENSITIVE_DATA_LEAKAGE"),
-        MCP_DOS("MCP_DOS", Severity.HIGH, "MCP - Denial of Wallet", "MCP_DOS"),
+        MCP_DOS("MCP_DOS", Severity.HIGH, "MCP - Denial of Service", "MCP_DOS"),
         MCP_AUTH("MCP_AUTH", Severity.HIGH, "MCP - Broken Authentication", "MCP_AUTH"),
         MCP_MALICIOUS_CODE_EXECUTION("MCP_MALICIOUS_CODE_EXECUTION", Severity.HIGH, "MCP - Malicious Code Execution", "MCP_MALICIOUS_CODE_EXECUTION"),
         MCP("MCP", Severity.HIGH, "Model Context Protocol (MCP) Security", "MCP"),
