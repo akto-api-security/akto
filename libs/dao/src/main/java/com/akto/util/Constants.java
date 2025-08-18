@@ -21,4 +21,7 @@ public class Constants {
     public static final String AKTO_NODE_ID = "x-akto-node";
     public static final String AKTO_REMOVE_AUTH= "x-akto-remove-auth";
 
+    public static final String AKTO_MCP_SERVER_TAG = "mcp-server";
+    public static final String AKTO_MCP_TOOLS_TAG = "mcp-tool";
+    public static final String AKTO_MCP_RESOURCES_TAG = "mcp-resource";
 }

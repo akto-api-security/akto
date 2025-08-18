@@ -1696,6 +1696,10 @@ public class DbLayer {
         DataIngestionLogsDao.instance.insertOne(log);
     }
 
+    public static void insertMCPAuditDataLog(McpAuditInfo auditInfo) {
+        McpAuditInfoDao.instance.insertOne(auditInfo);
+    }
+
     public static List<SlackWebhook> fetchSlackWebhooks() {
         return SlackWebhooksDao.instance.findAll(Filters.empty());
     }

@@ -107,6 +107,7 @@ public class DbAction extends ActionSupport {
     List<DependencyNode> dependencyNodeList;
     TestScript testScript;
     String openApiSchema;
+    McpAuditInfo auditInfo;
 
     private ModuleInfo moduleInfo;
 
@@ -2639,6 +2640,19 @@ public class DbAction extends ActionSupport {
         } catch (Exception e) {
             e.printStackTrace();
             loggerMaker.errorAndAddToDb(e, "Error insertDataIngestionLog " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+
+
+    public String insertMCPAuditDataLog() {
+        try {
+            DbLayer.insertMCPAuditDataLog(auditInfo);
+        } catch (Exception e) {
+            e.printStackTrace();
+            loggerMaker.errorAndAddToDb(e, "Error insertMCPAuditDataLog " + e.toString());
             return Action.ERROR.toUpperCase();
         }
         return Action.SUCCESS.toUpperCase();
