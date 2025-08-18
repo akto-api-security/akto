@@ -1,4 +1,4 @@
-import { Avatar, Badge, Box, HorizontalStack, IndexFiltersMode, List, Text, Tooltip } from "@shopify/polaris";
+import { Avatar, Badge, Box, IndexFiltersMode, List, Text } from "@shopify/polaris";
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards";
 import TitleWithInfo from "../../../components/shared/TitleWithInfo";
 
@@ -103,6 +103,7 @@ function TestsTablePage() {
     const [selectedTest, setSelectedTest] = useState({})
     const [data, setData] = useState({ 'all': [], 'by_akto': [], 'custom': [], 'inactive': [] })
     const localSubCategoryMap = LocalStore.getState().subCategoryMap
+    const categoryMap = LocalStore.getState().categoryMap;
 
     const severityOrder = { CRITICAL: 5, HIGH: 4, MEDIUM: 3, LOW: 2, dynamic_severity: 1 };
 
@@ -155,15 +156,23 @@ function TestsTablePage() {
 
     const fetchAllTests = async () => {
         try {
+            let categoriesName = Object.keys(categoryMap);
             let metaDataObj = {
                 subCategories: [],
+                categories: []
             }
-            metaDataObj = await transform.getAllSubcategoriesData(false, "testEditor")
+            if ((localSubCategoryMap && Object.keys(localSubCategoryMap).length > 0 ) && categoriesName.length > 0) {
+                metaDataObj = {
+                    subCategories: Object.values(localSubCategoryMap),
+                    categories: Object.keys(categoryMap)
+                }
+                
+            } else { 
+                metaDataObj = await transform.getAllSubcategoriesData(false, "testEditor")
+                categoriesName = metaDataObj?.categories.map(x => x.name)
+            }
             if (!metaDataObj?.subCategories?.length) return;
-    
             try {
-                let categories = metaDataObj?.categories || []
-                let categoriesName = categories.map(cat => cat?.name);
                 metaDataObj.subCategories = metaDataObj.subCategories.filter(
                     (subCategory) => categoriesName.includes(subCategory.superCategory.name)
                 )

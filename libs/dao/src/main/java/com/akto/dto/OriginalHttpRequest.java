@@ -12,6 +12,7 @@ import java.util.stream.Collectors;
 import lombok.Getter;
 import lombok.Setter;
 import okhttp3.HttpUrl;
+import okhttp3.Headers;
 
 import java.net.URI;
 import java.util.*;
@@ -471,6 +472,30 @@ public class OriginalHttpRequest {
         } else {
             return path + "?" + query;
         }
+    }
+
+    /**
+     * Converts the headers map to OkHttp Headers object
+     * @return OkHttp Headers object
+     */
+    public Headers toOkHttpHeaders() {
+        if (this.headers == null || this.headers.isEmpty()) {
+            return new Headers.Builder().build();
+        }
+        
+        Headers.Builder builder = new Headers.Builder();
+        for (Map.Entry<String, List<String>> entry : this.headers.entrySet()) {
+            String key = entry.getKey();
+            List<String> values = entry.getValue();
+            if (values != null) {
+                for (String value : values) {
+                    if (value != null) {
+                        builder.add(key, value);
+                    }
+                }
+            }
+        }
+        return builder.build();
     }
 
     @Override

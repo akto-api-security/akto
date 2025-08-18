@@ -54,6 +54,8 @@ import static com.akto.runtime.utils.Utils.parseCookie;
 import org.apache.commons.lang3.StringUtils;
 import org.bson.types.ObjectId;
 
+import com.akto.util.McpSseEndpointHelper;
+
 
 public class Executor {
 
@@ -218,6 +220,9 @@ public class Executor {
                     testReq.getRequest().getHeaders().put("x-akto-original-url", Collections.singletonList(origRawApi.getRequest().getUrl()));
                     testReq.getRequest().getHeaders().put("x-akto-original-method", Collections.singletonList(origRawApi.getRequest().getMethod()));   
                 }
+
+                // Add SSE endpoint header for MCP collections
+                McpSseEndpointHelper.addSseEndpointHeader(testReq.getRequest(), apiInfoKey.getApiCollectionId());
 
                 testResponse = ApiExecutor.sendRequest(testReq.getRequest(), followRedirect, testingRunConfig, debug, testLogs, Utils.SKIP_SSRF_CHECK, false);
                 requestSent = true;

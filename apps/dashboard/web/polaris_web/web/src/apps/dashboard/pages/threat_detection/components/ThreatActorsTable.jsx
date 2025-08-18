@@ -11,6 +11,9 @@ import dayjs from "dayjs";
 import { flags } from "./flags/index.mjs";
 import { Tooltip, Text } from "@shopify/polaris";
 import { useSearchParams } from "react-router-dom";
+import { isMCPSecurityCategory } from "../../../../main/labelHelper";
+import { labelMap } from "../../../../main/labelHelperMap";
+
 const resourceName = {
   singular: "actor",
   plural: "actors",
@@ -33,8 +36,8 @@ const headers = [
     value: "latestIp",
   },
   {
-    text: "Latest API",
-    title: "Latest API",
+    text: "Latest " + labelMap[PersistStore.getState().dashboardCategory]["API"],
+    title: "Latest " + labelMap[PersistStore.getState().dashboardCategory]["API"],
     value: "latestApi",
   },
   {
@@ -157,7 +160,8 @@ function ThreatActorTable({ data, currDateRange, handleRowClick }) {
         // Get the sensitive data for the endpoint
         const sensitiveData = sensitiveDataMap[x.latestApiEndpoint] || [];
         const accessTypes = accessTypesMap[x.latestApiEndpoint] || [];
-        return {
+        
+        const baseData = {
           ...x,
           actor: x.id ? (
             <Text variant="bodyMd" fontWeight="medium">
@@ -185,12 +189,36 @@ function ThreatActorTable({ data, currDateRange, handleRowClick }) {
           latestApi: (
             <GetPrettifyEndpoint
               maxWidth={"300px"}
-              method={x.latestApiMethod}
+              {...(!isMCPSecurityCategory() && { method: x.latestApiMethod })}
               url={x.latestApiEndpoint}
               isNew={false}
             />
           ),
         };
+
+        // Add actorType only when the column is visible
+        if (isMCPSecurityCategory()) {
+          // Special case: certain IP addresses should have actorType as "MCP Server"
+          const mcpServerIPs = [
+            "139.99.122.41",
+            "103.142.26.101", 
+            "185.199.108.153",
+            "45.77.212.90",
+            "203.27.227.220",
+            "94.130.90.73",
+            "202.182.119.6",
+            "196.240.57.155",
+            "41.79.86.190"
+          ];
+          
+          if (mcpServerIPs.includes(x.latestApiIp)) {
+            baseData.actorType = "MCP Server";
+          } else {
+            baseData.actorType = x.actorType || "User";
+          }
+        }
+
+        return baseData;
       }));
     } catch (e) {
       setToast(true, true, "Error fetching threat actors");
@@ -245,12 +273,26 @@ function ThreatActorTable({ data, currDateRange, handleRowClick }) {
     fillFilters();
   }, []);
 
+  const getHeaders = () => {
+    const baseHeaders = [...headers];
+    
+    if (isMCPSecurityCategory()) {
+      baseHeaders.unshift({
+        text: "Actor Type",
+        value: "actorType",
+        title: "Actor Type",
+      });
+    }
+
+    return baseHeaders;
+  };
+
   return (
     <GithubServerTable
       onRowClick={(data) => onRowClick(data)}
       key={key}
       pageLimit={50}
-      headers={headers}
+      headers={getHeaders()}
       resourceName={resourceName}
       sortOptions={sortOptions}
       disambiguateLabel={disambiguateLabel}
@@ -261,7 +303,7 @@ function ThreatActorTable({ data, currDateRange, handleRowClick }) {
       hasRowActions={true}
       getActions={() => { }}
       hideQueryField={true}
-      headings={headers}
+      headings={getHeaders()}
       useNewRow={true}
       condensedHeight={true}
     />

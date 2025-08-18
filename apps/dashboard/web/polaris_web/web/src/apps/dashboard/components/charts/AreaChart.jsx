@@ -1,8 +1,9 @@
 import HighchartsReact from "highcharts-react-official";
 import Highcharts from "highcharts";
 import React from "react";
+import { getDashboardCategory, mapLabel } from "../../../main/labelHelper";
 
-function AreaChart({ data, height = 280, color = '#6D3BEF', yAxisTitle = 'APIs Tested', tooltipFormatter }) {
+function AreaChart({ data, height = 280, color = '#6D3BEF', yAxisTitle = `${mapLabel('APIs Tested', getDashboardCategory())}`, tooltipFormatter }) {
   const chartOptions = {
     chart: {
       type: 'area',

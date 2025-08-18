@@ -47,9 +47,9 @@ export function createActionItem(
         priorityComp: <Badge status={badgeStatus}>{priority}</Badge>,
         actionItem: renderTooltipBox(staticTitle, '220px'), 
         descriptionCol: renderTooltipBox(description, '260px'),
-        team: renderTooltipBox(team, '120px'),
+        team: renderTooltipBox(team, '90px'),
         effort: renderTooltipBox(effort, '100px'),
-        whyItMatters: renderTooltipBox(whyItMatters, '260px'), // Use the new parameter
+        whyItMatters: renderTooltipBox(whyItMatters, '260px'), 
         displayName: staticTitle,
         staticTitle,
         description,

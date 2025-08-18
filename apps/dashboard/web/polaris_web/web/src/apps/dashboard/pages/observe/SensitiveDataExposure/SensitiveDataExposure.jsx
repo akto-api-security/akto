@@ -6,18 +6,19 @@ import values from "@/util/values";
 import {produce} from "immer"
 import api from "../api"
 import func from "@/util/func"
-import { useParams, useSearchParams } from "react-router-dom"
+import { useParams } from "react-router-dom"
 import PersistStore from "../../../../main/PersistStore"
 import DateRangeFilter from "../../../components/layouts/DateRangeFilter"
 import GetPrettifyEndpoint from "../GetPrettifyEndpoint";
 import TooltipText from "../../../components/shared/TooltipText";
 import SaveAsCollectionModal from "../api_collections/api_query_component/SaveAsCollectionModal";
+import { getDashboardCategory, mapLabel } from "../../../../main/labelHelper";
 
 const headings = [
     {
         text: "Endpoint",
         value: "endpointComp",
-        title: "Api endpoints",
+        title: mapLabel("API endpoints", getDashboardCategory()),
         textValue: "endpoint",
         filterKey: 'endpoint'
     },
