@@ -301,31 +301,30 @@ public class KeyTypes {
     }
 
     public static boolean isPhoneNumber(String mobileNumber) {
+        if (mobileNumber == null) return false;
+    
+        for (int i = 0, n = mobileNumber.length(); i < n; i++) {
+            char c = mobileNumber.charAt(i);
+            char lc = (char) (c | 0x20);
+            if (lc >= 'a' && lc <= 'z') return false;
+        }
+    
         boolean lengthCondition = mobileNumber.length() < 8 || mobileNumber.length() > 16;
-        boolean alphabetsCondition = mobileNumber.toLowerCase() != mobileNumber.toUpperCase(); // contains alphabets
-
-        if (lengthCondition || alphabetsCondition) {
-            return false;
-        }
-
+        if (lengthCondition) return false;
+    
         PhoneNumberUtil phoneNumberUtil = PhoneNumberUtil.getInstance();
-
-        // isPossibleNumber computes faster than parse but less accuracy
-        boolean check = phoneNumberUtil.isPossibleNumber(mobileNumber,
-                    Phonenumber.PhoneNumber.CountryCodeSource.UNSPECIFIED.name());
-        if (!check) {
-            return false;
-        }
+        // quick plausibility check
+        boolean possible = phoneNumberUtil.isPossibleNumber(mobileNumber,
+                Phonenumber.PhoneNumber.CountryCodeSource.UNSPECIFIED.name());
+        if (!possible) return false;
 
         try {
             Phonenumber.PhoneNumber phone = phoneNumberUtil.parse(mobileNumber,
                     Phonenumber.PhoneNumber.CountryCodeSource.UNSPECIFIED.name());
             return phoneNumberUtil.isValidNumber(phone);
         } catch (Exception e) {
-            // eat it
             return false;
         }
-
     }
 
     public static boolean isJWT(String jwt) {
