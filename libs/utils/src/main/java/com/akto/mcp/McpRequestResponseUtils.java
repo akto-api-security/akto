@@ -93,12 +93,11 @@ public final class McpRequestResponseUtils {
                 case McpSchema.METHOD_TOOLS_CALL:
                     if (params != null && StringUtils.isNotBlank(params.getName())) {
                         url = HttpResponseParams.addPathParamToUrl(url, params.getName());
-                        Integer apiCollectionId = responseParams.getRequestParams() != null ? responseParams.getRequestParams().getApiCollectionId() : null;
                         String name = params.getName() != null ? params.getName() : "";
                         auditInfo = new McpAuditInfo(
                                 Context.now(), "", AKTO_MCP_TOOLS_TAG, 0,
-                                name, "", null,
-                                apiCollectionId != null ? apiCollectionId : 0
+                                name, "", null, responseParams.getRequestParams().getApiCollectionId()
+
                         );
                     }
                     break;
@@ -106,11 +105,10 @@ public final class McpRequestResponseUtils {
                 case McpSchema.METHOD_RESOURCES_READ:
                     if (params != null && StringUtils.isNotBlank(params.getUri())) {
                         url = HttpResponseParams.addPathParamToUrl(url, params.getUri());
-                        Integer apiCollectionId = responseParams.getRequestParams() != null ? responseParams.getRequestParams().getApiCollectionId() : null;
                         String uri = params.getUri() != null ? params.getUri() : "";
                         auditInfo = new McpAuditInfo(
                                 Context.now(), "", AKTO_MCP_RESOURCES_TAG, 0,
-                                uri, "", null, apiCollectionId != null ? apiCollectionId : 0
+                                uri, "", null, responseParams.getRequestParams().getApiCollectionId()
                         );
                     }
                     break;
