@@ -7,6 +7,7 @@ public class ConditionsType {
     private String key;
     private String value;
     private Set<String> urlsList;
+    private int position;
 
 
     public ConditionsType () {}
@@ -39,5 +40,13 @@ public class ConditionsType {
 
     public void setUrlsList(Set<String> urlsList) {
         this.urlsList = urlsList;
+    }
+
+    public int getPosition() {
+        return position;
+    }
+
+    public void setPosition(int position) {
+        this.position = position;
     }
 }
