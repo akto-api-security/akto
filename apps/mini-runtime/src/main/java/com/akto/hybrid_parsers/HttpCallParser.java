@@ -617,6 +617,7 @@ public class HttpCallParser {
             hostName = hostName.trim();
 
             String key = hostName;
+            boolean ismcpServer = false;
 
             if (hostNameToIdMap.containsKey(key)) {
                 apiCollectionId = hostNameToIdMap.get(key);
@@ -631,6 +632,7 @@ public class HttpCallParser {
                         tagList = new ArrayList<>();
                     }
                     tagList.add(mcpServerTagOpt.get());
+                    ismcpServer = true;
                 }
                 try {
 
@@ -642,16 +644,18 @@ public class HttpCallParser {
                     }
 
                     //New MCP server detected, audit it
-                    McpAuditInfo auditInfo = null;
-                    try {
-                        auditInfo = new McpAuditInfo(
-                                Context.now(), "", AKTO_MCP_SERVER_TAG , 0,
-                                hostName != null ? hostName : "", "", null,
-                                apiCollectionId
-                        );
-                        dataActor.insertMCPAuditDataLog(auditInfo);
-                    } catch (Exception e) {
-                        loggerMaker.error("Error creating or inserting MCP audit info: " + e.getMessage());
+                    if(ismcpServer) {
+                        McpAuditInfo auditInfo = null;
+                        try {
+                            auditInfo = new McpAuditInfo(
+                                    Context.now(), "", AKTO_MCP_SERVER_TAG, 0,
+                                    hostName != null ? hostName : "", "", null,
+                                    apiCollectionId
+                            );
+                            dataActor.insertMCPAuditDataLog(auditInfo);
+                        } catch (Exception e) {
+                            loggerMaker.error("Error creating or inserting MCP audit info: " + e.getMessage());
+                        }
                     }
                     hostNameToIdMap.put(key, apiCollectionId);
                 } catch (Exception e) {
