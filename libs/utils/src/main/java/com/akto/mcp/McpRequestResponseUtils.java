@@ -88,39 +88,46 @@ public final class McpRequestResponseUtils {
 
         McpAuditInfo auditInfo = null;
 
-        switch (mcpJsonRpcModel.getMethod()) {
-            case McpSchema.METHOD_TOOLS_CALL:
-                if (params != null && StringUtils.isNotBlank(params.getName())) {
-                    url = HttpResponseParams.addPathParamToUrl(url, params.getName());
+        try {
+            switch (mcpJsonRpcModel.getMethod()) {
+                case McpSchema.METHOD_TOOLS_CALL:
+                    if (params != null && StringUtils.isNotBlank(params.getName())) {
+                        url = HttpResponseParams.addPathParamToUrl(url, params.getName());
+                        Integer apiCollectionId = responseParams.getRequestParams() != null ? responseParams.getRequestParams().getApiCollectionId() : null;
+                        String name = params.getName() != null ? params.getName() : "";
+                        auditInfo = new McpAuditInfo(
+                                Context.now(), "", AKTO_MCP_TOOLS_TAG, 0,
+                                name, "", null,
+                                apiCollectionId != null ? apiCollectionId : 0
+                        );
+                    }
+                    break;
 
-                    // Create audit info for MCP Tool call
-                    auditInfo = new McpAuditInfo(
-                            Context.now(), "", AKTO_MCP_TOOLS_TAG, 0,
-                            params.getName(), "", null,
-                            responseParams.getRequestParams().getApiCollectionId()
-                    );
-                }
-                break;
+                case McpSchema.METHOD_RESOURCES_READ:
+                    if (params != null && StringUtils.isNotBlank(params.getUri())) {
+                        url = HttpResponseParams.addPathParamToUrl(url, params.getUri());
+                        Integer apiCollectionId = responseParams.getRequestParams() != null ? responseParams.getRequestParams().getApiCollectionId() : null;
+                        String uri = params.getUri() != null ? params.getUri() : "";
+                        auditInfo = new McpAuditInfo(
+                                Context.now(), "", AKTO_MCP_RESOURCES_TAG, 0,
+                                uri, "", null, apiCollectionId != null ? apiCollectionId : 0
+                        );
+                    }
+                    break;
 
-            case McpSchema.METHOD_RESOURCES_READ:
-                if (params != null && StringUtils.isNotBlank(params.getUri())) {
-                    url = HttpResponseParams.addPathParamToUrl(url, params.getUri());
-
-                    // Create audit info for MCP Resource read
-                    auditInfo = new McpAuditInfo(
-                            Context.now(), "", AKTO_MCP_RESOURCES_TAG, 0,
-                            params.getUri(), "", null,
-                            responseParams.getRequestParams().getApiCollectionId()
-                    );
-                }
-                break;
-
-            default:
-                break;
+                default:
+                    break;
+            }
+        } catch (Exception e) {
+            logger.error("Error forming auditInfo or processing MCP method call", e);
         }
 
         if (auditInfo != null) {
-            dataActor.insertMCPAuditDataLog(auditInfo);
+            try {
+                dataActor.insertMCPAuditDataLog(auditInfo);
+            } catch (Exception e) {
+                logger.error("Error inserting MCP audit data log", e);
+            }
         }
         responseParams.getRequestParams().setUrl(url);
     }

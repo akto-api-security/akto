@@ -642,12 +642,17 @@ public class HttpCallParser {
                     }
 
                     //New MCP server detected, audit it
-                    McpAuditInfo auditInfo = new McpAuditInfo(
-                            Context.now(), "", AKTO_MCP_SERVER_TAG , 0,
-                            hostName, "", null,
-                            apiCollectionId
-                    );
-                    dataActor.insertMCPAuditDataLog(auditInfo);
+                    McpAuditInfo auditInfo = null;
+                    try {
+                        auditInfo = new McpAuditInfo(
+                                Context.now(), "", AKTO_MCP_SERVER_TAG , 0,
+                                hostName != null ? hostName : "", "", null,
+                                apiCollectionId
+                        );
+                        dataActor.insertMCPAuditDataLog(auditInfo);
+                    } catch (Exception e) {
+                        loggerMaker.error("Error creating or inserting MCP audit info: " + e.getMessage());
+                    }
                     hostNameToIdMap.put(key, apiCollectionId);
                 } catch (Exception e) {
                     loggerMaker.errorAndAddToDb(e, "Failed to create collection for host : " + hostName);
