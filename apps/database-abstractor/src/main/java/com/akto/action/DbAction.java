@@ -67,6 +67,7 @@ import lombok.Getter;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.*;
+import lombok.Setter;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 import com.google.gson.Gson;
@@ -107,6 +108,8 @@ public class DbAction extends ActionSupport {
     List<DependencyNode> dependencyNodeList;
     TestScript testScript;
     String openApiSchema;
+    @Getter @Setter
+    McpAuditInfo auditInfo;
 
     private ModuleInfo moduleInfo;
 
@@ -2639,6 +2642,19 @@ public class DbAction extends ActionSupport {
         } catch (Exception e) {
             e.printStackTrace();
             loggerMaker.errorAndAddToDb(e, "Error insertDataIngestionLog " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+
+
+    public String insertMCPAuditDataLog() {
+        try {
+            DbLayer.insertMCPAuditDataLog(auditInfo);
+        } catch (Exception e) {
+            e.printStackTrace();
+            loggerMaker.errorAndAddToDb(e, "Error insertMCPAuditDataLog " + e.toString());
             return Action.ERROR.toUpperCase();
         }
         return Action.SUCCESS.toUpperCase();

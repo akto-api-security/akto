@@ -674,6 +674,10 @@ public class DbActor extends DataActor {
         return DbLayer.fetchOpenApiSchema(apiCollectionId);
     }
 
+    public void insertMCPAuditDataLog(McpAuditInfo auditInfo) {
+        DbLayer.insertMCPAuditDataLog(auditInfo);
+    }
+
     public List<SlackWebhook> fetchSlackWebhooks() {
         return DbLayer.fetchSlackWebhooks();
     }
