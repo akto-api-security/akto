@@ -118,7 +118,11 @@ public final class McpRequestResponseUtils {
         }
 
         if (auditInfo != null) {
-            McpAuditInfoDao.instance.insertOne(auditInfo);
+            try {
+                McpAuditInfoDao.instance.insertOne(auditInfo);
+            } catch (Exception e) {
+                logger.error("Error inserting MCP audit data log", e);
+            }
         }
         responseParams.getRequestParams().setUrl(url);
     }

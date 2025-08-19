@@ -59,13 +59,17 @@ public class MCPScanAction extends UserAction {
                 createdCollection = new ApiCollection(collectionId, hostName, Context.now(), new HashSet<>(), hostName, 0, false, true, sseEndpoint);
                 ApiCollectionsDao.instance.insertOne(createdCollection);
 
-                //New MCP server detected, audit it
-                McpAuditInfo auditInfo = new McpAuditInfo(
-                        Context.now(), "", AKTO_MCP_SERVER_TAG , 0,
-                        hostName, "", null,
-                        collectionId
-                );
-                McpAuditInfoDao.instance.insertOne(auditInfo);
+                try {
+                    //New MCP server detected, audit it
+                    McpAuditInfo auditInfo = new McpAuditInfo(
+                            Context.now(), "", AKTO_MCP_SERVER_TAG , 0,
+                            hostName, "", null,
+                            collectionId
+                    );
+                    McpAuditInfoDao.instance.insertOne(auditInfo);
+                } catch (Exception e) {
+                    loggerMaker.error("Exception while inserting McpAuditInfo: " + e.getMessage(), LogDb.DASHBOARD);
+                }
             }
 
             if(createdCollection == null) {
@@ -79,7 +83,7 @@ public class MCPScanAction extends UserAction {
                 Updates.setOnInsert("startTs", Context.now()),
                 Updates.setOnInsert("urls", new HashSet<>()),
                 Updates.set(ApiCollection.SSE_CALLBACK_URL, sseEndpoint),
-                Updates.set(ApiCollection.TAGS_STRING, 
+                Updates.set(ApiCollection.TAGS_STRING,
                 Collections.singletonList(new CollectionTags(Context.now(), AKTO_MCP_SERVER_TAG, "MCP Server", TagSource.KUBERNETES)))
             );
 
@@ -90,7 +94,7 @@ public class MCPScanAction extends UserAction {
             ApiCollectionsDao.instance.getMCollection()
                 .findOneAndUpdate(Filters.eq(ApiCollection.ID, createdCollection.getId()), updates, updateOptions);
 
-            
+
             // Create APIConfig for MCP tools sync job
             // Use the provided authKey and authValue for authentication
             APIConfig apiConfig = new APIConfig("userIdentifier","access-token", 1, 1, 1);
@@ -102,12 +106,12 @@ public class MCPScanAction extends UserAction {
                 } else {
                     authHeader = "";
                     loggerMaker.info("No authentication credentials provided");
-                }           
-                int accountId = Context.accountId.get();  
+                }
+                int accountId = Context.accountId.get();
                 executorService.schedule(new Runnable() {
                     public void run() {
                         Context.accountId.set(accountId);
-                        loggerMaker.info("Starting MCP sync job for collection: {} with host: {} and SSE endpoint: {}", 
+                        loggerMaker.info("Starting MCP sync job for collection: {} with host: {} and SSE endpoint: {}",
                             createdCollection.getId(), createdCollection.getHostName(), createdCollection.getSseCallbackUrl());
                         McpToolsSyncJobExecutor.INSTANCE.runJobforCollection(createdCollection, apiConfig, authHeader);
                     }
