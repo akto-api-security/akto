@@ -303,14 +303,14 @@ public class KeyTypes {
     public static boolean isPhoneNumber(String mobileNumber) {
         if (mobileNumber == null) return false;
     
+        boolean lengthCondition = mobileNumber.length() < 8 || mobileNumber.length() > 16;
+        if (lengthCondition) return false;
+
         for (int i = 0, n = mobileNumber.length(); i < n; i++) {
             char c = mobileNumber.charAt(i);
             char lc = (char) (c | 0x20);
             if (lc >= 'a' && lc <= 'z') return false;
         }
-    
-        boolean lengthCondition = mobileNumber.length() < 8 || mobileNumber.length() > 16;
-        if (lengthCondition) return false;
     
         PhoneNumberUtil phoneNumberUtil = PhoneNumberUtil.getInstance();
         // quick plausibility check
