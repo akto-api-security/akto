@@ -4016,7 +4016,7 @@ public class ClientActor extends DataActor {
     public void insertMCPAuditDataLog(McpAuditInfo auditInfo) {
         Map<String, List<String>> headers = buildHeaders();
         BasicDBObject obj = new BasicDBObject();
-        obj.put("log", auditInfo);
+        obj.put("auditInfo", auditInfo);
         OriginalHttpRequest request = new OriginalHttpRequest(url + "/insertMCPAuditDataLog", "", "POST", obj.toString(), headers, "");
         try {
             OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
