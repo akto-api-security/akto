@@ -2030,7 +2030,7 @@ public class APICatalogSync {
             return new Pair<>(mcpAssetsSyncLimit, MetricTypes.MCP_ASSET_COUNT);
         }
         // add ai sync limit in future
-        return new Pair<>(mcpAssetsSyncLimit, MetricTypes.ACTIVE_ENDPOINTS);
+        return new Pair<>(apiSyncLimit, MetricTypes.ACTIVE_ENDPOINTS);
     }
 
 
