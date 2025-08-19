@@ -544,7 +544,8 @@ public class Utils {
 
                 // iterate over the urlsList and modify the url
                 String currentUrl = originalHttpRequest.getUrl();
-                if(!urlsList.contains(currentUrl)){
+                String currentMethod = originalHttpRequest.getMethod();
+                if(!urlsList.contains(currentMethod + " " + currentUrl)){
                     continue;
                 }
 
