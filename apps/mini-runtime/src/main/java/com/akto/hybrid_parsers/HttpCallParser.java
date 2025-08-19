@@ -230,6 +230,23 @@ public class HttpCallParser {
         return contentType.contains("html") || contentType.contains("text/html");
     }
 
+    public static boolean blockRedirects(HttpResponseParams responseParam) {
+        if (responseParam.getStatusCode() != 302) return false;
+
+        String requestPayload = responseParam.getRequestParams() != null ? responseParam.getRequestParams().getPayload() : null;
+        String responsePayload = responseParam.getPayload();
+        boolean isEmptyRequestPayload = (requestPayload == null) || requestPayload.isEmpty() || "{}".equals(requestPayload.trim());
+        boolean isEmptyResponsePayload = (responsePayload == null) || responsePayload.isEmpty() || "{}".equals(responsePayload.trim());
+        String locationHeader = getHeaderValue(responseParam.getHeaders(), "location");
+        boolean locationContainsPageNotFound = locationHeader != null && locationHeader.toLowerCase().contains("pagenotfound");
+
+        if (isEmptyRequestPayload && isEmptyResponsePayload && locationContainsPageNotFound) {
+            return true;
+        }
+
+        return false;
+    }
+
     public static FILTER_TYPE applyTrafficFilterInProcess(HttpResponseParams responseParam){
 
         FILTER_TYPE filterType = FILTER_TYPE.ALLOWED;
@@ -240,6 +257,10 @@ public class HttpCallParser {
         if (responseParam.getStatusCode() >= 400 || isBlockedHost(hostName) || isBlockedContentType(contentType)) {
             filterType = FILTER_TYPE.BLOCKED;
             return filterType;
+        }
+
+        if (blockRedirects(responseParam)) {
+            return FILTER_TYPE.BLOCKED;
         }
 
         // Modify host header to Kubernetes Service filter
