@@ -451,10 +451,13 @@ public class ApiExecutor {
     private static void calculateFinalRequestFromAdvancedSettings(OriginalHttpRequest originalHttpRequest, List<TestConfigsAdvancedSettings> advancedSettings){
         Map<String,List<ConditionsType>> headerConditions = new HashMap<>();
         Map<String,List<ConditionsType>> payloadConditions = new HashMap<>();
+        Map<String,List<ConditionsType>> urlConditions = new HashMap<>();
 
         for(TestConfigsAdvancedSettings settings: advancedSettings){
             if(settings.getOperatorType().toLowerCase().contains("header")){
                 headerConditions.put(settings.getOperatorType(), settings.getOperationsGroupList());
+            }else if(settings.getOperatorType().toLowerCase().contains("url")){
+                urlConditions.put(settings.getOperatorType(), settings.getOperationsGroupList());
             }else{
                 payloadConditions.put(settings.getOperatorType(), settings.getOperationsGroupList());
             }
@@ -478,6 +481,16 @@ public class ApiExecutor {
             payloadConditions.getOrDefault(TestEditorEnums.NonTerminalExecutorDataOperands.MODIFY_BODY_PARAM.name(), emptyList),
             emptyList,
             payloadConditions.getOrDefault(TestEditorEnums.TerminalExecutorDataOperands.DELETE_BODY_PARAM.name(), emptyList)
+        );
+
+        // modify URL parameters using the fetchUrlModifyPayload functionality
+        Utils.modifyUrlParamOperations(originalHttpRequest, 
+            urlConditions.getOrDefault("MODIFY_URL_PARAM", emptyList),
+            "token_replace"
+        );
+        Utils.modifyUrlParamOperations(originalHttpRequest, 
+            urlConditions.getOrDefault("ADD_URL_PARAM", emptyList),
+            "token_insert"
         );
     }
 
