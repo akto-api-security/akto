@@ -75,8 +75,9 @@ public class MCPScanAction extends UserAction {
             updateOptions.upsert(true);
             updateOptions.returnDocument(ReturnDocument.AFTER);
 
-            ApiCollectionsDao.instance.getMCollection()
-                .findOneAndUpdate(Filters.eq(ApiCollection.ID, createdCollection.getId()), updates, updateOptions);
+            createdCollection = ApiCollectionsDao.instance.getMCollection()
+                .findOneAndUpdate(
+                    Filters.eq(ApiCollection.ID, createdCollection.getId()), updates, updateOptions);
 
             
             // Create APIConfig for MCP tools sync job
