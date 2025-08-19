@@ -163,6 +163,36 @@ const api = {
                 showApiInfo
             }
         })
+    },
+
+    fetchBrokenAuthenticationIssues: async (filterSubCategory, showApiInfo) => {
+        return await request({
+            url: '/api/getBUACategoryCount',
+            method: 'post',
+            data: {
+                filterStatus: ["OPEN"],
+                filterSubCategory,
+                showApiInfo
+            }
+        })
+    },
+
+    fetchIssuesByApis: async (showIssues) => {
+        const data = (typeof showIssues === 'boolean') ? { showIssues } : {};
+        return await request({
+            url: '/api/fetchIssuesByApis',
+            method: 'post',
+            data
+        })
+    },
+
+    fetchUrlsByIssues: async (showTestSubCategories) => {
+        const data = (typeof showTestSubCategories === 'boolean') ? { showTestSubCategories } : {};
+        return await request({
+            url: '/api/fetchUrlsByIssues',
+            method: 'post',
+            data
+        })
     }
 }
 

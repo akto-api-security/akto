@@ -31,7 +31,6 @@ import useTable from "../../../components/tables/TableContext"
 import HeadingWithTooltip from "../../../components/shared/HeadingWithTooltip"
 import { SelectSource } from "./SelectSource"
 import InlineEditableText from "../../../components/shared/InlineEditableText"
-import ApiIssuesTab from "./ApiIssuesTab"
 import IssuesApi from "../../issues/api"
 import SequencesFlow from "./SequencesFlow"
 import { getDashboardCategory, mapLabel } from "../../../../main/labelHelper"
@@ -152,13 +151,15 @@ const headings = [
 ]
 
 let headers = JSON.parse(JSON.stringify(headings))
-headers.push({
-    text: 'Method',
-    filterKey: 'method',
-    showFilter: true,
-    textValue: 'method',
-    sortActive: true
-})
+if(!getDashboardCategory().includes("MCP")){
+    headers.push({
+        text: 'Method',
+        filterKey: 'method',
+        showFilter: true,
+        textValue: 'method',
+        sortActive: true
+    })
+}
 
 headers.push({
     text: 'Sensitive params in request',
@@ -260,7 +261,6 @@ function ApiEndpoints(props) {
         let sensitiveParamsResp;
         let sourceCodeData = {};
         let apiInfoSeverityMap ;
-        let issuesDataResp;
         if (isQueryPage) {
             let apiCollectionData = endpointListFromConditions
             if (Object.keys(endpointListFromConditions).length === 0) {
