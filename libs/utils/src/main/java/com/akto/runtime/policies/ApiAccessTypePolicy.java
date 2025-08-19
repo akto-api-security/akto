@@ -9,6 +9,7 @@ import org.springframework.security.web.util.matcher.IpAddressMatcher;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 
 public class ApiAccessTypePolicy {
@@ -17,10 +18,12 @@ public class ApiAccessTypePolicy {
 
 	public static final String X_FORWARDED_FOR = "x-forwarded-for";
     private static final Logger logger = LoggerFactory.getLogger(ApiAccessTypePolicy.class);
+    private static List<IpAddressMatcher> privateMatchers;
 
     public ApiAccessTypePolicy(List<String> privateCidrList, List<String> partnerIpList) {
-        this.privateCidrList = privateCidrList;
-        this.partnerIpList = partnerIpList;
+        this.privateCidrList = privateCidrList == null ? Collections.emptyList() : new ArrayList<>(privateCidrList);
+        this.partnerIpList   = partnerIpList == null ? Collections.emptyList() : new ArrayList<>(partnerIpList);
+        privateMatchers = buildMatchers(this.privateCidrList);
     }
 
     // RFC standard list. To be used later.
@@ -48,6 +51,17 @@ public class ApiAccessTypePolicy {
         } catch (Exception e) {
         }
         return ip;
+    }
+
+    private static List<IpAddressMatcher> buildMatchers(List<String> cidrs) {
+        if (cidrs == null || cidrs.isEmpty()) return Collections.emptyList();
+        List<IpAddressMatcher> out = new ArrayList<>(cidrs.size());
+        for (String c : cidrs) {
+            if (c != null && !c.isEmpty()) {
+                out.add(new IpAddressMatcher(c));
+            }
+        }
+        return Collections.unmodifiableList(out);
     }
 
     public void findApiAccessType(HttpResponseParams httpResponseParams, ApiInfo apiInfo) {
@@ -125,19 +139,10 @@ public class ApiAccessTypePolicy {
     }
 
     public boolean ipInCidr(String ip) {
-        IpAddressMatcher ipAddressMatcher;
-        // todo: add standard private IP list
-        List<String> checkList = new ArrayList<>();
-        if (privateCidrList != null && !privateCidrList.isEmpty()) {
-            checkList.addAll(privateCidrList);
+        List<IpAddressMatcher> matchers = privateMatchers;
+        for (int i = 0, n = matchers.size(); i < n; i++) {
+            if (matchers.get(i).matches(ip)) return true;
         }
-
-        for (String cidr : checkList) {
-            ipAddressMatcher = new IpAddressMatcher(cidr);
-            boolean result = ipAddressMatcher.matches(ip);
-            if (result) return true;
-        }
-
         return false;
     }
 
@@ -156,6 +161,7 @@ public class ApiAccessTypePolicy {
 
     public void setPrivateCidrList(List<String> privateCidrList) {
         this.privateCidrList = privateCidrList;
+        privateMatchers = buildMatchers(this.privateCidrList);
     }
 
     public List<String> getPartnerIpList() {
