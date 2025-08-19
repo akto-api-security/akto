@@ -86,11 +86,12 @@ public class TestModifyPayload {
     public void testModifyUrlParamOperations() {
         OriginalHttpRequest originalHttpRequest = new OriginalHttpRequest();
         originalHttpRequest.setUrl("/api/v1/users/aryan");
+        originalHttpRequest.setMethod("GET");
         List<ConditionsType> modifyUrlParams = new ArrayList<>();
         ConditionsType condition = new ConditionsType();
         condition.setKey("");
         condition.setValue("umesh");
-        condition.setUrlsList(new HashSet<String>(Arrays.asList("/api/v1/users/aryan")));
+        condition.setUrlsList(new HashSet<String>(Arrays.asList("GET /api/v1/users/aryan")));
         condition.setPosition(4);
         modifyUrlParams.add(condition);
         com.akto.testing.Utils.modifyUrlParamOperations(originalHttpRequest, modifyUrlParams, "token_replace");
@@ -101,12 +102,13 @@ public class TestModifyPayload {
     public void testAddUrlParamOperations() {
         OriginalHttpRequest originalHttpRequest = new OriginalHttpRequest();
         originalHttpRequest.setUrl("/api/v1/users/aryan");
+        originalHttpRequest.setMethod("GET");
         List<ConditionsType> modifyUrlParams = new ArrayList<>();
         ConditionsType condition = new ConditionsType();
         condition.setKey("");
         condition.setValue("umesh");
-        condition.setUrlsList(new HashSet<String>(Arrays.asList("/api/v1/users/aryan")));
-        condition.setPosition(5);
+        condition.setUrlsList(new HashSet<String>(Arrays.asList("GET /api/v1/users/aryan")));
+        condition.setPosition(5);   
         modifyUrlParams.add(condition);
         com.akto.testing.Utils.modifyUrlParamOperations(originalHttpRequest, modifyUrlParams, "token_insert");
         assertEquals(originalHttpRequest.getUrl(), "/api/v1/users/aryan/umesh");
