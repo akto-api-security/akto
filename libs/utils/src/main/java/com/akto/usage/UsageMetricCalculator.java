@@ -1,5 +1,6 @@
 package com.akto.usage;
 
+import com.mongodb.BasicDBObject;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
@@ -118,6 +119,22 @@ public class UsageMetricCalculator {
         return ret;
     }
 
+    public static Set<Integer> getMcpCollections() {
+        List<ApiCollection> apiCollections = ApiCollectionsDao.instance.findAll(new BasicDBObject());
+        return apiCollections.stream().
+            filter(ApiCollection::isMcpCollection)
+            .map(ApiCollection::getId)
+            .collect(Collectors.toSet());
+    }
+
+    public static Set<Integer> getNonMcpCollections() {
+        List<ApiCollection> apiCollections = ApiCollectionsDao.instance.findAll(new BasicDBObject());
+        return apiCollections.stream().
+            filter(apiCollection -> !apiCollection.isMcpCollection())
+            .map(ApiCollection::getId)
+            .collect(Collectors.toSet());
+    }
+
     public static List<String> getInvalidTestErrors() {
         List<String> invalidErrors = new ArrayList<String>() {{
             add(TestResult.TestError.DEACTIVATED_ENDPOINT.getMessage());
@@ -131,7 +148,19 @@ public class UsageMetricCalculator {
          * Count all endpoints.
          * Same query being used on dashboard.
          */
-        return (int)SingleTypeInfoDao.instance.fetchEndpointsCount(0, Context.now(), getDemosAndDeactivated(), false);
+        Set<Integer> demosAndDeactivated = getDemosAndDeactivated();
+        demosAndDeactivated.addAll(getMcpCollections());
+        return (int)SingleTypeInfoDao.instance.fetchEndpointsCount(0, Context.now(), demosAndDeactivated, false);
+    }
+
+    public static int calculateMCPAssets() {
+        /*
+         * To count MCP endpoints, we need to filter out the collections that does not have
+         * MCP tag in tagsList.
+         */
+        Set<Integer> demosAndDeactivated = getDemosAndDeactivated();
+        demosAndDeactivated.addAll(getNonMcpCollections());
+        return (int)SingleTypeInfoDao.instance.fetchEndpointsCount(0, Context.now(), demosAndDeactivated, false);
     }
 
     public static int calculateCustomTests(UsageMetric usageMetric) {
@@ -227,6 +256,9 @@ public class UsageMetricCalculator {
             switch (metricType) {
                 case ACTIVE_ENDPOINTS:
                     usage = calculateActiveEndpoints();
+                    break;
+                case MCP_ASSET_COUNT:
+                    usage = calculateMCPAssets();
                     break;
                 case CUSTOM_TESTS:
                     usage = calculateCustomTests(usageMetric);
