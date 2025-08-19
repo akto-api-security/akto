@@ -36,6 +36,8 @@ import com.opensymphony.xwork2.ActionSupport;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.*;
+import lombok.Getter;
+import lombok.Setter;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 
@@ -79,6 +81,7 @@ public class DbAction extends ActionSupport {
     List<BulkUpdates> writesForOverageInfo;
     List<DependencyNode> dependencyNodeList;
     TestScript testScript;
+    @Setter @Getter
     McpAuditInfo auditInfo;
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(DbAction.class, LoggerMaker.LogDb.DASHBOARD);
