@@ -35,6 +35,7 @@ import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods;
 import com.akto.dto.usage.MetricTypes;
+import com.akto.log.LoggerMaker.LogDb;
 import com.mongodb.BasicDBObject;
 
 import java.util.List;
@@ -305,4 +306,6 @@ public abstract class DataActor {
     public abstract String getLLMPromptResponse(JSONObject promptPayload);
 
     public abstract List<SlackWebhook> fetchSlackWebhooks();
+
+    public abstract boolean transmitLogsBatch(List<Log> batch, LogDb logDb);
 }
