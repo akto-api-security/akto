@@ -91,6 +91,7 @@ public class HttpCallParser {
 
     // Pre-compiled patterns for better performance
     private static final Pattern IP_ADDRESS_PATTERN = Pattern.compile("\\b\\d{1,3}(?:\\.\\d{1,3}){3}.*");
+    private static final String EMPTY_JSON = "{}";
     
     // List of ignored host names for fast contains() checks
     private static final List<String> IGNORE_HOST_NAMES = Arrays.asList(
@@ -231,20 +232,30 @@ public class HttpCallParser {
     }
 
     public static boolean blockRedirects(HttpResponseParams responseParam) {
+        // Early exit for non-302 responses
         if (responseParam.getStatusCode() != 302) return false;
 
-        String requestPayload = responseParam.getRequestParams() != null ? responseParam.getRequestParams().getPayload() : null;
-        String responsePayload = responseParam.getPayload();
-        boolean isEmptyRequestPayload = (requestPayload == null) || requestPayload.isEmpty() || "{}".equals(requestPayload.trim());
-        boolean isEmptyResponsePayload = (responsePayload == null) || responsePayload.isEmpty() || "{}".equals(responsePayload.trim());
-        String locationHeader = getHeaderValue(responseParam.getHeaders(), "location");
-        boolean locationContainsPageNotFound = locationHeader != null && locationHeader.toLowerCase().contains("pagenotfound");
-
-        if (isEmptyRequestPayload && isEmptyResponsePayload && locationContainsPageNotFound) {
-            return true;
+        // Early exit for null request params or payload
+        boolean isRequestPayloadEmpty = false;
+        if (responseParam.getRequestParams().getPayload() == null
+                || responseParam.getRequestParams().getPayload().isEmpty()
+                || EMPTY_JSON.equals(responseParam.getRequestParams().getPayload())) {
+            isRequestPayloadEmpty = true;
         }
 
-        return false;
+        boolean isResponsePayloadEmpty = false;
+        if (responseParam.getPayload() == null
+                || responseParam.getPayload().isEmpty()
+                || EMPTY_JSON.equals(responseParam.getPayload())) {
+            isResponsePayloadEmpty = true;
+        }
+
+        if (!isRequestPayloadEmpty || !isResponsePayloadEmpty) {
+            return false;
+        }
+
+        String locationHeader = getHeaderValue(responseParam.getHeaders(), "location");
+        return locationHeader != null && locationHeader.contains("pagenotfound");
     }
 
     public static FILTER_TYPE applyTrafficFilterInProcess(HttpResponseParams responseParam){
