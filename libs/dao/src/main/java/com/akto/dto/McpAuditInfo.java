@@ -41,5 +41,4 @@ public class McpAuditInfo {
         this.apiAccessTypes = apiAccessTypes;
         this.hostCollectionId = hostCollectionId;
     }
-
 }
