@@ -961,7 +961,7 @@ public class APICatalogSync {
             SingleTypeInfo deltaInfo = deltaInfoMap.get(key);
             if(deltaInfo.getParam().contains("_queryParam")) {
                 String originalParam = deltaInfo.getParam().split("_queryParam")[0];
-                deltaInfo.setQueryParam(true);
+                deltaInfo.setIsQueryParam(true);
                 deltaInfo.setParam(originalParam);
             }
             Bson update;
