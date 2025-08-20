@@ -1195,9 +1195,19 @@ public class DbAction extends ActionSupport {
         return Action.SUCCESS.toUpperCase();
     }
 
+    private static List<Integer> HIGHER_STI_LIMIT_ACCOUNT_IDS = Arrays.asList(1736798101, 1718042191);
+    private static boolean higherStiLimit = System.getenv().getOrDefault("HIGHER_STI_LIMIT", "true").equals("true");
+    private static int STI_LIMIT = 20_000_000;
+
     public String fetchEstimatedDocCount() {
         try {
+
             count = DbLayer.fetchEstimatedDocCount();
+            if (higherStiLimit && HIGHER_STI_LIMIT_ACCOUNT_IDS.contains(Context.accountId.get())) {
+                // Mini runtime skips traffic processing for more than 20M STIs, 
+                // This will help allowing 20M more STIs to be processed.
+                count = count > STI_LIMIT ? count - STI_LIMIT : count;
+            }
         } catch (Exception e){
             loggerMaker.errorAndAddToDb(e, "Error in fetchEstimatedDocCount " + e.toString());
         }
