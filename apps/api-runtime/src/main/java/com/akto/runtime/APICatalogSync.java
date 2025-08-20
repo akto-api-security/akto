@@ -2026,8 +2026,17 @@ public class APICatalogSync {
 
     private Pair<SyncLimit, MetricTypes> getSyncLimitForApiCollection(ApiCollection apiCollection, SyncLimit apiSyncLimit,
         SyncLimit mcpAssetsSyncLimit, SyncLimit aiAssetsSyncLimit) {
+
+        if (apiCollection == null) {
+            return new Pair<>(apiSyncLimit, MetricTypes.ACTIVE_ENDPOINTS);
+        }
+
         if (apiCollection.isMcpCollection()) {
             return new Pair<>(mcpAssetsSyncLimit, MetricTypes.MCP_ASSET_COUNT);
+        }
+
+        if (apiCollection.isGenAICollection()) {
+            return new Pair<>(aiAssetsSyncLimit, MetricTypes.AI_ASSET_COUNT);
         }
         // add ai sync limit in future
         return new Pair<>(apiSyncLimit, MetricTypes.ACTIVE_ENDPOINTS);

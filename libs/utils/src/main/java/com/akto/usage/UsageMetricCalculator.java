@@ -1,6 +1,7 @@
 package com.akto.usage;
 
-import com.mongodb.BasicDBObject;
+import com.akto.dto.rbac.UsersCollectionsList;
+import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
@@ -120,19 +121,15 @@ public class UsageMetricCalculator {
     }
 
     public static Set<Integer> getMcpCollections() {
-        List<ApiCollection> apiCollections = ApiCollectionsDao.instance.findAll(new BasicDBObject());
-        return apiCollections.stream().
-            filter(ApiCollection::isMcpCollection)
-            .map(ApiCollection::getId)
-            .collect(Collectors.toSet());
+        return UsersCollectionsList.getContextCollections(CONTEXT_SOURCE.MCP);
     }
 
-    public static Set<Integer> getNonMcpCollections() {
-        List<ApiCollection> apiCollections = ApiCollectionsDao.instance.findAll(new BasicDBObject());
-        return apiCollections.stream().
-            filter(apiCollection -> !apiCollection.isMcpCollection())
-            .map(ApiCollection::getId)
-            .collect(Collectors.toSet());
+    public static Set<Integer> getGenAiCollections() {
+        return UsersCollectionsList.getContextCollections(CONTEXT_SOURCE.GEN_AI);
+    }
+
+    public static Set<Integer> getApiCollections() {
+        return UsersCollectionsList.getContextCollections(CONTEXT_SOURCE.API);
     }
 
     public static List<String> getInvalidTestErrors() {
@@ -148,19 +145,34 @@ public class UsageMetricCalculator {
          * Count all endpoints.
          * Same query being used on dashboard.
          */
-        Set<Integer> demosAndDeactivated = getDemosAndDeactivated();
-        demosAndDeactivated.addAll(getMcpCollections());
-        return (int)SingleTypeInfoDao.instance.fetchEndpointsCount(0, Context.now(), demosAndDeactivated, false);
+        Set<Integer> collectionsToDiscard = getGenAiCollections();
+        collectionsToDiscard.addAll(getMcpCollections());
+        return calculateEndpoints(collectionsToDiscard);
     }
 
-    public static int calculateMCPAssets() {
+    private static int calculateMCPAssets() {
         /*
          * To count MCP endpoints, we need to filter out the collections that does not have
          * MCP tag in tagsList.
          */
-        Set<Integer> demosAndDeactivated = getDemosAndDeactivated();
-        demosAndDeactivated.addAll(getNonMcpCollections());
-        return (int)SingleTypeInfoDao.instance.fetchEndpointsCount(0, Context.now(), demosAndDeactivated, false);
+        Set<Integer> collectionsToDiscard = getGenAiCollections();
+        collectionsToDiscard.addAll(getApiCollections());
+        return calculateEndpoints(collectionsToDiscard);
+    }
+
+    private static int calculateGenAiAssets() {
+        /*
+         * To count GenAI endpoints, we need to filter out the collections that does not have
+         * GenAI tag in tagsList.
+         */
+        Set<Integer> collectionsToDiscard = getMcpCollections();
+        collectionsToDiscard.addAll(getApiCollections());
+        return calculateEndpoints(collectionsToDiscard);
+    }
+
+    private static int calculateEndpoints(Set<Integer> collectionsIdsToDiscard) {
+        collectionsIdsToDiscard.addAll(getDemosAndDeactivated());
+        return (int) SingleTypeInfoDao.instance.fetchEndpointsCount(0, Context.now(), collectionsIdsToDiscard, false);
     }
 
     public static int calculateCustomTests(UsageMetric usageMetric) {
@@ -259,6 +271,9 @@ public class UsageMetricCalculator {
                     break;
                 case MCP_ASSET_COUNT:
                     usage = calculateMCPAssets();
+                    break;
+                case AI_ASSET_COUNT:
+                    usage = calculateGenAiAssets();
                     break;
                 case CUSTOM_TESTS:
                     usage = calculateCustomTests(usageMetric);
