@@ -49,6 +49,7 @@ import com.akto.dto.testing.TestResult.TestError;
 import com.akto.dto.testing.TestingEndpoints;
 import com.akto.dto.testing.TestingRun;
 import com.akto.dto.testing.TestingRunResult;
+import com.akto.dto.testing.UrlModifierPayload;
 import com.akto.dto.testing.WorkflowUpdatedSampleData;
 import com.akto.dto.type.RequestTemplate;
 import com.akto.log.LoggerMaker;
@@ -490,6 +491,37 @@ public class Utils {
         }
 
         httpRequest.setQueryParams(queryParams);
+    }
+
+    public static void modifyUrlParamOperations(OriginalHttpRequest originalHttpRequest, List<ConditionsType> modifyUrlParams, String operationType) {
+        if (modifyUrlParams == null || modifyUrlParams.isEmpty()) {
+            return;
+        }
+
+        for (ConditionsType condition : modifyUrlParams) {
+            try {
+                // get the urlsList for the filter condition
+                Set<String> urlsList = condition.getUrlsList();
+                if (urlsList == null || urlsList.isEmpty()) {
+                    continue;
+                }
+
+                // iterate over the urlsList and modify the url
+                String currentUrl = originalHttpRequest.getUrl();
+                String currentMethod = originalHttpRequest.getMethod();
+                if(!urlsList.contains(currentMethod + " " + currentUrl)){
+                    continue;
+                }
+
+                // now we have to call modifyURL
+                UrlModifierPayload urlModifierPayload = new UrlModifierPayload("", condition.getPosition(), condition.getValue(), operationType);
+                String newUrl = com.akto.test_editor.Utils.buildNewUrl(urlModifierPayload, currentUrl);
+                originalHttpRequest.setUrl(newUrl);
+            } catch (Exception e) {
+                // Log error but continue with other operations
+                System.err.println("Error modifying URL parameter: " + e.getMessage());
+            }
+        }
     }
 
     public static Map<String, Integer> finalCountIssuesMap(ObjectId testingRunResultSummaryId){
