@@ -8,6 +8,7 @@ import com.akto.dto.testing.TestingEndpoints;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.util.Constants;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Sorts;
 import com.mongodb.client.model.UpdateOneModel;
 import com.mongodb.client.model.Updates;
 import com.mongodb.client.model.WriteModel;
@@ -103,20 +104,44 @@ public class SensitiveSampleDataDao extends AccountsContextDaoWithRbac<Sensitive
             Filters.eq(Constants.ID + "." + SingleTypeInfo._API_COLLECTION_ID, apiCollectionId),
             Filters.in(Constants.ID + "." + SingleTypeInfo.SUB_TYPE, SingleTypeInfoDao.instance.sensitiveSubTypeInRequestNames())
         );
-        List<SensitiveSampleData> sensitiveSampleDataList = instance.findAll(matchFilter);
-        ArrayList<WriteModel<SingleTypeInfo>> bulkUpdatesForSingleTypeInfo = new ArrayList<>();
-        for (SensitiveSampleData sensitiveSampleData : sensitiveSampleDataList) {
-            List<String> samples = sensitiveSampleData.getSampleData();
-            for (String sample : samples) {
-                if (hasAnyQueryParam(sample)) {
-                    bulkUpdatesForSingleTypeInfo.add(new UpdateOneModel<>(sensitiveSampleData.getId().getFilterFromParamId(), Updates.set("isQueryParam", true)));
-                    break;
+        
+        int limit = 100;
+        int skip = 0;
+        int totalProcessed = 0;
+        
+        while (true) {
+            List<SensitiveSampleData> sensitiveSampleDataList = instance.findAll(matchFilter, skip, limit, Sorts.ascending("_id"));
+            
+            if (sensitiveSampleDataList == null || sensitiveSampleDataList.isEmpty()) {
+                break;
+            }
+            
+            ArrayList<WriteModel<SingleTypeInfo>> bulkUpdatesForSingleTypeInfo = new ArrayList<>();
+            for (SensitiveSampleData sensitiveSampleData : sensitiveSampleDataList) {
+                List<String> samples = sensitiveSampleData.getSampleData();
+                for (String sample : samples) {
+                    if (hasAnyQueryParam(sample)) {
+                        bulkUpdatesForSingleTypeInfo.add(new UpdateOneModel<>(sensitiveSampleData.getId().getFilterFromParamId(), Updates.set("isQueryParam", true)));
+                        break;
+                    }
                 }
             }
+            
+            if(!bulkUpdatesForSingleTypeInfo.isEmpty()) {
+                System.out.println("Backfilling isQueryParam for apiCollectionId: " + apiCollectionId + " " + bulkUpdatesForSingleTypeInfo.size() + " single type infos (batch " + (skip/limit + 1) + ")");
+                SingleTypeInfoDao.instance.getMCollection().bulkWrite(bulkUpdatesForSingleTypeInfo);
+            }
+            
+            totalProcessed += sensitiveSampleDataList.size();
+            skip += limit;
+            
+            // If we got fewer results than the limit, we've reached the end
+            if (sensitiveSampleDataList.size() < limit) {
+                break;
+            }
         }
-        if(!bulkUpdatesForSingleTypeInfo.isEmpty()) {
-            SingleTypeInfoDao.instance.getMCollection().bulkWrite(bulkUpdatesForSingleTypeInfo);
-        }
+        
+        System.out.println("Completed backfilling isQueryParam. Total records processed: " + totalProcessed + " for apiCollectionId: " + apiCollectionId);
     }
 
     @Override

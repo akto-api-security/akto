@@ -2515,7 +2515,7 @@ public class InitializerListener implements ServletContextListener {
                 AccountTask.instance.executeTask(new Consumer<Account>() {
                     @Override
                     public void accept(Account t) {
-                        if(t.getId() == 1000000 || t.getId() == 1718042191){
+                        if(t.getId() == 1000000 || t.getId() == 1718042191 || t.getId() == 1736798101){
                             Context.accountId.set(t.getId());
                             BackwardCompatibility backwardCompatibility = BackwardCompatibilityDao.instance.findOne(Filters.empty());
                             if(backwardCompatibility.getFillQueryParams() == 0){
@@ -2532,7 +2532,6 @@ public class InitializerListener implements ServletContextListener {
                                     );
                                     SingleTypeInfo.fetchCustomDataTypes(t.getId());
                                     for(ApiCollection apiCollection : apiCollections){
-                                        logger.infoAndAddToDb("Filling query params for api collection " + apiCollection.getHostName());
                                         SensitiveSampleDataDao.instance.backFillIsQueryParamInSingleTypeInfo(apiCollection.getId());
                                     }
                                 } catch (Exception e) {
