@@ -3,19 +3,27 @@ package com.akto.action;
 import com.akto.ApiRequest;
 import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.context.Context;
+import com.akto.dao.testing.TestRolesDao;
 import com.akto.dto.ApiCollection;
+import com.akto.dto.RecordedLoginFlowInput;
+import com.akto.dto.testing.AuthMechanism;
+import com.akto.dto.testing.TestRoles;
 import com.akto.log.LoggerMaker;
+import com.akto.util.Constants;
+import com.akto.util.RecordedLoginFlowUtil;
 import com.akto.utils.Utils;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.mongodb.BasicDBList;
+import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.opensymphony.xwork2.Action;
+import org.apache.commons.lang3.StringUtils;
+import org.bson.types.ObjectId;
 import org.json.JSONObject;
 
+import java.io.File;
 import java.net.URL;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.List;
+import java.util.*;
 
 public class AktoJaxAction extends UserAction {
 
@@ -24,6 +32,9 @@ public class AktoJaxAction extends UserAction {
     private String password;
     private String apiKey;
     private String dashboardUrl;
+    private String testRoleHaxId;
+
+    private String outscopeUrls;
 
     private String crawlerData;
 
@@ -62,12 +73,37 @@ public class AktoJaxAction extends UserAction {
 
             JSONObject requestBody = new JSONObject();
             requestBody.put("hostname", hostname);
-            requestBody.put("username", username);
-            requestBody.put("password", password);
             requestBody.put("apiKey", apiKey);
             requestBody.put("dashboardUrl", dashboardUrl);
             requestBody.put("collectionId", collectionId);
             requestBody.put("accountId", Context.accountId.get());
+            requestBody.put("outscopeUrls", outscopeUrls);
+
+            if(!StringUtils.isEmpty(username) && !StringUtils.isEmpty(password)) {
+                requestBody.put("username", username);
+                requestBody.put("password", password);
+            } else if(testRoleHaxId != null && !testRoleHaxId.isEmpty()) {
+                TestRoles testRole = TestRolesDao.instance.findOne(Filters.eq(Constants.ID, new ObjectId(testRoleHaxId)));
+                AuthMechanism authMechanismForRole = testRole.findDefaultAuthMechanism();
+
+                RecordedLoginFlowInput recordedLoginFlowInput = authMechanismForRole.getRecordedLoginFlowInput();
+                String payload = recordedLoginFlowInput.getContent().toString();
+                File tmpOutputFile;
+                File tmpErrorFile;
+                try {
+                    tmpOutputFile = File.createTempFile("output", ".json");
+                    tmpErrorFile = File.createTempFile("recordedFlowOutput", ".txt");
+                    RecordedLoginFlowUtil.triggerFlow(recordedLoginFlowInput.getTokenFetchCommand(), payload, tmpOutputFile.getPath(), tmpErrorFile.getPath(), getSUser().getId());
+
+                    String token = RecordedLoginFlowUtil.fetchToken(tmpOutputFile.getPath(), tmpErrorFile.getPath());
+                    BasicDBObject parseToken = BasicDBObject.parse(token);
+                    if(parseToken != null) {
+                        BasicDBList allCookies = (BasicDBList) parseToken.get("all_cookies");
+                        requestBody.put("cookies", allCookies);
+                    }
+                } catch (Exception e) {
+                }
+            }
 
             String reqData = requestBody.toString();
             JsonNode node = ApiRequest.postRequest(new HashMap<>(), url, reqData);
@@ -160,5 +196,21 @@ public class AktoJaxAction extends UserAction {
 
     public void setDashboardUrl(String dashboardUrl) {
         this.dashboardUrl = dashboardUrl;
+    }
+
+    public String getTestRoleHaxId() {
+        return testRoleHaxId;
+    }
+
+    public void setTestRoleHaxId(String testRoleHaxId) {
+        this.testRoleHaxId = testRoleHaxId;
+    }
+
+    public String getOutscopeUrls() {
+        return outscopeUrls;
+    }
+
+    public void setOutscopeUrls(String outscopeUrls) {
+        this.outscopeUrls = outscopeUrls;
     }
 }
