@@ -531,6 +531,7 @@ public class SingleTypeInfo {
     long maxValue = ACCEPTED_MIN_VALUE;  // this value will be used when field doesn't exist in db
     public static final String LAST_SEEN = "lastSeen";
     long lastSeen;
+    boolean isQueryParam;
 
     @BsonIgnore
     private boolean isPrivate; // do not use this field anywhere else. This was added to convey if STI is private or not to frontend
@@ -958,5 +959,13 @@ public String composeKeyWithCustomSubType(SubType s) {
 
     public void setId(ObjectId id) {
         this.id = id;
+    }
+
+    public boolean getIsQueryParam() {
+        return isQueryParam;
+    }
+
+    public void setIsQueryParam(boolean isQueryParam) {
+        this.isQueryParam = isQueryParam;
     }
 }
