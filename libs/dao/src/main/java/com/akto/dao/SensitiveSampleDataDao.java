@@ -98,11 +98,13 @@ public class SensitiveSampleDataDao extends AccountsContextDaoWithRbac<Sensitive
     }
 
     public void backFillIsQueryParamInSingleTypeInfo(int apiCollectionId) {
+        List<String> subTypes = SingleTypeInfoDao.instance.sensitiveSubTypeInRequestNames();
+        System.out.println("Subtypes: " + subTypes.size());
         Bson matchFilter = Filters.and(
             Filters.eq(Constants.ID + "." + SingleTypeInfo._RESPONSE_CODE, -1),
             Filters.eq(Constants.ID + "." + SingleTypeInfo._IS_HEADER, false),
             Filters.eq(Constants.ID + "." + SingleTypeInfo._API_COLLECTION_ID, apiCollectionId),
-            Filters.in(Constants.ID + "." + SingleTypeInfo.SUB_TYPE, SingleTypeInfoDao.instance.sensitiveSubTypeInRequestNames())
+            Filters.in(Constants.ID + "." + SingleTypeInfo.SUB_TYPE, subTypes)
         );
         
         int limit = 100;

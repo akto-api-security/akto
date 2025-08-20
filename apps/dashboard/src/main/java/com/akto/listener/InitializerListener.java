@@ -2517,6 +2517,7 @@ public class InitializerListener implements ServletContextListener {
                     public void accept(Account t) {
                         if(t.getId() == 1000000 || t.getId() == 1718042191 || t.getId() == 1736798101){
                             Context.accountId.set(t.getId());
+                            Context.contextSource.set(com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE.API);
                             logger.infoAndAddToDb("Starting backfill query params for account " + t.getId());
                             int now = Context.now();
                             BackwardCompatibility backwardCompatibility = BackwardCompatibilityDao.instance.findOne(Filters.empty());
@@ -2532,6 +2533,7 @@ public class InitializerListener implements ServletContextListener {
                                             Filters.exists(ApiCollection.HOST_NAME, true)
                                         ), Projections.include(ApiCollection.ID, ApiCollection.HOST_NAME)
                                     );
+                                    logger.infoAndAddToDb("Fetched " + apiCollections.size() + " api collections");
                                     SingleTypeInfo.fetchCustomDataTypes(t.getId());
                                     for(ApiCollection apiCollection : apiCollections){
                                         SensitiveSampleDataDao.instance.backFillIsQueryParamInSingleTypeInfo(apiCollection.getId());
