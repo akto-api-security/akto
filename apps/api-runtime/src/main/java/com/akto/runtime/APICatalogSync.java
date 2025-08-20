@@ -1334,6 +1334,11 @@ public class APICatalogSync {
         for(String key: deltaInfoMap.keySet()) {
             SingleTypeInfo dbInfo = dbInfoMap.get(key);
             SingleTypeInfo deltaInfo = deltaInfoMap.get(key);
+            if(deltaInfo.getParam().contains("_queryParam")) {
+                deltaInfo.setIsQueryParam(true);
+                String originalParam = deltaInfo.getParam().split("_queryParam")[0];
+                deltaInfo.setParam(originalParam);
+            }
             Bson update;
 
             int inc = deltaInfo.getCount() - (dbInfo == null ? 0 : dbInfo.getCount());
@@ -1433,7 +1438,7 @@ public class APICatalogSync {
                 );
             }
 
-            Bson updateKey = SingleTypeInfoDao.createFilters(deltaInfo);
+            Bson updateKey = Filters.and(SingleTypeInfoDao.createFilters(deltaInfo), Filters.eq("isQueryParam", deltaInfo.getIsQueryParam()));
             update = Updates.combine(update,
             Updates.setOnInsert(SingleTypeInfo._COLLECTION_IDS, Arrays.asList(deltaInfo.getApiCollectionId())));
 

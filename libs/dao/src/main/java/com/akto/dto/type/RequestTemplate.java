@@ -646,7 +646,12 @@ public class RequestTemplate {
         return parseRequestPayload(reqPayload, urlWithParams);
     }
     public static JSONObject parseRequestPayloadToJsonObject(String reqPayload, String urlWithParams) {
-        BasicDBObject queryParams = getQueryJSON(urlWithParams);
+        BasicDBObject queryParams = null;
+        try {
+            queryParams = getQueryJSONWithSuffix(urlWithParams);
+        } catch (Exception e) {
+            queryParams = new BasicDBObject();
+        }
 
         if (reqPayload == null || reqPayload.isEmpty()) {
             reqPayload = "{}";
