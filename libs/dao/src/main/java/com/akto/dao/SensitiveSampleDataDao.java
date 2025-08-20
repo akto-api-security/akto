@@ -121,7 +121,7 @@ public class SensitiveSampleDataDao extends AccountsContextDaoWithRbac<Sensitive
                 List<String> samples = sensitiveSampleData.getSampleData();
                 for (String sample : samples) {
                     if (hasAnyQueryParam(sample)) {
-                        bulkUpdatesForSingleTypeInfo.add(new UpdateOneModel<>(sensitiveSampleData.getId().getFilterFromParamId(), Updates.set("isQueryParam", true)));
+                        bulkUpdatesForSingleTypeInfo.add(new UpdateOneModel<>(SingleTypeInfo.getFilterFromParamId(sensitiveSampleData.getId()), Updates.set("isQueryParam", true)));
                         break;
                     }
                 }
