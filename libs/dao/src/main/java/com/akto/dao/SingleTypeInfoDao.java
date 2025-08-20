@@ -21,7 +21,6 @@ import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.*;
 
 import org.bson.conversions.Bson;
-import org.checkerframework.checker.units.qual.s;
 
 public class SingleTypeInfoDao extends AccountsContextDaoWithRbac<SingleTypeInfo> {
 

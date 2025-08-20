@@ -51,7 +51,6 @@ import org.apache.commons.lang3.EnumUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
-import org.checkerframework.common.returnsreceiver.qual.This;
 import org.json.JSONObject;
 
 import com.akto.DaoInit;
@@ -2536,7 +2535,7 @@ public class InitializerListener implements ServletContextListener {
                                     logger.infoAndAddToDb("Fetched " + apiCollections.size() + " api collections");
                                     SingleTypeInfo.fetchCustomDataTypes(t.getId());
                                     for(ApiCollection apiCollection : apiCollections){
-                                        SensitiveSampleDataDao.instance.backFillIsQueryParamInSingleTypeInfo(apiCollection.getId());
+                                        SampleDataDao.instance.backFillIsQueryParamInSingleTypeInfo(apiCollection.getId());
                                     }
                                     logger.infoAndAddToDb("Completed backfill query params for account " + t.getId() + " in " + (Context.now() - now) + " seconds");
                                 } catch (Exception e) {
