@@ -15,6 +15,8 @@ import com.akto.mcp.McpJsonRpcModel;
 import com.akto.util.Pair;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
+
 import java.net.URL;
 
 public class McpRequestResponseUtilsTest {
@@ -23,6 +25,7 @@ public class McpRequestResponseUtilsTest {
         HttpRequestParams reqParams = new HttpRequestParams();
         reqParams.setPayload(payload);
         reqParams.setUrl(url);
+        reqParams.setApiCollectionId(123456789);
 
         HttpResponseParams responseParams = new HttpResponseParams();
         responseParams.setRequestParams(reqParams);
@@ -33,6 +36,13 @@ public class McpRequestResponseUtilsTest {
 
     @Test
     public void testMcpToolsCallWithName() throws Exception {
+        // Mock DataActor to avoid NullPointerException during audit log insertion
+        com.akto.data_actor.DataActor mockDataActor = Mockito.mock(com.akto.data_actor.DataActor.class);
+        Mockito.doNothing().when(mockDataActor).insertMCPAuditDataLog(Mockito.any());
+        java.lang.reflect.Field field = com.akto.mcp.McpRequestResponseUtils.class.getDeclaredField("dataActor");
+        field.setAccessible(true);
+        field.set(null, mockDataActor);
+
         String payload = "{ \"jsonrpc\": \"2.0\", \"method\": \"tools/call\", \"params\": { \"name\": \"testTool\" }, \"id\": 1 }";
         String url = "http://localhost:8080/mcp?sessionId=abc123";
         HttpResponseParams responseParams = createHttpResponseParams(payload, url);
@@ -198,6 +208,13 @@ public class McpRequestResponseUtilsTest {
 
     @Test
     public void testMcpToolsCallWithNameAndQueryParams() throws Exception {
+        // Mock DataActor to avoid NullPointerException during audit log insertion
+        com.akto.data_actor.DataActor mockDataActor = Mockito.mock(com.akto.data_actor.DataActor.class);
+        Mockito.doNothing().when(mockDataActor).insertMCPAuditDataLog(Mockito.any());
+        java.lang.reflect.Field field = com.akto.mcp.McpRequestResponseUtils.class.getDeclaredField("dataActor");
+        field.setAccessible(true);
+        field.set(null, mockDataActor);
+
         String payload = "{ \"jsonrpc\": \"2.0\", \"method\": \"tools/call\", \"params\": { \"name\": \"testTool\" }, \"id\": 1 }";
         String url = "http://localhost:8080/mcp?foo=bar&baz=qux";
         HttpResponseParams responseParams = createHttpResponseParams(payload, url);

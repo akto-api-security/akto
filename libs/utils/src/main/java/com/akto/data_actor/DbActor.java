@@ -641,4 +641,8 @@ public class DbActor extends DataActor {
     @Override
     public void updateModuleInfo(ModuleInfo moduleInfo) {
     }
+
+    public void insertMCPAuditDataLog(McpAuditInfo auditInfo) {
+        DbLayer.insertMCPAuditDataLog(auditInfo);
+    }
 }
