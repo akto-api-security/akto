@@ -965,7 +965,7 @@ public String composeKeyWithCustomSubType(SubType s) {
         return isQueryParam;
     }
 
-    public void setQueryParam(boolean isQueryParam) {
+    public void setIsQueryParam(boolean isQueryParam) {
         this.isQueryParam = isQueryParam;
     }
 }
