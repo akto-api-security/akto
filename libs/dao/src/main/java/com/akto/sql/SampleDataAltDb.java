@@ -333,6 +333,57 @@ public class SampleDataAltDb {
         executeQuery(prepareStmt, (rs) -> null);
     }
 
+    final static String CREATE_TOP10_TRIGGER_FUNCTION_QUERY = 
+        "CREATE OR REPLACE FUNCTION sampledata02_enforce_top10()\n" +
+        "RETURNS trigger\n" +
+        "LANGUAGE plpgsql\n" +
+        "AS $$\n" +
+        "BEGIN\n" +
+        "  -- Delete rows from the same group as the new row\n" +
+        "  -- where the row is older than the 10th most recent\n" +
+        "  DELETE FROM sampledata02 s\n" +
+        "  WHERE s.api_collection_id = NEW.api_collection_id\n" +
+        "    AND s.method = NEW.method\n" +
+        "    AND s.url = NEW.url\n" +
+        "    AND (s.timestamp, s.id) < (\n" +
+        "      -- Find the 10th most recent row for this group\n" +
+        "      SELECT t.timestamp, t.id\n" +
+        "      FROM sampledata02 t\n" +
+        "      WHERE t.api_collection_id = NEW.api_collection_id\n" +
+        "        AND t.method = NEW.method\n" +
+        "        AND t.url = NEW.url\n" +
+        "      ORDER BY t.timestamp DESC, t.id DESC\n" +
+        "      OFFSET 9   -- skip the first 9 (newest 9 rows)\n" +
+        "      LIMIT 1    -- this is the 10th row\n" +
+        "    );\n" +
+        "\n" +
+        "  RETURN NULL; -- no row changes, just cleanup\n" +
+        "END;\n" +
+        "$$;";
+
+    final static String CREATE_TOP10_TRIGGER_QUERY = 
+        "DROP TRIGGER IF EXISTS trg_sampledata02_top10 ON sampledata02;\n" +
+        "CREATE TRIGGER trg_sampledata02_top10\n" +
+        "AFTER INSERT ON sampledata02\n" +
+        "FOR EACH ROW\n" +
+        "EXECUTE FUNCTION sampledata02_enforce_top10();";
+
+    public static void createTop10Trigger() throws Exception {
+        // First create the trigger function
+        FailableFunction<Connection, PreparedStatement, SQLException> prepareFunctionStmt = (conn) -> {
+            return conn.prepareStatement(CREATE_TOP10_TRIGGER_FUNCTION_QUERY, Statement.RETURN_GENERATED_KEYS);
+        };
+
+        executeQuery(prepareFunctionStmt, (rs) -> null);
+
+        // Then create and attach the trigger
+        FailableFunction<Connection, PreparedStatement, SQLException> prepareTriggerStmt = (conn) -> {
+            return conn.prepareStatement(CREATE_TOP10_TRIGGER_QUERY, Statement.RETURN_GENERATED_KEYS);
+        };
+
+        executeQuery(prepareTriggerStmt, (rs) -> null);
+    }
+
     final static String UPDATE_URL_QUERY = "update sampledata02 set url=? where id in (?";
 
     public static void updateUrl(List<String> uuidList, String newUrl) throws Exception {
