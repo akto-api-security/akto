@@ -140,8 +140,9 @@ public class SensitiveSampleDataDao extends AccountsContextDaoWithRbac<Sensitive
                 break;
             }
         }
-        
-        System.out.println("Completed backfilling isQueryParam. Total records processed: " + totalProcessed + " for apiCollectionId: " + apiCollectionId);
+        if(totalProcessed > 0){
+            System.out.println("Completed backfilling isQueryParam. Total records processed: " + totalProcessed + " for apiCollectionId: " + apiCollectionId);
+        }
     }
 
     @Override

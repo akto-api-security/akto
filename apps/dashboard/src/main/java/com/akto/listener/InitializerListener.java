@@ -2517,6 +2517,8 @@ public class InitializerListener implements ServletContextListener {
                     public void accept(Account t) {
                         if(t.getId() == 1000000 || t.getId() == 1718042191 || t.getId() == 1736798101){
                             Context.accountId.set(t.getId());
+                            logger.infoAndAddToDb("Starting backfill query params for account " + t.getId());
+                            int now = Context.now();
                             BackwardCompatibility backwardCompatibility = BackwardCompatibilityDao.instance.findOne(Filters.empty());
                             if(backwardCompatibility.getFillQueryParams() == 0){
                                 BackwardCompatibilityDao.instance.updateOne(
@@ -2534,6 +2536,7 @@ public class InitializerListener implements ServletContextListener {
                                     for(ApiCollection apiCollection : apiCollections){
                                         SensitiveSampleDataDao.instance.backFillIsQueryParamInSingleTypeInfo(apiCollection.getId());
                                     }
+                                    logger.infoAndAddToDb("Completed backfill query params for account " + t.getId() + " in " + (Context.now() - now) + " seconds");
                                 } catch (Exception e) {
                                     logger.errorAndAddToDb(e, "Error while filling query params");
                                 }
