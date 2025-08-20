@@ -1,6 +1,10 @@
 package com.akto.mcp;
 
+import com.akto.dao.context.Context;
+import com.akto.data_actor.DataActor;
+import com.akto.data_actor.DataActorFactory;
 import com.akto.dto.HttpResponseParams;
+import com.akto.dto.McpAuditInfo;
 import com.akto.jsonrpc.JsonRpcUtils;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
@@ -16,6 +20,9 @@ import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
 
+import static com.akto.util.Constants.AKTO_MCP_RESOURCES_TAG;
+import static com.akto.util.Constants.AKTO_MCP_TOOLS_TAG;
+
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public final class McpRequestResponseUtils {
 
@@ -25,6 +32,7 @@ public final class McpRequestResponseUtils {
         McpSchema.METHOD_RESOURCES_READ
     ));
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+    private static DataActor dataActor = DataActorFactory.fetchInstance();
 
     public static HttpResponseParams parseMcpResponseParams(HttpResponseParams responseParams) {
         String requestPayload = responseParams.getRequestParams().getPayload();
@@ -78,21 +86,46 @@ public final class McpRequestResponseUtils {
 
         String url = responseParams.getRequestParams().getURL();
 
-        switch (mcpJsonRpcModel.getMethod()) {
-            case McpSchema.METHOD_TOOLS_CALL:
-                if (params != null && StringUtils.isNotBlank(params.getName())) {
-                    url = HttpResponseParams.addPathParamToUrl(url, params.getName());
-                }
-                break;
+        McpAuditInfo auditInfo = null;
 
-            case McpSchema.METHOD_RESOURCES_READ:
-                if (params != null && StringUtils.isNotBlank(params.getUri())) {
-                    url = HttpResponseParams.addPathParamToUrl(url, params.getUri());
-                }
-                break;
+        try {
+            switch (mcpJsonRpcModel.getMethod()) {
+                case McpSchema.METHOD_TOOLS_CALL:
+                    if (params != null && StringUtils.isNotBlank(params.getName())) {
+                        url = HttpResponseParams.addPathParamToUrl(url, params.getName());
+                        String name = params.getName() != null ? params.getName() : "";
+                        auditInfo = new McpAuditInfo(
+                                Context.now(), "", AKTO_MCP_TOOLS_TAG, 0,
+                                name, "", null, responseParams.getRequestParams().getApiCollectionId()
 
-            default:
-                break;
+                        );
+                    }
+                    break;
+
+                case McpSchema.METHOD_RESOURCES_READ:
+                    if (params != null && StringUtils.isNotBlank(params.getUri())) {
+                        url = HttpResponseParams.addPathParamToUrl(url, params.getUri());
+                        String uri = params.getUri() != null ? params.getUri() : "";
+                        auditInfo = new McpAuditInfo(
+                                Context.now(), "", AKTO_MCP_RESOURCES_TAG, 0,
+                                uri, "", null, responseParams.getRequestParams().getApiCollectionId()
+                        );
+                    }
+                    break;
+
+                default:
+                    break;
+            }
+        } catch (Exception e) {
+            logger.error("Error forming auditInfo or processing MCP method call", e);
+        }
+
+        if (auditInfo != null) {
+            try {
+                dataActor.insertMCPAuditDataLog(auditInfo);
+            } catch (Exception e) {
+                logger.error("Error inserting MCP audit data log", e);
+            }
         }
         responseParams.getRequestParams().setUrl(url);
     }
