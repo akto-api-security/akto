@@ -273,7 +273,7 @@ public class McpToolsSyncJobExecutor {
             false,
             new HashMap<>(),
             apiConfig,
-            true,
+            false,
             true
         );
     }
