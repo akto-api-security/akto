@@ -2510,6 +2510,40 @@ public class InitializerListener implements ServletContextListener {
                         logger.errorAndAddToDb("Failed to initialize Auth0 due to: " + e.getMessage(), LogDb.DASHBOARD);
                     }
                 }
+
+                // run backward fill job for query params
+                AccountTask.instance.executeTask(new Consumer<Account>() {
+                    @Override
+                    public void accept(Account t) {
+                        if(t.getId() == 1000000 || t.getId() == 1718042191){
+                            Context.accountId.set(t.getId());
+                            BackwardCompatibility backwardCompatibility = BackwardCompatibilityDao.instance.findOne(Filters.empty());
+                            if(backwardCompatibility.getFillQueryParams() == 0){
+                                BackwardCompatibilityDao.instance.updateOne(
+                                    Filters.eq("_id", backwardCompatibility.getId()),
+                                    Updates.set("fillQueryParams", Context.now())
+                                );
+                                try {
+                                    List<ApiCollection> apiCollections = ApiCollectionsDao.instance.findAll(
+                                        Filters.and(
+                                            Filters.ne(ApiCollection._DEACTIVATED, true),
+                                            Filters.exists(ApiCollection.HOST_NAME, true)
+                                        ), Projections.include(ApiCollection.ID, ApiCollection.HOST_NAME)
+                                    );
+                                    SingleTypeInfo.fetchCustomDataTypes(t.getId());
+                                    for(ApiCollection apiCollection : apiCollections){
+                                        logger.infoAndAddToDb("Filling query params for api collection " + apiCollection.getHostName());
+                                        SensitiveSampleDataDao.instance.backFillIsQueryParamInSingleTypeInfo(apiCollection.getId());
+                                    }
+                                } catch (Exception e) {
+                                    logger.errorAndAddToDb(e, "Error while filling query params");
+                                }
+                                
+                            }
+                            
+                        }
+                    }
+                }, "backfill-query-params");
             }
         }, 0, TimeUnit.SECONDS);
 
