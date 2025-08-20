@@ -11,6 +11,8 @@ import com.akto.types.CappedSet;
 import com.akto.util.AccountTask;
 import com.mongodb.BasicDBObject;
 import io.swagger.v3.oas.models.media.*;
+import lombok.Setter;
+
 import org.apache.commons.lang3.StringUtils;
 import org.bson.codecs.pojo.annotations.BsonIgnore;
 import org.bson.codecs.pojo.annotations.BsonProperty;
@@ -545,9 +547,6 @@ public class SingleTypeInfo {
     private boolean isPrivate; // do not use this field anywhere else. This was added to convey if STI is private or not to frontend
     @BsonIgnore
     private Object value;
-
-    // Only being used for generating OpenAPI spec.
-    @BsonIgnore
     private boolean isQueryParam;
 
     public boolean isQueryParam() {
@@ -987,5 +986,13 @@ public String composeKeyWithCustomSubType(SubType s) {
 
     public void setId(ObjectId id) {
         this.id = id;
+    }
+
+    public boolean getIsQueryParam() {
+        return isQueryParam;
+    }
+
+    public void setIsQueryParam(boolean isQueryParam) {
+        this.isQueryParam = isQueryParam;
     }
 }
