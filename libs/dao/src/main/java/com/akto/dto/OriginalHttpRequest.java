@@ -315,16 +315,9 @@ public class OriginalHttpRequest {
         Map<String,List<String>> headers = new HashMap<>();
         if (headersFromRequest == null) return headers;
         for (Object k: headersFromRequest.keySet()) {
-
-            String key = k.toString().toLowerCase();
-            String rawValue = headersFromRequest.get(k).toString();
-
-            List<String> splitValues = Arrays.stream(rawValue.split(","))
-                .map(String::trim)
-                .filter(v -> !StringUtils.isEmpty(v))
-                .collect(Collectors.toList());
-
-            headers.computeIfAbsent(key, x -> new ArrayList<>()).addAll(splitValues);
+            List<String> values = headers.getOrDefault(k,new ArrayList<>());
+            values.add(headersFromRequest.get(k).toString());
+            headers.put(k.toString().toLowerCase(),values);
         }
         return headers;
     }

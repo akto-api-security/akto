@@ -810,25 +810,16 @@ public class ApiExecutor {
             return true;
         }
 
-        boolean hasEventStream = false;
-        boolean hasApplicationJson = false;
-
         for (Map.Entry<String, List<String>> entry : request.getHeaders().entrySet()) {
             if (HttpRequestResponseUtils.HEADER_ACCEPT.equalsIgnoreCase(entry.getKey()) && entry.getValue() != null
                 && !entry.getValue().isEmpty()) {
-                for (String value : entry.getValue()) {
-                    if (HttpRequestResponseUtils.TEXT_EVENT_STREAM_CONTENT_TYPE.equalsIgnoreCase(value)) {
-                        hasEventStream = true;
-                    }
-                    if (HttpRequestResponseUtils.APPLICATION_JSON.equalsIgnoreCase(value)) {
-                        hasApplicationJson = true;
-                    }
-                    if (hasEventStream && hasApplicationJson) {
-                        break;
-                    }
+                String value = entry.getValue().get(0).toLowerCase();
+                if (value.contains(HttpRequestResponseUtils.TEXT_EVENT_STREAM_CONTENT_TYPE) && value.contains(
+                    HttpRequestResponseUtils.APPLICATION_JSON)) {
+                    return false;
                 }
             }
         }
-        return !(hasEventStream && hasApplicationJson);
+        return true;
     }
 }
