@@ -89,7 +89,8 @@ let filters = [
     choices:[
         {label:"Header", value:"header"},
         {label:"Payload", value:"payload"},
-        {label:"URL param", value:"urlParam"}
+        {label:"URL param", value:"urlParam"},
+        {label:"Query param", value:"queryParam"}
     ],
   },
   {
@@ -119,7 +120,7 @@ const convertDataIntoTableFormat = (endpoint, apiCollectionMap) => {
     temp['apiCollectionId'] = endpoint.apiCollectionId
     temp['detected_timestamp'] = func.prettifyEpoch(endpoint.timestamp)
     temp['timestamp'] = endpoint.timestamp
-    temp['location'] = (endpoint.isHeader ? "Header" : (endpoint.isUrlParam ? "URL param" : "Payload"))
+    temp['location'] = (endpoint.isHeader ? "Header" : (endpoint.isUrlParam ? "URL param" : (endpoint.isQueryParam ? "Query param" : "Payload")))
     temp['isHeader'] = endpoint.isHeader
     temp["paramLocation"] = endpoint.responseCode < 0 ? "Request" : "Response"
     temp['keyValue'] = key

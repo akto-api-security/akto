@@ -6,10 +6,18 @@ import com.akto.dto.ApiInfo;
 import com.akto.dto.SensitiveSampleData;
 import com.akto.dto.testing.TestingEndpoints;
 import com.akto.dto.type.SingleTypeInfo;
+import com.akto.util.Constants;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Sorts;
+import com.mongodb.client.model.UpdateOneModel;
+import com.mongodb.client.model.Updates;
+import com.mongodb.client.model.WriteModel;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 import org.bson.conversions.Bson;
 
@@ -72,6 +80,69 @@ public class SensitiveSampleDataDao extends AccountsContextDaoWithRbac<Sensitive
 
         MCollection.createIndexIfAbsent(getDBName(), getCollName(),
                 new String[] { SingleTypeInfo._COLLECTION_IDS }, true);
+    }
+    private static final Pattern QUERY_PARAM = Pattern.compile("(\\?|&)[^=\\s&]+=[^&\\s]+");
+
+    public static boolean hasAnyQueryParam(String raw) {
+        if (raw == null || raw.isEmpty()) return false;
+
+        // Fast path: if there is no '?' at all, there cannot be query params
+        int q = raw.indexOf('?');
+        if (q < 0) return false;
+
+        // Optional micro filter: if there is a '?' but no '=' after it, likely no params
+        if (raw.indexOf('=', q) < 0) return false;
+
+        // Fallback to accurate regex
+        return QUERY_PARAM.matcher(raw).find();
+    }
+
+    public void backFillIsQueryParamInSingleTypeInfo(int apiCollectionId) {
+        Bson matchFilter = Filters.and(
+            Filters.eq(Constants.ID + "." + SingleTypeInfo._RESPONSE_CODE, -1),
+            Filters.eq(Constants.ID + "." + SingleTypeInfo._IS_HEADER, false),
+            Filters.eq(Constants.ID + "." + SingleTypeInfo._API_COLLECTION_ID, apiCollectionId),
+            Filters.in(Constants.ID + "." + SingleTypeInfo.SUB_TYPE, SingleTypeInfoDao.instance.sensitiveSubTypeInRequestNames())
+        );
+        
+        int limit = 100;
+        int skip = 0;
+        int totalProcessed = 0;
+        
+        while (true) {
+            List<SensitiveSampleData> sensitiveSampleDataList = instance.findAll(matchFilter, skip, limit, Sorts.ascending("_id"));
+            
+            if (sensitiveSampleDataList == null || sensitiveSampleDataList.isEmpty()) {
+                break;
+            }
+            
+            ArrayList<WriteModel<SingleTypeInfo>> bulkUpdatesForSingleTypeInfo = new ArrayList<>();
+            for (SensitiveSampleData sensitiveSampleData : sensitiveSampleDataList) {
+                List<String> samples = sensitiveSampleData.getSampleData();
+                for (String sample : samples) {
+                    if (hasAnyQueryParam(sample)) {
+                        bulkUpdatesForSingleTypeInfo.add(new UpdateOneModel<>(sensitiveSampleData.getId().getFilterFromParamId(), Updates.set("isQueryParam", true)));
+                        break;
+                    }
+                }
+            }
+            
+            if(!bulkUpdatesForSingleTypeInfo.isEmpty()) {
+                System.out.println("Backfilling isQueryParam for apiCollectionId: " + apiCollectionId + " " + bulkUpdatesForSingleTypeInfo.size() + " single type infos (batch " + (skip/limit + 1) + ")");
+                SingleTypeInfoDao.instance.getMCollection().bulkWrite(bulkUpdatesForSingleTypeInfo);
+            }
+            
+            totalProcessed += sensitiveSampleDataList.size();
+            skip += limit;
+            
+            // If we got fewer results than the limit, we've reached the end
+            if (sensitiveSampleDataList.size() < limit) {
+                break;
+            }
+        }
+        if(totalProcessed > 0){
+            System.out.println("Completed backfilling isQueryParam. Total records processed: " + totalProcessed + " for apiCollectionId: " + apiCollectionId);
+        }
     }
 
     @Override

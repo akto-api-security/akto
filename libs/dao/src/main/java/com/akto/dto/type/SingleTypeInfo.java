@@ -10,12 +10,15 @@ import com.akto.dto.CustomDataType;
 import com.akto.types.CappedSet;
 import com.akto.util.AccountTask;
 import com.mongodb.BasicDBObject;
+import com.mongodb.client.model.Filters;
+
 import io.swagger.v3.oas.models.media.*;
 import lombok.Setter;
 
 import org.apache.commons.lang3.StringUtils;
 import org.bson.codecs.pojo.annotations.BsonIgnore;
 import org.bson.codecs.pojo.annotations.BsonProperty;
+import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -468,6 +471,19 @@ public class SingleTypeInfo {
 
         public void setIsUrlParam(boolean urlParam) {
             isUrlParam = urlParam;
+        }
+
+        public Bson getFilterFromParamId() {
+
+            return Filters.and(
+                Filters.eq(SingleTypeInfo._URL, url),
+                Filters.eq(SingleTypeInfo._METHOD, method),
+                Filters.eq(SingleTypeInfo._RESPONSE_CODE, responseCode),
+                Filters.eq(SingleTypeInfo._IS_HEADER, isHeader),
+                Filters.eq(SingleTypeInfo._PARAM, param),
+                Filters.eq(SingleTypeInfo.SUB_TYPE, subType.name),
+                Filters.eq(SingleTypeInfo._API_COLLECTION_ID, apiCollectionId)
+            );
         }
 
         @Override
