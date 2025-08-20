@@ -83,7 +83,7 @@ public class SensitiveSampleDataDao extends AccountsContextDaoWithRbac<Sensitive
     }
     private static final Pattern QUERY_PARAM = Pattern.compile("(\\?|&)[^=\\s&]+=[^&\\s]+");
 
-    public static boolean hasAnyQueryParam(String raw) {
+    public static boolean hasAnyQueryParam(String raw, String param) {
         if (raw == null || raw.isEmpty()) return false;
 
         // Fast path: if there is no '?' at all, there cannot be query params
@@ -92,7 +92,10 @@ public class SensitiveSampleDataDao extends AccountsContextDaoWithRbac<Sensitive
 
         // Optional micro filter: if there is a '?' but no '=' after it, likely no params
         if (raw.indexOf('=', q) < 0) return false;
-
+        if(param != null && !param.isEmpty()) {
+            String regex = "(?:\\?|&)" + param + "=";
+            return raw.matches(".*" + regex + ".*");
+        }
         // Fallback to accurate regex
         return QUERY_PARAM.matcher(raw).find();
     }
@@ -122,7 +125,7 @@ public class SensitiveSampleDataDao extends AccountsContextDaoWithRbac<Sensitive
             for (SensitiveSampleData sensitiveSampleData : sensitiveSampleDataList) {
                 List<String> samples = sensitiveSampleData.getSampleData();
                 for (String sample : samples) {
-                    if (hasAnyQueryParam(sample)) {
+                    if (hasAnyQueryParam(sample, "")) {
                         bulkUpdatesForSingleTypeInfo.add(new UpdateOneModel<>(SingleTypeInfo.getFilterFromParamId(sensitiveSampleData.getId()), Updates.set("isQueryParam", true)));
                         break;
                     }
