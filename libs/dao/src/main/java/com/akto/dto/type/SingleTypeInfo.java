@@ -144,6 +144,18 @@ public class SingleTypeInfo {
         info.setRedactedDataTypes(redactedDataTypes);
     }
 
+    public static Bson getFilterFromParamId(ParamId paramId) {
+        return Filters.and(
+            Filters.eq(SingleTypeInfo._URL, paramId.getUrl()),
+            Filters.eq(SingleTypeInfo._METHOD, paramId.getMethod()),
+            Filters.eq(SingleTypeInfo._RESPONSE_CODE, paramId.getResponseCode()),
+            Filters.eq(SingleTypeInfo._IS_HEADER, paramId.isHeader()),
+            Filters.eq(SingleTypeInfo._PARAM, paramId.getParam()),
+            Filters.eq(SingleTypeInfo.SUB_TYPE, paramId.getSubType().name),
+            Filters.eq(SingleTypeInfo._API_COLLECTION_ID, paramId.getApiCollectionId())
+        );
+    }
+
     public static void fetchCustomDataTypes(int accountId, List<CustomDataType> customDataTypes,
                                             List<AktoDataType> aktoDataTypes) {
         Map<String, CustomDataType> newMap = new HashMap<>();
@@ -471,19 +483,6 @@ public class SingleTypeInfo {
 
         public void setIsUrlParam(boolean urlParam) {
             isUrlParam = urlParam;
-        }
-
-        public Bson getFilterFromParamId() {
-
-            return Filters.and(
-                Filters.eq(SingleTypeInfo._URL, url),
-                Filters.eq(SingleTypeInfo._METHOD, method),
-                Filters.eq(SingleTypeInfo._RESPONSE_CODE, responseCode),
-                Filters.eq(SingleTypeInfo._IS_HEADER, isHeader),
-                Filters.eq(SingleTypeInfo._PARAM, param),
-                Filters.eq(SingleTypeInfo.SUB_TYPE, subType.name),
-                Filters.eq(SingleTypeInfo._API_COLLECTION_ID, apiCollectionId)
-            );
         }
 
         @Override
