@@ -132,7 +132,8 @@ export async function fetchAllActionItemsApiInfo() {
         api.fetchIssuesByApis(true),
         api.fetchUrlsByIssues(true),
         api.fetchVulnerableApisByCategory("VEM", true),
-        api.fetchVulnerableApisByCategory("MHH", true)
+        api.fetchVulnerableApisByCategory("MHH", true),
+        observeApi.getSensitiveInfoForCollections('topSensitive')
     ]);
 
     const [
@@ -151,7 +152,8 @@ export async function fetchAllActionItemsApiInfo() {
         issuesByApisResult,
         urlsByIssuesResult,
         vemVulnerableApisApiInfoResult,
-        mhhVulnerableApisApiInfoResult
+        mhhVulnerableApisApiInfoResult,
+        topSensitiveResult
     ] = results;
 
     const sensitiveAndUnauthenticatedApis = sensitiveAndUnauthenticatedValueResult.status === 'fulfilled' ? sensitiveAndUnauthenticatedValueResult?.value?.sensitiveUnauthenticatedEndpointsApiInfo || [] : [];
@@ -170,6 +172,7 @@ export async function fetchAllActionItemsApiInfo() {
     const urlsByIssuesForAllActionItems = urlsByIssuesResult.status === 'fulfilled' ? urlsByIssuesResult.value : null;
     const vemVulnerableApisApiInfo = vemVulnerableApisApiInfoResult.status === 'fulfilled' ? vemVulnerableApisApiInfoResult.value?.vulnerableApisApiInfo || [] : [];
     const mhhVulnerableApisApiInfo = mhhVulnerableApisApiInfoResult.status === 'fulfilled' ? mhhVulnerableApisApiInfoResult.value?.vulnerableApisApiInfo || [] : [];
+    const sensitiveSubtypesInUrl = topSensitiveResult.status === 'fulfilled' ? topSensitiveResult.value?.sensitiveSubtypesInUrl || [] : [];
 
 
     const multipleIssuesApiInfo = Array.isArray(issuesByApisForAllActionItems?.issueNamesByAPIs)
@@ -200,5 +203,6 @@ export async function fetchAllActionItemsApiInfo() {
         urlsByIssues: urlsByIssuesForAllActionItems,
         vemVulnerableApisApiInfo: vemVulnerableApisApiInfo,
         mhhVulnerableApisApiInfo: mhhVulnerableApisApiInfo,
+        sensitiveSubtypesInUrl: sensitiveSubtypesInUrl,
     };
 }

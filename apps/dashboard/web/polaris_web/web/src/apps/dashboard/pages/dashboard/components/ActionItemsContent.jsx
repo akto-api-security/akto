@@ -38,7 +38,8 @@ const ACTION_ITEM_TYPES = {
     FREQUENTLY_VULNERABLE_ENDPOINTS: 'FREQUENTLY_VULNERABLE_ENDPOINTS',
     BUILD_REMEDIATION_PLAYBOOKS: 'BUILD_REMEDIATION_PLAYBOOKS',
     VERBOSE_ERROR_MESSAGES: 'VERBOSE_ERROR_MESSAGES',
-    MISSING_SECURITY_HEADERS: 'MISSING_SECURITY_HEADERS'
+    MISSING_SECURITY_HEADERS: 'MISSING_SECURITY_HEADERS',
+    TOP_PUBLIC_EXPOSED_APIS: 'TOP_PUBLIC_EXPOSED_APIS',
 };
 
 const JIRA_INTEGRATION_URL = "/dashboard/settings/integrations/jira";
@@ -195,6 +196,7 @@ export const ActionItemsContent = ({ actionItemsData, onCountChange }) => {
         setActionItems(filteredItems);
         let totalCount = filteredItems.length;
         let criticalCardsDataToSet = [];
+        const topPublicExposedCount = 3; 
         
         if (sensitiveAndUnauthenticatedCount > 0) {
             totalCount += 1;
@@ -225,6 +227,20 @@ export const ActionItemsContent = ({ actionItemsData, onCountChange }) => {
                 actionItemType: ACTION_ITEM_TYPES.VULNERABLE_APIS
             });
         }
+
+        totalCount += 1;
+        criticalCardsDataToSet.push({
+            id: 'p0-top-public',
+            priority: 'P0',
+            staticTitle: 'Top 3 APIs with public exposure',
+            title: 'Top 3 APIs with public exposure',
+            description: 'Top 3 APIs exposing maximum sensitive data',
+            team: 'Security & Development',
+            effort: 'High',
+            count: topPublicExposedCount,
+            whyItMatters: 'Violates data privacy regulations (GDPR, CCPA) and risks customer trust',
+            actionItemType: ACTION_ITEM_TYPES.TOP_PUBLIC_EXPOSED_APIS
+        });
         
         setCriticalCardsData(criticalCardsDataToSet);
         if (onCountChange) {
