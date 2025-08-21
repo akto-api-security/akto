@@ -2,6 +2,7 @@ package com.akto.utils;
 
 import java.time.Duration;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -33,6 +34,24 @@ import com.mongodb.BasicDBObject;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class KafkaUtils {
+    // Cached set of account IDs for topic routing
+    final private static Set<String> accountIdSet = getAccountIdSetFromEnv();
+
+    private static Set<String> getAccountIdSetFromEnv() {
+        String accountIdsEnv = getCachedEnv("AKTO_KAFKA_ACCOUNT_ID");
+        if (accountIdsEnv != null && !accountIdsEnv.isEmpty()) {
+            String[] parts = accountIdsEnv.split(",");
+            Set<String> accountIdSet = new HashSet<>();
+            for (String part : parts) {
+                String trimmed = part.trim();
+                if (!trimmed.isEmpty()) {
+                    accountIdSet.add(trimmed);
+                }
+            }
+            return accountIdSet;
+        }
+        return Collections.emptySet();
+    }
     // Local cache for environment variables
     private static final Map<String, String> envCache = new ConcurrentHashMap<>();
     private static String getCachedEnv(String key) {
@@ -253,23 +272,11 @@ public class KafkaUtils {
     }
 
     public void insertData(List<BulkUpdates> writes, String triggerMethod, int accountId) {
-
         try {
-            String accountIdsEnv = getCachedEnv("KAFKA_TOPICS_ACCOUNT_ID");
-            if (accountIdsEnv != null && !accountIdsEnv.isEmpty()) {
-                String[] parts = accountIdsEnv.split(",");
-                Set<String> accountIdSet = new HashSet<>();
-                for (String part : parts) {
-                    String trimmed = part.trim();
-                    if (!trimmed.isEmpty()) {
-                        accountIdSet.add(trimmed);
-                    }
-                }
-                if (accountIdSet.contains(String.valueOf(accountId))) {
-                    String topicName = getTopicNameForAccount("AKTO_KAFKA_TOPIC_NAME", accountId);
-                    insertDataCore(writes, triggerMethod, accountId, "", topicName, "kafka insertData (custom topic)");
-                    return;
-                }
+            if (accountIdSet != null && accountIdSet.contains(String.valueOf(accountId))) {
+                String topicName = getTopicNameForAccount("AKTO_KAFKA_TOPIC_NAME", accountId);
+                insertDataCore(writes, triggerMethod, accountId, "", topicName, "kafka insertData (custom topic)");
+                return;
             }
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error in insertData: "+ e.toString());
