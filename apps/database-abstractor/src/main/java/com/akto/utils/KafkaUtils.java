@@ -61,9 +61,18 @@ public class KafkaUtils {
         
     }
 
+    public static String getReadTopicName() {
+        String accountIdStr = getCachedEnv("AKTO_KAFKA_ACCOUNT_ID");
+        if (accountIdStr != null && !accountIdStr.isEmpty()) {
+            int accountId = Integer.parseInt(accountIdStr);
+            return getTopicNameForAccount("AKTO_KAFKA_TOPIC_NAME", accountId);
+        }
+        return getCachedEnv("AKTO_KAFKA_TOPIC_NAME");
+    }
+
     public void initKafkaConsumer() {
         System.out.println("kafka init consumer called");
-        String topicName = getCachedEnv("AKTO_KAFKA_TOPIC_NAME");
+        String topicName = getReadTopicName();
         String kafkaBrokerUrl = getCachedEnv("AKTO_KAFKA_BROKER_URL"); // kafka1:19092
         String isKubernetes = getCachedEnv("IS_KUBERNETES");
         if (isKubernetes != null && isKubernetes.equalsIgnoreCase("true")) {
@@ -231,7 +240,25 @@ public class KafkaUtils {
         return writeEnabled.equalsIgnoreCase("true");
     }
 
+
+    public static String getTopicNameForAccount(String defaultTopicEnvVar, int accountId) {
+        String defaultTopic = getCachedEnv(defaultTopicEnvVar);
+        String topicName = defaultTopic + "_" + accountId;
+        return topicName;
+    }
+
     public void insertData(List<BulkUpdates> writes, String triggerMethod, int accountId) {
+
+        String accountIdsEnv = getCachedEnv("KAFKA_TOPICS_ACCOUNT_ID");
+        if (accountIdsEnv != null && !accountIdsEnv.isEmpty()) {
+            List<String> accountIdList = Arrays.asList(accountIdsEnv.split(","));
+            if (accountIdList.contains(String.valueOf(accountId))) {
+                String topicName = getTopicNameForAccount("AKTO_KAFKA_TOPIC_NAME", accountId);
+                insertDataCore(writes, triggerMethod, accountId, null, topicName, "kafka insertData (custom topic)");
+                return;
+            }
+        }
+
         insertDataCore(writes, triggerMethod, accountId, "AKTO_KAFKA_TOPIC_NAME", null, "kafka insertData");
     }
 
