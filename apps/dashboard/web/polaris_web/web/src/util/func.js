@@ -16,6 +16,7 @@ import { circle_cancel, circle_tick_minor } from "@/apps/dashboard/components/ic
 import quickStartFunc from '../apps/dashboard/pages/quick_start/transform';
 import { Box } from '@shopify/polaris';
 import TooltipText from '../apps/dashboard/components/shared/TooltipText';
+import { getMethod } from "../apps/dashboard/pages/observe/GetPrettifyEndpoint";
 
 const iconsUsedMap = {
   CalendarMinor,ClockMinor,CircleAlertMajor,DynamicSourceMinor, LockMinor, KeyMajor, ProfileMinor, PasskeyMinor,
@@ -951,7 +952,8 @@ isObject(obj) {
 },
 
 toMethodUrlString({method,url}){
-  return method + " " + url;
+  const finalMethod = getMethod(url, method);
+  return finalMethod + " " + url;
 },
 toMethodUrlObject(str){
 
