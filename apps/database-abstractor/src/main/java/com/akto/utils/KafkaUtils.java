@@ -34,6 +34,11 @@ import com.mongodb.BasicDBObject;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class KafkaUtils {
+    // Local cache for environment variables
+    private static final Map<String, String> envCache = new ConcurrentHashMap<>();
+    private static String getCachedEnv(String key) {
+        return envCache.computeIfAbsent(key, System::getenv);
+    }
     // Cached set of account IDs for topic routing
     final private static Set<String> accountIdSet = getAccountIdSetFromEnv();
 
@@ -51,11 +56,6 @@ public class KafkaUtils {
             return accountIdSet;
         }
         return Collections.emptySet();
-    }
-    // Local cache for environment variables
-    private static final Map<String, String> envCache = new ConcurrentHashMap<>();
-    private static String getCachedEnv(String key) {
-        return envCache.computeIfAbsent(key, System::getenv);
     }
     
     private final static ObjectMapper mapper = new ObjectMapper();
