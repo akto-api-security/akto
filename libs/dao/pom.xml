@@ -56,7 +56,7 @@
         <dependency>
             <groupId>commons-validator</groupId>
             <artifactId>commons-validator</artifactId>
-            <version>1.7</version>
+            <version>1.10.0</version>
         </dependency>
         <dependency>
             <groupId>io.swagger.parser.v3</groupId>
@@ -100,7 +100,7 @@
         <dependency>
             <groupId>org.springframework.security</groupId>
             <artifactId>spring-security-web</artifactId>
-            <version>5.7.13</version>
+            <version>5.8.16</version>
         </dependency>
         <dependency>
             <groupId>de.flapdoodle.embed</groupId>
@@ -142,7 +142,7 @@
         <dependency>
             <groupId>com.nimbusds</groupId>
             <artifactId>nimbus-jose-jwt</artifactId>
-            <version>9.37.2</version>
+            <version>9.37.4</version>
         </dependency>
         <dependency>
             <groupId>com.auth0</groupId>
