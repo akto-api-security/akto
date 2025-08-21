@@ -267,7 +267,7 @@ public class KafkaUtils {
                 }
                 if (accountIdSet.contains(String.valueOf(accountId))) {
                     String topicName = getTopicNameForAccount("AKTO_KAFKA_TOPIC_NAME", accountId);
-                    insertDataCore(writes, triggerMethod, accountId, null, topicName, "kafka insertData (custom topic)");
+                    insertDataCore(writes, triggerMethod, accountId, "", topicName, "kafka insertData (custom topic)");
                     return;
                 }
             }
