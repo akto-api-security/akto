@@ -44,7 +44,9 @@ public class AktoJaxAction extends UserAction {
 
     public String initiateCrawler() {
         try {
+            loggerMaker.infoAndAddToDb("Initializing Crawler", LoggerMaker.LogDb.DASHBOARD);
             String url = System.getenv("AKTOJAX_SERVICE_URL") + "/triggerCrawler";
+            loggerMaker.infoAndAddToDb("Crawler service url: " + url, LoggerMaker.LogDb.DASHBOARD);
 
             URL parsedUrl = new URL(hostname);
             String host = parsedUrl.getHost();
@@ -70,6 +72,8 @@ public class AktoJaxAction extends UserAction {
                     collectionId = apiCollection.getId();
                 }
             }
+
+            loggerMaker.infoAndAddToDb("Crawler collection id: " + collectionId, LoggerMaker.LogDb.DASHBOARD);
 
             JSONObject requestBody = new JSONObject();
             requestBody.put("hostname", hostname);
@@ -98,16 +102,23 @@ public class AktoJaxAction extends UserAction {
                     String token = RecordedLoginFlowUtil.fetchToken(tmpOutputFile.getPath(), tmpErrorFile.getPath());
                     BasicDBObject parseToken = BasicDBObject.parse(token);
                     if(parseToken != null) {
+                        loggerMaker.infoAndAddToDb("Got the cookies from test role for crawler");
                         BasicDBList allCookies = (BasicDBList) parseToken.get("all_cookies");
                         requestBody.put("cookies", allCookies);
                     }
                 } catch (Exception e) {
+                    loggerMaker.errorAndAddToDb("Error while fetching cookies from test role: " + e.getMessage(), LoggerMaker.LogDb.DASHBOARD);
                 }
             }
 
             String reqData = requestBody.toString();
+
+            loggerMaker.infoAndAddToDb("Crawler request data: " + reqData, LoggerMaker.LogDb.DASHBOARD);
+
             JsonNode node = ApiRequest.postRequest(new HashMap<>(), url, reqData);
             String status = node.get("status").textValue();
+
+            loggerMaker.infoAndAddToDb("Crawler status: " + status, LoggerMaker.LogDb.DASHBOARD);
 
             if(status.equalsIgnoreCase("success")) {
                 return Action.SUCCESS.toUpperCase();
@@ -125,6 +136,8 @@ public class AktoJaxAction extends UserAction {
         String topic = System.getenv("AKTO_KAFKA_TOPIC_NAME");
         if (topic == null) topic = "akto.api.logs";
 
+        loggerMaker.infoAndAddToDb("uploadCrawlerData() - Crawler topic: " + topic, LoggerMaker.LogDb.DASHBOARD);
+
         // fetch collection id
         ApiCollection apiCollection = ApiCollectionsDao.instance.findOne(Filters.eq("_id", Integer.valueOf(apiCollectionId)));
         if(apiCollection == null) {
@@ -133,6 +146,7 @@ public class AktoJaxAction extends UserAction {
         }
 
         try {
+            loggerMaker.infoAndAddToDb("uploadCrawlerData() - Pushing crawler data to kafka", LoggerMaker.LogDb.DASHBOARD);
             Utils.pushDataToKafka(apiCollection.getId(), topic, Arrays.asList(crawlerData), new ArrayList<>(), true, true, true);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Exception while inserting crawler data", LoggerMaker.LogDb.DASHBOARD);

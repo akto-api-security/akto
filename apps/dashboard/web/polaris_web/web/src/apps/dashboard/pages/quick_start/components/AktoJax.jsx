@@ -54,7 +54,7 @@ const AktoJax = () => {
         })
     }
 
-    useEffect(async () => {
+    const fetchTestRoles = async () => {
         const testRolesResponse = await testingApi.fetchTestRoles()
             var testRoles = testRolesResponse.testRoles.map(testRole => {
                 return {
@@ -64,6 +64,10 @@ const AktoJax = () => {
             })
         setTestRolesArr(testRoles)
         setTestRole(testRoles?.[0]?.["value"])
+    }
+
+    useEffect(() => {
+        fetchTestRoles()
     }, [])
 
     return (
