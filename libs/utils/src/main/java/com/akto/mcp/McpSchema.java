@@ -47,6 +47,9 @@ public final class McpSchema {
     public static final String MCP_NOTIFICATIONS_PROGRESS_METHOD = "notifications/progress";
     public static final String MCP_NOTIFICATIONS_RESOURCES_UPDATED_METHOD = "notifications/resources/updated";
 
+    public static final String MCP_INIT_REQUEST = "{\"method\":\"initialize\",\"params\":{\"protocolVersion\":\"2025-06-18\",\"capabilities\":{\"sampling\":{},\"roots\":{\"listChanged\":true}},\"clientInfo\":{\"name\":\"akto-security\",\"version\":\"1.0.0\"}},\"jsonrpc\":\"2.0\",\"id\":111}";
+    public static final String MCP_NOTIFICATIONS_INIT_REQUEST = "{\"jsonrpc\":\"2.0\",\"method\":\"notifications/initialized\"}";
+
     public static final Set<String> MCP_METHOD_SET = Collections.unmodifiableSet(new HashSet<>(Arrays.asList(
         McpSchema.METHOD_TOOLS_LIST,
         McpSchema.METHOD_TOOLS_CALL,

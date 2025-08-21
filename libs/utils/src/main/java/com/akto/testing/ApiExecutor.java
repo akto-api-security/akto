@@ -9,11 +9,13 @@ import com.akto.dto.CollectionConditions.TestConfigsAdvancedSettings;
 import com.akto.dto.testing.TLSAuthParam;
 import com.akto.dto.testing.TestingRunConfig;
 import com.akto.dto.testing.TestingRunResult;
+import com.akto.dto.testing.TestingRunResult.TestLog;
 import com.akto.dto.testing.rate_limit.RateLimitHandler;
 import com.akto.dto.type.URLMethods;
 import com.akto.dto.type.URLMethods.Method;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.mcp.McpSchema;
 import com.akto.metrics.AllMetrics;
 import com.akto.util.Constants;
 import com.akto.util.HttpRequestResponseUtils;
@@ -677,50 +679,54 @@ public class ApiExecutor {
         String host = uri.getScheme() + "://" + uri.getHost() + (uri.getPort() != -1 ? ":" + uri.getPort() : "");
         SseSession session = openSseSession(host);
 
-        if (StringUtils.isEmpty(session.endpoint)) {
-            closeSseSession(session);
-            throw new Exception("Failed to open SSE session as endpoint not found");
-        }
-
-        request.setUrl(url);
-
-        // Add sessionId as query param to actual request
-        String[] queryParam = session.endpoint.split("\\?");
-        // for cases where MCP tools are discovered by Akto, we need to override/add the message endpoint with the actual one we received from the sse stream
-        if (overrideMessageEndpoint) {
-            request.setUrl(host + session.endpoint);
-        } else {
-            if (queryParam.length > 1) {
-                request.setQueryParams(queryParam[1]);
-            }
-        }
-
-        // Send actual request
-        OriginalHttpResponse resp = sendRequest(request, followRedirects, testingRunConfig, debug, testLogs, skipSSRFCheck, true);
-
-        if (resp.getStatusCode() >= 400) {
-            closeSseSession(session);
-            return resp;
-        }
-
-        // Wait for matching SSE message
-        String body = request.getBody();
-        JsonNode node = objectMapper.readTree(body);
-        String id = node.get("id").asText();
-        String sseMsg = null;
         try {
-            sseMsg = waitForMatchingSseMessage(session, id, 30000); // 30s timeout
+            if (StringUtils.isEmpty(session.endpoint)) {
+                throw new Exception("Failed to open SSE session as endpoint not found");
+            }
 
+            // for cases where MCP tools are discovered by Akto, we need to override/add the message endpoint with the actual one we received from the sse stream
+
+            request.setUrl(overrideMessageEndpoint
+                ? host + session.endpoint
+                : url);
+
+            if (!overrideMessageEndpoint) {
+                URI endpointUri = new URI(session.endpoint);
+                String query = endpointUri.getRawQuery();
+                if (query != null) {
+                    request.setQueryParams(query);
+                }
+            }
+
+            sendMcpInitSequence(request, testingRunConfig, debug, testLogs, skipSSRFCheck, session);
+
+            OriginalHttpResponse resp = sendRequest(request, followRedirects, testingRunConfig, debug, testLogs,
+                skipSSRFCheck, true);
+
+            if (resp.getStatusCode() >= 400) {
+                closeSseSession(session);
+                return resp;
+            }
+
+            // Wait for matching SSE message
+            String body = request.getBody();
+            JsonNode node = objectMapper.readTree(body);
+            String id = node.get("id").asText();
+            String sseMsg = waitForMatchingSseMessage(session, id, 30000); // 30s timeout
+
+            JsonNode sseJson = objectMapper.readTree(sseMsg);
+            String jsonBody = objectMapper.writeValueAsString(sseJson);
+            return new OriginalHttpResponse(jsonBody, resp.getHeaders(), resp.getStatusCode());
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in sendRequestWithSse for request: " + request.getUrl(),
+                LogDb.TESTING);
+            throw e;
         } finally {
             closeSseSession(session);
         }
-
-        JsonNode sseJson = objectMapper.readTree(sseMsg);
-        String jsonBody = objectMapper.writeValueAsString(sseJson);
-        return new OriginalHttpResponse(jsonBody, resp.getHeaders(), resp.getStatusCode());
     }
 
-    private static void closeSseSession(SseSession session) throws InterruptedException {
+    private static void closeSseSession(ApiExecutor.SseSession session) throws InterruptedException {
         if (session.readerThread != null) {
             session.readerThread.interrupt();
             session.readerThread.join();
@@ -750,5 +756,35 @@ public class ApiExecutor {
             }
         }
         return true;
+    }
+
+    private static void sendMcpInitSequence(OriginalHttpRequest request, TestingRunConfig testingRunConfig, boolean debug,
+        List<TestingRunResult.TestLog> testLogs, boolean skipSSRFCheck, SseSession session) throws Exception {
+        String originalBody = request.getBody();
+        request.setBody(McpSchema.MCP_INIT_REQUEST);
+        sendInitRequestToSSEMCP(request, true, testingRunConfig, debug, true, testLogs, skipSSRFCheck, session, "111");
+        request.setBody(McpSchema.MCP_NOTIFICATIONS_INIT_REQUEST);
+        sendInitRequestToSSEMCP(request, true, testingRunConfig, debug, false, testLogs, skipSSRFCheck, session, "112");
+        request.setBody(originalBody);
+    }
+
+    private static void sendInitRequestToSSEMCP(OriginalHttpRequest request, boolean followRedirects,
+        TestingRunConfig testingRunConfig, boolean debug, boolean waitForSSE, List<TestLog> testLogs,
+        boolean skipSSRFCheck, SseSession session, String requestId) throws Exception {
+
+        OriginalHttpResponse initResponse = sendRequest(request, followRedirects, testingRunConfig, debug, testLogs,
+            skipSSRFCheck, true);
+
+        if (initResponse.getStatusCode() >= 400) {
+            loggerMaker.errorAndAddToDb("Failed to send init request to SSE MCP: " + initResponse.getBody(),
+                LogDb.TESTING);
+            throw new Exception("Failed to send init request to SSE MCP: " + initResponse.getBody());
+        }
+
+        String resp = null;
+        if (waitForSSE) {
+            resp = waitForMatchingSseMessage(session, requestId, 10000); // 10s timeout
+            loggerMaker.debug("SSE response: {}", resp);
+        }
     }
 }
