@@ -2,11 +2,12 @@ package com.akto.utils;
 
 import java.time.Duration;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.stream.Collectors;
 
 import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
@@ -256,10 +257,15 @@ public class KafkaUtils {
         try {
             String accountIdsEnv = getCachedEnv("KAFKA_TOPICS_ACCOUNT_ID");
             if (accountIdsEnv != null && !accountIdsEnv.isEmpty()) {
-                List<String> accountIdList = Arrays.stream(accountIdsEnv.split(",\\s*"))
-                .map(String::trim)
-                .collect(Collectors.toList());
-                if (accountIdList.contains(String.valueOf(accountId))) {
+                String[] parts = accountIdsEnv.split(",");
+                Set<String> accountIdSet = new HashSet<>();
+                for (String part : parts) {
+                    String trimmed = part.trim();
+                    if (!trimmed.isEmpty()) {
+                        accountIdSet.add(trimmed);
+                    }
+                }
+                if (accountIdSet.contains(String.valueOf(accountId))) {
                     String topicName = getTopicNameForAccount("AKTO_KAFKA_TOPIC_NAME", accountId);
                     insertDataCore(writes, triggerMethod, accountId, null, topicName, "kafka insertData (custom topic)");
                     return;
