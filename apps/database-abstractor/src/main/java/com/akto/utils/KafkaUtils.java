@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.stream.Collectors;
 
 import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
@@ -62,10 +63,14 @@ public class KafkaUtils {
     }
 
     public static String getReadTopicName() {
-        String accountIdStr = getCachedEnv("AKTO_KAFKA_ACCOUNT_ID");
-        if (accountIdStr != null && !accountIdStr.isEmpty()) {
-            int accountId = Integer.parseInt(accountIdStr);
-            return getTopicNameForAccount("AKTO_KAFKA_TOPIC_NAME", accountId);
+        try {
+            String accountIdStr = getCachedEnv("AKTO_KAFKA_ACCOUNT_ID");
+            if (accountIdStr != null && !accountIdStr.isEmpty()) {
+                int accountId = Integer.parseInt(accountIdStr);
+                return getTopicNameForAccount("AKTO_KAFKA_TOPIC_NAME", accountId);
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in getReadTopicName: "+ e.toString());
         }
         return getCachedEnv("AKTO_KAFKA_TOPIC_NAME");
     }
@@ -243,22 +248,25 @@ public class KafkaUtils {
 
     public static String getTopicNameForAccount(String defaultTopicEnvVar, int accountId) {
         String defaultTopic = getCachedEnv(defaultTopicEnvVar);
-        String topicName = defaultTopic + "_" + accountId;
-        return topicName;
+        return defaultTopic + "_" + accountId;
     }
 
     public void insertData(List<BulkUpdates> writes, String triggerMethod, int accountId) {
 
-        String accountIdsEnv = getCachedEnv("KAFKA_TOPICS_ACCOUNT_ID");
-        if (accountIdsEnv != null && !accountIdsEnv.isEmpty()) {
-            List<String> accountIdList = Arrays.stream(accountIdsEnv.split(",\\s*"))
+        try {
+            String accountIdsEnv = getCachedEnv("KAFKA_TOPICS_ACCOUNT_ID");
+            if (accountIdsEnv != null && !accountIdsEnv.isEmpty()) {
+                List<String> accountIdList = Arrays.stream(accountIdsEnv.split(",\\s*"))
                 .map(String::trim)
                 .collect(Collectors.toList());
-            if (accountIdList.contains(String.valueOf(accountId))) {
-                String topicName = getTopicNameForAccount("AKTO_KAFKA_TOPIC_NAME", accountId);
-                insertDataCore(writes, triggerMethod, accountId, null, topicName, "kafka insertData (custom topic)");
-                return;
+                if (accountIdList.contains(String.valueOf(accountId))) {
+                    String topicName = getTopicNameForAccount("AKTO_KAFKA_TOPIC_NAME", accountId);
+                    insertDataCore(writes, triggerMethod, accountId, null, topicName, "kafka insertData (custom topic)");
+                    return;
+                }
             }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in insertData: "+ e.toString());
         }
 
         insertDataCore(writes, triggerMethod, accountId, "AKTO_KAFKA_TOPIC_NAME", null, "kafka insertData");
