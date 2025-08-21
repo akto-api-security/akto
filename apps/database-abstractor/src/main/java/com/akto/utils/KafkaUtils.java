@@ -2,9 +2,12 @@ package com.akto.utils;
 
 import java.time.Duration;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.kafka.clients.consumer.Consumer;
@@ -36,6 +39,24 @@ public class KafkaUtils {
     private static String getCachedEnv(String key) {
         return envCache.computeIfAbsent(key, System::getenv);
     }
+    // Cached set of account IDs for topic routing
+    final private static Set<String> accountIdSet = getAccountIdSetFromEnv();
+
+    private static Set<String> getAccountIdSetFromEnv() {
+        String accountIdsEnv = getCachedEnv("AKTO_KAFKA_ACCOUNT_ID");
+        if (accountIdsEnv != null && !accountIdsEnv.isEmpty()) {
+            String[] parts = accountIdsEnv.split(",");
+            Set<String> accountIdSet = new HashSet<>();
+            for (String part : parts) {
+                String trimmed = part.trim();
+                if (!trimmed.isEmpty()) {
+                    accountIdSet.add(trimmed);
+                }
+            }
+            return accountIdSet;
+        }
+        return Collections.emptySet();
+    }
     
     private final static ObjectMapper mapper = new ObjectMapper();
     private static final Gson gson = new Gson();
@@ -61,9 +82,22 @@ public class KafkaUtils {
         
     }
 
+    public static String getReadTopicName() {
+        try {
+            String accountIdStr = getCachedEnv("AKTO_KAFKA_ACCOUNT_ID");
+            if (accountIdStr != null && !accountIdStr.isEmpty()) {
+                int accountId = Integer.parseInt(accountIdStr);
+                return getTopicNameForAccount("AKTO_KAFKA_TOPIC_NAME", accountId);
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in getReadTopicName: "+ e.toString());
+        }
+        return getCachedEnv("AKTO_KAFKA_TOPIC_NAME");
+    }
+
     public void initKafkaConsumer() {
         System.out.println("kafka init consumer called");
-        String topicName = getCachedEnv("AKTO_KAFKA_TOPIC_NAME");
+        String topicName = getReadTopicName();
         String kafkaBrokerUrl = getCachedEnv("AKTO_KAFKA_BROKER_URL"); // kafka1:19092
         String isKubernetes = getCachedEnv("IS_KUBERNETES");
         if (isKubernetes != null && isKubernetes.equalsIgnoreCase("true")) {
@@ -231,7 +265,23 @@ public class KafkaUtils {
         return writeEnabled.equalsIgnoreCase("true");
     }
 
+
+    public static String getTopicNameForAccount(String defaultTopicEnvVar, int accountId) {
+        String defaultTopic = getCachedEnv(defaultTopicEnvVar);
+        return defaultTopic + "_" + accountId;
+    }
+
     public void insertData(List<BulkUpdates> writes, String triggerMethod, int accountId) {
+        try {
+            if (accountIdSet != null && accountIdSet.contains(String.valueOf(accountId))) {
+                String topicName = getTopicNameForAccount("AKTO_KAFKA_TOPIC_NAME", accountId);
+                insertDataCore(writes, triggerMethod, accountId, "", topicName, "kafka insertData (custom topic)");
+                return;
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in insertData: "+ e.toString());
+        }
+
         insertDataCore(writes, triggerMethod, accountId, "AKTO_KAFKA_TOPIC_NAME", null, "kafka insertData");
     }
 
