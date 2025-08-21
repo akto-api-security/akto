@@ -251,7 +251,9 @@ public class KafkaUtils {
 
         String accountIdsEnv = getCachedEnv("KAFKA_TOPICS_ACCOUNT_ID");
         if (accountIdsEnv != null && !accountIdsEnv.isEmpty()) {
-            List<String> accountIdList = Arrays.asList(accountIdsEnv.split(","));
+            List<String> accountIdList = Arrays.stream(accountIdsEnv.split(",\\s*"))
+                .map(String::trim)
+                .collect(Collectors.toList());
             if (accountIdList.contains(String.valueOf(accountId))) {
                 String topicName = getTopicNameForAccount("AKTO_KAFKA_TOPIC_NAME", accountId);
                 insertDataCore(writes, triggerMethod, accountId, null, topicName, "kafka insertData (custom topic)");
