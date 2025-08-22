@@ -54,7 +54,7 @@ public class KeyTypes {
 
         String key = param.replaceAll("#", ".").replaceAll("\\.\\$", "");
         String[] keyArr = key.split("\\.");
-        String lastField = keyArr[keyArr.length - 1];
+        String lastField = keyArr[keyArr.length - 1].split("_queryParam")[0];
         ParamId paramId = new ParamId(url, method, responseCode, isHeader, param, SingleTypeInfo.GENERIC, apiCollectionId, isUrlParam);
         SubType subType = findSubType(object,lastField,paramId);
 
@@ -248,7 +248,7 @@ public class KeyTypes {
     }
 
     public static SubType findSubType(Object o,String key, ParamId paramId) {
-
+        
         int accountId = Context.accountId.get();
         boolean checkForSubtypes = true ;
         for (String keyType : SingleTypeInfo.getCustomDataTypeMap(accountId).keySet()) {
@@ -301,31 +301,30 @@ public class KeyTypes {
     }
 
     public static boolean isPhoneNumber(String mobileNumber) {
+        if (mobileNumber == null) return false;
+    
         boolean lengthCondition = mobileNumber.length() < 8 || mobileNumber.length() > 16;
-        boolean alphabetsCondition = mobileNumber.toLowerCase() != mobileNumber.toUpperCase(); // contains alphabets
+        if (lengthCondition) return false;
 
-        if (lengthCondition || alphabetsCondition) {
-            return false;
+        for (int i = 0, n = mobileNumber.length(); i < n; i++) {
+            char c = mobileNumber.charAt(i);
+            char lc = (char) (c | 0x20);
+            if (lc >= 'a' && lc <= 'z') return false;
         }
-
+    
         PhoneNumberUtil phoneNumberUtil = PhoneNumberUtil.getInstance();
-
-        // isPossibleNumber computes faster than parse but less accuracy
-        boolean check = phoneNumberUtil.isPossibleNumber(mobileNumber,
-                    Phonenumber.PhoneNumber.CountryCodeSource.UNSPECIFIED.name());
-        if (!check) {
-            return false;
-        }
+        // quick plausibility check
+        boolean possible = phoneNumberUtil.isPossibleNumber(mobileNumber,
+                Phonenumber.PhoneNumber.CountryCodeSource.UNSPECIFIED.name());
+        if (!possible) return false;
 
         try {
             Phonenumber.PhoneNumber phone = phoneNumberUtil.parse(mobileNumber,
                     Phonenumber.PhoneNumber.CountryCodeSource.UNSPECIFIED.name());
             return phoneNumberUtil.isValidNumber(phone);
         } catch (Exception e) {
-            // eat it
             return false;
         }
-
     }
 
     public static boolean isJWT(String jwt) {
