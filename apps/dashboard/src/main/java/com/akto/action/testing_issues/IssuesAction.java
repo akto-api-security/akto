@@ -856,51 +856,6 @@ public class IssuesAction extends UserAction {
     }
 
 
-    /**
-     * API to fetch the number of URLs from vulnerable_testing_run_results with testsubtype matching ids from YAML templates where info.category.name is "VEM" and "MHH" as per type provided in request.
-     * Returns count of vulnerable APIs.
-     */
-
-    public String fetchVulnerableApisByCategory() {
-        try {
-            // Fetch only YAML templates where info.category.name is "VEM"
-            Bson filterQ = UsageMetricCalculator.excludeDemosAndDeactivated(TestingRunResult.API_INFO_KEY+".apiCollectionId");
-
-
-            List<YamlTemplate> yamlTemplates = YamlTemplateDao.instance.findAll(
-                    Filters.eq("info.category.name", categoryType)
-            );
-            Set<String> testIds = new HashSet<>();
-            if (yamlTemplates.isEmpty()) {
-                this.addActionError("No YAML templates found with category name 'VEM' or 'MHH'.");
-                return ERROR.toUpperCase();
-            }
-
-            for (YamlTemplate template : yamlTemplates) {
-                testIds.add(template.getId());
-            }
-            if (testIds.isEmpty()) {
-                this.addActionError("No VEM or MHH test IDs found in YAML templates.");
-                return ERROR.toUpperCase();
-            }
-
-            this.endpointsCount = 0;
-
-            Bson filter = Filters.and(
-                    filterQ,
-                    Filters.in("testSubType", testIds)
-            );
-            endpointsCount = (int) (VulnerableTestingRunResultDao.instance.count(filter));
-            return SUCCESS.toUpperCase();
-
-        } catch (Exception e) {
-            e.printStackTrace();
-            this.addActionError("Error fetching VEM vulnerable apiInfoKey: " + e.getMessage());
-            return ERROR.toUpperCase();
-        }
-    }
-
-
     public List<TestingRunIssues> getIssues() {
         return issues;
     }

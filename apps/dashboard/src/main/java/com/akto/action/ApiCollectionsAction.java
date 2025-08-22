@@ -582,13 +582,7 @@ public class ApiCollectionsAction extends UserAction {
         this.sensitiveUrlsInResponse = SingleTypeInfoDao.instance.getSensitiveApisCount(sensitiveSubtypes, true, Filters.nin(SingleTypeInfo._API_COLLECTION_ID, deactivatedCollections));
 
         sensitiveSubtypes.addAll(sensitiveSubtypesInRequest);
-
-        if(type.equals("topSensitive")){
-            this.sensitiveSubtypesInUrl = SingleTypeInfoDao.instance.getSensitiveSubtypesDetectedForUrl(sensitiveSubtypes);
-        }else {
-            this.sensitiveSubtypesInCollection = SingleTypeInfoDao.instance.getSensitiveSubtypesDetectedForCollection(sensitiveSubtypes);
-        }
-
+        this.sensitiveSubtypesInCollection = SingleTypeInfoDao.instance.getSensitiveSubtypesDetectedForCollection(sensitiveSubtypes);
         return Action.SUCCESS.toUpperCase();
     }
 

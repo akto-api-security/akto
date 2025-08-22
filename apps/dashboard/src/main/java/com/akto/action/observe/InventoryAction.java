@@ -1202,22 +1202,48 @@ public class InventoryAction extends UserAction {
 
 
     public String fetchOnlyOnceTestedAPICount() {
-
         Bson filterQ = UsageMetricCalculator.excludeDemosAndDeactivated(ApiInfo.ID_API_COLLECTION_ID);
-
         Bson filter = Filters.and(
                 filterQ,
                 Filters.exists(ApiInfo.LAST_TESTED, true),
                 Filters.eq(ApiInfo.TOTAL_TESTED_COUNT, 1)
         );
 
+        int totalCount = (int) ApiInfoDao.instance.count(filter);
+        int numThreads = Math.max(1, Runtime.getRuntime().availableProcessors());
+        int batchSize = (int) Math.ceil((double) totalCount / numThreads);
+
+        this.onlyOnceTestedEndpointsCount = 0;
         if (this.showApiInfo) {
-            this.onlyOnceTestedEndpointsApiInfo = ApiInfoDao.instance.findAll(filter);
-            this.onlyOnceTestedEndpointsCount = this.onlyOnceTestedEndpointsApiInfo.size();
-        } else {
-            this.onlyOnceTestedEndpointsCount = (int) ApiInfoDao.instance.count(filter);
+            this.onlyOnceTestedEndpointsApiInfo.clear();
         }
 
+        List<Integer> skips = new ArrayList<>();
+        for (int i = 0; i < numThreads; i++) {
+            skips.add(i * batchSize);
+        }
+
+        AtomicInteger count = new AtomicInteger(0);
+        List<ApiInfo> allResults = Collections.synchronizedList(new ArrayList<>());
+
+        skips.parallelStream().forEach(skip -> {
+            List<ApiInfo> batch = ApiInfoDao.instance.findAll(
+                    filter, skip, batchSize, null, null
+            );
+            count.addAndGet(batch.size());
+            if (this.showApiInfo) {
+                allResults.addAll(batch);
+            }
+        });
+
+        this.onlyOnceTestedEndpointsCount = count.get();
+        if (this.showApiInfo) {
+            this.onlyOnceTestedEndpointsApiInfo.addAll(allResults);
+        }
+
+        response = new BasicDBObject();
+        response.put("onlyOnceTestedEndpointsCount", this.onlyOnceTestedEndpointsCount);
+        response.put("onlyOnceTestedEndpointsApiInfo", this.showApiInfo ? this.onlyOnceTestedEndpointsApiInfo : new ArrayList<>());
         return Action.SUCCESS.toUpperCase();
     }
 

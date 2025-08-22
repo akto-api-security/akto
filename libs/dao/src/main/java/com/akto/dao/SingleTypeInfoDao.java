@@ -560,41 +560,6 @@ public class SingleTypeInfoDao extends AccountsContextDaoWithRbac<SingleTypeInfo
         return result ;
     }
 
-    public Map<String, List<String>> getSensitiveSubtypesDetectedForUrl(List<String> sensitiveParameters) {
-        BasicDBObject groupedId = new BasicDBObject(SingleTypeInfo._API_COLLECTION_ID, "$apiCollectionId")
-                .append(SingleTypeInfo._URL, "$url")
-                .append(SingleTypeInfo._METHOD, "$method");
-        List<Bson> pipeline = generateFilterForSubtypes(sensitiveParameters, groupedId, false, Filters.empty());
-        MongoCursor<BasicDBObject> collectionsCursor = SingleTypeInfoDao.instance.getMCollection().aggregate(pipeline, BasicDBObject.class).cursor();
-        Map<String, List<String>> endpointSubtypeMap = new HashMap<>();
-        while (collectionsCursor.hasNext()) {
-            try {
-                BasicDBObject basicDBObject = collectionsCursor.next();
-                BasicDBObject id = (BasicDBObject) basicDBObject.get("_id");
-                int apiCollectionId = id.getInt("apiCollectionId");
-                String url = id.getString("url");
-                String method = id.getString("method");
-                List<String> subtypes = (List<String>) basicDBObject.get("subTypes");
-                String key = method + " " + url + "_" + apiCollectionId;
-                if (subtypes != null && subtypes.size() > 1) {
-                    endpointSubtypeMap.put(key, subtypes);
-                }
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-        }
-        // Sort and limit to top 3 by subtypes count
-        return endpointSubtypeMap.entrySet().stream()
-                .sorted((e1, e2) -> Integer.compare(e2.getValue().size(), e1.getValue().size()))
-                .limit(3)
-                .collect(Collectors.toMap(
-                        Map.Entry::getKey,
-                        Map.Entry::getValue,
-                        (a, b) -> a,
-                        LinkedHashMap::new
-                ));
-    }
-
     public Integer getSensitiveApisCount(List<String> sensitiveParameters, boolean inResponseOnly, Bson customFilter){
        
         BasicDBObject groupedId = new BasicDBObject(SingleTypeInfo._API_COLLECTION_ID, "$apiCollectionId")
