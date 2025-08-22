@@ -1,5 +1,5 @@
 import { TopBar, Icon, Text, ActionList, Modal, TextField, HorizontalStack, Box, Avatar, VerticalStack, Button, Scrollable } from '@shopify/polaris';
-import { NotificationMajor, CustomerPlusMajor, LogOutMinor, NoteMinor, ResourcesMajor, UpdateInventoryMajor, PageMajor, DynamicSourceMajor, PhoneMajor, ChatMajor, SettingsMajor } from '@shopify/polaris-icons';
+import { NotificationMajor, CustomerPlusMajor, LogOutMinor, NoteMinor, ResourcesMajor, UpdateInventoryMajor, PhoneMajor, ChatMajor, SettingsMajor } from '@shopify/polaris-icons';
 import { useState, useCallback, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Store from '../../../store';
@@ -13,6 +13,7 @@ import { debounce } from 'lodash';
 import LocalStore from '../../../../main/LocalStorageStore';
 import SessionStore from '../../../../main/SessionStore';
 import IssuesStore from '../../../pages/issues/issuesStore';
+import Dropdown from '../Dropdown';
 
 function ContentWithIcon({icon,text, isAvatar= false}) {
     return(
@@ -39,6 +40,9 @@ export default function Header() {
     const resetStore = LocalStore(state => state.resetStore)
     const resetSession  = SessionStore(state => state.resetStore)
     const resetFields = IssuesStore(state => state.resetStore)
+
+    const dashboardCategory = PersistStore.getState().dashboardCategory;
+    const setDashboardCategory = PersistStore.getState().setDashboardCategory
 
     /* Search bar */
     //const allRoutes = Store((state) => state.allRoutes)
@@ -113,6 +117,19 @@ export default function Header() {
         })
     }
 
+    const handleDashboardChange = (value) => {
+        PersistStore.getState().setAllCollections([]);
+        PersistStore.getState().setCollectionsMap({});
+        PersistStore.getState().setHostNameMap({});
+        PersistStore.getState().setLastCalledSensitiveInfo(0);
+        PersistStore.getState().setLastFetchedInfo({ lastRiskScoreInfo: 0, lastSensitiveInfo: 0 });
+        LocalStore.getState().setCategoryMap({}); 
+        LocalStore.getState().setSubCategoryMap({});
+        SessionStore.getState().setThreatFiltersMap({});
+        setDashboardCategory(value);
+        window.location.reload();
+        window.location.href("/dashboard/observe/inventory")
+    }
 
     function createNewAccount() {
         api.saveToAccount(newAccount).then(resp => {
@@ -216,6 +233,27 @@ export default function Header() {
             <TopBar
                 showNavigationToggle
                 userMenu={userMenuMarkup}
+                contextControl={
+                    <Box paddingInlineStart={3} paddingInlineEnd={3}>
+                        <HorizontalStack gap={4} wrap={false}>
+                            <div style={{ cursor: 'pointer' }} onClick={() => window.location.href = "/dashboard/observe/inventory"} className='logo'>
+                                <img src="/public/akto_name_with_logo.svg" alt="Akto Logo" style={{ maxWidth: '78px' }} />
+                            </div>
+
+                            <Box minWidth='150px'>
+                                <Dropdown
+                                    menuItems={[
+                                        { value: "API Security", label: "API Security", id: "api-security" },
+                                        { value: "MCP Security", label: "MCP Security", id: "mcp-security" },
+                                        { value: "Gen AI", label: "AI Agent Security", id: "gen-ai" },
+                                    ]}
+                                    initial={dashboardCategory || "API Security"}
+                                    selected={(val) => handleDashboardChange(val)}
+                                />
+                            </Box>
+                        </HorizontalStack>
+                    </Box>
+                }
                 searchField={searchFieldMarkup}
                 searchResultsVisible={searchValue.length > 0}
                 searchResults={searchResultsMarkup}

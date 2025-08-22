@@ -2,9 +2,13 @@ package com.akto.utils;
 
 import com.akto.log.LoggerMaker;
 import com.akto.util.DashboardMode;
+import com.akto.util.enums.GlobalEnums;
+import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
+import com.akto.util.enums.GlobalEnums.TestCategory;
 
 import static com.akto.listener.InitializerListener.loadTemplateFilesFromDirectory;
 
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
@@ -75,6 +79,52 @@ public class TestTemplateUtils {
         }
         
         return repoZip;
+    }
+
+    public static TestCategory[] getAllTestCategoriesWithinContext(CONTEXT_SOURCE contextSource) {
+        if(contextSource == null) {
+            contextSource = CONTEXT_SOURCE.API; // Default to API if contextSource is null
+        }
+        TestCategory[] allCategories = GlobalEnums.TestCategory.values();
+        TestCategory[] mcpCategories = {
+            TestCategory.MCP_AUTH,
+            TestCategory.MCP_INPUT_VALIDATION,
+            TestCategory.MCP_DOS,
+            TestCategory.MCP_SENSITIVE_DATA_LEAKAGE,
+            TestCategory.MCP,
+            TestCategory.MCP_TOOL_POISONING,
+            TestCategory.MCP_PROMPT_INJECTION,
+            TestCategory.MCP_PRIVILEGE_ABUSE,
+            TestCategory.MCP_INDIRECT_PROMPT_INJECTION,
+            TestCategory.MCP_MALICIOUS_CODE_EXECUTION,
+        };
+
+        TestCategory[] llmCategories = {
+            GlobalEnums.TestCategory.LLM,
+            GlobalEnums.TestCategory.LLM01,
+            GlobalEnums.TestCategory.LLM02,
+            GlobalEnums.TestCategory.LLM03,
+            GlobalEnums.TestCategory.LLM04,
+            GlobalEnums.TestCategory.LLM05,
+            GlobalEnums.TestCategory.LLM06,
+            GlobalEnums.TestCategory.LLM07,
+            GlobalEnums.TestCategory.LLM08,
+            GlobalEnums.TestCategory.LLM09,
+            GlobalEnums.TestCategory.LLM10
+        };
+
+        switch (contextSource) {
+            case MCP:
+                return mcpCategories;
+
+            case GEN_AI:
+                return llmCategories;
+            
+            default:
+                return Arrays.stream(allCategories)
+                    .filter(category -> !Arrays.asList(mcpCategories).contains(category) && !Arrays.asList(llmCategories).contains(category))
+                    .toArray(TestCategory[]::new);
+        }
     }
 
 }

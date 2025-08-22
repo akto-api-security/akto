@@ -8,6 +8,7 @@ import { SearchMinor, InfoMinor, LockMinor, ClockMinor, PasskeyMinor, LinkMinor,
 import api from "./api";
 import GetPrettifyEndpoint from "./GetPrettifyEndpoint";
 import ShowListInBadge from "../../components/shared/ShowListInBadge";
+import { getDashboardCategory } from "../../../main/labelHelper";
 
 const standardHeaders = [
     'accept', 'accept-ch', 'accept-ch-lifetime', 'accept-charset', 'accept-encoding', 'accept-language', 'accept-patch', 'accept-post', 'accept-ranges', 'access-control-allow-credentials', 'access-control-allow-headers', 'access-control-allow-methods', 'access-control-allow-origin', 'access-control-expose-headers', 'access-control-max-age', 'access-control-request-headers', 'access-control-request-method', 'age', 'allow', 'alt-svc', 'alt-used', 'authorization',
@@ -277,13 +278,13 @@ const transform = {
         }
     },
     fillSensitiveParams: (sensitiveParams, apiCollection) => {
-        sensitiveParams = sensitiveParams.reduce((z,e) => {
+        sensitiveParams = sensitiveParams && sensitiveParams.reduce((z,e) => {
             let key = [e.apiCollectionId + "-" + e.url + "-" + e.method]
             z[key] = z[key] || new Set()
             z[key].add(e.subType || {"name": "CUSTOM"})
             return z
         },{})
-        Object.entries(sensitiveParams).forEach(p => {
+        sensitiveParams && Object.entries(sensitiveParams).forEach(p => {
             let apiCollectionIndex = apiCollection.findIndex(e => {
                 return (e.apiCollectionId + "-" + e.url + "-" + e.method) === p[0]
             })
@@ -548,6 +549,22 @@ const transform = {
     },
 
     getTruncatedUrl(url){
+        const category = getDashboardCategory();
+        if(category.includes("MCP")){
+            try {
+                const s = String(url);
+                const [path, tail = ""] = s.split(/(?=[?#])/); // keep ? or # in tail
+                const newPath = path
+                  .replace(/^.*?\/calls?(?:\/|$)/i, "/")       // keep only what's after /call or /calls
+                  .replace(/\/{2,}/g, "/");                    // collapse slashes
+                return (newPath.endsWith("/") && newPath !== "/")
+                  ? newPath.slice(0, -1) + tail
+                  : newPath + tail;
+            } catch (error) {
+                return url;
+            }
+            
+        }
         try {
             const parsedURL = new URL(url)
             const pathUrl = parsedURL.pathname.replace(/%7B/g, '{').replace(/%7D/g, '}');

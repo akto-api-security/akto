@@ -5,6 +5,9 @@ import { CellType } from "../../../components/tables/rows/GithubRow";
 import GetPrettifyEndpoint from "../../observe/GetPrettifyEndpoint";
 import func from "../../../../../util/func";
 import PersistStore from "../../../../main/PersistStore";
+import SessionStore from "../../../../main/SessionStore";
+import { isMCPSecurityCategory } from "../../../../main/labelHelper";
+import { labelMap } from "../../../../main/labelHelperMap";
 
 const resourceName = {
   singular: "api",
@@ -13,9 +16,9 @@ const resourceName = {
 
 const headers = [
   {
-    text: "Endpoint",
+    text:  labelMap[PersistStore.getState().dashboardCategory]["Endpoint"],
     value: "api",
-    title: "Endpoint",
+    title: labelMap[PersistStore.getState().dashboardCategory]["Endpoint"],
   },
   {
     text: "Malicious Actors",
@@ -64,26 +67,52 @@ function ThreatApiTable({ currDateRange, rowClicked }) {
 
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {}, []);
+  const threatFiltersMap = SessionStore((state) => state.threatFiltersMap)
+  const attackTypeChoices = Object.keys(threatFiltersMap).length === 0 ? [] : Object.entries(threatFiltersMap).map(([key, value]) => {
+    return {
+      label: value?._id || key,
+      value: value?._id || key
+    }
+  })
+
+  useEffect(() => {
+    filters = [
+      {
+        key: 'latestAttack',
+        label: 'Latest attack sub-category',
+        type: 'select',
+        choices: attackTypeChoices,
+        multiple: true
+      }
+    ]
+  }, []);
 
   function disambiguateLabel(key, value) {
     return func.convertToDisambiguateLabelObj(value, null, 2);
   }
 
-  async function fetchData(sortKey, sortOrder, skip) {
+  async function fetchData(sortKey, sortOrder, skip, limit, filters) {
     setLoading(true);
+    let latestAttack = [];
+    if (filters?.latestAttack) {
+      latestAttack = filters?.latestAttack;
+    }
     const sort = { [sortKey]: sortOrder };
-    const res = await api.fetchThreatApis(skip, sort);
+    const res = await api.fetchThreatApis(skip, sort, latestAttack);
     let total = res.total;
     let ret = res?.apis?.map((x) => {
       return {
         ...x,
-        id: `${x.method}-${x.api}`,
+        id:`${x.method}-${x.api}`,
         actorsCount: x.actorsCount,
         requestsCount: x.requestsCount,
         discoveredAt: func.prettifyEpoch(x.discoveredAt),
         api: (
-          <GetPrettifyEndpoint method={x.method} url={x.api} isNew={false} />
+          <GetPrettifyEndpoint 
+            {...(!isMCPSecurityCategory() && { method: x.method })}
+            url={x.api}
+            isNew={false}
+          />
         ),
       };
     });

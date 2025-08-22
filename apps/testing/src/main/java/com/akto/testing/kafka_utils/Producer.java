@@ -2,6 +2,7 @@ package com.akto.testing.kafka_utils;
 
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+
 import java.util.Collections;
 import java.util.List;
 import java.util.Properties;
@@ -35,11 +36,14 @@ public class Producer {
             String messageString = singleTestPayload.toString();
             try {
                 int waitStart = Context.now();
-                while (throttleNumber.get() > 500 && (Context.now() - waitStart) < Constants.MAX_WAIT_FOR_SLEEP) {
-                    Thread.sleep(2000);
+                while (throttleNumber.get() > 1000 && (Context.now() - waitStart) < Constants.MAX_WAIT_FOR_SLEEP) {
+                    Thread.sleep(1000);
                 }
             } catch (Exception e) {
                 e.printStackTrace();
+            }
+            if(totalRecords.get() % 3000 == 0) {
+                logger.debug("Total records sent to Kafka: {}, Throttle count: {}", totalRecords.get(), throttleNumber.get());
             }
             totalRecords.incrementAndGet();
             throttleNumber.incrementAndGet();

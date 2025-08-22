@@ -63,6 +63,9 @@ public class ApiCollection {
     private boolean matchDependencyWithOtherCollections;
     public static final String MATCH_DEPENDENCY_WITH_OTHER_COLLECTIONS = "matchDependencyWithOtherCollections";
 
+    String sseCallbackUrl;
+    public static final String SSE_CALLBACK_URL = "sseCallbackUrl";
+
     private static final List<String> ENV_KEYWORDS_WITH_DOT = Arrays.asList(
         "staging", "preprod", "qa", "demo", "dev", "test", "svc", 
         "localhost", "local", "intranet", "lan", "example", "invalid", 
@@ -114,6 +117,18 @@ public class ApiCollection {
         this.sampleCollectionsDropped = sampleCollectionsDropped;
     }
 
+    public ApiCollection(int id, String name, int startTs, Set<String> urls, String hostName, int vxlanId, boolean redact, boolean sampleCollectionsDropped, String sseCallbackUrl) {
+        this.id = id;
+        this.name = name;
+        this.startTs = startTs;
+        this.urls = urls;
+        this.hostName = hostName;
+        this.vxlanId = vxlanId;
+        this.redact = redact;
+        this.sampleCollectionsDropped = sampleCollectionsDropped;
+        this.sseCallbackUrl = sseCallbackUrl;
+    }
+
     public ApiCollection(int id, String name, List<TestingEndpoints> conditions) {
         this.id = id;
         this.name = name;
@@ -157,8 +172,6 @@ public class ApiCollection {
     }
 
     public List<CollectionTags> getEnvType(){
-        if(this.type != null && this.type == Type.API_GROUP) return null;
-        
         if(this.tagsList == null || this.tagsList.isEmpty()){
             CollectionTags envTypeTag = new CollectionTags();
             envTypeTag.setKeyName("envType");
@@ -402,5 +415,20 @@ public class ApiCollection {
             return this.getTagsList().stream().anyMatch(t -> Constants.AKTO_MCP_SERVER_TAG.equals(t.getKeyName()));
         }
         return false;
+    }
+
+    public boolean isGenAICollection() {
+        if (!CollectionUtils.isEmpty(this.getTagsList())) {
+            return this.getTagsList().stream().anyMatch(t -> Constants.AKTO_GEN_AI_TAG.equals(t.getKeyName()));
+        }
+        return false;
+    }
+
+    public String getSseCallbackUrl() {
+        return sseCallbackUrl;
+    }   
+
+    public void setSseCallbackUrl(String sseCallbackUrl) {
+        this.sseCallbackUrl = sseCallbackUrl;
     }
 }

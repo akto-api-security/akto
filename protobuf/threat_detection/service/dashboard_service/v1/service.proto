@@ -45,6 +45,7 @@ message ListMaliciousRequestsRequest {
       optional TimeRangeFilter detected_at_time_range = 4;
       repeated string types = 5;
       repeated string sub_category = 6;
+      repeated string latest_attack = 7;
     }
 
     // The number of alerts to return
@@ -122,6 +123,7 @@ message ListThreatApiRequest {
     repeated string urls = 1;
     repeated string methods = 2;
     optional TimeRangeFilter detected_at_time_range = 3;
+    repeated string latest_attack = 4;
   }
 
   optional uint32 skip = 1;
@@ -146,6 +148,7 @@ message ListThreatApiResponse {
 message ThreatActorByCountryRequest {
   uint32 start_ts = 1;
   uint32 end_ts = 2;
+  repeated string latest_attack = 3;
 }
 
 message ThreatActorByCountryResponse {
@@ -160,6 +163,7 @@ message ThreatActorByCountryResponse {
 message ThreatCategoryWiseCountRequest {
   uint32 start_ts = 1;
   uint32 end_ts = 2;
+  repeated string latest_attack = 3;
 }
 
 message ThreatActorFilterRequest {
@@ -184,6 +188,7 @@ message ThreatCategoryWiseCountResponse {
 message ThreatSeverityWiseCountRequest {
   uint32 start_ts = 1;
   uint32 end_ts = 2;
+  repeated string latest_attack = 3;
 }
 
 message ThreatSeverityWiseCountResponse {
@@ -198,6 +203,7 @@ message ThreatSeverityWiseCountResponse {
 message DailyActorsCountRequest {
   uint32 start_ts = 1;
   uint32 end_ts = 2;
+  repeated string latest_attack = 3;
 }
 
 message DailyActorsCountResponse {
@@ -213,6 +219,7 @@ message DailyActorsCountResponse {
 message ThreatActivityTimelineRequest {
   uint32 start_ts = 1;
   uint32 end_ts = 2;
+  repeated string latest_attack = 3;
 }
 
 message ThreatActivityTimelineResponse {

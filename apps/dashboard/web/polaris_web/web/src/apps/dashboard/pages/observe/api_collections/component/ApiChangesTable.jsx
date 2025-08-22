@@ -8,6 +8,7 @@ import useTable from '../../../../components/tables/TableContext';
 import GithubServerTable from '../../../../components/tables/GithubServerTable';
 import tableFunc from '../../../../components/tables/transform';
 import api from '../../api';
+import { getDashboardCategory, mapLabel } from '../../../../../main/labelHelper';
 
 function ApiChangesTable(props) {
 
@@ -18,7 +19,7 @@ function ApiChangesTable(props) {
   const [loading, setLoading] = useState(false);
   const [newEndpointsCount, setNewEndpointsCount] = useState(0)
 
-  const definedTableTabs = ['New endpoints', 'New params']
+  const definedTableTabs = [mapLabel("New endpoints", getDashboardCategory()), 'New params']
 
   const initialCount = [newEndpointsCount , newParams.length]
 

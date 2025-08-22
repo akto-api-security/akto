@@ -22,16 +22,27 @@ import com.client9.libinjection.SQLParse;
 public class ThreatDetector {
 
     private static final String LFI_OS_FILES_DATA = "/lfi-os-files.data";
+    private static final String OS_COMMAND_INJECTION_DATA = "/os-command-injection.data";
+    private static final String SSRF_DATA = "/ssrf.data";
     public static final String LFI_FILTER_ID = "LocalFileInclusionLFIRFI";
     public static final String SQL_INJECTION_FILTER_ID = "SQLInjection";
+    public static final String OS_COMMAND_INJECTION_FILTER_ID = "OSCommandInjection";
+    public static final String SSRF_FILTER_ID = "SSRF";
     private static Map<String, Object> varMap = new HashMap<>();
     private Trie lfiTrie;
+    private Trie osCommandInjectionTrie;
+    private Trie ssrfTrie;
     private static final LoggerMaker logger = new LoggerMaker(ThreatDetector.class, LogDb.THREAT_DETECTION);
 
     public ThreatDetector() throws Exception {
-        Trie.TrieBuilder builder = Trie.builder();
+        lfiTrie = generateTrie(LFI_OS_FILES_DATA);
+        osCommandInjectionTrie = generateTrie(OS_COMMAND_INJECTION_DATA);
+        ssrfTrie = generateTrie(SSRF_DATA);
+    }
 
-        try (InputStream is = ThreatDetector.class.getResourceAsStream(LFI_OS_FILES_DATA);
+    private Trie generateTrie(String fileName) throws Exception {
+        Trie.TrieBuilder builder = Trie.builder();
+        try (InputStream is = ThreatDetector.class.getResourceAsStream(fileName);
                 BufferedReader reader = new BufferedReader(new InputStreamReader(is))) {
             String line;
             while ((line = reader.readLine()) != null) {
@@ -42,8 +53,7 @@ public class ThreatDetector {
             }
         }
 
-        lfiTrie = builder.build();
-
+        return builder.build();
     }
 
     public boolean applyFilter(FilterConfig threatFilter, HttpResponseParams httpResponseParams, RawApi rawApi,
@@ -52,8 +62,14 @@ public class ThreatDetector {
             if (threatFilter.getId().equals(LFI_FILTER_ID)) {
                 return isLFiThreat(httpResponseParams);
             }
-            if (threatFilter.getId().equals(SQL_INJECTION_FILTER_ID)) {
-                return isSqliThreat(httpResponseParams);
+            // if (threatFilter.getId().equals(SQL_INJECTION_FILTER_ID)) {
+            //     return isSqliThreat(httpResponseParams);
+            // }
+            if (threatFilter.getId().equals(OS_COMMAND_INJECTION_FILTER_ID)) {
+                return isOsCommandInjectionThreat(httpResponseParams); 
+            }
+            if (threatFilter.getId().equals(SSRF_FILTER_ID)) {
+                return isSSRFThreat(httpResponseParams); 
             }
             return validateFilterForRequest(threatFilter, rawApi, apiInfoKey);
         } catch (Exception e) {
@@ -86,15 +102,47 @@ public class ThreatDetector {
             return true;
         }
 
-        if (SQLParse.isSQLi(httpResponseParams.getRequestParams().getPayload())) {
+        if (SQLParse.isSQLi(httpResponseParams.getRequestParams().getHeaders().toString())) {
             return true;
         }
 
-        return SQLParse.isSQLi(httpResponseParams.getRequestParams().getHeaders().toString());
+        return SQLParse.isSQLi(httpResponseParams.getRequestParams().getPayload());
     }
 
     public boolean isLFiThreat(HttpResponseParams httpResponseParams) {
-        // TODO: .get() is expensive, optimize it
-        return lfiTrie.containsMatch(httpResponseParams.getOriginalMsg().get());
+        if (lfiTrie.containsMatch(httpResponseParams.getRequestParams().getURL())) {
+            return true;
+        }
+
+        if (lfiTrie.containsMatch(httpResponseParams.getRequestParams().getHeaders().toString())) {
+            return true;
+        }
+
+        return lfiTrie.containsMatch(httpResponseParams.getRequestParams().getPayload());
     }
+
+    public boolean isOsCommandInjectionThreat(HttpResponseParams httpResponseParams) {
+        if (osCommandInjectionTrie.containsMatch(httpResponseParams.getRequestParams().getURL())) {
+            return true;
+        }
+
+        if (osCommandInjectionTrie.containsMatch(httpResponseParams.getRequestParams().getHeaders().toString())) {
+            return true;
+        }
+
+        return osCommandInjectionTrie.containsMatch(httpResponseParams.getRequestParams().getPayload());
+    }
+
+    public boolean isSSRFThreat(HttpResponseParams httpResponseParams) {
+        if (ssrfTrie.containsMatch(httpResponseParams.getRequestParams().getURL())) {
+            return true;
+        }
+
+        if (ssrfTrie.containsMatch(httpResponseParams.getRequestParams().getHeaders().toString())) {
+            return true;
+        }
+
+        return ssrfTrie.containsMatch(httpResponseParams.getRequestParams().getPayload());
+    }
+
 }

@@ -22,6 +22,13 @@ export default {
             data: {}
         })
     },
+    fetchCountForUningestedApis(){
+        return request({
+            url: '/api/getCountForUningestedApis',
+            method: 'post',
+            data: {}
+        })
+    },
     getCollection(apiCollectionId){
         return  request({
             url: '/api/getCollection',

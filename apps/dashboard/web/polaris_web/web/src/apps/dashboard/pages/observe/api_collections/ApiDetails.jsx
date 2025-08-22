@@ -8,23 +8,23 @@ import api from "../api";
 import ApiSchema from "./ApiSchema";
 import dashboardFunc from "../../transform";
 import AktoGptLayout from "../../../components/aktoGpt/AktoGptLayout";
-import func from "@/util/func"
+import func from "@/util/func" 
 import transform from "../transform";
 import ApiDependency from "./ApiDependency";
 import RunTest from "./RunTest";
 import PersistStore from "../../../../main/PersistStore";
-import values from "@/util/values";
 import gptApi from "../../../components/aktoGpt/api";
 import GraphMetric from '../../../components/GraphMetric'
-
 import { HorizontalDotsMinor, FileMinor } from "@shopify/polaris-icons"
 import LocalStore from "../../../../main/LocalStorageStore";
 import InlineEditableText from "../../../components/shared/InlineEditableText";
 import GridRows from "../../../components/shared/GridRows";
 import Dropdown from "../../../components/layouts/Dropdown";
+import ApiIssuesTab from "./ApiIssuesTab";
 
 import Highcharts from 'highcharts';
 import HighchartsMore from 'highcharts/highcharts-more';
+import { getDashboardCategory, mapLabel } from "../../../../main/labelHelper";
 
 HighchartsMore(Highcharts);
 
@@ -56,7 +56,7 @@ function TechCard(props){
 }
 
 function ApiDetails(props) {
-    const { showDetails, setShowDetails, apiDetail, headers, getStatus, isGptActive } = props
+    const { showDetails, setShowDetails, apiDetail, headers, getStatus, isGptActive, collectionIssuesData } = props
 
     const localCategoryMap = LocalStore.getState().categoryMap
     const localSubCategoryMap = LocalStore.getState().subCategoryMap
@@ -76,14 +76,14 @@ function ApiDetails(props) {
     const [editableDescription, setEditableDescription] = useState(description)
     const [useLocalSubCategoryData, setUseLocalSubCategoryData] = useState(false)
     const [apiCallStats, setApiCallStats] = useState([]); 
-    const [apiCallDistribution, setApiCallDistribution] = useState([]); // New state for distribution data
+    const [apiCallDistribution, setApiCallDistribution] = useState([]);
     const endTs = func.timeNow();
     const [startTime, setStartTime] = useState(endTs - statsOptions[6].value)
     const [hasApiStats, setHasApiStats] = useState(false);
     const [hasApiDistribution, setHasApiDistribution] = useState(false);
     const apiStatsAvailableRef = useRef(false);
     const apiDistributionAvailableRef = useRef(false);
-
+    const [selectedTabId, setSelectedTabId] = useState('values');
 
     const statusFunc = getStatus ? getStatus : (x) => {
         try {
@@ -99,14 +99,14 @@ function ApiDetails(props) {
 
     const standardHeaders = new Set(transform.getStandardHeaderList())
 
-    const getNiceBinSize = (rawSize) => {
-        const magnitude = Math.pow(10, Math.floor(Math.log10(rawSize)));
-        const leading = rawSize / magnitude;
-        if (leading <= 1) return 1 * magnitude;
-        if (leading <= 2) return 2 * magnitude;
-        if (leading <= 5) return 5 * magnitude;
-        return 10 * magnitude;
-    };
+    // const getNiceBinSize = (rawSize) => {
+    //     const magnitude = Math.pow(10, Math.floor(Math.log10(rawSize)));
+    //     const leading = rawSize / magnitude;
+    //     if (leading <= 1) return 1 * magnitude;
+    //     if (leading <= 2) return 2 * magnitude;
+    //     if (leading <= 5) return 5 * magnitude;
+    //     return 10 * magnitude;
+    // };
 
     // // Function to bin data
     // const binData = (rawData, targetBins = 10) => {
@@ -165,11 +165,6 @@ function ApiDetails(props) {
     const fetchDistributionData = async () => {
         try {
             const { apiCollectionId, endpoint, method } = apiDetail;
-
-            const now = new Date();
-            const startOfToday = Math.floor(new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime() / 1000);
-            const startOfTomorrow = startOfToday + 86400; // seconds in a day
-    
             const res = await api.fetchIpLevelApiCallStats(apiCollectionId, endpoint, method, Math.floor(startTime / 60),  Math.floor(endTs / 60));
     
             const bucketStats = res.bucketStats || [];
@@ -571,6 +566,16 @@ function ApiDetails(props) {
             />
         </Box>,
     }
+
+    const hasIssues = apiDetail?.severityObj && Object.values(apiDetail.severityObj).some(count => count > 0);
+
+    const IssuesTab = {
+        id: 'issues',
+        content: 'Issues',
+        component: <ApiIssuesTab apiDetail={apiDetail} collectionIssuesData={collectionIssuesData} />,
+    };
+
+
     const ApiCallStatsTab = {
         id: 'api-call-stats',
         content: 'API Call Stats',
@@ -734,8 +739,14 @@ function ApiDetails(props) {
         headingComp,
         <LayoutWithTabs
             key="tabs"
-            tabs={[ValuesTab, SchemaTab, ApiCallStatsTab, DependencyTab]}
-            currTab={() => { }}
+            tabs={[
+                ValuesTab,
+                SchemaTab,
+                ...(hasIssues ? [IssuesTab] : []),
+                ApiCallStatsTab,
+                DependencyTab
+            ]}
+            currTab={(tab) => setSelectedTabId(tab.id)}
             disabledTabs={disabledTabs}
         />
     ]
@@ -743,7 +754,7 @@ function ApiDetails(props) {
     return (
         <div>
             <FlyLayout
-                title="API details"
+                title={`${mapLabel("API details", getDashboardCategory())}`}
                 show={showDetails}
                 setShow={setShowDetails}
                 components={components}

@@ -46,7 +46,7 @@ public class TestSignupAction extends MongoBasedTest{
 
         assertEquals("GUEST", signupAction.fetchDefaultInviteRole(ACCOUNT_ID, "GUEST"));
 
-        CustomRole customRole = new CustomRole("CUSTOM_ROLE", Role.ADMIN.name(), new ArrayList<>(), false);
+        CustomRole customRole = new CustomRole("CUSTOM_ROLE", Role.ADMIN.name(), new ArrayList<>(), false, new ArrayList<>());
         CustomRoleDao.instance.insertOne(customRole);
 
         assertEquals("GUEST", signupAction.fetchDefaultInviteRole(ACCOUNT_ID, "GUEST"));

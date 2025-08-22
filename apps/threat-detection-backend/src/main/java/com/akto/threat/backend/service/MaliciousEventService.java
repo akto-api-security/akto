@@ -103,7 +103,7 @@ public class MaliciousEventService {
 
     Set<String> latestAttack =
         MaliciousEventService.<String>findDistinctFields(
-            coll, "subCategory", String.class, Filters.empty());
+            coll, "filterId", String.class, Filters.empty());
 
     Set<String> countries =
         MaliciousEventService.<String>findDistinctFields(
@@ -131,7 +131,7 @@ public class MaliciousEventService {
             coll, "latestApiEndpoint", String.class, Filters.empty());
     Set<String> subCategories =
         MaliciousEventService.<String>findDistinctFields(
-            coll, "subCategory", String.class, Filters.empty());
+            coll, "filterId", String.class, Filters.empty());
 
     return FetchAlertFiltersResponse.newBuilder().addAllActors(actors).addAllUrls(urls).addAllSubCategory(subCategories).build();
   }
@@ -147,6 +147,10 @@ public class MaliciousEventService {
     int skip = request.hasSkip() ? request.getSkip() : 0;
     Map<String, Integer> sort = request.getSortMap();
     ListMaliciousRequestsRequest.Filter filter = request.getFilter();
+
+    if(filter.getLatestAttackList() == null || filter.getLatestAttackList().isEmpty()) {
+      return ListMaliciousRequestsResponse.newBuilder().build();
+    }
 
     MongoCollection<MaliciousEventModel> coll =
         this.mongoClient
@@ -173,6 +177,10 @@ public class MaliciousEventService {
 
     if (!filter.getSubCategoryList().isEmpty()) {
       query.append("subCategory", new Document("$in", filter.getSubCategoryList()));
+    }
+
+    if (!filter.getLatestAttackList().isEmpty()) {
+      query.append("filterId", new Document("$in", filter.getLatestAttackList()));
     }
 
     if (filter.hasDetectedAtTimeRange()) {

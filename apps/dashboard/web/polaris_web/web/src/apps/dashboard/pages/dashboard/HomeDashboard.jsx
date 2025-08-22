@@ -28,6 +28,7 @@ import CriticalFindingsGraph from '../issues/IssuesPage/CriticalFindingsGraph';
 import values from "@/util/values";
 import { ActionItemsContent } from './components/ActionItemsContent';
 import { fetchActionItemsData } from './components/actionItemsTransform';
+import { getDashboardCategory, isMCPSecurityCategory, mapLabel } from '../../../main/labelHelper';
 
 function HomeDashboard() {
 
@@ -276,8 +277,8 @@ function HomeDashboard() {
             setApiRiskScore(0)
         }
 
-        if (apisInScopeForTesting && apisInScopeForTesting> 0 && apisTestedInLookBackPeriod) {
-            const testCoverage = 100 * apisTestedInLookBackPeriod / apisInScopeForTesting
+        if (totalAPIs && totalAPIs> 0 && apisTestedInLookBackPeriod) {
+            const testCoverage = 100 * apisTestedInLookBackPeriod / totalAPIs
             setTestCoverage(parseFloat(testCoverage.toFixed(2)))
         } else {
             setTestCoverage(0)
@@ -408,7 +409,7 @@ function HomeDashboard() {
             ["gRPC", apiStats.apiTypeMap.GRPC || 0],
             ["SOAP", apiStats.apiTypeMap.SOAP || 0],
         ];
-        const countMissing = apiTypeMissing - (missingCount + redundantCount)
+        const countMissing = apiTypeMissing;
         if(missingCount > 0) {
             data.push(["Need more data", countMissing]);
         }
@@ -495,7 +496,7 @@ function HomeDashboard() {
 
     const summaryInfo = [
         {
-            title: 'Total APIs',
+            title: mapLabel("Total APIs", getDashboardCategory()),
             data: transform.formatNumberWithCommas(totalAPIs),
             variant: 'heading2xl',
             byLineComponent: observeFunc.generateByLineComponent((totalAPIs - oldTotalApis), func.timeDifference(startTimestamp, endTimestamp)),
@@ -510,7 +511,7 @@ function HomeDashboard() {
             smoothChartComponent: (<SmoothAreaChart tickPositions={[oldIssueCount, totalIssuesCount]} />),
         },
         {
-            title: 'API Risk Score',
+            title: mapLabel("API Risk Score", getDashboardCategory()),
             data: customRiskScoreAvg !== 0 ? parseFloat(customRiskScoreAvg.toFixed(2))  : apiRiskScore,
             variant: 'heading2xl',
             color: (customRiskScoreAvg > 2.5 || apiRiskScore > 2.5) ? 'critical' : 'warning',
@@ -635,8 +636,8 @@ function HomeDashboard() {
                 <ProgressBarChart data={riskScoreData} />
             </div>
         }
-        title="APIs by Risk score"
-        titleToolTip="Distribution of APIs based on their calculated risk scores. Higher scores indicate greater potential security risks."
+        title={`${mapLabel("APIs", getDashboardCategory())} by Risk score`}
+        titleToolTip={`Distribution of ${mapLabel("APIs", getDashboardCategory())} based on their calculated risk scores. Higher scores indicate greater potential security risks.`}
         linkText="Check out"
         linkUrl="/dashboard/observe/inventory"
     />
@@ -645,8 +646,8 @@ function HomeDashboard() {
         component={
             <ChartypeComponent data={accessTypeMap} navUrl={"/dashboard/observe/inventory"} title={""} isNormal={true} boxHeight={'250px'} chartOnLeft={true} dataTableWidth="250px" boxPadding={0} pieInnerSize="50%" />
         }
-        title="APIs by Access type"
-        titleToolTip="Categorization of APIs based on their access permissions and intended usage (Partner, Internal, External, etc.)."
+        title={`${mapLabel("APIs", getDashboardCategory())} by Access type`}
+        titleToolTip={`Categorization of ${mapLabel("APIs", getDashboardCategory())} based on their access permissions and intended usage (Partner, Internal, External, etc.).`}
         linkText="Check out"
         linkUrl="/dashboard/observe/inventory"
     />
@@ -658,13 +659,13 @@ function HomeDashboard() {
                     <ChartypeComponent data={authMap} navUrl={"/dashboard/observe/inventory"} title={""} isNormal={true} boxHeight={'250px'} chartOnLeft={true} dataTableWidth="250px" boxPadding={0} pieInnerSize="50%"/>
                 </div>
             }
-            title="APIs by Authentication"
-            titleToolTip="Breakdown of APIs by the authentication methods they use, including unauthenticated APIs which may pose security risks."
+            title={`${mapLabel("APIs", getDashboardCategory())} by Authentication`}
+            titleToolTip={`Breakdown of ${mapLabel("APIs", getDashboardCategory())} by the authentication methods they use, including unauthenticated APIs which may pose security risks.`}
             linkText="Check out"
             linkUrl="/dashboard/observe/inventory"
         />
 
-    const apisByTypeComponent = <InfoCard
+    const apisByTypeComponent = (!isMCPSecurityCategory()) ? <InfoCard
         component={
             <StackedChart
                 type='column'
@@ -675,7 +676,7 @@ function HomeDashboard() {
                 data={apiTypesData}
                 defaultChartOptions={defaultChartOptions}
                 text="true"
-                yAxisTitle="Number of APIs"
+                yAxisTitle={`Number of ${mapLabel("APIs", getDashboardCategory())}`}
                 width={Object.keys(apiTypesData).length > 4 ? "25" : "40"}
                 gap={10}
                 showGridLines={true}
@@ -688,11 +689,11 @@ function HomeDashboard() {
                 exportingDisabled={true}
             />
         }
-        title="API Type"
-        titleToolTip="Distribution of APIs by their architectural style or protocol (e.g., REST, GraphQL, gRPC, SOAP)."
+        title={`${mapLabel("API", getDashboardCategory())} Type`}
+        titleToolTip={`Distribution of ${mapLabel("APIs", getDashboardCategory())} by their architectural style or protocol (e.g., REST, GraphQL, gRPC, SOAP).`}
         linkText="Check out"
         linkUrl="/dashboard/observe/inventory"
-    />
+    /> : null
 
     const newDomainsComponent = <InfoCard
         component={
@@ -723,18 +724,18 @@ function HomeDashboard() {
             {id: 'risk-score', component: apisByRiskscoreComponent},
             {id: 'access-type', component: apisByAccessTypeComponent},
             {id: 'auth-type', component: apisByAuthTypeComponent},
-            {id: 'api-type', component: apisByTypeComponent},
-            {id: 'new-domains', component: newDomainsComponent}
+            {id: 'new-domains', component: newDomainsComponent},
+            {id: 'api-type', component: apisByTypeComponent}
         ] :
         [
             {id: 'risk-score', component: apisByRiskscoreComponent},
             {id: 'access-type', component: apisByAccessTypeComponent},
             {id: 'auth-type', component: apisByAuthTypeComponent},
-            {id: 'api-type', component: apisByTypeComponent},
             {id: 'new-domains', component: newDomainsComponent},
             {id: 'critical-apis', component: criticalUnsecuredAPIsOverTime},
             {id: 'vulnerable-apis', component: vulnerableApisBySeverityComponent},
-            {id: 'critical-findings', component: criticalFindings}
+            {id: 'critical-findings', component: criticalFindings},
+            {id: 'api-type', component: apisByTypeComponent},
         ]
 
     const gridComponent = (
@@ -768,13 +769,15 @@ function HomeDashboard() {
 
     const pageComponents = [showBannerComponent ? <DashboardBanner key="dashboardBanner" /> : tabsComponent]
 
+    const dashboardCategory = PersistStore((state) => state.dashboardCategory) || "API Security"
+
     return (
         <Box>
             {loading ? <SpinnerCentered /> :
                 <PageWithMultipleCards
                     title={
                         <Text variant='headingLg'>
-                            API Security Posture
+                            {mapLabel("API Security Posture", dashboardCategory)}
                         </Text>
                     }
                     isFirstPage={true}

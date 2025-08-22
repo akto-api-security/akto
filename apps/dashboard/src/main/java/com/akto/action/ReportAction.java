@@ -1,34 +1,47 @@
 package com.akto.action;
 
+import java.net.URI;
 import java.net.URL;
 import java.util.HashMap;
-import java.util.Map;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 
 import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
 import javax.servlet.http.HttpSession;
 
 import com.akto.dao.testing.sources.TestReportsDao;
 import com.akto.dto.testing.sources.TestReports;
 import com.mongodb.MongoCommandException;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.Updates;
+
+import lombok.Getter;
+import lombok.Setter;
+
 import org.apache.struts2.ServletActionContext;
 import org.bson.types.ObjectId;
 import org.json.JSONObject;
 
 import com.akto.ApiRequest;
-import com.akto.TimeoutObject;
 import com.akto.dao.context.Context;
 import com.akto.dto.User;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.utils.Token;
 import com.fasterxml.jackson.databind.JsonNode;
-import com.twilio.rest.proxy.v1.service.Session;
+
+import com.akto.dao.testing.TestingRunDao;
+import com.akto.dto.testing.TestingRun;
+import com.akto.dto.testing.TestingEndpoints;
+import com.akto.dto.testing.CollectionWiseTestingEndpoints;
+import com.akto.dto.testing.CustomTestingEndpoints;
+import com.akto.dao.ApiCollectionsDao;
+import com.akto.dto.ApiCollection;
+import com.akto.dto.ApiInfo;
+import com.akto.util.Constants;
+
 
 public class ReportAction extends UserAction {
 
@@ -188,6 +201,111 @@ public class ReportAction extends UserAction {
             status = "ERROR";
             e.printStackTrace();
             return ERROR.toUpperCase();
+        }
+    }
+
+    @Setter
+    private String testingRunId;
+
+    @Getter
+    private String uniqueHostsTestedForRun;
+
+    public String getUniqueHostsTested() {
+        if (testingRunId == null || testingRunId.isEmpty()) {
+            return ERROR.toUpperCase();
+        }
+
+        try {
+            // Fetch the testing run by ID
+            TestingRun testingRun = TestingRunDao.instance.findOne(Filters.eq("_id", new ObjectId(testingRunId)));
+            if (testingRun == null || testingRun.getTestingEndpoints() == null) {
+                this.uniqueHostsTestedForRun = "";
+                return SUCCESS.toUpperCase();
+            }
+
+            TestingEndpoints testingEndpoints = testingRun.getTestingEndpoints();
+            Set<String> uniqueHosts = new HashSet<>();
+            Set<Integer> uniqueApiCollectionIds = new HashSet<>(); 
+
+            if (testingEndpoints.getType().equals(TestingEndpoints.Type.COLLECTION_WISE)) {
+                // Handle collection-wise testing endpoints
+                CollectionWiseTestingEndpoints collectionWiseEndpoints = (CollectionWiseTestingEndpoints) testingEndpoints;
+                int apiCollectionId = collectionWiseEndpoints.getApiCollectionId();
+                
+                // Get the API collection to check if it has a hostname
+                ApiCollection apiCollection = ApiCollectionsDao.instance.findOne(
+                    Filters.eq(Constants.ID, apiCollectionId),
+                    Projections.include(ApiCollection.HOST_NAME)
+                );
+                
+                if (apiCollection != null && apiCollection.getHostName() != null && !apiCollection.getHostName().isEmpty()) {
+                    // If collection has hostname, return it
+                    this.uniqueHostsTestedForRun = apiCollection.getHostName();
+                    return SUCCESS.toUpperCase();
+                } else {
+                    // If no hostname, get unique hosts from API info keys
+                    List<ApiInfo.ApiInfoKey> apiInfoKeys = testingEndpoints.returnApis();
+                    for (ApiInfo.ApiInfoKey apiInfoKey : apiInfoKeys) {
+                        String hostname = extractHostnameFromUrl(apiInfoKey.getUrl());
+                        if (hostname != null && !hostname.isEmpty()) {
+                            uniqueHosts.add(hostname);
+                        }
+                        uniqueApiCollectionIds.add(apiInfoKey.getApiCollectionId());
+                    }
+                }
+            } else if (testingEndpoints.getType() == TestingEndpoints.Type.CUSTOM) {
+                // Handle custom testing endpoints
+                CustomTestingEndpoints customEndpoints = (CustomTestingEndpoints) testingEndpoints;
+                List<ApiInfo.ApiInfoKey> apisList = customEndpoints.getApisList();
+                
+                if (apisList != null) {
+                    for (ApiInfo.ApiInfoKey apiInfoKey : apisList) {
+                        String hostname = extractHostnameFromUrl(apiInfoKey.getUrl());
+                        if (hostname != null && !hostname.isEmpty()) {
+                            uniqueHosts.add(hostname);
+                        }
+                        uniqueApiCollectionIds.add(apiInfoKey.getApiCollectionId());
+                    }
+                }
+            }
+
+            // Get unique hosts from API collections for type: API_GROUP
+            if (uniqueApiCollectionIds.size() > 0) {
+                List<ApiCollection> apiCollections = ApiCollectionsDao.instance.findAll(Filters.and(Filters.in(Constants.ID, uniqueApiCollectionIds), Filters.ne(ApiCollection._DEACTIVATED, true)), Projections.include(ApiCollection.HOST_NAME));
+                for (ApiCollection apiCollection : apiCollections) {
+                    if (apiCollection.getHostName() != null && !apiCollection.getHostName().isEmpty()) {
+                        uniqueHosts.add(apiCollection.getHostName());
+                    }
+                }
+            }
+
+            // Return comma-separated list of unique hosts
+            this.uniqueHostsTestedForRun = String.join(", ", uniqueHosts);
+            return SUCCESS.toUpperCase();
+            
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error getting unique hosts tested: " + e.getMessage(), LogDb.DASHBOARD);
+            return ERROR.toUpperCase();
+        }
+
+    }
+
+    private String extractHostnameFromUrl(String url) {
+        try {
+            if (url == null || url.isEmpty()) {
+                return null;
+            }
+            
+            // Only process URLs that start with http:// or https://
+            if (!url.startsWith("http://") && !url.startsWith("https://")) {
+                return null;
+            }
+            
+            URI uri = new URI(url);
+            return uri.getHost();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error extracting hostname from URL: " + url + " - " + e.getMessage(), LogDb.DASHBOARD);
+            return null;
         }
     }
 

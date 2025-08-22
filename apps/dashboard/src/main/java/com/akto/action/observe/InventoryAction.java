@@ -24,6 +24,7 @@ import com.akto.parsers.HttpCallParser;
 import com.akto.runtime.APICatalogSync;
 import com.akto.runtime.Main;
 import com.akto.util.Constants;
+import com.akto.util.GroupByTimeRange;
 import com.akto.utils.AccountHTTPCallParserAktoPolicyInfo;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.MongoCursor;
@@ -37,6 +38,8 @@ import io.swagger.v3.oas.models.Paths;
 import io.swagger.v3.oas.models.servers.Server;
 import io.swagger.v3.parser.core.models.SwaggerParseResult;
 
+import lombok.Getter;
+import lombok.Setter;
 import org.bson.Document;
 import org.bson.conversions.Bson;
 
@@ -57,6 +60,23 @@ public class InventoryAction extends UserAction {
 
     //     return Action.SUCCESS.toUpperCase();
     // }
+
+    @Getter
+    int notTestedEndpointsCount;
+
+    @Getter
+    int onlyOnceTestedEndpointsCount;
+
+    @Setter
+    private boolean showUrls;
+
+    @Getter
+    private List<ApiInfo> notTestedEndpointsApiInfo = new ArrayList<>();
+    @Setter
+    private boolean showApiInfo;
+
+    @Getter
+    private List<ApiInfo> onlyOnceTestedEndpointsApiInfo = new ArrayList<>();
 
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(InventoryAction.class, LogDb.DASHBOARD);
@@ -706,6 +726,7 @@ public class InventoryAction extends UserAction {
                     boolean isHeader = value.contains("header");
                     boolean isUrlParam = value.contains("urlParam");
                     boolean isPayload = value.contains("payload");
+                    boolean isQueryParam = value.contains("queryParam");
                     ArrayList<Bson> locationFilters = new ArrayList<>();
                     if (isHeader) {
                         locationFilters.add(Filters.eq(SingleTypeInfo._IS_HEADER, true));
@@ -719,6 +740,9 @@ public class InventoryAction extends UserAction {
                                 Filters.or(
                                         Filters.exists(SingleTypeInfo._IS_URL_PARAM, false),
                                         Filters.eq(SingleTypeInfo._IS_URL_PARAM, false))));
+                    }
+                    if (isQueryParam) {
+                        locationFilters.add(Filters.eq("isQueryParam", true));
                     }
                     filterList.add(Filters.or(locationFilters));
                     break;
@@ -782,7 +806,15 @@ public class InventoryAction extends UserAction {
         }else{
             filterList.add(Filters.nin(ApiInfo.ID_API_COLLECTION_ID, deactivatedCollections));
         }
-        
+
+        try {
+            List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
+            if (collectionIds != null) {
+                filterList.add(Filters.in(SingleTypeInfo._COLLECTION_IDS, collectionIds));
+            }
+        } catch (Exception e) {
+        }
+
         loggerMaker.debugAndAddToDb(filterList.toString(), LogDb.DASHBOARD);
         return Filters.and(filterList);
 
@@ -1137,6 +1169,82 @@ public class InventoryAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
+    public String fetchNotTestedAPICount() {
+        Bson filterQ = UsageMetricCalculator.excludeDemosAndDeactivated(ApiInfo.ID_API_COLLECTION_ID);
+
+        Bson filter = Filters.and(
+                filterQ,
+                Filters.exists(ApiInfo.LAST_TESTED, false)
+        );
+
+        if (this.showApiInfo) {
+            this.notTestedEndpointsApiInfo = ApiInfoDao.instance.findAll(filter);
+            this.notTestedEndpointsCount = this.notTestedEndpointsApiInfo.size();
+        } else {
+            this.notTestedEndpointsCount = (int) ApiInfoDao.instance.count(filter);
+        }
+
+        return Action.SUCCESS.toUpperCase();
+    }
+
+
+    public String fetchOnlyOnceTestedAPICount() {
+
+        Bson filterQ = UsageMetricCalculator.excludeDemosAndDeactivated(ApiInfo.ID_API_COLLECTION_ID);
+
+        Bson filter = Filters.and(
+                filterQ,
+                Filters.exists(ApiInfo.LAST_TESTED, true),
+                Filters.eq(ApiInfo.TOTAL_TESTED_COUNT, 1)
+        );
+
+        if (this.showApiInfo) {
+            this.onlyOnceTestedEndpointsApiInfo = ApiInfoDao.instance.findAll(filter);
+            this.onlyOnceTestedEndpointsCount = this.onlyOnceTestedEndpointsApiInfo.size();
+        } else {
+            this.onlyOnceTestedEndpointsCount = (int) ApiInfoDao.instance.count(filter);
+        }
+
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String fetchTestedApisRanges(){
+        response = new BasicDBObject();
+         try {
+            List<Bson> pipeLine = new ArrayList<>();
+            pipeLine.add(Aggregates.sort(
+                Sorts.descending(ApiInfo.LAST_TESTED)
+            ));
+            pipeLine.add(
+                Aggregates.match(Filters.gt(ApiInfo.LAST_TESTED, 0))
+            );
+
+            try {
+                List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
+                if(collectionIds != null) {
+                    pipeLine.add(Aggregates.match(Filters.in(SingleTypeInfo._COLLECTION_IDS, collectionIds)));
+                }
+            } catch(Exception e){
+            }
+
+            GroupByTimeRange.groupByWeek(pipeLine, ApiInfo.LAST_TESTED, "totalApisTested", new BasicDBObject());
+            MongoCursor<BasicDBObject> cursor = ApiInfoDao.instance.getMCollection().aggregate(pipeLine, BasicDBObject.class).cursor();
+            while (cursor.hasNext()) {
+                BasicDBObject document = cursor.next();
+                if(document.isEmpty()) continue;
+                BasicDBObject id = (BasicDBObject) document.get("_id");
+                String key = id.getInt("year") + "_" + id.getInt("weekOfYear");
+                response.put(key, document.getInt("totalApisTested"));
+            }
+            cursor.close();
+        } catch (Exception e) {
+            // TODO: handle exception
+            e.printStackTrace();
+        }
+        
+
+        return SUCCESS.toUpperCase();
+    }
 
     public String getSortKey() {
         return this.sortKey;

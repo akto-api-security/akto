@@ -45,6 +45,10 @@ public class ThreatApiService {
     List<Document> base = new ArrayList<>();
     ListThreatApiRequest.Filter filter = request.getFilter();
 
+    if(filter.getLatestAttackList() == null || filter.getLatestAttackList().isEmpty()) {
+      return ListThreatApiResponse.newBuilder().build();
+    }
+
     Document match = new Document();
     if (!filter.getMethodsList().isEmpty()) {
       match.append("latestApiMethod", new Document("$in", filter.getMethodsList()));
@@ -52,6 +56,10 @@ public class ThreatApiService {
 
     if (!filter.getUrlsList().isEmpty()) {
       match.append("latestApiEndpoint", new Document("$in", filter.getUrlsList()));
+    }
+
+    if (!filter.getLatestAttackList().isEmpty()) {
+      match.append("filterId", new Document("$in", filter.getLatestAttackList()));
     }
 
     if (filter.hasDetectedAtTimeRange()) {
@@ -123,6 +131,10 @@ public class ThreatApiService {
   public ThreatCategoryWiseCountResponse getSubCategoryWiseCount(
     String accountId, ThreatCategoryWiseCountRequest req) {
 
+    if(req.getLatestAttackList() == null || req.getLatestAttackList().isEmpty()) {
+      return ThreatCategoryWiseCountResponse.newBuilder().build();
+    }
+
     loggerMaker.info("getSubCategoryWiseCount start ts " + Context.now());
 
     MongoCollection<Document> coll =
@@ -131,14 +143,18 @@ public class ThreatApiService {
             .getCollection(MongoDBCollection.ThreatDetection.MALICIOUS_EVENTS, Document.class);
 
     List<Document> pipeline = new ArrayList<>();
+    Document match = new Document();
+
+    if(req.getLatestAttackList() != null && !req.getLatestAttackList().isEmpty()) {
+      match.append("filterId", new Document("$in", req.getLatestAttackList()));
+    }
 
     // 1. Match on time range
     if (req.getStartTs() != 0 || req.getEndTs() != 0) {
-      pipeline.add(new Document("$match",
-          new Document("detectedAt",
-              new Document("$gte", req.getStartTs())
-                  .append("$lte", req.getEndTs()))));
+      match.append("detectedAt", new Document("$gte", req.getStartTs()).append("$lte", req.getEndTs()));
     }
+
+    pipeline.add(new Document("$match", match));
 
     // 3. Group by category and subCategory
     pipeline.add(new Document("$group",
@@ -177,6 +193,10 @@ public class ThreatApiService {
   public ThreatSeverityWiseCountResponse getSeverityWiseCount(
     String accountId, ThreatSeverityWiseCountRequest req) {
 
+    if(req.getLatestAttackList() == null || req.getLatestAttackList().isEmpty()) {
+      return ThreatSeverityWiseCountResponse.newBuilder().build();
+    }
+
     loggerMaker.info("getSeverityWiseCount start ts " + Context.now());
 
     MongoCollection<Document> coll =
@@ -192,7 +212,8 @@ public class ThreatApiService {
       Bson filter = Filters.and(
           Filters.eq("severity", severity),
           Filters.gte("detectedAt", req.getStartTs()),
-          Filters.lte("detectedAt", req.getEndTs())
+          Filters.lte("detectedAt", req.getEndTs()),
+          Filters.in("filterId", req.getLatestAttackList())
       );
 
       long count = coll.countDocuments(filter);

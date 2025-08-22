@@ -190,7 +190,7 @@ public class Main {
 
         return ret;
     }
-    private static final int LAST_TEST_RUN_EXECUTION_DELTA = 5 * 60;
+    private static final int LAST_TEST_RUN_EXECUTION_DELTA = 10 * 60;
     private static final int DEFAULT_DELTA_IGNORE_TIME = 2*60*60;
     private static final int MAX_RETRIES_FOR_FAILED_SUMMARIES = 3;
 
@@ -212,8 +212,13 @@ public class Main {
         );
 
         // returns the previous state of testing run before the update
-        return TestingRunDao.instance.getMCollection().withWriteConcern(WriteConcern.W1).findOneAndUpdate(
-                Filters.or(filter1,filter2), update);
+        TestingRun testingRun = TestingRunDao.instance.getMCollection().withWriteConcern(WriteConcern.W1).findOneAndUpdate(
+                Filters.or(filter1), update);
+        if (testingRun == null) {
+            testingRun = TestingRunDao.instance.getMCollection().withWriteConcern(WriteConcern.W1).findOneAndUpdate(
+                    Filters.or(filter2), update);
+        }
+        return testingRun;
     }
 
     private static TestingRunResultSummary findPendingTestingRunResultSummary(int userDeltaTime) {
@@ -237,7 +242,13 @@ public class Main {
 
         Bson update = Updates.set(TestingRun.STATE, TestingRun.State.RUNNING);
 
-        TestingRunResultSummary trrs = TestingRunResultSummariesDao.instance.getMCollection().withWriteConcern(WriteConcern.W1).findOneAndUpdate(Filters.or(filter1,filter2), update);
+        // for ci-cd tests, we need to check filter1, filter2 separately, coz if 2 machines are running , and first
+        // one is executing, and at t + 22 minutes and less than delta, the other machine will pick up the running summary instead of the scheduled one if present
+        // because findOneAndUpdate will return the first one {sorted by default id} that matches the filter
+        TestingRunResultSummary trrs = TestingRunResultSummariesDao.instance.getMCollection().withWriteConcern(WriteConcern.W1).findOneAndUpdate(filter1, update);
+        if(trrs == null) {
+            trrs = TestingRunResultSummariesDao.instance.getMCollection().withWriteConcern(WriteConcern.W1).findOneAndUpdate(filter2, update);
+        }
 
         return trrs;
     }

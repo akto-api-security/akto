@@ -6,18 +6,19 @@ import values from "@/util/values";
 import {produce} from "immer"
 import api from "../api"
 import func from "@/util/func"
-import { useParams, useSearchParams } from "react-router-dom"
+import { useParams } from "react-router-dom"
 import PersistStore from "../../../../main/PersistStore"
 import DateRangeFilter from "../../../components/layouts/DateRangeFilter"
 import GetPrettifyEndpoint from "../GetPrettifyEndpoint";
 import TooltipText from "../../../components/shared/TooltipText";
 import SaveAsCollectionModal from "../api_collections/api_query_component/SaveAsCollectionModal";
+import { getDashboardCategory, mapLabel } from "../../../../main/labelHelper";
 
 const headings = [
     {
         text: "Endpoint",
         value: "endpointComp",
-        title: "Api endpoints",
+        title: mapLabel("API endpoints", getDashboardCategory()),
         textValue: "endpoint",
         filterKey: 'endpoint'
     },
@@ -88,7 +89,8 @@ let filters = [
     choices:[
         {label:"Header", value:"header"},
         {label:"Payload", value:"payload"},
-        {label:"URL param", value:"urlParam"}
+        {label:"URL param", value:"urlParam"},
+        {label:"Query param", value:"queryParam"}
     ],
   },
   {
@@ -118,7 +120,7 @@ const convertDataIntoTableFormat = (endpoint, apiCollectionMap) => {
     temp['apiCollectionId'] = endpoint.apiCollectionId
     temp['detected_timestamp'] = func.prettifyEpoch(endpoint.timestamp)
     temp['timestamp'] = endpoint.timestamp
-    temp['location'] = (endpoint.isHeader ? "Header" : (endpoint.isUrlParam ? "URL param" : "Payload"))
+    temp['location'] = (endpoint.isHeader ? "Header" : (endpoint.isUrlParam ? "URL param" : (endpoint.isQueryParam ? "Query param" : "Payload")))
     temp['isHeader'] = endpoint.isHeader
     temp["paramLocation"] = endpoint.responseCode < 0 ? "Request" : "Response"
     temp['keyValue'] = key

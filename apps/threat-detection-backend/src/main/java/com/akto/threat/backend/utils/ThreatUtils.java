@@ -47,6 +47,7 @@ public class ThreatUtils {
         requiredIndexes.put("severity_1_detectedAt_1", Indexes.ascending("severity", "detectedAt"));
         requiredIndexes.put("detectedAt_-1_actor_1", Indexes.compoundIndex(Indexes.descending("detectedAt"), Indexes.ascending("actor")));
         requiredIndexes.put("actor_1_detectedAt_-1", Indexes.compoundIndex(Indexes.ascending("actor"), Indexes.descending("detectedAt")));
+        requiredIndexes.put("filterId_1", Indexes.ascending("filterId"));
 
         for (Map.Entry<String, Bson> entry : requiredIndexes.entrySet()) {
             if (!existingIndexes.contains(entry.getKey())) {

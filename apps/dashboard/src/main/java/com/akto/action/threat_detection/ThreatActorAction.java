@@ -3,6 +3,7 @@ package com.akto.action.threat_detection;
 import com.akto.ProtoMessageUtils;
 import com.akto.dao.ConfigsDao;
 import com.akto.dao.context.Context;
+import com.akto.dao.monitoring.FilterYamlTemplateDao;
 import com.akto.dto.Config;
 import com.akto.dto.Config.AwsWafConfig;
 import com.akto.dto.OriginalHttpRequest;
@@ -16,6 +17,7 @@ import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.Th
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatActorFilterResponse;
 import com.akto.testing.ApiExecutor;
 import com.akto.util.Constants;
+import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
@@ -42,6 +44,8 @@ import org.apache.http.impl.client.HttpClients;
 import org.apache.http.util.EntityUtils;
 import org.bson.conversions.Bson;
 
+import static com.akto.action.threat_detection.utils.ThreatsUtils.getTemplates;
+
 public class ThreatActorAction extends AbstractThreatDetectionAction {
 
   List<DashboardThreatActor> actors;
@@ -66,6 +70,7 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
   String actor;
   String filterId;
 
+  // TODO: remove this, use API Executor.
   private final CloseableHttpClient httpClient;
 
   public static final String CLOUDFLARE_WAF_BASE_URL = "https://api.cloudflare.com/client/v4";
@@ -85,15 +90,18 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
     post.addHeader("Authorization", "Bearer " + this.getApiToken());
     post.addHeader("Content-Type", "application/json");
 
-    if(startTs == 0 || endTs == 0) {
-      startTs = Context.now() - 1 * 24 * 60 * 60; // default to last 1 day
-      endTs = Context.now();
+    if(endTs <= 0){
+        endTs = Context.now();
     }
+    startTs = Math.max(startTs, 0);
+
+    List<String> templatesContext = getTemplates(this.latestAttack);
 
     Map<String, Object> body = new HashMap<String, Object>() {
       {
         put("start_ts", startTs);
         put("end_ts", endTs);
+        put("latestAttack", templatesContext);
       }
     };
     String msg = objectMapper.valueToTree(body).toString();
@@ -125,6 +133,8 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
     HttpGet get = new HttpGet(String.format("%s/api/dashboard/fetch_filters_for_threat_actors", this.getBackendUrl()));
     get.addHeader("Authorization", "Bearer " + this.getApiToken());
     get.addHeader("Content-Type", "application/json");
+    int accountId = Context.accountId.get();
+    CONTEXT_SOURCE source = Context.contextSource.get();
 
     try (CloseableHttpResponse resp = this.httpClient.execute(get)) {
       String responseBody = EntityUtils.toString(resp.getEntity());
@@ -134,7 +144,11 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
           .ifPresent(
               msg -> {
                 this.country = msg.getCountriesList();
-                this.latestAttack = msg.getSubCategoriesList();
+                Set<String> allowedTemplates = FilterYamlTemplateDao.getContextTemplatesForAccount(accountId, source);
+                this.latestAttack =
+                    msg.getSubCategoriesList().stream()
+                        .filter(allowedTemplates::contains)
+                        .collect(Collectors.toList());
                 this.actorId = msg.getActorIdList();
               });
     } catch (Exception e) {
@@ -151,9 +165,9 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
     post.addHeader("Content-Type", "application/json");
     Map<String, Object> filter = new HashMap<>();
 
-    if(this.latestAttack != null && !this.latestAttack.isEmpty()){
-      filter.put("latestAttack", this.latestAttack);
-    }
+    List<String> templates = getTemplates(latestAttack);
+    filter.put("latestAttack", templates);
+
     if(this.country != null && !this.country.isEmpty()){
       filter.put("country", this.country);
     }

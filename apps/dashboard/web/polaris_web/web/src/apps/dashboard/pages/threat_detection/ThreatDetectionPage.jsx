@@ -18,6 +18,7 @@ import threatDetectionFunc from "./transform";
 import InfoCard from "../dashboard/new_components/InfoCard";
 import BarGraph from "../../components/charts/BarGraph";
 import SessionStore from "../../../main/SessionStore";
+import { getDashboardCategory, mapLabel } from "../../../main/labelHelper";
 
 const convertToGraphData = (severityMap) => {
     let dataArr = []
@@ -42,7 +43,7 @@ const ChartComponent = ({ subCategoryCount, severityCountMap }) => {
           />
           <InfoCard
                 title={"Threats by severity"}
-                titleToolTip={"Number of APIs per each category"}
+                titleToolTip={`Number of ${mapLabel("APIs", getDashboardCategory())} per each category`}
                 component={
                     <BarGraph
                         data={severityCountMap}
@@ -54,7 +55,7 @@ const ChartComponent = ({ subCategoryCount, severityCountMap }) => {
                             },
                         }}
                         showYAxis={true}
-                        yAxisTitle="Number of APIs"
+                        yAxisTitle={`Number of ${mapLabel("APIs", getDashboardCategory())}`}
                         showGridLines={true}
                         barWidth={100 - (severityCountMap.length * 6)}
                         barGap={12}
@@ -253,7 +254,7 @@ function ThreatDetectionPage() {
     return <PageWithMultipleCards
         title={
             <TitleWithInfo
-                titleText={"API Threat Activity"}
+                titleText={mapLabel("API Threat Activity", getDashboardCategory())}
                 tooltipContent={"Identify malicious requests with Akto's powerful threat detection capabilities"}
             />
         }

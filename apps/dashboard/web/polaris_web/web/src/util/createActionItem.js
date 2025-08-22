@@ -6,21 +6,22 @@ import JiraTicketDisplay from '../apps/dashboard/components/shared/JiraTicketDis
 export function createActionItem(
     id,
     priority,
-    title,
-    description,
+    staticTitle, 
+    description, 
     team,
     effort,
     count,
     actionItemType,
     jiraTicketUrlMap,
-    handleJiraIntegration
+    handleJiraIntegration,
+    whyItMatters 
 ) {
     const jiraTicketUrl = jiraTicketUrlMap[actionItemType];
     const jiraKey = jiraTicketUrl ? jiraTicketUrl.split('/').pop() : '';
 
     const actionItemObj = {
         id,
-        title,
+        staticTitle,
         description,
         actionItemType,
         team,
@@ -44,12 +45,13 @@ export function createActionItem(
             </Box>
         ),
         priorityComp: <Badge status={badgeStatus}>{priority}</Badge>,
-        actionItem: renderTooltipBox(title, '400px'),
-        team: renderTooltipBox(team, '200px'),
+        actionItem: renderTooltipBox(staticTitle, '220px'), 
+        descriptionCol: renderTooltipBox(description, '260px'),
+        team: renderTooltipBox(team, '90px'),
         effort: renderTooltipBox(effort, '100px'),
-        whyItMatters: renderTooltipBox(description, '400px'),
-        displayName: title,
-        title,
+        whyItMatters: renderTooltipBox(whyItMatters, '260px'), 
+        displayName: staticTitle,
+        staticTitle,
         description,
         actionItemType,
         count,

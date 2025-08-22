@@ -2,6 +2,8 @@ package com.akto.dao.testing_run_findings;
 
 import java.util.*;
 
+import com.mongodb.client.MongoCollection;
+import org.bson.Document;
 import org.bson.conversions.Bson;
 
 import com.akto.dao.AccountsContextDaoWithRbac;
@@ -71,6 +73,11 @@ public class TestingRunIssuesDao extends AccountsContextDaoWithRbac<TestingRunIs
         fieldNames = new String[]{TestingRunIssues.TICKET_PROJECT_KEY, TestingRunIssues.TICKET_SOURCE,
             TestingRunIssues.TICKET_ID};
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, true);
+
+        // Index for fetchUrlsByIssues - improves grouping and sorting by testSubCategory
+        fieldNames = new String[]{TestingRunIssues.TEST_RUN_ISSUES_STATUS, "_id." + TestingIssuesId.TEST_SUB_CATEGORY};
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, true);
+
     }
 
     private List<Bson> getPipelineForSeverityCount(Bson filter, boolean expandApiGroups, BasicDBObject groupedId) {
@@ -287,6 +294,11 @@ public class TestingRunIssuesDao extends AccountsContextDaoWithRbac<TestingRunIs
         }
 
         return finalMap;
+    }
+
+
+    public MongoCollection<Document> getRawCollection() {
+        return clients[0].getDatabase(getDBName()).getCollection(getCollName(), Document.class);
     }
 
     private TestingRunIssuesDao() {}

@@ -20,6 +20,7 @@ public class AccessTokenAction implements Action, ServletResponseAware, ServletR
 
     private static final LoggerMaker logger = new LoggerMaker(AccessTokenAction.class, LogDb.DASHBOARD);
     public static final String ACCESS_TOKEN_HEADER_NAME = "access-token";
+    public static final String CONTEXT_SOURCE_HEADER = "x-context-source";
 
     @Override
     public String execute() {

@@ -34,6 +34,7 @@ import ReactFlow, {
   
   } from 'react-flow-renderer';
 import SetUserEnvPopupComponent from "./component/SetUserEnvPopupComponent";
+import { getDashboardCategory, mapLabel } from "../../../../main/labelHelper";
   
 const CenterViewType = {
     Table: 0,
@@ -44,16 +45,16 @@ const CenterViewType = {
 
 const headers = [
     {
-        title: "API collection name",
-        text: "API collection name",
+        title: mapLabel("API collection name", getDashboardCategory()),
+        text: mapLabel("API collection name", getDashboardCategory()),
         value: "displayNameComp",
         filterKey: "displayName",
         textValue: 'displayName',
         showFilter: true
     },
     {
-        title: "Total endpoints",
-        text: "Total endpoints",
+        title: mapLabel("Total endpoints", getDashboardCategory()),
+        text: mapLabel("Total endpoints", getDashboardCategory()),
         value: "urlsCount",
         isText: CellType.TEXT,
         sortActive: true,
@@ -202,6 +203,12 @@ function convertToCollectionData(c) {
 
 const convertToNewData = (collectionsArr, sensitiveInfoMap, severityInfoMap, coverageMap, trafficInfoMap, riskScoreMap, isLoading) => {
 
+    // Ensure collectionsArr is an array
+    if (!Array.isArray(collectionsArr)) {
+        console.error("collectionsArr is not an array:", collectionsArr);
+        return { prettify: [], normal: [] };
+    }
+
     const newData = collectionsArr.map((c) => {
         if(c.deactivated){
             c.rowStatus = 'critical'
@@ -228,6 +235,7 @@ const convertToNewData = (collectionsArr, sensitiveInfoMap, severityInfoMap, cov
     return { prettify: prettifyData, normal: newData }
 }
 
+
 function ApiCollections(props) {
 
     const {customCollectionDataFilter, onlyShowCollectionsTable, sendData} = props;
@@ -235,7 +243,7 @@ function ApiCollections(props) {
     const userRole = window.USER_ROLE
 
     const navigate = useNavigate();
-    const [data, setData] = useState({'all': [], 'hostname':[], 'groups': [], 'custom': [], 'deactivated': []})
+    const [data, setData] = useState({'all': [], 'hostname':[], 'groups': [], 'custom': [], 'deactivated': [], 'Untracked': []})
     const [active, setActive] = useState(false);
     const [loading, setLoading] = useState(false)
           
@@ -253,7 +261,7 @@ function ApiCollections(props) {
 
     // const dummyData = dummyJson;
 
-    const definedTableTabs = ['All', 'Hostname', 'Groups', 'Custom', 'Deactivated']
+    const definedTableTabs = ['All', 'Hostname', 'Groups', 'Custom', 'Deactivated', 'Untracked']
 
     const { tabsInfo, selectItems } = useTable()
     const tableSelectedTab = PersistStore.getState().tableSelectedTab[window.location.pathname]
@@ -270,6 +278,7 @@ function ApiCollections(props) {
     const setSamples = ObserveStore(state => state.setSamples)
     const setSelectedUrl = ObserveStore(state => state.setSelectedUrl)
     const [deactivateCollections, setDeactivateCollections] = useState([])
+    const [uningestedApiCountMap, setUningestedApiCountMap] = useState({})
 
     const resetFunc = () => {
         setInventoryFlyout(false)
@@ -313,11 +322,11 @@ function ApiCollections(props) {
     // similarly call sensitive and severityInfo
 
     async function fetchData() {
-
-        // first api call to get only collections name and collection id
-        setLoading(true)
-        const apiCollectionsResp = await api.getAllCollectionsBasic();
-        setLoading(false)
+        try {
+            // first api call to get only collections name and collection id
+            setLoading(true)
+            const apiCollectionsResp = await api.getAllCollectionsBasic();
+            setLoading(false)
 
         if(customCollectionDataFilter){
             apiCollectionsResp.apiCollections = (apiCollectionsResp.apiCollections || []).filter(customCollectionDataFilter)
@@ -358,6 +367,7 @@ function ApiCollections(props) {
             api.getCoverageInfoForCollections(),
             api.getLastTrafficSeen(),
             collectionApi.fetchCountForHostnameDeactivatedCollections(),
+            collectionApi.fetchCountForUningestedApis(),
             dashboardApi.fetchEndpointsCount(0, 0)
         ];
         if(shouldCallHeavyApis){
@@ -379,7 +389,8 @@ function ApiCollections(props) {
         // let coverageInfo = dummyData.coverageMap
         let trafficInfo = results[1].status === 'fulfilled' ? results[1].value : {};
         let deactivatedCountInfo = results[2].status === 'fulfilled' ? results[2].value : {};
-        let fetchEndpointsCountResp = results[3].status === 'fulfilled' ? results[3].value : {}
+        let uningestedApiCountInfo = results[3].status === 'fulfilled' ? results[3].value : {};
+        let fetchEndpointsCountResp = results[4].status === 'fulfilled' ? results[4].value : {}
 
         let riskScoreObj = lastFetchedResp
         let sensitiveInfo = lastFetchedSensitiveResp
@@ -389,24 +400,24 @@ function ApiCollections(props) {
         }
 
         if(shouldCallHeavyApis){
-            if(results[4]?.status === "fulfilled"){
-                const res = results[4].value
+            if(results[5]?.status === "fulfilled"){
+                const res = results[5].value
                 riskScoreObj = {
                     criticalUrls: res.criticalEndpointsCount,
                     riskScoreMap: res.riskScoreOfCollectionsMap
                 }
             }
 
-            if(results[5]?.status === "fulfilled"){
-                const res = results[5].value
+            if(results[6]?.status === "fulfilled"){
+                const res = results[6].value
                 sensitiveInfo ={ 
                     sensitiveUrls: res.sensitiveUrlsInResponse,
                     sensitiveInfoMap: res.sensitiveSubtypesInCollection
                 }
             }
 
-            if(results[6]?.status === "fulfilled"){
-                const res = results[6].value
+            if(results[7]?.status === "fulfilled"){
+                const res = results[7].value
                 severityObj = res
             }
 
@@ -421,7 +432,7 @@ function ApiCollections(props) {
         let usersCollectionList = []
         let userList = []
 
-        const index = !shouldCallHeavyApis ? 4 : 7
+        const index = !shouldCallHeavyApis ? 5 : 8
 
         if(userRole === 'ADMIN') {
             if(results[index]?.status === "fulfilled") {
@@ -449,8 +460,27 @@ function ApiCollections(props) {
         setHasUsageEndpoints(hasUserEndpoints)
         setCoverageMap(coverageInfo)
 
-        dataObj = convertToNewData(tmp, sensitiveInfo.sensitiveInfoMap, severityObj, coverageInfo, trafficInfo, riskScoreObj?.riskScoreMap, false);
+        // Ensure all parameters are defined before calling convertToNewData
+        const sensitiveInfoMap = sensitiveInfo?.sensitiveInfoMap || {};
+        const severityInfoMap = severityObj || {};
+        const coverageMap = coverageInfo || {};
+        const trafficInfoMap = trafficInfo || {};
+        const riskScoreMap = riskScoreObj?.riskScoreMap || {};
+        
+        // Ensure tmp is defined and is an array
+        if (!Array.isArray(tmp)) {
+            console.error("tmp is not an array:", tmp);
+            return;
+        }
+        
+        dataObj = convertToNewData(tmp, sensitiveInfoMap, severityInfoMap, coverageMap, trafficInfoMap, riskScoreMap, false);
         setNormalData(dataObj.normal)
+
+        // Ensure dataObj.prettify exists
+        if (!dataObj.prettify) {
+            console.error("dataObj.prettify is undefined");
+            return;
+        }
 
         // Separate active and deactivated collections
         const deactivatedCollectionsCopy = dataObj.prettify.filter(c => c.deactivated).map((c)=>{
@@ -459,7 +489,27 @@ function ApiCollections(props) {
             }
             return c
         });
+
+        const collectionMap = new Map(dataObj.prettify.map(c => [c.id, c]));
+        const untrackedCollections = Object.entries(uningestedApiCountInfo || {})
+            .filter(([_, count]) => count > 0)
+            .map(([collectionId, untrackedCount]) => {
+                const collection = collectionMap.get(parseInt(collectionId));
+                return collection ? {
+                    id: collection.id,
+                    displayName: collection.displayName,
+                    displayNameComp: collection.displayNameComp,
+                    urlsCount: untrackedCount,
+                    rowStatus: 'critical',
+                    disableClick: true,
+                    deactivated: true
+                } : null;
+            })
+            .filter(Boolean);
         setDeactivateCollections(JSON.parse(JSON.stringify(deactivatedCollectionsCopy)));
+        
+        // Process uningested API data
+        setUningestedApiCountMap(uningestedApiCountInfo || {});
         
         // Calculate summary data only for active collections
         const summary = transform.getSummaryData(dataObj.normal)
@@ -479,7 +529,13 @@ function ApiCollections(props) {
         tmp.groups = allGroupsForTmp;
         tmp.custom = tmp.all.filter(x => !tmp.hostname.includes(x) && !x.deactivated && !tmp.groups.includes(x));
         tmp.deactivated = deactivatedCollectionsCopy
+        tmp.untracked = untrackedCollections
+        
         setData(tmp);
+        } catch (error) {
+            console.error("Error in fetchData:", error);
+            setLoading(false);
+        }
     }
 
     function disambiguateLabel(key, value) {
@@ -731,9 +787,7 @@ function ApiCollections(props) {
             )
         }
         const bulkActionsOptions = [...actions];
-        if(selectedTab !== 'groups') {
-            bulkActionsOptions.push(toggleEnvType)
-        }
+        bulkActionsOptions.push(toggleEnvType)
         return bulkActionsOptions
     }
     const updateData = (dataMap) => {
@@ -820,19 +874,19 @@ function ApiCollections(props) {
 
       const summaryItems = [
         {
-            title: "Total APIs",
+            title: mapLabel("Total APIs", getDashboardCategory()),
             data: transform.formatNumberWithCommas(totalAPIs),
         },
         {
-            title: "Critical APIs",
+            title: mapLabel("Critical APIs", getDashboardCategory()),
             data: transform.formatNumberWithCommas(summaryData.totalCriticalEndpoints),
         },
         {
-            title: "Tested APIs (Coverage)",
+            title: mapLabel("Tested APIs (Coverage)", getDashboardCategory()),
             data: coverage
         },
         {
-            title: "Sensitive in response APIs",
+            title: mapLabel("Sensitive in response APIs", getDashboardCategory()),
             data: transform.formatNumberWithCommas(summaryData.totalSensitiveEndpoints),
         }
     ]
@@ -956,7 +1010,7 @@ function ApiCollections(props) {
             title={
                 <TitleWithInfo 
                     tooltipContent={"Akto automatically groups similar APIs into meaningful collections based on their subdomain names. "}
-                    titleText={"API collections"} 
+                    titleText={mapLabel("API Collections", getDashboardCategory())} 
                     docsUrl={"https://docs.akto.io/api-inventory/concepts"}
                 />
             }
