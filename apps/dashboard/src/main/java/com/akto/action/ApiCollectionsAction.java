@@ -319,14 +319,14 @@ public class ApiCollectionsAction extends UserAction {
         Bson filter = Filters.in(SingleTypeInfo._COLLECTION_IDS, apiCollectionIds);
         Bson update = Updates.pullAll(SingleTypeInfo._COLLECTION_IDS, apiCollectionIds);
 
-        SingleTypeInfoDao.instance.deleteAll(Filters.in("apiCollectionId", apiCollectionIds));
+        SingleTypeInfoDao.instance.getMCollection().deleteMany(Filters.in("apiCollectionId", apiCollectionIds));
         SingleTypeInfoDao.instance.updateMany(filter, update);
-        APISpecDao.instance.deleteAll(Filters.in("apiCollectionId", apiCollectionIds));
-        SensitiveParamInfoDao.instance.deleteAll(Filters.in("apiCollectionId", apiCollectionIds));
-        SampleDataDao.instance.deleteAll(Filters.in("_id.apiCollectionId", apiCollectionIds));
-        SensitiveSampleDataDao.instance.deleteAll(Filters.in("_id.apiCollectionId", apiCollectionIds));
-        TrafficInfoDao.instance.deleteAll(Filters.in("_id.apiCollectionId", apiCollectionIds));
-        DeleteResult apiInfoDeleteResult = ApiInfoDao.instance.deleteAll(Filters.in("_id.apiCollectionId", apiCollectionIds));
+        APISpecDao.instance.getMCollection().deleteMany(Filters.in("apiCollectionId", apiCollectionIds));
+        SensitiveParamInfoDao.instance.getMCollection().deleteMany(Filters.in("apiCollectionId", apiCollectionIds));
+        SampleDataDao.instance.getMCollection().deleteMany(Filters.in("_id.apiCollectionId", apiCollectionIds));
+        SensitiveSampleDataDao.instance.getMCollection().deleteMany(Filters.in("_id.apiCollectionId", apiCollectionIds));
+        TrafficInfoDao.instance.getMCollection().deleteMany(Filters.in("_id.apiCollectionId", apiCollectionIds));
+        DeleteResult apiInfoDeleteResult = ApiInfoDao.instance.getMCollection().deleteMany(Filters.in("_id.apiCollectionId", apiCollectionIds));
         SensitiveParamInfoDao.instance.updateMany(filter, update);
 
         /*
