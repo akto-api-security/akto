@@ -7,12 +7,14 @@ import com.akto.dao.SignupDao;
 import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dao.UsersDao;
 import com.akto.dao.context.Context;
+import com.akto.dao.monitoring.ModuleInfoDao;
 import com.akto.dao.testing.DefaultTestSuitesDao;
 import com.akto.dto.BackwardCompatibility;
 import com.akto.dto.Config;
 import com.akto.dto.SignupInfo;
 import com.akto.dto.SignupUserInfo;
 import com.akto.dto.User;
+import com.akto.dto.monitoring.ModuleInfo;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.listener.InitializerListener;
 import com.akto.listener.RuntimeListener;
@@ -20,10 +22,10 @@ import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.notifications.email.SendgridEmail;
 import com.akto.password_reset.PasswordResetUtils;
+import com.akto.util.Constants;
 import com.akto.util.DashboardMode;
 import com.akto.utils.JWT;
 import com.akto.utils.Token;
-import com.akto.utils.jobs.CleanInventory;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.FindOneAndUpdateOptions;
@@ -280,6 +282,17 @@ public class LoginAction implements Action, ServletResponseAware, ServletRequest
                     });
                     service.submit(() ->{
                         triggerVulnColUpdation(user);
+                    });
+                    // temporary clean up
+                    // TODO: remove this after 2 days 
+                    service.submit(() ->{
+                        for (String accountIdStr : user.getAccounts().keySet()) {
+                            int accountId = Integer.parseInt(accountIdStr);
+                            Context.accountId.set(accountId);
+                            if(ModuleInfoDao.instance.isValidForTimestamp(ModuleInfo.ModuleType.MINI_RUNTIME, Context.now() - 4 * Constants.ONE_DAY_TIMESTAMP, Context.now(), "1.50.0")){
+                                SingleTypeInfoDao.deleteDuplicateHostsForSameApi();
+                            }
+                        }
                     });
                 }
             }

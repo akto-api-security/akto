@@ -6,6 +6,7 @@ import java.util.*;
 
 import com.akto.dao.context.Context;
 import com.akto.dto.AktoDataType;
+import com.akto.dto.ApiCollection;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.CollectionConditions.MethodCondition;
 import com.akto.dto.rbac.UsersCollectionsList;
@@ -21,6 +22,7 @@ import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.*;
 
 import org.bson.conversions.Bson;
+import org.bson.types.ObjectId;
 
 public class SingleTypeInfoDao extends AccountsContextDaoWithRbac<SingleTypeInfo> {
 
@@ -853,6 +855,36 @@ public class SingleTypeInfoDao extends AccountsContextDaoWithRbac<SingleTypeInfo
         }
         return endpoints;
     }
+
+    public static void deleteDuplicateHostsForSameApi(){
+        List<ApiCollection> apiCollections = ApiCollectionsDao.instance.findAll(
+            Filters.and(
+                Filters.ne(ApiCollection._DEACTIVATED, true),
+                Filters.exists(ApiCollection.HOST_NAME)
+            ),
+            Projections.include(Constants.ID)
+        );
+        for(ApiCollection apiCollection: apiCollections) {
+            SingleTypeInfoDao.deleteDuplicateHostsForSameApi(apiCollection.getId());
+        }
+    }
+
+
+    public static void deleteDuplicateHostsForSameApi(int apiCollectionId){
+        List<SingleTypeInfo> allList = SingleTypeInfoDao.instance.findAll(filterForHostHeader(apiCollectionId, true), Projections.include(SingleTypeInfo._API_COLLECTION_ID, SingleTypeInfo._URL, SingleTypeInfo._METHOD));
+        Set<String> uniqueKeys = new HashSet<>();
+        List<ObjectId> deleteIds = new ArrayList<>();
+        for (SingleTypeInfo sti : allList) {
+            String key = sti.getApiCollectionId() + "_" + sti.getUrl() + "_" + sti.getMethod();
+            if(uniqueKeys.contains(key)){
+                deleteIds.add(sti.getId());
+            } else {
+                uniqueKeys.add(key);
+            }
+        }
+        SingleTypeInfoDao.instance.getMCollection().deleteMany(Filters.in("_id", deleteIds));
+    }
+
 
     public static BasicDBObject getApiInfoGroupedId() {
         BasicDBObject groupedId = 
