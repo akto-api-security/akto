@@ -279,6 +279,9 @@ public class InitializerListener implements ServletContextListener {
     private static String domain = null;
     public static String subdomain = "https://app.akto.io";
 
+    // Accounts that are allowed to run API group jobs
+    private static final List<Integer> ALLOWED_API_GROUP_ACCOUNT_IDS = new ArrayList<>(Arrays.asList(1_000_000, 1718042191, 1664578207, 1693004074, 1685916748, 1736798101));
+
     private static Map<String, String> piiFileMap;
     Crons crons = new Crons();
 
@@ -414,10 +417,9 @@ public class InitializerListener implements ServletContextListener {
     }
 
     public void updateApiGroupsForAccounts() {
-        List<Integer> accounts = new ArrayList<>(Arrays.asList(1_000_000, 1718042191, 1664578207, 1693004074, 1685916748, 1736798101));
         scheduler.scheduleAtFixedRate(new Runnable() {
             public void run() {
-                for (int account : accounts) {
+                for (int account : ALLOWED_API_GROUP_ACCOUNT_IDS) {
                     Context.accountId.set(account);
                     createFirstUnauthenticatedApiGroup();
                 }
@@ -2232,26 +2234,26 @@ public class InitializerListener implements ServletContextListener {
     }
 
     public void updateCustomCollections() {
-        List<ApiCollection> apiCollections = ApiCollectionsDao.instance.findAll(new BasicDBObject());
+        List<ApiCollection> apiCollections = ApiCollectionsDao.instance.findAll(
+                Filters.eq(ApiCollection._TYPE, ApiCollection.Type.API_GROUP.name()));
+
         for (ApiCollection apiCollection : apiCollections) {
-            if (ApiCollection.Type.API_GROUP.equals(apiCollection.getType())) {
-                List<TestingEndpoints> conditions = apiCollection.getConditions();
+            List<TestingEndpoints> conditions = apiCollection.getConditions();
 
-                // Don't update API groups that are delta update based
-                boolean isDeltaUpdateBasedApiGroup = false;
-                for (TestingEndpoints testingEndpoints : conditions) {
-                    if (TestingEndpoints.checkDeltaUpdateBased(testingEndpoints.getType())) {
-                        isDeltaUpdateBasedApiGroup = true;
-                        break;
-                    }
+            // Don't update API groups that are delta update based
+            boolean isDeltaUpdateBasedApiGroup = false;
+            for (TestingEndpoints testingEndpoints : conditions) {
+                if (TestingEndpoints.checkDeltaUpdateBased(testingEndpoints.getType())) {
+                    isDeltaUpdateBasedApiGroup = true;
+                    break;
                 }
-
-                if (isDeltaUpdateBasedApiGroup) {
-                    continue;
-                }
-
-                ApiCollectionUsers.computeCollectionsForCollectionId(conditions, apiCollection.getId());
             }
+
+            if (isDeltaUpdateBasedApiGroup) {
+                continue;
+            }
+
+            ApiCollectionUsers.computeCollectionsForCollectionId(conditions, apiCollection.getId());
         }
     }
 
@@ -2296,6 +2298,13 @@ public class InitializerListener implements ServletContextListener {
                     @Override
                     public void accept(Account t) {
                         try {
+                            if(!ALLOWED_API_GROUP_ACCOUNT_IDS.contains(t.getId())){
+                                logger.info("Skipping update custom collections for account: " + t.getId());
+                                return;
+                            }
+
+                            // Run only for allowed accounts
+                            logger.info("Running update custom collections for account: " + t.getId());
                             updateCustomCollections();
                         } catch (Exception e){
                             logger.errorAndAddToDb(e, "Error while updating custom collections: " + e.getMessage(), LogDb.DASHBOARD);
@@ -2314,7 +2323,7 @@ public class InitializerListener implements ServletContextListener {
                     }
                 }, "update-custom-collections");
             }
-        }, 0, 24, TimeUnit.HOURS);
+        }, 0, 3, TimeUnit.HOURS);
     }
 
     public static void fetchIntegratedConnections(BackwardCompatibility backwardCompatibility){
@@ -2430,6 +2439,11 @@ public class InitializerListener implements ServletContextListener {
 
                     logger.debug("Starting init functions and scheduling jobs at " + now);
                     updateSensitiveInfoInApiInfo.setUpSensitiveMapInApiInfoScheduler();
+
+                    // API group jobs
+                    setUpUpdateCustomCollections();
+                    updateApiGroupsForAccounts(); 
+
                     syncCronInfo.setUpUpdateCronScheduler();
                     if(runJobFunctionsAnyway) {
                         crons.trafficAlertsScheduler();
@@ -2439,7 +2453,6 @@ public class InitializerListener implements ServletContextListener {
                         // }
 
                         // trimCappedCollectionsJob();
-                        updateApiGroupsForAccounts(); 
                         setUpTestEditorTemplatesScheduler();
                         JobsCron.instance.jobsScheduler(JobExecutorType.DASHBOARD);
                         setupAutomatedApiGroupsScheduler();
@@ -2449,7 +2462,6 @@ public class InitializerListener implements ServletContextListener {
                         setUpDependencyFlowScheduler();
                         tokenGeneratorCron.tokenGeneratorScheduler();
                         crons.deleteTestRunsScheduler();
-                        setUpUpdateCustomCollections();
                         setUpFillCollectionIdArrayJob();
                                                
 
