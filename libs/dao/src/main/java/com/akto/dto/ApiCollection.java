@@ -55,6 +55,9 @@ public class ApiCollection {
     private boolean matchDependencyWithOtherCollections;
     public static final String MATCH_DEPENDENCY_WITH_OTHER_COLLECTIONS = "matchDependencyWithOtherCollections";
 
+    String sseCallbackUrl;
+    public static final String SSE_CALLBACK_URL = "sseCallbackUrl";
+
     private static final List<String> ENV_KEYWORDS_WITH_DOT = Arrays.asList(
         "staging", "preprod", "qa", "demo", "dev", "test", "svc", 
         "localhost", "local", "intranet", "lan", "example", "invalid", 
@@ -379,4 +382,13 @@ public class ApiCollection {
     public void setTagsList(List<CollectionTags> tagsList) {
         this.tagsList = tagsList;
     }
+
+    public String getSseCallbackUrl() {
+        return sseCallbackUrl;
+    }   
+
+    public void setSseCallbackUrl(String sseCallbackUrl) {
+        this.sseCallbackUrl = sseCallbackUrl;
+    }
+
 }
