@@ -3,7 +3,6 @@ package com.akto.dao;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.*;
-import java.util.stream.Collectors;
 
 import com.akto.dao.context.Context;
 import com.akto.dto.AktoDataType;

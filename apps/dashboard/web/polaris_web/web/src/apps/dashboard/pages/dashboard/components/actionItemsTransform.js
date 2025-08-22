@@ -10,7 +10,7 @@ export async function fetchActionItemsData() {
     // Fetch total count for batching (Sensitive & Unauthenticated)
     const initialResp = await api.fetchSensitiveAndUnauthenticatedValue(false, 0, 1);
     const totalCount = initialResp?.sensitiveUnauthenticatedEndpointsCount || 0;
-    const limit = 50;
+    const limit = 500;
     const numBatches = Math.ceil(totalCount / limit);
     let batchPromises = [];
     for (let i = 0; i < numBatches; i++) {
@@ -166,7 +166,7 @@ export async function fetchActionItemsData() {
 
 
 export async function fetchAllActionItemsApiInfo() {
-    const limit = 50;
+    const limit = 500;
     const types = ['HIGH_RISK', 'SENSITIVE', 'THIRD_PARTY'];
     let allResults = {};
 
