@@ -1,11 +1,13 @@
 package com.akto.dto;
 
+import com.akto.util.Constants;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+import org.apache.commons.collections.CollectionUtils;
 import org.bson.codecs.pojo.annotations.BsonId;
 import org.bson.codecs.pojo.annotations.BsonIgnore;
 
@@ -22,6 +24,8 @@ public class ApiCollection {
     public static final String ID = "_id";
     public static final String NAME = "name";
     String name;
+    public static final String DESCRIPTION = "description";
+    String description;
     int startTs;
     public static final String _URLS = "urls";
     public static final String START_TS = "startTs";
@@ -38,6 +42,7 @@ public class ApiCollection {
 
     public static final String SAMPLE_COLLECTIONS_DROPPED = "sampleCollectionsDropped";
 
+    public static final String URLS_COUNT = "urlsCount";
     @BsonIgnore
     int urlsCount;
 
@@ -45,6 +50,9 @@ public class ApiCollection {
 
     public static final String _DEACTIVATED = "deactivated";
     boolean deactivated;
+
+    public static final String IS_OUT_OF_TESTING_SCOPE = "isOutOfTestingScope";
+    boolean isOutOfTestingScope;
 
     public static final String AUTOMATED = "automated";
     boolean automated;
@@ -81,6 +89,7 @@ public class ApiCollection {
     Type type;
     public static final String _TYPE = "type";
 
+    // TODO: Remove this field once you are sure that no one is using it.
     @Deprecated
     String userSetEnvType;
 
@@ -91,6 +100,8 @@ public class ApiCollection {
 
     List<CollectionTags> tagsList;
     public static final String TAGS_STRING = "tagsList";
+
+    public static final String DEFAULT_TAG_KEY = "userSetEnvType";
 
     public ApiCollection() {
     }
@@ -104,18 +115,6 @@ public class ApiCollection {
         this.vxlanId = vxlanId;
         this.redact = redact;
         this.sampleCollectionsDropped = sampleCollectionsDropped;
-    }
-
-    public ApiCollection(int id, String name, int startTs, Set<String> urls, String hostName, int vxlanId, boolean redact, boolean sampleCollectionsDropped, String sseCallbackUrl) {
-        this.id = id;
-        this.name = name;
-        this.startTs = startTs;
-        this.urls = urls;
-        this.hostName = hostName;
-        this.vxlanId = vxlanId;
-        this.redact = redact;
-        this.sampleCollectionsDropped = sampleCollectionsDropped;
-        this.sseCallbackUrl = sseCallbackUrl;
     }
 
     public ApiCollection(int id, String name, List<TestingEndpoints> conditions) {
@@ -161,8 +160,6 @@ public class ApiCollection {
     }
 
     public List<CollectionTags> getEnvType(){
-        if(this.type != null && this.type == Type.API_GROUP) return null;
-        
         if(this.tagsList == null || this.tagsList.isEmpty()){
             CollectionTags envTypeTag = new CollectionTags();
             envTypeTag.setKeyName("envType");
@@ -228,6 +225,14 @@ public class ApiCollection {
 
     public void setDeactivated(boolean deactivated) {
         this.deactivated = deactivated;
+    }
+
+    public boolean getIsOutOfTestingScope(){
+        return isOutOfTestingScope;
+    }
+
+    public void setIsOutOfTestingScope(boolean isOutOfTestingScope){
+        this.isOutOfTestingScope = isOutOfTestingScope;
     }
 
     // to be used in front end
@@ -333,27 +338,15 @@ public class ApiCollection {
 	public void setUserSetEnvType(String userSetEnvType) {
         this.userSetEnvType = userSetEnvType;
 
-        if (userSetEnvType == null || userSetEnvType.isEmpty()) {
-            return; 
-        }
-
-        if (this.tagsList == null) {
+        if(this.tagsList == null) {
             this.tagsList = new ArrayList<>();
         }
 
-        // Update the userSetEnvType tag if it exists, otherwise add a new one
-
-        boolean updated = false;
-        for (CollectionTags tag : this.tagsList) {
-            if ("userSetEnvType".equals(tag.getKeyName())) {
-                tag.setValue(userSetEnvType);
-                updated = true;
-                break;
+        if(userSetEnvType != null) {
+            String[] envList = userSetEnvType.split(",");
+            for(String env : envList) {
+                this.tagsList.add(new CollectionTags(Context.now(), DEFAULT_TAG_KEY, env.trim(), CollectionTags.TagSource.USER));
             }
-        }
-
-        if (!updated) {
-            this.tagsList.add(new CollectionTags(Context.now(), "userSetEnvType", userSetEnvType, CollectionTags.TagSource.USER));
         }
 	}
 
@@ -385,14 +378,38 @@ public class ApiCollection {
         this.runDependencyAnalyser = runDependencyAnalyser;
     }
 
+    public String getDescription() {
+        return description;
+    }
 
+    public void setDescription(String description) {
+        this.description = description;
+    }
 
     public List<CollectionTags> getTagsList() {
         return tagsList;
     }
 
     public void setTagsList(List<CollectionTags> tagsList) {
-        this.tagsList = tagsList;
+        if(this.tagsList == null) {
+            this.tagsList = new ArrayList<>();
+        }
+
+        this.tagsList.addAll(tagsList);
+    }
+
+    public boolean isMcpCollection() {
+        if (!CollectionUtils.isEmpty(this.getTagsList())) {
+            return this.getTagsList().stream().anyMatch(t -> Constants.AKTO_MCP_SERVER_TAG.equals(t.getKeyName()));
+        }
+        return false;
+    }
+
+    public boolean isGenAICollection() {
+        if (!CollectionUtils.isEmpty(this.getTagsList())) {
+            return this.getTagsList().stream().anyMatch(t -> Constants.AKTO_GEN_AI_TAG.equals(t.getKeyName()));
+        }
+        return false;
     }
 
     public String getSseCallbackUrl() {
@@ -402,5 +419,4 @@ public class ApiCollection {
     public void setSseCallbackUrl(String sseCallbackUrl) {
         this.sseCallbackUrl = sseCallbackUrl;
     }
-
 }
