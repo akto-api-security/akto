@@ -31,6 +31,7 @@ import com.akto.test_editor.OrgUtils;
 import com.akto.test_editor.utils.Utils;
 import com.akto.util.Constants;
 import com.akto.util.HttpRequestResponseUtils;
+import com.akto.util.McpSseEndpointHelper;
 import com.akto.util.modifier.JWTPayloadReplacer;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -43,7 +44,6 @@ import com.mongodb.BasicDBObject;
 import static com.akto.test_editor.utils.Utils.bodyValuesUnchanged;
 import static com.akto.test_editor.utils.Utils.headerValuesUnchanged;
 import static com.akto.runtime.utils.Utils.convertOriginalReqRespToString;
-
 
 import org.apache.commons.lang3.StringUtils;
 
@@ -193,6 +193,10 @@ public class Executor {
                     testReq.getRequest().getHeaders().put("x-akto-original-url", Collections.singletonList(origRawApi.getRequest().getUrl()));
                     testReq.getRequest().getHeaders().put("x-akto-original-method", Collections.singletonList(origRawApi.getRequest().getMethod()));   
                 }
+
+                // Add SSE endpoint header for MCP collections
+                McpSseEndpointHelper.addSseEndpointHeader(testReq.getRequest(), apiInfoKey.getApiCollectionId());
+
                 testResponse = ApiExecutor.sendRequest(testReq.getRequest(), followRedirect, testingRunConfig, debug, testLogs, Main.SKIP_SSRF_CHECK);
                 requestSent = true;
                 ExecutionResult attempt = new ExecutionResult(singleReq.getSuccess(), singleReq.getErrMsg(), testReq.getRequest(), testResponse);
