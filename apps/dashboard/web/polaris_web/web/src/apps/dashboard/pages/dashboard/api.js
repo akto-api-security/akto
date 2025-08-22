@@ -177,8 +177,17 @@ const api = {
         })
     },
 
-    fetchIssuesByApis: async (showIssues) => {
-        const data = (typeof showIssues === 'boolean') ? { showIssues } : {};
+    fetchIssuesByApis: async (params) => {
+        let data = {};
+        if (typeof params === 'boolean') {
+            data = { showIssues: params };
+        } else if (typeof params === 'object' && params !== null) {
+            data = {
+                showIssues: params.showIssues || false,
+                categoryType: params.categoryType || null
+            };
+        }
+        
         return await request({
             url: '/api/fetchIssuesByApis',
             method: 'post',
@@ -192,14 +201,6 @@ const api = {
             url: '/api/fetchUrlsByIssues',
             method: 'post',
             data
-        })
-    },
-
-    fetchVulnerableApisByCategory: async (categoryType, showApiInfo) => {
-        return await request({
-            url: '/api/fetchVulnerableApisByCategory',
-            method: 'post',
-            data: { categoryType, showApiInfo }
         })
     }
 }
