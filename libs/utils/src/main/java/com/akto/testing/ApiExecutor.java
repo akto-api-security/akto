@@ -739,6 +739,9 @@ public class ApiExecutor {
             session.readerThread.join();
         }
         if (session.response != null) {
+            if (session.response.body() != null) {
+                session.response.body().close();
+            }
             session.response.close();
         }
     }
