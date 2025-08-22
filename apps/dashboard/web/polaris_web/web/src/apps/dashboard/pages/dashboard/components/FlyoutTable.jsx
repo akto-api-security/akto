@@ -27,6 +27,7 @@ const ACTION_ITEM_TYPES = {
     APIS_WITH_MULTIPLE_ISSUES: 'APIS_WITH_MULTIPLE_ISSUES',
     VERBOSE_ERROR_MESSAGES: 'VERBOSE_ERROR_MESSAGES',
     MISSING_SECURITY_HEADERS: 'MISSING_SECURITY_HEADERS',
+    TOP_PUBLIC_EXPOSED_APIS: 'TOP_PUBLIC_EXPOSED_APIS',
 };
 
 const getIssueLabel = (actionItemType) => {
@@ -61,6 +62,8 @@ const getIssueLabel = (actionItemType) => {
             return 'Verbose Error Messages';
         case ACTION_ITEM_TYPES.MISSING_SECURITY_HEADERS:
             return 'Missing Security Headers';
+        case ACTION_ITEM_TYPES.TOP_PUBLIC_EXPOSED_APIS:
+            return 'Sensitive Data';
         default:
             return '-';
     }
@@ -84,12 +87,27 @@ function FlyoutTable({ actionItemType, count, allApiInfo, apiInfoLoading }) {
             try {
                 setLoading(true);
                 let relevantData = [];
+                let presetSensitiveParamsMap = null;
                 switch (actionItemType) {
                     case ACTION_ITEM_TYPES.HIGH_RISK_APIS:
                         relevantData = allApiInfo.highRiskApis || [];
                         break;
                     case ACTION_ITEM_TYPES.SENSITIVE_DATA_ENDPOINTS:
                         relevantData = allApiInfo.sensitiveDataEndpoints || [];
+                        break;
+                    case ACTION_ITEM_TYPES.TOP_PUBLIC_EXPOSED_APIS:
+                        {
+                            const items = allApiInfo.sensitiveSubtypesInUrl || [];
+                            relevantData = items.map(x => x.apiInfo || {});
+                            presetSensitiveParamsMap = items.reduce((acc, item) => {
+                                const url = item?.apiInfo?.id?.url || item?.apiInfo?.url;
+                                if (url) {
+                                    const subTypes = Array.isArray(item.subTypes) ? Array.from(new Set(item.subTypes)) : [];
+                                    if (subTypes.length > 0) acc[url] = subTypes;
+                                }
+                                return acc;
+                            }, {});
+                        }
                         break;
                     case ACTION_ITEM_TYPES.UNAUTHENTICATED_APIS:
                         relevantData = allApiInfo.unauthenticatedApis || [];
@@ -138,9 +156,9 @@ function FlyoutTable({ actionItemType, count, allApiInfo, apiInfoLoading }) {
                 }
 
                 const endpointUrls = relevantData.map(api => api.id?.url || api.url);
-                let sensitiveParamsMap = {};
+                let sensitiveParamsMap = presetSensitiveParamsMap || {};
                 try {
-                    if (endpointUrls.length > 0) {
+                    if (!presetSensitiveParamsMap && endpointUrls.length > 0) {
                         const resp = await observeApi.fetchSensitiveParamsForEndpoints(endpointUrls);
                         if (resp?.data?.endpoints) {
                             resp.data.endpoints.forEach(item => {
@@ -280,7 +298,7 @@ function FlyoutTable({ actionItemType, count, allApiInfo, apiInfoLoading }) {
                 { text: 'Collection', title: 'Collection', value: 'collection', isText: CellType.TEXT, maxWidth: '150px' },
             ];
         }
-        if (actionItemType === ACTION_ITEM_TYPES.SENSITIVE_DATA_ENDPOINTS || actionItemType === ACTION_ITEM_TYPES.CRITICAL_SENSITIVE_UNAUTH) {
+        if (actionItemType === ACTION_ITEM_TYPES.SENSITIVE_DATA_ENDPOINTS || actionItemType === ACTION_ITEM_TYPES.CRITICAL_SENSITIVE_UNAUTH || actionItemType === ACTION_ITEM_TYPES.TOP_PUBLIC_EXPOSED_APIS) {
             return [
                 { text: 'Endpoint', title: 'Endpoint', value: 'endpoint', maxWidth: '300px' },
                 { text: 'Sensitive Params', title: 'Sensitive Params', value: 'sensitiveParams', isText: CellType.TEXT, maxWidth: '200px' },

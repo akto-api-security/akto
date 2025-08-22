@@ -7,10 +7,12 @@ import java.util.regex.Pattern;
 
 import com.akto.dao.*;
 import com.akto.dao.billing.OrganizationsDao;
+import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dto.*;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.rbac.UsersCollectionsList;
+import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.type.SingleTypeInfo;
@@ -182,6 +184,24 @@ public class DashboardAction extends UserAction {
         response = new BasicDBObject();
         List<Bson> basePipeline = new ArrayList<>();
         Bson filterQ = UsageMetricCalculator.excludeDemosAndDeactivated(TestingRunIssues.ID_API_COLLECTION_ID);
+        
+        if (categoryType != null && !categoryType.isEmpty()) {
+            List<YamlTemplate> yamlTemplates = YamlTemplateDao.instance.findAll(
+                    Filters.eq("info.category.name", categoryType)
+            );
+            Set<String> testIds = new HashSet<>();
+            for (YamlTemplate template : yamlTemplates) {
+                testIds.add(template.getId());
+            }
+            
+            if (!testIds.isEmpty()) {
+                basePipeline.add(Aggregates.match(Filters.in(
+                    Constants.ID + "." + TestingIssuesId.TEST_SUB_CATEGORY, 
+                    testIds
+                )));
+            }
+        }
+        
         basePipeline.add(
             Aggregates.match(Filters.and(
                 Filters.eq(TestingRunIssues.TEST_RUN_ISSUES_STATUS, GlobalEnums.TestRunIssueStatus.OPEN),
@@ -226,7 +246,12 @@ public class DashboardAction extends UserAction {
             int count = doc.getInt("count", 0);
             countByAPIs.put(key, count);
 
-            if (this.showIssues && count >= 2) {
+            // When category filtering is enabled, include all APIs regardless of issue count
+            // When no category filtering, only include APIs with 2+ issues 
+            boolean shouldIncludeApiInfo = this.showIssues && 
+                (categoryType != null && !categoryType.isEmpty() || count >= 2);
+            
+            if (shouldIncludeApiInfo) {
                 @SuppressWarnings("unchecked")
                 List<String> names = (List<String>) doc.getOrDefault("issueNames", new ArrayList<String>());
                 List<String> norm = new ArrayList<>();
@@ -524,4 +549,7 @@ public class DashboardAction extends UserAction {
     public void setShowIssues(boolean showIssues) {
         this.showIssues = showIssues;
     }
+
+    @Setter
+    private String categoryType;
 }

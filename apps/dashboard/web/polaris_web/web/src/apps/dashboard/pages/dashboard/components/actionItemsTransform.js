@@ -26,8 +26,8 @@ export async function fetchActionItemsData() {
         api.fetchIssuesByApis(),
         api.fetchUrlsByIssues(false),
         api.fetchBrokenAuthenticationIssues(allSubCategories, false),
-        api.fetchVulnerableApisByCategory("VEM", false),
-        api.fetchVulnerableApisByCategory("MHH", false)
+        api.fetchIssuesByApis({ categoryType: "VEM", showIssues: false }),
+        api.fetchIssuesByApis({ categoryType: "MHH", showIssues: false })
     ]);
 
     const [
@@ -76,8 +76,15 @@ export async function fetchActionItemsData() {
     let vulnerableApiCount = vulnerableApiCountResult.status === 'fulfilled' ? vulnerableApiCountResult.value?.buaCategoryCount || 0 : 0;
     let misConfiguredTestsCount = misConfiguredTestsCountResult.status === 'fulfilled' ? misConfiguredTestsCountResult.value?.misConfiguredTestsCount || 0 : 0;
     let brokenAuthIssuesCount = brokenAuthIssuesResp ? brokenAuthIssuesResp.buaCategoryCount || 0 : 0;
-    let vemVulnerableApisCount = vemVulnerableApisResult.status === 'fulfilled' ? vemVulnerableApisResult.value?.endpointsCount || 0 : 0;
-    let mhhVulnerableApisCount = mhhVulnerableApisResult.status === 'fulfilled' ? mhhVulnerableApisResult.value?.endpointsCount || 0 : 0;
+    let vemVulnerableApisCount = 0;
+    let mhhVulnerableApisCount = 0;
+    
+    if (vemVulnerableApisResult.status === 'fulfilled' && vemVulnerableApisResult.value?.countByAPIs) {
+        vemVulnerableApisCount = Object.keys(vemVulnerableApisResult.value.countByAPIs).length;
+    }
+    if (mhhVulnerableApisResult.status === 'fulfilled' && mhhVulnerableApisResult.value?.countByAPIs) {
+        mhhVulnerableApisCount = Object.keys(mhhVulnerableApisResult.value.countByAPIs).length;
+    }
 
     if (apiStats?.apiStatsEnd && apiStats?.apiStatsStart) {
         const { apiStatsEnd, apiStatsStart } = apiStats;
@@ -131,8 +138,9 @@ export async function fetchAllActionItemsApiInfo() {
         api.fetchBrokenAuthenticationIssues(allSubCategories, true),
         api.fetchIssuesByApis(true),
         api.fetchUrlsByIssues(true),
-        api.fetchVulnerableApisByCategory("VEM", true),
-        api.fetchVulnerableApisByCategory("MHH", true)
+        api.fetchIssuesByApis({ categoryType: "VEM", showIssues: true }),
+        api.fetchIssuesByApis({ categoryType: "MHH", showIssues: true }),
+        observeApi.getSensitiveInfoForCollections('topSensitive')
     ]);
 
     const [
@@ -151,7 +159,8 @@ export async function fetchAllActionItemsApiInfo() {
         issuesByApisResult,
         urlsByIssuesResult,
         vemVulnerableApisApiInfoResult,
-        mhhVulnerableApisApiInfoResult
+        mhhVulnerableApisApiInfoResult,
+        topSensitiveResult
     ] = results;
 
     const sensitiveAndUnauthenticatedApis = sensitiveAndUnauthenticatedValueResult.status === 'fulfilled' ? sensitiveAndUnauthenticatedValueResult?.value?.sensitiveUnauthenticatedEndpointsApiInfo || [] : [];
@@ -168,8 +177,9 @@ export async function fetchAllActionItemsApiInfo() {
     const brokenAuthIssuesApiInfo = brokenAuthIssuesApiInfoResult.status === 'fulfilled' ? brokenAuthIssuesApiInfoResult.value?.buaCategoryApiInfo || [] : [];
     const issuesByApisForAllActionItems = issuesByApisResult.status === 'fulfilled' ? issuesByApisResult.value : null;
     const urlsByIssuesForAllActionItems = urlsByIssuesResult.status === 'fulfilled' ? urlsByIssuesResult.value : null;
-    const vemVulnerableApisApiInfo = vemVulnerableApisApiInfoResult.status === 'fulfilled' ? vemVulnerableApisApiInfoResult.value?.vulnerableApisApiInfo || [] : [];
-    const mhhVulnerableApisApiInfo = mhhVulnerableApisApiInfoResult.status === 'fulfilled' ? mhhVulnerableApisApiInfoResult.value?.vulnerableApisApiInfo || [] : [];
+    const vemVulnerableApisApiInfo = vemVulnerableApisApiInfoResult.status === 'fulfilled' ? vemVulnerableApisApiInfoResult.value?.issueNamesByAPIs?.map(item => item.apiInfo) || [] : [];
+    const mhhVulnerableApisApiInfo = mhhVulnerableApisApiInfoResult.status === 'fulfilled' ? mhhVulnerableApisApiInfoResult.value?.issueNamesByAPIs?.map(item => item.apiInfo) || [] : [];
+    const sensitiveSubtypesInUrl = topSensitiveResult.status === 'fulfilled' ? topSensitiveResult.value?.sensitiveSubtypesInUrl || [] : [];
 
 
     const multipleIssuesApiInfo = Array.isArray(issuesByApisForAllActionItems?.issueNamesByAPIs)
@@ -200,5 +210,6 @@ export async function fetchAllActionItemsApiInfo() {
         urlsByIssues: urlsByIssuesForAllActionItems,
         vemVulnerableApisApiInfo: vemVulnerableApisApiInfo,
         mhhVulnerableApisApiInfo: mhhVulnerableApisApiInfo,
+        sensitiveSubtypesInUrl: sensitiveSubtypesInUrl,
     };
 }

@@ -3,6 +3,7 @@ package com.akto.dao;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.*;
+import java.util.stream.Collectors;
 
 import com.akto.dao.context.Context;
 import com.akto.dto.AktoDataType;
@@ -557,6 +558,44 @@ public class SingleTypeInfoDao extends AccountsContextDaoWithRbac<SingleTypeInfo
             }
         }
         return result ;
+    }
+    
+    public List<BasicDBObject> getSensitiveSubtypesDetectedForUrl(List<String> sensitiveParameters) {
+        BasicDBObject groupedId = new BasicDBObject(SingleTypeInfo._API_COLLECTION_ID, "$apiCollectionId")
+                .append(SingleTypeInfo._URL, "$url")
+                .append(SingleTypeInfo._METHOD, "$method");
+        List<Bson> pipeline = generateFilterForSubtypes(sensitiveParameters, groupedId, false, Filters.empty());
+        MongoCursor<BasicDBObject> collectionsCursor = SingleTypeInfoDao.instance.getMCollection().aggregate(pipeline, BasicDBObject.class).cursor();
+        List<BasicDBObject> records = new ArrayList<>();
+        while (collectionsCursor.hasNext()) {
+            try {
+                BasicDBObject basicDBObject = collectionsCursor.next();
+                BasicDBObject id = (BasicDBObject) basicDBObject.get("_id");
+                int apiCollectionId = id.getInt("apiCollectionId");
+                String url = id.getString("url");
+                String method = id.getString("method");
+                List<String> subtypes = (List<String>) basicDBObject.get("subTypes");
+                ApiInfo apiInfo = ApiInfoDao.instance.findOne(ApiInfoDao.getFilter(url, method, apiCollectionId));
+                if (apiInfo == null) {
+                    ApiInfo.ApiInfoKey apiInfoKey = new ApiInfo.ApiInfoKey(apiCollectionId, url, URLMethods.Method.fromString(method));
+                    apiInfo = new ApiInfo();
+                    apiInfo.setId(apiInfoKey);
+                }
+                if (subtypes != null && subtypes.size() > 1) {
+                    BasicDBObject rec = new BasicDBObject();
+                    rec.put("apiInfo", apiInfo);
+                    rec.put("subTypes", subtypes);
+                    records.add(rec);
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+        // Sort and limit to top 3 by subtypes count
+        return records.stream()
+                .sorted((a, b) -> Integer.compare(((List)b.get("subTypes")).size(), ((List)a.get("subTypes")).size()))
+                .limit(3)
+                .collect(Collectors.toList());
     }
 
     public Integer getSensitiveApisCount(List<String> sensitiveParameters, boolean inResponseOnly, Bson customFilter){
