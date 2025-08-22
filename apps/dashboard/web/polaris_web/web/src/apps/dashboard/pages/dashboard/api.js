@@ -193,6 +193,14 @@ const api = {
             method: 'post',
             data
         })
+    },
+
+    fetchVulnerableApisByCategory: async (categoryType, showApiInfo) => {
+        return await request({
+            url: '/api/fetchVulnerableApisByCategory',
+            method: 'post',
+            data: { categoryType, showApiInfo }
+        })
     }
 }
 
