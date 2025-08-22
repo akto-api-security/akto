@@ -85,11 +85,13 @@ function CollectionComponent(props) {
 
     const getApiEndpointsOptions = (data) => {
         return data.map(apiEndpoint => {
-            let str = func.toMethodUrlString(apiEndpoint);
+            let strLabel = func.toMethodUrlString({...apiEndpoint, shouldParse: true});
+            let strValue = func.toMethodUrlString({...apiEndpoint, shouldParse: false});
+
             return {
-                id: str,
-                label: str,
-                value: str
+                id: strValue,
+                label: strLabel,
+                value: strValue
             }
         })
     }

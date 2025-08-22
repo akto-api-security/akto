@@ -17,6 +17,7 @@ import quickStartFunc from '../apps/dashboard/pages/quick_start/transform';
 import { Box } from '@shopify/polaris';
 import TooltipText from '../apps/dashboard/components/shared/TooltipText';
 import { getMethod } from "../apps/dashboard/pages/observe/GetPrettifyEndpoint";
+import observeFunc from '../apps/dashboard/pages/observe/transform';
 
 const iconsUsedMap = {
   CalendarMinor,ClockMinor,CircleAlertMajor,DynamicSourceMinor, LockMinor, KeyMajor, ProfileMinor, PasskeyMinor,
@@ -951,9 +952,13 @@ isObject(obj) {
   return obj !== null && typeof obj === 'object';
 },
 
-toMethodUrlString({method,url}){
-  const finalMethod = getMethod(url, method);
-  return finalMethod + " " + url;
+toMethodUrlString({method,url, shouldParse =false}){
+  if(shouldParse){
+    const finalMethod = getMethod(url, method);
+    const finalUrl = observeFunc.getTruncatedUrl(url);
+    return finalMethod + " " + finalUrl;
+  }
+  return method + " " + url;
 },
 toMethodUrlObject(str){
 
