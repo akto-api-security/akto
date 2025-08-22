@@ -55,6 +55,9 @@ public class ApiCollection {
     private boolean matchDependencyWithOtherCollections;
     public static final String MATCH_DEPENDENCY_WITH_OTHER_COLLECTIONS = "matchDependencyWithOtherCollections";
 
+    String sseCallbackUrl;
+    public static final String SSE_CALLBACK_URL = "sseCallbackUrl";
+
     private static final List<String> ENV_KEYWORDS_WITH_DOT = Arrays.asList(
         "staging", "preprod", "qa", "demo", "dev", "test", "svc", 
         "localhost", "local", "intranet", "lan", "example", "invalid", 
@@ -101,6 +104,18 @@ public class ApiCollection {
         this.vxlanId = vxlanId;
         this.redact = redact;
         this.sampleCollectionsDropped = sampleCollectionsDropped;
+    }
+
+    public ApiCollection(int id, String name, int startTs, Set<String> urls, String hostName, int vxlanId, boolean redact, boolean sampleCollectionsDropped, String sseCallbackUrl) {
+        this.id = id;
+        this.name = name;
+        this.startTs = startTs;
+        this.urls = urls;
+        this.hostName = hostName;
+        this.vxlanId = vxlanId;
+        this.redact = redact;
+        this.sampleCollectionsDropped = sampleCollectionsDropped;
+        this.sseCallbackUrl = sseCallbackUrl;
     }
 
     public ApiCollection(int id, String name, List<TestingEndpoints> conditions) {
@@ -379,4 +394,13 @@ public class ApiCollection {
     public void setTagsList(List<CollectionTags> tagsList) {
         this.tagsList = tagsList;
     }
+
+    public String getSseCallbackUrl() {
+        return sseCallbackUrl;
+    }   
+
+    public void setSseCallbackUrl(String sseCallbackUrl) {
+        this.sseCallbackUrl = sseCallbackUrl;
+    }
+
 }
