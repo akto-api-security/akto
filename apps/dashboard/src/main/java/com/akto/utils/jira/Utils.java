@@ -12,6 +12,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.commons.lang3.StringUtils;
 
@@ -45,9 +46,82 @@ public class Utils {
     // Thread pool for making calls to jira in parallel
     private static final ExecutorService multiFieldPool = Executors.newFixedThreadPool(10);
 
-    public static Map<String, Map<String, BasicDBList>> fetchAccountJiraFields() {
+    public static Pair<Integer, Map<String, BasicDBObject>> parseJiraFieldSearchPayload(String responsePayload) {
+        int total = 0;
+        Map<String, BasicDBObject> fieldSearchMap = new HashMap<>();
         
+        try {
+            BasicDBObject payloadObj = BasicDBObject.parse(responsePayload);
+            total = payloadObj.getInt("total", 0);
 
+            BasicDBList values = (BasicDBList) payloadObj.get("values");
+            if (values != null) {
+                for (Object valueObj : values) {
+                    if (valueObj == null)
+                        continue;
+                    BasicDBObject value = (BasicDBObject) valueObj;
+                    String id = value.getString("id", "");
+                    if (id == null || id.isEmpty()) {
+                        continue;
+                    }
+                    fieldSearchMap.put(id, value);
+                }
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error while parsing jira field search results.");
+        }
+
+        return new Pair<>(total, fieldSearchMap);
+    }    
+
+    public static BasicDBList parseJiraFieldsForIssuePayload(String responsePayload, String projectKey, String issueType, Map<String, BasicDBObject> fieldSearchMap) {
+        BasicDBList fieldsForIssueType = new BasicDBList();
+        
+        try {
+            BasicDBObject payloadObj = BasicDBObject.parse(responsePayload);
+            BasicDBList issueFields = (BasicDBList) payloadObj.get("fields");
+
+            if (issueFields != null) {
+                for (Object issueField : issueFields) {
+                    if (issueField == null)
+                        continue;
+
+                    BasicDBObject issueFieldBasicDBObject = (BasicDBObject) issueField;
+                    String fieldId = issueFieldBasicDBObject.getString("fieldId");
+                    String fieldName = issueFieldBasicDBObject.getString("name");
+
+                    if (fieldId == null || fieldName == null)
+                        continue;
+
+                    // check if fieldId is present in fieldSearchMap which contains more metadata about the field
+                    if (fieldSearchMap.containsKey(fieldId)) {
+                        Boolean ignoreField = false;
+                        BasicDBObject fieldValue = fieldSearchMap.get(fieldId);
+                        if (fieldValue == null)
+                            ignoreField = true;
+                        else {
+                            Boolean isUnscreenable = fieldValue.getBoolean("isUnscreenable", false);
+                            Boolean isLocked = fieldValue.getBoolean("isLocked", false);
+                            if (isUnscreenable == true || isLocked == true)
+                                ignoreField = true;
+                        }
+
+                        if (ignoreField)
+                            continue;
+                    }
+
+                    fieldsForIssueType.add(issueFieldBasicDBObject);
+                }
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error while parsing issue fields response for project: "
+                                    + projectKey + ", issueType: " + issueType);
+        }
+
+        return fieldsForIssueType;
+    }    
+
+    public static Map<String, Map<String, BasicDBList>> fetchAccountJiraFields() {
         JiraIntegration jiraIntegration = JiraIntegrationDao.instance.findOne(new BasicDBObject());
         if (jiraIntegration == null) {
             loggerMaker.errorAndAddToDb("Jira integration not found. Cannot fetch create issue field metadata.");
@@ -63,7 +137,7 @@ public class Utils {
         int accountId = Context.accountId.get();
 
         int total = 0;
-        int startAt = 0;
+        AtomicInteger startAt = new AtomicInteger(0);
         int maxResults = 50;
         String fieldSearchRequestUrl = baseUrl + FIELD_SEARCH_ENDPOINT;
         String queryParamsFormatStr = "startAt=%d&expand=isUnscreenable&expand=isLocked";
@@ -73,7 +147,7 @@ public class Utils {
         // Initial request to get the total number of fields and the first page of
         // results
         try {
-            String queryParams = String.format(queryParamsFormatStr, startAt);
+            String queryParams = String.format(queryParamsFormatStr, startAt.get());
             OriginalHttpRequest request = new OriginalHttpRequest(fieldSearchRequestUrl, queryParams, "GET", "",
                     headers, "");
             loggerMaker.infoAndAddToDb("Performing jira field search request: " + request.getUrl() + "?" + queryParams);
@@ -87,27 +161,13 @@ public class Utils {
                 return Collections.emptyMap();
             }
 
-            BasicDBObject payloadObj;
-            try {
-                payloadObj = BasicDBObject.parse(responsePayload);
-                total = payloadObj.getInt("total", 0);
-
-                BasicDBList values = (BasicDBList) payloadObj.get("values");
-                if (values != null) {
-                    for (Object valueObj : values) {
-                        if (valueObj == null)
-                            continue;
-                        BasicDBObject value = (BasicDBObject) valueObj;
-                        String id = value.getString("id", "");
-                        if (id == null || id.isEmpty()) {
-                            continue;
-                        }
-                        fieldSearchMap.put(id, value);
-                    }
-                }
-
-            } catch (Exception e) {
-                loggerMaker.errorAndAddToDb(e, "Error while parsing jira field search results.");
+            //BasicDBObject payloadObj;
+            Pair<Integer, Map<String, BasicDBObject>> parsedPayload = parseJiraFieldSearchPayload(responsePayload);
+            
+            total = parsedPayload.getFirst();
+            Map<String, BasicDBObject> initialFieldSearchMap = parsedPayload.getSecond();
+            if (initialFieldSearchMap != null) {
+                fieldSearchMap.putAll(initialFieldSearchMap);
             }
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error while making jira field search request. ");
@@ -115,12 +175,11 @@ public class Utils {
 
         // Fetch the remaining fields search pages in parallel
         while (true) {
-            startAt += maxResults;
-            if (startAt >= total) {
+            if (startAt.get() >= total) {
                 break;
             }
 
-            String queryParams = String.format(queryParamsFormatStr, startAt);
+            String queryParams = String.format(queryParamsFormatStr, startAt.get());
             OriginalHttpRequest request = new OriginalHttpRequest(fieldSearchRequestUrl, queryParams, "GET", "",
                     headers, "");
 
@@ -141,26 +200,10 @@ public class Utils {
                                 String.format("Error while making jira field search request. Response Code %d",
                                         response.getStatusCode()));
                     } else {
-                        BasicDBObject payloadObj;
-                        try {
-                            payloadObj = BasicDBObject.parse(responsePayload);
+                        Pair<Integer, Map<String, BasicDBObject>> parsedPayload = parseJiraFieldSearchPayload(responsePayload);
 
-                            BasicDBList values = (BasicDBList) payloadObj.get("values");
-                            if (values != null) {
-                                for (Object valueObj : values) {
-                                    if (valueObj == null)
-                                        continue;
-                                    BasicDBObject value = (BasicDBObject) valueObj;
-                                    String id = value.getString("id", "");
-                                    if (id == null || id.isEmpty()) {
-                                        continue;
-                                    }
-                                    paginatedFieldSearchMap.put(id, value);
-                                }
-                            }
-
-                        } catch (Exception e) {
-                            loggerMaker.errorAndAddToDb(e, "Error while parsing jira field search results.");
+                        if (parsedPayload.getSecond() != null) {
+                            paginatedFieldSearchMap.putAll(parsedPayload.getSecond());
                         }
                     }
                 } catch (Exception e) {
@@ -169,6 +212,8 @@ public class Utils {
 
                 return paginatedFieldSearchMap;
             }));
+
+            startAt.addAndGet(maxResults);
         }
 
         // Wait for all tasks to finish and fill the field search map
@@ -188,17 +233,22 @@ public class Utils {
             return Collections.emptyMap();
         }
 
+        // Map to hold the information required to create issues for each project and issue type
         Map<String, Map<String, BasicDBList>> createIssueFieldMetaData = new HashMap<>();
         
         List<Future<Map.Entry<String, Map<String, BasicDBList>>>> futures = new ArrayList<>();
 
+        // Iterate for each project
         for (Map.Entry<String, List<BasicDBObject>> entry : projectIdsMap.entrySet()) {
             String projectKey = entry.getKey();
             List<BasicDBObject> issueTypes = entry.getValue();
 
+            // Create a task for each project to fetch issue type fields in parallel
             futures.add(multiFieldPool.submit(() -> {
                 Context.accountId.set(accountId);
                 Map<String, BasicDBList> fieldsForProject = new HashMap<>();
+
+                // Iterate over each issue type in the project
                 for (BasicDBObject issueTypeObj : issueTypes) {
                     if (issueTypeObj == null)
                         continue;
@@ -211,6 +261,7 @@ public class Utils {
                     loggerMaker.infoAndAddToDb("Fetching fields for issueType: " + issueType);
 
                     try {
+                        // Fetch fields for a issue type
                         String requestUrl = String.format(baseUrl + CREATE_ISSUE_FIELD_METADATA_ENDPOINT, projectKey,
                                 issueId);
                         String queryParams = "maxResults=200";
@@ -224,49 +275,8 @@ public class Utils {
                             loggerMaker.errorAndAddToDb(
                                     String.format("Error while fetching issue fields. %s %s Response Code %d",
                                             projectKey, issueType, response.getStatusCode()));
-                            continue;
-                        }
-
-                        BasicDBObject payloadObj;
-                        try {
-                            payloadObj = BasicDBObject.parse(responsePayload);
-                            BasicDBList issueFields = (BasicDBList) payloadObj.get("fields");
-
-                            if (issueFields == null)
-                                continue;
-                            for (Object issueField : issueFields) {
-                                if (issueField == null)
-                                    continue;
-
-                                BasicDBObject issueFieldBasicDBObject = (BasicDBObject) issueField;
-                                String fieldId = issueFieldBasicDBObject.getString("fieldId");
-                                String fieldName = issueFieldBasicDBObject.getString("name");
-
-                                if (fieldId == null || fieldName == null)
-                                    continue;
-
-                                // check if fieldId is present in fieldSearchMap
-                                if (fieldSearchMap.containsKey(fieldId)) {
-                                    Boolean ignoreField = false;
-                                    BasicDBObject fieldValue = fieldSearchMap.get(fieldId);
-                                    if (fieldValue == null)
-                                        ignoreField = true;
-                                    else {
-                                        Boolean isUnscreenable = fieldValue.getBoolean("isUnscreenable", false);
-                                        Boolean isLocked = fieldValue.getBoolean("isLocked", false);
-                                        if (isUnscreenable == true || isLocked == true)
-                                            ignoreField = true;
-                                    }
-
-                                    if (ignoreField)
-                                        continue;
-                                }
-
-                                fieldsForIssueType.add(issueFieldBasicDBObject);
-                            }
-                        } catch (Exception e) {
-                            loggerMaker.errorAndAddToDb(e, "Error while parsing issue fields response for project: "
-                                    + projectKey + ", issueType: " + issueType);
+                        } else {
+                            fieldsForIssueType = parseJiraFieldsForIssuePayload(responsePayload, projectKey, issueType, fieldSearchMap);
                         }
                     } catch (Exception e) {
                         loggerMaker.errorAndAddToDb(e, "Error while fetching issue fields for project: " + projectKey
