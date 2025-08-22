@@ -719,6 +719,23 @@ function ApiEndpoints(props) {
             })
         }
     }
+    
+    const showOnlyUnique = () => {
+        const endpoints = endpointData["all"]
+        // unique endpoint is who has method same and url same
+        // here endpoint can duplicated as in some cases the url doesn't start with /
+        // so matching with removing first letter if slash is first letter
+        const uniqueEndpoints = endpoints.filter((endpoint, index, self) =>
+            index === self.findIndex((t) => t.method === endpoint.method && t.endpoint.replace(/^\//, '') === endpoint.endpoint.replace(/^\//, ''))
+        )
+        const data = {}
+        data['sensitive'] = uniqueEndpoints.filter(x => x.sensitive && x.sensitive.size > 0)
+        data['high_risk'] = uniqueEndpoints.filter(x=> x.riskScore >= 4)
+        data['new'] = uniqueEndpoints.filter(x=> x.isNew)
+        data['no_auth'] = uniqueEndpoints.filter(x => x.open)
+        data['all'] = uniqueEndpoints
+        setEndpointData(data)
+    }
 
     function handleFileChange(file) {
         if (file) {
@@ -913,6 +930,10 @@ function ApiEndpoints(props) {
                                                     onChange={() => redactCheckBoxClicked()}
                                                 /></Box>,
                                         onAction: () => { redactCheckBoxClicked() },
+                                    },
+                                    window?.USER_NAME?.includes("@akto.io") && {
+                                        content: 'Show only unique endpoints',
+                                        onAction: () => { showOnlyUnique() },
                                     }
                                 ]
                             }

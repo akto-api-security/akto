@@ -741,19 +741,20 @@ public class ApiExecutor {
         }
         String host = uri.getScheme() + "://" + uri.getHost() + (uri.getPort() != -1 ? ":" + uri.getPort() : "");
 
-        // Use provided SSE endpoint or default to "/sse"
-        String sseEndpoint = "/sse"; // Default SSE endpoint
+        String sseEndpoint = "/sse";
         if (request.getHeaders() != null && request.getHeaders().containsKey("x-akto-sse-endpoint")) {
             sseEndpoint = request.getHeaders().get("x-akto-sse-endpoint").get(0);
-            // Remove the custom header to avoid sending it to the server
             request.getHeaders().remove("x-akto-sse-endpoint");
         }
         
-        // Open SSE session with dynamic endpoint and request headers
         Headers headers = request.toOkHttpHeaders();
         SseSession session = openSseSession(host, sseEndpoint, headers, debug);
 
-        // Add sessionId as query param to actual request
+        if (StringUtils.isEmpty(session.endpoint)) {
+            closeSseSession(session);
+            throw new Exception("Failed to open SSE session as endpoint not found");
+        }
+
         String[] queryParam = session.endpoint.split("\\?");
         if (overrideMessageEndpoint) {
             request.setUrl(host + session.endpoint);
@@ -768,13 +769,7 @@ public class ApiExecutor {
         OriginalHttpResponse resp = sendRequest(request, followRedirects, testingRunConfig, debug, true, testLogs, skipSSRFCheck);
 
         if (resp.getStatusCode() >= 400) {
-            if (session.readerThread != null) {
-                session.readerThread.interrupt();
-                session.readerThread.join(); // Wait for thread to finish
-            }
-            if (session.response != null) {
-                session.response.close(); // Now it's safe
-            }
+            closeSseSession(session);
             return resp;
         }
 
@@ -786,13 +781,7 @@ public class ApiExecutor {
         try {
             sseMsg = waitForMatchingSseMessage(session, id, 10000); // 10s timeout
         } finally {
-            if (session.readerThread != null) {
-                session.readerThread.interrupt();
-                session.readerThread.join(); // Wait for thread to finish
-            }
-            if (session.response != null) {
-                session.response.close(); // Now it's safe
-            }
+            closeSseSession(session);
         }
 
         // Return SSE message as JSON (not as a string)
@@ -810,25 +799,29 @@ public class ApiExecutor {
             return true;
         }
 
-        boolean hasEventStream = false;
-        boolean hasApplicationJson = false;
-
         for (Map.Entry<String, List<String>> entry : request.getHeaders().entrySet()) {
             if (HttpRequestResponseUtils.HEADER_ACCEPT.equalsIgnoreCase(entry.getKey()) && entry.getValue() != null
                 && !entry.getValue().isEmpty()) {
-                for (String value : entry.getValue()) {
-                    if (HttpRequestResponseUtils.TEXT_EVENT_STREAM_CONTENT_TYPE.equalsIgnoreCase(value)) {
-                        hasEventStream = true;
-                    }
-                    if (HttpRequestResponseUtils.APPLICATION_JSON.equalsIgnoreCase(value)) {
-                        hasApplicationJson = true;
-                    }
-                    if (hasEventStream && hasApplicationJson) {
-                        break;
-                    }
+                String value = entry.getValue().get(0).toLowerCase();
+                if (value.contains(HttpRequestResponseUtils.TEXT_EVENT_STREAM_CONTENT_TYPE) && value.contains(
+                    HttpRequestResponseUtils.APPLICATION_JSON)) {
+                    return false;
                 }
             }
         }
-        return !(hasEventStream && hasApplicationJson);
+        return true;
+    }
+
+    private static void closeSseSession(SseSession session) throws InterruptedException {
+        if (session.readerThread != null) {
+            session.readerThread.interrupt();
+            session.readerThread.join();
+        }
+        if (session.response != null) {
+            if (session.response.body() != null) {
+                session.response.body().close();
+            }
+            session.response.close();
+        }
     }
 }

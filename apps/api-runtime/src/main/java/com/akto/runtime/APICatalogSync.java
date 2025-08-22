@@ -1335,8 +1335,9 @@ public class APICatalogSync {
         for(String key: deltaInfoMap.keySet()) {
             SingleTypeInfo dbInfo = dbInfoMap.get(key);
             SingleTypeInfo deltaInfo = deltaInfoMap.get(key);
+            boolean isQueryParam = false;
             if(deltaInfo.getParam().contains("_queryParam")) {
-                deltaInfo.setIsQueryParam(true);
+                isQueryParam = true;
                 String originalParam = deltaInfo.getParam().split("_queryParam")[0];
                 deltaInfo.setParam(originalParam);
             }
@@ -1363,6 +1364,7 @@ public class APICatalogSync {
             update = Updates.combine(update, Updates.max(SingleTypeInfo.LAST_SEEN, deltaInfo.getLastSeen()));
             update = Updates.combine(update, Updates.max(SingleTypeInfo.MAX_VALUE, deltaInfo.getMaxValue()));
             update = Updates.combine(update, Updates.min(SingleTypeInfo.MIN_VALUE, deltaInfo.getMinValue()));
+            update = Updates.combine(update, Updates.set("isQueryParam", isQueryParam));
             if (source != null) {
                 Bson updateSourceMap = Updates.set(SingleTypeInfo.SOURCES + "." + source.name(), new Document("timestamp", timestamp) );
                 update = Updates.combine(update, updateSourceMap);
@@ -1439,7 +1441,7 @@ public class APICatalogSync {
                 );
             }
 
-            Bson updateKey = Filters.and(SingleTypeInfoDao.createFilters(deltaInfo), Filters.eq("isQueryParam", deltaInfo.getIsQueryParam()));
+            Bson updateKey = SingleTypeInfoDao.createFilters(deltaInfo);
             update = Updates.combine(update,
             Updates.setOnInsert(SingleTypeInfo._COLLECTION_IDS, Arrays.asList(deltaInfo.getApiCollectionId())));
 

@@ -8,15 +8,19 @@ import java.util.concurrent.Executors;
 
 import org.bson.conversions.Bson;
 
+import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.ApiInfoDao;
 import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dao.context.Context;
+import com.akto.dto.ApiCollection;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods.Method;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.util.Constants;
+import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.Updates;
@@ -204,6 +208,18 @@ public class CleanAction extends UserAction {
                     + res.getMatchedCount() + " modified: " + res.getModifiedCount());
         }
         return Action.SUCCESS.toUpperCase();
+    }
+
+    public String deleteDuplicateHosts(){
+        int accountId = Context.accountId.get();
+        CONTEXT_SOURCE contextSource = Context.contextSource.get();
+
+        service.submit(() -> {
+            Context.accountId.set(accountId);
+            Context.contextSource.set(contextSource);
+           
+        });
+        return SUCCESS.toUpperCase();
     }
 
     public List<Integer> getApiCollectionIds() {

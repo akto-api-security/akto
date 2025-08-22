@@ -28,7 +28,7 @@ import CriticalFindingsGraph from '../issues/IssuesPage/CriticalFindingsGraph';
 import values from "@/util/values";
 import { ActionItemsContent } from './components/ActionItemsContent';
 import { fetchActionItemsData } from './components/actionItemsTransform';
-import { getDashboardCategory, mapLabel } from '../../../main/labelHelper';
+import { getDashboardCategory, isMCPSecurityCategory, mapLabel } from '../../../main/labelHelper';
 
 function HomeDashboard() {
 
@@ -665,7 +665,7 @@ function HomeDashboard() {
             linkUrl="/dashboard/observe/inventory"
         />
 
-    const apisByTypeComponent = <InfoCard
+    const apisByTypeComponent = (!isMCPSecurityCategory()) ? <InfoCard
         component={
             <StackedChart
                 type='column'
@@ -693,7 +693,7 @@ function HomeDashboard() {
         titleToolTip={`Distribution of ${mapLabel("APIs", getDashboardCategory())} by their architectural style or protocol (e.g., REST, GraphQL, gRPC, SOAP).`}
         linkText="Check out"
         linkUrl="/dashboard/observe/inventory"
-    />
+    /> : null
 
     const newDomainsComponent = <InfoCard
         component={
@@ -724,18 +724,18 @@ function HomeDashboard() {
             {id: 'risk-score', component: apisByRiskscoreComponent},
             {id: 'access-type', component: apisByAccessTypeComponent},
             {id: 'auth-type', component: apisByAuthTypeComponent},
-            {id: 'api-type', component: apisByTypeComponent},
-            {id: 'new-domains', component: newDomainsComponent}
+            {id: 'new-domains', component: newDomainsComponent},
+            {id: 'api-type', component: apisByTypeComponent}
         ] :
         [
             {id: 'risk-score', component: apisByRiskscoreComponent},
             {id: 'access-type', component: apisByAccessTypeComponent},
             {id: 'auth-type', component: apisByAuthTypeComponent},
-            {id: 'api-type', component: apisByTypeComponent},
             {id: 'new-domains', component: newDomainsComponent},
             {id: 'critical-apis', component: criticalUnsecuredAPIsOverTime},
             {id: 'vulnerable-apis', component: vulnerableApisBySeverityComponent},
-            {id: 'critical-findings', component: criticalFindings}
+            {id: 'critical-findings', component: criticalFindings},
+            {id: 'api-type', component: apisByTypeComponent},
         ]
 
     const gridComponent = (

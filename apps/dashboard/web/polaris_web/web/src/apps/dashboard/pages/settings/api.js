@@ -675,6 +675,13 @@ const settingRequests = {
             method: 'post',
             data: {}
         })
+    },
+    async deleteDuplicateEntries() {
+        return await request({
+            url: '/api/deleteDuplicateEntries',
+            method: 'post',
+            data: {}
+        })
     }
 }
 
