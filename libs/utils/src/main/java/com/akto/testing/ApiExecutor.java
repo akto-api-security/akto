@@ -92,7 +92,7 @@ public class ApiExecutor {
 
         Call call = client.newCall(request);
         Response response = null;
-        String body;
+        String body = null;
         byte[] grpcBody = null;
         try {
             response = call.execute();
@@ -594,15 +594,12 @@ public class ApiExecutor {
         Thread readerThread;
     }
 
-    private static SseSession openSseSession(String host) throws Exception {
+    private static SseSession openSseSession(String host, String endpoint, Headers headers, boolean debug) throws Exception {
         SseSession session = new SseSession();
         OkHttpClient client = new OkHttpClient.Builder().build();
-        // header content type = text/event-stream
-        Headers headers = new Headers.Builder()
-            .add("Accept", "text/event-stream")
-            //.add("Content-Type", "text/event-stream")
-            .build();
-        Request request = new Request.Builder().url(host + "/sse").headers(headers).method("GET", null).build();
+        // Use provided endpoint for the SSE request
+        Request request = new Request.Builder().url(host + endpoint).headers(headers).build();
+
         Call call = client.newCall(request);
         Response response = call.execute();
         if (!response.isSuccessful()) {
@@ -657,7 +654,9 @@ public class ApiExecutor {
                         if (node.has("id") && node.get("id").asText().equals(id)) {
                             return msg;
                         }
-                    } catch (Exception ignored) {}
+                    } catch (Exception ignored) {
+                        loggerMaker.error("Error parsing SSE message: {}", ignored.getMessage());
+                    }
                 }
             }
             Thread.sleep(100);
@@ -675,7 +674,18 @@ public class ApiExecutor {
             throw new IllegalArgumentException("URL must be absolute with scheme and host for SSE: " + url);
         }
         String host = uri.getScheme() + "://" + uri.getHost() + (uri.getPort() != -1 ? ":" + uri.getPort() : "");
-        SseSession session = openSseSession(host);
+
+        // Use provided SSE endpoint or default to "/sse"
+        String sseEndpoint = "/sse"; // Default SSE endpoint
+        if (request.getHeaders() != null && request.getHeaders().containsKey("x-akto-sse-endpoint")) {
+            sseEndpoint = request.getHeaders().get("x-akto-sse-endpoint").get(0);
+            // Remove the custom header to avoid sending it to the server
+            request.getHeaders().remove("x-akto-sse-endpoint");
+        }
+
+        // Open SSE session with dynamic endpoint and request headers
+        Headers headers = request.toOkHttpHeaders();
+        SseSession session = openSseSession(host, sseEndpoint, headers, debug);
 
         if (StringUtils.isEmpty(session.endpoint)) {
             closeSseSession(session);
@@ -709,9 +719,12 @@ public class ApiExecutor {
         String id = node.get("id").asText();
         String sseMsg = null;
         try {
-            sseMsg = waitForMatchingSseMessage(session, id, 30000); // 30s timeout
+            sseMsg = waitForMatchingSseMessage(session, id, 60000); // 60s timeout
 
-        } finally {
+        } catch(Exception e) {
+            throw new Exception("SSE connection timeout, id=" + id + ": " + e.getMessage(), e);
+        }
+        finally {
             closeSseSession(session);
         }
 
@@ -726,6 +739,9 @@ public class ApiExecutor {
             session.readerThread.join();
         }
         if (session.response != null) {
+            if (session.response.body() != null) {
+                session.response.body().close();
+            }
             session.response.close();
         }
     }
