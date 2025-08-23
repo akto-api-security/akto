@@ -283,17 +283,6 @@ public class LoginAction implements Action, ServletResponseAware, ServletRequest
                     service.submit(() ->{
                         triggerVulnColUpdation(user);
                     });
-                    // temporary clean up
-                    // TODO: remove this after 2 days 
-                    service.submit(() ->{
-                        for (String accountIdStr : user.getAccounts().keySet()) {
-                            int accountId = Integer.parseInt(accountIdStr);
-                            Context.accountId.set(accountId);
-                            if(ModuleInfoDao.instance.isValidForTimestamp(ModuleInfo.ModuleType.MINI_RUNTIME, Context.now() - 4 * Constants.ONE_DAY_TIMESTAMP, Context.now(), "1.50.0")){
-                                SingleTypeInfoDao.deleteDuplicateHostsForSameApi();
-                            }
-                        }
-                    });
                 }
             }
             return Action.SUCCESS.toUpperCase();
