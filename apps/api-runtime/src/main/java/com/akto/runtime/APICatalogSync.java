@@ -397,6 +397,26 @@ public class APICatalogSync {
                 finalResult.templateToStaticURLs.putAll(result.templateToStaticURLs);
             }
 
+            for (String s: templateUrls) {
+                if (finalResult.deleteStaticUrls.contains(s)) continue;
+                String staticEndpoint = s.split(" ")[1];
+                String staticMethodStr = s.split(" ")[0];
+                Method staticMethod = Method.fromString(staticMethodStr);
+                for (String t: templateUrls) {
+                    if (finalResult.deleteStaticUrls.contains(t) || s.equals(t)) continue;
+                    String[] tSplit = t.split(" ");
+                    String tUrl  = tSplit[1];
+                    String tMethodStr = tSplit[0];
+                    Method tMethod= Method.fromString(tMethodStr);
+                    URLTemplate urlTemplate = createUrlTemplate(tUrl, tMethod);
+
+                    if (urlTemplate.match(staticEndpoint, staticMethod)) {
+                        finalResult.deleteStaticUrls.add(s);
+                        break;
+                    }
+                }
+            }
+
             offset += limit;
         } while (!singleTypeInfos.isEmpty());
 
