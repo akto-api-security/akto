@@ -803,6 +803,14 @@ public class InventoryAction extends UserAction {
             filterList.add(Filters.nin(ApiInfo.ID_API_COLLECTION_ID, deactivatedCollections));
         }
 
+        try {
+            List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
+            if (collectionIds != null) {
+                filterList.add(Filters.in(SingleTypeInfo._COLLECTION_IDS, collectionIds));
+            }
+        } catch (Exception e) {
+        }
+
         loggerMaker.debugAndAddToDb(filterList.toString(), LogDb.DASHBOARD);
         return Filters.and(filterList);
 
