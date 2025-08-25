@@ -123,11 +123,6 @@
             <scope>test</scope>
         </dependency>
         <dependency>
-            <groupId>com.akto.libs.protobuf</groupId>
-            <artifactId>protobuf</artifactId>
-            <version>${project.version}</version>
-        </dependency>
-        <dependency>
             <groupId>com.akto.libs.utils</groupId>
             <artifactId>utils</artifactId>
             <version>${project.version}</version>
