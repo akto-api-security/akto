@@ -29,6 +29,12 @@
             <scope>test</scope>
         </dependency>
         <dependency>
+            <groupId>de.flapdoodle.embed</groupId>
+            <artifactId>de.flapdoodle.embed.mongo</artifactId>
+            <version>3.2.6</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
             <groupId>com.akto.apps.api-runtime</groupId>
             <artifactId>api-runtime</artifactId>
             <version>${project.version}</version>
