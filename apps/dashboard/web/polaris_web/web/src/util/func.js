@@ -1972,7 +1972,14 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
   getAktoSeverities(){
     return ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW']
   },
-
+  getAktoSeveritiesInitMap(initArr = false) {
+    const aktoSeverities = this.getAktoSeverities()
+    const severitiesMap = aktoSeverities.reduce((acc, curr) => {
+      acc[curr] = initArr ? [] : 0
+      return acc
+    }, {})
+    return severitiesMap
+  },
   getSelectedItemsText(selectedItem) {
     if (!Array.isArray(selectedItem) || selectedItem?.length === 0) return "";
   
