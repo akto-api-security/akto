@@ -133,7 +133,49 @@
     --p-color-bg-critical-subdued: #FFF4F4 !important;
     --p-color-bg-caution-subdued: #FFF5EA !important;
     --p-color-bg-info-subdued: #A4E8F2 !important;
+
+    /* Dark mode variables - Using AWS Polaris color tokens */
+    --dark-bg-primary: #161d26;
+    --dark-bg-secondary: #1b232d;
+    --dark-bg-tertiary: #333843;
+    --dark-text-primary: #c6c6cd;
+    --dark-text-secondary: #656871;
+    --dark-border: #424650;
+    --dark-hover: #333843;
+    --dark-focus: #42b4ff;
+    --dark-input-bg: #161d26;
+    --dark-placeholder: #656871;
+    
+    /* Status colors for dark mode - AWS tokens */
+    --dark-success: #2bb534;
+    --dark-critical: #ff7a7a;
+    --dark-warning: #fbd332;
+    --dark-info: #42b4ff;
+    
+    /* AWS specific colors */
+    --aws-bg-container: #161d26;
+    --aws-bg-dropdown: #1b232d;
+    --aws-bg-button: #161d26;
+    --aws-bg-button-hover: #1b232d;
+    --aws-bg-button-active: #333843;
+    --aws-bg-table-header: #161d26;
+    --aws-bg-table-row: #1b232d;
+    --aws-bg-table-row-hover: #333843;
+    --aws-bg-item-selected: #001129;
+    --aws-bg-status-info: #001129;
+    --aws-bg-status-success: #001401;
+    --aws-bg-status-warning: #191100;
+    --aws-bg-status-error: #1f0000;
+    --aws-border-divider: #424650;
+    --aws-border-input: #656871;
+    --aws-border-input-focus: #6200EA;
+    --aws-border-item-selected: #42b4ff;
+    --aws-border-status-info: #42b4ff;
+    --aws-border-status-success: #2bb534;
+    --aws-border-status-warning: #fbd332;
+    --aws-border-status-error: #ff7a7a;
 }
+
 
 .Polaris-Page{
     padding: 0 32px !important;
@@ -142,6 +184,744 @@
 .Polaris-Frame__Main, .Polaris-Navigation {
     background: #F6F6F7 !important;
 }
+
+/* Dark mode - Main background and navigation */
+[data-theme="dark"] .Polaris-Frame__Main,
+[data-theme="dark"] .Polaris-Frame,
+[data-theme="dark"] .dashboard {
+    background: var(--dark-bg-primary) !important;
+}
+
+/* Dark mode - Left Navigation - AWS colors */
+[data-theme="dark"] .Polaris-Navigation,
+[data-theme="dark"] .Polaris-Navigation__PrimaryNavigation,
+[data-theme="dark"] .Polaris-Navigation__Section,
+[data-theme="dark"] .Polaris-Navigation__SectionHeading,
+[data-theme="dark"] .Polaris-Navigation__Item,
+[data-theme="dark"] .Polaris-Navigation__SecondaryNavigation {
+    background: var(--aws-bg-container) !important;
+}
+
+[data-theme="dark"] .Polaris-Navigation {
+    border-right: 1px solid var(--aws-border-divider) !important;
+}
+
+[data-theme="dark"] .Polaris-Navigation__Section {
+    border-bottom: 1px solid var(--aws-border-divider) !important;
+}
+
+[data-theme="dark"] .Polaris-Navigation__SecondaryNavigation {
+    border-top: 1px solid var(--aws-border-divider) !important;
+}
+
+[data-theme="dark"] .Polaris-Navigation__SectionHeading,
+[data-theme="dark"] .Polaris-Navigation__Item,
+[data-theme="dark"] .Polaris-Navigation__Icon,
+[data-theme="dark"] .Polaris-Navigation__Text {
+    color: var(--dark-text-primary) !important;
+}
+
+[data-theme="dark"] .Polaris-Navigation__Item:hover,
+[data-theme="dark"] .Polaris-Navigation__Item--active {
+    background: var(--aws-bg-button-hover) !important;
+    color: var(--dark-text-primary) !important;
+}
+
+/* Dark mode - TopBar */
+[data-theme="dark"] .Polaris-TopBar {
+    background: var(--dark-bg-secondary) !important;
+    border-bottom: 1px solid var(--dark-border) !important;
+}
+
+[data-theme="dark"] .Polaris-TopBar__SearchField {
+    background: var(--dark-bg-tertiary) !important;
+}
+
+[data-theme="dark"] .Polaris-TopBar__SearchField input {
+    background: var(--dark-bg-tertiary) !important;
+    color: var(--dark-text-primary) !important;
+}
+
+[data-theme="dark"] .Polaris-TopBar__SearchField input::placeholder {
+    color: var(--dark-text-secondary) !important;
+}
+
+/* Dark mode - Tables - AWS colors */
+[data-theme="dark"] .Polaris-DataTable,
+[data-theme="dark"] .Polaris-DataTable__Table,
+[data-theme="dark"] .Polaris-DataTable__TableBody tr,
+[data-theme="dark"] .Polaris-DataTable__TableBody td {
+    background: var(--aws-bg-table-row) !important;
+}
+
+[data-theme="dark"] .Polaris-DataTable {
+    border: 1px solid var(--aws-border-divider) !important;
+}
+
+[data-theme="dark"] .Polaris-DataTable__TableHead,
+[data-theme="dark"] .Polaris-DataTable__TableHead th {
+    background: var(--aws-bg-table-header) !important;
+    color: var(--dark-text-primary) !important;
+    border-bottom: 1px solid var(--aws-border-divider) !important;
+}
+
+[data-theme="dark"] .Polaris-DataTable__TableBody tr {
+    border-bottom: 1px solid var(--aws-border-divider) !important;
+}
+
+[data-theme="dark"] .Polaris-DataTable__TableBody tr:hover {
+    background: var(--aws-bg-table-row-hover) !important;
+}
+
+[data-theme="dark"] .Polaris-DataTable__TableBody td {
+    color: var(--dark-text-primary) !important;
+    border-bottom: 1px solid var(--aws-border-divider) !important;
+}
+
+/* Dark mode - IndexTable (Primary table component) - AWS colors */
+[data-theme="dark"] .Polaris-IndexTable,
+[data-theme="dark"] .Polaris-IndexTable__Table,
+[data-theme="dark"] .Polaris-IndexTable__TableBody tr,
+[data-theme="dark"] .Polaris-IndexTable__TableBody td {
+    background: var(--aws-bg-table-row) !important;
+}
+
+[data-theme="dark"] .Polaris-IndexTable {
+    border: 1px solid var(--aws-border-divider) !important;
+}
+
+[data-theme="dark"] .Polaris-IndexTable__TableHead,
+[data-theme="dark"] .Polaris-IndexTable__TableHead th {
+    background: var(--aws-bg-table-header) !important;
+    color: var(--dark-text-primary) !important;
+    border-bottom: 1px solid var(--aws-border-divider) !important;
+}
+
+[data-theme="dark"] .Polaris-IndexTable__TableBody tr {
+    border-bottom: 1px solid var(--aws-border-divider) !important;
+}
+
+[data-theme="dark"] .Polaris-IndexTable__TableBody tr:hover {
+    background: var(--aws-bg-table-row-hover) !important;
+}
+
+[data-theme="dark"] .Polaris-IndexTable__TableBody td {
+    color: var(--dark-text-primary) !important;
+    border-bottom: 1px solid var(--aws-border-divider) !important;
+}
+
+/* Dark mode - Custom table classes - AWS colors */
+[data-theme="dark"] .new-table {
+    background: var(--aws-bg-table-row) !important;
+    border: 1px solid var(--aws-border-divider) !important;
+}
+
+[data-theme="dark"] .new-table * {
+    background: var(--aws-bg-table-row) !important;
+}
+
+[data-theme="dark"] .new-table .Polaris-IndexTable,
+[data-theme="dark"] .new-table .Polaris-IndexTable__Table,
+[data-theme="dark"] .new-table .Polaris-IndexTable__TableBody,
+[data-theme="dark"] .new-table .Polaris-IndexTable__TableBody tr,
+[data-theme="dark"] .new-table .Polaris-IndexTable__TableBody td,
+[data-theme="dark"] .new-table table,
+[data-theme="dark"] .new-table table tbody,
+[data-theme="dark"] .new-table table tbody tr,
+[data-theme="dark"] .new-table table tbody td {
+    background: var(--aws-bg-table-row) !important;
+}
+
+[data-theme="dark"] .new-table .Polaris-IndexTable__TableHead,
+[data-theme="dark"] .new-table .Polaris-IndexTable__TableHead th,
+[data-theme="dark"] .new-table table thead,
+[data-theme="dark"] .new-table table thead th {
+    background: var(--aws-bg-table-header) !important;
+    color: var(--dark-text-primary) !important;
+    border-bottom: 1px solid var(--aws-border-divider) !important;
+}
+
+[data-theme="dark"] .new-table .Polaris-IndexTable__TableBody tr,
+[data-theme="dark"] .new-table .Polaris-IndexTable__TableBody td,
+[data-theme="dark"] .new-table table tbody tr,
+[data-theme="dark"] .new-table table tbody td {
+    border-bottom: 1px solid var(--aws-border-divider) !important;
+}
+
+[data-theme="dark"] .new-table .Polaris-IndexTable__TableBody tr:hover,
+[data-theme="dark"] .new-table table tbody tr:hover {
+    background: var(--aws-bg-table-row-hover) !important;
+}
+
+[data-theme="dark"] .new-table .Polaris-IndexTable__TableBody td,
+[data-theme="dark"] .new-table table tbody td {
+    color: var(--dark-text-primary) !important;
+}
+
+/* Condensed row styling */
+[data-theme="dark"] .condensed-row {
+    background: var(--dark-bg-secondary) !important;
+    border-bottom: 1px solid var(--dark-border) !important;
+}
+
+[data-theme="dark"] .condensed-row:hover {
+    background: var(--dark-hover) !important;
+}
+
+[data-theme="dark"] .condensed-row td {
+    background: var(--dark-bg-secondary) !important;
+    color: var(--dark-text-primary) !important;
+    border-bottom: 1px solid var(--dark-border) !important;
+}
+
+[data-theme="dark"] .condensed-row th {
+    background: var(--dark-bg-tertiary) !important;
+    color: var(--dark-text-primary) !important;
+    border-bottom: 1px solid var(--dark-border) !important;
+}
+
+/* Dark mode - IndexFilters (table tabs) */
+[data-theme="dark"] .Polaris-IndexFilters {
+    background: #2d3748 !important;
+    border-bottom: 1px solid #4a5568 !important;
+}
+
+[data-theme="dark"] .Polaris-IndexFilters__FiltersWrapper {
+    background: #2d3748 !important;
+}
+
+[data-theme="dark"] .Polaris-IndexFilters__Filters {
+    background: #2d3748 !important;
+}
+
+[data-theme="dark"] .Polaris-IndexFilters__Tabs {
+    background: #2d3748 !important;
+}
+
+[data-theme="dark"] .Polaris-IndexFilters__Tabs .Polaris-Tabs__Tab {
+    background: #2d3748 !important;
+    color: #ffffff !important;
+    border-bottom: 1px solid #4a5568 !important;
+}
+
+[data-theme="dark"] .Polaris-IndexFilters__Tabs .Polaris-Tabs__Tab--active {
+    background: #4a5568 !important;
+    color: #ffffff !important;
+    border-bottom: 2px solid #63b3ed !important;
+}
+
+[data-theme="dark"] .Polaris-IndexFilters__Tabs .Polaris-Tabs__Tab:hover {
+    background: #4a5568 !important;
+}
+
+[data-theme="dark"] .Polaris-Heading {
+    color: #ffffff !important;
+}
+
+[data-theme="dark"] .Polaris-DisplayText {
+    color: #ffffff !important;
+}
+
+[data-theme="dark"] .Polaris-Text--subdued,
+[data-theme="dark"] .Polaris-Caption {
+    color: #e2e8f0 !important;
+}
+
+/* Dark mode - Badges */
+[data-theme="dark"] .Polaris-Badge--statusSuccess {
+    background-color: #22543d !important;
+    color: #68d391 !important;
+}
+
+[data-theme="dark"] .Polaris-Badge--statusCritical {
+    background-color: #742a2a !important;
+    color: #fc8181 !important;
+}
+
+[data-theme="dark"] .Polaris-Badge--statusWarning {
+    background-color: #744210 !important;
+    color: #f6e05e !important;
+}
+
+[data-theme="dark"] .Polaris-Badge--statusInfo {
+    background-color: #2a4365 !important;
+    color: #63b3ed !important;
+}
+
+[data-theme="dark"] .Polaris-Badge--statusAttention {
+    background-color: #744210 !important;
+    color: #f6e05e !important;
+}
+
+[data-theme="dark"] .Polaris-Badge--statusNew {
+    background-color: #2a4365 !important;
+    color: #63b3ed !important;
+}
+
+/* Dark mode - Cards and containers */
+[data-theme="dark"] .Polaris-Card {
+    background: var(--dark-bg-secondary) !important;
+    border: 1px solid var(--dark-border) !important;
+}
+
+[data-theme="dark"] .Polaris-Card__Section {
+    background: var(--dark-bg-secondary) !important;
+    border-bottom: 1px solid var(--dark-border) !important;
+}
+
+[data-theme="dark"] .Polaris-Card__Section:last-child {
+    border-bottom: none !important;
+}
+
+/* Dark mode - Page elements */
+[data-theme="dark"] .Polaris-Page {
+    background: var(--dark-bg-primary) !important;
+}
+
+[data-theme="dark"] .Polaris-Page__Content {
+    background: var(--dark-bg-primary) !important;
+}
+
+[data-theme="dark"] .Polaris-Page__Header {
+    background: var(--dark-bg-primary) !important;
+}
+
+/* Dark mode - Boxes and Layout Components */
+[data-theme="dark"] .Polaris-Box {
+    background: var(--dark-bg-secondary) !important;
+    border: 1px solid var(--dark-border) !important;
+}
+
+[data-theme="dark"] .Polaris-Box--background {
+    background: var(--dark-bg-secondary) !important;
+}
+
+[data-theme="dark"] .Polaris-Box--backgroundSubdued {
+    background: var(--dark-bg-tertiary) !important;
+}
+
+[data-theme="dark"] .Polaris-Box--backgroundElevated {
+    background: var(--dark-bg-secondary) !important;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3) !important;
+}
+
+/* Dark mode - Vertical and Horizontal Stacks */
+[data-theme="dark"] .Polaris-VerticalStack {
+    background: transparent !important;
+}
+
+[data-theme="dark"] .Polaris-HorizontalStack {
+    background: transparent !important;
+}
+
+/* Dark mode - Grid Components */
+[data-theme="dark"] .Polaris-Grid {
+    background: transparent !important;
+}
+
+[data-theme="dark"] .Polaris-Text--root {
+    color: var(--dark-text-primary) !important;
+}
+
+[data-theme="dark"] .Polaris-Grid__Cell {
+    background: transparent !important;
+}
+
+[data-theme="dark"] .Polaris-Grid__Cell > * {
+    color: var(--dark-text-primary) !important;
+}
+
+/* Dark mode - Page Components */
+[data-theme="dark"] .Polaris-Page {
+    background: var(--dark-bg-primary) !important;
+}
+
+[data-theme="dark"] .Polaris-Page__Content {
+    background: var(--dark-bg-primary) !important;
+}
+
+[data-theme="dark"] .Polaris-Page__Title {
+    color: var(--dark-text-primary) !important;
+}
+
+[data-theme="dark"] .Polaris-Page__TitleText {
+    color: var(--dark-text-primary) !important;
+}
+
+/* Dark mode - All Heading Elements */
+[data-theme="dark"] h1,
+[data-theme="dark"] h2,
+[data-theme="dark"] h3,
+[data-theme="dark"] h4,
+[data-theme="dark"] h5,
+[data-theme="dark"] h6 {
+    color: var(--dark-text-primary) !important;
+}
+
+/* Dark mode - Layout Components */
+[data-theme="dark"] .Polaris-Layout {
+    background: var(--dark-bg-primary) !important;
+}
+
+[data-theme="dark"] .Polaris-Layout__Section {
+    background: var(--dark-bg-primary) !important;
+}
+
+[data-theme="dark"] .Polaris-Layout__Section--secondary {
+    background: var(--dark-bg-secondary) !important;
+}
+
+[data-theme="dark"] .Polaris-Layout__Section--oneThird {
+    background: var(--dark-bg-primary) !important;
+}
+
+[data-theme="dark"] .Polaris-Layout__Section--oneHalf {
+    background: var(--dark-bg-primary) !important;
+}
+
+[data-theme="dark"] .Polaris-Layout__Section--twoThirds {
+    background: var(--dark-bg-primary) !important;
+}
+
+/* Dark mode - InlineStack */
+[data-theme="dark"] .Polaris-InlineStack {
+    background: transparent !important;
+}
+
+[data-theme="dark"] .Polaris-InlineStack > * {
+    color: var(--dark-text-primary) !important;
+}
+
+/* Dark mode - BlockStack */
+[data-theme="dark"] .Polaris-BlockStack {
+    background: transparent !important;
+}
+
+[data-theme="dark"] .Polaris-BlockStack > * {
+    color: var(--dark-text-primary) !important;
+}
+
+/* Dark mode - PageWithMultipleCards specific styling */
+[data-theme="dark"] .Polaris-Page--fullWidth {
+    background: var(--dark-bg-primary) !important;
+}
+
+[data-theme="dark"] .Polaris-Page__Content > * {
+    color: var(--dark-text-primary) !important;
+}
+
+/* Dark mode - LearnPopoverComponent */
+[data-theme="dark"] .Polaris-Popover {
+    background: var(--dark-bg-secondary) !important;
+    border: 1px solid var(--dark-border) !important;
+}
+
+[data-theme="dark"] .Polaris-Popover__Content {
+    background: var(--dark-bg-secondary) !important;
+    color: var(--dark-text-primary) !important;
+}
+
+[data-theme="dark"] .Polaris-Popover__Pane {
+    background: var(--dark-bg-secondary) !important;
+    border-right: 1px solid var(--dark-border) !important;
+}
+
+/* Dark mode - Any custom components */
+[data-theme="dark"] .custom-component,
+[data-theme="dark"] .learn-more-component {
+    background: var(--dark-bg-secondary) !important;
+    color: var(--dark-text-primary) !important;
+}
+
+
+/* Dark mode - Dividers and Borders */
+[data-theme="dark"] .Polaris-Divider {
+    background: var(--dark-border) !important;
+    border-color: var(--dark-border) !important;
+    opacity: 0.6 !important;
+}
+
+[data-theme="dark"] hr {
+    background: var(--dark-border) !important;
+    border-color: var(--dark-border) !important;
+    opacity: 0.6 !important;
+}
+
+[data-theme="dark"] .Polaris-Border {
+    border-color: var(--dark-border) !important;
+    opacity: 0.6 !important;
+}
+/* Dark mode - Card borders - AWS colors */
+[data-theme="dark"] .Polaris-Card .Polaris-Box {
+    border: 1px solid var(--aws-border-divider) !important;
+    border-radius: 8px !important;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1) !important;
+}
+
+[data-theme="dark"] .Polaris-Card__Section {
+    border-bottom: 1px solid var(--aws-border-divider) !important;
+    opacity: 0.6 !important;
+}
+
+[data-theme="dark"] .Polaris-Card__Section:last-child {
+    border-bottom: none !important;
+}
+
+/* Dark mode - Legacy Card - AWS colors */
+[data-theme="dark"] .legacy-card {
+    background: var(--aws-bg-container) !important;
+    border: 1px solid var(--aws-border-divider) !important;
+    border-radius: 8px !important;
+}
+
+[data-theme="dark"] .legacy-card * {
+    background: var(--aws-bg-container) !important;
+}
+
+[data-theme="dark"] .legacy-card .Polaris-Card {
+    background: var(--aws-bg-container) !important;
+    border: 1px solid var(--aws-border-divider) !important;
+}
+
+[data-theme="dark"] .legacy-card .Polaris-Card__Section {
+    background: var(--aws-bg-container) !important;
+    border-bottom: 1px solid var(--aws-border-divider) !important;
+}
+
+/* Dark mode - Disabled Button - AWS colors */
+[data-theme="dark"] .Polaris-Button--disabled {
+    background: var(--aws-bg-button-active) !important;
+    border-color: var(--aws-border-input) !important;
+    color: var(--dark-placeholder) !important;
+    opacity: 0.6 !important;
+}
+
+[data-theme="dark"] .Polaris-Button--disabled:hover {
+    background: var(--aws-bg-button-active) !important;
+    border-color: var(--aws-border-input) !important;
+    color: var(--dark-placeholder) !important;
+}
+
+/* Dark mode - Banner - AWS colors */
+[data-theme="dark"] .Polaris-Banner {
+    background: var(--aws-bg-container) !important;
+    border: 1px solid var(--aws-border-divider) !important;
+    color: var(--dark-text-primary) !important;
+}
+
+[data-theme="dark"] .Polaris-Banner--statusInfo {
+    background: var(--aws-bg-status-info) !important;
+    border-color: var(--aws-border-status-info) !important;
+    color: var(--dark-text-primary) !important;
+}
+
+[data-theme="dark"] .Polaris-Banner--statusSuccess {
+    background: var(--aws-bg-status-success) !important;
+    border-color: var(--aws-border-status-success) !important;
+    color: var(--dark-text-primary) !important;
+}
+
+[data-theme="dark"] .Polaris-Banner--statusWarning {
+    background: var(--aws-bg-status-warning) !important;
+    border-color: var(--aws-border-status-warning) !important;
+    color: var(--dark-text-primary) !important;
+}
+
+[data-theme="dark"] .Polaris-Banner--statusCritical {
+    background: var(--aws-bg-status-error) !important;
+    border-color: var(--aws-border-status-error) !important;
+    color: var(--dark-text-primary) !important;
+}
+
+/* Dark mode - LegacyStack - AWS colors */
+[data-theme="dark"] .Polaris-LegacyStack {
+    background: transparent !important;
+}
+
+[data-theme="dark"] .Polaris-LegacyStack--alignmentBaseline {
+    background: transparent !important;
+}
+
+[data-theme="dark"] .Polaris-LegacyStack > * {
+    color: var(--dark-text-primary) !important;
+}
+
+/* Dark mode - ResourceList - AWS colors */
+[data-theme="dark"] .Polaris-ResourceList {
+    background: var(--aws-bg-container) !important;
+}
+
+[data-theme="dark"] .Polaris-ResourceList__Item {
+    background: var(--aws-bg-container) !important;
+    border-bottom: 1px solid var(--aws-border-divider) !important;
+    color: var(--dark-text-primary) !important;
+}
+
+[data-theme="dark"] .Polaris-ResourceList__Item:hover {
+    background: var(--aws-bg-table-row-hover) !important;
+}
+
+[data-theme="dark"] .Polaris-ResourceList__Item:last-child {
+    border-bottom: none !important;
+}
+
+[data-theme="dark"] .Polaris-ResourceList__Item--selected {
+    background: var(--aws-bg-item-selected) !important;
+    border-color: var(--aws-border-item-selected) !important;
+}
+
+/* Dark mode - Modal borders */
+[data-theme="dark"] .Polaris-Modal {
+    border: 1px solid var(--dark-border) !important;
+    border-radius: 8px !important;
+}
+
+[data-theme="dark"] .Polaris-Modal__Content {
+    border-top: 1px solid var(--dark-border) !important;
+    opacity: 0.6 !important;
+}
+
+/* Dark mode - Button borders and text - AWS colors */
+[data-theme="dark"] .Polaris-Button {
+    border-color: var(--aws-border-input) !important;
+    background: var(--aws-bg-button) !important;
+    color: var(--dark-text-primary) !important;
+}
+
+[data-theme="dark"] .Polaris-Button--outline {
+    border: 1px solid var(--aws-border-input) !important;
+    color: var(--dark-text-primary) !important;
+    background: var(--aws-bg-button) !important;
+}
+
+[data-theme="dark"] .Polaris-Button--outline:hover {
+    background: var(--aws-bg-button-hover) !important;
+    border-color: var(--aws-border-input-focus) !important;
+    color: var(--dark-text-primary) !important;
+}
+
+[data-theme="dark"] .Polaris-Button--outline:active {
+    background: var(--aws-bg-button-active) !important;
+    color: var(--dark-text-primary) !important;
+}
+
+[data-theme="dark"] .Polaris-Button--primary {
+    background: var(--aws-border-input-focus) !important;
+    border-color: var(--aws-border-input-focus) !important;
+    color: #ffffff !important;
+}
+
+[data-theme="dark"] .Polaris-Button--primary:hover {
+    background: #75cfff !important;
+    border-color: #75cfff !important;
+    color: #ffffff !important;
+}
+
+[data-theme="dark"] .Polaris-Button--primary:active {
+    background: #0088cc !important;
+    border-color: #0088cc !important;
+    color: #ffffff !important;
+}
+
+[data-theme="dark"] .Polaris-Button--destructive {
+    background: var(--dark-critical) !important;
+    border-color: var(--dark-critical) !important;
+    color: #ffffff !important;
+}
+
+[data-theme="dark"] .Polaris-Button--destructive:hover {
+    background: #ff9b9b !important;
+    border-color: #ff9b9b !important;
+    color: #ffffff !important;
+}
+
+[data-theme="dark"] .Polaris-Button--destructive:active {
+    background: #cc0000 !important;
+    border-color: #cc0000 !important;
+    color: #ffffff !important;
+}
+
+[data-theme="dark"] .Polaris-Button--plain {
+    background: transparent !important;
+    border-color: transparent !important;
+    color: var(--dark-text-primary) !important;
+}
+
+[data-theme="dark"] .Polaris-Button--plain:hover {
+    background: var(--aws-bg-button-hover) !important;
+    color: var(--dark-text-primary) !important;
+}
+
+[data-theme="dark"] .Polaris-Button--plain:active {
+    background: var(--aws-bg-button-active) !important;
+    color: var(--dark-text-primary) !important;
+}
+
+/* Dark mode - Input borders - AWS colors */
+[data-theme="dark"] .Polaris-TextField__Input {
+    border: 1px solid var(--aws-border-input) !important;
+    background: var(--aws-bg-container) !important;
+    color: var(--dark-text-primary) !important;
+    border-radius: 4px !important;
+}
+
+[data-theme="dark"] .Polaris-TextField__Input:focus {
+    border-color: var(--aws-border-input-focus) !important;
+    box-shadow: 0 0 0 1px var(--aws-border-input-focus) !important;
+}
+
+[data-theme="dark"] .Polaris-TextField__Input::placeholder {
+    color: var(--dark-placeholder) !important;
+}
+
+/* Dark mode - Select borders - AWS colors */
+[data-theme="dark"] .Polaris-Select {
+    border: 1px solid var(--aws-border-input) !important;
+    background: var(--aws-bg-container) !important;
+    border-radius: 4px !important;
+}
+
+[data-theme="dark"] .Polaris-Select__Input {
+    background: var(--aws-bg-container) !important;
+    color: var(--dark-text-primary) !important;
+}
+
+/* Dark mode - Tabs borders */
+[data-theme="dark"] .Polaris-Tabs {
+    border-bottom: 1px solid var(--dark-border) !important;
+    opacity: 0.6 !important;
+}
+
+[data-theme="dark"] .Polaris-Tabs__Tab {
+    border-bottom: 2px solid transparent !important;
+}
+
+[data-theme="dark"] .Polaris-Tabs__Tab--active {
+    border-bottom: 2px solid var(--dark-focus) !important;
+}
+
+/* Dark mode - List borders */
+[data-theme="dark"] .Polaris-List__Item {
+    border-bottom: 1px solid var(--dark-border) !important;
+    opacity: 0.6 !important;
+}
+
+[data-theme="dark"] .Polaris-List__Item:last-child {
+    border-bottom: none !important;
+}
+
+/* Dark mode - ActionList borders */
+[data-theme="dark"] .Polaris-ActionList__Item {
+    border-bottom: 1px solid #4a5568 !important;
+}
+
+
+
+/* Dark mode - ResourceList borders */
+[data-theme="dark"] .Polaris-ResourceList__Item {
+    border-bottom: 1px solid #4a5568 !important;
+}
+
 
 .Polaris-Tabs {
     padding: 0 !important;

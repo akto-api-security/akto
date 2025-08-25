@@ -1,5 +1,6 @@
 import { TopBar, Icon, Text, ActionList, Modal, TextField, HorizontalStack, Box, Avatar, VerticalStack, Button, Scrollable } from '@shopify/polaris';
 import { NotificationMajor, CustomerPlusMajor, LogOutMinor, NoteMinor, ResourcesMajor, UpdateInventoryMajor, PhoneMajor, ChatMajor, SettingsMajor } from '@shopify/polaris-icons';
+import DarkModeToggle from '../../DarkModeToggle';
 import { useState, useCallback, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Store from '../../../store';
@@ -212,6 +213,7 @@ export default function Header() {
                     <Text color="subdued" variant="bodySm">{`${currentTestsObj.totalTestsQueued} tests queued`}</Text>
                 </VerticalStack>
             </HorizontalStack> : null}
+            <DarkModeToggle />
             <TopBar.Menu
                 activatorContent={
                     <span id="beamer-btn" className={getColorForIcon()}>

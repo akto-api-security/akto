@@ -25,6 +25,7 @@ export function MethodBox({method, methodBoxWidth, url}){
       <Box width={methodBoxWidth || "64px"}>
         <HorizontalStack align="end">
           <span
+            className='method-box'
             style={{
               color: transform.getTextColor(finalMethod),
               fontSize: "14px",

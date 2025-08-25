@@ -78,6 +78,7 @@ import Help from "../dashboard/pages/settings/help_and_support/Help";
 import AdvancedTrafficFilters from "../dashboard/pages/settings/traffic-conditions/AdvancedTrafficFilters";
 import GoogleSamlSso from "../dashboard/pages/settings/integrations/sso/GoogleSamlSso";
 import SignUpWithSSO from "../signup/components/SignUpWithSSO";
+import LocalStore from "./LocalStorageStore";
 
 import TeamsWebhooks from "../dashboard/pages/settings/integrations/teamsWebhooks/TeamsWebhooks";
 import TeamsWebhook from "../dashboard/pages/settings/integrations/teamsWebhooks/TeamsWebhook";
@@ -504,12 +505,18 @@ const router = createBrowserRouter([
 
 function App() {
     const setAllRoutes = Store(state => state.setAllRoutes)
+    const isDarkMode = LocalStore(state => state.isDarkMode)
     const searchData = generateSearchData(router.routes)
     const {stigg} = useStiggContext();
+    
     useEffect(() => {
         stigg.setCustomerId(window.STIGG_CUSTOMER_ID, window.STIGG_CUSTOMER_TOKEN)
-
     })
+
+    useEffect(() => {
+        // Initialize theme on app load
+        document.documentElement.setAttribute('data-theme', isDarkMode ? 'dark' : 'light');
+    }, [isDarkMode])
 
 
     useEffect(() => {

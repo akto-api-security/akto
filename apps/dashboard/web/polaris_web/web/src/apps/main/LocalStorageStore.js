@@ -6,7 +6,8 @@ const initialState = {
     categoryMap: {},
     sendEventOnLogin: false,
     defaultIgnoreSummaryTime: 2 * 60 * 60,
-    lastEndpointEpoch: 0
+    lastEndpointEpoch: 0,
+    isDarkMode: false
 };
 
 let localStore = (set) => ({
@@ -49,6 +50,22 @@ let localStore = (set) => ({
             set({ lastEndpointEpoch });
         } catch (error) {
             console.error("Error setting lastEndpointEpoch:", error);
+        }
+    },
+
+    setIsDarkMode: (isDarkMode) => {
+        try {
+            set({ isDarkMode });
+        } catch (error) {
+            console.error("Error setting isDarkMode:", error);
+        }
+    },
+
+    toggleDarkMode: () => {
+        try {
+            set((state) => ({ isDarkMode: !state.isDarkMode }));
+        } catch (error) {
+            console.error("Error toggling dark mode:", error);
         }
     },
 
