@@ -37,7 +37,6 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.google.gson.Gson;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.MongoCollection;
-import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.Accumulators;
 import com.mongodb.client.model.Aggregates;
 import com.mongodb.client.model.Filters;
@@ -53,7 +52,6 @@ import java.net.MalformedURLException;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.util.*;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import javax.servlet.http.HttpServletRequest;
@@ -745,63 +743,44 @@ public class Utils {
             return new ApiInfoKeyResult(0, showApiInfo ? new ArrayList<>() : null);
         }
 
+        // Combine filters: exclude unwanted, include only allowed
         Bson combinedFilter = Filters.and(
                 matchFilter,
                 filterQ,
                 Filters.in(apiInfoKeyPath + ".apiCollectionId", collectionIds)
         );
 
-        int totalCount = (int) collection.countDocuments(combinedFilter);
-        int numThreads = Math.max(1, Runtime.getRuntime().availableProcessors());
-        int batchSize = (int) Math.ceil((double) totalCount / numThreads);
+        List<Bson> pipeline = new ArrayList<>();
+        pipeline.add(Aggregates.match(combinedFilter));
+        pipeline.add(Aggregates.project(Projections.include(
+                apiInfoKeyPath + ".apiCollectionId",
+                apiInfoKeyPath + ".url",
+                apiInfoKeyPath + ".method"
+        )));
+        pipeline.add(Aggregates.group(
+                new BasicDBObject("apiCollectionId", "$" + apiInfoKeyPath + ".apiCollectionId")
+                        .append("url", "$" + apiInfoKeyPath + ".url")
+                        .append("method", "$" + apiInfoKeyPath + ".method"),
+                Accumulators.first("apiInfoKey", "$" + apiInfoKeyPath)
+        ));
 
-        Set<ApiInfo.ApiInfoKey> apiInfoKeys = Collections.synchronizedSet(new HashSet<>());
-        List<ApiInfo> apiInfoList = Collections.synchronizedList(new ArrayList<>());
-        AtomicInteger count = new AtomicInteger(0);
-
-        List<Integer> skips = new ArrayList<>();
-        for (int i = 0; i < numThreads; i++) {
-            skips.add(i * batchSize);
-        }
-
-        skips.parallelStream().forEach(skip -> {
-            List<Bson> pipeline = new ArrayList<>();
-            pipeline.add(Aggregates.match(combinedFilter));
-            pipeline.add(Aggregates.project(Projections.include(
-                    apiInfoKeyPath + ".apiCollectionId",
-                    apiInfoKeyPath + ".url",
-                    apiInfoKeyPath + ".method"
-            )));
-            pipeline.add(Aggregates.group(
-                    new BasicDBObject("apiCollectionId", "$" + apiInfoKeyPath + ".apiCollectionId")
-                            .append("url", "$" + apiInfoKeyPath + ".url")
-                            .append("method", "$" + apiInfoKeyPath + ".method"),
-                    Accumulators.first("apiInfoKey", "$" + apiInfoKeyPath)
-            ));
-            pipeline.add(Aggregates.skip(skip));
-            pipeline.add(Aggregates.limit(batchSize));
-
-            try (MongoCursor<Document> cursor = collection.aggregate(pipeline, Document.class).iterator()) {
-                while (cursor.hasNext()) {
-                    Document doc = cursor.next();
-                    Document keyDoc = (Document) doc.get("apiInfoKey");
-                    if (keyDoc != null) {
-                        ApiInfo.ApiInfoKey key = new ApiInfo.ApiInfoKey(
-                                keyDoc.getInteger("apiCollectionId"),
-                                keyDoc.getString("url"),
-                                URLMethods.Method.fromString(keyDoc.getString("method"))
-                        );
-                        if (apiInfoKeys.add(key)) {
-                            if (showApiInfo) {
-                                apiInfoList.add(new ApiInfo(key));
-                            }
-                            count.incrementAndGet();
-                        }
-                    }
+        Set<ApiInfo.ApiInfoKey> apiInfoKeys = new HashSet<>();
+        List<ApiInfo> apiInfoList = new ArrayList<>();
+        List<Document> results = collection.aggregate(pipeline, Document.class).into(new ArrayList<>());
+        for (Document doc : results) {
+            Document keyDoc = (Document) doc.get("apiInfoKey");
+            if (keyDoc != null) {
+                ApiInfo.ApiInfoKey key = new ApiInfo.ApiInfoKey(
+                        keyDoc.getInteger("apiCollectionId"),
+                        keyDoc.getString("url"),
+                        URLMethods.Method.fromString(keyDoc.getString("method"))
+                );
+                apiInfoKeys.add(key);
+                if (showApiInfo) {
+                    apiInfoList.add(new ApiInfo(key));
                 }
             }
-        });
-
-        return new ApiInfoKeyResult(count.get(), showApiInfo ? apiInfoList : null);
+        }
+        return new ApiInfoKeyResult(apiInfoKeys.size(), showApiInfo ? apiInfoList : null);
     }
 }
