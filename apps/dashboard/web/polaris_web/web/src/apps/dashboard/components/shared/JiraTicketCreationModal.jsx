@@ -40,20 +40,16 @@ const JiraTicketCreationModal = ({ activator, modalActive, setModalActive, handl
 
     useEffect(() => {
         if (!isAzureModal && projId && issueType) {
-            // Ignore fields that are sent by akto
-            const ignoreFields = ["summary", "issuetype", "project", "labels", "description"]
-
             const initialFieldMetaData = createJiraIssueFieldMetaData?.[projId]?.[issueType] || [];
 
             const filteredFieldMetaData = initialFieldMetaData.filter(field => {
-                const hasNoDefault = field.hasDefaultValue === false; // filter out fields that have default values
-                const isNotIgnored = !ignoreFields.includes(field.key.toLowerCase()); // filter out fields that are sent by akto
-                return hasNoDefault && isNotIgnored;
+                const isCustom = field?.schema?.custom !== undefined ? true : false; // filter out fields that are not custom fields
+                return isCustom
             });
             setDisplayJiraIssueFieldMetadata(filteredFieldMetaData);
 
             const initialValues = filteredFieldMetaData.reduce((acc, field) => {
-                const fieldConfiguration = issuesFunctions.getJiraFieldConfigurations();
+                const fieldConfiguration = issuesFunctions.getJiraFieldConfigurations(field);
 
                 acc[field.fieldId] = fieldConfiguration.initialValue; //default value for each field
                 return acc;
