@@ -12,6 +12,7 @@ import java.util.stream.Collectors;
 import lombok.Getter;
 import lombok.Setter;
 import okhttp3.HttpUrl;
+import okhttp3.Headers;
 
 import java.net.URI;
 import java.util.*;
@@ -314,16 +315,9 @@ public class OriginalHttpRequest {
         Map<String,List<String>> headers = new HashMap<>();
         if (headersFromRequest == null) return headers;
         for (Object k: headersFromRequest.keySet()) {
-
-            String key = k.toString().toLowerCase();
-            String rawValue = headersFromRequest.get(k).toString();
-
-            List<String> splitValues = Arrays.stream(rawValue.split(","))
-                .map(String::trim)
-                .filter(v -> !StringUtils.isEmpty(v))
-                .collect(Collectors.toList());
-
-            headers.computeIfAbsent(key, x -> new ArrayList<>()).addAll(splitValues);
+            List<String> values = headers.getOrDefault(k,new ArrayList<>());
+            values.add(headersFromRequest.get(k).toString());
+            headers.put(k.toString().toLowerCase(),values);
         }
         return headers;
     }
@@ -471,6 +465,30 @@ public class OriginalHttpRequest {
         } else {
             return path + "?" + query;
         }
+    }
+
+    /**
+     * Converts the headers map to OkHttp Headers object
+     * @return OkHttp Headers object
+     */
+    public Headers toOkHttpHeaders() {
+        if (this.headers == null || this.headers.isEmpty()) {
+            return new Headers.Builder().build();
+        }
+        
+        Headers.Builder builder = new Headers.Builder();
+        for (Map.Entry<String, List<String>> entry : this.headers.entrySet()) {
+            String key = entry.getKey();
+            List<String> values = entry.getValue();
+            if (values != null) {
+                for (String value : values) {
+                    if (value != null) {
+                        builder.add(key, value);
+                    }
+                }
+            }
+        }
+        return builder.build();
     }
 
     @Override

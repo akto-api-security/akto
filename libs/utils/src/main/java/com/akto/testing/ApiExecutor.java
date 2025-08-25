@@ -486,10 +486,13 @@ public class ApiExecutor {
     private static void calculateFinalRequestFromAdvancedSettings(OriginalHttpRequest originalHttpRequest, List<TestConfigsAdvancedSettings> advancedSettings){
         Map<String,List<ConditionsType>> headerConditions = new HashMap<>();
         Map<String,List<ConditionsType>> payloadConditions = new HashMap<>();
+        Map<String,List<ConditionsType>> urlConditions = new HashMap<>();
 
         for(TestConfigsAdvancedSettings settings: advancedSettings){
             if(settings.getOperatorType().toLowerCase().contains("header")){
                 headerConditions.put(settings.getOperatorType(), settings.getOperationsGroupList());
+            }else if(settings.getOperatorType().toLowerCase().contains("url")){
+                urlConditions.put(settings.getOperatorType(), settings.getOperationsGroupList());
             }else{
                 payloadConditions.put(settings.getOperatorType(), settings.getOperationsGroupList());
             }
@@ -513,6 +516,16 @@ public class ApiExecutor {
             payloadConditions.getOrDefault(TestEditorEnums.NonTerminalExecutorDataOperands.MODIFY_BODY_PARAM.name(), emptyList), 
             emptyList,
             payloadConditions.getOrDefault(TestEditorEnums.TerminalExecutorDataOperands.DELETE_BODY_PARAM.name(), emptyList)
+        );
+
+        // modify URL parameters using the fetchUrlModifyPayload functionality
+        Utils.modifyUrlParamOperations(originalHttpRequest, 
+            urlConditions.getOrDefault("MODIFY_URL_PARAM", emptyList),
+            "token_replace"
+        );
+        Utils.modifyUrlParamOperations(originalHttpRequest, 
+            urlConditions.getOrDefault("ADD_URL_PARAM", emptyList),
+            "token_insert"
         );
     }
 
@@ -647,21 +660,18 @@ public class ApiExecutor {
 
 
     private static class SseSession {
-        String sessionId;
         String endpoint;
         List<String> messages = new ArrayList<>();
         Response response; // Store the OkHttp Response for cleanup
         Thread readerThread;
     }
 
-    private static SseSession openSseSession(String host, boolean debug) throws Exception {
+    private static SseSession openSseSession(String host, String endpoint, Headers headers, boolean debug) throws Exception {
         SseSession session = new SseSession();
         OkHttpClient client = new OkHttpClient.Builder().build();
-        // header content type = text/event-stream
-        Headers headers = new Headers.Builder()
-            .add("Accept", "text/event-stream")
-            .build();
-        Request request = new Request.Builder().url(host + "/sse").headers(headers).build();
+
+        // Use provided endpoint for the SSE request
+        Request request = new Request.Builder().url(host + endpoint).headers(headers).build();
         Call call = client.newCall(request);
         Response response = call.execute();
         if (!response.isSuccessful()) {
@@ -730,7 +740,18 @@ public class ApiExecutor {
             throw new IllegalArgumentException("URL must be absolute with scheme and host for SSE: " + url);
         }
         String host = uri.getScheme() + "://" + uri.getHost() + (uri.getPort() != -1 ? ":" + uri.getPort() : "");
-        SseSession session = openSseSession(host, debug);
+
+        // Use provided SSE endpoint or default to "/sse"
+        String sseEndpoint = "/sse"; // Default SSE endpoint
+        if (request.getHeaders() != null && request.getHeaders().containsKey("x-akto-sse-endpoint")) {
+            sseEndpoint = request.getHeaders().get("x-akto-sse-endpoint").get(0);
+            // Remove the custom header to avoid sending it to the server
+            request.getHeaders().remove("x-akto-sse-endpoint");
+        }
+        
+        // Open SSE session with dynamic endpoint and request headers
+        Headers headers = request.toOkHttpHeaders();
+        SseSession session = openSseSession(host, sseEndpoint, headers, debug);
 
         // Add sessionId as query param to actual request
         String[] queryParam = session.endpoint.split("\\?");
@@ -789,25 +810,16 @@ public class ApiExecutor {
             return true;
         }
 
-        boolean hasEventStream = false;
-        boolean hasApplicationJson = false;
-
         for (Map.Entry<String, List<String>> entry : request.getHeaders().entrySet()) {
             if (HttpRequestResponseUtils.HEADER_ACCEPT.equalsIgnoreCase(entry.getKey()) && entry.getValue() != null
                 && !entry.getValue().isEmpty()) {
-                for (String value : entry.getValue()) {
-                    if (HttpRequestResponseUtils.TEXT_EVENT_STREAM_CONTENT_TYPE.equalsIgnoreCase(value)) {
-                        hasEventStream = true;
-                    }
-                    if (HttpRequestResponseUtils.APPLICATION_JSON.equalsIgnoreCase(value)) {
-                        hasApplicationJson = true;
-                    }
-                    if (hasEventStream && hasApplicationJson) {
-                        break;
-                    }
+                String value = entry.getValue().get(0).toLowerCase();
+                if (value.contains(HttpRequestResponseUtils.TEXT_EVENT_STREAM_CONTENT_TYPE) && value.contains(
+                    HttpRequestResponseUtils.APPLICATION_JSON)) {
+                    return false;
                 }
             }
         }
-        return !(hasEventStream && hasApplicationJson);
+        return true;
     }
 }

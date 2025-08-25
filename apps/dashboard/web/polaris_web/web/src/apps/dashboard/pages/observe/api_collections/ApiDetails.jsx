@@ -1,5 +1,5 @@
 import LayoutWithTabs from "../../../components/layouts/LayoutWithTabs"
-import { Box, Button, Popover, Modal, Tooltip, ActionList, VerticalStack, HorizontalStack, Tag, Text, LegacyCard } from "@shopify/polaris"
+import { Box, Button, Popover, Modal, Tooltip, ActionList, VerticalStack, HorizontalStack, Tag, Text } from "@shopify/polaris"
 import FlyLayout from "../../../components/layouts/FlyLayout";
 import GithubCell from "../../../components/tables/cells/GithubCell";
 import SampleDataList from "../../../components/shared/SampleDataList";
@@ -13,7 +13,6 @@ import transform from "../transform";
 import ApiDependency from "./ApiDependency";
 import RunTest from "./RunTest";
 import PersistStore from "../../../../main/PersistStore";
-import values from "@/util/values";
 import gptApi from "../../../components/aktoGpt/api";
 import GraphMetric from '../../../components/GraphMetric'
 import { HorizontalDotsMinor, FileMinor } from "@shopify/polaris-icons"
@@ -25,6 +24,7 @@ import ApiIssuesTab from "./ApiIssuesTab";
 
 import Highcharts from 'highcharts';
 import HighchartsMore from 'highcharts/highcharts-more';
+import { getDashboardCategory, mapLabel } from "../../../../main/labelHelper";
 
 HighchartsMore(Highcharts);
 
@@ -84,8 +84,6 @@ function ApiDetails(props) {
     const apiStatsAvailableRef = useRef(false);
     const apiDistributionAvailableRef = useRef(false);
     const [selectedTabId, setSelectedTabId] = useState('values');
-    const apiCollectionMap = PersistStore(state => state.collectionsMap);
-    const hostNameMap = PersistStore.getState().hostNameMap;
 
     const statusFunc = getStatus ? getStatus : (x) => {
         try {
@@ -101,14 +99,14 @@ function ApiDetails(props) {
 
     const standardHeaders = new Set(transform.getStandardHeaderList())
 
-    const getNiceBinSize = (rawSize) => {
-        const magnitude = Math.pow(10, Math.floor(Math.log10(rawSize)));
-        const leading = rawSize / magnitude;
-        if (leading <= 1) return 1 * magnitude;
-        if (leading <= 2) return 2 * magnitude;
-        if (leading <= 5) return 5 * magnitude;
-        return 10 * magnitude;
-    };
+    // const getNiceBinSize = (rawSize) => {
+    //     const magnitude = Math.pow(10, Math.floor(Math.log10(rawSize)));
+    //     const leading = rawSize / magnitude;
+    //     if (leading <= 1) return 1 * magnitude;
+    //     if (leading <= 2) return 2 * magnitude;
+    //     if (leading <= 5) return 5 * magnitude;
+    //     return 10 * magnitude;
+    // };
 
     // // Function to bin data
     // const binData = (rawData, targetBins = 10) => {
@@ -167,11 +165,6 @@ function ApiDetails(props) {
     const fetchDistributionData = async () => {
         try {
             const { apiCollectionId, endpoint, method } = apiDetail;
-
-            const now = new Date();
-            const startOfToday = Math.floor(new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime() / 1000);
-            const startOfTomorrow = startOfToday + 86400; // seconds in a day
-    
             const res = await api.fetchIpLevelApiCallStats(apiCollectionId, endpoint, method, Math.floor(startTime / 60),  Math.floor(endTs / 60));
     
             const bucketStats = res.bucketStats || [];
@@ -761,7 +754,7 @@ function ApiDetails(props) {
     return (
         <div>
             <FlyLayout
-                title="API details"
+                title={`${mapLabel("API details", getDashboardCategory())}`}
                 show={showDetails}
                 setShow={setShowDetails}
                 components={components}

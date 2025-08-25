@@ -2,6 +2,9 @@ package com.akto.dto;
 
 import java.util.List;
 
+import lombok.Getter;
+import lombok.Setter;
+
 public class CustomRole {
 
     public final static String _NAME = "name";
@@ -10,13 +13,17 @@ public class CustomRole {
     public static final String DEFAULT_INVITE_ROLE = "defaultInviteRole";
     private String name;
     private String baseRole;
-    private List<Integer> apiCollectionsId;
+    private List<Integer> apiCollectionsId;    
     boolean defaultInviteRole;
+
+    @Getter
+    @Setter
+    private List<String> allowedFeaturesForUser;
 
     public CustomRole() {
     }
 
-    public CustomRole(String name, String baseRole, List<Integer> apiCollectionsId, boolean defaultInviteRole) {
+    public CustomRole(String name, String baseRole, List<Integer> apiCollectionsId, boolean defaultInviteRole, List<String> allowedFeaturesForUser) {
         switch (baseRole) {
             case "ADMIN":
             case "DEVELOPER":
@@ -31,6 +38,7 @@ public class CustomRole {
         this.name = name;
         this.apiCollectionsId = apiCollectionsId;
         this.defaultInviteRole = defaultInviteRole;
+        this.allowedFeaturesForUser = allowedFeaturesForUser;
     }
 
     public String getName() {

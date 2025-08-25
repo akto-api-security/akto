@@ -4,10 +4,15 @@ package com.akto.utils;
 import org.junit.Test;
 import static org.junit.Assert.*;
 
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashSet;
+import java.util.List;
 
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
+import com.akto.dto.OriginalHttpRequest;
+import com.akto.dto.CollectionConditions.ConditionsType;
 import com.akto.dto.test_editor.Util;
 
 public class TestModifyPayload {
@@ -75,5 +80,37 @@ public class TestModifyPayload {
                 }}));
         boolean result = Util.modifyValueInPayload(root, null, "name", "hello-world");
         assertEquals(result, false);
+    }
+
+    @Test
+    public void testModifyUrlParamOperations() {
+        OriginalHttpRequest originalHttpRequest = new OriginalHttpRequest();
+        originalHttpRequest.setUrl("/api/v1/users/aryan");
+        originalHttpRequest.setMethod("GET");
+        List<ConditionsType> modifyUrlParams = new ArrayList<>();
+        ConditionsType condition = new ConditionsType();
+        condition.setKey("");
+        condition.setValue("umesh");
+        condition.setUrlsList(new HashSet<String>(Arrays.asList("GET /api/v1/users/aryan")));
+        condition.setPosition(4);
+        modifyUrlParams.add(condition);
+        com.akto.testing.Utils.modifyUrlParamOperations(originalHttpRequest, modifyUrlParams, "token_replace");
+        assertEquals(originalHttpRequest.getUrl(), "/api/v1/users/umesh");
+    }
+
+    @Test
+    public void testAddUrlParamOperations() {
+        OriginalHttpRequest originalHttpRequest = new OriginalHttpRequest();
+        originalHttpRequest.setUrl("/api/v1/users/aryan");
+        originalHttpRequest.setMethod("GET");
+        List<ConditionsType> modifyUrlParams = new ArrayList<>();
+        ConditionsType condition = new ConditionsType();
+        condition.setKey("");
+        condition.setValue("umesh");
+        condition.setUrlsList(new HashSet<String>(Arrays.asList("GET /api/v1/users/aryan")));
+        condition.setPosition(5);   
+        modifyUrlParams.add(condition);
+        com.akto.testing.Utils.modifyUrlParamOperations(originalHttpRequest, modifyUrlParams, "token_insert");
+        assertEquals(originalHttpRequest.getUrl(), "/api/v1/users/aryan/umesh");
     }
 }

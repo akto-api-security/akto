@@ -726,6 +726,7 @@ public class InventoryAction extends UserAction {
                     boolean isHeader = value.contains("header");
                     boolean isUrlParam = value.contains("urlParam");
                     boolean isPayload = value.contains("payload");
+                    boolean isQueryParam = value.contains("queryParam");
                     ArrayList<Bson> locationFilters = new ArrayList<>();
                     if (isHeader) {
                         locationFilters.add(Filters.eq(SingleTypeInfo._IS_HEADER, true));
@@ -739,6 +740,9 @@ public class InventoryAction extends UserAction {
                                 Filters.or(
                                         Filters.exists(SingleTypeInfo._IS_URL_PARAM, false),
                                         Filters.eq(SingleTypeInfo._IS_URL_PARAM, false))));
+                    }
+                    if (isQueryParam) {
+                        locationFilters.add(Filters.eq("isQueryParam", true));
                     }
                     filterList.add(Filters.or(locationFilters));
                     break;

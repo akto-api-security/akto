@@ -29,12 +29,26 @@ export default {
         return request({
             url: '/api/fetchRecentParams',
             method: 'post',
-            data: {
-                startTimestamp,
-                endTimestamp
-            }
+            data: { startTimestamp, endTimestamp }
         })
     },
+    async fetchAuditData(sortKey, sortOrder, skip, limit, filters, filterOperators) {
+        const resp = await request({
+            url: '/api/fetchAuditData',
+            method: 'post',
+            data: { sortKey, sortOrder, skip, limit, filters, filterOperators }
+        });
+        return resp;
+    },
+    async updateAuditData(hexId, remarks) {
+            const resp = await request({
+                url: '/api/updateAuditData',
+                method: 'post',
+                data: { hexId, remarks }
+            });
+            return resp;
+        },
+
     async fetchDataTypeNames() {
         const resp = await request({
             url: '/api/fetchDataTypeNames',
@@ -926,6 +940,17 @@ export default {
             method: 'post',
             data: {}
         })
+    },
+
+    async getApiSequences(apiCollectionId) {
+        const resp = await request({
+            url: '/api/getApiSequences',
+            method: 'post',
+            data: {
+                apiCollectionId: apiCollectionId
+            }
+        })
+        return resp
     }
 
 }

@@ -23,6 +23,7 @@ import { CellType } from "@/apps/dashboard/components/tables/rows/GithubRow";
 import LocalStore from "../../../main/LocalStorageStore";
 import GetPrettifyEndpoint from "@/apps/dashboard/pages/observe/GetPrettifyEndpoint";
 import JiraTicketDisplay from "../../components/shared/JiraTicketDisplay";
+import { getMethod } from "../observe/GetPrettifyEndpoint";
 
 let headers = [
     {
@@ -825,8 +826,9 @@ convertSubIntoSubcategory(resp){
 },
 getUrlComp(url){
   let arr = url.split(' ')
-  const method = arr[0]
   const endpoint = arr[1]
+  const method = getMethod(endpoint, arr[0]);
+  const finalEndpoint = observeFunc.getTruncatedUrl(endpoint)
 
   return(
     <HorizontalStack gap={1}>
@@ -835,7 +837,7 @@ getUrlComp(url){
           <Text variant="bodyMd" fontWeight="medium" color="subdued">{method}</Text>
         </HorizontalStack>
       </Box>
-      <div style={{fontSize: '14px', lineHeight: '20px', color: '#202223'}} data-testid="affected_endpoints">{endpoint}</div>
+      <div style={{fontSize: '14px', lineHeight: '20px', color: '#202223'}} data-testid="affected_endpoints">{finalEndpoint}</div>
     </HorizontalStack>
   )
 },
@@ -975,6 +977,7 @@ getPrettifiedTestRunResults(testRunResults){
   let prettifiedResults = []
   Object.keys(testRunResultsObj).forEach((key)=>{
     let obj = testRunResultsObj[key]
+    console.log("testing:", obj.urls);
     let prettifiedObj = {
       ...obj,
       nameComp: <div data-testid={obj.name}><Box maxWidth="250px"><TooltipText tooltip={obj.name} text={obj.name} textProps={{fontWeight: 'medium'}}/></Box></div>,
