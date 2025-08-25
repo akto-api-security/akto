@@ -27,6 +27,7 @@ public class ClientLayer {
 
     private static final Logger logger = LoggerFactory.getLogger(ClientLayer.class);
     private static final String url = System.getenv("TESTING_DB_LAYER_SERVICE_URL");
+    private static final boolean dbMergingMode = System.getenv().getOrDefault("DB_MERGING_MODE", "false").equals("true");
     private static final CodecRegistry codecRegistry = DaoInit.createCodecRegistry();
     private static final Gson gson = new Gson();
     ObjectMapper objectMapper = new ObjectMapper().configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false).configure(DeserializationFeature.FAIL_ON_INVALID_SUBTYPE, false).configure(DeserializationFeature.FAIL_ON_IGNORED_PROPERTIES, false);
@@ -212,6 +213,7 @@ public class ClientLayer {
         BasicDBObject obj = new BasicDBObject();
         obj.put("apiCollectionId", apiCollectionId);
         obj.put("offset", offset);
+        obj.put("dbMergingMode", dbMergingMode);
         List<SampleDataAlt> results = new ArrayList<>();
         OriginalHttpRequest request = new OriginalHttpRequest(url + "/fetchSampleData", "", "POST", obj.toString(), headers, "");
         try {
