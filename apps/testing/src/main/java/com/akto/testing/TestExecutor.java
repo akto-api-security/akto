@@ -1261,7 +1261,6 @@ public class TestExecutor {
                 if (methodIndex != -1) {
                     // Remove everything from method name onwards
                     String trimmedUrl = url.substring(0, methodIndex);
-                    apiInfoKey.setUrl(trimmedUrl);
                     rawApi.getRequest().setUrl(trimmedUrl);
                 }
             }
