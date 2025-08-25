@@ -1371,7 +1371,6 @@
             </result>
         </action>
 
-
         <action name="api/fetchAllUrlsAndMethods" class="com.akto.action.observe.InventoryAction" method="fetchAllUrlsAndMethods">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />

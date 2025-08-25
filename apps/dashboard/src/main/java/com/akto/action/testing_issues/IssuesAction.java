@@ -101,6 +101,10 @@ public class IssuesAction extends UserAction {
     private boolean showApiInfo;
     @Getter
     private List<ApiInfo> buaCategoryApiInfo = new ArrayList<>();
+    @Setter
+    String categoryType;
+    @Getter
+    int endpointsCount;
 
     public boolean isShowApiInfo() {
         return showApiInfo;

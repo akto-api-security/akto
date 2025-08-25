@@ -165,7 +165,7 @@ function HomeDashboard() {
 
     const fetchData = async () => {
         setLoading(true)
-        // all apis 
+        // all apis
         let apiPromises = [
             observeApi.getUserEndpoints(),
             api.findTotalIssues(startTimestamp, endTimestamp),
@@ -183,8 +183,8 @@ function HomeDashboard() {
         let fetchEndpointsCountResp = results[3].status === 'fulfilled' ? results[3].value : {}
         let issueSeverityMap = results[4].status === 'fulfilled' ? results[4].value : {}
         let missingApiInfoData = results[5].status === 'fulfilled' ? results[5].value : {}
-        const totalRedundantApis = missingApiInfoData?.redundantApiInfoKeys || 0  
-        const totalMissingApis = missingApiInfoData?.totalMissing|| 0 
+        const totalRedundantApis = missingApiInfoData?.redundantApiInfoKeys || 0
+        const totalMissingApis = missingApiInfoData?.totalMissing|| 0
 
         setShowBannerComponent(!userEndpoints)
 
@@ -215,9 +215,16 @@ function HomeDashboard() {
     async function getActionItemsDataAndCount() {
         const data = await fetchActionItemsData();
         setActionItemsData(data);
+        const excludeKeys = new Set([
+            'numBatches',
+            'highRiskNumBatches',
+            'shadowNumBatches',
+            'notTestedNumBatches'
+        ]);
         let count = 0;
-        Object.values(data).forEach((val) => {
-            if (val > 0) count++;
+        Object.entries(data).forEach(([key, val]) => {
+            if (excludeKeys.has(key)) return;
+            if (typeof val === 'number' && val > 0) count++;
         });
         setActionItemsCount(count);
     }
@@ -347,7 +354,7 @@ function HomeDashboard() {
             accessTypeMap["Need more data"].text = countMissing;
             accessTypeMap["Need more data"].dataTableComponent = generateChangeComponent(0, false);
         }
-        
+
         setAccessTypeMap(accessTypeMap)
     }
 
@@ -396,7 +403,7 @@ function HomeDashboard() {
             };
         }
 
-        
+
         setAuthMap(authMap)
     }
 

@@ -8,15 +8,93 @@ export async function fetchActionItemsData() {
     const endTimestamp = func.timeNow();
     const startTimestamp = endTimestamp - 3600 * 24 * 7;
 
+    // Fetch total count for batching (Sensitive & Unauthenticated)
+    const initialResp = await api.fetchSensitiveAndUnauthenticatedValue(false, 0, 1);
+    const totalCount = initialResp?.sensitiveUnauthenticatedEndpointsCount || 0;
+    const limit = 500;
+    const numBatches = Math.ceil(totalCount / limit);
+    let batchPromises = [];
+    for (let i = 0; i < numBatches; i++) {
+        batchPromises.push(api.fetchSensitiveAndUnauthenticatedValue(false, i * limit, limit));
+    }
+    const batchResults = await Promise.allSettled(batchPromises);
+    let sensitiveAndUnauthenticatedCount = 0;
+    let allApiInfo = [];
+    for (const result of batchResults) {
+        if (result.status === 'fulfilled') {
+            sensitiveAndUnauthenticatedCount += result.value?.sensitiveUnauthenticatedEndpointsCount || 0;
+            if (result.value?.sensitiveUnauthenticatedEndpointsApiInfo) {
+                allApiInfo.push(...result.value.sensitiveUnauthenticatedEndpointsApiInfo);
+            }
+        }
+    }
+
+    // Fetch High Risk Third Party
+    const highRiskInitialResp = await api.fetchHighRiskThirdPartyValue(false, 0, 1);
+    const highRiskTotalCount = highRiskInitialResp?.highRiskThirdPartyEndpointsCount || 0;
+    const highRiskNumBatches = Math.ceil(highRiskTotalCount / limit);
+    let highRiskBatchPromises = [];
+    for (let i = 0; i < highRiskNumBatches; i++) {
+        highRiskBatchPromises.push(api.fetchHighRiskThirdPartyValue(false, i * limit, limit));
+    }
+    const highRiskBatchResults = await Promise.allSettled(highRiskBatchPromises);
+    let highRiskThirdPartyCount = 0;
+    let allHighRiskThirdPartyApiInfo = [];
+    for (const result of highRiskBatchResults) {
+        if (result.status === 'fulfilled') {
+            highRiskThirdPartyCount += result.value?.highRiskThirdPartyEndpointsCount || 0;
+            if (result.value?.highRiskThirdPartyEndpointsApiInfo) {
+                allHighRiskThirdPartyApiInfo.push(...result.value.highRiskThirdPartyEndpointsApiInfo);
+            }
+        }
+    }
+
+    // Fetch Shadow APIs
+    const shadowInitialResp = await api.fetchShadowApisValue(false, 0, 1);
+    const shadowTotalCount = shadowInitialResp?.shadowApisCount || 0;
+    const shadowNumBatches = Math.ceil(shadowTotalCount / limit);
+    let shadowBatchPromises = [];
+    for (let i = 0; i < shadowNumBatches; i++) {
+        shadowBatchPromises.push(api.fetchShadowApisValue(false, i * limit, limit));
+    }
+    const shadowBatchResults = await Promise.allSettled(shadowBatchPromises);
+    let shadowApisCount = 0;
+    let allShadowApisInfo = [];
+    for (const result of shadowBatchResults) {
+        if (result.status === 'fulfilled') {
+            shadowApisCount += result.value?.shadowApisCount || 0;
+            if (result.value?.shadowApisInfo) {
+                allShadowApisInfo.push(...result.value.shadowApisInfo);
+            }
+        }
+    }
+
+    // Fetch Not Tested APIs
+    const notTestedInitialResp = await api.getNotTestedAPICount(false, 0, 1);
+    const notTestedTotalCount = notTestedInitialResp?.notTestedEndpointsCount || 0;
+    const notTestedNumBatches = Math.ceil(notTestedTotalCount / limit);
+    let notTestedBatchPromises = [];
+    for (let i = 0; i < notTestedNumBatches; i++) {
+        notTestedBatchPromises.push(api.getNotTestedAPICount(false, i * limit, limit));
+    }
+    const notTestedBatchResults = await Promise.allSettled(notTestedBatchPromises);
+    let notTestedApiCountCombined = 0;
+    let allNotTestedEndpointsApiInfo = [];
+    for (const result of notTestedBatchResults) {
+        if (result.status === 'fulfilled') {
+            notTestedApiCountCombined += result.value?.notTestedEndpointsCount || 0;
+            if (result.value?.notTestedEndpointsApiInfo) {
+                allNotTestedEndpointsApiInfo.push(...result.value.notTestedEndpointsApiInfo);
+            }
+        }
+    }
+
     const subCategoryMap = LocalStore.getState().subCategoryMap || {};
     const allSubCategories = Object.keys(subCategoryMap);
 
     const results = await Promise.allSettled([
         api.fetchApiStats(startTimestamp, endTimestamp),
         observeApi.fetchCountMapOfApis(),
-        api.fetchSensitiveAndUnauthenticatedValue(false),
-        api.fetchHighRiskThirdPartyValue(false),
-        api.fetchShadowApisValue(false),
         settingsModule.fetchAdminInfo(),
         api.fetchUnauthenticatedApis(false),
         api.getNotTestedAPICount(false),
@@ -31,9 +109,6 @@ export async function fetchActionItemsData() {
     const [
         apiStatsResult,
         countMapRespResult,
-        sensitiveAndUnauthenticatedValueResult,
-        highRiskThirdPartyValueResult,
-        shadowApisValueResult,
         adminSettingsResult,
         unauthenticatedApisResult,
         notTestedApiCountResult,
@@ -47,9 +122,6 @@ export async function fetchActionItemsData() {
 
     const apiStats = apiStatsResult.status === 'fulfilled' ? apiStatsResult.value : null;
     const countMapResp = countMapRespResult.status === 'fulfilled' ? countMapRespResult.value : null;
-    const sensitiveAndUnauthenticatedCount = sensitiveAndUnauthenticatedValueResult.status === 'fulfilled' ? sensitiveAndUnauthenticatedValueResult.value.sensitiveUnauthenticatedEndpointsCount || 0 : 0;
-    const highRiskThirdPartyCount = highRiskThirdPartyValueResult.status === 'fulfilled' ? highRiskThirdPartyValueResult.value.highRiskThirdPartyEndpointsCount || 0 : 0;
-    const shadowApisCount = shadowApisValueResult.status === 'fulfilled' ? shadowApisValueResult.value.shadowApisCount || 0 : 0;
     const adminSettings = adminSettingsResult.status === 'fulfilled' ? adminSettingsResult.value.resp : {};
     const unauthenticatedApis = unauthenticatedApisResult.status === 'fulfilled' ? unauthenticatedApisResult.value.unauthenticatedApis || 0 : 0;
     const jiraTicketUrlMap = adminSettings?.jiraTicketUrlMap || {};
@@ -57,7 +129,7 @@ export async function fetchActionItemsData() {
     const urlsByIssues = urlsByIssuesResult.status === 'fulfilled' ? urlsByIssuesResult.value : null;
     const brokenAuthIssuesResp = brokenAuthIssuesResult.status === 'fulfilled' ? brokenAuthIssuesResult.value : null;
     const urlsByIssuesTotalCount = urlsByIssues && typeof urlsByIssues.totalCount === 'number' ? urlsByIssues.totalCount : 0;
-    // Count URLs where value is >= 2
+
     let highValueIssuesCount = 0;
     if (issuesByApis && issuesByApis.countByAPIs && typeof issuesByApis.countByAPIs === 'object') {
         highValueIssuesCount = Object.values(issuesByApis.countByAPIs).filter(value => value >= 2).length;
@@ -75,7 +147,6 @@ export async function fetchActionItemsData() {
 
     if (apiStats?.apiStatsEnd && apiStats?.apiStatsStart) {
         const { apiStatsEnd, apiStatsStart } = apiStats;
-
         highRiskCount = Object.entries(apiStatsEnd.riskScoreMap || {})
             .filter(([score]) => parseInt(score) > 3)
             .reduce((total, [, count]) => total + count, 0);
@@ -95,31 +166,63 @@ export async function fetchActionItemsData() {
         onlyOnceTestedApiCount,
         vulnerableApiCount,
         misConfiguredTestsCount,
+        numBatches,
+        allApiInfo,
+        highRiskNumBatches,
+        allHighRiskThirdPartyApiInfo,
+        shadowNumBatches,
+        allShadowApisInfo,
+        notTestedNumBatches,
+        allNotTestedEndpointsApiInfo,
         brokenAuthIssuesCount,
-        highValueIssuesCount, 
+        highValueIssuesCount,
         issuesByApis,
         urlsByIssues,
         urlsByIssuesTotalCount
     };
 }
 
-
 export async function fetchAllActionItemsApiInfo() {
+    const limit = 500;
+    const types = ['HIGH_RISK', 'SENSITIVE', 'THIRD_PARTY'];
+    let allResults = {};
     const subCategoryMap = LocalStore.getState().subCategoryMap || {};
     const allSubCategories = Object.keys(subCategoryMap);
+
+    for (const type of types) {
+        const initialResp = await api.fetchActionItemsApiInfo(type, 0, 1);
+        const totalCount = initialResp?.response?.totalCount || 0;
+        const numBatches = Math.ceil(totalCount / limit);
+        let batchPromises = [];
+        for (let i = 0; i < numBatches; i++) {
+            batchPromises.push(api.fetchActionItemsApiInfo(type, i * limit, limit));
+        }
+        const batchResults = await Promise.allSettled(batchPromises);
+        let allApiInfos = [];
+        for (const result of batchResults) {
+            if (result.status === 'fulfilled' && result.value?.response?.apiInfos) {
+                allApiInfos.push(...result.value.response.apiInfos);
+            }
+        }
+        allResults[type] = {
+            apiInfos: allApiInfos,
+            numBatches,
+            totalCount
+        };
+    }
 
     const results = await Promise.allSettled([
         api.fetchSensitiveAndUnauthenticatedValue(true),
         api.fetchHighRiskThirdPartyValue(true),
         api.fetchShadowApisValue(true),
         api.fetchUnauthenticatedApis(true),
-        api.fetchActionItemsApiInfo('HIGH_RISK'),
-        api.fetchActionItemsApiInfo('SENSITIVE'),
-        api.fetchActionItemsApiInfo('THIRD_PARTY'),
         api.getNotTestedAPICount(true),
         api.getOnlyOnceTestedAPICount(true),
         api.getMisConfiguredTestsCount(true),
         api.getVulnerableApiCount(true),
+        api.fetchActionItemsApiInfo('HIGH_RISK'),
+        api.fetchActionItemsApiInfo('SENSITIVE'),
+        api.fetchActionItemsApiInfo('THIRD_PARTY'),
         api.fetchBrokenAuthenticationIssues(allSubCategories, true),
         api.fetchIssuesByApis(true),
         api.fetchUrlsByIssues(true)
@@ -130,13 +233,13 @@ export async function fetchAllActionItemsApiInfo() {
         highRiskThirdPartyValueResult,
         shadowApisValueResult,
         unauthenticatedApisResult,
-        highRiskResult,
-        sensitiveResult,
-        thirdPartyResult,
         notTestedApiInfoResult,
         onlyOnceTestedApiInfoResult,
         misConfiguredTestsApiInfoResult,
         vulnerableApiCountResult,
+        highRiskResult,
+        sensitiveResult,
+        thirdPartyResult,
         brokenAuthIssuesApiInfoResult,
         issuesByApisResult,
         urlsByIssuesResult
@@ -157,7 +260,6 @@ export async function fetchAllActionItemsApiInfo() {
     const issuesByApisForAllActionItems = issuesByApisResult.status === 'fulfilled' ? issuesByApisResult.value : null;
     const urlsByIssuesForAllActionItems = urlsByIssuesResult.status === 'fulfilled' ? urlsByIssuesResult.value : null;
 
-
     const multipleIssuesApiInfo = Array.isArray(issuesByApisForAllActionItems?.issueNamesByAPIs)
         ? issuesByApisForAllActionItems.issueNamesByAPIs
             .map(item => {
@@ -177,12 +279,12 @@ export async function fetchAllActionItemsApiInfo() {
         highRiskThirdParty: highRiskThirdPartyApis,
         shadowApis: shadowApis,
         sensitiveAndUnauthenticated: sensitiveAndUnauthenticatedApis,
-        notTestedEndpointsApiInfo: notTestedEndpointsApiInfo,
-        onlyOnceTestedEndpointsApiInfo: onlyOnceTestedEndpointsApiInfo,
-        misConfiguredTestsApiInfo: misConfiguredTestsApiInfo,
-        vulnerableApiCountApiInfo: vulnerableApiCountApiInfo,
-        brokenAuthIssuesApiInfo: brokenAuthIssuesApiInfo,
-        multipleIssuesApiInfo: multipleIssuesApiInfo,
-        urlsByIssues: urlsByIssuesForAllActionItems,
+        notTestedEndpointsApiInfo,
+        onlyOnceTestedEndpointsApiInfo,
+        misConfiguredTestsApiInfo,
+        vulnerableApiCountApiInfo,
+        brokenAuthIssuesApiInfo,
+        multipleIssuesApiInfo,
+        urlsByIssues: urlsByIssuesForAllActionItems
     };
 }

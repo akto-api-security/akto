@@ -92,12 +92,12 @@ public class ApiCollectionsAction extends UserAction {
     }
 
     boolean redacted;
-    
+
     public List<ApiCollection> fillApiCollectionsUrlCount(List<ApiCollection> apiCollections, Bson filter) {
-	int tsRandom = Context.now();
-	loggerMaker.debugAndAddToDb("fillApiCollectionsUrlCount started: " + tsRandom, LoggerMaker.LogDb.DASHBOARD);
+        int tsRandom = Context.now();
+        loggerMaker.debugAndAddToDb("fillApiCollectionsUrlCount started: " + tsRandom, LoggerMaker.LogDb.DASHBOARD);
         Map<Integer, Integer> countMap = ApiCollectionsDao.instance.buildEndpointsCountToApiCollectionMap(filter);
-	loggerMaker.debugAndAddToDb("fillApiCollectionsUrlCount buildEndpointsCountToApiCollectionMap done: " + tsRandom, LoggerMaker.LogDb.DASHBOARD);
+        loggerMaker.debugAndAddToDb("fillApiCollectionsUrlCount buildEndpointsCountToApiCollectionMap done: " + tsRandom, LoggerMaker.LogDb.DASHBOARD);
 
         for (ApiCollection apiCollection: apiCollections) {
             int apiCollectionId = apiCollection.getId();
@@ -112,7 +112,7 @@ public class ApiCollectionsAction extends UserAction {
                 apiCollection.setUrlsCount(count);
             } else {
                 /*
-                 * In case the default collection is filled by traffic-collector traffic, 
+                 * In case the default collection is filled by traffic-collector traffic,
                  * the count will not be null, but the fallbackCount would be zero
                  */
                 if (apiCollectionId == 0 && count != null) {
@@ -152,7 +152,7 @@ public class ApiCollectionsAction extends UserAction {
         }
 
         this.deactivatedHostnameCountMap = ApiCollectionsDao.instance.buildEndpointsCountToApiCollectionMap(
-            Filters.in(SingleTypeInfo._COLLECTION_IDS, deactivatedIds)
+                Filters.in(SingleTypeInfo._COLLECTION_IDS, deactivatedIds)
         );
         return SUCCESS.toUpperCase();
     }
@@ -193,8 +193,8 @@ public class ApiCollectionsAction extends UserAction {
         // remove the cache of context collections for account
         UsersCollectionsList.deleteContextCollectionsForUser(Context.accountId.get(), Context.contextSource.get());
         pipeLine.add(Aggregates.project(Projections.fields(
-            Projections.computed(ApiCollection.URLS_COUNT, new BasicDBObject("$size", new BasicDBObject("$ifNull", Arrays.asList("$urls", Collections.emptyList())))),
-            Projections.include(ApiCollection.ID, ApiCollection.NAME, ApiCollection.HOST_NAME, ApiCollection._TYPE, ApiCollection.TAGS_STRING, ApiCollection._DEACTIVATED,ApiCollection.START_TS, ApiCollection.AUTOMATED, ApiCollection.DESCRIPTION, ApiCollection.USER_ENV_TYPE, ApiCollection.IS_OUT_OF_TESTING_SCOPE)
+                Projections.computed(ApiCollection.URLS_COUNT, new BasicDBObject("$size", new BasicDBObject("$ifNull", Arrays.asList("$urls", Collections.emptyList())))),
+                Projections.include(ApiCollection.ID, ApiCollection.NAME, ApiCollection.HOST_NAME, ApiCollection._TYPE, ApiCollection.TAGS_STRING, ApiCollection._DEACTIVATED,ApiCollection.START_TS, ApiCollection.AUTOMATED, ApiCollection.DESCRIPTION, ApiCollection.USER_ENV_TYPE, ApiCollection.IS_OUT_OF_TESTING_SCOPE)
         )));
 
         try {
@@ -211,7 +211,7 @@ public class ApiCollectionsAction extends UserAction {
                 this.apiCollections.add(apiCollection);
             } catch (Exception e) {
                 e.printStackTrace();
-            }   
+            }
         }
 
         this.apiCollections = fillApiCollectionsUrlCount(this.apiCollections, Filters.nin(SingleTypeInfo._API_COLLECTION_ID, deactivatedCollections));
@@ -276,7 +276,7 @@ public class ApiCollectionsAction extends UserAction {
         try {
             int userId = Context.userId.get();
             int accountId = Context.accountId.get();
-    
+
             /*
              * Since admin has all access, we don't update any collections for them.
              */
@@ -289,24 +289,24 @@ public class ApiCollectionsAction extends UserAction {
                     Updates.addToSet(RBAC.API_COLLECTIONS_ID, apiCollection.getId()),
                     new UpdateOptions().upsert(false)
             );
-    
+
             UsersCollectionsList.deleteCollectionIdsFromCache(userId, accountId);
             // remove the cache of context collections for account
             UsersCollectionsList.deleteContextCollectionsForUser(Context.accountId.get(), Context.contextSource.get());
         } catch(Exception e){
         }
-        
+
         ActivitiesDao.instance.insertActivity("Collection created", "new Collection " + this.collectionName + " created");
 
         return Action.SUCCESS.toUpperCase();
     }
 
     public String deleteCollection() {
-        
+
         this.apiCollections = new ArrayList<>();
         this.apiCollections.add(new ApiCollection(apiCollectionId, null, 0, null, null, 0, false, true));
         return this.deleteMultipleCollections();
-    } 
+    }
 
     public String deleteMultipleCollections() {
         List<Integer> apiCollectionIds = new ArrayList<>();
@@ -359,7 +359,7 @@ public class ApiCollectionsAction extends UserAction {
             int userId = Context.userId.get();
             int accountId = Context.accountId.get();
             UsersCollectionsList.deleteCollectionIdsFromCache(userId, accountId);
-            
+
             // remove the cache of context collections for account
             UsersCollectionsList.deleteContextCollectionsForUser(Context.accountId.get(), Context.contextSource.get());
         } catch (Exception e) {
@@ -422,7 +422,7 @@ public class ApiCollectionsAction extends UserAction {
             addActionError("Error deleting APIs");
             return ERROR.toUpperCase();
         }
-        
+
         return SUCCESS.toUpperCase();
     }
 
@@ -527,7 +527,7 @@ public class ApiCollectionsAction extends UserAction {
         }
 
         ApiCollectionUsers.computeCollectionsForCollectionId(apiCollection.getConditions(), apiCollection.getId());
-        
+
         return SUCCESS.toUpperCase();
     }
 
@@ -553,8 +553,8 @@ public class ApiCollectionsAction extends UserAction {
 
     public String redactCollection() {
         List<Bson> updates = Arrays.asList(
-            Updates.set(ApiCollection.REDACT, redacted),
-            Updates.set(ApiCollection.SAMPLE_COLLECTIONS_DROPPED, !redacted)
+                Updates.set(ApiCollection.REDACT, redacted),
+                Updates.set(ApiCollection.SAMPLE_COLLECTIONS_DROPPED, !redacted)
         );
         ApiCollectionsDao.instance.updateOneNoUpsert(Filters.eq("_id", apiCollectionId), Updates.combine(updates));
         if(redacted){
@@ -615,15 +615,15 @@ public class ApiCollectionsAction extends UserAction {
          * Use Unwind to unwind the collectionIds field resulting in a document for each collectionId in the collectionIds array
          */
         UnwindOptions unwindOptions = new UnwindOptions();
-        unwindOptions.preserveNullAndEmptyArrays(false);  
+        unwindOptions.preserveNullAndEmptyArrays(false);
         pipeline.add(Aggregates.unwind("$collectionIds", unwindOptions));
 
         BasicDBObject groupId = new BasicDBObject("apiCollectionId", "$collectionIds");
         pipeline.add(Aggregates.sort(
-            Sorts.descending(ApiInfo.RISK_SCORE)
+                Sorts.descending(ApiInfo.RISK_SCORE)
         ));
         pipeline.add(Aggregates.group(groupId,
-            Accumulators.max(ApiInfo.RISK_SCORE, "$riskScore")
+                Accumulators.max(ApiInfo.RISK_SCORE, "$riskScore")
         ));
 
         MongoCursor<BasicDBObject> cursor = ApiInfoDao.instance.getMCollection().aggregate(pipeline, BasicDBObject.class).cursor();
@@ -673,8 +673,8 @@ public class ApiCollectionsAction extends UserAction {
         Bson deactivatedFilter = Filters.eq(ApiCollection._DEACTIVATED, true);
         if(!deactivated){
             deactivatedFilter = Filters.or(
-                Filters.exists(ApiCollection._DEACTIVATED, false),
-                Filters.eq(ApiCollection._DEACTIVATED, false)
+                    Filters.exists(ApiCollection._DEACTIVATED, false),
+                    Filters.eq(ApiCollection._DEACTIVATED, false)
             );
         }
 
@@ -742,8 +742,8 @@ public class ApiCollectionsAction extends UserAction {
                 return ERROR.toUpperCase();
             }
             ApiCollectionsDao.instance.updateMany(
-                Filters.in(ApiCollection.ID, this.apiCollectionIds),
-                Updates.set(ApiCollection.IS_OUT_OF_TESTING_SCOPE, !this.currentIsOutOfTestingScopeVal)
+                    Filters.in(ApiCollection.ID, this.apiCollectionIds),
+                    Updates.set(ApiCollection.IS_OUT_OF_TESTING_SCOPE, !this.currentIsOutOfTestingScopeVal)
             );
             response = new BasicDBObject();
             response.put("success", true);
@@ -781,7 +781,7 @@ public class ApiCollectionsAction extends UserAction {
     private List<CollectionTags> envType;
     private boolean resetEnvTypes;
 
-	public String updateEnvType(){
+    public String updateEnvType(){
         if(!resetEnvTypes && (envType == null || envType.isEmpty())) {
             addActionError("Please enter a valid ENV type.");
             return Action.ERROR.toUpperCase();
@@ -792,9 +792,9 @@ public class ApiCollectionsAction extends UserAction {
             updateOptions.upsert(false);
 
             /*
-            * User can only update collections which they have access to.
-            * so we remove entries which are not in the collections access list.
-            */
+             * User can only update collections which they have access to.
+             * so we remove entries which are not in the collections access list.
+             */
             try {
                 List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
                 if(collectionIds != null) {
@@ -917,7 +917,7 @@ public class ApiCollectionsAction extends UserAction {
             Set<Integer> apiCollections = new HashSet<>(entry.getValue());
 
             /*
-             * Need actual role, not base role, 
+             * Need actual role, not base role,
              * thus using direct Rbac query, not cached map.
              */
             RBAC rbac = RBACDao.instance.findOne(Filters.and(
@@ -975,11 +975,11 @@ public class ApiCollectionsAction extends UserAction {
         }
 
         ApiCollectionsDao.instance.updateOne(
-            Filters.eq(ApiCollection.ID, apiCollectionId),
-            Updates.combine(
-                Updates.set(ApiCollection.NAME, collectionName),
-                Updates.set("displayName", collectionName)
-            )
+                Filters.eq(ApiCollection.ID, apiCollectionId),
+                Updates.combine(
+                        Updates.set(ApiCollection.NAME, collectionName),
+                        Updates.set("displayName", collectionName)
+                )
         );
 
         return Action.SUCCESS.toUpperCase();
@@ -1024,9 +1024,9 @@ public class ApiCollectionsAction extends UserAction {
     public String fetchHighRiskThirdPartyValue() {
         Bson filterQ = UsageMetricCalculator.excludeDemosAndDeactivated(ApiInfo.ID_API_COLLECTION_ID);
         Bson filter = Filters.and(
-            filterQ,
-            Filters.gte(ApiInfo.RISK_SCORE, 4),
-            Filters.in(ApiInfo.API_ACCESS_TYPES, ApiInfo.ApiAccessType.THIRD_PARTY)
+                filterQ,
+                Filters.gte(ApiInfo.RISK_SCORE, 4),
+                Filters.in(ApiInfo.API_ACCESS_TYPES, ApiInfo.ApiAccessType.THIRD_PARTY)
         );
 
         if (this.showApiInfo) {
@@ -1042,10 +1042,10 @@ public class ApiCollectionsAction extends UserAction {
     public String fetchShadowApisValue() {
         ApiCollection shadowApisCollection = ApiCollectionsDao.instance.findByName(AKTO_DISCOVERED_APIS_COLLECTION);
         if (shadowApisCollection != null) {
-            
+
             if (this.showApiInfo) {
                 this.shadowApisApiInfo = ApiInfoDao.instance.findAll(
-                    Filters.eq(ApiInfo.ID_API_COLLECTION_ID, shadowApisCollection.getId())
+                        Filters.eq(ApiInfo.ID_API_COLLECTION_ID, shadowApisCollection.getId())
                 );
                 this.shadowApisCount = shadowApisApiInfo.size();
             }else{
@@ -1056,28 +1056,28 @@ public class ApiCollectionsAction extends UserAction {
         return Action.SUCCESS.toUpperCase();
     }
 
-    private String filterType; 
-    
+    private String filterType;
+
     public String fetchActionItemsApiInfo() {
         Bson filterQ = UsageMetricCalculator.excludeDemosAndDeactivated(ApiInfo.ID_API_COLLECTION_ID);
         List<ApiInfo> result = new ArrayList<>();
-        
+
         switch (filterType) {
             case "HIGH_RISK":
                 Bson highRiskFilter = Filters.and(
-                    filterQ,
-                    Filters.gt(ApiInfo.RISK_SCORE, 3)
+                        filterQ,
+                        Filters.gt(ApiInfo.RISK_SCORE, 3)
                 );
                 result = ApiInfoDao.instance.findAll(highRiskFilter);
                 break;
-                
+
             case "SENSITIVE":
                 Bson sensitiveFilter = SingleTypeInfoDao.instance.filterForSensitiveParamsExcludingUserMarkedSensitive(
-                    null, null, null, null
+                        null, null, null, null
                 );
                 List<SingleTypeInfo> sensitiveSTIs = SingleTypeInfoDao.instance.findAll(sensitiveFilter);
                 java.util.Set<String> seen = new java.util.HashSet<>();
-                
+
                 for (SingleTypeInfo sti : sensitiveSTIs) {
                     int collectionId = sti.getApiCollectionId();
                     String url = sti.getUrl();
@@ -1096,13 +1096,13 @@ public class ApiCollectionsAction extends UserAction {
                     }
                 }
                 break;
-                
+
             case "THIRD_PARTY":
                 int sevenDaysAgo = (int) (System.currentTimeMillis() / 1000) - 604800; // 7 days in seconds
                 Bson thirdPartyFilter = Filters.and(
-                    filterQ,
-                    Filters.gte(ApiInfo.LAST_SEEN, sevenDaysAgo),
-                    Filters.in(ApiInfo.API_ACCESS_TYPES, ApiInfo.ApiAccessType.THIRD_PARTY)
+                        filterQ,
+                        Filters.gte(ApiInfo.LAST_SEEN, sevenDaysAgo),
+                        Filters.in(ApiInfo.API_ACCESS_TYPES, ApiInfo.ApiAccessType.THIRD_PARTY)
                 );
                 result = ApiInfoDao.instance.findAll(thirdPartyFilter);
                 break;
@@ -1120,14 +1120,14 @@ public class ApiCollectionsAction extends UserAction {
                 addActionError("Invalid filter type: " + filterType);
                 return Action.ERROR.toUpperCase();
         }
-        
+
         BasicDBObject response = new BasicDBObject();
         response.put("apiInfos", result);
-        
+
         this.response = response;
         return Action.SUCCESS.toUpperCase();
     }
-    
+
     public void setFilterType(String filterType) {
         this.filterType = filterType;
     }
@@ -1148,7 +1148,7 @@ public class ApiCollectionsAction extends UserAction {
     public int getApiCollectionId() {
         return this.apiCollectionId;
     }
-  
+
     public void setApiCollectionId(int apiCollectionId) {
         this.apiCollectionId = apiCollectionId;
     }
@@ -1214,8 +1214,8 @@ public class ApiCollectionsAction extends UserAction {
     }
 
     public void setEnvType(List<CollectionTags> envType) {
-		this.envType = envType;
-	}
+        this.envType = envType;
+    }
 
     public void setApiCollectionIds(List<Integer> apiCollectionIds) {
         this.apiCollectionIds = apiCollectionIds;
