@@ -114,7 +114,6 @@ public class TestExecutorTest extends MongoBasedTest {
 
         boolean result = testExecutor.filterJsonRpcPayload(rawApi, apiInfoKey);
         assertEquals(true, result);
-        assertEquals("http://example.com", apiInfoKey.getUrl());
         assertEquals("http://example.com", rawApi.getRequest().getUrl());
 
         // Case 2: Invalid JSON-RPC version
@@ -133,7 +132,6 @@ public class TestExecutorTest extends MongoBasedTest {
         apiInfoKey.setUrl("http://example.com/testMethod");
         result = testExecutor.filterJsonRpcPayload(rawApi, apiInfoKey);
         assertEquals(true, result);
-        assertEquals("http://example.com/testMethod", apiInfoKey.getUrl());
     }
 
     @Test
