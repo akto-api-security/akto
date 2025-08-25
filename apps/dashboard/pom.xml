@@ -118,6 +118,12 @@
             <scope>test</scope>
         </dependency>
         <dependency>
+            <groupId>de.flapdoodle.embed</groupId>
+            <artifactId>de.flapdoodle.embed.mongo</artifactId>
+            <version>3.2.6</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
             <groupId>com.akto.libs.protobuf</groupId>
             <artifactId>protobuf</artifactId>
             <version>${project.version}</version>
