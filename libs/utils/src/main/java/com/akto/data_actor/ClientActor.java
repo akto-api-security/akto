@@ -4012,4 +4012,22 @@ public class ClientActor extends DataActor {
             return new ArrayList<>();
         }
     }
+
+    public void insertMCPAuditDataLog(McpAuditInfo auditInfo) {
+        Map<String, List<String>> headers = buildHeaders();
+        BasicDBObject obj = new BasicDBObject();
+        obj.put("auditInfo", auditInfo);
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/insertMCPAuditDataLog", "", "POST", obj.toString(), headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb("non 2xx response in insertMCPAuditDataLog", LogDb.RUNTIME);
+                return;
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in insertMCPAuditDataLog" + e, LogDb.RUNTIME);
+            return;
+        }
+    }
 }
