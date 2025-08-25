@@ -78,6 +78,13 @@
             <version>${project.version}</version>
         </dependency>
         <dependency>
+            <groupId>com.akto.libs.dao</groupId>
+            <artifactId>dao</artifactId>
+            <version>${project.version}</version>
+            <type>test-jar</type>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
             <groupId>org.apache.httpcomponents</groupId>
             <artifactId>httpclient</artifactId>
             <version>4.5.13</version>
