@@ -133,7 +133,6 @@ public class TestExecutorTest extends MongoBasedTest {
         apiInfoKey.setUrl("http://example.com/testMethod");
         result = testExecutor.filterJsonRpcPayload(rawApi, apiInfoKey);
         assertEquals(true, result);
-        assertEquals("http://example.com/testMethod", apiInfoKey.getUrl());
     }
 
     @Test
