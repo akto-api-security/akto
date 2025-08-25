@@ -1187,4 +1187,8 @@ public class DbLayer {
             Filters.empty()
         );
     }
+
+    public static void insertMCPAuditDataLog(McpAuditInfo auditInfo) {
+        McpAuditInfoDao.instance.insertOne(auditInfo);
+    }
 }
