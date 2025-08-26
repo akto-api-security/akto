@@ -67,4 +67,26 @@ public class McpSseEndpointHelper {
             loggerMaker.warn("Failed to add SSE endpoint header for collection {}: {}", apiCollectionId, e.getMessage());
         }
     }
-} 
+
+    /**
+     * Detects if the given server URL supports SSE (text/event-stream)
+     * @param serverUrl The server URL to check
+     * @return true if SSE is supported, false otherwise
+     */
+    public static boolean detectSseSupport(String serverUrl) {
+        try {
+            java.net.HttpURLConnection conn = (java.net.HttpURLConnection) new java.net.URL(serverUrl).openConnection();
+            conn.setRequestMethod("GET");
+            conn.setConnectTimeout(3000);
+            conn.setReadTimeout(3000);
+            conn.connect();
+            String contentType = conn.getHeaderField("Content-Type");
+            boolean isSse = conn.getResponseCode() == 200 && contentType != null && contentType.toLowerCase().contains("text/event-stream");
+            conn.disconnect();
+            return isSse;
+        } catch (Exception e) {
+            loggerMaker.error("Error checking SSE support: " + e.getMessage(), LogDb.TESTING);
+            return false;
+        }
+    }
+}

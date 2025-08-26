@@ -19,12 +19,12 @@ import com.akto.dto.traffic.CollectionTags.TagSource;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.runtime.McpToolsSyncJobExecutor;
-import com.akto.util.Constants;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.FindOneAndUpdateOptions;
 import com.mongodb.client.model.ReturnDocument;
 import com.mongodb.client.model.Updates;
 import com.opensymphony.xwork2.Action;
+import com.akto.util.McpSseEndpointHelper;
 
 import static com.akto.util.Constants.AKTO_MCP_SERVER_TAG;
 
@@ -50,13 +50,17 @@ public class MCPScanAction extends UserAction {
             hostName = hostName.trim();
             int collectionId = hostName.hashCode();
 
+            // Detect SSE support using helper
+            boolean isSse = McpSseEndpointHelper.detectSseSupport(serverUrl);
+            String sseCallbackUrlToSet = isSse ? sseEndpoint : null;
+
             //create api collection using collectionId if it does not exist
             createdCollection = ApiCollectionsDao.instance.findOne(Filters.eq(ApiCollection.ID, collectionId));
             if (createdCollection != null) {
                 loggerMaker.info("ApiCollection already exists for host: " + hostName, LogDb.DASHBOARD);
             } else {
                 loggerMaker.info("Creating ApiCollection for host: " + hostName, LogDb.DASHBOARD);  
-                createdCollection = new ApiCollection(collectionId, hostName, Context.now(), new HashSet<>(), hostName, 0, false, true, sseEndpoint);
+                createdCollection = new ApiCollection(collectionId, null, Context.now(), new HashSet<>(), hostName, 0, false, true, sseCallbackUrlToSet);
                 ApiCollectionsDao.instance.insertOne(createdCollection);
 
                 try {
@@ -82,7 +86,7 @@ public class MCPScanAction extends UserAction {
                 Updates.setOnInsert("_id", collectionId),
                 Updates.setOnInsert("startTs", Context.now()),
                 Updates.setOnInsert("urls", new HashSet<>()),
-                Updates.set(ApiCollection.SSE_CALLBACK_URL, sseEndpoint),
+                Updates.set(ApiCollection.SSE_CALLBACK_URL, sseCallbackUrlToSet),
                 Updates.set(ApiCollection.TAGS_STRING,
                 Collections.singletonList(new CollectionTags(Context.now(), AKTO_MCP_SERVER_TAG, "MCP Server", TagSource.KUBERNETES)))
             );
