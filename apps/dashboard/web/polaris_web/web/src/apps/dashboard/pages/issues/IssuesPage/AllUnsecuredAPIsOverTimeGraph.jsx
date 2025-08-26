@@ -5,6 +5,7 @@ import func from '@/util/func';
 import LineChart from '../../../components/charts/LineChart';
 import EmptyCard from '../../dashboard/new_components/EmptyCard';
 import { Text } from '@shopify/polaris';
+import { getDashboardCategory, mapLabel } from '../../../../main/labelHelper';
 
 const AllUnsecuredAPIsOverTimeGraph = () => {
   const [chartData, setChartData] = useState([]);
@@ -61,12 +62,12 @@ const AllUnsecuredAPIsOverTimeGraph = () => {
   return (
     allZero ? (
       <EmptyCard
-        title="Unsecured APIs Over Time"
-        subTitleComponent={<Text alignment='center' color='subdued'>No unsecured APIs found</Text>}
+        title={`Unsecured ${mapLabel("APIs", getDashboardCategory())} Over Time`}
+        subTitleComponent={<Text alignment='center' color='subdued'>{`No unsecured ${mapLabel("APIs", getDashboardCategory())} found`}</Text>}
       />
     ) : (
       <InfoCard
-        title="Unsecured APIs Over Time"
+        title={`Unsecured ${mapLabel("APIs", getDashboardCategory())} Over Time`}
         titleToolTip="Monthly count of issues by severity for the last 12 months."
         component={
           <LineChart

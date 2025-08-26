@@ -5,6 +5,7 @@ import dayjs from "dayjs";
 import { useEffect, useState } from "react";
 import { Spinner } from "@shopify/polaris";
 import api from "../api";
+import { getDashboardCategory, mapLabel } from "../../../../main/labelHelper";
 
 
 const ThreatActivityTimeline = ({ startTimestamp, endTimestamp, onSubCategoryClick }) => {
@@ -75,7 +76,7 @@ const ThreatActivityTimeline = ({ startTimestamp, endTimestamp, onSubCategoryCli
         },
         yAxis: {
             title: {
-                text: "# of APIs"
+                text: `# of ${mapLabel("APIs", getDashboardCategory())}`
             }
         },
         plotOptions: {

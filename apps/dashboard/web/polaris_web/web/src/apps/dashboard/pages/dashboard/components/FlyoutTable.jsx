@@ -9,6 +9,7 @@ import TooltipText from '@/apps/dashboard/components/shared/TooltipText';
 import transform from "@/apps/dashboard/pages/observe/transform";
 import func from "@/util/func";
 import PersistStore from "@/apps/main/PersistStore";
+import { getDashboardCategory, mapLabel } from '../../../../main/labelHelper';
 
 const ACTION_ITEM_TYPES = {
     HIGH_RISK_APIS: 'HIGH_RISK_APIS',
@@ -300,7 +301,7 @@ function FlyoutTable({ actionItemType, count, allApiInfo, apiInfoLoading }) {
         }
         if (actionItemType === ACTION_ITEM_TYPES.SENSITIVE_DATA_ENDPOINTS || actionItemType === ACTION_ITEM_TYPES.CRITICAL_SENSITIVE_UNAUTH || actionItemType === ACTION_ITEM_TYPES.TOP_PUBLIC_EXPOSED_APIS) {
             return [
-                { text: 'Endpoint', title: 'Endpoint', value: 'endpoint', maxWidth: '300px' },
+                { text: mapLabel("Endpoint", getDashboardCategory()), title: mapLabel("Endpoint", getDashboardCategory()), value: 'endpoint', maxWidth: '300px' },
                 { text: 'Sensitive Params', title: 'Sensitive Params', value: 'sensitiveParams', isText: CellType.TEXT, maxWidth: '200px' },
                 { text: 'Risk Score', title: 'Risk Score', value: 'riskScore', isText: CellType.TEXT },
                 { text: 'Issues', title: 'Issues', value: 'issues', isText: CellType.TEXT, maxWidth: '150px' },
@@ -314,7 +315,7 @@ function FlyoutTable({ actionItemType, count, allApiInfo, apiInfoLoading }) {
             ];
         } else {
             return [
-                { text: 'Endpoint', title: 'Endpoint', value: 'endpoint', maxWidth: '300px' },
+                { text: mapLabel("Endpoint", getDashboardCategory()), title: mapLabel("Endpoint", getDashboardCategory()), value: 'endpoint', maxWidth: '300px' },
                 { text: 'Risk Score', title: 'Risk Score', value: 'riskScore', isText: CellType.TEXT },
                 { text: 'Issues', title: 'Issues', value: 'issues', isText: CellType.TEXT, maxWidth: '150px' },
                 { text: 'Hostname', title: 'Hostname', value: 'hostname', isText: CellType.TEXT, maxWidth: '200px' },

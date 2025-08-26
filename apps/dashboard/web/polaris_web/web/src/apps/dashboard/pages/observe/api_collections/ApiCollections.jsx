@@ -45,16 +45,16 @@ const CenterViewType = {
 
 const headers = [
     {
-        title: "API collection name",
-        text: "API collection name",
+        title: mapLabel("API collection name", getDashboardCategory()),
+        text: mapLabel("API collection name", getDashboardCategory()),
         value: "displayNameComp",
         filterKey: "displayName",
         textValue: 'displayName',
         showFilter: true
     },
     {
-        title: "Total endpoints",
-        text: "Total endpoints",
+        title: mapLabel("Total endpoints", getDashboardCategory()),
+        text: mapLabel("Total endpoints", getDashboardCategory()),
         value: "urlsCount",
         isText: CellType.TEXT,
         sortActive: true,
@@ -243,7 +243,7 @@ function ApiCollections(props) {
     const userRole = window.USER_ROLE
 
     const navigate = useNavigate();
-    const [data, setData] = useState({'all': [], 'hostname':[], 'groups': [], 'custom': [], 'deactivated': [], 'Untracked APIs': []})
+    const [data, setData] = useState({'all': [], 'hostname':[], 'groups': [], 'custom': [], 'deactivated': [], 'Untracked': []})
     const [active, setActive] = useState(false);
     const [loading, setLoading] = useState(false)
           
@@ -261,7 +261,7 @@ function ApiCollections(props) {
 
     // const dummyData = dummyJson;
 
-    const definedTableTabs = ['All', 'Hostname', 'Groups', 'Custom', 'Deactivated', 'Untracked APIs']
+    const definedTableTabs = ['All', 'Hostname', 'Groups', 'Custom', 'Deactivated', 'Untracked']
 
     const { tabsInfo, selectItems } = useTable()
     const tableSelectedTab = PersistStore.getState().tableSelectedTab[window.location.pathname]
@@ -496,7 +496,9 @@ function ApiCollections(props) {
             .map(([collectionId, untrackedCount]) => {
                 const collection = collectionMap.get(parseInt(collectionId));
                 return collection ? {
-                    ...collection,
+                    id: collection.id,
+                    displayName: collection.displayName,
+                    displayNameComp: collection.displayNameComp,
                     urlsCount: untrackedCount,
                     rowStatus: 'critical',
                     disableClick: true,
@@ -527,7 +529,7 @@ function ApiCollections(props) {
         tmp.groups = allGroupsForTmp;
         tmp.custom = tmp.all.filter(x => !tmp.hostname.includes(x) && !x.deactivated && !tmp.groups.includes(x));
         tmp.deactivated = deactivatedCollectionsCopy
-        tmp.untracked_apis = untrackedCollections
+        tmp.untracked = untrackedCollections
         
         setData(tmp);
         } catch (error) {
@@ -872,19 +874,19 @@ function ApiCollections(props) {
 
       const summaryItems = [
         {
-            title: "Total APIs",
+            title: mapLabel("Total APIs", getDashboardCategory()),
             data: transform.formatNumberWithCommas(totalAPIs),
         },
         {
-            title: "Critical APIs",
+            title: mapLabel("Critical APIs", getDashboardCategory()),
             data: transform.formatNumberWithCommas(summaryData.totalCriticalEndpoints),
         },
         {
-            title: "Tested APIs (Coverage)",
+            title: mapLabel("Tested APIs (Coverage)", getDashboardCategory()),
             data: coverage
         },
         {
-            title: "Sensitive in response APIs",
+            title: mapLabel("Sensitive in response APIs", getDashboardCategory()),
             data: transform.formatNumberWithCommas(summaryData.totalSensitiveEndpoints),
         }
     ]

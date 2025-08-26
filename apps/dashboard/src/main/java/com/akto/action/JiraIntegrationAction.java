@@ -51,9 +51,6 @@ import lombok.Setter;
 
 import java.io.File;
 import java.util.*;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
@@ -73,6 +70,8 @@ import static com.akto.utils.jira.Utils.buildAdditionalIssueFieldsForJira;
 import static com.akto.utils.jira.Utils.buildApiToken;
 import static com.akto.utils.jira.Utils.buildBasicRequest;
 import static com.akto.utils.jira.Utils.buildPayloadForJiraTicket;
+import static com.akto.utils.jira.Utils.getAccountJiraFields;
+
 import static com.akto.utils.jira.Utils.getJiraTicketUrlPair;
 import static com.akto.utils.jira.Utils.handleError;
 import static com.akto.utils.jira.Utils.retryWithoutGzipRequest;
@@ -106,7 +105,7 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
     private static final String CREATE_ISSUE_ENDPOINT_BULK = "/rest/api/3/issue/bulk";
     private static final String ATTACH_FILE_ENDPOINT = "/attachments";
     private static final String ISSUE_STATUS_ENDPOINT = "/rest/api/3/project/%s/statuses";
-    private static final String CREATE_ISSUE_FIELD_METADATA_ENDPOINT = "/rest/api/3/issue/createmeta/%s/issuetypes/%s"; //https://developer.atlassian.com/cloud/jira/platform/rest/v3/api-group-issues/#api-rest-api-3-issue-createmeta-projectidorkey-issuetypes-issuetypeid-get
+
     private static final LoggerMaker loggerMaker = new LoggerMaker(ApiExecutor.class, LogDb.DASHBOARD);
 
     private static final int TICKET_SYNC_JOB_RECURRING_INTERVAL_SECONDS = 3600;
@@ -511,96 +510,15 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
     }
 
     Map<String, Map<String, BasicDBList>> createIssueFieldMetaData;
-    private final ExecutorService multiFieldPool = Executors.newFixedThreadPool(10);
     public String fetchCreateIssueFieldMetaData() {
 
         JiraIntegration jiraIntegration = JiraIntegrationDao.instance.findOne(new BasicDBObject());
-        if(jiraIntegration == null) {
+        if (jiraIntegration == null) {
             addActionError("Jira is not integrated.");
             return ERROR.toUpperCase();
         }
 
-        Map<String, List<BasicDBObject>> projectIdsMap = jiraIntegration.getProjectIdsMap();
-        if (projectIdsMap == null || projectIdsMap.isEmpty()) {
-            return Action.SUCCESS.toUpperCase();
-        }
-        String baseUrl = jiraIntegration.getBaseUrl();
-        Map<String, List<String>> headers = new HashMap<>();
-        String authHeader = Base64.getEncoder().encodeToString((jiraIntegration.getUserEmail() + ":" +  jiraIntegration.getApiToken()).getBytes());
-        headers.put("Authorization", Collections.singletonList("Basic " + authHeader));
-        createIssueFieldMetaData = new HashMap<>();
-
-        List<Future<Map.Entry<String, Map<String, BasicDBList>>>> futures = new ArrayList<>();
-        int accountId = Context.accountId.get();
-
-        for (Map.Entry<String, List<BasicDBObject>> entry : projectIdsMap.entrySet()) {
-            String projectKey = entry.getKey();
-            List<BasicDBObject> issueTypes = entry.getValue();
-
-            futures.add(multiFieldPool.submit(() -> {
-                Context.accountId.set(accountId);
-                Map<String, BasicDBList> fieldsForProject = new HashMap<>();
-                for (BasicDBObject issueTypeObj : issueTypes) {
-                    if (issueTypeObj == null) continue;
-                    String issueId = issueTypeObj.getString("issueId");
-                    String issueType = issueTypeObj.getString("issueType");
-
-                    if (issueId == null || issueType == null) continue;
-                    BasicDBList fieldsForIssueType = new BasicDBList();
-                    loggerMaker.infoAndAddToDb("Fetching fields for issueType: " + issueType);
-
-                    try {
-                        String requestUrl = String.format(baseUrl + CREATE_ISSUE_FIELD_METADATA_ENDPOINT, projectKey, issueId);
-                        OriginalHttpRequest request = new OriginalHttpRequest(requestUrl, "", "GET", "", headers, "");
-                        OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false,new ArrayList<>());
-                        String responsePayload = response.getBody();
-
-                        if (response.getStatusCode() > 201 || responsePayload == null) {
-                            loggerMaker.errorAndAddToDb(String.format("Error while fetching issue fields. %s %s Response Code %d", projectKey, issueType, response.getStatusCode()));
-                            continue;
-                        }
-
-                        BasicDBObject payloadObj;
-                        try {
-                            payloadObj = BasicDBObject.parse(responsePayload);
-                            BasicDBList issueFields = (BasicDBList) payloadObj.get("fields");
-
-                            if (issueFields == null) continue;
-                            for (Object issueField : issueFields) {
-                                if (issueField == null) continue;
-
-                                BasicDBObject issueFieldBasicDBObject = (BasicDBObject) issueField;
-                                String fieldId = issueFieldBasicDBObject.getString("fieldId");
-                                String fieldName = issueFieldBasicDBObject.getString("name");
-                                Boolean isRequired = issueFieldBasicDBObject.getBoolean("required", false);
-                                if (fieldId == null || fieldName == null || !isRequired) continue;
-
-                                fieldsForIssueType.add(issueFieldBasicDBObject);
-                            }
-                        } catch (Exception e) {
-                            loggerMaker.errorAndAddToDb(e, "Error while parsing issue fields response for project: " + projectKey + ", issueType: " + issueType);
-                        }
-                    } catch (Exception e) {
-                        loggerMaker.errorAndAddToDb(e, "Error while fetching issue fields for project: " + projectKey + ", issueType: " + issueType);
-                    }
-
-                    fieldsForProject.put(issueId, fieldsForIssueType);
-                }
-                return new AbstractMap.SimpleEntry<>(projectKey, fieldsForProject);
-            }));
-        }
-
-        // Wait for all tasks to finish and fill the map
-        for (Future<Map.Entry<String, Map<String, BasicDBList>>> future : futures) {
-            try {
-                Map.Entry<String, Map<String, BasicDBList>> entry = future.get(60, TimeUnit.SECONDS);
-                if (entry != null) {
-                    createIssueFieldMetaData.put(entry.getKey(), entry.getValue());
-                }
-            } catch (Exception e) {
-                loggerMaker.errorAndAddToDb(e, "Error waiting for Jira metadata fetch task");
-            }
-        }
+        createIssueFieldMetaData = getAccountJiraFields();
 
         return Action.SUCCESS.toUpperCase();
     }

@@ -115,33 +115,7 @@ public class UsersCollectionsList {
         Set<Integer> collectionList = new HashSet<>();
 
         if (collectionIdEntry == null || (Context.now() - collectionIdEntry.getSecond() > CONTEXT_EXPIRY_TIME)) {
-            Bson finalFilter = Filters.or(
-                Filters.exists(ApiCollection.TAGS_STRING, false),
-                Filters.nor(
-                    Filters.elemMatch(ApiCollection.TAGS_STRING, Filters.eq(CollectionTags.KEY_NAME, Constants.AKTO_MCP_SERVER_TAG)),
-                    Filters.elemMatch(ApiCollection.TAGS_STRING, Filters.eq(CollectionTags.KEY_NAME, Constants.AKTO_GEN_AI_TAG))
-                )
-            );
-            switch (source) {
-                case MCP:
-                    finalFilter = Filters.and(
-                        Filters.exists(ApiCollection.TAGS_STRING),
-                        Filters.elemMatch(ApiCollection.TAGS_STRING, Filters.eq(CollectionTags.KEY_NAME, Constants.AKTO_MCP_SERVER_TAG))
-                    );
-                    break;
-                case GEN_AI:
-                    finalFilter = Filters.and(
-                        Filters.exists(ApiCollection.TAGS_STRING),
-                        Filters.elemMatch(ApiCollection.TAGS_STRING, Filters.eq(CollectionTags.KEY_NAME, Constants.AKTO_GEN_AI_TAG))
-                    );
-                    break;
-                default:
-                    break;
-            }
-            MongoCursor<ApiCollection> cursor = ApiCollectionsDao.instance.getMCollection().find(finalFilter).projection(Projections.include(Constants.ID)).iterator();
-            while (cursor.hasNext()) {
-                collectionList.add(cursor.next().getId());
-            }
+            collectionList = getContextCollections(source);
         } else {
             collectionList = collectionIdEntry.getFirst();
         }
@@ -149,4 +123,35 @@ public class UsersCollectionsList {
         return collectionList;
     }
 
+    public static Set<Integer> getContextCollections(CONTEXT_SOURCE source) {
+        Set<Integer> collectionIds = new HashSet<>();
+        Bson finalFilter = Filters.or(
+            Filters.exists(ApiCollection.TAGS_STRING, false),
+            Filters.nor(
+                Filters.elemMatch(ApiCollection.TAGS_STRING, Filters.eq(CollectionTags.KEY_NAME, Constants.AKTO_MCP_SERVER_TAG)),
+                Filters.elemMatch(ApiCollection.TAGS_STRING, Filters.eq(CollectionTags.KEY_NAME, Constants.AKTO_GEN_AI_TAG))
+            )
+        );
+        switch (source) {
+            case MCP:
+                finalFilter = Filters.and(
+                    Filters.exists(ApiCollection.TAGS_STRING),
+                    Filters.elemMatch(ApiCollection.TAGS_STRING, Filters.eq(CollectionTags.KEY_NAME, Constants.AKTO_MCP_SERVER_TAG))
+                );
+                break;
+            case GEN_AI:
+                finalFilter = Filters.and(
+                    Filters.exists(ApiCollection.TAGS_STRING),
+                    Filters.elemMatch(ApiCollection.TAGS_STRING, Filters.eq(CollectionTags.KEY_NAME, Constants.AKTO_GEN_AI_TAG))
+                );
+                break;
+            default:
+                break;
+        }
+        MongoCursor<ApiCollection> cursor = ApiCollectionsDao.instance.getMCollection().find(finalFilter).projection(Projections.include(Constants.ID)).iterator();
+        while (cursor.hasNext()) {
+            collectionIds.add(cursor.next().getId());
+        }
+        return collectionIds;
+    }
 }

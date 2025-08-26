@@ -1,12 +1,14 @@
 package com.akto.interceptor;
 
 import com.akto.action.test_editor.SaveTestEditorAction;
+import com.akto.dao.test_editor.TestEditorEnums.DataOperands;
 import com.akto.gpt.handlers.gpt_prompts.TestExecutorModifier;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.test_editor.Utils;
 import com.akto.util.DashboardMode;
 import com.opensymphony.xwork2.ActionInvocation;
+import org.apache.commons.lang3.StringUtils;
 
 public class ContextBasedUsageInterceptor extends UsageInterceptor {
 
@@ -25,8 +27,7 @@ public class ContextBasedUsageInterceptor extends UsageInterceptor {
 
             if (actionObject instanceof SaveTestEditorAction) {
                 SaveTestEditorAction action = (SaveTestEditorAction) actionObject;
-                if (action.getContent() != null && action.getContent().length() > 0
-                        && action.getContent().contains(Utils._MAGIC)) {
+                if (isMagicKeywordPresent(action.getContent())) {
                     invocation.getInvocationContext().put(_FEATURE_LABEL, TestExecutorModifier._AKTO_GPT_AI);
                     return invocation.invoke();
                 }
@@ -42,4 +43,10 @@ public class ContextBasedUsageInterceptor extends UsageInterceptor {
 
     }
 
+    private boolean isMagicKeywordPresent(String content) {
+        return StringUtils.isNotBlank(content) && (content.contains(Utils._MAGIC)
+            || content.contains(Utils.MAGIC_CONTEXT)
+            || content.contains(DataOperands.MAGIC_VALIDATE.name().toLowerCase())
+            || content.contains(DataOperands.NOT_MAGIC_VALIDATE.name().toUpperCase()));
+    }
 }

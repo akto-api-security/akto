@@ -29,6 +29,7 @@ import com.akto.mcp.McpSchema.ServerCapabilities;
 import com.akto.mcp.McpSchema.Tool;
 import com.akto.parsers.HttpCallParser;
 import com.akto.testing.ApiExecutor;
+import com.akto.util.McpSseEndpointHelper;
 import com.akto.util.Constants;
 import com.akto.util.JSONUtils;
 import com.akto.util.Pair;
@@ -272,7 +273,7 @@ public class McpToolsSyncJobExecutor {
             false,
             new HashMap<>(),
             apiConfig,
-            true,
+            false,
             true
         );
     }
@@ -295,8 +296,8 @@ public class McpToolsSyncJobExecutor {
 
     private Pair<JSONRPCResponse, HttpResponseParams> getMcpMethodResponse(String host, String authHeader,  String mcpMethod,
         String mcpMethodRequestJson, ApiCollection apiCollection) throws Exception {
-        OriginalHttpRequest mcpRequest = createRequest(host, authHeader, mcpMethod, mcpMethodRequestJson);
-        String jsonrpcResponse = sendRequest(mcpRequest);
+        OriginalHttpRequest mcpRequest = createRequest(host, authHeader, mcpMethod, mcpMethodRequestJson, apiCollection);
+        String jsonrpcResponse = sendRequest(mcpRequest, apiCollection);
 
         JSONRPCResponse rpcResponse = (JSONRPCResponse) McpSchema.deserializeJsonRpcMessage(mapper, jsonrpcResponse);
 
@@ -318,9 +319,19 @@ public class McpToolsSyncJobExecutor {
         return new Pair<>(rpcResponse, responseParams);
     }
 
-    private OriginalHttpRequest createRequest(String host, String authHeader,String mcpMethod, String mcpMethodRequestJson) {
-        return new OriginalHttpRequest(mcpMethod,
-            null,
+    private OriginalHttpRequest createRequest(String host, String authHeader, String mcpMethod, String mcpMethodRequestJson, ApiCollection apiCollection) {
+        String sseCallbackUrl = apiCollection.getSseCallbackUrl();
+        String queryParams = null;
+
+        if (sseCallbackUrl != null && !sseCallbackUrl.isEmpty()) {  
+            // Extract query params from sseCallbackUrl (may contain auth keys)
+            if (sseCallbackUrl.contains("?")) {
+                queryParams = sseCallbackUrl.split("\\?", 2)[1];
+            }
+        }
+        
+        return new OriginalHttpRequest(mcpMethod, // Keep original MCP method path
+            queryParams, // Add SSE callback query params
             HttpMethod.POST.name(),
             mcpMethodRequestJson,
             OriginalHttpRequest.buildHeadersMap(buildHeaders(host, authHeader)),
@@ -338,8 +349,12 @@ public class McpToolsSyncJobExecutor {
         return "{\"Content-Type\":\"application/json\",\"Accept\":\"*/*\",\"host\":\"" + host + "\"" + authHeader + "}";
     }
 
-    private String sendRequest(OriginalHttpRequest request) throws Exception {
+    private String sendRequest(OriginalHttpRequest request, ApiCollection apiCollection) throws Exception {
         try {
+            // Use the utility class to add SSE endpoint header
+            McpSseEndpointHelper.addSseEndpointHeader(request, apiCollection.getId());
+            
+            // Use the standard ApiExecutor method (it will read the header)
             OriginalHttpResponse response = ApiExecutor.sendRequestWithSse(request, true, null, false,
                 new ArrayList<>(), false, true);
             return response.getBody();

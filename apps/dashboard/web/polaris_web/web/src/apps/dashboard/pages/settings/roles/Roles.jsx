@@ -1,6 +1,5 @@
-import { ActionList, Avatar, Banner, Box, Button, HorizontalStack, Icon, LegacyCard, Link, Page, Popover, ResourceItem, ResourceList, Text, Modal, TextField, VerticalStack, Checkbox } from "@shopify/polaris"
-import { DeleteMajor, TickMinor, PasskeyMajor } from "@shopify/polaris-icons"
-import { useEffect, useState, useRef } from "react";
+import { Box, HorizontalStack, LegacyCard, Page, ResourceItem, ResourceList, Text, Modal, TextField, VerticalStack, Checkbox } from "@shopify/polaris"
+import { useEffect, useState } from "react";
 import func from "@/util/func";
 import settingRequests from "../api";
 import ResourceListModal from "../../../components/shared/ResourceListModal";
@@ -8,6 +7,7 @@ import { usersCollectionRenderItem } from "../rbac/utils";
 import PersistStore from "../../../../main/PersistStore";
 import SearchableResourceList from "../../../components/shared/SearchableResourceList";
 import OperatorDropdown from "../../../components/layouts/OperatorDropdown";
+import Dropdown from "../../../components/layouts/Dropdown";
 
 const rolesOptions = [
     {
@@ -46,6 +46,7 @@ const Roles = () => {
     const [loading, setLoading] = useState(false)
     const collectionsMap = PersistStore(state => state.collectionsMap)
     const [createNewRoleModalActive, setCreateNewRoleModalActive] = useState(false)
+    const [allowedFeatures, setAllowedFeatures] = useState([])
 
     const toggleInviteUserModal = () => {
         setCreateNewRoleModalActive(!createNewRoleModalActive)
@@ -54,13 +55,19 @@ const Roles = () => {
     const getRoleData = async () => {
         setLoading(true);
         const roleResponse = await settingRequests.getCustomRoles()
-        console.log(roleResponse);
         if (roleResponse.roles) {
             setRoles(roleResponse.roles)
             setTempRoles(roleResponse.roles)
         }
         setLoading(false)
     };
+
+    const getAllAllowedFeatures = async () => {
+        const featuresResponse = await settingRequests.getAllowedFeaturesForRBAC()
+        if (featuresResponse) {
+            setAllowedFeatures(featuresResponse);
+        }
+    }
 
     useEffect(() => {
         if (userRole !== 'GUEST') {
@@ -70,19 +77,21 @@ const Roles = () => {
             id: parseInt(id, 10),
             collectionName
         })));
+        getAllAllowedFeatures();
+
     }, [])
 
-    const getRoleApiCollectionIds = (role) => {
-        return roles.filter(r => r.name === role)[0].apiCollectionsId || []
+    const getRoleItems = (role, key) => {
+        return roles.filter(r => r.name === role)[0][key] || []
     };
 
-    const handleSelectedItemsChange = (role, items) => {
+    const handleSelectedItemsChange = (role, items, key) => {
         setRoles(prevRoles => {
             return prevRoles.map(r => {
                 if (r.name === role) {
                     return {
                         ...r,
-                        apiCollectionsId: items
+                        [key]: items
                     }
                 }
                 return r;
@@ -120,7 +129,7 @@ const Roles = () => {
 
     const handleUpdate = async (role) => {
         const roleData = roles.filter(r => r.name === role)[0]
-        await settingRequests.updateCustomRole(roleData.apiCollectionsId, role, roleData.baseRole, roleData.defaultInviteRole)
+        await settingRequests.updateCustomRole(roleData.apiCollectionsId, role, roleData.baseRole, roleData.defaultInviteRole, roleData.allowedFeaturesForUser)
         await getRoleData();
     }
 
@@ -182,7 +191,7 @@ const Roles = () => {
                                 content: (
                                     <ResourceListModal
                                         title={`Update ${name} role`}
-                                        activatorPlaceaholder={`${(getRoleApiCollectionIds(name) || []).length} collections accessible, ${getRoleDisplayName(baseRole)} permissions${defaultInviteRole ? ', Default invite role' : ''}`}
+                                        activatorPlaceaholder={`${(getRoleItems(name, "apiCollectionsId") || []).length} collections accessible, ${getRoleDisplayName(baseRole)} permissions${defaultInviteRole ? ', Default invite role' : ''}`}
                                         isColoredActivator={true}
                                         component={<VerticalStack gap={4}>
                                             <Box paddingBlockStart={4}>
@@ -202,6 +211,20 @@ const Roles = () => {
                                                     />
                                                 </HorizontalStack>
                                             </Box>
+                                            <Box paddingBlockStart={4}> 
+                                                <HorizontalStack gap={"4"}  align="center" blockAlign="center">
+                                                    <Text variant="bodyMd" as="h4">
+                                                        Allowed Features
+                                                    </Text>
+                                                    <Dropdown
+                                                        id={`allowed-features-${name}`}
+                                                        menuItems={allowedFeatures.map(feature => ({ label: feature, value: feature }))}
+                                                        selected={(items) =>  handleSelectedItemsChange(name, items, 'allowedFeaturesForUser')}
+                                                        allowMultiple={true}
+                                                        initial={getRoleItems(name, "allowedFeaturesForUser")}
+                                                    />
+                                                </HorizontalStack>
+                                            </Box>
                                             <Box>
                                                 <SearchableResourceList
                                                     resourceName={'collection'}
@@ -209,8 +232,8 @@ const Roles = () => {
                                                     renderItem={usersCollectionRenderItem}
                                                     isFilterControlEnabale={userRole === 'ADMIN'}
                                                     selectable={userRole === 'ADMIN'}
-                                                    onSelectedItemsChange={(items) => handleSelectedItemsChange(name, items)}
-                                                    alreadySelectedItems={getRoleApiCollectionIds(name)}
+                                                    onSelectedItemsChange={(items) => handleSelectedItemsChange(name, items, 'apiCollectionsId')}
+                                                    alreadySelectedItems={getRoleItems(name, "apiCollectionsId")}
                                                 />
                                             </Box>
                                         </VerticalStack>}

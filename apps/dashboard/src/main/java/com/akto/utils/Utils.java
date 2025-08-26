@@ -168,7 +168,9 @@ public class Utils {
             return result;
         }
         for (JsonNode variable : variables) {
-            result.put(variable.get("key").asText(), variable.get("value").asText());
+            if (variable.get("key") != null && variable.get("value") != null) {
+                result.put(variable.get("key").asText(), variable.get("value").asText());
+            }
         }
         return result;
     }

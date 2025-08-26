@@ -66,6 +66,9 @@ const onFunc = {
             case "DELETE": return `var(--color-delete)`;
             case "OPTIONS": return `var(--color-options)`;
             case "HEAD": return `var(--color-head)`;
+            case "TOOL": return `var(--color-tool)`;
+            case "RESOURCE": return `var(--color-resource)`;
+            case "PROMPT": return `var(--color-prompt)`;
             default:
                 return "";
         }

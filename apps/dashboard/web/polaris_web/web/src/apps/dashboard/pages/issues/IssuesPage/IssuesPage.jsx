@@ -292,7 +292,14 @@ function IssuesPage() {
         }
 
     const handleSaveJiraAction = () => {
-        const jiraMetaData = issuesFunctions.prepareAdditionalIssueFieldsJiraMetaData()
+        let jiraMetaData;
+        try {
+            jiraMetaData = issuesFunctions.prepareAdditionalIssueFieldsJiraMetaData(projId, issueType);
+        } catch (error) {
+            setToast(true, true, "Please fill all required fields before creating a Jira ticket.");
+            resetResourcesSelected()
+            return;
+        }
 
         setToast(true, false, "Please wait while we create your Jira ticket.")
         setJiraModalActive(false)
@@ -389,7 +396,11 @@ function IssuesPage() {
         },
         {
             content: 'Export selected Issues',
-            onAction: () => { openVulnerabilityReport(items) }
+            onAction: () => { openVulnerabilityReport(items, false) }
+        },
+        {
+            content: 'Export selected Issues summary',
+            onAction: () => { openVulnerabilityReport(items, true) }
         },
         {
             content: 'Create jira ticket',
@@ -467,10 +478,12 @@ function IssuesPage() {
           }          
     }
 
-    const openVulnerabilityReport = async(items = []) => {
+    const openVulnerabilityReport = async (items = [], summaryMode = false) => {
         await testingApi.generatePDFReport(issuesFilters, items).then((res) => {
-          const responseId = res.split("=")[1];
-          window.open('/dashboard/issues/summary/' + responseId.split("}")[0], '_blank');
+            const responseId = res.split("=")[1];
+            const summaryModeQueryParam = summaryMode === true ? 'summaryMode=true' : '';
+            const redirectUrl = `/dashboard/issues/summary/${responseId.split("}")[0]}?${summaryModeQueryParam}`;
+            window.open(redirectUrl, '_blank');
         })
 
         resetResourcesSelected();
@@ -776,7 +789,7 @@ function IssuesPage() {
             
             : components
             ]}
-            primaryAction={<Button primary onClick={() => openVulnerabilityReport()} disabled={showEmptyScreen}>Export results</Button>}
+            primaryAction={<Button primary onClick={() => openVulnerabilityReport([], false)} disabled={showEmptyScreen}>Export results</Button>}
             secondaryActions={
             <HorizontalStack  gap={2}>
                 <DateRangeFilter initialDispatch={currDateRange} dispatch={(dateObj) => dispatchCurrDateRange({ type: "update", period: dateObj.period, title: dateObj.title, alias: dateObj.alias })} />
@@ -792,6 +805,10 @@ function IssuesPage() {
                     {
                       content: 'Export results as CSV',
                       onAction: exportCsv,
+                    },
+                    {
+                      content: 'Export summary report',
+                      onAction: () => openVulnerabilityReport([], true),
                     },
                   ]}
                 />

@@ -62,7 +62,7 @@ public class ConsumerUtil {
     private static final LoggerMaker logger = new LoggerMaker(ConsumerUtil.class, LogDb.TESTING);
     public static ExecutorService executor = Executors.newFixedThreadPool(100);
 
-    private final int maxRunTimeForTests = 5 * 60;
+    private final int maxRunTimeForTests = 4 * 60;
 
     public void initializeConsumer() {
         String mongoURI = System.getenv("AKTO_MONGO_CONN");

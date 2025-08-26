@@ -590,7 +590,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
         }
         let finalAdvancedConditions = []
 
-        if (conditions.length > 0 && conditions[0]?.data?.key?.length > 0) {
+        if (conditions.length > 0 && (conditions[0]?.data?.key?.length > 0 || conditions[0]?.data?.position?.length > 0)) {
             finalAdvancedConditions = transform.prepareConditionsForTesting(conditions)
         }
 

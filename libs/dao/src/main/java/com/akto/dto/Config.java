@@ -448,6 +448,9 @@ public abstract class Config {
         private String customTestsLabel;
 
         private String activeAccountsLabel;
+        private String aiAssetsLabel;
+        private String mcpAssetsLabel;
+
         public static final String CONFIG_ID = ConfigType.STIGG.name() + CONFIG_SALT;
 
         public StiggConfig() {
@@ -525,6 +528,22 @@ public abstract class Config {
 
         public void setActiveAccountsLabel(String activeAccountsLabel) {
             this.activeAccountsLabel = activeAccountsLabel;
+        }
+
+        public String getAiAssetsLabel() {
+            return aiAssetsLabel;
+        }
+
+        public void setAiAssetsLabel(String aiAssetsLabel) {
+            this.aiAssetsLabel = aiAssetsLabel;
+        }
+
+        public String getMcpAssetsLabel() {
+            return mcpAssetsLabel;
+        }
+
+        public void setMcpAssetsLabel(String mcpAssetsLabel) {
+            this.mcpAssetsLabel = mcpAssetsLabel;
         }
     }
     @BsonDiscriminator

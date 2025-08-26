@@ -6,6 +6,8 @@ import GetPrettifyEndpoint from "../../observe/GetPrettifyEndpoint";
 import func from "../../../../../util/func";
 import PersistStore from "../../../../main/PersistStore";
 import SessionStore from "../../../../main/SessionStore";
+import { isMCPSecurityCategory } from "../../../../main/labelHelper";
+import { labelMap } from "../../../../main/labelHelperMap";
 
 const resourceName = {
   singular: "api",
@@ -14,9 +16,9 @@ const resourceName = {
 
 const headers = [
   {
-    text: "Endpoint",
+    text:  labelMap[PersistStore.getState().dashboardCategory]["Endpoint"],
     value: "api",
-    title: "Endpoint",
+    title: labelMap[PersistStore.getState().dashboardCategory]["Endpoint"],
   },
   {
     text: "Malicious Actors",
@@ -101,12 +103,16 @@ function ThreatApiTable({ currDateRange, rowClicked }) {
     let ret = res?.apis?.map((x) => {
       return {
         ...x,
-        id: `${x.method}-${x.api}`,
+        id:`${x.method}-${x.api}`,
         actorsCount: x.actorsCount,
         requestsCount: x.requestsCount,
         discoveredAt: func.prettifyEpoch(x.discoveredAt),
         api: (
-          <GetPrettifyEndpoint method={x.method} url={x.api} isNew={false} />
+          <GetPrettifyEndpoint 
+            {...(!isMCPSecurityCategory() && { method: x.method })}
+            url={x.api}
+            isNew={false}
+          />
         ),
       };
     });

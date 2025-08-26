@@ -12,6 +12,14 @@ export function mapLabel(value, category) {
 }
 
 export function getDashboardCategory() {
-  const category = PersistStore((state) => state.dashboardCategory) || "API Security"
-  return category
+  try {
+    const category = PersistStore.getState().dashboardCategory
+    return category
+  } catch(e){
+    return "API Security"
+  }
+}
+
+export function isMCPSecurityCategory() {
+  return getDashboardCategory() === 'MCP Security';
 }

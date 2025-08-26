@@ -311,8 +311,12 @@ public class HttpCallParser {
             FeatureAccess featureAccess = UsageMetricUtils.getFeatureAccess(Context.accountId.get(), MetricTypes.ACTIVE_ENDPOINTS);
             SyncLimit syncLimit = featureAccess.fetchSyncLimit();
 
+            SyncLimit mcpAssetsSyncLimit = fetchSyncLimit(MetricTypes.MCP_ASSET_COUNT);
+            SyncLimit aiAssetsSyncLimit = fetchSyncLimit(MetricTypes.AI_ASSET_COUNT);
+
             numberOfSyncs++;
-            apiCatalogSync.syncWithDB(syncImmediately, fetchAllSTI, syncLimit, responseParams.get(0).getSource());
+            apiCatalogSync.syncWithDB(syncImmediately, fetchAllSTI, syncLimit, mcpAssetsSyncLimit, aiAssetsSyncLimit,
+                responseParams.get(0).getSource());
             if (DbMode.dbType.equals(DbMode.DbType.MONGO_DB)) {
                 dependencyAnalyser.dbState = apiCatalogSync.dbState;
                 dependencyAnalyser.syncWithDb();
@@ -776,5 +780,13 @@ public class HttpCallParser {
         updates = Updates.combine(updates,
             Updates.set(ApiCollection.TAGS_STRING, Collections.singletonList(getMcpServerTag())));
         return updates;
+    }
+
+    private SyncLimit fetchSyncLimit(MetricTypes metricType) {
+        FeatureAccess featureAccess = UsageMetricUtils.getFeatureAccess(Context.accountId.get(), metricType);
+        if (featureAccess.equals(FeatureAccess.noAccess)) {
+            featureAccess.setUsageLimit(0);
+        }
+        return featureAccess.fetchSyncLimit();
     }
 }

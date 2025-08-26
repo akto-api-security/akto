@@ -10,10 +10,15 @@ import com.akto.dto.CustomDataType;
 import com.akto.types.CappedSet;
 import com.akto.util.AccountTask;
 import com.mongodb.BasicDBObject;
+import com.mongodb.client.model.Filters;
+
 import io.swagger.v3.oas.models.media.*;
+import lombok.Setter;
+
 import org.apache.commons.lang3.StringUtils;
 import org.bson.codecs.pojo.annotations.BsonIgnore;
 import org.bson.codecs.pojo.annotations.BsonProperty;
+import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -137,6 +142,18 @@ public class SingleTypeInfo {
         }
         info.setAktoDataTypeMap(newAktoMap);
         info.setRedactedDataTypes(redactedDataTypes);
+    }
+
+    public static Bson getFilterFromParamId(ParamId paramId) {
+        return Filters.and(
+            Filters.eq(SingleTypeInfo._URL, paramId.getUrl()),
+            Filters.eq(SingleTypeInfo._METHOD, paramId.getMethod()),
+            Filters.eq(SingleTypeInfo._RESPONSE_CODE, paramId.getResponseCode()),
+            Filters.eq(SingleTypeInfo._IS_HEADER, paramId.isHeader()),
+            Filters.eq(SingleTypeInfo._PARAM, paramId.getParam()),
+            Filters.eq(SingleTypeInfo.SUB_TYPE, paramId.getSubType().name),
+            Filters.eq(SingleTypeInfo._API_COLLECTION_ID, paramId.getApiCollectionId())
+        );
     }
 
     public static void fetchCustomDataTypes(int accountId, List<CustomDataType> customDataTypes,
@@ -545,9 +562,6 @@ public class SingleTypeInfo {
     private boolean isPrivate; // do not use this field anywhere else. This was added to convey if STI is private or not to frontend
     @BsonIgnore
     private Object value;
-
-    // Only being used for generating OpenAPI spec.
-    @BsonIgnore
     private boolean isQueryParam;
 
     public boolean isQueryParam() {
@@ -987,5 +1001,13 @@ public String composeKeyWithCustomSubType(SubType s) {
 
     public void setId(ObjectId id) {
         this.id = id;
+    }
+
+    public boolean getIsQueryParam() {
+        return isQueryParam;
+    }
+
+    public void setIsQueryParam(boolean isQueryParam) {
+        this.isQueryParam = isQueryParam;
     }
 }

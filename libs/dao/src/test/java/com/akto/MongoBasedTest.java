@@ -14,7 +14,6 @@ import de.flapdoodle.embed.mongo.MongodStarter;
 import de.flapdoodle.embed.mongo.config.ImmutableMongodConfig;
 import de.flapdoodle.embed.mongo.config.Net;
 import de.flapdoodle.embed.mongo.distribution.Version;
-import org.junit.jupiter.api.BeforeEach;
 
 public class MongoBasedTest {
 
@@ -23,7 +22,6 @@ public class MongoBasedTest {
     public static MongodExecutable mongodExe;
     public static MongodProcess mongod;
 
-    @BeforeEach
 
     @BeforeClass
     public static void beforeClass() throws Exception {

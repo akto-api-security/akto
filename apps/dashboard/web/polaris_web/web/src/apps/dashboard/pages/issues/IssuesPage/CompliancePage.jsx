@@ -6,7 +6,7 @@ import Store from "../../../store";
 import func from "@/util/func";
 import { MarkFulfilledMinor, ReportMinor, ExternalMinor } from '@shopify/polaris-icons';
 import PersistStore from "../../../../main/PersistStore";
-import { Button, Popover, Box, Avatar, Text, HorizontalGrid, HorizontalStack, IndexFiltersMode, VerticalStack } from "@shopify/polaris";
+import { Button, Popover, Box, Avatar, Text, HorizontalGrid, HorizontalStack, IndexFiltersMode, VerticalStack, ActionList } from "@shopify/polaris";
 import EmptyScreensLayout from "../../../components/banners/EmptyScreensLayout";
 import { ISSUES_PAGE_DOCS_URL } from "../../../../main/onboardingData";
 import {SelectCollectionComponent} from "../../testing/TestRunsPage/TestrunsBannerComponent"
@@ -263,7 +263,14 @@ function CompliancePage() {
     filtersOptions = func.getCollectionFilters(filtersOptions)
 
     const handleSaveJiraAction = () => {
-        const jiraMetaData = issuesFunctions.prepareAdditionalIssueFieldsJiraMetaData()
+        let jiraMetaData;
+        try {
+            jiraMetaData = issuesFunctions.prepareAdditionalIssueFieldsJiraMetaData(projId, issueType);
+        } catch (error) {
+            setToast(true, true, "Please fill all required fields before creating a Jira ticket.");
+            resetResourcesSelected()
+            return;
+        }
 
         setToast(true, false, "Please wait while we create your Jira ticket.")
         setJiraModalActive(false)
@@ -360,7 +367,11 @@ function CompliancePage() {
         },
         {
             content: 'Export selected Issues',
-            onAction: () => { openVulnerabilityReport(items) }
+            onAction: () => { openVulnerabilityReport(items, false) }
+        },
+        {
+            content: 'Export selected Issues summary',
+            onAction: () => { openVulnerabilityReport(items, true) }
         },
         {
             content: 'Create jira ticket',
@@ -431,10 +442,12 @@ function CompliancePage() {
           }          
     }
 
-    const openVulnerabilityReport = async(items = []) => {
+    const openVulnerabilityReport = async (items = [], summaryMode = false) => {
         await testingApi.generatePDFReport(issuesFilters, items).then((res) => {
-          const responseId = res.split("=")[1];
-          window.open('/dashboard/issues/summary/' + responseId.split("}")[0], '_blank');
+            const responseId = res.split("=")[1];
+            const summaryModeQueryParam = summaryMode === true ? 'summaryMode=true' : '';
+            const redirectUrl = `/dashboard/issues/summary/${responseId.split("}")[0]}?${summaryModeQueryParam}`;
+            window.open(redirectUrl, '_blank');
         })
 
         resetResourcesSelected();
@@ -601,6 +614,8 @@ function CompliancePage() {
             />
         </>
     )
+
+    const [popOverActive, setPopOverActive] = useState(false)
     
     return (
         <>
@@ -663,8 +678,28 @@ function CompliancePage() {
             
             : components
             ]}
-            primaryAction={<Button primary onClick={() => openVulnerabilityReport()} disabled={showEmptyScreen}>Export {complianceView} report</Button>}
-            secondaryActions={<DateRangeFilter initialDispatch={currDateRange} dispatch={(dateObj) => dispatchCurrDateRange({ type: "update", period: dateObj.period, title: dateObj.title, alias: dateObj.alias })} />}
+            primaryAction={<Button primary onClick={() => openVulnerabilityReport([], false)} disabled={showEmptyScreen}>Export {complianceView} report</Button>}
+            secondaryActions={
+                <HorizontalStack gap={2}>
+                    <DateRangeFilter initialDispatch={currDateRange} dispatch={(dateObj) => dispatchCurrDateRange({ type: "update", period: dateObj.period, title: dateObj.title, alias: dateObj.alias })} />
+                    <Popover
+                        active={popOverActive}
+                        activator={<Button onClick={() => setPopOverActive((prev) => !prev)} disabled={showEmptyScreen} disclosure>More Actions</Button>}
+                        autofocusTarget="first-node"
+                        onClose={() => setPopOverActive(false)}
+                    >
+                        <ActionList
+                            actionRole="menuitem"
+                            items={[
+                                {
+                                    content: 'Export summary report',
+                                    onAction: () => openVulnerabilityReport([], true),
+                                },
+                            ]}
+                        />
+                    </Popover>
+                </HorizontalStack>
+            }
         />
             {(resultId !== null && resultId.length > 0) ? <TestRunResultPage /> : null}
             <JiraTicketCreationModal

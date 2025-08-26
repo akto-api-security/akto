@@ -3,6 +3,42 @@ import React, { useRef, useState } from 'react'
 import func from '@/util/func'
 import transform from '../onboarding/transform'
 import observeFunc from "./transform"
+import { getDashboardCategory } from '../../../main/labelHelper'
+
+export const getMethod = (url, method) => {
+    const category = getDashboardCategory();
+    if(category.includes("MCP")){
+        if(url.includes("tool")){
+            return "TOOL";
+        }else if(url.includes("resource")){
+            return "RESOURCE";
+        }else if(url.includes("prompt")){
+            return "PROMPT";
+        }
+    }
+    return method;
+}
+
+export function MethodBox({method, methodBoxWidth, url}){
+    const finalMethod = getMethod(url, method);
+    return (
+      <Box width={methodBoxWidth || "64px"}>
+        <HorizontalStack align="end">
+          <span
+            style={{
+              color: transform.getTextColor(finalMethod),
+              fontSize: "14px",
+              fontWeight: 500,
+              lineHeight: "20px",
+            }}
+          >
+            {finalMethod}
+          </span>
+        </HorizontalStack>
+      </Box>
+    )
+}
+
 function GetPrettifyEndpoint({method,url, isNew, maxWidth, methodBoxWidth}){
     const ref = useRef(null)
     const localUrl = url || "/"
@@ -14,20 +50,7 @@ function GetPrettifyEndpoint({method,url, isNew, maxWidth, methodBoxWidth}){
         onMouseEnter={() => setCopyActive(true)}
         onMouseLeave={() => setCopyActive(false)}
       >
-        <Box width={methodBoxWidth || "54px"}>
-          <HorizontalStack align="end">
-            <span
-              style={{
-                color: transform.getTextColor(method),
-                fontSize: "14px",
-                fontWeight: 500,
-                lineHeight: "20px",
-              }}
-            >
-              {method}
-            </span>
-          </HorizontalStack>
-        </Box>
+        <MethodBox method={method} methodBoxWidth={methodBoxWidth} url={url} />
         <Box width={maxWidth ? maxWidth : "30vw"}>
           <div
             style={{
@@ -47,7 +70,7 @@ function GetPrettifyEndpoint({method,url, isNew, maxWidth, methodBoxWidth}){
                   onClick={(e) => {
                     e.stopPropagation();
                     func.copyToClipboard(
-                      method + " " + localUrl,
+                      getMethod(localUrl, method) + " " + localUrl,
                       ref,
                       "URL copied"
                     );

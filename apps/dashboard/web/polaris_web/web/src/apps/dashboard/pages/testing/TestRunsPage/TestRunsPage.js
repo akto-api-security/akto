@@ -19,6 +19,7 @@ import TitleWithInfo from "@/apps/dashboard/components/shared/TitleWithInfo";
 import ApiCollectionCoverageGraph from "./ApiCollectionCoverageGraph";
 import ApisTestedOverTimeGraph from './ApisTestedOverTimeGraph';
 import TestRunOverTimeGraph from './TestRunOverTimeGraph';
+import { getDashboardCategory, mapLabel } from "../../../../main/labelHelper";
 /*
   {
     text:"", // req. -> The text to be shown wherever the header is being shown
@@ -76,7 +77,7 @@ const headers = [
   },
   {
     text: 'Total Apis',
-    title: 'Total Endpoints',
+    title: mapLabel("Total endpoints", getDashboardCategory()),
     value: 'total_apis',
     type: CellType.TEXT
   },

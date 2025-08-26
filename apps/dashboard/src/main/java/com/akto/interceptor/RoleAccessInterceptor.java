@@ -46,7 +46,7 @@ public class RoleAccessInterceptor extends AbstractInterceptor {
     }
 
     public final static String FORBIDDEN = "FORBIDDEN";
-    private final static String USER = "user";
+    public final static String USER = "user";
 
     private int getUserAccountId (Map<String, Object> session) throws Exception{
         try {

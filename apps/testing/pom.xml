@@ -22,6 +22,19 @@
             <version>${project.version}</version>
         </dependency>
         <dependency>
+            <groupId>com.akto.libs.dao</groupId>
+            <artifactId>dao</artifactId>
+            <version>${project.version}</version>
+            <type>test-jar</type>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>de.flapdoodle.embed</groupId>
+            <artifactId>de.flapdoodle.embed.mongo</artifactId>
+            <version>3.2.6</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
             <groupId>com.akto.apps.api-runtime</groupId>
             <artifactId>api-runtime</artifactId>
             <version>${project.version}</version>
@@ -44,6 +57,17 @@
             <artifactId>powermock-api-mockito2</artifactId>
             <version>2.0.9</version>
             <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.apache.kafka</groupId>
+            <artifactId>kafka-clients</artifactId>
+            <version>3.0.0</version>
+        </dependency>
+        <dependency>
+            <groupId>io.confluent.parallelconsumer</groupId>
+            <artifactId>parallel-consumer-core</artifactId>
+            <version>0.5.2.4</version>
         </dependency>
 
     </dependencies>
