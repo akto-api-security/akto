@@ -83,7 +83,7 @@ function OpenApiSource() {
     let successModalContent = (
         <div>
             <Text>Total APIs in the uploaded file: {uploadObj.totalCount}</Text>
-            <Text>Total APIs (including all 2XX response codes) parsed correctly by Akto: {uploadObj.correctlyParsedApis}</Text>
+            <Text>Total APIs (including all response codes) parsed correctly by Akto: {uploadObj.correctlyParsedApis}</Text>
             {
                 uploadObj.apisWithErrorsAndCannotBeImported + uploadObj.apisWithErrorsAndParsed > 0 &&
                 <div>
