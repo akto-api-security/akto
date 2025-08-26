@@ -501,8 +501,20 @@ function SingleTestRunPage() {
       case "STOPPED":
         return "Test has been stopped";
       case "COMPLETED":
+
+        let delta = Math.abs(selectedTestRun.startTimestamp - selectedTestRun.endTimestamp);
+        let earlyFinish = "";
+        let testRunTime = testingRunResultSummariesObj?.testingRun?.testRunTime;
+        if (testRunTime == null || testRunTime == undefined || testRunTime <= 0) {
+          testRunTime = 1800;
+        }
+
+        if (delta >= testRunTime) {
+          earlyFinish = "| Test exited because max time limit reached"
+        }
+
         return `Scanned ${func.prettifyEpoch(selectedTestRun.startTimestamp)} for a duration of
-        ${func.getTimeTakenByTest(selectedTestRun.startTimestamp, selectedTestRun.endTimestamp)}`;
+        ${func.getTimeTakenByTest(selectedTestRun.startTimestamp, selectedTestRun.endTimestamp)} ${earlyFinish}`;
       case "FAILED":
       case "FAIL":
         return "Test execution has failed during run";

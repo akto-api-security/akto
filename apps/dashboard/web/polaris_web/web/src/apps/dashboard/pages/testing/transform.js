@@ -977,7 +977,6 @@ getPrettifiedTestRunResults(testRunResults){
   let prettifiedResults = []
   Object.keys(testRunResultsObj).forEach((key)=>{
     let obj = testRunResultsObj[key]
-    console.log("testing:", obj.urls);
     let prettifiedObj = {
       ...obj,
       nameComp: <div data-testid={obj.name}><Box maxWidth="250px"><TooltipText tooltip={obj.name} text={obj.name} textProps={{fontWeight: 'medium'}}/></Box></div>,
