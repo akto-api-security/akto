@@ -133,10 +133,16 @@ public class UsageCalculator {
                 case CUSTOM_TESTS:
                     featureId = stiggConfig.getCustomTestsLabel();
                     break;
+                case AI_ASSET_COUNT:
+                    featureId = stiggConfig.getAiAssetsLabel();
+                    break;
+                case MCP_ASSET_COUNT:
+                    featureId = stiggConfig.getMcpAssetsLabel();
+                    break;
 
                 default:
-
                     loggerMaker.errorAndAddToDb("This is not a standard metric type: " + metricType, LoggerMaker.LogDb.BILLING);
+                    break;
             }
 
             if (featureId == null) {
