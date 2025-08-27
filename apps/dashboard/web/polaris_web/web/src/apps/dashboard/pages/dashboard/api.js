@@ -184,7 +184,9 @@ const api = {
         } else if (typeof params === 'object' && params !== null) {
             data = {
                 showIssues: params.showIssues || false,
-                categoryType: params.categoryType || null
+                categoryTypes: Array.isArray(params.categoryTypes)
+                    ? params.categoryTypes
+                    : (params.categoryType ? [params.categoryType] : null)
             };
         }
         

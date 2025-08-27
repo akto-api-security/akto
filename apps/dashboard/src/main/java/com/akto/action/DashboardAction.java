@@ -4,6 +4,7 @@ import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 import com.akto.dao.*;
 import com.akto.dao.billing.OrganizationsDao;
@@ -181,113 +182,148 @@ public class DashboardAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
     public String fetchIssuesByApis() {
-        response = new BasicDBObject();
-        List<Bson> basePipeline = new ArrayList<>();
-        Bson filterQ = UsageMetricCalculator.excludeDemosAndDeactivated(TestingRunIssues.ID_API_COLLECTION_ID);
-        
-        if (categoryType != null && !categoryType.isEmpty()) {
-            List<YamlTemplate> yamlTemplates = YamlTemplateDao.instance.findAll(
+        BasicDBObject finalResponse = new BasicDBObject();
+
+        List<String> categories = (categoryTypes == null || categoryTypes.isEmpty())
+            ? Collections.singletonList(null)
+            : categoryTypes;
+
+        for (String categoryType : categories) {
+            BasicDBObject result = new BasicDBObject();
+            List<Bson> basePipeline = new ArrayList<>();
+            Bson filterQ = UsageMetricCalculator.excludeDemosAndDeactivated(TestingRunIssues.ID_API_COLLECTION_ID);
+
+            if (categoryType != null && !categoryType.isEmpty()) {
+                List<YamlTemplate> yamlTemplates = YamlTemplateDao.instance.findAll(
                     Filters.eq("info.category.name", categoryType)
+                );
+                Set<String> testIds = yamlTemplates.stream()
+                    .map(YamlTemplate::getId)
+                    .collect(Collectors.toSet());
+
+                if (!testIds.isEmpty()) {
+                    basePipeline.add(Aggregates.match(Filters.in(
+                        Constants.ID + "." + TestingIssuesId.TEST_SUB_CATEGORY,
+                        testIds
+                    )));
+                } else {
+                    result.put("countByAPIs", new HashMap<>());
+                    if (this.showIssues) {
+                        result.put("issueNamesByAPIs", new ArrayList<>());
+                    }
+                    if (categories.size() == 1) {
+                        this.response = result;
+                        return SUCCESS.toUpperCase();
+                    }
+                    finalResponse.put(categoryType, result);
+                    continue;
+                }
+            }
+
+            basePipeline.add(
+                Aggregates.match(Filters.and(
+                    Filters.eq(TestingRunIssues.TEST_RUN_ISSUES_STATUS, GlobalEnums.TestRunIssueStatus.OPEN),
+                    filterQ
+                ))
             );
-            Set<String> testIds = new HashSet<>();
-            for (YamlTemplate template : yamlTemplates) {
-                testIds.add(template.getId());
+
+            try {
+                List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(
+                    Context.userId.get(), Context.accountId.get()
+                );
+                if (collectionIds != null) {
+                    basePipeline.add(Aggregates.match(Filters.in(SingleTypeInfo._COLLECTION_IDS, collectionIds)));
+                }
+            } catch (Exception e) {
             }
-            
-            if (!testIds.isEmpty()) {
-                basePipeline.add(Aggregates.match(Filters.in(
-                    Constants.ID + "." + TestingIssuesId.TEST_SUB_CATEGORY, 
-                    testIds
-                )));
+
+            BasicDBObject groupedId = new BasicDBObject(SingleTypeInfo._URL, "$" + TestingRunIssues.ID_URL)
+                .append(SingleTypeInfo._METHOD, "$" + TestingRunIssues.ID_METHOD)
+                .append(SingleTypeInfo._API_COLLECTION_ID, "$" + TestingRunIssues.ID_API_COLLECTION_ID);
+
+            List<BsonField> groupAccumulators = new ArrayList<>();
+            groupAccumulators.add(Accumulators.sum("count", 1));
+            if (this.showIssues) {
+                String subCategoryPath = Constants.ID + "." + TestingIssuesId.TEST_SUB_CATEGORY;
+                groupAccumulators.add(Accumulators.addToSet("issueNames", "$" + subCategoryPath));
             }
-        }
-        
-        basePipeline.add(
-            Aggregates.match(Filters.and(
-                Filters.eq(TestingRunIssues.TEST_RUN_ISSUES_STATUS, GlobalEnums.TestRunIssueStatus.OPEN),
-                filterQ
-            ))
-        );
-        try {
-            List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
-            if (collectionIds != null) {
-                basePipeline.add(Aggregates.match(Filters.in(SingleTypeInfo._COLLECTION_IDS, collectionIds)));
-            }
-        } catch (Exception e) {
-        }
 
-        List<Bson> pipeline = new ArrayList<>(basePipeline);
-        BasicDBObject groupedId = new BasicDBObject(SingleTypeInfo._URL, "$" + TestingRunIssues.ID_URL)
-            .append(SingleTypeInfo._METHOD, "$" + TestingRunIssues.ID_METHOD)
-            .append(SingleTypeInfo._API_COLLECTION_ID, "$" + TestingRunIssues.ID_API_COLLECTION_ID);
+            List<Bson> pipeline = new ArrayList<>(basePipeline);
+            pipeline.add(Aggregates.group(groupedId, groupAccumulators.toArray(new BsonField[0])));
 
-        List<BsonField> groupAccumulators = new ArrayList<>();
-        groupAccumulators.add(Accumulators.sum("count", 1));
-        if (this.showIssues) {
-            String subCategoryPath = Constants.ID + "." + TestingIssuesId.TEST_SUB_CATEGORY;
-            groupAccumulators.add(Accumulators.addToSet("issueNames", "$" + subCategoryPath));
-        }
-        pipeline.add(Aggregates.group(groupedId, groupAccumulators.toArray(new BsonField[0])));
+            MongoCursor<BasicDBObject> cursor = TestingRunIssuesDao.instance
+                .getMCollection()
+                .aggregate(pipeline, BasicDBObject.class)
+                .cursor();
 
-        MongoCursor<BasicDBObject> cursor = TestingRunIssuesDao.instance.getMCollection().aggregate(pipeline, BasicDBObject.class).cursor();
+            Map<ApiInfoKey, Integer> countByAPIs = new HashMap<>();
+            Map<ApiInfoKey, List<String>> issueNamesByKey = new HashMap<>();
+            List<BasicDBObject> idDocsForIssueNames = new ArrayList<>();
 
-        Map<ApiInfoKey, Integer> countByAPIs = new HashMap<>();
-        Map<ApiInfoKey, List<String>> issueNamesByKey = new HashMap<>();
-        List<BasicDBObject> idDocsForIssueNames = new ArrayList<>();
+            while (cursor.hasNext()) {
+                BasicDBObject doc = cursor.next();
+                BasicDBObject id = (BasicDBObject) doc.get("_id");
+                ApiInfoKey key = new ApiInfoKey(
+                    id.getInt(SingleTypeInfo._API_COLLECTION_ID),
+                    id.getString(SingleTypeInfo._URL),
+                    Method.valueOf(id.getString(SingleTypeInfo._METHOD))
+                );
 
-        while (cursor.hasNext()) {
-            BasicDBObject doc = cursor.next();
-            BasicDBObject id = (BasicDBObject) doc.get("_id");
-            ApiInfoKey key = new ApiInfoKey(
-                id.getInt(SingleTypeInfo._API_COLLECTION_ID),
-                id.getString(SingleTypeInfo._URL),
-                Method.valueOf(id.getString(SingleTypeInfo._METHOD))
-            );
-            int count = doc.getInt("count", 0);
-            countByAPIs.put(key, count);
+                int count = doc.getInt("count", 0);
+                countByAPIs.put(key, count);
 
-            // When category filtering is enabled, include all APIs regardless of issue count
-            // When no category filtering, only include APIs with 2+ issues 
-            boolean shouldIncludeApiInfo = this.showIssues && 
-                (categoryType != null && !categoryType.isEmpty() || count >= 2);
-            
-            if (shouldIncludeApiInfo) {
-                @SuppressWarnings("unchecked")
-                List<String> names = (List<String>) doc.getOrDefault("issueNames", new ArrayList<String>());
-                List<String> norm = new ArrayList<>();
-                for (String n : names) norm.add(n == null ? "UNKNOWN" : n);
-                issueNamesByKey.put(key, norm);
+                boolean shouldIncludeApiInfo = this.showIssues &&
+                    ((categoryType != null && !categoryType.isEmpty()) || count >= 2);
 
-                BasicDBObject idObj = new BasicDBObject("apiCollectionId", key.getApiCollectionId())
+                if (shouldIncludeApiInfo) {
+                    @SuppressWarnings("unchecked")
+                    List<String> names = (List<String>) doc.getOrDefault("issueNames", new ArrayList<String>());
+                    List<String> normalized = names.stream()
+                        .map(n -> n == null ? "UNKNOWN" : n)
+                        .collect(Collectors.toList());
+                    issueNamesByKey.put(key, normalized);
+
+                    BasicDBObject idObj = new BasicDBObject("apiCollectionId", key.getApiCollectionId())
                         .append("url", key.getUrl())
                         .append("method", key.getMethod().name());
-                idDocsForIssueNames.add(new BasicDBObject("_id", idObj));
+                    idDocsForIssueNames.add(new BasicDBObject("_id", idObj));
+                }
             }
-        }
 
-        response.put("countByAPIs", countByAPIs);
+            result.put("countByAPIs", countByAPIs);
 
-        if (this.showIssues) {
-            if (issueNamesByKey.isEmpty()) {
-                response.put("issueNamesByAPIs", new ArrayList<BasicDBObject>());
+            if (this.showIssues) {
+                if (issueNamesByKey.isEmpty()) {
+                    result.put("issueNamesByAPIs", new ArrayList<BasicDBObject>());
+                } else {
+                    List<ApiInfo> apiInfos = ApiInfoDao.getApiInfosFromList(idDocsForIssueNames, -1);
+                    Map<ApiInfoKey, ApiInfo> apiInfoByKey = new HashMap<>();
+                    for (ApiInfo a : apiInfos) apiInfoByKey.put(a.getId(), a);
+
+                    List<BasicDBObject> issueNamesByAPIs = new ArrayList<>();
+                    for (Map.Entry<ApiInfoKey, List<String>> e : issueNamesByKey.entrySet()) {
+                        ApiInfo ai = apiInfoByKey.get(e.getKey());
+                        if (ai == null) continue;
+                        issueNamesByAPIs.add(
+                            new BasicDBObject("apiInfo", ai).append("issueNames", e.getValue())
+                        );
+                    }
+                    result.put("issueNamesByAPIs", issueNamesByAPIs);
+                }
+            }
+
+            if (categories.size() == 1) {
+                this.response = result;
                 return SUCCESS.toUpperCase();
+            } else {
+                finalResponse.put(categoryType, result);
             }
-
-            List<ApiInfo> apiInfos = ApiInfoDao.getApiInfosFromList(idDocsForIssueNames, -1);
-            Map<ApiInfoKey, ApiInfo> apiInfoByKey = new HashMap<>();
-            for (ApiInfo a : apiInfos) apiInfoByKey.put(a.getId(), a);
-
-            List<BasicDBObject> issueNamesByAPIs = new ArrayList<>();
-            for (Map.Entry<ApiInfoKey, List<String>> e : issueNamesByKey.entrySet()) {
-                ApiInfo ai = apiInfoByKey.get(e.getKey());
-                if (ai == null) continue;
-                issueNamesByAPIs.add(new BasicDBObject("apiInfo", ai).append("issueNames", e.getValue()));
-            }
-            response.put("issueNamesByAPIs", issueNamesByAPIs);
         }
 
+        this.response = finalResponse;
         return SUCCESS.toUpperCase();
     }
+
 
     public String fetchIssuesTrend(){
         if(endTimeStamp == 0){
@@ -551,5 +587,5 @@ public class DashboardAction extends UserAction {
     }
 
     @Setter
-    private String categoryType;
+    private List<String> categoryTypes;
 }
