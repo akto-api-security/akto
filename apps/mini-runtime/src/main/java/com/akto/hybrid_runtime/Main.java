@@ -134,13 +134,13 @@ public class Main {
         return false;
     }
 
-    private static void buildProtobufKafkaProducer() {
+    private static void buildProtobufKafkaProducer(String kafkaBrokerUrl) {
         if(!isProtoKafkaEnabled()){
             loggerMaker.info("Skipping proto kafka producer init");
             return;
         }
         loggerMaker.info("Building protobuf kafka producer...................");
-        String kafkaBrokerUrl = "kafka1:19092";
+        // String kafkaBrokerUrl = "kafka1:19092";
         int batchSize = AccountSettings.DEFAULT_CENTRAL_KAFKA_BATCH_SIZE;
         int lingerMS = AccountSettings.DEFAULT_CENTRAL_KAFKA_LINGER_MS;
         
@@ -233,6 +233,7 @@ public class Main {
             loggerMaker.infoAndAddToDb("is_kubernetes: true");
             kafkaBrokerUrl = "127.0.0.1:29092";
         }
+        final String brokerUrlFinal = kafkaBrokerUrl;
         String groupIdConfig =  System.getenv("AKTO_KAFKA_GROUP_ID_CONFIG") != null
                 ? System.getenv("AKTO_KAFKA_GROUP_ID_CONFIG")
                 : "asdf";
@@ -274,7 +275,7 @@ public class Main {
         String centralKafkaTopicName = AccountSettings.DEFAULT_CENTRAL_KAFKA_TOPIC_NAME;
 
         buildKafka();
-        buildProtobufKafkaProducer();
+        buildProtobufKafkaProducer(brokerUrlFinal);
         scheduler.scheduleAtFixedRate(new Runnable() {
             public void run() {
                 if (kafkaProducer == null || !kafkaProducer.producerReady) {
@@ -282,7 +283,7 @@ public class Main {
                 }
                 // Also check protobuf producer
                 if (protobufKafkaProducer == null) {
-                    buildProtobufKafkaProducer();
+                    buildProtobufKafkaProducer(brokerUrlFinal);
                 }
             }
         }, 5, 5, TimeUnit.MINUTES);
@@ -454,7 +455,7 @@ public class Main {
         }, 0, 24, TimeUnit.HOURS);
 
         if(isDbMergingModeEnabled()){
-            runDBMaintainceJob(apiConfig);
+            runDBMaintenanceJob(apiConfig);
         }else{
             kafkaSubscribeAndProcess(topicName, syncImmediately, fetchAllSTI, accountInfoMap, isDashboardInstance, centralKafkaTopicName,
                     apiConfig, main, exceptionOnCommitSync, httpCallParserMap, lastSyncOffset);

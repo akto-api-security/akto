@@ -57,6 +57,9 @@ public class ApiCollection {
     private boolean matchDependencyWithOtherCollections;
     public static final String MATCH_DEPENDENCY_WITH_OTHER_COLLECTIONS = "matchDependencyWithOtherCollections";
 
+    String sseCallbackUrl;
+    public static final String SSE_CALLBACK_URL = "sseCallbackUrl";
+
     public enum Type {
         API_GROUP
     }
@@ -104,6 +107,18 @@ public class ApiCollection {
         this.vxlanId = vxlanId;
         this.redact = redact;
         this.sampleCollectionsDropped = sampleCollectionsDropped;
+    }
+
+    public ApiCollection(int id, String name, int startTs, Set<String> urls, String hostName, int vxlanId, boolean redact, boolean sampleCollectionsDropped, String sseCallbackUrl) {
+        this.id = id;
+        this.name = name;
+        this.startTs = startTs;
+        this.urls = urls;
+        this.hostName = hostName;
+        this.vxlanId = vxlanId;
+        this.redact = redact;
+        this.sampleCollectionsDropped = sampleCollectionsDropped;
+        this.sseCallbackUrl = sseCallbackUrl;
     }
 
     public ApiCollection(int id, String name, List<TestingEndpoints> conditions) {
@@ -348,4 +363,14 @@ public class ApiCollection {
     public void setRunDependencyAnalyser(boolean runDependencyAnalyser) {
         this.runDependencyAnalyser = runDependencyAnalyser;
     }
+
+
+    public String getSseCallbackUrl() {
+        return sseCallbackUrl;
+    }   
+
+    public void setSseCallbackUrl(String sseCallbackUrl) {
+        this.sseCallbackUrl = sseCallbackUrl;
     }
+
+}

@@ -85,8 +85,8 @@ jobs:
           cd apps/mini-runtime
           if [[ "${{ github.event.inputs.mini-runtime }}" == "true" ]]; then
             cd ../mini-runtime
-            docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/$REGISTRY_ALIAS/akto-api-security-mini-runtime:$IMAGE_TAG3 . --push
-            echo "::set-output name=image::$ECR_REGISTRY/akto-api-security-mini-runtime:$IMAGE_TAG3"
+            docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/$REGISTRY_ALIAS/akto-api-security-mini-runtime:$IMAGE_TAG -t $ECR_REGISTRY/$REGISTRY_ALIAS/akto-api-security-mini-runtime:$IMAGE_TAG1 -t $ECR_REGISTRY/$REGISTRY_ALIAS/akto-api-security-mini-runtime:$IMAGE_TAG2 -t $ECR_REGISTRY/$REGISTRY_ALIAS/akto-api-security-mini-runtime:$IMAGE_TAG3 . --push
+            echo "::set-output name=image::$ECR_REGISTRY/akto-api-security-mini-runtime:$IMAGE_TAG"
           fi
 
           if [[ "${{ github.event.inputs.mini-testing }}" == "true" ]]; then
@@ -97,7 +97,7 @@ jobs:
 
           if [[ "${{ github.event.inputs.testing-db-layer }}" == "true" ]]; then
             cd ../testing-db-layer
-            docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/$REGISTRY_ALIAS/akto-api-security-testing-db-layer:$IMAGE_TAG3 . --push
+            docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/$REGISTRY_ALIAS/akto-api-security-testing-db-layer:$IMAGE_TAG -t $ECR_REGISTRY/$REGISTRY_ALIAS/akto-api-security-testing-db-layer:$IMAGE_TAG1 -t $ECR_REGISTRY/$REGISTRY_ALIAS/akto-api-security-testing-db-layer:$IMAGE_TAG2 -t $ECR_REGISTRY/$REGISTRY_ALIAS/akto-api-security-testing-db-layer:$IMAGE_TAG3 . --push
             echo "::set-output name=image::$ECR_REGISTRY/akto-api-security-testing-db-layer:$IMAGE_TAG3"
           fi
           
@@ -130,7 +130,7 @@ jobs:
           cd apps/mini-runtime
           if [[ "${{ github.event.inputs.mini-runtime }}" == "true" ]]; then
             cd ../mini-runtime
-            docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/mini-runtime:$IMAGE_TAG3 . --push
+            docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/mini-runtime:$IMAGE_TAG -t $ECR_REGISTRY/mini-runtime:$IMAGE_TAG1 -t $ECR_REGISTRY/mini-runtime:$IMAGE_TAG2 -t $ECR_REGISTRY/mini-runtime:$IMAGE_TAG3 . --push
           fi
 
           if [[ "${{ github.event.inputs.mini-testing }}" == "true" ]]; then
@@ -140,7 +140,7 @@ jobs:
 
           if [[ "${{ github.event.inputs.testing-db-layer }}" == "true" ]]; then
             cd ../testing-db-layer
-            docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/testing-db-layer:$IMAGE_TAG3 . --push
+            docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/testing-db-layer:$IMAGE_TAG -t $ECR_REGISTRY/testing-db-layer:$IMAGE_TAG1 -t $ECR_REGISTRY/testing-db-layer:$IMAGE_TAG2 -t $ECR_REGISTRY/testing-db-layer:$IMAGE_TAG3 . --push
           fi
           
           if [[ "${{ github.event.inputs.mini-runtime-service }}" == "true" ]]; then
