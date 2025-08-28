@@ -7,6 +7,8 @@ import {
     DiamondAlertMinor,
     StarFilledMinor,
     FinancesMinor,
+    LockMajor,
+    AutomationFilledMajor,
 } from "@shopify/polaris-icons";
 import {useLocation, useNavigate} from "react-router-dom";
 
@@ -379,7 +381,7 @@ export default function LeftNav() {
                         MCP Guardrails
                     </Text>
                 ),
-                icon: DiamondAlertMinor,
+                icon: LockMajor,
                 onClick: () => {
                     handleSelect("dashboard_mcp_guardrails");
                     navigate("/dashboard/mcp-guardrails");
@@ -395,7 +397,7 @@ export default function LeftNav() {
                         AI Agent Guardrails
                     </Text>
                 ),
-                icon: StarFilledMinor,
+                icon: AutomationFilledMajor,
                 onClick: () => {
                     handleSelect("dashboard_ai_agent_guardrails");
                     navigate("/dashboard/ai-agent-guardrails");
