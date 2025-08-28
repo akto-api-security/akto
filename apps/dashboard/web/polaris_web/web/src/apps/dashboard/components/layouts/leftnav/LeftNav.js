@@ -373,6 +373,38 @@ export default function LeftNav() {
                 url: "#",
                 key: "8",
             }] : []),
+            {
+                label: (
+                    <Text variant="bodyMd" fontWeight="medium">
+                        MCP Guardrails
+                    </Text>
+                ),
+                icon: DiamondAlertMinor,
+                onClick: () => {
+                    handleSelect("dashboard_mcp_guardrails");
+                    navigate("/dashboard/mcp-guardrails");
+                    setActive("normal");
+                },
+                selected: leftNavSelected === "dashboard_mcp_guardrails",
+                url: "#",
+                key: "9",
+            },
+            {
+                label: (
+                    <Text variant="bodyMd" fontWeight="medium">
+                        AI Agent Guardrails
+                    </Text>
+                ),
+                icon: StarFilledMinor,
+                onClick: () => {
+                    handleSelect("dashboard_ai_agent_guardrails");
+                    navigate("/dashboard/ai-agent-guardrails");
+                    setActive("normal");
+                },
+                selected: leftNavSelected === "dashboard_ai_agent_guardrails",
+                url: "#",
+                key: "10",
+            },
         ]
 
         const exists = items.find(item => item.key === "quick_start")
