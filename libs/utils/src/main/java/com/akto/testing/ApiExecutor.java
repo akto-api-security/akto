@@ -794,22 +794,15 @@ public class ApiExecutor {
         if (!isJsonRpcRequest(request)) {
             return false;
         }
-
+        // Only use SSE if POST and sseCallbackUrl is set in the request headers (x-akto-sse-endpoint)
         if (!Method.POST.name().equalsIgnoreCase(request.getMethod())) {
-            return true;
+            return false;
         }
-
-        for (Map.Entry<String, List<String>> entry : request.getHeaders().entrySet()) {
-            if (HttpRequestResponseUtils.HEADER_ACCEPT.equalsIgnoreCase(entry.getKey()) && entry.getValue() != null
-                && !entry.getValue().isEmpty()) {
-                String value = entry.getValue().get(0).toLowerCase();
-                if (value.contains(HttpRequestResponseUtils.TEXT_EVENT_STREAM_CONTENT_TYPE) && value.contains(
-                    HttpRequestResponseUtils.APPLICATION_JSON)) {
-                    return false;
-                }
-            }
+        if (request.getHeaders() != null && request.getHeaders().containsKey("x-akto-sse-endpoint")) {
+            String sseEndpoint = request.getHeaders().get("x-akto-sse-endpoint").get(0);
+            return sseEndpoint != null && !sseEndpoint.isEmpty();
         }
-        return true;
+        return false;
     }
 
     private static void closeSseSession(SseSession session) throws InterruptedException {
