@@ -83,8 +83,6 @@ public class HttpCallParser {
     // Using default timeouts [10 seconds], as this is a slow API.
     private static final OkHttpClient client = CoreHTTPClient.client.newBuilder().build();
     
-    private static final ExecutorService service = Executors.newFixedThreadPool(1);
-    private static boolean pgMerging = false;
 
     private static final ConcurrentLinkedQueue<BasicDBObject> queue = new ConcurrentLinkedQueue<>();
     private DataActor dataActor = DataActorFactory.fetchInstance();
@@ -383,12 +381,11 @@ public class HttpCallParser {
 
         this.sync_count += filteredResponseParams.size();
         int syncThresh = numberOfSyncs < 10 ? 10000 : sync_threshold_count;
-        executeCatalogSync(syncImmediately, fetchAllSTI, accountSettings, isHarOrPcap, syncThresh);
+        executeCatalogSync(syncImmediately, fetchAllSTI, isHarOrPcap, syncThresh);
 
     }
 
-    private void executeCatalogSync(boolean syncImmediately, boolean fetchAllSTI, AccountSettings accountSettings,
-            boolean isHarOrPcap, int syncThresh) {
+    private void executeCatalogSync(boolean syncImmediately, boolean fetchAllSTI, boolean isHarOrPcap, int syncThresh) {
         if (syncImmediately || this.sync_count >= syncThresh || (Context.now() - this.last_synced) > this.sync_threshold_time || isHarOrPcap) {
             long startTime = System.currentTimeMillis();
             numberOfSyncs++;
@@ -409,28 +406,6 @@ public class HttpCallParser {
             this.last_synced = Context.now();
             this.sync_count = 0;
 
-            if (accountSettings != null && accountSettings.isRedactPayload()) {
-                loggerMaker.infoAndAddToDb("Current pg merging status " + pgMerging);
-                /*
-                 * submit a job only if it is not running.
-                 */
-                if (!pgMerging) {
-                    int accountId = Context.accountId.get();
-                    pgMerging = true;
-                    service.submit(() -> {
-                        Context.accountId.set(accountId);
-                        try {
-                            loggerMaker.infoAndAddToDb("Running merging job for sql");
-                            MergeLogicLocal.mergingJob(apiCatalogSync.dbState);
-                            loggerMaker.infoAndAddToDb("completed merging job for sql");
-                        } catch (Exception e) {
-                            loggerMaker.errorAndAddToDb(e, "error in sql merge job");
-                        } finally {
-                            pgMerging = false;
-                        }
-                    });
-                }
-            }
             long endTime = System.currentTimeMillis();
             loggerMaker.debug("Completed Syncing API catalog..." + numberOfSyncs + " " + (endTime - startTime) + " ms");
         }
