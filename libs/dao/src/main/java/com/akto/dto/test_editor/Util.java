@@ -1,9 +1,13 @@
 package com.akto.dto.test_editor;
 
+import java.util.Base64;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+import org.json.JSONObject;
+
+import com.akto.util.Pair;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 
@@ -88,5 +92,23 @@ public class Util {
         }
 
         return res;
+    }
+
+    public static Pair<JSONObject, JSONObject> decodeJWT(String jwtStr) throws Exception {
+        String[] jwtList = jwtStr.split("\\.");
+        
+        if (jwtList.length != 3)
+            throw new Exception("Invalid JWT, number of segments not 3");
+        
+        String jwtHeaderStr = new String(Base64.getDecoder().decode(jwtList[0])); // The first part of the JWT contains the header encoded in Base64
+        JSONObject jwtHeader = new JSONObject(jwtHeaderStr); 
+        
+        if (!jwtHeader.has("alg")) // A valid jwt should have "alg" key in it's header
+            throw new Exception("Invalid JWT, alg key not present in header");
+
+        String jwtPayloadStr = new String(Base64.getDecoder().decode(jwtList[1])); // The second part of the JWT contains the payload encoded in Base64
+        JSONObject jwtPayload = new JSONObject(jwtPayloadStr); 
+        
+        return new Pair<JSONObject,JSONObject>(jwtHeader, jwtPayload);
     }
 }
