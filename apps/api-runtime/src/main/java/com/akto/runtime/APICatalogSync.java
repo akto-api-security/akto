@@ -1871,7 +1871,7 @@ public class APICatalogSync {
 
         boolean redact = false;
         if (accountSettings != null) {
-            redact =  accountSettings.isRedactPayload();
+            redact = accountSettings.isRedactPayload() && source.equals(HttpResponseParams.Source.MIRRORING);
             if (accountSettings.getPartnerIpList() != null) {
                 partnerIpsList = accountSettings.getPartnerIpList();
             }
