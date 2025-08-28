@@ -570,7 +570,7 @@ public class Main {
      * Control to enable this is done by setting the DB_MERGING_MODE environment variable to true.
      * @param apiConfig
      */
-    public static void runDBMaintainceJob(APIConfig apiConfig) {
+    public static void runDBMaintenanceJob(APIConfig apiConfig) {
         APICatalogSync apiCatalogSync = new APICatalogSync(apiConfig.getUserIdentifier(), apiConfig.getThreshold(), fetchAllSTI);
         while (true) {
             try {
