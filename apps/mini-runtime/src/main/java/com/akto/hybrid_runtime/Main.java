@@ -127,8 +127,15 @@ public class Main {
         }
     }
     
+    private static boolean isProtoKafkaEnabled() {
+        if (DataActor.actualAccountId == 1752208054) {
+            return true;
+        }
+        return false;
+    }
+
     private static void buildProtobufKafkaProducer() {
-        if (DataActor.actualAccountId != 1752208054) {
+        if(!isProtoKafkaEnabled()){
             loggerMaker.info("Skipping proto kafka producer init");
             return;
         }
@@ -446,6 +453,25 @@ public class Main {
             }
         }, 0, 24, TimeUnit.HOURS);
 
+        if(isDbMergingModeEnabled()){
+            runDBMaintainceJob(apiConfig);
+        }else{
+            kafkaSubscribeAndProcess(topicName, syncImmediately, fetchAllSTI, accountInfoMap, isDashboardInstance, centralKafkaTopicName,
+                    apiConfig, main, exceptionOnCommitSync, httpCallParserMap, lastSyncOffset);
+        }
+    }
+
+    public static boolean isDbMergingModeEnabled(){
+        return System.getenv().getOrDefault("DB_MERGING_MODE", "false").equalsIgnoreCase("true");
+    }
+
+    /**
+     * Main method of mini runtime where traffic kafka topic consumer does processing.
+     */
+    private static void kafkaSubscribeAndProcess(String topicName, boolean syncImmediately, boolean fetchAllSTI,
+            Map<Integer, AccountInfo> accountInfoMap, boolean isDashboardInstance, String centralKafkaTopicName,
+            APIConfig apiConfig, final Main main, final AtomicBoolean exceptionOnCommitSync,
+            Map<String, HttpCallParser> httpCallParserMap, long lastSyncOffset) {
         try {
             main.consumer.subscribe(Arrays.asList(topicName));
             loggerMaker.infoAndAddToDb("Consumer subscribed to topic: " + topicName);
@@ -460,50 +486,7 @@ public class Main {
                 long start = System.currentTimeMillis();
                 // TODO: what happens if exception
                 Map<String, List<HttpResponseParams>> responseParamsToAccountMap = new HashMap<>();
-                for (ConsumerRecord<String,String> r: records) {
-                    HttpResponseParams httpResponseParams;
-                    try {
-                         
-                        printL(r.value());
-                        AllMetrics.instance.setRuntimeKafkaRecordCount(1);
-                        AllMetrics.instance.setRuntimeKafkaRecordSize(r.value().length());
-
-                        lastSyncOffset++;
-                        if (DataControlFetcher.stopIngestionFromKafka()) {
-                            continue;
-                        }
-
-                        if (lastSyncOffset % 100 == 0) {
-                            loggerMaker.info("Committing offset at position: " + lastSyncOffset);
-                        }
-
-                        if (tryForCollectionName(r.value())) {
-                            continue;
-                        }
-
-                        httpResponseParams = HttpCallParser.parseKafkaMessage(r.value());
-                        if (httpResponseParams == null) {
-                            loggerMaker.error("httpresponse params was skipped due to invalid json requestBody");
-                            continue;
-                        }
-                        HttpRequestParams requestParams = httpResponseParams.getRequestParams();
-                        String debugHost = Utils.printDebugHostLog(httpResponseParams);
-                        if (debugHost != null) {
-                            loggerMaker.infoAndAddToDb("Found debug host: " + debugHost + " in url: " + requestParams.getMethod() + " " + requestParams.getURL());
-                        }
-                        if (Utils.printDebugUrlLog(requestParams.getURL())) {
-                            loggerMaker.infoAndAddToDb("Found debug url: " + requestParams.getURL());
-                        }
-                    } catch (Exception e) {
-                        loggerMaker.errorAndAddToDb(e, "Error while parsing kafka message " + e);
-                        continue;
-                    }
-                    String accountId = httpResponseParams.getAccountId();
-                    if (!responseParamsToAccountMap.containsKey(accountId)) {
-                        responseParamsToAccountMap.put(accountId, new ArrayList<>());
-                    }
-                    responseParamsToAccountMap.get(accountId).add(httpResponseParams);
-                }
+                bulkParseTrafficToResponseParams(lastSyncOffset, records, responseParamsToAccountMap);
 
                 handleResponseParams(responseParamsToAccountMap,
                     accountInfoMap,
@@ -532,6 +515,89 @@ public class Main {
         }
     }
 
+
+    private static void bulkParseTrafficToResponseParams(long lastSyncOffset, ConsumerRecords<String, String> records,
+            Map<String, List<HttpResponseParams>> responseParamsToAccountMap) {
+        for (ConsumerRecord<String,String> r: records) {
+            HttpResponseParams httpResponseParams;
+            try {
+                 
+                printL(r.value());
+                AllMetrics.instance.setRuntimeKafkaRecordCount(1);
+                AllMetrics.instance.setRuntimeKafkaRecordSize(r.value().length());
+
+                lastSyncOffset++;
+                if (DataControlFetcher.stopIngestionFromKafka()) {
+                    continue;
+                }
+
+                if (lastSyncOffset % 100 == 0) {
+                    loggerMaker.info("Committing offset at position: " + lastSyncOffset);
+                }
+
+                if (tryForCollectionName(r.value())) {
+                    continue;
+                }
+
+                httpResponseParams = HttpCallParser.parseKafkaMessage(r.value());
+                if (httpResponseParams == null) {
+                    loggerMaker.error("httpresponse params was skipped due to invalid json requestBody");
+                    continue;
+                }
+                HttpRequestParams requestParams = httpResponseParams.getRequestParams();
+                String debugHost = Utils.printDebugHostLog(httpResponseParams);
+                if (debugHost != null) {
+                    loggerMaker.infoAndAddToDb("Found debug host: " + debugHost + " in url: " + requestParams.getMethod() + " " + requestParams.getURL());
+                }
+                if (Utils.printDebugUrlLog(requestParams.getURL())) {
+                    loggerMaker.infoAndAddToDb("Found debug url: " + requestParams.getURL());
+                }
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb(e, "Error while parsing kafka message " + e);
+                continue;
+            }
+            String accountId = httpResponseParams.getAccountId();
+            if (!responseParamsToAccountMap.containsKey(accountId)) {
+                responseParamsToAccountMap.put(accountId, new ArrayList<>());
+            }
+            responseParamsToAccountMap.get(accountId).add(httpResponseParams);
+        }
+    }
+
+    /**
+     * This method is used to run the postgres db sample data merging job.
+     * This must run on only one special instance of mini runtime.
+     * Control to enable this is done by setting the DB_MERGING_MODE environment variable to true.
+     * @param apiConfig
+     */
+    public static void runDBMaintainceJob(APIConfig apiConfig) {
+        APICatalogSync apiCatalogSync = new APICatalogSync(apiConfig.getUserIdentifier(), apiConfig.getThreshold(), fetchAllSTI);
+        while (true) {
+            try {
+                loggerMaker.info("Running sql merging job");
+
+                AccountInfo accountInfo = refreshAccountInfo(accountInfoMap, Context.accountId.get());
+                if (!accountInfo.accountSettings.isRedactPayload()) {
+                    loggerMaker.warn("Sql merging skipped due to redaction disabled in account:"
+                            + accountInfo.getAccountSettings().getId());
+                    return;
+                }
+
+                MergeLogicLocal.mergingJob(apiCatalogSync.dbState);
+                loggerMaker.info("Completed sql merging job");
+
+                apiCatalogSync.refreshDbState(fetchAllSTI);
+
+                // Sleep 1 minutes to simulate earlier syncWithDB frequency.
+                Thread.sleep(1 * 60 * 1000);
+
+                
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb(e, "Error in sql merging job");
+            }
+        }
+    }
+
     public static void handleResponseParams(Map<String, List<HttpResponseParams>> responseParamsToAccountMap,
         Map<Integer, AccountInfo> accountInfoMap, boolean isDashboardInstance,
         Map<String, HttpCallParser> httpCallParserMap, APIConfig apiConfig, boolean fetchAllSTI,
@@ -547,15 +613,7 @@ public class Main {
 
             Context.accountId.set(accountIdInt);
 
-            AccountInfo accountInfo = accountInfoMap.computeIfAbsent(accountIdInt, k -> new AccountInfo());
-
-            if ((Context.now() - accountInfo.lastEstimatedCountTime) > 60*60) {
-                loggerMaker.infoAndAddToDb("current time: " + Context.now() + " lastEstimatedCountTime: " + accountInfo.lastEstimatedCountTime);
-                accountInfo.lastEstimatedCountTime = Context.now();
-                accountInfo.estimatedCount = dataActor.fetchEstimatedDocCount();
-                accountInfo.setAccountSettings(dataActor.fetchAccountSettings());
-                loggerMaker.infoAndAddToDb("STI Estimated count: " + accountInfo.estimatedCount);
-            }
+            AccountInfo accountInfo = refreshAccountInfo(accountInfoMap, accountIdInt);
 
             if (!isDashboardInstance && accountInfo.estimatedCount> 20_000_000) {
                 loggerMaker.infoAndAddToDb("STI count is greater than 20M, skipping");
@@ -591,27 +649,47 @@ public class Main {
                 parser.syncFunction(accWiseResponse, syncImmediately, fetchAllSTI, accountInfo.accountSettings);
                 loggerMaker.debugInfoAddToDb("Sync function completed for account: " + accountId);
 
-                // send to central kafka
-                if (kafkaProducer != null) {
-                    loggerMaker.infoAndAddToDb("Sending " + accWiseResponse.size() +" records to context analyzer");
-                    for (HttpResponseParams httpResponseParams: accWiseResponse) {
-                        try {
-                            loggerMaker.debugInfoAddToDb("Sending to kafka data for account: " + httpResponseParams.getAccountId());
-                            kafkaProducer.send(httpResponseParams.getOrig(), centralKafkaTopicName);
-                        } catch (Exception e) {
-                            // force close it
-                            loggerMaker.errorAndAddToDb(e, "Closing kafka: " + e.getMessage());
-                            kafkaProducer.close();
-                            loggerMaker.infoAndAddToDb("Successfully closed kafka");
-                        }
-                    }
-                } else {
-                    loggerMaker.error("Kafka producer is null");
-                }
+                sendToCentralKafka(centralKafkaTopicName, accWiseResponse);
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb(e, "Error in handleResponseParams: " + e.toString());
             }
         }
+    }
+
+
+    private static void sendToCentralKafka(String centralKafkaTopicName, List<HttpResponseParams> accWiseResponse) {
+        // send to central kafka
+        if (kafkaProducer != null) {
+            loggerMaker.infoAndAddToDb("Sending " + accWiseResponse.size() +" records to context analyzer");
+            for (HttpResponseParams httpResponseParams: accWiseResponse) {
+                try {
+                    loggerMaker.debugInfoAddToDb("Sending to kafka data for account: " + httpResponseParams.getAccountId());
+                    kafkaProducer.send(httpResponseParams.getOrig(), centralKafkaTopicName);
+                } catch (Exception e) {
+                    // force close it
+                    loggerMaker.errorAndAddToDb(e, "Closing kafka: " + e.getMessage());
+                    kafkaProducer.close();
+                    loggerMaker.infoAndAddToDb("Successfully closed kafka");
+                }
+            }
+        } else {
+            loggerMaker.error("Kafka producer is null");
+        }
+    }
+
+
+
+    private static AccountInfo refreshAccountInfo(Map<Integer, AccountInfo> accountInfoMap, int accountIdInt) {
+        AccountInfo accountInfo = accountInfoMap.computeIfAbsent(accountIdInt, k -> new AccountInfo());
+
+        if ((Context.now() - accountInfo.lastEstimatedCountTime) > 60*60) {
+            loggerMaker.infoAndAddToDb("current time: " + Context.now() + " lastEstimatedCountTime: " + accountInfo.lastEstimatedCountTime);
+            accountInfo.lastEstimatedCountTime = Context.now();
+            accountInfo.estimatedCount = dataActor.fetchEstimatedDocCount();
+            accountInfo.setAccountSettings(dataActor.fetchAccountSettings());
+            loggerMaker.infoAndAddToDb("STI Estimated count: " + accountInfo.estimatedCount);
+        }
+        return accountInfo;
     }
 
     public static List<HttpResponseParams> filterBasedOnHeaders(List<HttpResponseParams> accWiseResponse,
@@ -752,6 +830,10 @@ public class Main {
      * Convert HttpResponseParams to protobuf format and send to akto.api.logs2 topic
      */
     private static void sendToProtobufKafka(HttpResponseParams httpResponseParams) {
+        if(!isProtoKafkaEnabled()){
+            return;
+        }
+
         try {
             if (protobufKafkaProducer == null) {
                 loggerMaker.error("Protobuf Kafka producer is null");
