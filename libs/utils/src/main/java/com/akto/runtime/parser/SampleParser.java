@@ -41,6 +41,17 @@ public class SampleParser {
         }
     }
 
+    public static boolean isPossiblyIncompleteJson(String json) {
+        if(json == null || json.isEmpty()) {
+            return false;
+        }
+
+        if ((json.startsWith("{") && !json.endsWith("}")) || (json.startsWith("[") && !json.endsWith("]"))) {
+            return true;
+        }
+        return false;
+    }
+
     public static HttpResponseParams parseSampleMessage(String message) throws Exception {
                 //convert java object to JSON format
         Map<String, Object> json = JSON.parseObject(message);
@@ -52,6 +63,16 @@ public class SampleParser {
 
         String rawRequestPayload = (String) json.get("requestPayload");
         String requestPayload = HttpRequestResponseUtils.rawToJsonString(rawRequestPayload,requestHeaders);
+
+        List<String> contentTypeList = requestHeaders.getOrDefault("content-type", new ArrayList<>());
+
+        String contentTypeHeader = "application/json";
+        if (contentTypeList.size() > 0) {
+            contentTypeHeader = contentTypeList.get(0);
+        }
+        if (contentTypeHeader.equals("application/json") && isPossiblyIncompleteJson(requestPayload)) {
+            return null;
+        }
 
         String apiCollectionIdStr = json.getOrDefault("akto_vxlan_id", "0").toString();
         int apiCollectionId = 0;

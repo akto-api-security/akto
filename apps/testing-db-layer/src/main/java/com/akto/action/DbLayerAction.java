@@ -32,6 +32,8 @@ public class DbLayerAction extends ActionSupport {
     String method;
     String url;
     int skip;
+    // MergingLocal samples logic should be run from only a single mini runtime.
+    boolean dbMergingMode;
 
     private static final int fetchLimit = 1000;
 
@@ -81,6 +83,9 @@ public class DbLayerAction extends ActionSupport {
     }
 
     public String bulkInsertSamples() {
+        if (System.getenv().getOrDefault("SKIP_BULK_INSERT", "false").equals("true")) {
+            return SUCCESS.toUpperCase();
+        }
         try {
             List<SampleDataAlt> sampleDataList = new ArrayList<>();
             for (SampleDataAltCopy sampleDataAltCopy: samplesCopy) {
@@ -119,6 +124,11 @@ public class DbLayerAction extends ActionSupport {
     }
 
     public String fetchSampleData() {
+        if(!dbMergingMode) {
+            unfilteredSamples = new ArrayList<>();
+            samplesCopy = new ArrayList<>();
+            return SUCCESS.toUpperCase();
+        }
         try {
             unfilteredSamples = SampleDataAltDb.iterateAndGetAll(apiCollectionId, fetchLimit, skip);
             samplesCopy = new ArrayList<>();
@@ -243,6 +253,14 @@ public class DbLayerAction extends ActionSupport {
 
     public void setSkip(int skip) {
         this.skip = skip;
+    }
+
+    public boolean getDbMergingMode() {
+        return dbMergingMode;
+    }
+
+    public void setDbMergingMode(boolean dbMergingMode) {
+        this.dbMergingMode = dbMergingMode;
     }
 
     public List<SampleDataAltCopy> getSamplesCopy() {
