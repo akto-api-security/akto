@@ -11,6 +11,8 @@ import func from "@/util/func";
 import PersistStore from "@/apps/main/PersistStore";
 import { getDashboardCategory, mapLabel } from '../../../../main/labelHelper';
 
+const BATCH_SIZE = 500;
+
 const ACTION_ITEM_TYPES = {
     HIGH_RISK_APIS: 'HIGH_RISK_APIS',
     SENSITIVE_DATA_ENDPOINTS: 'SENSITIVE_DATA_ENDPOINTS',
@@ -156,23 +158,7 @@ function FlyoutTable({ actionItemType, count, allApiInfo, apiInfoLoading }) {
                         relevantData = [];
                 }
 
-                const endpointUrls = relevantData.map(api => api.id?.url || api.url);
-                let sensitiveParamsMap = presetSensitiveParamsMap || {};
-                try {
-                    if (!presetSensitiveParamsMap && endpointUrls.length > 0) {
-                        const resp = await observeApi.fetchSensitiveParamsForEndpoints(endpointUrls);
-                        if (resp?.data?.endpoints) {
-                            resp.data.endpoints.forEach(item => {
-                                if (!sensitiveParamsMap[item.url]) sensitiveParamsMap[item.url] = [];
-                                sensitiveParamsMap[item.url].push(item.subTypeString || item.subType?.name);
-                            });
-                        }
-                    }
-                } catch (e) {
-                    console.error('Error fetching sensitive params:', e);
-                }
-
-                const transformedData = relevantData.map((api, index) => {
+                const transformApiRow = (api, index, sensitiveMap) => {
                     const url = api.id?.url || api.url || '-';
                     const method = api.id?.method || api.method || '-';
 
@@ -246,9 +232,52 @@ function FlyoutTable({ actionItemType, count, allApiInfo, apiInfoLoading }) {
                     }
 
                     return baseRow;
-                });
+                };
 
-                setApiData(transformedData);
+                // Initial Render 
+                const initialBatch = relevantData.slice(0, BATCH_SIZE);
+                const initialEndpointUrls = initialBatch.map(api => api.id?.url || api.url);
+                let sensitiveParamsMap = presetSensitiveParamsMap || {};
+
+                if (!presetSensitiveParamsMap && initialEndpointUrls.length > 0) {
+                    try {
+                        const resp = await observeApi.fetchSensitiveParamsForEndpoints(initialEndpointUrls);
+                        if (resp?.data?.endpoints) {
+                            resp.data.endpoints.forEach(item => {
+                                if (!sensitiveParamsMap[item.url]) sensitiveParamsMap[item.url] = [];
+                                sensitiveParamsMap[item.url].push(item.subTypeString || item.subType?.name);
+                            });
+                        }
+                    } catch (e) { console.error('Error fetching sensitive params for initial batch:', e); }
+                }
+
+                const transformedInitialData = initialBatch.map((api, index) => transformApiRow(api, index, sensitiveParamsMap));
+                setApiData(transformedInitialData);
+                setLoading(false);
+
+                // Process remaining data in the background 
+                if (relevantData.length > BATCH_SIZE) {
+                    setTimeout(async () => {
+                        const remainingBatch = relevantData.slice(BATCH_SIZE);
+                        const remainingEndpointUrls = remainingBatch.map(api => api.id?.url || api.url);
+                        
+                        if (!presetSensitiveParamsMap && remainingEndpointUrls.length > 0) {
+                            try {
+                                const resp = await observeApi.fetchSensitiveParamsForEndpoints(remainingEndpointUrls);
+                                if (resp?.data?.endpoints) {
+                                    resp.data.endpoints.forEach(item => {
+                                        if (!sensitiveParamsMap[item.url]) sensitiveParamsMap[item.url] = [];
+                                        sensitiveParamsMap[item.url].push(item.subTypeString || item.subType?.name);
+                                    });
+                                }
+                            } catch (e) { console.error('Error fetching sensitive params for remaining batch:', e); }
+                        }
+                        
+                        const transformedRemainingData = remainingBatch.map((api, index) => transformApiRow(api, BATCH_SIZE + index, sensitiveParamsMap));
+                        setApiData(prevData => [...prevData, ...transformedRemainingData]);
+                    }, 0);
+                }
+
             } catch (error) {
                 console.error('Error processing API data for flyout:', error);
                 setApiData([]);
