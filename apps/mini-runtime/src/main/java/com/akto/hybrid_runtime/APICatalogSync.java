@@ -2,10 +2,16 @@ package com.akto.hybrid_runtime;
 
 import com.akto.mcp.McpSchema;
 import java.security.interfaces.RSAPublicKey;
+import java.util.regex.Pattern;
 import java.util.*;
 import java.util.Map.Entry;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.regex.Pattern;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 import com.akto.PayloadEncodeUtil;
 import com.akto.dao.*;
@@ -1429,6 +1435,7 @@ public class APICatalogSync {
         List<Object> writesForSampleData = new ArrayList<>();
         List<Object> writesForSensitiveParamInfo = new ArrayList<>();
         Map<Integer, Boolean> apiCollectionToRedactPayload = new HashMap<>();
+        loggerMaker.debug("fetch all collections meta");
         List<ApiCollection> all = dataActor.fetchAllApiCollectionsMeta();
         for(ApiCollection apiCollection: all) {
             apiCollectionToRedactPayload.put(apiCollection.getId(), apiCollection.getRedact());
@@ -1449,6 +1456,7 @@ public class APICatalogSync {
         counter++;
         
         for(int apiCollectionId: this.delta.keySet()) {
+            loggerMaker.debug("Syncing apiCollectionId: " + apiCollectionId + " counter: " + counter);
             APICatalog deltaCatalog = this.delta.get(apiCollectionId);
 
             /*
@@ -1530,6 +1538,7 @@ public class APICatalogSync {
             //DbUpdateReturn dbUpdateReturn = getDBUpdatesForParams(deltaCatalog, dbCatalog, redact, redactCollectionLevel);
 
             // todo: redactCollectionLevel
+            loggerMaker.debug("Building params writes for apiCollectionId: " + apiCollectionId);
             DbUpdateReturnHybrid dbUpdateReturn = getDBUpdatesForParamsHybrid(deltaCatalog, dbCatalog, redact, redactCollectionLevel);
             writesForParams.addAll(dbUpdateReturn.bulkUpdatesForSingleTypeInfo);
             writesForSensitiveSampleData.addAll(dbUpdateReturn.bulkUpdatesForSampleData);
@@ -1539,7 +1548,9 @@ public class APICatalogSync {
             deltaCatalog.setDeletedInfo(new ArrayList<>());
 
             boolean forceUpdate = syncImmediately || counter % 10 == 0;
+            loggerMaker.debug("Building DB updates writes for sample data for apiCollectionId: " + apiCollectionId + " forceUpdate: " + forceUpdate);
             writesForSampleData.addAll(getDBUpdatesForSampleDataHybrid(apiCollectionId, deltaCatalog,dbCatalog, forceUpdate, redact, redactCollectionLevel));
+            loggerMaker.debug("done with sample data updates for apiCollectionId: " + apiCollectionId + " sampleData size: " + writesForSampleData.size());
 
         }
 
@@ -1618,7 +1629,80 @@ public class APICatalogSync {
 
         List<BulkUpdates> bulkUpdates = new ArrayList<>();
         List<SampleDataAlt> unfilteredSamples = new ArrayList<>();
-        for (SampleData sample: sampleData) {
+        loggerMaker.debug("Redacting sample data for apiCollectionId: " + apiCollectionId + " sampleData size: " + sampleData.size());
+        handleSampleDataRedaction(apiCollectionId, accountLevelRedact, apiCollectionLevelRedact, sampleData, bulkUpdates, unfilteredSamples);
+
+        loggerMaker.debug("Inserting bulk sample data for apiCollectionId: " + apiCollectionId + " sampleData size: " + sampleData.size());
+
+        if (accountLevelRedact || apiCollectionLevelRedact) {
+            try {
+                long start = System.currentTimeMillis();
+                List<SampleDataAlt> samplesBatch = new ArrayList<>();
+                for (int i = 0; i < unfilteredSamples.size(); i++) {
+                    samplesBatch.add(unfilteredSamples.get(i));
+                    if ((i % 100) == 0) {
+                        clientLayer.bulkInsertSamples(samplesBatch);
+                        samplesBatch = new ArrayList<>();
+                    }
+                }
+                if (!samplesBatch.isEmpty()) {
+                    clientLayer.bulkInsertSamples(samplesBatch);
+                }
+                AllMetrics.instance.setPostgreSampleDataInsertedCount(unfilteredSamples.size());
+                AllMetrics.instance.setPostgreSampleDataInsertLatency(System.currentTimeMillis() - start);
+
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb(e, "unable to insert sample data in postgres");
+            }
+        }
+        
+        loggerMaker.debug("Inserted bulk sample data for apiCollectionId: " + apiCollectionId + " sampleData size: " + sampleData.size());
+
+
+        return bulkUpdates;
+    }
+
+    private final ExecutorService batchExecutor = Executors.newSingleThreadExecutor();
+
+    public <T> T runWithTimeout(Callable<T> task, int timeoutSeconds) throws Exception {
+        Future<T> future = batchExecutor.submit(task);
+        try {
+            return future.get(timeoutSeconds, TimeUnit.SECONDS);
+        } catch (TimeoutException e) {
+            future.cancel(true); 
+            throw new RuntimeException("Batch timed out and was killed", e);
+        }
+    }
+
+    private void handleSampleDataRedaction(int apiCollectionId, boolean accountLevelRedact, boolean apiCollectionLevelRedact, List<SampleData> sampleData,
+            List<BulkUpdates> bulkUpdates, List<SampleDataAlt> unfilteredSamples) {
+        int batchSize = 100;
+        for (int i = 0; i < sampleData.size(); i += batchSize) {
+            int end = Math.min(i + batchSize, sampleData.size());
+            List<SampleData> batch = sampleData.subList(i, end);
+            int accId = Context.accountId.get();
+            List<SampleData> lastExecutedBatch = new ArrayList<>();
+            try {
+                runWithTimeout(() -> {
+                    Context.accountId.set(accId);
+                    processSampleBatch(batch, accountLevelRedact, apiCollectionLevelRedact, bulkUpdates, unfilteredSamples, lastExecutedBatch); // explicitly pass accountId, threads don't share Context.
+                    return null;
+                }, 10);
+            } catch (Exception e) {
+                // print lastExecutedBatch for debugging
+                loggerMaker.errorAndAddToDb(e, "Batch processing timed out or failed apiCollectionId: " + apiCollectionId + " batch size: " + batch.size());
+                for (SampleData sd : lastExecutedBatch) {
+                    for (String sample : sd.getSamples()) {
+                        loggerMaker.infoAndAddToDb("lastExecutedBatch sample: " + sample);
+                    }
+                }
+            }
+        }
+    }
+
+    private void processSampleBatch(List<SampleData> batch, boolean accountLevelRedact, boolean apiCollectionLevelRedact,
+            List<BulkUpdates> bulkUpdates, List<SampleDataAlt> unfilteredSamples, List<SampleData> lastExecutedBatch) {
+        for (SampleData sample: batch) {
             if (sample.getSamples().size() == 0) {
                 continue;
             }
@@ -1627,6 +1711,8 @@ public class APICatalogSync {
             ArrayList<String> updates = new ArrayList<>();
             for (String s: sample.getSamples()) {
                 try {
+                    lastExecutedBatch.clear();
+                    lastExecutedBatch.add(sample);
                     String redactedSample = RedactSampleData.redactIfRequired(s, accountLevelRedact, apiCollectionLevelRedact);
                     if (accountLevelRedact || apiCollectionLevelRedact) {
                         Map<String, Object> json = gson.fromJson(redactedSample, Map.class);
@@ -1654,8 +1740,7 @@ public class APICatalogSync {
                     }
                     finalSamples.add(redactedSample);
                 } catch (Exception e) {
-                    loggerMaker.errorAndAddToDb(e,"Error while redacting data" )
-                    ;
+                    loggerMaker.errorAndAddToDb(e,"Error while redacting data" );
                 }
             }
             UpdatePayload updatePayload = new UpdatePayload("samples", finalSamples, "pushEach");
@@ -1673,30 +1758,6 @@ public class APICatalogSync {
             filterMap.put("_id", sample.getId());
             bulkUpdates.add(new BulkUpdates(filterMap, updates));
         }
-
-        if (accountLevelRedact || apiCollectionLevelRedact) {
-            try {
-                long start = System.currentTimeMillis();
-                List<SampleDataAlt> samplesBatch = new ArrayList<>();
-                for (int i = 0; i < unfilteredSamples.size(); i++) {
-                    samplesBatch.add(unfilteredSamples.get(i));
-                    if ((i % 100) == 0) {
-                        clientLayer.bulkInsertSamples(samplesBatch);
-                        samplesBatch = new ArrayList<>();
-                    }
-                }
-                if (!samplesBatch.isEmpty()) {
-                    clientLayer.bulkInsertSamples(samplesBatch);
-                }
-                AllMetrics.instance.setPostgreSampleDataInsertedCount(unfilteredSamples.size());
-                AllMetrics.instance.setPostgreSampleDataInsertLatency(System.currentTimeMillis() - start);
-
-            } catch (Exception e) {
-                loggerMaker.errorAndAddToDb(e, "unable to insert sample data in postgres");
-            }
-        }
-
-        return bulkUpdates;
     }
 
     public DbUpdateReturnHybrid getDBUpdatesForParamsHybrid(APICatalog currentDelta, APICatalog currentState, boolean redactSampleData, boolean collectionLevelRedact) {

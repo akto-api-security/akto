@@ -90,6 +90,17 @@ public class HttpCallParser {
     private DataActor dataActor = DataActorFactory.fetchInstance();
     private Map<Integer, ApiCollection> apiCollectionsMap = new HashMap<>();
 
+    // Pre-compiled patterns for better performance
+    private static final Pattern IP_ADDRESS_PATTERN = Pattern.compile("\\b\\d{1,3}(?:\\.\\d{1,3}){3}.*");
+    private static final String EMPTY_JSON = "{}";
+    
+    // List of ignored host names for fast contains() checks
+    private static final List<String> IGNORE_HOST_NAMES = Arrays.asList(
+        "svc.cluster.local",
+        "localhost", 
+        "kubernetes.default.svc"
+    );
+
     public static void init() {
         trafficMetricsExecutor.scheduleAtFixedRate(new Runnable() {
             @Override
@@ -205,13 +216,47 @@ public class HttpCallParser {
     public static boolean isBlockedHost(String hostName) {
         if (hostName == null) return false;
         hostName = hostName.toLowerCase();
-        return hostName.matches("(?:\\b\\d{1,3}(?:\\.\\d{1,3}){3}.*|.*localhost.*|kubernetes.default.svc)");
+        
+        // Fast IP address check using pre-compiled pattern
+        if (IP_ADDRESS_PATTERN.matcher(hostName).matches()) {
+            return true;
+        }
+        
+        // Fast domain check using the ignore list
+        return IGNORE_HOST_NAMES.stream().anyMatch(hostName::contains);
     }
 
     public static boolean isBlockedContentType(String contentType) {
         if (contentType == null || contentType.isEmpty()) return false;
         contentType = contentType.toLowerCase();
         return contentType.contains("html") || contentType.contains("text/html");
+    }
+
+    public static boolean blockRedirects(HttpResponseParams responseParam) {
+        // Early exit for non-302 responses
+        if (responseParam.getStatusCode() != 302) return false;
+
+        // Early exit for null request params or payload
+        boolean isRequestPayloadEmpty = false;
+        if (responseParam.getRequestParams().getPayload() == null
+                || responseParam.getRequestParams().getPayload().isEmpty()
+                || EMPTY_JSON.equals(responseParam.getRequestParams().getPayload())) {
+            isRequestPayloadEmpty = true;
+        }
+
+        boolean isResponsePayloadEmpty = false;
+        if (responseParam.getPayload() == null
+                || responseParam.getPayload().isEmpty()
+                || EMPTY_JSON.equals(responseParam.getPayload())) {
+            isResponsePayloadEmpty = true;
+        }
+
+        if (!isRequestPayloadEmpty || !isResponsePayloadEmpty) {
+            return false;
+        }
+
+        String locationHeader = getHeaderValue(responseParam.getHeaders(), "location");
+        return locationHeader != null && locationHeader.contains("pagenotfound");
     }
 
     public static FILTER_TYPE applyTrafficFilterInProcess(HttpResponseParams responseParam){
@@ -226,13 +271,24 @@ public class HttpCallParser {
             return filterType;
         }
 
+        if (blockRedirects(responseParam)) {
+            return FILTER_TYPE.BLOCKED;
+        }
+
         // Modify host header to Kubernetes Service filter
         // TODO: Make this generic or customer specific
-        String serviceName = getHeaderValue(responseParam.getRequestParams().getHeaders(), "x-akto-k8s-catalog.agoda.com/component");
+        String serviceName = getHeaderValue(responseParam.getRequestParams().getHeaders(), "x-akto-k8s-privatecloud.agoda.com/service");
         if (serviceName != null && serviceName.length() > 0){
             responseParam.getRequestParams().getHeaders().put("host", Arrays.asList(hostName + "-" + serviceName));
             filterType = FILTER_TYPE.MODIFIED;
         }
+
+        // Merge am-pc collections
+        if(hostName.contains("am-pc")) {
+            responseParam.getRequestParams().getHeaders().put("host", Arrays.asList("am-pc.ID.am.agoda.is"));
+            filterType = FILTER_TYPE.MODIFIED;
+        }
+
         return filterType;
     }
 
@@ -327,14 +383,24 @@ public class HttpCallParser {
 
         this.sync_count += filteredResponseParams.size();
         int syncThresh = numberOfSyncs < 10 ? 10000 : sync_threshold_count;
+        executeCatalogSync(syncImmediately, fetchAllSTI, accountSettings, isHarOrPcap, syncThresh);
+
+    }
+
+    private void executeCatalogSync(boolean syncImmediately, boolean fetchAllSTI, AccountSettings accountSettings,
+            boolean isHarOrPcap, int syncThresh) {
         if (syncImmediately || this.sync_count >= syncThresh || (Context.now() - this.last_synced) > this.sync_threshold_time || isHarOrPcap) {
+            long startTime = System.currentTimeMillis();
             numberOfSyncs++;
+            loggerMaker.debug("Starting Syncing API catalog..." + numberOfSyncs);
             List<ApiCollection> apiCollections = dataActor.fetchAllApiCollectionsMeta();
             for (ApiCollection apiCollection: apiCollections) {
                 apiCollectionsMap.put(apiCollection.getId(), apiCollection);
             }
             SyncLimit syncLimit = fetchSyncLimit();
+
             apiCatalogSync.syncWithDB(syncImmediately, fetchAllSTI, syncLimit);
+
             if (DataActor.actualAccountId == 1745303931 || DataActor.actualAccountId == 1741069294 || DataActor.actualAccountId == 1749515934) {
                 dependencyAnalyser.dbState = apiCatalogSync.dbState;
                 dependencyAnalyser.syncWithDb();
@@ -365,8 +431,9 @@ public class HttpCallParser {
                     });
                 }
             }
+            long endTime = System.currentTimeMillis();
+            loggerMaker.debug("Completed Syncing API catalog..." + numberOfSyncs + " " + (endTime - startTime) + " ms");
         }
-
     }
 
     private List<HttpResponseParams> filterDefaultPayloads(List<HttpResponseParams> filteredResponseParams, Map<String, DefaultPayload> defaultPayloadMap) {
