@@ -578,10 +578,7 @@ public class Main {
                 loggerMaker.info("Running sql merging job");
 
                 AccountInfo accountInfo = refreshAccountInfo(accountInfoMap, Context.accountId.get());
-                if (!accountInfo.accountSettings.isRedactPayload()) {
-                    loggerMaker.warn("Sql merging skipped due to redaction disabled in account:"
-                            + accountInfo.getAccountSettings().getId());
-                    return;
+                    continue;
                 }
 
                 MergeLogicLocal.mergingJob(apiCatalogSync.dbState);
