@@ -373,7 +373,7 @@ export default function LeftNav() {
                 url: "#",
                 key: "8",
             }] : []),
-            {
+            ...(dashboardCategory === "MCP Security" ? [{
                 label: (
                     <Text variant="bodyMd" fontWeight="medium">
                         MCP Guardrails
@@ -388,8 +388,8 @@ export default function LeftNav() {
                 selected: leftNavSelected === "dashboard_mcp_guardrails",
                 url: "#",
                 key: "9",
-            },
-            {
+            }] : []),
+            ...(dashboardCategory === "Gen AI" ? [{
                 label: (
                     <Text variant="bodyMd" fontWeight="medium">
                         AI Agent Guardrails
@@ -404,7 +404,7 @@ export default function LeftNav() {
                 selected: leftNavSelected === "dashboard_ai_agent_guardrails",
                 url: "#",
                 key: "10",
-            },
+            }] : []),
         ]
 
         const exists = items.find(item => item.key === "quick_start")
