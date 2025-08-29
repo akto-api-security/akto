@@ -16,17 +16,18 @@ const (
 type ThreatCategory string
 
 const (
-	// OWASP LLM Categories
-	ThreatCategoryLLM01 ThreatCategory = "LLM01"
-	ThreatCategoryLLM02 ThreatCategory = "LLM02"
-	ThreatCategoryLLM03 ThreatCategory = "LLM03"
-	ThreatCategoryLLM04 ThreatCategory = "LLM04"
-	ThreatCategoryLLM05 ThreatCategory = "LLM05"
-	ThreatCategoryLLM06 ThreatCategory = "LLM06"
-	ThreatCategoryLLM07 ThreatCategory = "LLM07"
-	ThreatCategoryLLM08 ThreatCategory = "LLM08"
-	ThreatCategoryLLM09 ThreatCategory = "LLM09"
-	ThreatCategoryLLM10 ThreatCategory = "LLM10"
+	// OWASP LLM Top 10 2025 Categories
+	// Based on: https://genai.owasp.org/llm-top-10/
+	ThreatCategoryPromptInjection           ThreatCategory = "LLM01_PROMPT_INJECTION"
+	ThreatCategorySensitiveInfoDisclosure   ThreatCategory = "LLM02_SENSITIVE_INFO_DISCLOSURE"
+	ThreatCategorySupplyChain               ThreatCategory = "LLM03_SUPPLY_CHAIN"
+	ThreatCategoryDataModelPoisoning        ThreatCategory = "LLM04_DATA_MODEL_POISONING"
+	ThreatCategoryImproperOutputHandling    ThreatCategory = "LLM05_IMPROPER_OUTPUT_HANDLING"
+	ThreatCategoryExcessiveAgency           ThreatCategory = "LLM06_EXCESSIVE_AGENCY"
+	ThreatCategorySystemPromptLeakage       ThreatCategory = "LLM07_SYSTEM_PROMPT_LEAKAGE"
+	ThreatCategoryVectorEmbeddingWeaknesses ThreatCategory = "LLM08_VECTOR_EMBEDDING_WEAKNESSES"
+	ThreatCategoryMisinformation            ThreatCategory = "LLM09_MISINFORMATION"
+	ThreatCategoryUnboundedConsumption      ThreatCategory = "LLM10_UNBOUNDED_CONSUMPTION"
 
 	// MCP-specific Categories
 	ThreatCategoryToolAbuse          ThreatCategory = "TOOL_ABUSE"
@@ -136,18 +137,31 @@ func (pa PolicyAction) IsValid() bool {
 // IsValid checks if a ThreatCategory is valid
 func (tc ThreatCategory) IsValid() bool {
 	validCategories := []ThreatCategory{
-		ThreatCategoryLLM01, ThreatCategoryLLM02,
-		ThreatCategoryLLM03, ThreatCategoryLLM04,
-		ThreatCategoryLLM05, ThreatCategoryLLM06,
-		ThreatCategoryLLM07, ThreatCategoryLLM08,
-		ThreatCategoryLLM09, ThreatCategoryLLM10,
+		ThreatCategoryPromptInjection,
+		ThreatCategorySensitiveInfoDisclosure,
+		ThreatCategorySupplyChain,
+		ThreatCategoryDataModelPoisoning,
+		ThreatCategoryImproperOutputHandling,
+		ThreatCategoryExcessiveAgency,
+		ThreatCategorySystemPromptLeakage,
+		ThreatCategoryVectorEmbeddingWeaknesses,
+		ThreatCategoryMisinformation,
+		ThreatCategoryUnboundedConsumption,
 		ThreatCategoryToolAbuse,
-		ThreatCategorySchemaViolation, ThreatCategorySSRF,
-		ThreatCategoryFSTraversal, ThreatCategoryCodeExec,
-		ThreatCategoryDataExfil, ThreatCategorySecrets,
-		ThreatCategoryPII, ThreatCategoryDOS, ThreatCategoryEmbeddingPoison,
-		ThreatCategoryToolChaining, ThreatCategoryEnvAbuse,
-		ThreatCategoryRecursiveInjection, ThreatCategoryOOBPromptInjection,
+		ThreatCategorySchemaViolation,
+		ThreatCategorySSRF,
+		ThreatCategoryFSTraversal,
+		ThreatCategoryCodeExec,
+		ThreatCategoryDataExfil,
+		ThreatCategorySecrets,
+		ThreatCategoryPII,
+		ThreatCategoryDOS,
+		ThreatCategoryEmbeddingPoison,
+		ThreatCategoryToolChaining,
+		ThreatCategoryEnvAbuse,
+		ThreatCategoryRecursiveInjection,
+		ThreatCategoryOOBPromptInjection,
+		ThreatCategorySuspiciousKeyword,
 	}
 
 	for _, valid := range validCategories {
