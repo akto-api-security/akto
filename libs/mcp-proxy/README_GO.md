@@ -23,11 +23,11 @@ A simple, high-performance Go library for analyzing and validating MCP (Model Co
 ## 🏗️ Architecture
 
 ```
-mcp-threat-detection/
+mcp-proxy/
 ├── cmd/                    # Application entry points
 │   ├── api/               # HTTP API server
 │   └── cli/               # Command-line interface
-├── pkg/                    # Core library packages
+├── mcp-threat/            # Core library packages
 │   ├── types/             # Data structures and types
 │   ├── config/            # Configuration management
 │   ├── providers/         # LLM provider implementations
@@ -46,7 +46,7 @@ mcp-threat-detection/
 
 ```bash
 git clone <your-repo>
-cd mcp-threat-detection
+cd mcp-proxy
 go mod download
 ```
 
@@ -127,8 +127,8 @@ import (
     "fmt"
     "log"
 
-    "mcp-threat-detection/pkg/client"
-    "mcp-threat-detection/pkg/config"
+    "github.com/akto-api-security/akto/libs/mcp-proxy/mcp-threat/client"
+    "github.com/akto-api-security/akto/libs/mcp-proxy/mcp-threat/config"
 )
 
 func main() {
@@ -293,7 +293,7 @@ make docker-build
 make docker-run
 
 # Or manually
-docker run -p 8080:8080 --env-file .env mcp-threat-detection:latest
+docker run -p 8080:8080 --env-file .env mcp-proxy:latest
 ```
 
 ### Docker Compose
@@ -303,7 +303,7 @@ Create a `docker-compose.yml`:
 ```yaml
 version: '3.8'
 services:
-  mcp-threat-detection:
+  mcp-proxy:
     build: .
     ports:
       - "8080:8080"
@@ -465,10 +465,10 @@ The project uses relative imports for all internal packages:
 
 ```go
 import (
-    "mcp-threat-detection/pkg/client"
-    "mcp-threat-detection/pkg/config"
-    "mcp-threat-detection/pkg/types"
-    "mcp-threat-detection/pkg/validators"
+    "github.com/akto-api-security/akto/libs/mcp-proxy/mcp-threat/client"
+    "github.com/akto-api-security/akto/libs/mcp-proxy/mcp-threat/config"
+    "github.com/akto-api-security/akto/libs/mcp-proxy/mcp-threat/types"
+    "github.com/akto-api-security/akto/libs/mcp-proxy/mcp-threat/validators"
 )
 ```
 

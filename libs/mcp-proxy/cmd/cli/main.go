@@ -10,9 +10,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/akto-api-security/akto/apps/mcp-threat-detection/mcp-threat/client"
-	"github.com/akto-api-security/akto/apps/mcp-threat-detection/mcp-threat/config"
-	"github.com/akto-api-security/akto/apps/mcp-threat-detection/mcp-threat/types"
+	"github.com/akto-api-security/akto/libs/mcp-proxy/mcp-threat/client"
+	"github.com/akto-api-security/akto/libs/mcp-proxy/mcp-threat/config"
+	"github.com/akto-api-security/akto/libs/mcp-proxy/mcp-threat/types"
+
 	"github.com/joho/godotenv"
 )
 

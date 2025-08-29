@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/akto-api-security/akto/apps/mcp-threat-detection/mcp-threat/types"
+	"github.com/akto-api-security/akto/libs/mcp-proxy/mcp-threat/types"
 )
 
 // KeywordDetector provides fast keyword-based threat detection

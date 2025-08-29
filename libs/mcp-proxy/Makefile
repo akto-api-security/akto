@@ -1,5 +1,5 @@
 # Variables
-BINARY_NAME=mcp-threat-detection
+BINARY_NAME=mcp-proxy
 API_BINARY_NAME=mcp-api
 CLI_BINARY_NAME=mcp-cli
 VERSION=$(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")

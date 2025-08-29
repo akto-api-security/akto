@@ -7,9 +7,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/akto-api-security/akto/apps/mcp-threat-detection/mcp-threat/constants"
-	"github.com/akto-api-security/akto/apps/mcp-threat-detection/mcp-threat/providers"
-	"github.com/akto-api-security/akto/apps/mcp-threat-detection/mcp-threat/types"
+	"github.com/akto-api-security/akto/libs/mcp-proxy/mcp-threat/constants"
+	"github.com/akto-api-security/akto/libs/mcp-proxy/mcp-threat/providers"
+	"github.com/akto-api-security/akto/libs/mcp-proxy/mcp-threat/types"
 )
 
 // Validator defines the interface that all validators must implement
