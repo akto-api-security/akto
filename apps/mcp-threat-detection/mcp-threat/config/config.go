@@ -167,4 +167,4 @@ func GetDefaultConfig() *types.AppConfig {
 		},
 		Debug: false,
 	}
-} 
+}

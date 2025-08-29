@@ -12,22 +12,27 @@ import (
 	"mcp-threat-detection/mcp-threat/types"
 )
 
-// BaseValidator provides common validation functionality
-type BaseValidator struct {
+// Validator defines the interface that all validators must implement
+type Validator interface {
+	Validate(ctx context.Context, request *types.ValidationRequest) *types.ValidationResponse
+}
+
+// BaseLLMValidator provides common validation functionality for LLM-based validators
+type BaseLLMValidator struct {
 	provider providers.LLMProvider
 	prompt   string
 }
 
-// NewBaseValidator creates a new base validator
-func NewBaseValidator(provider providers.LLMProvider, prompt string) *BaseValidator {
-	return &BaseValidator{
+// NewBaseLLMValidator creates a new base validator
+func NewBaseLLMValidator(provider providers.LLMProvider, prompt string) *BaseLLMValidator {
+	return &BaseLLMValidator{
 		provider: provider,
 		prompt:   prompt,
 	}
 }
 
 // buildContext builds the context string for validation
-func (bv *BaseValidator) buildContext(mcpPayload interface{}, toolDesc *string) string {
+func (bv *BaseLLMValidator) buildContext(mcpPayload interface{}, toolDesc *string) string {
 	var contextParts []string
 
 	// Tool description
@@ -57,12 +62,12 @@ func (bv *BaseValidator) buildContext(mcpPayload interface{}, toolDesc *string) 
 }
 
 // getPayloadType returns the type of payload being validated
-func (bv *BaseValidator) getPayloadType() string {
+func (bv *BaseLLMValidator) getPayloadType() string {
 	return "Request (raw)"
 }
 
 // parseResponse parses the LLM response into structured data
-func (bv *BaseValidator) parseResponse(rawResponse string) map[string]interface{} {
+func (bv *BaseLLMValidator) parseResponse(rawResponse string) map[string]interface{} {
 	// Try to extract JSON from the response
 	startIdx := strings.Index(rawResponse, "{")
 	endIdx := strings.LastIndex(rawResponse, "}")
@@ -90,7 +95,7 @@ func (bv *BaseValidator) parseResponse(rawResponse string) map[string]interface{
 }
 
 // createVerdict creates a Verdict object from parsed response
-func (bv *BaseValidator) createVerdict(parsedResponse map[string]interface{}) *types.Verdict {
+func (bv *BaseLLMValidator) createVerdict(parsedResponse map[string]interface{}) *types.Verdict {
 	verdict := types.NewVerdict()
 
 	// Handle different response formats
@@ -149,13 +154,13 @@ func (bv *BaseValidator) createVerdict(parsedResponse map[string]interface{}) *t
 
 // RequestValidator validates MCP requests
 type RequestValidator struct {
-	*BaseValidator
+	BaseLLMValidator
 }
 
 // NewRequestValidator creates a new request validator
 func NewRequestValidator(provider providers.LLMProvider) *RequestValidator {
 	return &RequestValidator{
-		BaseValidator: NewBaseValidator(provider, constants.RequestValidatorPrompt),
+		BaseLLMValidator: *NewBaseLLMValidator(provider, constants.RequestValidatorPrompt),
 	}
 }
 
@@ -209,13 +214,13 @@ func (rv *RequestValidator) Validate(ctx context.Context, request *types.Validat
 
 // ResponseValidator validates MCP responses
 type ResponseValidator struct {
-	*BaseValidator
+	BaseLLMValidator
 }
 
 // NewResponseValidator creates a new response validator
 func NewResponseValidator(provider providers.LLMProvider) *ResponseValidator {
 	return &ResponseValidator{
-		BaseValidator: NewBaseValidator(provider, constants.ResponseValidatorPrompt),
+		BaseLLMValidator: *NewBaseLLMValidator(provider, constants.ResponseValidatorPrompt),
 	}
 }
 
@@ -265,4 +270,4 @@ func (rv *ResponseValidator) Validate(ctx context.Context, request *types.Valida
 	// Set success response
 	response.SetSuccess(verdict, response.ProcessingTime)
 	return response
-} 
+}

@@ -10,10 +10,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/joho/godotenv"
 	"mcp-threat-detection/mcp-threat/client"
 	"mcp-threat-detection/mcp-threat/config"
 	"mcp-threat-detection/mcp-threat/types"
+
+	"github.com/joho/godotenv"
 )
 
 func main() {
@@ -163,16 +164,17 @@ func loadInput(input string) (interface{}, error) {
 
 // outputJSON outputs the result in JSON format
 func outputJSON(response *types.ValidationResponse) {
+	// Do not include raw if not valid JSON; keep it nil to avoid marshal errors
 	output := map[string]interface{}{
 		"success": response.Success,
 		"verdict": map[string]interface{}{
 			"is_malicious_request": response.Verdict.IsMaliciousRequest,
-			"confidence":            response.Verdict.Confidence,
-			"categories":            response.Verdict.Categories,
-			"evidence":              response.Verdict.Evidence,
-			"policy_action":         response.Verdict.PolicyAction,
-			"reasoning":             response.Verdict.Reasoning,
-			"raw":                   response.Verdict.Raw,
+			"confidence":           response.Verdict.Confidence,
+			"categories":           response.Verdict.Categories,
+			"evidence":             response.Verdict.Evidence,
+			"policy_action":        response.Verdict.PolicyAction,
+			"reasoning":            response.Verdict.Reasoning,
+			"raw":                  nil,
 		},
 		"processing_time_ms": response.ProcessingTime,
 	}

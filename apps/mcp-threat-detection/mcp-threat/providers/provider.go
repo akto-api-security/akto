@@ -75,9 +75,9 @@ func (op *OpenAIProvider) Generate(ctx context.Context, messages []types.ChatMes
 
 	// Create request payload
 	payload := map[string]interface{}{
-		"model":       op.model,
-		"messages":    openaiMessages,
-		"temperature": temperature,
+		"model":                 op.model,
+		"messages":              openaiMessages,
+		"temperature":           temperature,
 		"max_completion_tokens": 10000,
 	}
 
@@ -235,4 +235,4 @@ func GetProvider(providerType string, config map[string]interface{}) (LLMProvide
 	default:
 		return nil, fmt.Errorf("unsupported provider type: %s", providerType)
 	}
-} 
+}

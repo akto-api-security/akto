@@ -8,8 +8,8 @@ import (
 type PolicyAction string
 
 const (
-	PolicyActionBlock                PolicyAction = "block"
-	PolicyActionAllow               PolicyAction = "allow"
+	PolicyActionBlock PolicyAction = "block"
+	PolicyActionAllow PolicyAction = "allow"
 )
 
 // ThreatCategory represents different types of threats
@@ -29,31 +29,32 @@ const (
 	ThreatCategoryLLM10 ThreatCategory = "LLM10"
 
 	// MCP-specific Categories
-	ThreatCategoryToolAbuse           ThreatCategory = "TOOL_ABUSE"
-	ThreatCategorySchemaViolation     ThreatCategory = "SCHEMA_VIOLATION"
-	ThreatCategorySSRF                ThreatCategory = "SSRF"
-	ThreatCategoryFSTraversal         ThreatCategory = "FS_TRAVERSAL"
-	ThreatCategoryCodeExec            ThreatCategory = "CODE_EXEC"
-	ThreatCategoryDataExfil           ThreatCategory = "DATA_EXFIL"
-	ThreatCategorySecrets             ThreatCategory = "SECRETS"
-	ThreatCategoryPII                 ThreatCategory = "PII"
-	ThreatCategoryDOS                 ThreatCategory = "DOS"
-	ThreatCategoryEmbeddingPoison     ThreatCategory = "EMBEDDING_POISON"
-	ThreatCategoryToolChaining        ThreatCategory = "TOOL_CHAINING"
-	ThreatCategoryEnvAbuse            ThreatCategory = "ENV_ABUSE"
-	ThreatCategoryRecursiveInjection  ThreatCategory = "RECURSIVE_INJECTION"
+	ThreatCategoryToolAbuse          ThreatCategory = "TOOL_ABUSE"
+	ThreatCategorySchemaViolation    ThreatCategory = "SCHEMA_VIOLATION"
+	ThreatCategorySSRF               ThreatCategory = "SSRF"
+	ThreatCategoryFSTraversal        ThreatCategory = "FS_TRAVERSAL"
+	ThreatCategoryCodeExec           ThreatCategory = "CODE_EXEC"
+	ThreatCategoryDataExfil          ThreatCategory = "DATA_EXFIL"
+	ThreatCategorySecrets            ThreatCategory = "SECRETS"
+	ThreatCategoryPII                ThreatCategory = "PII"
+	ThreatCategoryDOS                ThreatCategory = "DOS"
+	ThreatCategoryEmbeddingPoison    ThreatCategory = "EMBEDDING_POISON"
+	ThreatCategoryToolChaining       ThreatCategory = "TOOL_CHAINING"
+	ThreatCategoryEnvAbuse           ThreatCategory = "ENV_ABUSE"
+	ThreatCategoryRecursiveInjection ThreatCategory = "RECURSIVE_INJECTION"
 	ThreatCategoryOOBPromptInjection ThreatCategory = "OOB_PROMPT_INJECTION"
+	ThreatCategorySuspiciousKeyword  ThreatCategory = "SUSPICIOUS_WORD"
 )
 
 // Verdict represents the validation result
 type Verdict struct {
-	IsMaliciousRequest bool            `json:"is_malicious_request"`
-	Confidence         float64         `json:"confidence"`
+	IsMaliciousRequest bool             `json:"is_malicious_request"`
+	Confidence         float64          `json:"confidence"`
 	Categories         []ThreatCategory `json:"categories"`
-	Evidence           []string        `json:"evidence"`
-	PolicyAction       PolicyAction    `json:"policy_action"`
-	Reasoning          string          `json:"reasoning"`
-	Raw                json.RawMessage `json:"raw"`
+	Evidence           []string         `json:"evidence"`
+	PolicyAction       PolicyAction     `json:"policy_action"`
+	Reasoning          string           `json:"reasoning"`
+	Raw                json.RawMessage  `json:"raw"`
 }
 
 // ValidationRequest represents a request for validation
@@ -64,10 +65,10 @@ type ValidationRequest struct {
 
 // ValidationResponse represents the response from validation
 type ValidationResponse struct {
-	Success         bool      `json:"success"`
-	Verdict        *Verdict  `json:"verdict,omitempty"`
-	Error          *string   `json:"error,omitempty"`
-	ProcessingTime float64   `json:"processing_time_ms"`
+	Success        bool     `json:"success"`
+	Verdict        *Verdict `json:"verdict,omitempty"`
+	Error          *string  `json:"error,omitempty"`
+	ProcessingTime float64  `json:"processing_time_ms"`
 }
 
 // LLMConfig represents configuration for LLM providers
@@ -94,10 +95,10 @@ type ChatMessage struct {
 
 // LLMRequest represents a request to the LLM
 type LLMRequest struct {
-	Model       string         `json:"model"`
-	Messages    []ChatMessage  `json:"messages"`
-	Temperature float64        `json:"temperature"`
-	MaxTokens   int            `json:"max_tokens"`
+	Model       string        `json:"model"`
+	Messages    []ChatMessage `json:"messages"`
+	Temperature float64       `json:"temperature"`
+	MaxTokens   int           `json:"max_tokens"`
 }
 
 // LLMResponse represents a response from the LLM
@@ -141,7 +142,7 @@ func (tc ThreatCategory) IsValid() bool {
 		ThreatCategoryLLM07, ThreatCategoryLLM08,
 		ThreatCategoryLLM09, ThreatCategoryLLM10,
 		ThreatCategoryToolAbuse,
-		ThreatCategorySchemaViolation,ThreatCategorySSRF,
+		ThreatCategorySchemaViolation, ThreatCategorySSRF,
 		ThreatCategoryFSTraversal, ThreatCategoryCodeExec,
 		ThreatCategoryDataExfil, ThreatCategorySecrets,
 		ThreatCategoryPII, ThreatCategoryDOS, ThreatCategoryEmbeddingPoison,
@@ -173,7 +174,7 @@ func NewVerdict() *Verdict {
 // NewValidationResponse creates a new ValidationResponse
 func NewValidationResponse() *ValidationResponse {
 	return &ValidationResponse{
-		Success:         false,
+		Success:        false,
 		Verdict:        nil,
 		Error:          nil,
 		ProcessingTime: 0.0,
@@ -209,4 +210,4 @@ func (v *Verdict) AddEvidence(evidence string) {
 // IsBlocked returns true if the verdict recommends blocking
 func (v *Verdict) IsBlocked() bool {
 	return v.PolicyAction == PolicyActionBlock
-} 
+}

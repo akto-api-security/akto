@@ -141,7 +141,7 @@ func GetRequestPrompt(toolDesc, mcpRequest string) string {
 	if toolDesc == "" {
 		toolDesc = "<blank>"
 	}
-	
+
 	return fmt.Sprintf(RequestValidatorPrompt, toolDesc, mcpRequest)
 }
 
@@ -150,6 +150,6 @@ func GetResponsePrompt(toolDesc, mcpResponse string) string {
 	if toolDesc == "" {
 		toolDesc = "<blank>"
 	}
-	
+
 	return fmt.Sprintf(ResponseValidatorPrompt, toolDesc, mcpResponse)
-} 
+}

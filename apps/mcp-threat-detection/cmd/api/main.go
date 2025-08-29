@@ -10,12 +10,13 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/gin-contrib/cors"
-	"github.com/gin-gonic/gin"
-	"github.com/joho/godotenv"
 	"mcp-threat-detection/mcp-threat/client"
 	"mcp-threat-detection/mcp-threat/config"
 	"mcp-threat-detection/mcp-threat/types"
+
+	"github.com/gin-contrib/cors"
+	"github.com/gin-gonic/gin"
+	"github.com/joho/godotenv"
 )
 
 var (
@@ -160,7 +161,7 @@ func validateRequest(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(appConfig.LLM.Timeout)*time.Second)
 	defer cancel()
 
-	response := validator.ValidateRequest(ctx, req.MCPPayload, req.ToolDescription)
+	response := validator.Validate(ctx, req.MCPPayload, req.ToolDescription)
 
 	c.JSON(http.StatusOK, response)
 }
@@ -176,7 +177,7 @@ func validateResponse(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(appConfig.LLM.Timeout)*time.Second)
 	defer cancel()
 
-	response := validator.ValidateResponse(ctx, req.MCPPayload, req.ToolDescription)
+	response := validator.Validate(ctx, req.MCPPayload, req.ToolDescription)
 
 	c.JSON(http.StatusOK, response)
-} 
+}

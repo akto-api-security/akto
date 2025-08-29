@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 
 	"mcp-threat-detection/mcp-threat/constants"
 	"mcp-threat-detection/mcp-threat/providers"
@@ -13,8 +14,9 @@ import (
 
 // MCPValidator is the main client for MCP validation
 type MCPValidator struct {
-	providerType     string
-	provider         providers.LLMProvider
+	providerType      string
+	provider          providers.LLMProvider
+	keywordDetector   *validators.KeywordDetector
 	requestValidator  *validators.RequestValidator
 	responseValidator *validators.ResponseValidator
 }
@@ -28,12 +30,14 @@ func NewMCPValidator(providerType string, providerConfig map[string]interface{})
 	}
 
 	// Create validators
+	keywordDetector := validators.NewKeywordDetector()
 	requestValidator := validators.NewRequestValidator(provider)
 	responseValidator := validators.NewResponseValidator(provider)
 
 	return &MCPValidator{
-		providerType:     providerType,
-		provider:         provider,
+		providerType:      providerType,
+		provider:          provider,
+		keywordDetector:   keywordDetector,
 		requestValidator:  requestValidator,
 		responseValidator: responseValidator,
 	}, nil
@@ -42,7 +46,7 @@ func NewMCPValidator(providerType string, providerConfig map[string]interface{})
 // NewMCPValidatorWithConfig creates a new MCP validator with full configuration
 func NewMCPValidatorWithConfig(config *types.AppConfig) (*MCPValidator, error) {
 	providerConfig := make(map[string]interface{})
-	
+
 	// Set basic config
 	providerConfig["timeout"] = config.LLM.Timeout
 	providerConfig["temperature"] = config.LLM.Temperature
@@ -71,11 +75,11 @@ func NewMCPValidatorWithConfig(config *types.AppConfig) (*MCPValidator, error) {
 	return NewMCPValidator(config.LLM.ProviderType, providerConfig)
 }
 
-// ValidateRequest validates an MCP request
-func (mv *MCPValidator) ValidateRequest(ctx context.Context, mcpPayload interface{}, toolDescription *string) *types.ValidationResponse {
-	// Convert payload to string if it's not already
+// Validate is a generic validation method that handles request/response automatically
+func (mv *MCPValidator) Validate(ctx context.Context, payload interface{}, toolDescription *string) *types.ValidationResponse {
+	// Serialize payload to string
 	var payloadStr string
-	switch v := mcpPayload.(type) {
+	switch v := payload.(type) {
 	case string:
 		payloadStr = v
 	default:
@@ -88,59 +92,25 @@ func (mv *MCPValidator) ValidateRequest(ctx context.Context, mcpPayload interfac
 		}
 	}
 
-	// Create validation request
 	request := &types.ValidationRequest{
 		MCPPayload:      payloadStr,
 		ToolDescription: toolDescription,
 	}
 
-	// Perform validation
-	return mv.requestValidator.Validate(ctx, request)
-}
-
-// ValidateResponse validates an MCP response
-func (mv *MCPValidator) ValidateResponse(ctx context.Context, mcpResponse interface{}, toolDescription *string) *types.ValidationResponse {
-	// Convert response to string if it's not already
-	var responseStr string
-	switch v := mcpResponse.(type) {
-	case string:
-		responseStr = v
-	default:
-		if jsonData, err := json.Marshal(v); err == nil {
-			responseStr = string(jsonData)
-		} else {
-			response := types.NewValidationResponse()
-			response.SetError(fmt.Sprintf("failed to serialize response: %v", err))
-			return response
-		}
+	keywordResponse := mv.keywordDetector.Validate(ctx, request)
+	if keywordResponse.Verdict != nil && keywordResponse.Verdict.IsMaliciousRequest {
+		log.Printf("INFO: Threats detected by keyword detector, blocking")
+		return keywordResponse
 	}
 
-	// Create validation request
-	request := &types.ValidationRequest{
-		MCPPayload:      responseStr,
-		ToolDescription: toolDescription,
-	}
-
-	// Perform validation
-	return mv.responseValidator.Validate(ctx, request)
+	return mv.detectValidationType(payload).Validate(ctx, request)
 }
 
-// Validate is a generic validation method that automatically determines the type
-func (mv *MCPValidator) Validate(ctx context.Context, payload interface{}, toolDescription *string) *types.ValidationResponse {
-	// Auto-detect validation type based on payload content
-	validationType := mv.detectValidationType(payload)
-	
-	if validationType == "response" {
-		return mv.ValidateResponse(ctx, payload, toolDescription)
-	}
-	return mv.ValidateRequest(ctx, payload, toolDescription)
-}
-
-// detectValidationType automatically determines if payload is a request or response
-func (mv *MCPValidator) detectValidationType(payload interface{}) string {
+// detectValidationType returns the appropriate LLM validator (request/response)
+func (mv *MCPValidator) detectValidationType(payload interface{}) validators.Validator {
 	// Convert payload to map for analysis
 	var payloadMap map[string]interface{}
-	
+
 	switch v := payload.(type) {
 	case map[string]interface{}:
 		payloadMap = v
@@ -148,40 +118,40 @@ func (mv *MCPValidator) detectValidationType(payload interface{}) string {
 		// Try to parse JSON string
 		if err := json.Unmarshal([]byte(v), &payloadMap); err != nil {
 			// If not JSON, treat as request
-			return "request"
+			return mv.requestValidator
 		}
 	default:
 		// For other types, try to marshal to JSON first
 		if jsonData, err := json.Marshal(v); err == nil {
 			if err := json.Unmarshal(jsonData, &payloadMap); err != nil {
-				return "request"
+				return mv.requestValidator
 			}
 		} else {
-			return "request"
+			return mv.requestValidator
 		}
 	}
-	
+
 	// Check for response indicators
 	if payloadMap != nil {
 		// Common response fields that indicate this is a response
 		responseIndicators := []string{"result", "error", "data", "content", "output", "response"}
 		for _, indicator := range responseIndicators {
 			if _, exists := payloadMap[indicator]; exists {
-				return "response"
+				return mv.responseValidator
 			}
 		}
-		
+
 		// Check for request-specific fields
 		requestIndicators := []string{"method", "params", "arguments", "name", "id"}
 		for _, indicator := range requestIndicators {
 			if _, exists := payloadMap[indicator]; exists {
-				return "request"
+				return mv.requestValidator
 			}
 		}
 	}
-	
-	// Default to request validation
-	return "request"
+
+	// Default to request validator
+	return mv.requestValidator
 }
 
 // Close cleans up resources
@@ -189,4 +159,4 @@ func (mv *MCPValidator) Close() error {
 	// For now, no cleanup is needed
 	// In the future, this could close connections, cancel goroutines, etc.
 	return nil
-} 
+}
