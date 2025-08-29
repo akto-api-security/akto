@@ -1,0 +1,32 @@
+# Build artifacts
+bin/
+dist/
+coverage/
+.go-build/
+*.out
+
+# Binaries
+main
+
+# Dependency/vendor (if ever used)
+vendor/
+
+# Logs
+*.log
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Temp files
+.tmp/
+.tmp*/
+
+# OS files
+.DS_Store
+
+# Editor/IDE
+.vscode/
+.idea/
+*.swp
