@@ -6,10 +6,10 @@ import (
 	"fmt"
 	"log"
 
-	"mcp-threat-detection/mcp-threat/constants"
-	"mcp-threat-detection/mcp-threat/providers"
-	"mcp-threat-detection/mcp-threat/types"
-	"mcp-threat-detection/mcp-threat/validators"
+	"github.com/akto-api-security/akto/apps/mcp-threat-detection/mcp-threat/constants"
+	"github.com/akto-api-security/akto/apps/mcp-threat-detection/mcp-threat/providers"
+	"github.com/akto-api-security/akto/apps/mcp-threat-detection/mcp-threat/types"
+	"github.com/akto-api-security/akto/apps/mcp-threat-detection/mcp-threat/validators"
 )
 
 // MCPValidator is the main client for MCP validation

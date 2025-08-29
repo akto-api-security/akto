@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"mcp-threat-detection/mcp-threat/types"
+	"github.com/akto-api-security/akto/apps/mcp-threat-detection/mcp-threat/types"
 )
 
 // KeywordDetector provides fast keyword-based threat detection
@@ -69,7 +69,7 @@ func (kd *KeywordDetector) Validate(ctx context.Context, request *types.Validati
 
 	// Check for suspicious keywords
 	if !suspiciousRegex.MatchString(payloadStr) {
-		// No threats detectedx
+		// No threats detected
 		verdict := types.NewVerdict()
 		verdict.IsMaliciousRequest = false
 		verdict.Confidence = 1.0

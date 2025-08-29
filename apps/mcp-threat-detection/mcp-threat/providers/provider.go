@@ -9,8 +9,8 @@ import (
 	"net/http"
 	"time"
 
-	"mcp-threat-detection/mcp-threat/constants"
-	"mcp-threat-detection/mcp-threat/types"
+	"github.com/akto-api-security/akto/apps/mcp-threat-detection/mcp-threat/constants"
+	"github.com/akto-api-security/akto/apps/mcp-threat-detection/mcp-threat/types"
 )
 
 // LLMProvider defines the interface for different LLM providers
