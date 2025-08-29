@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 
 	"github.com/akto-api-security/akto/libs/mcp-proxy/mcp-threat/constants"
 	"github.com/akto-api-security/akto/libs/mcp-proxy/mcp-threat/providers"
@@ -99,7 +98,6 @@ func (mv *MCPValidator) Validate(ctx context.Context, payload interface{}, toolD
 
 	keywordResponse := mv.keywordDetector.Validate(ctx, request)
 	if keywordResponse.Verdict != nil && keywordResponse.Verdict.IsMaliciousRequest {
-		log.Printf("INFO: Threats detected by keyword detector, blocking")
 		return keywordResponse
 	}
 

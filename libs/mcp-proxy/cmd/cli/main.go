@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"strings"
 	"time"
 
 	"github.com/akto-api-security/akto/libs/mcp-proxy/mcp-threat/client"
@@ -20,13 +19,12 @@ import (
 func main() {
 	// Parse command line flags
 	var (
-		payload    = flag.String("payload", "", "MCP payload (raw JSON string or @path/to/file.json) [REQUIRED]")
-		toolDesc   = flag.String("tool-desc", "", "Tool/Resource description (string or @file.txt) [OPTIONAL]")
-		provider   = flag.String("provider", "", "LLM provider to use (openai, self_hosted)")
-		model      = flag.String("model", "", "Model name (overrides environment config)")
-		endpoint   = flag.String("endpoint", "", "Custom endpoint for self-hosted LLMs")
-		apiKey     = flag.String("api-key", "", "API key (overrides environment config)")
-		jsonOutput = flag.Bool("json", false, "Output result in JSON format")
+		payload  = flag.String("payload", "", "MCP payload (raw JSON string or @path/to/file.json) [REQUIRED]")
+		toolDesc = flag.String("tool-desc", "", "Tool/Resource description (string or @file.txt) [OPTIONAL]")
+		provider = flag.String("provider", "", "LLM provider to use (openai, self_hosted)")
+		model    = flag.String("model", "", "Model name (overrides environment config)")
+		endpoint = flag.String("endpoint", "", "Custom endpoint for self-hosted LLMs")
+		apiKey   = flag.String("api-key", "", "API key (overrides environment config)")
 		// verbose    = flag.Bool("verbose", false, "Verbose output")
 		timeout = flag.Duration("timeout", 60*time.Second, "Timeout for validation")
 	)
@@ -97,12 +95,8 @@ func main() {
 		log.Fatalf("Validation failed: unknown error")
 	}
 
-	// Output result
-	if *jsonOutput {
-		outputJSON(response)
-	} else {
-		outputFormatted(response)
-	}
+	// Output result - only JSON format
+	outputJSON(response)
 }
 
 // loadInput loads input from string or file
@@ -161,54 +155,4 @@ func outputJSON(response *types.ValidationResponse) {
 	}
 
 	fmt.Println(string(jsonData))
-}
-
-// outputFormatted outputs the result in a formatted way
-func outputFormatted(response *types.ValidationResponse) {
-	fmt.Println("\n" + strings.Repeat("=", 60))
-	fmt.Println("VALIDATION RESULT")
-	fmt.Println(strings.Repeat("=", 60))
-
-	if response.ProcessingTime > 0 {
-		fmt.Printf("Processing Time: %.2fms\n", response.ProcessingTime)
-	}
-
-	verdict := response.Verdict
-	fmt.Printf("Malicious: %s\n", boolToYesNo(verdict.IsMaliciousRequest))
-	fmt.Printf("Confidence: %.2f\n", verdict.Confidence)
-	fmt.Printf("Policy Action: %s\n", verdict.PolicyAction)
-
-	// Format categories
-	var categoryStrs []string
-	for _, cat := range verdict.Categories {
-		categoryStrs = append(categoryStrs, string(cat))
-	}
-	fmt.Printf("Categories: %s\n", strings.Join(categoryStrs, ", "))
-
-	// Format evidence
-	if len(verdict.Evidence) > 0 {
-		fmt.Printf("Evidence: %s\n", strings.Join(verdict.Evidence, ", "))
-	}
-
-	fmt.Printf("Reasoning: %s\n", verdict.Reasoning)
-
-	fmt.Println(strings.Repeat("=", 60))
-
-	// Check if this should be blocked
-	if verdict.IsMaliciousRequest {
-		fmt.Println("\n🚨 RECOMMENDATION: This request should be BLOCKED!")
-		if verdict.PolicyAction == types.PolicyActionBlock {
-			fmt.Println("   Policy action: BLOCK")
-		}
-	} else {
-		fmt.Println("\n✅ RECOMMENDATION: This request appears safe")
-	}
-}
-
-// boolToYesNo converts a boolean to "YES" or "NO"
-func boolToYesNo(b bool) string {
-	if b {
-		return "🚨 YES"
-	}
-	return "✅ NO"
 }
