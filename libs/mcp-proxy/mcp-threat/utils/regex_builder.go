@@ -1,4 +1,4 @@
-package threat_detector
+package main
 
 import (
 	"fmt"
@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-var SuspiciousKeywords = []string{
+var suspiciousKeywords = []string{
 	// Unix/Linux paths and files
 	"/etc/passwd",
 	"/etc/shadow",
@@ -50,10 +50,8 @@ var SuspiciousKeywords = []string{
 
 	"ignore previous instructions",
 	"ignore all instructions",
-	"ignore other instructions",
 	"ignore safety checks",
 	"ignore remaining instructions",
-
 	"disregard prior instructions",
 	"forget prior instructions",
 	"bypass safety checks",
@@ -61,51 +59,39 @@ var SuspiciousKeywords = []string{
 	"ignore system policies",
 	"override system prompt",
 	"reveal system prompt",
-	"show system prompt",
 	"print system prompt",
 	"leak system prompt",
 	"system prompt",
 	"hidden system prompt",
 	"act as an ai",
 	"act as root",
-	"you are root",
-	"you are sudo",
 	"run as sudo",
 	"run as admin",
-	"ignore role boundaries",
 	"override tool output",
 	"follow last instruction",
-	"priority instruction",
 	"developer mode",
 	"jailbreak mode",
 	"do anything now",
 	"dan mode",
-	"you are dan",
-	"ignore ethical rules",
-	"bypass moderation",
-	"hypothetically only",
-	"fictional scenario",
 	"just for research",
 	"ignore guardrails",
 	"ignore safety layer",
-	"send to webhook",
-	"post to webhook",
 	"ignore prior context",
 	"share secret",
 	"rotate keys now",
-	"godmode",
 	"god mode",
+	"attacker",
 }
 
-func GetSuspiciousRegex() *regexp.Regexp {
-	rex, err := BuildUnionRegex(SuspiciousKeywords)
+func getSuspiciousRegex() *regexp.Regexp {
+	rex, err := buildUnionRegex(suspiciousKeywords)
 	if err != nil {
 		return nil
 	}
 	return rex
 }
 
-func BuildUnionRegex(uniqueKeywords []string) (*regexp.Regexp, error) {
+func buildUnionRegex(uniqueKeywords []string) (*regexp.Regexp, error) {
 	if len(uniqueKeywords) == 0 {
 		return regexp.Compile("a^") // matches nothing
 	}
@@ -117,15 +103,24 @@ func BuildUnionRegex(uniqueKeywords []string) (*regexp.Regexp, error) {
 			for i := range tokens {
 				tokens[i] = regexp.QuoteMeta(tokens[i])
 			}
-			parts = append(parts, strings.Join(tokens, `(?:[\s\S]*?)`))
+			parts = append(parts, strings.Join(tokens, `[\W_]+`))
 		} else {
 			// single word or tag like <instructions>
-			parts = append(parts, regexp.QuoteMeta(k)+`(?:[\s\S]*?)`)
+			parts = append(parts, regexp.QuoteMeta(k)+`[\W_]+`)
 		}
 	}
 
 	// Go does NOT support lookbehind, so we use word boundaries only where applicable
 	pattern := fmt.Sprintf(`(?i)(?:%s)`, strings.Join(parts, "|"))
-	print(pattern)
 	return regexp.Compile(pattern)
+}
+
+func main() {
+	regex := getSuspiciousRegex()
+	if regex == nil {
+		fmt.Println("Failed to compile regex")
+		return
+	}
+
+	fmt.Printf("Compiled regex pattern: %s\n", regex.String())
 }
