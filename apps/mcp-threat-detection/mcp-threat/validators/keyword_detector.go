@@ -50,13 +50,10 @@ func (kd *KeywordDetector) Validate(ctx context.Context, request *types.Validati
 		response.ProcessingTime = float64(time.Since(startTime).Milliseconds())
 	}()
 
-	// Convert payload to string
-	var payloadStr string
-	switch v := request.MCPPayload.(type) {
-	case string:
-		payloadStr = v
-	default:
-		response.SetError("keyword detector only supports string payloads")
+	// Expect caller to provide string payload
+	payloadStr, ok := request.MCPPayload.(string)
+	if !ok {
+		response.SetError("keyword detector expects string payload")
 		return response
 	}
 
@@ -72,7 +69,7 @@ func (kd *KeywordDetector) Validate(ctx context.Context, request *types.Validati
 
 	// Check for suspicious keywords
 	if !suspiciousRegex.MatchString(payloadStr) {
-		// No threats detected
+		// No threats detectedx
 		verdict := types.NewVerdict()
 		verdict.IsMaliciousRequest = false
 		verdict.Confidence = 1.0
