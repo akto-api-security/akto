@@ -61,6 +61,14 @@ const api = {
         })
     },
 
+    fetchMcpdata: async (filterType) => {
+        return await request({
+            url: '/api/fetchMcpdata',
+            method: 'post',
+            data: { filterType }
+        })
+    },
+
     getIntegratedConnections: async () => {
         return await request({
             url: '/api/getIntegratedConnectionsInfo',
