@@ -883,7 +883,6 @@ public class IssuesAction extends UserAction {
         }
     }
 
-
     public List<TestingRunIssues> getIssues() {
         return issues;
     }

@@ -103,7 +103,8 @@ export async function fetchActionItemsData() {
         api.getMisConfiguredTestsCount(),
         api.fetchIssuesByApis(),
         api.fetchUrlsByIssues(false),
-        api.fetchBrokenAuthenticationIssues(allSubCategories, false)
+        api.fetchBrokenAuthenticationIssues(allSubCategories, false),
+        api.fetchIssuesByApis({ categoryTypes: ["VEM", "MHH"], showIssues: false })
     ]);
 
     const [
@@ -117,8 +118,19 @@ export async function fetchActionItemsData() {
         misConfiguredTestsCountResult,
         issuesByApisResult,
         urlsByIssuesResult,
-        brokenAuthIssuesResult
+        brokenAuthIssuesResult,
+        categorizedVulnerableApisResult
     ] = results;
+
+    const categorizedData = categorizedVulnerableApisResult.status === 'fulfilled' ? categorizedVulnerableApisResult.value : {};
+    const vemVulnerableApisResult = {
+        status: categorizedVulnerableApisResult.status,
+        value: categorizedData?.VEM || null
+    };
+    const mhhVulnerableApisResult = {
+        status: categorizedVulnerableApisResult.status,
+        value: categorizedData?.MHH || null
+    };
 
     const apiStats = apiStatsResult.status === 'fulfilled' ? apiStatsResult.value : null;
     const countMapResp = countMapRespResult.status === 'fulfilled' ? countMapRespResult.value : null;
@@ -144,6 +156,15 @@ export async function fetchActionItemsData() {
     let vulnerableApiCount = vulnerableApiCountResult.status === 'fulfilled' ? vulnerableApiCountResult.value?.buaCategoryCount || 0 : 0;
     let misConfiguredTestsCount = misConfiguredTestsCountResult.status === 'fulfilled' ? misConfiguredTestsCountResult.value?.misConfiguredTestsCount || 0 : 0;
     let brokenAuthIssuesCount = brokenAuthIssuesResp ? brokenAuthIssuesResp.buaCategoryCount || 0 : 0;
+    let vemVulnerableApisCount = 0;
+    let mhhVulnerableApisCount = 0;
+
+    if (vemVulnerableApisResult.status === 'fulfilled' && vemVulnerableApisResult.value?.countByAPIs) {
+        vemVulnerableApisCount = Object.keys(vemVulnerableApisResult.value.countByAPIs).length;
+    }
+    if (mhhVulnerableApisResult.status === 'fulfilled' && mhhVulnerableApisResult.value?.countByAPIs) {
+        mhhVulnerableApisCount = Object.keys(mhhVulnerableApisResult.value.countByAPIs).length;
+    }
 
     if (apiStats?.apiStatsEnd && apiStats?.apiStatsStart) {
         const { apiStatsEnd, apiStatsStart } = apiStats;
@@ -178,7 +199,9 @@ export async function fetchActionItemsData() {
         highValueIssuesCount,
         issuesByApis,
         urlsByIssues,
-        urlsByIssuesTotalCount
+        urlsByIssuesTotalCount,
+        vemVulnerableApisCount,
+        mhhVulnerableApisCount
     };
 }
 
@@ -225,7 +248,9 @@ export async function fetchAllActionItemsApiInfo() {
         api.fetchActionItemsApiInfo('THIRD_PARTY'),
         api.fetchBrokenAuthenticationIssues(allSubCategories, true),
         api.fetchIssuesByApis(true),
-        api.fetchUrlsByIssues(true)
+        api.fetchUrlsByIssues(true),
+        api.fetchIssuesByApis({ categoryTypes: ["VEM", "MHH"], showIssues: true }),
+        observeApi.getSensitiveInfoForCollections('topSensitive')
     ]);
 
     const [
@@ -242,8 +267,20 @@ export async function fetchAllActionItemsApiInfo() {
         thirdPartyResult,
         brokenAuthIssuesApiInfoResult,
         issuesByApisResult,
-        urlsByIssuesResult
+        urlsByIssuesResult,
+        categorizedVulnerableApisApiInfoResult,
+        topSensitiveResult
     ] = results;
+
+    const categorizedApiInfoData = categorizedVulnerableApisApiInfoResult.status === 'fulfilled' ? categorizedVulnerableApisApiInfoResult.value : {};
+    const vemVulnerableApisApiInfoResult = {
+        status: categorizedVulnerableApisApiInfoResult.status,
+        value: categorizedApiInfoData?.VEM || null
+    };
+    const mhhVulnerableApisApiInfoResult = {
+        status: categorizedVulnerableApisApiInfoResult.status,
+        value: categorizedApiInfoData?.MHH || null
+    };
 
     const sensitiveAndUnauthenticatedApis = sensitiveAndUnauthenticatedValueResult.status === 'fulfilled' ? sensitiveAndUnauthenticatedValueResult?.value?.sensitiveUnauthenticatedEndpointsApiInfo || [] : [];
     const highRiskThirdPartyApis = highRiskThirdPartyValueResult.status === 'fulfilled' ? highRiskThirdPartyValueResult?.value?.highRiskThirdPartyEndpointsApiInfo || [] : [];
@@ -259,6 +296,9 @@ export async function fetchAllActionItemsApiInfo() {
     const brokenAuthIssuesApiInfo = brokenAuthIssuesApiInfoResult.status === 'fulfilled' ? brokenAuthIssuesApiInfoResult.value?.buaCategoryApiInfo || [] : [];
     const issuesByApisForAllActionItems = issuesByApisResult.status === 'fulfilled' ? issuesByApisResult.value : null;
     const urlsByIssuesForAllActionItems = urlsByIssuesResult.status === 'fulfilled' ? urlsByIssuesResult.value : null;
+    const vemVulnerableApisApiInfo = vemVulnerableApisApiInfoResult.status === 'fulfilled' ? vemVulnerableApisApiInfoResult.value?.issueNamesByAPIs?.map(item => item.apiInfo) || [] : [];
+    const mhhVulnerableApisApiInfo = mhhVulnerableApisApiInfoResult.status === 'fulfilled' ? mhhVulnerableApisApiInfoResult.value?.issueNamesByAPIs?.map(item => item.apiInfo) || [] : [];
+    const sensitiveSubtypesInUrl = topSensitiveResult.status === 'fulfilled' ? topSensitiveResult.value?.sensitiveSubtypesInUrl || [] : [];
 
     const multipleIssuesApiInfo = Array.isArray(issuesByApisForAllActionItems?.issueNamesByAPIs)
         ? issuesByApisForAllActionItems.issueNamesByAPIs
@@ -279,12 +319,15 @@ export async function fetchAllActionItemsApiInfo() {
         highRiskThirdParty: highRiskThirdPartyApis,
         shadowApis: shadowApis,
         sensitiveAndUnauthenticated: sensitiveAndUnauthenticatedApis,
-        notTestedEndpointsApiInfo,
-        onlyOnceTestedEndpointsApiInfo,
-        misConfiguredTestsApiInfo,
-        vulnerableApiCountApiInfo,
-        brokenAuthIssuesApiInfo,
-        multipleIssuesApiInfo,
-        urlsByIssues: urlsByIssuesForAllActionItems
+        notTestedEndpointsApiInfo: notTestedEndpointsApiInfo,
+        onlyOnceTestedEndpointsApiInfo: onlyOnceTestedEndpointsApiInfo,
+        misConfiguredTestsApiInfo: misConfiguredTestsApiInfo,
+        vulnerableApiCountApiInfo: vulnerableApiCountApiInfo,
+        brokenAuthIssuesApiInfo: brokenAuthIssuesApiInfo,
+        multipleIssuesApiInfo: multipleIssuesApiInfo,
+        urlsByIssues: urlsByIssuesForAllActionItems,
+        vemVulnerableApisApiInfo: vemVulnerableApisApiInfo,
+        mhhVulnerableApisApiInfo: mhhVulnerableApisApiInfo,
+        sensitiveSubtypesInUrl: sensitiveSubtypesInUrl,
     };
 }

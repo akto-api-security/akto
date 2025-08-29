@@ -63,6 +63,7 @@ public class ApiCollectionsAction extends UserAction {
     int criticalEndpointsCount;
     int sensitiveUrlsInResponse;
     Map<Integer, List<String>> sensitiveSubtypesInCollection = new HashMap<>();
+    List<BasicDBObject> sensitiveSubtypesInUrl = new ArrayList<>();
     LastCronRunInfo timerInfo;
 
     Map<Integer,Map<String,Integer>> severityInfo = new HashMap<>();
@@ -82,6 +83,8 @@ public class ApiCollectionsAction extends UserAction {
     List<ApiInfo> highRiskThirdPartyEndpointsApiInfo = new ArrayList<>();
     @Getter
     List<ApiInfo> shadowApisApiInfo = new ArrayList<>();
+    @Setter
+    String type;
 
     public List<ApiInfoKey> getApiList() {
         return apiList;
@@ -578,7 +581,13 @@ public class ApiCollectionsAction extends UserAction {
         this.sensitiveUrlsInResponse = SingleTypeInfoDao.instance.getSensitiveApisCount(sensitiveSubtypes, true, Filters.nin(SingleTypeInfo._API_COLLECTION_ID, deactivatedCollections));
 
         sensitiveSubtypes.addAll(sensitiveSubtypesInRequest);
-        this.sensitiveSubtypesInCollection = SingleTypeInfoDao.instance.getSensitiveSubtypesDetectedForCollection(sensitiveSubtypes);
+
+        if(type != null && type.equals("topSensitive")){
+            this.sensitiveSubtypesInUrl = SingleTypeInfoDao.instance.getSensitiveSubtypesDetectedForUrl(sensitiveSubtypes);
+        }else {
+            this.sensitiveSubtypesInCollection = SingleTypeInfoDao.instance.getSensitiveSubtypesDetectedForCollection(sensitiveSubtypes);
+        }
+
         return Action.SUCCESS.toUpperCase();
     }
 
@@ -1159,6 +1168,10 @@ public class ApiCollectionsAction extends UserAction {
 
     public Map<Integer, List<String>> getSensitiveSubtypesInCollection() {
         return sensitiveSubtypesInCollection;
+    }
+    
+    public List<BasicDBObject> getSensitiveSubtypesInUrl() {
+        return sensitiveSubtypesInUrl;
     }
 
     public Map<Integer, Integer> getTestedEndpointsMaps() {

@@ -37,7 +37,10 @@ const ACTION_ITEM_TYPES = {
     ADDRESS_MISCONFIGURED_TESTS: 'ADDRESS_MISCONFIGURED_TESTS',
     BROKEN_AUTHENTICATION_ISSUES: 'BROKEN_AUTHENTICATION_ISSUES',
     FREQUENTLY_VULNERABLE_ENDPOINTS: 'FREQUENTLY_VULNERABLE_ENDPOINTS',
-    BUILD_REMEDIATION_PLAYBOOKS: 'BUILD_REMEDIATION_PLAYBOOKS'
+    BUILD_REMEDIATION_PLAYBOOKS: 'BUILD_REMEDIATION_PLAYBOOKS',
+    VERBOSE_ERROR_MESSAGES: 'VERBOSE_ERROR_MESSAGES',
+    MISSING_SECURITY_HEADERS: 'MISSING_SECURITY_HEADERS',
+    TOP_PUBLIC_EXPOSED_APIS: 'TOP_PUBLIC_EXPOSED_APIS',
 };
 
 const JIRA_INTEGRATION_URL = "/dashboard/settings/integrations/jira";
@@ -155,6 +158,8 @@ export const ActionItemsContent = ({ actionItemsData, onCountChange }) => {
             brokenAuthIssuesCount,
             highValueIssuesCount,
             urlsByIssuesTotalCount,
+            vemVulnerableApisCount,
+            mhhVulnerableApisCount,
         } = actionItemsData;
         setJiraTicketUrlMap(ticketMap || {});
 
@@ -181,13 +186,18 @@ export const ActionItemsContent = ({ actionItemsData, onCountChange }) => {
             ,
             createActionItem('11', 'P2', 'Remediate frequently vulnerable endpoints', `${highValueIssuesCount} endpoint surfaced repeatedly in test results - track and prioritize for remediation`, "Security Team", "Low", highValueIssuesCount, ACTION_ITEM_TYPES.FREQUENTLY_VULNERABLE_ENDPOINTS, jiraTicketUrlMap, handleJiraIntegration, "Focuses remediation on APIs with recurring issues"),
 
-            createActionItem('12', 'P2', 'Build remediation playbooks for common issues', `${urlsByIssuesTotalCount} common vulnerability types detected that can benefit from standardized remediation steps`, "Security & DevOps", "Low", urlsByIssuesTotalCount, ACTION_ITEM_TYPES.BUILD_REMEDIATION_PLAYBOOKS, jiraTicketUrlMap, handleJiraIntegration, "Reduces response time and improves fix consistency across teams")
+            createActionItem('12', 'P2', 'Build remediation playbooks for common issues', `${urlsByIssuesTotalCount} common vulnerability types detected that can benefit from standardized remediation steps`, "Security & DevOps", "Low", urlsByIssuesTotalCount, ACTION_ITEM_TYPES.BUILD_REMEDIATION_PLAYBOOKS, jiraTicketUrlMap, handleJiraIntegration, "Reduces response time and improves fix consistency across teams"),
+
+            createActionItem('13', 'P1', 'Investigate verbose error messages or stack traces', `${vemVulnerableApisCount} APIs leaking debug information in responses.`, "Development", "Medium", vemVulnerableApisCount, ACTION_ITEM_TYPES.VERBOSE_ERROR_MESSAGES, jiraTicketUrlMap, handleJiraIntegration, "Can disclose sensitive implementation details to attackers"),
+
+            createActionItem('14', 'P2', 'Verify security headers on API responses', `${mhhVulnerableApisCount} Ensure headers like HSTS, X-Frame-Options, etc. are present.`, "DevOps / Security", "Low", mhhVulnerableApisCount, ACTION_ITEM_TYPES.MISSING_SECURITY_HEADERS, jiraTicketUrlMap, handleJiraIntegration, "Hardens APIs against clickjacking and other browser-based attacks")
         ];
 
         const filteredItems = items.filter(item => item.count > 0);
         setActionItems(filteredItems);
         let totalCount = filteredItems.length;
         let criticalCardsDataToSet = [];
+        const topPublicExposedCount = 3; 
         
         if (sensitiveAndUnauthenticatedCount > 0) {
             totalCount += 1;
@@ -218,6 +228,20 @@ export const ActionItemsContent = ({ actionItemsData, onCountChange }) => {
                 actionItemType: ACTION_ITEM_TYPES.VULNERABLE_APIS
             });
         }
+
+        totalCount += 1;
+        criticalCardsDataToSet.push({
+            id: 'p0-top-public',
+            priority: 'P0',
+            staticTitle: 'Top 3 APIs with public exposure',
+            title: 'Top 3 APIs with public exposure',
+            description: 'Top 3 APIs exposing maximum sensitive data',
+            team: 'Security & Development',
+            effort: 'High',
+            count: topPublicExposedCount,
+            whyItMatters: 'Violates data privacy regulations (GDPR, CCPA) and risks customer trust',
+            actionItemType: ACTION_ITEM_TYPES.TOP_PUBLIC_EXPOSED_APIS
+        });
         
         setCriticalCardsData(criticalCardsDataToSet);
         if (onCountChange) {
