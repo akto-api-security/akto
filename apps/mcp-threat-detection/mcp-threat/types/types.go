@@ -162,6 +162,7 @@ func (tc ThreatCategory) IsValid() bool {
 		ThreatCategoryRecursiveInjection,
 		ThreatCategoryOOBPromptInjection,
 		ThreatCategorySuspiciousKeyword,
+		ThreatCategorySuspiciousKeyword,
 	}
 
 	for _, valid := range validCategories {
