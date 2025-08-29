@@ -5,8 +5,8 @@ import (
 	"os"
 	"strconv"
 
-	"mcp-threat-detection/mcp-threat/constants"
-	"mcp-threat-detection/mcp-threat/types"
+	"github.com/akto-api-security/akto/apps/mcp-threat-detection/mcp-threat/constants"
+	"github.com/akto-api-security/akto/apps/mcp-threat-detection/mcp-threat/types"
 )
 
 // LoadConfigFromEnv loads configuration from environment variables

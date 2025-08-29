@@ -10,10 +10,9 @@ import (
 	"syscall"
 	"time"
 
-	"mcp-threat-detection/mcp-threat/client"
-	"mcp-threat-detection/mcp-threat/config"
-	"mcp-threat-detection/mcp-threat/types"
-
+	"github.com/akto-api-security/akto/apps/mcp-threat-detection/mcp-threat/client"
+	"github.com/akto-api-security/akto/apps/mcp-threat-detection/mcp-threat/config"
+	"github.com/akto-api-security/akto/apps/mcp-threat-detection/mcp-threat/types"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"

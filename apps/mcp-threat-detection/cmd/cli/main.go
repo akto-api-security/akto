@@ -10,10 +10,9 @@ import (
 	"strings"
 	"time"
 
-	"mcp-threat-detection/mcp-threat/client"
-	"mcp-threat-detection/mcp-threat/config"
-	"mcp-threat-detection/mcp-threat/types"
-
+	"github.com/akto-api-security/akto/apps/mcp-threat-detection/mcp-threat/client"
+	"github.com/akto-api-security/akto/apps/mcp-threat-detection/mcp-threat/config"
+	"github.com/akto-api-security/akto/apps/mcp-threat-detection/mcp-threat/types"
 	"github.com/joho/godotenv"
 )
 
@@ -27,8 +26,8 @@ func main() {
 		endpoint   = flag.String("endpoint", "", "Custom endpoint for self-hosted LLMs")
 		apiKey     = flag.String("api-key", "", "API key (overrides environment config)")
 		jsonOutput = flag.Bool("json", false, "Output result in JSON format")
-		verbose    = flag.Bool("verbose", false, "Verbose output")
-		timeout    = flag.Duration("timeout", 60*time.Second, "Timeout for validation")
+		// verbose    = flag.Bool("verbose", false, "Verbose output")
+		timeout = flag.Duration("timeout", 60*time.Second, "Timeout for validation")
 	)
 	flag.Parse()
 
@@ -38,11 +37,7 @@ func main() {
 	}
 
 	// Load environment variables
-	if err := godotenv.Load(); err != nil {
-		if *verbose {
-			log.Println("No .env file found, using environment variables")
-		}
-	}
+	_ = godotenv.Load()
 
 	// Load configuration
 	appConfig, err := config.LoadConfigFromEnv()
@@ -88,36 +83,17 @@ func main() {
 	}
 	defer validator.Close()
 
-	if *verbose {
-		log.Printf("Initialized validator with provider: %s", appConfig.LLM.ProviderType)
-		log.Printf("Model: %s", appConfig.LLM.Model)
-	}
-
 	// Perform validation
-	if *verbose {
-		log.Printf("Validating payload...")
-		payloadStr := fmt.Sprintf("%v", payloadData)
-		if len(payloadStr) > 200 {
-			payloadStr = payloadStr[:200] + "..."
-		}
-		log.Printf("Payload: %s", payloadStr)
-		if toolDescData != nil {
-			log.Printf("Tool Description: %s", *toolDescData)
-		}
-	}
-
 	ctx, cancel := context.WithTimeout(context.Background(), *timeout)
 	defer cancel()
 
-	// Use generic validation that auto-detects type
 	response := validator.Validate(ctx, payloadData, toolDescData)
 
 	if !response.Success {
 		if response.Error != nil {
 			log.Fatalf("Validation failed: %s", *response.Error)
-		} else {
-			log.Fatalf("Validation failed: unknown error")
 		}
+		log.Fatalf("Validation failed: unknown error")
 	}
 
 	// Output result
@@ -164,7 +140,6 @@ func loadInput(input string) (interface{}, error) {
 
 // outputJSON outputs the result in JSON format
 func outputJSON(response *types.ValidationResponse) {
-	// Do not include raw if not valid JSON; keep it nil to avoid marshal errors
 	output := map[string]interface{}{
 		"success": response.Success,
 		"verdict": map[string]interface{}{

@@ -3,10 +3,13 @@ module mcp-threat-detection
 go 1.21
 
 require (
+	github.com/akto-api-security/akto/apps/mcp-threat-detection/mcp-threat v0.0.0
 	github.com/gin-contrib/cors v1.4.0
 	github.com/gin-gonic/gin v1.9.1
 	github.com/joho/godotenv v1.5.1
 )
+
+replace github.com/akto-api-security/akto/apps/mcp-threat-detection/mcp-threat => ./mcp-threat
 
 require (
 	github.com/bytedance/sonic v1.9.1 // indirect
