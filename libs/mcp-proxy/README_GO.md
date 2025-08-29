@@ -1,4 +1,4 @@
-# MCP Threat Detection Library - Go Implementation
+# MCP Proxy Library - Go Implementation
 
 A simple, high-performance Go library for analyzing and validating MCP (Model Context Protocol) requests and responses using LLM-based threat detection. Built with Go's simplicity and performance in mind.
 
@@ -42,7 +42,16 @@ mcp-proxy/
 
 ## 🚀 Quick Start
 
-### 1. Clone and Setup
+### 1. Install the Library
+
+```bash
+# Install the specific version
+go get github.com/akto-api-security/akto/libs/mcp-proxy@v1.0.1_mcpthreat
+```
+
+**Note**: This library uses version `v1.0.1_mcpthreat` to avoid conflicts with existing tags. Always specify the version when installing.
+
+### 2. Clone and Setup
 
 ```bash
 git clone <your-repo>
@@ -78,6 +87,22 @@ make build-cli
 
 # Or run directly
 make run-cli
+```
+
+## 📦 Versioning
+
+This library uses version `v1.0.1_mcpthreat` to avoid conflicts with existing tags in the repository.
+
+### Installing Specific Version
+```bash
+go get github.com/akto-api-security/akto/libs/mcp-proxy@v1.0.1_mcpthreat
+```
+
+### In go.mod
+```go
+require (
+    github.com/akto-api-security/akto/libs/mcp-proxy v1.0.1_mcpthreat
+)
 ```
 
 ## 🔧 Configuration
