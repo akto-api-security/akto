@@ -2,7 +2,6 @@ package validators
 
 import (
 	"context"
-	"log"
 	"regexp"
 	"strings"
 	"time"
@@ -34,7 +33,6 @@ func init() {
 	var err error
 	suspiciousRegex, err = regexp.Compile(regexPattern)
 	if err != nil {
-		log.Printf("ERROR: failed to compile threat detection regex: %v", err)
 		panic("failed to compile threat detection regex: " + err.Error())
 	}
 }
