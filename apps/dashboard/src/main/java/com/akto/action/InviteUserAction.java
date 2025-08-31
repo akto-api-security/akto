@@ -45,10 +45,6 @@ public class InviteUserAction extends UserAction{
     public static final String AKTO_DOMAIN = "akto.io";
 
     public static Map<String, String> commonOrganisationsMap = new HashMap<>();
-    static {
-        commonOrganisationsMap.put("gotocompany.com", "gotocompany.com");
-        commonOrganisationsMap.put("gojek.com", "gotocompany.com");
-    }
     private static final ExecutorService executor = Executors.newFixedThreadPool(1);
 
     private static final Pattern EMAIL_PATTERN = Pattern.compile("^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$");
