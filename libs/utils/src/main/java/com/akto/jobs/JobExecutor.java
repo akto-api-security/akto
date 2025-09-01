@@ -149,7 +149,7 @@ public abstract class JobExecutor<T extends JobParams> {
         SLACK_EXECUTOR.submit(() -> {
             Context.accountId.set(1000000);
             SlackWebhook slackWebhook = SlackWebhooksDao.instance.findOne(Filters.empty());
-            if (targetAccountId == 1723492815 && slackWebhook != null) { // send slack alerts only for MIQ account
+            if (targetAccountId == 1723492815 && slackWebhook != null) { // send slack alerts only for account
                 try {
                     StringBuilder message = new StringBuilder();
 
