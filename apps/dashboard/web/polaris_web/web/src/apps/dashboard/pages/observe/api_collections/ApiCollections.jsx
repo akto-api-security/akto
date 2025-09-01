@@ -368,7 +368,6 @@ function ApiCollections(props) {
             api.getLastTrafficSeen(),
             collectionApi.fetchCountForHostnameDeactivatedCollections(),
             collectionApi.fetchCountForUningestedApis(),
-            dashboardApi.fetchEndpointsCount(0, 0)
         ];
         if(shouldCallHeavyApis){
             apiPromises = [
@@ -390,34 +389,30 @@ function ApiCollections(props) {
         let trafficInfo = results[1].status === 'fulfilled' ? results[1].value : {};
         let deactivatedCountInfo = results[2].status === 'fulfilled' ? results[2].value : {};
         let uningestedApiCountInfo = results[3].status === 'fulfilled' ? results[3].value : {};
-        let fetchEndpointsCountResp = results[4].status === 'fulfilled' ? results[4].value : {}
 
         let riskScoreObj = lastFetchedResp
         let sensitiveInfo = lastFetchedSensitiveResp
         let severityObj = lastFetchedSeverityResp
-        if (fetchEndpointsCountResp && fetchEndpointsCountResp.newCount) {
-            setTotalAPIs(fetchEndpointsCountResp.newCount)
-        }
 
         if(shouldCallHeavyApis){
-            if(results[5]?.status === "fulfilled"){
-                const res = results[5].value
+            if(results[4]?.status === "fulfilled"){
+                const res = results[4].value
                 riskScoreObj = {
                     criticalUrls: res.criticalEndpointsCount,
                     riskScoreMap: res.riskScoreOfCollectionsMap
                 }
             }
 
-            if(results[6]?.status === "fulfilled"){
-                const res = results[6].value
+            if(results[5]?.status === "fulfilled"){
+                const res = results[5].value
                 sensitiveInfo ={ 
                     sensitiveUrls: res.sensitiveUrlsInResponse,
                     sensitiveInfoMap: res.sensitiveSubtypesInCollection
                 }
             }
 
-            if(results[7]?.status === "fulfilled"){
-                const res = results[7].value
+            if(results[6]?.status === "fulfilled"){
+                const res = results[6].value
                 severityObj = res
             }
 
@@ -431,8 +426,7 @@ function ApiCollections(props) {
 
         let usersCollectionList = []
         let userList = []
-
-        const index = !shouldCallHeavyApis ? 5 : 8
+        const index = !shouldCallHeavyApis ? 4 : 7
 
         if(userRole === 'ADMIN') {
             if(results[index]?.status === "fulfilled") {
@@ -510,6 +504,9 @@ function ApiCollections(props) {
         
         // Process uningested API data
         setUningestedApiCountMap(uningestedApiCountInfo || {});
+        const fetchEndpointsCountResp = await dashboardApi.fetchEndpointsCount(0, 0)
+        setTotalAPIs(fetchEndpointsCountResp.newCount)
+
         
         // Calculate summary data only for active collections
         const summary = transform.getSummaryData(dataObj.normal)
