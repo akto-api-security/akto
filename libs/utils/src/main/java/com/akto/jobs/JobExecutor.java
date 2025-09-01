@@ -2,22 +2,30 @@ package com.akto.jobs;
 
 import com.akto.dao.context.Context;
 import com.akto.dao.jobs.JobsDao;
+import com.akto.dao.notifications.SlackWebhooksDao;
 import com.akto.dto.jobs.Job;
 import com.akto.dto.jobs.JobParams;
 import com.akto.dto.jobs.JobStatus;
 import com.akto.dto.jobs.ScheduleType;
+import com.akto.dto.notifications.SlackWebhook;
 import com.akto.jobs.exception.RetryableJobException;
 import com.akto.log.LoggerMaker;
+import com.akto.notifications.slack.CustomTextAlert;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.FindOneAndUpdateOptions;
 import com.mongodb.client.model.ReturnDocument;
 import com.mongodb.client.model.Updates;
+import com.slack.api.Slack;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import org.bson.types.ObjectId;
 
 public abstract class JobExecutor<T extends JobParams> {
     private static final LoggerMaker logger = new LoggerMaker(JobExecutor.class);
 
     protected final Class<T> paramClass;
+    private static final Slack SLACK_INSTANCE = Slack.getInstance();
+    private static final ExecutorService SLACK_EXECUTOR = Executors.newSingleThreadExecutor();
 
     public JobExecutor(Class<T> paramClass) {
         this.paramClass = paramClass;
@@ -27,6 +35,7 @@ public abstract class JobExecutor<T extends JobParams> {
         ObjectId jobId = job.getId();
         logger.info("Executing job: {}", job);
         Job executedJob;
+        String errorMessage = null;
         try {
             runJob(job);
             executedJob = logSuccess(jobId);
@@ -35,10 +44,12 @@ public abstract class JobExecutor<T extends JobParams> {
             executedJob = reScheduleJob(job);
             logger.error("Error occurred while executing the job. Re-scheduling the job. {}", executedJob, rex);
         } catch (Exception e) {
+            errorMessage = e.getMessage();
             executedJob = logFailure(jobId, e);
             logger.error("Error occurred while executing the job. Not re-scheduling. {}", executedJob, e);
         }
         handleRecurringJob(executedJob);
+        sendSlackAlert(job, errorMessage);
     }
 
     private Job logSuccess(ObjectId id) {
@@ -131,6 +142,34 @@ public abstract class JobExecutor<T extends JobParams> {
                 Updates.set(Job.LAST_UPDATED_AT, now)
             )
         );
+    }
+
+    private void sendSlackAlert(Job job, String errorMessage) {
+        int targetAccountId = job.getAccountId();
+        SLACK_EXECUTOR.submit(() -> {
+            Context.accountId.set(1000000);
+            SlackWebhook slackWebhook = SlackWebhooksDao.instance.findOne(Filters.empty());
+            if (targetAccountId == 1723492815 && slackWebhook != null) { // send slack alerts only for MIQ account
+                try {
+                    StringBuilder message = new StringBuilder();
+
+                    message.append("Job ")
+                        .append(errorMessage == null ? "completed successfully. " : "failed. ")
+                        .append("Name: ").append(job.getJobParams().getJobType())
+                        .append(" | Account: ").append(targetAccountId)
+                        .append(" | JobId: ").append(job.getId().toHexString());
+
+                    if (errorMessage != null) {
+                        message.append(" | Error: ").append(errorMessage);
+                    }
+
+                    CustomTextAlert customTextAlert = new CustomTextAlert(message.toString());
+                    SLACK_INSTANCE.send(slackWebhook.getWebhook(), customTextAlert.toJson());
+                } catch (Exception e) {
+                    logger.error("Error sending slack alert", e);
+                }
+            }
+        });
     }
 
     protected abstract void runJob(Job job) throws Exception;
