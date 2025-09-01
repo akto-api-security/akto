@@ -353,6 +353,14 @@ public class Parser {
                         log.setUrl(urlPath);
                         log.setUploadId(uploadId);
                         try {
+
+                            if(messageObject.get(mKeys.path) != null) {
+                                String urlTemp = messageObject.get(mKeys.path);
+                                if(urlTemp.contains("mcp")){
+                                    messageObject.put(mKeys.path, "/mcp");
+                                }
+                            }
+
                             String s = mapper.writeValueAsString(messageObject);
                             log.setAktoFormat(s);
 
@@ -364,6 +372,11 @@ public class Parser {
                         if(!apiLevelErrors.isEmpty()) {
                             log.setErrors(apiLevelErrors);
                         }
+
+                        if(log.getUrl().contains("mcp")){
+                            log.setUrl("/mcp");
+                        }
+
                         uploadLogs.add(log);
                     }
                 }

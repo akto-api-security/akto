@@ -1,5 +1,12 @@
 package com.akto.gpt.handlers.gpt_prompts;
 
+import com.akto.dto.OriginalHttpRequest;
+import com.akto.dto.OriginalHttpResponse;
+import com.akto.testing.ApiExecutor;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 import javax.validation.ValidationException;
@@ -55,6 +62,7 @@ public abstract class PromptHandler {
         try {
             validate(queryData);
             String prompt = getPrompt(queryData);
+            logger.info(">>>>>>>>>>>>>Prompt: " + prompt);
             String rawResponse = call(prompt, OLLAMA_MODEL, temperature, max_tokens);
             BasicDBObject resp = processResponse(rawResponse);
             return resp;
@@ -100,25 +108,7 @@ public abstract class PromptHandler {
         payload.put("options", options);
         payload.put("stream", false);
 
-        RequestBody body = RequestBody.create(payload.toString(), mediaType);
-        Request request = new Request.Builder()
-                .url(OLLAMA_SERVER_ENDPOINT)
-                .method("POST", body)
-                .addHeader("Content-Type", "application/json")
-                .build();
-
-        try (
-                Response response = client.newCall(request).execute()) {
-            if (!response.isSuccessful()) {
-                logger.error("Unexpected response code: " + response.code());
-                return null;
-            }
-            ResponseBody responseBody = response.body();
-            return responseBody != null ? responseBody.string() : null;
-        } catch (IOException e) {
-            logger.error("Error while executing request: " + e.getMessage());
-            return null;
-        }
+        return getLLMPromptResponse(payload);
     }
 
     /**
@@ -152,6 +142,8 @@ public abstract class PromptHandler {
 
             JSONObject jsonResponse = new JSONObject(rawResponse);
             String cleanResponse = jsonResponse.getString("response");
+
+            logger.info(">>>>>>>>>>>Cleaned response: " + cleanResponse);
     
             // Remove <think> tags
             cleanResponse = cleanResponse.replaceAll("(?s)<think>.*?</think>", "").trim();
@@ -167,5 +159,56 @@ public abstract class PromptHandler {
             logger.error("Failed to clean LLM response: " + rawResponse, e);
             return "NOT_FOUND";
         }
+    }
+
+    private String getLLMPromptResponse(JSONObject promptPayload) {
+        try {
+            JSONObject requestJson = new JSONObject();
+            requestJson.put("llmPayload", promptPayload);
+
+            OriginalHttpRequest request = new OriginalHttpRequest(
+                "https://cyborg.akto.io/api/getLLMResponse",
+                "",
+                "POST",
+                requestJson.toString(),
+                buildHeaders(),
+                ""
+            );
+
+            logger.debug("Sending request to LLM server: {}", requestJson);
+
+            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+
+            if (response == null) {
+                logger.errorAndAddToDb("Response object is null from LLM server");
+                return null;
+            }
+
+            String responsePayload = response.getBody();
+
+            if (response.getStatusCode() != 200) {
+                logger.errorAndAddToDb("Non-2xx response in getLLMResponse: " + response.getStatusCode());
+                return null;
+            }
+
+            if (responsePayload == null || responsePayload.trim().isEmpty()) {
+                logger.errorAndAddToDb("Empty or null response body from LLM server");
+                return null;
+            }
+
+            logger.debug("Received response from LLM server: {}", responsePayload);
+            return responsePayload;
+
+        } catch (Exception e) {
+            logger.errorAndAddToDb(e, "Exception in getLLMResponse.");
+        }
+        return null;
+    }
+
+    public Map<String, List<String>> buildHeaders() {
+        Map<String, List<String>> headers = new HashMap<>();
+        // add token
+        headers.put("Authorization", Collections.singletonList(""));
+        return headers;
     }
 }

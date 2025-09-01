@@ -614,16 +614,20 @@ public class ApiExecutor {
     }
 
     private static boolean isJsonRpcRequest(OriginalHttpRequest request) {
+
+        String body = request.getBody();
+        if (body == null) {
+            return false;
+        }
         try {
-            String body = request.getBody();
-            if (body == null) {
-                return false;
-            }
             JsonNode node = objectMapper.readTree(body);
             return node.has("jsonrpc") && node.has("id") && node.has("method");
         } catch (Exception e) {
-            return false;
+            if(body.contains("\"jsonrpc\"") && body.contains("\"id\"") && body.contains("\"method\"")) {
+                return true;
+            }
         }
+        return false;
     }
     
     private static String getEventStreamResponseBodyWithTimeout(Response response, long timeoutMs) throws IOException {
