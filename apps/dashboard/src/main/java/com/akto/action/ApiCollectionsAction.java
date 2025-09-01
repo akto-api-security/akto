@@ -4,6 +4,7 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 import com.akto.action.observe.InventoryAction;
+import com.akto.dao.billing.UningestedApiOverageDao;
 import com.akto.dto.*;
 import com.akto.util.Pair;
 
@@ -51,6 +52,8 @@ import com.opensymphony.xwork2.Action;
 
 import lombok.Setter;
 import static com.akto.util.Constants.AKTO_DISCOVERED_APIS_COLLECTION;
+import com.akto.dto.billing.UningestedApiOverage;
+import com.akto.dto.type.URLMethods;
 
 public class ApiCollectionsAction extends UserAction {
 
@@ -132,6 +135,7 @@ public class ApiCollectionsAction extends UserAction {
     private Map<Integer, Integer> deactivatedHostnameCountMap;
 
     private Map<Integer, Integer> uningestedApiCountMap;
+    private List<UningestedApiOverage> uningestedApiList;
 
     public String getCountForHostnameDeactivatedCollections(){
         this.deactivatedHostnameCountMap = new HashMap<>();
@@ -160,9 +164,21 @@ public class ApiCollectionsAction extends UserAction {
     public String getCountForUningestedApis(){
         this.uningestedApiCountMap = new HashMap<>();
         try {
-            this.uningestedApiCountMap = com.akto.dao.billing.UningestedApiOverageDao.instance.getCountByCollection();
+            this.uningestedApiCountMap = UningestedApiOverageDao.instance.getCountByCollection();
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error fetching uningested API counts", LogDb.DASHBOARD);
+        }
+        return SUCCESS.toUpperCase();
+    }
+
+    public String fetchUningestedApis(){
+        this.uningestedApiList = new ArrayList<>();
+        try {
+            // Fetch all uningested APIs excluding OPTIONS methods
+            Bson filter = Filters.ne(UningestedApiOverage.METHOD, URLMethods.Method.OPTIONS);
+            this.uningestedApiList = UningestedApiOverageDao.instance.findAll(filter);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error fetching uningested API details", LogDb.DASHBOARD);
         }
         return SUCCESS.toUpperCase();
     }
@@ -1251,6 +1267,14 @@ public class ApiCollectionsAction extends UserAction {
 
     public Map<Integer, Integer> getUningestedApiCountMap() {
         return uningestedApiCountMap;
+    }
+
+    public List<UningestedApiOverage> getUningestedApiList() {
+        return uningestedApiList;
+    }
+
+    public void setUningestedApiList(List<UningestedApiOverage> uningestedApiList) {
+        this.uningestedApiList = uningestedApiList;
     }
 
     public void setDescription(String description) {
