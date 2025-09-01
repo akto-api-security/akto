@@ -426,9 +426,6 @@ function ApiCollections(props) {
 
         let usersCollectionList = []
         let userList = []
-        const fetchEndpointsCountResp = await dashboardApi.fetchEndpointsCount(0, 0)
-        setTotalAPIs(fetchEndpointsCountResp.newCount)
-
         const index = !shouldCallHeavyApis ? 4 : 7
 
         if(userRole === 'ADMIN') {
@@ -507,6 +504,9 @@ function ApiCollections(props) {
         
         // Process uningested API data
         setUningestedApiCountMap(uningestedApiCountInfo || {});
+        const fetchEndpointsCountResp = await dashboardApi.fetchEndpointsCount(0, 0)
+        setTotalAPIs(fetchEndpointsCountResp.newCount)
+
         
         // Calculate summary data only for active collections
         const summary = transform.getSummaryData(dataObj.normal)
