@@ -4668,7 +4668,7 @@
             </result>
         </action>
 
-        <action name="api/fetch429RequestsCount" class="com.akto.action.testing.RateLimitAnalysisAction" method="fetch429RequestsCount">
+        <action name="api/fetchTestResultsStatsCount" class="com.akto.action.testing.TestResultsStatsAction" method="fetchTestResultsStatsCount">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
@@ -4682,7 +4682,7 @@
                 <param name="includeProperties">^actionErrors.*</param>
             </result>
             <result name="SUCCESS" type="json">
-                <param name="root">count429Requests</param>
+                <param name="root">count</param>
             </result>
             <result name="ERROR" type="json">
                 <param name="statusCode">422</param>

@@ -18,17 +18,17 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
-public class RateLimitAnalysisAction extends UserAction {
+public class TestResultsStatsAction extends UserAction {
 
-    private static final LoggerMaker loggerMaker = new LoggerMaker(RateLimitAnalysisAction.class, LogDb.DASHBOARD);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(TestResultsStatsAction.class, LogDb.DASHBOARD);
 
     private String testingRunResultSummaryHexId;
     private String testingRunHexId;
 
     @Getter
-    private int count429Requests = 0;
+    private int count = 0;
 
-    public String fetch429RequestsCount() {
+    public String fetchTestResultsStatsCount() {
         try {
             ObjectId testingRunResultSummaryId;
             ObjectId testingRunId;
@@ -72,7 +72,7 @@ public class RateLimitAnalysisAction extends UserAction {
                             Filters.regex("lastResult.message", "\"statusCode\"\\s*:\\s*429"))));
 
             // Count stage
-            pipeline.add(Aggregates.count("total429"));
+            pipeline.add(Aggregates.count("totalCount"));
 
             // Execute aggregation
             MongoCursor<BasicDBObject> cursor = TestingRunResultDao.instance.getMCollection()
@@ -80,15 +80,15 @@ public class RateLimitAnalysisAction extends UserAction {
 
             if (cursor.hasNext()) {
                 BasicDBObject result = cursor.next();
-                this.count429Requests = result.getInt("total429", 0);
+                this.count = result.getInt("totalCount", 0);
             } else {
-                this.count429Requests = 0;
+                this.count = 0;
             }
 
             cursor.close();
 
             loggerMaker.debugAndAddToDb(
-                    "Found " + count429Requests + " requests with 429 status code for test run: " + testingRunHexId,
+                    "Found " + count + " requests with 429 status code for test run: " + testingRunHexId,
                     LogDb.DASHBOARD);
 
         } catch (Exception e) {
