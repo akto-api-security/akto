@@ -70,7 +70,11 @@ public class MergeLogicLocal {
         parser.apiCatalogSync.dbState.put(1234, apiCatalog);
         mergingJob(parser.apiCatalogSync.dbState);
     }
-        
+     
+    /**
+     * Compare and templatize the urls in postgres and mongodb.
+     * @param dbState STIs fetched from mongoDB.
+     */
     public static void mergingJob(Map<Integer, APICatalog> dbState) {
         long start = System.currentTimeMillis();
         for (int apiCollectionId : dbState.keySet()) {

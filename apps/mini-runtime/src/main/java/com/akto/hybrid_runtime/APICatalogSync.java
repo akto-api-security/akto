@@ -1592,6 +1592,10 @@ public class APICatalogSync {
             dataActor.bulkWriteSensitiveParamInfo(writesForSensitiveParamInfo);
         }
 
+        refreshDbState(fetchAllSTI);
+    }
+
+    public void refreshDbState(boolean fetchAllSTI) {
         int now = Context.now();
         if (lastBuildFromDb + DB_REFRESH_CYCLE < now) {
             loggerMaker.infoAndAddToDb("starting build from db inside syncWithDb at : " + now);
