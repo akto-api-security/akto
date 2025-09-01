@@ -29,6 +29,13 @@ export default {
             data: {}
         })
     },
+    fetchUningestedApis(){
+        return request({
+            url: '/api/fetchUningestedApis',
+            method: 'post',
+            data: {}
+        })
+    },
     getCollection(apiCollectionId){
         return  request({
             url: '/api/getCollection',

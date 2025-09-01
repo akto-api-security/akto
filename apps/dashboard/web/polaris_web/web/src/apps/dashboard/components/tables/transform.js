@@ -58,13 +58,13 @@ const tableFunc = {
 
         // actually apply filters for table filter
         let singleFilterData = tempData
-        Object.keys(filters).forEach((filterKey)=>{
+        Object.keys(filters || {}).forEach((filterKey)=>{
           singleFilterData = props.data;
 
           if(filterKey.includes('dateRange')){
             const dataKey = filterKey.split('_')[0];
-            const startTs = filters[filterKey].since ? Date.parse(filters[filterKey].since)/1000 : 0;
-            const endTs = filters[filterKey].until ? Date.parse(filters[filterKey].until)/1000 : 0;
+            const startTs = filters[filterKey]?.since ? Date.parse(filters[filterKey].since)/1000 : 0;
+            const endTs = filters[filterKey]?.until ? Date.parse(filters[filterKey].until)/1000 : 0;
 
             singleFilterData = singleFilterData.filter((value) => {
               if(value[dataKey] && value[dataKey] >= startTs && value[dataKey] <= endTs){
@@ -73,7 +73,7 @@ const tableFunc = {
               return false;
             })
           }else{
-            let filterSet = new Set(filters[filterKey]);
+            let filterSet = new Set(filters[filterKey] || []);
             if(filterSet.size!==0){
               singleFilterData = singleFilterData.filter((value) => {
                   return [].concat(value[filterKey]).filter(v => filterSet.has(v)).length > 0
@@ -94,7 +94,7 @@ const tableFunc = {
             props.getFilteredItems(tempData)
           }
   
-          let finalData = props.useModifiedData ? props.modifyData(tempData,filters) : tempData
+          let finalData = props.useModifiedData ? props.modifyData(tempData,filters || {}) : tempData
           
           let page = skip / limit;
           let pageLimit = limit;
