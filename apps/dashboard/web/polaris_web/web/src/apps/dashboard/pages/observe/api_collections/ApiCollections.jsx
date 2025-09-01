@@ -391,7 +391,7 @@ function ApiCollections(props) {
         let trafficInfo = results[1].status === 'fulfilled' ? results[1].value : {};
         let deactivatedCountInfo = results[2].status === 'fulfilled' ? results[2].value : {};
         let uningestedApiCountInfo = results[3].status === 'fulfilled' ? results[3].value : {};
-        let uningestedApiDetails = results[4].status === 'fulfilled' ? results[5].value : {};
+        let uningestedApiDetails = results[4].status === 'fulfilled' ? results[4].value : {};
         let riskScoreObj = lastFetchedResp
         let sensitiveInfo = lastFetchedSensitiveResp
         let severityObj = lastFetchedSeverityResp
