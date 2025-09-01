@@ -82,6 +82,8 @@ public class ApiCollectionsAction extends UserAction {
     List<ApiInfo> highRiskThirdPartyEndpointsApiInfo = new ArrayList<>();
     @Getter
     List<ApiInfo> shadowApisApiInfo = new ArrayList<>();
+    @Getter
+    int mcpDataCount;
 
     public List<ApiInfoKey> getApiList() {
         return apiList;
@@ -1127,6 +1129,79 @@ public class ApiCollectionsAction extends UserAction {
         this.response = response;
         return Action.SUCCESS.toUpperCase();
     }
+
+
+    // For MCP Security posture dashboard
+    public String fetchMcpdata() {
+        int count = 0;
+        String filterType = this.filterType; // Assume filterType is set from request
+        int now = (int) (System.currentTimeMillis() / 1000);
+        int last24Hours = now - 86400;
+        int oneHourAgo = now - 3600;
+        int sevenDaysAgo = now - 604800; // 7 days in seconds
+        Bson filterQ = UsageMetricCalculator.excludeDemosAndDeactivated(ApiInfo.ID_API_COLLECTION_ID);
+
+        // Common MCP filter, similar to isMcpCollection logic
+        Bson mcpTagFilter = Filters.elemMatch(ApiCollection.TAGS_STRING,
+            Filters.eq("keyName", com.akto.util.Constants.AKTO_MCP_SERVER_TAG)
+        );
+        List<ApiCollection> mcpCollections = ApiCollectionsDao.instance.findAll(mcpTagFilter, null);
+        List<Integer> mcpCollectionIds = mcpCollections.stream().map(ApiCollection::getId).collect(Collectors.toList());
+
+        switch (filterType) {
+            case "TOTAL_APIS":
+                Bson totalApisFilter = Filters.and(
+                    filterQ,
+                    Filters.in(ApiInfo.ID_API_COLLECTION_ID, mcpCollectionIds)
+                );
+                this.mcpDataCount = (int) ApiInfoDao.instance.count(totalApisFilter);
+                break;
+            case "NEW_APIS_7_DAYS":
+                Bson newApisFilter = Filters.and(
+                    filterQ,
+                    Filters.in(ApiInfo.ID_API_COLLECTION_ID, mcpCollectionIds),
+                    Filters.gte(ApiInfo.DISCOVERED_TIMESTAMP, sevenDaysAgo)
+                );
+                this.mcpDataCount = (int) ApiInfoDao.instance.count(newApisFilter);
+                break;
+            case "THIRD_PARTY_APIS":
+                Bson thirdPartyFilter = Filters.and(
+                    filterQ,
+                    Filters.in(ApiInfo.API_ACCESS_TYPES, ApiInfo.ApiAccessType.THIRD_PARTY),
+                    Filters.in(ApiInfo.ID_API_COLLECTION_ID, mcpCollectionIds)
+                );
+                this.mcpDataCount = (int) ApiInfoDao.instance.count(thirdPartyFilter);
+                break;
+            case "CRITICAL_APIS":
+                // ...existing code...
+                break;
+            case "TOOLS":
+                // ...existing code...
+                break;
+            case "PROMPTS":
+                // ...existing code...
+                break;
+            case "RESOURCES":
+                // ...existing code...
+                break;
+            case "SERVERS":
+                // ...existing code...
+                break;
+            case "AGENTS":
+                // ...existing code...
+                break;
+            case "CLIENTS":
+                // ...existing code...
+                break;
+            default:
+                // ...existing code...
+        }
+        // ...existing code...
+
+        return Action.SUCCESS.toUpperCase();
+    }
+
+
 
     public void setFilterType(String filterType) {
         this.filterType = filterType;
