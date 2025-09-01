@@ -14,13 +14,10 @@ var suspiciousKeywords = []string{
 	"/etc/hosts",
 	"/etc/crontab",
 	"/root/",
-	"~/.ssh/",
 	"/proc/",
 	"/sys/",
 	"/dev/random",
 	"/dev/urandom",
-	"/.env",
-	".env",
 	"/etc/environment",
 
 	// Windows paths and env
@@ -103,10 +100,12 @@ func buildUnionRegex(uniqueKeywords []string) (*regexp.Regexp, error) {
 			for i := range tokens {
 				tokens[i] = regexp.QuoteMeta(tokens[i])
 			}
-			parts = append(parts, strings.Join(tokens, `[\W_]+`))
+			parts = append(parts, `\b`+strings.Join(tokens, `[\W_]+`)+`\b`)
+		} else if strings.HasPrefix(k, "/") {
+			parts = append(parts, `(?:[\W_]|^)`+regexp.QuoteMeta(k)+`(?:[\W_]|$)`)
 		} else {
 			// single word or tag like <instructions>
-			parts = append(parts, regexp.QuoteMeta(k)+`[\W_]+`)
+			parts = append(parts, `\b`+regexp.QuoteMeta(k)+`\b`)
 		}
 	}
 
