@@ -84,6 +84,7 @@ function HomeDashboard() {
     const [oldRiskScore, setOldRiskScore] = useState(0)
     const [showTestingComponents, setShowTestingComponents] = useState(false)
     const [customRiskScoreAvg, setCustomRiskScoreAvg] = useState(0)
+    const [mcpTotals, setMcpTotals] = useState({ mcpTotalApis: null, thirdPartyApis: null, newApis7Days: null })
 
     const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), values.ranges[2]);
 
@@ -172,7 +173,10 @@ function HomeDashboard() {
             api.fetchApiStats(startTimestamp, endTimestamp),
             api.fetchEndpointsCount(startTimestamp, endTimestamp),
             testingApi.fetchSeverityInfoForIssues({}, [], 0),
-            api.getApiInfoForMissingData(0, endTimestamp)
+            api.getApiInfoForMissingData(0, endTimestamp),
+            api.fetchMcpdata('TOTAL_APIS'),
+            api.fetchMcpdata('THIRD_PARTY_APIS'),
+            api.fetchMcpdata('NEW_APIS_7_DAYS')
         ];
 
         let results = await Promise.allSettled(apiPromises);
@@ -183,6 +187,9 @@ function HomeDashboard() {
         let fetchEndpointsCountResp = results[3].status === 'fulfilled' ? results[3].value : {}
         let issueSeverityMap = results[4].status === 'fulfilled' ? results[4].value : {}
         let missingApiInfoData = results[5].status === 'fulfilled' ? results[5].value : {}
+        let mcpTotalApis = results[6]?.status === 'fulfilled' ? (results[6].value?.mcpDataCount ?? null) : null
+        let mcpThirdParty = results[7]?.status === 'fulfilled' ? (results[7].value?.mcpDataCount ?? null) : null
+        let mcpNew7Days = results[8]?.status === 'fulfilled' ? (results[8].value?.mcpDataCount ?? null) : null
         const totalRedundantApis = missingApiInfoData?.redundantApiInfoKeys || 0
         const totalMissingApis = missingApiInfoData?.totalMissing|| 0
 
@@ -204,6 +211,8 @@ function HomeDashboard() {
         buildDeltaInfo(fetchHistoricalDataResp)
 
         buildEndpointsCount(fetchEndpointsCountResp)
+
+        setMcpTotals({ mcpTotalApis: mcpTotalApis, thirdPartyApis: mcpThirdParty, newApis7Days: mcpNew7Days })
 
         setLoading(false)
     }
@@ -501,7 +510,7 @@ function HomeDashboard() {
         setNewDomains(result)
     }
 
-    const summaryInfo = [
+    let summaryInfo = [
         {
             title: mapLabel("Total APIs", getDashboardCategory()),
             data: transform.formatNumberWithCommas(totalAPIs),
@@ -536,6 +545,25 @@ function HomeDashboard() {
             smoothChartComponent: (<SmoothAreaChart tickPositions={[oldTestCoverage, testCoverage]} />)
         }
     ]
+
+    // MCP-only summary items (dont have the backend for this yet)
+
+    if (isMCPSecurityCategory()) {
+        const totalRequestsItem = {
+            title: 'Total requests',
+            data: '-',
+            variant: 'heading2xl'
+        }
+
+        const openAlertsItem = {
+            title: 'Open Alerts',
+            data: '-',
+            variant: 'heading2xl'
+        }
+
+        summaryInfo.unshift(totalRequestsItem)
+        summaryInfo.push(openAlertsItem)
+    }
 
     const summaryComp = (
         <SummaryCard summaryItems={summaryInfo} />
@@ -702,6 +730,113 @@ function HomeDashboard() {
         linkUrl="/dashboard/observe/inventory"
     /> : null
 
+    // MCP-only 
+    const mcpDiscoveryMiniCard = (
+        <InfoCard
+            component={
+                <HorizontalGrid columns={4} gap={6}>
+                    <VerticalStack gap={1}>
+                        <Text color="subdued">APIs</Text>
+                        <Text variant='headingMd'>{mcpTotals.mcpTotalApis ?? '-'}</Text>
+                    </VerticalStack>
+                    <VerticalStack gap={1}>
+                        <Text color="subdued">Services</Text>
+                        <Text variant='headingMd'>-</Text>
+                    </VerticalStack>
+                    <VerticalStack gap={1}>
+                        <Text color="subdued">3rd party APIs</Text>
+                        <Text variant='headingMd'>{mcpTotals.thirdPartyApis ?? '-'}</Text>
+                    </VerticalStack>
+                    <VerticalStack gap={1}>
+                        <Text color="subdued">Identities</Text>
+                        <Text variant='headingMd'>-</Text>
+                    </VerticalStack>
+                </HorizontalGrid>
+            }
+            title={'Discovery'}
+            titleToolTip={'High-level MCP discovery snapshot'}
+            linkText={''}
+            linkUrl={''}
+        />
+    )
+
+    const mcpRiskDetectionsMiniCard = (
+        <InfoCard
+            component={
+                <HorizontalGrid columns={4} gap={6}>
+                    <VerticalStack gap={1}>
+                        <Text color="subdued">Critical</Text>
+                        <Text variant='headingMd'>-</Text>
+                    </VerticalStack>
+                    <VerticalStack gap={1}>
+                        <Text color="subdued">AI security</Text>
+                        <Text variant='headingMd'>-</Text>
+                    </VerticalStack>
+                    <VerticalStack gap={1}>
+                        <Text color="subdued">MCP security</Text>
+                        <Text variant='headingMd'>-</Text>
+                    </VerticalStack>
+                    <VerticalStack gap={1}>
+                        <Text color="subdued">CVE's</Text>
+                        <Text variant='headingMd'>-</Text>
+                    </VerticalStack>
+                </HorizontalGrid>
+            }
+            title={'Risk Detections'}
+            titleToolTip={'Key MCP risk detection metrics'}
+            linkText={''}
+            linkUrl={''}
+        />
+    )
+
+    const hasTypesData = false
+    const mcpTypesTableCard = (
+        hasTypesData ?
+        <InfoCard
+            component={
+                <Box>
+                    <DataTable
+                        columnContentTypes={['text','numeric']}
+                        headings={[<Text color="subdued">Type</Text>, <Text color="subdued">Count</Text>]}
+                        rows={[]}
+                        increasedTableDensity
+                        hoverable={false}
+                    />
+                </Box>
+            }
+            title={'Types'}
+            titleToolTip={'Sample distribution of MCP entity types'}
+            linkText={''}
+            linkUrl={''}
+        /> : <EmptyCard title="Types" subTitleComponent={<Text alignment='center' color='subdued'>No MCP entity types to display</Text>} />
+    )
+ 
+    const mcpApiRequestsSeries = []
+    const hasRequestsData = Array.isArray(mcpApiRequestsSeries) && mcpApiRequestsSeries.some(p => p && p[1] > 0)
+    const mcpApiRequestsCard = (
+        hasRequestsData ?
+        <InfoCard
+            component={
+                <StackedChart
+                    type='spline'
+                    color='#658EE2'
+                    areaFillHex={'false'}
+                    height='280'
+                    data={[{ name: 'MCP API Requests', color: '#658EE2', data: mcpApiRequestsSeries }]}
+                    defaultChartOptions={{}}
+                    text={true}
+                    showGridLines={true}
+                    yAxisTitle={''}
+                    exportingDisabled={true}
+                />
+            }
+            title={'MCP API Requests'}
+            titleToolTip={'Sample request volume trend'}
+            linkText={''}
+            linkUrl={''}
+        /> : <EmptyCard title="MCP API Requests" subTitleComponent={<Text alignment='center' color='subdued'>No MCP API requests in the selected period</Text>} />
+    )
+
     const newDomainsComponent = <InfoCard
         component={
             <Scrollable style={{ height: "320px" }} shadow>
@@ -723,7 +858,7 @@ function HomeDashboard() {
         minHeight="344px"
     />
 
-    const gridComponents = showTestingComponents ?
+    let gridComponents = showTestingComponents ?
         [
             {id: 'critical-apis', component: criticalUnsecuredAPIsOverTime},
             {id: 'vulnerable-apis', component: vulnerableApisBySeverityComponent},
@@ -744,6 +879,16 @@ function HomeDashboard() {
             {id: 'critical-findings', component: criticalFindings},
             {id: 'api-type', component: apisByTypeComponent},
         ]
+
+    if (isMCPSecurityCategory()) {
+        gridComponents = [
+            {id: 'mcp-discovery', component: mcpDiscoveryMiniCard},
+            {id: 'mcp-risk', component: mcpRiskDetectionsMiniCard},
+            {id: 'mcp-types-table', component: mcpTypesTableCard},
+            {id: 'mcp-api-requests', component: mcpApiRequestsCard},
+            ...gridComponents
+        ]
+    }
 
     const gridComponent = (
         <HorizontalGrid gap={5} columns={2}>
