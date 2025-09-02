@@ -75,7 +75,7 @@ export const labelMap = {
     "API Collection Coverage": "AI Agent Collection Coverage",
     "API collection name": "AI Agent Collection Name",
     "API Testing": "AI Agent Security Testing",
-    "Threat Detection": "AI Agent Security",
+    "Threat Detection": "AI Agent Protection",
     "Total APIs": "Total APIs",
     "Critical APIs": "Critical APIs",
     "Tested APIs (Coverage)": "Tested APIs (Coverage)",

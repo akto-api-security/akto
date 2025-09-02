@@ -279,6 +279,7 @@ function ApiCollections(props) {
     const setSelectedUrl = ObserveStore(state => state.setSelectedUrl)
     const [deactivateCollections, setDeactivateCollections] = useState([])
     const [uningestedApiCountMap, setUningestedApiCountMap] = useState({})
+    const [uningestedApiData, setUningestedApiData] = useState({})
 
     const resetFunc = () => {
         setInventoryFlyout(false)
@@ -368,7 +369,7 @@ function ApiCollections(props) {
             api.getLastTrafficSeen(),
             collectionApi.fetchCountForHostnameDeactivatedCollections(),
             collectionApi.fetchCountForUningestedApis(),
-            dashboardApi.fetchEndpointsCount(0, 0)
+            collectionApi.fetchUningestedApis(),
         ];
         if(shouldCallHeavyApis){
             apiPromises = [
@@ -390,14 +391,10 @@ function ApiCollections(props) {
         let trafficInfo = results[1].status === 'fulfilled' ? results[1].value : {};
         let deactivatedCountInfo = results[2].status === 'fulfilled' ? results[2].value : {};
         let uningestedApiCountInfo = results[3].status === 'fulfilled' ? results[3].value : {};
-        let fetchEndpointsCountResp = results[4].status === 'fulfilled' ? results[4].value : {}
-
+        let uningestedApiDetails = results[4].status === 'fulfilled' ? results[4].value : {};
         let riskScoreObj = lastFetchedResp
         let sensitiveInfo = lastFetchedSensitiveResp
         let severityObj = lastFetchedSeverityResp
-        if (fetchEndpointsCountResp && fetchEndpointsCountResp.newCount) {
-            setTotalAPIs(fetchEndpointsCountResp.newCount)
-        }
 
         if(shouldCallHeavyApis){
             if(results[5]?.status === "fulfilled"){
@@ -491,6 +488,20 @@ function ApiCollections(props) {
         });
 
         const collectionMap = new Map(dataObj.prettify.map(c => [c.id, c]));
+
+        // Process untracked API data
+        const untrackedApiDataMap = {};
+        if (uningestedApiDetails && uningestedApiDetails.uningestedApiList) {
+            uningestedApiDetails.uningestedApiList.forEach(api => {
+                const collectionId = api.apiCollectionId;
+                if (!untrackedApiDataMap[collectionId]) {
+                    untrackedApiDataMap[collectionId] = [];
+                }
+                untrackedApiDataMap[collectionId].push(api);
+            });
+        }
+        setUningestedApiData(untrackedApiDataMap);
+
         const untrackedCollections = Object.entries(uningestedApiCountInfo || {})
             .filter(([_, count]) => count > 0)
             .map(([collectionId, untrackedCount]) => {
@@ -502,7 +513,9 @@ function ApiCollections(props) {
                     urlsCount: untrackedCount,
                     rowStatus: 'critical',
                     disableClick: true,
-                    deactivated: true
+                    deactivated: false,
+                    collapsibleRow: untrackedApiDataMap[collection.id] ?
+                        transform.getUntrackedApisCollapsibleRow(untrackedApiDataMap[collection.id]) : null
                 } : null;
             })
             .filter(Boolean);
@@ -510,7 +523,10 @@ function ApiCollections(props) {
         
         // Process uningested API data
         setUningestedApiCountMap(uningestedApiCountInfo || {});
-        
+        const fetchEndpointsCountResp = await dashboardApi.fetchEndpointsCount(0, 0)
+        setTotalAPIs(fetchEndpointsCountResp.newCount)
+
+
         // Calculate summary data only for active collections
         const summary = transform.getSummaryData(dataObj.normal)
         summary.totalCriticalEndpoints = riskScoreObj.criticalUrls;

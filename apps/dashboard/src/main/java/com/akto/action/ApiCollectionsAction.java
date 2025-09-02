@@ -4,6 +4,7 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 import com.akto.action.observe.InventoryAction;
+import com.akto.dao.billing.UningestedApiOverageDao;
 import com.akto.dto.*;
 import com.akto.util.Pair;
 
@@ -51,6 +52,8 @@ import com.opensymphony.xwork2.Action;
 
 import lombok.Setter;
 import static com.akto.util.Constants.AKTO_DISCOVERED_APIS_COLLECTION;
+import com.akto.dto.billing.UningestedApiOverage;
+import com.akto.dto.type.URLMethods;
 
 public class ApiCollectionsAction extends UserAction {
 
@@ -83,6 +86,8 @@ public class ApiCollectionsAction extends UserAction {
     List<ApiInfo> highRiskThirdPartyEndpointsApiInfo = new ArrayList<>();
     @Getter
     List<ApiInfo> shadowApisApiInfo = new ArrayList<>();
+    @Getter
+    int mcpDataCount;
     @Setter
     String type;
 
@@ -135,6 +140,7 @@ public class ApiCollectionsAction extends UserAction {
     private Map<Integer, Integer> deactivatedHostnameCountMap;
 
     private Map<Integer, Integer> uningestedApiCountMap;
+    private List<UningestedApiOverage> uningestedApiList;
 
     public String getCountForHostnameDeactivatedCollections(){
         this.deactivatedHostnameCountMap = new HashMap<>();
@@ -163,9 +169,21 @@ public class ApiCollectionsAction extends UserAction {
     public String getCountForUningestedApis(){
         this.uningestedApiCountMap = new HashMap<>();
         try {
-            this.uningestedApiCountMap = com.akto.dao.billing.UningestedApiOverageDao.instance.getCountByCollection();
+            this.uningestedApiCountMap = UningestedApiOverageDao.instance.getCountByCollection();
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error fetching uningested API counts", LogDb.DASHBOARD);
+        }
+        return SUCCESS.toUpperCase();
+    }
+
+    public String fetchUningestedApis(){
+        this.uningestedApiList = new ArrayList<>();
+        try {
+            // Fetch all uningested APIs excluding OPTIONS methods
+            Bson filter = Filters.ne(UningestedApiOverage.METHOD, URLMethods.Method.OPTIONS);
+            this.uningestedApiList = UningestedApiOverageDao.instance.findAll(filter);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error fetching uningested API details", LogDb.DASHBOARD);
         }
         return SUCCESS.toUpperCase();
     }
@@ -581,13 +599,7 @@ public class ApiCollectionsAction extends UserAction {
         this.sensitiveUrlsInResponse = SingleTypeInfoDao.instance.getSensitiveApisCount(sensitiveSubtypes, true, Filters.nin(SingleTypeInfo._API_COLLECTION_ID, deactivatedCollections));
 
         sensitiveSubtypes.addAll(sensitiveSubtypesInRequest);
-
-        if(type != null && type.equals("topSensitive")){
-            this.sensitiveSubtypesInUrl = SingleTypeInfoDao.instance.getSensitiveSubtypesDetectedForUrl(sensitiveSubtypes);
-        }else {
-            this.sensitiveSubtypesInCollection = SingleTypeInfoDao.instance.getSensitiveSubtypesDetectedForCollection(sensitiveSubtypes);
-        }
-
+        this.sensitiveSubtypesInCollection = SingleTypeInfoDao.instance.getSensitiveSubtypesDetectedForCollection(sensitiveSubtypes);
         return Action.SUCCESS.toUpperCase();
     }
 
@@ -1137,6 +1149,79 @@ public class ApiCollectionsAction extends UserAction {
         return Action.SUCCESS.toUpperCase();
     }
 
+
+    // For MCP Security posture dashboard
+    public String fetchMcpdata() {
+        int count = 0;
+        String filterType = this.filterType; // Assume filterType is set from request
+        int now = (int) (System.currentTimeMillis() / 1000);
+        int last24Hours = now - 86400;
+        int oneHourAgo = now - 3600;
+        int sevenDaysAgo = now - 604800; // 7 days in seconds
+        Bson filterQ = UsageMetricCalculator.excludeDemosAndDeactivated(ApiInfo.ID_API_COLLECTION_ID);
+
+        // Common MCP filter, similar to isMcpCollection logic
+        Bson mcpTagFilter = Filters.elemMatch(ApiCollection.TAGS_STRING,
+            Filters.eq("keyName", com.akto.util.Constants.AKTO_MCP_SERVER_TAG)
+        );
+        List<ApiCollection> mcpCollections = ApiCollectionsDao.instance.findAll(mcpTagFilter, null);
+        List<Integer> mcpCollectionIds = mcpCollections.stream().map(ApiCollection::getId).collect(Collectors.toList());
+
+        switch (filterType) {
+            case "TOTAL_APIS":
+                Bson totalApisFilter = Filters.and(
+                    filterQ,
+                    Filters.in(ApiInfo.ID_API_COLLECTION_ID, mcpCollectionIds)
+                );
+                this.mcpDataCount = (int) ApiInfoDao.instance.count(totalApisFilter);
+                break;
+            case "NEW_APIS_7_DAYS":
+                Bson newApisFilter = Filters.and(
+                    filterQ,
+                    Filters.in(ApiInfo.ID_API_COLLECTION_ID, mcpCollectionIds),
+                    Filters.gte(ApiInfo.DISCOVERED_TIMESTAMP, sevenDaysAgo)
+                );
+                this.mcpDataCount = (int) ApiInfoDao.instance.count(newApisFilter);
+                break;
+            case "THIRD_PARTY_APIS":
+                Bson thirdPartyFilter = Filters.and(
+                    filterQ,
+                    Filters.in(ApiInfo.API_ACCESS_TYPES, ApiInfo.ApiAccessType.THIRD_PARTY),
+                    Filters.in(ApiInfo.ID_API_COLLECTION_ID, mcpCollectionIds)
+                );
+                this.mcpDataCount = (int) ApiInfoDao.instance.count(thirdPartyFilter);
+                break;
+            case "CRITICAL_APIS":
+                // ...existing code...
+                break;
+            case "TOOLS":
+                // ...existing code...
+                break;
+            case "PROMPTS":
+                // ...existing code...
+                break;
+            case "RESOURCES":
+                // ...existing code...
+                break;
+            case "SERVERS":
+                // ...existing code...
+                break;
+            case "AGENTS":
+                // ...existing code...
+                break;
+            case "CLIENTS":
+                // ...existing code...
+                break;
+            default:
+                // ...existing code...
+        }
+        // ...existing code...
+
+        return Action.SUCCESS.toUpperCase();
+    }
+
+
+
     public void setFilterType(String filterType) {
         this.filterType = filterType;
     }
@@ -1169,7 +1254,7 @@ public class ApiCollectionsAction extends UserAction {
     public Map<Integer, List<String>> getSensitiveSubtypesInCollection() {
         return sensitiveSubtypesInCollection;
     }
-    
+
     public List<BasicDBObject> getSensitiveSubtypesInUrl() {
         return sensitiveSubtypesInUrl;
     }
@@ -1264,6 +1349,14 @@ public class ApiCollectionsAction extends UserAction {
 
     public Map<Integer, Integer> getUningestedApiCountMap() {
         return uningestedApiCountMap;
+    }
+
+    public List<UningestedApiOverage> getUningestedApiList() {
+        return uningestedApiList;
+    }
+
+    public void setUningestedApiList(List<UningestedApiOverage> uningestedApiList) {
+        this.uningestedApiList = uningestedApiList;
     }
 
     public void setDescription(String description) {

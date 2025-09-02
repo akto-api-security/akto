@@ -708,7 +708,6 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
     const handleModifyConfig = async () => {
         const settings = transform.prepareConditionsForTesting(conditions)
         let autoTicketingDetails = jiraProjectMap? testRun.autoTicketingDetails : null;
-        console.log("testRun", testRun, testSuiteIds)
         const editableConfigObject = transform.prepareEditableConfigObject(testRun, settings, testIdConfig.hexId,testSuiteIds,autoTicketingDetails)
         await testingApi.modifyTestingRunConfig(testIdConfig?.testingRunConfig?.id, editableConfigObject).then(() => {
             func.setToast(true, false, "Modified testing run config successfully")
