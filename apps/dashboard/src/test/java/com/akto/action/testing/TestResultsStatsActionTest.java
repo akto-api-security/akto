@@ -263,8 +263,8 @@ public class TestResultsStatsActionTest extends MongoBasedTest {
                 session.put("user", user);
                 action.setSession(session);
 
-                action.setTestingRunHexId(testingRunId.toHexString());
                 action.setTestingRunResultSummaryHexId(testingRunResultSummaryId.toHexString());
+                action.setTestingRunHexId(testingRunId.toHexString());
 
                 String result = action.fetchTestResultsStatsCount();
 
@@ -308,8 +308,8 @@ public class TestResultsStatsActionTest extends MongoBasedTest {
                 session.put("user", user);
                 action.setSession(session);
 
-                action.setTestingRunHexId(testingRunId.toHexString());
                 action.setTestingRunResultSummaryHexId(testingRunResultSummaryId.toHexString());
+                action.setTestingRunHexId(testingRunId.toHexString());
 
                 String result = action.fetchTestResultsStatsCount();
 
@@ -444,6 +444,6 @@ public class TestResultsStatsActionTest extends MongoBasedTest {
                 // Check logs for explain output showing index usage
                 assertEquals("SUCCESS", result);
                 assertEquals(1, action.getCount());
-                
+
         }
 }

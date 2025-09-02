@@ -53,9 +53,7 @@ public class TestResultsStatsAction extends UserAction {
 
             // Match stage
             pipeline.add(Aggregates.match(
-                    Filters.and(
-                            Filters.eq("testRunResultSummaryId", testingRunResultSummaryId),
-                            Filters.eq("testRunId", testingRunId))));
+                    Filters.eq("testRunResultSummaryId", testingRunResultSummaryId)));
 
             // Project stage to get the last result
             pipeline.add(Aggregates.project(

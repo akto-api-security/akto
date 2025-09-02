@@ -265,7 +265,7 @@ function SingleTestRunPage() {
     
     // Fetch test results stats for the new summary
     if (summary && summary.hexId) {
-      await fetchTestResultsStats(hexId, summary.hexId);
+      fetchTestResultsStats(hexId, summary.hexId);
     }
     
     if (!initialCall && updateTable) {
