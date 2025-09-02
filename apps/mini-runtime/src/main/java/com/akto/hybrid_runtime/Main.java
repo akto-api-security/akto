@@ -26,6 +26,8 @@ import com.akto.runtime.utils.Utils;
 import com.akto.testing_db_layer_client.ClientLayer;
 import com.akto.util.DashboardMode;
 import com.google.gson.Gson;
+
+import org.apache.commons.lang3.StringUtils;
 import org.apache.kafka.clients.consumer.*;
 import org.apache.kafka.clients.producer.*;
 import org.apache.kafka.common.Metric;
@@ -55,6 +57,9 @@ public class Main {
 
     // this sync threshold time is used for deleting sample data
     public static final int sync_threshold_time = 120;
+    public static final boolean isKafkaAuthenticationEnabled = System.getenv("KAFKA_AUTH_ENABLED") != null && System.getenv("KAFKA_AUTH_ENABLED").equalsIgnoreCase("true");
+    public static final String kafkaUsername = System.getenv("KAFKA_USERNAME");
+    public static final String kafkaPassword = System.getenv("KAFKA_PASSWORD");
 
     private static int debugPrintCounter = 500;
     private static void printL(Object o) {
@@ -119,7 +124,16 @@ public class Main {
             int centralKafkaBatchSize = AccountSettings.DEFAULT_CENTRAL_KAFKA_BATCH_SIZE;
             int centralKafkaLingerMS = AccountSettings.DEFAULT_CENTRAL_KAFKA_LINGER_MS;
             if (centralKafkaBrokerUrl != null) {
-                kafkaProducer = new Kafka(centralKafkaBrokerUrl, centralKafkaLingerMS, centralKafkaBatchSize);
+                // Get Kafka authentication credentials from environment variables
+                if(isKafkaAuthenticationEnabled){
+                    if(StringUtils.isEmpty(kafkaPassword) || StringUtils.isEmpty(kafkaUsername)){
+                        loggerMaker.errorAndAddToDb("Kafka authentication credentials not provided");
+                        return;
+                    }
+                    kafkaProducer = new Kafka(centralKafkaBrokerUrl, centralKafkaLingerMS, centralKafkaBatchSize, kafkaUsername, kafkaPassword, true);
+                }else{
+                    kafkaProducer = new Kafka(centralKafkaBrokerUrl, centralKafkaLingerMS, centralKafkaBatchSize);
+                }
                 loggerMaker.info("Connected to central kafka @ " + Context.now());
             }
         } else {
@@ -156,6 +170,21 @@ public class Main {
             kafkaProps.put(ProducerConfig.DELIVERY_TIMEOUT_MS_CONFIG, lingerMS + 5000);
             kafkaProps.put(ProducerConfig.RETRY_BACKOFF_MS_CONFIG, 100);
             
+            if (isKafkaAuthenticationEnabled) {
+                if(StringUtils.isEmpty(kafkaPassword) || StringUtils.isEmpty(kafkaUsername)){
+                    loggerMaker.errorAndAddToDb("Kafka authentication credentials not provided");
+                    return;
+                }
+                kafkaProps.put("security.protocol", "SASL_PLAINTEXT");
+                kafkaProps.put("sasl.mechanism", "PLAIN");
+                
+                // Create JAAS configuration for SASL PLAIN
+                String jaasConfig = String.format(
+                    "org.apache.kafka.common.security.plain.PlainLoginModule required username=\"%s\" password=\"%s\";",
+                    kafkaUsername, kafkaPassword
+                );
+                kafkaProps.put("sasl.jaas.config", jaasConfig);
+            }
             protobufKafkaProducer = new KafkaProducer<>(kafkaProps);
             loggerMaker.info("Connected to protobuf kafka producer @ " + Context.now());
         } catch (Exception e) {
@@ -922,6 +951,22 @@ public class Main {
         properties.put(ConsumerConfig.GROUP_ID_CONFIG, groupIdConfig);
         properties.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
         properties.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, false);
+        
+        if (isKafkaAuthenticationEnabled) {
+            if(StringUtils.isEmpty(kafkaPassword) || StringUtils.isEmpty(kafkaUsername)){
+                loggerMaker.errorAndAddToDb("Kafka authentication credentials not provided");
+                return null;
+            }
+            properties.put("security.protocol", "SASL_PLAINTEXT");
+            properties.put("sasl.mechanism", "PLAIN");
+            
+            // Create JAAS configuration for SASL PLAIN
+            String jaasConfig = String.format(
+                "org.apache.kafka.common.security.plain.PlainLoginModule required username=\"%s\" password=\"%s\";",
+                kafkaUsername, kafkaPassword
+            );
+            properties.put("sasl.jaas.config", jaasConfig);
+        }
 
         return properties;
     }

@@ -1,5 +1,6 @@
 package com.akto.kafka;
 
+import org.apache.commons.lang3.StringUtils;
 import org.apache.kafka.clients.producer.*;
 import org.apache.kafka.common.serialization.StringSerializer;
 import org.slf4j.Logger;
@@ -26,6 +27,15 @@ public class Kafka {
         producerReady = false;
         try {
             setProducer(brokerIP, lingerMS, batchSize, 5000, 0);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    public Kafka(String brokerIP, int lingerMS, int batchSize, String username, String password, boolean isAuthenticationEnabled) {
+        producerReady = false;
+        try {
+            setProducer(brokerIP, lingerMS, batchSize, 5000, 0, username, password, isAuthenticationEnabled );
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -61,6 +71,10 @@ public class Kafka {
     }
 
     private void setProducer(String brokerIP, int lingerMS, int batchSize, int maxRequestTimeout, int maxRetries) {
+        setProducer(brokerIP, lingerMS, batchSize, maxRequestTimeout, maxRetries, null, null, false);
+    }
+
+    private void setProducer(String brokerIP, int lingerMS, int batchSize, int maxRequestTimeout, int maxRetries, String username, String password, boolean isAuthenticationEnabled) {
         if (producer != null) close(); // close existing producer connection
 
         Properties kafkaProps = new Properties();
@@ -76,8 +90,23 @@ public class Kafka {
         if(maxRetries > 0){
             kafkaProps.put(ProducerConfig.RETRY_BACKOFF_MS_CONFIG, 100);
         }
-        producer = new KafkaProducer<String, String>(kafkaProps);
 
+        // Add authentication if username and password are provided
+        if (isAuthenticationEnabled) {
+            if(StringUtils.isEmpty(username) || StringUtils.isEmpty(password)){
+                logger.error("Kafka authentication credentials not provided");
+                return;
+            }
+            kafkaProps.put("security.protocol", "SASL_PLAINTEXT");
+            kafkaProps.put("sasl.mechanism", "PLAIN");
+            String jaasConfig = String.format(
+                "org.apache.kafka.common.security.plain.PlainLoginModule required username=\"%s\" password=\"%s\";",
+                username, password
+            );
+            kafkaProps.put("sasl.jaas.config", jaasConfig);
+        }
+
+        producer = new KafkaProducer<String, String>(kafkaProps);
 
         // test if connection successful by sending a test message in a blocking way
         // calling .get() blocks the thread till we receive a message
