@@ -104,7 +104,10 @@ public class ApiCollectionUsers {
             return 0;
         }
 
+        List<Bson> filterList = SingleTypeInfoDao.filterForHostHostHeaderRaw();
+        Bson filters = Filters.and(filterList);
         Bson stiFiltes = getFilters(conditions, CollectionType.ApiCollectionId);
+        stiFiltes = Filters.and(filters, stiFiltes);
         List<Bson> pipeLine = new ArrayList<>();
         pipeLine.add(Aggregates.match(stiFiltes));
 
