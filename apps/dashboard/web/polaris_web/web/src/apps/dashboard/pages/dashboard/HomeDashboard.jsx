@@ -84,7 +84,7 @@ function HomeDashboard() {
     const [oldRiskScore, setOldRiskScore] = useState(0)
     const [showTestingComponents, setShowTestingComponents] = useState(false)
     const [customRiskScoreAvg, setCustomRiskScoreAvg] = useState(0)
-    const [mcpTotals, setMcpTotals] = useState({ mcpTotalApis: null, thirdPartyApis: null, newApis7Days: null })
+    const [mcpTotals, setMcpTotals] = useState({ mcpTotalApis: null, thirdPartyApis: null, newApis7Days: null, openAlerts: null, criticalApis: null })
 
     const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), values.ranges[2]);
 
@@ -176,7 +176,9 @@ function HomeDashboard() {
             api.getApiInfoForMissingData(0, endTimestamp),
             api.fetchMcpdata('TOTAL_APIS'),
             api.fetchMcpdata('THIRD_PARTY_APIS'),
-            api.fetchMcpdata('NEW_APIS_7_DAYS')
+            api.fetchMcpdata('NEW_APIS_7_DAYS'),
+            api.fetchMcpdata('OPEN_ALERTS'),
+            api.fetchMcpdata('CRITICAL_APIS')
         ];
 
         let results = await Promise.allSettled(apiPromises);
@@ -190,6 +192,8 @@ function HomeDashboard() {
         let mcpTotalApis = results[6]?.status === 'fulfilled' ? (results[6].value?.mcpDataCount ?? null) : null
         let mcpThirdParty = results[7]?.status === 'fulfilled' ? (results[7].value?.mcpDataCount ?? null) : null
         let mcpNew7Days = results[8]?.status === 'fulfilled' ? (results[8].value?.mcpDataCount ?? null) : null
+        let mcpOpenAlerts = results[9]?.status === 'fulfilled' ? (results[9].value?.mcpDataCount ?? null) : null
+        let mcpCriticalApis = results[10]?.status === 'fulfilled' ? (results[10].value?.mcpDataCount ?? null) : null
         const totalRedundantApis = missingApiInfoData?.redundantApiInfoKeys || 0
         const totalMissingApis = missingApiInfoData?.totalMissing|| 0
 
@@ -212,7 +216,7 @@ function HomeDashboard() {
 
         buildEndpointsCount(fetchEndpointsCountResp)
 
-        setMcpTotals({ mcpTotalApis: mcpTotalApis, thirdPartyApis: mcpThirdParty, newApis7Days: mcpNew7Days })
+        setMcpTotals({ mcpTotalApis: mcpTotalApis, thirdPartyApis: mcpThirdParty, newApis7Days: mcpNew7Days, openAlerts: mcpOpenAlerts, criticalApis: mcpCriticalApis })
 
         setLoading(false)
     }
@@ -557,7 +561,7 @@ function HomeDashboard() {
 
         const openAlertsItem = {
             title: 'Open Alerts',
-            data: '-',
+            data: mcpTotals.openAlerts ?? '-',
             variant: 'heading2xl'
         }
 
@@ -766,7 +770,7 @@ function HomeDashboard() {
                 <HorizontalGrid columns={4} gap={6}>
                     <VerticalStack gap={1}>
                         <Text color="subdued">Critical</Text>
-                        <Text variant='headingMd'>-</Text>
+                        <Text variant='headingMd'>{mcpTotals.criticalApis ?? '-'}</Text>
                     </VerticalStack>
                     <VerticalStack gap={1}>
                         <Text color="subdued">AI security</Text>
