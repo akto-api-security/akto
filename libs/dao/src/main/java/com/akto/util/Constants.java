@@ -41,6 +41,7 @@ public class Constants {
 
     public final static String _AKTO = "AKTO";
     public static final String AKTO_MCP_SERVER_TAG = "mcp-server";
+    public static final String AKTO_GEN_AI_TAG = "gen-ai";
     public static final String AKTO_MCP_TOOLS_TAG = "mcp-tool";
     public static final String AKTO_MCP_RESOURCES_TAG = "mcp-resource";
 }
