@@ -45,6 +45,9 @@ const (
 	ThreatCategoryRecursiveInjection ThreatCategory = "RECURSIVE_INJECTION"
 	ThreatCategoryOOBPromptInjection ThreatCategory = "OOB_PROMPT_INJECTION"
 	ThreatCategorySuspiciousKeyword  ThreatCategory = "SUSPICIOUS_WORD"
+
+	// Text classifier
+	ThreatCategoryPromptInjectionTextClassifier ThreatCategory = "PROMPT_INJECTION_TEXT_CLASSIFIER"
 )
 
 // Verdict represents the validation result
