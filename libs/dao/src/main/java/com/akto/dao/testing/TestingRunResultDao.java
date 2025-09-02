@@ -99,8 +99,7 @@ public class TestingRunResultDao extends AccountsContextDaoWithRbac<TestingRunRe
         }
 
         public List<TestingRunResult> fetchLatestTestingRunResultWithCustomAggregations(Bson filters, int limit,
-                        int skip,
-                        Bson customSort) {
+                        int skip, Bson customSort) {
                 if (customSort == null) {
                         customSort = new BasicDBObject();
                 }
@@ -113,29 +112,25 @@ public class TestingRunResultDao extends AccountsContextDaoWithRbac<TestingRunRe
                 Bson addSeverityValueStage = Aggregates.addFields(
                                 new Field<>("severityValue", new BasicDBObject("$switch",
                                                 new BasicDBObject("branches", Arrays.asList(
-                                                                new BasicDBObject("case",
-                                                                                new BasicDBObject("$eq",
-                                                                                                Arrays.asList("$confidence",
-                                                                                                                GlobalEnums.Severity.CRITICAL
-                                                                                                                                .name())))
+                                                                new BasicDBObject("case", new BasicDBObject("$eq",
+                                                                                Arrays.asList("$confidence",
+                                                                                                GlobalEnums.Severity.CRITICAL
+                                                                                                                .name())))
                                                                                 .append("then", 4),
-                                                                new BasicDBObject("case",
-                                                                                new BasicDBObject("$eq",
-                                                                                                Arrays.asList("$confidence",
-                                                                                                                GlobalEnums.Severity.HIGH
-                                                                                                                                .name())))
+                                                                new BasicDBObject("case", new BasicDBObject("$eq",
+                                                                                Arrays.asList("$confidence",
+                                                                                                GlobalEnums.Severity.HIGH
+                                                                                                                .name())))
                                                                                 .append("then", 3),
-                                                                new BasicDBObject("case",
-                                                                                new BasicDBObject("$eq",
-                                                                                                Arrays.asList("$confidence",
-                                                                                                                GlobalEnums.Severity.MEDIUM
-                                                                                                                                .name())))
+                                                                new BasicDBObject("case", new BasicDBObject("$eq",
+                                                                                Arrays.asList("$confidence",
+                                                                                                GlobalEnums.Severity.MEDIUM
+                                                                                                                .name())))
                                                                                 .append("then", 2),
-                                                                new BasicDBObject("case",
-                                                                                new BasicDBObject("$eq",
-                                                                                                Arrays.asList("$confidence",
-                                                                                                                GlobalEnums.Severity.LOW
-                                                                                                                                .name())))
+                                                                new BasicDBObject("case", new BasicDBObject("$eq",
+                                                                                Arrays.asList("$confidence",
+                                                                                                GlobalEnums.Severity.LOW
+                                                                                                                .name())))
                                                                                 .append("then", 1)))
                                                                 .append("default", 0))));
 
@@ -274,8 +269,7 @@ public class TestingRunResultDao extends AccountsContextDaoWithRbac<TestingRunRe
                                 false);
 
                 MCollection.createIndexIfAbsent(getDBName(), getCollName(),
-                                new String[] { TestingRunResult.END_TIMESTAMP },
-                                false);
+                                new String[] { TestingRunResult.END_TIMESTAMP }, false);
 
                 String[] fieldNames = new String[] { TestingRunResult.END_TIMESTAMP, TestResult.TEST_RESULTS_ERRORS };
                 MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, false);
@@ -304,9 +298,6 @@ public class TestingRunResultDao extends AccountsContextDaoWithRbac<TestingRunRe
 
                 fieldNames = new String[] { TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, TestingRunResult.VULNERABLE,
                                 TestingRunResult.API_INFO_KEY, TestingRunResult.TEST_SUB_TYPE };
-                MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, false);
-
-                fieldNames = new String[] { TestingRunResult.TEST_RESULTS + ".message" };
                 MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, false);
 
                 fieldNames = new String[] { TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, TestingRunResult.TEST_RUN_ID };
