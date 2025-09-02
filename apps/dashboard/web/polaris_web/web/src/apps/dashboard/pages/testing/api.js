@@ -45,6 +45,14 @@ export default {
         })
         return resp        
     },
+    async fetchTestResultsStatsCount(data) {
+        const resp = await request({
+            url: '/api/fetchTestResultsStatsCount',
+            method: 'post',
+            data: data
+        })
+        return resp        
+    },
     async fetchRemediationInfo(testId) {
         const resp = await request({
             url: 'api/fetchRemediationInfo',
