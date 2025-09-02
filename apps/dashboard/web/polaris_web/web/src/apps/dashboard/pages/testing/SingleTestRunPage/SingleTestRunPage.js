@@ -235,7 +235,6 @@ function SingleTestRunPage() {
         setTestResultsStatsCount(0);
       }
     } catch (error) {
-      console.warn('Failed to fetch test results stats:', error);
       setTestResultsStatsCount(0);
     }
   }
@@ -911,11 +910,11 @@ function SingleTestRunPage() {
                   const percentage = totalRequests > 0 ? (testResultsStatsCount / totalRequests) * 100 : 0;
                   
                   if (percentage > 70) {
-                    return <div className="api-stats-badge api-stats-critical">{testResultsStatsCount} requests</div>;
+                    return <div className="api-stats-badge api-stats-critical">{testResultsStatsCount} requests returned 429</div>;
                   } else if (percentage >= 40) {
-                    return <div className="api-stats-badge api-stats-warning">{testResultsStatsCount} requests</div>;
+                    return <div className="api-stats-badge api-stats-warning">{testResultsStatsCount} requests returned 429</div>;
                   } else {
-                    return <div className="api-stats-badge api-stats-success">{testResultsStatsCount} requests</div>;
+                    return <div className="api-stats-badge api-stats-success">{testResultsStatsCount} requests returned 429</div>;
                   }
                 })()}
               </HorizontalStack>
