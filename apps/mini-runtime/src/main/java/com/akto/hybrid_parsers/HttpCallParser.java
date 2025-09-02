@@ -82,7 +82,7 @@ public class HttpCallParser {
 
     // Using default timeouts [10 seconds], as this is a slow API.
     private static final OkHttpClient client = CoreHTTPClient.client.newBuilder().build();
-    
+
 
     private static final ConcurrentLinkedQueue<BasicDBObject> queue = new ConcurrentLinkedQueue<>();
     private DataActor dataActor = DataActorFactory.fetchInstance();
@@ -91,11 +91,11 @@ public class HttpCallParser {
     // Pre-compiled patterns for better performance
     private static final Pattern IP_ADDRESS_PATTERN = Pattern.compile("\\b\\d{1,3}(?:\\.\\d{1,3}){3}.*");
     private static final String EMPTY_JSON = "{}";
-    
+
     // List of ignored host names for fast contains() checks
     private static final List<String> IGNORE_HOST_NAMES = Arrays.asList(
         "svc.cluster.local",
-        "localhost", 
+        "localhost",
         "kubernetes.default.svc"
     );
 
@@ -191,35 +191,39 @@ public class HttpCallParser {
     private static int lastSyncLimitFetch = 0;
     private static final int REFRESH_INTERVAL = 60 * 10; // 10 minutes.
     private static SyncLimit syncLimit = FeatureAccess.fullAccess.fetchSyncLimit();
+    private static SyncLimit mcpAssetSyncLimit = FeatureAccess.noAccess.fetchSyncLimit();
+    private static SyncLimit aiAssetSyncLimit = FeatureAccess.noAccess.fetchSyncLimit();
 
-    private SyncLimit fetchSyncLimit() {
+    private void fetchSyncLimit() {
         try {
             if ((lastSyncLimitFetch + REFRESH_INTERVAL) >= Context.now()) {
-                return syncLimit;
+                return;
             }
 
             int accountId = DataActor.actualAccountId;
             // to:do check for on-prem air gapped deployments
             Organization organization = OrgUtils.getOrganizationCached(accountId);
             FeatureAccess featureAccess = UsageMetricUtils.getFeatureAccess(organization, MetricTypes.ACTIVE_ENDPOINTS);
-            loggerMaker.infoAndAddToDb("Fetching sync limit for accountId: " + accountId + " with usageLimit: " + featureAccess.getUsageLimit() + " and usage: " + featureAccess.getUsage());
+            loggerMaker.infoAndAddToDb("Fetching api sync limit for accountId: " + accountId + " with usageLimit: "
+                + featureAccess.getUsageLimit() + " and usage: " + featureAccess.getUsage());
             syncLimit = featureAccess.fetchSyncLimit();
+            mcpAssetSyncLimit = fetchSyncLimit(organization, MetricTypes.MCP_ASSET_COUNT);
+            aiAssetSyncLimit = fetchSyncLimit(organization, MetricTypes.AI_ASSET_COUNT);
             lastSyncLimitFetch = Context.now();
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(e, "error in fetching sync limit from feature access " + e.toString());
+            loggerMaker.errorAndAddToDb(e, "error in fetching sync limit from feature access " + e);
         }
-        return syncLimit;
     }
 
     public static boolean isBlockedHost(String hostName) {
         if (hostName == null) return false;
         hostName = hostName.toLowerCase();
-        
+
         // Fast IP address check using pre-compiled pattern
         if (IP_ADDRESS_PATTERN.matcher(hostName).matches()) {
             return true;
         }
-        
+
         // Fast domain check using the ignore list
         return IGNORE_HOST_NAMES.stream().anyMatch(hostName::contains);
     }
@@ -394,10 +398,8 @@ public class HttpCallParser {
             for (ApiCollection apiCollection: apiCollections) {
                 apiCollectionsMap.put(apiCollection.getId(), apiCollection);
             }
-            SyncLimit syncLimit = fetchSyncLimit();
-
-            apiCatalogSync.syncWithDB(syncImmediately, fetchAllSTI, syncLimit);
-
+            fetchSyncLimit();
+            apiCatalogSync.syncWithDB(syncImmediately, fetchAllSTI, syncLimit, mcpAssetSyncLimit, aiAssetSyncLimit);
             if (DataActor.actualAccountId == 1745303931 || DataActor.actualAccountId == 1741069294 || DataActor.actualAccountId == 1749515934) {
                 dependencyAnalyser.dbState = apiCatalogSync.dbState;
                 dependencyAnalyser.syncWithDb();
@@ -959,5 +961,13 @@ public class HttpCallParser {
             return Optional.of(new CollectionTags(Context.now(), "mcp-server", "MCP Server", TagSource.KUBERNETES));
         }
         return Optional.empty();
+    }
+
+    private SyncLimit fetchSyncLimit(Organization organization, MetricTypes metricType) {
+        FeatureAccess featureAccess = UsageMetricUtils.getFeatureAccess(organization, metricType);
+        if (featureAccess.equals(FeatureAccess.noAccess)) {
+            featureAccess.setUsageLimit(0);
+        }
+        return featureAccess.fetchSyncLimit();
     }
 }
