@@ -567,7 +567,10 @@ public class SingleTypeInfoDao extends AccountsContextDaoWithRbac<SingleTypeInfo
                 .append(SingleTypeInfo._METHOD, "$method");
         List<Bson> pipeline = generateFilterForSubtypes(sensitiveParameters, groupedId, false, Filters.empty());
         MongoCursor<BasicDBObject> collectionsCursor = SingleTypeInfoDao.instance.getMCollection().aggregate(pipeline, BasicDBObject.class).cursor();
-        List<BasicDBObject> records = new ArrayList<>();
+        
+        List<ApiInfo.ApiInfoKey> apiInfoKeys = new ArrayList<>();
+        List<BasicDBObject> aggregationResults = new ArrayList<>();
+        
         while (collectionsCursor.hasNext()) {
             try {
                 BasicDBObject basicDBObject = collectionsCursor.next();
@@ -576,22 +579,45 @@ public class SingleTypeInfoDao extends AccountsContextDaoWithRbac<SingleTypeInfo
                 String url = id.getString("url");
                 String method = id.getString("method");
                 List<String> subtypes = (List<String>) basicDBObject.get("subTypes");
-                ApiInfo apiInfo = ApiInfoDao.instance.findOne(ApiInfoDao.getFilter(url, method, apiCollectionId));
-                if (apiInfo == null) {
-                    ApiInfo.ApiInfoKey apiInfoKey = new ApiInfo.ApiInfoKey(apiCollectionId, url, URLMethods.Method.fromString(method));
-                    apiInfo = new ApiInfo();
-                    apiInfo.setId(apiInfoKey);
-                }
+                
                 if (subtypes != null && subtypes.size() > 1) {
-                    BasicDBObject rec = new BasicDBObject();
-                    rec.put("apiInfo", apiInfo);
-                    rec.put("subTypes", subtypes);
-                    records.add(rec);
+                    ApiInfo.ApiInfoKey apiInfoKey = new ApiInfo.ApiInfoKey(apiCollectionId, url, URLMethods.Method.fromString(method));
+                    apiInfoKeys.add(apiInfoKey);
+                    aggregationResults.add(basicDBObject);
                 }
             } catch (Exception e) {
                 e.printStackTrace();
             }
         }
+        
+        Map<ApiInfo.ApiInfoKey, ApiInfo> apiInfoMap = new HashMap<>();
+        if (!apiInfoKeys.isEmpty()) {
+            List<Bson> filters = apiInfoKeys.stream()
+                    .map(ApiInfoDao::getFilter)
+                    .collect(Collectors.toList());
+            List<ApiInfo> apiInfos = ApiInfoDao.instance.findAll(Filters.or(filters));
+            apiInfoMap = apiInfos.stream()
+                    .collect(Collectors.toMap(ApiInfo::getId, apiInfo -> apiInfo));
+        }
+        
+        List<BasicDBObject> records = new ArrayList<>();
+        for (int i = 0; i < aggregationResults.size(); i++) {
+            BasicDBObject basicDBObject = aggregationResults.get(i);
+            ApiInfo.ApiInfoKey apiInfoKey = apiInfoKeys.get(i);
+            List<String> subtypes = (List<String>) basicDBObject.get("subTypes");
+            
+            ApiInfo apiInfo = apiInfoMap.get(apiInfoKey);
+            if (apiInfo == null) {
+                apiInfo = new ApiInfo();
+                apiInfo.setId(apiInfoKey);
+            }
+            
+            BasicDBObject rec = new BasicDBObject();
+            rec.put("apiInfo", apiInfo);
+            rec.put("subTypes", subtypes);
+            records.add(rec);
+        }
+        
         // Sort and limit to top 3 by subtypes count
         return records.stream()
                 .sorted((a, b) -> Integer.compare(((List)b.get("subTypes")).size(), ((List)a.get("subTypes")).size()))
