@@ -104,7 +104,8 @@ function FlyoutTable({ actionItemType, count, allApiInfo, apiInfoLoading }) {
                             presetSensitiveParamsMap = items.reduce((acc, item) => {
                                 const url = item?.apiInfo?.id?.url || item?.apiInfo?.url;
                                 if (url) {
-                                    const subTypes = Array.isArray(item.subTypes) ? Array.from(new Set(item.subTypes)) : [];
+                                    const rawSubTypes = Array.isArray(item?.subTypes) ? item.subTypes : [];
+                                    const subTypes = rawSubTypes.length > 0 ? Array.from(new Set(rawSubTypes)) : [];
                                     if (subTypes.length > 0) acc[url] = subTypes;
                                 }
                                 return acc;
