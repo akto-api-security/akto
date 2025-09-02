@@ -402,4 +402,48 @@ public class TestResultsStatsActionTest extends MongoBasedTest {
                 assertEquals(6, action.getCount());
                 assertTrue(action.getActionErrors().isEmpty());
         }
+
+        @Test
+        public void testIndexUsageExplain() {
+                // Clear collection and setup test data
+                TestingRunResultDao.instance.getMCollection().drop();
+
+                ObjectId summaryId = new ObjectId();
+                ObjectId runId = new ObjectId();
+
+                // Create a test document with 429 status code
+                TestResult rateLimitResult = new TestResult("{\"statusCode\": 429, \"message\": \"Rate limited\"}",
+                                "", new ArrayList<>(), 100.0, false, TestResult.Confidence.HIGH, null);
+
+                ApiInfo.ApiInfoKey apiInfoKey = new ApiInfo.ApiInfoKey(1, "/test-index", URLMethods.Method.GET);
+                TestingRunResult testDoc = new TestingRunResult(
+                                runId, apiInfoKey, "RATE_LIMIT", "INDEX_TEST",
+                                Arrays.asList(rateLimitResult), false, new ArrayList<SingleTypeInfo>(),
+                                80, Context.now(), Context.now(), summaryId,
+                                null, new ArrayList<TestingRunResult.TestLog>());
+
+                TestingRunResultDao.instance.insertOne(testDoc);
+
+                // Set up context
+                Context.userId.set(0);
+                Context.contextSource.set(GlobalEnums.CONTEXT_SOURCE.API);
+
+                // Test with explain to check index usage
+                TestResultsStatsAction action = new TestResultsStatsAction();
+                Map<String, Object> session = new HashMap<>();
+                User user = new User();
+                user.setLogin("test@akto.io");
+                session.put("user", user);
+                action.setSession(session);
+
+                action.setTestingRunResultSummaryHexId(summaryId.toHexString());
+                action.setTestingRunHexId(runId.toHexString());
+
+                String result = action.fetchTestResultsStatsCount();
+
+                // Check logs for explain output showing index usage
+                assertEquals("SUCCESS", result);
+                assertEquals(1, action.getCount());
+                
+        }
 }
