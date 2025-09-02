@@ -75,7 +75,10 @@ public class ApiCollectionUsers {
         if(conditions == null || conditions.isEmpty()){
             return new ArrayList<>();
         }
+        List<Bson> filterList = SingleTypeInfoDao.filterForHostHostHeaderRaw();
         Bson singleTypeInfoFilters = getFilters(conditions, CollectionType.ApiCollectionId);
+        Bson filters = Filters.and(filterList);
+        filters = Filters.and(filters, singleTypeInfoFilters);
         if (deactivatedCollections != null && !deactivatedCollections.isEmpty()) {
             singleTypeInfoFilters = Filters.and(singleTypeInfoFilters, Filters.nin(SingleTypeInfo._API_COLLECTION_ID, deactivatedCollections));
         }
