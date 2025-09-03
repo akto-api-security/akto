@@ -13,11 +13,12 @@ import (
 
 // MCPValidator is the main client for MCP validation
 type MCPValidator struct {
-	providerType      string
-	provider          providers.LLMProvider
-	keywordDetector   *validators.KeywordDetector
-	requestValidator  *validators.RequestValidator
-	responseValidator *validators.ResponseValidator
+	providerType             string
+	provider                 providers.LLMProvider
+	keywordDetector          *validators.KeywordDetector
+	requestValidator         *validators.RequestValidator
+	responseValidator        *validators.ResponseValidator
+	promptInjectionValidator *validators.PromptValidator
 }
 
 // NewMCPValidator creates a new MCP validator instance
@@ -99,6 +100,14 @@ func (mv *MCPValidator) Validate(ctx context.Context, payload interface{}, toolD
 	keywordResponse := mv.keywordDetector.Validate(ctx, request)
 	if keywordResponse.Verdict != nil && keywordResponse.Verdict.IsMaliciousRequest {
 		return keywordResponse
+	}
+
+	promptInjectionValidationResponse := mv.promptInjectionValidator.Validate(ctx, request)
+	// directly rejecting lower confidence values and directly accepting higher ones
+	if promptInjectionValidationResponse.Verdict != nil &&
+		(promptInjectionValidationResponse.Verdict.IsMaliciousRequest ||
+			promptInjectionValidationResponse.Verdict.Confidence < validators.PromptLowerThreshold) {
+		return promptInjectionValidationResponse
 	}
 
 	return mv.detectValidationType(payload).Validate(ctx, request)
