@@ -12,6 +12,7 @@ import org.bson.conversions.Bson;
 
 import com.akto.action.observe.Utils;
 import com.akto.dao.*;
+import com.akto.dao.McpAuditInfoDao;
 import com.akto.billing.UsageMetricUtils;
 import com.akto.dao.context.Context;
 import com.akto.dto.billing.FeatureAccess;
@@ -1172,17 +1173,29 @@ public class ApiCollectionsAction extends UserAction {
                 );
                 this.mcpDataCount = (int) ApiInfoDao.instance.count(thirdPartyFilter);
                 break;
+            case "OPEN_ALERTS":
+                Bson openAlertsFilter = Filters.eq("markedBy", "");
+                this.mcpDataCount = (int) McpAuditInfoDao.instance.count(openAlertsFilter);
+                break;
             case "CRITICAL_APIS":
-                // ...existing code...
+                Bson criticalApisFilter = Filters.and(
+                    filterQ,
+                    Filters.in(ApiInfo.ID_API_COLLECTION_ID, mcpCollectionIds),
+                    Filters.gte(ApiInfo.RISK_SCORE, 4)
+                );
+                this.mcpDataCount = (int) ApiInfoDao.instance.count(criticalApisFilter);
                 break;
             case "TOOLS":
-                // ...existing code...
+                Bson toolsFilter = Filters.eq("type", Constants.AKTO_MCP_TOOLS_TAG);
+                this.mcpDataCount = (int) McpAuditInfoDao.instance.count(toolsFilter);
                 break;
             case "PROMPTS":
-                // ...existing code...
+                Bson promptsFilter = Filters.eq("type", Constants.AKTO_MCP_PROMPTS_TAG);
+                this.mcpDataCount = (int) McpAuditInfoDao.instance.count(promptsFilter);
                 break;
             case "RESOURCES":
-                // ...existing code...
+                Bson resourcesFilter = Filters.eq("type", Constants.AKTO_MCP_RESOURCES_TAG);
+                this.mcpDataCount = (int) McpAuditInfoDao.instance.count(resourcesFilter);
                 break;
             case "SERVERS":
                 // ...existing code...
