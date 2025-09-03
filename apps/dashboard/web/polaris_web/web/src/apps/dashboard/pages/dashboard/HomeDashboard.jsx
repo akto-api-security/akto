@@ -178,7 +178,10 @@ function HomeDashboard() {
             api.fetchMcpdata('THIRD_PARTY_APIS'),
             api.fetchMcpdata('NEW_APIS_7_DAYS'),
             api.fetchMcpdata('OPEN_ALERTS'),
-            api.fetchMcpdata('CRITICAL_APIS')
+            api.fetchMcpdata('CRITICAL_APIS'),
+            api.fetchMcpdata('TOOLS'),
+            api.fetchMcpdata('PROMPTS'),
+            api.fetchMcpdata('RESOURCES')
         ];
 
         let results = await Promise.allSettled(apiPromises);
@@ -194,6 +197,9 @@ function HomeDashboard() {
         let mcpNew7Days = results[8]?.status === 'fulfilled' ? (results[8].value?.mcpDataCount ?? null) : null
         let mcpOpenAlerts = results[9]?.status === 'fulfilled' ? (results[9].value?.mcpDataCount ?? null) : null
         let mcpCriticalApis = results[10]?.status === 'fulfilled' ? (results[10].value?.mcpDataCount ?? null) : null
+        let mcpTools = results[11]?.status === 'fulfilled' ? (results[11].value?.mcpDataCount ?? null) : null
+        let mcpPrompts = results[12]?.status === 'fulfilled' ? (results[12].value?.mcpDataCount ?? null) : null
+        let mcpResources = results[13]?.status === 'fulfilled' ? (results[13].value?.mcpDataCount ?? null) : null
         const totalRedundantApis = missingApiInfoData?.redundantApiInfoKeys || 0
         const totalMissingApis = missingApiInfoData?.totalMissing|| 0
 
@@ -216,7 +222,7 @@ function HomeDashboard() {
 
         buildEndpointsCount(fetchEndpointsCountResp)
 
-        setMcpTotals({ mcpTotalApis: mcpTotalApis, thirdPartyApis: mcpThirdParty, newApis7Days: mcpNew7Days, openAlerts: mcpOpenAlerts, criticalApis: mcpCriticalApis })
+        setMcpTotals({ mcpTotalApis: mcpTotalApis, thirdPartyApis: mcpThirdParty, newApis7Days: mcpNew7Days, openAlerts: mcpOpenAlerts, criticalApis: mcpCriticalApis, tools: mcpTools, prompts: mcpPrompts, resources: mcpResources })
 
         setLoading(false)
     }
@@ -793,7 +799,11 @@ function HomeDashboard() {
         />
     )
 
-    const hasTypesData = false
+    const hasTypesData = 
+        mcpTotals.tools != null || 
+        mcpTotals.prompts != null || 
+        mcpTotals.resources != null;
+        
     const mcpTypesTableCard = (
         hasTypesData ?
         <InfoCard
@@ -802,7 +812,11 @@ function HomeDashboard() {
                     <DataTable
                         columnContentTypes={['text','numeric']}
                         headings={[<Text color="subdued">Type</Text>, <Text color="subdued">Count</Text>]}
-                        rows={[]}
+                        rows={[
+                            ['Tools', mcpTotals.tools ?? '-'],
+                            ['Prompts', mcpTotals.prompts ?? '-'],
+                            ['Resources', mcpTotals.resources ?? '-']
+                        ]}
                         increasedTableDensity
                         hoverable={false}
                     />
