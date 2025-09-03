@@ -1174,7 +1174,10 @@ public class ApiCollectionsAction extends UserAction {
                 this.mcpDataCount = (int) ApiInfoDao.instance.count(thirdPartyFilter);
                 break;
             case "OPEN_ALERTS":
-                Bson openAlertsFilter = Filters.eq("markedBy", "");
+                Bson openAlertsFilter = Filters.and(
+                    Filters.or(Filters.eq("markedBy", ""), Filters.eq("markedBy", null)),
+                    Filters.or(Filters.eq("remarks", ""), Filters.eq("remarks", null))
+                );
                 this.mcpDataCount = (int) McpAuditInfoDao.instance.count(openAlertsFilter);
                 break;
             case "CRITICAL_APIS":
@@ -1186,30 +1189,32 @@ public class ApiCollectionsAction extends UserAction {
                 this.mcpDataCount = (int) ApiInfoDao.instance.count(criticalApisFilter);
                 break;
             case "TOOLS":
-                Bson toolsFilter = Filters.eq("type", Constants.AKTO_MCP_TOOLS_TAG);
+                Bson toolsFilter = Filters.and(
+                    Filters.eq("type", Constants.AKTO_MCP_TOOLS_TAG),
+                    Filters.ne("remarks", "Rejected")
+                );
                 this.mcpDataCount = (int) McpAuditInfoDao.instance.count(toolsFilter);
                 break;
             case "PROMPTS":
-                Bson promptsFilter = Filters.eq("type", Constants.AKTO_MCP_PROMPTS_TAG);
+                Bson promptsFilter = Filters.and(
+                    Filters.eq("type", Constants.AKTO_MCP_PROMPTS_TAG),
+                    Filters.ne("remarks", "Rejected")
+                );
                 this.mcpDataCount = (int) McpAuditInfoDao.instance.count(promptsFilter);
                 break;
             case "RESOURCES":
-                Bson resourcesFilter = Filters.eq("type", Constants.AKTO_MCP_RESOURCES_TAG);
+                Bson resourcesFilter = Filters.and(
+                    Filters.eq("type", Constants.AKTO_MCP_RESOURCES_TAG),
+                    Filters.ne("remarks", "Rejected")
+                );
                 this.mcpDataCount = (int) McpAuditInfoDao.instance.count(resourcesFilter);
                 break;
-            case "SERVERS":
-                // ...existing code...
-                break;
-            case "AGENTS":
-                // ...existing code...
-                break;
-            case "CLIENTS":
-                // ...existing code...
-                break;
+
             default:
-                // ...existing code...
+                addActionError("Invalid filter type: " + filterType);
+                return Action.ERROR.toUpperCase();
         }
-        // ...existing code...
+
 
         return Action.SUCCESS.toUpperCase();
     }
