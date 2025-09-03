@@ -40,7 +40,6 @@ import com.mongodb.client.model.Accumulators;
 import com.mongodb.client.model.Aggregates;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
-import com.mongodb.client.model.Sorts;
 import com.mongodb.client.model.Updates;
 import com.mongodb.client.result.UpdateResult;
 
@@ -76,64 +75,14 @@ public class ApiCollectionUsers {
         if(conditions == null || conditions.isEmpty()){
             return new ArrayList<>();
         }
-        // Optimized path: fetch endpoints directly from api_info (one doc per endpoint)
-        Bson apiInfoFilters = getFilters(conditions, CollectionType.Id_ApiCollectionId);
+        List<Bson> filterList = SingleTypeInfoDao.filterForHostHostHeaderRaw();
+        Bson singleTypeInfoFilters = getFilters(conditions, CollectionType.ApiCollectionId);
+        Bson filters = Filters.and(filterList);
+        filters = Filters.and(filters, singleTypeInfoFilters);
         if (deactivatedCollections != null && !deactivatedCollections.isEmpty()) {
-            apiInfoFilters = Filters.and(apiInfoFilters, Filters.nin("_id." + ApiInfo.ApiInfoKey.API_COLLECTION_ID, deactivatedCollections));
+            singleTypeInfoFilters = Filters.and(singleTypeInfoFilters, Filters.nin(SingleTypeInfo._API_COLLECTION_ID, deactivatedCollections));
         }
-
-        // Build projection to minimize payload
-        Bson projection = Projections.include(
-            "_id." + ApiInfo.ApiInfoKey.API_COLLECTION_ID,
-            "_id." + ApiInfo.ApiInfoKey.URL,
-            "_id." + ApiInfo.ApiInfoKey.METHOD,
-            ApiInfo.LAST_SEEN,
-            ApiInfo.DISCOVERED_TIMESTAMP
-        );
-
-        List<BasicDBObject> endpoints = new ArrayList<>();
-        List<ApiInfo> apiInfoList = ApiInfoDao.instance.findAll(
-            apiInfoFilters,
-            skip,
-            limit,
-            projection,
-            Sorts.descending(ApiInfo.LAST_SEEN)
-        );
-
-        for (ApiInfo apiInfo : apiInfoList) {
-            int apiCollectionId = apiInfo.getId().getApiCollectionId();
-            String url = apiInfo.getId().getUrl();
-            String method = apiInfo.getId().getMethod().name();
-            
-            // Validate data consistency: ensure corresponding STI entry exists
-            Bson stiValidationFilter = Filters.and(
-                Filters.eq(SingleTypeInfo._API_COLLECTION_ID, apiCollectionId),
-                Filters.eq(SingleTypeInfo._URL, url),
-                Filters.eq(SingleTypeInfo._METHOD, method)
-            );
-            boolean stiExists = SingleTypeInfoDao.instance.exists(stiValidationFilter);
-            if (!stiExists) {
-                // Skip this endpoint if no corresponding STI data exists
-                continue;
-            }
-            
-            int startTs = 0;
-            try {
-                // Prefer lastSeen; fallback to discoveredTimestamp
-                if (apiInfo.getLastSeen() != 0) {
-                    startTs = apiInfo.getLastSeen();
-                } else if (apiInfo.getDiscoveredTimestamp() != 0) {
-                    startTs = apiInfo.getDiscoveredTimestamp();
-                }
-            } catch (Exception ignored) {}
-
-            BasicDBObject groupId = new BasicDBObject(ApiInfo.ApiInfoKey.API_COLLECTION_ID, apiCollectionId)
-                .append(ApiInfo.ApiInfoKey.URL, url)
-                .append(ApiInfo.ApiInfoKey.METHOD, method);
-            endpoints.add(new BasicDBObject("startTs", startTs).append("_id", groupId));
-        }
-
-        return endpoints;
+        return ApiCollectionsDao.fetchEndpointsInCollection(singleTypeInfoFilters, skip, limit, deltaPeriodValue);
     }
     public static int getApisCountFromConditions(List<TestingEndpoints> conditions, List<Integer> deactivatedCollections) {
 
@@ -155,47 +104,38 @@ public class ApiCollectionUsers {
             return 0;
         }
 
-        // Optimized path: count endpoints directly from api_info (one doc per endpoint)
-        Bson apiInfoFilters = getFilters(conditions, CollectionType.Id_ApiCollectionId);
-        
-        if (deactivatedCollections != null && !deactivatedCollections.isEmpty()) {
-            apiInfoFilters = Filters.and(apiInfoFilters, Filters.nin("_id.apiCollectionId", deactivatedCollections));
-        }
+        List<Bson> filterList = SingleTypeInfoDao.filterForHostHostHeaderRaw();
+        Bson filters = Filters.and(filterList);
+        Bson stiFiltes = getFilters(conditions, CollectionType.ApiCollectionId);
+        stiFiltes = Filters.and(filters, stiFiltes);
+        List<Bson> pipeLine = new ArrayList<>();
+        pipeLine.add(Aggregates.match(stiFiltes));
 
-        // Add user collection filtering
         try {
             List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
             if(collectionIds != null) {
-                apiInfoFilters = Filters.and(apiInfoFilters, Filters.in(ApiInfo.COLLECTION_IDS, collectionIds));
+                pipeLine.add(Aggregates.match(Filters.in(SingleTypeInfo._COLLECTION_IDS, collectionIds)));
             }
         } catch(Exception e){
         }
 
-        // Validate data consistency: ensure corresponding STI entries exist
-        List<ApiInfo> apiInfoList = ApiInfoDao.instance.findAll(apiInfoFilters, Projections.include("_id"));
-        int validCount = 0;
-        
-        for (ApiInfo apiInfo : apiInfoList) {
-            int apiCollectionId = apiInfo.getId().getApiCollectionId();
-            String url = apiInfo.getId().getUrl();
-            String method = apiInfo.getId().getMethod().name();
-            
-            // Check if corresponding STI data exists (header params only)
-            Bson stiValidationFilter = Filters.and(
-                Filters.eq(SingleTypeInfo._API_COLLECTION_ID, apiCollectionId),
-                Filters.eq(SingleTypeInfo._URL, url),
-                Filters.eq(SingleTypeInfo._METHOD, method),
-                Filters.eq(SingleTypeInfo._RESPONSE_CODE, -1),
-                Filters.eq(SingleTypeInfo._IS_HEADER, true)
-            );
-            
-            boolean stiExists = SingleTypeInfoDao.instance.exists(stiValidationFilter);
-            if (stiExists) {
-                validCount++;
-            }
+        pipeLine.add(Aggregates.match(Filters.and(
+            Filters.eq(SingleTypeInfo._RESPONSE_CODE, -1),
+            Filters.eq(SingleTypeInfo._IS_HEADER, true)
+        )));
+        BasicDBObject groupedId = SingleTypeInfoDao.getApiInfoGroupedId();
+        pipeLine.add(Aggregates.group(groupedId, Accumulators.sum("count", 1)));
+        pipeLine.add(Aggregates.count("finalCount"));
+
+        int ansCount = 0;
+
+        MongoCursor<BasicDBObject> countCursor = SingleTypeInfoDao.instance.getMCollection().aggregate(pipeLine, BasicDBObject.class).cursor();
+        while(countCursor.hasNext()){
+            BasicDBObject dbObject = countCursor.next();
+            ansCount = dbObject.getInt("finalCount");
         }
 
-        return validCount;
+        return ansCount;
     }
 
     public static void updateApiCollection(List<TestingEndpoints> conditions, int id) {

@@ -893,8 +893,4 @@ public class SingleTypeInfoDao extends AccountsContextDaoWithRbac<SingleTypeInfo
                 .append("method", "$method");
         return groupedId;
     }
-
-    public boolean exists(Bson filter) {
-        return this.getMCollection().countDocuments(filter, new CountOptions().limit(1)) > 0;
-    }
 }
