@@ -231,6 +231,7 @@ function SingleTestRunPage() {
           testingRunResultSummaryHexId: testingRunResultSummaryHexId
         });
         setTestResultsStatsCount(response || 0);
+        console.log(response);
       } else {
         setTestResultsStatsCount(0);
       }
@@ -875,7 +876,6 @@ function SingleTestRunPage() {
                 </div>
               )
             }
-
             )}
           <Button plain monochrome onClick={() => setUpdateTable(Date.now().toString())}><Tooltip content="Refresh page" dismissOnMouseOut> <Icon source={RefreshMajor} /></Tooltip></Button>
         </HorizontalStack>
@@ -902,19 +902,51 @@ function SingleTestRunPage() {
               <Box width="1px" borderColor="border-subdued" borderInlineStartWidth="1" minHeight='16px' />
               <HorizontalStack gap={"1"}>
                 <Box><Icon color="subdued" source={CircleAlertMajor} /></Box>
-                <Tooltip content="The total number of 429 (Too Many Requests) responses received during testing. High numbers may indicate rate limiting by the target server or infrastructure." hasUnderline={false}>
-                  <Text color="subdued" fontWeight="medium" variant="bodyMd" style={{ cursor: 'pointer' }}>API request stats:</Text>
+                <Tooltip 
+                  content={
+                    <VerticalStack gap="2">
+                      <Text variant="bodyMd">
+                        The total number of 429 (Too Many Requests) responses received during testing. 
+                        High numbers may indicate rate limiting by the target server or infrastructure.
+                      </Text>
+                      <Box paddingBlockStart="1" borderBlockStartWidth="1" borderColor="border-subdued">
+                        <Text variant="bodySm" color="subdued" fontWeight="medium">
+                          ⚠️ Note: These are approximate numbers based on sampled data, not exact counts.
+                        </Text>
+                      </Box>
+                    </VerticalStack>
+                  } 
+                  hasUnderline={false}
+                >
+                  <HorizontalStack gap="1" align="center">
+                    <Text color="subdued" fontWeight="medium" variant="bodyMd" style={{ cursor: 'pointer' }}>
+                      API request stats:
+                    </Text>
+
+                  </HorizontalStack>
                 </Tooltip>
                 {(() => {
                   const totalRequests = currentSummary?.testResultsCount || 0;
                   const percentage = totalRequests > 0 ? (testResultsStatsCount / totalRequests) * 100 : 0;
                   
                   if (percentage > 70) {
-                    return <div className="api-stats-badge api-stats-critical">{testResultsStatsCount} requests returned 429</div>;
+                    return (
+                      <div className="api-stats-badge api-stats-critical">
+                        ~{testResultsStatsCount} requests returned 429
+                      </div>
+                    );
                   } else if (percentage >= 40) {
-                    return <div className="api-stats-badge api-stats-warning">{testResultsStatsCount} requests returned 429</div>;
+                    return (
+                      <div className="api-stats-badge api-stats-warning">
+                        ~{testResultsStatsCount} requests returned 429
+                      </div>
+                    );
                   } else {
-                    return <div className="api-stats-badge api-stats-success">{testResultsStatsCount} requests returned 429</div>;
+                    return (
+                      <div className="api-stats-badge api-stats-success">
+                        ~{testResultsStatsCount} requests returned 429
+                      </div>
+                    );
                   }
                 })()}
               </HorizontalStack>
@@ -924,6 +956,7 @@ function SingleTestRunPage() {
       </VerticalStack>
     </Box>
   )
+
 
   let moreActionsList = transform.getActions(selectedTestRun)
   moreActionsList.push({

@@ -234,6 +234,18 @@ public class TestingRunResultDao extends AccountsContextDaoWithRbac<TestingRunRe
         MCollection.createIndexIfAbsent(getDBName(), getCollName(),
                 new String[] { TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, TestingRunResult.VULNERABLE, Constants.ID }, false);
 
+    // Add partial index for testRunResultSummaryId, vulnerable, endTimestamp with partialFilterExpression on testResults.message
+        Bson partialIndex = Indexes.compoundIndex(
+        Indexes.ascending("testRunResultSummaryId"),
+        Indexes.ascending("vulnerable"), 
+        Indexes.descending("endTimestamp")
+        );
+
+        IndexOptions partialIndexOptions = new IndexOptions()
+            .name("testRunResultSummaryId_1_vulnerable_1_endTimestamp_-1_partial_message_exists")
+            .partialFilterExpression(Filters.exists("testResults.message", true));
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), partialIndex, partialIndexOptions);
+
 
         MCollection.createIndexIfAbsent(getDBName(), getCollName(),
                 new String[] { TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, TestingRunResult.VULNERABLE, ERRORS_KEY }, false);

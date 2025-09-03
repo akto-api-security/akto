@@ -10,6 +10,7 @@ import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.Aggregates;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
+import com.mongodb.client.model.Sorts;
 import lombok.Getter;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
@@ -31,62 +32,63 @@ public class TestResultsStatsAction extends UserAction {
     public String fetchTestResultsStatsCount() {
         try {
             ObjectId testingRunResultSummaryId;
-            ObjectId testingRunId;
 
-            // Check if parameters are provided
-            if (this.testingRunResultSummaryHexId == null || this.testingRunResultSummaryHexId.trim().isEmpty() ||
-                    this.testingRunHexId == null || this.testingRunHexId.trim().isEmpty()) {
-                addActionError("Missing required parameters: testingRunResultSummaryHexId and testingRunHexId");
+            // Input validation to prevent invalid ObjectId parsing errors
+            if (this.testingRunResultSummaryHexId == null || this.testingRunResultSummaryHexId.trim().isEmpty()) {
+                addActionError("Missing required parameter: testingRunResultSummaryHexId");
                 return ERROR.toUpperCase();
             }
 
             try {
                 testingRunResultSummaryId = new ObjectId(this.testingRunResultSummaryHexId);
-                testingRunId = new ObjectId(this.testingRunHexId);
             } catch (Exception e) {
-                addActionError("Invalid test summary id or test run id: " + e.getMessage());
+                addActionError("Invalid test summary id: " + e.getMessage());
                 return ERROR.toUpperCase();
             }
 
-            // Build aggregation pipeline similar to the MongoDB command
+            // Build optimized aggregation pipeline for 429 status code counting
             List<Bson> pipeline = new ArrayList<>();
 
-            // Match stage
-            pipeline.add(Aggregates.match(
-                    Filters.eq("testRunResultSummaryId", testingRunResultSummaryId)));
-
-            // Project stage to get the last result
-            pipeline.add(Aggregates.project(
-                    Projections.computed("lastResult",
-                            new BasicDBObject("$arrayElemAt",
-                                    Arrays.asList(
-                                            new BasicDBObject("$slice", Arrays.asList("$testResults", -1)),
-                                            0)))));
-
-            // Match stage to filter for 429 status codes
+            // Stage 1: Filter documents by summary ID and ensure testResults.message exists
             pipeline.add(Aggregates.match(
                     Filters.and(
-                            Filters.exists("lastResult.message"),
-                            Filters.regex("lastResult.message", "\"statusCode\"\\s*:\\s*429"))));
+                            Filters.eq("testRunResultSummaryId", testingRunResultSummaryId),
+                            //Filters.eq("vulnerable", false), 
+                            Filters.exists("testResults.message", true)
+                    )));
 
-            // Count stage
-            pipeline.add(Aggregates.count("totalCount"));
+            // Stage 2: Sort by latest results and limit to prevent memory exhaustion
+            pipeline.add(Aggregates.sort(Sorts.descending("endTimestamp")));
+            pipeline.add(Aggregates.limit(10000));
 
-            // Execute aggregation
+            // Stage 3: Project last message from testResults array for processing
+            pipeline.add(Aggregates.project(
+                    Projections.computed("lastMessage",
+                            new BasicDBObject("$arrayElemAt", 
+                                    Arrays.asList("$testResults.message", -1)))));
+
+            // Stage 4: Filter for HTTP 429 (Too Many Requests) status codes via regex
+            pipeline.add(Aggregates.match(
+                    Filters.regex("lastMessage", "\"statusCode\"\\s*:\\s*429")));
+
+            // Stage 5: Count matching documents and return single result
+            pipeline.add(Aggregates.count("count"));
+
+            // Execute aggregation with proper resource cleanup
             MongoCursor<BasicDBObject> cursor = TestingRunResultDao.instance.getMCollection()
                     .aggregate(pipeline, BasicDBObject.class).cursor();
 
             if (cursor.hasNext()) {
                 BasicDBObject result = cursor.next();
-                this.count = result.getInt("totalCount", 0);
+                this.count = result.getInt("count", 0);
             } else {
-                this.count = 0;
+                this.count = 0; // No documents matched the criteria
             }
 
-            cursor.close();
+            cursor.close(); 
 
             loggerMaker.debugAndAddToDb(
-                    "Found " + count + " requests with 429 status code for test run: " + testingRunHexId,
+                    "Found " + count + " requests with 429 status code for test summary: " + testingRunResultSummaryHexId,
                     LogDb.DASHBOARD);
 
         } catch (Exception e) {
@@ -98,20 +100,12 @@ public class TestResultsStatsAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
-    // Getters and setters
+    // Standard getters and setters for Struts2 action parameter binding
     public String getTestingRunResultSummaryHexId() {
         return testingRunResultSummaryHexId;
     }
 
     public void setTestingRunResultSummaryHexId(String testingRunResultSummaryHexId) {
         this.testingRunResultSummaryHexId = testingRunResultSummaryHexId;
-    }
-
-    public String getTestingRunHexId() {
-        return testingRunHexId;
-    }
-
-    public void setTestingRunHexId(String testingRunHexId) {
-        this.testingRunHexId = testingRunHexId;
     }
 }
