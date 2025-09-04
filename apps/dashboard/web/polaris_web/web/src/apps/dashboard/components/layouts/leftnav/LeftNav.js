@@ -7,6 +7,8 @@ import {
     DiamondAlertMinor,
     StarFilledMinor,
     FinancesMinor,
+    LockMajor,
+    AutomationFilledMajor,
 } from "@shopify/polaris-icons";
 import {useLocation, useNavigate} from "react-router-dom";
 
@@ -372,6 +374,38 @@ export default function LeftNav() {
                 selected: leftNavSelected.includes("agent_team"),
                 url: "#",
                 key: "8",
+            }] : []),
+            ...(dashboardCategory === "MCP Security" ? [{
+                label: (
+                    <Text variant="bodyMd" fontWeight="medium">
+                        MCP Guardrails
+                    </Text>
+                ),
+                icon: LockMajor,
+                onClick: () => {
+                    handleSelect("dashboard_mcp_guardrails");
+                    navigate("/dashboard/mcp-guardrails");
+                    setActive("normal");
+                },
+                selected: leftNavSelected === "dashboard_mcp_guardrails",
+                url: "#",
+                key: "9",
+            }] : []),
+            ...(dashboardCategory === "Gen AI" ? [{
+                label: (
+                    <Text variant="bodyMd" fontWeight="medium">
+                        AI Agent Guardrails
+                    </Text>
+                ),
+                icon: AutomationFilledMajor,
+                onClick: () => {
+                    handleSelect("dashboard_ai_agent_guardrails");
+                    navigate("/dashboard/ai-agent-guardrails");
+                    setActive("normal");
+                },
+                selected: leftNavSelected === "dashboard_ai_agent_guardrails",
+                url: "#",
+                key: "10",
             }] : []),
         ]
 

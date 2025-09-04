@@ -4,6 +4,7 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 import com.akto.action.observe.InventoryAction;
+import com.akto.dao.billing.UningestedApiOverageDao;
 import com.akto.dto.*;
 import com.akto.util.Pair;
 
@@ -53,6 +54,8 @@ import com.opensymphony.xwork2.Action;
 import lombok.Setter;
 import static com.akto.util.Constants.AKTO_DISCOVERED_APIS_COLLECTION;
 import static com.akto.util.Constants.AKTO_MCP_SERVER_TAG;
+import com.akto.dto.billing.UningestedApiOverage;
+import com.akto.dto.type.URLMethods;
 
 public class ApiCollectionsAction extends UserAction {
 
@@ -138,6 +141,7 @@ public class ApiCollectionsAction extends UserAction {
     private Map<Integer, Integer> deactivatedHostnameCountMap;
 
     private Map<Integer, Integer> uningestedApiCountMap;
+    private List<UningestedApiOverage> uningestedApiList;
 
     public String getCountForHostnameDeactivatedCollections(){
         this.deactivatedHostnameCountMap = new HashMap<>();
@@ -166,9 +170,21 @@ public class ApiCollectionsAction extends UserAction {
     public String getCountForUningestedApis(){
         this.uningestedApiCountMap = new HashMap<>();
         try {
-            this.uningestedApiCountMap = com.akto.dao.billing.UningestedApiOverageDao.instance.getCountByCollection();
+            this.uningestedApiCountMap = UningestedApiOverageDao.instance.getCountByCollection();
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error fetching uningested API counts", LogDb.DASHBOARD);
+        }
+        return SUCCESS.toUpperCase();
+    }
+
+    public String fetchUningestedApis(){
+        this.uningestedApiList = new ArrayList<>();
+        try {
+            // Fetch all uningested APIs excluding OPTIONS methods
+            Bson filter = Filters.ne(UningestedApiOverage.METHOD, URLMethods.Method.OPTIONS);
+            this.uningestedApiList = UningestedApiOverageDao.instance.findAll(filter);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error fetching uningested API details", LogDb.DASHBOARD);
         }
         return SUCCESS.toUpperCase();
     }
@@ -1176,55 +1192,31 @@ public class ApiCollectionsAction extends UserAction {
                 );
                 this.mcpDataCount = (int) ApiInfoDao.instance.count(thirdPartyFilter);
                 break;
-            case "OPEN_ALERTS":
-                Bson openAlertsFilter = Filters.and(
-                    Filters.or(Filters.eq("markedBy", ""), Filters.eq("markedBy", null)),
-                    Filters.or(Filters.eq("remarks", ""), Filters.eq("remarks", null))
-                );
-                this.mcpDataCount = (int) McpAuditInfoDao.instance.count(openAlertsFilter);
-                break;
             case "CRITICAL_APIS":
-                Bson criticalApisFilter = Filters.and(
-                    filterQ,
-                    Filters.in(ApiInfo.ID_API_COLLECTION_ID, mcpCollectionIds),
-                    Filters.gte(ApiInfo.RISK_SCORE, 4)
-                );
-                this.mcpDataCount = (int) ApiInfoDao.instance.count(criticalApisFilter);
+                // ...existing code...
                 break;
             case "TOOLS":
-                Bson toolsFilter = Filters.and(
-                    Filters.eq("type", Constants.AKTO_MCP_TOOLS_TAG),
-                    Filters.ne("remarks", "Rejected")
-                );
-                this.mcpDataCount = (int) McpAuditInfoDao.instance.count(toolsFilter);
+                // ...existing code...
                 break;
             case "PROMPTS":
-                Bson promptsFilter = Filters.and(
-                    Filters.eq("type", Constants.AKTO_MCP_PROMPTS_TAG),
-                    Filters.ne("remarks", "Rejected")
-                );
-                this.mcpDataCount = (int) McpAuditInfoDao.instance.count(promptsFilter);
+                // ...existing code...
                 break;
             case "RESOURCES":
-                Bson resourcesFilter = Filters.and(
-                    Filters.eq("type", Constants.AKTO_MCP_RESOURCES_TAG),
-                    Filters.ne("remarks", "Rejected")
-                );
-                this.mcpDataCount = (int) McpAuditInfoDao.instance.count(resourcesFilter);
+                // ...existing code...
                 break;
-            case "MCP_SERVER":
-                Bson mcpServerFilter = Filters.and(
-                        Filters.eq("type", Constants.AKTO_MCP_SERVER_TAG),
-                        Filters.ne("remarks", "Rejected")
-                );
-                this.mcpDataCount = (int) McpAuditInfoDao.instance.count(mcpServerFilter);
+            case "SERVERS":
+                // ...existing code...
                 break;
-
+            case "AGENTS":
+                // ...existing code...
+                break;
+            case "CLIENTS":
+                // ...existing code...
+                break;
             default:
-                addActionError("Invalid filter type: " + filterType);
-                return Action.ERROR.toUpperCase();
+                // ...existing code...
         }
-
+        // ...existing code...
 
         return Action.SUCCESS.toUpperCase();
     }
@@ -1354,6 +1346,14 @@ public class ApiCollectionsAction extends UserAction {
 
     public Map<Integer, Integer> getUningestedApiCountMap() {
         return uningestedApiCountMap;
+    }
+
+    public List<UningestedApiOverage> getUningestedApiList() {
+        return uningestedApiList;
+    }
+
+    public void setUningestedApiList(List<UningestedApiOverage> uningestedApiList) {
+        this.uningestedApiList = uningestedApiList;
     }
 
     public void setDescription(String description) {

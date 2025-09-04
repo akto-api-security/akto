@@ -24,6 +24,7 @@ import {
   ReportMinor,
   RefreshMajor,
   CustomersMinor,
+  CircleAlertMajor,
   PlusMinor,
   SettingsMinor,
   ViewMajor
@@ -161,6 +162,7 @@ function SingleTestRunPage() {
   const [testingRunResultSummariesObj, setTestingRunResultSummariesObj] = useState({})
   const [allResultsLength, setAllResultsLength] = useState(undefined)
   const [currentSummary, setCurrentSummary] = useState('')
+  const [testResultsStatsCount, setTestResultsStatsCount] = useState(0)
   const localCategoryMap = LocalStore.getState().categoryMap
   const localSubCategoryMap = LocalStore.getState().subCategoryMap
   const [useLocalSubCategoryData, setUseLocalSubCategoryData] = useState(false)
@@ -221,6 +223,22 @@ function SingleTestRunPage() {
     })
   }
 
+  async function fetchTestResultsStats(testingRunHexId, testingRunResultSummaryHexId) {
+    try {
+      if (testingRunHexId && testingRunResultSummaryHexId) {
+        const response = await api.fetchTestResultsStatsCount({
+          testingRunHexId: testingRunHexId,
+          testingRunResultSummaryHexId: testingRunResultSummaryHexId
+        });
+        setTestResultsStatsCount(response || 0);
+      } else {
+        setTestResultsStatsCount(0);
+      }
+    } catch (error) {
+      setTestResultsStatsCount(0);
+    }
+  }
+
   async function setSummary(summary, initialCall = false) {
     setTempLoading((prev) => {
       prev.running = false;
@@ -244,6 +262,12 @@ function SingleTestRunPage() {
     });
     let updateTable = currentSummary.hexId !== summary.hexId;
     setCurrentSummary(summary);
+    
+    // Fetch test results stats for the new summary
+    if (summary && summary.hexId) {
+      fetchTestResultsStats(hexId, summary.hexId);
+    }
+    
     if (!initialCall && updateTable) {
       setUpdateTable(Date.now().toString())
     }
@@ -846,8 +870,8 @@ function SingleTestRunPage() {
               const sev = item.split(' ')
               const tempSev = sev.length > 1 ? sev[1].toUpperCase() : ''
               return (
-                <div className={`badge-wrapper-${tempSev}`}>
-                  <Badge key={item}>{item}</Badge>
+                <div key={item} className={`badge-wrapper-${tempSev}`}>
+                  <Badge>{item}</Badge>
                 </div>
               )
             }
@@ -873,6 +897,29 @@ function SingleTestRunPage() {
             <Box><Icon color="subdued" source={PriceLookupMinor} /></Box>
             <Text color="subdued" variant="bodyMd">{getHeadingStatus(selectedTestRun)}</Text>
           </HorizontalStack>
+          {testResultsStatsCount > 0 && (
+            <>
+              <Box width="1px" borderColor="border-subdued" borderInlineStartWidth="1" minHeight='16px' />
+              <HorizontalStack gap={"1"}>
+                <Box><Icon color="subdued" source={CircleAlertMajor} /></Box>
+                <Tooltip content="The total number of 429 (Too Many Requests) responses received during testing. High numbers may indicate rate limiting by the target server or infrastructure." hasUnderline={false}>
+                  <Text color="subdued" fontWeight="medium" variant="bodyMd" style={{ cursor: 'pointer' }}>API request stats:</Text>
+                </Tooltip>
+                {(() => {
+                  const totalRequests = currentSummary?.testResultsCount || 0;
+                  const percentage = totalRequests > 0 ? (testResultsStatsCount / totalRequests) * 100 : 0;
+                  
+                  if (percentage > 70) {
+                    return <div className="api-stats-badge api-stats-critical">{testResultsStatsCount} requests returned 429</div>;
+                  } else if (percentage >= 40) {
+                    return <div className="api-stats-badge api-stats-warning">{testResultsStatsCount} requests returned 429</div>;
+                  } else {
+                    return <div className="api-stats-badge api-stats-success">{testResultsStatsCount} requests returned 429</div>;
+                  }
+                })()}
+              </HorizontalStack>
+            </>
+          )}
         </HorizontalStack>
       </VerticalStack>
     </Box>
