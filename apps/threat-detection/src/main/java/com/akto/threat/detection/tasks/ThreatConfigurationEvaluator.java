@@ -12,6 +12,7 @@ import com.akto.dto.OriginalHttpResponse;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ActorId;
+import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.RatelimitConfig.RatelimitConfigItem;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatConfiguration;
 import com.akto.testing.ApiExecutor;
 import com.akto.threat.detection.actor.SourceIPActorGenerator;
@@ -24,10 +25,16 @@ public class ThreatConfigurationEvaluator {
     private ThreatConfiguration threatConfiguration;
     private int threatConfigurationUpdateIntervalSec = 15 * 60; // 15 minutes
     private int threatConfigLastUpdatedAt = 0;
+    
 
     public enum ThreatActorIdType {
         IP,
         HEADER
+    }
+
+    public enum RatelimitConfigType {
+        DEFAULT, // Global ratelimit rule for all requests, only one allowed
+        CUSTOM
     }
 
     public enum ThreatActorRuleKind {
@@ -129,5 +136,18 @@ public class ThreatConfigurationEvaluator {
             }
         }
         return actor;
+    }
+
+    public RatelimitConfigItem getRatelimitConfig(HttpResponseParams responseParam) {
+        getThreatConfiguration();
+        if (threatConfiguration == null) {
+            return null;
+        }
+        for (RatelimitConfigItem rule : threatConfiguration.getRatelimitConfig().getRulesList()) {
+            if (rule.getType().equals(RatelimitConfigType.DEFAULT.name())) {
+                return rule;
+            }
+        }
+        return null;
     }
 }

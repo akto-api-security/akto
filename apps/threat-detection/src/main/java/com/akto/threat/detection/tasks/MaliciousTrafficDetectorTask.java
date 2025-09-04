@@ -43,6 +43,7 @@ import com.akto.proto.generated.threat_detection.message.malicious_event.v1.Mali
 import com.akto.proto.generated.threat_detection.message.malicious_event.v1.MaliciousEventMessage;
 import com.akto.proto.generated.threat_detection.message.sample_request.v1.SampleMaliciousRequest;
 import com.akto.proto.generated.threat_detection.message.sample_request.v1.SchemaConformanceError;
+import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.RatelimitConfig.RatelimitConfigItem;
 import com.akto.proto.http_response_param.v1.HttpResponseParam;
 import com.akto.proto.http_response_param.v1.StringList;
 import com.akto.rules.TestPlugin;
@@ -268,6 +269,14 @@ public class MaliciousTrafficDetectorTask implements Task {
       String ipApiCmsKey = Utils.buildIpApiCmsDataKey(actor, apiCollectionIdStr, url, method.toString());
       long curEpochMin = responseParam.getTime()/60;
       this.distributionCalculator.updateFrequencyBuckets(distributionKey, curEpochMin, ipApiCmsKey);
+
+      if (this.threatConfigEvaluator.getRatelimitConfig(responseParam) != null) {
+        RatelimitConfigItem ratelimitConfig = this.threatConfigEvaluator.getRatelimitConfig(responseParam);
+        long count = this.distributionCalculator.getSlidingWindowCount(ipApiCmsKey, curEpochMin, ratelimitConfig.getPeriod());
+        if (count >= ratelimitConfig.getMaxRequests()) {
+          logger.debugAndAddToDb("Ratelimit hit for url " + apiInfoKey.getUrl() + " actor " + actor + " ratelimitConfig " + ratelimitConfig.toString());
+        }
+      }
     }
 
     List<SchemaConformanceError> errors = null; 

@@ -12,6 +12,7 @@ import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.Li
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ListThreatActorsRequest;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ModifyThreatActorStatusRequest;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ModifyThreatActorStatusResponse;
+import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.RatelimitConfig;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatConfiguration;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.Actor;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ActorId;
@@ -59,6 +60,7 @@ public class ThreatActorService {
         .getCollection(MongoDBCollection.ThreatDetection.THREAT_CONFIGURATION, Document.class);
     Document doc = coll.find().first();
     if (doc != null) {
+        // Handle actor configuration
         Object actorIdObj = doc.get("actor");
         if (actorIdObj instanceof List) {
             List<?> actorIdList = (List<?>) actorIdObj;
@@ -76,6 +78,40 @@ public class ThreatActorService {
             }
             builder.setActor(actorBuilder);
         }
+        
+        // Handle ratelimit configuration
+        Object ratelimitObj = doc.get("ratelimitConfig");
+        if (ratelimitObj instanceof Document) {
+            Document ratelimitDoc = (Document) ratelimitObj;
+            Object rulesObj = ratelimitDoc.get("rules");
+            if (rulesObj instanceof List) {
+                List<?> rulesList = (List<?>) rulesObj;
+                RatelimitConfig.Builder ratelimitBuilder = RatelimitConfig.newBuilder();
+                for (Object ruleObj : rulesList) {
+                    if (ruleObj instanceof Document) {
+                        Document ruleDoc = (Document) ruleObj;
+                        RatelimitConfig.RatelimitConfigItem.Builder itemBuilder = 
+                            RatelimitConfig.RatelimitConfigItem.newBuilder();
+                        
+                        if (ruleDoc.getString("name") != null) 
+                            itemBuilder.setName(ruleDoc.getString("name"));
+                        if (ruleDoc.getInteger("period") != null) 
+                            itemBuilder.setPeriod(ruleDoc.getInteger("period"));
+                        if (ruleDoc.getInteger("maxRequests") != null) 
+                            itemBuilder.setMaxRequests(ruleDoc.getInteger("maxRequests"));
+                        if (ruleDoc.getInteger("mitigationPeriod") != null) 
+                            itemBuilder.setMitigationPeriod(ruleDoc.getInteger("mitigationPeriod"));
+                        if (ruleDoc.getString("action") != null) 
+                            itemBuilder.setAction(ruleDoc.getString("action"));
+                        if (ruleDoc.getString("type") != null) 
+                            itemBuilder.setType(ruleDoc.getString("type"));
+                        
+                        ratelimitBuilder.addRules(itemBuilder);
+                    }
+                }
+                builder.setRatelimitConfig(ratelimitBuilder);
+            }
+        }
     }
     return builder.build();
 }
@@ -87,9 +123,11 @@ public class ThreatActorService {
             .getDatabase(accountId)
             .getCollection(MongoDBCollection.ThreatDetection.THREAT_CONFIGURATION, Document.class);
 
+    Document newDoc = new Document();
+    
     // Prepare a list of actorId documents
-    List<Document> actorIdDocs = new ArrayList<>();
     if (updatedConfig.hasActor()) {
+        List<Document> actorIdDocs = new ArrayList<>();
         Actor actor = updatedConfig.getActor();
         for (ActorId actorId : actor.getActorIdList()) {
             Document actorIdDoc = new Document();
@@ -99,8 +137,26 @@ public class ThreatActorService {
             if (!actorId.getPattern().isEmpty()) actorIdDoc.append("pattern", actorId.getPattern());
             actorIdDocs.add(actorIdDoc);
         }
+        newDoc.append("actor", actorIdDocs);
     }
-    Document newDoc = new Document("actor", actorIdDocs);
+    
+    // Prepare rate limit config documents
+    if (updatedConfig.hasRatelimitConfig()) {
+        List<Document> ratelimitDocs = new ArrayList<>();
+        RatelimitConfig ratelimitConfig = updatedConfig.getRatelimitConfig();
+        for (RatelimitConfig.RatelimitConfigItem item : ratelimitConfig.getRulesList()) {
+            Document ratelimitDoc = new Document();
+            if (!item.getName().isEmpty()) ratelimitDoc.append("name", item.getName());
+            if (item.getPeriod() > 0) ratelimitDoc.append("period", item.getPeriod());
+            if (item.getMaxRequests() > 0) ratelimitDoc.append("maxRequests", item.getMaxRequests());
+            if (item.getMitigationPeriod() > 0) ratelimitDoc.append("mitigationPeriod", item.getMitigationPeriod());
+            if (!item.getAction().isEmpty()) ratelimitDoc.append("action", item.getAction());
+            if (!item.getType().isEmpty()) ratelimitDoc.append("type", item.getType());
+            ratelimitDocs.add(ratelimitDoc);
+        }
+        newDoc.append("ratelimitConfig", new Document("rules", ratelimitDocs));
+    }
+    
     Document existingDoc = coll.find().first();
 
     if (existingDoc != null) {
@@ -110,9 +166,12 @@ public class ThreatActorService {
         coll.insertOne(newDoc);
     }
 
-    // Set the actor in the returned proto
+    // Set the actor and ratelimitConfig in the returned proto
     if (updatedConfig.hasActor()) {
         builder.setActor(updatedConfig.getActor());
+    }
+    if (updatedConfig.hasRatelimitConfig()) {
+        builder.setRatelimitConfig(updatedConfig.getRatelimitConfig());
     }
     return builder.build();
 }
