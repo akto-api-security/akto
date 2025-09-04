@@ -210,7 +210,7 @@ function HomeDashboard() {
                         // Split the URL string by space to get url and method
                         const parts = urlString.split(' ');
                         const url = parts[0];
-                        const method = parts[1] || 'GET'; // Default to GET if method not provided
+                        const method = parts[1];
 
                         // Create a promise for each URL/method combination
                         promises.push(
