@@ -231,7 +231,6 @@ function SingleTestRunPage() {
           testingRunResultSummaryHexId: testingRunResultSummaryHexId
         });
         setTestResultsStatsCount(response || 0);
-        console.log(response);
       } else {
         setTestResultsStatsCount(0);
       }
