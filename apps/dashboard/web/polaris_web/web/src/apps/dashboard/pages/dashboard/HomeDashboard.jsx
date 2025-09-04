@@ -216,14 +216,12 @@ function HomeDashboard() {
                         promises.push(
                             observeApi.fetchApiCallStats(collection.id, url, method, startTs, endTs)
                                 .catch(err => {
-                                    console.error(`Error fetching stats for collection ${collection.id}, url: ${url}, method: ${method}:`, err);
                                     return null;
                                 })
                         );
                     });
                 } else {
                     // Skip collections without urls array or with empty urls array
-                    console.warn(`Collection ${collection.id} has no URLs to fetch stats for.`);
                 }
             });
 
@@ -248,7 +246,6 @@ function HomeDashboard() {
 
             setMcpApiCallStats(chartData);
         } catch (error) {
-            console.error('Error fetching MCP API call stats:', error);
             setMcpApiCallStats([]);
         }
     };
