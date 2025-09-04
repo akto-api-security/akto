@@ -85,6 +85,7 @@ function HomeDashboard() {
     const [showTestingComponents, setShowTestingComponents] = useState(false)
     const [customRiskScoreAvg, setCustomRiskScoreAvg] = useState(0)
     const [mcpTotals, setMcpTotals] = useState({ mcpTotalApis: null, thirdPartyApis: null, newApis7Days: null, openAlerts: null, criticalApis: null })
+    const [mcpApiCallStats, setMcpApiCallStats] = useState([])
 
     const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), values.ranges[2]);
 
@@ -164,6 +165,74 @@ function HomeDashboard() {
         });
     }
 
+    const fetchMcpApiCallStats = async () => {
+        try {
+            // Get MCP collections by checking for MCP tag
+            const mcpCollections = allCollections.filter(collection => {
+                return collection.envType && collection.envType.some(envType =>
+                    envType.keyName === 'mcp-server' && envType.value === 'MCP Server'
+                );
+            });
+
+            if (mcpCollections.length === 0) {
+                setMcpApiCallStats([]);
+                return;
+            }
+
+            // Fetch API call stats for each MCP collection and their URLs
+            const promises = [];
+            mcpCollections.forEach(collection => {
+                // Check if the collection has urls array and it's not empty
+                if (collection.urls && Array.isArray(collection.urls) && collection.urls.length > 0) {
+                    collection.urls.forEach(urlString => {
+                        // Split the URL string by space to get url and method
+                        const parts = urlString.split(' ');
+                        const url = parts[0];
+                        const method = parts[1] || 'GET'; // Default to GET if method not provided
+
+                        // Create a promise for each URL/method combination
+                        promises.push(
+                            observeApi.fetchApiCallStats(collection.id, url, method, startTimestamp, endTimestamp)
+                                .catch(err => {
+                                    console.error(`Error fetching stats for collection ${collection.id}, url: ${url}, method: ${method}:`, err);
+                                    return null;
+                                })
+                        );
+                    });
+                } else {
+                    // Skip collections without urls array or with empty urls array
+                    console.log(`Skipping collection ${collection.id}: No URLs found`);
+                }
+            });
+
+            const results = await Promise.all(promises);
+
+            // Aggregate the results
+            const aggregatedStats = {};
+            results.forEach(result => {
+                if (result && result.result && result.result.apiCallStats) {
+                    result.result.apiCallStats.forEach(stat => {
+                        const ts = stat.ts * 60 * 1000; // Convert to milliseconds
+                        if (!aggregatedStats[ts]) {
+                            aggregatedStats[ts] = 0;
+                        }
+                        aggregatedStats[ts] += stat.count;
+                    });
+                }
+            });
+
+            // Convert to array format for chart
+            const chartData = Object.entries(aggregatedStats)
+                .map(([ts, count]) => [parseInt(ts), count])
+                .sort((a, b) => a[0] - b[0]);
+
+            setMcpApiCallStats(chartData);
+        } catch (error) {
+            console.error('Error fetching MCP API call stats:', error);
+            setMcpApiCallStats([]);
+        }
+    };
+
     const fetchData = async () => {
         setLoading(true)
         // all apis
@@ -181,7 +250,8 @@ function HomeDashboard() {
             api.fetchMcpdata('CRITICAL_APIS'),
             api.fetchMcpdata('TOOLS'),
             api.fetchMcpdata('PROMPTS'),
-            api.fetchMcpdata('RESOURCES')
+            api.fetchMcpdata('RESOURCES'),
+            api.fetchMcpdata('MCP_SERVER')
         ];
 
         let results = await Promise.allSettled(apiPromises);
@@ -200,6 +270,7 @@ function HomeDashboard() {
         let mcpTools = results[11]?.status === 'fulfilled' ? (results[11].value?.mcpDataCount ?? null) : null
         let mcpPrompts = results[12]?.status === 'fulfilled' ? (results[12].value?.mcpDataCount ?? null) : null
         let mcpResources = results[13]?.status === 'fulfilled' ? (results[13].value?.mcpDataCount ?? null) : null
+        let mcpServer = results[14]?.status === 'fulfilled' ? (results[14].value?.mcpDataCount ?? null) : null
         const totalRedundantApis = missingApiInfoData?.redundantApiInfoKeys || 0
         const totalMissingApis = missingApiInfoData?.totalMissing|| 0
 
@@ -222,8 +293,8 @@ function HomeDashboard() {
 
         buildEndpointsCount(fetchEndpointsCountResp)
 
-        setMcpTotals({ mcpTotalApis: mcpTotalApis, thirdPartyApis: mcpThirdParty, newApis7Days: mcpNew7Days, openAlerts: mcpOpenAlerts, criticalApis: mcpCriticalApis, tools: mcpTools, prompts: mcpPrompts, resources: mcpResources })
-
+        setMcpTotals({ mcpTotalApis: mcpTotalApis, thirdPartyApis: mcpThirdParty, newApis7Days: mcpNew7Days, openAlerts: mcpOpenAlerts, criticalApis: mcpCriticalApis, tools: mcpTools, prompts: mcpPrompts, resources: mcpResources, server: mcpServer })
+        fetchMcpApiCallStats();
         setLoading(false)
     }
 
@@ -799,11 +870,12 @@ function HomeDashboard() {
         />
     )
 
-    const hasTypesData = 
-        mcpTotals.tools != null || 
-        mcpTotals.prompts != null || 
-        mcpTotals.resources != null;
-        
+    const hasTypesData =
+        mcpTotals.tools != null ||
+        mcpTotals.prompts != null ||
+        mcpTotals.resources != null||
+        mcpTotals.server != null;
+
     const mcpTypesTableCard = (
         hasTypesData ?
         <InfoCard
@@ -815,7 +887,8 @@ function HomeDashboard() {
                         rows={[
                             ['Tools', mcpTotals.tools ?? '-'],
                             ['Prompts', mcpTotals.prompts ?? '-'],
-                            ['Resources', mcpTotals.resources ?? '-']
+                            ['Resources', mcpTotals.resources ?? '-'],
+                            ['MCP Server', mcpTotals.server ?? '-']
                         ]}
                         increasedTableDensity
                         hoverable={false}
@@ -829,8 +902,8 @@ function HomeDashboard() {
         /> : <EmptyCard title="Types" subTitleComponent={<Text alignment='center' color='subdued'>No MCP entity types to display</Text>} />
     )
  
-    const mcpApiRequestsSeries = []
-    const hasRequestsData = Array.isArray(mcpApiRequestsSeries) && mcpApiRequestsSeries.some(p => p && p[1] > 0)
+    const mcpApiRequestsSeries = mcpApiCallStats
+    const hasRequestsData = Array.isArray(mcpApiRequestsSeries) && mcpApiRequestsSeries.length > 0 && mcpApiRequestsSeries.some(p => p && p[1] > 0)
     const mcpApiRequestsCard = (
         hasRequestsData ?
         <InfoCard
@@ -849,7 +922,7 @@ function HomeDashboard() {
                 />
             }
             title={'MCP API Requests'}
-            titleToolTip={'Sample request volume trend'}
+            titleToolTip={'API request volume trend for MCP collections over time'}
             linkText={''}
             linkUrl={''}
         /> : <EmptyCard title="MCP API Requests" subTitleComponent={<Text alignment='center' color='subdued'>No MCP API requests in the selected period</Text>} />
