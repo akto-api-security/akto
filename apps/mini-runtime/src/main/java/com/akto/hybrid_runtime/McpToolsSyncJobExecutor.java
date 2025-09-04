@@ -61,6 +61,8 @@ public class McpToolsSyncJobExecutor {
         "{\"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"" + McpSchema.METHOD_TOOLS_LIST + "\", \"params\": {}}";
     private static final String MCP_RESOURCE_LIST_REQUEST_JSON =
         "{\"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"" + McpSchema.METHOD_RESOURCES_LIST + "\", \"params\": {}}";
+    private static final String MCP_PROMPTS_LIST_REQUEST_JSON =
+            "{\"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"" + McpSchema.METHOD_PROMPT_LIST + "\", \"params\": {}}";
     private static final String LOCAL_IP = "127.0.0.1";
     private ServerCapabilities mcpServerCapabilities = null;
 
@@ -105,10 +107,12 @@ public class McpToolsSyncJobExecutor {
                     normalizedSampleDataSet);
                 List<HttpResponseParams> resourcesResponseList = handleMcpResourceDiscovery(apiCollection,
                     normalizedSampleDataSet);
+                List<HttpResponseParams> promptsResponseList = handleMcpPromptsDiscovery(apiCollection, normalizedSampleDataSet);
                 List<HttpResponseParams> responseParamsToProcess = new ArrayList<>();
                 responseParamsToProcess.addAll(initResponseList);
                 responseParamsToProcess.addAll(toolsResponseList);
                 responseParamsToProcess.addAll(resourcesResponseList);
+                responseParamsToProcess.addAll(promptsResponseList);
                 processResponseParams(apiConfig, responseParamsToProcess);
             } catch (Exception e) {
                 logger.error("Error while running MCP sync job for apiCollectionId: {} and hostname: {}",
@@ -268,6 +272,65 @@ public class McpToolsSyncJobExecutor {
             }
         } catch (Exception e) {
             logger.error("Error while discovering mcp resources for hostname: {}", host, e);
+        }
+        return responseParamsList;
+    }
+
+    private List<HttpResponseParams> handleMcpPromptsDiscovery(ApiCollection apiCollection,
+                                                                Set<String> normalizedSampleDataSet) {
+        String host = apiCollection.getHostName();
+
+        List<HttpResponseParams> responseParamsList = new ArrayList<>();
+        try {
+            if (mcpServerCapabilities != null && mcpServerCapabilities.getResources() == null) {
+                logger.debug("Skipping resources discovery as MCP server capabilities do not support resources.");
+                return responseParamsList;
+            }
+            Pair<JSONRPCResponse, HttpResponseParams> resourcesListResponsePair = getMcpMethodResponse(
+                    host, McpSchema.METHOD_PROMPT_LIST, MCP_PROMPTS_LIST_REQUEST_JSON, apiCollection);
+
+            if (resourcesListResponsePair.getSecond() != null && !normalizedSampleDataSet.contains(
+                    McpSchema.METHOD_PROMPT_LIST)) {
+                responseParamsList.add(resourcesListResponsePair.getSecond());
+            }
+            logger.debug("Received prompts/list response. Processing resources.....");
+
+            ListResourcesResult resourcesResult = JSONUtils.fromJson(resourcesListResponsePair.getFirst().getResult(),
+                    ListResourcesResult.class);
+
+            if (resourcesResult != null && !CollectionUtils.isEmpty(resourcesResult.getResources())) {
+                int id = 2;
+                String urlWithQueryParams = resourcesListResponsePair.getSecond().getRequestParams().getURL();
+                String toolsCallRequestHeaders = buildHeaders(host);
+
+                for (Resource resource : resourcesResult.getResources()) {
+                    if (normalizedSampleDataSet.contains(McpSchema.METHOD_PROMPT_GET + "/" + resource.getUri())) {
+                        logger.debug("Skipping prompt {} as it is already present in the db.", resource.getUri());
+                        continue;
+                    }
+                    JSONRPCRequest request = new JSONRPCRequest(
+                            McpSchema.JSONRPC_VERSION,
+                            McpSchema.METHOD_PROMPT_GET,
+                            id++,
+                            new ReadResourceRequest(resource.getUri())
+                    );
+
+                    HttpResponseParams readResourceHttpResponseParams = convertToAktoFormat(apiCollection.getId(),
+                            urlWithQueryParams,
+                            toolsCallRequestHeaders,
+                            HttpMethod.POST.name(),
+                            mapper.writeValueAsString(request),
+                            new OriginalHttpResponse("", Collections.emptyMap(), HttpStatus.SC_OK));
+
+                    if (readResourceHttpResponseParams != null) {
+                        responseParamsList.add(readResourceHttpResponseParams);
+                    }
+                }
+            } else {
+                logger.debug("Skipping as List Prompt Result is null or Resources are empty");
+            }
+        } catch (Exception e) {
+            logger.error("Error while discovering mcp prompts for hostname: {}", host, e);
         }
         return responseParamsList;
     }
