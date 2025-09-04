@@ -297,36 +297,6 @@ public class TestResultsStatsAction extends UserAction {
         }
     }
 
-    public static void main(String[] args) {
-        try {
-            // Enable explain for testing
-            System.setProperty("mongodb.explain.aggregation", "true");
-            System.out.println("Starting index usage test...");
-            
-            System.out.println("Initializing MongoDB connection...");
-            DaoInit.init(new ConnectionString("mongodb://localhost:27017"));
-            Context.accountId.set(1_000_000);
-            System.out.println("MongoDB connection initialized successfully.");
-            
-            TestResultsStatsAction action = new TestResultsStatsAction();
-            action.setTestingRunResultSummaryHexId("68b3eebdcc9790a05f65271d");
-            action.setTestingRunHexId("68b0df99cc9790a05fa3e983");
-            
-            // First, list all indexes to see what's available
-            System.out.println("Listing all available indexes...");
-            action.listAllIndexes();
-            
-            System.out.println("Testing index usage for partial index on testingRunResults collection...");
-            String result = action.fetchTestResultsStatsCount();
-            System.out.println("Method result: " + result);
-            System.out.println("Count found: " + action.getCount());
-            
-        } catch (Exception e) {
-            System.err.println("Error during test execution: " + e.getMessage());
-            e.printStackTrace();
-        }
-    }
-
     // Standard getters and setters for Struts2 action parameter binding
     public String getTestingRunResultSummaryHexId() {
         return testingRunResultSummaryHexId;
