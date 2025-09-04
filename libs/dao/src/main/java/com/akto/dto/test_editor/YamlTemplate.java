@@ -26,6 +26,8 @@ public class YamlTemplate {
     public static final String SETTINGS = "attributes";
     private TemplateSettings attributes;
 
+    public static final String CATEGORY = "info.category.name";
+
     public YamlTemplate(String id, int createdAt, String author, int updatedAt, String content, Info info, TemplateSettings attributes) {
         this.id = id;
         this.createdAt = createdAt;

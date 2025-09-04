@@ -1,6 +1,8 @@
 package com.akto.dto.test_editor;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import com.akto.dto.testing.ComplianceMapping;
 
@@ -50,6 +52,18 @@ public class Info {
     }
 
     public Info() { }
+
+    public Map<String, Object> toCustomMap() {
+        Map<String, Object> map = new HashMap<>();
+        if (this.category != null) map.put("category", this.category);
+        if (this.description != null) map.put("description", this.description);
+        if (this.details != null) map.put("details", this.details);
+        if (this.impact != null) map.put("impact", this.impact);
+        if (this.name != null) map.put("name", this.name);
+        if (this.severity != null) map.put("severity", this.severity);
+        if (this.subCategory != null) map.put("subCategory", this.subCategory);
+        return map;
+    }
 
     public String getName() {
         return name;

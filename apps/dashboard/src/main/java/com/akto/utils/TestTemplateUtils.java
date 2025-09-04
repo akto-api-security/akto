@@ -1,17 +1,19 @@
 package com.akto.utils;
 
+import com.akto.dao.test_editor.YamlTemplateDao;
+import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.log.LoggerMaker;
 import com.akto.util.DashboardMode;
 import com.akto.util.enums.GlobalEnums;
 import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 import com.akto.util.enums.GlobalEnums.TestCategory;
+import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Projections;
 
 import static com.akto.listener.InitializerListener.loadTemplateFilesFromDirectory;
 
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
+import java.util.stream.Collectors;
 
 public class TestTemplateUtils {
 
@@ -125,6 +127,20 @@ public class TestTemplateUtils {
                     .filter(category -> !Arrays.asList(mcpCategories).contains(category) && !Arrays.asList(llmCategories).contains(category))
                     .toArray(TestCategory[]::new);
         }
+    }
+
+    public static List<YamlTemplate> getAllTestTemplatesWithinContext(CONTEXT_SOURCE contextSource) {
+        TestCategory[] allTestCategoriesWithinContext = getAllTestCategoriesWithinContext(contextSource);
+        List<String> categoryNames = Arrays.stream(allTestCategoriesWithinContext)
+                .map(TestCategory::getName)
+                .collect(Collectors.toList());
+
+        List<YamlTemplate> yamlTemplateList = YamlTemplateDao.instance.findAll(
+                Filters.in(YamlTemplate.CATEGORY, categoryNames),
+                Projections.include("info")
+        );
+
+        return yamlTemplateList;
     }
 
 }

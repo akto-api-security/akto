@@ -17,6 +17,7 @@ import com.akto.dto.billing.FeatureAccess;
 import com.akto.dto.monitoring.ModuleInfo;
 import com.akto.dto.notifications.SlackWebhook;
 import com.akto.dto.test_editor.Info;
+import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.testing.*;
@@ -39,8 +40,10 @@ import com.akto.util.enums.GlobalEnums.TestErrorSource;
 import com.akto.utils.ApiInfoKeyResult;
 import com.akto.util.enums.GlobalEnums.TestRunIssueStatus;
 import com.akto.utils.DeleteTestRunUtils;
+import com.akto.utils.TestTemplateUtils;
 import com.akto.utils.Utils;
 import com.google.gson.Gson;
+import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.*;
@@ -1607,6 +1610,42 @@ public class StartTestAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
+    private String dashboardCategory;
+    private BasicDBList yamlTemplates;
+
+    public String fetchTemplatesByCategory() {
+        yamlTemplates = new BasicDBList();
+        List<YamlTemplate> yamlTemplatesList;
+        if(GlobalEnums.CONTEXT_SOURCE.API.name().equalsIgnoreCase(dashboardCategory)) {
+            yamlTemplatesList = TestTemplateUtils.getAllTestTemplatesWithinContext(GlobalEnums.CONTEXT_SOURCE.API);
+        } else if(GlobalEnums.CONTEXT_SOURCE.MCP.name().equalsIgnoreCase(dashboardCategory)) {
+            yamlTemplatesList = TestTemplateUtils.getAllTestTemplatesWithinContext(GlobalEnums.CONTEXT_SOURCE.MCP);
+        } else if(GlobalEnums.CONTEXT_SOURCE.GEN_AI.name().equalsIgnoreCase(dashboardCategory)) {
+            yamlTemplatesList = TestTemplateUtils.getAllTestTemplatesWithinContext(GlobalEnums.CONTEXT_SOURCE.GEN_AI);
+        } else {
+            yamlTemplatesList = new ArrayList<>();
+        }
+
+        for (YamlTemplate template : yamlTemplatesList) {
+            if (template.getInfo() != null) {
+                BasicDBObject infoObj = new BasicDBObject();
+
+                Map<String, Object> infoMap = template.getInfo().toCustomMap();
+                infoMap.put("_id", template.getId());
+
+                infoMap.forEach((key, value) -> {
+                    if (value != null) {
+                        infoObj.put(key, value);
+                    }
+                });
+
+                yamlTemplates.add(infoObj);
+            }
+        }
+
+        return SUCCESS.toUpperCase();
+    }
+
 
     public void setType(TestingEndpoints.Type type) {
         this.type = type;
@@ -2030,5 +2069,13 @@ public class StartTestAction extends UserAction {
     public void setSelectedSlackWebhook(int selectedSlackWebhook) {
         this.selectedSlackWebhook = selectedSlackWebhook;
 
+    }
+
+    public void setDashboardCategory(String dashboardCategory) {
+        this.dashboardCategory = dashboardCategory;
+    }
+
+    public BasicDBList getYamlTemplates() {
+        return yamlTemplates;
     }
 }
