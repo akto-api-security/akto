@@ -2,9 +2,11 @@ package com.akto.runtime;
 
 
 import com.akto.dao.ApiCollectionsDao;
+import com.akto.dao.McpAuditInfoDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.APIConfig;
 import com.akto.dto.ApiCollection;
+import com.akto.dto.McpAuditInfo;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.HttpResponseParams.Source;
 import com.akto.dto.OriginalHttpRequest;
@@ -21,8 +23,11 @@ import com.akto.mcp.McpSchema.InitializeResult;
 import com.akto.mcp.McpSchema.JSONRPCRequest;
 import com.akto.mcp.McpSchema.JSONRPCResponse;
 import com.akto.mcp.McpSchema.JsonSchema;
+import com.akto.mcp.McpSchema.GetPromptRequest;
+import com.akto.mcp.McpSchema.ListPromptsResult;
 import com.akto.mcp.McpSchema.ListResourcesResult;
 import com.akto.mcp.McpSchema.ListToolsResult;
+import com.akto.mcp.McpSchema.Prompt;
 import com.akto.mcp.McpSchema.ReadResourceRequest;
 import com.akto.mcp.McpSchema.Resource;
 import com.akto.mcp.McpSchema.ServerCapabilities;
@@ -60,6 +65,8 @@ public class McpToolsSyncJobExecutor {
         "{\"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"" + McpSchema.METHOD_TOOLS_LIST + "\", \"params\": {}}";
     private static final String MCP_RESOURCE_LIST_REQUEST_JSON =
         "{\"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"" + McpSchema.METHOD_RESOURCES_LIST + "\", \"params\": {}}";
+    private static final String MCP_PROMPTS_LIST_REQUEST_JSON =
+        "{\"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"" + McpSchema.METHOD_PROMPT_LIST + "\", \"params\": {}}";
     private static final String LOCAL_IP = "127.0.0.1";
     private ServerCapabilities mcpServerCapabilities = null;
 
@@ -110,10 +117,12 @@ public class McpToolsSyncJobExecutor {
         List<HttpResponseParams> initResponseList = initializeMcpServerCapabilities(apiCollection, authHeader);
         List<HttpResponseParams> toolsResponseList = handleMcpToolsDiscovery(apiCollection, authHeader);
         List<HttpResponseParams> resourcesResponseList = handleMcpResourceDiscovery(apiCollection, authHeader);
+        List<HttpResponseParams> promptsResponseList = handleMcpPromptsDiscovery(apiCollection, authHeader);
         processResponseParams(apiConfig, new ArrayList<HttpResponseParams>() {{
             addAll(initResponseList);
             addAll(toolsResponseList);
             addAll(resourcesResponseList);
+            addAll(promptsResponseList);
         }});
     }
 
@@ -258,6 +267,73 @@ public class McpToolsSyncJobExecutor {
             logger.error("Error while discovering mcp resources for hostname: {}", host, e);
         }
         return responseParamsList;
+    }
+
+    private List<HttpResponseParams> handleMcpPromptsDiscovery(ApiCollection apiCollection, String authHeader) {
+        String host = apiCollection.getHostName();
+
+        List<HttpResponseParams> responseParamsList = new ArrayList<>();
+        try {
+            if (mcpServerCapabilities != null && mcpServerCapabilities.getPrompts() == null) {
+                logger.debug("Skipping prompts discovery as MCP server capabilities do not support prompts.");
+                return responseParamsList;
+            }
+            Pair<JSONRPCResponse, HttpResponseParams> promptsListResponsePair = getMcpMethodResponse(
+                host, authHeader, McpSchema.METHOD_PROMPT_LIST, MCP_PROMPTS_LIST_REQUEST_JSON, apiCollection);
+
+            if (promptsListResponsePair.getSecond() != null) {
+                responseParamsList.add(promptsListResponsePair.getSecond());
+            }
+            logger.debug("Received prompts/list response. Processing prompts.....");
+
+            ListPromptsResult promptsResult = JSONUtils.fromJson(promptsListResponsePair.getFirst().getResult(),
+                ListPromptsResult.class);
+
+            if (promptsResult != null && !CollectionUtils.isEmpty(promptsResult.getPrompts())) {
+                int id = 2;
+                String urlWithQueryParams = promptsListResponsePair.getSecond().getRequestParams().getURL();
+                String promptsGetRequestHeaders = buildHeaders(host, authHeader);
+
+                for (Prompt prompt : promptsResult.getPrompts()) {
+                    JSONRPCRequest request = new JSONRPCRequest(
+                        McpSchema.JSONRPC_VERSION,
+                        McpSchema.METHOD_PROMPT_GET,
+                        id++,
+                        new GetPromptRequest(prompt.getName(), generateExampleArguments(prompt))
+                    );
+
+                    HttpResponseParams getPromptHttpResponseParams = convertToAktoFormat(apiCollection.getId(),
+                        urlWithQueryParams,
+                        promptsGetRequestHeaders,
+                        HttpMethod.POST.name(),
+                        mapper.writeValueAsString(request),
+                        new OriginalHttpResponse("", Collections.emptyMap(), HttpStatus.SC_OK));
+
+                    if (getPromptHttpResponseParams != null) {
+                        responseParamsList.add(getPromptHttpResponseParams);
+                    }
+                }
+
+            } else {
+                logger.debug("Skipping as List Prompts Result is null or Prompts are empty");
+            }
+        } catch (Exception e) {
+            logger.error("Error while discovering mcp prompts for hostname: {}", host, e);
+        }
+        return responseParamsList;
+    }
+    
+    private Map<String, Object> generateExampleArguments(Prompt prompt) {
+        if (prompt == null || CollectionUtils.isEmpty(prompt.getArguments())) {
+            return Collections.emptyMap();
+        }
+        Map<String, Object> args = new HashMap<>();
+        prompt.getArguments().forEach(arg -> {
+            if (arg.getRequired() != null && arg.getRequired()) {
+                args.put(arg.getName(), "example_" + arg.getName());
+            }
+        });
+        return args;
     }
 
     private void processResponseParams(APIConfig apiConfig, List<HttpResponseParams> responseParamsList) {

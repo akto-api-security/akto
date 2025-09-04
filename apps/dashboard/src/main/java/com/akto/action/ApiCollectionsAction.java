@@ -13,6 +13,7 @@ import org.bson.conversions.Bson;
 
 import com.akto.action.observe.Utils;
 import com.akto.dao.*;
+import com.akto.dao.McpAuditInfoDao;
 import com.akto.billing.UsageMetricUtils;
 import com.akto.dao.context.Context;
 import com.akto.dto.billing.FeatureAccess;
@@ -52,6 +53,7 @@ import com.opensymphony.xwork2.Action;
 
 import lombok.Setter;
 import static com.akto.util.Constants.AKTO_DISCOVERED_APIS_COLLECTION;
+import static com.akto.util.Constants.AKTO_MCP_SERVER_TAG;
 import com.akto.dto.billing.UningestedApiOverage;
 import com.akto.dto.type.URLMethods;
 
@@ -129,7 +131,9 @@ public class ApiCollectionsAction extends UserAction {
                 apiCollection.setUrlsCount(fallbackCount);
             }
 
-            apiCollection.setUrls(new HashSet<>());
+            if(!apiCollection.isMcpCollection()) {
+                apiCollection.setUrls((new HashSet<>()));
+            }
         }
         return apiCollections;
     }
@@ -212,7 +216,7 @@ public class ApiCollectionsAction extends UserAction {
         UsersCollectionsList.deleteContextCollectionsForUser(Context.accountId.get(), Context.contextSource.get());
         pipeLine.add(Aggregates.project(Projections.fields(
                 Projections.computed(ApiCollection.URLS_COUNT, new BasicDBObject("$size", new BasicDBObject("$ifNull", Arrays.asList("$urls", Collections.emptyList())))),
-                Projections.include(ApiCollection.ID, ApiCollection.NAME, ApiCollection.HOST_NAME, ApiCollection._TYPE, ApiCollection.TAGS_STRING, ApiCollection._DEACTIVATED,ApiCollection.START_TS, ApiCollection.AUTOMATED, ApiCollection.DESCRIPTION, ApiCollection.USER_ENV_TYPE, ApiCollection.IS_OUT_OF_TESTING_SCOPE)
+                Projections.include(ApiCollection.ID, ApiCollection.NAME, ApiCollection.HOST_NAME, ApiCollection._TYPE, ApiCollection.TAGS_STRING, ApiCollection._DEACTIVATED,ApiCollection.START_TS, ApiCollection.AUTOMATED, ApiCollection.DESCRIPTION, ApiCollection.USER_ENV_TYPE, ApiCollection.IS_OUT_OF_TESTING_SCOPE, ApiCollection._URLS)
         )));
 
         try {
