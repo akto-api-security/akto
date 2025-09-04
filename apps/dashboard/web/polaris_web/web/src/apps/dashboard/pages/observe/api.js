@@ -759,11 +759,12 @@ export default {
         })
     },
 
-    async getSeverityInfoForCollections(){
+    async getSensitiveInfoForCollections(type){
+        const data = (typeof type !== 'undefined' && type !== null) ? { type } : {}
         return await request({
-            url: '/api/getSeverityInfoForCollections',
+            url: '/api/getSensitiveInfoForCollections',
             method: 'post',
-            data:{},
+            data,
         })
     },
 

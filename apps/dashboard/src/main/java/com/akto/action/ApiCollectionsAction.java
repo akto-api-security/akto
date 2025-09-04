@@ -68,6 +68,7 @@ public class ApiCollectionsAction extends UserAction {
     int criticalEndpointsCount;
     int sensitiveUrlsInResponse;
     Map<Integer, List<String>> sensitiveSubtypesInCollection = new HashMap<>();
+    List<BasicDBObject> sensitiveSubtypesInUrl = new ArrayList<>();
     LastCronRunInfo timerInfo;
 
     Map<Integer,Map<String,Integer>> severityInfo = new HashMap<>();
@@ -89,6 +90,8 @@ public class ApiCollectionsAction extends UserAction {
     List<ApiInfo> shadowApisApiInfo = new ArrayList<>();
     @Getter
     int mcpDataCount;
+    @Setter
+    String type;
 
     public List<ApiInfoKey> getApiList() {
         return apiList;
@@ -1254,6 +1257,10 @@ public class ApiCollectionsAction extends UserAction {
 
     public Map<Integer, List<String>> getSensitiveSubtypesInCollection() {
         return sensitiveSubtypesInCollection;
+    }
+
+    public List<BasicDBObject> getSensitiveSubtypesInUrl() {
+        return sensitiveSubtypesInUrl;
     }
 
     public Map<Integer, Integer> getTestedEndpointsMaps() {
