@@ -58,4 +58,9 @@ public class Constants {
     public static final String AKTO_MCP_TOOLS_TAG = "mcp-tool";
     public static final String AKTO_MCP_RESOURCES_TAG = "mcp-resource";
     public static final String AKTO_MCP_PROMPTS_TAG = "mcp-prompt";
+    public static final String AKTO_MCP_TOOL = "TOOL";
+    public static final String AKTO_MCP_RESOURCE = "RESOURCE";
+    public static final String AKTO_MCP_PROMPT = "PROMPT";
+    public static final String AKTO_MCP_SERVER = "SERVER";
+
 }
