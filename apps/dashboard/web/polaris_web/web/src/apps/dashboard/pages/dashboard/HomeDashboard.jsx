@@ -29,6 +29,8 @@ import values from "@/util/values";
 import { ActionItemsContent } from './components/ActionItemsContent';
 import { fetchActionItemsData } from './components/actionItemsTransform';
 import { getDashboardCategory, isMCPSecurityCategory, mapLabel } from '../../../main/labelHelper';
+import GraphMetric from '../../components/GraphMetric';
+import Dropdown from '../../components/layouts/Dropdown';
 
 function HomeDashboard() {
 
@@ -86,6 +88,23 @@ function HomeDashboard() {
     const [customRiskScoreAvg, setCustomRiskScoreAvg] = useState(0)
     const [mcpTotals, setMcpTotals] = useState({ mcpTotalApis: null, thirdPartyApis: null, newApis7Days: null, openAlerts: null, criticalApis: null })
     const [mcpApiCallStats, setMcpApiCallStats] = useState([])
+    
+    // MCP API Requests time selector state
+    const statsOptions = [
+        {label: "15 minutes", value: 15*60},
+        {label: "30 minutes", value: 30*60},
+        {label: "1 hour", value: 60*60},
+        {label: "3 hours", value: 3*60*60},
+        {label: "6 hours", value: 6*60*60},
+        {label: "12 hours", value: 12*60*60},
+        {label: "1 day", value: 24*60*60},
+        {label: "7 days", value: 7*24*60*60},
+        {label: "1 month", value: 30*24*60*60},
+        {label: "2 months", value: 60*24*60*60},
+        {label: "1 year", value: 365*24*60*60},
+        {label: "All time", value: 10*365*24*60*60} // 10 years as a proxy for all time
+    ]
+    const [mcpStatsTimeRange, setMcpStatsTimeRange] = useState(func.timeNow() - statsOptions[6].value)
 
     const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), values.ranges[2]);
 
@@ -165,7 +184,7 @@ function HomeDashboard() {
         });
     }
 
-    const fetchMcpApiCallStats = async () => {
+    const fetchMcpApiCallStats = async (startTs, endTs) => {
         try {
             // Get MCP collections by checking for MCP tag
             const mcpCollections = allCollections.filter(collection => {
@@ -174,8 +193,11 @@ function HomeDashboard() {
                 );
             });
 
+
             if (mcpCollections.length === 0) {
-                setMcpApiCallStats([]);
+                // Generate empty data points for the time range
+                const emptyData = generateTimeSeriesWithGaps(startTs, endTs, {});
+                setMcpApiCallStats(emptyData);
                 return;
             }
 
@@ -192,7 +214,7 @@ function HomeDashboard() {
 
                         // Create a promise for each URL/method combination
                         promises.push(
-                            observeApi.fetchApiCallStats(collection.id, url, method, startTimestamp, endTimestamp)
+                            observeApi.fetchApiCallStats(collection.id, url, method, startTs, endTs)
                                 .catch(err => {
                                     console.error(`Error fetching stats for collection ${collection.id}, url: ${url}, method: ${method}:`, err);
                                     return null;
@@ -201,7 +223,7 @@ function HomeDashboard() {
                     });
                 } else {
                     // Skip collections without urls array or with empty urls array
-                    console.log(`Skipping collection ${collection.id}: No URLs found`);
+                    console.warn(`Collection ${collection.id} has no URLs to fetch stats for.`);
                 }
             });
 
@@ -221,16 +243,65 @@ function HomeDashboard() {
                 }
             });
 
-            // Convert to array format for chart
-            const chartData = Object.entries(aggregatedStats)
-                .map(([ts, count]) => [parseInt(ts), count])
-                .sort((a, b) => a[0] - b[0]);
+            // Generate complete time series with gaps filled as zeros
+            const chartData = generateTimeSeriesWithGaps(startTs, endTs, aggregatedStats);
 
             setMcpApiCallStats(chartData);
         } catch (error) {
             console.error('Error fetching MCP API call stats:', error);
             setMcpApiCallStats([]);
         }
+    };
+    
+    // Helper function to generate time series data with gaps filled as zeros
+    const generateTimeSeriesWithGaps = (startTs, endTs, dataMap) => {
+        const startMs = startTs * 1000;
+        const endMs = endTs * 1000;
+        const timeDiff = endMs - startMs;
+        
+        // Determine appropriate interval based on time range
+        let intervalMs;
+        if (timeDiff <= 60 * 60 * 1000) { // <= 1 hour: 1-minute intervals
+            intervalMs = 60 * 1000;
+        } else if (timeDiff <= 24 * 60 * 60 * 1000) { // <= 1 day: 5-minute intervals
+            intervalMs = 5 * 60 * 1000;
+        } else if (timeDiff <= 7 * 24 * 60 * 60 * 1000) { // <= 7 days: 1-hour intervals
+            intervalMs = 60 * 60 * 1000;
+        } else if (timeDiff <= 30 * 24 * 60 * 60 * 1000) { // <= 30 days: 6-hour intervals
+            intervalMs = 6 * 60 * 60 * 1000;
+        } else if (timeDiff <= 90 * 24 * 60 * 60 * 1000) { // <= 90 days: 1-day intervals
+            intervalMs = 24 * 60 * 60 * 1000;
+        } else { // > 90 days: 1-week intervals
+            intervalMs = 7 * 24 * 60 * 60 * 1000;
+        }
+        
+        // Generate complete time series
+        const completeData = [];
+        for (let ts = startMs; ts <= endMs; ts += intervalMs) {
+            // Find the closest data point within the interval
+            let value = 0;
+            for (let checkTs = ts; checkTs < ts + intervalMs && checkTs <= endMs; checkTs += 60000) {
+                if (dataMap[checkTs]) {
+                    value += dataMap[checkTs];
+                }
+            }
+            completeData.push([ts, value]);
+        }
+        
+        // If we have actual data points, merge them in for accuracy
+        Object.entries(dataMap).forEach(([ts, count]) => {
+            const timestamp = parseInt(ts);
+            if (timestamp >= startMs && timestamp <= endMs) {
+                // Find the nearest interval point
+                const intervalIndex = Math.floor((timestamp - startMs) / intervalMs);
+                if (intervalIndex >= 0 && intervalIndex < completeData.length) {
+                    // Update the value at this interval
+                    completeData[intervalIndex][1] = Math.max(completeData[intervalIndex][1], count);
+                }
+            }
+        });
+        
+        return completeData.sort((a, b) => a[0] - b[0]);
     };
 
     const fetchData = async () => {
@@ -294,13 +365,20 @@ function HomeDashboard() {
         buildEndpointsCount(fetchEndpointsCountResp)
 
         setMcpTotals({ mcpTotalApis: mcpTotalApis, thirdPartyApis: mcpThirdParty, newApis7Days: mcpNew7Days, openAlerts: mcpOpenAlerts, criticalApis: mcpCriticalApis, tools: mcpTools, prompts: mcpPrompts, resources: mcpResources, server: mcpServer })
-        fetchMcpApiCallStats();
+        fetchMcpApiCallStats(mcpStatsTimeRange, func.timeNow());
         setLoading(false)
     }
 
     useEffect(() => {
         fetchData()
     }, [startTimestamp, endTimestamp])
+    
+    // Fetch MCP API call stats when time range changes
+    useEffect(() => {
+        if (allCollections && allCollections.length > 0) {
+            fetchMcpApiCallStats(mcpStatsTimeRange, func.timeNow());
+        }
+    }, [mcpStatsTimeRange, allCollections])
 
     async function getActionItemsDataAndCount() {
         const data = await fetchActionItemsData();
@@ -904,28 +982,76 @@ function HomeDashboard() {
  
     const mcpApiRequestsSeries = mcpApiCallStats
     const hasRequestsData = Array.isArray(mcpApiRequestsSeries) && mcpApiRequestsSeries.length > 0 && mcpApiRequestsSeries.some(p => p && p[1] > 0)
+    const defaultMcpChartOptions = (enableLegends) => {
+        const options = {
+          plotOptions: {
+            series: {
+              events: {
+                legendItemClick: function () {
+                  return false;
+                },
+              },
+              marker: {
+                radius: 2,  // Smaller marker radius (default is usually 4)
+                states: {
+                  hover: {
+                    radius: 3  // Slightly larger on hover for better interaction
+                  }
+                }
+              }
+            },
+          },
+        };
+        if (enableLegends) {
+          options['legend'] = { layout: 'vertical', align: 'right', verticalAlign: 'middle' };
+        }
+        return options;
+    };
+    
     const mcpApiRequestsCard = (
-        hasRequestsData ?
         <InfoCard
             component={
-                <StackedChart
-                    type='spline'
-                    color='#658EE2'
-                    areaFillHex={'false'}
-                    height='280'
-                    data={[{ name: 'MCP API Requests', color: '#658EE2', data: mcpApiRequestsSeries }]}
-                    defaultChartOptions={{}}
-                    text={true}
-                    showGridLines={true}
-                    yAxisTitle={''}
-                    exportingDisabled={true}
-                />
+                <Box paddingBlockStart={'2'}>
+                    <HorizontalStack align="end">
+                        <Dropdown
+                            menuItems={statsOptions}
+                            initial={statsOptions[6].label}
+                            selected={(timeInSeconds) => {
+                                setMcpStatsTimeRange(func.timeNow() - timeInSeconds);
+                            }}
+                        />
+                    </HorizontalStack>
+                    {hasRequestsData ? (
+                        <GraphMetric
+                            key={`mcp-stats-${mcpStatsTimeRange}`}
+                            data={[{
+                                data: mcpApiRequestsSeries,
+                                color: '',
+                                name: 'MCP API Calls'
+                            }]}
+                            type='spline'
+                            color='#6200EA'
+                            areaFillHex='true'
+                            height='250'
+                            title=''
+                            subtitle=''
+                            defaultChartOptions={defaultMcpChartOptions(false)}
+                            backgroundColor='#ffffff'
+                            text='true'
+                            inputMetrics={[]}
+                        />
+                    ) : (
+                        <Box minHeight="250px" paddingBlockStart="8">
+                            <Text alignment='center' color='subdued'>No MCP API requests in the selected period</Text>
+                        </Box>
+                    )}
+                </Box>
             }
             title={'MCP API Requests'}
             titleToolTip={'API request volume trend for MCP collections over time'}
             linkText={''}
             linkUrl={''}
-        /> : <EmptyCard title="MCP API Requests" subTitleComponent={<Text alignment='center' color='subdued'>No MCP API requests in the selected period</Text>} />
+        />
     )
 
     const newDomainsComponent = <InfoCard
