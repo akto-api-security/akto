@@ -710,7 +710,7 @@ function HomeDashboard() {
     if (isMCPSecurityCategory()) {
         const totalRequestsItem = {
             title: 'Total requests',
-            data: '-',
+            data: mcpTotals.newApis7Days ?? '-',
             variant: 'heading2xl'
         }
 
@@ -924,7 +924,7 @@ function HomeDashboard() {
             component={
                 <HorizontalGrid columns={4} gap={6}>
                     <VerticalStack gap={1}>
-                        <Text color="subdued">Critical</Text>
+                        <Text color="subdued">Critical MCP APIs</Text>
                         <Text variant='headingMd'>{mcpTotals.criticalApis ?? '-'}</Text>
                     </VerticalStack>
                     <VerticalStack gap={1}>
@@ -948,8 +948,11 @@ function HomeDashboard() {
         />
     )
 
-        mcpTotals.resources != null ||
-        mcpTotals.server != null;
+    const hasTypesData = 
+        mcpTotals.tools != null || 
+        mcpTotals.prompts != null || 
+        mcpTotals.resources != null || 
+        mcpTotals.server != null
 
     const mcpTypesTableCard = (
         hasTypesData ?
