@@ -948,10 +948,7 @@ function HomeDashboard() {
         />
     )
 
-    const hasTypesData =
-        mcpTotals.tools != null ||
-        mcpTotals.prompts != null ||
-        mcpTotals.resources != null||
+        mcpTotals.resources != null ||
         mcpTotals.server != null;
 
     const mcpTypesTableCard = (
