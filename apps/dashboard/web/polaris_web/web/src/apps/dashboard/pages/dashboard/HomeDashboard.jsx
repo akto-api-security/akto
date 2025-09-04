@@ -313,7 +313,6 @@ function HomeDashboard() {
             api.getApiInfoForMissingData(0, endTimestamp),
             api.fetchMcpdata('TOTAL_APIS'),
             api.fetchMcpdata('THIRD_PARTY_APIS'),
-            api.fetchMcpdata('NEW_APIS_7_DAYS'),
             api.fetchMcpdata('OPEN_ALERTS'),
             api.fetchMcpdata('CRITICAL_APIS'),
             api.fetchMcpdata('TOOLS'),
@@ -332,13 +331,12 @@ function HomeDashboard() {
         let missingApiInfoData = results[5].status === 'fulfilled' ? results[5].value : {}
         let mcpTotalApis = results[6]?.status === 'fulfilled' ? (results[6].value?.mcpDataCount ?? null) : null
         let mcpThirdParty = results[7]?.status === 'fulfilled' ? (results[7].value?.mcpDataCount ?? null) : null
-        let mcpNew7Days = results[8]?.status === 'fulfilled' ? (results[8].value?.mcpDataCount ?? null) : null
-        let mcpOpenAlerts = results[9]?.status === 'fulfilled' ? (results[9].value?.mcpDataCount ?? null) : null
-        let mcpCriticalApis = results[10]?.status === 'fulfilled' ? (results[10].value?.mcpDataCount ?? null) : null
-        let mcpTools = results[11]?.status === 'fulfilled' ? (results[11].value?.mcpDataCount ?? null) : null
-        let mcpPrompts = results[12]?.status === 'fulfilled' ? (results[12].value?.mcpDataCount ?? null) : null
-        let mcpResources = results[13]?.status === 'fulfilled' ? (results[13].value?.mcpDataCount ?? null) : null
-        let mcpServer = results[14]?.status === 'fulfilled' ? (results[14].value?.mcpDataCount ?? null) : null
+        let mcpOpenAlerts = results[8]?.status === 'fulfilled' ? (results[8].value?.mcpDataCount ?? null) : null
+        let mcpCriticalApis = results[9]?.status === 'fulfilled' ? (results[9].value?.mcpDataCount ?? null) : null
+        let mcpTools = results[10]?.status === 'fulfilled' ? (results[10].value?.mcpDataCount ?? null) : null
+        let mcpPrompts = results[11]?.status === 'fulfilled' ? (results[11].value?.mcpDataCount ?? null) : null
+        let mcpResources = results[12]?.status === 'fulfilled' ? (results[12].value?.mcpDataCount ?? null) : null
+        let mcpServer = results[13]?.status === 'fulfilled' ? (results[13].value?.mcpDataCount ?? null) : null
         const totalRedundantApis = missingApiInfoData?.redundantApiInfoKeys || 0
         const totalMissingApis = missingApiInfoData?.totalMissing|| 0
 
@@ -361,7 +359,7 @@ function HomeDashboard() {
 
         buildEndpointsCount(fetchEndpointsCountResp)
 
-        setMcpTotals({ mcpTotalApis: mcpTotalApis, thirdPartyApis: mcpThirdParty, newApis7Days: mcpNew7Days, openAlerts: mcpOpenAlerts, criticalApis: mcpCriticalApis, tools: mcpTools, prompts: mcpPrompts, resources: mcpResources, server: mcpServer })
+        setMcpTotals({ mcpTotalApis: mcpTotalApis, thirdPartyApis: mcpThirdParty, newApis7Days: null, openAlerts: mcpOpenAlerts, criticalApis: mcpCriticalApis, tools: mcpTools, prompts: mcpPrompts, resources: mcpResources, server: mcpServer })
         fetchMcpApiCallStats(mcpStatsTimeRange, func.timeNow());
         setLoading(false)
     }
@@ -668,13 +666,6 @@ function HomeDashboard() {
 
     let summaryInfo = [
         {
-            title: mapLabel("Total APIs", getDashboardCategory()),
-            data: transform.formatNumberWithCommas(totalAPIs),
-            variant: 'heading2xl',
-            byLineComponent: observeFunc.generateByLineComponent((totalAPIs - oldTotalApis), func.timeDifference(startTimestamp, endTimestamp)),
-            smoothChartComponent: (<SmoothAreaChart tickPositions={[oldTotalApis, totalAPIs]} />)
-        },
-        {
             title: 'Issues',
             data: observeFunc.formatNumberWithCommas(totalIssuesCount),
             variant: 'heading2xl',
@@ -701,20 +692,31 @@ function HomeDashboard() {
             smoothChartComponent: (<SmoothAreaChart tickPositions={[oldTestCoverage, testCoverage]} />)
         }
     ]
+    // only show total apis for non-MCP security category
+    if (!isMCPSecurityCategory()) {
+        summaryInfo.unshift({
+            title: mapLabel("Total APIs", getDashboardCategory()),
+            data: transform.formatNumberWithCommas(totalAPIs),
+            variant: 'heading2xl',
+            byLineComponent: observeFunc.generateByLineComponent((totalAPIs - oldTotalApis), func.timeDifference(startTimestamp, endTimestamp)),
+            smoothChartComponent: (<SmoothAreaChart tickPositions={[oldTotalApis, totalAPIs]} />)
+        })
+    }
 
-    // MCP-only summary items (dont have the backend for this yet)
+    // MCP-only summary items
 
     if (isMCPSecurityCategory()) {
         const totalRequestsItem = {
-            title: 'Total requests',
-            data: mcpTotals.newApis7Days ?? '-',
+            title: 'Total MCP Requests',
+            data: mcpTotals.mcpTotalApis ?? '-',
             variant: 'heading2xl'
         }
 
         const openAlertsItem = {
             title: 'Open Alerts',
             data: mcpTotals.openAlerts ?? '-',
-            variant: 'heading2xl'
+            variant: 'heading2xl',
+            color: 'critical'
         }
 
         summaryInfo.unshift(totalRequestsItem)
