@@ -17,10 +17,9 @@ export const formatActorId = (actorId) => {
       </Text>
     );
   } else {
-    const truncated = actorId.length > 20 ? `${actorId.slice(0, 20)}...` : actorId;
     return (
       <Text variant="bodyMd" fontWeight="medium">
-        Non IP Value({truncated})
+        Non IP Value
       </Text>
     );
   }
