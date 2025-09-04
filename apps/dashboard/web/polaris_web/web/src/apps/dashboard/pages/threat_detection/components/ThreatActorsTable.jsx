@@ -9,10 +9,11 @@ import observeFunc from "../../observe/transform";
 import Store from "../../../store";
 import dayjs from "dayjs";
 import { flags } from "./flags/index.mjs";
-import { Tooltip, Text } from "@shopify/polaris";
+import { Tooltip } from "@shopify/polaris";
 import { useSearchParams } from "react-router-dom";
 import { isMCPSecurityCategory } from "../../../../main/labelHelper";
 import { labelMap } from "../../../../main/labelHelperMap";
+import { formatActorId } from "../utils/formatUtils";
 
 const resourceName = {
   singular: "actor",
@@ -163,12 +164,8 @@ function ThreatActorTable({ data, currDateRange, handleRowClick }) {
         
         const baseData = {
           ...x,
-          actor: x.id ? (
-            <Text variant="bodyMd" fontWeight="medium">
-              {x.id?.length > 50 ? `${x.id.slice(0, 50)}...` : x.id}
-            </Text>
-          ) : "-",
-          latestIp: x.latestApiIp || "-",
+          actor: formatActorId(x.id),
+          latestIp: formatActorId(x.latestApiIp),
           discoveredAt: x.discoveredAt ? dayjs(x.discoveredAt*1000).format('YYYY-MM-DD, HH:mm:ss A') : "-",
           sensitiveData: sensitiveData && sensitiveData.length > 0 ? observeFunc.prettifySubtypes(sensitiveData, false) : "-",
           latestAttack: x.latestAttack || "-",
