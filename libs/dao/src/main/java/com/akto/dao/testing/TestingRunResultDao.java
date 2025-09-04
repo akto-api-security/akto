@@ -234,7 +234,7 @@ public class TestingRunResultDao extends AccountsContextDaoWithRbac<TestingRunRe
         MCollection.createIndexIfAbsent(getDBName(), getCollName(),
                 new String[] { TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, TestingRunResult.VULNERABLE, Constants.ID }, false);
 
-    // Add partial index for testRunResultSummaryId, vulnerable, endTimestamp with partialFilterExpression on testResults.message
+        // Add partial index for testRunResultSummaryId, vulnerable, endTimestamp with partialFilterExpression on testResults.message
         Bson partialIndex = Indexes.compoundIndex(
         Indexes.ascending("testRunResultSummaryId"),
         Indexes.ascending("vulnerable"), 

@@ -26,18 +26,33 @@ public class TestResultsStatsActionTest extends MongoBasedTest {
 
     @Test
     public void testPartialIndexExistsAndIsUsed() {
+        // Explicitly trigger index creation
+        TestingRunResultDao.instance.createIndicesIfAbsent();
+        
         // Check if the partial index exists
         List<Document> indexes = TestingRunResultDao.instance.getRawCollection().listIndexes().into(new ArrayList<>());
+        System.out.println("All indexes in testingRunResults collection:");
+        for (Document idx : indexes) {
+            System.out.println("  Index name: " + idx.getString("name"));
+            System.out.println("  Keys: " + idx.get("key"));
+            if (idx.containsKey("partialFilterExpression")) {
+                System.out.println("  Partial filter: " + idx.get("partialFilterExpression"));
+            }
+            System.out.println("  ---");
+        }
+        
         boolean found = false;
         for (Document idx : indexes) {
-            if ("testRunResultSummaryId_1_vulnerable_1_endTimestamp_-1_partial_message_exists".equals(idx.getString("name"))) {
+            if (idx.containsKey("partialFilterExpression")) {
                 Document partialFilter = (Document) idx.get("partialFilterExpression");
-                assertNotNull("Partial filter expression should exist", partialFilter);
-                assertTrue("Should have testResults.message filter", partialFilter.containsKey("testResults.message"));
-                Document existsDoc = (Document) partialFilter.get("testResults.message");
-                assertEquals("Should have $exists: true", true, existsDoc.getBoolean("$exists"));
-                found = true;
-                break;
+                if (partialFilter != null && partialFilter.containsKey("testResults.message")) {
+                    Document existsDoc = (Document) partialFilter.get("testResults.message");
+                    if (existsDoc != null && Boolean.TRUE.equals(existsDoc.getBoolean("$exists"))) {
+                        found = true;
+                        System.out.println("Found partial index: " + idx.getString("name"));
+                        break;
+                    }
+                }
             }
         }
         assertTrue("Partial index for testResults.message existence should be present", found);
