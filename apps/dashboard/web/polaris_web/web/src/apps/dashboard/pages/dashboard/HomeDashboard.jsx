@@ -707,7 +707,7 @@ function HomeDashboard() {
 
     if (isMCPSecurityCategory()) {
         const totalRequestsItem = {
-            title: 'Total MCP Requests',
+            title: 'Total MCP Components',
             data: mcpTotals.mcpTotalApis ?? '-',
             variant: 'heading2xl'
         }
@@ -894,7 +894,7 @@ function HomeDashboard() {
             component={
                 <HorizontalGrid columns={4} gap={6}>
                     <VerticalStack gap={1}>
-                        <Text color="subdued">APIs</Text>
+                        <Text color="subdued">Components</Text>
                         <Text variant='headingMd'>{mcpTotals.mcpTotalApis ?? '-'}</Text>
                     </VerticalStack>
                     <VerticalStack gap={1}>
@@ -902,7 +902,7 @@ function HomeDashboard() {
                         <Text variant='headingMd'>-</Text>
                     </VerticalStack>
                     <VerticalStack gap={1}>
-                        <Text color="subdued">3rd party APIs</Text>
+                        <Text color="subdued">3rd party Components</Text>
                         <Text variant='headingMd'>{mcpTotals.thirdPartyApis ?? '-'}</Text>
                     </VerticalStack>
                     <VerticalStack gap={1}>
@@ -923,7 +923,7 @@ function HomeDashboard() {
             component={
                 <HorizontalGrid columns={4} gap={6}>
                     <VerticalStack gap={1}>
-                        <Text color="subdued">Critical MCP APIs</Text>
+                        <Text color="subdued">Critical MCP Components</Text>
                         <Text variant='headingMd'>{mcpTotals.criticalApis ?? '-'}</Text>
                     </VerticalStack>
                     <VerticalStack gap={1}>
@@ -1026,7 +1026,7 @@ function HomeDashboard() {
                             data={[{
                                 data: mcpApiRequestsSeries,
                                 color: '',
-                                name: 'MCP API Calls'
+                                name: 'MCP Components Calls'
                             }]}
                             type='spline'
                             color='#6200EA'
@@ -1041,13 +1041,13 @@ function HomeDashboard() {
                         />
                     ) : (
                         <Box minHeight="250px" paddingBlockStart="8">
-                            <Text alignment='center' color='subdued'>No MCP API requests in the selected period</Text>
+                            <Text alignment='center' color='subdued'>No MCP components requests in the selected period</Text>
                         </Box>
                     )}
                 </Box>
             }
-            title={'MCP API Requests'}
-            titleToolTip={'API request volume trend for MCP collections over time'}
+            title={'MCP Components Requests'}
+            titleToolTip={'Components request volume trend for MCP collections over time'}
             linkText={''}
             linkUrl={''}
         />
