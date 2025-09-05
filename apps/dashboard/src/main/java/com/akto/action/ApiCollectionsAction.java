@@ -30,6 +30,7 @@ import com.akto.dto.testing.CustomTestingEndpoints;
 import com.akto.dto.CollectionConditions.ConditionUtils;
 import com.akto.dto.rbac.UsersCollectionsList;
 import com.akto.dto.type.SingleTypeInfo;
+import com.akto.dao.SingleTypeInfoDao;
 import com.akto.listener.RuntimeListener;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
@@ -219,7 +220,7 @@ public class ApiCollectionsAction extends UserAction {
         UsersCollectionsList.deleteContextCollectionsForUser(Context.accountId.get(), Context.contextSource.get());
         pipeLine.add(Aggregates.project(Projections.fields(
                 Projections.computed(ApiCollection.URLS_COUNT, new BasicDBObject("$size", new BasicDBObject("$ifNull", Arrays.asList("$urls", Collections.emptyList())))),
-                Projections.include(ApiCollection.ID, ApiCollection.NAME, ApiCollection.HOST_NAME, ApiCollection._TYPE, ApiCollection.TAGS_STRING, ApiCollection._DEACTIVATED,ApiCollection.START_TS, ApiCollection.AUTOMATED, ApiCollection.DESCRIPTION, ApiCollection.USER_ENV_TYPE, ApiCollection.IS_OUT_OF_TESTING_SCOPE, ApiCollection._URLS)
+                Projections.include(ApiCollection.ID, ApiCollection.NAME, ApiCollection.HOST_NAME, ApiCollection._TYPE, ApiCollection.TAGS_STRING, ApiCollection._DEACTIVATED,ApiCollection.START_TS, ApiCollection.AUTOMATED, ApiCollection.DESCRIPTION, ApiCollection.USER_ENV_TYPE, ApiCollection.IS_OUT_OF_TESTING_SCOPE)
         )));
 
         try {
@@ -233,6 +234,29 @@ public class ApiCollectionsAction extends UserAction {
         while(cursor.hasNext()){
             try {
                 ApiCollection apiCollection = cursor.next();
+                
+                // Only fetch URLs and methods from SingleTypeInfo for MCP collections
+                if (apiCollection.isMcpCollection()) {
+                    Set<String> urlMethodSet = new HashSet<>();
+                    Bson filter = Filters.eq(SingleTypeInfo._API_COLLECTION_ID, apiCollection.getId());
+                    List<SingleTypeInfo> singleTypeInfos = SingleTypeInfoDao.instance.findAll(filter, 
+                        Projections.include(SingleTypeInfo._URL, SingleTypeInfo._METHOD));
+                    
+                    for (SingleTypeInfo singleTypeInfo : singleTypeInfos) {
+                        String url = singleTypeInfo.getUrl();
+                        String method = singleTypeInfo.getMethod();
+                        if (url != null && method != null) {
+                            urlMethodSet.add(url + " " + method);
+                        }
+                    }
+                    
+                    apiCollection.setUrls(urlMethodSet);
+                } else {
+
+                    //for non-MCP collections, URLs will not be set as per earlier implementation
+                    apiCollection.setUrls(new HashSet<>());
+                }
+                
                 this.apiCollections.add(apiCollection);
             } catch (Exception e) {
                 e.printStackTrace();
@@ -1197,10 +1221,41 @@ public class ApiCollectionsAction extends UserAction {
                 break;
             case "OPEN_ALERTS":
                 Bson openAlertsFilter = Filters.and(
-                        Filters.or(Filters.eq("markedBy", ""), Filters.eq("markedBy", null)),
-                        Filters.or(Filters.eq("remarks", ""), Filters.eq("remarks", null))
+                        Filters.or(Filters.eq("markedBy", ""), Filters.eq("markedBy", null))
                 );
-                this.mcpDataCount = (int) McpAuditInfoDao.instance.count(openAlertsFilter);
+                
+                // Fetch the open alerts to get type and lastDetected
+                List<McpAuditInfo> openAlerts = McpAuditInfoDao.instance.findAll(openAlertsFilter);
+                this.mcpDataCount = openAlerts.size();
+                
+                // Create response with type and human-readable last detected timestamp
+                if (!openAlerts.isEmpty()) {
+                    List<BasicDBObject> alertDetails = new ArrayList<>();
+                    for (McpAuditInfo alert : openAlerts) {
+                        BasicDBObject alertInfo = new BasicDBObject();
+                        alertInfo.put("type", alert.getType());
+                        
+                        // Convert lastDetected (epoch seconds) to human-readable format
+                        int lastDetectedEpoch = alert.getLastDetected();
+                        String lastDetectedFormatted = "";
+                        if (lastDetectedEpoch > 0) {
+                            java.time.Instant instant = java.time.Instant.ofEpochSecond(lastDetectedEpoch);
+                            java.time.ZonedDateTime zdt = java.time.ZonedDateTime.ofInstant(instant, java.time.ZoneOffset.UTC);
+                            java.time.format.DateTimeFormatter formatter = java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss 'UTC'");
+                            lastDetectedFormatted = zdt.format(formatter);
+                        }
+                        alertInfo.put("lastDetected", lastDetectedFormatted);
+                        alertInfo.put("lastDetectedEpoch", lastDetectedEpoch);
+                        alertDetails.add(alertInfo);
+                    }
+                    
+                    // Set the response object with count and alert details
+                    if (this.response == null) {
+                        this.response = new BasicDBObject();
+                    }
+                    this.response.put("count", this.mcpDataCount);
+                    this.response.put("alertDetails", alertDetails);
+                }
                 break;
             case "CRITICAL_APIS":
                 Bson criticalApisFilter = Filters.and(
