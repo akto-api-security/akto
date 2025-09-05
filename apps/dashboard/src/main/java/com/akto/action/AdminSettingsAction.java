@@ -66,6 +66,24 @@ public class AdminSettingsAction extends UserAction {
     @Override
     public String execute() throws Exception {
         accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
+        
+        // Initialize compulsoryDescription with defaults if it doesn't exist
+        if (accountSettings == null || accountSettings.getCompulsoryDescription() == null || accountSettings.getCompulsoryDescription().isEmpty()) {
+            Map<String, Boolean> defaultCompulsoryDescription = new HashMap<>();
+            defaultCompulsoryDescription.put("falsePositive", false);
+            defaultCompulsoryDescription.put("noTimeToFix", false);
+            defaultCompulsoryDescription.put("AcceptableFix", false);
+            
+            AccountSettingsDao.instance.getMCollection().updateOne(
+                AccountSettingsDao.generateFilter(),
+                Updates.set(AccountSettings.COMPULSORY_DESCRIPTION, defaultCompulsoryDescription),
+                new UpdateOptions().upsert(true)
+            );
+            
+            // Reload the accountSettings to get the updated document
+            accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
+        }
+        
         organization = OrganizationsDao.instance.findOne(Filters.empty());
         if(Context.accountId.get() != null && Context.accountId.get() != 0){
             currentAccount = AccountsDao.instance.findOne(
@@ -92,6 +110,8 @@ public class AdminSettingsAction extends UserAction {
     private boolean enableMergingOnVersions;
     @Setter
     private boolean allowRetrospectiveMerging;
+
+    private Map<String, Boolean> compulsoryDescription;
 
     public String updateSetupType() {
         AccountSettingsDao.instance.getMCollection().updateOne(
@@ -478,7 +498,26 @@ public class AdminSettingsAction extends UserAction {
             Filters.eq(Constants.ID, Context.accountId.get()),
             Updates.set(Account.HYBRID_TESTING_ENABLED, this.miniTestingEnabled)
         );
-        return SUCCESS.toUpperCase();   
+        return SUCCESS.toUpperCase();
+    }
+
+    public String updateCompulsoryDescription() {
+        if (compulsoryDescription == null) {
+            addActionError("Compulsory description settings cannot be null");
+            return ERROR.toUpperCase();
+        }
+
+        try {
+            AccountSettingsDao.instance.getMCollection().updateOne(
+                AccountSettingsDao.generateFilter(),
+                Updates.set(AccountSettings.COMPULSORY_DESCRIPTION, compulsoryDescription),
+                new UpdateOptions().upsert(true)
+            );
+            return SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            logger.error("Error updating compulsory description settings", e);
+            return ERROR.toUpperCase();
+        }
     }
 
     public String enableMergingOnVersionsInApis(){
@@ -627,5 +666,13 @@ public class AdminSettingsAction extends UserAction {
 
     public void setToggleCaseSensitiveApis(boolean toggleCaseSensitiveApis) {
         this.toggleCaseSensitiveApis = toggleCaseSensitiveApis;
+    }
+
+    public Map<String, Boolean> getCompulsoryDescription() {
+        return compulsoryDescription;
+    }
+
+    public void setCompulsoryDescription(Map<String, Boolean> compulsoryDescription) {
+        this.compulsoryDescription = compulsoryDescription;
     }
 }

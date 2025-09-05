@@ -52,6 +52,11 @@ function About() {
     const [miniTesting, setMiniTesting] = useState(false)
     const [mergingOnVersions, setMergingOnVersions] = useState(false)
     const [retrospective, setRetrospective] = useState(false)
+    const [compulsoryDescription, setCompulsoryDescription] = useState({
+        falsePositive: true,
+        noTimeToFix: false,
+        AcceptableFix: false
+    })
 
     const [pdf, setPdf] = useState("")
 
@@ -84,6 +89,11 @@ function About() {
         setSelectedUrlsList(resp.allowRedundantEndpointsList || [])
         setToggleCaseSensitiveApis(resp.handleApisCaseInsensitive || false)
         setMergingOnVersions(resp.allowMergingOnVersions || false)
+        setCompulsoryDescription(resp.compulsoryDescription || {
+            falsePositive: true,
+            noTimeToFix: false,
+            AcceptableFix: false
+        })
     }
 
     useEffect(()=>{
@@ -395,6 +405,62 @@ function About() {
         })
     }
 
+    const handleCompulsoryDescriptionSave = async () => {
+        try {
+            await settingRequests.updateCompulsoryDescription(compulsoryDescription);
+            func.setToast(true, false, "Compulsory description settings updated successfully.");
+            // Re-fetch the settings to ensure UI is in sync with database
+            await fetchDetails();
+        } catch (error) {
+            func.setToast(true, true, "Failed to update compulsory description settings.");
+        }
+    }
+
+    const compulsoryDescriptionComponent = (
+        <VerticalStack gap={4}>
+            <Text variant="headingMd">Compulsory Description Settings</Text>
+            <Text variant="bodyMd" color="subdued">
+                Configure which issue status changes require mandatory descriptions to be provided.
+            </Text>
+            <VerticalStack gap={3}>
+                <Checkbox
+                    label="False Positive - Require description when marking issues as false positive"
+                    checked={compulsoryDescription.falsePositive}
+                    onChange={(checked) => 
+                        setCompulsoryDescription(prev => ({ ...prev, falsePositive: checked }))
+                    }
+                    disabled={window.USER_ROLE !== 'ADMIN'}
+                />
+                <Checkbox
+                    label="No Time To Fix - Require description when marking issues as no time to fix"
+                    checked={compulsoryDescription.noTimeToFix}
+                    onChange={(checked) => 
+                        setCompulsoryDescription(prev => ({ ...prev, noTimeToFix: checked }))
+                    }
+                    disabled={window.USER_ROLE !== 'ADMIN'}
+                />
+                <Checkbox
+                    label="Acceptable Fix - Require description when marking issues as acceptable fix"
+                    checked={compulsoryDescription.AcceptableFix}
+                    onChange={(checked) => 
+                        setCompulsoryDescription(prev => ({ ...prev, AcceptableFix: checked }))
+                    }
+                    disabled={window.USER_ROLE !== 'ADMIN'}
+                />
+                {window.USER_ROLE === 'ADMIN' && (
+                    <Box width="150px" paddingBlockStart="3">
+                        <Button 
+                            primary 
+                            onClick={handleCompulsoryDescriptionSave}
+                        >
+                            Save Changes
+                        </Button>
+                    </Box>
+                )}
+            </VerticalStack>
+        </VerticalStack>
+    )
+
     const redundantUrlComp = (
         <VerticalStack gap={"4"}>
             <Box width='220px'>
@@ -574,6 +640,7 @@ function About() {
                                   <ToggleComponent text={"Activate regex matching in merging"} initial={newMerging} onToggle={handleNewMerging} />
                                   <ToggleComponent text={"Enable telemetry"} initial={enableTelemetry} onToggle={toggleTelemetry} />
                                   {redundantUrlComp}
+                                  {compulsoryDescriptionComponent}
                                   <VerticalStack gap={1}>
                                       <Text color="subdued">Traffic alert threshold</Text>
                                       <Box width='120px'>
@@ -595,6 +662,7 @@ function About() {
                   </LegacyCard.Section>
                   :<LegacyCard.Section title={<Text variant="headingMd">More settings</Text>}>
                     {redundantUrlComp}
+                    {compulsoryDescriptionComponent}
                   </LegacyCard.Section>
               }
             <LegacyCard.Section subdued>
