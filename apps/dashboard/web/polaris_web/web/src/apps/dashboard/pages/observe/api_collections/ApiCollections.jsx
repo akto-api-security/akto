@@ -392,7 +392,7 @@ function ApiCollections(props) {
         
         setData(res);
         setEnvTypeMap(envTypeObj);
-        setAllCollections(activeCollections);
+        setAllCollections(apiCollectionsResp?.apiCollections || []);
         
         if (res.hostname.length === 0 && (tableSelectedTab === undefined || tableSelectedTab.length === 0)) {
             setTimeout(() => {
