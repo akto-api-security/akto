@@ -235,6 +235,49 @@ const convertToNewData = (collectionsArr, sensitiveInfoMap, severityInfoMap, cov
     return { prettify: prettifyData, normal: newData }
 }
 
+const categorizeCollections = (prettifyArray) => {
+    const envTypeObj = {};
+    const hostnameCollections = [];
+    const groupCollections = [];
+    const customCollections = [];
+    const activeCollections = [];
+    const deactivatedCollectionsData = [];
+    const collectionMap = new Map();
+    
+    prettifyArray.forEach((c) => {
+        // Build environment map
+        envTypeObj[c.id] = c.envType;
+        collectionMap.set(c.id, c);
+        
+        // Categorize collections in single pass
+        if (!c.deactivated) {
+            activeCollections.push(c);
+            if (c.hostName !== null && c.hostName !== undefined) {
+                hostnameCollections.push(c);
+            } else if (c.type === "API_GROUP") {
+                groupCollections.push(c);
+            } else {
+                customCollections.push(c);
+            }
+        } else {
+            deactivatedCollectionsData.push(c);
+        }
+    });
+    
+    return {
+        envTypeObj,
+        collectionMap,
+        activeCollections,
+        categorized: {
+            all: prettifyArray,
+            hostname: hostnameCollections,
+            groups: groupCollections,
+            custom: customCollections,
+            deactivated: deactivatedCollectionsData,
+        }
+    };
+};
+
 
 function ApiCollections(props) {
 
@@ -278,8 +321,6 @@ function ApiCollections(props) {
     const setSamples = ObserveStore(state => state.setSamples)
     const setSelectedUrl = ObserveStore(state => state.setSelectedUrl)
     const [deactivateCollections, setDeactivateCollections] = useState([])
-    const [uningestedApiCountMap, setUningestedApiCountMap] = useState({})
-    const [uningestedApiData, setUningestedApiData] = useState({})
 
     const resetFunc = () => {
         setInventoryFlyout(false)
@@ -335,35 +376,32 @@ function ApiCollections(props) {
 
         let hasUserEndpoints = await api.getUserEndpoints()
         setHasUsageEndpoints(hasUserEndpoints)
-        let tmp = (apiCollectionsResp.apiCollections || []).map(convertToCollectionData)
-        let dataObj = {}
+        // Optimize data processing with single pass operations
+        let tmp = (apiCollectionsResp.apiCollections || []).map(convertToCollectionData);
+        let dataObj = {};
         dataObj = convertToNewData(tmp, {}, {}, {}, {}, {}, true);
-        let res = {}
-        res.all = dataObj.prettify
-        res.hostname = dataObj.prettify.filter((c) => c.hostName !== null && c.hostName !== undefined && !c.deactivated)
-        const allGroups = dataObj.prettify.filter((c) => c.type === "API_GROUP" && !c.deactivated);
-        res.groups = allGroups;
-        res.custom = res.all.filter(x => !res.hostname.includes(x) && !x.deactivated && !res.groups.includes(x));
+        
+        // Abstract categorization logic into reusable function
+        
+        
+        // Use the abstracted categorization function
+        const { envTypeObj, collectionMap, activeCollections, categorized } = categorizeCollections(dataObj.prettify);
+        
+        // Build result object with optimized structure
+        let res = categorized;
+        
         setData(res);
+        setEnvTypeMap(envTypeObj);
+        setAllCollections(activeCollections);
+        
         if (res.hostname.length === 0 && (tableSelectedTab === undefined || tableSelectedTab.length === 0)) {
             setTimeout(() => {
                 setSelectedTab("custom");
                 setSelected(3);
-            },[100])
+            }, [100]);
         }
 
-        let envTypeObj = {}
-        tmp.forEach((c) => {
-            envTypeObj[c.id] = c.envType
-        })
-        setEnvTypeMap(envTypeObj)
-        setAllCollections(apiCollectionsResp.apiCollections.filter(x => x?.deactivated !== true) || [])
-
         const shouldCallHeavyApis = (func.timeNow() - lastFetchedInfo.lastRiskScoreInfo) >= (5 * 60)
-        // const shouldCallHeavyApis = false;
-
-        // fire all the other apis in parallel
-
         let apiPromises = [
             api.getCoverageInfoForCollections(),
             api.getLastTrafficSeen(),
@@ -378,7 +416,7 @@ function ApiCollections(props) {
             ]
         }
 
-        if(userRole === 'ADMIN') {
+        if(userRole === 'ADMIN' && func.checkForRbacFeature()) {
             apiPromises = [
                 ...apiPromises,
                 ...[api.getAllUsersCollections(), settingRequests.getTeamData()]
@@ -425,13 +463,15 @@ function ApiCollections(props) {
             setLastFetchedSensitiveResp(sensitiveInfo)
 
         }
+        setHasUsageEndpoints(hasUserEndpoints)
+        setCoverageMap(coverageInfo)
 
         let usersCollectionList = []
         let userList = []
 
         const index = !shouldCallHeavyApis ? 5 : 8
 
-        if(userRole === 'ADMIN') {
+        if(userRole === 'ADMIN' && func.checkForRbacFeature()) {
             if(results[index]?.status === "fulfilled") {
                 const res = results[index].value
                 usersCollectionList = res
@@ -449,13 +489,9 @@ function ApiCollections(props) {
                     })
                 }
             }
+            setUsersCollection(usersCollectionList)
+            setTeamData(userList)
         }
-
-        setUsersCollection(usersCollectionList)
-        setTeamData(userList)
-
-        setHasUsageEndpoints(hasUserEndpoints)
-        setCoverageMap(coverageInfo)
 
         // Ensure all parameters are defined before calling convertToNewData
         const sensitiveInfoMap = sensitiveInfo?.sensitiveInfoMap || {};
@@ -480,15 +516,14 @@ function ApiCollections(props) {
         }
 
         // Separate active and deactivated collections
-        const deactivatedCollectionsCopy = dataObj.prettify.filter(c => c.deactivated).map((c)=>{
+        const deactivatedCollectionsCopy = res.deactivated.map((c)=>{
             if(deactivatedCountInfo.hasOwnProperty(c.id)){
                 c.urlsCount = deactivatedCountInfo[c.id]
             }
             return c
         });
 
-        const collectionMap = new Map(dataObj.prettify.map(c => [c.id, c]));
-
+        setDeactivateCollections(deactivatedCollectionsCopy)
         // Process untracked API data
         const untrackedApiDataMap = {};
         if (uningestedApiDetails && uningestedApiDetails.uningestedApiList) {
@@ -500,7 +535,8 @@ function ApiCollections(props) {
                 untrackedApiDataMap[collectionId].push(api);
             });
         }
-        setUningestedApiData(untrackedApiDataMap);
+
+        const finalPrettyObj = categorizeCollections(dataObj.prettify);
 
         const untrackedCollections = Object.entries(uningestedApiCountInfo || {})
             .filter(([_, count]) => count > 0)
@@ -519,35 +555,33 @@ function ApiCollections(props) {
                 } : null;
             })
             .filter(Boolean);
-        setDeactivateCollections(JSON.parse(JSON.stringify(deactivatedCollectionsCopy)));
         
-        // Process uningested API data
-        setUningestedApiCountMap(uningestedApiCountInfo || {});
-        const fetchEndpointsCountResp = await dashboardApi.fetchEndpointsCount(0, 0)
-        setTotalAPIs(fetchEndpointsCountResp.newCount)
+        // Make the heavy API call asynchronous to prevent blocking rendering
+        dashboardApi.fetchEndpointsCount(0, 0)
+            .then(response => {
+                setTotalAPIs(response.newCount);
+            })
+            .catch(error => {
+                console.error("Error fetching endpoints count:", error);
+            });
 
+        
+        // Build final data object efficiently using pre-categorized collections
+        tmp = {
+            ...finalPrettyObj.categorized,
+            untracked: untrackedCollections
+        };
+        
+        setData(tmp);
 
-        // Calculate summary data only for active collections
+         // Calculate summary data only for active collections
         const summary = transform.getSummaryData(dataObj.normal)
         summary.totalCriticalEndpoints = riskScoreObj.criticalUrls;
         summary.totalSensitiveEndpoints = sensitiveInfo.sensitiveUrls
         setSummaryData(summary)
-
-        setCollectionsMap(func.mapCollectionIdToName(tmp.filter(x => !x?.deactivated)))
-        const allHostNameMap = func.mapCollectionIdToHostName(tmp.filter(x => !x?.deactivated))
-        setHostNameMap(allHostNameMap)
-        setTagCollectionsMap(func.mapCollectionIdsToTagName(tmp.filter(x => !x?.deactivated)))
-        
-        tmp = {}
-        tmp.all = dataObj.prettify
-        tmp.hostname = dataObj.prettify.filter((c) => c.hostName !== null && c.hostName !== undefined && !c.deactivated)
-        const allGroupsForTmp = dataObj.prettify.filter((c) => c.type === "API_GROUP" && !c.deactivated);
-        tmp.groups = allGroupsForTmp;
-        tmp.custom = tmp.all.filter(x => !tmp.hostname.includes(x) && !x.deactivated && !tmp.groups.includes(x));
-        tmp.deactivated = deactivatedCollectionsCopy
-        tmp.untracked = untrackedCollections
-        
-        setData(tmp);
+        setCollectionsMap(func.mapCollectionIdToName(activeCollections))
+        setHostNameMap(func.mapCollectionIdToHostName(activeCollections))
+        setTagCollectionsMap(func.mapCollectionIdsToTagName(activeCollections))
         } catch (error) {
             console.error("Error in fetchData:", error);
             setLoading(false);
