@@ -30,6 +30,7 @@ import com.akto.dto.testing.CustomTestingEndpoints;
 import com.akto.dto.CollectionConditions.ConditionUtils;
 import com.akto.dto.rbac.UsersCollectionsList;
 import com.akto.dto.type.SingleTypeInfo;
+import com.akto.dao.SingleTypeInfoDao;
 import com.akto.listener.RuntimeListener;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
@@ -216,7 +217,7 @@ public class ApiCollectionsAction extends UserAction {
         UsersCollectionsList.deleteContextCollectionsForUser(Context.accountId.get(), Context.contextSource.get());
         pipeLine.add(Aggregates.project(Projections.fields(
                 Projections.computed(ApiCollection.URLS_COUNT, new BasicDBObject("$size", new BasicDBObject("$ifNull", Arrays.asList("$urls", Collections.emptyList())))),
-                Projections.include(ApiCollection.ID, ApiCollection.NAME, ApiCollection.HOST_NAME, ApiCollection._TYPE, ApiCollection.TAGS_STRING, ApiCollection._DEACTIVATED,ApiCollection.START_TS, ApiCollection.AUTOMATED, ApiCollection.DESCRIPTION, ApiCollection.USER_ENV_TYPE, ApiCollection.IS_OUT_OF_TESTING_SCOPE, ApiCollection._URLS)
+                Projections.include(ApiCollection.ID, ApiCollection.NAME, ApiCollection.HOST_NAME, ApiCollection._TYPE, ApiCollection.TAGS_STRING, ApiCollection._DEACTIVATED,ApiCollection.START_TS, ApiCollection.AUTOMATED, ApiCollection.DESCRIPTION, ApiCollection.USER_ENV_TYPE, ApiCollection.IS_OUT_OF_TESTING_SCOPE)
         )));
 
         try {
@@ -230,6 +231,29 @@ public class ApiCollectionsAction extends UserAction {
         while(cursor.hasNext()){
             try {
                 ApiCollection apiCollection = cursor.next();
+                
+                // Only fetch URLs and methods from SingleTypeInfo for MCP collections
+                if (apiCollection.isMcpCollection()) {
+                    Set<String> urlMethodSet = new HashSet<>();
+                    Bson filter = Filters.eq(SingleTypeInfo._API_COLLECTION_ID, apiCollection.getId());
+                    List<SingleTypeInfo> singleTypeInfos = SingleTypeInfoDao.instance.findAll(filter, 
+                        Projections.include(SingleTypeInfo._URL, SingleTypeInfo._METHOD));
+                    
+                    for (SingleTypeInfo singleTypeInfo : singleTypeInfos) {
+                        String url = singleTypeInfo.getUrl();
+                        String method = singleTypeInfo.getMethod();
+                        if (url != null && method != null) {
+                            urlMethodSet.add(url + " " + method);
+                        }
+                    }
+                    
+                    apiCollection.setUrls(urlMethodSet);
+                } else {
+
+                    //for non-MCP collections, URLs will not be set as per earlier implementation
+                    apiCollection.setUrls(new HashSet<>());
+                }
+                
                 this.apiCollections.add(apiCollection);
             } catch (Exception e) {
                 e.printStackTrace();
