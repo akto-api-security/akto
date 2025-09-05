@@ -1218,10 +1218,41 @@ public class ApiCollectionsAction extends UserAction {
                 break;
             case "OPEN_ALERTS":
                 Bson openAlertsFilter = Filters.and(
-                        Filters.or(Filters.eq("markedBy", ""), Filters.eq("markedBy", null)),
-                        Filters.or(Filters.eq("remarks", ""), Filters.eq("remarks", null))
+                        Filters.or(Filters.eq("markedBy", ""), Filters.eq("markedBy", null))
                 );
-                this.mcpDataCount = (int) McpAuditInfoDao.instance.count(openAlertsFilter);
+                
+                // Fetch the open alerts to get type and lastDetected
+                List<McpAuditInfo> openAlerts = McpAuditInfoDao.instance.findAll(openAlertsFilter);
+                this.mcpDataCount = openAlerts.size();
+                
+                // Create response with type and human-readable last detected timestamp
+                if (!openAlerts.isEmpty()) {
+                    List<BasicDBObject> alertDetails = new ArrayList<>();
+                    for (McpAuditInfo alert : openAlerts) {
+                        BasicDBObject alertInfo = new BasicDBObject();
+                        alertInfo.put("type", alert.getType());
+                        
+                        // Convert lastDetected (epoch seconds) to human-readable format
+                        int lastDetectedEpoch = alert.getLastDetected();
+                        String lastDetectedFormatted = "";
+                        if (lastDetectedEpoch > 0) {
+                            java.time.Instant instant = java.time.Instant.ofEpochSecond(lastDetectedEpoch);
+                            java.time.ZonedDateTime zdt = java.time.ZonedDateTime.ofInstant(instant, java.time.ZoneOffset.UTC);
+                            java.time.format.DateTimeFormatter formatter = java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss 'UTC'");
+                            lastDetectedFormatted = zdt.format(formatter);
+                        }
+                        alertInfo.put("lastDetected", lastDetectedFormatted);
+                        alertInfo.put("lastDetectedEpoch", lastDetectedEpoch);
+                        alertDetails.add(alertInfo);
+                    }
+                    
+                    // Set the response object with count and alert details
+                    if (this.response == null) {
+                        this.response = new BasicDBObject();
+                    }
+                    this.response.put("count", this.mcpDataCount);
+                    this.response.put("alertDetails", alertDetails);
+                }
                 break;
             case "CRITICAL_APIS":
                 Bson criticalApisFilter = Filters.and(
