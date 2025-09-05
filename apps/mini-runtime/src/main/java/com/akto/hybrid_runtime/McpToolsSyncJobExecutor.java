@@ -282,37 +282,37 @@ public class McpToolsSyncJobExecutor {
 
         List<HttpResponseParams> responseParamsList = new ArrayList<>();
         try {
-            if (mcpServerCapabilities != null && mcpServerCapabilities.getResources() == null) {
-                logger.debug("Skipping resources discovery as MCP server capabilities do not support resources.");
+            if (mcpServerCapabilities != null && mcpServerCapabilities.getPrompts() == null) {
+                logger.debug("Skipping prompts discovery as MCP server capabilities do not support prompts.");
                 return responseParamsList;
             }
-            Pair<JSONRPCResponse, HttpResponseParams> resourcesListResponsePair = getMcpMethodResponse(
+            Pair<JSONRPCResponse, HttpResponseParams> promptsListResponsePair = getMcpMethodResponse(
                     host, McpSchema.METHOD_PROMPT_LIST, MCP_PROMPTS_LIST_REQUEST_JSON, apiCollection);
 
-            if (resourcesListResponsePair.getSecond() != null && !normalizedSampleDataSet.contains(
+            if (promptsListResponsePair.getSecond() != null && !normalizedSampleDataSet.contains(
                     McpSchema.METHOD_PROMPT_LIST)) {
-                responseParamsList.add(resourcesListResponsePair.getSecond());
+                responseParamsList.add(promptsListResponsePair.getSecond());
             }
-            logger.debug("Received prompts/list response. Processing resources.....");
+            logger.debug("Received prompts/list response. Processing prompts.....");
 
-            ListResourcesResult resourcesResult = JSONUtils.fromJson(resourcesListResponsePair.getFirst().getResult(),
-                    ListResourcesResult.class);
+            McpSchema.ListPromptsResult promptsResult = JSONUtils.fromJson(promptsListResponsePair.getFirst().getResult(),
+                    McpSchema.ListPromptsResult.class);
 
-            if (resourcesResult != null && !CollectionUtils.isEmpty(resourcesResult.getResources())) {
+            if (promptsResult != null && !CollectionUtils.isEmpty(promptsResult.getPrompts())) {
                 int id = 2;
-                String urlWithQueryParams = resourcesListResponsePair.getSecond().getRequestParams().getURL();
+                String urlWithQueryParams = promptsListResponsePair.getSecond().getRequestParams().getURL();
                 String toolsCallRequestHeaders = buildHeaders(host);
 
-                for (Resource resource : resourcesResult.getResources()) {
-                    if (normalizedSampleDataSet.contains(McpSchema.METHOD_PROMPT_GET + "/" + resource.getUri())) {
-                        logger.debug("Skipping prompt {} as it is already present in the db.", resource.getUri());
+                for (McpSchema.Prompt prompt : promptsResult.getPrompts()) {
+                    if (normalizedSampleDataSet.contains(McpSchema.METHOD_PROMPT_GET + "/" + prompt.getName())) {
+                        logger.debug("Skipping prompt {} as it is already present in the db.", prompt.getName());
                         continue;
                     }
                     JSONRPCRequest request = new JSONRPCRequest(
                             McpSchema.JSONRPC_VERSION,
                             McpSchema.METHOD_PROMPT_GET,
                             id++,
-                            new ReadResourceRequest(resource.getUri())
+                            new ReadResourceRequest(prompt.getName())
                     );
 
                     HttpResponseParams readResourceHttpResponseParams = convertToAktoFormat(apiCollection.getId(),
@@ -327,7 +327,7 @@ public class McpToolsSyncJobExecutor {
                     }
                 }
             } else {
-                logger.debug("Skipping as List Prompt Result is null or Resources are empty");
+                logger.debug("Skipping as List Prompt Result is null or Prompts are empty");
             }
         } catch (Exception e) {
             logger.error("Error while discovering mcp prompts for hostname: {}", host, e);
