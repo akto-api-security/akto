@@ -20,8 +20,7 @@ import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
 
-import static com.akto.util.Constants.AKTO_MCP_RESOURCES_TAG;
-import static com.akto.util.Constants.AKTO_MCP_TOOLS_TAG;
+import static com.akto.util.Constants.*;
 
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public final class McpRequestResponseUtils {
@@ -109,6 +108,19 @@ public final class McpRequestResponseUtils {
                         auditInfo = new McpAuditInfo(
                                 Context.now(), "", AKTO_MCP_RESOURCES_TAG, 0,
                                 uri, "", null, responseParams.getRequestParams().getApiCollectionId()
+                        );
+                    }
+                    break;
+
+                case McpSchema.METHOD_PROMPT_GET:
+                    if (params != null && StringUtils.isNotBlank(params.getName())) {
+                        url = HttpResponseParams.addPathParamToUrl(url, params.getName());
+
+                        // Create audit info for MCP Resource read
+                        auditInfo = new McpAuditInfo(
+                                Context.now(), "", AKTO_MCP_PROMPTS_TAG, 0,
+                                params.getName(), "", null,
+                                responseParams.getRequestParams().getApiCollectionId()
                         );
                     }
                     break;
