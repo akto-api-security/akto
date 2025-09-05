@@ -87,6 +87,7 @@ function HomeDashboard() {
     const [showTestingComponents, setShowTestingComponents] = useState(false)
     const [customRiskScoreAvg, setCustomRiskScoreAvg] = useState(0)
     const [mcpTotals, setMcpTotals] = useState({ mcpTotalApis: null, thirdPartyApis: null, newApis7Days: null, openAlerts: null, criticalApis: null })
+    const [mcpOpenAlertDetails, setMcpOpenAlertDetails] = useState([])
     const [mcpApiCallStats, setMcpApiCallStats] = useState([])
     
     // MCP API Requests time selector state
@@ -332,6 +333,7 @@ function HomeDashboard() {
         let mcpTotalApis = results[6]?.status === 'fulfilled' ? (results[6].value?.mcpDataCount ?? null) : null
         let mcpThirdParty = results[7]?.status === 'fulfilled' ? (results[7].value?.mcpDataCount ?? null) : null
         let mcpOpenAlerts = results[8]?.status === 'fulfilled' ? (results[8].value?.mcpDataCount ?? null) : null
+        let mcpOpenAlertsDetails = results[8]?.status === 'fulfilled' ? (results[8].value?.response?.alertDetails ?? []) : []
         let mcpCriticalApis = results[9]?.status === 'fulfilled' ? (results[9].value?.mcpDataCount ?? null) : null
         let mcpTools = results[10]?.status === 'fulfilled' ? (results[10].value?.mcpDataCount ?? null) : null
         let mcpPrompts = results[11]?.status === 'fulfilled' ? (results[11].value?.mcpDataCount ?? null) : null
@@ -360,6 +362,7 @@ function HomeDashboard() {
         buildEndpointsCount(fetchEndpointsCountResp)
 
         setMcpTotals({ mcpTotalApis: mcpTotalApis, thirdPartyApis: mcpThirdParty, newApis7Days: null, openAlerts: mcpOpenAlerts, criticalApis: mcpCriticalApis, tools: mcpTools, prompts: mcpPrompts, resources: mcpResources, server: mcpServer })
+        setMcpOpenAlertDetails(Array.isArray(mcpOpenAlertsDetails) ? mcpOpenAlertsDetails.slice(0, 2) : [])
         fetchMcpApiCallStats(mcpStatsTimeRange, func.timeNow());
         setLoading(false)
     }
@@ -1053,6 +1056,36 @@ function HomeDashboard() {
         />
     )
 
+    // MCP-only Open Alerts card
+    const mcpOpenAlertsCard = (
+        <InfoCard
+            component={
+                <VerticalStack gap={3}>
+                    {mcpOpenAlertDetails && mcpOpenAlertDetails.length > 0 ? (
+                        mcpOpenAlertDetails.map((alert, idx) => (
+                            <Link key={`open-alert-${idx}`} url={'/dashboard/observe/audit'} removeUnderline>
+                                <Box padding="4" background="bg-surface" borderRadius="2" borderColor="border" borderWidth="2">
+                                    <VerticalStack gap={1}>
+                                        <Text variant='bodyMd' color='text'>{alert?.type || '-'}</Text>
+                                        <Text color='subdued' variant='bodySm'>{alert?.lastDetected || '-'}</Text>
+                                    </VerticalStack>
+                                </Box>
+                            </Link>
+                        ))
+                    ) : (
+                        <Box paddingBlockStart="1">
+                            <Text alignment='center' color='subdued'>No recent open alerts</Text>
+                        </Box>
+                    )}
+                </VerticalStack>
+            }
+            title={'Open Alerts'}
+            titleToolTip={'MCP open alerts detected in your workspace'}
+            linkText={'View more'}
+            linkUrl={'/dashboard/observe/audit'}
+        />
+    )
+
     const newDomainsComponent = <InfoCard
         component={
             <Scrollable style={{ height: "320px" }} shadow>
@@ -1098,20 +1131,37 @@ function HomeDashboard() {
 
     if (isMCPSecurityCategory()) {
         gridComponents = [
+            {id: 'mcp-api-requests', component: mcpApiRequestsCard},
+            {id: 'mcp-open-alerts', component: mcpOpenAlertsCard},
             {id: 'mcp-discovery', component: mcpDiscoveryMiniCard},
             {id: 'mcp-risk', component: mcpRiskDetectionsMiniCard},
             {id: 'mcp-types-table', component: mcpTypesTableCard},
-            {id: 'mcp-api-requests', component: mcpApiRequestsCard},
             ...gridComponents
         ]
     }
 
     const gridComponent = (
-        <HorizontalGrid gap={5} columns={2}>
-            {gridComponents.map(({id, component}) => (
-                <div key={id}>{component}</div>
-            ))}
-        </HorizontalGrid>
+        isMCPSecurityCategory() ? (
+            <VerticalStack gap={5}>
+                {/* First row with 3:1 ratio */}
+                <HorizontalGrid gap={5} columns={{xs: 1, sm: 1, md: '3fr 1fr'}}>
+                    {mcpApiRequestsCard}
+                    {mcpOpenAlertsCard}
+                </HorizontalGrid>
+                {/* Second row with equal columns */}
+                <HorizontalGrid gap={5} columns={2}>
+                    {gridComponents.slice(2).map(({id, component}) => (
+                        <div key={id}>{component}</div>
+                    ))}
+                </HorizontalGrid>
+            </VerticalStack>
+        ) : (
+            <HorizontalGrid gap={5} columns={2}>
+                {gridComponents.map(({id, component}) => (
+                    <div key={id}>{component}</div>
+                ))}
+            </HorizontalGrid>
+        )
     )
 
     const components = [
