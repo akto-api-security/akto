@@ -1,0 +1,27 @@
+version: '3.8'
+
+services:
+  caddy-mcp-proxy:
+    build:
+      context: ../  # Parent directory to include both caddy-proxy and mcp-threat
+      dockerfile: caddy-proxy/Dockerfile
+    ports:
+      - "8080:8080"   # Proxy port
+      - "2019:2019"   # Caddy admin API
+    env_file:
+      - .env
+    environment:
+      # These can override .env file values
+      - MCP_LLM_PROVIDER=${MCP_LLM_PROVIDER:-openai}
+      - MCP_LLM_MODEL=${MCP_LLM_MODEL:-gpt-4}
+      - MCP_LLM_TIMEOUT=${MCP_LLM_TIMEOUT:-60}
+      - MCP_LLM_TEMPERATURE=${MCP_LLM_TEMPERATURE:-0.0}
+      - MCP_DEBUG=${MCP_DEBUG:-false}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+    restart: unless-stopped
+    networks:
+      - proxy-network
+
+networks:
+  proxy-network:
+    driver: bridge
