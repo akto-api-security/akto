@@ -71,10 +71,11 @@ import static com.akto.utils.jira.Utils.buildApiToken;
 import static com.akto.utils.jira.Utils.buildBasicRequest;
 import static com.akto.utils.jira.Utils.buildPayloadForJiraTicket;
 import static com.akto.utils.jira.Utils.getAccountJiraFields;
-
+import static com.akto.utils.jira.Utils.isLabelsFieldError;
 import static com.akto.utils.jira.Utils.getJiraTicketUrlPair;
 import static com.akto.utils.jira.Utils.handleError;
 import static com.akto.utils.jira.Utils.retryWithoutGzipRequest;
+
 
 public class JiraIntegrationAction extends UserAction implements ServletRequestAware {
 
@@ -557,11 +558,33 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
             String responsePayload = response.getBody();
             if (response.getStatusCode() > 201 || responsePayload == null) {
                 loggerMaker.errorAndAddToDb("error while creating jira issue, url not accessible, requestbody " + request.getBody() + " ,responsebody " + response.getBody() + " ,responsestatus " + response.getStatusCode(), LoggerMaker.LogDb.DASHBOARD);
-                String error = handleError(responsePayload);
-                if (error != null) {
-                    addActionError("Error while creating jira issue: " + error);
+                
+                // Check if it's a labels field error and retry without labels
+                if (isLabelsFieldError(responsePayload)) {
+                    loggerMaker.info("Labels field error detected, retrying without labels field", LoggerMaker.LogDb.DASHBOARD);
+                    fields.remove("labels");
+                    reqPayload.put("fields", fields);
+                    
+                    // Create new request without labels
+                    OriginalHttpRequest retryRequest = new OriginalHttpRequest(url, "", "POST", reqPayload.toString(), headers, "");
+                    response = ApiExecutor.sendRequest(retryRequest, true, null, false, new ArrayList<>());
+                    responsePayload = response.getBody();
+                    
+                    if (response.getStatusCode() > 201 || responsePayload == null) {
+                        loggerMaker.errorAndAddToDb("error while creating jira issue after retry without labels, requestbody " + retryRequest.getBody() + " ,responsebody " + response.getBody() + " ,responsestatus " + response.getStatusCode(), LoggerMaker.LogDb.DASHBOARD);
+                        String error = handleError(responsePayload);
+                        if (error != null) {
+                            addActionError("Error while creating jira issue: " + error);
+                        }
+                        return Action.ERROR.toUpperCase();
+                    }
+                } else {
+                    String error = handleError(responsePayload);
+                    if (error != null) {
+                        addActionError("Error while creating jira issue: " + error);
+                    }
+                    return Action.ERROR.toUpperCase();
                 }
-                return Action.ERROR.toUpperCase();
             }
             try {
                 Pair<String, String> pair = getJiraTicketUrlPair(responsePayload, jiraIntegration.getBaseUrl());
@@ -823,11 +846,39 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
                                 + request.getBody() + " ,response body " + response.getBody() + " ,response status " + response.getStatusCode(),
                         LoggerMaker.LogDb.DASHBOARD);
 
-                String error = handleError(responsePayload);
-                if (error != null) {
-                    addActionError("Error while creating Jira issues in bulk: " + error);
+                // Check if it's a labels field error and retry without labels
+                if (isLabelsFieldError(responsePayload)) {
+                    loggerMaker.infoAndAddToDb("Labels field error detected in bulk request, retrying without labels field", LoggerMaker.LogDb.DASHBOARD);
+                    for (Object issueUpdateObj : issueUpdates) {
+                        BasicDBObject issueUpdate = (BasicDBObject) issueUpdateObj;
+                        BasicDBObject fields = (BasicDBObject) issueUpdate.get("fields");
+                        if (fields != null) {
+                            fields.remove("labels");
+                        }
+                    }
+                    
+                    // Create new request without labels
+                    OriginalHttpRequest retryRequest = new OriginalHttpRequest(url, "", "POST", reqPayload.toString(), headers, "");
+                    response = ApiExecutor.sendRequest(retryRequest, true, null, false, new ArrayList<>());
+                    responsePayload = response.getBody();
+                    
+                    if (response.getStatusCode() > 201 || responsePayload == null) {
+                        loggerMaker.errorAndAddToDb("Error while creating Jira issues in bulk after retry without labels, request body "
+                                        + retryRequest.getBody() + " ,response body " + response.getBody() + " ,response status " + response.getStatusCode(),
+                                LoggerMaker.LogDb.DASHBOARD);
+                        String error = handleError(responsePayload);
+                        if (error != null) {
+                            addActionError("Error while creating Jira issues in bulk: " + error);
+                        }
+                        return Action.ERROR.toUpperCase();
+                    }
+                } else {
+                    String error = handleError(responsePayload);
+                    if (error != null) {
+                        addActionError("Error while creating Jira issues in bulk: " + error);
+                    }
+                    return Action.ERROR.toUpperCase();
                 }
-                return Action.ERROR.toUpperCase();
             }
 
             BasicDBObject payloadObj;
