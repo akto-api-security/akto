@@ -24,6 +24,7 @@ import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.testing.*;
+import com.akto.dto.User;
 import com.akto.dto.testing.sources.TestReports;
 import com.akto.dto.testing.sources.TestSourceConfig;
 import com.akto.log.LoggerMaker;
@@ -602,8 +603,11 @@ public class IssuesAction extends UserAction {
         logger.debug("Issue id from db to be updated " + issueId);
         logger.debug("status id from db to be updated " + statusToBeUpdated);
         logger.debug("status reason from db to be updated " + ignoreReason);
-        Bson update = Updates.combine(Updates.set(TestingRunIssues.TEST_RUN_ISSUES_STATUS, statusToBeUpdated),
-                                        Updates.set(TestingRunIssues.LAST_UPDATED, Context.now()));
+    User user = getSUser();
+    String userLogin = user != null ? user.getLogin() : "System";
+    Bson update = Updates.combine(Updates.set(TestingRunIssues.TEST_RUN_ISSUES_STATUS, statusToBeUpdated),
+                    Updates.set(TestingRunIssues.LAST_UPDATED, Context.now()),
+                    Updates.set(TestingRunIssues.LAST_UPDATED_BY, userLogin));
 
         if (statusToBeUpdated == TestRunIssueStatus.IGNORED) { //Changing status to ignored
             update = Updates.combine(update, Updates.set(TestingRunIssues.IGNORE_REASON, ignoreReason));
@@ -627,8 +631,11 @@ public class IssuesAction extends UserAction {
         logger.debug("Issue id from db to be updated " + issueIdArray);
         logger.debug("status id from db to be updated " + statusToBeUpdated);
         logger.debug("status reason from db to be updated " + ignoreReason);
-        Bson update = Updates.combine(Updates.set(TestingRunIssues.TEST_RUN_ISSUES_STATUS, statusToBeUpdated),
-                Updates.set(TestingRunIssues.LAST_UPDATED, Context.now()));
+    User user = getSUser();
+    String userLogin = user != null ? user.getLogin() : "System";
+    Bson update = Updates.combine(Updates.set(TestingRunIssues.TEST_RUN_ISSUES_STATUS, statusToBeUpdated),
+        Updates.set(TestingRunIssues.LAST_UPDATED, Context.now()),
+        Updates.set(TestingRunIssues.LAST_UPDATED_BY, userLogin));
 
         if (statusToBeUpdated == TestRunIssueStatus.IGNORED) { //Changing status to ignored
             update = Updates.combine(update, Updates.set(TestingRunIssues.IGNORE_REASON, ignoreReason));
@@ -784,7 +791,19 @@ public class IssuesAction extends UserAction {
             addActionError("Description cannot be null");
             return ERROR.toUpperCase();
         }
-        TestingRunIssuesDao.instance.updateOneNoUpsert(Filters.eq(Constants.ID, issueId), Updates.set(TestingRunIssues.DESCRIPTION, description));
+        
+        User user = getSUser();
+        String userLogin = user != null ? user.getLogin() : "Unknown";
+        int currentTime = Context.now();
+        
+        Bson update = Updates.combine(
+            Updates.set(TestingRunIssues.DESCRIPTION, description),
+            Updates.set(TestingRunIssues.DESCRIPTION_UPDATED_BY, userLogin),
+            Updates.set(TestingRunIssues.DESCRIPTION_UPDATED_AT, currentTime),
+            Updates.set(TestingRunIssues.LAST_UPDATED, currentTime)
+        );
+        
+        TestingRunIssuesDao.instance.updateOneNoUpsert(Filters.eq(Constants.ID, issueId), update);
         return SUCCESS.toUpperCase();
     }
 
