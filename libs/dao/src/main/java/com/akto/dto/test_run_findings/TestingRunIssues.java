@@ -39,6 +39,8 @@ public class TestingRunIssues {
     private String azureBoardsWorkItemUrl;
     public static final String LAST_UPDATED = "lastUpdated";
     private int lastUpdated;
+    public static final String LAST_UPDATED_BY = "lastUpdatedBy";
+    private String lastUpdatedBy;
     public static final String UNREAD = "unread";
     private boolean unread;
     private List<Integer> collectionIds;
@@ -158,6 +160,14 @@ public class TestingRunIssues {
 
     public void setLastUpdated(int lastUpdated) {
         this.lastUpdated = lastUpdated;
+    }
+
+    public String getLastUpdatedBy() {
+        return lastUpdatedBy;
+    }
+
+    public void setLastUpdatedBy(String lastUpdatedBy) {
+        this.lastUpdatedBy = lastUpdatedBy;
     }
 
     @Override

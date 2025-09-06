@@ -275,9 +275,8 @@ function IssuesPage() {
         const fetchCompulsorySettings = async () => {
             try {
                 const {resp} = await settingFunctions.fetchAdminInfo();
-                console.log("Fetched admin info:", resp);
+                
                 if (resp?.compulsoryDescription) {
-                    console.log("Compulsory description settings:", resp.compulsoryDescription);
                     setCompulsorySettings(resp.compulsoryDescription);
                 }
             } catch (error) {
@@ -364,7 +363,6 @@ function IssuesPage() {
     // Update the requiresDescription function
     const requiresDescription = (reason) => {
         const settingsKey = reasonToSettingsKeyMap[reason];
-        console.log("Checking if description required for:", reason, "Settings key:", settingsKey, "Value:", compulsorySettings[settingsKey]);
         return compulsorySettings[settingsKey] || false;
     };
 

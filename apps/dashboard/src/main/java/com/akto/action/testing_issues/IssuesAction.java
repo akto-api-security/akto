@@ -603,8 +603,11 @@ public class IssuesAction extends UserAction {
         logger.debug("Issue id from db to be updated " + issueId);
         logger.debug("status id from db to be updated " + statusToBeUpdated);
         logger.debug("status reason from db to be updated " + ignoreReason);
-        Bson update = Updates.combine(Updates.set(TestingRunIssues.TEST_RUN_ISSUES_STATUS, statusToBeUpdated),
-                                        Updates.set(TestingRunIssues.LAST_UPDATED, Context.now()));
+    User user = getSUser();
+    String userLogin = user != null ? user.getLogin() : "System";
+    Bson update = Updates.combine(Updates.set(TestingRunIssues.TEST_RUN_ISSUES_STATUS, statusToBeUpdated),
+                    Updates.set(TestingRunIssues.LAST_UPDATED, Context.now()),
+                    Updates.set(TestingRunIssues.LAST_UPDATED_BY, userLogin));
 
         if (statusToBeUpdated == TestRunIssueStatus.IGNORED) { //Changing status to ignored
             update = Updates.combine(update, Updates.set(TestingRunIssues.IGNORE_REASON, ignoreReason));
@@ -628,8 +631,11 @@ public class IssuesAction extends UserAction {
         logger.debug("Issue id from db to be updated " + issueIdArray);
         logger.debug("status id from db to be updated " + statusToBeUpdated);
         logger.debug("status reason from db to be updated " + ignoreReason);
-        Bson update = Updates.combine(Updates.set(TestingRunIssues.TEST_RUN_ISSUES_STATUS, statusToBeUpdated),
-                Updates.set(TestingRunIssues.LAST_UPDATED, Context.now()));
+    User user = getSUser();
+    String userLogin = user != null ? user.getLogin() : "System";
+    Bson update = Updates.combine(Updates.set(TestingRunIssues.TEST_RUN_ISSUES_STATUS, statusToBeUpdated),
+        Updates.set(TestingRunIssues.LAST_UPDATED, Context.now()),
+        Updates.set(TestingRunIssues.LAST_UPDATED_BY, userLogin));
 
         if (statusToBeUpdated == TestRunIssueStatus.IGNORED) { //Changing status to ignored
             update = Updates.combine(update, Updates.set(TestingRunIssues.IGNORE_REASON, ignoreReason));

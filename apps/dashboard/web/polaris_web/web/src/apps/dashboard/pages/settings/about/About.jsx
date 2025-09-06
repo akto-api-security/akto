@@ -405,11 +405,13 @@ function About() {
         })
     }
 
-    const handleCompulsoryDescriptionSave = async () => {
+    const handleCompulsoryToggle = async (key, checked) => {
+        const updated = { ...compulsoryDescription, [key]: checked };
+        setCompulsoryDescription(updated);
         try {
-            await settingRequests.updateCompulsoryDescription(compulsoryDescription);
+            await settingRequests.updateCompulsoryDescription(updated);
             func.setToast(true, false, "Compulsory description settings updated successfully.");
-            // Re-fetch the settings to ensure UI is in sync with database
+            // Re-fetch to ensure UI is fully in sync
             await fetchDetails();
         } catch (error) {
             func.setToast(true, true, "Failed to update compulsory description settings.");
@@ -426,37 +428,22 @@ function About() {
                 <Checkbox
                     label="False Positive - Require description when marking issues as false positive"
                     checked={compulsoryDescription.falsePositive}
-                    onChange={(checked) => 
-                        setCompulsoryDescription(prev => ({ ...prev, falsePositive: checked }))
-                    }
+                    onChange={(checked) => handleCompulsoryToggle('falsePositive', checked)}
                     disabled={window.USER_ROLE !== 'ADMIN'}
                 />
                 <Checkbox
                     label="No Time To Fix - Require description when marking issues as no time to fix"
                     checked={compulsoryDescription.noTimeToFix}
-                    onChange={(checked) => 
-                        setCompulsoryDescription(prev => ({ ...prev, noTimeToFix: checked }))
-                    }
+                    onChange={(checked) => handleCompulsoryToggle('noTimeToFix', checked)}
                     disabled={window.USER_ROLE !== 'ADMIN'}
                 />
                 <Checkbox
                     label="Acceptable Fix - Require description when marking issues as acceptable fix"
                     checked={compulsoryDescription.AcceptableFix}
-                    onChange={(checked) => 
-                        setCompulsoryDescription(prev => ({ ...prev, AcceptableFix: checked }))
-                    }
+                    onChange={(checked) => handleCompulsoryToggle('AcceptableFix', checked)}
                     disabled={window.USER_ROLE !== 'ADMIN'}
                 />
-                {window.USER_ROLE === 'ADMIN' && (
-                    <Box width="150px" paddingBlockStart="3">
-                        <Button 
-                            primary 
-                            onClick={handleCompulsoryDescriptionSave}
-                        >
-                            Save Changes
-                        </Button>
-                    </Box>
-                )}
+                {/* Save button removed - changes are saved immediately when a checkbox is toggled */}
             </VerticalStack>
         </VerticalStack>
     )
