@@ -365,94 +365,99 @@ function ApiCollections(props) {
 
     async function fetchData() {
         try {
-            // first api call to get only collections name and collection id
             setLoading(true)
-            const apiCollectionsResp = await api.getAllCollectionsBasic();
+            
+            // Build all API promises to run in parallel
+            const shouldCallHeavyApis = (func.timeNow() - lastFetchedInfo.lastRiskScoreInfo) >= (5 * 60)
+            
+            let apiPromises = [
+                api.getAllCollectionsBasic(),  // index 0
+                api.getUserEndpoints(),         // index 1
+                api.getCoverageInfoForCollections(), // index 2
+                api.getLastTrafficSeen(),            // index 3
+                collectionApi.fetchCountForHostnameDeactivatedCollections(), // index 4
+                collectionApi.fetchCountForUningestedApis(), // index 5
+                collectionApi.fetchUningestedApis(),        // index 6
+            ];
+            
+            if(shouldCallHeavyApis){
+                apiPromises = [
+                    ...apiPromises,
+                    ...[api.getRiskScoreInfo(), api.getSensitiveInfoForCollections(), api.getSeverityInfoForCollections()] // indices 7,8,9
+                ]
+            }
+
+            if(userRole === 'ADMIN' && func.checkForRbacFeature()) {
+                apiPromises = [
+                    ...apiPromises,
+                    ...[api.getAllUsersCollections(), settingRequests.getTeamData()] // indices 10,11 or 7,8 if no heavy APIs
+                ]
+            }
+
+            // Execute all APIs in parallel
+            let results = await Promise.allSettled(apiPromises);
+            
+            // Extract collections response (index 0)
+            const apiCollectionsResp = results[0].status === 'fulfilled' ? results[0].value : { apiCollections: [] };
             setLoading(false)
+            
+            if(customCollectionDataFilter){
+                apiCollectionsResp.apiCollections = (apiCollectionsResp.apiCollections || []).filter(customCollectionDataFilter)
+            }
+            
+            // Extract user endpoints (index 1)
+            let hasUserEndpoints = results[1].status === 'fulfilled' ? results[1].value : false;
+            setHasUsageEndpoints(hasUserEndpoints)
+            
+            // Process collections data
+            let tmp = (apiCollectionsResp.apiCollections || []).map(convertToCollectionData);
+            let dataObj = {};
+            dataObj = convertToNewData(tmp, {}, {}, {}, {}, {}, true);
+            
+            const { envTypeObj, collectionMap, activeCollections, categorized } = categorizeCollections(dataObj.prettify);
+            
+            let res = categorized;
+            
+            setData(res);
+            setEnvTypeMap(envTypeObj);
+            setAllCollections(activeCollections);
+            
+            if (res.hostname.length === 0 && (tableSelectedTab === undefined || tableSelectedTab.length === 0)) {
+                setTimeout(() => {
+                    setSelectedTab("custom");
+                    setSelected(3);
+                }, [100]);
+            }
 
-        if(customCollectionDataFilter){
-            apiCollectionsResp.apiCollections = (apiCollectionsResp.apiCollections || []).filter(customCollectionDataFilter)
-        }
-
-        let hasUserEndpoints = await api.getUserEndpoints()
-        setHasUsageEndpoints(hasUserEndpoints)
-        // Optimize data processing with single pass operations
-        let tmp = (apiCollectionsResp.apiCollections || []).map(convertToCollectionData);
-        let dataObj = {};
-        dataObj = convertToNewData(tmp, {}, {}, {}, {}, {}, true);
-        
-        // Abstract categorization logic into reusable function
-        
-        
-        // Use the abstracted categorization function
-        const { envTypeObj, collectionMap, activeCollections, categorized } = categorizeCollections(dataObj.prettify);
-        
-        // Build result object with optimized structure
-        let res = categorized;
-        
-        setData(res);
-        setEnvTypeMap(envTypeObj);
-        setAllCollections(activeCollections);
-        
-        if (res.hostname.length === 0 && (tableSelectedTab === undefined || tableSelectedTab.length === 0)) {
-            setTimeout(() => {
-                setSelectedTab("custom");
-                setSelected(3);
-            }, [100]);
-        }
-
-        const shouldCallHeavyApis = (func.timeNow() - lastFetchedInfo.lastRiskScoreInfo) >= (5 * 60)
-        let apiPromises = [
-            api.getCoverageInfoForCollections(),
-            api.getLastTrafficSeen(),
-            collectionApi.fetchCountForHostnameDeactivatedCollections(),
-            collectionApi.fetchCountForUningestedApis(),
-            collectionApi.fetchUningestedApis(),
-        ];
-        if(shouldCallHeavyApis){
-            apiPromises = [
-                ...apiPromises,
-                ...[api.getRiskScoreInfo(), api.getSensitiveInfoForCollections(), api.getSeverityInfoForCollections()]
-            ]
-        }
-
-        if(userRole === 'ADMIN' && func.checkForRbacFeature()) {
-            apiPromises = [
-                ...apiPromises,
-                ...[api.getAllUsersCollections(), settingRequests.getTeamData()]
-            ]
-        }
-
-        let results = await Promise.allSettled(apiPromises);
-        let coverageInfo = results[0].status === 'fulfilled' ? results[0].value : {};
-        // let coverageInfo = dummyData.coverageMap
-        let trafficInfo = results[1].status === 'fulfilled' ? results[1].value : {};
-        let deactivatedCountInfo = results[2].status === 'fulfilled' ? results[2].value : {};
-        let uningestedApiCountInfo = results[3].status === 'fulfilled' ? results[3].value : {};
-        let uningestedApiDetails = results[4].status === 'fulfilled' ? results[4].value : {};
+            // Extract metadata responses (with corrected indices)
+        let coverageInfo = results[2].status === 'fulfilled' ? results[2].value : {};
+        let trafficInfo = results[3].status === 'fulfilled' ? results[3].value : {};
+        let deactivatedCountInfo = results[4].status === 'fulfilled' ? results[4].value : {};
+        let uningestedApiCountInfo = results[5].status === 'fulfilled' ? results[5].value : {};
+        let uningestedApiDetails = results[6].status === 'fulfilled' ? results[6].value : {};
         let riskScoreObj = lastFetchedResp
         let sensitiveInfo = lastFetchedSensitiveResp
         let severityObj = lastFetchedSeverityResp
 
         if(shouldCallHeavyApis){
-            if(results[5]?.status === "fulfilled"){
-                const res = results[5].value
+            if(results[7]?.status === "fulfilled"){
+                const res = results[7].value
                 riskScoreObj = {
                     criticalUrls: res.criticalEndpointsCount,
                     riskScoreMap: res.riskScoreOfCollectionsMap
                 }
             }
 
-            if(results[6]?.status === "fulfilled"){
-                const res = results[6].value
+            if(results[8]?.status === "fulfilled"){
+                const res = results[8].value
                 sensitiveInfo ={ 
                     sensitiveUrls: res.sensitiveUrlsInResponse,
                     sensitiveInfoMap: res.sensitiveSubtypesInCollection
                 }
             }
 
-            if(results[7]?.status === "fulfilled"){
-                const res = results[7].value
+            if(results[9]?.status === "fulfilled"){
+                const res = results[9].value
                 severityObj = res
             }
 
@@ -463,13 +468,12 @@ function ApiCollections(props) {
             setLastFetchedSensitiveResp(sensitiveInfo)
 
         }
-        setHasUsageEndpoints(hasUserEndpoints)
         setCoverageMap(coverageInfo)
 
         let usersCollectionList = []
         let userList = []
 
-        const index = !shouldCallHeavyApis ? 5 : 8
+        const index = !shouldCallHeavyApis ? 7 : 10
 
         if(userRole === 'ADMIN' && func.checkForRbacFeature()) {
             if(results[index]?.status === "fulfilled") {
