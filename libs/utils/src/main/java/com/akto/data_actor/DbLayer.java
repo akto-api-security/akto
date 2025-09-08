@@ -522,11 +522,21 @@ public class DbLayer {
 
         ApiCollection apiCollection = ApiCollectionsDao.instance.findOne(filters);
         String userEnv = vpcId;
+        boolean vpcIdAlreadyExists = false;
+        
         if (userEnv != null && apiCollection != null && apiCollection.getUserSetEnvType() != null) {
             userEnv = apiCollection.getUserSetEnvType();
             if (!userEnv.contains(vpcId)) {
                 userEnv += ", " + vpcId;
+            } else {
+                vpcIdAlreadyExists = true;
             }
+        }
+
+        // Skip update for existing apiCollection if vpc and tags are same.
+        if ( apiCollection != null && (vpcId == null || vpcIdAlreadyExists) && (tags == null || tags.isEmpty())) {
+            loggerMaker.debug("No new tags or vpcId, Updates skipped for collectionId: " + vxlanId);
+            return;
         }
 
         Bson update = Updates.combine(
@@ -572,11 +582,20 @@ public class DbLayer {
 
         ApiCollection apiCollection = ApiCollectionsDao.instance.findOne(Filters.eq(ApiCollection.HOST_NAME, host));
         String userEnv = vpcId;
+        boolean vpcIdAlreadyExists = false;
         if (userEnv != null && apiCollection != null && apiCollection.getUserSetEnvType() != null) {
             userEnv = apiCollection.getUserSetEnvType();
             if (!userEnv.contains(vpcId)) {
                 userEnv += ", " + vpcId;
+            } else {
+                vpcIdAlreadyExists = true;
             }
+        }
+
+        // Skip update for existing apiCollection if vpc and tags are same.
+        if ( apiCollection != null && (vpcId == null || vpcIdAlreadyExists) && (tags == null || tags.isEmpty())) {
+            loggerMaker.debug("No new tags or vpcId, Updates skipped for collectionId: " + id);
+            return;
         }
 
         Bson updates = Updates.combine(
