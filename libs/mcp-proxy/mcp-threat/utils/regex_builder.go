@@ -1,4 +1,4 @@
-package main
+package utils
 
 import (
 	"fmt"
@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-var suspiciousKeywords = []string{
+var SuspiciousKeywords = []string{
 	// Unix/Linux paths and files
 	"/etc/passwd",
 	"/etc/shadow",
@@ -70,7 +70,6 @@ var suspiciousKeywords = []string{
 	"jailbreak mode",
 	"do anything now",
 	"dan mode",
-	"just for research",
 	"ignore guardrails",
 	"ignore safety layer",
 	"ignore prior context",
@@ -78,10 +77,14 @@ var suspiciousKeywords = []string{
 	"rotate keys now",
 	"god mode",
 	"attacker",
+	"malicious",
+	"exploit",
+	"attack",
+	"hack",
 }
 
 func getSuspiciousRegex() *regexp.Regexp {
-	rex, err := buildUnionRegex(suspiciousKeywords)
+	rex, err := buildUnionRegex(SuspiciousKeywords)
 	if err != nil {
 		return nil
 	}
