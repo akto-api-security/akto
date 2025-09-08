@@ -6,6 +6,7 @@ import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.rbac.UsersCollectionsList;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.util.Constants;
+import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.MongoDatabase;
@@ -14,11 +15,12 @@ import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 public class ApiCollectionsDao extends AccountsContextDaoWithRbac<ApiCollection> {
 
@@ -226,70 +228,129 @@ public class ApiCollectionsDao extends AccountsContextDaoWithRbac<ApiCollection>
                 nonGroupCollectionIds.add(collection.getId());
             }
         }
-                
-        // Step 2: Query count for non-group collections (direct apiCollectionId match)
-        if(!nonGroupCollectionIds.isEmpty()) {
-            Bson hostHeaderFilter = SingleTypeInfoDao.filterForHostHeader(0, false);
-            List<Bson> pipeline = new ArrayList<>();
-            pipeline.add(Aggregates.match(Filters.and(
-                hostHeaderFilter,
-                Filters.in(SingleTypeInfo._API_COLLECTION_ID, nonGroupCollectionIds),
-                filter
-            )));
-            pipeline.add(Aggregates.group(
-                "$" + SingleTypeInfo._API_COLLECTION_ID,
-                Accumulators.sum("count", 1)
-            ));
+        
+        // Capture current context before async operations
+        final Integer currentAccountId = Context.accountId.get();
+        final Integer currentUserId = Context.userId.get();
+        final CONTEXT_SOURCE currentContextSource = Context.contextSource.get();
+        
+        // Create a custom executor for better control
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        
+        // Step 2: Execute group and non-group queries in parallel
+        CompletableFuture<Map<Integer, Integer>> nonGroupFuture = CompletableFuture.supplyAsync(() -> {
+            // Restore context in async thread
+            Context.accountId.set(currentAccountId);
+            Context.userId.set(currentUserId);
+            Context.contextSource.set(currentContextSource);
             
-            MongoCursor<BasicDBObject> cursor = SingleTypeInfoDao.instance.getMCollection()
-                .aggregate(pipeline, BasicDBObject.class).cursor();
-            
-            while(cursor.hasNext()) {
-                try {
-                    BasicDBObject doc = cursor.next();
-                    int apiCollectionId = doc.getInt("_id");
-                    int count = doc.getInt("count");
-                    countMap.put(apiCollectionId, count);
-                } catch (Exception e) {
-                    e.printStackTrace();
+            Map<Integer, Integer> nonGroupCountMap = new HashMap<>();
+            try {
+                if(!nonGroupCollectionIds.isEmpty()) {
+                    Bson hostHeaderFilter = SingleTypeInfoDao.filterForHostHeader(0, false);
+                    List<Bson> pipeline = new ArrayList<>();
+                    pipeline.add(Aggregates.match(Filters.and(
+                        hostHeaderFilter,
+                        Filters.in(SingleTypeInfo._API_COLLECTION_ID, nonGroupCollectionIds),
+                        filter
+                    )));
+                    pipeline.add(Aggregates.group(
+                        "$" + SingleTypeInfo._API_COLLECTION_ID,
+                        Accumulators.sum("count", 1)
+                    ));
+                    
+                    MongoCursor<BasicDBObject> cursor = SingleTypeInfoDao.instance.getMCollection()
+                        .aggregate(pipeline, BasicDBObject.class).cursor();
+                    
+                    while(cursor.hasNext()) {
+                        try {
+                            BasicDBObject doc = cursor.next();
+                            int apiCollectionId = doc.getInt("_id");
+                            int count = doc.getInt("count");
+                            nonGroupCountMap.put(apiCollectionId, count);
+                        } catch (Exception e) {
+                            e.printStackTrace();
+                        }
+                    }
                 }
+            } finally {
+                // Clean up ThreadLocal
+                Context.accountId.remove();
+                Context.userId.remove();
             }
-        }
+            return nonGroupCountMap;
+        }, executor);
 
-        if(!groupCollectionIds.isEmpty()) {
-            Bson hostHeaderFilter = SingleTypeInfoDao.filterForHostHeader(0, false);
-            List<Bson> pipeline = new ArrayList<>();
-            pipeline.add(Aggregates.match(Filters.and(
-                hostHeaderFilter,
-                Filters.in(SingleTypeInfo._COLLECTION_IDS, groupCollectionIds),
-                filter
-            )));
-            pipeline.add(Aggregates.unwind("$" + SingleTypeInfo._COLLECTION_IDS));
-            pipeline.add(Aggregates.match(
-                Filters.in(SingleTypeInfo._COLLECTION_IDS, groupCollectionIds)
-            ));
-            pipeline.add(Aggregates.group(
-                "$" + SingleTypeInfo._COLLECTION_IDS,
-                Accumulators.sum("count", 1)
-            ));
+        CompletableFuture<Map<Integer, Integer>> groupFuture = CompletableFuture.supplyAsync(() -> {
+            // Restore context in async thread
+            Context.accountId.set(currentAccountId);
+            Context.userId.set(currentUserId);
+            Context.contextSource.set(currentContextSource);
             
-            MongoCursor<BasicDBObject> cursor = SingleTypeInfoDao.instance.getMCollection()
-                .aggregate(pipeline, BasicDBObject.class).cursor();
-            
-            while(cursor.hasNext()) {
-                try {
-                    BasicDBObject doc = cursor.next();
-                    int apiCollectionId = doc.getInt("_id");
-                    int count = doc.getInt("count");
-                    int existingCount = countMap.getOrDefault(apiCollectionId, 0);
-                    countMap.put(apiCollectionId, existingCount + count);
-                } catch (Exception e) {
-                    e.printStackTrace();
+            Map<Integer, Integer> groupCountMap = new HashMap<>();
+            try {
+                if(!groupCollectionIds.isEmpty()) {
+                    Bson hostHeaderFilter = SingleTypeInfoDao.filterForHostHeader(0, false);
+                    List<Bson> pipeline = new ArrayList<>();
+                    pipeline.add(Aggregates.match(Filters.and(
+                        hostHeaderFilter,
+                        Filters.in(SingleTypeInfo._COLLECTION_IDS, groupCollectionIds),
+                        filter
+                    )));
+                    pipeline.add(Aggregates.unwind("$" + SingleTypeInfo._COLLECTION_IDS));
+                    pipeline.add(Aggregates.match(
+                        Filters.in(SingleTypeInfo._COLLECTION_IDS, groupCollectionIds)
+                    ));
+                    pipeline.add(Aggregates.group(
+                        "$" + SingleTypeInfo._COLLECTION_IDS,
+                        Accumulators.sum("count", 1)
+                    ));
+                    
+                    MongoCursor<BasicDBObject> cursor = SingleTypeInfoDao.instance.getMCollection()
+                        .aggregate(pipeline, BasicDBObject.class).cursor();
+                    
+                    while(cursor.hasNext()) {
+                        try {
+                            BasicDBObject doc = cursor.next();
+                            int apiCollectionId = doc.getInt("_id");
+                            int count = doc.getInt("count");
+                            groupCountMap.put(apiCollectionId, count);
+                        } catch (Exception e) {
+                            e.printStackTrace();
+                        }
+                    }
                 }
+            } finally {
+                // Clean up ThreadLocal
+                Context.accountId.remove();
+                Context.userId.remove();
             }
+            return groupCountMap;
+        }, executor);
+        
+        // Wait for both futures to complete and merge results
+        try {
+            Map<Integer, Integer> nonGroupCounts = nonGroupFuture.get();
+            Map<Integer, Integer> groupCounts = groupFuture.get();
+            
+            // Merge non-group counts
+            countMap.putAll(nonGroupCounts);
+            
+            // Merge group counts (handle potential overlaps)
+            for (Map.Entry<Integer, Integer> entry : groupCounts.entrySet()) {
+                int apiCollectionId = entry.getKey();
+                int count = entry.getValue();
+                int existingCount = countMap.getOrDefault(apiCollectionId, 0);
+                countMap.put(apiCollectionId, existingCount + count);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        } finally {
+            // Shutdown executor
+            executor.shutdown();
         }
         
-        // Step 4: Add code analysis counts (if any)
+        // Step 3: Add code analysis counts (if any)
         Map<String, Integer> codeAnalysisUrlsCountMap = CodeAnalysisApiInfoDao.instance.getUrlsCount();
         if (!codeAnalysisUrlsCountMap.isEmpty()) {
             Map<String, Integer> idToCollectionNameMap = CodeAnalysisCollectionDao.instance.findIdToCollectionNameMap();
