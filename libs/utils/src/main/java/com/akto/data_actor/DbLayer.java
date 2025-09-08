@@ -587,7 +587,7 @@ public class DbLayer {
             userEnv = apiCollection.getUserSetEnvType();
             if (!userEnv.contains(vpcId)) {
                 userEnv += ", " + vpcId;
-            }else{
+            } else {
                 vpcIdAlreadyExists = true;
             }
         }

@@ -2363,7 +2363,7 @@ public class DbAction extends ActionSupport {
 
         String singleTagString = combinedTags.toString();
         if (ParamFilter.isNewEntry(Context.accountId.get(), apiCollectionId, "", "", singleTagString)) {
-        loggerMaker.debug("New tags found for apiCollectionId:" + apiCollectionId
+        loggerMaker.debug("New tags found for apiCollectionId: " + apiCollectionId
                 + "Bloom filter tagMissCount: " + tagMissCount);
             tagMissCount++;
             return tags;
@@ -2371,7 +2371,7 @@ public class DbAction extends ActionSupport {
 
         // Monitor bloom filter efficacy
         tagHitCount++;
-        loggerMaker.debug("Skipping tags updates, already present for apiCollectionId:" + apiCollectionId
+        loggerMaker.debug("Skipping tags updates, already present for apiCollectionId: " + apiCollectionId
                 + "Bloom filter tagHitCount: " + tagHitCount);
         return null;
     }
