@@ -133,8 +133,100 @@ public class ApiCollectionsAction extends UserAction {
                 apiCollection.setUrlsCount(fallbackCount);
             }
 
-            if(apiCollection.isMcpCollection() || (apiCollection.isMcpCollection() && apiCollection.isGuardRailCollection())) {
-                // do not clear urls for mcp and guardrail collections
+            if(apiCollection.isMcpCollection()) {
+                // Fetch URLs from api_hit_count_info for MCP and guard-rail collections
+                int collectionId = apiCollection.getId();
+                
+                // First, get the count of unique URLs to decide on approach
+                List<Bson> countPipeline = new ArrayList<>();
+                countPipeline.add(Aggregates.match(Filters.eq("apiCollectionId", collectionId)));
+                countPipeline.add(Aggregates.group(
+                    new BasicDBObject("url", "$url").append("method", "$method")
+                ));
+                countPipeline.add(Aggregates.count("totalCount"));
+                
+                int totalUniqueUrls = 0;
+                try (MongoCursor<BasicDBObject> countCursor = ApiHitCountInfoDao.instance.getMCollection()
+                    .aggregate(countPipeline, BasicDBObject.class).cursor()) {
+                    if (countCursor.hasNext()) {
+                        BasicDBObject countResult = countCursor.next();
+                        totalUniqueUrls = countResult.getInt("totalCount", 0);
+                    }
+                }
+                
+                Set<String> urlsFromHitCount = new HashSet<>();
+                
+                // If URLs count is reasonable, fetch all; otherwise fetch top URLs by hit count
+                if (totalUniqueUrls > 0) {
+                    List<Bson> pipeline = new ArrayList<>();
+                    pipeline.add(Aggregates.match(Filters.eq("apiCollectionId", collectionId)));
+                    
+                    if (totalUniqueUrls > 1000) {
+                        // For large collections, use sampling to get a representative subset
+                        // Calculate sampling rate to get approximately 1000 URLs
+                        double samplingRate = 1000.0 / totalUniqueUrls;
+                        
+                        pipeline.add(Aggregates.group(
+                            new BasicDBObject("url", "$url").append("method", "$method"),
+                            Accumulators.first("count", "$count")
+                        ));
+                        
+                        // Use MongoDB's sample operator for random sampling
+                        // This ensures we get a representative sample across all URLs
+                        pipeline.add(Aggregates.sample((int) Math.min(1000, totalUniqueUrls)));
+                        
+                        try (MongoCursor<BasicDBObject> cursor = ApiHitCountInfoDao.instance.getMCollection()
+                            .aggregate(pipeline, BasicDBObject.class).cursor()) {
+                            
+                            while(cursor.hasNext()) {
+                                BasicDBObject result = cursor.next();
+                                BasicDBObject id = (BasicDBObject) result.get("_id");
+                                if (id != null) {
+                                    String url = id.getString("url");
+                                    String method = id.getString("method");
+                                    if (url != null && method != null) {
+                                        urlsFromHitCount.add(url + " " + method);
+                                    }
+                                }
+                            }
+                        }
+                        
+                        loggerMaker.debugAndAddToDb("Collection " + collectionId + " has " + totalUniqueUrls + 
+                            " unique URLs, sampled " + urlsFromHitCount.size() + " URLs (sampling rate: " + 
+                            String.format("%.2f%%", samplingRate * 100) + ")", LogDb.DASHBOARD);
+                    } else {
+                        // For smaller collections, fetch all URLs
+                        pipeline.add(Aggregates.group(
+                            new BasicDBObject("url", "$url").append("method", "$method")
+                        ));
+                        
+                        try (MongoCursor<BasicDBObject> cursor = ApiHitCountInfoDao.instance.getMCollection()
+                            .aggregate(pipeline, BasicDBObject.class).cursor()) {
+                            
+                            while(cursor.hasNext()) {
+                                BasicDBObject result = cursor.next();
+                                BasicDBObject id = (BasicDBObject) result.get("_id");
+                                if (id != null) {
+                                    String url = id.getString("url");
+                                    String method = id.getString("method");
+                                    if (url != null && method != null) {
+                                        urlsFromHitCount.add(url + " " + method);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                
+                // Set the URLs from api_hit_count_info
+                if (!urlsFromHitCount.isEmpty()) {
+                    apiCollection.setUrls(urlsFromHitCount);
+                } else {
+                    // Keep existing URLs if no data found in api_hit_count_info
+                    if (apiCollection.getUrls() == null) {
+                        apiCollection.setUrls(new HashSet<>());
+                    }
+                }
             }else{
                 apiCollection.setUrls((new HashSet<>()));
             }
@@ -220,8 +312,7 @@ public class ApiCollectionsAction extends UserAction {
         UsersCollectionsList.deleteContextCollectionsForUser(Context.accountId.get(), Context.contextSource.get());
         pipeLine.add(Aggregates.project(Projections.fields(
                 Projections.computed(ApiCollection.URLS_COUNT, new BasicDBObject("$size", new BasicDBObject("$ifNull", Arrays.asList("$urls", Collections.emptyList())))),
-                Projections.include(ApiCollection.ID, ApiCollection.NAME, ApiCollection.HOST_NAME, ApiCollection._TYPE, ApiCollection.TAGS_STRING, ApiCollection._DEACTIVATED,ApiCollection.START_TS, ApiCollection.AUTOMATED, ApiCollection.DESCRIPTION, ApiCollection.USER_ENV_TYPE, ApiCollection.IS_OUT_OF_TESTING_SCOPE,
-                        ApiCollection._URLS)
+                Projections.include(ApiCollection.ID, ApiCollection.NAME, ApiCollection.HOST_NAME, ApiCollection._TYPE, ApiCollection.TAGS_STRING, ApiCollection._DEACTIVATED,ApiCollection.START_TS, ApiCollection.AUTOMATED, ApiCollection.DESCRIPTION, ApiCollection.USER_ENV_TYPE, ApiCollection.IS_OUT_OF_TESTING_SCOPE)
         )));
 
         try {
