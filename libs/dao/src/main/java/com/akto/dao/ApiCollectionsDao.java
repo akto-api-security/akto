@@ -14,6 +14,8 @@ import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -159,6 +161,9 @@ public class ApiCollectionsDao extends AccountsContextDaoWithRbac<ApiCollection>
         } catch(Exception e){
         }
 
+        // segregate above ids into group, non group
+        // make 2 separate queries
+
         BasicDBObject groupedId = new BasicDBObject(SingleTypeInfo._COLLECTION_IDS, "$" + SingleTypeInfo._COLLECTION_IDS);
         pipeline.add(Aggregates.unwind("$" + SingleTypeInfo._COLLECTION_IDS));
         pipeline.add(Aggregates.group(groupedId, Accumulators.sum("count",1)));
@@ -190,6 +195,124 @@ public class ApiCollectionsDao extends AccountsContextDaoWithRbac<ApiCollection>
             countMap.put(apiCollectionId, currentCount);
         }
 
+
+        return countMap;
+    }
+
+    public Map<Integer, Integer> buildEndpointsCountToApiCollectionMapOptimized(Bson filter, List<ApiCollection> apiCollections) {
+        Map<Integer, Integer> countMap = new HashMap<>();
+        int ts = Context.nowInMillis();
+        // Get user collection IDs for RBAC filtering
+        List<Integer> userCollectionIds = null;
+        try {
+            userCollectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
+        } catch(Exception e){
+            // If no user collections, proceed without filtering
+        }
+        
+        System.out.println("Time taken to fetch user collections: " + (Context.nowInMillis() - ts) + " ms\n");
+        // If no collection IDs provided, return empty map
+        if(userCollectionIds == null || userCollectionIds.isEmpty()) {
+            return countMap;
+        }
+        
+        // Step 1: Query api_collections to separate group and non-group collections
+        List<Integer> groupCollectionIds = new ArrayList<>();
+        List<Integer> nonGroupCollectionIds = new ArrayList<>();
+                
+        for(ApiCollection collection : apiCollections) {
+            if(collection.getType() == ApiCollection.Type.API_GROUP) {
+                groupCollectionIds.add(collection.getId());
+            } else {
+                nonGroupCollectionIds.add(collection.getId());
+            }
+        }
+
+        System.out.println("Time taken to segregate collections: " + (Context.nowInMillis() - ts) + " ms\n");
+                
+        // Step 2: Query count for non-group collections (direct apiCollectionId match)
+        if(!nonGroupCollectionIds.isEmpty()) {
+            Bson hostHeaderFilter = SingleTypeInfoDao.filterForHostHeader(0, false);
+            List<Bson> pipeline = new ArrayList<>();
+            pipeline.add(Aggregates.match(Filters.and(
+                hostHeaderFilter,
+                Filters.in(SingleTypeInfo._API_COLLECTION_ID, nonGroupCollectionIds),
+                filter
+            )));
+            pipeline.add(Aggregates.group(
+                "$" + SingleTypeInfo._API_COLLECTION_ID,
+                Accumulators.sum("count", 1)
+            ));
+            
+            MongoCursor<BasicDBObject> cursor = SingleTypeInfoDao.instance.getMCollection()
+                .aggregate(pipeline, BasicDBObject.class).cursor();
+            
+            while(cursor.hasNext()) {
+                try {
+                    BasicDBObject doc = cursor.next();
+                    int apiCollectionId = doc.getInt("_id");
+                    int count = doc.getInt("count");
+                    countMap.put(apiCollectionId, count);
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            }
+        }
+
+        System.out.println("Time taken to process non-group collections: " + (Context.nowInMillis() - ts) + " ms\n");
+
+        if(!groupCollectionIds.isEmpty()) {
+            Bson hostHeaderFilter = SingleTypeInfoDao.filterForHostHeader(0, false);
+            List<Bson> pipeline = new ArrayList<>();
+            pipeline.add(Aggregates.match(Filters.and(
+                hostHeaderFilter,
+                Filters.in(SingleTypeInfo._COLLECTION_IDS, groupCollectionIds),
+                filter
+            )));
+            pipeline.add(Aggregates.unwind("$" + SingleTypeInfo._COLLECTION_IDS));
+            pipeline.add(Aggregates.match(
+                Filters.in(SingleTypeInfo._COLLECTION_IDS, groupCollectionIds)
+            ));
+            pipeline.add(Aggregates.group(
+                "$" + SingleTypeInfo._COLLECTION_IDS,
+                Accumulators.sum("count", 1)
+            ));
+            
+            MongoCursor<BasicDBObject> cursor = SingleTypeInfoDao.instance.getMCollection()
+                .aggregate(pipeline, BasicDBObject.class).cursor();
+            
+            while(cursor.hasNext()) {
+                try {
+                    BasicDBObject doc = cursor.next();
+                    int apiCollectionId = doc.getInt("_id");
+                    int count = doc.getInt("count");
+                    int existingCount = countMap.getOrDefault(apiCollectionId, 0);
+                    countMap.put(apiCollectionId, existingCount + count);
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            }
+        }
+
+        System.out.println("Time taken to process group collections: " + (Context.nowInMillis() - ts) + " ms\n");
+        
+        // Step 4: Add code analysis counts (if any)
+        Map<String, Integer> codeAnalysisUrlsCountMap = CodeAnalysisApiInfoDao.instance.getUrlsCount();
+        if (!codeAnalysisUrlsCountMap.isEmpty()) {
+            Map<String, Integer> idToCollectionNameMap = CodeAnalysisCollectionDao.instance.findIdToCollectionNameMap();
+            for (String codeAnalysisId: codeAnalysisUrlsCountMap.keySet()) {
+                int count = codeAnalysisUrlsCountMap.getOrDefault(codeAnalysisId, 0);
+                Integer apiCollectionId = idToCollectionNameMap.get(codeAnalysisId);
+                if (apiCollectionId == null) continue;
+                
+                int currentCount = countMap.getOrDefault(apiCollectionId, 0);
+                currentCount += count;
+                
+                countMap.put(apiCollectionId, currentCount);
+            }
+        }
+        
+        System.out.println("Total time taken: " + (Context.nowInMillis() - ts) + " ms\n");
 
         return countMap;
     }
