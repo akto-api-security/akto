@@ -2367,14 +2367,14 @@ public class DbAction extends ActionSupport {
         if (ParamFilter.isNewEntry(Context.accountId.get(), apiCollectionId, "", "", singleTagString)) {
             tagMissCount.incrementAndGet();
             loggerMaker.info("New tags found for apiCollectionId: " + apiCollectionId
-                + "Bloom filter tagMissCount: " + tagMissCount.get());
+                + " Bloom filter tagMissCount: " + tagMissCount.get());
             return tags;
         }
 
         // Monitor bloom filter efficacy
         tagHitCount.incrementAndGet();
         loggerMaker.info("Skipping tags updates, already present for apiCollectionId: " + apiCollectionId
-                + "Bloom filter tagHitCount: " + tagHitCount.get());
+                + " Bloom filter tagHitCount: " + tagHitCount.get());
         return null;
     }
 
