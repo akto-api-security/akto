@@ -83,8 +83,7 @@ function GuardrailPolicies() {
 
     const rowClicked = async(data) => {
         setShowDetails(true)
-        setSampleData("--- \n ---")
-
+        setSampleData(data.yaml)
     }
 
     const currentComponentsForYamlPolicy = [
@@ -113,7 +112,7 @@ function GuardrailPolicies() {
             rowClickable={true} 
         />,   
         <FlyLayout
-            title={"Test Details"}
+            title={"Policy Details"}
             show={showDetails}
             setShow={setShowDetails}
             components={currentComponentsForYamlPolicy}

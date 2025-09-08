@@ -943,9 +943,10 @@ const sampleDataMap = {
 const policies = [
     {
         severityComp: "HIGH",
-        policy: "p1",
-        category: "p2",
-        createdTs: 1757313964
+        policy: "MCP PII Redaction Guardrail",
+        category: "PII and Sensitive data",
+        yaml: "id: MCP_PII_REDACTION_1\r\ninfo:\r\n  name: \"MCP PII Redaction Guardrail\"\r\n  description: >\r\n    \"Guardrail deployed as a proxy between MCP client and MCP server to detect and redact Personal Identifiable Information (PII) such as email addresses, social security numbers, credit card numbers, and phone numbers in responses to prevent disclosure.\"\r\nfilters:\r\n  request_payload:\r\n    - pattern: \"(name|address|ssn|social security|phone number|email|credit card|password)\"\r\n      type: regex\r\n      case_sensitive: false\r\n      description: \"Detects PII-related keywords in client requests to MCP server\"\r\n  response_payload:\r\n    - pattern: \"\\\\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\\\.[A-Za-z]{2,}\\\\b\"\r\n      type: regex\r\n      description: \"Detects email addresses in MCP server response\"\r\n      action:\r\n        type: redact\r\n        replacement: \"[EMAIL_REDACTED]\"\r\n    - pattern: \"\\\\b\\\\d{3}-\\\\d{2}-\\\\d{4}\\\\b\"\r\n      type: regex\r\n      description: \"Detects Social Security Numbers in MCP server response\"\r\n      action:\r\n        type: redact\r\n        replacement: \"[SSN_REDACTED]\"\r\n    - pattern: \"\\\\b\\\\d{4}-\\\\d{4}-\\\\d{4}-\\\\d{4}\\\\b\"\r\n      type: regex\r\n      description: \"Detects credit card numbers in MCP server response\"\r\n      action:\r\n        type: redact\r\n        replacement: \"[CREDIT_CARD_REDACTED]\"\r\n    - pattern: \"\\\\b\\\\d{3}-\\\\d{3}-\\\\d{4}\\\\b\"\r\n      type: regex\r\n      description: \"Detects phone numbers in MCP server response\"\r\n      action:\r\n        type: redact\r\n        replacement: \"[PHONE_REDACTED]\"",
+        createdTs: "Sep 1, 2025"
     }
 ]
 
