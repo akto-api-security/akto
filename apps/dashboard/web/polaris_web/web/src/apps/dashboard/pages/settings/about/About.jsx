@@ -55,10 +55,8 @@ function About() {
     const [compulsoryDescription, setCompulsoryDescription] = useState({
         falsePositive: true,
         noTimeToFix: false,
-        AcceptableFix: false
+        acceptableFix: false
     })
-
-    const [pdf, setPdf] = useState("")
 
     const setupOptions = settingFunctions.getSetupOptions()
 
@@ -89,11 +87,9 @@ function About() {
         setSelectedUrlsList(resp.allowRedundantEndpointsList || [])
         setToggleCaseSensitiveApis(resp.handleApisCaseInsensitive || false)
         setMergingOnVersions(resp.allowMergingOnVersions || false)
-        setCompulsoryDescription(resp.compulsoryDescription || {
-            falsePositive: true,
-            noTimeToFix: false,
-            AcceptableFix: false
-        })
+        if(resp?.compulsoryDescription && Object.keys(resp?.compulsoryDescription).length > 0) {
+            setCompulsoryDescription(resp.compulsoryDescription)
+        }
     }
 
     useEffect(()=>{
@@ -420,7 +416,7 @@ function About() {
 
     const compulsoryDescriptionComponent = (
         <VerticalStack gap={4}>
-            <Text variant="headingMd">Compulsory Description Settings</Text>
+            <Text variant="headingSm">Compulsory Description Settings</Text>
             <Text variant="bodyMd" color="subdued">
                 Configure which issue status changes require mandatory descriptions to be provided.
             </Text>
@@ -439,11 +435,10 @@ function About() {
                 />
                 <Checkbox
                     label="Acceptable Fix - Require description when marking issues as acceptable fix"
-                    checked={compulsoryDescription.AcceptableFix}
-                    onChange={(checked) => handleCompulsoryToggle('AcceptableFix', checked)}
+                    checked={compulsoryDescription.acceptableFix}
+                    onChange={(checked) => handleCompulsoryToggle('acceptableFix', checked)}
                     disabled={window.USER_ROLE !== 'ADMIN'}
                 />
-                {/* Save button removed - changes are saved immediately when a checkbox is toggled */}
             </VerticalStack>
         </VerticalStack>
     )

@@ -22,7 +22,6 @@ import com.akto.runtime.Main;
 import com.akto.runtime.policies.ApiAccessTypePolicy;
 import com.akto.util.Constants;
 import com.akto.util.DashboardMode;
-import com.akto.utils.jobs.CleanInventory;
 import com.akto.utils.jobs.JobUtils;
 import com.akto.utils.libs.utils.src.main.java.com.akto.runtime.policies.ApiAccessTypePolicyUtil;
 import com.mongodb.client.model.Filters;
@@ -66,24 +65,6 @@ public class AdminSettingsAction extends UserAction {
     @Override
     public String execute() throws Exception {
         accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
-        
-        // Initialize compulsoryDescription with defaults if it doesn't exist
-        if (accountSettings == null || accountSettings.getCompulsoryDescription() == null || accountSettings.getCompulsoryDescription().isEmpty()) {
-            Map<String, Boolean> defaultCompulsoryDescription = new HashMap<>();
-            defaultCompulsoryDescription.put("falsePositive", false);
-            defaultCompulsoryDescription.put("noTimeToFix", false);
-            defaultCompulsoryDescription.put("AcceptableFix", false);
-            
-            AccountSettingsDao.instance.getMCollection().updateOne(
-                AccountSettingsDao.generateFilter(),
-                Updates.set(AccountSettings.COMPULSORY_DESCRIPTION, defaultCompulsoryDescription),
-                new UpdateOptions().upsert(true)
-            );
-            
-            // Reload the accountSettings to get the updated document
-            accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
-        }
-        
         organization = OrganizationsDao.instance.findOne(Filters.empty());
         if(Context.accountId.get() != null && Context.accountId.get() != 0){
             currentAccount = AccountsDao.instance.findOne(
@@ -508,10 +489,9 @@ public class AdminSettingsAction extends UserAction {
         }
 
         try {
-            AccountSettingsDao.instance.getMCollection().updateOne(
+            AccountSettingsDao.instance.updateOneNoUpsert(
                 AccountSettingsDao.generateFilter(),
-                Updates.set(AccountSettings.COMPULSORY_DESCRIPTION, compulsoryDescription),
-                new UpdateOptions().upsert(true)
+                Updates.set(AccountSettings.COMPULSORY_DESCRIPTION, compulsoryDescription)
             );
             return SUCCESS.toUpperCase();
         } catch (Exception e) {

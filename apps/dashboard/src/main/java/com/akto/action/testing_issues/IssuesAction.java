@@ -603,11 +603,8 @@ public class IssuesAction extends UserAction {
         logger.debug("Issue id from db to be updated " + issueId);
         logger.debug("status id from db to be updated " + statusToBeUpdated);
         logger.debug("status reason from db to be updated " + ignoreReason);
-    User user = getSUser();
-    String userLogin = user != null ? user.getLogin() : "System";
-    Bson update = Updates.combine(Updates.set(TestingRunIssues.TEST_RUN_ISSUES_STATUS, statusToBeUpdated),
-                    Updates.set(TestingRunIssues.LAST_UPDATED, Context.now()),
-                    Updates.set(TestingRunIssues.LAST_UPDATED_BY, userLogin));
+        Bson update = Updates.combine(Updates.set(TestingRunIssues.TEST_RUN_ISSUES_STATUS, statusToBeUpdated),
+                        Updates.set(TestingRunIssues.LAST_UPDATED, Context.now()));
 
         if (statusToBeUpdated == TestRunIssueStatus.IGNORED) { //Changing status to ignored
             update = Updates.combine(update, Updates.set(TestingRunIssues.IGNORE_REASON, ignoreReason));
@@ -631,16 +628,19 @@ public class IssuesAction extends UserAction {
         logger.debug("Issue id from db to be updated " + issueIdArray);
         logger.debug("status id from db to be updated " + statusToBeUpdated);
         logger.debug("status reason from db to be updated " + ignoreReason);
-    User user = getSUser();
-    String userLogin = user != null ? user.getLogin() : "System";
-    Bson update = Updates.combine(Updates.set(TestingRunIssues.TEST_RUN_ISSUES_STATUS, statusToBeUpdated),
-        Updates.set(TestingRunIssues.LAST_UPDATED, Context.now()),
-        Updates.set(TestingRunIssues.LAST_UPDATED_BY, userLogin));
+        User user = getSUser();
+        String userLogin = user != null ? user.getLogin() : "System";
+        Bson update = Updates.combine(Updates.set(TestingRunIssues.TEST_RUN_ISSUES_STATUS, statusToBeUpdated),
+            Updates.set(TestingRunIssues.LAST_UPDATED, Context.now()),
+            Updates.set(TestingRunIssues.LAST_UPDATED_BY, userLogin));
 
         if (statusToBeUpdated == TestRunIssueStatus.IGNORED) { //Changing status to ignored
             update = Updates.combine(update, Updates.set(TestingRunIssues.IGNORE_REASON, ignoreReason));
         } else {
             update = Updates.combine(update, Updates.unset(TestingRunIssues.IGNORE_REASON));
+        }
+        if(!StringUtils.isEmpty(this.description)) {
+            update = Updates.combine(update, Updates.set(TestingRunIssues.DESCRIPTION, this.description));
         }
         TestingRunIssuesDao.instance.updateMany(Filters.in(ID, issueIdArray), update);
 
@@ -792,18 +792,7 @@ public class IssuesAction extends UserAction {
             return ERROR.toUpperCase();
         }
         
-        User user = getSUser();
-        String userLogin = user != null ? user.getLogin() : "Unknown";
-        int currentTime = Context.now();
-        
-        Bson update = Updates.combine(
-            Updates.set(TestingRunIssues.DESCRIPTION, description),
-            Updates.set(TestingRunIssues.DESCRIPTION_UPDATED_BY, userLogin),
-            Updates.set(TestingRunIssues.DESCRIPTION_UPDATED_AT, currentTime),
-            Updates.set(TestingRunIssues.LAST_UPDATED, currentTime)
-        );
-        
-        TestingRunIssuesDao.instance.updateOneNoUpsert(Filters.eq(Constants.ID, issueId), update);
+        TestingRunIssuesDao.instance.updateOneNoUpsert(Filters.eq(Constants.ID, issueId), Updates.set(TestingRunIssues.DESCRIPTION, description));
         return SUCCESS.toUpperCase();
     }
 
