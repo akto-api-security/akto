@@ -2374,7 +2374,7 @@ public class DbAction extends ActionSupport {
         // Monitor bloom filter efficacy
         tagHitCount.incrementAndGet();
         loggerMaker.info("Skipping tags updates, already present for apiCollectionId: " + apiCollectionId
-                + " accountId: " + Context.accountId.get() +" Bloom filter tagHitCount: " + tagHitCount.get());
+                + " accountId: " + Context.accountId.get() + " Bloom filter tagHitCount: " + tagHitCount.get());
         return null;
     }
 
