@@ -37,9 +37,9 @@ const headings = [
     title: "Policy",
   },
   {
-    text: "Filter",
-    value: "filterId",
-    title: "Guardrail type",
+    text: "Category",
+    value: "category",
+    title: "Category",
   },
   {
     text: "Created on",
@@ -79,7 +79,7 @@ function GuardrailPolicies() {
         />
       );
       
-
+    const policyData = guardRailData.policies
 
     const rowClicked = async(data) => {
         setShowDetails(true)
@@ -97,13 +97,13 @@ function GuardrailPolicies() {
 
 
       const components = [
-        <GithubSimpleTable>
+        <GithubSimpleTable
             key={0}
             resourceName={resourceName}
             useNewRow={true}
             headers={headings}
             headings={headings}
-            data={[]}
+            data={policyData}
             hideQueryField={true}
             hidePagination={true}
             showFooter={false}
@@ -111,7 +111,7 @@ function GuardrailPolicies() {
             emptyStateMarkup={emptyStateMarkup}   
             onRowClick={rowClicked}    
             rowClickable={true} 
-        </GithubSimpleTable>,   
+        />,   
         <FlyLayout
             title={"Test Details"}
             show={showDetails}

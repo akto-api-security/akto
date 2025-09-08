@@ -939,6 +939,16 @@ const sampleDataMap = {
   "/rest/user/login": loginPayload,
   "/investments/watchlists": xxPayload
 }
-const guardRailData = {guardRailDummyData, sampleDataMap};
+
+const policies = [
+    {
+        severityComp: "HIGH",
+        policy: "p1",
+        category: "p2",
+        createdTs: 1757313964
+    }
+]
+
+const guardRailData = {guardRailDummyData, sampleDataMap, policies};
 
 export default guardRailData;
