@@ -75,9 +75,9 @@ public class TestResultsStatsAction extends UserAction {
      */
     private static final String REGEX_CLOUDFLARE_BLOCKED = "(error\\s*1[0-9]{3}|error\\s*10[0-9]{3}|" +
             "access\\s*denied|rate\\s*limited|" +
-            "attention\\s*required.*cloudflare|" +
-            "blocked.*cloudflare|" +
-            "security\\s*service.*protect|" +
+            "attention\\s*required|" +
+            "blocked|" +
+            "security\\s*service|" +
             "ray\\s*id.*blocked)";
 
     public String fetchTestResultsStatsCount() {
