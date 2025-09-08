@@ -230,27 +230,25 @@ public class TestResultsStatsAction extends UserAction {
 
     private void explainAggregationPipeline(List<Bson> pipeline) {
         try {
-            System.out.println("=== RUNNING AGGREGATION EXPLAIN ===");
+            loggerMaker.debugAndAddToDb("=== RUNNING AGGREGATION EXPLAIN ===", LogDb.DASHBOARD);
 
             Document explainResult = TestingRunResultDao.instance.getRawCollection()
                     .aggregate(pipeline)
                     .explain(ExplainVerbosity.EXECUTION_STATS);
 
             if (explainResult != null) {
-                System.out.println("=== AGGREGATION EXPLAIN RESULTS ===");
-                System.out.println("Full Explain: " + explainResult.toJson());
+                loggerMaker.debugAndAddToDb("=== AGGREGATION EXPLAIN RESULTS ===", LogDb.DASHBOARD);
+                loggerMaker.debugAndAddToDb("Full Explain: " + explainResult.toJson(), LogDb.DASHBOARD);
 
                 loggerMaker.infoAndAddToDb("=== AGGREGATION EXPLAIN RESULTS ===", LogDb.DASHBOARD);
                 loggerMaker.infoAndAddToDb("Full Explain: " + explainResult.toJson(), LogDb.DASHBOARD);
 
                 analyzeExplainResults(explainResult);
             } else {
-                System.out.println("No explain result returned");
+                loggerMaker.debugAndAddToDb("No explain result returned", LogDb.DASHBOARD);
             }
 
         } catch (Exception e) {
-            System.err.println("Error running explain on aggregation pipeline: " + e.getMessage());
-            e.printStackTrace();
             loggerMaker.errorAndAddToDb(e, "Error running explain on aggregation pipeline: " + e.getMessage());
         }
     }
@@ -260,24 +258,22 @@ public class TestResultsStatsAction extends UserAction {
      */
     private void analyzeExplainResults(Document explanation) {
         try {
-            System.out.println("=== ANALYZING EXPLAIN RESULTS ===");
+            loggerMaker.debugAndAddToDb("=== ANALYZING EXPLAIN RESULTS ===", LogDb.DASHBOARD);
 
             @SuppressWarnings("unchecked")
             List<Document> stages = explanation.get("stages", List.class);
             if (stages != null && !stages.isEmpty()) {
-                System.out.println("Found " + stages.size() + " stages");
+                loggerMaker.debugAndAddToDb("Found " + stages.size() + " stages", LogDb.DASHBOARD);
                 for (int i = 0; i < stages.size(); i++) {
                     Document stage = stages.get(i);
-                    System.out.println("Analyzing stage " + (i + 1) + ": " + stage.keySet());
+                    loggerMaker.debugAndAddToDb("Analyzing stage " + (i + 1) + ": " + stage.keySet(), LogDb.DASHBOARD);
                     analyzeStage(stage);
                 }
             } else {
-                System.out.println("No stages found in explain result");
+                loggerMaker.debugAndAddToDb("No stages found in explain result", LogDb.DASHBOARD);
             }
 
         } catch (Exception e) {
-            System.err.println("Error analyzing explain results: " + e.getMessage());
-            e.printStackTrace();
             loggerMaker.errorAndAddToDb(e, "Error analyzing explain results: " + e.getMessage());
         }
     }
@@ -289,27 +285,27 @@ public class TestResultsStatsAction extends UserAction {
         try {
             Document cursor = stage.get("$cursor", Document.class);
             if (cursor != null) {
-                System.out.println("Found $cursor stage");
+                loggerMaker.debugAndAddToDb("Found $cursor stage", LogDb.DASHBOARD);
 
                 Document queryPlanner = cursor.get("queryPlanner", Document.class);
                 if (queryPlanner != null) {
                     Document winningPlan = queryPlanner.get("winningPlan", Document.class);
                     if (winningPlan != null) {
                         String stageName = winningPlan.getString("stage");
-                        System.out.println("Query Stage: " + stageName);
+                        loggerMaker.debugAndAddToDb("Query Stage: " + stageName, LogDb.DASHBOARD);
 
                         loggerMaker.infoAndAddToDb("Query Stage: " + stageName, LogDb.DASHBOARD);
 
                         if ("IXSCAN".equals(stageName)) {
                             String indexName = winningPlan.getString("indexName");
-                            System.out.println("✓ USING INDEX: " + indexName);
+                            loggerMaker.debugAndAddToDb("✓ USING INDEX: " + indexName, LogDb.DASHBOARD);
                             loggerMaker.infoAndAddToDb("✓ Using Index: " + indexName, LogDb.DASHBOARD);
                             checkCompoundIndexUsage(winningPlan);
                         } else if ("COLLSCAN".equals(stageName)) {
-                            System.out.println("⚠ COLLECTION SCAN - NO INDEX USED");
+                            loggerMaker.debugAndAddToDb("⚠ COLLECTION SCAN - NO INDEX USED", LogDb.DASHBOARD);
                             loggerMaker.infoAndAddToDb("⚠ Using Collection Scan - No Index Used!", LogDb.DASHBOARD);
                         } else {
-                            System.out.println("Stage type: " + stageName);
+                            loggerMaker.debugAndAddToDb("Stage type: " + stageName, LogDb.DASHBOARD);
                         }
                     }
                 }
@@ -325,15 +321,12 @@ public class TestResultsStatsAction extends UserAction {
                             "Execution Stats - Time: %dms, Returned: %d, DocsExamined: %d, KeysExamined: %d",
                             executionTimeMillis, nReturned, totalDocsExamined, totalKeysExamined);
 
-                    System.out.println(statsMsg);
                     loggerMaker.infoAndAddToDb(statsMsg, LogDb.DASHBOARD);
                 }
             } else {
-                System.out.println("No $cursor stage found in: " + stage.keySet());
+                loggerMaker.debugAndAddToDb("No $cursor stage found in: " + stage.keySet(), LogDb.DASHBOARD);
             }
         } catch (Exception e) {
-            System.err.println("Error analyzing stage: " + e.getMessage());
-            e.printStackTrace();
             loggerMaker.errorAndAddToDb(e, "Error analyzing stage: " + e.getMessage());
         }
     }
@@ -345,20 +338,19 @@ public class TestResultsStatsAction extends UserAction {
         try {
             String indexName = winningPlan.getString("indexName");
             if (indexName != null) {
-                System.out.println("Index being used: " + indexName);
+                loggerMaker.debugAndAddToDb("Index being used: " + indexName, LogDb.DASHBOARD);
 
                 if (indexName.contains("testRunResultSummaryId") &&
                         indexName.contains("vulnerable") &&
                         indexName.contains("endTimestamp")) {
-                    System.out.println("✓ USING OUR OPTIMIZED PARTIAL INDEX: " + indexName);
+                    loggerMaker.debugAndAddToDb("✓ USING OUR OPTIMIZED PARTIAL INDEX: " + indexName, LogDb.DASHBOARD);
                     loggerMaker.infoAndAddToDb("✓ Using our optimized partial index: " + indexName, LogDb.DASHBOARD);
                 } else {
-                    System.out.println("Using different index: " + indexName);
+                    loggerMaker.debugAndAddToDb("Using different index: " + indexName, LogDb.DASHBOARD);
                     loggerMaker.infoAndAddToDb("Using different index: " + indexName, LogDb.DASHBOARD);
                 }
             }
         } catch (Exception e) {
-            System.err.println("Error checking compound index usage: " + e.getMessage());
             loggerMaker.errorAndAddToDb(e, "Error checking compound index usage: " + e.getMessage());
         }
     }
@@ -370,8 +362,6 @@ public class TestResultsStatsAction extends UserAction {
         String explainMode = System.getProperty("mongodb.explain.aggregation", "false");
         boolean shouldExplain = "true".equalsIgnoreCase(explainMode) ||
                 "development".equalsIgnoreCase(System.getProperty("environment"));
-
-        System.out.println("Should run explain: " + shouldExplain + " (property: " + explainMode + ")");
         return shouldExplain;
     }
 
@@ -380,7 +370,7 @@ public class TestResultsStatsAction extends UserAction {
      */
     public void listAllIndexes() {
         try {
-            System.out.println("=== LISTING ALL INDEXES ===");
+            loggerMaker.debugAndAddToDb("=== LISTING ALL INDEXES ===", LogDb.DASHBOARD);
 
             List<Document> indexes = TestingRunResultDao.instance.getRawCollection()
                     .listIndexes().into(new ArrayList<>());
@@ -390,17 +380,16 @@ public class TestResultsStatsAction extends UserAction {
                 Document keys = index.get("key", Document.class);
                 Document partialFilter = index.get("partialFilterExpression", Document.class);
 
-                System.out.println("Index: " + indexName);
-                System.out.println("  Keys: " + (keys != null ? keys.toJson() : "null"));
+                loggerMaker.debugAndAddToDb("Index: " + indexName, LogDb.DASHBOARD);
+                loggerMaker.debugAndAddToDb("  Keys: " + (keys != null ? keys.toJson() : "null"), LogDb.DASHBOARD);
                 if (partialFilter != null) {
-                    System.out.println("  Partial Filter: " + partialFilter.toJson());
+                    loggerMaker.debugAndAddToDb("  Partial Filter: " + partialFilter.toJson(), LogDb.DASHBOARD);
                 }
-                System.out.println("---");
+                loggerMaker.debugAndAddToDb("---", LogDb.DASHBOARD);
             }
 
         } catch (Exception e) {
-            System.err.println("Error listing indexes: " + e.getMessage());
-            e.printStackTrace();
+            loggerMaker.errorAndAddToDb(e, "Error listing indexes: " + e.getMessage());
         }
     }
 

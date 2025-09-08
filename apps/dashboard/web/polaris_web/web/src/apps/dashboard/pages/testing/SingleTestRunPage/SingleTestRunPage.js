@@ -923,7 +923,7 @@ function SingleTestRunPage() {
             <>
               <Box width="1px" borderColor="border-subdued" borderInlineStartWidth="1" minHeight='16px' />
               <HorizontalStack gap={"1"}>
-                <Box><Icon color="subdued" source={CircleAlertMajor} /></Box>
+                <Box><Icon color="subdued" source={CircleInformationMajor} /></Box>
                 <Tooltip 
                   content={
                     <VerticalStack gap="2">
@@ -932,10 +932,9 @@ function SingleTestRunPage() {
                         <Text variant="bodySm">• 429 errors: {allTestResultsStats.count429}</Text>
                         <Text variant="bodySm">• 5xx errors: {allTestResultsStats.count500}</Text>
                         <Text variant="bodySm">• CDN/Cloudflare errors: {allTestResultsStats.countCloudflare}</Text>
-                        <Text variant="bodySm" fontWeight="medium">Total: {allTestResultsStats.totalCount}</Text>
                       </VerticalStack>
                       <Box paddingBlockStart="1" borderBlockStartWidth="1" borderColor="border-subdued">
-                        <Text variant="bodySm" color="subdued" fontWeight="medium">⚠️ Approximate counts based on sampled data. Includes totals shown above.</Text>
+                        <Text variant="bodySm" color="subdued" fontWeight="medium">Approximate counts based on sampled data. Includes totals shown above.</Text>
                       </Box>
                     </VerticalStack>
                   } 
@@ -949,26 +948,32 @@ function SingleTestRunPage() {
                   const total = currentSummary?.testResultsCount || 0;
                   const severityFor = (count) => {
                     const percentage = total > 0 ? (count / total) * 100 : 0;
-                    if (percentage > 70) return 'critical';
-                    if (percentage >= 40) return 'attention';
-                    return 'success';
+                    if (percentage > 70) return 'CRITICAL';
+                    if (percentage >= 40) return 'HIGH';
+                    return 'MEDIUM';
                   }
                   return (
                     <HorizontalStack gap="2" align="center">
                       {(() => { const sev = severityFor(allTestResultsStats.count429); return (
-                        <Badge tone={sev} status={sev}>
-                          429: {allTestResultsStats.count429}
-                        </Badge>
+                        <div className={`badge-wrapper-${sev.toUpperCase()}`}>
+                          <Badge>
+                            429: {allTestResultsStats.count429}
+                          </Badge>
+                        </div>
                       )})()}
                       {(() => { const sev = severityFor(allTestResultsStats.count500); return (
-                        <Badge tone={sev} status={sev}>
-                          5xx: {allTestResultsStats.count500}
-                        </Badge>
+                        <div className={`badge-wrapper-${sev.toUpperCase()}`}>
+                          <Badge>
+                            5xx: {allTestResultsStats.count500}
+                          </Badge>
+                        </div>
                       )})()}
                       {(() => { const sev = severityFor(allTestResultsStats.countCloudflare); return (
-                        <Badge tone={sev} status={sev}>
-                          CDN: {allTestResultsStats.countCloudflare}
-                        </Badge>
+                        <div className={`badge-wrapper-${sev.toUpperCase()}`}>
+                          <Badge>
+                            CDN: {allTestResultsStats.countCloudflare}
+                          </Badge>
+                        </div>
                       )})()}
                     </HorizontalStack>
                   );
