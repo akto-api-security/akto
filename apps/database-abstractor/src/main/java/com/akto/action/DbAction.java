@@ -2343,8 +2343,8 @@ public class DbAction extends ActionSupport {
         SlackSender.sendAlert(accountId, apiTestStatusAlert, testingRun.getSelectedSlackChannelId());
     }
 
-    private AtomicInteger tagHitCount = new AtomicInteger(0);
-    private AtomicInteger tagMissCount = new AtomicInteger(0);
+    private static AtomicInteger tagHitCount = new AtomicInteger(0);
+    private static AtomicInteger tagMissCount = new AtomicInteger(0);
 
     private List<CollectionTags> checkTagsNeedUpdates(List<CollectionTags> tags, int apiCollectionId) {
         
