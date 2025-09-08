@@ -86,11 +86,12 @@ function HomeDashboard() {
     const [oldRiskScore, setOldRiskScore] = useState(0)
     const [showTestingComponents, setShowTestingComponents] = useState(false)
     const [customRiskScoreAvg, setCustomRiskScoreAvg] = useState(0)
-    const [mcpTotals, setMcpTotals] = useState({ mcpTotalApis: null, thirdPartyApis: null, newApis7Days: null, openAlerts: null, criticalApis: null })
+    const [mcpTotals, setMcpTotals] = useState({ mcpTotalApis: null, thirdPartyApis: null, newApis7Days: null, openAlerts: null, criticalApis: null, policyGuardrailApis: null })
     const [mcpOpenAlertDetails, setMcpOpenAlertDetails] = useState([])
     const [mcpApiCallStats, setMcpApiCallStats] = useState([])
     const [policyGuardrailStats, setPolicyGuardrailStats] = useState([])
     const [policyGuardrailStatsTimeRange, setPolicyGuardrailStatsTimeRange] = useState(func.timeNow() - 24*60*60)
+    const [mcpTopApplications, setMcpTopApplications] = useState([])
 
     // MCP API Requests time selector state
     const statsOptions = [
@@ -386,7 +387,9 @@ function HomeDashboard() {
             api.fetchMcpdata('TOOLS'),
             api.fetchMcpdata('PROMPTS'),
             api.fetchMcpdata('RESOURCES'),
-            api.fetchMcpdata('MCP_SERVER')
+            api.fetchMcpdata('MCP_SERVER'),
+            api.fetchMcpdata('POLICY_GUARDRAIL_APIS'),
+            api.fetchMcpdata('TOP_3_APPLICATIONS_BY_TRAFFIC')
         ];
 
         let results = await Promise.allSettled(apiPromises);
@@ -406,6 +409,8 @@ function HomeDashboard() {
         let mcpPrompts = results[11]?.status === 'fulfilled' ? (results[11].value?.mcpDataCount ?? null) : null
         let mcpResources = results[12]?.status === 'fulfilled' ? (results[12].value?.mcpDataCount ?? null) : null
         let mcpServer = results[13]?.status === 'fulfilled' ? (results[13].value?.mcpDataCount ?? null) : null
+        let mcpPolicyGuardrailApis = results[14]?.status === 'fulfilled' ? (results[14].value?.mcpDataCount ?? null) : null
+        let mcpTopApps = results[15]?.status === 'fulfilled' ? (results[15].value?.response?.topApplications ?? []) : []
         const totalRedundantApis = missingApiInfoData?.redundantApiInfoKeys || 0
         const totalMissingApis = missingApiInfoData?.totalMissing|| 0
 
@@ -428,8 +433,9 @@ function HomeDashboard() {
 
         buildEndpointsCount(fetchEndpointsCountResp)
 
-        setMcpTotals({ mcpTotalApis: mcpTotalApis, thirdPartyApis: mcpThirdParty, newApis7Days: null, openAlerts: mcpOpenAlerts, criticalApis: mcpCriticalApis, tools: mcpTools, prompts: mcpPrompts, resources: mcpResources, server: mcpServer })
+        setMcpTotals({ mcpTotalApis: mcpTotalApis, thirdPartyApis: mcpThirdParty, newApis7Days: null, openAlerts: mcpOpenAlerts, criticalApis: mcpCriticalApis, tools: mcpTools, prompts: mcpPrompts, resources: mcpResources, server: mcpServer, policyGuardrailApis: mcpPolicyGuardrailApis })
         setMcpOpenAlertDetails(Array.isArray(mcpOpenAlertsDetails) ? mcpOpenAlertsDetails.slice(0, 2) : [])
+        setMcpTopApplications(Array.isArray(mcpTopApps) ? mcpTopApps : [])
         fetchMcpApiCallStats(mcpStatsTimeRange, func.timeNow());
         setLoading(false)
     }
@@ -969,22 +975,26 @@ function HomeDashboard() {
     const mcpDiscoveryMiniCard = (
         <InfoCard
             component={
-                <HorizontalGrid columns={4} gap={6}>
+                <HorizontalGrid columns={5} gap={3}>
                     <VerticalStack gap={1}>
-                        <Text color="subdued">Components</Text>
+                        <Box style={{ minHeight: '36px' }}><Text color="subdued">Components</Text></Box>
                         <Text variant='headingMd'>{mcpTotals.mcpTotalApis ?? '-'}</Text>
                     </VerticalStack>
                     <VerticalStack gap={1}>
-                        <Text color="subdued">Services</Text>
+                        <Box style={{ minHeight: '36px' }}><Text color="subdued">Services</Text></Box>
                         <Text variant='headingMd'>-</Text>
                     </VerticalStack>
                     <VerticalStack gap={1}>
-                        <Text color="subdued">3rd party Components</Text>
+                        <Box style={{ minHeight: '36px' }}><Text color="subdued">3rd party Components</Text></Box>
                         <Text variant='headingMd'>{mcpTotals.thirdPartyApis ?? '-'}</Text>
                     </VerticalStack>
                     <VerticalStack gap={1}>
-                        <Text color="subdued">Identities</Text>
+                        <Box style={{ minHeight: '36px' }}><Text color="subdued">Identities</Text></Box>
                         <Text variant='headingMd'>-</Text>
+                    </VerticalStack>
+                    <VerticalStack gap={1}>
+                        <Box style={{ minHeight: '36px' }}><Text color="subdued">Policy Guardrail APIs</Text></Box>
+                        <Text variant='headingMd'>{mcpTotals.policyGuardrailApis ?? '-'}</Text>
                     </VerticalStack>
                 </HorizontalGrid>
             }
@@ -1000,19 +1010,19 @@ function HomeDashboard() {
             component={
                 <HorizontalGrid columns={4} gap={6}>
                     <VerticalStack gap={1}>
-                        <Text color="subdued">Critical MCP Components</Text>
+                        <Box style={{ minHeight: '36px' }}><Text color="subdued">Critical MCP Components</Text></Box>
                         <Text variant='headingMd'>{mcpTotals.criticalApis ?? '-'}</Text>
                     </VerticalStack>
                     <VerticalStack gap={1}>
-                        <Text color="subdued">AI security</Text>
+                        <Box style={{ minHeight: '36px' }}><Text color="subdued">AI security</Text></Box>
                         <Text variant='headingMd'>-</Text>
                     </VerticalStack>
                     <VerticalStack gap={1}>
-                        <Text color="subdued">MCP security</Text>
+                        <Box style={{ minHeight: '36px' }}><Text color="subdued">MCP security</Text></Box>
                         <Text variant='headingMd'>-</Text>
                     </VerticalStack>
                     <VerticalStack gap={1}>
-                        <Text color="subdued">CVE's</Text>
+                        <Box style={{ minHeight: '36px' }}><Text color="subdued">CVE's</Text></Box>
                         <Text variant='headingMd'>-</Text>
                     </VerticalStack>
                 </HorizontalGrid>
@@ -1209,6 +1219,37 @@ function HomeDashboard() {
         />
     )
 
+    // MCP-only Top Applications by Traffic card
+    const hasTopApps = Array.isArray(mcpTopApplications) && mcpTopApplications.length > 0
+    const mcpTopApplicationsCard = (
+        hasTopApps ? (
+            <InfoCard
+                component={
+                    <Box>
+                        <VerticalStack gap={3}>
+                            {mcpTopApplications.map((app, idx) => (
+                                <HorizontalStack key={`top-app-${idx}`} align="space-between">
+                                    <Text variant='bodyMd' color='text'>{app?.name ?? '-'}</Text>
+                                    <Box paddingInlineStart="2" paddingInlineEnd="2" background="bg-fill-info" borderRadius="5">
+                                        <Text variant='bodySm' color='text-on-primary'>
+                                            {app?.hitCount != null ? app.hitCount.toLocaleString() + ' requests' : '-'}
+                                        </Text>
+                                    </Box>
+                                </HorizontalStack>
+                            ))}
+                        </VerticalStack>
+                    </Box>
+                }
+                title={'Top Applications by Traffic'}
+                titleToolTip={'Top 3 MCP applications ranked by total request volume'}
+                linkText={''}
+                linkUrl={''}
+            />
+        ) : (
+            <EmptyCard title="Top Applications by Traffic" subTitleComponent={<Text alignment='center' color='subdued'>No application traffic data</Text>} />
+        )
+    )
+
     const newDomainsComponent = <InfoCard
         component={
             <Scrollable style={{ height: "320px" }} shadow>
@@ -1259,6 +1300,7 @@ function HomeDashboard() {
             {id: 'mcp-discovery', component: mcpDiscoveryMiniCard},
             {id: 'mcp-risk', component: mcpRiskDetectionsMiniCard},
             {id: 'mcp-open-alerts', component: mcpOpenAlertsCard},
+            {id: 'mcp-top-applications', component: mcpTopApplicationsCard},
             {id: 'mcp-types-table', component: mcpTypesTableCard},
             ...gridComponents
         ]
