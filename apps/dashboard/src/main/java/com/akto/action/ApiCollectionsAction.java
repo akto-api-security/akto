@@ -1338,13 +1338,13 @@ public class ApiCollectionsAction extends UserAction {
                 );
                 List<ApiCollection> guardRailCollections = ApiCollectionsDao.instance.findAll(guardRailTagFilter, null);
                 List<Integer> guardRailCollectionIds = guardRailCollections.stream().map(ApiCollection::getId).collect(Collectors.toList());
-                
+                Bson filter = UsageMetricCalculator.excludeDemosAndDeactivated(SingleTypeInfo._API_COLLECTION_ID);
                 if (!guardRailCollectionIds.isEmpty()) {
                     Bson guardRailApisFilter = Filters.and(
-                        filterQ,
-                        Filters.in(ApiInfo.ID_API_COLLECTION_ID, guardRailCollectionIds)
+                            filter,
+                        Filters.in(SingleTypeInfo._API_COLLECTION_ID, guardRailCollectionIds)
                     );
-                    this.mcpDataCount = (int) ApiInfoDao.instance.count(guardRailApisFilter);
+                    this.mcpDataCount = (int) SingleTypeInfoDao.instance.count(guardRailApisFilter);
                 } else {
                     this.mcpDataCount = 0;
                 }
