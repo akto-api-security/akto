@@ -506,8 +506,8 @@ public class DbLayer {
             return tags;
         }
 
-        Set<CollectionTags> mergedTags = new HashSet<>(apiCollection.getTagsList());
-        mergedTags.addAll(tags);
+        Set<CollectionTags> mergedTags = new HashSet<>(tags);
+        mergedTags.addAll(apiCollection.getTagsList());
 
         tags = new ArrayList<>(mergedTags);
 
