@@ -384,12 +384,34 @@ export default function LeftNav() {
                 icon: LockMajor,
                 onClick: () => {
                     handleSelect("dashboard_mcp_guardrails");
-                    navigate("/dashboard/mcp-guardrails");
+                    navigate("/dashboard/guardrails/activity");
                     setActive("normal");
                 },
-                selected: leftNavSelected === "dashboard_mcp_guardrails",
+                selected: leftNavSelected.includes("_guardrails"),
                 url: "#",
                 key: "9",
+                subNavigationItems: [
+                    {
+                        label: "Guardrails Activity",
+                        onClick: () => {
+                            navigate("/dashboard/guardrails/activity");
+                            handleSelect("dashboard_guardrails_activity");
+                            setActive("active");
+                        },
+                        selected: leftNavSelected === "dashboard_guardrails_activity",
+                    },
+                    {
+                        label: "Guardrails Policies",
+                        onClick: () => {
+                            navigate("/dashboard/guardrails/policies");
+                            handleSelect("dashboard_guardrails_policies");
+                            setActive("active");
+                        },
+                        selected:
+                            leftNavSelected === "dashboard_guardrails_policies",
+                    }
+                ]
+
             }] : []),
             ...(dashboardCategory === "Gen AI" ? [{
                 label: (
@@ -397,15 +419,36 @@ export default function LeftNav() {
                         AI Agent Guardrails
                     </Text>
                 ),
-                icon: AutomationFilledMajor,
+                icon: LockMajor,
                 onClick: () => {
                     handleSelect("dashboard_ai_agent_guardrails");
-                    navigate("/dashboard/ai-agent-guardrails");
+                    navigate("/dashboard/guardrails/activity");
                     setActive("normal");
                 },
-                selected: leftNavSelected === "dashboard_ai_agent_guardrails",
+                selected: leftNavSelected.includes("_guardrails"),
                 url: "#",
                 key: "10",
+                subNavigationItems: [
+                    {
+                        label: "Guardrails Activity",
+                        onClick: () => {
+                            navigate("/dashboard/guardrails/activity");
+                            handleSelect("dashboard_guardrails_activity");
+                            setActive("active");
+                        },
+                        selected: leftNavSelected === "dashboard_guardrails_activity",
+                    },
+                    {
+                        label: "Guardrails Policies",
+                        onClick: () => {
+                            navigate("/dashboard/guardrails/policies");
+                            handleSelect("dashboard_guardrails_policies");
+                            setActive("active");
+                        },
+                        selected:
+                            leftNavSelected === "dashboard_guardrails_policies",
+                    }
+                ]
             }] : []),
         ]
 

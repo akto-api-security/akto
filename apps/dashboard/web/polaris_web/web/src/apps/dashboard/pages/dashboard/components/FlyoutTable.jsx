@@ -11,6 +11,8 @@ import func from "@/util/func";
 import PersistStore from "@/apps/main/PersistStore";
 import { getDashboardCategory, mapLabel } from '../../../../main/labelHelper';
 
+const BATCH_SIZE = 500;
+
 const ACTION_ITEM_TYPES = {
     HIGH_RISK_APIS: 'HIGH_RISK_APIS',
     SENSITIVE_DATA_ENDPOINTS: 'SENSITIVE_DATA_ENDPOINTS',
@@ -26,6 +28,9 @@ const ACTION_ITEM_TYPES = {
     BROKEN_AUTHENTICATION_ISSUES: 'BROKEN_AUTHENTICATION_ISSUES',
     FREQUENTLY_VULNERABLE_ENDPOINTS: 'FREQUENTLY_VULNERABLE_ENDPOINTS',
     APIS_WITH_MULTIPLE_ISSUES: 'APIS_WITH_MULTIPLE_ISSUES',
+    VERBOSE_ERROR_MESSAGES: 'VERBOSE_ERROR_MESSAGES',
+    MISSING_SECURITY_HEADERS: 'MISSING_SECURITY_HEADERS',
+    TOP_PUBLIC_EXPOSED_APIS: 'TOP_PUBLIC_EXPOSED_APIS',
 };
 
 const getIssueLabel = (actionItemType) => {
@@ -56,6 +61,12 @@ const getIssueLabel = (actionItemType) => {
             return 'Broken Authentication Issues';
         case ACTION_ITEM_TYPES.FREQUENTLY_VULNERABLE_ENDPOINTS:
             return 'Frequently Vulnerable Endpoints';
+        case ACTION_ITEM_TYPES.VERBOSE_ERROR_MESSAGES:
+            return 'Verbose Error Messages';
+        case ACTION_ITEM_TYPES.MISSING_SECURITY_HEADERS:
+            return 'Missing Security Headers';
+        case ACTION_ITEM_TYPES.TOP_PUBLIC_EXPOSED_APIS:
+            return 'Sensitive Data';
         default:
             return '-';
     }
@@ -79,12 +90,28 @@ function FlyoutTable({ actionItemType, count, allApiInfo, apiInfoLoading }) {
             try {
                 setLoading(true);
                 let relevantData = [];
+                let presetSensitiveParamsMap = null;
                 switch (actionItemType) {
                     case ACTION_ITEM_TYPES.HIGH_RISK_APIS:
                         relevantData = allApiInfo.highRiskApis || [];
                         break;
                     case ACTION_ITEM_TYPES.SENSITIVE_DATA_ENDPOINTS:
                         relevantData = allApiInfo.sensitiveDataEndpoints || [];
+                        break;
+                    case ACTION_ITEM_TYPES.TOP_PUBLIC_EXPOSED_APIS:
+                        {
+                            const items = allApiInfo.sensitiveSubtypesInUrl || [];
+                            relevantData = items.map(x => x.apiInfo || {});
+                            presetSensitiveParamsMap = items.reduce((acc, item) => {
+                                const url = item?.apiInfo?.id?.url || item?.apiInfo?.url;
+                                if (url) {
+                                    const rawSubTypes = Array.isArray(item?.subTypes) ? item.subTypes : [];
+                                    const subTypes = rawSubTypes.length > 0 ? Array.from(new Set(rawSubTypes)) : [];
+                                    if (subTypes.length > 0) acc[url] = subTypes;
+                                }
+                                return acc;
+                            }, {});
+                        }
                         break;
                     case ACTION_ITEM_TYPES.UNAUTHENTICATED_APIS:
                         relevantData = allApiInfo.unauthenticatedApis || [];
@@ -117,32 +144,22 @@ function FlyoutTable({ actionItemType, count, allApiInfo, apiInfoLoading }) {
                         relevantData = allApiInfo.brokenAuthIssuesApiInfo || [];
                         break;
                     case ACTION_ITEM_TYPES.FREQUENTLY_VULNERABLE_ENDPOINTS:
-                    relevantData = allApiInfo.multipleIssuesApiInfo || [];
-                    break;
+                        relevantData = allApiInfo.multipleIssuesApiInfo || [];
+                        break;
                     case ACTION_ITEM_TYPES.APIS_WITH_MULTIPLE_ISSUES:
-                    relevantData = allApiInfo.multipleIssuesApiInfo || [];
-                    break;
+                        relevantData = allApiInfo.multipleIssuesApiInfo || [];
+                        break;
+                    case ACTION_ITEM_TYPES.VERBOSE_ERROR_MESSAGES:
+                        relevantData = allApiInfo.vemVulnerableApisApiInfo || [];
+                        break;
+                    case ACTION_ITEM_TYPES.MISSING_SECURITY_HEADERS:
+                        relevantData = allApiInfo.mhhVulnerableApisApiInfo || [];
+                        break;
                     default:
                         relevantData = [];
                 }
 
-                const endpointUrls = relevantData.map(api => api.id?.url || api.url);
-                let sensitiveParamsMap = {};
-                try {
-                    if (endpointUrls.length > 0) {
-                        const resp = await observeApi.fetchSensitiveParamsForEndpoints(endpointUrls);
-                        if (resp?.data?.endpoints) {
-                            resp.data.endpoints.forEach(item => {
-                                if (!sensitiveParamsMap[item.url]) sensitiveParamsMap[item.url] = [];
-                                sensitiveParamsMap[item.url].push(item.subTypeString || item.subType?.name);
-                            });
-                        }
-                    }
-                } catch (e) {
-                    console.error('Error fetching sensitive params:', e);
-                }
-
-                const transformedData = relevantData.map((api, index) => {
+                const transformApiRow = (api, index, sensitiveMap) => {
                     const url = api.id?.url || api.url || '-';
                     const method = api.id?.method || api.method || '-';
 
@@ -216,9 +233,52 @@ function FlyoutTable({ actionItemType, count, allApiInfo, apiInfoLoading }) {
                     }
 
                     return baseRow;
-                });
+                };
 
-                setApiData(transformedData);
+                // Initial Render 
+                const initialBatch = relevantData.slice(0, BATCH_SIZE);
+                const initialEndpointUrls = initialBatch.map(api => api.id?.url || api.url);
+                let sensitiveParamsMap = presetSensitiveParamsMap || {};
+
+                if (!presetSensitiveParamsMap && initialEndpointUrls.length > 0) {
+                    try {
+                        const resp = await observeApi.fetchSensitiveParamsForEndpoints(initialEndpointUrls);
+                        if (resp?.data?.endpoints) {
+                            resp.data.endpoints.forEach(item => {
+                                if (!sensitiveParamsMap[item.url]) sensitiveParamsMap[item.url] = [];
+                                sensitiveParamsMap[item.url].push(item.subTypeString || item.subType?.name);
+                            });
+                        }
+                    } catch (e) { console.error('Error fetching sensitive params for initial batch:', e); }
+                }
+
+                const transformedInitialData = initialBatch.map((api, index) => transformApiRow(api, index, sensitiveParamsMap));
+                setApiData(transformedInitialData);
+                setLoading(false);
+
+                // Process remaining data in the background 
+                if (relevantData.length > BATCH_SIZE) {
+                    setTimeout(async () => {
+                        const remainingBatch = relevantData.slice(BATCH_SIZE);
+                        const remainingEndpointUrls = remainingBatch.map(api => api.id?.url || api.url);
+                        
+                        if (!presetSensitiveParamsMap && remainingEndpointUrls.length > 0) {
+                            try {
+                                const resp = await observeApi.fetchSensitiveParamsForEndpoints(remainingEndpointUrls);
+                                if (resp?.data?.endpoints) {
+                                    resp.data.endpoints.forEach(item => {
+                                        if (!sensitiveParamsMap[item.url]) sensitiveParamsMap[item.url] = [];
+                                        sensitiveParamsMap[item.url].push(item.subTypeString || item.subType?.name);
+                                    });
+                                }
+                            } catch (e) { console.error('Error fetching sensitive params for remaining batch:', e); }
+                        }
+                        
+                        const transformedRemainingData = remainingBatch.map((api, index) => transformApiRow(api, BATCH_SIZE + index, sensitiveParamsMap));
+                        setApiData(prevData => [...prevData, ...transformedRemainingData]);
+                    }, 0);
+                }
+
             } catch (error) {
                 console.error('Error processing API data for flyout:', error);
                 setApiData([]);
@@ -269,7 +329,7 @@ function FlyoutTable({ actionItemType, count, allApiInfo, apiInfoLoading }) {
                 { text: 'Collection', title: 'Collection', value: 'collection', isText: CellType.TEXT, maxWidth: '150px' },
             ];
         }
-        if (actionItemType === ACTION_ITEM_TYPES.SENSITIVE_DATA_ENDPOINTS || actionItemType === ACTION_ITEM_TYPES.CRITICAL_SENSITIVE_UNAUTH) {
+        if (actionItemType === ACTION_ITEM_TYPES.SENSITIVE_DATA_ENDPOINTS || actionItemType === ACTION_ITEM_TYPES.CRITICAL_SENSITIVE_UNAUTH || actionItemType === ACTION_ITEM_TYPES.TOP_PUBLIC_EXPOSED_APIS) {
             return [
                 { text: mapLabel("Endpoint", getDashboardCategory()), title: mapLabel("Endpoint", getDashboardCategory()), value: 'endpoint', maxWidth: '300px' },
                 { text: 'Sensitive Params', title: 'Sensitive Params', value: 'sensitiveParams', isText: CellType.TEXT, maxWidth: '200px' },

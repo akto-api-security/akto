@@ -185,8 +185,19 @@ const api = {
         })
     },
 
-    fetchIssuesByApis: async (showIssues) => {
-        const data = (typeof showIssues === 'boolean') ? { showIssues } : {};
+    fetchIssuesByApis: async (params) => {
+        let data = {};
+        if (typeof params === 'boolean') {
+            data = { showIssues: params };
+        } else if (typeof params === 'object' && params !== null) {
+            data = {
+                showIssues: params.showIssues || false,
+                categoryTypes: Array.isArray(params.categoryTypes)
+                    ? params.categoryTypes
+                    : (params.categoryType ? [params.categoryType] : null)
+            };
+        }
+        
         return await request({
             url: '/api/fetchIssuesByApis',
             method: 'post',

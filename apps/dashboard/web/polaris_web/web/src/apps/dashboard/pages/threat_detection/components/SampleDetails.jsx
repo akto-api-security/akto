@@ -185,7 +185,7 @@ function SampleDetails(props) {
     const tabsComponent = (
         <LayoutWithTabs
             key={"tabs-comp"}
-            tabs={[overviewTab, timelineTab, ValuesTab, remediationTab]}
+            tabs={ window.location.href.indexOf("guardrails") > -1 ? [ValuesTab] : [overviewTab, timelineTab, ValuesTab, remediationTab]}
             currTab = {() => {}}
         />
     )
