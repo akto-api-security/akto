@@ -48,10 +48,6 @@ const headings = [
     value: "createdTs",
     type: CellType.TEXT,
     sortActive: true,
-  },
-  {
-      title: '',
-      type: CellType.ACTION,
   }
 ];
 
@@ -128,8 +124,10 @@ function GuardrailPolicies() {
             showFooter={false}
             sortOptions={sortOptions}
             emptyStateMarkup={emptyStateMarkup}   
-            getActions = {(item) => getActionsList(item)}
-            hasRowActions={true}
+            onRowClick={rowClicked}    
+            rowClickable={true} 
+              // getActions = {(item) => getActionsList(item)}
+              // hasRowActions={true}
 
         />,   
         <FlyLayout
