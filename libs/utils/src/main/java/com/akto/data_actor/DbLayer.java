@@ -1127,12 +1127,26 @@ public class DbLayer {
         ObjectId summaryObjectId = new ObjectId(summaryId);
         FindOneAndUpdateOptions options = new FindOneAndUpdateOptions();
         options.returnDocument(ReturnDocument.AFTER);
+        Bson update = Updates.combine(
+            Updates.set(TestingRunResultSummary.END_TIMESTAMP, Context.now()),
+            Updates.set(TestingRunResultSummary.STATE, state)
+        );
+        if(totalCountIssues != null){
+            boolean hasAnyIssue = false;
+            for(Map.Entry<String, Integer> entry : totalCountIssues.entrySet()){
+                if(entry.getValue() > 0){
+                    hasAnyIssue = true;
+                    break;
+                }
+            }
+            if(hasAnyIssue){
+                update = Updates.combine(update, Updates.set(TestingRunResultSummary.COUNT_ISSUES, totalCountIssues));
+            }
+        }
         return TestingRunResultSummariesDao.instance.getMCollection().findOneAndUpdate(
                 Filters.eq(Constants.ID, summaryObjectId),
-                Updates.combine(
-                        Updates.set(TestingRunResultSummary.END_TIMESTAMP, Context.now()),
-                        Updates.set(TestingRunResultSummary.STATE, state)
-                ),options);
+                update
+            ,options);
     }
 
     public static List<Integer> fetchDeactivatedCollections() {
