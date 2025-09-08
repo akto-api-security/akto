@@ -2353,6 +2353,7 @@ public class DbAction extends ActionSupport {
         }
 
         StringBuilder combinedTags = new StringBuilder();
+        tags.sort(Comparator.comparing(CollectionTags::getKeyName));
 
         for (CollectionTags ctag : tags) {
             if (combinedTags.length() > 0) {
