@@ -14,6 +14,7 @@ import org.bson.conversions.Bson;
 import com.akto.action.observe.Utils;
 import com.akto.dao.*;
 import com.akto.dao.McpAuditInfoDao;
+import com.akto.dao.threat_detection.ApiHitCountInfoDao;
 import com.akto.billing.UsageMetricUtils;
 import com.akto.dao.context.Context;
 import com.akto.dto.billing.FeatureAccess;
@@ -132,7 +133,7 @@ public class ApiCollectionsAction extends UserAction {
                 apiCollection.setUrlsCount(fallbackCount);
             }
 
-            if(!apiCollection.isMcpCollection()) {
+            if(!apiCollection.isMcpCollection() || !apiCollection.isGuardRailCollection()) {
                 apiCollection.setUrls((new HashSet<>()));
             }
         }
@@ -217,7 +218,8 @@ public class ApiCollectionsAction extends UserAction {
         UsersCollectionsList.deleteContextCollectionsForUser(Context.accountId.get(), Context.contextSource.get());
         pipeLine.add(Aggregates.project(Projections.fields(
                 Projections.computed(ApiCollection.URLS_COUNT, new BasicDBObject("$size", new BasicDBObject("$ifNull", Arrays.asList("$urls", Collections.emptyList())))),
-                Projections.include(ApiCollection.ID, ApiCollection.NAME, ApiCollection.HOST_NAME, ApiCollection._TYPE, ApiCollection.TAGS_STRING, ApiCollection._DEACTIVATED,ApiCollection.START_TS, ApiCollection.AUTOMATED, ApiCollection.DESCRIPTION, ApiCollection.USER_ENV_TYPE, ApiCollection.IS_OUT_OF_TESTING_SCOPE)
+                Projections.include(ApiCollection.ID, ApiCollection.NAME, ApiCollection.HOST_NAME, ApiCollection._TYPE, ApiCollection.TAGS_STRING, ApiCollection._DEACTIVATED,ApiCollection.START_TS, ApiCollection.AUTOMATED, ApiCollection.DESCRIPTION, ApiCollection.USER_ENV_TYPE, ApiCollection.IS_OUT_OF_TESTING_SCOPE,
+                        ApiCollection._URLS)
         )));
 
         try {
@@ -231,29 +233,6 @@ public class ApiCollectionsAction extends UserAction {
         while(cursor.hasNext()){
             try {
                 ApiCollection apiCollection = cursor.next();
-                
-                // Only fetch URLs and methods from SingleTypeInfo for MCP collections
-                if (apiCollection.isMcpCollection()) {
-                    Set<String> urlMethodSet = new HashSet<>();
-                    Bson filter = Filters.eq(SingleTypeInfo._API_COLLECTION_ID, apiCollection.getId());
-                    List<SingleTypeInfo> singleTypeInfos = SingleTypeInfoDao.instance.findAll(filter, 
-                        Projections.include(SingleTypeInfo._URL, SingleTypeInfo._METHOD));
-                    
-                    for (SingleTypeInfo singleTypeInfo : singleTypeInfos) {
-                        String url = singleTypeInfo.getUrl();
-                        String method = singleTypeInfo.getMethod();
-                        if (url != null && method != null) {
-                            urlMethodSet.add(url + " " + method);
-                        }
-                    }
-                    
-                    apiCollection.setUrls(urlMethodSet);
-                } else {
-
-                    //for non-MCP collections, URLs will not be set as per earlier implementation
-                    apiCollection.setUrls(new HashSet<>());
-                }
-                
                 this.apiCollections.add(apiCollection);
             } catch (Exception e) {
                 e.printStackTrace();
@@ -1291,6 +1270,85 @@ public class ApiCollectionsAction extends UserAction {
                 );
                 this.mcpDataCount = (int) McpAuditInfoDao.instance.count(mcpServerFilter);
                 break;
+                
+            case "TOP_3_APPLICATIONS_BY_TRAFFIC":
+                // Use existing mcpCollectionIds from common filters above
+                Map<Integer, String> collectionIdToName = new HashMap<>();
+                
+                // Build collection ID to name mapping for all MCP collections
+                for (ApiCollection collection : mcpCollections) {
+                    collectionIdToName.put(collection.getId(), collection.getName());
+                }
+                
+                if (!mcpCollectionIds.isEmpty()) {
+                    // Aggregate pipeline to get hit counts per collection
+                    // api_hit_count_info structure: {_id: {ts: timestamp, apiCollectionId: int}, count: int}
+                    List<Bson> pipeline = new ArrayList<>();
+                    pipeline.add(Aggregates.match(Filters.in("apiCollectionId", mcpCollectionIds)));
+                    pipeline.add(Aggregates.group(
+                        "$apiCollectionId",
+                        Accumulators.sum("totalHits", "$count")
+                    ));
+                    pipeline.add(Aggregates.sort(Sorts.descending("totalHits")));
+                    pipeline.add(Aggregates.limit(3));
+                    
+                    // Execute aggregation on api_hit_count_info collection
+                    List<BasicDBObject> topApplications = new ArrayList<>();
+                    try (MongoCursor<BasicDBObject> cursor = ApiHitCountInfoDao.instance.getMCollection()
+                        .aggregate(pipeline, BasicDBObject.class).cursor()) {
+                        
+                        while(cursor.hasNext()) {
+                            BasicDBObject result = cursor.next();
+                            Integer collectionId = result.getInt("_id");
+                            Integer totalHits = result.getInt("totalHits");
+                            String collectionName = collectionIdToName.get(collectionId);
+                            
+                            if (collectionName != null) {
+                                BasicDBObject appInfo = new BasicDBObject();
+                                appInfo.put("name", collectionName);
+                                appInfo.put("collectionId", collectionId);
+                                appInfo.put("hitCount", totalHits);
+                                topApplications.add(appInfo);
+                            }
+                        }
+                    }
+                    
+                    // Set response with top applications
+                    if (this.response == null) {
+                        this.response = new BasicDBObject();
+                    }
+                    this.response.put("topApplications", topApplications);
+                    this.mcpDataCount = topApplications.size();
+                } else {
+                    // No active MCP collections found
+                    if (this.response == null) {
+                        this.response = new BasicDBObject();
+                    }
+                    this.response.put("topApplications", new ArrayList<>());
+                    this.mcpDataCount = 0;
+                }
+                break;
+                
+            case "POLICY_GUARDRAIL_APIS":
+                // Filter for collections with guard-rail tag
+                Bson guardRailTagFilter = Filters.elemMatch(ApiCollection.TAGS_STRING,
+                    Filters.eq("keyName", Constants.AKTO_GUARD_RAIL_TAG)
+                );
+                List<ApiCollection> guardRailCollections = ApiCollectionsDao.instance.findAll(guardRailTagFilter, null);
+                List<Integer> guardRailCollectionIds = guardRailCollections.stream().map(ApiCollection::getId).collect(Collectors.toList());
+                
+                if (!guardRailCollectionIds.isEmpty()) {
+                    Bson guardRailApisFilter = Filters.and(
+                        filterQ,
+                        Filters.in(ApiInfo.ID_API_COLLECTION_ID, guardRailCollectionIds)
+                    );
+                    this.mcpDataCount = (int) ApiInfoDao.instance.count(guardRailApisFilter);
+                } else {
+                    this.mcpDataCount = 0;
+                }
+                break;
+
+
 
             default:
                 addActionError("Invalid filter type: " + filterType);
