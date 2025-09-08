@@ -48,6 +48,7 @@ import com.akto.utils.RedactAlert;
 import com.akto.utils.SampleDataLogs;
 import com.akto.dto.type.URLMethods;
 import com.akto.dto.type.URLMethods.Method;
+import java.util.concurrent.atomic.AtomicInteger;
 import com.akto.testing.TestExecutor;
 import com.akto.trafficFilter.HostFilter;
 import com.akto.trafficFilter.ParamFilter;
@@ -2342,8 +2343,8 @@ public class DbAction extends ActionSupport {
         SlackSender.sendAlert(accountId, apiTestStatusAlert, testingRun.getSelectedSlackChannelId());
     }
 
-    private int tagHitCount = 0;
-    private int tagMissCount = 0;
+    private AtomicInteger tagHitCount = new AtomicInteger(0);
+    private AtomicInteger tagMissCount = new AtomicInteger(0);
 
     private List<CollectionTags> checkTagsNeedUpdates(List<CollectionTags> tags, int apiCollectionId) {
         
@@ -2363,16 +2364,16 @@ public class DbAction extends ActionSupport {
 
         String singleTagString = combinedTags.toString();
         if (ParamFilter.isNewEntry(Context.accountId.get(), apiCollectionId, "", "", singleTagString)) {
-        loggerMaker.debug("New tags found for apiCollectionId: " + apiCollectionId
-                + "Bloom filter tagMissCount: " + tagMissCount);
-            tagMissCount++;
+            tagMissCount.incrementAndGet();
+            loggerMaker.debug("New tags found for apiCollectionId: " + apiCollectionId
+                + "Bloom filter tagMissCount: " + tagMissCount.get());
             return tags;
         }
 
         // Monitor bloom filter efficacy
-        tagHitCount++;
+        tagHitCount.incrementAndGet();
         loggerMaker.debug("Skipping tags updates, already present for apiCollectionId: " + apiCollectionId
-                + "Bloom filter tagHitCount: " + tagHitCount);
+                + "Bloom filter tagHitCount: " + tagHitCount.get());
         return null;
     }
 
