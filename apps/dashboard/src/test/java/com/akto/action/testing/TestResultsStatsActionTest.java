@@ -110,6 +110,23 @@ public class TestResultsStatsActionTest extends MongoBasedTest {
     }
 
     @Test
+    public void testRegexPatternFor5xxErrors() {
+        String regex = TestResultsStatsAction.REGEX_5XX;
+
+        // Should match these 5xx patterns
+        assertTrue("{\"statusCode\": 500}".matches(".*" + regex + ".*"));
+        assertTrue("{\"statusCode\":502}".matches(".*" + regex + ".*"));
+        assertTrue("{\"statusCode\"   :   520}".matches(".*" + regex + ".*"));
+        assertTrue("{\"statusCode\": 599}".matches(".*" + regex + ".*"));
+
+        // Should NOT match these patterns
+        assertFalse("{\"statusCode\": 400}".matches(".*" + regex + ".*"));
+        assertFalse("{\"statusCode\": 429}".matches(".*" + regex + ".*"));
+        assertFalse("{\"statusCode\": \"500\"}".matches(".*" + regex + ".*"));
+        assertFalse("{\"status\": 500}".matches(".*" + regex + ".*"));
+    }
+
+    @Test
     public void testFetchTestResultsStatsCount_MissingTestingRunResultSummaryHexId() {
         TestResultsStatsAction action = new TestResultsStatsAction();
         String result = action.fetchTestResultsStatsCount();
@@ -120,9 +137,21 @@ public class TestResultsStatsActionTest extends MongoBasedTest {
     }
 
     @Test
+    public void testFetchTestResultsStatsCount_MissingPatternType() {
+        TestResultsStatsAction action = new TestResultsStatsAction();
+        action.setTestingRunResultSummaryHexId(new ObjectId().toHexString());
+        String result = action.fetchTestResultsStatsCount();
+        assertEquals("ERROR", result);
+        Collection<String> errors = action.getActionErrors();
+        assertFalse(errors.isEmpty());
+        assertTrue(errors.iterator().next().contains("Missing required parameter: patternType"));
+    }
+
+    @Test
     public void testFetchTestResultsStatsCount_InvalidTestingRunResultSummaryHexId() {
         TestResultsStatsAction action = new TestResultsStatsAction();
         action.setTestingRunResultSummaryHexId("invalid-object-id");
+        action.setPatternType("HTTP_429");
         String result = action.fetchTestResultsStatsCount();
         assertEquals("ERROR", result);
         assertTrue(action.getActionErrors().iterator().next().contains("Invalid test summary id"));
@@ -132,6 +161,7 @@ public class TestResultsStatsActionTest extends MongoBasedTest {
     public void testFetchTestResultsStatsCount_EmptyStringTestingRunResultSummaryHexId() {
         TestResultsStatsAction action = new TestResultsStatsAction();
         action.setTestingRunResultSummaryHexId("");
+        action.setPatternType("HTTP_429");
         String result = action.fetchTestResultsStatsCount();
         assertEquals("ERROR", result);
         assertTrue(action.getActionErrors().iterator().next().contains("Missing required parameter"));
@@ -141,14 +171,25 @@ public class TestResultsStatsActionTest extends MongoBasedTest {
     public void testFetchTestResultsStatsCount_ValidTestingRunResultSummaryHexIdNoData() {
         TestResultsStatsAction action = new TestResultsStatsAction();
         action.setTestingRunResultSummaryHexId(new ObjectId().toHexString());
+        action.setPatternType("HTTP_429");
         String result = action.fetchTestResultsStatsCount();
         assertEquals("SUCCESS", result);
         assertEquals(0, action.getCount());
     }
 
     @Test
+    public void testFetchTestResultsStatsCount_InvalidPatternType() {
+        TestResultsStatsAction action = new TestResultsStatsAction();
+        action.setTestingRunResultSummaryHexId(new ObjectId().toHexString());
+        action.setPatternType("INVALID_PATTERN");
+        String result = action.fetchTestResultsStatsCount();
+        assertEquals("ERROR", result);
+        assertTrue(action.getActionErrors().iterator().next().contains("Invalid pattern type"));
+    }
+
+    @Test
     public void testRegexPatternFor429Detection() {
-        String regex = "\"statusCode\"\\s*:\\s*429";
+        String regex = TestResultsStatsAction.REGEX_429;
 
         // Should match these 429 patterns
         assertTrue("{\"statusCode\": 429}".matches(".*" + regex + ".*"));
@@ -163,7 +204,7 @@ public class TestResultsStatsActionTest extends MongoBasedTest {
 
     @Test
     public void testRegexPatternForCloudflareBlocked() {
-        String regex = "(error\\s*1[0-9]{3}|error\\s*10[0-9]{3}|access\\s*denied|rate\\s*limited|attention\\s*required.*cloudflare|blocked.*cloudflare|security\\s*service.*protect|ray\\s*id.*blocked)";
+        String regex = TestResultsStatsAction.REGEX_CLOUDFLARE;
 
         assertTrue("Error 1020 should match", "Error 1020: Access denied".toLowerCase().matches(".*" + regex + ".*"));
         assertTrue("Error 1015 rate limited should match",
@@ -184,7 +225,7 @@ public class TestResultsStatsActionTest extends MongoBasedTest {
 
     @Test
     public void testCloudflareCfRayHeadersDoNotMatch() {
-        String regex = "(error\\s*1[0-9]{3}|error\\s*10[0-9]{3}|access\\s*denied|rate\\s*limited|attention\\s*required.*cloudflare|blocked.*cloudflare|security\\s*service.*protect|ray\\s*id.*blocked)";
+        String regex = TestResultsStatsAction.REGEX_CLOUDFLARE;
 
         String[] benignHeaders = new String[] {
                 "{\"statusCode\": 200, \"headers\": {\"cf-ray\": \"7f9e7f2ad9be2a3c-DEL\", \"server\": \"cloudflare\"}}",
@@ -202,7 +243,9 @@ public class TestResultsStatsActionTest extends MongoBasedTest {
                 "{\"statusCode\": 429, \"body\": \"You are being rate limited by Cloudflare\"}",
                 "{\"statusCode\": 403, \"body\": \"Attention Required! | Cloudflare\"}",
                 "{\"statusCode\": 403, \"body\": \"This website is using a security service to protect itself from online attacks.\"}",
-                "{\"statusCode\": 403, \"body\": \"Ray ID XYZ blocked\"}"
+                "{\"statusCode\": 403, \"body\": \"Ray ID XYZ blocked\"}",
+                "{\"statusCode\": 403, \"body\": \"WAF rule triggered: Malicious request detected\"}",
+                "{\"statusCode\": 403, \"body\": \"WAF block: SQL injection attempt detected\"}"
         };
 
         for (String s : blockedSamples) {
@@ -253,6 +296,7 @@ public class TestResultsStatsActionTest extends MongoBasedTest {
         session.put("user", user);
         action.setSession(session);
         action.setTestingRunResultSummaryHexId(testingRunResultSummaryId.toHexString());
+        action.setPatternType("HTTP_429");
 
         String result = action.fetchTestResultsStatsCount();
 
@@ -290,6 +334,7 @@ public class TestResultsStatsActionTest extends MongoBasedTest {
         session.put("user", user);
         action.setSession(session);
         action.setTestingRunResultSummaryHexId(testingRunResultSummaryId.toHexString());
+        action.setPatternType("HTTP_429");
 
         String result = action.fetchTestResultsStatsCount();
 
@@ -363,6 +408,7 @@ public class TestResultsStatsActionTest extends MongoBasedTest {
         session.put("user", user);
         action.setSession(session);
         action.setTestingRunResultSummaryHexId(testingRunResultSummaryId.toHexString());
+        action.setPatternType("HTTP_429");
 
         String result = action.fetchTestResultsStatsCount();
 
@@ -422,6 +468,7 @@ public class TestResultsStatsActionTest extends MongoBasedTest {
         session.put("user", user);
         action.setSession(session);
         action.setTestingRunResultSummaryHexId(testingRunResultSummaryId.toHexString());
+        action.setPatternType("HTTP_429");
 
         long startTime = System.currentTimeMillis();
         String result = action.fetchTestResultsStatsCount();
@@ -434,5 +481,133 @@ public class TestResultsStatsActionTest extends MongoBasedTest {
         long executionTime = endTime - startTime;
         assertTrue("Query should complete quickly with proper indexing (took " + executionTime + "ms)",
                 executionTime < 5000); // Should be much faster, but allowing 5s for CI environments
+    }
+
+    @Test
+    public void testFetchTestResultsStatsCount_With5xxResponses() {
+        // Clear and setup test data
+        TestingRunResultDao.instance.getMCollection().drop();
+        ObjectId testingRunId = new ObjectId();
+        ObjectId testingRunResultSummaryId = new ObjectId();
+
+        List<TestingRunResult> testingRunResults = new ArrayList<>();
+
+        // Create test results with various 5xx status codes
+        String[] serverErrors = {
+                "{\"statusCode\": 500, \"body\": \"Internal Server Error\"}",
+                "{\"statusCode\":502,\"error\":\"Bad Gateway\"}",
+                "{\"statusCode\": 520, \"error\": \"Cloudflare: Web server is returning an unknown error\"}",
+                "{\"statusCode\": 521, \"body\": \"Cloudflare: Web server is down\"}",
+                "{\"statusCode\": 522, \"error\": \"Cloudflare: Connection timed out\"}",
+                "{\"statusCode\": 503, \"body\": \"Service Unavailable\"}"
+        };
+
+        for (int i = 0; i < serverErrors.length; i++) {
+            TestResult serverErrorResult = new TestResult(serverErrors[i],
+                    "", new ArrayList<>(), 100.0, false, TestResult.Confidence.HIGH, null);
+            ApiInfo.ApiInfoKey apiInfoKey = new ApiInfo.ApiInfoKey(1, "/5xx-test-" + i, URLMethods.Method.GET);
+            TestingRunResult runResult = new TestingRunResult(
+                    testingRunId, apiInfoKey, "SERVER_ERROR", "SERVER_ERROR_TEST",
+                    Arrays.asList(serverErrorResult), false, new ArrayList<SingleTypeInfo>(),
+                    80, Context.now(), Context.now(), testingRunResultSummaryId,
+                    null, new ArrayList<TestingRunResult.TestLog>());
+            testingRunResults.add(runResult);
+        }
+
+        TestingRunResultDao.instance.insertMany(testingRunResults);
+
+        // Set up context
+        Context.userId.set(0);
+        Context.contextSource.set(GlobalEnums.CONTEXT_SOURCE.API);
+
+        TestResultsStatsAction action = new TestResultsStatsAction();
+        Map<String, Object> session = new HashMap<>();
+        User user = new User();
+        user.setLogin("test@akto.io");
+        session.put("user", user);
+        action.setSession(session);
+        action.setTestingRunResultSummaryHexId(testingRunResultSummaryId.toHexString());
+        action.setPatternType("HTTP_5XX");
+
+        String result = action.fetchTestResultsStatsCount();
+
+        assertEquals("SUCCESS", result);
+        assertEquals(6, action.getCount()); // Should find all 6 server errors
+        assertTrue(action.getActionErrors().isEmpty());
+    }
+
+    @Test
+    public void testFetchTestResultsStatsCount_WithCloudflareResponses() {
+        // Clear and setup test data
+        TestingRunResultDao.instance.getMCollection().drop();
+        ObjectId testingRunId = new ObjectId();
+        ObjectId testingRunResultSummaryId = new ObjectId();
+
+        List<TestingRunResult> testingRunResults = new ArrayList<>();
+
+        // Create test results with various Cloudflare blocking scenarios
+        String[] cloudflareErrors = {
+                "{\"statusCode\": 403, \"body\": \"Error 1020: Access denied\"}",
+                "{\"statusCode\": 429, \"body\": \"Error 1015: You are being rate limited\"}",
+                "{\"statusCode\": 403, \"body\": \"Attention Required! | Cloudflare\"}",
+                "{\"statusCode\": 403, \"body\": \"User blocked by Cloudflare\"}",
+                "{\"statusCode\": 403, \"body\": \"This website is using a security service to protect itself from online attacks.\"}",
+                "{\"statusCode\": 403, \"body\": \"Ray ID XYZ123 blocked\"}",
+                "{\"statusCode\": 403, \"body\": \"WAF rule triggered: SQL injection detected\"}",
+                "{\"statusCode\": 403, \"body\": \"WAF block: Malicious payload detected\"}",
+                "{\"statusCode\": 403, \"body\": \"Error 1012: Access denied\"}"
+        };
+
+        for (int i = 0; i < cloudflareErrors.length; i++) {
+            TestResult cloudflareErrorResult = new TestResult(cloudflareErrors[i],
+                    "", new ArrayList<>(), 100.0, false, TestResult.Confidence.HIGH, null);
+            ApiInfo.ApiInfoKey apiInfoKey = new ApiInfo.ApiInfoKey(1, "/cf-test-" + i, URLMethods.Method.POST);
+            TestingRunResult runResult = new TestingRunResult(
+                    testingRunId, apiInfoKey, "CLOUDFLARE_BLOCK", "CLOUDFLARE_BLOCK_TEST",
+                    Arrays.asList(cloudflareErrorResult), false, new ArrayList<SingleTypeInfo>(),
+                    80, Context.now(), Context.now(), testingRunResultSummaryId,
+                    null, new ArrayList<TestingRunResult.TestLog>());
+            testingRunResults.add(runResult);
+        }
+
+        // Add some benign responses that should NOT match
+        String[] benignResponses = {
+                "{\"statusCode\": 200, \"headers\": {\"cf-ray\": \"7f9e7f2ad9be2a3c-DEL\"}}",
+                "{\"statusCode\": 204, \"headers\": {\"cf-ray\": \"72f0a1b7ce4321ab-LHR\"}}",
+                "{\"statusCode\": 302, \"headers\": {\"server\": \"cloudflare\"}}"
+        };
+
+        for (int i = 0; i < benignResponses.length; i++) {
+            TestResult benignResult = new TestResult(benignResponses[i],
+                    "", new ArrayList<>(), 100.0, false, TestResult.Confidence.HIGH, null);
+            ApiInfo.ApiInfoKey apiInfoKey = new ApiInfo.ApiInfoKey(1, "/benign-" + i, URLMethods.Method.GET);
+            TestingRunResult runResult = new TestingRunResult(
+                    testingRunId, apiInfoKey, "BENIGN_TEST", "BENIGN_TEST",
+                    Arrays.asList(benignResult), false, new ArrayList<SingleTypeInfo>(),
+                    80, Context.now(), Context.now(), testingRunResultSummaryId,
+                    null, new ArrayList<TestingRunResult.TestLog>());
+            testingRunResults.add(runResult);
+        }
+
+        TestingRunResultDao.instance.insertMany(testingRunResults);
+
+        // Set up context
+        Context.userId.set(0);
+        Context.contextSource.set(GlobalEnums.CONTEXT_SOURCE.API);
+
+        TestResultsStatsAction action = new TestResultsStatsAction();
+        Map<String, Object> session = new HashMap<>();
+        User user = new User();
+        user.setLogin("test@akto.io");
+        session.put("user", user);
+        action.setSession(session);
+        action.setTestingRunResultSummaryHexId(testingRunResultSummaryId.toHexString());
+        action.setPatternType("CLOUDFLARE");
+
+        String result = action.fetchTestResultsStatsCount();
+
+        assertEquals("SUCCESS", result);
+        assertEquals(9, action.getCount()); // Should find 9 Cloudflare blocking scenarios, excluding benign responses
+        assertTrue(action.getActionErrors().isEmpty());
     }
 }

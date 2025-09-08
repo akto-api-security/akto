@@ -971,7 +971,7 @@ function SingleTestRunPage() {
                       {(() => { const sev = severityFor(allTestResultsStats.countCloudflare); return (
                         <div className={`badge-wrapper-${sev.toUpperCase()}`}>
                           <Badge>
-                            CDN: {allTestResultsStats.countCloudflare}
+                          Cloudflare errors: {allTestResultsStats.countCloudflare}
                           </Badge>
                         </div>
                       )})()}
