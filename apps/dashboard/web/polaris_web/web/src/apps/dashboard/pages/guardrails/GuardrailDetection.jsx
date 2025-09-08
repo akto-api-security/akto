@@ -30,9 +30,9 @@ const headings = [
     title: "Severity",
   },
   {
-    text: labelMap[PersistStore.getState().dashboardCategory]["API endpoint"],
+    text: "AI Agent",
     value: "endpointComp",
-    title: labelMap[PersistStore.getState().dashboardCategory]["API endpoint"],
+    title: "AI Agent",
   },
   {
     text: "Actor",
@@ -44,13 +44,6 @@ const headings = [
     text: "Filter",
     value: "filterId",
     title: "Guardrail type",
-  },
-  {
-    text: "Collection",
-    value: "apiCollectionName",
-    title: "Collection",
-    maxWidth: "95px",
-    type: CellType.TEXT,
   },
   {
     text: "Discovered",
@@ -67,14 +60,14 @@ const sortOptions = [
     value: "detectedAt asc",
     directionLabel: "Newest",
     sortKey: "detectedAt",
-    columnIndex: 5,
+    columnIndex: 4,
   },
   {
     label: "Discovered time",
     value: "detectedAt desc",
     directionLabel: "Oldest",
     sortKey: "detectedAt",
-    columnIndex: 5,
+    columnIndex: 4,
   },
 ];
 
