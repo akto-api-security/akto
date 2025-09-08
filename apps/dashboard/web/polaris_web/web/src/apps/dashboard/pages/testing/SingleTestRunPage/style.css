@@ -17,30 +17,3 @@
 .banner-wrapper .Polaris-Banner--statusCritical {
   background-color: #fff4f4 !important;
 }
-
-/* API request stats badge styles */
-.api-stats-badge {
-  display: inline-block;
-  padding: 4px 12px;
-  border-radius: 20px;
-  font-size: 12px;
-  font-weight: 500;
-}
-
-.api-stats-critical {
-  background-color: #ffebee;
-  color: #c62828;
-  border: 1px solid #ffcdd2;
-}
-
-.api-stats-warning {
-  background-color: #fff8e1;
-  color: #f57c00;
-  border: 1px solid #ffe0b2;
-}
-
-.api-stats-success {
-  background-color: #e8f5e8;
-  color: #2e7d32;
-  border: 1px solid #c8e6c9;
-}
