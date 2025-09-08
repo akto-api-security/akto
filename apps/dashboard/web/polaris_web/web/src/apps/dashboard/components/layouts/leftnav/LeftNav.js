@@ -383,13 +383,33 @@ export default function LeftNav() {
                 ),
                 icon: LockMajor,
                 onClick: () => {
-                    handleSelect("dashboard_mcp_guardrails");
-                    navigate("/dashboard/mcp-guardrails");
-                    setActive("normal");
+                    handleSelect("dashboard_mcp_guardrails_activity");
+                    navigate("/dashboard/mcp-security/guardrails/activity");
+                    setActive("active");
                 },
-                selected: leftNavSelected === "dashboard_mcp_guardrails",
+                selected: leftNavSelected.includes("_mcp_guardrails"),
                 url: "#",
                 key: "9",
+                subNavigationItems: [
+                    {
+                        label: "Guardrail Activity",
+                        onClick: () => {
+                            navigate("/dashboard/mcp-security/guardrails/activity");
+                            handleSelect("dashboard_mcp_guardrails_activity");
+                            setActive("active");
+                        },
+                        selected: leftNavSelected === "dashboard_mcp_guardrails_activity",
+                    },
+                    {
+                        label: "Guardrail Policy",
+                        onClick: () => {
+                            navigate("/dashboard/mcp-security/guardrails/policy");
+                            handleSelect("dashboard_mcp_guardrails_policy");
+                            setActive("active");
+                        },
+                        selected: leftNavSelected === "dashboard_mcp_guardrails_policy",
+                    },
+                ],
             }] : []),
             ...(dashboardCategory === "Gen AI" ? [{
                 label: (
