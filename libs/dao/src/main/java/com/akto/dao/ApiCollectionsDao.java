@@ -16,8 +16,10 @@ import org.bson.types.ObjectId;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -206,22 +208,25 @@ public class ApiCollectionsDao extends AccountsContextDaoWithRbac<ApiCollection>
         int ts = Context.nowInMillis();
         // Get user collection IDs for RBAC filtering
         List<Integer> userCollectionIds = null;
+        Set<Integer> userCollectionIdsSet = new HashSet<>();
         try {
             userCollectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
+            if (userCollectionIds != null) {
+                userCollectionIdsSet.addAll(userCollectionIds);
+            }
         } catch(Exception e){
             // If no user collections, proceed without filtering
         }
-        
-        // If no collection IDs provided, return empty map
-        if(userCollectionIds == null || userCollectionIds.isEmpty()) {
-            return countMap;
-        }
+
         
         // Step 1: Query api_collections to separate group and non-group collections
         List<Integer> groupCollectionIds = new ArrayList<>();
         List<Integer> nonGroupCollectionIds = new ArrayList<>();
                 
         for(ApiCollection collection : apiCollections) {
+            if (userCollectionIds != null && !userCollectionIdsSet.contains(collection.getId())) {
+                continue;
+            }
             if(collection.getType() == ApiCollection.Type.API_GROUP) {
                 groupCollectionIds.add(collection.getId());
             } else {
