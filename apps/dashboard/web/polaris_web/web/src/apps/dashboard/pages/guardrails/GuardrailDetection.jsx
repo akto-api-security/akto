@@ -222,9 +222,16 @@ function GuardrailDetection() {
 
       tooltip: {
         shared: true,
-        headerFormat: "<span style='font-size:11px'>T={point.key}</span><br/>",
+        headerFormat: "<span style='font-size:12px'><b>Day {point.key}</b></span><br/>",
         pointFormat:
-          "<span style='color:{series.color}'>●</span> {series.name}: <b>{point.y}</b><br/>"
+          "<span style='color:{series.color}'>●</span> {series.name}: <b>{point.y:,.0f}</b> requests<br/>",
+        backgroundColor: 'rgba(255, 255, 255, 0.95)',
+        borderColor: '#ddd',
+        borderRadius: 4,
+        padding: 10,
+        style: {
+          fontSize: '12px'
+        }
       },
 
       plotOptions: {
