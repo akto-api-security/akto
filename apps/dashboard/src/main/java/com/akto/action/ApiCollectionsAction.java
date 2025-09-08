@@ -133,7 +133,9 @@ public class ApiCollectionsAction extends UserAction {
                 apiCollection.setUrlsCount(fallbackCount);
             }
 
-            if(!apiCollection.isMcpCollection() || !apiCollection.isGuardRailCollection()) {
+            if(apiCollection.isMcpCollection() || (apiCollection.isMcpCollection() && apiCollection.isGuardRailCollection())) {
+                // do not clear urls for mcp and guardrail collections
+            }else{
                 apiCollection.setUrls((new HashSet<>()));
             }
         }
