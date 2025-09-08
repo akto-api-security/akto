@@ -89,7 +89,9 @@ function HomeDashboard() {
     const [mcpTotals, setMcpTotals] = useState({ mcpTotalApis: null, thirdPartyApis: null, newApis7Days: null, openAlerts: null, criticalApis: null })
     const [mcpOpenAlertDetails, setMcpOpenAlertDetails] = useState([])
     const [mcpApiCallStats, setMcpApiCallStats] = useState([])
-    
+    const [policyGuardrailStats, setPolicyGuardrailStats] = useState([])
+    const [policyGuardrailStatsTimeRange, setPolicyGuardrailStatsTimeRange] = useState(func.timeNow() - 24*60*60)
+
     // MCP API Requests time selector state
     const statsOptions = [
         {label: "15 minutes", value: 15*60},
@@ -184,6 +186,71 @@ function HomeDashboard() {
             setShowTestingComponents(finalResult && finalResult.length > 0)
         });
     }
+
+    const fetchPolicyGuardrailStats = async (startTs, endTs) => {
+        try {
+            // Get collections with guard-rail tag
+            const guardRailCollections = allCollections.filter(collection => {
+                return collection.envType && collection.envType.some(envType =>
+                    envType.keyName === 'guard-rail' && envType.value === 'Guard Rail'
+                );
+            });
+
+            if (guardRailCollections.length === 0) {
+                // Generate empty data points for the time range
+                const emptyData = generateTimeSeriesWithGaps(startTs, endTs, {});
+                setPolicyGuardrailStats(emptyData);
+                return;
+            }
+
+            // Fetch API call stats for each guard-rail collection and their URLs
+            const promises = [];
+            guardRailCollections.forEach(collection => {
+                // Check if the collection has urls array and it's not empty
+                if (collection.urls && Array.isArray(collection.urls) && collection.urls.length > 0) {
+                    collection.urls.forEach(urlString => {
+                        // Split the URL string by space to get url and method
+                        const parts = urlString.split(' ');
+                        const url = parts[0];
+                        const method = parts[1];
+
+                        // Create a promise for each URL/method combination
+                        promises.push(
+                            observeApi.fetchApiCallStats(collection.id, url, method, startTs, endTs)
+                                .catch(err => {
+                                    return null;
+                                })
+                        );
+                    });
+                } else {
+                    // Skip collections without urls array or with empty urls array
+                }
+            });
+
+            const results = await Promise.all(promises);
+
+            // Aggregate the results
+            const aggregatedStats = {};
+            results.forEach(result => {
+                if (result && result.result && result.result.apiCallStats) {
+                    result.result.apiCallStats.forEach(stat => {
+                        const ts = stat.ts * 60 * 1000; // Convert to milliseconds
+                        if (!aggregatedStats[ts]) {
+                            aggregatedStats[ts] = 0;
+                        }
+                        aggregatedStats[ts] += stat.count;
+                    });
+                }
+            });
+
+            // Generate complete time series with gaps filled as zeros
+            const chartData = generateTimeSeriesWithGaps(startTs, endTs, aggregatedStats);
+
+            setPolicyGuardrailStats(chartData);
+        } catch (error) {
+            setPolicyGuardrailStats([]);
+        }
+    };
 
     const fetchMcpApiCallStats = async (startTs, endTs) => {
         try {
@@ -377,6 +444,13 @@ function HomeDashboard() {
             fetchMcpApiCallStats(mcpStatsTimeRange, func.timeNow());
         }
     }, [mcpStatsTimeRange, allCollections])
+
+    // Fetch Policy Guardrail stats when time range changes
+    useEffect(() => {
+        if (allCollections && allCollections.length > 0) {
+            fetchPolicyGuardrailStats(policyGuardrailStatsTimeRange, func.timeNow());
+        }
+    }, [policyGuardrailStatsTimeRange, allCollections])
 
     async function getActionItemsDataAndCount() {
         const data = await fetchActionItemsData();
@@ -1056,6 +1130,55 @@ function HomeDashboard() {
         />
     )
 
+    // Policy Guardrails graph component
+    const policyGuardrailSeries = policyGuardrailStats
+    const hasPolicyGuardrailData = Array.isArray(policyGuardrailSeries) && policyGuardrailSeries.length > 0 && policyGuardrailSeries.some(p => p && p[1] > 0)
+    const policyGuardrailsCard = (
+        <InfoCard
+            component={
+                <Box paddingBlockStart={'2'}>
+                    <HorizontalStack align="end">
+                        <Dropdown
+                            menuItems={statsOptions}
+                            initial={statsOptions[6].label}
+                            selected={(timeInSeconds) => {
+                                setPolicyGuardrailStatsTimeRange(func.timeNow() - timeInSeconds);
+                            }}
+                        />
+                    </HorizontalStack>
+                    {hasPolicyGuardrailData ? (
+                        <GraphMetric
+                            key={`policy-guardrail-stats-${policyGuardrailStatsTimeRange}`}
+                            data={[{
+                                data: policyGuardrailSeries,
+                                color: '',
+                                name: 'Policy Guardrails'
+                            }]}
+                            type='spline'
+                            color='#00AA5B'
+                            areaFillHex='true'
+                            height='250'
+                            title=''
+                            subtitle=''
+                            defaultChartOptions={defaultMcpChartOptions(false)}
+                            backgroundColor='#ffffff'
+                            text='true'
+                            inputMetrics={[]}
+                        />
+                    ) : (
+                        <Box minHeight="250px" paddingBlockStart="8">
+                            <Text alignment='center' color='subdued'>No policy guardrail requests in the selected period</Text>
+                        </Box>
+                    )}
+                </Box>
+            }
+            title={'Policy Guardrails'}
+            titleToolTip={'Policy guardrail request volume trend for collections with guard-rail tag over time'}
+            linkText={''}
+            linkUrl={''}
+        />
+    )
+
     // MCP-only Open Alerts card
     const mcpOpenAlertsCard = (
         <InfoCard
@@ -1132,9 +1255,10 @@ function HomeDashboard() {
     if (isMCPSecurityCategory()) {
         gridComponents = [
             {id: 'mcp-api-requests', component: mcpApiRequestsCard},
-            {id: 'mcp-open-alerts', component: mcpOpenAlertsCard},
+            {id: 'policy-guardrails', component: policyGuardrailsCard},
             {id: 'mcp-discovery', component: mcpDiscoveryMiniCard},
             {id: 'mcp-risk', component: mcpRiskDetectionsMiniCard},
+            {id: 'mcp-open-alerts', component: mcpOpenAlertsCard},
             {id: 'mcp-types-table', component: mcpTypesTableCard},
             ...gridComponents
         ]
@@ -1143,12 +1267,12 @@ function HomeDashboard() {
     const gridComponent = (
         isMCPSecurityCategory() ? (
             <VerticalStack gap={5}>
-                {/* First row with 3:1 ratio */}
-                <HorizontalGrid gap={5} columns={{xs: 1, sm: 1, md: '3fr 1fr'}}>
+                {/* First row with MCP Components Requests and Policy Guardrails side by side */}
+                <HorizontalGrid gap={5} columns={2}>
                     {mcpApiRequestsCard}
-                    {mcpOpenAlertsCard}
+                    {policyGuardrailsCard}
                 </HorizontalGrid>
-                {/* Second row with equal columns */}
+                {/* Second row with equal columns for remaining components */}
                 <HorizontalGrid gap={5} columns={2}>
                     {gridComponents.slice(2).map(({id, component}) => (
                         <div key={id}>{component}</div>
