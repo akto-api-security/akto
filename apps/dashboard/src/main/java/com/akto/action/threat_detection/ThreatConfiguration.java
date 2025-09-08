@@ -36,19 +36,31 @@ public class ThreatConfiguration {
     @lombok.NoArgsConstructor
     public static class RatelimitConfig {
         private List<RatelimitConfigItem> rules;
-    }
-    
-    @lombok.Getter
-    @lombok.Setter
-    @lombok.AllArgsConstructor
-    @lombok.NoArgsConstructor
-    public static class RatelimitConfigItem {
-        private String name;
-        private Integer period;
-        private Integer maxRequests;
-        private Integer mitigationPeriod;
-        private String action;
-        private String type;
+        
+        @lombok.Getter
+        @lombok.Setter
+        @lombok.AllArgsConstructor
+        @lombok.NoArgsConstructor
+        public static class AutomatedThreshold {
+            private String percentile;
+            private Integer overflowPercentage;
+            private Integer baselinePeriod;
+        }
+        
+        @lombok.Getter
+        @lombok.Setter
+        @lombok.AllArgsConstructor
+        @lombok.NoArgsConstructor
+        public static class RatelimitConfigItem {
+            private String name;
+            private Integer period;
+            private Integer maxRequests;
+            private Integer mitigationPeriod;
+            private String action;
+            private String type;
+            private AutomatedThreshold autoThreshold;
+            private String behaviour;
+        }
     }
 
 }

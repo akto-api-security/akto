@@ -105,6 +105,23 @@ public class ThreatActorService {
                             itemBuilder.setAction(ruleDoc.getString("action"));
                         if (ruleDoc.getString("type") != null) 
                             itemBuilder.setType(ruleDoc.getString("type"));
+                        if (ruleDoc.getString("behaviour") != null)
+                            itemBuilder.setBehaviour(ruleDoc.getString("behaviour"));
+                        
+                        // Handle AutomatedThreshold
+                        Object autoThresholdObj = ruleDoc.get("autoThreshold");
+                        if (autoThresholdObj instanceof Document) {
+                            Document autoThresholdDoc = (Document) autoThresholdObj;
+                            RatelimitConfig.AutomatedThreshold.Builder thresholdBuilder = 
+                                RatelimitConfig.AutomatedThreshold.newBuilder();
+                            if (autoThresholdDoc.getString("percentile") != null)
+                                thresholdBuilder.setPercentile(autoThresholdDoc.getString("percentile"));
+                            if (autoThresholdDoc.getInteger("overflowPercentage") != null)
+                                thresholdBuilder.setOverflowPercentage(autoThresholdDoc.getInteger("overflowPercentage"));
+                            if (autoThresholdDoc.getInteger("baselinePeriod") != null)
+                                thresholdBuilder.setOverflowPercentage(autoThresholdDoc.getInteger("baselinePeriod"));
+                            itemBuilder.setAutoThreshold(thresholdBuilder);
+                        }
                         
                         ratelimitBuilder.addRules(itemBuilder);
                     }
@@ -152,6 +169,21 @@ public class ThreatActorService {
             if (item.getMitigationPeriod() > 0) ratelimitDoc.append("mitigationPeriod", item.getMitigationPeriod());
             if (!item.getAction().isEmpty()) ratelimitDoc.append("action", item.getAction());
             if (!item.getType().isEmpty()) ratelimitDoc.append("type", item.getType());
+            if (!item.getBehaviour().isEmpty()) ratelimitDoc.append("behaviour", item.getBehaviour());
+            
+            // Handle AutomatedThreshold
+            if (item.hasAutoThreshold()) {
+                RatelimitConfig.AutomatedThreshold autoThreshold = item.getAutoThreshold();
+                Document autoThresholdDoc = new Document();
+                if (!autoThreshold.getPercentile().isEmpty()) 
+                    autoThresholdDoc.append("percentile", autoThreshold.getPercentile());
+                if (autoThreshold.getOverflowPercentage() > 0) 
+                    autoThresholdDoc.append("overflowPercentage", autoThreshold.getOverflowPercentage());
+                if (autoThreshold.getBaselinePeriod() > 0) 
+                    autoThresholdDoc.append("baselinePeriod", autoThreshold.getBaselinePeriod());
+                ratelimitDoc.append("autoThreshold", autoThresholdDoc);
+            }
+            
             ratelimitDocs.add(ratelimitDoc);
         }
         newDoc.append("ratelimitConfig", new Document("rules", ratelimitDocs));

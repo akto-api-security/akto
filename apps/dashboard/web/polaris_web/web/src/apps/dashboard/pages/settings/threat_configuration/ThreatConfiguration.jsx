@@ -12,7 +12,7 @@ function ThreatConfiguration() {
         />,
         <RatelimitConfigComponent
             title={"Rate Limit Configuration"}
-            description={"Configure rate limiting rules to protect your APIs from abuse. Set thresholds, time windows, and actions for different API endpoints."}
+            description={"Configure rate limiting rules to protect your APIs from abuse."}
             key={"ratelimitConfig"}
         />
     ];

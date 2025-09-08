@@ -64,6 +64,12 @@ public class ApiInfo {
     public static final String DESCRIPTION = "description";
     private String description;
 
+    public static final String RATELIMITS = "rateLimits";
+    private Map<String, Integer> rateLimits;
+
+    public static final String RATE_LIMIT_CONFIDENCE = "rateLimitConfidence";
+    private float rateLimitConfidence;
+
     public enum ApiType {
         REST, GRAPHQL, GRPC, SOAP
     }
@@ -153,6 +159,14 @@ public class ApiInfo {
     public ApiInfo(ApiInfoKey apiInfoKey) {
         this.id = apiInfoKey;
         this.violations = new HashMap<>();
+
+        // Initialize rate limits with -1 => no limits
+        this.rateLimits = new HashMap<>();
+        this.rateLimits.put("p50", -1);
+        this.rateLimits.put("p75", -1);
+        this.rateLimits.put("p90", -1);
+        this.rateLimits.put("maxRequests", -1);
+
         this.apiAccessTypes = new HashSet<>();
         this.allAuthTypesFound = new HashSet<>();
         this.lastSeen = Context.now();
@@ -473,5 +487,21 @@ public class ApiInfo {
 
     public void setDescription(String description) {
         this.description = description;
+    }
+
+    public Map<String, Integer> getRateLimits() {
+        return rateLimits;
+    }
+
+    public void setRateLimits(Map<String, Integer> rateLimits) {
+        this.rateLimits = rateLimits;
+    }
+
+    public float getRateLimitConfidence() {
+        return rateLimitConfidence;
+    }
+
+    public void setRateLimitConfidence(float rateLimitConfidence) {
+        this.rateLimitConfidence = rateLimitConfidence;
     }
 }
