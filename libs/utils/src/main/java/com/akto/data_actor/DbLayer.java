@@ -535,7 +535,7 @@ public class DbLayer {
 
         // Skip update for existing apiCollection if vpc and tags are same.
         if ( apiCollection != null && (vpcId == null || vpcIdAlreadyExists) && (tags == null || tags.isEmpty())) {
-            loggerMaker.debug("No new tags or vpcId, Updates skipped for collectionId: " + vxlanId);
+            loggerMaker.info("No new tags or vpcId, Updates skipped for collectionId: " + vxlanId);
             return;
         }
 
@@ -594,7 +594,7 @@ public class DbLayer {
 
         // Skip update for existing apiCollection if vpc and tags are same.
         if ( apiCollection != null && (vpcId == null || vpcIdAlreadyExists) && (tags == null || tags.isEmpty())) {
-            loggerMaker.debug("No new tags or vpcId, Updates skipped for collectionId: " + id);
+            loggerMaker.info("No new tags or vpcId, Updates skipped for collectionId: " + id);
             return;
         }
 
