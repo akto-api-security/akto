@@ -1,6 +1,6 @@
 import { useReducer, useState, useEffect } from "react";
 import { Box, EmptySearchResult, HorizontalStack, Popover, ActionList, Button, Icon, Badge} from '@shopify/polaris';
-import {FileMinor, HideMinor, ViewMinor} from '@shopify/polaris-icons';
+import {CancelMinor, EditMinor, FileMinor, HideMinor, ViewMinor} from '@shopify/polaris-icons';
 import DateRangeFilter from "../../components/layouts/DateRangeFilter";
 import PageWithMultipleCards from "../../components/layouts/PageWithMultipleCards";
 import func from "@/util/func";
@@ -9,6 +9,7 @@ import { produce } from "immer"
 import { getDashboardCategory, mapLabel } from "../../../main/labelHelper";
 import SessionStore from "../../../main/SessionStore";
 import GithubSimpleTable from "../../components/tables/GithubSimpleTable";
+import GithubServerTable from "../../components/tables/GithubSimpleTable";
 import { labelMap } from '../../../main/labelHelperMap';
 import PersistStore from '@/apps/main/PersistStore';
 import { CellType } from "@/apps/dashboard/components/tables/rows/GithubRow";
@@ -47,6 +48,10 @@ const headings = [
     value: "createdTs",
     type: CellType.TEXT,
     sortActive: true,
+  },
+  {
+      title: '',
+      type: CellType.ACTION,
   }
 ];
 
@@ -94,9 +99,24 @@ function GuardrailPolicies() {
         </Box>
     ]
 
+    const getActionsList = (item) => {
+        return [{title: 'Actions', items: [
+            {
+                content: 'Disable policy',
+                icon: CancelMinor,
+                onAction: () => {},
+            },
+            {
+                content: 'View policy',
+                icon: ViewMinor,
+                onAction: () => {rowClicked(item)},
+            }
+        ]}]
+    }
+
 
       const components = [
-        <GithubSimpleTable
+        <GithubServerTable
             key={0}
             resourceName={resourceName}
             useNewRow={true}
@@ -108,8 +128,9 @@ function GuardrailPolicies() {
             showFooter={false}
             sortOptions={sortOptions}
             emptyStateMarkup={emptyStateMarkup}   
-            onRowClick={rowClicked}    
-            rowClickable={true} 
+            getActions = {(item) => getActionsList(item)}
+            hasRowActions={true}
+
         />,   
         <FlyLayout
             title={"Policy Details"}
