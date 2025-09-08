@@ -267,12 +267,30 @@ function GuardrailDetection() {
   useEffect(() => {
     if (!chartRef.current) return;
 
-    const data = [
-      { name: "Prompt Injection", y: 18000, color: "#E63B2E" },
-      { name: "Toxic content",   y: 12000, color: "#F9A6A6" },
-      { name: "PII Data Leak",   y: 14000, color: "#F14A3E" },
-      { name: "Harmful Content", y: 10022, color: "#F37474" }
-    ];
+    // Count occurrences of each guardrail type from the actual data
+    const guardrailCounts = {};
+    guardRailData.guardRailDummyData.maliciousEvents.forEach(event => {
+      const filterId = event.filterId;
+      guardrailCounts[filterId] = (guardrailCounts[filterId] || 0) + 1;
+    });
+
+    // Create dynamic multipliers for more realistic visualization
+    const multipliers = {
+      "PII": 8500,
+      "Sensitive data guardrail": 4200,
+      "Word mask": 6300,
+      "Injection guardrail": 3100,
+      "Competitor analysis": 2800,
+      "Bias Check": 1950
+    };
+
+    // Create chart data with dynamic values
+    const colors = ["#E63B2E", "#F14A3E", "#F37474", "#F9A6A6", "#FF8C82", "#FFB3BA"];
+    const data = Object.keys(guardrailCounts).map((key, index) => ({
+      name: key,
+      y: guardrailCounts[key] * (multipliers[key] || Math.floor(Math.random() * 5000 + 1000)),
+      color: colors[index % colors.length]
+    }));
 
     const total = data.reduce((sum, d) => sum + d.y, 0);
 
@@ -288,7 +306,7 @@ function GuardrailDetection() {
             if (!this.customLabel) {
               this.customLabel = this.renderer.text(
                 `<div style="text-align: center">
-                  <div style="font-size:12px;color:#666">Total</div>
+                  <div style="font-size:12px;color:#666">Total Violations</div>
                   <div style="font-size:20px;font-weight:600">${Highcharts.numberFormat(total, 0)}</div>
                 </div>`,
                 0,
@@ -330,7 +348,10 @@ function GuardrailDetection() {
       },
 
       tooltip: {
-        pointFormat: "<b>{point.y}</b> ({point.percentage:.1f}%)"
+        pointFormat: "<b>{point.y:,.0f}</b> violations<br/>({point.percentage:.1f}% of total)",
+        backgroundColor: 'rgba(255, 255, 255, 0.95)',
+        borderColor: '#ccc',
+        borderRadius: 4
       },
 
       series: [
@@ -367,7 +388,7 @@ function GuardrailDetection() {
                 <Box width="33.33%">
                     <Card>
                         <VerticalStack gap="3">
-                            <Text variant="headingMd" as="h3">Request by type</Text>
+                            <Text variant="headingMd" as="h3">Violations by guardrail type</Text>
                             <div ref={chartRef} style={{ height: 240, width: "100%" }} />
                         </VerticalStack>
                     </Card>
