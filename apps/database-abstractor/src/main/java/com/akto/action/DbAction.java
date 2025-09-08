@@ -2342,9 +2342,43 @@ public class DbAction extends ActionSupport {
         SlackSender.sendAlert(accountId, apiTestStatusAlert, testingRun.getSelectedSlackChannelId());
     }
 
+    private int tagHitCount = 0;
+    private int tagMissCount = 0;
+
+    private List<CollectionTags> checkTagsNeedUpdates(List<CollectionTags> tags, int apiCollectionId) {
+        
+        if(tags == null || tags.isEmpty()){
+            return null;
+        }
+
+        StringBuilder combinedTags = new StringBuilder();
+
+        for (CollectionTags ctag : tags) {
+            if (combinedTags.length() > 0) {
+                combinedTags.append(", ");
+            }
+            combinedTags.append(ctag.getKeyName()).append("=").append(ctag.getValue());
+
+        }
+
+        String singleTagString = combinedTags.toString();
+        if (ParamFilter.isNewEntry(Context.accountId.get(), apiCollectionId, "", "", singleTagString)) {
+        loggerMaker.debug("New tags found for apiCollectionId:" + apiCollectionId
+                + "Bloom filter tagMissCount: " + tagMissCount);
+            tagMissCount++;
+            return tags;
+        }
+
+        // Monitor bloom filter efficacy
+        tagHitCount++;
+        loggerMaker.debug("Skipping tags updates, already present for apiCollectionId:" + apiCollectionId
+                + "Bloom filter tagHitCount: " + tagHitCount);
+        return null;
+    }
+
     public String createCollectionSimpleForVpc() {
         try {
-            DbLayer.createCollectionSimpleForVpc(vxlanId, vpcId, tagsList);
+            DbLayer.createCollectionSimpleForVpc(vxlanId, vpcId, checkTagsNeedUpdates(tagsList, vxlanId));
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error in createCollectionSimpleForVpc " + e.toString());
             return Action.ERROR.toUpperCase();
@@ -2354,7 +2388,7 @@ public class DbAction extends ActionSupport {
 
     public String createCollectionForHostAndVpc() {
         try {
-            DbLayer.createCollectionForHostAndVpc(host, colId, vpcId, tagsList);
+            DbLayer.createCollectionForHostAndVpc(host, colId, vpcId, checkTagsNeedUpdates(tagsList, colId));
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error in createCollectionForHostAndVpc " + e.toString());
             return Action.ERROR.toUpperCase();
