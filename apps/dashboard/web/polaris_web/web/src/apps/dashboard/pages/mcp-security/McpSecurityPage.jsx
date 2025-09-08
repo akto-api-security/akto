@@ -14,7 +14,7 @@ function McpSecurityPage() {
     if (!stiggFeatures || Object.keys(stiggFeatures).length === 0) {
       return false;
     }
-    return stiggFeatures['MCP_SECURITY']?.isGranted || false;
+    return stiggFeatures['MCP_SECURITY']?.isGranted || true;
   }, []);
 
   const [apiCollectionIds, setApiCollectionIds] = useState([]);

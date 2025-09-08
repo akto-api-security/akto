@@ -381,6 +381,26 @@ public class Utils {
         return null;
     }
 
+    public static boolean isFieldError(String responsePayload, String fieldKey) {
+        if (responsePayload != null) {
+            try {
+                BasicDBObject obj = BasicDBObject.parse(responsePayload);
+                BasicDBObject errors = (BasicDBObject) obj.get("errors");
+                if (errors != null) {
+                    String fieldError = errors.getString(fieldKey);
+                    return fieldError != null && fieldError.contains("Field '" + fieldKey + "' cannot be set");
+                }
+            } catch (Exception e) {
+                // If parsing fails, return false
+            }
+        }
+        return false;
+    }
+
+    public static boolean isLabelsFieldError(String responsePayload) {
+        return isFieldError(responsePayload, "labels");
+    }
+
     public static Pair<String, String> getJiraTicketUrlPair(String responsePayload, String jiraBaseUrl) {
         if (StringUtils.isEmpty(responsePayload)) {
             return null;
