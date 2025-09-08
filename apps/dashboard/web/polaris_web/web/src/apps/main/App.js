@@ -97,6 +97,8 @@ import UndoDemergedApis from "../dashboard/pages/settings/undo_demerged_apis/Und
 import GmailWebhookCore from "../dashboard/pages/settings/integrations/gmailWebhooks/GmailWebhookCore";
 import GmailWebhook from "../dashboard/pages/settings/integrations/gmailWebhooks/GmailWebhook";
 import McpSecurityPage from "../dashboard/pages/mcp-security/McpSecurityPage.jsx";
+import GuardrailActivityPage from "../dashboard/pages/mcp-security/guardrail-activity/GuardrailActivityPage.jsx";
+import GuardrailPolicyPage from "../dashboard/pages/mcp-security/guardrail-policy/GuardrailPolicyPage.jsx";
 import AuditData from "../dashboard/pages/observe/AuditData";
 import ComingSoonPage from "../dashboard/components/shared/ComingSoonPage";
 
@@ -256,10 +258,25 @@ const router = createBrowserRouter([
                     {
                         path: "mcp-security",
                         element: <McpSecurityPage/>,
-                    },
-                    {
-                        path: "mcp-guardrails",
-                        element: <ComingSoonPage title="MCP Guardrails" />,
+                        children: [
+                            {
+                                path: "guardrails",
+                                children: [
+                                    {
+                                        path: "",
+                                        element: <GuardrailActivityPage/>
+                                    },
+                                    {
+                                        path: "activity",
+                                        element: <GuardrailActivityPage/>
+                                    },
+                                    {
+                                        path: "policy",
+                                        element: <GuardrailPolicyPage/>
+                                    }
+                                ]
+                            }
+                        ]
                     },
                     {
                         path: "ai-agent-guardrails",

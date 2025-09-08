@@ -1,13 +1,18 @@
 import { Box, Button, Badge, HorizontalStack, Text } from '@shopify/polaris';
-import EmptyScreensLayout from '../../components/banners/EmptyScreensLayout';
 import LayoutWithTabs from '../../components/layouts/LayoutWithTabs';
 import { useState, useMemo } from 'react';
 import PageWithMultipleCards from '../../components/layouts/PageWithMultipleCards';
 import SummaryCardInfo from '../../components/shared/SummaryCardInfo';
 import ApiCollections from '../observe/api_collections/ApiCollections';
 import TestRunsPage from '../testing/TestRunsPage/TestRunsPage';
+import { Outlet, useLocation } from 'react-router-dom';
 
 function McpSecurityPage() {
+  const location = useLocation();
+  
+  // Check if we're on a nested route
+  const isNestedRoute = location.pathname.includes('/guardrails/');
+  
   // Check if user has MCP_SECURITY feature access
   const hasMcpSecurityAccess = useMemo(() => {
     const stiggFeatures = window.STIGG_FEATURE_WISE_ALLOWED;
@@ -97,6 +102,11 @@ function McpSecurityPage() {
     { title: 'Hosts with Sensitive Data', data: summaryData.hostsWithSensitiveData, color: 'warning' },
   ];
 
+  // If we're on a nested route, render the Outlet
+  if (isNestedRoute) {
+    return <Outlet />;
+  }
+
   return (
     <PageWithMultipleCards
       title={
@@ -108,26 +118,13 @@ function McpSecurityPage() {
       isFirstPage={true}
       components={[
         <>
-          {hasMcpSecurityAccess ? (
-            <>
-              <SummaryCardInfo summaryItems={summaryItems} key="summary" />
-              <Box width="100%" key="tabs">
-                <LayoutWithTabs
-                  tabs={[discoveryTab, testResultsTab]}
-                  currTab={() => { }}
-                />
-              </Box>
-            </>
-          ) : (
-            <Box width="100%" key="beta-card">
-              <EmptyScreensLayout
-                iconSrc={"/public/mcp.svg"}
-                headingText={"MCP Security is in beta"}
-                description={"MCP Security is currently in beta. Contact our sales team to learn more about this feature and get access."}
-                bodyComponent={<Button url="https://www.akto.io/api-security-demo" target="_blank" primary>Contact sales</Button>}
-              />
-            </Box>
-          )}
+          <SummaryCardInfo summaryItems={summaryItems} key="summary" />
+          <Box width="100%" key="tabs">
+            <LayoutWithTabs
+              tabs={[discoveryTab, testResultsTab]}
+              currTab={() => { }}
+            />
+          </Box>
         </>
       ]}
     />
