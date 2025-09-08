@@ -6,7 +6,7 @@ import Store from "../../../store";
 import func from "@/util/func";
 import { MarkFulfilledMinor, ReportMinor, ExternalMinor } from '@shopify/polaris-icons';
 import PersistStore from "../../../../main/PersistStore";
-import { ActionList, Button, HorizontalGrid, HorizontalStack, IndexFiltersMode, Popover } from "@shopify/polaris";
+import { ActionList, Button, HorizontalGrid, HorizontalStack, IndexFiltersMode, Popover, Modal, TextField, Text, VerticalStack } from "@shopify/polaris";
 import EmptyScreensLayout from "../../../components/banners/EmptyScreensLayout";
 import { ISSUES_PAGE_DOCS_URL } from "../../../../main/onboardingData";
 import {SelectCollectionComponent} from "../../testing/TestRunsPage/TestrunsBannerComponent"
@@ -185,6 +185,17 @@ function IssuesPage() {
     const [projectId, setProjectId] = useState('')
     const [workItemType, setWorkItemType] = useState('')
     const [issuesByApis, setIssuesByApis] = useState({});
+    
+    // Compulsory description modal states
+    const [compulsoryDescriptionModal, setCompulsoryDescriptionModal] = useState(false)
+    const [pendingIgnoreAction, setPendingIgnoreAction] = useState(null)
+    const [mandatoryDescription, setMandatoryDescription] = useState("")
+    const [modalLoading, setModalLoading] = useState(false)
+    const [compulsorySettings, setCompulsorySettings] = useState({
+        "False positive": false,
+        "No time to fix": false,
+        "Acceptable risk": false
+    })
 
     const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), values.ranges[5])
 
@@ -259,6 +270,22 @@ function IssuesPage() {
         }
     }, [])
 
+    // Fetch compulsory description settings
+    useEffect(() => {
+        const fetchCompulsorySettings = async () => {
+            try {
+                const {resp} = await settingFunctions.fetchAdminInfo();
+                
+                if (resp?.compulsoryDescription) {
+                    setCompulsorySettings(resp.compulsoryDescription);
+                }
+            } catch (error) {
+                console.error("Error fetching compulsory settings:", error);
+            }
+        };
+        fetchCompulsorySettings();
+    }, []);
+
     const [searchParams, setSearchParams] = useSearchParams();
     const resultId = searchParams.get("result")
 
@@ -326,6 +353,67 @@ function IssuesPage() {
         })
     }
 
+    // mapping strings
+    const reasonToSettingsKeyMap = {
+        "False positive": "falsePositive",
+        "Acceptable risk": "AcceptableFix", 
+        "No time to fix": "noTimeToFix"
+    };
+
+    // Update the requiresDescription function
+    const requiresDescription = (reason) => {
+        const settingsKey = reasonToSettingsKeyMap[reason];
+        return compulsorySettings[settingsKey] || false;
+    };
+
+
+    const handleIgnoreWithDescription = () => {
+        if (pendingIgnoreAction && mandatoryDescription.trim()) {
+            performBulkIgnoreAction(pendingIgnoreAction.items, pendingIgnoreAction.reason, mandatoryDescription);
+            setCompulsoryDescriptionModal(false);
+            setPendingIgnoreAction(null);
+            setMandatoryDescription("");
+        }
+    };
+
+    // When modal opens, fetch the current description for the first selected issue
+    useEffect(() => {
+        if (compulsoryDescriptionModal && pendingIgnoreAction && pendingIgnoreAction.items?.length > 0) {
+            setModalLoading(true);
+            // Only show description for the first selected issue
+            const issueId = pendingIgnoreAction.items[0];
+            api.fetchTestingRunResult(issueId).then(res => {
+                const desc = res?.testingRunResult?.description || "";
+                setMandatoryDescription(desc);
+            }).catch(() => {
+                setMandatoryDescription(""); // Set empty if fetch fails
+            }).finally(() => {
+                setModalLoading(false);
+            });
+        }
+    }, [compulsoryDescriptionModal, pendingIgnoreAction]);
+
+    const performBulkIgnoreAction = (items, ignoreReason, description = "") => {
+        // If description is provided, update each issue's description first
+        if (description && items.length > 0) {
+            const updatePromises = items.map(item => 
+                testingApi.updateIssueDescription(item, description)
+            );
+            
+            Promise.allSettled(updatePromises).then(() => {
+                api.bulkUpdateIssueStatus(items, "IGNORED", ignoreReason, {}).then((res) => {
+                    setToast(true, false, `Issue${items.length === 1 ? "" : "s"} ignored with description`);
+                    resetResourcesSelected();
+                });
+            });
+        } else {
+            api.bulkUpdateIssueStatus(items, "IGNORED", ignoreReason, {}).then((res) => {
+                setToast(true, false, `Issue${items.length === 1 ? "" : "s"} ignored`);
+                resetResourcesSelected();
+            });
+        }
+    };
+
     let promotedBulkActions = (selectedResources) => {
         let items
         if(selectedResources.length > 0 && typeof selectedResources[0][0] === 'string') {
@@ -336,10 +424,12 @@ function IssuesPage() {
         }
         
         function ignoreAction(ignoreReason){
-            api.bulkUpdateIssueStatus(items, "IGNORED", ignoreReason, {} ).then((res) => {
-                setToast(true, false, `Issue${items.length==1 ? "" : "s"} ignored`)
-                resetResourcesSelected()
-            })
+            if (requiresDescription(ignoreReason)) {
+                setPendingIgnoreAction({ items, reason: ignoreReason });
+                setCompulsoryDescriptionModal(true);
+                return;
+            }
+            performBulkIgnoreAction(items, ignoreReason);
         }
         
         function reopenAction(){
@@ -573,18 +663,18 @@ function IssuesPage() {
         await api.fetchIssues(skip, limit, filterStatus, filterCollectionsId, filterSeverity, filterSubCategory, sortKey, sortOrder, startTimestamp, endTimestamp, activeCollections, filterCompliance).then((issuesDataRes) => {
             const uniqueIssuesMap = new Map()
             issuesDataRes.issues.forEach(item => {
-                const key = `${item?.id?.testSubCategory}|${item?.severity}|${item?.unread.toString()}`
+                const key = `${item.id.testSubCategory}|${item.severity}|${item.testRunIssueStatus}`
                 if (!uniqueIssuesMap.has(key)) {
                     uniqueIssuesMap.set(key, {
-                        id: item?.id,
-                        severity: func.toSentenceCase(item?.severity),
-                        compliance: Object.keys(subCategoryMap[item?.id?.testSubCategory]?.compliance?.mapComplianceToListClauses || {}),
-                        severityType: item?.severity,
-                        issueName: item?.id?.testSubCategory,
-                        category: item?.id?.testSubCategory,
-                        numberOfEndpoints: 1,
-                        creationTime: item?.creationTime,
-                        issueStatus: item?.unread.toString(),
+                        id: item.id,
+                        issueName: item.id.testSubCategory,
+                        severity: item.severity,
+                        testRunIssueStatus: item.testRunIssueStatus,
+                        creationTime: item.creationTime,
+                        ignoreReason: item.ignoreReason,
+                        severityType: item.severity,
+                        issueStatus: item.issueStatus,
+                        compliance: item.compliance || [],
                         testRunName: "Test Run",
                         domains: [(hostNameMap[item?.id?.apiInfoKey?.apiCollectionId] !== null ? hostNameMap[item?.id?.apiInfoKey?.apiCollectionId] : apiCollectionMap[item?.id?.apiInfoKey?.apiCollectionId])],
                         urls: [{
@@ -838,6 +928,40 @@ function IssuesPage() {
                 issueType={workItemType}
                 isAzureModal={true}
             />
+            
+            <Modal
+                open={compulsoryDescriptionModal}
+                onClose={() => setCompulsoryDescriptionModal(false)}
+                title="Description Required"
+                primaryAction={{
+                    content: modalLoading ? 'Loading...' : 'Confirm',
+                    onAction: handleIgnoreWithDescription,
+                    disabled: mandatoryDescription.trim().length === 0 || modalLoading
+                }}
+                secondaryActions={[
+                    {
+                        content: 'Cancel',
+                        onAction: () => setCompulsoryDescriptionModal(false)
+                    }
+                ]}
+            >
+                <Modal.Section>
+                    <VerticalStack gap="4">
+                        <Text variant="bodyMd">
+                            A description is required for this action based on your account settings. Please provide a reason for marking these issues as "{pendingIgnoreAction?.reason}".
+                        </Text>
+                        <TextField
+                            label="Description"
+                            value={mandatoryDescription}
+                            onChange={setMandatoryDescription}
+                            multiline={4}
+                            autoComplete="off"
+                            placeholder="Please provide a description for this action..."
+                            disabled={modalLoading}
+                        />
+                    </VerticalStack>
+                </Modal.Section>
+            </Modal>
         </>
     )
 }

@@ -9601,6 +9601,28 @@
             </result>
         </action>
 
+        <action name="api/updateCompulsoryDescription" class="com.akto.action.AdminSettingsAction" method="updateCompulsoryDescription">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">ADMIN_ACTIONS</param>
+                <param name="accessType">READ_WRITE</param>
+                <param name="actionDescription">User updated compulsory description settings</param>
+            </interceptor-ref>
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="SUCCESS"  type="json">
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
         <action name="api/fetchApiAuditLogsFromDb" class="com.akto.action.settings.ApiAuditLogsAction" method="fetchApiAuditLogsFromDb">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
