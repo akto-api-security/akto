@@ -210,7 +210,6 @@ public class ApiCollectionsDao extends AccountsContextDaoWithRbac<ApiCollection>
             // If no user collections, proceed without filtering
         }
         
-        System.out.println("Time taken to fetch user collections: " + (Context.nowInMillis() - ts) + " ms\n");
         // If no collection IDs provided, return empty map
         if(userCollectionIds == null || userCollectionIds.isEmpty()) {
             return countMap;
@@ -227,8 +226,6 @@ public class ApiCollectionsDao extends AccountsContextDaoWithRbac<ApiCollection>
                 nonGroupCollectionIds.add(collection.getId());
             }
         }
-
-        System.out.println("Time taken to segregate collections: " + (Context.nowInMillis() - ts) + " ms\n");
                 
         // Step 2: Query count for non-group collections (direct apiCollectionId match)
         if(!nonGroupCollectionIds.isEmpty()) {
@@ -258,8 +255,6 @@ public class ApiCollectionsDao extends AccountsContextDaoWithRbac<ApiCollection>
                 }
             }
         }
-
-        System.out.println("Time taken to process non-group collections: " + (Context.nowInMillis() - ts) + " ms\n");
 
         if(!groupCollectionIds.isEmpty()) {
             Bson hostHeaderFilter = SingleTypeInfoDao.filterForHostHeader(0, false);
@@ -293,8 +288,6 @@ public class ApiCollectionsDao extends AccountsContextDaoWithRbac<ApiCollection>
                 }
             }
         }
-
-        System.out.println("Time taken to process group collections: " + (Context.nowInMillis() - ts) + " ms\n");
         
         // Step 4: Add code analysis counts (if any)
         Map<String, Integer> codeAnalysisUrlsCountMap = CodeAnalysisApiInfoDao.instance.getUrlsCount();
@@ -312,8 +305,6 @@ public class ApiCollectionsDao extends AccountsContextDaoWithRbac<ApiCollection>
             }
         }
         
-        System.out.println("Total time taken: " + (Context.nowInMillis() - ts) + " ms\n");
-
         return countMap;
     }
 
