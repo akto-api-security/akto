@@ -62,7 +62,23 @@ public class TestResultsStatsAction extends UserAction {
      */
     private static final String REGEX_429 = "\"statusCode\"\\s*:\\s*429";
     private static final String REGEX_5XX = "\"statusCode\"\\s*:\\s*5[0-9][0-9]";
-    private static final String REGEX_CLOUDFLARE = "(cloudflare|cf-ray|ray\\s*id|error\\s*1[0-9]{3}|error\\s*10[0-9]{3}|error\\s*5[0-9]{2})";
+    /**
+     * Cloudflare Blocking/Error Detection (NOT including cf-ray headers)
+     * 
+     * This regex focuses on actual Cloudflare blocking scenarios, not all CF
+     * traffic:
+     * - 1xxx series errors: DNS, firewall, security blocks
+     * - 10xxx series errors: API/redirect configuration issues
+     * - Specific blocking messages: Access denied, rate limited, etc.
+     * - Does NOT include cf-ray header (which appears on ALL responses including
+     * 2xx)
+     */
+    private static final String REGEX_CLOUDFLARE_BLOCKED = "(error\\s*1[0-9]{3}|error\\s*10[0-9]{3}|" +
+            "access\\s*denied|rate\\s*limited|" +
+            "attention\\s*required.*cloudflare|" +
+            "blocked.*cloudflare|" +
+            "security\\s*service.*protect|" +
+            "ray\\s*id.*blocked)";
 
     public String fetchTestResultsStatsCount() {
         try {
@@ -111,7 +127,7 @@ public class TestResultsStatsAction extends UserAction {
             // Get counts for each error type using predefined patterns
             int count429 = getCountByPattern(testingRunResultSummaryId, REGEX_429);
             int count5xx = getCountByPattern(testingRunResultSummaryId, REGEX_5XX);
-            int countCloudflare = getCountByPattern(testingRunResultSummaryId, REGEX_CLOUDFLARE);
+            int countCloudflare = getCountByPattern(testingRunResultSummaryId, REGEX_CLOUDFLARE_BLOCKED);
 
             // Format response for frontend consumption (pipe-separated)
             this.statusCounts = count429 + "|" + count5xx + "|" + countCloudflare;
@@ -158,7 +174,7 @@ public class TestResultsStatsAction extends UserAction {
             case "CLOUDFLARE":
             case "CDN":
             case "CF":
-                return REGEX_CLOUDFLARE;
+                return REGEX_CLOUDFLARE_BLOCKED;
             default:
                 return REGEX_429; // Default for backward compatibility
         }
@@ -172,8 +188,8 @@ public class TestResultsStatsAction extends UserAction {
             return "429 Rate Limiting";
         if (REGEX_5XX.equals(regex))
             return "5xx Server Errors (includes Cloudflare 520-530)";
-        if (REGEX_CLOUDFLARE.equals(regex))
-            return "Cloudflare Non-HTTP Errors (1xxx, 10xxx, identifiers)";
+        if (REGEX_CLOUDFLARE_BLOCKED.equals(regex))
+            return "Cloudflare Blocking/Errors (1xxx, 10xxx, blocking phrases)";
         return "custom pattern";
     }
 
