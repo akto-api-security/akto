@@ -1298,27 +1298,27 @@ function HomeDashboard() {
     // }
 
     const gridComponent = (
-        isMCPSecurityCategory() ? (
-            <VerticalStack gap={5}>
-                {/* First row with MCP Components Requests and Policy Guardrails side by side */}
-                <HorizontalGrid gap={5} columns={2}>
-                    {mcpApiRequestsCard}
-                    {policyGuardrailsCard}
-                </HorizontalGrid>
-                {/* Second row with equal columns for remaining components */}
-                <HorizontalGrid gap={5} columns={2}>
-                    {gridComponents.slice(2).map(({id, component}) => (
-                        <div key={id}>{component}</div>
-                    ))}
-                </HorizontalGrid>
-            </VerticalStack>
-        ) : (
+        // isMCPSecurityCategory() ? (
+        //     <VerticalStack gap={5}>
+        //         {/* First row with MCP Components Requests and Policy Guardrails side by side */}
+        //         <HorizontalGrid gap={5} columns={2}>
+        //             {mcpApiRequestsCard}
+        //             {policyGuardrailsCard}
+        //         </HorizontalGrid>
+        //         {/* Second row with equal columns for remaining components */}
+        //         <HorizontalGrid gap={5} columns={2}>
+        //             {gridComponents.slice(2).map(({id, component}) => (
+        //                 <div key={id}>{component}</div>
+        //             ))}
+        //         </HorizontalGrid>
+        //     </VerticalStack>
+        // ) : (
             <HorizontalGrid gap={5} columns={2}>
                 {gridComponents.map(({id, component}) => (
                     <div key={id}>{component}</div>
                 ))}
             </HorizontalGrid>
-        )
+        // )
     )
 
     const components = [
