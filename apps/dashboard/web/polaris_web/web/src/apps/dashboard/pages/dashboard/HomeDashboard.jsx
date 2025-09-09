@@ -1284,18 +1284,18 @@ function HomeDashboard() {
             {id: 'api-type', component: apisByTypeComponent},
         ]
 
-    if (isMCPSecurityCategory()) {
-        gridComponents = [
-            {id: 'mcp-api-requests', component: mcpApiRequestsCard},
-            {id: 'policy-guardrails', component: policyGuardrailsCard},
-            {id: 'mcp-discovery', component: mcpDiscoveryMiniCard},
-            {id: 'mcp-risk', component: mcpRiskDetectionsMiniCard},
-            {id: 'mcp-open-alerts', component: mcpOpenAlertsCard},
-            {id: 'mcp-top-applications', component: mcpTopApplicationsCard},
-            {id: 'mcp-types-table', component: mcpTypesTableCard},
-            ...gridComponents
-        ]
-    }
+    // if (isMCPSecurityCategory()) {
+    //     gridComponents = [
+    //         {id: 'mcp-api-requests', component: mcpApiRequestsCard},
+    //         {id: 'policy-guardrails', component: policyGuardrailsCard},
+    //         {id: 'mcp-discovery', component: mcpDiscoveryMiniCard},
+    //         {id: 'mcp-risk', component: mcpRiskDetectionsMiniCard},
+    //         {id: 'mcp-open-alerts', component: mcpOpenAlertsCard},
+    //         {id: 'mcp-top-applications', component: mcpTopApplicationsCard},
+    //         {id: 'mcp-types-table', component: mcpTypesTableCard},
+    //         ...gridComponents
+    //     ]
+    // }
 
     const gridComponent = (
         isMCPSecurityCategory() ? (
