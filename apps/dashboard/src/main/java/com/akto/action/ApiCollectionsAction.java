@@ -6,6 +6,7 @@ import java.util.stream.Collectors;
 import com.akto.action.observe.InventoryAction;
 import com.akto.dao.billing.UningestedApiOverageDao;
 import com.akto.dto.*;
+import com.akto.service.ApiCollectionUrlService;
 import com.akto.util.Pair;
 
 import lombok.Getter;
@@ -104,6 +105,16 @@ public class ApiCollectionsAction extends UserAction {
     }
 
     boolean redacted;
+    
+    private final ApiCollectionUrlService apiCollectionUrlService = new ApiCollectionUrlService();
+    
+    /**
+     * Helper method to populate URLs for collections.
+     * Delegates to the service layer for better separation of concerns.
+     */
+    private void populateCollectionUrls(ApiCollection apiCollection) {
+        apiCollectionUrlService.populateMcpCollectionUrls(apiCollection);
+    }
 
     public List<ApiCollection> fillApiCollectionsUrlCount(List<ApiCollection> apiCollections, Bson filter) {
         int tsRandom = Context.now();
@@ -139,103 +150,8 @@ public class ApiCollectionsAction extends UserAction {
                 apiCollection.setUrlsCount(fallbackCount);
             }
 
-            if(apiCollection.isMcpCollection()) {
-                // Fetch URLs from api_hit_count_info for MCP and guard-rail collections
-                int collectionId = apiCollection.getId();
-
-                // First, get the count of unique URLs to decide on approach
-                List<Bson> countPipeline = new ArrayList<>();
-                countPipeline.add(Aggregates.match(Filters.eq("apiCollectionId", collectionId)));
-                countPipeline.add(Aggregates.group(
-                        new BasicDBObject("url", "$url").append("method", "$method")
-                ));
-                countPipeline.add(Aggregates.count("totalCount"));
-
-                int totalUniqueUrls = 0;
-                try (MongoCursor<BasicDBObject> countCursor = ApiHitCountInfoDao.instance.getMCollection()
-                        .aggregate(countPipeline, BasicDBObject.class).cursor()) {
-                    if (countCursor.hasNext()) {
-                        BasicDBObject countResult = countCursor.next();
-                        totalUniqueUrls = countResult.getInt("totalCount", 0);
-                    }
-                }
-
-                Set<String> urlsFromHitCount = new HashSet<>();
-
-                // If URLs count is reasonable, fetch all; otherwise fetch top URLs by hit count
-                if (totalUniqueUrls > 0) {
-                    List<Bson> pipeline = new ArrayList<>();
-                    pipeline.add(Aggregates.match(Filters.eq("apiCollectionId", collectionId)));
-
-                    if (totalUniqueUrls > 1000) {
-                        // For large collections, use sampling to get a representative subset
-                        // Calculate sampling rate to get approximately 1000 URLs
-                        double samplingRate = 1000.0 / totalUniqueUrls;
-
-                        pipeline.add(Aggregates.group(
-                                new BasicDBObject("url", "$url").append("method", "$method"),
-                                Accumulators.first("count", "$count")
-                        ));
-
-                        // Use MongoDB's sample operator for random sampling
-                        // This ensures we get a representative sample across all URLs
-                        pipeline.add(Aggregates.sample((int) Math.min(1000, totalUniqueUrls)));
-
-                        try (MongoCursor<BasicDBObject> cursor = ApiHitCountInfoDao.instance.getMCollection()
-                                .aggregate(pipeline, BasicDBObject.class).cursor()) {
-
-                            while(cursor.hasNext()) {
-                                BasicDBObject result = cursor.next();
-                                BasicDBObject id = (BasicDBObject) result.get("_id");
-                                if (id != null) {
-                                    String url = id.getString("url");
-                                    String method = id.getString("method");
-                                    if (url != null && method != null) {
-                                        urlsFromHitCount.add(url + " " + method);
-                                    }
-                                }
-                            }
-                        }
-
-                        loggerMaker.debugAndAddToDb("Collection " + collectionId + " has " + totalUniqueUrls +
-                                " unique URLs, sampled " + urlsFromHitCount.size() + " URLs (sampling rate: " +
-                                String.format("%.2f%%", samplingRate * 100) + ")", LogDb.DASHBOARD);
-                    } else {
-                        // For smaller collections, fetch all URLs
-                        pipeline.add(Aggregates.group(
-                                new BasicDBObject("url", "$url").append("method", "$method")
-                        ));
-
-                        try (MongoCursor<BasicDBObject> cursor = ApiHitCountInfoDao.instance.getMCollection()
-                                .aggregate(pipeline, BasicDBObject.class).cursor()) {
-
-                            while(cursor.hasNext()) {
-                                BasicDBObject result = cursor.next();
-                                BasicDBObject id = (BasicDBObject) result.get("_id");
-                                if (id != null) {
-                                    String url = id.getString("url");
-                                    String method = id.getString("method");
-                                    if (url != null && method != null) {
-                                        urlsFromHitCount.add(url + " " + method);
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-
-                // Set the URLs from api_hit_count_info
-                if (!urlsFromHitCount.isEmpty()) {
-                    apiCollection.setUrls(urlsFromHitCount);
-                } else {
-                    // Keep existing URLs if no data found in api_hit_count_info
-                    if (apiCollection.getUrls() == null) {
-                        apiCollection.setUrls(new HashSet<>());
-                    }
-                }
-            }else{
-                apiCollection.setUrls((new HashSet<>()));
-            }
+            // Populate URLs for MCP collections using the service
+            populateCollectionUrls(apiCollection);
         }
         return apiCollections;
     }
@@ -1275,8 +1191,10 @@ public class ApiCollectionsAction extends UserAction {
                         Filters.or(Filters.eq("markedBy", ""), Filters.eq("markedBy", null))
                 );
 
-                // Fetch the open alerts to get type and lastDetected
-                List<McpAuditInfo> openAlerts = McpAuditInfoDao.instance.findAll(openAlertsFilter);
+                // Optimize: Use projection to fetch only required fields (type and lastDetected)
+                // This reduces network transfer and memory usage
+                Bson projection = Projections.include("type", "lastDetected");
+                List<McpAuditInfo> openAlerts = McpAuditInfoDao.instance.findAll(openAlertsFilter, projection);
                 this.mcpDataCount = openAlerts.size();
 
                 // Create response with type and human-readable last detected timestamp
