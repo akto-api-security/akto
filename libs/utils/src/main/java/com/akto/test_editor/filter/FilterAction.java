@@ -76,6 +76,7 @@ public final class FilterAction {
         put("not_magic_validate", new NotMagicValidateFilter());
         put("nlp_classification", new NlpClassificationFilter());  // TODO: MCP - Demo placeholder
         put("category", new CategoryFilter());  // TODO: MCP - Demo placeholder
+        put("confidence", new ConfidenceFilter());
     }};
 
     public FilterAction() { }

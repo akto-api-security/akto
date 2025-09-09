@@ -27,7 +27,8 @@ public class TestEditorEnums {
         VALUETYPE,
         MAGIC_VALIDATE,
         NOT_MAGIC_VALIDATE,
-        CATEGORY
+        CATEGORY,
+        CONFIDENCE
     }
 
     public enum CollectionOperands {
