@@ -767,6 +767,15 @@ export default {
         })
     },
 
+    async getSensitiveInfoForCollections(type){
+        const data = (typeof type !== 'undefined' && type !== null) ? { type } : {}
+        return await request({
+            url: '/api/getSensitiveInfoForCollections',
+            method: 'post',
+            data,
+        })
+    },
+
     async getLastTrafficSeen(){
         return await request({
             url: '/api/getLastSeenTrafficInfoForCollections',

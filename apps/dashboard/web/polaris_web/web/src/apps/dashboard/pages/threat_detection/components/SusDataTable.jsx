@@ -9,6 +9,7 @@ import { Badge } from "@shopify/polaris";
 import dayjs from "dayjs";
 import SessionStore from "../../../../main/SessionStore";
 import { labelMap } from "../../../../main/labelHelperMap";
+import { formatActorId } from "../utils/formatUtils";
 
 const resourceName = {
   singular: "sample",
@@ -133,7 +134,7 @@ function SusDataTable({ currDateRange, rowClicked }) {
       return {
         ...x,
         id: x.id,
-        actorComp: x.actor?.length > 50 ? `${x.actor.slice(0, 50)}...` : x.actor ,
+        actorComp: formatActorId(x.actor),
         endpointComp: (
           <GetPrettifyEndpoint 
             maxWidth="300px" 

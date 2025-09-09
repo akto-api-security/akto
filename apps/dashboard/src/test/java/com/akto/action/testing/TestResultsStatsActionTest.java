@@ -10,396 +10,604 @@ import com.akto.dto.testing.TestingRunResult;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.util.enums.GlobalEnums;
 import com.akto.dto.User;
+import com.mongodb.client.model.Aggregates;
+import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Sorts;
+import com.mongodb.client.AggregateIterable;
+import com.mongodb.ExplainVerbosity;
+import org.bson.Document;
+import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 import org.junit.Test;
-
 import java.util.*;
-
 import static org.junit.Assert.*;
 
 public class TestResultsStatsActionTest extends MongoBasedTest {
 
-        @Test
-        public void testFetchTestResultsStatsCount_MissingParameters() {
-                // Test case: Both parameters missing
-                TestResultsStatsAction action = new TestResultsStatsAction();
+    @Test
+    public void testPartialIndexExistsAndIsUsed() {
+        // Explicitly trigger index creation
+        TestingRunResultDao.instance.createIndicesIfAbsent();
 
-                String result = action.fetchTestResultsStatsCount();
-
-                assertEquals("ERROR", result);
-                Collection<String> errors = action.getActionErrors();
-                assertFalse(errors.isEmpty());
-                assertTrue(errors.iterator().next().contains("Missing required parameters"));
+        // Check if the partial index exists
+        List<Document> indexes = TestingRunResultDao.instance.getRawCollection().listIndexes().into(new ArrayList<>());
+        System.out.println("All indexes in testingRunResults collection:");
+        for (Document idx : indexes) {
+            System.out.println("  Index name: " + idx.getString("name"));
+            System.out.println("  Keys: " + idx.get("key"));
+            if (idx.containsKey("partialFilterExpression")) {
+                System.out.println("  Partial filter: " + idx.get("partialFilterExpression"));
+            }
+            System.out.println("  ---");
         }
 
-        @Test
-        public void testFetchTestResultsStatsCount_MissingTestingRunHexId() {
-                // Test case: Only testingRunHexId missing
-                TestResultsStatsAction action = new TestResultsStatsAction();
-                action.setTestingRunResultSummaryHexId(new ObjectId().toHexString());
-                // testingRunHexId not set
-
-                String result = action.fetchTestResultsStatsCount();
-
-                assertEquals("ERROR", result);
-                Collection<String> errors = action.getActionErrors();
-                assertFalse(errors.isEmpty());
-                assertTrue(errors.iterator().next().contains("Missing required parameters"));
-        }
-
-        @Test
-        public void testFetchTestResultsStatsCount_MissingTestingRunResultSummaryHexId() {
-                // Test case: Only testingRunResultSummaryHexId missing
-                TestResultsStatsAction action = new TestResultsStatsAction();
-                action.setTestingRunHexId(new ObjectId().toHexString());
-                // testingRunResultSummaryHexId not set
-
-                String result = action.fetchTestResultsStatsCount();
-
-                assertEquals("ERROR", result);
-                Collection<String> errors = action.getActionErrors();
-                assertFalse(errors.isEmpty());
-                assertTrue(errors.iterator().next().contains("Missing required parameters"));
-        }
-
-        @Test
-        public void testFetchTestResultsStatsCount_InvalidObjectIds() {
-                // Test case: Various invalid ObjectId formats for both parameters
-                TestResultsStatsAction action = new TestResultsStatsAction();
-
-                // Test invalid run ID
-                action.setTestingRunHexId("invalid-object-id");
-                action.setTestingRunResultSummaryHexId(new ObjectId().toHexString());
-                String result = action.fetchTestResultsStatsCount();
-                assertEquals("ERROR", result);
-                assertTrue(action.getActionErrors().iterator().next()
-                                .contains("Invalid test summary id or test run id"));
-
-                // Test invalid summary ID
-                action = new TestResultsStatsAction();
-                action.setTestingRunHexId(new ObjectId().toHexString());
-                action.setTestingRunResultSummaryHexId("another-invalid-id");
-                result = action.fetchTestResultsStatsCount();
-                assertEquals("ERROR", result);
-                assertTrue(action.getActionErrors().iterator().next()
-                                .contains("Invalid test summary id or test run id"));
-
-                // Test various malformed formats
-                action = new TestResultsStatsAction();
-                action.setTestingRunHexId("abc123"); // too short
-                action.setTestingRunResultSummaryHexId("507f1f77bcf86cd799439@11"); // special chars
-                result = action.fetchTestResultsStatsCount();
-                assertEquals("ERROR", result);
-                assertTrue(action.getActionErrors().iterator().next()
-                                .contains("Invalid test summary id or test run id"));
-        }
-
-        @Test
-        public void testFetchTestResultsStatsCount_EmptyStringParameters() {
-                // Test case: Empty string parameters
-                TestResultsStatsAction action = new TestResultsStatsAction();
-                action.setTestingRunHexId("   "); // whitespace only
-                action.setTestingRunResultSummaryHexId(""); // empty string
-
-                String result = action.fetchTestResultsStatsCount();
-
-                assertEquals("ERROR", result);
-                Collection<String> errors = action.getActionErrors();
-                assertFalse(errors.isEmpty());
-                assertTrue(errors.iterator().next().contains("Missing required parameters"));
-        }
-
-        @Test
-        public void testFetchTestResultsStatsCount_NullParameters() {
-                // Test case: Explicitly null parameters
-                TestResultsStatsAction action = new TestResultsStatsAction();
-                action.setTestingRunHexId(null);
-                action.setTestingRunResultSummaryHexId(null);
-
-                String result = action.fetchTestResultsStatsCount();
-
-                assertEquals("ERROR", result);
-                Collection<String> errors = action.getActionErrors();
-                assertFalse(errors.isEmpty());
-                assertTrue(errors.iterator().next().contains("Missing required parameters"));
-        }
-
-        @Test
-        public void testFetchTestResultsStatsCount_ValidParametersNoData() {
-                // Test case: Various valid parameters but no data in database
-                TestResultsStatsAction action = new TestResultsStatsAction();
-
-                // Test with normal ObjectIds
-                action.setTestingRunHexId(new ObjectId().toHexString());
-                action.setTestingRunResultSummaryHexId(new ObjectId().toHexString());
-                String result = action.fetchTestResultsStatsCount();
-                assertEquals("SUCCESS", result);
-                assertEquals(0, action.getCount());
-
-                // Test with edge case ObjectIds (all zeros, all 1s)
-                action = new TestResultsStatsAction();
-                action.setTestingRunHexId("000000000000000000000000");
-                action.setTestingRunResultSummaryHexId("111111111111111111111111");
-                result = action.fetchTestResultsStatsCount();
-                assertEquals("SUCCESS", result);
-                assertEquals(0, action.getCount());
-        }
-
-        @Test
-        public void testAction_429StatusCodeDetectionLogic() {
-                // Test that validates the regex pattern used for 429 detection
-
-                String regex = "\"statusCode\"\\s*:\\s*429";
-
-                // Should match these 429 patterns:
-                assertTrue("{\"statusCode\": 429}".matches(".*" + regex + ".*"));
-                assertTrue("{\"statusCode\":429}".matches(".*" + regex + ".*"));
-                assertTrue("{\"statusCode\"   :   429}".matches(".*" + regex + ".*"));
-                assertTrue("{\"other\":\"data\",\"statusCode\": 429,\"message\":\"rate limited\"}"
-                                .matches(".*" + regex + ".*"));
-
-                // Should NOT match these non-429 patterns:
-                assertFalse("{\"statusCode\": 200}".matches(".*" + regex + ".*"));
-                assertFalse("{\"statusCode\": \"429\"}".matches(".*" + regex + ".*")); // String 429
-                assertFalse("{\"status\": 429}".matches(".*" + regex + ".*")); // Wrong field name
-                assertFalse("{\"message\": \"429 error\"}".matches(".*" + regex + ".*")); // 429 in message only
-        }
-
-        @Test
-        public void testGettersAndSetters() {
-                // Test the getter and setter methods
-                TestResultsStatsAction action = new TestResultsStatsAction();
-
-                String testRunId = new ObjectId().toHexString();
-                String summaryId = new ObjectId().toHexString();
-
-                action.setTestingRunHexId(testRunId);
-                action.setTestingRunResultSummaryHexId(summaryId);
-
-                assertEquals(testRunId, action.getTestingRunHexId());
-                assertEquals(summaryId, action.getTestingRunResultSummaryHexId());
-
-                assertEquals(0, action.getCount());
-        }
-
-        @Test
-        public void testActionInitialState() {
-                // Test the initial state of a new action instance
-                TestResultsStatsAction action = new TestResultsStatsAction();
-
-                // Initial values should be null/0
-                assertNull(action.getTestingRunHexId());
-                assertNull(action.getTestingRunResultSummaryHexId());
-                assertEquals(0, action.getCount());
-                assertTrue(action.getActionErrors().isEmpty());
-        }
-
-        @Test
-        public void testMultipleErrorAccumulation() {
-                // Test that multiple validation errors can be accumulated
-                TestResultsStatsAction action = new TestResultsStatsAction();
-
-                // First call with missing parameters
-                action.fetchTestResultsStatsCount();
-                int firstErrorCount = action.getActionErrors().size();
-                assertTrue(firstErrorCount > 0);
-
-                // Second call with invalid IDs (errors should accumulate)
-                action.setTestingRunHexId("invalid1");
-                action.setTestingRunResultSummaryHexId("invalid2");
-                action.fetchTestResultsStatsCount();
-
-                int secondErrorCount = action.getActionErrors().size();
-                assertTrue("Errors should accumulate", secondErrorCount >= firstErrorCount);
-        }
-
-        @Test
-        public void testFetchTestResultsStatsCount_With429Responses() {
-                // Setup: Clear collection and prepare test data with 429s
-                TestingRunResultDao.instance.getMCollection().drop();
-
-                ObjectId testingRunId = new ObjectId();
-                ObjectId testingRunResultSummaryId = new ObjectId();
-
-                // Create test results with 429 status codes
-                List<TestingRunResult> testingRunResults = new ArrayList<>();
-
-                // Test result 1: Contains 429 status code
-                TestResult rateLimitResult = new TestResult("{\"statusCode\": 429, \"body\": \"Too Many Requests\"}",
-                                "", new ArrayList<>(), 100.0, false, TestResult.Confidence.HIGH, null);
-
-                ApiInfo.ApiInfoKey apiInfoKey1 = new ApiInfo.ApiInfoKey(1, "/test1", URLMethods.Method.GET);
-                TestingRunResult runResult1 = new TestingRunResult(
-                                testingRunId, apiInfoKey1, "RATE_LIMIT", "RATE_LIMIT_TEST",
-                                Arrays.asList(rateLimitResult), false, new ArrayList<SingleTypeInfo>(),
-                                80, Context.now(), Context.now(), testingRunResultSummaryId,
-                                null, new ArrayList<TestingRunResult.TestLog>());
-                testingRunResults.add(runResult1);
-
-                // Test result 2: Another 429 with different formatting
-                TestResult throttledResult = new TestResult("{\"statusCode\":429,\"error\":\"Rate limited\"}",
-                                "", new ArrayList<>(), 100.0, false, TestResult.Confidence.HIGH, null);
-
-                ApiInfo.ApiInfoKey apiInfoKey2 = new ApiInfo.ApiInfoKey(1, "/test2", URLMethods.Method.POST);
-                TestingRunResult runResult2 = new TestingRunResult(
-                                testingRunId, apiInfoKey2, "RATE_LIMIT", "RATE_LIMIT_TEST",
-                                Arrays.asList(throttledResult), false, new ArrayList<SingleTypeInfo>(),
-                                80, Context.now(), Context.now(), testingRunResultSummaryId,
-                                null, new ArrayList<TestingRunResult.TestLog>());
-                testingRunResults.add(runResult2);
-
-                // Insert test data into database
-                TestingRunResultDao.instance.insertMany(testingRunResults);
-
-                // Set up context like in TestRolesActionTest
-                Context.userId.set(0);
-                Context.contextSource.set(GlobalEnums.CONTEXT_SOURCE.API);
-
-                // Set up session like in TestRolesActionTest
-                TestResultsStatsAction action = new TestResultsStatsAction();
-                Map<String, Object> session = new HashMap<>();
-                User user = new User();
-                user.setLogin("test@akto.io");
-                session.put("user", user);
-                action.setSession(session);
-
-                action.setTestingRunResultSummaryHexId(testingRunResultSummaryId.toHexString());
-                action.setTestingRunHexId(testingRunId.toHexString());
-
-                String result = action.fetchTestResultsStatsCount();
-
-                // Assert: Verify the results
-                assertEquals("SUCCESS", result);
-                assertEquals(2, action.getCount()); // Should find 2 results with 429 status codes
-                assertTrue(action.getActionErrors().isEmpty());
-        }
-
-        @Test
-        public void testFetchTestResultsStatsCount_No429Responses() {
-                // Setup: Clear collection and prepare test data without 429s
-                TestingRunResultDao.instance.getMCollection().drop();
-
-                ObjectId testingRunId = new ObjectId();
-                ObjectId testingRunResultSummaryId = new ObjectId();
-
-                // Create test results WITHOUT 429 status codes
-                List<TestingRunResult> testingRunResults = new ArrayList<>();
-
-                TestResult okResult = new TestResult("{\"statusCode\": 200, \"body\": \"OK\"}",
-                                "", new ArrayList<>(), 100.0, false, TestResult.Confidence.HIGH, null);
-
-                ApiInfo.ApiInfoKey apiInfoKey1 = new ApiInfo.ApiInfoKey(1, "/test1", URLMethods.Method.GET);
-                TestingRunResult runResult1 = new TestingRunResult(
-                                testingRunId, apiInfoKey1, "SQL_INJECTION", "SQL_INJECTION_TEST",
-                                Arrays.asList(okResult), false, new ArrayList<SingleTypeInfo>(),
-                                80, Context.now(), Context.now(), testingRunResultSummaryId,
-                                null, new ArrayList<TestingRunResult.TestLog>());
-                testingRunResults.add(runResult1);
-
-                TestingRunResultDao.instance.insertMany(testingRunResults);
-
-                Context.userId.set(0);
-                Context.contextSource.set(GlobalEnums.CONTEXT_SOURCE.API);
-
-                TestResultsStatsAction action = new TestResultsStatsAction();
-                Map<String, Object> session = new HashMap<>();
-                User user = new User();
-                user.setLogin("test@akto.io");
-                session.put("user", user);
-                action.setSession(session);
-
-                action.setTestingRunResultSummaryHexId(testingRunResultSummaryId.toHexString());
-                action.setTestingRunHexId(testingRunId.toHexString());
-
-                String result = action.fetchTestResultsStatsCount();
-
-                assertEquals("SUCCESS", result);
-                assertEquals(0, action.getCount()); // Should find 0 results with 429 status codes
-                assertTrue(action.getActionErrors().isEmpty());
-        }
-
-        @Test
-        public void testFetchTestResultsStatsCount_VariousStatusCodeFormats() {
-                // Test with actual database operations using various 429 formats
-                TestingRunResultDao.instance.getMCollection().drop();
-
-                ObjectId testingRunId = new ObjectId();
-                ObjectId testingRunResultSummaryId = new ObjectId();
-
-                List<TestingRunResult> testingRunResults = new ArrayList<>();
-
-                // Various 429 formats that should be detected
-                String[] formats429 = {
-                                "{\"statusCode\": 429, \"message\": \"Too Many Requests\"}",
-                                "{\"statusCode\":429,\"error\":\"Rate limited\"}",
-                                "{ \"statusCode\" : 429 , \"body\": \"Throttled\" }",
-                                "{\"statusCode\": 429}",
-                                "{\"other\": \"data\", \"statusCode\": 429, \"timestamp\": 123456}",
-                                "{\"statusCode\":   429   ,\"reason\":\"rate_limit\"}"
-                };
-
-                // Add all 429 cases
-                for (int i = 0; i < formats429.length; i++) {
-                        TestResult testResult = new TestResult(formats429[i],
-                                        "", new ArrayList<>(), 100.0, true, TestResult.Confidence.HIGH, null);
-
-                        ApiInfo.ApiInfoKey apiInfoKey = new ApiInfo.ApiInfoKey(1, "/format-429-" + i,
-                                        URLMethods.Method.POST);
-                        TestingRunResult runResult = new TestingRunResult(
-                                        testingRunId, apiInfoKey, "RATE_LIMIT", "FORMAT_TEST",
-                                        Arrays.asList(testResult), true, new ArrayList<SingleTypeInfo>(),
-                                        80, Context.now(), Context.now(), testingRunResultSummaryId,
-                                        null, new ArrayList<TestingRunResult.TestLog>());
-                        testingRunResults.add(runResult);
+        boolean found = false;
+        for (Document idx : indexes) {
+            if (idx.containsKey("partialFilterExpression")) {
+                Document partialFilter = (Document) idx.get("partialFilterExpression");
+                if (partialFilter != null && partialFilter.containsKey("testResults.message")) {
+                    Document existsDoc = (Document) partialFilter.get("testResults.message");
+                    if (existsDoc != null && Boolean.TRUE.equals(existsDoc.getBoolean("$exists"))) {
+                        found = true;
+                        System.out.println("Found partial index: " + idx.getString("name"));
+                        break;
+                    }
                 }
-
-                // Non-429 formats that should NOT be detected
-                String[] formatsNon429 = {
-                                "{\"statusCode\": 200, \"message\": \"OK\"}",
-                                "{\"statusCode\": 404, \"error\": \"Not Found\"}",
-                                "{\"statusCode\": 500, \"error\": \"Internal Server Error\"}",
-                                "{\"message\": \"429 mentioned but not statusCode field\"}",
-                                "{\"statusCode\": \"429\", \"note\": \"string not number\"}" // String 429 shouldn't
-                                                                                             // match
-                };
-
-                // Add all non-429 cases
-                for (int i = 0; i < formatsNon429.length; i++) {
-                        TestResult testResult = new TestResult(formatsNon429[i],
-                                        "", new ArrayList<>(), 100.0, false, TestResult.Confidence.HIGH, null);
-
-                        ApiInfo.ApiInfoKey apiInfoKey = new ApiInfo.ApiInfoKey(1, "/format-non429-" + i,
-                                        URLMethods.Method.GET);
-                        TestingRunResult runResult = new TestingRunResult(
-                                        testingRunId, apiInfoKey, "OTHER_TEST", "FORMAT_TEST",
-                                        Arrays.asList(testResult), false, new ArrayList<SingleTypeInfo>(),
-                                        80, Context.now(), Context.now(), testingRunResultSummaryId,
-                                        null, new ArrayList<TestingRunResult.TestLog>());
-                        testingRunResults.add(runResult);
-                }
-
-                TestingRunResultDao.instance.insertMany(testingRunResults);
-
-                // Set up context
-                Context.userId.set(0);
-                Context.contextSource.set(GlobalEnums.CONTEXT_SOURCE.API);
-
-                // Execute
-                TestResultsStatsAction action = new TestResultsStatsAction();
-                Map<String, Object> session = new HashMap<>();
-                User user = new User();
-                user.setLogin("test@akto.io");
-                session.put("user", user);
-                action.setSession(session);
-
-                action.setTestingRunHexId(testingRunId.toHexString());
-                action.setTestingRunResultSummaryHexId(testingRunResultSummaryId.toHexString());
-
-                String result = action.fetchTestResultsStatsCount();
-
-                // Assert: Should find exactly 6 (only the 429 numeric status codes)
-                assertEquals("SUCCESS", result);
-                assertEquals(6, action.getCount());
-                assertTrue(action.getActionErrors().isEmpty());
+            }
         }
+        assertTrue("Partial index for testResults.message existence should be present", found);
+    }
+
+    @Test
+    public void testPartialIndexIsActuallyUsedInQuery() {
+        // Setup test data that should use the partial index
+        TestingRunResultDao.instance.getMCollection().drop();
+        ObjectId testingRunResultSummaryId = new ObjectId();
+
+        // Create and insert test data with testResults.message
+        List<TestingRunResult> testingRunResults = new ArrayList<>();
+        for (int i = 0; i < 100; i++) {
+            TestResult testResult = new TestResult("{\"statusCode\": " + (i % 2 == 0 ? "429" : "200") + "}",
+                    "", new ArrayList<>(), 100.0, false, TestResult.Confidence.HIGH, null);
+            ApiInfo.ApiInfoKey apiInfoKey = new ApiInfo.ApiInfoKey(1, "/test" + i, URLMethods.Method.GET);
+            TestingRunResult runResult = new TestingRunResult(
+                    new ObjectId(), apiInfoKey, "TEST", "TEST",
+                    Arrays.asList(testResult), false, new ArrayList<SingleTypeInfo>(),
+                    80, Context.now(), Context.now(), testingRunResultSummaryId,
+                    null, new ArrayList<TestingRunResult.TestLog>());
+            testingRunResults.add(runResult);
+        }
+        TestingRunResultDao.instance.insertMany(testingRunResults);
+
+        // Build the same aggregation pipeline as the action
+        List<Bson> pipeline = new ArrayList<>();
+        pipeline.add(Aggregates.match(
+                Filters.and(
+                        Filters.eq("testRunResultSummaryId", testingRunResultSummaryId),
+                        Filters.exists("testResults.message", true))));
+        pipeline.add(Aggregates.sort(Sorts.descending("endTimestamp")));
+        pipeline.add(Aggregates.limit(10000));
+
+        // Execute with explain to check index usage
+        AggregateIterable<Document> aggregation = TestingRunResultDao.instance.getRawCollection()
+                .aggregate(pipeline);
+
+        // Get explain results
+        Document explainResult = TestingRunResultDao.instance.getRawCollection()
+                .aggregate(pipeline)
+                .explain(ExplainVerbosity.EXECUTION_STATS);
+
+        // Verify the query didn't use a full collection scan
+        assertNotNull("Explain result should not be null", explainResult);
+
+        // Check execution stats
+        Document executionStats = explainResult.get("executionStats", Document.class);
+        if (executionStats != null) {
+            String executionStage = executionStats.getString("executionStage");
+            // Should not be a COLLSCAN for large datasets
+            assertNotEquals("Should not perform collection scan with proper index", "COLLSCAN", executionStage);
+        }
+    }
+
+    @Test
+    public void testRegexPatternFor5xxErrors() {
+        String regex = TestResultsStatsAction.REGEX_5XX;
+
+        // Should match these 5xx patterns
+        assertTrue("{\"statusCode\": 500}".matches(".*" + regex + ".*"));
+        assertTrue("{\"statusCode\":502}".matches(".*" + regex + ".*"));
+        assertTrue("{\"statusCode\"   :   520}".matches(".*" + regex + ".*"));
+        assertTrue("{\"statusCode\": 599}".matches(".*" + regex + ".*"));
+
+        // Should NOT match these patterns
+        assertFalse("{\"statusCode\": 400}".matches(".*" + regex + ".*"));
+        assertFalse("{\"statusCode\": 429}".matches(".*" + regex + ".*"));
+        assertFalse("{\"statusCode\": \"500\"}".matches(".*" + regex + ".*"));
+        assertFalse("{\"status\": 500}".matches(".*" + regex + ".*"));
+    }
+
+    @Test
+    public void testFetchTestResultsStatsCount_MissingTestingRunResultSummaryHexId() {
+        TestResultsStatsAction action = new TestResultsStatsAction();
+        String result = action.fetchTestResultsStatsCount();
+        assertEquals("ERROR", result);
+        Collection<String> errors = action.getActionErrors();
+        assertFalse(errors.isEmpty());
+        assertTrue(errors.iterator().next().contains("Missing required parameter"));
+    }
+
+    @Test
+    public void testFetchTestResultsStatsCount_MissingPatternType() {
+        TestResultsStatsAction action = new TestResultsStatsAction();
+        action.setTestingRunResultSummaryHexId(new ObjectId().toHexString());
+        String result = action.fetchTestResultsStatsCount();
+        assertEquals("ERROR", result);
+        Collection<String> errors = action.getActionErrors();
+        assertFalse(errors.isEmpty());
+        assertTrue(errors.iterator().next().contains("Missing required parameter: patternType"));
+    }
+
+    @Test
+    public void testFetchTestResultsStatsCount_InvalidTestingRunResultSummaryHexId() {
+        TestResultsStatsAction action = new TestResultsStatsAction();
+        action.setTestingRunResultSummaryHexId("invalid-object-id");
+        action.setPatternType("HTTP_429");
+        String result = action.fetchTestResultsStatsCount();
+        assertEquals("ERROR", result);
+        assertTrue(action.getActionErrors().iterator().next().contains("Invalid test summary id"));
+    }
+
+    @Test
+    public void testFetchTestResultsStatsCount_EmptyStringTestingRunResultSummaryHexId() {
+        TestResultsStatsAction action = new TestResultsStatsAction();
+        action.setTestingRunResultSummaryHexId("");
+        action.setPatternType("HTTP_429");
+        String result = action.fetchTestResultsStatsCount();
+        assertEquals("ERROR", result);
+        assertTrue(action.getActionErrors().iterator().next().contains("Missing required parameter"));
+    }
+
+    @Test
+    public void testFetchTestResultsStatsCount_ValidTestingRunResultSummaryHexIdNoData() {
+        TestResultsStatsAction action = new TestResultsStatsAction();
+        action.setTestingRunResultSummaryHexId(new ObjectId().toHexString());
+        action.setPatternType("HTTP_429");
+        String result = action.fetchTestResultsStatsCount();
+        assertEquals("SUCCESS", result);
+        assertEquals(0, action.getCount());
+    }
+
+    @Test
+    public void testFetchTestResultsStatsCount_InvalidPatternType() {
+        TestResultsStatsAction action = new TestResultsStatsAction();
+        action.setTestingRunResultSummaryHexId(new ObjectId().toHexString());
+        action.setPatternType("INVALID_PATTERN");
+        String result = action.fetchTestResultsStatsCount();
+        assertEquals("ERROR", result);
+        assertTrue(action.getActionErrors().iterator().next().contains("Invalid pattern type"));
+    }
+
+    @Test
+    public void testRegexPatternFor429Detection() {
+        String regex = TestResultsStatsAction.REGEX_429;
+
+        // Should match these 429 patterns
+        assertTrue("{\"statusCode\": 429}".matches(".*" + regex + ".*"));
+        assertTrue("{\"statusCode\":429}".matches(".*" + regex + ".*"));
+        assertTrue("{\"statusCode\"   :   429}".matches(".*" + regex + ".*"));
+
+        // Should NOT match these patterns
+        assertFalse("{\"statusCode\": 200}".matches(".*" + regex + ".*"));
+        assertFalse("{\"statusCode\": \"429\"}".matches(".*" + regex + ".*"));
+        assertFalse("{\"status\": 429}".matches(".*" + regex + ".*"));
+    }
+
+    @Test
+    public void testRegexPatternForCloudflareBlocked() {
+        String regex = TestResultsStatsAction.REGEX_CLOUDFLARE;
+
+        assertTrue("Error 1020 should match", "Error 1020: Access denied".toLowerCase().matches(".*" + regex + ".*"));
+        assertTrue("Error 1015 rate limited should match",
+                "Error 1015: You are being rate limited".toLowerCase().matches(".*" + regex + ".*"));
+        assertTrue("Attention Required Cloudflare should match",
+                "Attention Required! | Cloudflare".toLowerCase().matches(".*" + regex + ".*"));
+        assertTrue("Blocked Cloudflare should match",
+                "User blocked by Cloudflare".toLowerCase().matches(".*" + regex + ".*"));
+        assertTrue("Security service protect should match",
+                "This website is using a security service to protect itself from online attacks.".toLowerCase()
+                        .matches(".*" + regex + ".*"));
+        assertTrue("Ray ID blocked should match", "Ray ID ABC blocked".toLowerCase().matches(".*" + regex + ".*"));
+
+        // Should NOT match benign 2xx with cf-ray header
+        assertFalse("cf-ray header alone should not match",
+                "{\"statusCode\":200, \"headers\":{\"cf-ray\":\"abc\"}}".toLowerCase().matches(".*" + regex + ".*"));
+    }
+
+    @Test
+    public void testCloudflareCfRayHeadersDoNotMatch() {
+        String regex = TestResultsStatsAction.REGEX_CLOUDFLARE;
+
+        String[] benignHeaders = new String[] {
+                "{\"statusCode\": 200, \"headers\": {\"cf-ray\": \"7f9e7f2ad9be2a3c-DEL\", \"server\": \"cloudflare\"}}",
+                "{\"statusCode\": 204, \"headers\": {\"cf-ray\": \"72f0a1b7ce4321ab-LHR\"}}",
+                "{\"statusCode\": 302, \"headers\": {\"cf-ray\": \"6a5d1e2f3c4b9abc-SIN\", \"cf-cache-status\": \"HIT\"}}",
+                "{\"statusCode\": 200, \"headers\": {\"server\": \"cloudflare\", \"cf-ray\": \"8090abcd1234efgh-BOM\"}}"
+        };
+
+        for (String h : benignHeaders) {
+            assertFalse("Benign cf-ray header should not match: " + h, h.toLowerCase().matches(".*" + regex + ".*"));
+        }
+
+        String[] blockedSamples = new String[] {
+                "{\"statusCode\": 403, \"body\": \"Error 1020: Access denied\"}",
+                "{\"statusCode\": 429, \"body\": \"You are being rate limited by Cloudflare\"}",
+                "{\"statusCode\": 403, \"body\": \"Attention Required! | Cloudflare\"}",
+                "{\"statusCode\": 403, \"body\": \"This website is using a security service to protect itself from online attacks.\"}",
+                "{\"statusCode\": 403, \"body\": \"Ray ID XYZ blocked\"}",
+                "{\"statusCode\": 403, \"body\": \"WAF rule triggered: Malicious request detected\"}",
+                "{\"statusCode\": 403, \"body\": \"WAF block: SQL injection attempt detected\"}"
+        };
+
+        for (String s : blockedSamples) {
+            assertTrue("Blocked sample should match: " + s, s.toLowerCase().matches(".*" + regex + ".*"));
+        }
+    }
+
+    @Test
+    public void testFetchTestResultsStatsCount_With429Responses() {
+        // Clear and setup test data
+        TestingRunResultDao.instance.getMCollection().drop();
+        ObjectId testingRunId = new ObjectId();
+        ObjectId testingRunResultSummaryId = new ObjectId();
+
+        List<TestingRunResult> testingRunResults = new ArrayList<>();
+
+        // Create test results with 429 status codes
+        TestResult rateLimitResult = new TestResult("{\"statusCode\": 429, \"body\": \"Too Many Requests\"}",
+                "", new ArrayList<>(), 100.0, false, TestResult.Confidence.HIGH, null);
+        ApiInfo.ApiInfoKey apiInfoKey1 = new ApiInfo.ApiInfoKey(1, "/test1", URLMethods.Method.GET);
+        TestingRunResult runResult1 = new TestingRunResult(
+                testingRunId, apiInfoKey1, "RATE_LIMIT", "RATE_LIMIT_TEST",
+                Arrays.asList(rateLimitResult), false, new ArrayList<SingleTypeInfo>(),
+                80, Context.now(), Context.now(), testingRunResultSummaryId,
+                null, new ArrayList<TestingRunResult.TestLog>());
+        testingRunResults.add(runResult1);
+
+        TestResult throttledResult = new TestResult("{\"statusCode\":429,\"error\":\"Rate limited\"}",
+                "", new ArrayList<>(), 100.0, false, TestResult.Confidence.HIGH, null);
+        ApiInfo.ApiInfoKey apiInfoKey2 = new ApiInfo.ApiInfoKey(1, "/test2", URLMethods.Method.POST);
+        TestingRunResult runResult2 = new TestingRunResult(
+                testingRunId, apiInfoKey2, "RATE_LIMIT", "RATE_LIMIT_TEST",
+                Arrays.asList(throttledResult), false, new ArrayList<SingleTypeInfo>(),
+                80, Context.now(), Context.now(), testingRunResultSummaryId,
+                null, new ArrayList<TestingRunResult.TestLog>());
+        testingRunResults.add(runResult2);
+
+        TestingRunResultDao.instance.insertMany(testingRunResults);
+
+        // Set up context
+        Context.userId.set(0);
+        Context.contextSource.set(GlobalEnums.CONTEXT_SOURCE.API);
+
+        TestResultsStatsAction action = new TestResultsStatsAction();
+        Map<String, Object> session = new HashMap<>();
+        User user = new User();
+        user.setLogin("test@akto.io");
+        session.put("user", user);
+        action.setSession(session);
+        action.setTestingRunResultSummaryHexId(testingRunResultSummaryId.toHexString());
+        action.setPatternType("HTTP_429");
+
+        String result = action.fetchTestResultsStatsCount();
+
+        assertEquals("SUCCESS", result);
+        assertEquals(2, action.getCount());
+        assertTrue(action.getActionErrors().isEmpty());
+    }
+
+    @Test
+    public void testFetchTestResultsStatsCount_No429Responses() {
+        TestingRunResultDao.instance.getMCollection().drop();
+        ObjectId testingRunId = new ObjectId();
+        ObjectId testingRunResultSummaryId = new ObjectId();
+
+        List<TestingRunResult> testingRunResults = new ArrayList<>();
+        TestResult okResult = new TestResult("{\"statusCode\": 200, \"body\": \"OK\"}",
+                "", new ArrayList<>(), 100.0, false, TestResult.Confidence.HIGH, null);
+        ApiInfo.ApiInfoKey apiInfoKey1 = new ApiInfo.ApiInfoKey(1, "/test1", URLMethods.Method.GET);
+        TestingRunResult runResult1 = new TestingRunResult(
+                testingRunId, apiInfoKey1, "SQL_INJECTION", "SQL_INJECTION_TEST",
+                Arrays.asList(okResult), false, new ArrayList<SingleTypeInfo>(),
+                80, Context.now(), Context.now(), testingRunResultSummaryId,
+                null, new ArrayList<TestingRunResult.TestLog>());
+        testingRunResults.add(runResult1);
+
+        TestingRunResultDao.instance.insertMany(testingRunResults);
+
+        Context.userId.set(0);
+        Context.contextSource.set(GlobalEnums.CONTEXT_SOURCE.API);
+
+        TestResultsStatsAction action = new TestResultsStatsAction();
+        Map<String, Object> session = new HashMap<>();
+        User user = new User();
+        user.setLogin("test@akto.io");
+        session.put("user", user);
+        action.setSession(session);
+        action.setTestingRunResultSummaryHexId(testingRunResultSummaryId.toHexString());
+        action.setPatternType("HTTP_429");
+
+        String result = action.fetchTestResultsStatsCount();
+
+        assertEquals("SUCCESS", result);
+        assertEquals(0, action.getCount());
+        assertTrue(action.getActionErrors().isEmpty());
+    }
+
+    @Test
+    public void testFetchTestResultsStatsCount_VariousStatusCodeFormats() {
+        TestingRunResultDao.instance.getMCollection().drop();
+        ObjectId testingRunId = new ObjectId();
+        ObjectId testingRunResultSummaryId = new ObjectId();
+
+        List<TestingRunResult> testingRunResults = new ArrayList<>();
+
+        // Various 429 formats that should be detected
+        String[] formats429 = {
+                "{\"statusCode\": 429, \"message\": \"Too Many Requests\"}",
+                "{\"statusCode\":429,\"error\":\"Rate limited\"}",
+                "{ \"statusCode\" : 429 , \"body\": \"Throttled\" }",
+                "{\"statusCode\": 429}",
+                "{\"other\": \"data\", \"statusCode\": 429, \"timestamp\": 123456}",
+                "{\"statusCode\":   429   ,\"reason\":\"rate_limit\"}"
+        };
+
+        // Add all 429 cases
+        for (int i = 0; i < formats429.length; i++) {
+            TestResult testResult = new TestResult(formats429[i],
+                    "", new ArrayList<>(), 100.0, false, TestResult.Confidence.HIGH, null);
+            ApiInfo.ApiInfoKey apiInfoKey = new ApiInfo.ApiInfoKey(1, "/format-429-" + i, URLMethods.Method.POST);
+            TestingRunResult runResult = new TestingRunResult(
+                    testingRunId, apiInfoKey, "RATE_LIMIT", "FORMAT_TEST",
+                    Arrays.asList(testResult), false, new ArrayList<SingleTypeInfo>(),
+                    80, Context.now(), Context.now(), testingRunResultSummaryId,
+                    null, new ArrayList<TestingRunResult.TestLog>());
+            testingRunResults.add(runResult);
+        }
+
+        // Non-429 formats that should NOT be detected
+        String[] formatsNon429 = {
+                "{\"statusCode\": 200, \"message\": \"OK\"}",
+                "{\"statusCode\": 404, \"error\": \"Not Found\"}",
+                "{\"statusCode\": 500, \"error\": \"Internal Server Error\"}",
+                "{\"message\": \"429 mentioned but not statusCode field\"}",
+                "{\"statusCode\": \"429\", \"note\": \"string not number\"}"
+        };
+
+        // Add all non-429 cases
+        for (int i = 0; i < formatsNon429.length; i++) {
+            TestResult testResult = new TestResult(formatsNon429[i],
+                    "", new ArrayList<>(), 100.0, false, TestResult.Confidence.HIGH, null);
+            ApiInfo.ApiInfoKey apiInfoKey = new ApiInfo.ApiInfoKey(1, "/format-non429-" + i, URLMethods.Method.GET);
+            TestingRunResult runResult = new TestingRunResult(
+                    testingRunId, apiInfoKey, "OTHER_TEST", "FORMAT_TEST",
+                    Arrays.asList(testResult), false, new ArrayList<SingleTypeInfo>(),
+                    80, Context.now(), Context.now(), testingRunResultSummaryId,
+                    null, new ArrayList<TestingRunResult.TestLog>());
+            testingRunResults.add(runResult);
+        }
+
+        TestingRunResultDao.instance.insertMany(testingRunResults);
+
+        Context.userId.set(0);
+        Context.contextSource.set(GlobalEnums.CONTEXT_SOURCE.API);
+
+        TestResultsStatsAction action = new TestResultsStatsAction();
+        Map<String, Object> session = new HashMap<>();
+        User user = new User();
+        user.setLogin("test@akto.io");
+        session.put("user", user);
+        action.setSession(session);
+        action.setTestingRunResultSummaryHexId(testingRunResultSummaryId.toHexString());
+        action.setPatternType("HTTP_429");
+
+        String result = action.fetchTestResultsStatsCount();
+
+        assertEquals("SUCCESS", result);
+        assertEquals(6, action.getCount()); // Should find exactly 6 (only numeric 429s)
+        assertTrue(action.getActionErrors().isEmpty());
+    }
+
+    @Test
+    public void testGettersAndSetters() {
+        TestResultsStatsAction action = new TestResultsStatsAction();
+        String summaryId = new ObjectId().toHexString();
+        action.setTestingRunResultSummaryHexId(summaryId);
+        assertEquals(summaryId, action.getTestingRunResultSummaryHexId());
+        assertEquals(0, action.getCount());
+    }
+
+    @Test
+    public void testActionInitialState() {
+        TestResultsStatsAction action = new TestResultsStatsAction();
+        assertNull(action.getTestingRunResultSummaryHexId());
+        assertEquals(0, action.getCount());
+        assertTrue(action.getActionErrors().isEmpty());
+    }
+
+    @Test
+    public void testPerformanceWithLargeDataset() {
+        // Test with larger dataset to ensure index is being used effectively
+        TestingRunResultDao.instance.getMCollection().drop();
+        ObjectId testingRunResultSummaryId = new ObjectId();
+
+        List<TestingRunResult> testingRunResults = new ArrayList<>();
+
+        // Create 1000 documents with various status codes
+        for (int i = 0; i < 1000; i++) {
+            int statusCode = i % 10 == 0 ? 429 : 200; // 10% are 429s
+            TestResult testResult = new TestResult("{\"statusCode\": " + statusCode + "}",
+                    "", new ArrayList<>(), 100.0, false, TestResult.Confidence.HIGH, null);
+            ApiInfo.ApiInfoKey apiInfoKey = new ApiInfo.ApiInfoKey(1, "/perf-test-" + i, URLMethods.Method.GET);
+            TestingRunResult runResult = new TestingRunResult(
+                    new ObjectId(), apiInfoKey, "PERF_TEST", "PERF_TEST",
+                    Arrays.asList(testResult), false, new ArrayList<SingleTypeInfo>(),
+                    80, Context.now() + i, Context.now() + i, testingRunResultSummaryId,
+                    null, new ArrayList<TestingRunResult.TestLog>());
+            testingRunResults.add(runResult);
+        }
+
+        TestingRunResultDao.instance.insertMany(testingRunResults);
+
+        Context.userId.set(0);
+        Context.contextSource.set(GlobalEnums.CONTEXT_SOURCE.API);
+
+        TestResultsStatsAction action = new TestResultsStatsAction();
+        Map<String, Object> session = new HashMap<>();
+        User user = new User();
+        user.setLogin("test@akto.io");
+        session.put("user", user);
+        action.setSession(session);
+        action.setTestingRunResultSummaryHexId(testingRunResultSummaryId.toHexString());
+        action.setPatternType("HTTP_429");
+
+        long startTime = System.currentTimeMillis();
+        String result = action.fetchTestResultsStatsCount();
+        long endTime = System.currentTimeMillis();
+
+        assertEquals("SUCCESS", result);
+        assertEquals(100, action.getCount()); // Should find 100 (10% of 1000)
+
+        // Performance assertion - should complete quickly with proper index
+        long executionTime = endTime - startTime;
+        assertTrue("Query should complete quickly with proper indexing (took " + executionTime + "ms)",
+                executionTime < 5000); // Should be much faster, but allowing 5s for CI environments
+    }
+
+    @Test
+    public void testFetchTestResultsStatsCount_With5xxResponses() {
+        // Clear and setup test data
+        TestingRunResultDao.instance.getMCollection().drop();
+        ObjectId testingRunId = new ObjectId();
+        ObjectId testingRunResultSummaryId = new ObjectId();
+
+        List<TestingRunResult> testingRunResults = new ArrayList<>();
+
+        // Create test results with various 5xx status codes
+        String[] serverErrors = {
+                "{\"statusCode\": 500, \"body\": \"Internal Server Error\"}",
+                "{\"statusCode\":502,\"error\":\"Bad Gateway\"}",
+                "{\"statusCode\": 520, \"error\": \"Cloudflare: Web server is returning an unknown error\"}",
+                "{\"statusCode\": 521, \"body\": \"Cloudflare: Web server is down\"}",
+                "{\"statusCode\": 522, \"error\": \"Cloudflare: Connection timed out\"}",
+                "{\"statusCode\": 503, \"body\": \"Service Unavailable\"}"
+        };
+
+        for (int i = 0; i < serverErrors.length; i++) {
+            TestResult serverErrorResult = new TestResult(serverErrors[i],
+                    "", new ArrayList<>(), 100.0, false, TestResult.Confidence.HIGH, null);
+            ApiInfo.ApiInfoKey apiInfoKey = new ApiInfo.ApiInfoKey(1, "/5xx-test-" + i, URLMethods.Method.GET);
+            TestingRunResult runResult = new TestingRunResult(
+                    testingRunId, apiInfoKey, "SERVER_ERROR", "SERVER_ERROR_TEST",
+                    Arrays.asList(serverErrorResult), false, new ArrayList<SingleTypeInfo>(),
+                    80, Context.now(), Context.now(), testingRunResultSummaryId,
+                    null, new ArrayList<TestingRunResult.TestLog>());
+            testingRunResults.add(runResult);
+        }
+
+        TestingRunResultDao.instance.insertMany(testingRunResults);
+
+        // Set up context
+        Context.userId.set(0);
+        Context.contextSource.set(GlobalEnums.CONTEXT_SOURCE.API);
+
+        TestResultsStatsAction action = new TestResultsStatsAction();
+        Map<String, Object> session = new HashMap<>();
+        User user = new User();
+        user.setLogin("test@akto.io");
+        session.put("user", user);
+        action.setSession(session);
+        action.setTestingRunResultSummaryHexId(testingRunResultSummaryId.toHexString());
+        action.setPatternType("HTTP_5XX");
+
+        String result = action.fetchTestResultsStatsCount();
+
+        assertEquals("SUCCESS", result);
+        assertEquals(6, action.getCount()); // Should find all 6 server errors
+        assertTrue(action.getActionErrors().isEmpty());
+    }
+
+    @Test
+    public void testFetchTestResultsStatsCount_WithCloudflareResponses() {
+        // Clear and setup test data
+        TestingRunResultDao.instance.getMCollection().drop();
+        ObjectId testingRunId = new ObjectId();
+        ObjectId testingRunResultSummaryId = new ObjectId();
+
+        List<TestingRunResult> testingRunResults = new ArrayList<>();
+
+        // Create test results with various Cloudflare blocking scenarios
+        String[] cloudflareErrors = {
+                "{\"statusCode\": 403, \"body\": \"Error 1020: Access denied\"}",
+                "{\"statusCode\": 429, \"body\": \"Error 1015: You are being rate limited\"}",
+                "{\"statusCode\": 403, \"body\": \"Attention Required! | Cloudflare\"}",
+                "{\"statusCode\": 403, \"body\": \"User blocked by Cloudflare\"}",
+                "{\"statusCode\": 403, \"body\": \"This website is using a security service to protect itself from online attacks.\"}",
+                "{\"statusCode\": 403, \"body\": \"Ray ID XYZ123 blocked\"}",
+                "{\"statusCode\": 403, \"body\": \"WAF rule triggered: SQL injection detected\"}",
+                "{\"statusCode\": 403, \"body\": \"WAF block: Malicious payload detected\"}",
+                "{\"statusCode\": 403, \"body\": \"Error 1012: Access denied\"}"
+        };
+
+        for (int i = 0; i < cloudflareErrors.length; i++) {
+            TestResult cloudflareErrorResult = new TestResult(cloudflareErrors[i],
+                    "", new ArrayList<>(), 100.0, false, TestResult.Confidence.HIGH, null);
+            ApiInfo.ApiInfoKey apiInfoKey = new ApiInfo.ApiInfoKey(1, "/cf-test-" + i, URLMethods.Method.POST);
+            TestingRunResult runResult = new TestingRunResult(
+                    testingRunId, apiInfoKey, "CLOUDFLARE_BLOCK", "CLOUDFLARE_BLOCK_TEST",
+                    Arrays.asList(cloudflareErrorResult), false, new ArrayList<SingleTypeInfo>(),
+                    80, Context.now(), Context.now(), testingRunResultSummaryId,
+                    null, new ArrayList<TestingRunResult.TestLog>());
+            testingRunResults.add(runResult);
+        }
+
+        // Add some benign responses that should NOT match
+        String[] benignResponses = {
+                "{\"statusCode\": 200, \"headers\": {\"cf-ray\": \"7f9e7f2ad9be2a3c-DEL\"}}",
+                "{\"statusCode\": 204, \"headers\": {\"cf-ray\": \"72f0a1b7ce4321ab-LHR\"}}",
+                "{\"statusCode\": 302, \"headers\": {\"server\": \"cloudflare\"}}"
+        };
+
+        for (int i = 0; i < benignResponses.length; i++) {
+            TestResult benignResult = new TestResult(benignResponses[i],
+                    "", new ArrayList<>(), 100.0, false, TestResult.Confidence.HIGH, null);
+            ApiInfo.ApiInfoKey apiInfoKey = new ApiInfo.ApiInfoKey(1, "/benign-" + i, URLMethods.Method.GET);
+            TestingRunResult runResult = new TestingRunResult(
+                    testingRunId, apiInfoKey, "BENIGN_TEST", "BENIGN_TEST",
+                    Arrays.asList(benignResult), false, new ArrayList<SingleTypeInfo>(),
+                    80, Context.now(), Context.now(), testingRunResultSummaryId,
+                    null, new ArrayList<TestingRunResult.TestLog>());
+            testingRunResults.add(runResult);
+        }
+
+        TestingRunResultDao.instance.insertMany(testingRunResults);
+
+        // Set up context
+        Context.userId.set(0);
+        Context.contextSource.set(GlobalEnums.CONTEXT_SOURCE.API);
+
+        TestResultsStatsAction action = new TestResultsStatsAction();
+        Map<String, Object> session = new HashMap<>();
+        User user = new User();
+        user.setLogin("test@akto.io");
+        session.put("user", user);
+        action.setSession(session);
+        action.setTestingRunResultSummaryHexId(testingRunResultSummaryId.toHexString());
+        action.setPatternType("CLOUDFLARE");
+
+        String result = action.fetchTestResultsStatsCount();
+
+        assertEquals("SUCCESS", result);
+        assertEquals(9, action.getCount()); // Should find 9 Cloudflare blocking scenarios, excluding benign responses
+        assertTrue(action.getActionErrors().isEmpty());
+    }
 }

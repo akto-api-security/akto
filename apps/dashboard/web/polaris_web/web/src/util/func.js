@@ -714,7 +714,7 @@ prettifyEpoch(epoch) {
                 .filter(col => !col.deactivated && Array.isArray(col.envType) && col.envType.length > 0)
                 .forEach(col => {
                   col.envType.forEach(env => {
-                  const keyName = env.keyName.startsWith('userSetEnvType') || env.keyName.startsWith('envType')
+                  const keyName = env && env.keyName && (env.keyName.startsWith('userSetEnvType') || env.keyName.startsWith('envType'))
                     ? env.keyName.replace(/^(userSetEnvType|envType)/, 'env')
                     : env.keyName;
                     const key = `${keyName}=${env.value}`;

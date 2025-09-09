@@ -26,7 +26,9 @@ public class TestEditorEnums {
         BELONGS_TO_COLLECTIONS,
         VALUETYPE,
         MAGIC_VALIDATE,
-        NOT_MAGIC_VALIDATE
+        NOT_MAGIC_VALIDATE,
+        CATEGORY,
+        CONFIDENCE
     }
 
     public enum CollectionOperands {
@@ -64,7 +66,8 @@ public class TestEditorEnums {
     public enum BodyOperator {
         LENGTH,
         PERCENTAGE_MATCH,
-        PERCENTAGE_MATCH_SCHEMA
+        PERCENTAGE_MATCH_SCHEMA,
+        NLP_CLASSIFICATION
     }
 
     public enum ExtractOperator {

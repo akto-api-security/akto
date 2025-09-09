@@ -192,15 +192,6 @@ const resourceName = {
     plural: 'collections',
   };
 
-function convertToCollectionData(c) {
-    return {
-        ...c,
-        detected: func.prettifyEpoch(c.startTs),
-        icon: CircleTickMajor,
-        nextUrl: "/dashboard/observe/inventory/"+ c.id
-    }    
-}
-
 const convertToNewData = (collectionsArr, sensitiveInfoMap, severityInfoMap, coverageMap, trafficInfoMap, riskScoreMap, isLoading) => {
 
     // Ensure collectionsArr is an array
@@ -216,8 +207,11 @@ const convertToNewData = (collectionsArr, sensitiveInfoMap, severityInfoMap, cov
         }
         return{
             ...c,
+            detected: func.prettifyEpoch(c.startTs),
+            icon: CircleTickMajor,
+            nextUrl: "/dashboard/observe/inventory/"+ c.id,
             envType: c?.envType?.map(func.formatCollectionType),
-            displayNameComp: (<Box maxWidth="20vw"><TooltipText tooltip={c.displayName} text={c.displayName} textProps={{fontWeight: 'medium'}}/></Box>),
+            displayNameComp: (<Box maxWidth="30vw"><Text fontWeight="medium">{c.displayName}</Text></Box>),
             testedEndpoints: c.urlsCount === 0 ? 0 : (coverageMap[c.id] ? coverageMap[c.id] : 0),
             sensitiveInRespTypes: sensitiveInfoMap[c.id] ? sensitiveInfoMap[c.id] : [],
             severityInfo: severityInfoMap[c.id] ? severityInfoMap[c.id] : {},
@@ -225,7 +219,7 @@ const convertToNewData = (collectionsArr, sensitiveInfoMap, severityInfoMap, cov
             detectedTimestamp: c.urlsCount === 0 ? 0 : (trafficInfoMap[c.id] || 0),
             riskScore: c.urlsCount === 0 ? 0 : (riskScoreMap[c.id] ? riskScoreMap[c.id] : 0),
             discovered: func.prettifyEpoch(c.startTs || 0),
-            descriptionComp: (<Box maxWidth="300px"><TooltipText tooltip={c.description} text={c.description}/></Box>),
+            descriptionComp: (<Box maxWidth="350px"><Text>{c.description}</Text></Box>),
             outOfTestingScopeComp: c.isOutOfTestingScope ? (<Text>Yes</Text>) : (<Text>No</Text>),
             // outOfTestingScope: c.isOutOfTestingScope || false
         }
@@ -234,6 +228,49 @@ const convertToNewData = (collectionsArr, sensitiveInfoMap, severityInfoMap, cov
     const prettifyData = transform.prettifyCollectionsData(newData, isLoading)
     return { prettify: prettifyData, normal: newData }
 }
+
+const categorizeCollections = (prettifyArray) => {
+    const envTypeObj = {};
+    const hostnameCollections = [];
+    const groupCollections = [];
+    const customCollections = [];
+    const activeCollections = [];
+    const deactivatedCollectionsData = [];
+    const collectionMap = new Map();
+    
+    prettifyArray.forEach((c) => {
+        // Build environment map
+        envTypeObj[c.id] = c.envType;
+        collectionMap.set(c.id, c);
+        
+        // Categorize collections in single pass
+        if (!c.deactivated) {
+            activeCollections.push(c);
+            if (c.hostName !== null && c.hostName !== undefined) {
+                hostnameCollections.push(c);
+            } else if (c.type === "API_GROUP") {
+                groupCollections.push(c);
+            } else {
+                customCollections.push(c);
+            }
+        } else {
+            deactivatedCollectionsData.push(c);
+        }
+    });
+    
+    return {
+        envTypeObj,
+        collectionMap,
+        activeCollections,
+        categorized: {
+            all: prettifyArray,
+            hostname: hostnameCollections,
+            groups: groupCollections,
+            custom: customCollections,
+            deactivated: deactivatedCollectionsData,
+        }
+    };
+};
 
 
 function ApiCollections(props) {
@@ -278,8 +315,6 @@ function ApiCollections(props) {
     const setSamples = ObserveStore(state => state.setSamples)
     const setSelectedUrl = ObserveStore(state => state.setSelectedUrl)
     const [deactivateCollections, setDeactivateCollections] = useState([])
-    const [uningestedApiCountMap, setUningestedApiCountMap] = useState({})
-    const [uningestedApiData, setUningestedApiData] = useState({})
 
     const resetFunc = () => {
         setInventoryFlyout(false)
@@ -324,97 +359,67 @@ function ApiCollections(props) {
 
     async function fetchData() {
         try {
-            // first api call to get only collections name and collection id
             setLoading(true)
-            const apiCollectionsResp = await api.getAllCollectionsBasic();
-            setLoading(false)
+            
+            // Build all API promises to run in parallel
+            const shouldCallHeavyApis = (func.timeNow() - lastFetchedInfo.lastRiskScoreInfo) >= (5 * 60)
+            
+            let apiPromises = [
+                api.getAllCollectionsBasic(),  // index 0
+                api.getUserEndpoints(),         // index 1
+                api.getCoverageInfoForCollections(), // index 2
+                api.getLastTrafficSeen(),            // index 3
+                collectionApi.fetchCountForHostnameDeactivatedCollections(), // index 4
+                collectionApi.fetchCountForUningestedApis(), // index 5
+                collectionApi.fetchUningestedApis(),        // index 6
+            ];
+            
+            if(shouldCallHeavyApis){
+                apiPromises = [
+                    ...apiPromises,
+                    ...[api.getRiskScoreInfo(), api.getSeverityInfoForCollections()] // indices 7,8 (removed getSensitiveInfoForCollections)
+                ]
+            }
 
-        if(customCollectionDataFilter){
-            apiCollectionsResp.apiCollections = (apiCollectionsResp.apiCollections || []).filter(customCollectionDataFilter)
-        }
+            if(userRole === 'ADMIN' && func.checkForRbacFeature()) {
+                apiPromises = [
+                    ...apiPromises,
+                    ...[api.getAllUsersCollections(), settingRequests.getTeamData()] // indices 10,11 or 7,8 if no heavy APIs
+                ]
+            }
 
-        let hasUserEndpoints = await api.getUserEndpoints()
-        setHasUsageEndpoints(hasUserEndpoints)
-        let tmp = (apiCollectionsResp.apiCollections || []).map(convertToCollectionData)
-        let dataObj = {}
-        dataObj = convertToNewData(tmp, {}, {}, {}, {}, {}, true);
-        let res = {}
-        res.all = dataObj.prettify
-        res.hostname = dataObj.prettify.filter((c) => c.hostName !== null && c.hostName !== undefined && !c.deactivated)
-        const allGroups = dataObj.prettify.filter((c) => c.type === "API_GROUP" && !c.deactivated);
-        res.groups = allGroups;
-        res.custom = res.all.filter(x => !res.hostname.includes(x) && !x.deactivated && !res.groups.includes(x));
-        setData(res);
-        if (res.hostname.length === 0 && (tableSelectedTab === undefined || tableSelectedTab.length === 0)) {
-            setTimeout(() => {
-                setSelectedTab("custom");
-                setSelected(3);
-            },[100])
-        }
+            // Execute all APIs in parallel
+            let results = await Promise.allSettled(apiPromises);
+            
+            // Extract collections response (index 0)
+            const apiCollectionsResp = results[0].status === 'fulfilled' ? results[0].value : { apiCollections: [] };
+            // Extract user endpoints (index 1)
+            let hasUserEndpoints = results[1].status === 'fulfilled' ? results[1].value : false;
+            
 
-        let envTypeObj = {}
-        tmp.forEach((c) => {
-            envTypeObj[c.id] = c.envType
-        })
-        setEnvTypeMap(envTypeObj)
-        setAllCollections(apiCollectionsResp.apiCollections.filter(x => x?.deactivated !== true) || [])
-
-        const shouldCallHeavyApis = (func.timeNow() - lastFetchedInfo.lastRiskScoreInfo) >= (5 * 60)
-        // const shouldCallHeavyApis = false;
-
-        // fire all the other apis in parallel
-
-        let apiPromises = [
-            api.getCoverageInfoForCollections(),
-            api.getLastTrafficSeen(),
-            collectionApi.fetchCountForHostnameDeactivatedCollections(),
-            collectionApi.fetchCountForUningestedApis(),
-            collectionApi.fetchUningestedApis(),
-        ];
-        if(shouldCallHeavyApis){
-            apiPromises = [
-                ...apiPromises,
-                ...[api.getRiskScoreInfo(), api.getSensitiveInfoForCollections(), api.getSeverityInfoForCollections()]
-            ]
-        }
-
-        if(userRole === 'ADMIN') {
-            apiPromises = [
-                ...apiPromises,
-                ...[api.getAllUsersCollections(), settingRequests.getTeamData()]
-            ]
-        }
-
-        let results = await Promise.allSettled(apiPromises);
-        let coverageInfo = results[0].status === 'fulfilled' ? results[0].value : {};
-        // let coverageInfo = dummyData.coverageMap
-        let trafficInfo = results[1].status === 'fulfilled' ? results[1].value : {};
-        let deactivatedCountInfo = results[2].status === 'fulfilled' ? results[2].value : {};
-        let uningestedApiCountInfo = results[3].status === 'fulfilled' ? results[3].value : {};
-        let uningestedApiDetails = results[4].status === 'fulfilled' ? results[4].value : {};
-        let riskScoreObj = lastFetchedResp
-        let sensitiveInfo = lastFetchedSensitiveResp
-        let severityObj = lastFetchedSeverityResp
+            // Extract metadata responses (with corrected indices)
+            let coverageInfo = results[2].status === 'fulfilled' ? results[2].value : {};
+            let trafficInfo = results[3].status === 'fulfilled' ? results[3].value : {};
+            let deactivatedCountInfo = results[4].status === 'fulfilled' ? results[4].value : {};
+            let uningestedApiCountInfo = results[5].status === 'fulfilled' ? results[5].value : {};
+            let uningestedApiDetails = results[6].status === 'fulfilled' ? results[6].value : {};
+            let riskScoreObj = lastFetchedResp
+            let sensitiveInfo = lastFetchedSensitiveResp
+            let severityObj = lastFetchedSeverityResp
 
         if(shouldCallHeavyApis){
-            if(results[5]?.status === "fulfilled"){
-                const res = results[5].value
+            if(results[7]?.status === "fulfilled"){
+                const res = results[7].value
                 riskScoreObj = {
                     criticalUrls: res.criticalEndpointsCount,
                     riskScoreMap: res.riskScoreOfCollectionsMap
                 }
             }
 
-            if(results[6]?.status === "fulfilled"){
-                const res = results[6].value
-                sensitiveInfo ={ 
-                    sensitiveUrls: res.sensitiveUrlsInResponse,
-                    sensitiveInfoMap: res.sensitiveSubtypesInCollection
-                }
-            }
+            // Skip results[8] - will fetch sensitive info asynchronously
 
-            if(results[7]?.status === "fulfilled"){
-                const res = results[7].value
+            if(results[8]?.status === "fulfilled"){
+                const res = results[8].value
                 severityObj = res
             }
 
@@ -422,16 +427,16 @@ function ApiCollections(props) {
             setLastFetchedInfo({lastRiskScoreInfo: func.timeNow(), lastSensitiveInfo: func.timeNow()})
             setLastFetchedResp(riskScoreObj)
             setLastFetchedSeverityResp(severityObj)
-            setLastFetchedSensitiveResp(sensitiveInfo)
 
         }
+        setCoverageMap(coverageInfo)
 
         let usersCollectionList = []
         let userList = []
 
-        const index = !shouldCallHeavyApis ? 5 : 8
+        const index = !shouldCallHeavyApis ? 7 : 9 // Updated index after removing sensitive info
 
-        if(userRole === 'ADMIN') {
+        if(userRole === 'ADMIN' && func.checkForRbacFeature()) {
             if(results[index]?.status === "fulfilled") {
                 const res = results[index].value
                 usersCollectionList = res
@@ -449,13 +454,9 @@ function ApiCollections(props) {
                     })
                 }
             }
+            setUsersCollection(usersCollectionList)
+            setTeamData(userList)
         }
-
-        setUsersCollection(usersCollectionList)
-        setTeamData(userList)
-
-        setHasUsageEndpoints(hasUserEndpoints)
-        setCoverageMap(coverageInfo)
 
         // Ensure all parameters are defined before calling convertToNewData
         const sensitiveInfoMap = sensitiveInfo?.sensitiveInfoMap || {};
@@ -463,14 +464,13 @@ function ApiCollections(props) {
         const coverageMap = coverageInfo || {};
         const trafficInfoMap = trafficInfo || {};
         const riskScoreMap = riskScoreObj?.riskScoreMap || {};
-        
-        // Ensure tmp is defined and is an array
-        if (!Array.isArray(tmp)) {
-            console.error("tmp is not an array:", tmp);
-            return;
+        setLoading(false);
+        let finalArr = apiCollectionsResp.apiCollections || [];
+        if(customCollectionDataFilter){ 
+            finalArr = finalArr.filter(customCollectionDataFilter)
         }
-        
-        dataObj = convertToNewData(tmp, sensitiveInfoMap, severityInfoMap, coverageMap, trafficInfoMap, riskScoreMap, false);
+            
+        const dataObj = convertToNewData(finalArr, sensitiveInfoMap, severityInfoMap, coverageMap, trafficInfoMap, riskScoreMap, false);
         setNormalData(dataObj.normal)
 
         // Ensure dataObj.prettify exists
@@ -479,16 +479,18 @@ function ApiCollections(props) {
             return;
         }
 
+        const { envTypeObj, collectionMap, activeCollections, categorized } = categorizeCollections(dataObj.prettify);
+        let res = categorized;
+
         // Separate active and deactivated collections
-        const deactivatedCollectionsCopy = dataObj.prettify.filter(c => c.deactivated).map((c)=>{
+        const deactivatedCollectionsCopy = res.deactivated.map((c)=>{
             if(deactivatedCountInfo.hasOwnProperty(c.id)){
                 c.urlsCount = deactivatedCountInfo[c.id]
             }
             return c
         });
 
-        const collectionMap = new Map(dataObj.prettify.map(c => [c.id, c]));
-
+        setDeactivateCollections(deactivatedCollectionsCopy)
         // Process untracked API data
         const untrackedApiDataMap = {};
         if (uningestedApiDetails && uningestedApiDetails.uningestedApiList) {
@@ -500,7 +502,6 @@ function ApiCollections(props) {
                 untrackedApiDataMap[collectionId].push(api);
             });
         }
-        setUningestedApiData(untrackedApiDataMap);
 
         const untrackedCollections = Object.entries(uningestedApiCountInfo || {})
             .filter(([_, count]) => count > 0)
@@ -519,35 +520,87 @@ function ApiCollections(props) {
                 } : null;
             })
             .filter(Boolean);
-        setDeactivateCollections(JSON.parse(JSON.stringify(deactivatedCollectionsCopy)));
         
-        // Process uningested API data
-        setUningestedApiCountMap(uningestedApiCountInfo || {});
-        const fetchEndpointsCountResp = await dashboardApi.fetchEndpointsCount(0, 0)
-        setTotalAPIs(fetchEndpointsCountResp.newCount)
-
-
-        // Calculate summary data only for active collections
-        const summary = transform.getSummaryData(dataObj.normal)
-        summary.totalCriticalEndpoints = riskScoreObj.criticalUrls;
-        summary.totalSensitiveEndpoints = sensitiveInfo.sensitiveUrls
-        setSummaryData(summary)
-
-        setCollectionsMap(func.mapCollectionIdToName(tmp.filter(x => !x?.deactivated)))
-        const allHostNameMap = func.mapCollectionIdToHostName(tmp.filter(x => !x?.deactivated))
-        setHostNameMap(allHostNameMap)
-        setTagCollectionsMap(func.mapCollectionIdsToTagName(tmp.filter(x => !x?.deactivated)))
+        // Make the heavy API call asynchronous to prevent blocking rendering
         
-        tmp = {}
-        tmp.all = dataObj.prettify
-        tmp.hostname = dataObj.prettify.filter((c) => c.hostName !== null && c.hostName !== undefined && !c.deactivated)
-        const allGroupsForTmp = dataObj.prettify.filter((c) => c.type === "API_GROUP" && !c.deactivated);
-        tmp.groups = allGroupsForTmp;
-        tmp.custom = tmp.all.filter(x => !tmp.hostname.includes(x) && !x.deactivated && !tmp.groups.includes(x));
-        tmp.deactivated = deactivatedCollectionsCopy
-        tmp.untracked = untrackedCollections
+
+        setHasUsageEndpoints(hasUserEndpoints)
+        res['Untracked'] = untrackedCollections
         
-        setData(tmp);
+        setData(res);
+        setEnvTypeMap(envTypeObj);
+        setAllCollections(apiCollectionsResp.apiCollections || []);
+        
+        // Fetch endpoints count and sensitive info asynchronously
+        Promise.all([
+            dashboardApi.fetchEndpointsCount(0, 0),
+            shouldCallHeavyApis ? api.getSensitiveInfoForCollections() : Promise.resolve(null)
+        ]).then(([endpointsResponse, sensitiveResponse]) => {
+            // Update endpoints count
+            if (endpointsResponse) {
+                setTotalAPIs(endpointsResponse.newCount);
+            }
+            
+            // Update sensitive info if available
+            if (sensitiveResponse) {
+                const newSensitiveInfo = {
+                    sensitiveUrls: sensitiveResponse.sensitiveUrlsInResponse,
+                    sensitiveInfoMap: sensitiveResponse.sensitiveSubtypesInCollection
+                };
+                
+                // Update the store with new sensitive info
+                setLastFetchedSensitiveResp(newSensitiveInfo);
+                
+                // Re-calculate data with new sensitive info
+                const updatedDataObj = convertToNewData(
+                    finalArr,
+                    newSensitiveInfo.sensitiveInfoMap || {},
+                    severityInfoMap,
+                    coverageMap,
+                    trafficInfoMap,
+                    riskScoreMap,
+                    false
+                );
+                
+                setNormalData(updatedDataObj.normal);
+                
+                // Re-categorize and update the prettified data
+                if (updatedDataObj.prettify) {
+                    const { categorized: updatedCategorized } = categorizeCollections(updatedDataObj.prettify);
+                    
+                    // Update deactivated collections with counts
+                    const updatedDeactivatedCollections = updatedCategorized.deactivated.map((c) => {
+                        if(deactivatedCountInfo.hasOwnProperty(c.id)){
+                            c.urlsCount = deactivatedCountInfo[c.id]
+                        }
+                        return c
+                    });
+                    
+                    updatedCategorized.deactivated = updatedDeactivatedCollections;
+                    updatedCategorized['Untracked'] = untrackedCollections;
+                    
+                    setData(updatedCategorized);
+                    
+                    // Update summary with new sensitive endpoints count
+                    const updatedSummary = transform.getSummaryData(updatedDataObj.normal);
+                    updatedSummary.totalCriticalEndpoints = riskScoreObj.criticalUrls;
+                    updatedSummary.totalSensitiveEndpoints = newSensitiveInfo.sensitiveUrls;
+                    setSummaryData(updatedSummary);
+                }
+            }
+        }).catch(error => {
+            console.error("Error fetching endpoints count or sensitive info:", error);
+        });
+
+        if (res.hostname.length === 0 && (tableSelectedTab === undefined || tableSelectedTab.length === 0)) {
+            setTimeout(() => {
+                setSelectedTab("custom");
+                setSelected(3);
+            }, [100]);
+        }
+        setCollectionsMap(func.mapCollectionIdToName(activeCollections))
+        setHostNameMap(func.mapCollectionIdToHostName(activeCollections))
+        setTagCollectionsMap(func.mapCollectionIdsToTagName(activeCollections))
         } catch (error) {
             console.error("Error in fetchData:", error);
             setLoading(false);

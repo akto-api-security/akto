@@ -74,6 +74,9 @@ public final class FilterAction {
         put("belongs_to_collections", new ApiCollectionFilter());
         put("magic_validate", new MagicValidateFilter());
         put("not_magic_validate", new NotMagicValidateFilter());
+        put("nlp_classification", new NlpClassificationFilter());  // TODO: MCP - Demo placeholder
+        put("category", new CategoryFilter());  // TODO: MCP - Demo placeholder
+        put("confidence", new ConfidenceFilter());
     }};
 
     public FilterAction() { }
@@ -127,6 +130,9 @@ public final class FilterAction {
                 return applyFilterOnDestinationIps(filterActionRequest);
             case "country_code":
                 return applyFilterOnCountryCode(filterActionRequest);
+            case "nlp_classification":
+                return applyFilterOnNlpClassification(filterActionRequest);
+                
             default:
                 return new DataOperandsFilterResponse(false, null, null, null);
 
@@ -1596,6 +1602,36 @@ public final class FilterAction {
         if (singleTypeInfo == null) return null;
 
         return singleTypeInfo;
+    }
+
+    public DataOperandsFilterResponse applyFilterOnNlpClassification(FilterActionRequest filterActionRequest) {
+        // TODO: MCP - This should work like other term operands
+        // It should get the payload content and perform NLP classification on it
+        // For now, this is a demo placeholder that accepts all but validates nothing
+        
+        RawApi rawApi = filterActionRequest.fetchRawApiBasedOnContext();
+        if (rawApi == null) {
+            return new DataOperandsFilterResponse(false, null, null, null);
+        }
+        
+        // Get the payload content (request or response body)
+        String payload = null;
+        if ("request_payload".equalsIgnoreCase(filterActionRequest.getConcernedProperty())) {
+            payload = rawApi.getRequest().getBody();
+        } else if ("response_payload".equalsIgnoreCase(filterActionRequest.getConcernedProperty())) {
+            payload = rawApi.getResponse().getBody();
+        }
+        
+        if (payload == null) {
+            return new DataOperandsFilterResponse(false, null, null, null);
+        }
+        
+        // TODO: MCP - Call actual NLP classification service on the payload content
+        // The payload content should be analyzed for hate speech, toxicity, etc.
+        // For demo purposes, always return false to indicate feature not implemented
+        
+        return new DataOperandsFilterResponse(false, null, null, null, 
+            "NLP Classification not yet implemented - demo mode. Payload length: " + payload.length());
     }
 
 }
