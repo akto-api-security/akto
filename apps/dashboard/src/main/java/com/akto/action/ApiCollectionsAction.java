@@ -6,13 +6,17 @@ import java.util.stream.Collectors;
 import com.akto.action.observe.InventoryAction;
 import com.akto.dao.billing.UningestedApiOverageDao;
 import com.akto.dto.*;
+import com.akto.service.ApiCollectionUrlService;
 import com.akto.util.Pair;
+import com.akto.util.enums.GlobalEnums;
 
 import lombok.Getter;
 import org.bson.conversions.Bson;
 
 import com.akto.action.observe.Utils;
 import com.akto.dao.*;
+import com.akto.dao.McpAuditInfoDao;
+import com.akto.dao.threat_detection.ApiHitCountInfoDao;
 import com.akto.billing.UsageMetricUtils;
 import com.akto.dao.context.Context;
 import com.akto.dto.billing.FeatureAccess;
@@ -29,6 +33,7 @@ import com.akto.dto.testing.CustomTestingEndpoints;
 import com.akto.dto.CollectionConditions.ConditionUtils;
 import com.akto.dto.rbac.UsersCollectionsList;
 import com.akto.dto.type.SingleTypeInfo;
+import com.akto.dao.SingleTypeInfoDao;
 import com.akto.listener.RuntimeListener;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
@@ -101,6 +106,22 @@ public class ApiCollectionsAction extends UserAction {
     }
 
     boolean redacted;
+    
+    private final ApiCollectionUrlService apiCollectionUrlService = new ApiCollectionUrlService();
+    
+    /**
+     * Helper method to populate URLs for collections.
+     * Delegates to the service layer for better separation of concerns.
+     * Only populates MCP URLs when dashboard context is not API security.
+     */
+    private void populateCollectionUrls(ApiCollection apiCollection) {
+        // Do not populate MCP URLs if dashboard context is API security
+        if (Context.contextSource.get() != null && Context.contextSource.get() == GlobalEnums.CONTEXT_SOURCE.MCP) {
+            apiCollectionUrlService.populateMcpCollectionUrls(apiCollection);
+        }else {
+            apiCollection.setUrls(new HashSet<>());
+        }
+    }
 
     public List<ApiCollection> fillApiCollectionsUrlCount(List<ApiCollection> apiCollections, Bson filter) {
         int tsRandom = Context.now();
@@ -113,7 +134,7 @@ public class ApiCollectionsAction extends UserAction {
             Integer count = countMap.get(apiCollectionId);
             int fallbackCount = apiCollection.getUrls()!=null ? apiCollection.getUrls().size() : apiCollection.getUrlsCount();
             if (apiCollectionId == RuntimeListener.VULNERABLE_API_COLLECTION_ID) {
-                fallbackCount = 200;    
+                fallbackCount = 200;
             }
             if (count != null && (apiCollection.getHostName() != null)) {
                 apiCollection.setUrlsCount(count);
@@ -136,9 +157,8 @@ public class ApiCollectionsAction extends UserAction {
                 apiCollection.setUrlsCount(fallbackCount);
             }
 
-            if(!apiCollection.isMcpCollection()) {
-                apiCollection.setUrls((new HashSet<>()));
-            }
+            // Populate URLs for MCP collections using the service
+            populateCollectionUrls(apiCollection);
         }
         return apiCollections;
     }
@@ -1175,10 +1195,43 @@ public class ApiCollectionsAction extends UserAction {
                 break;
             case "OPEN_ALERTS":
                 Bson openAlertsFilter = Filters.and(
-                        Filters.or(Filters.eq("markedBy", ""), Filters.eq("markedBy", null)),
-                        Filters.or(Filters.eq("remarks", ""), Filters.eq("remarks", null))
+                        Filters.or(Filters.eq("markedBy", ""), Filters.eq("markedBy", null))
                 );
-                this.mcpDataCount = (int) McpAuditInfoDao.instance.count(openAlertsFilter);
+
+                // Optimize: Use projection to fetch only required fields (type and lastDetected)
+                // This reduces network transfer and memory usage
+                Bson projection = Projections.include("type", "lastDetected");
+                List<McpAuditInfo> openAlerts = McpAuditInfoDao.instance.findAll(openAlertsFilter, projection);
+                this.mcpDataCount = openAlerts.size();
+
+                // Create response with type and human-readable last detected timestamp
+                if (!openAlerts.isEmpty()) {
+                    List<BasicDBObject> alertDetails = new ArrayList<>();
+                    for (McpAuditInfo alert : openAlerts) {
+                        BasicDBObject alertInfo = new BasicDBObject();
+                        alertInfo.put("type", alert.getType());
+
+                        // Convert lastDetected (epoch seconds) to human-readable format
+                        int lastDetectedEpoch = alert.getLastDetected();
+                        String lastDetectedFormatted = "";
+                        if (lastDetectedEpoch > 0) {
+                            java.time.Instant instant = java.time.Instant.ofEpochSecond(lastDetectedEpoch);
+                            java.time.ZonedDateTime zdt = java.time.ZonedDateTime.ofInstant(instant, java.time.ZoneOffset.UTC);
+                            java.time.format.DateTimeFormatter formatter = java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss 'UTC'");
+                            lastDetectedFormatted = zdt.format(formatter);
+                        }
+                        alertInfo.put("lastDetected", lastDetectedFormatted);
+                        alertInfo.put("lastDetectedEpoch", lastDetectedEpoch);
+                        alertDetails.add(alertInfo);
+                    }
+
+                    // Set the response object with count and alert details
+                    if (this.response == null) {
+                        this.response = new BasicDBObject();
+                    }
+                    this.response.put("count", this.mcpDataCount);
+                    this.response.put("alertDetails", alertDetails);
+                }
                 break;
             case "CRITICAL_APIS":
                 Bson criticalApisFilter = Filters.and(
@@ -1217,6 +1270,95 @@ public class ApiCollectionsAction extends UserAction {
                 );
                 this.mcpDataCount = (int) McpAuditInfoDao.instance.count(mcpServerFilter);
                 break;
+
+            case "TOP_3_APPLICATIONS_BY_TRAFFIC":
+                // Use existing mcpCollectionIds from common filters above
+                Map<Integer, String> collectionIdToName = new HashMap<>();
+
+                // Build collection ID to name mapping for all MCP collections
+                for (ApiCollection collection : mcpCollections) {
+                    collectionIdToName.put(collection.getId(), collection.getName());
+                }
+
+                if (!mcpCollectionIds.isEmpty()) {
+                    // Aggregate pipeline to get hit counts per collection
+                    // api_hit_count_info structure: {_id: {ts: timestamp, apiCollectionId: int}, count: int}
+                    List<Bson> pipeline = new ArrayList<>();
+                    pipeline.add(Aggregates.match(Filters.in("apiCollectionId", mcpCollectionIds)));
+                    pipeline.add(Aggregates.group(
+                        "$apiCollectionId",
+                        Accumulators.sum("totalHits", "$count")
+                    ));
+                    pipeline.add(Aggregates.sort(Sorts.descending("totalHits")));
+                    pipeline.add(Aggregates.limit(3));
+
+                    // Execute aggregation on api_hit_count_info collection
+                    List<BasicDBObject> topApplications = new ArrayList<>();
+                    try (MongoCursor<BasicDBObject> cursor = ApiHitCountInfoDao.instance.getMCollection()
+                        .aggregate(pipeline, BasicDBObject.class).cursor()) {
+
+                        while(cursor.hasNext()) {
+                            BasicDBObject result = cursor.next();
+                            Integer collectionId = result.getInt("_id");
+                            Integer totalHits = result.getInt("totalHits");
+                            String collectionName = collectionIdToName.get(collectionId);
+
+                            if (collectionName != null) {
+                                BasicDBObject appInfo = new BasicDBObject();
+                                appInfo.put("name", collectionName);
+                                appInfo.put("collectionId", collectionId);
+                                appInfo.put("hitCount", totalHits);
+                                topApplications.add(appInfo);
+                            }
+                        }
+                    }
+
+                    // Set response with top applications
+                    if (this.response == null) {
+                        this.response = new BasicDBObject();
+                    }
+                    this.response.put("topApplications", topApplications);
+                    this.mcpDataCount = topApplications.size();
+                } else {
+                    // No active MCP collections found
+                    if (this.response == null) {
+                        this.response = new BasicDBObject();
+                    }
+                    this.response.put("topApplications", new ArrayList<>());
+                    this.mcpDataCount = 0;
+                }
+                break;
+
+            case "POLICY_GUARDRAIL_APIS":
+                // Filter for collections with guard-rail tag
+                Bson guardRailTagFilter = Filters.elemMatch(ApiCollection.TAGS_STRING,
+                    Filters.eq("keyName", Constants.AKTO_GUARD_RAIL_TAG)
+                );
+                // Use projection to only fetch IDs, reducing memory usage
+                List<ApiCollection> guardRailCollections = ApiCollectionsDao.instance.findAll(
+                    guardRailTagFilter, 
+                    Projections.include(ApiCollection.ID)
+                );
+                List<Integer> guardRailCollectionIds = guardRailCollections.stream()
+                    .map(ApiCollection::getId)
+                    .collect(Collectors.toList());
+                
+                if (!guardRailCollectionIds.isEmpty()) {
+
+                    // Put the indexed field first in the AND clause for better index utilization
+                    Bson collectionFilter = Filters.in(SingleTypeInfo._API_COLLECTION_ID, guardRailCollectionIds);
+                    Bson excludeFilter = UsageMetricCalculator.excludeDemosAndDeactivated(SingleTypeInfo._API_COLLECTION_ID);
+                    
+                    // Order matters for index usage - put the most selective filter first
+                    Bson guardRailApisFilter = Filters.and(collectionFilter, excludeFilter);
+                    
+                    this.mcpDataCount = (int) SingleTypeInfoDao.instance.count(guardRailApisFilter);
+                } else {
+                    this.mcpDataCount = 0;
+                }
+                break;
+
+
 
             default:
                 addActionError("Invalid filter type: " + filterType);
