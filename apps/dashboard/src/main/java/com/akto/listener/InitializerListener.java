@@ -208,6 +208,7 @@ import com.akto.util.IntercomEventsUtil;
 import com.akto.util.JSONUtils;
 import com.akto.util.Pair;
 import com.akto.util.UsageUtils;
+import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 import com.akto.util.enums.GlobalEnums.Severity;
 import com.akto.util.enums.GlobalEnums.TemplatePlan;
 import com.akto.util.enums.GlobalEnums.TestCategory;
@@ -4139,13 +4140,38 @@ public class InitializerListener implements ServletContextListener {
             @Override
             public void accept(Account a) {
                 int accountId = a.getId();
-                UsageMetricHandler.calcAndSyncAccountUsage(accountId);
+                UsageMetric endpointUsage = UsageMetricHandler.calcAndSyncAccountUsage(accountId);
+                int endpointCountOnDashboard = (int)fetchEndpointCountOnDashboard();
+                logger.debugAndAddToDb("Account: " + accountId + " endpoint count on billing: " + endpointUsage.getUsage() + " endpoint count on dashboard: " + endpointCountOnDashboard);
+                if (endpointCountOnDashboard != endpointUsage.getUsage()) {
+                    Organization organization = OrganizationsDao.instance.findOne(Filters.eq(Constants.ID, endpointUsage.getOrganizationId()));
+                    sendToSlack(organization, accountId, endpointUsage.getUsage(), endpointCountOnDashboard);
+                }
             }
         }, "usage-scheduler");
 
         DeactivateCollections.deactivateCollectionsJob();
 
         isCalcUsageRunning = false;
+    }
+
+    public static long fetchEndpointCountOnDashboard() {
+        Context.contextSource.set(CONTEXT_SOURCE.API);
+        Context.userId.set(0);
+        InventoryAction inventoryAction = new InventoryAction();
+        inventoryAction.setStartTimestamp(0);
+        inventoryAction.setEndTimestamp(0);
+        inventoryAction.fetchEndpointsCount();
+        return inventoryAction.getNewCount();
+    }
+
+    protected static void sendToSlack(Organization organization, int accountId, int billingCount, int dashboardCount) {
+        if (organization == null) {
+            return;
+        }
+        String txt = String.format("API endpoint count mismatch for %s %s acc: %s billing: %s dashboard: %s",
+                organization.getId(), organization.getAdminEmail(), accountId, billingCount, dashboardCount);
+        UsageMetricUtils.sendToUsageSlack(txt);
     }
 
     static boolean isSyncWithAktoRunning = false;
