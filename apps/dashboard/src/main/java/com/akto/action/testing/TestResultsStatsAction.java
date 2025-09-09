@@ -217,7 +217,7 @@ public class TestResultsStatsAction extends UserAction {
         pipeline.add(Aggregates.match(
                 Filters.and(
                         Filters.eq("testRunResultSummaryId", testingRunResultSummaryId),
-                        // Filters.eq("vulnerable", false),
+                        Filters.eq("vulnerable", false),
                         Filters.exists("testResults.message", true))));
 
         // Stage 2: Sort by latest results and limit to prevent memory exhaustion
