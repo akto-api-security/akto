@@ -113,6 +113,7 @@ public class BackwardCompatibility {
     private int cleanupRbacEntries;
 
     private int fillLastTestedField;
+    private int fillQueryParams;
 
     public static final String FILL_LAST_TESTED_FIELD = "fillLastTestedField";
 
@@ -126,7 +127,7 @@ public class BackwardCompatibility {
                                  int deactivateCollections, int disableAwsSecretPii, int apiCollectionAutomatedField, 
                                  int automatedApiGroups, int addAdminRoleIfAbsent, int dropSpecialCharacterApiCollections, int fixApiAccessType,
                                  int addDefaultFilters, int moveAzureSamlToNormalSaml, int deleteOptionsAPIs, int moveOktaOidcSSO, int markSummariesVulnerable,
-                                 int changeOperatorConditionInCDT, int cleanupRbacEntries, int fillLastTestedField) {
+                                 int changeOperatorConditionInCDT, int cleanupRbacEntries, int fillLastTestedField, int fillQueryParams) {
         this.id = id;
         this.dropFilterSampleData = dropFilterSampleData;
         this.resetSingleTypeInfoCount = resetSingleTypeInfoCount;
@@ -162,7 +163,8 @@ public class BackwardCompatibility {
         this.markSummariesVulnerable = markSummariesVulnerable;
         this.changeOperatorConditionInCDT = changeOperatorConditionInCDT;
         this.cleanupRbacEntries = cleanupRbacEntries;
-        this.fillLastTestedField = fillLastTestedField;
+        this.fillLastTestedField = fillLastTestedField; 
+        this.fillQueryParams = fillQueryParams;
     }
 
     public BackwardCompatibility() {
@@ -486,5 +488,13 @@ public class BackwardCompatibility {
 
     public void setFillLastTestedField(int fillLastTestedField) {
         this.fillLastTestedField = fillLastTestedField;
+    }
+
+    public int getFillQueryParams() {
+        return fillQueryParams;
+    }
+
+    public void setFillQueryParams(int fillQueryParams) {
+        this.fillQueryParams = fillQueryParams;
     }
 }

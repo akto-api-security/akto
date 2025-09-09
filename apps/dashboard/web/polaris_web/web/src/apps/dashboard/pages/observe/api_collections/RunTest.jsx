@@ -590,7 +590,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
         }
         let finalAdvancedConditions = []
 
-        if (conditions.length > 0 && conditions[0]?.data?.key?.length > 0) {
+        if (conditions.length > 0 && (conditions[0]?.data?.key?.length > 0 || conditions[0]?.data?.position?.length > 0)) {
             finalAdvancedConditions = transform.prepareConditionsForTesting(conditions)
         }
 
@@ -708,7 +708,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
     const handleModifyConfig = async () => {
         const settings = transform.prepareConditionsForTesting(conditions)
         let autoTicketingDetails = jiraProjectMap? testRun.autoTicketingDetails : null;
-        const editableConfigObject = transform.prepareEditableConfigObject(testRun, settings, testIdConfig.hexId,testSuiteIds,testMode,autoTicketingDetails)
+        const editableConfigObject = transform.prepareEditableConfigObject(testRun, settings, testIdConfig.hexId,testSuiteIds,autoTicketingDetails)
         await testingApi.modifyTestingRunConfig(testIdConfig?.testingRunConfig?.id, editableConfigObject).then(() => {
             func.setToast(true, false, "Modified testing run config successfully")
             setShowEditableSettings(false)

@@ -44,7 +44,7 @@ public class Constants {
     public static final boolean KAFKA_DEBUG_MODE = (StringUtils.hasLength(System.getenv("KAFKA_DEBUG_MODE")) && System.getenv("KAFKA_DEBUG_MODE").equals("true"));
     public static final int MAX_REQUEST_TIMEOUT = StringUtils.hasLength(System.getenv("MAX_REQUEST_TIMEOUT")) ? Integer.parseInt(System.getenv("MAX_REQUEST_TIMEOUT")) : 15000;
     public static final int LINGER_MS_KAFKA = StringUtils.hasLength(System.getenv("LINGER_MS_KAFKA")) ?  Integer.parseInt(System.getenv("LINGER_MS_KAFKA")) : 10000;
-    public static final int MAX_WAIT_FOR_SLEEP = 3 * 60; // 3 minutes
+    public static final int MAX_WAIT_FOR_SLEEP = 60; // 1 minute
     public static final String UNDERSCORE = "_";
     public static final String AKTO_AGENT_NAME = "AKTO-AI-agents";
     public static final Model AKTO_AGENT_MODEL = new Model(AKTO_AGENT_NAME, ModelType.AZURE_OPENAI, new HashMap<>());
@@ -54,4 +54,13 @@ public class Constants {
     public final static String DEFAULT_AKTO_DASHBOARD_URL = "https://app.akto.io";
     public static final String AKTO_DISCOVERED_APIS_COLLECTION = "shadow_apis";
     public static final String AKTO_MCP_SERVER_TAG = "mcp-server";
+    public static final String AKTO_GEN_AI_TAG = "gen-ai";
+    public static final String AKTO_MCP_TOOLS_TAG = "mcp-tool";
+    public static final String AKTO_MCP_RESOURCES_TAG = "mcp-resource";
+    public static final String AKTO_MCP_PROMPTS_TAG = "mcp-prompt";
+    public static final String AKTO_MCP_TOOL = "TOOL";
+    public static final String AKTO_MCP_RESOURCE = "RESOURCE";
+    public static final String AKTO_MCP_PROMPT = "PROMPT";
+    public static final String AKTO_MCP_SERVER = "SERVER";
+
 }

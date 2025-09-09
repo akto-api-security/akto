@@ -8,11 +8,18 @@ import com.akto.dto.traffic.Key;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.URLMethods;
 import com.akto.dto.type.SingleTypeInfo;
+import com.akto.util.Constants;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.Sorts;
+import com.mongodb.client.model.UpdateOneModel;
+import com.mongodb.client.model.Updates;
+import com.mongodb.client.model.WriteModel;
+
+
 import org.bson.conversions.Bson;
+import org.bson.types.ObjectId;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -172,6 +179,70 @@ public class SampleDataDao extends AccountsContextDaoWithRbac<SampleData> {
         cursor.close();
 
         return sampleDataList;
+    }
+
+    // use the same method in SensitiveSampleDataDao to backfill isQueryParam in SingleTypeInfo for accounts having non-redacted data
+    // for redaction on accounts, we don't have sensitive sample data, so use this instead
+    public void backFillIsQueryParamInSingleTypeInfo(int apiCollectionId) {
+        List<String> subTypes = SingleTypeInfoDao.instance.sensitiveSubTypeInRequestNames();
+        Bson baseFilter = Filters.and(
+            Filters.eq(SingleTypeInfo._RESPONSE_CODE, -1),
+            Filters.eq(SingleTypeInfo._IS_HEADER, false),
+            Filters.in(SingleTypeInfo.SUB_TYPE, subTypes),
+            Filters.eq(SingleTypeInfo._API_COLLECTION_ID, apiCollectionId)
+        );
+        ObjectId lastProcessedId = null;
+        while (true) {
+            
+            if (lastProcessedId != null) {
+                baseFilter = Filters.and(
+                    baseFilter,
+                    Filters.gt("_id", lastProcessedId)
+                );
+            }
+            ArrayList<WriteModel<SingleTypeInfo>> bulkUpdatesForSingleTypeInfo = new ArrayList<>();
+            List<SingleTypeInfo> stis = SingleTypeInfoDao.instance.findAll(baseFilter, 0, 1000, Sorts.ascending(Constants.ID));
+            if (stis.isEmpty()) {
+                break;
+            }
+            lastProcessedId = stis.get(stis.size() - 1).getId();
+            String currentMethod = "";
+            String currentUrl = "";
+            List<String> samples = new ArrayList<>();
+
+            for (SingleTypeInfo sti : stis) {
+                if(!currentMethod.equals(sti.getMethod()) && !currentUrl.equals(sti.getUrl())) {
+                    currentMethod = sti.getMethod();
+                    currentUrl = sti.getUrl();
+                    SampleData sampleData = SampleDataDao.instance.findOne(
+                        ApiInfoDao.getFilter(currentUrl, currentMethod, apiCollectionId)
+                    );
+                    samples = sampleData != null ? sampleData.getSamples() : new ArrayList<>();
+                }
+
+                for (String sample : samples) {
+                    if (SensitiveSampleDataDao.hasAnyQueryParam(sample, sti.getParam())) {
+                        System.out.println("Found matching query param for SingleTypeInfo: " + sti.getParam() + " in URL: " + currentUrl + ", Method: " + currentMethod);
+                        bulkUpdatesForSingleTypeInfo.add(new UpdateOneModel<>(
+                            Filters.and(
+                                Filters.eq(SingleTypeInfo._URL, currentUrl),
+                                Filters.eq(SingleTypeInfo._METHOD, currentMethod),
+                                Filters.eq(SingleTypeInfo._RESPONSE_CODE, -1),
+                                Filters.eq(SingleTypeInfo._IS_HEADER, false),
+                                Filters.eq(SingleTypeInfo._PARAM, sti.getParam()),
+                                Filters.eq(SingleTypeInfo.SUB_TYPE, sti.getSubType()),
+                                Filters.eq(SingleTypeInfo._API_COLLECTION_ID, apiCollectionId)
+                            ),
+                            Updates.set("isQueryParam", true)
+                        ));
+                    }
+                }
+            }
+            if (!bulkUpdatesForSingleTypeInfo.isEmpty()) {
+                System.out.println("Bulk updating SingleTypeInfo documents..., size=" + bulkUpdatesForSingleTypeInfo.size() + " for API Collection ID: " + apiCollectionId);
+                SingleTypeInfoDao.instance.getMCollection().bulkWrite(bulkUpdatesForSingleTypeInfo);
+            }
+        }
     }
 
 

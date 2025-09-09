@@ -12,14 +12,13 @@ import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.collections.MapUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.bson.conversions.Bson;
-
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.testing.GenericTestResult;
 import com.akto.dto.testing.TestingRunResult;
 import com.akto.dto.type.SingleTypeInfo;
+import com.akto.util.enums.GlobalEnums.TestRunIssueStatus;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
-
 public class Utils {
 
     public static Bson createFiltersForTestingReport(Map<String, List<String>> filterMap){
@@ -49,6 +48,7 @@ public class Utils {
                     break;
                 case "severityStatus":
                     filterList.add(Filters.in(TestingRunResult.TEST_RESULTS + ".0." + GenericTestResult._CONFIDENCE, value));
+                    break;
                 case "testFilter":
                     filterList.add(Filters.in(TestingRunResult.TEST_SUB_TYPE, value));
                     break;
@@ -83,7 +83,7 @@ public class Utils {
         return finalResult;
     }
 
-    public static BasicDBObject buildIssueMetaDataMap(List<TestingRunIssues> issues, Map<TestingIssuesId, TestingRunResult> idToResultMap){
+    public static BasicDBObject buildIssueMetaDataMap(List<TestingRunIssues> issues, Map<TestingIssuesId, TestingRunResult> idToResultMap, List<TestRunIssueStatus> statusList){
         BasicDBObject issueMetaDataMap = new BasicDBObject();
         Map<String, String> descriptionMap = new HashMap<>();
         Map<String, String> jiraIssueMap = new HashMap<>();
@@ -96,7 +96,7 @@ public class Utils {
             if (StringUtils.isNotBlank(issue.getJiraIssueUrl())) {
                 jiraIssueMap.put(result.getHexId(), issue.getJiraIssueUrl());
             }
-            if(issue.getTestRunIssueStatus().name().equals("IGNORED")){
+            if(issue.getTestRunIssueStatus() != null && (statusList == null || statusList.contains(issue.getTestRunIssueStatus()))) {
                 statusMap.put(result.getHexId(), issue.getTestRunIssueStatus().name());
             }
             
@@ -104,8 +104,6 @@ public class Utils {
         issueMetaDataMap.put("descriptions", descriptionMap);
         issueMetaDataMap.put("jiraIssues", jiraIssueMap);
         issueMetaDataMap.put("statuses", statusMap);
-        issueMetaDataMap.put("count", statusMap.size());
         return issueMetaDataMap;
     }
-
 }

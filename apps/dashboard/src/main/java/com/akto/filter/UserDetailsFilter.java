@@ -36,6 +36,7 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.servlet.http.HttpSession;
 import org.apache.commons.lang3.StringUtils;
+import com.akto.util.enums.GlobalEnums;
 
 // This is the first filter which will hit for every request to server
 // First checks if the access token is valid or not (from header)
@@ -80,6 +81,7 @@ public class UserDetailsFilter implements Filter {
         HttpServletResponse httpServletResponse = (HttpServletResponse) servletResponse;
         String accessTokenFromResponse = httpServletResponse.getHeader(AccessTokenAction.ACCESS_TOKEN_HEADER_NAME);
         String accessTokenFromRequest = httpServletRequest.getHeader(AccessTokenAction.ACCESS_TOKEN_HEADER_NAME);
+        String contextSourceFromRequest = httpServletRequest.getHeader(AccessTokenAction.CONTEXT_SOURCE_HEADER);
         String requestURI = httpServletRequest.getRequestURI();
 
         // get api key header
@@ -92,6 +94,15 @@ public class UserDetailsFilter implements Filter {
         Utility utility = null;
 
         HttpSession session = httpServletRequest.getSession(false);
+        if(StringUtils.isEmpty(contextSourceFromRequest)){
+            Context.contextSource.set(GlobalEnums.CONTEXT_SOURCE.API);
+        } else {
+            try {
+                Context.contextSource.set(GlobalEnums.CONTEXT_SOURCE.valueOf(contextSourceFromRequest.toUpperCase()));
+            } catch (Exception e) {
+                Context.contextSource.set(GlobalEnums.CONTEXT_SOURCE.API);
+            }
+        }
         if (apiKeyFlag) {
             // For apiKey sessions we want to start fresh. Hence, delete any existing session and create new one
             if (session != null) session.invalidate();

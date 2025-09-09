@@ -8,6 +8,7 @@ import com.akto.dao.JiraIntegrationDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dao.testing.BidirectionalSyncSettingsDao;
+import com.akto.dao.testing.RemediationsDao;
 import com.akto.dao.testing.TestingRunResultDao;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dto.Config.AktoHostUrlConfig;
@@ -22,6 +23,7 @@ import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.testing.BidirectionalSyncSettings;
+import com.akto.dto.testing.Remediation;
 import com.akto.dto.testing.TestResult;
 import com.akto.dto.testing.TestingRunResult;
 import com.akto.jobs.JobScheduler;
@@ -43,20 +45,19 @@ import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.*;
 import com.opensymphony.xwork2.Action;
 
+import java.net.URI;
+import java.util.function.Function;
 import lombok.Setter;
 
 import java.io.File;
-import java.net.URL;
 import java.util.*;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 import javax.servlet.http.HttpServletRequest;
 import okhttp3.*;
 
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.struts2.interceptor.ServletRequestAware;
 import org.bson.Document;
@@ -65,12 +66,16 @@ import org.bson.types.ObjectId;
 
 import com.akto.dao.AccountSettingsDao;
 
+import static com.akto.utils.jira.Utils.buildAdditionalIssueFieldsForJira;
 import static com.akto.utils.jira.Utils.buildApiToken;
 import static com.akto.utils.jira.Utils.buildBasicRequest;
-import static com.akto.utils.jira.Utils.retryWithoutGzipRequest;
-import static com.akto.utils.jira.Utils.handleError;
-import static com.akto.utils.jira.Utils.getJiraTicketUrlPair;
 import static com.akto.utils.jira.Utils.buildPayloadForJiraTicket;
+import static com.akto.utils.jira.Utils.getAccountJiraFields;
+import static com.akto.utils.jira.Utils.isLabelsFieldError;
+import static com.akto.utils.jira.Utils.getJiraTicketUrlPair;
+import static com.akto.utils.jira.Utils.handleError;
+import static com.akto.utils.jira.Utils.retryWithoutGzipRequest;
+
 
 public class JiraIntegrationAction extends UserAction implements ServletRequestAware {
 
@@ -101,7 +106,7 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
     private static final String CREATE_ISSUE_ENDPOINT_BULK = "/rest/api/3/issue/bulk";
     private static final String ATTACH_FILE_ENDPOINT = "/attachments";
     private static final String ISSUE_STATUS_ENDPOINT = "/rest/api/3/project/%s/statuses";
-    private static final String CREATE_ISSUE_FIELD_METADATA_ENDPOINT = "/rest/api/3/issue/createmeta/%s/issuetypes/%s"; //https://developer.atlassian.com/cloud/jira/platform/rest/v3/api-group-issues/#api-rest-api-3-issue-createmeta-projectidorkey-issuetypes-issuetypeid-get
+
     private static final LoggerMaker loggerMaker = new LoggerMaker(ApiExecutor.class, LogDb.DASHBOARD);
 
     private static final int TICKET_SYNC_JOB_RECURRING_INTERVAL_SECONDS = 3600;
@@ -110,6 +115,8 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
             .readTimeout(60, TimeUnit.SECONDS)
             .writeTimeout(60, TimeUnit.SECONDS)
             .build();
+
+    private static final String REMEDIATION_INFO_URL = "tests-library-master/remediation/%s.md";
 
     @Setter
     private String title;
@@ -504,96 +511,15 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
     }
 
     Map<String, Map<String, BasicDBList>> createIssueFieldMetaData;
-    private final ExecutorService multiFieldPool = Executors.newFixedThreadPool(10);
     public String fetchCreateIssueFieldMetaData() {
 
         JiraIntegration jiraIntegration = JiraIntegrationDao.instance.findOne(new BasicDBObject());
-        if(jiraIntegration == null) {
+        if (jiraIntegration == null) {
             addActionError("Jira is not integrated.");
             return ERROR.toUpperCase();
         }
 
-        Map<String, List<BasicDBObject>> projectIdsMap = jiraIntegration.getProjectIdsMap();
-        if (projectIdsMap == null || projectIdsMap.isEmpty()) {
-            return Action.SUCCESS.toUpperCase();
-        }
-        String baseUrl = jiraIntegration.getBaseUrl();
-        Map<String, List<String>> headers = new HashMap<>();
-        String authHeader = Base64.getEncoder().encodeToString((jiraIntegration.getUserEmail() + ":" +  jiraIntegration.getApiToken()).getBytes());
-        headers.put("Authorization", Collections.singletonList("Basic " + authHeader));
-        createIssueFieldMetaData = new HashMap<>();
-
-        List<Future<Map.Entry<String, Map<String, BasicDBList>>>> futures = new ArrayList<>();
-        int accountId = Context.accountId.get();
-
-        for (Map.Entry<String, List<BasicDBObject>> entry : projectIdsMap.entrySet()) {
-            String projectKey = entry.getKey();
-            List<BasicDBObject> issueTypes = entry.getValue();
-
-            futures.add(multiFieldPool.submit(() -> {
-                Context.accountId.set(accountId);
-                Map<String, BasicDBList> fieldsForProject = new HashMap<>();
-                for (BasicDBObject issueTypeObj : issueTypes) {
-                    if (issueTypeObj == null) continue;
-                    String issueId = issueTypeObj.getString("issueId");
-                    String issueType = issueTypeObj.getString("issueType");
-
-                    if (issueId == null || issueType == null) continue;
-                    BasicDBList fieldsForIssueType = new BasicDBList();
-                    loggerMaker.infoAndAddToDb("Fetching fields for issueType: " + issueType);
-
-                    try {
-                        String requestUrl = String.format(baseUrl + CREATE_ISSUE_FIELD_METADATA_ENDPOINT, projectKey, issueId);
-                        OriginalHttpRequest request = new OriginalHttpRequest(requestUrl, "", "GET", "", headers, "");
-                        OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false,new ArrayList<>());
-                        String responsePayload = response.getBody();
-
-                        if (response.getStatusCode() > 201 || responsePayload == null) {
-                            loggerMaker.errorAndAddToDb(String.format("Error while fetching issue fields. %s %s Response Code %d", projectKey, issueType, response.getStatusCode()));
-                            continue;
-                        }
-
-                        BasicDBObject payloadObj;
-                        try {
-                            payloadObj = BasicDBObject.parse(responsePayload);
-                            BasicDBList issueFields = (BasicDBList) payloadObj.get("fields");
-
-                            if (issueFields == null) continue;
-                            for (Object issueField : issueFields) {
-                                if (issueField == null) continue;
-
-                                BasicDBObject issueFieldBasicDBObject = (BasicDBObject) issueField;
-                                String fieldId = issueFieldBasicDBObject.getString("fieldId");
-                                String fieldName = issueFieldBasicDBObject.getString("name");
-                                Boolean isRequired = issueFieldBasicDBObject.getBoolean("required", false);
-                                if (fieldId == null || fieldName == null || !isRequired) continue;
-
-                                fieldsForIssueType.add(issueFieldBasicDBObject);
-                            }
-                        } catch (Exception e) {
-                            loggerMaker.errorAndAddToDb(e, "Error while parsing issue fields response for project: " + projectKey + ", issueType: " + issueType);
-                        }
-                    } catch (Exception e) {
-                        loggerMaker.errorAndAddToDb(e, "Error while fetching issue fields for project: " + projectKey + ", issueType: " + issueType);
-                    }
-
-                    fieldsForProject.put(issueId, fieldsForIssueType);
-                }
-                return new AbstractMap.SimpleEntry<>(projectKey, fieldsForProject);
-            }));
-        }
-
-        // Wait for all tasks to finish and fill the map
-        for (Future<Map.Entry<String, Map<String, BasicDBList>>> future : futures) {
-            try {
-                Map.Entry<String, Map<String, BasicDBList>> entry = future.get(60, TimeUnit.SECONDS);
-                if (entry != null) {
-                    createIssueFieldMetaData.put(entry.getKey(), entry.getValue());
-                }
-            } catch (Exception e) {
-                loggerMaker.errorAndAddToDb(e, "Error waiting for Jira metadata fetch task");
-            }
-        }
+        createIssueFieldMetaData = getAccountJiraFields();
 
         return Action.SUCCESS.toUpperCase();
     }
@@ -606,7 +532,17 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
             addActionError("Jira is not integrated.");
             return ERROR.toUpperCase();
         }
-        BasicDBObject fields = jiraTicketPayloadCreator(jiraMetaData);
+
+        TestingRunIssues testingRunIssues = TestingRunIssuesDao.instance.findOne(
+            Filters.eq(Constants.ID, jiraMetaData.getTestingIssueId()));
+        YamlTemplate yamlTemplate = YamlTemplateDao.instance.findOne(
+            Filters.eq(Constants.ID, jiraMetaData.getTestingIssueId().getTestSubCategory()),
+            Projections.include(YamlTemplate.INFO));
+        Remediation remediation = RemediationsDao.instance.findOne(
+            Filters.eq(Constants.ID,
+                getRemediationId(jiraMetaData.getTestingIssueId().getTestSubCategory())));
+        BasicDBObject fields = jiraTicketPayloadCreator(jiraMetaData, testingRunIssues, yamlTemplate.getInfo(),
+            remediation);
 
         reqPayload.put("fields", fields);
 
@@ -622,11 +558,33 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
             String responsePayload = response.getBody();
             if (response.getStatusCode() > 201 || responsePayload == null) {
                 loggerMaker.errorAndAddToDb("error while creating jira issue, url not accessible, requestbody " + request.getBody() + " ,responsebody " + response.getBody() + " ,responsestatus " + response.getStatusCode(), LoggerMaker.LogDb.DASHBOARD);
-                String error = handleError(responsePayload);
-                if (error != null) {
-                    addActionError("Error while creating jira issue: " + error);
+                
+                // Check if it's a labels field error and retry without labels
+                if (isLabelsFieldError(responsePayload)) {
+                    loggerMaker.info("Labels field error detected, retrying without labels field", LoggerMaker.LogDb.DASHBOARD);
+                    fields.remove("labels");
+                    reqPayload.put("fields", fields);
+                    
+                    // Create new request without labels
+                    OriginalHttpRequest retryRequest = new OriginalHttpRequest(url, "", "POST", reqPayload.toString(), headers, "");
+                    response = ApiExecutor.sendRequest(retryRequest, true, null, false, new ArrayList<>());
+                    responsePayload = response.getBody();
+                    
+                    if (response.getStatusCode() > 201 || responsePayload == null) {
+                        loggerMaker.errorAndAddToDb("error while creating jira issue after retry without labels, requestbody " + retryRequest.getBody() + " ,responsebody " + response.getBody() + " ,responsestatus " + response.getStatusCode(), LoggerMaker.LogDb.DASHBOARD);
+                        String error = handleError(responsePayload);
+                        if (error != null) {
+                            addActionError("Error while creating jira issue: " + error);
+                        }
+                        return Action.ERROR.toUpperCase();
+                    }
+                } else {
+                    String error = handleError(responsePayload);
+                    if (error != null) {
+                        addActionError("Error while creating jira issue: " + error);
+                    }
+                    return Action.ERROR.toUpperCase();
                 }
-                return Action.ERROR.toUpperCase();
             }
             try {
                 Pair<String, String> pair = getJiraTicketUrlPair(responsePayload, jiraIntegration.getBaseUrl());
@@ -767,10 +725,21 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
 
         List<TestingRunResult> testingRunResultList = new ArrayList<>();
         int existingIssues = 0;
-        List<TestingRunIssues> testingRunIssuesList = TestingRunIssuesDao.instance.findAll(Filters.and(
-                Filters.in("_id", issuesIds),
-                Filters.exists("jiraIssueUrl", true)
-        ));
+        List<TestingRunIssues> testingRunIssuesList = TestingRunIssuesDao.instance.findAll(
+            Filters.in("_id", issuesIds),
+            Projections.include(Constants.ID, TestingRunIssues.JIRA_ISSUE_URL,
+                TestingRunIssues.TEST_RUN_ISSUES_STATUS, TestingRunIssues.LAST_UPDATED, TestingRunIssues.CREATION_TIME,
+                TestingRunIssues.KEY_SEVERITY, TestingRunIssues.IGNORE_REASON)
+        );
+
+        Map<TestingIssuesId, TestingRunIssues> issuesEligibleForJiraMap = testingRunIssuesList.stream()
+            .filter(issue -> StringUtils.isBlank(issue.getJiraIssueUrl()))
+            .collect(Collectors.toMap(TestingRunIssues::getId, Function.identity()));
+
+        testingRunIssuesList = testingRunIssuesList.stream().filter(
+            issue -> StringUtils.isNotBlank(issue.getJiraIssueUrl())
+        ).collect(Collectors.toList());
+
         Set<TestingIssuesId> testingRunIssueIds = new HashSet<>();
         for (TestingRunIssues testingRunIssues : testingRunIssuesList) {
             testingRunIssueIds.add(testingRunIssues.getId());
@@ -800,7 +769,7 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
             try {
                 String inputUrl = testingIssuesId.getApiInfoKey().getUrl();
 
-                URL url = new URL(inputUrl);
+                URI url = new URI(inputUrl);
                 String hostname = url.getHost();
                 String endpoint = url.getPath();
 
@@ -841,8 +810,14 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
             return Action.SUCCESS.toUpperCase();
         }
 
+        Map<String, Remediation> remediationMap = getRemediationMap(testingSubCategories);
+
         for (JiraMetaData jiraMetaData : jiraMetaDataList) {
-            BasicDBObject fields = jiraTicketPayloadCreator(jiraMetaData);
+            TestingIssuesId issuesId = jiraMetaData.getTestingIssueId();
+            BasicDBObject fields = jiraTicketPayloadCreator(jiraMetaData,
+                issuesEligibleForJiraMap.get(issuesId),
+                testSubTypeToInfoMap.get(issuesId.getTestSubCategory()),
+                remediationMap.get(getRemediationId(issuesId.getTestSubCategory())));
 
             // Prepare the issue object
             BasicDBObject issueObject = new BasicDBObject();
@@ -871,11 +846,39 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
                                 + request.getBody() + " ,response body " + response.getBody() + " ,response status " + response.getStatusCode(),
                         LoggerMaker.LogDb.DASHBOARD);
 
-                String error = handleError(responsePayload);
-                if (error != null) {
-                    addActionError("Error while creating Jira issues in bulk: " + error);
+                // Check if it's a labels field error and retry without labels
+                if (isLabelsFieldError(responsePayload)) {
+                    loggerMaker.infoAndAddToDb("Labels field error detected in bulk request, retrying without labels field", LoggerMaker.LogDb.DASHBOARD);
+                    for (Object issueUpdateObj : issueUpdates) {
+                        BasicDBObject issueUpdate = (BasicDBObject) issueUpdateObj;
+                        BasicDBObject fields = (BasicDBObject) issueUpdate.get("fields");
+                        if (fields != null) {
+                            fields.remove("labels");
+                        }
+                    }
+                    
+                    // Create new request without labels
+                    OriginalHttpRequest retryRequest = new OriginalHttpRequest(url, "", "POST", reqPayload.toString(), headers, "");
+                    response = ApiExecutor.sendRequest(retryRequest, true, null, false, new ArrayList<>());
+                    responsePayload = response.getBody();
+                    
+                    if (response.getStatusCode() > 201 || responsePayload == null) {
+                        loggerMaker.errorAndAddToDb("Error while creating Jira issues in bulk after retry without labels, request body "
+                                        + retryRequest.getBody() + " ,response body " + response.getBody() + " ,response status " + response.getStatusCode(),
+                                LoggerMaker.LogDb.DASHBOARD);
+                        String error = handleError(responsePayload);
+                        if (error != null) {
+                            addActionError("Error while creating Jira issues in bulk: " + error);
+                        }
+                        return Action.ERROR.toUpperCase();
+                    }
+                } else {
+                    String error = handleError(responsePayload);
+                    if (error != null) {
+                        addActionError("Error while creating Jira issues in bulk: " + error);
+                    }
+                    return Action.ERROR.toUpperCase();
                 }
-                return Action.ERROR.toUpperCase();
             }
 
             BasicDBObject payloadObj;
@@ -932,7 +935,8 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
         return Action.SUCCESS.toUpperCase();
     }
 
-    private BasicDBObject jiraTicketPayloadCreator(JiraMetaData jiraMetaData) {
+    private BasicDBObject jiraTicketPayloadCreator(JiraMetaData jiraMetaData, TestingRunIssues issue,
+        Info info, Remediation remediation) {
         String endpoint = jiraMetaData.getEndPointStr().replace("Endpoint - ", "");
         String truncatedEndpoint = endpoint;
         if(endpoint.length() > 30) {
@@ -950,9 +954,31 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
         contentList.add(buildContentDetails("Issue link - Akto dashboard", jiraMetaData.getIssueUrl()));
         contentList.add(buildContentDetails(jiraMetaData.getIssueDescription(), null));
 
+        List<BasicDBObject> additionalFields = buildAdditionalIssueFieldsForJira(info, issue, remediation);
+        if (!CollectionUtils.isEmpty(additionalFields)) {
+            contentList.addAll(additionalFields);
+        }
+
         BasicDBObject fields = buildPayloadForJiraTicket(summary, this.projId, this.issueType, contentList,jiraMetaData.getAdditionalIssueFields());
         fields.put("labels", new String[] {JobConstants.TICKET_LABEL_AKTO_SYNC});
         return fields;
+    }
+
+    private Map<String, Remediation> getRemediationMap(List<String> testingSubCategories) {
+        List<Remediation> remediationList = RemediationsDao.instance.findAll(
+            Filters.in(Constants.ID,
+                testingSubCategories.stream().map(this::getRemediationId)
+                    .collect(Collectors.toList())));
+
+        return remediationList.stream()
+            .collect(Collectors.toMap(
+                Remediation::getid,
+                Function.identity()
+            ));
+    }
+
+    private String getRemediationId(String testSubCategory) {
+        return String.format(REMEDIATION_INFO_URL, testSubCategory);
     }
 
     public String getBaseUrl() {

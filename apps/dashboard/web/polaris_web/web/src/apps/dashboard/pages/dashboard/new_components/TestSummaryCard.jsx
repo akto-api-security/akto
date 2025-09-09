@@ -1,6 +1,7 @@
 import { Badge, Box, Button, Card, HorizontalGrid, HorizontalStack, LegacyCard, Link, Text, VerticalStack } from '@shopify/polaris'
 import React from 'react'
 import TooltipText from '../../../components/shared/TooltipText'
+import { getDashboardCategory, mapLabel } from '../../../../main/labelHelper'
 
 function TestSummaryCard({ summaryItem }) {
     const severityLevels = [
@@ -33,7 +34,7 @@ function TestSummaryCard({ summaryItem }) {
                                 </HorizontalStack>
                             </VerticalStack>
                             <VerticalStack gap={2}>
-                                <Text color='subdued' variant='headingXs' fontWeight='semibold'>APIs Tested</Text>
+                                <Text color='subdued' variant='headingXs' fontWeight='semibold'>{mapLabel('APIs Tested', getDashboardCategory())}</Text>
                                 <Text variant='headingSm' fontWeight='medium'>{summaryItem.totalApis}</Text>
                             </VerticalStack>
                         </HorizontalStack>

@@ -97,7 +97,7 @@ public class TestDBSync extends MongoBasedTest {
             aggr.addURL(TestDump2.createSampleParams("user"+i, url+i));
         }
         sync.computeDelta(aggr, true, 0, false);
-        sync.syncWithDB(false, true, SyncLimit.noLimit, Source.HAR);
+        sync.syncWithDB(false, true, SyncLimit.noLimit, SyncLimit.noLimit, SyncLimit.noLimit, Source.HAR);
         APICatalogSync.mergeUrlsAndSave(123, true, false, sync.existingAPIsInDb, false, false);
         sync.buildFromDB(false, true);
 
@@ -216,7 +216,7 @@ public class TestDBSync extends MongoBasedTest {
             aggr.addURL(TestDump2.createSampleParams("user"+i, "/payment/id"+i));
         }
         sync.computeDelta(aggr, true, 123, false);
-        sync.syncWithDB(false, true, SyncLimit.noLimit, Source.HAR);
+        sync.syncWithDB(false, true, SyncLimit.noLimit, SyncLimit.noLimit, SyncLimit.noLimit, Source.HAR);
 
 
         assertEquals(30, sync.getDbState(123).getStrictURLToMethods().size());
@@ -230,7 +230,7 @@ public class TestDBSync extends MongoBasedTest {
         aggr2.addURL(resp2);
         
         sync.computeDelta(aggr2, true, 123, false);
-        sync.syncWithDB(false, true, SyncLimit.noLimit, Source.HAR);
+        sync.syncWithDB(false, true, SyncLimit.noLimit, SyncLimit.noLimit, SyncLimit.noLimit, Source.HAR);
         APICatalogSync.mergeUrlsAndSave(123, true, false, sync.existingAPIsInDb, false, false);
         sync.buildFromDB(false, true);
 
@@ -575,7 +575,8 @@ public class TestDBSync extends MongoBasedTest {
 
         HttpCallParser httpCallParser = new HttpCallParser("", 100000, 10000, 10000, true);
         httpCallParser.syncFunction(responseParamsList,true, true, null);
-        httpCallParser.apiCatalogSync.syncWithDB(true, true, SyncLimit.noLimit, Source.HAR);
+        httpCallParser.apiCatalogSync.syncWithDB(true, true, SyncLimit.noLimit, SyncLimit.noLimit, SyncLimit.noLimit,
+            Source.HAR);
 
         ApiCollection one = ApiCollectionsDao.instance.findOne(new BasicDBObject());
         String host = "dev-1.akto.io";

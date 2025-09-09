@@ -32,11 +32,11 @@ const api = {
         })
     },
 
-    fetchCriticalIssuesTrend: async (startTimeStamp, endTimeStamp) => {
+    fetchCriticalIssuesTrend: async (startTimeStamp, endTimeStamp, severityToFetch = []) => {
         return await request({
             url: '/api/fetchCriticalIssuesTrend',
             method: 'post',
-            data: { startTimeStamp, endTimeStamp }
+            data: { startTimeStamp, endTimeStamp, severityToFetch }
         })
     },
 
@@ -58,6 +58,14 @@ const api = {
             data: {
                 skip
             }
+        })
+    },
+
+    fetchMcpdata: async (filterType) => {
+        return await request({
+            url: '/api/fetchMcpdata',
+            method: 'post',
+            data: { filterType }
         })
     },
 
@@ -90,27 +98,119 @@ const api = {
         })
     },
 
-    fetchSensitiveAndUnauthenticatedValue: async () => {
+    fetchSensitiveAndUnauthenticatedValue: async (showApiInfo) => {
         return await request({
             url: '/api/getSensitiveAndUnauthenticatedValue',
             method: 'post',
-            data: {}
+            data: { showApiInfo}
         })
     },
 
-    fetchHighRiskThirdPartyValue: async () => {
+    fetchHighRiskThirdPartyValue: async (showApiInfo) => {
         return await request({
             url: '/api/getHighRiskThirdPartyValue',
             method: 'post',
-            data: {}
+            data: { showApiInfo}
         })
     },
 
-    fetchShadowApisValue: async () => {
+    fetchShadowApisValue: async (showApiInfo) => {
         return await request({
             url: '/api/getShadowApis',
             method: 'post',
-            data: {}
+            data: { showApiInfo}
+        })
+    },
+    fetchUnauthenticatedApis: async (showApiInfo) => {
+        return await request({
+            url: '/api/fetchAllUnauthenticatedApis',
+            method: 'post',
+            data: { showApiInfo }
+        })
+    },
+
+    fetchActionItemsApiInfo: async (filterType) => {
+        return await request({
+            url: '/api/fetchActionItemsApiInfo',
+            method: 'post',
+            data: { filterType }
+        })
+    },
+
+    getNotTestedAPICount: async (showApiInfo) => {
+        return await request({
+            url: '/api/getNotTestedAPICount',
+            method: 'post',
+            data: { showApiInfo }
+        })
+    },
+
+    getOnlyOnceTestedAPICount: async (showApiInfo) => {
+        return await request({
+            url: '/api/getOnlyOnceTestedAPICount',
+            method: 'post',
+            data: { showApiInfo }
+        })
+    },
+
+    getMisConfiguredTestsCount: async (showApiInfo) => {
+        return await request({
+            url: '/api/getMisConfiguredTestsCount',
+            method: 'post',
+            data: { showApiInfo }
+        })
+    },
+
+    getVulnerableApiCount: async (showApiInfo) => {
+        return await request({
+            url: '/api/getBUACategoryCount',
+            method: 'post',
+            data: {
+                filterSeverity: ["CRITICAL"],
+                filterStatus: ["OPEN"],
+                showApiInfo
+            }
+        })
+    },
+
+    fetchBrokenAuthenticationIssues: async (filterSubCategory, showApiInfo) => {
+        return await request({
+            url: '/api/getBUACategoryCount',
+            method: 'post',
+            data: {
+                filterStatus: ["OPEN"],
+                filterSubCategory,
+                showApiInfo
+            }
+        })
+    },
+
+    fetchIssuesByApis: async (params) => {
+        let data = {};
+        if (typeof params === 'boolean') {
+            data = { showIssues: params };
+        } else if (typeof params === 'object' && params !== null) {
+            data = {
+                showIssues: params.showIssues || false,
+                categoryTypes: Array.isArray(params.categoryTypes)
+                    ? params.categoryTypes
+                    : (params.categoryType ? [params.categoryType] : null)
+            };
+        }
+        
+        return await request({
+            url: '/api/fetchIssuesByApis',
+            method: 'post',
+            data
+        })
+    },
+
+    fetchUrlsByIssues: async (showTestSubCategories) => {
+        const data = (typeof showTestSubCategories === 'boolean') ? { showTestSubCategories } : {};
+        return await request({
+            url: '/api/fetchUrlsByIssues',
+            method: 'post',
+            data
         })
     }
 }

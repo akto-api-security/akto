@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import InfoCard from "../../dashboard/new_components/InfoCard";
 import BarGraph from "../../../components/charts/BarGraph";
+import { getDashboardCategory, mapLabel } from "../../../../main/labelHelper";
 
 const TopThreatTypeChart = ({ data }) => {
   const [chartData, setChartData] = useState([]);
@@ -29,7 +30,7 @@ const TopThreatTypeChart = ({ data }) => {
             },
           }}
           showYAxis={true}
-          yAxisTitle="# of APIs"
+          yAxisTitle={`# of ${mapLabel("APIs", getDashboardCategory())}`}
           barWidth={100 - (data.length * 6)}
           barGap={12}
           showGridLines={true}

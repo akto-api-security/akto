@@ -1,5 +1,5 @@
 import GithubServerTable from "../../../components/tables/GithubServerTable";
-import {Text,IndexFiltersMode, LegacyCard, HorizontalStack, Button, Collapsible, HorizontalGrid, Box, Divider} from '@shopify/polaris';
+import {Text,IndexFiltersMode, LegacyCard, HorizontalStack, Button, Collapsible, HorizontalGrid, Box, Divider, VerticalStack} from '@shopify/polaris';
 import { ChevronDownMinor , ChevronUpMinor } from '@shopify/polaris-icons';
 import api from "../api";
 import testingApi from "../../testing/api";
@@ -16,6 +16,10 @@ import {TestrunsBannerComponent} from "./TestrunsBannerComponent";
 import useTable from "../../../components/tables/TableContext";
 import PersistStore from "../../../../main/PersistStore";
 import TitleWithInfo from "@/apps/dashboard/components/shared/TitleWithInfo";
+import ApiCollectionCoverageGraph from "./ApiCollectionCoverageGraph";
+import ApisTestedOverTimeGraph from './ApisTestedOverTimeGraph';
+import TestRunOverTimeGraph from './TestRunOverTimeGraph';
+import { getDashboardCategory, mapLabel } from "../../../../main/labelHelper";
 /*
   {
     text:"", // req. -> The text to be shown wherever the header is being shown
@@ -73,7 +77,7 @@ const headers = [
   },
   {
     text: 'Total Apis',
-    title: 'Total Endpoints',
+    title: mapLabel("Total endpoints", getDashboardCategory()),
     value: 'total_apis',
     type: CellType.TEXT
   },
@@ -99,6 +103,7 @@ let filters = [
     label: 'Severity',
     title: 'Severity',
     choices: [
+      { label: "Critical", value: "CRITICAL" },
       { label: "High", value: "HIGH" }, 
       { label: "Medium", value: "MEDIUM" },
       { label: "Low", value: "LOW" }
@@ -322,17 +327,23 @@ const SummaryCardComponent = () =>{
         <Collapsible open={collapsible} transition={{duration: '500ms', timingFunction: 'ease-in-out'}}>
           <LegacyCard.Subsection>
             <Box paddingBlockStart={3}><Divider/></Box>
-            <HorizontalGrid columns={2} gap={6}>
-              <ChartypeComponent chartSize={190} navUrl={"/dashboard/issues/"} data={subCategoryInfo} title={"Categories"} isNormal={true} boxHeight={'250px'}/>
-              <ChartypeComponent
-                  data={severityMap}
-                  navUrl={"/dashboard/issues/"} title={"Severity"} isNormal={true} boxHeight={'250px'} dataTableWidth="250px" boxPadding={8}
-                  pieInnerSize="50%"
-                  chartOnLeft={false}
-                  chartSize={190}
-              />
-            </HorizontalGrid>
-
+            <VerticalStack gap={"5"}>
+              <HorizontalGrid columns={2} gap={6}>
+                <ChartypeComponent chartSize={190} navUrl={"/dashboard/issues/"} data={subCategoryInfo} title={"Categories"} isNormal={true} boxHeight={'250px'}/>
+                <ChartypeComponent
+                    data={severityMap}
+                    navUrl={"/dashboard/issues/"} title={"Severity"} isNormal={true} boxHeight={'250px'} dataTableWidth="250px" boxPadding={8}
+                    pieInnerSize="50%"
+                    chartOnLeft={false}
+                    chartSize={190}
+                />
+              </HorizontalGrid>
+              <HorizontalGrid columns={2} gap={4}>
+                <ApiCollectionCoverageGraph />
+                <TestRunOverTimeGraph />
+              </HorizontalGrid>
+              <ApisTestedOverTimeGraph />
+            </VerticalStack>
           </LegacyCard.Subsection>
         </Collapsible>
         : null }
@@ -383,6 +394,7 @@ const coreTable = (
     promotedBulkActions={promotedBulkActions}
     selectable= {true}
     callFromOutside={updateTable}
+    lastColumnSticky={true}
   />   
 )
 

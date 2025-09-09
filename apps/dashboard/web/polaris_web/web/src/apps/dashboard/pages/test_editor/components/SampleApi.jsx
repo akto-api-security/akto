@@ -172,11 +172,12 @@ const SampleApi = () => {
     }
 
     const apiEndpointsOptions = apiEndpoints.map(apiEndpoint => {
-        let str = func.toMethodUrlString(apiEndpoint);
+        let strLabel = func.toMethodUrlString({...apiEndpoint, shouldParse: true});
+        let strValue = func.toMethodUrlString({...apiEndpoint, shouldParse: false});
         return {
-            id: str,
-            label: str,
-            value: str
+            id: strValue,
+            label: strLabel,
+            value: strValue
         }
     })
 
@@ -342,8 +343,8 @@ const SampleApi = () => {
                 <HorizontalStack gap={2}>
                     <Button id={"select-sample-api"} onClick={toggleSelectApiActive} size="slim">
                         <Box maxWidth="200px">
-                            <Tooltip content={copySelectedApiEndpoint} hoverDelay={"100"}>
-                                <Text variant="bodyMd" truncate>{copySelectedApiEndpoint}</Text>
+                            <Tooltip content={func.toMethodUrlString({...func.toMethodUrlObject(copySelectedApiEndpoint), shouldParse: true})} hoverDelay={"100"}>
+                                <Text variant="bodyMd" truncate>{func.toMethodUrlString({...func.toMethodUrlObject(copySelectedApiEndpoint), shouldParse: true})}</Text>
                             </Tooltip>
                         </Box>
                     </Button>
@@ -425,7 +426,7 @@ const SampleApi = () => {
                         placeholder="Select API endpoint"
                         optionsList={apiEndpointsOptions}
                         setSelected={setCopySelectedApiEndpoint}
-                        value={copySelectedApiEndpoint==null ? "No endpoints selected" : copySelectedApiEndpoint}
+                        value={copySelectedApiEndpoint==null ? "No endpoints selected" : func.toMethodUrlString({...func.toMethodUrlObject(copySelectedApiEndpoint), shouldParse: true})}
                         preSelected={[copySelectedApiEndpoint]}
                     />
 

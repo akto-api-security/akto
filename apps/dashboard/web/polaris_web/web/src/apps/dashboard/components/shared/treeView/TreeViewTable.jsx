@@ -6,6 +6,7 @@ import useTable from '../../tables/TableContext'
 import treeViewFunc from './transform'
 import PersistStore from '../../../../main/PersistStore'
 import { CellType } from '../../tables/rows/GithubRow'
+import { getDashboardCategory, mapLabel } from '../../../../main/labelHelper'
 
 const groupObj =  {
     title: "Group name",
@@ -50,8 +51,8 @@ function TreeViewTable({collectionsArr, sortOptions, resourceName, tableHeaders,
     
     const filters = [{
         key: 'apiCollectionId',
-        label: 'Api collection name',
-        title: 'Api collection name',
+        label: mapLabel("API collection name", getDashboardCategory()),
+        title: mapLabel("API collection name", getDashboardCategory()),
         choices: collectionsArr.map((x) => {
             return {
                 label: x.displayName,

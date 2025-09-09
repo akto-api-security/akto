@@ -26,12 +26,16 @@ import values from "@/util/values";
 import SpinnerCentered from "../../../components/progress/SpinnerCentered.jsx";
 import TableStore from "../../../components/tables/TableStore.js";
 import CriticalFindingsGraph from "./CriticalFindingsGraph.jsx";
-import CriticalUnsecuredAPIsOverTimeGraph from "./CriticalUnsecuredAPIsOverTimeGraph.jsx";
+import AllUnsecuredAPIsOverTimeGraph from "./AllUnsecuredAPIsOverTimeGraph.jsx";
+import ApisWithMostOpenIsuuesGraph from './ApisWithMostOpenIsuuesGraph.jsx';
+import IssuesByCollection from './IssuesByCollection.jsx';
+import CriticalUnresolvedApisByAge from './CriticalUnresolvedApisByAge.jsx';
 import settingFunctions from "../../settings/module.js";
 import JiraTicketCreationModal from "../../../components/shared/JiraTicketCreationModal.jsx";
 import testingApi from "../../testing/api.js"
 import { saveAs } from 'file-saver'
 import issuesFunctions from '@/apps/dashboard/pages/issues/module';
+import IssuesGraphsGroup from "./IssuesGraphsGroup.jsx";
 
 
 const sortOptions = [
@@ -180,6 +184,7 @@ function IssuesPage() {
     const [projectToWorkItemsMap, setProjectToWorkItemsMap] = useState({})
     const [projectId, setProjectId] = useState('')
     const [workItemType, setWorkItemType] = useState('')
+    const [issuesByApis, setIssuesByApis] = useState({});
 
     const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), values.ranges[5])
 
@@ -248,6 +253,12 @@ function IssuesPage() {
         setKey(!key)
     }, [startTimestamp, endTimestamp])
 
+    useEffect(() => {
+        if (selectedTab.toUpperCase() === 'OPEN') {
+            setKey(!key)
+        }
+    }, [])
+
     const [searchParams, setSearchParams] = useSearchParams();
     const resultId = searchParams.get("result")
 
@@ -281,7 +292,14 @@ function IssuesPage() {
         }
 
     const handleSaveJiraAction = () => {
-        const jiraMetaData = issuesFunctions.prepareAdditionalIssueFieldsJiraMetaData()
+        let jiraMetaData;
+        try {
+            jiraMetaData = issuesFunctions.prepareAdditionalIssueFieldsJiraMetaData(projId, issueType);
+        } catch (error) {
+            setToast(true, true, "Please fill all required fields before creating a Jira ticket.");
+            resetResourcesSelected()
+            return;
+        }
 
         setToast(true, false, "Please wait while we create your Jira ticket.")
         setJiraModalActive(false)
@@ -378,7 +396,11 @@ function IssuesPage() {
         },
         {
             content: 'Export selected Issues',
-            onAction: () => { openVulnerabilityReport(items) }
+            onAction: () => { openVulnerabilityReport(items, false) }
+        },
+        {
+            content: 'Export selected Issues summary',
+            onAction: () => { openVulnerabilityReport(items, true) }
         },
         {
             content: 'Create jira ticket',
@@ -456,13 +478,25 @@ function IssuesPage() {
           }          
     }
 
-    const openVulnerabilityReport = async(items = []) => {
+    const openVulnerabilityReport = async (items = [], summaryMode = false) => {
         await testingApi.generatePDFReport(issuesFilters, items).then((res) => {
-          const responseId = res.split("=")[1];
-          window.open('/dashboard/issues/summary/' + responseId.split("}")[0], '_blank');
+            const responseId = res.split("=")[1];
+            const summaryModeQueryParam = summaryMode === true ? 'summaryMode=true' : '';
+            const redirectUrl = `/dashboard/issues/summary/${responseId.split("}")[0]}?${summaryModeQueryParam}`;
+            window.open(redirectUrl, '_blank');
         })
 
         resetResourcesSelected();
+    }
+
+    const fetchIssuesByApisData = async () => {
+        await api.fetchIssuesByApis().then((res) => {
+            if (res && res.countByAPIs) {
+                setIssuesByApis(res.countByAPIs)
+            } else {
+                setIssuesByApis({})
+            }
+        })
     }
 
     const infoItems = [
@@ -490,8 +524,10 @@ function IssuesPage() {
     }
   }, [subCategoryMap, apiCollectionMap])
 
+
     useEffect(() => {
         // Fetch jira integration field metadata
+        fetchIssuesByApisData()
         if (window.JIRA_INTEGRATED === 'true') {
             issuesFunctions.fetchCreateIssueFieldMetaData()
         }
@@ -679,10 +715,19 @@ function IssuesPage() {
                 endTimestamp={endTimestamp}
             />
 
-            <HorizontalGrid gap={5} columns={2} key={"critical-issues-graph-detail"}>
-                <CriticalUnsecuredAPIsOverTimeGraph startTimestamp={startTimestamp} endTimestamp={endTimestamp} linkText={""} linkUrl={""} />
-                <CriticalFindingsGraph startTimestamp={startTimestamp} endTimestamp={endTimestamp} linkText={""} linkUrl={""} />
-            </HorizontalGrid>
+            <IssuesGraphsGroup heading="Issues summary">
+              {[
+                <HorizontalGrid gap={5} columns={2} key="critical-issues-graph-detail">
+                  <CriticalUnresolvedApisByAge />
+                  <CriticalFindingsGraph startTimestamp={startTimestamp} endTimestamp={endTimestamp} linkText={""} linkUrl={""} />
+                </HorizontalGrid>,
+                <HorizontalGrid columns={2} gap={4} key="open-issues-graphs">
+                  <ApisWithMostOpenIsuuesGraph issuesData={issuesByApis} />
+                  <IssuesByCollection collectionsData={issuesByApis} />
+                </HorizontalGrid>,
+                <AllUnsecuredAPIsOverTimeGraph key="unsecured-over-time" startTimestamp={startTimestamp} endTimestamp={endTimestamp} linkText={""} linkUrl={""} />
+              ]}
+            </IssuesGraphsGroup>
 
             <GithubServerTable
                 key={key}
@@ -744,7 +789,7 @@ function IssuesPage() {
             
             : components
             ]}
-            primaryAction={<Button primary onClick={() => openVulnerabilityReport()} disabled={showEmptyScreen}>Export results</Button>}
+            primaryAction={<Button primary onClick={() => openVulnerabilityReport([], false)} disabled={showEmptyScreen}>Export results</Button>}
             secondaryActions={
             <HorizontalStack  gap={2}>
                 <DateRangeFilter initialDispatch={currDateRange} dispatch={(dateObj) => dispatchCurrDateRange({ type: "update", period: dateObj.period, title: dateObj.title, alias: dateObj.alias })} />
@@ -760,6 +805,10 @@ function IssuesPage() {
                     {
                       content: 'Export results as CSV',
                       onAction: exportCsv,
+                    },
+                    {
+                      content: 'Export summary report',
+                      onAction: () => openVulnerabilityReport([], true),
                     },
                   ]}
                 />

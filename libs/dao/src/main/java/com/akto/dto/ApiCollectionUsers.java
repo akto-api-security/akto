@@ -75,7 +75,10 @@ public class ApiCollectionUsers {
         if(conditions == null || conditions.isEmpty()){
             return new ArrayList<>();
         }
+        List<Bson> filterList = SingleTypeInfoDao.filterForHostHostHeaderRaw();
         Bson singleTypeInfoFilters = getFilters(conditions, CollectionType.ApiCollectionId);
+        Bson filters = Filters.and(filterList);
+        singleTypeInfoFilters = Filters.and(filters, singleTypeInfoFilters);
         if (deactivatedCollections != null && !deactivatedCollections.isEmpty()) {
             singleTypeInfoFilters = Filters.and(singleTypeInfoFilters, Filters.nin(SingleTypeInfo._API_COLLECTION_ID, deactivatedCollections));
         }
@@ -101,7 +104,10 @@ public class ApiCollectionUsers {
             return 0;
         }
 
+        List<Bson> filterList = SingleTypeInfoDao.filterForHostHostHeaderRaw();
+        Bson filters = Filters.and(filterList);
         Bson stiFiltes = getFilters(conditions, CollectionType.ApiCollectionId);
+        stiFiltes = Filters.and(filters, stiFiltes);
         List<Bson> pipeLine = new ArrayList<>();
         pipeLine.add(Aggregates.match(stiFiltes));
 

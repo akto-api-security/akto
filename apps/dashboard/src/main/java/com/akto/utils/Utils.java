@@ -11,17 +11,16 @@ import com.akto.dao.SampleDataDao;
 import com.akto.dao.SensitiveParamInfoDao;
 import com.akto.dao.SensitiveSampleDataDao;
 import com.akto.dao.SingleTypeInfoDao;
-import com.akto.dto.AccountSettings;
-import com.akto.dto.HttpResponseParams;
-import com.akto.dto.OriginalHttpRequest;
-import com.akto.dto.OriginalHttpResponse;
+import com.akto.dto.*;
 import com.akto.dto.dependency_flow.DependencyFlow;
+import com.akto.dto.rbac.UsersCollectionsList;
 import com.akto.dto.testing.*;
 import com.akto.dto.third_party_access.Credential;
 import com.akto.dto.third_party_access.PostmanCredential;
 import com.akto.dto.third_party_access.ThirdPartyAccess;
 import com.akto.dto.traffic.Key;
 import com.akto.dto.type.SingleTypeInfo;
+import com.akto.dto.type.URLMethods;
 import com.akto.dto.upload.FileUploadError;
 import com.akto.listener.KafkaListener;
 import com.akto.listener.RuntimeListener;
@@ -30,15 +29,24 @@ import com.akto.log.LoggerMaker.LogDb;
 import com.akto.parsers.HttpCallParser;
 import com.akto.runtime.APICatalogSync;
 import com.akto.testing.ApiExecutor;
+import com.akto.usage.UsageMetricCalculator;
+import com.akto.util.Constants;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.google.gson.Gson;
 import com.mongodb.BasicDBObject;
+import com.mongodb.client.MongoCollection;
+import com.mongodb.client.model.Accumulators;
+import com.mongodb.client.model.Aggregates;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Projections;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
+import org.bson.Document;
+import org.bson.conversions.Bson;
+
 import java.io.File;
 import java.net.MalformedURLException;
 import java.net.URISyntaxException;
@@ -53,11 +61,12 @@ import static com.akto.dto.RawApi.convertHeaders;
 
 public class Utils {
 
-    private static final LoggerMaker loggerMaker = new LoggerMaker(Utils.class, LogDb.DASHBOARD);;
+    private static final LoggerMaker loggerMaker = new LoggerMaker(Utils.class, LogDb.DASHBOARD);
+    ;
     private final static ObjectMapper mapper = new ObjectMapper();
 
     public static Map<String, String> getAuthMap(JsonNode auth, Map<String, String> variableMap) {
-        Map<String,String> result = new HashMap<>();
+        Map<String, String> result = new HashMap<>();
 
         if (auth == null) {
             return result;
@@ -105,61 +114,63 @@ public class Utils {
                     }
                 }
 
-                    if (authKeyName.isEmpty() || authValueName.isEmpty()) {
-                        throw new IllegalArgumentException(
-                                "One of  kv is empty: key=" + authKeyName + " value=" + authValueName);
-                    } else {
-                        result.put(authKeyName, authValueName);
+                if (authKeyName.isEmpty() || authValueName.isEmpty()) {
+                    throw new IllegalArgumentException(
+                            "One of  kv is empty: key=" + authKeyName + " value=" + authValueName);
+                } else {
+                    result.put(authKeyName, authValueName);
+                }
+                break;
+            case "basic":
+                ArrayNode basicParams = (ArrayNode) auth.get("basic");
+                String basicUsername = "", basicPassword = "";
+                for (JsonNode basicKeyHeader : basicParams) {
+                    String key = basicKeyHeader.get("key").asText();
+                    String value = basicKeyHeader.get("value").asText();
+                    switch (key) {
+                        case "username":
+                            basicUsername = replaceVariables(value, variableMap);
+                            break;
+                        case "password":
+                            basicPassword = replaceVariables(value, variableMap);
+                            break;
+                        default:
+                            break;
                     }
-                    break;
-                case "basic":
-                    ArrayNode basicParams = (ArrayNode) auth.get("basic");
-                    String basicUsername = "", basicPassword = "";
-                    for (JsonNode basicKeyHeader : basicParams) {
-                        String key = basicKeyHeader.get("key").asText();
-                        String value = basicKeyHeader.get("value").asText();
-                        switch (key) {
-                            case "username":
-                                basicUsername = replaceVariables(value, variableMap);
-                                break;
-                            case "password":
-                                basicPassword = replaceVariables(value, variableMap);
-                                break;
-                            default:
-                                break;
-                        }
-                    }
+                }
 
-                    if (basicUsername.isEmpty() || basicPassword.isEmpty()) {
-                        throw new IllegalArgumentException(
-                                "One of  username/password is empty: username=" + basicUsername + " password="
-                                        + basicPassword);
-                    } else {
-                        /*
-                         * Base64 implementation ref: https://www.ietf.org/rfc/rfc2617.txt
-                         */
-                        String basicCredentials = basicUsername + ":" + basicPassword;
-                        String basicEncoded = Base64.getEncoder().encodeToString(basicCredentials.getBytes());
+                if (basicUsername.isEmpty() || basicPassword.isEmpty()) {
+                    throw new IllegalArgumentException(
+                            "One of  username/password is empty: username=" + basicUsername + " password="
+                                    + basicPassword);
+                } else {
+                    /*
+                     * Base64 implementation ref: https://www.ietf.org/rfc/rfc2617.txt
+                     */
+                    String basicCredentials = basicUsername + ":" + basicPassword;
+                    String basicEncoded = Base64.getEncoder().encodeToString(basicCredentials.getBytes());
 
-                        String basicHeader = "Basic " + basicEncoded;
-                        result.put("Authorization", basicHeader);
-                    }
-                    break;
-                default:
-                    throw new IllegalArgumentException("Unsupported auth type: " + authType );
-            }
+                    String basicHeader = "Basic " + basicEncoded;
+                    result.put("Authorization", basicHeader);
+                }
+                break;
+            default:
+                throw new IllegalArgumentException("Unsupported auth type: " + authType);
+        }
 
 
         return result;
     }
 
-    public static Map<String, String> getVariableMap(ArrayNode variables){
-        Map<String,String> result = new HashMap<>();
-        if(variables == null){
+    public static Map<String, String> getVariableMap(ArrayNode variables) {
+        Map<String, String> result = new HashMap<>();
+        if (variables == null) {
             return result;
         }
-        for(JsonNode variable : variables){
-            result.put(variable.get("key").asText(), variable.get("value").asText());
+        for (JsonNode variable : variables) {
+            if (variable.get("key") != null && variable.get("value") != null) {
+                result.put(variable.get("key").asText(), variable.get("value").asText());
+            }
         }
         return result;
     }
@@ -170,10 +181,10 @@ public class Utils {
             return true;
         } catch (MalformedURLException | URISyntaxException e) {
             Pattern pattern = Pattern.compile("\\$\\{[^}]*\\}");
-                Matcher matcher = pattern.matcher(url);
-                if (matcher.find()) {
-                    return true;
-                }
+            Matcher matcher = pattern.matcher(url);
+            if (matcher.find()) {
+                return true;
+            }
             return false;
         }
     }
@@ -204,7 +215,7 @@ public class Utils {
 
         return sb.toString();
     }
-    
+
     public static Pair<Map<String, String>, List<FileUploadError>> convertApiInAktoFormat(JsonNode apiInfo, Map<String, String> variables, String accountId, boolean allowReplay, Map<String, String> authMap, String miniTestingName) {
         Pair<Map<String, String>, List<String>> resp;
         List<FileUploadError> errors = new ArrayList<>();
@@ -217,7 +228,7 @@ public class Utils {
             if (authApiNode != null) {
                 try {
                     authMap = getAuthMap(authApiNode, variables);
-                }catch (Exception e) {
+                } catch (Exception e) {
                     errors.add(new FileUploadError("Error while getting auth map for " + apiName + " : " + e.toString(), FileUploadError.ErrorType.WARNING));
                     loggerMaker.errorAndAddToDb(e, String.format("Error while getting auth map for %s : %s", apiName, e.toString()), LogDb.DASHBOARD);
                 }
@@ -228,7 +239,7 @@ public class Utils {
             result.put("path", getPath(request, variables));
 
             JsonNode methodObj = request.get("method");
-            if (methodObj == null){
+            if (methodObj == null) {
                 errors.add(new FileUploadError("No method field exists", FileUploadError.ErrorType.ERROR));
                 return Pair.of(null, errors);
             }
@@ -237,7 +248,7 @@ public class Utils {
             ArrayNode requestHeadersNode = (ArrayNode) request.get("header");
             Map<String, String> requestHeadersMap = getHeaders(requestHeadersNode, variables);
             requestHeadersMap.putAll(authMap);
-            String requestHeadersString =  mapper.writeValueAsString(requestHeadersMap);
+            String requestHeadersString = mapper.writeValueAsString(requestHeadersMap);
             result.put("requestHeaders", requestHeadersString);
 
             JsonNode bodyNode = request.get("body");
@@ -245,7 +256,7 @@ public class Utils {
             requestPayload = replaceVariables(requestPayload, variables);
 
             JsonNode responseNode = apiInfo.get("response");
-            JsonNode response = responseNode != null && responseNode.has(0) ?  responseNode.get(0): null;
+            JsonNode response = responseNode != null && responseNode.has(0) ? responseNode.get(0) : null;
 
             String responseHeadersString;
             String responsePayload;
@@ -255,11 +266,11 @@ public class Utils {
             if (response == null) {
                 if (allowReplay) {
                     Map<String, List<String>> reqHeadersListMap = new HashMap<>();
-                    for (String key: requestHeadersMap.keySet()) {
+                    for (String key : requestHeadersMap.keySet()) {
                         reqHeadersListMap.put(key, Collections.singletonList(requestHeadersMap.get(key)));
                     }
 
-                    OriginalHttpRequest originalHttpRequest = new OriginalHttpRequest(result.get("path"), "", result.get("method"), requestPayload, reqHeadersListMap , "http");
+                    OriginalHttpRequest originalHttpRequest = new OriginalHttpRequest(result.get("path"), "", result.get("method"), requestPayload, reqHeadersListMap, "http");
                     try {
                         OriginalHttpResponse res = null;
                         if (StringUtils.isEmpty(miniTestingName)) {
@@ -268,14 +279,14 @@ public class Utils {
                             res = com.akto.testing.Utils.runRequestOnHybridTesting(originalHttpRequest);
                         }
                         responseHeadersString = convertHeaders(res.getHeaders());
-                        responsePayload =  res.getBody();
-                        statusCode =  res.getStatusCode()+"";
-                        status =  "";
-                        if(res.getStatusCode() < 200 || res.getStatusCode() >=400){
+                        responsePayload = res.getBody();
+                        statusCode = res.getStatusCode() + "";
+                        status = "";
+                        if (res.getStatusCode() < 200 || res.getStatusCode() >= 400) {
                             throw new Exception("Found non 2XX response on replaying the API");
                         }
                     } catch (Exception e) {
-                        loggerMaker.errorAndAddToDb(e,"Error while making request for " + originalHttpRequest.getFullUrlWithParams() + " : " + e.toString(), LogDb.DASHBOARD);
+                        loggerMaker.errorAndAddToDb(e, "Error while making request for " + originalHttpRequest.getFullUrlWithParams() + " : " + e.toString(), LogDb.DASHBOARD);
                         errors.add(new FileUploadError("Error while replaying request for " + originalHttpRequest.getFullUrlWithParams() + " : " + e.toString(), FileUploadError.ErrorType.ERROR));
                         return Pair.of(null, errors);
                     }
@@ -314,11 +325,11 @@ public class Utils {
             result.put("status", status);
             result.put("requestPayload", requestPayload);
             result.put("ip", "null");
-            result.put("time", Context.now()+"");
+            result.put("time", Context.now() + "");
             result.put("type", "http");
             result.put("source", "POSTMAN");
             return Pair.of(result, errors);
-        } catch (Exception e){
+        } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, String.format("Failed to convert postman obj to Akto format : %s", e.toString()), LogDb.DASHBOARD);
             errors.add(new FileUploadError("Failed to convert postman obj to Akto", FileUploadError.ErrorType.ERROR));
             return Pair.of(null, errors);
@@ -326,59 +337,59 @@ public class Utils {
     }
 
     public static String extractRequestPayload(JsonNode bodyNode) {
-        if(bodyNode == null || bodyNode.isNull()){
+        if (bodyNode == null || bodyNode.isNull()) {
             return "";
         }
         String mode = bodyNode.get("mode").asText();
-        if(mode.equals("none")){
+        if (mode.equals("none")) {
             return "";
         }
-        if(mode.equals("raw")){
+        if (mode.equals("raw")) {
             return bodyNode.get("raw").asText();
         }
-        if(mode.equals("formdata")){
+        if (mode.equals("formdata")) {
             ArrayNode formdata = (ArrayNode) bodyNode.get("formdata");
             StringBuilder sb = new StringBuilder();
-            for(JsonNode node : formdata){
+            for (JsonNode node : formdata) {
                 String type = node.get("type").asText();
-                if(type.equals("file")){
+                if (type.equals("file")) {
                     sb.append(node.get("key").asText()).append("=").append(node.get("src").asText()).append("&");
-                } else if(type.equals("text")){
+                } else if (type.equals("text")) {
                     sb.append(node.get("key").asText()).append("=").append(node.get("value").asText()).append("&");
                 }
             }
-            if (sb.length() > 0) sb.deleteCharAt(sb.length()-1);
+            if (sb.length() > 0) sb.deleteCharAt(sb.length() - 1);
             return sb.toString();
         }
-        if(mode.equals("urlencoded")){
+        if (mode.equals("urlencoded")) {
             ArrayNode urlencoded = (ArrayNode) bodyNode.get("urlencoded");
             StringBuilder sb = new StringBuilder();
-            for(JsonNode node : urlencoded){
+            for (JsonNode node : urlencoded) {
                 sb.append(node.get("key").asText()).append("=").append(node.get("value").asText()).append("&");
             }
-            if (sb.length() > 0) sb.deleteCharAt(sb.length()-1);
+            if (sb.length() > 0) sb.deleteCharAt(sb.length() - 1);
             return sb.toString();
         }
-        if(mode.equals("graphql")){
+        if (mode.equals("graphql")) {
             return bodyNode.get("graphql").toPrettyString();
         }
-        if(mode.equals("file")){
+        if (mode.equals("file")) {
             return bodyNode.get("file").get("src").asText();
         }
         return bodyNode.toPrettyString();
     }
 
     private static String getContentType(JsonNode request, JsonNode response, Map<String, String> responseHeadersMap) {
-        if(responseHeadersMap.containsKey("content-type")){
+        if (responseHeadersMap.containsKey("content-type")) {
             return responseHeadersMap.get("content-type");
         }
-        if(request.has("body")){
+        if (request.has("body")) {
             JsonNode body = request.get("body");
-            if(body.has("options")){
+            if (body.has("options")) {
                 JsonNode options = request.get("options");
-                if(options.has("raw")){
+                if (options.has("raw")) {
                     JsonNode raw = request.get("raw");
-                    if(raw.has("language")){
+                    if (raw.has("language")) {
                         return raw.get("language").asText();
                     }
                 }
@@ -400,7 +411,7 @@ public class Utils {
         return replaceVariables(url, variables);
     }
 
-    public static String process(ArrayNode arrayNode, String delimiter, Map<String, String> variables){
+    public static String process(ArrayNode arrayNode, String delimiter, Map<String, String> variables) {
         ArrayList<String> variableReplacedHostList = new ArrayList<>();
         for (JsonNode jsonNode : arrayNode) {
             String hostPart = jsonNode.asText();
@@ -415,8 +426,8 @@ public class Utils {
     private static String extractVariableAndReplace(String str, Map<String, String> variables) {
         int start = str.indexOf('{');
         int end = str.lastIndexOf('}');
-        String key = str.substring(start+2, end-1);
-        if(variables.containsKey(key)){
+        String key = str.substring(start + 2, end - 1);
+        if (variables.containsKey(key)) {
             String val = variables.get(key);
             str = str.replace("{{" + key + "}}", val);
         }
@@ -424,12 +435,12 @@ public class Utils {
     }
 
 
-    private static Map<String, String> getHeaders(ArrayNode headers, Map<String, String> variables){
+    private static Map<String, String> getHeaders(ArrayNode headers, Map<String, String> variables) {
         Map<String, String> result = new HashMap<>();
         if (headers == null) return result;
-        for(JsonNode node: headers){
+        for (JsonNode node : headers) {
             String key = node.get("key").asText().toLowerCase();
-            key = replaceVariables(key,variables);
+            key = replaceVariables(key, variables);
 
             String value = node.get("value").asText();
             value = replaceVariables(value, variables);
@@ -437,17 +448,17 @@ public class Utils {
             result.put(key, value);
         }
 
-        return  result;
+        return result;
     }
 
     //TODO handle item as a json object
     public static void fetchApisRecursively(ArrayNode items, ArrayList<JsonNode> jsonNodes) {
-        if(items == null || items.size() == 0){
+        if (items == null || items.size() == 0) {
             return;
         }
-        for(JsonNode item: items){
-            if(item.has("item")){
-                fetchApisRecursively( (ArrayNode) item.get("item"), jsonNodes);
+        for (JsonNode item : items) {
+            if (item.has("item")) {
+                fetchApisRecursively((ArrayNode) item.get("item"), jsonNodes);
             } else {
                 jsonNodes.add(item);
             }
@@ -459,26 +470,27 @@ public class Utils {
         pushDataToKafka(apiCollectionId, topic, messages, errors, skipKafka, takeFromMsg, false, false);
     }
     /*
-    * this function is used primarily for non-automated traffic collection, like
-    * postman, har and openAPI.
-    * Thus, we can skip advanced traffic filters for these cases.
-    */
+     * this function is used primarily for non-automated traffic collection, like
+     * postman, har and openAPI.
+     * Thus, we can skip advanced traffic filters for these cases.
+     */
 
     public static void pushDataToKafka(int apiCollectionId, String topic, List<String> messages, List<String> errors, boolean skipKafka, boolean takeFromMsg, boolean skipAdvancedFilters) throws Exception {
         pushDataToKafka(apiCollectionId, topic, messages, errors, skipKafka, takeFromMsg, skipAdvancedFilters, false);
     }
+
     public static void pushDataToKafka(int apiCollectionId, String topic, List<String> messages, List<String> errors, boolean skipKafka, boolean takeFromMsg, boolean skipAdvancedFilters, boolean skipMergingOnKnownStaticURLsForVersionedApis) throws Exception {
         List<HttpResponseParams> responses = new ArrayList<>();
-        for (String message: messages){
+        for (String message : messages) {
             int messageLimit = (int) Math.round(0.8 * KafkaListener.BATCH_SIZE_CONFIG);
             if (skipKafka) {
                 messageLimit = messageLimit * 2;
             }
             if (message.length() < messageLimit) {
                 if (!skipKafka) {
-                    KafkaListener.kafka.send(message,"har_" + topic);
+                    KafkaListener.kafka.send(message, "har_" + topic);
                 } else {
-                    HttpResponseParams responseParams =  HttpCallParser.parseKafkaMessage(message);
+                    HttpResponseParams responseParams = HttpCallParser.parseKafkaMessage(message);
                     responseParams.getRequestParams().setApiCollectionId(apiCollectionId);
                     responses.add(responseParams);
                 }
@@ -488,7 +500,7 @@ public class Utils {
         }
 
         //todo:shivam handle resource analyser in AccountHTTPCallParserAktoPolicyInfo
-        if(skipKafka) {
+        if (skipKafka) {
 
             int accountId = Context.accountId.get();
             if (takeFromMsg) {
@@ -516,7 +528,7 @@ public class Utils {
 
             boolean makeApisCaseInsensitive = false;
             boolean mergeUrlsOnVersions = false;
-            if(accountSettings != null){
+            if (accountSettings != null) {
                 makeApisCaseInsensitive = accountSettings.getHandleApisCaseInsensitive();
                 mergeUrlsOnVersions = accountSettings.isAllowMergingOnVersions();
             }
@@ -532,10 +544,10 @@ public class Utils {
 //            info.getResourceAnalyser().syncWithDb();
             try {
                 DependencyFlow dependencyFlow = new DependencyFlow();
-                dependencyFlow.run(apiCollectionId+"");
+                dependencyFlow.run(apiCollectionId + "");
                 dependencyFlow.syncWithDb();
             } catch (Exception e) {
-                loggerMaker.errorAndAddToDb(e,"Exception while running dependency flow", LoggerMaker.LogDb.DASHBOARD);
+                loggerMaker.errorAndAddToDb(e, "Exception while running dependency flow", LoggerMaker.LogDb.DASHBOARD);
             }
         }
     }
@@ -566,8 +578,9 @@ public class Utils {
         }
         return result;
     }
-    
+
     private static final Gson gson = new Gson();
+
     public static BasicDBObject extractJsonResponse(String message, boolean isRequest) {
         Map<String, Object> json = gson.fromJson(message, Map.class);
 
@@ -577,8 +590,8 @@ public class Utils {
             respPayload = "{}";
         }
 
-        if(respPayload.startsWith("[")) {
-            respPayload = "{\"json\": "+respPayload+"}";
+        if (respPayload.startsWith("[")) {
+            respPayload = "{\"json\": " + respPayload + "}";
         }
 
         BasicDBObject payload;
@@ -591,8 +604,8 @@ public class Utils {
         return payload;
     }
 
-    public static float calculateRiskValueForSeverity(String severity){
-        float riskScore = 0 ;
+    public static float calculateRiskValueForSeverity(String severity) {
+        float riskScore = 0;
         switch (severity) {
             case "CRITICAL":
             case "HIGH":
@@ -605,7 +618,7 @@ public class Utils {
 
             case "LOW":
                 riskScore += 1;
-        
+
             default:
                 break;
         }
@@ -613,14 +626,14 @@ public class Utils {
         return riskScore;
     }
 
-    public static float getRiskScoreValueFromSeverityScore(float severityScore){
-        if(severityScore >= 100){
+    public static float getRiskScoreValueFromSeverityScore(float severityScore) {
+        if (severityScore >= 100) {
             return 2;
-        }else if(severityScore >= 10){
+        } else if (severityScore >= 10) {
             return 1;
-        }else if(severityScore > 0){
+        } else if (severityScore > 0) {
             return (float) 0.5;
-        }else{
+        } else {
             return 0;
         }
     }
@@ -639,8 +652,8 @@ public class Utils {
 
     }
 
-    public static List<String> getUniqueValuesOfList(List<String> input){
-        if(input == null || input.isEmpty()){
+    public static List<String> getUniqueValuesOfList(List<String> input) {
+        if (input == null || input.isEmpty()) {
             return new ArrayList<>();
         }
         Set<String> copySet = new HashSet<>(input);
@@ -657,7 +670,7 @@ public class Utils {
     }
 
     public static File createRequestFile(String originalMessage, String message) {
-        if(originalMessage == null || message == null) {
+        if (originalMessage == null || message == null) {
             return null;
         }
         try {
@@ -713,5 +726,63 @@ public class Utils {
         }
 
         return testResult;
+    }
+
+    public static ApiInfoKeyResult fetchUniqueApiInfoKeys(
+            MongoCollection<Document> collection,
+            Bson matchFilter,
+            String apiInfoKeyPath,
+            boolean showApiInfo
+    ) {
+        Bson filterQ = UsageMetricCalculator.excludeDemosAndDeactivated(apiInfoKeyPath + ".apiCollectionId");
+        List<Integer> collectionIds;
+        try {
+            collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
+            if (collectionIds == null) {
+                return new ApiInfoKeyResult(0, showApiInfo ? new ArrayList<>() : null);
+            }
+        } catch (Exception e) {
+            return new ApiInfoKeyResult(0, showApiInfo ? new ArrayList<>() : null);
+        }
+
+        // Combine filters: exclude unwanted, include only allowed
+        Bson combinedFilter = Filters.and(
+                matchFilter,
+                filterQ,
+                Filters.in(apiInfoKeyPath + ".apiCollectionId", collectionIds)
+        );
+
+        List<Bson> pipeline = new ArrayList<>();
+        pipeline.add(Aggregates.match(combinedFilter));
+        pipeline.add(Aggregates.project(Projections.include(
+                apiInfoKeyPath + ".apiCollectionId",
+                apiInfoKeyPath + ".url",
+                apiInfoKeyPath + ".method"
+        )));
+        pipeline.add(Aggregates.group(
+                new BasicDBObject("apiCollectionId", "$" + apiInfoKeyPath + ".apiCollectionId")
+                        .append("url", "$" + apiInfoKeyPath + ".url")
+                        .append("method", "$" + apiInfoKeyPath + ".method"),
+                Accumulators.first("apiInfoKey", "$" + apiInfoKeyPath)
+        ));
+
+        Set<ApiInfo.ApiInfoKey> apiInfoKeys = new HashSet<>();
+        List<ApiInfo> apiInfoList = new ArrayList<>();
+        List<Document> results = collection.aggregate(pipeline, Document.class).into(new ArrayList<>());
+        for (Document doc : results) {
+            Document keyDoc = (Document) doc.get("apiInfoKey");
+            if (keyDoc != null) {
+                ApiInfo.ApiInfoKey key = new ApiInfo.ApiInfoKey(
+                        keyDoc.getInteger("apiCollectionId"),
+                        keyDoc.getString("url"),
+                        URLMethods.Method.fromString(keyDoc.getString("method"))
+                );
+                apiInfoKeys.add(key);
+                if (showApiInfo) {
+                    apiInfoList.add(new ApiInfo(key));
+                }
+            }
+        }
+        return new ApiInfoKeyResult(apiInfoKeys.size(), showApiInfo ? apiInfoList : null);
     }
 }

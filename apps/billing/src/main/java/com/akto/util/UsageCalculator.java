@@ -10,8 +10,8 @@ import com.akto.dto.billing.OrganizationFlags;
 import com.akto.dto.billing.OrganizationUsage;
 import com.akto.dto.usage.MetricTypes;
 import com.akto.dto.usage.UsageMetric;
-import com.akto.log.CacheLoggerMaker;
 import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import com.akto.notifications.email.SendgridEmail;
 import com.akto.stigg.StiggReporterClient;
 import com.mongodb.BasicDBList;
@@ -27,8 +27,7 @@ import java.util.*;
 import static com.akto.dto.billing.OrganizationUsage.*;
 
 public class UsageCalculator {
-    private static final LoggerMaker loggerMaker = new LoggerMaker(UsageCalculator.class);
-    private static final CacheLoggerMaker cacheLoggerMaker = new CacheLoggerMaker(UsageMetricUtils.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(UsageCalculator.class, LogDb.BILLING);
     public static final UsageCalculator instance = new UsageCalculator();
 
     private UsageCalculator() {}
@@ -133,10 +132,16 @@ public class UsageCalculator {
                 case CUSTOM_TESTS:
                     featureId = stiggConfig.getCustomTestsLabel();
                     break;
+                case AI_ASSET_COUNT:
+                    featureId = stiggConfig.getAiAssetsLabel();
+                    break;
+                case MCP_ASSET_COUNT:
+                    featureId = stiggConfig.getMcpAssetsLabel();
+                    break;
 
                 default:
-
                     loggerMaker.errorAndAddToDb("This is not a standard metric type: " + metricType, LoggerMaker.LogDb.BILLING);
+                    break;
             }
 
             if (featureId == null) {
@@ -243,9 +248,9 @@ public class UsageCalculator {
                         usage = usageMetric.getUsage();
                     } else {
                         String err = "Missing account id: " + account + " orgId: " + organizationId+ " metricType: " + metricTypeString + " hour: " + hour;
-                        loggerMaker.errorAndAddToDb(err, LoggerMaker.LogDb.BILLING);
+                        loggerMaker.infoAndAddToDb(err);
                         if (!shouldProcessIncomplete(organizationId, flags)) {
-                            throw new Exception(err);
+                            continue;
                         }
                     }
 

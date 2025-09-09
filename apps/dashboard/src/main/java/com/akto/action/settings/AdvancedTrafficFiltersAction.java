@@ -8,6 +8,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
+import org.apache.commons.lang3.StringUtils;
 import org.bson.conversions.Bson;
 
 import com.akto.action.UserAction;
@@ -18,18 +19,23 @@ import com.akto.dao.runtime_filters.AdvancedTrafficFiltersDao;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.monitoring.FilterConfig;
 import com.akto.dto.test_editor.YamlTemplate;
+import com.akto.dto.type.SingleTypeInfo;
+import com.akto.dto.type.URLMethods.Method;
 import com.akto.usage.UsageMetricCalculator;
 import com.akto.util.Constants;
 import com.akto.utils.TrafficFilterUtil;
 import com.akto.utils.jobs.CleanInventory;
+import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.FindOneAndUpdateOptions;
 import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.Sorts;
 import com.mongodb.client.model.Updates;
 import com.opensymphony.xwork2.Action;
+import com.akto.dto.traffic.Key;
 
 import lombok.Getter;
+import static com.akto.utils.Utils.deleteApis;
 
 public class AdvancedTrafficFiltersAction extends UserAction {
 
@@ -165,6 +171,68 @@ public class AdvancedTrafficFiltersAction extends UserAction {
         }
         return SUCCESS.toUpperCase();
     }
+
+    @Getter
+    BasicDBObject response;
+
+    public String deleteOptionAndSlashApis(){
+        List<ApiCollection> apiCollectionList = ApiCollectionsDao.fetchAllHosts();
+        response = new BasicDBObject();
+        for (ApiCollection apiCollection: apiCollectionList) {
+            if(apiCollection.isDeactivated()) {
+                continue;
+            }
+            List<Key> toBeDeleted = new ArrayList<>();
+            if (apiCollection.getHostName() == null) {
+                continue;
+            }
+            List<Key> toBeMoved = new ArrayList<>();
+            int optionsApisCount = 0;
+            int slashApisCount = 0;
+            List<BasicDBObject> endpoints = ApiCollectionsDao.fetchEndpointsInCollectionUsingHost(apiCollection.getId(), 0, false);
+
+            if (endpoints == null || endpoints.isEmpty()) {
+                continue;
+            }
+            for (BasicDBObject singleTypeInfo: endpoints) {
+                singleTypeInfo = (BasicDBObject) (singleTypeInfo.getOrDefault("_id", new BasicDBObject()));
+                int apiCollectionId = singleTypeInfo.getInt("apiCollectionId");
+                String url = singleTypeInfo.getString("url");
+                String method = singleTypeInfo.getString("method");
+
+                Key key = new Key(apiCollectionId, url, Method.fromString(method), -1, 0, 0);
+
+                if (method.equalsIgnoreCase("options")) {
+                    toBeDeleted.add(key);
+                    optionsApisCount++;
+                    continue;
+                }else if(!StringUtils.isEmpty(url) && !url.startsWith("/") && SingleTypeInfo.doesNotStartWithSuperType(url) && !url.startsWith("http")){
+                    toBeMoved.add(key);
+                    slashApisCount++;
+                    continue;
+                }
+            }
+
+            if(!deleteAPIsInstantly) {
+                response.put(apiCollection.getHostName(), new BasicDBObject()
+                        .append("optionsApisCount", optionsApisCount)
+                        .append("slashApisCount", slashApisCount)); 
+            }else{
+                if (!toBeDeleted.isEmpty() || !toBeMoved.isEmpty()) {
+                    if(!toBeMoved.isEmpty()) {
+                        CleanInventory.moveApisFromSampleData(toBeMoved, false);
+                        deleteApis(toBeMoved);
+                    }else if(!toBeDeleted.isEmpty()) {
+                        deleteApis(toBeDeleted);
+                    }
+                    
+                }
+            }
+        }
+
+        return SUCCESS.toUpperCase();
+    }
+
 
     public List<YamlTemplate> getTemplatesList() {
         return templatesList;

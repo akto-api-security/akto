@@ -16,6 +16,8 @@ import { circle_cancel, circle_tick_minor } from "@/apps/dashboard/components/ic
 import quickStartFunc from '../apps/dashboard/pages/quick_start/transform';
 import { Box } from '@shopify/polaris';
 import TooltipText from '../apps/dashboard/components/shared/TooltipText';
+import { getMethod } from "../apps/dashboard/pages/observe/GetPrettifyEndpoint";
+import observeFunc from '../apps/dashboard/pages/observe/transform';
 
 const iconsUsedMap = {
   CalendarMinor,ClockMinor,CircleAlertMajor,DynamicSourceMinor, LockMinor, KeyMajor, ProfileMinor, PasskeyMinor,
@@ -425,7 +427,12 @@ prettifyEpoch(epoch) {
   },
   epochToDateTime(timestamp) {
     var date = new Date(timestamp * 1000);
-    return date.toLocaleString('en-US',{timeZone: window.TIME_ZONE === 'Us/Pacific' ? 'America/Los_Angeles' : window.TIME_ZONE});
+
+    const timezone = (!window.TIME_ZONE || window.TIME_ZONE.trim() === '' || window.TIME_ZONE === 'Us/Pacific')
+    ? 'America/Los_Angeles'
+    : window.TIME_ZONE;
+
+    return date.toLocaleString('en-US',{timeZone: timezone});
   },
   getFormattedDate(epoch) {
     const date = new Date(epoch * 1000)
@@ -707,7 +714,7 @@ prettifyEpoch(epoch) {
                 .filter(col => !col.deactivated && Array.isArray(col.envType) && col.envType.length > 0)
                 .forEach(col => {
                   col.envType.forEach(env => {
-                  const keyName = env.keyName.startsWith('userSetEnvType') || env.keyName.startsWith('envType')
+                  const keyName = env && env.keyName && (env.keyName.startsWith('userSetEnvType') || env.keyName.startsWith('envType'))
                     ? env.keyName.replace(/^(userSetEnvType|envType)/, 'env')
                     : env.keyName;
                     const key = `${keyName}=${env.value}`;
@@ -945,7 +952,12 @@ isObject(obj) {
   return obj !== null && typeof obj === 'object';
 },
 
-toMethodUrlString({method,url}){
+toMethodUrlString({method,url, shouldParse =false}){
+  if(shouldParse){
+    const finalMethod = getMethod(url, method);
+    const finalUrl = observeFunc.getTruncatedUrl(url);
+    return finalMethod + " " + finalUrl;
+  }
   return method + " " + url;
 },
 toMethodUrlObject(str){
@@ -1960,7 +1972,14 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
   getAktoSeverities(){
     return ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW']
   },
-
+  getAktoSeveritiesInitMap(initArr = false) {
+    const aktoSeverities = this.getAktoSeverities()
+    const severitiesMap = aktoSeverities.reduce((acc, curr) => {
+      acc[curr] = initArr ? [] : 0
+      return acc
+    }, {})
+    return severitiesMap
+  },
   getSelectedItemsText(selectedItem) {
     if (!Array.isArray(selectedItem) || selectedItem?.length === 0) return "";
   

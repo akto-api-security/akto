@@ -1,4 +1,4 @@
-import { Button, LegacyCard, ResourceItem, ResourceList, Text } from '@shopify/polaris'
+import { Button, HorizontalStack, LegacyCard, ResourceItem, ResourceList, Text } from '@shopify/polaris'
 import React, { useEffect, useState } from 'react'
 import settingRequests from '../api'
 import func from '@/util/func'
@@ -22,6 +22,10 @@ const UndoDemergedApis = () => {
             func.setToast(true, true, 'Something went wrong while fetching de-merged APIs')
             setLoading(false)
         })
+    }
+
+    const deleteDuplicateEntries = async () => {
+        await settingRequests.deleteDuplicateEntries();
     }
 
     useEffect(() => {
@@ -85,7 +89,11 @@ const UndoDemergedApis = () => {
     )
 
     const secondaryActionsComp = (
-        <Button disabled={mergedApis?.length === 0} onClick={() => undoDemergedApis(mergedApis)}>Undo All De-merged APIs</Button>
+        <HorizontalStack gap={"2"}>
+            <Button disabled={mergedApis?.length === 0} onClick={() => undoDemergedApis(mergedApis)}>Undo All De-merged APIs</Button>
+                {window.USER_NAME?.toLowerCase()?.includes("@akto.io") ? <Button onClick={() => deleteDuplicateEntries()}>Delete duplicates</Button> : null}
+        </HorizontalStack>
+        
     )
 
     return (

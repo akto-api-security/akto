@@ -148,6 +148,10 @@ public class OpenApiAction extends UserAction implements ServletResponseAware {
 
         int accountId = Context.accountId.get();
 
+        if (apiCollectionId == 0) {
+            apiCollectionId = -1;
+        }
+
         File file = new File(FileUpload.UploadType.SWAGGER_FILE.toString(), GzipUtils.zipString(openAPIString));
         InsertOneResult fileInsertId = FilesDao.instance.insertOne(file);
         String fileId = fileInsertId.getInsertedId().asObjectId().getValue().toHexString();
@@ -161,11 +165,11 @@ public class OpenApiAction extends UserAction implements ServletResponseAware {
         String fileUploadId = insertOneResult.getInsertedId().asObjectId().getValue().toString();
         this.uploadId = fileUploadId;
         ApiCollection apiCollection = ApiCollectionsDao.instance.getMeta(apiCollectionId);
-        if (apiCollection.getHostName() != null) {
+        if (apiCollection != null && apiCollection.getHostName() != null) {
             source = HttpResponseParams.Source.MIRRORING;
         }
 
-        if (apiCollection.getType() != null && apiCollection.getType().equals(ApiCollection.Type.API_GROUP)) {
+        if (apiCollection != null && apiCollection.getType() != null && apiCollection.getType().equals(ApiCollection.Type.API_GROUP)) {
             addActionError("Can't upload OpenAPI file for collection groups");
             return ERROR.toUpperCase();
         }

@@ -8,6 +8,9 @@ import func from "../../../../../util/func";
 import { Badge } from "@shopify/polaris";
 import dayjs from "dayjs";
 import SessionStore from "../../../../main/SessionStore";
+import { labelMap } from "../../../../main/labelHelperMap";
+import { formatActorId } from "../utils/formatUtils";
+
 const resourceName = {
   singular: "sample",
   plural: "samples",
@@ -20,9 +23,9 @@ const headers = [
     title: "Severity",
   },
   {
-    text: "Api Endpoint",
+    text: labelMap[PersistStore.getState().dashboardCategory]["API endpoint"],
     value: "endpointComp",
-    title: "Api Endpoint",
+    title: labelMap[PersistStore.getState().dashboardCategory]["API endpoint"],
   },
   {
     text: "Threat Actor",
@@ -95,7 +98,8 @@ function SusDataTable({ currDateRange, rowClicked }) {
     let sourceIpsFilter = [],
       apiCollectionIdsFilter = [],
       matchingUrlFilter = [],
-      typeFilter = [];
+      typeFilter = [],
+      latestAttack = [];
     if (filters?.actor) {
       sourceIpsFilter = filters?.actor;
     }
@@ -108,6 +112,9 @@ function SusDataTable({ currDateRange, rowClicked }) {
     if(filters?.type){
       typeFilter = filters?.type
     }
+    if(filters?.latestAttack){
+      latestAttack = filters?.latestAttack
+    }
     const sort = { [sortKey]: sortOrder };
     const res = await api.fetchSuspectSampleData(
       skip,
@@ -117,7 +124,8 @@ function SusDataTable({ currDateRange, rowClicked }) {
       typeFilter,
       sort,
       startTimestamp,
-      endTimestamp
+      endTimestamp,
+      latestAttack
     );
 //    setSubCategoryChoices(distinctSubCategories);
     let total = res.total;
@@ -126,9 +134,14 @@ function SusDataTable({ currDateRange, rowClicked }) {
       return {
         ...x,
         id: x.id,
-        actorComp: x.actor?.length > 50 ? `${x.actor.slice(0, 50)}...` : x.actor ,
+        actorComp: formatActorId(x.actor),
         endpointComp: (
-          <GetPrettifyEndpoint maxWidth="300px" method={x.method} url={x.url} isNew={false} />
+          <GetPrettifyEndpoint 
+            maxWidth="300px" 
+            method={x.method}
+            url={x.url} 
+            isNew={false} 
+          />
         ),
         apiCollectionName: collectionsMap[x.apiCollectionId] || "-",
         discoveredTs: dayjs(x.timestamp*1000).format("DD-MM-YYYY HH:mm:ss"),
@@ -143,6 +156,14 @@ function SusDataTable({ currDateRange, rowClicked }) {
     setLoading(false);
     return { value: ret, total: total };
   }
+
+  const attackTypeChoices = Object.keys(threatFiltersMap).length === 0 ? [] : Object.entries(threatFiltersMap).map(([key, value]) => {
+    return {
+      label: value?._id || key,
+      value: value?._id || key
+    }
+  })
+  
 
   async function fillFilters() {
     const res = await api.fetchFiltersThreatTable();
@@ -177,7 +198,14 @@ function SusDataTable({ currDateRange, rowClicked }) {
           {label: 'Rule based', value: 'Rule-Based'},
           {label: 'Anomaly', value: 'Anomaly'},
         ],
-      }
+      },
+      {
+        key: 'latestAttack',
+        label: 'Latest attack sub-category',
+        type: 'select',
+        choices: attackTypeChoices,
+        multiple: true
+      },
     ];
   }
 

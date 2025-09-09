@@ -173,7 +173,15 @@ function TestRunResultPage(props) {
 
     let jiraTicketKey = ""
 
-    const additionalIssueFields = window.JIRA_INTEGRATED === "true" ? issuesFunctions.prepareAdditionalIssueFields() : {}
+    const additionalIssueFields = {};
+    try {
+      const customIssueFields = issuesFunctions.prepareCustomIssueFields(projId, issueType);
+      additionalIssueFields["customIssueFields"] = customIssueFields;
+    } catch (error) {
+      setToast(true, true, "Please fill all required fields before creating a Jira ticket.");
+      return;
+    }
+
     await createJiraTicketApiCall("Host - "+hostName, pathname, window.location.href, description, issueTitle, issueId, projId, issueType, additionalIssueFields).then(async(res)=> {
       if(res?.errorMessage) {
         setToast(true, true, res?.errorMessage)

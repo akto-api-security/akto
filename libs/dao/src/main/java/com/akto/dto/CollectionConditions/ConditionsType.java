@@ -7,6 +7,7 @@ public class ConditionsType {
     private String key;
     private String value;
     private Set<String> urlsList;
+    private int position;
 
 
     public ConditionsType () {}
@@ -41,6 +42,14 @@ public class ConditionsType {
         this.urlsList = urlsList;
     }
 
+    public int getPosition() {
+        return position;
+    }
+
+    public void setPosition(int position) {
+        this.position = position;
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o)
@@ -54,7 +63,9 @@ public class ConditionsType {
                         (value == null && that.value == null))
                 &&
                 ((urlsList != null && that.urlsList != null && urlsList.equals(that.urlsList)) ||
-                        (urlsList == null && that.urlsList == null));
+                        (urlsList == null && that.urlsList == null)) &&
+                ((position != 0 && that.position != 0 && position == that.position) ||
+                        (position == 0 && that.position == 0));
     }
 
 }

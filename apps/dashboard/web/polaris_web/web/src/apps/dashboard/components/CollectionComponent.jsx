@@ -6,6 +6,7 @@ import func from "@/util/func"
 import PersistStore from '../../main/PersistStore';
 import api from '../pages/testing/api';
 import Dropdown from './layouts/Dropdown';
+import { labelMap } from '../../main/labelHelperMap';
 
 const HTTP_METHODS = [
     {'label': 'GET', 'value': 'GET'},
@@ -28,6 +29,7 @@ function CollectionComponent(props) {
     const initialHostRegexText = (condition && condition?.type === 'HOST_REGEX') ? (condition?.data?.host_regex || '') : ''
     const [regexText, setRegexText] = useState(initialRegexText)
     const [hostRegexText, setHostRegexText] = useState(initialHostRegexText)
+    const dashboardCategory = PersistStore(state => state.dashboardCategory)
 
     useEffect(() => {
         fetchApiEndpoints(condition.data)
@@ -83,11 +85,13 @@ function CollectionComponent(props) {
 
     const getApiEndpointsOptions = (data) => {
         return data.map(apiEndpoint => {
-            let str = func.toMethodUrlString(apiEndpoint);
+            let strLabel = func.toMethodUrlString({...apiEndpoint, shouldParse: true});
+            let strValue = func.toMethodUrlString({...apiEndpoint, shouldParse: false});
+
             return {
-                id: str,
-                label: str,
-                value: str
+                id: strValue,
+                label: strLabel,
+                value: strValue
             }
         })
     }
@@ -123,7 +127,7 @@ function CollectionComponent(props) {
                 <DropdownSearch
                     id={`api-endpoint-${index}`}
                     disabled={apiEndpoints?.endpoints == undefined || apiEndpoints.endpoints.length === 0}
-                    placeholder="Select API endpoint"
+                    placeholder={`Select ${labelMap[dashboardCategory]["API endpoint"]}`}
                     optionsList={apiEndpoints?.endpoints == undefined || typeof apiEndpoints.then == 'function' ? [] :
                         apiEndpoints.endpoints}
                     setSelected={(apiEndpoints) => {
