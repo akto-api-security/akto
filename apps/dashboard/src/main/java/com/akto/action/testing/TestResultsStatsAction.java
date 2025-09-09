@@ -29,17 +29,73 @@ public class TestResultsStatsAction extends UserAction {
 
     private String testingRunResultSummaryHexId;
     private String testingRunHexId;
+    private String patternType; // required: one of [HTTP_429, HTTP_5XX, CLOUDFLARE]
 
     @Getter
     private int count = 0;
+
+    /**
+     * HTTP 429 Rate Limiting Pattern
+     * Detects JSON responses with statusCode: 429 indicating rate limiting.
+     * Reference: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/429
+     */
+    public static final String REGEX_429 = "\"statusCode\"\\s*:\\s*429";
+
+    /**
+     * HTTP 5xx Server Error Pattern
+     * Detects JSON responses with statusCode: 500-599 indicating server errors.
+     * Includes Cloudflare 520-530 series errors (Bad Gateway, Origin Down, etc.).
+     * Reference:
+     * https://developers.cloudflare.com/support/troubleshooting/http-status-codes/5xx-server-error/
+     */
+    public static final String REGEX_5XX = "\"statusCode\"\\s*:\\s*5[0-9][0-9]";
+
+    /**
+     * Cloudflare Security and CDN Error Pattern
+     * Detects various Cloudflare blocking scenarios and error conditions:
+     * 
+     * Error Codes:
+     * - 1xxx series (1000-1999): DNS resolution, firewall, security blocking
+     * - 10xxx series (10000+): API limits, configuration issues
+     * - Specific codes: 1012 (access denied), 1015 (rate limited), 1020 (access
+     * denied)
+     * 
+     * Security Blocking:
+     * - WAF (Web Application Firewall) triggered blocks
+     * - Cloudflare security service protection messages
+     * - Access denied and rate limiting scenarios
+     * - Attention Required pages shown to users
+     * 
+     * Note: Excludes cf-ray headers which are present on all Cloudflare responses
+     * including successful 2xx codes.
+     * 
+     * References:
+     * -
+     * https://developers.cloudflare.com/support/troubleshooting/http-status-codes/cloudflare-1xxx-errors/
+     * - https://developers.cloudflare.com/waf/
+     * - https://developers.cloudflare.com/fundamentals/reference/cloudflare-ray-id/
+     */
+    public static final String REGEX_CLOUDFLARE = "(error\\s*1[0-9]{3}|error\\s*10[0-9]{3}|" +
+            "access\\s*denied|rate\\s*limited|" +
+            "attention\\s*required|" +
+            "blocked|" +
+            "security\\s*service|" +
+            "waf\\s*(active|block|rule|trigger|protection)|" +
+            "modsecurity|firewall\\s*rule|" +
+            "ray\\s*id.*blocked)";
 
     public String fetchTestResultsStatsCount() {
         try {
             ObjectId testingRunResultSummaryId;
 
-            // Input validation to prevent invalid ObjectId parsing errors
+            // Input validation
             if (this.testingRunResultSummaryHexId == null || this.testingRunResultSummaryHexId.trim().isEmpty()) {
                 addActionError("Missing required parameter: testingRunResultSummaryHexId");
+                return ERROR.toUpperCase();
+            }
+
+            if (this.patternType == null || this.patternType.trim().isEmpty()) {
+                addActionError("Missing required parameter: patternType");
                 return ERROR.toUpperCase();
             }
 
@@ -50,61 +106,25 @@ public class TestResultsStatsAction extends UserAction {
                 return ERROR.toUpperCase();
             }
 
-            // Build optimized aggregation pipeline for 429 status code counting
-            List<Bson> pipeline = new ArrayList<>();
-
-            // Stage 1: Filter documents by summary ID and ensure testResults.message exists
-            pipeline.add(Aggregates.match(
-                    Filters.and(
-                            Filters.eq("testRunResultSummaryId", testingRunResultSummaryId),
-                            Filters.eq("vulnerable", false),
-                            Filters.exists("testResults.message", true)
-                    )));
-
-            // Stage 2: Sort by latest results and limit to prevent memory exhaustion
-            pipeline.add(Aggregates.sort(Sorts.descending("endTimestamp")));
-            pipeline.add(Aggregates.limit(10000));
-
-            // Stage 3: Project last message from testResults array for processing
-            pipeline.add(Aggregates.project(
-                    Projections.computed("lastMessage",
-                            new BasicDBObject("$arrayElemAt", 
-                                    Arrays.asList("$testResults.message", -1)))));
-
-            // Stage 4: Filter for HTTP 429 (Too Many Requests) status codes via regex
-            pipeline.add(Aggregates.match(
-                    Filters.regex("lastMessage", "\"statusCode\"\\s*:\\s*429")));
-
-            // Stage 5: Count matching documents and return single result
-            pipeline.add(Aggregates.count("count"));
-
-
-            //Run the Main Method for testing of index
-            // Run explain functionality
-            if (shouldRunExplain()) {
-                explainAggregationPipeline(pipeline);
+            // Resolve regex pattern based on pattern type
+            String resolvedRegex = resolveRegexPattern();
+            if (resolvedRegex == null) {
+                addActionError("Invalid pattern type. Supported types: HTTP_429, HTTP_5XX, CLOUDFLARE");
+                return ERROR.toUpperCase();
             }
 
-            // Execute aggregation with proper resource cleanup
-            MongoCursor<BasicDBObject> cursor = TestingRunResultDao.instance.getMCollection()
-                    .aggregate(pipeline, BasicDBObject.class).cursor();
+            String description = describePattern(resolvedRegex);
 
-            if (cursor.hasNext()) {
-                BasicDBObject result = cursor.next();
-                this.count = result.getInt("count", 0);
-            } else {
-                this.count = 0;
-            }
-
-            cursor.close();
+            this.count = getCountByPattern(testingRunResultSummaryId, resolvedRegex);
 
             loggerMaker.debugAndAddToDb(
-                    "Found " + count + " requests with 429 status code for test summary: " + testingRunResultSummaryHexId,
+                    "Found " + count + " requests matching " + description + " for test summary: "
+                            + testingRunResultSummaryHexId,
                     LogDb.DASHBOARD);
 
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(e, "Error fetching 429 requests count: " + e.getMessage());
-            addActionError("Error fetching 429 requests count");
+            loggerMaker.errorAndAddToDb(e, "Error fetching test results stats: " + e.getMessage());
+            addActionError("Error fetching test results stats");
             return ERROR.toUpperCase();
         }
 
@@ -112,34 +132,113 @@ public class TestResultsStatsAction extends UserAction {
     }
 
     /**
-     * Explains the aggregation pipeline to check index usage and performance
+     * Resolves regex pattern from pattern type
      */
+    private String resolveRegexPattern() {
+        String type = this.patternType.trim().toUpperCase();
+        switch (type) {
+            case "HTTP_429":
+            case "429":
+            case "RATE_LIMIT":
+                return REGEX_429;
+            case "HTTP_5XX":
+            case "5XX":
+            case "SERVER_ERROR":
+                return REGEX_5XX;
+            case "CLOUDFLARE":
+            case "CDN":
+            case "CF":
+                return REGEX_CLOUDFLARE;
+            default:
+                return null; // Invalid pattern type
+        }
+    }
+
+    /**
+     * Provides human-readable description of the pattern being used
+     */
+    private String describePattern(String regex) {
+        if (REGEX_429.equals(regex))
+            return "429 Rate Limiting";
+        if (REGEX_5XX.equals(regex))
+            return "5xx Server Errors (includes Cloudflare 520-530)";
+        if (REGEX_CLOUDFLARE.equals(regex))
+            return "Cloudflare Blocking/Errors (1xxx, 10xxx, WAF, security blocks)";
+        return "unknown pattern";
+    }
+
+    /**
+     * Core aggregation pipeline for pattern-based error counting
+     * Optimized for performance with proper indexing hints and limits
+     */
+    private int getCountByPattern(ObjectId testingRunResultSummaryId, String regex) {
+        List<Bson> pipeline = new ArrayList<>();
+
+        // Stage 1: Filter documents by summary ID and ensure testResults.message exists
+        pipeline.add(Aggregates.match(
+                Filters.and(
+                        Filters.eq("testRunResultSummaryId", testingRunResultSummaryId),
+                        Filters.eq("vulnerable", false),
+                        Filters.exists("testResults.message", true))));
+
+        // Stage 2: Sort by latest results and limit to prevent memory exhaustion
+        pipeline.add(Aggregates.sort(Sorts.descending("endTimestamp")));
+        pipeline.add(Aggregates.limit(10000));
+
+        // Stage 3: Project last message from testResults array for processing
+        pipeline.add(Aggregates.project(
+                Projections.computed("lastMessage",
+                        new BasicDBObject("$arrayElemAt",
+                                Arrays.asList("$testResults.message", -1)))));
+
+        // Stage 4: Filter for pattern via regex (case insensitive for Cloudflare
+        // errors)
+        pipeline.add(Aggregates.match(
+                Filters.regex("lastMessage", regex, "i")));
+
+        // Stage 5: Count matching documents and return single result
+        pipeline.add(Aggregates.count("count"));
+
+        // Performance monitoring in development/debug mode
+        if (shouldRunExplain()) {
+            explainAggregationPipeline(pipeline);
+        }
+
+        // Execute aggregation with proper resource cleanup
+        MongoCursor<BasicDBObject> cursor = TestingRunResultDao.instance.getMCollection()
+                .aggregate(pipeline, BasicDBObject.class).cursor();
+
+        int resultCount = 0;
+        if (cursor.hasNext()) {
+            BasicDBObject result = cursor.next();
+            resultCount = result.getInt("count", 0);
+        }
+
+        cursor.close();
+        return resultCount;
+    }
+
     private void explainAggregationPipeline(List<Bson> pipeline) {
         try {
-            System.out.println("=== RUNNING AGGREGATION EXPLAIN ===");
-            
-            // CORRECTED: Use explain() on the collection, not on the result
+            loggerMaker.debugAndAddToDb("=== RUNNING AGGREGATION EXPLAIN ===", LogDb.DASHBOARD);
+
             Document explainResult = TestingRunResultDao.instance.getRawCollection()
                     .aggregate(pipeline)
                     .explain(ExplainVerbosity.EXECUTION_STATS);
 
             if (explainResult != null) {
-                System.out.println("=== AGGREGATION EXPLAIN RESULTS ===");
-                System.out.println("Full Explain: " + explainResult.toJson());
-                
-                // Also log using LoggerMaker
+                loggerMaker.debugAndAddToDb("=== AGGREGATION EXPLAIN RESULTS ===", LogDb.DASHBOARD);
+                loggerMaker.debugAndAddToDb("Full Explain: " + explainResult.toJson(), LogDb.DASHBOARD);
+
                 loggerMaker.infoAndAddToDb("=== AGGREGATION EXPLAIN RESULTS ===", LogDb.DASHBOARD);
                 loggerMaker.infoAndAddToDb("Full Explain: " + explainResult.toJson(), LogDb.DASHBOARD);
-                
-                // Extract and log key performance metrics
+
                 analyzeExplainResults(explainResult);
             } else {
-                System.out.println("No explain result returned");
+                loggerMaker.debugAndAddToDb("No explain result returned", LogDb.DASHBOARD);
             }
-            
+
         } catch (Exception e) {
-            System.err.println("Error running explain on aggregation pipeline: " + e.getMessage());
-            e.printStackTrace();
             loggerMaker.errorAndAddToDb(e, "Error running explain on aggregation pipeline: " + e.getMessage());
         }
     }
@@ -149,25 +248,22 @@ public class TestResultsStatsAction extends UserAction {
      */
     private void analyzeExplainResults(Document explanation) {
         try {
-            System.out.println("=== ANALYZING EXPLAIN RESULTS ===");
-            
-            // Check stages for index usage
+            loggerMaker.debugAndAddToDb("=== ANALYZING EXPLAIN RESULTS ===", LogDb.DASHBOARD);
+
             @SuppressWarnings("unchecked")
             List<Document> stages = explanation.get("stages", List.class);
             if (stages != null && !stages.isEmpty()) {
-                System.out.println("Found " + stages.size() + " stages");
+                loggerMaker.debugAndAddToDb("Found " + stages.size() + " stages", LogDb.DASHBOARD);
                 for (int i = 0; i < stages.size(); i++) {
                     Document stage = stages.get(i);
-                    System.out.println("Analyzing stage " + (i + 1) + ": " + stage.keySet());
+                    loggerMaker.debugAndAddToDb("Analyzing stage " + (i + 1) + ": " + stage.keySet(), LogDb.DASHBOARD);
                     analyzeStage(stage);
                 }
             } else {
-                System.out.println("No stages found in explain result");
+                loggerMaker.debugAndAddToDb("No stages found in explain result", LogDb.DASHBOARD);
             }
 
         } catch (Exception e) {
-            System.err.println("Error analyzing explain results: " + e.getMessage());
-            e.printStackTrace();
             loggerMaker.errorAndAddToDb(e, "Error analyzing explain results: " + e.getMessage());
         }
     }
@@ -177,56 +273,50 @@ public class TestResultsStatsAction extends UserAction {
      */
     private void analyzeStage(Document stage) {
         try {
-            // Look for $cursor stage which indicates index usage
             Document cursor = stage.get("$cursor", Document.class);
             if (cursor != null) {
-                System.out.println("Found $cursor stage");
-                
+                loggerMaker.debugAndAddToDb("Found $cursor stage", LogDb.DASHBOARD);
+
                 Document queryPlanner = cursor.get("queryPlanner", Document.class);
                 if (queryPlanner != null) {
                     Document winningPlan = queryPlanner.get("winningPlan", Document.class);
                     if (winningPlan != null) {
                         String stageName = winningPlan.getString("stage");
-                        System.out.println("Query Stage: " + stageName);
-                        
+                        loggerMaker.debugAndAddToDb("Query Stage: " + stageName, LogDb.DASHBOARD);
+
                         loggerMaker.infoAndAddToDb("Query Stage: " + stageName, LogDb.DASHBOARD);
-                        
-                        // Check if using index scan vs collection scan
+
                         if ("IXSCAN".equals(stageName)) {
                             String indexName = winningPlan.getString("indexName");
-                            System.out.println("✓ USING INDEX: " + indexName);
+                            loggerMaker.debugAndAddToDb("✓ USING INDEX: " + indexName, LogDb.DASHBOARD);
                             loggerMaker.infoAndAddToDb("✓ Using Index: " + indexName, LogDb.DASHBOARD);
                             checkCompoundIndexUsage(winningPlan);
                         } else if ("COLLSCAN".equals(stageName)) {
-                            System.out.println("⚠ COLLECTION SCAN - NO INDEX USED");
+                            loggerMaker.debugAndAddToDb("⚠ COLLECTION SCAN - NO INDEX USED", LogDb.DASHBOARD);
                             loggerMaker.infoAndAddToDb("⚠ Using Collection Scan - No Index Used!", LogDb.DASHBOARD);
                         } else {
-                            System.out.println("Stage type: " + stageName);
+                            loggerMaker.debugAndAddToDb("Stage type: " + stageName, LogDb.DASHBOARD);
                         }
                     }
                 }
-                
-                // Check execution stats if available
+
                 Document executionStats = cursor.get("executionStats", Document.class);
                 if (executionStats != null) {
                     Integer executionTimeMillis = executionStats.getInteger("executionTimeMillis");
                     Integer nReturned = executionStats.getInteger("nReturned");
                     Integer totalDocsExamined = executionStats.getInteger("totalDocsExamined");
                     Integer totalKeysExamined = executionStats.getInteger("totalKeysExamined");
-                    
+
                     String statsMsg = String.format(
-                        "Execution Stats - Time: %dms, Returned: %d, DocsExamined: %d, KeysExamined: %d",
-                        executionTimeMillis, nReturned, totalDocsExamined, totalKeysExamined);
-                    
-                    System.out.println(statsMsg);
+                            "Execution Stats - Time: %dms, Returned: %d, DocsExamined: %d, KeysExamined: %d",
+                            executionTimeMillis, nReturned, totalDocsExamined, totalKeysExamined);
+
                     loggerMaker.infoAndAddToDb(statsMsg, LogDb.DASHBOARD);
                 }
             } else {
-                System.out.println("No $cursor stage found in: " + stage.keySet());
+                loggerMaker.debugAndAddToDb("No $cursor stage found in: " + stage.keySet(), LogDb.DASHBOARD);
             }
         } catch (Exception e) {
-            System.err.println("Error analyzing stage: " + e.getMessage());
-            e.printStackTrace();
             loggerMaker.errorAndAddToDb(e, "Error analyzing stage: " + e.getMessage());
         }
     }
@@ -238,33 +328,30 @@ public class TestResultsStatsAction extends UserAction {
         try {
             String indexName = winningPlan.getString("indexName");
             if (indexName != null) {
-                System.out.println("Index being used: " + indexName);
-                
-                if (indexName.contains("testRunResultSummaryId") && 
-                    indexName.contains("vulnerable") && 
-                    indexName.contains("endTimestamp")) {
-                    System.out.println("✓ USING OUR OPTIMIZED PARTIAL INDEX: " + indexName);
+                loggerMaker.debugAndAddToDb("Index being used: " + indexName, LogDb.DASHBOARD);
+
+                if (indexName.contains("testRunResultSummaryId") &&
+                        indexName.contains("vulnerable") &&
+                        indexName.contains("endTimestamp")) {
+                    loggerMaker.debugAndAddToDb("✓ USING OUR OPTIMIZED PARTIAL INDEX: " + indexName, LogDb.DASHBOARD);
                     loggerMaker.infoAndAddToDb("✓ Using our optimized partial index: " + indexName, LogDb.DASHBOARD);
                 } else {
-                    System.out.println("Using different index: " + indexName);
+                    loggerMaker.debugAndAddToDb("Using different index: " + indexName, LogDb.DASHBOARD);
                     loggerMaker.infoAndAddToDb("Using different index: " + indexName, LogDb.DASHBOARD);
                 }
             }
         } catch (Exception e) {
-            System.err.println("Error checking compound index usage: " + e.getMessage());
             loggerMaker.errorAndAddToDb(e, "Error checking compound index usage: " + e.getMessage());
         }
     }
 
     /**
-     * Determines when to run explain - can be controlled by system property or environment
+     * Determines when to run explain - controlled by system property or environment
      */
     private boolean shouldRunExplain() {
         String explainMode = System.getProperty("mongodb.explain.aggregation", "false");
-        boolean shouldExplain = "true".equalsIgnoreCase(explainMode) || 
-                               "development".equalsIgnoreCase(System.getProperty("environment"));
-        
-        System.out.println("Should run explain: " + shouldExplain + " (property: " + explainMode + ")");
+        boolean shouldExplain = "true".equalsIgnoreCase(explainMode) ||
+                "development".equalsIgnoreCase(System.getProperty("environment"));
         return shouldExplain;
     }
 
@@ -273,27 +360,26 @@ public class TestResultsStatsAction extends UserAction {
      */
     public void listAllIndexes() {
         try {
-            System.out.println("=== LISTING ALL INDEXES ===");
-            
+            loggerMaker.debugAndAddToDb("=== LISTING ALL INDEXES ===", LogDb.DASHBOARD);
+
             List<Document> indexes = TestingRunResultDao.instance.getRawCollection()
                     .listIndexes().into(new ArrayList<>());
-            
+
             for (Document index : indexes) {
                 String indexName = index.getString("name");
                 Document keys = index.get("key", Document.class);
                 Document partialFilter = index.get("partialFilterExpression", Document.class);
-                
-                System.out.println("Index: " + indexName);
-                System.out.println("  Keys: " + (keys != null ? keys.toJson() : "null"));
+
+                loggerMaker.debugAndAddToDb("Index: " + indexName, LogDb.DASHBOARD);
+                loggerMaker.debugAndAddToDb("  Keys: " + (keys != null ? keys.toJson() : "null"), LogDb.DASHBOARD);
                 if (partialFilter != null) {
-                    System.out.println("  Partial Filter: " + partialFilter.toJson());
+                    loggerMaker.debugAndAddToDb("  Partial Filter: " + partialFilter.toJson(), LogDb.DASHBOARD);
                 }
-                System.out.println("---");
+                loggerMaker.debugAndAddToDb("---", LogDb.DASHBOARD);
             }
-            
+
         } catch (Exception e) {
-            System.err.println("Error listing indexes: " + e.getMessage());
-            e.printStackTrace();
+            loggerMaker.errorAndAddToDb(e, "Error listing indexes: " + e.getMessage());
         }
     }
 
@@ -313,5 +399,12 @@ public class TestResultsStatsAction extends UserAction {
     public void setTestingRunHexId(String testingRunHexId) {
         this.testingRunHexId = testingRunHexId;
     }
-}
 
+    public String getPatternType() {
+        return patternType;
+    }
+
+    public void setPatternType(String patternType) {
+        this.patternType = patternType;
+    }
+}
