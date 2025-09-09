@@ -9,7 +9,6 @@ import { produce } from "immer"
 import { getDashboardCategory, mapLabel } from "../../../main/labelHelper";
 import SessionStore from "../../../main/SessionStore";
 import GithubSimpleTable from "../../components/tables/GithubSimpleTable";
-import GithubServerTable from "../../components/tables/GithubSimpleTable";
 import { labelMap } from '../../../main/labelHelperMap';
 import PersistStore from '@/apps/main/PersistStore';
 import { CellType } from "@/apps/dashboard/components/tables/rows/GithubRow";
@@ -48,6 +47,10 @@ const headings = [
     value: "createdTs",
     type: CellType.TEXT,
     sortActive: true,
+  },
+  {
+    title: '',
+    type: CellType.ACTION,
   }
 ];
 
@@ -96,23 +99,26 @@ function GuardrailPolicies() {
     ]
 
     const getActionsList = (item) => {
-        return [{title: 'Actions', items: [
-            {
-                content: 'Disable policy',
-                icon: CancelMinor,
-                onAction: () => {},
-            },
-            {
-                content: 'View policy',
-                icon: ViewMinor,
-                onAction: () => {rowClicked(item)},
-            }
-        ]}]
+      const actionItems = [{title: 'Actions',
+        items: [
+          {
+            content: 'Disable policy',
+            icon: CancelMinor,
+            onAction: () => {},
+        },
+        {
+            content: 'View policy',
+            icon: ViewMinor,
+            onAction: () => {rowClicked(item)},
+        }
+        ]
+    }]
+    return actionItems
     }
 
 
       const components = [
-        <GithubServerTable
+        <GithubSimpleTable
             key={0}
             resourceName={resourceName}
             useNewRow={true}
@@ -126,8 +132,9 @@ function GuardrailPolicies() {
             emptyStateMarkup={emptyStateMarkup}   
             onRowClick={rowClicked}    
             rowClickable={true} 
-              // getActions = {(item) => getActionsList(item)}
-              // hasRowActions={true}
+            getActions={getActionsList}
+            hasRowActions={true}
+            hardCodedKey={true}
 
         />,   
         <FlyLayout
