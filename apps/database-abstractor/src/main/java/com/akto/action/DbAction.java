@@ -413,6 +413,24 @@ public class DbAction extends ActionSupport {
         return Action.SUCCESS.toUpperCase();
     }
 
+    @Getter @Setter
+    private ApiInfoKey lastApiInfoKey;
+    @Getter @Setter
+    List<BasicDBObject> apiInfoRatelimts = new ArrayList<>();
+
+    public String fetchApiRateLimits() {
+        try {
+            loggerMaker.error("init fetchApiRateLimits account id: " + Context.accountId.get());
+            apiInfoRatelimts = DbLayer.fetchApiRateLimits(lastApiInfoKey);
+        } catch (Exception e) {
+            e.printStackTrace();
+            loggerMaker.error("fetchApiRateLimits account id: " + Context.accountId.get());
+            loggerMaker.errorAndAddToDb(e, "error in fetchApiRateLimits" + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
     public String fetchNonTrafficApiInfos() {
         try {
             apiInfos = DbLayer.fetchNonTrafficApiInfos();
