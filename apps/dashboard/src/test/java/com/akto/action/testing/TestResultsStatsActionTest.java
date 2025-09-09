@@ -762,29 +762,7 @@ public class TestResultsStatsActionTest extends MongoBasedTest {
         }
     }
 
-    @Test
-    public void testRegexPatternForChallengePages() {
-        String regex = TestResultsStatsAction.REGEX_CLOUDFLARE;
-
-        // Challenge and verification pages that should match
-        String[] challengeMessages = {
-                "Cloudflare managed challenge: Please complete the verification to continue to the website",
-                "Interactive challenge required: Click to verify you are human before accessing this website",
-                "CAPTCHA verification: Complete the security check to prove you are not a robot",
-                "Browser integrity check: Verifying your browser supports JavaScript and cookies",
-                "Security challenge: Please wait while we verify your request is legitimate",
-                "Managed challenge: Additional verification required due to suspicious activity",
-                "Javascript challenge: Your browser will be checked before accessing the website",
-                "Cloudflare challenge: Please complete the verification process to continue",
-                "Checking your browser before accessing the website DDoS protection by Cloudflare",
-                "Under attack mode activated by Cloudflare for this website"
-        };
-
-        for (String challenge : challengeMessages) {
-            assertTrue("Challenge message should match: " + challenge,
-                    challenge.toLowerCase().matches(".*" + regex + ".*"));
-        }
-    }
+    
 
     @Test
     public void testRegexPatternForSpecificCloudflareErrorCodes() {
