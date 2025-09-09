@@ -302,7 +302,7 @@ public class ApiCollectionsDao extends AccountsContextDaoWithRbac<ApiCollection>
                     Bson hostHeaderFilter = SingleTypeInfoDao.filterForHostHeader(0, false);
                     
                     // For small number of groups, individual queries are faster than $unwind
-                    if (groupCollectionIds.size() <= 20) {
+                    if (groupCollectionIds.size() <= 50) {
                         
                         // Run individual count queries in parallel using CompletableFutures
                         List<CompletableFuture<Pair<Integer, Integer>>> futures = new ArrayList<>();
@@ -310,9 +310,10 @@ public class ApiCollectionsDao extends AccountsContextDaoWithRbac<ApiCollection>
                         
                         for (Integer collectionId : groupCollectionIds) {
                             CompletableFuture<Pair<Integer, Integer>> future = CompletableFuture.supplyAsync(() -> {
+                                // Use Filters.in for array field - checks if array contains the value
                                 Bson matchFilter = Filters.and(
                                     hostHeaderFilter,
-                                    Filters.eq(SingleTypeInfo._COLLECTION_IDS, collectionId),
+                                    Filters.in(SingleTypeInfo._COLLECTION_IDS, collectionId),
                                     filter
                                 );
                                 long count = SingleTypeInfoDao.instance.getMCollection().countDocuments(matchFilter);
