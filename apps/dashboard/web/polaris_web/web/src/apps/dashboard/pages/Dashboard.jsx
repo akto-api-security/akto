@@ -113,7 +113,7 @@ function Dashboard() {
     },[trafficAlerts.length])
 
     useEffect(() => {
-        if((allCollections && allCollections.length === 0) || (Object.keys(collectionsMap).length === 0)){
+        if(((allCollections && allCollections.length === 0) || (Object.keys(collectionsMap).length === 0)) && location.pathname !== "/dashboard/observe/inventory"){
             fetchAllCollections()
         }
         if (!subCategoryMap || (Object.keys(subCategoryMap).length === 0)) {
