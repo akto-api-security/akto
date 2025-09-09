@@ -9,6 +9,7 @@ package com.akto.threat.detection.tasks;
 // import io.lettuce.core.RedisClient;
 
 // import org.apache.http.client.methods.HttpPost;
+// TODO: do not use CloseableHttpClient
 // import org.apache.http.impl.client.CloseableHttpClient;
 // import org.junit.Before;
 // import org.junit.jupiter.api.BeforeEach;

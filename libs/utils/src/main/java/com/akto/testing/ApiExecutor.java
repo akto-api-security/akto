@@ -10,6 +10,7 @@ import com.akto.dto.testing.TestingRunConfig;
 import com.akto.dto.testing.TestingRunResult;
 import com.akto.dto.testing.rate_limit.RateLimitHandler;
 import com.akto.dto.type.URLMethods;
+import com.akto.dto.type.URLMethods.Method;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.Constants;
@@ -25,6 +26,7 @@ import java.io.InputStream;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -378,7 +380,7 @@ public class ApiExecutor {
         boolean skipSSRFCheck) throws Exception {
         // don't lowercase url because query params will change and will result in incorrect request
 
-        if (!jsonRpcCheck && isJsonRpcRequest(request)) {
+        if (!jsonRpcCheck && shouldInitiateSSEStream(request)) {
             return sendRequestWithSse(request, followRedirects, testingRunConfig, debug, testLogs, skipSSRFCheck, false);
         }
 
@@ -484,10 +486,13 @@ public class ApiExecutor {
     private static void calculateFinalRequestFromAdvancedSettings(OriginalHttpRequest originalHttpRequest, List<TestConfigsAdvancedSettings> advancedSettings){
         Map<String,List<ConditionsType>> headerConditions = new HashMap<>();
         Map<String,List<ConditionsType>> payloadConditions = new HashMap<>();
+        Map<String,List<ConditionsType>> urlConditions = new HashMap<>();
 
         for(TestConfigsAdvancedSettings settings: advancedSettings){
             if(settings.getOperatorType().toLowerCase().contains("header")){
                 headerConditions.put(settings.getOperatorType(), settings.getOperationsGroupList());
+            }else if(settings.getOperatorType().toLowerCase().contains("url")){
+                urlConditions.put(settings.getOperatorType(), settings.getOperationsGroupList());
             }else{
                 payloadConditions.put(settings.getOperatorType(), settings.getOperationsGroupList());
             }
@@ -511,6 +516,16 @@ public class ApiExecutor {
             payloadConditions.getOrDefault(TestEditorEnums.NonTerminalExecutorDataOperands.MODIFY_BODY_PARAM.name(), emptyList), 
             emptyList,
             payloadConditions.getOrDefault(TestEditorEnums.TerminalExecutorDataOperands.DELETE_BODY_PARAM.name(), emptyList)
+        );
+
+        // modify URL parameters using the fetchUrlModifyPayload functionality
+        Utils.modifyUrlParamOperations(originalHttpRequest, 
+            urlConditions.getOrDefault("MODIFY_URL_PARAM", emptyList),
+            "token_replace"
+        );
+        Utils.modifyUrlParamOperations(originalHttpRequest, 
+            urlConditions.getOrDefault("ADD_URL_PARAM", emptyList),
+            "token_insert"
         );
     }
 
@@ -545,7 +560,10 @@ public class ApiExecutor {
         } else if (contentType.contains(HttpRequestResponseUtils.FORM_URL_ENCODED_CONTENT_TYPE)) {
             if(payload.startsWith("{")) {
                 payload = HttpRequestResponseUtils.jsonToFormUrlEncoded(payload);
-                body = RequestBody.create(payload, MediaType.parse(contentType));
+                body = RequestBody.create(
+                    MediaType.parse(HttpRequestResponseUtils.FORM_URL_ENCODED_CONTENT_TYPE),
+                    payload.getBytes(StandardCharsets.UTF_8)
+                );
             }
         } else if (contentType.contains(HttpRequestResponseUtils.GRPC_CONTENT_TYPE)) {
             try {
@@ -642,21 +660,18 @@ public class ApiExecutor {
 
 
     private static class SseSession {
-        String sessionId;
         String endpoint;
         List<String> messages = new ArrayList<>();
         Response response; // Store the OkHttp Response for cleanup
         Thread readerThread;
     }
 
-    private static SseSession openSseSession(String host, boolean debug) throws Exception {
+    private static SseSession openSseSession(String host, String endpoint, Headers headers, boolean debug) throws Exception {
         SseSession session = new SseSession();
         OkHttpClient client = new OkHttpClient.Builder().build();
-        // header content type = text/event-stream
-        Headers headers = new Headers.Builder()
-            .add("Accept", "text/event-stream")
-            .build();
-        Request request = new Request.Builder().url(host + "/sse").headers(headers).build();
+
+        // Use provided endpoint for the SSE request
+        Request request = new Request.Builder().url(host + endpoint).headers(headers).build();
         Call call = client.newCall(request);
         Response response = call.execute();
         if (!response.isSuccessful()) {
@@ -725,9 +740,21 @@ public class ApiExecutor {
             throw new IllegalArgumentException("URL must be absolute with scheme and host for SSE: " + url);
         }
         String host = uri.getScheme() + "://" + uri.getHost() + (uri.getPort() != -1 ? ":" + uri.getPort() : "");
-        SseSession session = openSseSession(host, debug);
 
-        // Add sessionId as query param to actual request
+        String sseEndpoint = "/sse";
+        if (request.getHeaders() != null && request.getHeaders().containsKey("x-akto-sse-endpoint")) {
+            sseEndpoint = request.getHeaders().get("x-akto-sse-endpoint").get(0);
+            request.getHeaders().remove("x-akto-sse-endpoint");
+        }
+        
+        Headers headers = request.toOkHttpHeaders();
+        SseSession session = openSseSession(host, sseEndpoint, headers, debug);
+
+        if (StringUtils.isEmpty(session.endpoint)) {
+            closeSseSession(session);
+            throw new Exception("Failed to open SSE session as endpoint not found");
+        }
+
         String[] queryParam = session.endpoint.split("\\?");
         if (overrideMessageEndpoint) {
             request.setUrl(host + session.endpoint);
@@ -742,13 +769,7 @@ public class ApiExecutor {
         OriginalHttpResponse resp = sendRequest(request, followRedirects, testingRunConfig, debug, true, testLogs, skipSSRFCheck);
 
         if (resp.getStatusCode() >= 400) {
-            if (session.readerThread != null) {
-                session.readerThread.interrupt();
-                session.readerThread.join(); // Wait for thread to finish
-            }
-            if (session.response != null) {
-                session.response.close(); // Now it's safe
-            }
+            closeSseSession(session);
             return resp;
         }
 
@@ -760,18 +781,47 @@ public class ApiExecutor {
         try {
             sseMsg = waitForMatchingSseMessage(session, id, 10000); // 10s timeout
         } finally {
-            if (session.readerThread != null) {
-                session.readerThread.interrupt();
-                session.readerThread.join(); // Wait for thread to finish
-            }
-            if (session.response != null) {
-                session.response.close(); // Now it's safe
-            }
+            closeSseSession(session);
         }
 
         // Return SSE message as JSON (not as a string)
         JsonNode sseJson = objectMapper.readTree(sseMsg);
         String jsonBody = objectMapper.writeValueAsString(sseJson);
         return new OriginalHttpResponse(jsonBody, resp.getHeaders(), resp.getStatusCode());
+    }
+
+    private static boolean shouldInitiateSSEStream(OriginalHttpRequest request) {
+        if (!isJsonRpcRequest(request)) {
+            return false;
+        }
+
+        if (!Method.POST.name().equalsIgnoreCase(request.getMethod())) {
+            return true;
+        }
+
+        for (Map.Entry<String, List<String>> entry : request.getHeaders().entrySet()) {
+            if (HttpRequestResponseUtils.HEADER_ACCEPT.equalsIgnoreCase(entry.getKey()) && entry.getValue() != null
+                && !entry.getValue().isEmpty()) {
+                String value = entry.getValue().get(0).toLowerCase();
+                if (value.contains(HttpRequestResponseUtils.TEXT_EVENT_STREAM_CONTENT_TYPE) && value.contains(
+                    HttpRequestResponseUtils.APPLICATION_JSON)) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    private static void closeSseSession(SseSession session) throws InterruptedException {
+        if (session.readerThread != null) {
+            session.readerThread.interrupt();
+            session.readerThread.join();
+        }
+        if (session.response != null) {
+            if (session.response.body() != null) {
+                session.response.body().close();
+            }
+            session.response.close();
+        }
     }
 }

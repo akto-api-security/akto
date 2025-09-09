@@ -335,7 +335,8 @@ public class DashboardRouter implements ARouter {
                     threatActorService.getDailyActorCounts(
                         ctx.get("accountId"),
                         req.getStartTs(),
-                        req.getEndTs()
+                        req.getEndTs(),
+                        req.getLatestAttackList()
                     )
                 ).ifPresent(s -> ctx.response().setStatusCode(200).end(s));
             });
@@ -360,7 +361,8 @@ public class DashboardRouter implements ARouter {
                     threatActorService.getThreatActivityTimeline(
                         ctx.get("accountId"),
                         req.getStartTs(),
-                        req.getEndTs()
+                        req.getEndTs(),
+                        req.getLatestAttackList()
                     )
                 ).ifPresent(s -> ctx.response().setStatusCode(200).end(s));
             });

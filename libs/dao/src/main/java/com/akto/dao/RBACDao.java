@@ -27,6 +27,7 @@ public class RBACDao extends CommonContextDao<RBAC> {
 
     //Caching for RBACDAO
     private static final ConcurrentHashMap<Pair<Integer, Integer>, Pair<Role, Integer>> userRolesMap = new ConcurrentHashMap<>();
+    private static final ConcurrentHashMap<Pair<Integer, Integer>, Pair<List<String>, Integer>> allowedFeaturesMapForUser = new ConcurrentHashMap<>();
     private static final int EXPIRY_TIME = 15 * 60; // 15 minute
     public void createIndicesIfAbsent() {
 
@@ -48,6 +49,7 @@ public class RBACDao extends CommonContextDao<RBAC> {
 
     public void deleteUserEntryFromCache(Pair<Integer, Integer> key) {
         userRolesMap.remove(key);
+        allowedFeaturesMapForUser.remove(key);
     }
 
     /*
@@ -84,6 +86,33 @@ public class RBACDao extends CommonContextDao<RBAC> {
             actualRole = userRoleEntry.getFirst();
         }
         return actualRole;
+    }
+
+    public static boolean hasAccessToFeature(int userId, int accountId, String featureLabel) {
+        Pair<Integer, Integer> key = new Pair<>(userId, accountId);
+        RBAC.Role userRoleRecord = RBACDao.getCurrentRoleForUser(userId, accountId);
+        if (userRoleRecord == null) {
+            userRoleRecord = RBAC.Role.MEMBER;
+        }
+        if (userRoleRecord.equals(RBAC.Role.ADMIN)) {
+            return true; // Admin has access to all features
+        }
+        if(featureLabel == null || featureLabel.isEmpty() || !RBAC.SPECIAL_FEATURES_FOR_RBAC.contains(featureLabel)) {
+            return true;
+        }
+        Pair<List<String>, Integer> allowedFeaturesEntry = allowedFeaturesMapForUser.get(key);
+        if (allowedFeaturesEntry == null || allowedFeaturesEntry.getFirst() == null || (Context.now() - allowedFeaturesEntry.getSecond() > EXPIRY_TIME)) {
+            List<String> allowedFeatures = instance.getAllowedFeaturesForRole(userId, accountId);
+            allowedFeaturesMapForUser.put(key, new Pair<>(allowedFeatures, Context.now()));
+            if(allowedFeatures != null && !allowedFeatures.isEmpty() && allowedFeatures.contains(featureLabel)) {
+                return true;
+            }
+            return false;
+        }
+        if(allowedFeaturesEntry.getFirst() == null || allowedFeaturesEntry.getFirst().isEmpty()) {
+            return false;
+        }
+        return allowedFeaturesEntry.getFirst().contains(featureLabel);
     }
 
     public List<Integer> getUserCollectionsById(int userId, int accountId) {
@@ -123,6 +152,32 @@ public class RBACDao extends CommonContextDao<RBAC> {
         }
 
         return new ArrayList<>(apiCollectionsId);
+    }
+
+    public List<String> getAllowedFeaturesForRole(int userId, int accountId) {
+        RBAC rbac = RBACDao.instance.findOne(
+                Filters.and(
+                        eq(RBAC.USER_ID, userId),
+                        eq(RBAC.ACCOUNT_ID, accountId)),
+                Projections.include(RBAC.ALLOWED_FEATURES_FOR_USER, RBAC.ROLE));
+
+        if (RBAC.Role.ADMIN.name().equals(rbac.getRole())) {
+            return RBAC.SPECIAL_FEATURES_FOR_RBAC;
+        }
+
+        String role = RBAC.Role.MEMBER.name();
+        if(rbac != null){
+            role = rbac.getRole();
+        }
+        CustomRole customRole = CustomRoleDao.instance.findRoleByName(role);
+        Set<String> allowedFeatures = new HashSet<>();
+        if (customRole != null && customRole.getAllowedFeaturesForUser() != null && !customRole.getAllowedFeaturesForUser().isEmpty()) {
+            allowedFeatures.addAll(customRole.getAllowedFeaturesForUser());
+        }
+        if(rbac != null && rbac.getAllowedFeaturesForUser() != null) {
+            allowedFeatures.addAll(rbac.getAllowedFeaturesForUser());
+        }
+        return new ArrayList<>(allowedFeatures);
     }
 
     public HashMap<Integer, List<Integer>> getAllUsersCollections(int accountId) {

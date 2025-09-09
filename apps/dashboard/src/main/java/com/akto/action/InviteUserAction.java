@@ -49,6 +49,11 @@ public class InviteUserAction extends UserAction{
 
     private static final Pattern EMAIL_PATTERN = Pattern.compile("^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$");
 
+    static {
+        commonOrganisationsMap.put("blinkhealth.com", "blinkhealth.com");
+        commonOrganisationsMap.put("blinkrx.com", "blinkhealth.com");
+    }
+
     public static String validateEmail(String email, String adminLogin) {
         if (email == null) return INVALID_EMAIL_ERROR;
 

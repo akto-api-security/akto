@@ -16,8 +16,10 @@ import com.akto.util.DbMode;
 import com.akto.util.enums.GlobalEnums;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
+import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.*;
+import org.bson.Document;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 
@@ -232,6 +234,18 @@ public class TestingRunResultDao extends AccountsContextDaoWithRbac<TestingRunRe
         MCollection.createIndexIfAbsent(getDBName(), getCollName(),
                 new String[] { TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, TestingRunResult.VULNERABLE, Constants.ID }, false);
 
+        // Add partial index for testRunResultSummaryId, vulnerable, endTimestamp with partialFilterExpression on testResults.message
+        Bson partialIndex = Indexes.compoundIndex(
+        Indexes.ascending("testRunResultSummaryId"),
+        Indexes.ascending("vulnerable"), 
+        Indexes.descending("endTimestamp")
+        );
+
+        IndexOptions partialIndexOptions = new IndexOptions()
+            .name("testRunResultSummaryId_1_vulnerable_1_endTimestamp_-1_partial_message_exists")
+            .partialFilterExpression(Filters.exists("testResults.message", true));
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), partialIndex, partialIndexOptions);
+
 
         MCollection.createIndexIfAbsent(getDBName(), getCollName(),
                 new String[] { TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, TestingRunResult.VULNERABLE, ERRORS_KEY }, false);
@@ -261,6 +275,10 @@ public class TestingRunResultDao extends AccountsContextDaoWithRbac<TestingRunRe
 
         fieldNames = new String[]{TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, TestingRunResult.VULNERABLE, TestingRunResult.API_INFO_KEY, TestingRunResult.TEST_SUB_TYPE};
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, false);
+    }
+
+    public MongoCollection<Document> getRawCollection() {
+        return clients[0].getDatabase(getDBName()).getCollection(getCollName(), Document.class);
     }
 
     public void convertToCappedCollection() {

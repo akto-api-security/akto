@@ -3,9 +3,12 @@ import func from "@/util/func"
 import "../api_inventory.css"
 import { useRef, useEffect, useState } from "react"
 import transform from "../../transform"
+import { getMethod } from "../../GetPrettifyEndpoint"
+import onboardingTransform from "../../../onboarding/transform"
 
 const StyledEndpoint = (data, fontSize, variant, shouldNotTruncate, showWithoutHost) => {
     const { method, url } = func.toMethodUrlObject(data)
+    let finalMethod = getMethod(url, method);
     let absoluteUrl = showWithoutHost ? transform.getTruncatedUrl(url) : url
     const arr = absoluteUrl.split("/")
     let colored = []
@@ -17,20 +20,6 @@ const StyledEndpoint = (data, fontSize, variant, shouldNotTruncate, showWithoutH
 
     let finalFontSize = fontSize ? fontSize: "16px"
     let finalVariant = variant ? variant : "headingMd"
-
-    function getMethodColor(method) {
-        switch (method) {
-            case "GET": return `var(--color-get)`;
-            case "POST": return `var(--color-post)`;
-            case "PUT": return `var(--color-put)`;
-            case "PATCH": return `var(--color-patch)`;
-            case "DELETE": return `var(--color-delete)`;
-            case "OPTIONS": return `var(--color-options)`;
-            case "HEAD": return `var(--color-head)`;
-            default:
-                return "";
-        }
-    }
 
     const ref = useRef(null);
     const [isTruncated, setIsTruncated] = useState(false);
@@ -44,8 +33,8 @@ const StyledEndpoint = (data, fontSize, variant, shouldNotTruncate, showWithoutH
 
     const endpoint = (
         <div style={{display: 'flex', gap: "8px"}}>
-            <div style={{color: getMethodColor(method), fontSize: finalFontSize, fontWeight: 600}}>
-                {method}
+            <div style={{color: onboardingTransform.getTextColor(finalMethod), fontSize: finalFontSize, fontWeight: 600}}>
+                {finalMethod}
             </div>
             <div className={shouldNotTruncate ? "full-url" : "styled-endpoint"} ref={ref}>
                 {

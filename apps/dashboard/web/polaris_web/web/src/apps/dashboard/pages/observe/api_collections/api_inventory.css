@@ -40,5 +40,5 @@
 
 .inventory-list .Polaris-ActionList__Prefix {
     display: inline !important;
-    width: 140px !important;
+    /* width: 140px !important; */
 }

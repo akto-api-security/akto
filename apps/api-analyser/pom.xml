@@ -21,6 +21,13 @@
             <version>${project.version}</version>
         </dependency>
         <dependency>
+            <groupId>com.akto.libs.dao</groupId>
+            <artifactId>dao</artifactId>
+            <version>${project.version}</version>
+            <type>test-jar</type>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
             <groupId>com.akto.libs.utils</groupId>
             <artifactId>utils</artifactId>
             <version>${project.version}</version>

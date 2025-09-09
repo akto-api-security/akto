@@ -24,6 +24,7 @@ import {
   ReportMinor,
   RefreshMajor,
   CustomersMinor,
+  CircleAlertMajor,
   PlusMinor,
   SettingsMinor,
   ViewMajor
@@ -143,7 +144,8 @@ function SingleTestRunPage() {
       "SKIPPED_EXEC_NEED_CONFIG": 0,
       "VULNERABLE": 0,
       "SKIPPED_EXEC_API_REQUEST_FAILED": 0,
-      "SKIPPED_EXEC": 0
+      "SKIPPED_EXEC": 0,
+      "IGNORED_ISSUES": 0
     })  
   const [testMode, setTestMode] = useState(false)
 
@@ -160,6 +162,7 @@ function SingleTestRunPage() {
   const [testingRunResultSummariesObj, setTestingRunResultSummariesObj] = useState({})
   const [allResultsLength, setAllResultsLength] = useState(undefined)
   const [currentSummary, setCurrentSummary] = useState('')
+  const [testResultsStatsCount, setTestResultsStatsCount] = useState(0)
   const localCategoryMap = LocalStore.getState().categoryMap
   const localSubCategoryMap = LocalStore.getState().subCategoryMap
   const [useLocalSubCategoryData, setUseLocalSubCategoryData] = useState(false)
@@ -220,6 +223,22 @@ function SingleTestRunPage() {
     })
   }
 
+  async function fetchTestResultsStats(testingRunHexId, testingRunResultSummaryHexId) {
+    try {
+      if (testingRunHexId && testingRunResultSummaryHexId) {
+        const response = await api.fetchTestResultsStatsCount({
+          testingRunHexId: testingRunHexId,
+          testingRunResultSummaryHexId: testingRunResultSummaryHexId
+        });
+        setTestResultsStatsCount(response || 0);
+      } else {
+        setTestResultsStatsCount(0);
+      }
+    } catch (error) {
+      setTestResultsStatsCount(0);
+    }
+  }
+
   async function setSummary(summary, initialCall = false) {
     setTempLoading((prev) => {
       prev.running = false;
@@ -241,8 +260,15 @@ function SingleTestRunPage() {
 
       return { ...prev };
     });
+    let updateTable = currentSummary.hexId !== summary.hexId;
     setCurrentSummary(summary);
-    if (!initialCall) {
+    
+    // Fetch test results stats for the new summary
+    if (summary && summary.hexId) {
+      fetchTestResultsStats(hexId, summary.hexId);
+    }
+    
+    if (!initialCall && updateTable) {
       setUpdateTable(Date.now().toString())
     }
   }
@@ -373,8 +399,6 @@ function SingleTestRunPage() {
 
   const fetchTableData = async (sortKey, sortOrder, skip, limit, filters, filterOperators, queryValue) => {
     let testRunResultsRes = []
-    let totalIgnoredIssuesCount = 0
-    let ignoredIssueListCount = 0
     let localCountMap = testRunCountMap;
     const { testingRun, workflowTest, testingRunType } = testingRunResultSummariesObj
     if (testingRun === undefined) {
@@ -401,54 +425,42 @@ function SingleTestRunPage() {
     setTestingRunConfigId(testingRun.testingRunConfig?.id || -1)
     setSelectedTestRun(localSelectedTestRun);
     if (localSelectedTestRun.testingRunResultSummaryHexId) {
-      if (selectedTab === 'ignored_issues') {
-        let ignoredTestRunResults = []
-        await api.fetchIssuesByStatusAndSummaryId(localSelectedTestRun.testingRunResultSummaryHexId, ["IGNORED"], sortKey, sortOrder, skip, limit, filters).then((resp) => {
-          const ignoredIssuesTestingResult = resp?.testingRunResultList || [];
-          ignoredTestRunResults = transform.prepareTestRunResults(hexId, ignoredIssuesTestingResult, localSubCategoryMap, subCategoryFromSourceConfigMap, resp?.issuesDescriptionMap, resp?.jiraIssuesMapForResults);
-        })
-        testRunResultsRes = ignoredTestRunResults
-        totalIgnoredIssuesCount = ignoredTestRunResults.length
-      } else {
-        await api.fetchTestingRunResults(localSelectedTestRun.testingRunResultSummaryHexId, tableTabMap[selectedTab], sortKey, sortOrder, skip, limit, filters, queryValue).then(({ testingRunResults, errorEnums, issueslistCount, issuesDescriptionMap, jiraIssuesMapForResults }) => {
-          ignoredIssueListCount = issueslistCount
+      await api.fetchTestingRunResults(localSelectedTestRun.testingRunResultSummaryHexId, tableTabMap[selectedTab], sortKey, sortOrder, skip, limit, filters, queryValue).then(({ testingRunResults, errorEnums, issuesDescriptionMap, jiraIssuesMapForResults }) => {
           testRunResultsRes = transform.prepareTestRunResults(hexId, testingRunResults, localSubCategoryMap, subCategoryFromSourceConfigMap, issuesDescriptionMap, jiraIssuesMapForResults)
           if (selectedTab === 'domain_unreachable' || selectedTab === 'skipped' || selectedTab === 'need_configurations') {
             errorEnums['UNKNOWN_ERROR_OCCURRED'] = "OOPS! Unknown error occurred."
             setErrorsObject(errorEnums)
             setMissingConfigs(transform.getMissingConfigs(testRunResultsRes))
           }
-        })
-        if (!func.deepComparison(copyFilters, filters) || copyUpdateTable !== updateTable) {
-          if(copyUpdateTable !== updateTable){
-            setCopyUpdateTable(updateTable)
-          }else{
-            setCopyFilters(filters)
-          }
-          await api.fetchTestRunResultsCount(localSelectedTestRun.testingRunResultSummaryHexId).then((testCountMap) => {
-            if(testCountMap !== null){
-              localCountMap = JSON.parse(JSON.stringify(testCountMap))  
-            }
-            //Assuming vulnerable count is after removing ignored issues aLL - (OOTHER COUNT + IGNORED)
-            localCountMap['IGNORED_ISSUES'] = ignoredIssueListCount
-            let countOthers = 0;
-            Object.keys(localCountMap).forEach((x) => {
-              if (x !== 'ALL') {
-                countOthers += localCountMap[x]
-              }
-            })
-            localCountMap['SECURED'] = localCountMap['ALL'] >= countOthers ? localCountMap['ALL'] - countOthers : 0
-            const orderedValues = tableTabsOrder.map(key => localCountMap[tableTabMap[key]] || 0)
-            setTestRunResultsCount(orderedValues)
-            setTestRunCountMap(JSON.parse(JSON.stringify(localCountMap)));
-          })
+      })
+      if (!func.deepComparison(copyFilters, filters) || copyUpdateTable !== updateTable) {
+        if(copyUpdateTable !== updateTable){
+          setCopyUpdateTable(updateTable)
+        }else{
+          setCopyFilters(filters)
         }
+        await api.fetchTestRunResultsCount(localSelectedTestRun.testingRunResultSummaryHexId, filters).then((testCountMap) => {
+          if(testCountMap !== null){
+            localCountMap = JSON.parse(JSON.stringify(testCountMap))  
+          }
+          let countOthers = 0;
+          Object.keys(localCountMap).forEach((x) => {
+            if (x !== 'ALL') {
+              countOthers += localCountMap[x]
+            }
+          })
+          localCountMap['SECURED'] = localCountMap['ALL'] >= countOthers ? localCountMap['ALL'] - countOthers : 0
+          localCountMap['VULNERABLE'] = Math.abs(localCountMap['VULNERABLE'] - localCountMap['IGNORED_ISSUES']);
+          const orderedValues = tableTabsOrder.map(key => localCountMap[tableTabMap[key]] || 0)
+          setTestRunResultsCount(orderedValues)
+          setTestRunCountMap(JSON.parse(JSON.stringify(localCountMap)));
+        })
       }
     }
     const key = tableTabMap[selectedTab]
-    const total = (testRunCountMap[key] !== undefined && testRunCountMap[key] !== 0) ? testRunCountMap[key] : localCountMap[key]
+    const total = localCountMap[key]
     fillTempData(testRunResultsRes, selectedTab)
-    return { value: transform.getPrettifiedTestRunResults(testRunResultsRes), total: selectedTab === 'ignored_issues' ? totalIgnoredIssuesCount : total }
+    return { value: transform.getPrettifiedTestRunResults(testRunResultsRes), total: total }
   }
 
   useEffect(() => { handleAddSettings() }, [testingRunConfigSettings])
@@ -513,8 +525,20 @@ function SingleTestRunPage() {
       case "STOPPED":
         return "Test has been stopped";
       case "COMPLETED":
+
+        let delta = Math.abs(selectedTestRun.startTimestamp - selectedTestRun.endTimestamp);
+        let earlyFinish = "";
+        let testRunTime = testingRunResultSummariesObj?.testingRun?.testRunTime;
+        if (testRunTime == null || testRunTime == undefined || testRunTime <= 0) {
+          testRunTime = 1800;
+        }
+
+        if (delta >= testRunTime) {
+          earlyFinish = "| Test exited because max time limit reached"
+        }
+
         return `Scanned ${func.prettifyEpoch(selectedTestRun.startTimestamp)} for a duration of
-        ${func.getTimeTakenByTest(selectedTestRun.startTimestamp, selectedTestRun.endTimestamp)}`;
+        ${func.getTimeTakenByTest(selectedTestRun.startTimestamp, selectedTestRun.endTimestamp)} ${earlyFinish}`;
       case "FAILED":
       case "FAIL":
         return "Test execution has failed during run";
@@ -756,7 +780,7 @@ function SingleTestRunPage() {
     runningTestsComp, <TrendChart key={tempLoading.running} hexId={hexId} setSummary={setSummary} show={true} totalVulnerabilities={tableCountObj.vulnerable} />,
     metadataComponent(), loading ? <SpinnerCentered key="loading" /> : (!workflowTest ? resultTable : workflowTestBuilder)];
 
-  const openVulnerabilityReport = async () => {
+  const openVulnerabilityReport = async (summaryMode = false) => {
     const currentPageKey = "/dashboard/testing/" + selectedTestRun?.id + "/#" + selectedTab
     let selectedFilters = filtersMap[currentPageKey]?.filters || [];
     let filtersObj = {
@@ -769,7 +793,9 @@ function SingleTestRunPage() {
 
     await api.generatePDFReport(filtersObj, []).then((res) => {
       const responseId = res.split("=")[1];
-      window.open('/dashboard/testing/summary/' + responseId.split("}")[0], '_blank');
+      const summaryModeQueryParam = summaryMode === true ? 'summaryMode=true' : '';
+      const redirectUrl = `/dashboard/testing/summary/${responseId.split("}")[0]}?${summaryModeQueryParam}`;
+      window.open(redirectUrl, '_blank');
     })
   }
 
@@ -844,12 +870,11 @@ function SingleTestRunPage() {
               const sev = item.split(' ')
               const tempSev = sev.length > 1 ? sev[1].toUpperCase() : ''
               return (
-                <div className={`badge-wrapper-${tempSev}`}>
-                  <Badge key={item}>{item}</Badge>
+                <div key={item} className={`badge-wrapper-${tempSev}`}>
+                  <Badge>{item}</Badge>
                 </div>
               )
             }
-
             )}
           <Button plain monochrome onClick={() => setUpdateTable(Date.now().toString())}><Tooltip content="Refresh page" dismissOnMouseOut> <Icon source={RefreshMajor} /></Tooltip></Button>
         </HorizontalStack>
@@ -871,18 +896,79 @@ function SingleTestRunPage() {
             <Box><Icon color="subdued" source={PriceLookupMinor} /></Box>
             <Text color="subdued" variant="bodyMd">{getHeadingStatus(selectedTestRun)}</Text>
           </HorizontalStack>
+          {testResultsStatsCount > 0 && (
+            <>
+              <Box width="1px" borderColor="border-subdued" borderInlineStartWidth="1" minHeight='16px' />
+              <HorizontalStack gap={"1"}>
+                <Box><Icon color="subdued" source={CircleAlertMajor} /></Box>
+                <Tooltip 
+                  content={
+                    <VerticalStack gap="2">
+                      <Text variant="bodyMd">
+                        The total number of 429 (Too Many Requests) responses received during testing. 
+                        High numbers may indicate rate limiting by the target server or infrastructure.
+                      </Text>
+                      <Box paddingBlockStart="1" borderBlockStartWidth="1" borderColor="border-subdued">
+                        <Text variant="bodySm" color="subdued" fontWeight="medium">
+                          ⚠️ Note: These are approximate numbers based on sampled data, not exact counts.
+                        </Text>
+                      </Box>
+                    </VerticalStack>
+                  } 
+                  hasUnderline={false}
+                >
+                  <HorizontalStack gap="1" align="center">
+                    <Text color="subdued" fontWeight="medium" variant="bodyMd" style={{ cursor: 'pointer' }}>
+                      API request stats:
+                    </Text>
+
+                  </HorizontalStack>
+                </Tooltip>
+                {(() => {
+                  const totalRequests = currentSummary?.testResultsCount || 0;
+                  const percentage = totalRequests > 0 ? (testResultsStatsCount / totalRequests) * 100 : 0;
+                  
+                  if (percentage > 70) {
+                    return (
+                      <div className="api-stats-badge api-stats-critical">
+                        ~{testResultsStatsCount} requests returned 429
+                      </div>
+                    );
+                  } else if (percentage >= 40) {
+                    return (
+                      <div className="api-stats-badge api-stats-warning">
+                        ~{testResultsStatsCount} requests returned 429
+                      </div>
+                    );
+                  } else {
+                    return (
+                      <div className="api-stats-badge api-stats-success">
+                        ~{testResultsStatsCount} requests returned 429
+                      </div>
+                    );
+                  }
+                })()}
+              </HorizontalStack>
+            </>
+          )}
         </HorizontalStack>
       </VerticalStack>
     </Box>
   )
 
+
   let moreActionsList = transform.getActions(selectedTestRun)
   moreActionsList.push({
     title: 'Export', items: [
       {
+        content: 'Export summary report',
+        icon: ReportMinor,
+        onAction: () => openVulnerabilityReport(true)
+      },
+      {
         content: 'Export vulnerability report',
         icon: ReportMinor,
-        onAction: () => openVulnerabilityReport()
+        onAction: () => openVulnerabilityReport(false)
       }
     ]
   })

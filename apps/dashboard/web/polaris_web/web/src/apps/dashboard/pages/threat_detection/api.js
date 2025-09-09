@@ -16,7 +16,7 @@ const threatDetectionRequests = {
         })
     },
 
-    fetchSuspectSampleData(skip, ips, apiCollectionIds, urls, types, sort, startTimestamp, endTimestamp, limit) {
+    fetchSuspectSampleData(skip, ips, apiCollectionIds, urls, types, sort, startTimestamp, endTimestamp, latestAttack, limit) {
         return request({
             url: '/api/fetchSuspectSampleData',
             method: 'post',
@@ -29,6 +29,7 @@ const threatDetectionRequests = {
                 sort: sort,
                 startTimestamp: startTimestamp,
                 endTimestamp: endTimestamp,
+                latestAttack: latestAttack || [],
                 limit: limit || 50
             }
         })
@@ -55,13 +56,14 @@ const threatDetectionRequests = {
             }
         })
     },
-    fetchThreatApis(skip, sort) {
+    fetchThreatApis(skip, sort, latestAttack) {
         return request({
             url: '/api/fetchThreatApis',
             method: 'post',
             data: {
                 skip: skip,
-                sort: sort
+                sort: sort,
+                latestAttack: latestAttack || []
             }
         })
     },

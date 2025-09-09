@@ -141,10 +141,14 @@ public class ThreatActorService {
         ListThreatActorsRequest.Filter filter = request.getFilter();
         Document match = new Document();
 
+        if(filter.getLatestAttackList() == null || filter.getLatestAttackList().isEmpty()) {
+            return ListThreatActorResponse.newBuilder().build();
+        }
+
         // Apply filters
         if (!filter.getActorsList().isEmpty()) match.append("actor", new Document("$in", filter.getActorsList()));
         if (!filter.getLatestIpsList().isEmpty()) match.append("latestApiIp", new Document("$in", filter.getLatestIpsList()));
-        if (!filter.getLatestAttackList().isEmpty()) match.append("subCategory", new Document("$in", filter.getLatestAttackList()));
+        if (!filter.getLatestAttackList().isEmpty()) match.append("filterId", new Document("$in", filter.getLatestAttackList()));
         if (!filter.getCountryList().isEmpty()) match.append("country", new Document("$in", filter.getCountryList()));
         if (filter.hasDetectedAtTimeRange()) {
             match.append("detectedAt", new Document("$gte", filter.getDetectedAtTimeRange().getStart()).append("$lte", filter.getDetectedAtTimeRange().getEnd()));
@@ -165,7 +169,7 @@ public class ThreatActorService {
             .append("latestApiIp", new Document("$first", "$latestApiIp"))
             .append("country", new Document("$first", "$country"))
             .append("discoveredAt", new Document("$first", "$detectedAt"))
-            .append("latestSubCategory", new Document("$first", "$subCategory"))
+            .append("latestSubCategory", new Document("$first", "$filterId"))
         ));
 
         // Facet: count and paginated result
@@ -200,7 +204,7 @@ public class ThreatActorService {
                     activityDataList.add(ActivityData.newBuilder()
                         .setUrl(doc2.getString("latestApiEndpoint"))
                         .setDetectedAt(doc2.getLong("detectedAt"))
-                        .setSubCategory(doc2.getString("subCategory"))
+                        .setSubCategory(doc2.getString("filterId"))
                         .setSeverity(doc2.getString("severity"))
                         .setMethod(doc2.getString("latestApiMethod"))
                         .build());
@@ -222,8 +226,12 @@ public class ThreatActorService {
         return ListThreatActorResponse.newBuilder().addAllActors(actors).setTotal(total).build();
     }
 
-  public DailyActorsCountResponse getDailyActorCounts(String accountId, long startTs, long endTs) {
-    
+  public DailyActorsCountResponse getDailyActorCounts(String accountId, long startTs, long endTs, List<String> latestAttackList) {
+
+      if(latestAttackList == null || latestAttackList.isEmpty()) {
+          return DailyActorsCountResponse.newBuilder().build();
+      }
+
     List<DailyActorsCountResponse.ActorsCount> actors = new ArrayList<>();
     MongoCollection<Document> coll = this.mongoClient
         .getDatabase(accountId)
@@ -231,8 +239,14 @@ public class ThreatActorService {
 
         List<Document> pipeline = new ArrayList<>();
 
-        
-        Document matchConditions = new Document("detectedAt", new Document("$lte", endTs));
+
+      Document matchConditions = new Document();
+
+      if(latestAttackList != null && !latestAttackList.isEmpty()) {
+          matchConditions.append("filterId", new Document("$in", latestAttackList));
+      }
+
+      matchConditions.append("detectedAt", new Document("$lte", endTs));
         if (startTs > 0) {
             matchConditions.get("detectedAt", Document.class).append("$gte", startTs);
         }
@@ -303,8 +317,12 @@ public class ThreatActorService {
         return DailyActorsCountResponse.newBuilder().addAllActorsCounts(actors).build();
   }
 
-  public ThreatActivityTimelineResponse getThreatActivityTimeline(String accountId, long startTs, long endTs) {
-    
+  public ThreatActivityTimelineResponse getThreatActivityTimeline(String accountId, long startTs, long endTs, List<String> latestAttackList) {
+
+      if(latestAttackList == null || latestAttackList.isEmpty()) {
+          return ThreatActivityTimelineResponse.newBuilder().build();
+      }
+
         List<ThreatActivityTimelineResponse.ActivityTimeline> timeline = new ArrayList<>();
         // long sevenDaysInSeconds = TimeUnit.DAYS.toSeconds(7);
         // if (startTs < endTs - sevenDaysInSeconds) {
@@ -313,11 +331,18 @@ public class ThreatActorService {
         MongoCollection<Document> coll = this.mongoClient
             .getDatabase(accountId)
             .getCollection(MongoDBCollection.ThreatDetection.MALICIOUS_EVENTS, Document.class);
-            
-        List<Document> pipeline = Arrays.asList(
-        // Stage 1: Match documents within the startTs and endTs range
-        new Document("$match", new Document("detectedAt",
-            new Document("$gte", startTs).append("$lte", endTs))),
+
+      Document match = new Document();
+
+      if(latestAttackList != null && !latestAttackList.isEmpty()) {
+          match.append("filterId", new Document("$in", latestAttackList));
+      }
+
+      // Stage 1: Match documents within the startTs and endTs range
+      match.append("detectedAt", new Document("$gte", startTs).append("$lte", endTs));
+
+      List<Document> pipeline = Arrays.asList(
+        new Document("$match", match),
 
         // Stage 2: Project required fields and normalize timestamp to daily granularity
         new Document("$project", new Document("dayStart",
@@ -435,6 +460,11 @@ public class ThreatActorService {
 
   public ThreatActorByCountryResponse getThreatActorByCountry(
       String accountId, ThreatActorByCountryRequest request) {
+
+      if(request.getLatestAttackList() == null || request.getLatestAttackList().isEmpty()) {
+          return ThreatActorByCountryResponse.newBuilder().build();
+      }
+
     MongoCollection<Document> coll =
         this.mongoClient
             .getDatabase(accountId)
@@ -442,13 +472,21 @@ public class ThreatActorService {
 
     List<Document> pipeline = new ArrayList<>();
 
+    Document match = new Document();
+
+      if(request.getLatestAttackList() != null && !request.getLatestAttackList().isEmpty()) {
+          match.append("filterId", new Document("$in", request.getLatestAttackList()));
+      }
+
     // 1. Match on time range
     if (request.getStartTs() != 0 || request.getEndTs() != 0) {
-      pipeline.add(new Document("$match",
-          new Document("detectedAt",
+
+          match.append("detectedAt",
               new Document("$gte", request.getStartTs())
-                  .append("$lte", request.getEndTs()))));
+                  .append("$lte", request.getEndTs()));
     }
+
+  pipeline.add(new Document("$match", match));
 
     // 2. Project only necessary fields
     pipeline.add(new Document("$project", new Document("country", 1).append("actor", 1)));

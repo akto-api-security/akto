@@ -54,7 +54,7 @@ public class KeyTypes {
 
         String key = param.replaceAll("#", ".").replaceAll("\\.\\$", "");
         String[] keyArr = key.split("\\.");
-        String lastField = keyArr[keyArr.length - 1];
+        String lastField = keyArr[keyArr.length - 1].split("_queryParam")[0];
         ParamId paramId = new ParamId(url, method, responseCode, isHeader, param, SingleTypeInfo.GENERIC, apiCollectionId, isUrlParam);
         SubType subType = findSubType(object,lastField,paramId);
 
@@ -247,7 +247,7 @@ public class KeyTypes {
     }
 
     public static SubType findSubType(Object o,String key, ParamId paramId) {
-
+        
         int accountId = Context.accountId.get();
         boolean checkForSubtypes = true ;
         for (String keyType : SingleTypeInfo.getCustomDataTypeMap(accountId).keySet()) {

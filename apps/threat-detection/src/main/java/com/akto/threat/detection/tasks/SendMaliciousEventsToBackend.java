@@ -1,20 +1,21 @@
 package com.akto.threat.detection.tasks;
 
 import com.akto.ProtoMessageUtils;
+import com.akto.dto.OriginalHttpRequest;
+import com.akto.dto.OriginalHttpResponse;
 import com.akto.kafka.KafkaConfig;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.proto.generated.threat_detection.message.malicious_event.v1.MaliciousEventKafkaEnvelope;
 import com.akto.proto.generated.threat_detection.message.malicious_event.v1.MaliciousEventMessage;
 import com.akto.proto.generated.threat_detection.service.malicious_alert_service.v1.RecordMaliciousEventRequest;
+import com.akto.testing.ApiExecutor;
+import com.akto.threat.detection.utils.Utils;
 import com.google.protobuf.InvalidProtocolBufferException;
-import java.io.IOException;
-import org.apache.http.client.methods.HttpPost;
-import org.apache.http.entity.ContentType;
-import org.apache.http.entity.StringEntity;
-import org.apache.http.impl.client.CloseableHttpClient;
-import org.apache.http.impl.client.HttpClients;
-import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 
 /*
@@ -22,19 +23,10 @@ This will send alerts to threat detection backend
  */
 public class SendMaliciousEventsToBackend extends AbstractKafkaConsumerTask<byte[]> {
 
-  private final CloseableHttpClient httpClient;
   private static final LoggerMaker logger = new LoggerMaker(SendMaliciousEventsToBackend.class, LogDb.THREAT_DETECTION);
-  private static final PoolingHttpClientConnectionManager connManager = new PoolingHttpClientConnectionManager();
-  
 
   public SendMaliciousEventsToBackend(KafkaConfig trafficConfig, String topic) {
     super(trafficConfig, topic);
-    connManager.setMaxTotal(100);
-    connManager.setDefaultMaxPerRoute(100);
-    this.httpClient = HttpClients.custom()
-        .setConnectionManager(connManager)
-        .setKeepAliveStrategy((response, context) -> 30_000)
-        .build();
   }
 
   protected void processRecords(ConsumerRecords<String, byte[]> records) {
@@ -54,31 +46,27 @@ public class SendMaliciousEventsToBackend extends AbstractKafkaConsumerTask<byte
 
           try {
             MaliciousEventMessage evt = envelope.getMaliciousEvent();
-
             RecordMaliciousEventRequest.Builder reqBuilder =
                 RecordMaliciousEventRequest.newBuilder().setMaliciousEvent(evt);
-
             RecordMaliciousEventRequest maliciousEventRequest = reqBuilder.build();
-            String url = System.getenv("AKTO_THREAT_PROTECTION_BACKEND_URL");
-            String token = System.getenv("AKTO_THREAT_PROTECTION_BACKEND_TOKEN");
             ProtoMessageUtils.toString(maliciousEventRequest)
                 .ifPresent(
                     msg -> {
-                      StringEntity requestEntity =
-                          new StringEntity(msg, ContentType.APPLICATION_JSON);
-                      HttpPost req =
-                          new HttpPost(
-                              String.format("%s/api/threat_detection/record_malicious_event", url));
-                      req.addHeader("Authorization", "Bearer " + token);
-                      req.setEntity(requestEntity);
+                      Map<String, List<String>> headers = Utils.buildHeaders();
+                      headers.put("x-akto-ignore", Collections.singletonList("true"));
+                      headers.put("Content-Type", Collections.singletonList("application/json"));
+                      OriginalHttpRequest request = new OriginalHttpRequest(Utils.getThreatProtectionBackendUrl() + "/api/threat_detection/record_malicious_event", "","POST", msg, headers, "");
                       try {
                         logger.debugAndAddToDb("sending malicious event to threat backend for url " + evt.getLatestApiEndpoint() + " filterId " + evt.getFilterId() + " eventType " + evt.getEventType().toString());
-                        this.httpClient.execute(req);
-                      } catch (IOException e) {
+                        OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+                        String responsePayload = response.getBody();
+                        if (response.getStatusCode() != 200 || responsePayload == null) {
+                          logger.errorAndAddToDb("non 2xx response in record_malicious_event");
+                        }
+                      } catch (Exception e) {
                         logger.errorAndAddToDb("error sending malicious event " + e.getMessage());
                         e.printStackTrace();
                       }
-
                     });
           } catch (Exception e) {
             e.printStackTrace();

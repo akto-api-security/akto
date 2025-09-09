@@ -85,5 +85,12 @@ export default {
             method: 'post',
             data: payload
         })
+    },
+    fetchIssuesByApis() {
+        return request({
+            url: 'api/fetchIssuesByApis',
+            method: 'post',
+            data: {}
+        })
     }
 }

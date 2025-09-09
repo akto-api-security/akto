@@ -3,9 +3,11 @@ package com.akto.dao;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.*;
+import java.util.stream.Collectors;
 
 import com.akto.dao.context.Context;
 import com.akto.dto.AktoDataType;
+import com.akto.dto.ApiCollection;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.CollectionConditions.MethodCondition;
 import com.akto.dto.rbac.UsersCollectionsList;
@@ -21,7 +23,7 @@ import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.*;
 
 import org.bson.conversions.Bson;
-import org.checkerframework.checker.units.qual.s;
+import org.bson.types.ObjectId;
 
 public class SingleTypeInfoDao extends AccountsContextDaoWithRbac<SingleTypeInfo> {
 
@@ -558,6 +560,70 @@ public class SingleTypeInfoDao extends AccountsContextDaoWithRbac<SingleTypeInfo
         }
         return result ;
     }
+    
+    public List<BasicDBObject> getSensitiveSubtypesDetectedForUrl(List<String> sensitiveParameters) {
+        BasicDBObject groupedId = new BasicDBObject(SingleTypeInfo._API_COLLECTION_ID, "$apiCollectionId")
+                .append(SingleTypeInfo._URL, "$url")
+                .append(SingleTypeInfo._METHOD, "$method");
+        List<Bson> pipeline = generateFilterForSubtypes(sensitiveParameters, groupedId, false, Filters.empty());
+        MongoCursor<BasicDBObject> collectionsCursor = SingleTypeInfoDao.instance.getMCollection().aggregate(pipeline, BasicDBObject.class).cursor();
+        
+        List<ApiInfo.ApiInfoKey> apiInfoKeys = new ArrayList<>();
+        List<BasicDBObject> aggregationResults = new ArrayList<>();
+        
+        while (collectionsCursor.hasNext()) {
+            try {
+                BasicDBObject basicDBObject = collectionsCursor.next();
+                BasicDBObject id = (BasicDBObject) basicDBObject.get("_id");
+                int apiCollectionId = id.getInt("apiCollectionId");
+                String url = id.getString("url");
+                String method = id.getString("method");
+                List<String> subtypes = (List<String>) basicDBObject.get("subTypes");
+                
+                if (subtypes != null && subtypes.size() > 1) {
+                    ApiInfo.ApiInfoKey apiInfoKey = new ApiInfo.ApiInfoKey(apiCollectionId, url, URLMethods.Method.fromString(method));
+                    apiInfoKeys.add(apiInfoKey);
+                    aggregationResults.add(basicDBObject);
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+        
+        Map<ApiInfo.ApiInfoKey, ApiInfo> apiInfoMap = new HashMap<>();
+        if (!apiInfoKeys.isEmpty()) {
+            List<Bson> filters = apiInfoKeys.stream()
+                    .map(ApiInfoDao::getFilter)
+                    .collect(Collectors.toList());
+            List<ApiInfo> apiInfos = ApiInfoDao.instance.findAll(Filters.or(filters));
+            apiInfoMap = apiInfos.stream()
+                    .collect(Collectors.toMap(ApiInfo::getId, apiInfo -> apiInfo));
+        }
+        
+        List<BasicDBObject> records = new ArrayList<>();
+        for (int i = 0; i < aggregationResults.size(); i++) {
+            BasicDBObject basicDBObject = aggregationResults.get(i);
+            ApiInfo.ApiInfoKey apiInfoKey = apiInfoKeys.get(i);
+            List<String> subtypes = (List<String>) basicDBObject.get("subTypes");
+            
+            ApiInfo apiInfo = apiInfoMap.get(apiInfoKey);
+            if (apiInfo == null) {
+                apiInfo = new ApiInfo();
+                apiInfo.setId(apiInfoKey);
+            }
+            
+            BasicDBObject rec = new BasicDBObject();
+            rec.put("apiInfo", apiInfo);
+            rec.put("subTypes", subtypes);
+            records.add(rec);
+        }
+        
+        // Sort and limit to top 3 by subtypes count
+        return records.stream()
+                .sorted((a, b) -> Integer.compare(((List)b.get("subTypes")).size(), ((List)a.get("subTypes")).size()))
+                .limit(3)
+                .collect(Collectors.toList());
+    }
 
     public Integer getSensitiveApisCount(List<String> sensitiveParameters, boolean inResponseOnly, Bson customFilter){
        
@@ -854,6 +920,36 @@ public class SingleTypeInfoDao extends AccountsContextDaoWithRbac<SingleTypeInfo
         }
         return endpoints;
     }
+
+    public static void deleteDuplicateHostsForSameApi(){
+        List<ApiCollection> apiCollections = ApiCollectionsDao.instance.findAll(
+            Filters.and(
+                Filters.ne(ApiCollection._DEACTIVATED, true),
+                Filters.exists(ApiCollection.HOST_NAME)
+            ),
+            Projections.include(Constants.ID)
+        );
+        for(ApiCollection apiCollection: apiCollections) {
+            SingleTypeInfoDao.deleteDuplicateHostsForSameApi(apiCollection.getId());
+        }
+    }
+
+
+    public static void deleteDuplicateHostsForSameApi(int apiCollectionId){
+        List<SingleTypeInfo> allList = SingleTypeInfoDao.instance.findAll(filterForHostHeader(apiCollectionId, true), Projections.include(SingleTypeInfo._API_COLLECTION_ID, SingleTypeInfo._URL, SingleTypeInfo._METHOD));
+        Set<String> uniqueKeys = new HashSet<>();
+        List<ObjectId> deleteIds = new ArrayList<>();
+        for (SingleTypeInfo sti : allList) {
+            String key = sti.getApiCollectionId() + "_" + sti.getUrl() + "_" + sti.getMethod();
+            if(uniqueKeys.contains(key)){
+                deleteIds.add(sti.getId());
+            } else {
+                uniqueKeys.add(key);
+            }
+        }
+        SingleTypeInfoDao.instance.getMCollection().deleteMany(Filters.in("_id", deleteIds));
+    }
+
 
     public static BasicDBObject getApiInfoGroupedId() {
         BasicDBObject groupedId = 

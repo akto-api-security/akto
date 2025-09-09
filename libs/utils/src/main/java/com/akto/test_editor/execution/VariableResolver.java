@@ -149,7 +149,8 @@ public class VariableResolver {
                         expressionList.remove(index);
                         List<Object> valList = (List) val;
                         for (int i = expressionList.size(); i < valList.size(); i++) {
-                            Object v = param.replaceFirst("(\\$\\{[^}]*\\})", valList.get(i).toString());
+                            String finalVal = (valList.get(i) instanceof String) ? ((String) valList.get(i)) : valList.get(i).toString();
+                            Object v = param.replaceFirst("(\\$\\{[^}]*\\})", Matcher.quoteReplacement(finalVal));
                             expressionList.add(v);
                         }
                     }

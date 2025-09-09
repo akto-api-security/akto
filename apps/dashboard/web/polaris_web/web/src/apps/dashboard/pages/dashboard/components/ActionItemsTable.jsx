@@ -5,7 +5,7 @@ const resourceName = {
   plural: 'action items'
 };
 
-const ActionItemsTable = ({ data, headers, getActions, jiraTicketUrlMap }) => {
+const ActionItemsTable = ({ data, headers, getActions, jiraTicketUrlMap, onRowClick }) => {
   return (
     <GithubSimpleTable
       key={`table-${JSON.stringify(jiraTicketUrlMap)}`}
@@ -23,6 +23,7 @@ const ActionItemsTable = ({ data, headers, getActions, jiraTicketUrlMap }) => {
       defaultSortField="priority"
       defaultSortDirection="asc"
       emptyStateMessage="No action items found"
+      onRowClick={onRowClick}
     />
   );
 };

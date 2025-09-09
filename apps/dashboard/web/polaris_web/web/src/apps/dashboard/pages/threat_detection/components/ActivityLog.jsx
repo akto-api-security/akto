@@ -13,6 +13,7 @@ import func from '@/util/func';
 import {useState} from 'react';
 import GetPrettifyEndpoint from '../../observe/GetPrettifyEndpoint';
 import PersistStore from "../../../../main/PersistStore";
+import { labelMap } from '../../../../main/labelHelperMap';
   
  export const ActivityLog = ({ activityLog, actorDetails }) => {
     const [itemStrings, setItemStrings] = useState([
@@ -139,7 +140,7 @@ import PersistStore from "../../../../main/PersistStore";
                   {title: 'Time'},
                   {title: 'Attack type'},
                   {title: 'Severity'},
-                  {title: 'Api Endpoint'},
+                  {title: labelMap[PersistStore.getState().dashboardCategory]["API endpoint"]},
               ]}
           >
             {rowMarkup}

@@ -15,6 +15,7 @@ import SummaryCardInfo from "../../../components/shared/SummaryCardInfo";
 import LineChart from "../../../components/charts/LineChart";
 import TitleWithInfo from "@/apps/dashboard/components/shared/TitleWithInfo";
 import { useLocation } from "react-router-dom";
+import { getDashboardCategory, mapLabel } from "../../../../main/labelHelper";
 
 
 function ApiChanges() {
@@ -119,12 +120,12 @@ function ApiChanges() {
 
     const infoItems = [
         {
-            title: "New endpoints",
+            title: mapLabel("New endpoints", getDashboardCategory()),
             isComp: true,
             data: <div data-testid="new_endpoints_count" style={{fontWeight: 600, color: '#1F2124', fontSize: '14px'}}>{summaryCountObj.newEndpointsCount}</div>,
         },
         {
-            title: "New sensitive endpoints",
+            title: mapLabel("New sensitive endpoints", getDashboardCategory()),
             data: transform.formatNumberWithCommas(summaryCountObj.sensitiveEndpointsCount),
             color: "critical",
         },
@@ -170,7 +171,7 @@ function ApiChanges() {
             {
                 data: endpointsTrend,
                 color: "#61affe",
-                name: "New endpoints"
+                name: mapLabel("New endpoints", getDashboardCategory())
             },
             {
                 data: parametersTrend,
@@ -219,7 +220,7 @@ function ApiChanges() {
         <PageWithMultipleCards
             title={
                 <TitleWithInfo
-                    titleText={"API changes"}
+                    titleText={mapLabel("API changes", getDashboardCategory())}
                     docsUrl={"https://docs.akto.io/api-inventory/concepts/api-changes"}
                     tooltipContent={"Information about endpoints and parameters found in your inventory."}
                 />

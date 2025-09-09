@@ -6,6 +6,7 @@ import java.util.Map;
 import org.bson.conversions.Bson;
 
 import com.akto.action.UserAction;
+import com.akto.dao.context.Context;
 import com.akto.dao.monitoring.FilterConfigYamlParser;
 import com.akto.dao.monitoring.FilterYamlTemplateDao;
 import com.akto.dto.monitoring.FilterConfig;
@@ -21,6 +22,7 @@ public class FilterYamlTemplateAction extends UserAction {
     String content;
 
     public String fetchFilterYamlTemplate() {
+        FilterYamlTemplateDao.deleteContextCollectionsForUser(Context.accountId.get(), Context.contextSource.get());
         Map<String, FilterConfig> configs = FilterYamlTemplateDao.instance.fetchFilterConfig(true, false);
         this.templates = TrafficFilterUtil.getFilterTemplates(configs);
         return SUCCESS.toUpperCase();

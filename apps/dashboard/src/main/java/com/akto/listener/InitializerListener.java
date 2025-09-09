@@ -208,6 +208,7 @@ import com.akto.util.IntercomEventsUtil;
 import com.akto.util.JSONUtils;
 import com.akto.util.Pair;
 import com.akto.util.UsageUtils;
+import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 import com.akto.util.enums.GlobalEnums.Severity;
 import com.akto.util.enums.GlobalEnums.TemplatePlan;
 import com.akto.util.enums.GlobalEnums.TestCategory;
@@ -2487,6 +2488,44 @@ public class InitializerListener implements ServletContextListener {
                         logger.errorAndAddToDb("Failed to initialize Auth0 due to: " + e.getMessage(), LogDb.DASHBOARD);
                     }
                 }
+
+                // run backward fill job for query params
+                AccountTask.instance.executeTask(new Consumer<Account>() {
+                    @Override
+                    public void accept(Account t) {
+                        if(t.getId() == 1000000 || t.getId() == 1718042191 || t.getId() == 1736798101){
+                            Context.accountId.set(t.getId());
+                            Context.contextSource.set(com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE.API);
+                            logger.infoAndAddToDb("Starting backfill query params for account " + t.getId());
+                            int now = Context.now();
+                            BackwardCompatibility backwardCompatibility = BackwardCompatibilityDao.instance.findOne(Filters.empty());
+                            if(backwardCompatibility.getFillQueryParams() == 0){
+                                BackwardCompatibilityDao.instance.updateOne(
+                                    Filters.eq("_id", backwardCompatibility.getId()),
+                                    Updates.set("fillQueryParams", Context.now())
+                                );
+                                try {
+                                    List<ApiCollection> apiCollections = ApiCollectionsDao.instance.findAll(
+                                        Filters.and(
+                                            Filters.ne(ApiCollection._DEACTIVATED, true),
+                                            Filters.exists(ApiCollection.HOST_NAME, true)
+                                        ), Projections.include(ApiCollection.ID, ApiCollection.HOST_NAME)
+                                    );
+                                    logger.infoAndAddToDb("Fetched " + apiCollections.size() + " api collections");
+                                    SingleTypeInfo.fetchCustomDataTypes(t.getId());
+                                    for(ApiCollection apiCollection : apiCollections){
+                                        SampleDataDao.instance.backFillIsQueryParamInSingleTypeInfo(apiCollection.getId());
+                                    }
+                                    logger.infoAndAddToDb("Completed backfill query params for account " + t.getId() + " in " + (Context.now() - now) + " seconds");
+                                } catch (Exception e) {
+                                    logger.errorAndAddToDb(e, "Error while filling query params");
+                                }
+                                
+                            }
+                            
+                        }
+                    }
+                }, "backfill-query-params");
             }
         }, 0, TimeUnit.SECONDS);
 
@@ -4101,13 +4140,38 @@ public class InitializerListener implements ServletContextListener {
             @Override
             public void accept(Account a) {
                 int accountId = a.getId();
-                UsageMetricHandler.calcAndSyncAccountUsage(accountId);
+                UsageMetric endpointUsage = UsageMetricHandler.calcAndSyncAccountUsage(accountId);
+                int endpointCountOnDashboard = (int)fetchEndpointCountOnDashboard();
+                logger.debugAndAddToDb("Account: " + accountId + " endpoint count on billing: " + endpointUsage.getUsage() + " endpoint count on dashboard: " + endpointCountOnDashboard);
+                if (endpointCountOnDashboard != endpointUsage.getUsage()) {
+                    Organization organization = OrganizationsDao.instance.findOne(Filters.eq(Constants.ID, endpointUsage.getOrganizationId()));
+                    sendToSlack(organization, accountId, endpointUsage.getUsage(), endpointCountOnDashboard);
+                }
             }
         }, "usage-scheduler");
 
         DeactivateCollections.deactivateCollectionsJob();
 
         isCalcUsageRunning = false;
+    }
+
+    public static long fetchEndpointCountOnDashboard() {
+        Context.contextSource.set(CONTEXT_SOURCE.API);
+        Context.userId.set(0);
+        InventoryAction inventoryAction = new InventoryAction();
+        inventoryAction.setStartTimestamp(0);
+        inventoryAction.setEndTimestamp(0);
+        inventoryAction.fetchEndpointsCount();
+        return inventoryAction.getNewCount();
+    }
+
+    protected static void sendToSlack(Organization organization, int accountId, int billingCount, int dashboardCount) {
+        if (organization == null) {
+            return;
+        }
+        String txt = String.format("API endpoint count mismatch for %s %s acc: %s billing: %s dashboard: %s",
+                organization.getId(), organization.getAdminEmail(), accountId, billingCount, dashboardCount);
+        UsageMetricUtils.sendToUsageSlack(txt);
     }
 
     static boolean isSyncWithAktoRunning = false;

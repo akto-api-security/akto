@@ -136,7 +136,9 @@ public class UsageMetricHandler {
         return usageMetric;
     }
 
-    public static void calcAndSyncAccountUsage(int accountId){
+    public static UsageMetric calcAndSyncAccountUsage(int accountId){
+        UsageMetric apiEndpointsUsageMetric = new UsageMetric();
+
         try {
 
             AccountSettings accountSettings = AccountSettingsDao.instance.findOne(
@@ -144,7 +146,7 @@ public class UsageMetricHandler {
 
             if (accountSettings == null) {
                 loggerMaker.errorAndAddToDb("AccountSettings not found for account: " + accountId, LogDb.DASHBOARD);
-                return;
+                return apiEndpointsUsageMetric;
             }
             
             // Get organization to which account belongs to
@@ -154,7 +156,7 @@ public class UsageMetricHandler {
 
             if (organization == null) {
                 loggerMaker.errorAndAddToDb("Organization not found for account: " + accountId, LogDb.DASHBOARD);
-                return;
+                return apiEndpointsUsageMetric;
             }
 
             loggerMaker.infoAndAddToDb(String.format("Measuring usage for %s / %d ", organization.getName(), accountId), LogDb.DASHBOARD);
@@ -182,10 +184,15 @@ public class UsageMetricHandler {
                 );
 
                 updateOrgMeteredUsage(organization);
+                if (MetricTypes.ACTIVE_ENDPOINTS.equals(metricType)) {
+                    apiEndpointsUsageMetric = usageMetric;
+                }
             }
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, String.format("Error while measuring usage for account %d. Error: %s", accountId, e.getMessage()), LogDb.DASHBOARD);
         }
+
+        return apiEndpointsUsageMetric;
     }
 
     public static HashMap<String, FeatureAccess> updateFeatureMapWithLocalUsageMetrics(HashMap<String, FeatureAccess> featureWiseAllowed, Set<Integer> accounts){

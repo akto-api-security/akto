@@ -24,7 +24,9 @@ public class TestEditorEnums {
         COOKIE_EXPIRE_FILTER,
         DATATYPE,
         BELONGS_TO_COLLECTIONS,
-        VALUETYPE
+        VALUETYPE,
+        MAGIC_VALIDATE,
+        NOT_MAGIC_VALIDATE
     }
 
     public enum CollectionOperands {

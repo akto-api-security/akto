@@ -97,6 +97,10 @@ import UndoDemergedApis from "../dashboard/pages/settings/undo_demerged_apis/Und
 import GmailWebhookCore from "../dashboard/pages/settings/integrations/gmailWebhooks/GmailWebhookCore";
 import GmailWebhook from "../dashboard/pages/settings/integrations/gmailWebhooks/GmailWebhook";
 import McpSecurityPage from "../dashboard/pages/mcp-security/McpSecurityPage.jsx";
+import AuditData from "../dashboard/pages/observe/AuditData";
+import ComingSoonPage from "../dashboard/components/shared/ComingSoonPage";
+import GuardrailDetection    from "../dashboard/pages/guardrails/GuardrailDetection";
+import GuardrailPolicies   from "../dashboard/pages/guardrails/GuardrailPolicies";
 
 // if you add a component in a new path, please verify the search implementation in function -> 'getSearchItemsArr' in func.js
 
@@ -188,6 +192,11 @@ const router = createBrowserRouter([
                             {
                                 path: "sensitive/:subType/:apiCollectionId/:urlAndMethod",
                                 element: <SingleRequest/>
+                            },
+                            {
+                                path: "audit",
+                                element: <AuditData/>
+
                             }
                         ]
                     },
@@ -250,6 +259,19 @@ const router = createBrowserRouter([
                         path: "mcp-security",
                         element: <McpSecurityPage/>,
                     },
+                    {
+                        path: "guardrails",
+                        children: [
+                            {
+                                path: "activity",
+                                element: <GuardrailDetection/>
+                            },
+                            {
+                                path: "policies",
+                                element: <GuardrailPolicies/>
+                            }
+                        ]
+                    }
                 ]
             },
             {

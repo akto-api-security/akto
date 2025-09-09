@@ -99,6 +99,10 @@
    --color-delete: #f93e3e ;
    --color-head: #9012fe ;
    --color-patch: #50e3c2 ;
+   --color-tool: #49cc90;    /* green — active/action-oriented, like POST */
+   --color-resource: #61affe; /* blue — data/info-oriented, like GET */
+   --color-prompt: #bc6ff1;   /* purple — creative/conversational */
+
    --color-disabled: #ebebeb ;
    --color-options: #0d5aa7 ;
    --color-success-new: #008060;

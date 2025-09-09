@@ -1,6 +1,7 @@
 package com.akto.action;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
 import com.akto.dao.CustomRoleDao;
 import com.akto.dao.PendingInviteCodesDao;
@@ -14,6 +15,9 @@ import com.akto.util.Pair;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
+
+import lombok.Getter;
+import lombok.Setter;
 
 public class RoleAction extends UserAction {
 
@@ -113,6 +117,12 @@ public class RoleAction extends UserAction {
         return true;
     }
 
+    @Setter
+    private List<String> allowedFeaturesForUser;
+
+    @Getter
+    List<String> allowedFeaturesForRBAC;
+
     public String createCustomRole() {
 
         if (!validateRoleName()) {
@@ -139,7 +149,13 @@ public class RoleAction extends UserAction {
             return ERROR.toUpperCase();
         }
 
-        CustomRole role = new CustomRole(roleName, baseRole, apiCollectionIds, defaultInviteRole);
+        if(allowedFeaturesForUser != null && !allowedFeaturesForUser.isEmpty()) {
+            allowedFeaturesForUser = allowedFeaturesForUser.stream()
+                .filter(feature -> RBAC.SPECIAL_FEATURES_FOR_RBAC.contains(feature))
+                .collect(Collectors.toList());
+        }
+
+        CustomRole role = new CustomRole(roleName, baseRole, apiCollectionIds, defaultInviteRole, allowedFeaturesForUser);
         CustomRoleDao.instance.insertOne(role);
         RBACDao.instance.deleteUserEntryFromCache(new Pair<>(getSUser().getId(), Context.accountId.get()));
         return SUCCESS.toUpperCase();
@@ -167,10 +183,17 @@ public class RoleAction extends UserAction {
             return ERROR.toUpperCase();
         }
 
+        if(allowedFeaturesForUser != null && !allowedFeaturesForUser.isEmpty()) {
+            allowedFeaturesForUser = allowedFeaturesForUser.stream()
+                .filter(feature -> RBAC.SPECIAL_FEATURES_FOR_RBAC.contains(feature))
+                .collect(Collectors.toList());
+        }
+
         CustomRoleDao.instance.updateOne(Filters.eq(CustomRole._NAME, roleName),Updates.combine(
             Updates.set(CustomRole.BASE_ROLE, baseRole),
             Updates.set(CustomRole.API_COLLECTIONS_ID, apiCollectionIds),
-            Updates.set(CustomRole.DEFAULT_INVITE_ROLE, defaultInviteRole)
+            Updates.set(CustomRole.DEFAULT_INVITE_ROLE, defaultInviteRole),
+            Updates.set(RBAC.ALLOWED_FEATURES_FOR_USER, allowedFeaturesForUser)
         ));
         RBACDao.instance.deleteUserEntryFromCache(new Pair<>(getSUser().getId(), Context.accountId.get()));
 
@@ -204,6 +227,11 @@ public class RoleAction extends UserAction {
         CustomRoleDao.instance.deleteAll(Filters.eq(CustomRole._NAME, roleName));
         RBACDao.instance.deleteUserEntryFromCache(new Pair<>(getSUser().getId(), Context.accountId.get()));
 
+        return SUCCESS.toUpperCase();
+    }
+
+    public String allowedFeaturesForRBAC(){
+        this.allowedFeaturesForRBAC = RBAC.SPECIAL_FEATURES_FOR_RBAC;
         return SUCCESS.toUpperCase();
     }
 

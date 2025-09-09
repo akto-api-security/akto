@@ -434,16 +434,15 @@ public class TestExecutor {
 
                             Thread.sleep(2000);
                     }
+                }else{
+                    Thread.sleep(20000); // wait for 20 seconds to ensure all messages are processed
+                    dbObject.put("PRODUCER_RUNNING", false);
+                    dbObject.put("CONSUMER_RUNNING", true);
+                    writeJsonContentInFile(Constants.TESTING_STATE_FOLDER_PATH, Constants.TESTING_STATE_FILE_NAME, dbObject);
+                    loggerMaker.infoAndAddToDb("Finished inserting records in kafka: " + totalRecordsInsertedInKafka.get() + " skipping records: " + skippedRecordsForKafka.get(), LogDb.TESTING);
                 }
-
             } catch (InterruptedException e) {
                 throw new RuntimeException(e);
-            }
-            if(Constants.IS_NEW_TESTING_ENABLED){
-                dbObject.put("PRODUCER_RUNNING", false);
-                dbObject.put("CONSUMER_RUNNING", true);
-                writeJsonContentInFile(Constants.TESTING_STATE_FOLDER_PATH, Constants.TESTING_STATE_FILE_NAME, dbObject);
-                loggerMaker.infoAndAddToDb("Finished inserting records in kafka: " + totalRecordsInsertedInKafka.get() + " skipping records: " + skippedRecordsForKafka.get(), LogDb.TESTING);
             }
         }
         
@@ -1262,7 +1261,6 @@ public class TestExecutor {
                 if (methodIndex != -1) {
                     // Remove everything from method name onwards
                     String trimmedUrl = url.substring(0, methodIndex);
-                    apiInfoKey.setUrl(trimmedUrl);
                     rawApi.getRequest().setUrl(trimmedUrl);
                 }
             }

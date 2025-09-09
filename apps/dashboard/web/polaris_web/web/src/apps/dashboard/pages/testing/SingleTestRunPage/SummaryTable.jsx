@@ -5,6 +5,7 @@ import api from '../api'
 import { IndexTable, useIndexResourceState, LegacyCard, HorizontalStack, Pagination } from '@shopify/polaris'
 import { GithubRow } from '../../../components/tables/rows/GithubRow'
 import observeFunc from "../../observe/transform"
+import { getDashboardCategory, mapLabel } from '../../../../main/labelHelper'
 
 function SummaryTable({testingRunResultSummaries, setSummary}) {
 
@@ -25,7 +26,7 @@ function SummaryTable({testingRunResultSummaries, setSummary}) {
             isCustom: true
         },
         {
-            title: 'Total apis tested',
+            title: `Total ${mapLabel('APIs Tested', getDashboardCategory())}`,
             value: 'totalApis',
         },
     ]

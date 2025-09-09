@@ -6,7 +6,7 @@ function DropdownSearch(props) {
 
     const id = props.id ? props.id : "dropdown-search"
 
-    const { disabled, label, placeholder, optionsList, setSelected, value , avatarIcon, preSelected, allowMultiple, itemName, dropdownSearchKey, isNested, sliceMaxVal, showSelectedItemLabels=false, searchDisable=false} = props
+    const { disabled, label, placeholder, optionsList, setSelected, value , avatarIcon, preSelected, allowMultiple, itemName, dropdownSearchKey, isNested, sliceMaxVal, showSelectedItemLabels=false, searchDisable=false, textfieldRequiredIndicator=false} = props
 
     const deselectedOptions = optionsList
     const [selectedOptions, setSelectedOptions] = useState(preSelected ? preSelected : []);
@@ -191,6 +191,7 @@ function DropdownSearch(props) {
             suffix={<Icon source={ChevronDownMinor} color="base" />}
             placeholder={placeholder}
             autoComplete="off"
+            requiredIndicator={textfieldRequiredIndicator}
             {...(!searchDisable? {onFocus:handleFocusEvent}: {})}
         />
     );

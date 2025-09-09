@@ -1,6 +1,9 @@
 package com.akto.mcp;
 
+import com.akto.dao.McpAuditInfoDao;
+import com.akto.dao.context.Context;
 import com.akto.dto.HttpResponseParams;
+import com.akto.dto.McpAuditInfo;
 import com.akto.jsonrpc.JsonRpcUtils;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
@@ -15,6 +18,8 @@ import java.util.Set;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
+
+import static com.akto.util.Constants.*;
 
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public final class McpRequestResponseUtils {
@@ -78,21 +83,58 @@ public final class McpRequestResponseUtils {
 
         String url = responseParams.getRequestParams().getURL();
 
+        McpAuditInfo auditInfo = null;
+
         switch (mcpJsonRpcModel.getMethod()) {
             case McpSchema.METHOD_TOOLS_CALL:
                 if (params != null && StringUtils.isNotBlank(params.getName())) {
                     url = HttpResponseParams.addPathParamToUrl(url, params.getName());
+
+                    // Create audit info for MCP Tool call
+                    auditInfo = new McpAuditInfo(
+                            Context.now(), "", AKTO_MCP_TOOLS_TAG, 0,
+                            params.getName(), "", null,
+                            responseParams.getRequestParams().getApiCollectionId()
+                    );
                 }
                 break;
 
             case McpSchema.METHOD_RESOURCES_READ:
                 if (params != null && StringUtils.isNotBlank(params.getUri())) {
                     url = HttpResponseParams.addPathParamToUrl(url, params.getUri());
+
+                    // Create audit info for MCP Resource read
+                    auditInfo = new McpAuditInfo(
+                            Context.now(), "", AKTO_MCP_RESOURCES_TAG, 0,
+                            params.getName(), "", null,
+                            responseParams.getRequestParams().getApiCollectionId()
+                    );
+                }
+                break;
+
+            case McpSchema.METHOD_PROMPT_GET:
+                if (params != null && StringUtils.isNotBlank(params.getName())) {
+                    url = HttpResponseParams.addPathParamToUrl(url, params.getName());
+
+                    // Create audit info for MCP Resource read
+                    auditInfo = new McpAuditInfo(
+                            Context.now(), "", AKTO_MCP_PROMPTS_TAG, 0,
+                            params.getName(), "", null,
+                            responseParams.getRequestParams().getApiCollectionId()
+                    );
                 }
                 break;
 
             default:
                 break;
+        }
+
+        if (auditInfo != null) {
+            try {
+                McpAuditInfoDao.instance.insertOne(auditInfo);
+            } catch (Exception e) {
+                logger.error("Error inserting MCP audit data log", e);
+            }
         }
         responseParams.getRequestParams().setUrl(url);
     }
