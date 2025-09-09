@@ -6,6 +6,7 @@ import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.rbac.UsersCollectionsList;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.util.Constants;
+import com.akto.util.Pair;
 import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.MongoCursor;
@@ -267,16 +268,19 @@ public class ApiCollectionsDao extends AccountsContextDaoWithRbac<ApiCollection>
                     MongoCursor<BasicDBObject> cursor = SingleTypeInfoDao.instance.getMCollection()
                         .aggregate(pipeline, BasicDBObject.class).cursor();
                     
-                    while(cursor.hasNext()) {
-                        try {
+                    try {
+                        while(cursor.hasNext()) {
                             BasicDBObject doc = cursor.next();
                             int apiCollectionId = doc.getInt("_id");
                             int count = doc.getInt("count");
                             nonGroupCountMap.put(apiCollectionId, count);
-                        } catch (Exception e) {
-                            e.printStackTrace();
                         }
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    } finally {
+                        cursor.close(); // Always close cursor to free resources
                     }
+
                 }
             } finally {
                 // Clean up ThreadLocal
@@ -296,34 +300,77 @@ public class ApiCollectionsDao extends AccountsContextDaoWithRbac<ApiCollection>
             try {
                 if(!groupCollectionIds.isEmpty()) {
                     Bson hostHeaderFilter = SingleTypeInfoDao.filterForHostHeader(0, false);
-                    List<Bson> pipeline = new ArrayList<>();
-                    pipeline.add(Aggregates.match(Filters.and(
-                        hostHeaderFilter,
-                        Filters.in(SingleTypeInfo._COLLECTION_IDS, groupCollectionIds),
-                        filter
-                    )));
-                    pipeline.add(Aggregates.unwind("$" + SingleTypeInfo._COLLECTION_IDS));
-                    pipeline.add(Aggregates.match(
-                        Filters.in(SingleTypeInfo._COLLECTION_IDS, groupCollectionIds)
-                    ));
-                    pipeline.add(Aggregates.group(
-                        "$" + SingleTypeInfo._COLLECTION_IDS,
-                        Accumulators.sum("count", 1)
-                    ));
                     
-                    MongoCursor<BasicDBObject> cursor = SingleTypeInfoDao.instance.getMCollection()
-                        .aggregate(pipeline, BasicDBObject.class).cursor();
-                    
-                    while(cursor.hasNext()) {
+                    // For small number of groups, individual queries are faster than $unwind
+                    if (groupCollectionIds.size() <= 20) {
+                        
+                        // Run individual count queries in parallel using CompletableFutures
+                        List<CompletableFuture<Pair<Integer, Integer>>> futures = new ArrayList<>();
+                        ExecutorService queryExecutor = Executors.newFixedThreadPool(Math.min(groupCollectionIds.size(), 10));
+                        
+                        for (Integer collectionId : groupCollectionIds) {
+                            CompletableFuture<Pair<Integer, Integer>> future = CompletableFuture.supplyAsync(() -> {
+                                Bson matchFilter = Filters.and(
+                                    hostHeaderFilter,
+                                    Filters.eq(SingleTypeInfo._COLLECTION_IDS, collectionId),
+                                    filter
+                                );
+                                long count = SingleTypeInfoDao.instance.getMCollection().countDocuments(matchFilter);
+                                return new Pair<>(collectionId, (int)count);
+                            }, queryExecutor);
+                            futures.add(future);
+                        }
+                        
+                        // Collect results
                         try {
-                            BasicDBObject doc = cursor.next();
-                            int apiCollectionId = doc.getInt("_id");
-                            int count = doc.getInt("count");
-                            groupCountMap.put(apiCollectionId, count);
+                            CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
+                            for (CompletableFuture<Pair<Integer, Integer>> future : futures) {
+                                Pair<Integer, Integer> result = future.get();
+                                groupCountMap.put(result.getFirst(), result.getSecond());
+                            }
                         } catch (Exception e) {
                             e.printStackTrace();
+                        } finally {
+                            queryExecutor.shutdown();
+                        }
+                        
+                    } else {
+                        // For large number of groups, use optimized aggregation
+                        
+                        // Remove redundant second match after unwind
+                        List<Bson> pipeline = new ArrayList<>();
+                        pipeline.add(Aggregates.match(Filters.and(
+                            hostHeaderFilter,
+                            Filters.in(SingleTypeInfo._COLLECTION_IDS, groupCollectionIds),
+                            filter
+                        )));
+                        pipeline.add(Aggregates.unwind("$" + SingleTypeInfo._COLLECTION_IDS));
+                        // REMOVED redundant match - unwind already filtered the documents
+                        pipeline.add(Aggregates.group(
+                            "$" + SingleTypeInfo._COLLECTION_IDS,
+                            Accumulators.sum("count", 1)
+                        ));
+                        
+                        MongoCursor<BasicDBObject> cursor = SingleTypeInfoDao.instance.getMCollection()
+                            .aggregate(pipeline, BasicDBObject.class)
+                            .allowDiskUse(true)
+                            .batchSize(1000)
+                            .cursor();
+                        
+                        try {
+                            while(cursor.hasNext()) {
+                                BasicDBObject doc = cursor.next();
+                                int apiCollectionId = doc.getInt("_id");
+                                int count = doc.getInt("count");
+                                groupCountMap.put(apiCollectionId, count);
+                            }
+                        } catch (Exception e) {
+                            e.printStackTrace();
+                        } finally {
+                            cursor.close();
                         }
                     }
+                    
                 }
             } finally {
                 // Clean up ThreadLocal
