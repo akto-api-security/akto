@@ -99,6 +99,8 @@ import GmailWebhook from "../dashboard/pages/settings/integrations/gmailWebhooks
 import McpSecurityPage from "../dashboard/pages/mcp-security/McpSecurityPage.jsx";
 import AuditData from "../dashboard/pages/observe/AuditData";
 import ComingSoonPage from "../dashboard/components/shared/ComingSoonPage";
+import GuardrailDetection    from "../dashboard/pages/guardrails/GuardrailDetection";
+import GuardrailPolicies   from "../dashboard/pages/guardrails/GuardrailPolicies";
 
 // if you add a component in a new path, please verify the search implementation in function -> 'getSearchItemsArr' in func.js
 
@@ -258,13 +260,18 @@ const router = createBrowserRouter([
                         element: <McpSecurityPage/>,
                     },
                     {
-                        path: "mcp-guardrails",
-                        element: <ComingSoonPage title="MCP Guardrails" />,
-                    },
-                    {
-                        path: "ai-agent-guardrails",
-                        element: <ComingSoonPage title="AI Agent Guardrails" />,
-                    },
+                        path: "guardrails",
+                        children: [
+                            {
+                                path: "activity",
+                                element: <GuardrailDetection/>
+                            },
+                            {
+                                path: "policies",
+                                element: <GuardrailPolicies/>
+                            }
+                        ]
+                    }
                 ]
             },
             {

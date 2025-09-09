@@ -13,7 +13,6 @@ import org.bson.conversions.Bson;
 
 import com.akto.action.observe.Utils;
 import com.akto.dao.*;
-import com.akto.dao.McpAuditInfoDao;
 import com.akto.billing.UsageMetricUtils;
 import com.akto.dao.context.Context;
 import com.akto.dto.billing.FeatureAccess;
@@ -106,13 +105,16 @@ public class ApiCollectionsAction extends UserAction {
     public List<ApiCollection> fillApiCollectionsUrlCount(List<ApiCollection> apiCollections, Bson filter) {
         int tsRandom = Context.now();
         loggerMaker.debugAndAddToDb("fillApiCollectionsUrlCount started: " + tsRandom, LoggerMaker.LogDb.DASHBOARD);
-        Map<Integer, Integer> countMap = ApiCollectionsDao.instance.buildEndpointsCountToApiCollectionMap(filter);
+        Map<Integer, Integer> countMap = ApiCollectionsDao.instance.buildEndpointsCountToApiCollectionMapOptimized(filter, apiCollections);
         loggerMaker.debugAndAddToDb("fillApiCollectionsUrlCount buildEndpointsCountToApiCollectionMap done: " + tsRandom, LoggerMaker.LogDb.DASHBOARD);
 
         for (ApiCollection apiCollection: apiCollections) {
             int apiCollectionId = apiCollection.getId();
             Integer count = countMap.get(apiCollectionId);
             int fallbackCount = apiCollection.getUrls()!=null ? apiCollection.getUrls().size() : apiCollection.getUrlsCount();
+            if (apiCollectionId == RuntimeListener.VULNERABLE_API_COLLECTION_ID) {
+                fallbackCount = 200;    
+            }
             if (count != null && (apiCollection.getHostName() != null)) {
                 apiCollection.setUrlsCount(count);
             } else if(ApiCollection.Type.API_GROUP.equals(apiCollection.getType())){
@@ -214,33 +216,9 @@ public class ApiCollectionsAction extends UserAction {
     }
 
     public String fetchAllCollectionsBasic() {
-        List<Bson> pipeLine = new ArrayList<>();
-        // remove the cache of context collections for account
         UsersCollectionsList.deleteContextCollectionsForUser(Context.accountId.get(), Context.contextSource.get());
-        pipeLine.add(Aggregates.project(Projections.fields(
-                Projections.computed(ApiCollection.URLS_COUNT, new BasicDBObject("$size", new BasicDBObject("$ifNull", Arrays.asList("$urls", Collections.emptyList())))),
-                Projections.include(ApiCollection.ID, ApiCollection.NAME, ApiCollection.HOST_NAME, ApiCollection._TYPE, ApiCollection.TAGS_STRING, ApiCollection._DEACTIVATED,ApiCollection.START_TS, ApiCollection.AUTOMATED, ApiCollection.DESCRIPTION, ApiCollection.USER_ENV_TYPE, ApiCollection.IS_OUT_OF_TESTING_SCOPE, ApiCollection._URLS)
-        )));
-
-        try {
-            List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
-            if(collectionIds != null) {
-                pipeLine.add(Aggregates.match(Filters.in(Constants.ID, collectionIds)));
-            }
-        } catch(Exception e){
-        }
-        MongoCursor<ApiCollection> cursor = ApiCollectionsDao.instance.getMCollection().aggregate(pipeLine, ApiCollection.class).cursor();
-        while(cursor.hasNext()){
-            try {
-                ApiCollection apiCollection = cursor.next();
-                this.apiCollections.add(apiCollection);
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-        }
-
+        this.apiCollections = ApiCollectionsDao.instance.findAll(Filters.empty(), Projections.exclude("urls"));
         this.apiCollections = fillApiCollectionsUrlCount(this.apiCollections, Filters.nin(SingleTypeInfo._API_COLLECTION_ID, deactivatedCollections));
-
         return Action.SUCCESS.toUpperCase();
     }
 
@@ -1195,31 +1173,56 @@ public class ApiCollectionsAction extends UserAction {
                 );
                 this.mcpDataCount = (int) ApiInfoDao.instance.count(thirdPartyFilter);
                 break;
+            case "OPEN_ALERTS":
+                Bson openAlertsFilter = Filters.and(
+                        Filters.or(Filters.eq("markedBy", ""), Filters.eq("markedBy", null)),
+                        Filters.or(Filters.eq("remarks", ""), Filters.eq("remarks", null))
+                );
+                this.mcpDataCount = (int) McpAuditInfoDao.instance.count(openAlertsFilter);
+                break;
             case "CRITICAL_APIS":
-                // ...existing code...
+                Bson criticalApisFilter = Filters.and(
+                        filterQ,
+                        Filters.in(ApiInfo.ID_API_COLLECTION_ID, mcpCollectionIds),
+                        Filters.gte(ApiInfo.RISK_SCORE, 4)
+                );
+                this.mcpDataCount = (int) ApiInfoDao.instance.count(criticalApisFilter);
                 break;
             case "TOOLS":
-                // ...existing code...
+                Bson toolsFilter = Filters.and(
+                        Filters.eq("type", Constants.AKTO_MCP_TOOL),
+                        Filters.ne("remarks", "Rejected")
+                );
+                this.mcpDataCount = (int) McpAuditInfoDao.instance.count(toolsFilter);
                 break;
             case "PROMPTS":
-                // ...existing code...
+                Bson promptsFilter = Filters.and(
+                        Filters.eq("type", Constants.AKTO_MCP_PROMPT),
+                        Filters.ne("remarks", "Rejected")
+                );
+                this.mcpDataCount = (int) McpAuditInfoDao.instance.count(promptsFilter);
                 break;
             case "RESOURCES":
-                // ...existing code...
+                Bson resourcesFilter = Filters.and(
+                        Filters.eq("type", Constants.AKTO_MCP_RESOURCE),
+                        Filters.ne("remarks", "Rejected")
+                );
+                this.mcpDataCount = (int) McpAuditInfoDao.instance.count(resourcesFilter);
                 break;
-            case "SERVERS":
-                // ...existing code...
+
+            case "MCP_SERVER":
+                Bson mcpServerFilter = Filters.and(
+                        Filters.eq("type", Constants.AKTO_MCP_SERVER),
+                        Filters.ne("remarks", "Rejected")
+                );
+                this.mcpDataCount = (int) McpAuditInfoDao.instance.count(mcpServerFilter);
                 break;
-            case "AGENTS":
-                // ...existing code...
-                break;
-            case "CLIENTS":
-                // ...existing code...
-                break;
+
             default:
-                // ...existing code...
+                addActionError("Invalid filter type: " + filterType);
+                return Action.ERROR.toUpperCase();
         }
-        // ...existing code...
+
 
         return Action.SUCCESS.toUpperCase();
     }
