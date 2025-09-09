@@ -188,20 +188,6 @@ jobs:
           name: Release ${{ steps.tag_version.outputs.new_tag }}
           omitBody: true
 
-      - name: Send Github release notification to Slack Mini-Runtime
-        if: ${{ github.event.inputs.mini-runtime == 'true' }}
-        id: slack-tag
-        uses: slackapi/slack-github-action@v1.23.0
-        with:
-          payload: |
-            {
-              "text": "Mini Runtime v${{ github.event.inputs.release_version }} released with tag vmini-runtime-${{ github.event.inputs.release_version }}!"
-            }
-        env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-          SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
-
-      # Additional conditional tagging and releases for other modules
       - name: Push git tag Mini-Testing
         if: ${{ github.event.inputs.mini-testing == 'true' }}
         id: tag_mini_testing
@@ -217,19 +203,6 @@ jobs:
           tag: ${{ steps.tag_mini_testing.outputs.new_tag }}
           name: Release ${{ steps.tag_mini_testing.outputs.new_tag }}
           omitBody: true
-
-      - name: Send Github release notification to Slack Mini-Testing
-        if: ${{ github.event.inputs.mini-testing == 'true' }}
-        id: slack-tag-mini-testing
-        uses: slackapi/slack-github-action@v1.23.0
-        with:
-          payload: |
-            {
-              "text": "Mini Testing v${{ github.event.inputs.release_version }} released with tag vmini-testing-${{ github.event.inputs.release_version }}!"
-            }
-        env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-          SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
 
       - name: Push git tag Testing-Db-Layer
         if: ${{ github.event.inputs.testing-db-layer == 'true' }}
@@ -247,19 +220,6 @@ jobs:
           name: Release ${{ steps.tag_testing_db_layer.outputs.new_tag }}
           omitBody: true
 
-      - name: Send Github release notification to Slack Testing-Db-Layer
-        if: ${{ github.event.inputs.testing-db-layer == 'true' }}
-        id: slack-tag-testing-db-layer
-        uses: slackapi/slack-github-action@v1.23.0
-        with:
-          payload: |
-            {
-              "text": "Testing DB Layer v${{ github.event.inputs.release_version }} released with tag vtesting-db-layer-${{ github.event.inputs.release_version }}!"
-            }
-        env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-          SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
-
       - name: Push git tag Mini-Runtime-Service
         if: ${{ github.event.inputs.mini-runtime-service == 'true' }}
         id: tag_mini_runtime_service
@@ -275,16 +235,3 @@ jobs:
           tag: ${{ steps.tag_mini_runtime_service.outputs.new_tag }}
           name: Release ${{ steps.tag_mini_runtime_service.outputs.new_tag }}
           omitBody: true
-
-      - name: Send Github release notification to Slack Mini-Runtime-Service
-        if: ${{ github.event.inputs.mini-runtime-service == 'true' }}
-        id: slack-tag-mini-runtime-service
-        uses: slackapi/slack-github-action@v1.23.0
-        with:
-          payload: |
-            {
-              "text": "Mini Runtime Service v${{ github.event.inputs.release_version }} released with tag vmini-runtime-service-${{ github.event.inputs.release_version }}!"
-            }
-        env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-          SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
