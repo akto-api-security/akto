@@ -1327,14 +1327,24 @@ public class ApiCollectionsAction extends UserAction {
                 Bson guardRailTagFilter = Filters.elemMatch(ApiCollection.TAGS_STRING,
                     Filters.eq("keyName", Constants.AKTO_GUARD_RAIL_TAG)
                 );
-                List<ApiCollection> guardRailCollections = ApiCollectionsDao.instance.findAll(guardRailTagFilter, null);
-                List<Integer> guardRailCollectionIds = guardRailCollections.stream().map(ApiCollection::getId).collect(Collectors.toList());
-                Bson filter = UsageMetricCalculator.excludeDemosAndDeactivated(SingleTypeInfo._API_COLLECTION_ID);
+                // Use projection to only fetch IDs, reducing memory usage
+                List<ApiCollection> guardRailCollections = ApiCollectionsDao.instance.findAll(
+                    guardRailTagFilter, 
+                    Projections.include(ApiCollection.ID)
+                );
+                List<Integer> guardRailCollectionIds = guardRailCollections.stream()
+                    .map(ApiCollection::getId)
+                    .collect(Collectors.toList());
+                
                 if (!guardRailCollectionIds.isEmpty()) {
-                    Bson guardRailApisFilter = Filters.and(
-                            filter,
-                        Filters.in(SingleTypeInfo._API_COLLECTION_ID, guardRailCollectionIds)
-                    );
+
+                    // Put the indexed field first in the AND clause for better index utilization
+                    Bson collectionFilter = Filters.in(SingleTypeInfo._API_COLLECTION_ID, guardRailCollectionIds);
+                    Bson excludeFilter = UsageMetricCalculator.excludeDemosAndDeactivated(SingleTypeInfo._API_COLLECTION_ID);
+                    
+                    // Order matters for index usage - put the most selective filter first
+                    Bson guardRailApisFilter = Filters.and(collectionFilter, excludeFilter);
+                    
                     this.mcpDataCount = (int) SingleTypeInfoDao.instance.count(guardRailApisFilter);
                 } else {
                     this.mcpDataCount = 0;
