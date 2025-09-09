@@ -610,4 +610,240 @@ public class TestResultsStatsActionTest extends MongoBasedTest {
         assertEquals(9, action.getCount()); // Should find 9 Cloudflare blocking scenarios, excluding benign responses
         assertTrue(action.getActionErrors().isEmpty());
     }
+
+    @Test
+    public void testRegexPatternForCloudflareHTMLErrorPages() {
+        String regex = TestResultsStatsAction.REGEX_CLOUDFLARE;
+
+        // HTML error pages that should match
+        String[] htmlErrors = {
+                "<!DOCTYPE html><html><head><title>Attention Required! | Cloudflare</title></head><body><h1>Sorry, you have been blocked</h1></body></html>",
+                "<!DOCTYPE html><html><head><title>Just a moment...</title></head><body><p>DDoS protection by Cloudflare</p></body></html>",
+                "<!DOCTYPE html><html><head><title>Security Check - Cloudflare</title></head><body><div class=\"error-code\">Error 1020: Access denied</div></body></html>",
+                "<!DOCTYPE html><html><head><title>Under Attack Mode - Cloudflare</title></head><body><h1>Website Under Attack Mode</h1></body></html>",
+                "<html><body><h1>Checking your browser before accessing the website.</h1><p>DDoS protection by Cloudflare</p></body></html>"
+        };
+
+        for (String html : htmlErrors) {
+            assertTrue("HTML error page should match: " + html.substring(0, Math.min(100, html.length())),
+                    html.toLowerCase().matches(".*" + regex + ".*"));
+        }
+    }
+
+    @Test
+    public void testRegexPatternForCloudflareAPIErrors() {
+        String regex = TestResultsStatsAction.REGEX_CLOUDFLARE;
+
+        // API error responses that should match
+        String[] apiErrors = {
+                "{\"error\":{\"code\":1020,\"message\":\"Access denied\"},\"ray_id\":\"7f2a8c9b4e1d3a6f\"}",
+                "{\"error\":{\"code\":1015,\"message\":\"Rate limit exceeded\"},\"ray_id\":\"8g3b9d0c5f2e4b7g\"}",
+                "{\"error\":{\"code\":1012,\"message\":\"Access denied\"},\"ray_id\":\"9h4c0e1d6g3f5c8h\"}",
+                "{\"error\":{\"code\":1025,\"message\":\"Please check back later\"},\"ray_id\":\"0i5d1f2e7h4g6d9i\"}",
+                "{\"error\":{\"code\":1101,\"message\":\"Worker threw exception\"},\"ray_id\":\"1j6e2g3f8i5h7e0j\"}",
+                "{\"error\":{\"code\":1102,\"message\":\"Worker exceeded CPU time limit\"},\"ray_id\":\"2k7f3h4g9j6i8f1k\"}",
+                "{\"error\":{\"code\":1200,\"message\":\"HTTP/1.1 400 Bad Request\"},\"ray_id\":\"3l8g4i5h0k7j9g2l\"}",
+                "{\"error\":{\"code\":10001,\"message\":\"API rate limit exceeded\"},\"ray_id\":\"4m9h5j6i1l8k0h3m\"}"
+        };
+
+        for (String apiError : apiErrors) {
+            assertTrue("API error should match: " + apiError,
+                    apiError.toLowerCase().matches(".*" + regex + ".*"));
+        }
+    }
+
+    @Test
+    public void testRegexPatternForWAFBlocking() {
+        String regex = TestResultsStatsAction.REGEX_CLOUDFLARE;
+
+        // WAF blocking messages that should match
+        String[] wafMessages = {
+                "WAF Alert: SQL injection attempt detected and blocked by Cloudflare security rules",
+                "WAF Block: Cross-site scripting (XSS) attack prevented by Web Application Firewall",
+                "WAF Security: Malicious payload detected in request headers - access denied",
+                "WAF Protection: Command injection attempt blocked by security policy",
+                "WAF Triggered: Suspicious file upload blocked by Cloudflare WAF rules",
+                "WAF Defense: Directory traversal attack prevented by Web Application Firewall",
+                "WAF Alert: Server-side template injection attempt blocked",
+                "WAF Security: XML external entity (XXE) attack prevented",
+                "WAF Block: LDAP injection attempt detected and denied",
+                "WAF Protection: Remote file inclusion attack blocked by security rules"
+        };
+
+        for (String wafMessage : wafMessages) {
+            assertTrue("WAF message should match: " + wafMessage,
+                    wafMessage.toLowerCase().matches(".*" + regex + ".*"));
+        }
+    }
+
+    @Test
+    public void testRegexPatternForChallengePages() {
+        String regex = TestResultsStatsAction.REGEX_CLOUDFLARE;
+
+        // Challenge and verification pages that should match
+        String[] challengeMessages = {
+                "Cloudflare managed challenge: Please complete the verification to continue to the website",
+                "Interactive challenge required: Click to verify you are human before accessing this website",
+                "CAPTCHA verification: Complete the security check to prove you are not a robot",
+                "Browser integrity check: Verifying your browser supports JavaScript and cookies",
+                "Security challenge: Please wait while we verify your request is legitimate",
+                "Managed challenge: Additional verification required due to suspicious activity",
+                "Javascript challenge: Your browser will be checked before accessing the website",
+                "Cloudflare challenge: Please complete the verification process to continue",
+                "Checking your browser before accessing the website DDoS protection by Cloudflare",
+                "Under attack mode activated by Cloudflare for this website"
+        };
+
+        for (String challenge : challengeMessages) {
+            assertTrue("Challenge message should match: " + challenge,
+                    challenge.toLowerCase().matches(".*" + regex + ".*"));
+        }
+    }
+
+    @Test
+    public void testRegexPatternForSpecificCloudflareErrorCodes() {
+        String regex = TestResultsStatsAction.REGEX_CLOUDFLARE;
+
+        // Test specific Cloudflare error codes
+        String[] errorCodes = {
+                "Error 1000: DNS points to prohibited IP",
+                "Error 1001: DNS resolution error",
+                "Error 1002: DNS points to prohibited IP",
+                "Error 1003: Direct IP access not allowed",
+                "Error 1004: Host not configured to serve web traffic over HTTPS",
+                "Error 1005: Country or region blocked by administrator",
+                "Error 1006: Access denied due to robot activity",
+                "Error 1007: Access denied due to proxy traffic",
+                "Error 1008: Access denied due to VPN traffic",
+                "Error 1009: Access denied due to banned country",
+                "Error 1010: The owner of this website bans your access based on your browser",
+                "Error 1011: Access denied due to hotlinking",
+                "Error 1012: Access denied",
+                "Error 1013: HTTP hostname and TLS SNI hostname mismatch",
+                "Error 1014: CNAME Cross-User Banned",
+                "Error 1015: You are being rate limited",
+                "Error 1016: Origin DNS error",
+                "Error 1017: Origin web server connection failed",
+                "Error 1018: Could not route to the origin server",
+                "Error 1019: Compute server error",
+                "Error 1020: Access denied",
+                "Error 1021: The request is not allowed",
+                "Error 1022: The request is not allowed",
+                "Error 1023: Access is denied",
+                "Error 1024: Please check back later",
+                "Error 1025: Please check back later",
+                "Error 10000: Unknown error",
+                "Error 10001: Country blocked",
+                "Error 10002: Suspected bot activity",
+                "Error 10003: Request denied for security reasons",
+                "Error 10004: Too many requests",
+                "Error 10005: Access denied by security rule",
+                "Error 10006: Website temporarily disabled"
+        };
+
+        for (String errorCode : errorCodes) {
+            assertTrue("Error code should match: " + errorCode,
+                    errorCode.toLowerCase().matches(".*" + regex + ".*"));
+        }
+    }
+
+    @Test
+    public void testRegexPatternForUnderAttackMode() {
+        String regex = TestResultsStatsAction.REGEX_CLOUDFLARE;
+
+        // Under attack mode messages
+        String[] underAttackMessages = {
+                "Website under attack mode activated by Cloudflare",
+                "This website is currently under attack and has activated Cloudflare protection",
+                "Under attack mode: additional security measures by Cloudflare",
+                "Cloudflare under attack mode: Please wait while we check your browser",
+                "DDoS protection: under attack mode enabled for this website",
+                "Security check in progress - under attack mode by Cloudflare"
+        };
+
+        for (String message : underAttackMessages) {
+            assertTrue("Under attack message should match: " + message,
+                    message.toLowerCase().matches(".*" + regex + ".*"));
+        }
+    }
+
+    @Test
+    public void testRegexPatternForDDoSProtection() {
+        String regex = TestResultsStatsAction.REGEX_CLOUDFLARE;
+
+        // DDoS protection messages
+        String[] ddosMessages = {
+                "DDoS protection by Cloudflare activated",
+                "Cloudflare DDoS protection: request being verified",
+                "Anti-DDoS measures enabled by Cloudflare",
+                "DDoS attack mitigation in progress - protected by Cloudflare",
+                "Cloudflare is protecting this website from DDoS attacks"
+        };
+
+        for (String ddosMessage : ddosMessages) {
+            assertTrue("DDoS message should match: " + ddosMessage,
+                    ddosMessage.toLowerCase().matches(".*" + regex + ".*"));
+        }
+    }
+
+    @Test
+    public void testRegexPatternForSecurityChecks() {
+        String regex = TestResultsStatsAction.REGEX_CLOUDFLARE;
+
+        // Security check messages
+        String[] securityMessages = {
+                "Security check required by Cloudflare",
+                "Cloudflare security check: verifying your browser",
+                "Additional security verification by Cloudflare required",
+                "Security challenge activated by Cloudflare protection",
+                "Cloudflare security screening in progress"
+        };
+
+        for (String securityMessage : securityMessages) {
+            assertTrue("Security message should match: " + securityMessage,
+                    securityMessage.toLowerCase().matches(".*" + regex + ".*"));
+        }
+    }
+
+    @Test
+    public void testRegexPatternForRayIdBlocked() {
+        String regex = TestResultsStatsAction.REGEX_CLOUDFLARE;
+
+        // Ray ID blocking scenarios
+        String[] rayIdMessages = {
+                "Ray ID 7f2a8c9b4e1d3a6f blocked due to security violation",
+                "Request blocked - Ray ID: 8g3b9d0c5f2e4b7g",
+                "Access denied: Ray ID 9h4c0e1d6g3f5c8h blocked",
+                "Security violation - Ray ID abc123def456 blocked",
+                "Ray ID XYZ789 blocked by security policy"
+        };
+
+        for (String rayMessage : rayIdMessages) {
+            assertTrue("Ray ID blocked message should match: " + rayMessage,
+                    rayMessage.toLowerCase().matches(".*" + regex + ".*"));
+        }
+    }
+
+    @Test
+    public void testRegexPatternForBenignCloudflareTraffic() {
+        String regex = TestResultsStatsAction.REGEX_CLOUDFLARE;
+
+        // These should NOT match - benign Cloudflare traffic
+        String[] benignMessages = {
+                "{\"statusCode\": 200, \"headers\": {\"cf-ray\": \"7f9e7f2ad9be2a3c-DEL\", \"server\": \"cloudflare\"}}",
+                "{\"statusCode\": 201, \"headers\": {\"cf-ray\": \"72f0a1b7ce4321ab-LHR\"}}",
+                "{\"statusCode\": 204, \"headers\": {\"cf-ray\": \"6a5d1e2f3c4b9abc-SIN\", \"cf-cache-status\": \"HIT\"}}",
+                "{\"statusCode\": 301, \"headers\": {\"server\": \"cloudflare\", \"cf-ray\": \"8090abcd1234efgh-BOM\"}}",
+                "{\"statusCode\": 302, \"headers\": {\"server\": \"cloudflare\"}}",
+                "Successful response via Cloudflare CDN",
+                "Content delivered by Cloudflare edge server",
+                "Response cached by Cloudflare",
+                "Static content served through Cloudflare network"
+        };
+
+        for (String benignMessage : benignMessages) {
+            assertFalse("Benign Cloudflare traffic should NOT match: " + benignMessage,
+                    benignMessage.toLowerCase().matches(".*" + regex + ".*"));
+        }
+    }
 }

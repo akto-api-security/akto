@@ -71,18 +71,29 @@ public class TestResultsStatsAction extends UserAction {
      * 
      * References:
      * -
+     * -
      * https://developers.cloudflare.com/support/troubleshooting/http-status-codes/cloudflare-1xxx-errors/
      * - https://developers.cloudflare.com/waf/
      * - https://developers.cloudflare.com/fundamentals/reference/cloudflare-ray-id/
+     * - Error page types:
+     * https://developers.cloudflare.com/rules/custom-errors/reference/error-page-types/
+     * - Block pages:
+     * https://developers.cloudflare.com/cloudflare-one/policies/gateway/block-page/
+     * - Custom errors: https://developers.cloudflare.com/rules/custom-errors/
      */
-    public static final String REGEX_CLOUDFLARE = "(error\\s*1[0-9]{3}|error\\s*10[0-9]{3}|" +
-            "access\\s*denied|rate\\s*limited|" +
-            "attention\\s*required|" +
-            "blocked|" +
-            "security\\s*service|" +
-            "waf\\s*(active|block|rule|trigger|protection)|" +
-            "modsecurity|firewall\\s*rule|" +
-            "ray\\s*id.*blocked)";
+    public static final String REGEX_CLOUDFLARE = "(error\\s*1[0-9]{3}|error\\s*10[0-9]{3}|" + // CF-specific error
+                                                                                               // codes
+            "attention\\s*required.*cloudflare|" + // Challenge page identifier
+            "under\\s*attack.*cloudflare|cloudflare.*under\\s*attack|" + // Under attack mode
+            "ddos\\s*protection.*cloudflare|cloudflare.*ddos|" + // DDoS protection
+            "(blocked|denied|limited|restricted).*cloudflare|" + // Generic blocking with CF context
+            "cloudflare.*(blocked|denied|limited|restricted|security)|" + // CF context with blocking
+            "waf.*cloudflare|cloudflare.*waf|" + // WAF by Cloudflare
+            "rate.*limit.*cloudflare|cloudflare.*rate.*limit|" + // Rate limiting by CF
+            "checking.*browser.*cloudflare|" + // Browser check challenge
+            "security.*check.*cloudflare|" + // Security challenges
+            "managed.*challenge.*cloudflare|" + // Managed challenge
+            "ray\\s*id.*blocked)"; // Ray ID when blocked
 
     public String fetchTestResultsStatsCount() {
         try {
