@@ -8,6 +8,7 @@ import com.akto.dao.billing.UningestedApiOverageDao;
 import com.akto.dto.*;
 import com.akto.service.ApiCollectionUrlService;
 import com.akto.util.Pair;
+import com.akto.util.enums.GlobalEnums;
 
 import lombok.Getter;
 import org.bson.conversions.Bson;
@@ -111,9 +112,15 @@ public class ApiCollectionsAction extends UserAction {
     /**
      * Helper method to populate URLs for collections.
      * Delegates to the service layer for better separation of concerns.
+     * Only populates MCP URLs when dashboard context is not API security.
      */
     private void populateCollectionUrls(ApiCollection apiCollection) {
-        apiCollectionUrlService.populateMcpCollectionUrls(apiCollection);
+        // Do not populate MCP URLs if dashboard context is API security
+        if (Context.contextSource.get() != null && Context.contextSource.get() == GlobalEnums.CONTEXT_SOURCE.MCP) {
+            apiCollectionUrlService.populateMcpCollectionUrls(apiCollection);
+        }else {
+            apiCollection.setUrls(new HashSet<>());
+        }
     }
 
     public List<ApiCollection> fillApiCollectionsUrlCount(List<ApiCollection> apiCollections, Bson filter) {
