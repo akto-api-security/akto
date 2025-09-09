@@ -19,6 +19,7 @@ import org.bson.Document;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 import org.junit.Test;
+import com.mongodb.client.model.Updates;
 import java.util.*;
 import static org.junit.Assert.*;
 
@@ -534,6 +535,91 @@ public class TestResultsStatsActionTest extends MongoBasedTest {
         assertEquals("SUCCESS", result);
         assertEquals(6, action.getCount()); // Should find all 6 server errors
         assertTrue(action.getActionErrors().isEmpty());
+    }
+
+    @Test
+    public void testFetchTestResultsStatsCount_UsesApiErrorsWhenPresent() {
+        TestingRunResultDao.instance.getMCollection().drop();
+        ObjectId testingRunResultSummaryId = new ObjectId();
+
+        // Insert minimal docs
+        List<TestingRunResult> testingRunResults = new ArrayList<>();
+        for (int i = 0; i < 3; i++) {
+            TestResult placeholder = new TestResult("{}",
+                    "", new ArrayList<>(), 100.0, false, TestResult.Confidence.HIGH, null);
+            ApiInfo.ApiInfoKey apiInfoKey = new ApiInfo.ApiInfoKey(1, "/api-errors-map-" + i, URLMethods.Method.GET);
+            TestingRunResult tr = new TestingRunResult(new ObjectId(), apiInfoKey, "TEST", "TEST",
+                    Arrays.asList(placeholder), false, new ArrayList<SingleTypeInfo>(),
+                    80, Context.now(), Context.now(), testingRunResultSummaryId,
+                    null, new ArrayList<TestingRunResult.TestLog>());
+            testingRunResults.add(tr);
+        }
+        TestingRunResultDao.instance.insertMany(testingRunResults);
+
+        // Set apiErrors map: total 4 matches for 429 (2 + 1 + 1)
+        TestingRunResultDao.instance.getRawCollection().updateOne(
+                new Document("testRunResultSummaryId", testingRunResultSummaryId)
+                        .append("apiInfoKey.url", "/api-errors-map-0"),
+                Updates.set("apiErrors", new Document("429", 2).append("5xx", 0).append("cloudflare", 0)));
+        TestingRunResultDao.instance.getRawCollection().updateOne(
+                new Document("testRunResultSummaryId", testingRunResultSummaryId)
+                        .append("apiInfoKey.url", "/api-errors-map-1"),
+                Updates.set("apiErrors", new Document("429", 1)));
+        TestingRunResultDao.instance.getRawCollection().updateOne(
+                new Document("testRunResultSummaryId", testingRunResultSummaryId)
+                        .append("apiInfoKey.url", "/api-errors-map-2"),
+                Updates.set("apiErrors", new Document("429", 1).append("5xx", 3)));
+
+        Context.userId.set(0);
+        Context.contextSource.set(GlobalEnums.CONTEXT_SOURCE.API);
+
+        TestResultsStatsAction action = new TestResultsStatsAction();
+        Map<String, Object> session = new HashMap<>();
+        User user = new User();
+        user.setLogin("test@akto.io");
+        session.put("user", user);
+        action.setSession(session);
+        action.setTestingRunResultSummaryHexId(testingRunResultSummaryId.toHexString());
+        action.setPatternType("HTTP_429");
+
+        String result = action.fetchTestResultsStatsCount();
+        assertEquals("SUCCESS", result);
+        assertEquals(4, action.getCount());
+        assertTrue(action.isFromApiErrors());
+    }
+
+    @Test
+    public void testFetchTestResultsStatsCount_FallbackWhenApiErrorsAbsent() {
+        TestingRunResultDao.instance.getMCollection().drop();
+        ObjectId testingRunResultSummaryId = new ObjectId();
+
+        List<TestingRunResult> testingRunResults = new ArrayList<>();
+        TestResult rateLimitResult = new TestResult("{\"statusCode\": 429}",
+                "", new ArrayList<>(), 100.0, false, TestResult.Confidence.HIGH, null);
+        ApiInfo.ApiInfoKey apiInfoKey = new ApiInfo.ApiInfoKey(1, "/no-api-errors", URLMethods.Method.GET);
+        TestingRunResult tr = new TestingRunResult(new ObjectId(), apiInfoKey, "TEST", "TEST",
+                Arrays.asList(rateLimitResult), false, new ArrayList<SingleTypeInfo>(),
+                80, Context.now(), Context.now(), testingRunResultSummaryId,
+                null, new ArrayList<TestingRunResult.TestLog>());
+        testingRunResults.add(tr);
+        TestingRunResultDao.instance.insertMany(testingRunResults);
+
+        Context.userId.set(0);
+        Context.contextSource.set(GlobalEnums.CONTEXT_SOURCE.API);
+
+        TestResultsStatsAction action = new TestResultsStatsAction();
+        Map<String, Object> session = new HashMap<>();
+        User user = new User();
+        user.setLogin("test@akto.io");
+        session.put("user", user);
+        action.setSession(session);
+        action.setTestingRunResultSummaryHexId(testingRunResultSummaryId.toHexString());
+        action.setPatternType("HTTP_429");
+
+        String result = action.fetchTestResultsStatsCount();
+        assertEquals("SUCCESS", result);
+        assertEquals(1, action.getCount());
+        assertFalse(action.isFromApiErrors());
     }
 
     @Test
