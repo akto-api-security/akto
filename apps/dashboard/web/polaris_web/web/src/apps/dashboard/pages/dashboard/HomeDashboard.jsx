@@ -795,15 +795,8 @@ function HomeDashboard() {
             variant: 'heading2xl'
         }
 
-        const openAlertsItem = {
-            title: 'Open Alerts',
-            data: mcpTotals.openAlerts ?? '-',
-            variant: 'heading2xl',
-            color: 'critical'
-        }
 
         summaryInfo.unshift(totalRequestsItem)
-        summaryInfo.push(openAlertsItem)
     }
 
     const summaryComp = (
@@ -1203,13 +1196,13 @@ function HomeDashboard() {
                         ))
                     ) : (
                         <Box paddingBlockStart="1">
-                            <Text alignment='center' color='subdued'>No recent open alerts</Text>
+                            <Text alignment='center' color='subdued'>No recent open audit alerts</Text>
                         </Box>
                     )}
                 </VerticalStack>
             }
-            title={'Open Alerts'}
-            titleToolTip={'MCP open alerts detected in your workspace'}
+            title={'Open Audit Alerts'}
+            titleToolTip={'MCP open audit alerts detected in your workspace'}
             linkText={'View more'}
             linkUrl={'/dashboard/observe/audit'}
             linkText={mcpOpenAlertDetails && mcpOpenAlertDetails.length > 0 ? 'View more' : undefined}
