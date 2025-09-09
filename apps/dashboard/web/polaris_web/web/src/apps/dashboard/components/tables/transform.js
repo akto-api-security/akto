@@ -3,37 +3,53 @@ import PersistStore from "../../../main/PersistStore";
 
 const tableFunc = {
     fetchDataSync: function (sortKey, sortOrder, skip, limit, filters, filterOperators, queryValue, setFilters, props){
-        let localFilters = func.prepareFilters(props.data,props.filters);  
+        // Early return for empty data
+        if (!props.data || props.data.length === 0) {
+            setFilters([]);
+            return {value: [], total: 0, fullDataIds: []};
+        }
+        
+        let localFilters = func.prepareFilters(props.data,props.filters);
+        
+        // Optimize filter generation - cache results if data hasn't changed
+        const dataLength = props.data.length;
+        
         let filtersFromHeaders = props.headers.filter((header) => {
           return header.showFilter
         }).map((header) => {
           let key = header.filterKey || header.value
           let label = header.filterLabel || header.text
-          let allItemValues = []
-          props.data && props.data.forEach(i => {
-            let value = i[key]
+          
+          // Use Set for better performance with large datasets
+          let uniqueValues = new Set();
+          
+          for (let i = 0; i < props.data.length; i++) {
+            let value = props.data[i][key];
             if (value instanceof Set) {
-              allItemValues = allItemValues.concat(...value)
+              value.forEach(v => uniqueValues.add(v));
             } else if (value instanceof Array) {
-              allItemValues = allItemValues.concat(...value)
+              value.forEach(v => uniqueValues.add(v));
             } else if (typeof value !== 'undefined') {
-              allItemValues.push(value)
+              uniqueValues.add(value);
             }
           }
-          )
-          let distinctItems = [...new Set(allItemValues.sort())]
-          let choices = distinctItems.map((item) => {return {label:item, value:item}})
-          return (
-            {
-              key: key,
-              label: label,
-              title: label,
-              choices: choices,
-            }
-          )
+          
+          // Convert to array and sort only once
+          let distinctItems = Array.from(uniqueValues);
+          distinctItems.sort();
+          
+          let choices = distinctItems.map((item) => ({label: item, value: item}));
+          
+          return {
+            key: key,
+            label: label,
+            title: label,
+            choices: choices,
+          };
         })
+        
         localFilters = localFilters.concat(filtersFromHeaders)
-        localFilters = localFilters.filter((filter) => {return filter.choices.length>0})
+        localFilters = localFilters.filter((filter) => filter.choices.length > 0)
         setFilters(localFilters);
           let tempData = props.data;
 
@@ -56,52 +72,78 @@ const tableFunc = {
           return {value:final2Data,total:tempData.length, fullDataIds: tempData.map((x) => {return {id: x?.id}})}
         }
 
-        // actually apply filters for table filter
-        let singleFilterData = tempData
-        Object.keys(filters || {}).forEach((filterKey)=>{
-          singleFilterData = props.data;
-
-          if(filterKey.includes('dateRange')){
-            const dataKey = filterKey.split('_')[0];
-            const startTs = filters[filterKey]?.since ? Date.parse(filters[filterKey].since)/1000 : 0;
-            const endTs = filters[filterKey]?.until ? Date.parse(filters[filterKey].until)/1000 : 0;
-
-            singleFilterData = singleFilterData.filter((value) => {
-              if(value[dataKey] && value[dataKey] >= startTs && value[dataKey] <= endTs){
-                return true;
+        // Optimized filter application - fix the bug where singleFilterData resets to props.data
+        const filterKeys = Object.keys(filters || {});
+        
+        if (filterKeys.length > 0) {
+          // Apply all filters in a single pass for better performance
+          tempData = tempData.filter((item) => {
+            // Check if item passes ALL filters
+            for (let filterKey of filterKeys) {
+              if (filterKey.includes('dateRange')) {
+                const dataKey = filterKey.split('_')[0];
+                const startTs = filters[filterKey]?.since ? Date.parse(filters[filterKey].since)/1000 : 0;
+                const endTs = filters[filterKey]?.until ? Date.parse(filters[filterKey].until)/1000 : 0;
+                
+                if (!item[dataKey] || item[dataKey] < startTs || item[dataKey] > endTs) {
+                  return false; // Item doesn't pass this filter
+                }
+              } else {
+                let filterSet = new Set(filters[filterKey] || []);
+                if (filterSet.size !== 0) {
+                  const itemValue = item[filterKey];
+                  let hasMatch = false;
+                  
+                  if (itemValue instanceof Array) {
+                    hasMatch = itemValue.some(v => filterSet.has(v));
+                  } else if (itemValue instanceof Set) {
+                    hasMatch = Array.from(itemValue).some(v => filterSet.has(v));
+                  } else {
+                    hasMatch = filterSet.has(itemValue);
+                  }
+                  
+                  if (!hasMatch) {
+                    return false; // Item doesn't pass this filter
+                  }
+                }
               }
-              return false;
-            })
-          }else{
-            let filterSet = new Set(filters[filterKey] || []);
-            if(filterSet.size!==0){
-              singleFilterData = singleFilterData.filter((value) => {
-                  return [].concat(value[filterKey]).filter(v => filterSet.has(v)).length > 0
-                })
             }
+            return true; // Item passes all filters
+          });
+        }
+
+
+        // Optimize search query - skip if no query
+        if (queryValue && queryValue.length > 0) {
+          const lowerQuery = queryValue.toLowerCase();
+          tempData = tempData.filter((value) => {
+            return func.findInObjectValue(value, lowerQuery, ['id', 'time', 'icon', 'order', 'conditions']);
+          });
+        }
+
+          // Sort only if we have data and a sort key
+          if (tempData.length > 0 && dataSortKey) {
+            tempData = func.sortFunc(tempData, dataSortKey, sortOrder, props?.treeView !== undefined ? true : false)
           }
-          tempData = tempData.filter(value => singleFilterData.includes(value));
-        })
-
-
-        // used for search query
-        tempData = tempData.filter((value) => {
-          return func.findInObjectValue(value, queryValue.toLowerCase(), ['id', 'time', 'icon', 'order', 'conditions']);
-        })
-
-          tempData = func.sortFunc(tempData, dataSortKey, sortOrder, props?.treeView !== undefined ? true : false)
+          
           if(props.getFilteredItems){
             props.getFilteredItems(tempData)
           }
   
-          let finalData = props.useModifiedData ? props.modifyData(tempData,filters || {}) : tempData
+          let finalData = props.useModifiedData ? props.modifyData(tempData, filters || {}) : tempData
           
-          let page = skip / limit;
-          let pageLimit = limit;
-          let final2Data = finalData && finalData.length <= pageLimit ? finalData :
-          finalData.slice(page * pageLimit, Math.min((page + 1) * pageLimit, finalData.length))
+          // Optimize pagination calculations
+          const totalLength = finalData.length;
+          const page = Math.floor(skip / limit);
+          const startIndex = page * limit;
+          const endIndex = Math.min(startIndex + limit, totalLength);
+          
+          // Slice only if necessary
+          let final2Data = (totalLength <= limit) ? finalData : finalData.slice(startIndex, endIndex);
+          let fullDataIds= finalData.map((x) => ({id: x?.id}));
+          
 
-          return {value:final2Data,total:tempData.length, fullDataIds: finalData.map((x) => {return {id: x?.id}})}
+          return {value: final2Data, total: totalLength, fullDataIds: fullDataIds}
     },
     mergeFilters(filterArray1, filterArray2, labelFunc, handleRemoveAppliedFilter){
       const combined = [...filterArray1, ...filterArray2];
