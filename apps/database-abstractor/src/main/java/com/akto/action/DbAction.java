@@ -416,12 +416,12 @@ public class DbAction extends ActionSupport {
     @Getter @Setter
     private ApiInfoKey lastApiInfoKey;
     @Getter @Setter
-    List<BasicDBObject> apiInfoRatelimts = new ArrayList<>();
+    List<BasicDBObject> apiInfoRateLimits = new ArrayList<>();
 
     public String fetchApiRateLimits() {
         try {
             loggerMaker.error("init fetchApiRateLimits account id: " + Context.accountId.get());
-            apiInfoRatelimts = DbLayer.fetchApiRateLimits(lastApiInfoKey);
+            apiInfoRateLimits = DbLayer.fetchApiRateLimits(lastApiInfoKey);
         } catch (Exception e) {
             e.printStackTrace();
             loggerMaker.error("fetchApiRateLimits account id: " + Context.accountId.get());
