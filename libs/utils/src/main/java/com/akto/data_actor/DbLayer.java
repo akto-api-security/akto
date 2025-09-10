@@ -275,7 +275,6 @@ public class DbLayer {
                 )
             );
             filters = Filters.and(existsFilter, paginationFilter);
-            loggerMaker.infoAndAddToDb("Pagination filter - lastKey: " + lastApiInfoKey.toString(), LoggerMaker.LogDb.RUNTIME);
         }
 
         int limit = 1000;

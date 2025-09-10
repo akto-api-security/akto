@@ -206,6 +206,16 @@ public class ApiInfo {
 
         this.apiAccessTypes.addAll(that.getApiAccessTypes());
 
+        // Merge rateLimits - take the maximum value for each key
+        for (String k: that.rateLimits.keySet()) {
+            if (this.rateLimits.get(k) == null || that.rateLimits.get(k) > this.rateLimits.get(k)) {
+                this.rateLimits.put(k, that.rateLimits.get(k));
+            }
+        }
+
+        // Merge rateLimitConfidence - take the maximum confidence
+        this.rateLimitConfidence = Math.max(this.rateLimitConfidence, that.rateLimitConfidence);
+
     }
 
     public void setViolations(Map<String, Integer> violations) {
