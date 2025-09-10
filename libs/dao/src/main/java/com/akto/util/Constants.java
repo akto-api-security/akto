@@ -18,6 +18,7 @@ public class Constants {
     public static final String AKTO_THREAT_PROTECTION_BACKEND_HOST = "tbs.akto.io";
     public static final String AKTO_THREAT_DETECTION_CACHE_PREFIX = "akto:threat:schema:";
     public static final String RATE_LIMIT_CACHE_PREFIX = "ratelimit:";
+    public static final String API_RATE_LIMIT_CONFIDENCE = "rateLimitConfidence";
     public static final int RATE_LIMIT_UNLIMITED_REQUESTS = -1;
     public static final String P50_CACHE_KEY = "p50";
     public static final String P75_CACHE_KEY = "p75";

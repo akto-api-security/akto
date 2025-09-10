@@ -25,19 +25,36 @@ import com.akto.threat.detection.actor.SourceIPActorGenerator;
 import com.akto.threat.detection.cache.ApiCountCacheLayer;
 import com.akto.threat.detection.utils.Utils;
 import com.akto.util.Constants;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 @lombok.Getter
 @lombok.Setter
 public class ThreatConfigurationEvaluator {
     private static final LoggerMaker logger = new LoggerMaker(ThreatConfiguration.class, LogDb.THREAT_DETECTION);
+    private static float RATE_LIMIT_CONFIDENCE_THRESHOLD = 0.0f;
+    private static final RatelimitConfigItem DEFAULT_GLOBAL_RATE_LIMIT_RULE = RatelimitConfigItem.newBuilder()
+            .setName("Global Rate Limit Rule")
+            .setPeriod(5)
+            .setAction("BLOCK")
+            .setType(RatelimitConfigType.DEFAULT.name())
+            .setBehaviour("DYNAMIC")
+            .setRateLimitConfidence(RATE_LIMIT_CONFIDENCE_THRESHOLD)
+            .setAutoThreshold(RatelimitConfig.AutomatedThreshold.newBuilder()
+                    .setPercentile("p90")
+                    .setOverflowPercentage(50)
+                    .setBaselinePeriod(2)
+                    .build())
+            .setMitigationPeriod(5).build();
+
     private ThreatConfiguration threatConfiguration;
     private int threatConfigurationUpdateIntervalSec = 15 * 60; // 15 minutes
     private int threatConfigLastUpdatedAt = 0;
     private List<ApiInfo> apiInfos;
     private DataActor dataActor;
     private ApiCountCacheLayer apiCountCacheLayer;
-    private float RATE_LIMIT_CONFIDENCE_THRESHOLD = 0.0f;
-    
+    private ScheduledExecutorService scheduledExecutor;
 
     public enum ThreatActorIdType {
         IP,
@@ -53,7 +70,8 @@ public class ThreatConfigurationEvaluator {
         HOSTNAME,
     }
 
-    public ThreatConfigurationEvaluator(ThreatConfiguration threatConfiguration, DataActor dataActor, ApiCountCacheLayer apiCountCacheLayer) {
+    public ThreatConfigurationEvaluator(ThreatConfiguration threatConfiguration, DataActor dataActor,
+            ApiCountCacheLayer apiCountCacheLayer) {
         this.dataActor = dataActor;
         this.apiCountCacheLayer = apiCountCacheLayer;
 
@@ -63,17 +81,41 @@ public class ThreatConfigurationEvaluator {
         } else {
             this.threatConfiguration = getThreatConfiguration();
         }
+
+        resyncApiInfos();
+
+        // Every 15 minutes call resyncApiInfos
+        this.scheduledExecutor = Executors.newScheduledThreadPool(1);
+        this.scheduledExecutor.scheduleAtFixedRate(() -> {
+            try {
+                logger.info("Starting scheduled resync of API infos");
+                resyncApiInfos();
+                logger.info("Completed scheduled resync of API infos");
+            } catch (Exception e) {
+                logger.error("Error during scheduled resync of API infos", e);
+            }
+        }, 15, 15, TimeUnit.MINUTES); 
     }
 
-    public long getApiRateLimitFromCache(ApiInfoKey apiInfoKey, String percentile, int overflowPercentage) {
-        long rateLimit = this.apiCountCacheLayer.get(Constants.RATE_LIMIT_CACHE_PREFIX + apiInfoKey.toString() + ":" + percentile);
+    public long getApiRateLimitFromCache(ApiInfoKey apiInfoKey, RatelimitConfigItem rule) {
+        String baseKey = Constants.RATE_LIMIT_CACHE_PREFIX + apiInfoKey.toString() + ":";
 
-        if (rateLimit == 0){
+        long rateLimit = this.apiCountCacheLayer.get(baseKey + rule.getAutoThreshold().getPercentile());
+
+        if (rateLimit == 0) {
+            logger.debug("Rate limiting skipped no ratelimits found for api: " + apiInfoKey.toString() + " percentile: "
+                    + rule.getAutoThreshold().getPercentile());
             return Constants.RATE_LIMIT_UNLIMITED_REQUESTS;
         }
-        return rateLimit + rateLimit * overflowPercentage/100;
-    }
 
+        long apiConfidence = this.apiCountCacheLayer.get(baseKey + Constants.API_RATE_LIMIT_CONFIDENCE);
+        if (apiConfidence < rule.getRateLimitConfidence()) {
+            logger.debug("Rate limiting skipped API rateLimitConfidence: " + apiConfidence
+                    + " lower than configured confidence: " + rule.getRateLimitConfidence());
+            return Constants.RATE_LIMIT_UNLIMITED_REQUESTS;
+        }
+        return rateLimit + rateLimit * rule.getAutoThreshold().getOverflowPercentage() / 100;
+    }
 
     public ThreatConfiguration getThreatConfiguration() {
 
@@ -82,21 +124,20 @@ public class ThreatConfigurationEvaluator {
                 && now - threatConfigLastUpdatedAt < threatConfigurationUpdateIntervalSec) {
             return this.threatConfiguration;
         }
-        resyncApiInfos();
         return fetchThreatConfigApi(now);
     }
 
-    public void resyncApiInfos (){
+    public void resyncApiInfos() {
         try {
-            this.apiInfos = dataActor.fetchApiInfos();
+            this.apiInfos = dataActor.fetchApiRateLimits(null);
 
             if (apiInfos == null || apiInfos.isEmpty()) {
                 logger.warnAndAddToDb("No api infos found for account");
                 return;
             }
-            logger.debug(apiInfos.size() + ": APIs found for account" + Context.accountId.get());
+            logger.debug(apiInfos.size() + ": APIs found for account " + Context.accountId.get());
 
-            for(ApiInfo apiInfo: this.apiInfos){ 
+            for (ApiInfo apiInfo : this.apiInfos) {
 
                 if (apiInfo.getRateLimits() == null || apiInfo.getRateLimits().isEmpty()) {
                     continue;
@@ -105,20 +146,22 @@ public class ThreatConfigurationEvaluator {
                 Map<String, Integer> rateLimits = apiInfo.getRateLimits();
 
                 String baseKey = Constants.RATE_LIMIT_CACHE_PREFIX + apiInfo.getId().toString();
-                    
-                // Store each percentile value separately in cache
+                // TODO: float to long conversion???
+                this.apiCountCacheLayer.set(baseKey + ":" + Constants.API_RATE_LIMIT_CONFIDENCE,
+                        (long) apiInfo.getRateLimitConfidence());
 
-                for (String percentileKey: Arrays.asList(Constants.P50_CACHE_KEY, Constants.P75_CACHE_KEY, Constants.P90_CACHE_KEY)){
+                // Store each percentile value separately in cache
+                for (String percentileKey : Arrays.asList(Constants.P50_CACHE_KEY, Constants.P75_CACHE_KEY,
+                        Constants.P90_CACHE_KEY)) {
                     int numRequests = rateLimits.getOrDefault(percentileKey, Constants.RATE_LIMIT_UNLIMITED_REQUESTS);
 
-                    if(numRequests == Constants.RATE_LIMIT_UNLIMITED_REQUESTS){
+                    if (numRequests == Constants.RATE_LIMIT_UNLIMITED_REQUESTS) {
                         continue;
                     }
 
-                    // TODO: Existing docs in mongo are missing these variables, will this be backwards compatible? 
-
                     // Apply rate-limits to only high confidence
-                    if(!(apiInfo.getRateLimitConfidence() > RATE_LIMIT_CONFIDENCE_THRESHOLD)){
+                    // TODO: use the default rule confidence.
+                    if (!(apiInfo.getRateLimitConfidence() > RATE_LIMIT_CONFIDENCE_THRESHOLD)) {
                         continue;
                     }
                     this.apiCountCacheLayer.set(baseKey + ":" + percentileKey, numRequests);
@@ -134,7 +177,9 @@ public class ThreatConfigurationEvaluator {
     private ThreatConfiguration fetchThreatConfigApi(int now) {
         Map<String, List<String>> headers = Utils.buildHeaders();
         headers.put("Content-Type", Collections.singletonList("application/json"));
-        OriginalHttpRequest request = new OriginalHttpRequest(Utils.getThreatProtectionBackendUrl() + "/api/dashboard/get_threat_configuration", "","GET", null, headers, "");
+        OriginalHttpRequest request = new OriginalHttpRequest(
+                Utils.getThreatProtectionBackendUrl() + "/api/dashboard/get_threat_configuration", "", "GET", null,
+                headers, "");
         try {
             OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
             String responsePayload = response.getBody();
@@ -180,7 +225,8 @@ public class ThreatConfigurationEvaluator {
         String actor = SourceIPActorGenerator.instance.generate(responseParam).orElse("");
         responseParam.setSourceIP(actor);
         if (responseParam.getOriginalMsg() != null) {
-            logger.debugAndAddToDbCount("Actor ID generated: " + actor + " for response: " + responseParam.getOriginalMsg().get());
+            logger.debugAndAddToDbCount(
+                    "Actor ID generated: " + actor + " for response: " + responseParam.getOriginalMsg().get());
         }
 
         if (threatConfiguration == null) {
@@ -212,22 +258,21 @@ public class ThreatConfigurationEvaluator {
         return actor;
     }
 
-    
-    public RatelimitConfigItem getDefaultRateLimitConfig(){
+    public RatelimitConfigItem getDefaultRateLimitConfig() {
         getThreatConfiguration();
         if (threatConfiguration == null) {
-            return null;
+            return DEFAULT_GLOBAL_RATE_LIMIT_RULE;
         }
         for (RatelimitConfigItem rule : threatConfiguration.getRatelimitConfig().getRulesList()) {
             if (rule.getType().equals(RatelimitConfigType.DEFAULT.name())) {
                 return rule;
             }
         }
-        return null;
+        return DEFAULT_GLOBAL_RATE_LIMIT_RULE;
     }
 
     public long getRatelimit(ApiInfoKey apiInfoKey) {
         RatelimitConfigItem rule = getDefaultRateLimitConfig();
-        return getApiRateLimitFromCache(apiInfoKey, rule.getAutoThreshold().getPercentile(), rule.getAutoThreshold().getOverflowPercentage());
+        return getApiRateLimitFromCache(apiInfoKey, rule);
     }
 }

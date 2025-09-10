@@ -1,9 +1,7 @@
 package com.akto.threat.detection.tasks;
 
 import java.time.Duration;
-import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
@@ -32,6 +30,8 @@ import com.akto.dto.RawApiMetadata;
 import com.akto.dto.api_protection_parse_layer.AggregationRules;
 import com.akto.dto.api_protection_parse_layer.Rule;
 import com.akto.dto.monitoring.FilterConfig;
+import com.akto.dto.test_editor.Category;
+import com.akto.dto.test_editor.Info;
 import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.type.URLMethods;
 import com.akto.hybrid_parsers.HttpCallParser;
@@ -268,6 +268,17 @@ public class MaliciousTrafficDetectorTask implements Task {
     List<SchemaConformanceError> errors = null; 
 
     if (apiDistributionEnabled) {
+
+      // TODO: Remove this hack
+      FilterConfig ipApiRateLimitFilter = new FilterConfig("IpApiRateLimited", null, null, null);
+      Info info = new Info();
+      info.setName("IpApiRFateLimited");
+      info.setCategory(new Category("ApiAbuse", "ApiAbuse", "ApiAbuse"));
+      info.setSubCategory("RateLimiting");
+      info.setSeverity("MEDIUM");
+      ipApiRateLimitFilter.setInfo(info);
+
+
       String apiCollectionIdStr = Integer.toString(apiCollectionId);
       String distributionKey = Utils.buildApiDistributionKey(apiCollectionIdStr, url, method.toString());
       String ipApiCmsKey = Utils.buildIpApiCmsDataKey(actor, apiCollectionIdStr, url, method.toString());
@@ -277,12 +288,14 @@ public class MaliciousTrafficDetectorTask implements Task {
       // Check and raise alert for RateLimits
       RatelimitConfigItem ratelimitConfig = this.threatConfigEvaluator.getDefaultRateLimitConfig();
       long ratelimit = this.threatConfigEvaluator.getRatelimit(apiInfoKey);
+
+      // TODO: API infos must store the data for the same period as the rule.
       long count = this.distributionCalculator.getSlidingWindowCount(ipApiCmsKey, curEpochMin, ratelimitConfig.getPeriod());
 
-      if (count >= ratelimit) {
+      if (count > ratelimit) {
         logger.debugAndAddToDb("Ratelimit hit for url " + apiInfoKey.getUrl() + " actor " + actor + " ratelimitConfig " + ratelimitConfig.toString());
-        SampleMaliciousRequest maliciousReq = Utils.buildSampleMaliciousRequest(actor, responseParam, null, metadata, errors);
-        generateAndPushMaliciousEventRequest(null, actor, responseParam, maliciousReq, EventType.EVENT_TYPE_AGGREGATED);
+        SampleMaliciousRequest maliciousReq = Utils.buildSampleMaliciousRequest(actor, responseParam, ipApiRateLimitFilter, metadata, errors);
+        generateAndPushMaliciousEventRequest(ipApiRateLimitFilter, actor, responseParam, maliciousReq, EventType.EVENT_TYPE_AGGREGATED);
       }
     }
 

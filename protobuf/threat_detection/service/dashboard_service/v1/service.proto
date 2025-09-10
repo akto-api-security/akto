@@ -269,7 +269,12 @@ message Actor {
 }
 
 message RatelimitConfig {
-
+  
+  message AutomatedThreshold{
+    string percentile = 1;
+    int32 overflow_percentage = 2;
+    int32 baseline_period = 3;
+  }
   message RatelimitConfigItem {
     string name = 1;
     int32 period = 2;
@@ -277,6 +282,9 @@ message RatelimitConfig {
     int32 mitigation_period = 4;
     string action = 5;
     string type = 6; // default or custom
+    AutomatedThreshold auto_threshold = 7;
+    string behaviour = 8; // dynamic or static
+    float rate_limit_confidence = 9;
   }
   repeated RatelimitConfigItem rules = 1;
 }

@@ -69,7 +69,8 @@ const RatelimitConfigComponent = ({ title, description }) => {
                     percentile: "p75",
                     overflowPercentage: 20,
                     baselinePeriod: 2
-                }
+                },
+                rateLimitConfidence: 0.5
             }
             : {
                 // Subsequent rules - empty name and custom type
@@ -79,7 +80,8 @@ const RatelimitConfigComponent = ({ title, description }) => {
                 mitigationPeriod: 5,
                 action: ACTIONS.BLOCK,
                 type: RULE_TYPES.CUSTOM,
-                behaviour: BEHAVIOURS.STATIC
+                behaviour: BEHAVIOURS.STATIC,
+                rateLimitConfidence: 0.5
             };
         
         setRatelimitRules([...ratelimitRules, newRule]);
@@ -112,6 +114,10 @@ const RatelimitConfigComponent = ({ title, description }) => {
             // Convert to number for numeric fields
             if (['period', 'maxRequests', 'mitigationPeriod'].includes(field)) {
                 value = parseInt(value) || 0;
+            }
+            // Convert to float for rateLimitConfidence
+            if (field === 'rateLimitConfidence') {
+                value = parseFloat(value) || 0.5;
             }
             // Handle nested autoThreshold fields
             if (field.startsWith('autoThreshold.')) {
@@ -265,6 +271,17 @@ const RatelimitConfigComponent = ({ title, description }) => {
                                                 placeholder="e.g., 100"
                                                 requiredIndicator={true}
                                             />
+                                            <TextField
+                                                label="Rate Limit Confidence"
+                                                type="number"
+                                                value={String(rule.rateLimitConfidence !== undefined ? rule.rateLimitConfidence : 0.5)}
+                                                onChange={(value) => handleInputChange(index, 'rateLimitConfidence', value)}
+                                                placeholder="e.g., 0.5"
+                                                helpText="Confidence level between 0 and 1"
+                                                min="0"
+                                                max="1"
+                                                step="0.1"
+                                            />
                                         </VerticalStack>
                                     </Box>
                                 )}
@@ -296,6 +313,17 @@ const RatelimitConfigComponent = ({ title, description }) => {
                                                     suffix="%"
                                                 />
                                             </HorizontalGrid>
+                                            <TextField
+                                                label="Rate Limit Confidence"
+                                                type="number"
+                                                value={String(rule.rateLimitConfidence !== undefined ? rule.rateLimitConfidence : 0.5)}
+                                                onChange={(value) => handleInputChange(index, 'rateLimitConfidence', value)}
+                                                placeholder="e.g., 0.5"
+                                                helpText="Confidence level between 0 and 1"
+                                                min="0"
+                                                max="1"
+                                                step="0.1"
+                                            />
                                         </VerticalStack>
                                     </Box>
                                 )}

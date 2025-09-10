@@ -60,6 +60,7 @@ public class ThreatConfiguration {
             private String type;
             private AutomatedThreshold autoThreshold;
             private String behaviour;
+            private float rateLimitConfidence;
         }
     }
 

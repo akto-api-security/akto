@@ -107,6 +107,9 @@ public class ThreatActorService {
                             itemBuilder.setType(ruleDoc.getString("type"));
                         if (ruleDoc.getString("behaviour") != null)
                             itemBuilder.setBehaviour(ruleDoc.getString("behaviour"));
+                        if(ruleDoc.getDouble("rateLimitConfidence") != null) {
+                            itemBuilder.setRateLimitConfidence(ruleDoc.getDouble("rateLimitConfidence").floatValue());
+                        }
                         
                         // Handle AutomatedThreshold
                         Object autoThresholdObj = ruleDoc.get("autoThreshold");
@@ -119,7 +122,7 @@ public class ThreatActorService {
                             if (autoThresholdDoc.getInteger("overflowPercentage") != null)
                                 thresholdBuilder.setOverflowPercentage(autoThresholdDoc.getInteger("overflowPercentage"));
                             if (autoThresholdDoc.getInteger("baselinePeriod") != null)
-                                thresholdBuilder.setOverflowPercentage(autoThresholdDoc.getInteger("baselinePeriod"));
+                                thresholdBuilder.setBaselinePeriod(autoThresholdDoc.getInteger("baselinePeriod"));
                             itemBuilder.setAutoThreshold(thresholdBuilder);
                         }
                         
@@ -170,6 +173,11 @@ public class ThreatActorService {
             if (!item.getAction().isEmpty()) ratelimitDoc.append("action", item.getAction());
             if (!item.getType().isEmpty()) ratelimitDoc.append("type", item.getType());
             if (!item.getBehaviour().isEmpty()) ratelimitDoc.append("behaviour", item.getBehaviour());
+            if (item.getRateLimitConfidence() > 0.0) {
+                // Round to 1 decimal place to avoid floating point precision issues
+                double roundedConfidence = Math.round(item.getRateLimitConfidence() * 10.0) / 10.0;
+                ratelimitDoc.append("rateLimitConfidence", roundedConfidence);
+            }
             
             // Handle AutomatedThreshold
             if (item.hasAutoThreshold()) {
