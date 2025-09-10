@@ -176,6 +176,7 @@ import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods;
 import com.akto.dto.type.URLMethods.Method;
 import com.akto.dto.upload.FileUpload;
+import com.akto.dto.usage.MetricTypes;
 import com.akto.dto.usage.UsageMetric;
 import com.akto.log.CacheLoggerMaker;
 import com.akto.log.LoggerMaker;
@@ -4145,7 +4146,7 @@ public class InitializerListener implements ServletContextListener {
                 int accountId = a.getId();
                 UsageMetric endpointUsage = UsageMetricHandler.calcAndSyncAccountUsage(accountId);
                 int endpointCountOnDashboard = (int)fetchEndpointCountOnDashboard();
-                logger.debugAndAddToDb("Account: " + accountId + " endpoint count on billing: " + endpointUsage.getUsage() + " endpoint count on dashboard: " + endpointCountOnDashboard);
+                logger.info("Account: " + accountId + " endpoint count on billing: " + endpointUsage.getUsage() + " endpoint count on dashboard: " + endpointCountOnDashboard);
                 if (endpointCountOnDashboard != endpointUsage.getUsage()) {
                     Organization organization = OrganizationsDao.instance.findOne(Filters.eq(Constants.ID, endpointUsage.getOrganizationId()));
                     sendToSlack(organization, accountId, endpointUsage.getUsage(), endpointCountOnDashboard);
@@ -4160,7 +4161,7 @@ public class InitializerListener implements ServletContextListener {
 
     public static long fetchEndpointCountOnDashboard() {
         Context.contextSource.set(CONTEXT_SOURCE.API);
-        Context.userId.set(0);
+        Context.userId.set(-1);
         InventoryAction inventoryAction = new InventoryAction();
         inventoryAction.setStartTimestamp(0);
         inventoryAction.setEndTimestamp(0);
@@ -4172,8 +4173,12 @@ public class InitializerListener implements ServletContextListener {
         if (organization == null) {
             return;
         }
-        String txt = String.format("API endpoint count mismatch for %s %s acc: %s billing: %s dashboard: %s",
-                organization.getId(), organization.getAdminEmail(), accountId, billingCount, dashboardCount);
+
+        FeatureAccess featureAccess = organization.getFeatureWiseAllowed().getOrDefault(MetricTypes.ACTIVE_ENDPOINTS.name(), new FeatureAccess(false));
+        int usageLimit = featureAccess.getUsageLimit();
+
+        String txt = String.format("API endpoint count mismatch for %s %s acc: %s billing: %s dashboard: %s limit: %s",
+                organization.getId(), organization.getAdminEmail(), accountId, billingCount, dashboardCount, usageLimit);
         UsageMetricUtils.sendToUsageSlack(txt);
     }
 

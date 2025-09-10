@@ -77,6 +77,11 @@ public class UsersCollectionsList {
                 collectionList = null;
             }
 
+            // userId = -1 is used for system operations where we want to avoid rbac checks
+            if (userId == -1) {
+                collectionList = null;
+            }
+
             usersCollectionMap.put(key, new Pair<>(collectionList, Context.now()));
         } else {
             collectionList = collectionIdEntry.getFirst();
