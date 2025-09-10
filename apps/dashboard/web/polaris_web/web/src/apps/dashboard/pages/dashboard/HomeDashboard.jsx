@@ -90,7 +90,6 @@ function HomeDashboard() {
     const [mcpOpenAlertDetails, setMcpOpenAlertDetails] = useState([])
     const [mcpApiCallStats, setMcpApiCallStats] = useState([])
     const [policyGuardrailStats, setPolicyGuardrailStats] = useState([])
-    const [policyGuardrailStatsTimeRange, setPolicyGuardrailStatsTimeRange] = useState(func.timeNow() - 30*24*60*60)
     const [mcpTopApplications, setMcpTopApplications] = useState([])
 
     // MCP API Requests time selector state
@@ -109,6 +108,7 @@ function HomeDashboard() {
         {label: "All time", value: 10*365*24*60*60} // 10 years as a proxy for all time
     ]
     const [mcpStatsTimeRange, setMcpStatsTimeRange] = useState(func.timeNow() - statsOptions[8].value)
+    const [policyGuardrailStatsTimeRange, setPolicyGuardrailStatsTimeRange] = useState(func.timeNow() - statsOptions[8].value)
 
     // Function to handle navigation to audit page with MCP context
     const handleMcpAuditNavigation = useCallback(() => {
