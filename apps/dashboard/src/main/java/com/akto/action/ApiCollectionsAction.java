@@ -15,7 +15,6 @@ import org.bson.conversions.Bson;
 
 import com.akto.action.observe.Utils;
 import com.akto.dao.*;
-import com.akto.dao.McpAuditInfoDao;
 import com.akto.dao.threat_detection.ApiHitCountInfoDao;
 import com.akto.billing.UsageMetricUtils;
 import com.akto.dao.context.Context;
@@ -33,7 +32,6 @@ import com.akto.dto.testing.CustomTestingEndpoints;
 import com.akto.dto.CollectionConditions.ConditionUtils;
 import com.akto.dto.rbac.UsersCollectionsList;
 import com.akto.dto.type.SingleTypeInfo;
-import com.akto.dao.SingleTypeInfoDao;
 import com.akto.listener.RuntimeListener;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
@@ -126,16 +124,16 @@ public class ApiCollectionsAction extends UserAction {
     public List<ApiCollection> fillApiCollectionsUrlCount(List<ApiCollection> apiCollections, Bson filter) {
         int tsRandom = Context.now();
         loggerMaker.debugAndAddToDb("fillApiCollectionsUrlCount started: " + tsRandom, LoggerMaker.LogDb.DASHBOARD);
-        Map<Integer, Integer> countMap = ApiCollectionsDao.instance.buildEndpointsCountToApiCollectionMapOptimized(filter, apiCollections);
+        Map<Integer, Integer> countMap = ApiCollectionsDao.instance.buildEndpointsCountToApiCollectionMap(filter);
         loggerMaker.debugAndAddToDb("fillApiCollectionsUrlCount buildEndpointsCountToApiCollectionMap done: " + tsRandom, LoggerMaker.LogDb.DASHBOARD);
 
         for (ApiCollection apiCollection: apiCollections) {
             int apiCollectionId = apiCollection.getId();
             Integer count = countMap.get(apiCollectionId);
             int fallbackCount = apiCollection.getUrls()!=null ? apiCollection.getUrls().size() : apiCollection.getUrlsCount();
-            if (apiCollectionId == RuntimeListener.VULNERABLE_API_COLLECTION_ID) {
-                fallbackCount = 200;
-            }
+            // if (apiCollectionId == RuntimeListener.VULNERABLE_API_COLLECTION_ID) {
+            //     fallbackCount = 200;
+            // }
             if (count != null && (apiCollection.getHostName() != null)) {
                 apiCollection.setUrlsCount(count);
             } else if(ApiCollection.Type.API_GROUP.equals(apiCollection.getType())){
