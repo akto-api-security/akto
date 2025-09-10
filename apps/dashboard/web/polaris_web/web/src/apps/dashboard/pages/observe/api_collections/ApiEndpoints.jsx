@@ -290,17 +290,37 @@ function ApiEndpoints(props) {
                 api.fetchApisFromStis(apiCollectionId),
                 api.fetchApiInfosForCollection(apiCollectionId),
                 api.fetchAPIsFromSourceCode(apiCollectionId),
-                api.loadSensitiveParameters(apiCollectionId),
                 api.getSeveritiesCountPerCollection(apiCollectionId),
                 IssuesApi.fetchIssues(0, 1000, ["OPEN"], [apiCollectionId], null, null, null, null, null, null, true, null)
             ];
+            
+            // Start loading sensitive parameters immediately but don't wait for it
+            const sensitiveParamsPromise = api.loadSensitiveParameters(apiCollectionId);
+            
             let results = await Promise.allSettled(apiPromises);
             let stisEndpoints =  results[0].status === 'fulfilled' ? results[0].value : {};
             let apiInfosData = results[1].status === 'fulfilled' ? results[1].value : {};
             sourceCodeData = results[2].status === 'fulfilled' ? results[2].value : {};
-            sensitiveParamsResp =  results[3].status === 'fulfilled' ? results[3].value : {};
-            apiInfoSeverityMap = results[4].status === 'fulfilled' ? results[4].value : {};
-            let issuesDataResp = results[5].status === 'fulfilled' ? results[5].value : {};
+            apiInfoSeverityMap = results[3].status === 'fulfilled' ? results[3].value : {};
+            let issuesDataResp = results[4].status === 'fulfilled' ? results[4].value : {};
+            
+            // Initialize with empty sensitive params for fast UI loading
+            sensitiveParamsResp = { data: { endpoints: [] } };
+            
+            // Handle sensitive params when they arrive (don't wait)
+            sensitiveParamsPromise.then((sensitiveResp) => {
+                // Re-process the data with sensitive params
+                processDataWithSensitiveParams(
+                    sensitiveResp,
+                    stisEndpoints,
+                    apiInfosData,
+                    sourceCodeData,
+                    apiInfoSeverityMap,
+                    issuesDataResp
+                );
+            }).catch((err) => {
+                console.error("Failed to load sensitive parameters:", err);
+            });
             setShowEmptyScreen(stisEndpoints?.list !== undefined && stisEndpoints?.list?.length === 0)
             apiEndpointsInCollection = stisEndpoints?.list !== undefined && stisEndpoints.list.map(x => { return { ...x._id, startTs: x.startTs, changesCount: x.changesCount, shadow: x.shadow ? x.shadow : false } })
             apiInfoListInCollection = apiInfosData.apiInfoList
@@ -440,6 +460,140 @@ function ApiEndpoints(props) {
         setApiEndpoints(apiEndpointsInCollection)
         setApiInfoList(apiInfoListInCollection)
         setUnusedEndpoints(unusedEndpointsInCollection)
+    }
+    
+    // Helper function to process data with sensitive params
+    const processDataWithSensitiveParams = (
+        sensitiveParamsResp,
+        stisEndpoints,
+        apiInfosData,
+        sourceCodeData,
+        apiInfoSeverityMap,
+        issuesDataResp
+    ) => {
+        // Re-create the data processing pipeline with sensitive params
+        let apiEndpointsInCollection = stisEndpoints?.list !== undefined && 
+            stisEndpoints.list.map(x => { 
+                return { ...x._id, startTs: x.startTs, changesCount: x.changesCount, shadow: x.shadow ? x.shadow : false } 
+            });
+        let apiInfoListInCollection = apiInfosData.apiInfoList;
+        
+        let sensitiveParams = sensitiveParamsResp.data.endpoints;
+        let sensitiveParamsMap = {};
+        
+        sensitiveParams.forEach(p => {
+            let position = p.responseCode > -1 ? "response" : "request";
+            let key = p.method + " " + p.url + " " + p.apiCollectionId;
+            if (!sensitiveParamsMap[key]) sensitiveParamsMap[key] = new Set();
+            
+            if (!p.subType) {
+                p.subType = { name: "CUSTOM" };
+            }
+            
+            sensitiveParamsMap[key].add({ name: p.subType, position: position});
+        });
+        
+        // Apply sensitive params to endpoints
+        apiEndpointsInCollection.forEach(apiEndpoint => {
+            const key = apiEndpoint.method + " " + apiEndpoint.url + " " + apiEndpoint.apiCollectionId;
+            const allSensitive = new Set(), sensitiveInResp = [], sensitiveInReq = [];
+            
+            sensitiveParamsMap[key]?.forEach(({ name, position }) => {
+                allSensitive.add(name);
+                (position === 'response' ? sensitiveInResp : sensitiveInReq).push(name);
+            });
+            
+            Object.assign(apiEndpoint, {
+                sensitive: allSensitive,
+                sensitiveInReq,
+                sensitiveInResp
+            });
+        });
+        
+        // Continue with the rest of the data processing
+        apiInfoSeverityMap = func.getSeverityCountPerEndpointList(apiInfoSeverityMap);
+        
+        let data = {};
+        let allEndpoints = func.mergeApiInfoAndApiCollection(apiEndpointsInCollection, apiInfoListInCollection, collectionsMap, apiInfoSeverityMap);
+        
+        // Handle code analysis endpoints
+        const codeAnalysisCollectionInfo = sourceCodeData.codeAnalysisCollectionInfo;
+        const codeAnalysisApisMap = codeAnalysisCollectionInfo?.codeAnalysisApisMap;
+        let shadowApis = [];
+        
+        if (codeAnalysisApisMap) {
+            shadowApis = { ...codeAnalysisApisMap };
+            
+            // Find shadow endpoints and map api endpoint location
+            allEndpoints.forEach(api => {
+                let apiEndpoint = transform.getTruncatedUrl(api.endpoint);
+                if (apiEndpoint !== "/" && apiEndpoint.endsWith("/")) 
+                    apiEndpoint = apiEndpoint.slice(0, -1);
+                
+                const apiKey = api.method + " " + apiEndpoint;
+                
+                if (Object.hasOwn(codeAnalysisApisMap, apiKey)) {
+                    const codeAnalysisApi = codeAnalysisApisMap[apiKey];
+                    const location = codeAnalysisApi.location;
+                    api.sourceLocation = codeAnalysisApi.location.filePath;
+                    api.sourceLocationComp = <SourceLocation location={location} />;
+                    delete shadowApis[apiKey];
+                } else {
+                    api.source_location = "";
+                }
+            });
+            
+            shadowApis = Object.entries(shadowApis).map(([ codeAnalysisApiKey, codeAnalysisApi ]) => {
+                const {id, lastSeenTs, discoveredTs, location} = codeAnalysisApi;
+                const { method, endpoint} = id;
+                
+                return {
+                    id: codeAnalysisApiKey,
+                    endpointComp: <GetPrettifyEndpoint method={method} url={endpoint} isNew={false} />,
+                    method: method,
+                    endpoint: endpoint,
+                    apiCollectionId: apiCollectionId,
+                    codeAnalysisEndpoint: true,
+                    sourceLocation: location.filePath,
+                    sourceLocationComp: <SourceLocation location={location} />,
+                    parameterisedEndpoint: method + " " + endpoint,
+                    apiCollectionName: collectionsMap[apiCollectionId],
+                    last_seen: func.prettifyEpoch(lastSeenTs),
+                    added: func.prettifyEpoch(discoveredTs),
+                    descriptionComp: (<Box maxWidth="300px"><TooltipText tooltip={codeAnalysisApi.description} text={codeAnalysisApi.description}/></Box>),
+                };
+            });
+        }
+        
+        const prettifyData = transform.prettifyEndpointsData(allEndpoints);
+        
+        const zombie = prettifyData.filter(
+            obj => obj.sources && 
+                   Object.keys(obj.sources).length === 1 &&
+                   obj.sources.hasOwnProperty("OPEN_API")
+        );
+        
+        var hasOpenAPI = false;
+        prettifyData.forEach((obj) => {
+            if (obj.sources && obj.sources.hasOwnProperty("OPEN_API")) {
+                hasOpenAPI = true;
+            }
+        });
+        
+        const undocumented = hasOpenAPI ? prettifyData.filter(
+            obj => obj.sources && !obj.sources.hasOwnProperty("OPEN_API")
+        ) : [];
+        
+        // Build the data object with all tabs
+        data['all'] = [ ...prettifyData, ...shadowApis ];
+        data['sensitive'] = prettifyData.filter(x => x.sensitive && x.sensitive.size > 0);
+        data['high_risk'] = prettifyData.filter(x => x.riskScore >= 4);
+        data['new'] = prettifyData.filter(x => x.isNew);
+        data['no_auth'] = prettifyData.filter(x => x.open);
+        data['shadow'] = [ ...shadowApis, ...undocumented ];
+        data['zombie'] = zombie;
+        
+        setEndpointData(data);
     }
 
     useEffect(() => {
