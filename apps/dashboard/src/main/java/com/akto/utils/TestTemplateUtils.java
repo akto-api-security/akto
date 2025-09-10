@@ -101,16 +101,16 @@ public class TestTemplateUtils {
 
         TestCategory[] llmCategories = {
             GlobalEnums.TestCategory.LLM,
-            GlobalEnums.TestCategory.LLM01,
-            GlobalEnums.TestCategory.LLM02,
-            GlobalEnums.TestCategory.LLM03,
-            GlobalEnums.TestCategory.LLM04,
-            GlobalEnums.TestCategory.LLM05,
-            GlobalEnums.TestCategory.LLM06,
-            GlobalEnums.TestCategory.LLM07,
-            GlobalEnums.TestCategory.LLM08,
-            GlobalEnums.TestCategory.LLM09,
-            GlobalEnums.TestCategory.LLM10
+            GlobalEnums.TestCategory.PROMPT_INJECTION,
+            GlobalEnums.TestCategory.SENSITIVE_INFORMATION_DISCLOSURE,
+            GlobalEnums.TestCategory.SUPPLY_CHAIN,
+            GlobalEnums.TestCategory.DATA_AND_MODEL_POISONING,
+            GlobalEnums.TestCategory.IMPROPER_OUTPUT_HANDLING,
+            GlobalEnums.TestCategory.EXCESSIVE_AGENCY,
+            GlobalEnums.TestCategory.SYSTEM_PROMPT_LEAKAGE,
+            GlobalEnums.TestCategory.VECTOR_AND_EMBEDDING_WEAKNESSES,
+            GlobalEnums.TestCategory.MISINFORMATION,
+            GlobalEnums.TestCategory.UNBOUNDED_CONSUMPTION
         };
 
         switch (contextSource) {
