@@ -31,7 +31,7 @@ public class JobsCron {
 
     public void jobsScheduler(JobExecutorType jobExecutorType) {
         scheduler.scheduleAtFixedRate(() -> {
-            logger.debug("started jobs");
+            logger.info("started jobs");
 
             // filters -
             /* OR

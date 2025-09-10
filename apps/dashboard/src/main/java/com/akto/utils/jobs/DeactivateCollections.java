@@ -44,6 +44,7 @@ public class DeactivateCollections {
 
         executorService.schedule(new Runnable() {
             public void run() {
+                loggerMaker.info("Starting deactivate collections job");
                 OrganizationTask.instance.executeTask(new Consumer<Organization>() {
                     @Override
                     public void accept(Organization organization) {
@@ -52,7 +53,6 @@ public class DeactivateCollections {
                 }, "deactivate-collections");
             }
         }, 0, TimeUnit.SECONDS);
-
     }
 
     private static void raiseMixpanelEvent(Organization organization, int accountId, int overage) {

@@ -2425,11 +2425,12 @@ public class InitializerListener implements ServletContextListener {
                 int now = Context.now();
                 if (runJobFunctions || runJobFunctionsAnyway) {
 
-                    logger.debug("Starting init functions and scheduling jobs at " + now);
+                    logger.info("Starting init functions and scheduling jobs at " + now);
 
                     AccountTask.instance.executeTask(new Consumer<Account>() {
                         @Override
                         public void accept(Account account) {
+                            logger.info("Starting createIndices for " + account.getId() + " at " + now);
                             DaoInit.createIndices();
                         }
                     }, "context-initializer-secondary");
@@ -4136,6 +4137,7 @@ public class InitializerListener implements ServletContextListener {
         }
 
         isCalcUsageRunning = true;
+        logger.info("Running calcUsage");
         AccountTask.instance.executeTask(new Consumer<Account>() {
             @Override
             public void accept(Account a) {
@@ -4179,7 +4181,7 @@ public class InitializerListener implements ServletContextListener {
         if (isSyncWithAktoRunning) return;
 
         isSyncWithAktoRunning = true;
-        logger.debug("Running usage sync scheduler");
+        logger.info("Running usage sync scheduler");
         try {
             List<UsageMetric> usageMetrics = UsageMetricsDao.instance.findAll(
                     Filters.eq(UsageMetric.SYNCED_WITH_AKTO, false)
@@ -4213,6 +4215,7 @@ public class InitializerListener implements ServletContextListener {
                     logger.debugAndAddToDb("Usage cron dibs not acquired, skipping usage cron", LoggerMaker.LogDb.DASHBOARD);
                     return;
                 }
+                logger.info("started setupUsageScheduler");
                 /*
                  * This syncs existing entries in db.
                  * This is needed in case the machine were down,
