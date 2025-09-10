@@ -112,6 +112,17 @@
             </result>
         </action>
 
+        <action name="api/fetchApiRateLimits" class="com.akto.action.DbAction" method="fetchApiRateLimits">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
         <action name="api/fetchNonTrafficApiInfos" class="com.akto.action.DbAction" method="fetchNonTrafficApiInfos">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />

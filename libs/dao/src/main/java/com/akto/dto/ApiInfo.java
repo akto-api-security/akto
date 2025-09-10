@@ -48,6 +48,12 @@ public class ApiInfo {
     public static final String LAST_CALCULATED_TIME = "lastCalculatedTime";
     private int lastCalculatedTime;
 
+    public static final String RATELIMITS = "rateLimits";
+    private Map<String, Integer> rateLimits;
+    
+    public static final String RATE_LIMIT_CONFIDENCE = "rateLimitConfidence";
+    private float rateLimitConfidence;
+
     public enum AuthType {
         UNAUTHENTICATED, BASIC, AUTHORIZATION_HEADER, JWT, API_TOKEN, BEARER, CUSTOM
     }
@@ -133,6 +139,14 @@ public class ApiInfo {
     public ApiInfo(ApiInfoKey apiInfoKey) {
         this.id = apiInfoKey;
         this.violations = new HashMap<>();
+        
+        // Initialize rate limits with -1 => no limits
+        this.rateLimits = new HashMap<>();
+        this.rateLimits.put("p50", -1);
+        this.rateLimits.put("p75", -1);
+        this.rateLimits.put("p90", -1);
+        this.rateLimits.put("maxRequests", -1);
+             
         this.apiAccessTypes = new HashSet<>();
         this.allAuthTypesFound = new HashSet<>();
         this.lastSeen = Context.now();
@@ -191,6 +205,16 @@ public class ApiInfo {
         this.allAuthTypesFound.addAll(that.allAuthTypesFound);
 
         this.apiAccessTypes.addAll(that.getApiAccessTypes());
+
+        // Merge rateLimits - take the maximum value for each key
+        for (String k: that.rateLimits.keySet()) {
+            if (this.rateLimits.get(k) == null || that.rateLimits.get(k) > this.rateLimits.get(k)) {
+                this.rateLimits.put(k, that.rateLimits.get(k));
+            }
+        }
+
+        // Merge rateLimitConfidence - take the maximum confidence
+        this.rateLimitConfidence = Math.max(this.rateLimitConfidence, that.rateLimitConfidence);
 
     }
 
@@ -341,6 +365,22 @@ public class ApiInfo {
 
     public void setLastCalculatedTime(int lastCalculatedTime) {
         this.lastCalculatedTime = lastCalculatedTime;
+    }
+
+    public Map<String, Integer> getRateLimits() {
+        return rateLimits;
+    }
+
+    public void setRateLimits(Map<String, Integer> rateLimits) {
+        this.rateLimits = rateLimits;
+    }
+
+    public float getRateLimitConfidence() {
+        return rateLimitConfidence;
+    }
+
+    public void setRateLimitConfidence(float rateLimitConfidence) {
+        this.rateLimitConfidence = rateLimitConfidence;
     }
 
 }

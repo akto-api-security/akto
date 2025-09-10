@@ -170,7 +170,10 @@ public class LoggerMaker  {
 
     public void info(String msg, Object... vars){
         logger.info(msg, vars);
+    }
 
+    public void warn(String msg, Object... vars){
+        logger.warn(msg, vars);
     }
 
     protected String basicError(String err, LogDb db) {
