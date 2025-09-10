@@ -90,7 +90,7 @@ function HomeDashboard() {
     const [mcpOpenAlertDetails, setMcpOpenAlertDetails] = useState([])
     const [mcpApiCallStats, setMcpApiCallStats] = useState([])
     const [policyGuardrailStats, setPolicyGuardrailStats] = useState([])
-    const [policyGuardrailStatsTimeRange, setPolicyGuardrailStatsTimeRange] = useState(func.timeNow() - 24*60*60)
+    const [policyGuardrailStatsTimeRange, setPolicyGuardrailStatsTimeRange] = useState(func.timeNow() - 30*24*60*60)
     const [mcpTopApplications, setMcpTopApplications] = useState([])
 
     // MCP API Requests time selector state
@@ -108,7 +108,7 @@ function HomeDashboard() {
         {label: "1 year", value: 365*24*60*60},
         {label: "All time", value: 10*365*24*60*60} // 10 years as a proxy for all time
     ]
-    const [mcpStatsTimeRange, setMcpStatsTimeRange] = useState(func.timeNow() - statsOptions[6].value)
+    const [mcpStatsTimeRange, setMcpStatsTimeRange] = useState(func.timeNow() - statsOptions[8].value)
 
     const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), values.ranges[2]);
 
@@ -1090,7 +1090,7 @@ function HomeDashboard() {
                     <HorizontalStack align="end">
                         <Dropdown
                             menuItems={statsOptions}
-                            initial={statsOptions[6].label}
+                            initial={statsOptions[8].label}
                             selected={(timeInSeconds) => {
                                 setMcpStatsTimeRange(func.timeNow() - timeInSeconds);
                             }}
@@ -1139,7 +1139,7 @@ function HomeDashboard() {
                     <HorizontalStack align="end">
                         <Dropdown
                             menuItems={statsOptions}
-                            initial={statsOptions[6].label}
+                            initial={statsOptions[8].label}
                             selected={(timeInSeconds) => {
                                 setPolicyGuardrailStatsTimeRange(func.timeNow() - timeInSeconds);
                             }}
@@ -1284,41 +1284,41 @@ function HomeDashboard() {
             {id: 'api-type', component: apisByTypeComponent},
         ]
 
-    // if (isMCPSecurityCategory()) {
-    //     gridComponents = [
-    //         {id: 'mcp-api-requests', component: mcpApiRequestsCard},
-    //         {id: 'policy-guardrails', component: policyGuardrailsCard},
-    //         {id: 'mcp-discovery', component: mcpDiscoveryMiniCard},
-    //         {id: 'mcp-risk', component: mcpRiskDetectionsMiniCard},
-    //         {id: 'mcp-open-alerts', component: mcpOpenAlertsCard},
-    //         {id: 'mcp-top-applications', component: mcpTopApplicationsCard},
-    //         {id: 'mcp-types-table', component: mcpTypesTableCard},
-    //         ...gridComponents
-    //     ]
-    // }
+    if (isMCPSecurityCategory()) {
+        gridComponents = [
+            {id: 'mcp-api-requests', component: mcpApiRequestsCard},
+            {id: 'policy-guardrails', component: policyGuardrailsCard},
+            {id: 'mcp-discovery', component: mcpDiscoveryMiniCard},
+            {id: 'mcp-top-applications', component: mcpTopApplicationsCard},
+          //  {id: 'mcp-risk', component: mcpRiskDetectionsMiniCard},
+            {id: 'mcp-open-alerts', component: mcpOpenAlertsCard},
+            {id: 'mcp-types-table', component: mcpTypesTableCard},
+            ...gridComponents
+        ]
+    }
 
     const gridComponent = (
-        // isMCPSecurityCategory() ? (
-        //     <VerticalStack gap={5}>
-        //         {/* First row with MCP Components Requests and Policy Guardrails side by side */}
-        //         <HorizontalGrid gap={5} columns={2}>
-        //             {mcpApiRequestsCard}
-        //             {policyGuardrailsCard}
-        //         </HorizontalGrid>
-        //         {/* Second row with equal columns for remaining components */}
-        //         <HorizontalGrid gap={5} columns={2}>
-        //             {gridComponents.slice(2).map(({id, component}) => (
-        //                 <div key={id}>{component}</div>
-        //             ))}
-        //         </HorizontalGrid>
-        //     </VerticalStack>
-        // ) : (
+        isMCPSecurityCategory() ? (
+            <VerticalStack gap={5}>
+                {/* First row with MCP Components Requests and Policy Guardrails side by side */}
+                <HorizontalGrid gap={5} columns={2}>
+                    {mcpApiRequestsCard}
+                    {policyGuardrailsCard}
+                </HorizontalGrid>
+                {/* Second row with equal columns for remaining components */}
+                <HorizontalGrid gap={5} columns={2}>
+                    {gridComponents.slice(2).map(({id, component}) => (
+                        <div key={id}>{component}</div>
+                    ))}
+                </HorizontalGrid>
+            </VerticalStack>
+        ) : (
             <HorizontalGrid gap={5} columns={2}>
                 {gridComponents.map(({id, component}) => (
                     <div key={id}>{component}</div>
                 ))}
             </HorizontalGrid>
-        // )
+         )
     )
 
     const components = [
