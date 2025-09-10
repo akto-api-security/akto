@@ -110,6 +110,14 @@ function HomeDashboard() {
     ]
     const [mcpStatsTimeRange, setMcpStatsTimeRange] = useState(func.timeNow() - statsOptions[8].value)
 
+    // Function to handle navigation to audit page with MCP context
+    const handleMcpAuditNavigation = useCallback(() => {
+        // Set dashboard category to MCP Security before navigating
+        PersistStore.getState().setDashboardCategory('MCP Security');
+        // Navigate to audit page
+        window.location.href = '/dashboard/observe/audit';
+    }, [])
+
     const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), values.ranges[2]);
 
     const getTimeEpoch = (key) => {
@@ -1185,14 +1193,15 @@ function HomeDashboard() {
                 <VerticalStack gap={3}>
                     {mcpOpenAlertDetails && mcpOpenAlertDetails.length > 0 ? (
                         mcpOpenAlertDetails.map((alert, idx) => (
-                            <Link key={`open-alert-${idx}`} url={'/dashboard/observe/audit'} removeUnderline>
+                            <Box key={`open-alert-${idx}`} onClick={handleMcpAuditNavigation} style={{cursor: 'pointer'}}>
                                 <Box padding="4" background="bg-surface" borderRadius="2" borderColor="border" borderWidth="2">
                                     <VerticalStack gap={1}>
+                                        <Text variant='bodyMd' fontWeight='semibold'>{alert?.resourceName || '-'}</Text>
                                         <Text variant='bodyMd' color='text'>{alert?.type || '-'}</Text>
                                         <Text color='subdued' variant='bodySm'>{alert?.lastDetected || '-'}</Text>
                                     </VerticalStack>
                                 </Box>
-                            </Link>
+                            </Box>
                         ))
                     ) : (
                         <Box paddingBlockStart="1">
@@ -1206,7 +1215,8 @@ function HomeDashboard() {
             linkText={'View more'}
             linkUrl={'/dashboard/observe/audit'}
             linkText={mcpOpenAlertDetails && mcpOpenAlertDetails.length > 0 ? 'View more' : undefined}
-            linkUrl={mcpOpenAlertDetails && mcpOpenAlertDetails.length > 0 ? '/dashboard/observe/audit' : undefined}
+            linkUrl={undefined}
+            onLinkClick={mcpOpenAlertDetails && mcpOpenAlertDetails.length > 0 ? handleMcpAuditNavigation : undefined}
         />
     )
 

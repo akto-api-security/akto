@@ -1200,7 +1200,7 @@ public class ApiCollectionsAction extends UserAction {
 
                 // Optimize: Use projection to fetch only required fields (type and lastDetected)
                 // This reduces network transfer and memory usage
-                Bson projection = Projections.include("type", "lastDetected");
+                Bson projection = Projections.include("type", "lastDetected", "resourceName");
                 List<McpAuditInfo> openAlerts = McpAuditInfoDao.instance.findAll(openAlertsFilter, projection);
                 this.mcpDataCount = openAlerts.size();
 
@@ -1210,6 +1210,7 @@ public class ApiCollectionsAction extends UserAction {
                     for (McpAuditInfo alert : openAlerts) {
                         BasicDBObject alertInfo = new BasicDBObject();
                         alertInfo.put("type", alert.getType());
+                        alertInfo.put("resourceName", alert.getResourceName());
 
                         // Convert lastDetected (epoch seconds) to human-readable format
                         int lastDetectedEpoch = alert.getLastDetected();
