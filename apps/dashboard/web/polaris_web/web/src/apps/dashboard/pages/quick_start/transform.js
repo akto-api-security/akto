@@ -14,6 +14,7 @@ import BitBucketSource from "./components/BitBucketSource"
 import GithubSource from "./components/GithubSource"
 import AktoJax from "./components/AktoJax"  
 import McpScan from "./components/McpScan" 
+import AiAgentScan from "./components/AiAgentScan"
 
 
 const mirroringObj = {
@@ -202,6 +203,15 @@ const aktoJaxObj = {
     docsUrl: 'https://docs.akto.io/dast/akto-dast',
     key: "AKTODAST",
     component : <AktoJax />
+}
+
+const aiScanObj = {
+    icon: '/public/ollama.svg',
+    label: "AI Agent Import",
+    text: "You can use Akto to import AI Agents to Akto dashboard for better coverage.",
+    docsUrl: 'https://docs.akto.io',
+    key: "AKTOAI",
+    component : <AiAgentScan />
 }
 
 const mcpScanObj = {    
@@ -1095,6 +1105,10 @@ const quickStartFunc = {
             aktoJaxObj
         ];
 
+        const aiScanConnectors = [
+            aiScanObj
+        ]
+
         // MCP Scan
         const mcpScan = [
             mcpScanObj
@@ -1115,6 +1129,7 @@ const quickStartFunc = {
             "Hybrid SaaS": hybridSaas,
             "MCP Security": mcpScan,
             "DAST": crawler,
+            "AI Security": aiScanConnectors,
             "Kubernetes": kubernetes,
             "API Gateways": apiGateways,
             "Mirroring": mirroring,

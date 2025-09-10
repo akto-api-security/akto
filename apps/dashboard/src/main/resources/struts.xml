@@ -2920,6 +2920,30 @@
             </result>
         </action>
 
+        <action name="api/importFromUrl" class="com.akto.action.AgentImportAction" method="importFromUrl">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">AI_AGENTS</param>
+                <param name="accessType">READ_WRITE</param>
+                <param name="actionDescription">User imported API data from URL using AI agents</param>
+            </interceptor-ref>
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <interceptor-ref name="usageInterceptor">
+                <param name="featureLabel">AI_AGENTS</param>
+            </interceptor-ref>
+            <result name="SUCCESS"  type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
         <action name="api/fetchCollections" class="com.akto.action.PostmanAction" method="fetchCollections">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />

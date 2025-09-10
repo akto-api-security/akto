@@ -185,6 +185,14 @@ const api = {
             data: {serverUrl, authKey, authValue, dashboardUrl}
         })
     },
+
+    initiateAiAgentImport(openaiUrl, openaiApiKey, model, maxRequests, dashboardUrl) {
+        return request({
+            url: '/api/initiateAiAgentImport',
+            method: 'post',
+            data: {openaiUrl, openaiApiKey, model, maxRequests, dashboardUrl}
+        })
+    },
 }
 
 export default api
