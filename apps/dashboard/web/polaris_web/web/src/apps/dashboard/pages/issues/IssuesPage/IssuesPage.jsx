@@ -192,9 +192,9 @@ function IssuesPage() {
     const [mandatoryDescription, setMandatoryDescription] = useState("")
     const [modalLoading, setModalLoading] = useState(false)
     const [compulsorySettings, setCompulsorySettings] = useState({
-        "False positive": false,
-        "No time to fix": false,
-        "Acceptable risk": false
+        falsePositive: false,
+        noTimeToFix: false,
+        acceptableFix: false
     })
 
     const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), values.ranges[5])
@@ -353,65 +353,42 @@ function IssuesPage() {
         })
     }
 
-    // mapping strings
-    const reasonToSettingsKeyMap = {
-        "False positive": "falsePositive",
-        "Acceptable risk": "AcceptableFix", 
-        "No time to fix": "noTimeToFix"
-    };
-
-    // Update the requiresDescription function
-    const requiresDescription = (reason) => {
-        const settingsKey = reasonToSettingsKeyMap[reason];
-        return compulsorySettings[settingsKey] || false;
+    // Use keys directly for reasons and compulsorySettings
+    const requiresDescription = (reasonKey) => {
+        return compulsorySettings[reasonKey] || false;
     };
 
 
     const handleIgnoreWithDescription = () => {
         if (pendingIgnoreAction && mandatoryDescription.trim()) {
-            performBulkIgnoreAction(pendingIgnoreAction.items, pendingIgnoreAction.reason, mandatoryDescription);
-            setCompulsoryDescriptionModal(false);
-            setPendingIgnoreAction(null);
-            setMandatoryDescription("");
+            // Use the same endpoint as TestRunResultFlyout.jsx for description update
+            const updatePromises = pendingIgnoreAction.items.map(item => 
+                testingApi.updateIssueDescription(item, mandatoryDescription)
+            );
+            Promise.allSettled(updatePromises).then(() => {
+                performBulkIgnoreAction(pendingIgnoreAction.items, pendingIgnoreAction.reason, mandatoryDescription);
+                setCompulsoryDescriptionModal(false);
+                setPendingIgnoreAction(null);
+                setMandatoryDescription("");
+            });
         }
     };
 
-    // When modal opens, fetch the current description for the first selected issue
     useEffect(() => {
         if (compulsoryDescriptionModal && pendingIgnoreAction && pendingIgnoreAction.items?.length > 0) {
-            setModalLoading(true);
-            // Only show description for the first selected issue
-            const issueId = pendingIgnoreAction.items[0];
-            api.fetchTestingRunResult(issueId).then(res => {
-                const desc = res?.testingRunResult?.description || "";
-                setMandatoryDescription(desc);
-            }).catch(() => {
-                setMandatoryDescription(""); // Set empty if fetch fails
-            }).finally(() => {
-                setModalLoading(false);
-            });
+            setMandatoryDescription("");
+            setModalLoading(false);
         }
     }, [compulsoryDescriptionModal, pendingIgnoreAction]);
 
     const performBulkIgnoreAction = (items, ignoreReason, description = "") => {
-        // If description is provided, update each issue's description first
-        if (description && items.length > 0) {
-            const updatePromises = items.map(item => 
-                testingApi.updateIssueDescription(item, description)
-            );
-            
-            Promise.allSettled(updatePromises).then(() => {
-                api.bulkUpdateIssueStatus(items, "IGNORED", ignoreReason, {}).then((res) => {
-                    setToast(true, false, `Issue${items.length === 1 ? "" : "s"} ignored with description`);
-                    resetResourcesSelected();
-                });
-            });
-        } else {
-            api.bulkUpdateIssueStatus(items, "IGNORED", ignoreReason, {}).then((res) => {
-                setToast(true, false, `Issue${items.length === 1 ? "" : "s"} ignored`);
-                resetResourcesSelected();
-            });
-        }
+        api.bulkUpdateIssueStatus(items, "IGNORED", ignoreReason, { description }).then((res) => {
+            setToast(true, false, `Issue${items.length === 1 ? "" : "s"} ignored${description ? " with description" : ""}`);
+            if (items.length === 1 && typeof setMandatoryDescription === 'function') {
+                setMandatoryDescription(description);
+            }
+            resetResourcesSelected();
+        });
     };
 
     let promotedBulkActions = (selectedResources) => {
@@ -423,13 +400,13 @@ function IssuesPage() {
             items = selectedResources.map((item) => JSON.parse(item))
         }
         
-        function ignoreAction(ignoreReason){
-            if (requiresDescription(ignoreReason)) {
-                setPendingIgnoreAction({ items, reason: ignoreReason });
+        function ignoreAction(reasonKey){
+            if (requiresDescription(reasonKey)) {
+                setPendingIgnoreAction({ items, reason: reasonKey });
                 setCompulsoryDescriptionModal(true);
                 return;
             }
-            performBulkIgnoreAction(items, ignoreReason);
+            performBulkIgnoreAction(items, reasonKey);
         }
         
         function reopenAction(){
@@ -472,36 +449,41 @@ function IssuesPage() {
             })
         }
         
-        let issues = [{
-            content: 'False positive',
-            onAction: () => { ignoreAction("False positive") }
-        },
-        {
-            content: 'Acceptable risk',
-            onAction: () => { ignoreAction("Acceptable risk") }
-        },
-        {
-            content: 'No time to fix',
-            onAction: () => { ignoreAction("No time to fix") }
-        },
-        {
-            content: 'Export selected Issues',
-            onAction: () => { openVulnerabilityReport(items, false) }
-        },
-        {
-            content: 'Export selected Issues summary',
-            onAction: () => { openVulnerabilityReport(items, true) }
-        },
-        {
-            content: 'Create jira ticket',
-            onAction: () => { createJiraTicketBulk() },
-            disabled: (window.JIRA_INTEGRATED === 'false')
-        },
-        {
-            content: 'Create azure work item',
-            onAction: () => { createAzureBoardWorkItemBulk() },
-            disabled: (window.AZURE_BOARDS_INTEGRATED === 'false')
-        }]
+        let issues = [
+            {
+                content: 'False positive',
+                key: 'falsePositive',
+                onAction: () => { ignoreAction('falsePositive') }
+            },
+            {
+                content: 'Acceptable fix',
+                key: 'acceptableFix',
+                onAction: () => { ignoreAction('acceptableFix') }
+            },
+            {
+                content: 'No time to fix',
+                key: 'noTimeToFix',
+                onAction: () => { ignoreAction('noTimeToFix') }
+            },
+            {
+                content: 'Export selected Issues',
+                onAction: () => { openVulnerabilityReport(items, false) }
+            },
+            {
+                content: 'Export selected Issues summary',
+                onAction: () => { openVulnerabilityReport(items, true) }
+            },
+            {
+                content: 'Create jira ticket',
+                onAction: () => { createJiraTicketBulk() },
+                disabled: (window.JIRA_INTEGRATED === 'false')
+            },
+            {
+                content: 'Create azure work item',
+                onAction: () => { createAzureBoardWorkItemBulk() },
+                disabled: (window.AZURE_BOARDS_INTEGRATED === 'false')
+            }
+        ];
         
         let reopen =  [{
             content: 'Reopen',
@@ -747,21 +729,21 @@ function IssuesPage() {
 
         await api.fetchIssues(0, 20000, filterStatus, filterCollectionsId, filterSeverity, filterSubCategory, "severity", -1, startTimestamp, endTimestamp, activeCollections, filterCompliance).then((issuesDataRes) => {
             issuesDataRes.issues.forEach((item) => {
-                    const issue = {
-                        id: item?.id,
-                        severityVal: func.toSentenceCase(item?.severity),
-                        complianceVal: Object.keys(subCategoryMap[item?.id?.testSubCategory]?.compliance?.mapComplianceToListClauses || {}),
-                        issueName: item?.id?.testSubCategory,
-                        category: subCategoryMap[item?.id?.testSubCategory]?.superCategory?.shortName,
-                        numberOfEndpoints: 1,
-                        creationTime: func.prettifyEpoch(item?.creationTime),
-                        issueStatus: item?.unread.toString() === 'false' ? "read" : "unread",
-                        domainVal:[(hostNameMap[item?.id?.apiInfoKey?.apiCollectionId] !== null ? hostNameMap[item?.id?.apiInfoKey?.apiCollectionId] : apiCollectionMap[item?.id?.apiInfoKey?.apiCollectionId])],
-                        url:`${item?.id?.apiInfoKey?.method} ${item?.id?.apiInfoKey?.url}`
-                    }
-                    issueItems.push(issue)
-                })
-
+                if (!item || !item.id || !item.id.testSubCategory || !subCategoryMap[item.id.testSubCategory]) return;
+                const issue = {
+                    id: item.id,
+                    severityVal: func.toSentenceCase(item.severity),
+                    complianceVal: Object.keys(subCategoryMap[item.id.testSubCategory]?.compliance?.mapComplianceToListClauses || {}),
+                    issueName: item.id.testSubCategory,
+                    category: subCategoryMap[item.id.testSubCategory]?.superCategory?.shortName,
+                    numberOfEndpoints: 1,
+                    creationTime: func.prettifyEpoch(item.creationTime),
+                    issueStatus: item.unread && item.unread.toString() === 'false' ? "read" : "unread",
+                    domainVal:[(item.id.apiInfoKey && hostNameMap[item.id.apiInfoKey.apiCollectionId] !== null ? hostNameMap[item.id.apiInfoKey.apiCollectionId] : apiCollectionMap[item.id.apiInfoKey.apiCollectionId])],
+                    url:`${item.id.apiInfoKey?.method || ""} ${item.id.apiInfoKey?.url || ""}`
+                }
+                issueItems.push(issue)
+            })
         }).catch((e) => {
             func.setToast(true, true, e.message)
         })
