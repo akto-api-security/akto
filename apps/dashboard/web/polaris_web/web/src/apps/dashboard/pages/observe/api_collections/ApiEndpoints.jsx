@@ -474,11 +474,14 @@ function ApiEndpoints(props) {
                             (position === 'response' ? sensitiveInResp : sensitiveInReq).push(name);
                         });
 
+                        const sensitiveTags = [...func.convertSensitiveTags(allSensitive)]
+
                         Object.assign(apiEndpoint, {
                             sensitive: allSensitive,
+                            sensitiveTags,
                             sensitiveInReq: [...func.convertSensitiveTags(sensitiveInReq)],
                             sensitiveInResp: [...func.convertSensitiveTags(sensitiveInResp)],
-                            sensitiveTagsComp: transform.prettifySubtypes([...func.convertSensitiveTags(allSensitive)])
+                            sensitiveTagsComp: transform.prettifySubtypes(sensitiveTags)
                         });
                     })
 
