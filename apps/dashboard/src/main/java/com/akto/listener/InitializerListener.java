@@ -261,6 +261,7 @@ public class InitializerListener implements ServletContextListener {
 
     private static final CacheLoggerMaker cacheLoggerMaker = new CacheLoggerMaker(InitializerListener.class);
     private static final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
+    private static final ScheduledExecutorService usageScheduler = Executors.newScheduledThreadPool(1);
     public static final boolean isSaas = "true".equals(System.getenv("IS_SAAS"));
 
     private static final int THREE_HOURS = 3*60*60;
@@ -4207,7 +4208,7 @@ public class InitializerListener implements ServletContextListener {
     }
 
     public void setupUsageScheduler() {
-        scheduler.scheduleAtFixedRate(new Runnable() {
+        usageScheduler.scheduleAtFixedRate(new Runnable() {
             public void run() {
                 Context.accountId.set(1000_000);
                 boolean dibs = callDibs("usage-scheduler", 60*60, 60);
