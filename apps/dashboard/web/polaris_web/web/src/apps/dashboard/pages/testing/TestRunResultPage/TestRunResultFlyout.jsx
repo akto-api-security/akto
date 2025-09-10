@@ -94,39 +94,21 @@ function TestRunResultFlyout(props) {
 
     const handleSaveDescription = async () => {
         setIsEditingDescription(false);
-        
-        if(editDescription === description) {
-            return
+        if (editDescription === description) {
+            return;
         }
-        await testingApi.updateIssueDescription(issueDetails.id, editDescription)
-            .then(async () => {
-                setDescription(editDescription);
-                func.setToast(true, false, "Description saved successfully");
-
-                // Re-fetch the latest issue details and update local state so timeline refreshes
-                try {
-                    if (issueDetails && issueDetails.id) {
-                        const resp = await issuesApi.fetchTestingRunResult(issueDetails.id)
-                        
-                        const updatedIssue = resp?.data || resp || {}
-                        
-                        if (updatedIssue.description !== undefined) {
-                            setDescription(updatedIssue.description)
-                            setEditDescription(updatedIssue.description)
-                        }
-    
-                        if (typeof props.setIssueDetails === 'function') {
-                            props.setIssueDetails(updatedIssue)
-                        }
-                    }
-                } catch (e) {
-                    console.error('Failed to re-fetch issue details after description save', e)
-                }
-            })
-            .catch((err) => {
-                console.error("Failed to save description:", err);
-                func.setToast(true, true, "Failed to save description");
-            })
+        try {
+            await testingApi.updateIssueDescription(issueDetails.id, editDescription);
+            setDescription(editDescription);
+            func.setToast(true, false, "Description saved successfully");
+            // Use state variable for updates, no need to re-fetch
+            if (typeof props.setIssueDetails === 'function') {
+                props.setIssueDetails({ ...issueDetails, description: editDescription });
+            }
+        } catch (err) {
+            console.error("Failed to save description:", err);
+            func.setToast(true, true, "Failed to save description");
+        }
     }
 
     useEffect(() => {
@@ -469,15 +451,6 @@ function TestRunResultFlyout(props) {
         }
         activityEvents.push(createdEvent)
 
-        // Add description update event if description exists
-        if (issue.description && issue.description.trim()) {
-            const descriptionEvent = {
-                description: `Description updated: "${issue.description}"`,
-                timestamp: issue.getDescriptionUpdatedAt ? issue.getDescriptionUpdatedAt() : (issue.descriptionUpdatedAt || issue.lastUpdated || issue.creationTime),
-                user: issue.getDescriptionUpdatedBy ? issue.getDescriptionUpdatedBy() : (issue.descriptionUpdatedBy || 'System')
-            }
-            activityEvents.push(descriptionEvent)
-        }
 
         if (issue.testRunIssueStatus === 'IGNORED') {
             const ignoredEvent = {
