@@ -53,7 +53,7 @@ public class SlackSender {
 
                     if(statusCode == 200) {
                         loggerMaker.infoAndAddToDb("Slack Alert Type: " + alertType + " Info: " + "Alert sent successfully.");
-                        return;
+                        break;
                     } else {
                         loggerMaker.errorAndAddToDb("Slack Alert Type: " + alertType + " Error: " + response.getMessage());
                     }
@@ -66,7 +66,7 @@ public class SlackSender {
                         Thread.sleep(retryDelays[attempts]);
                     } catch(InterruptedException ie) {
                         loggerMaker.errorAndAddToDb("Slack Alert Type: " + alertType + " Error: " + "Thread was interrupted, failed to complete operation");
-                        return;
+                        break;
                     }
                 }
 
@@ -89,7 +89,7 @@ public class SlackSender {
 
     private static void sendDuplicateAlert(String payload, int accountId){
        if(accountId == 1723492815){
-            Context.accountId.set(accountId);
+            Context.accountId.set(1000000);
             SlackWebhook slackWebhook = SlackWebhooksDao.instance.findOne(Filters.empty());
             if (slackWebhook == null) {
                 Context.accountId.set(accountId);

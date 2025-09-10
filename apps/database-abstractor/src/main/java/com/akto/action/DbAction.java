@@ -48,6 +48,7 @@ import com.akto.utils.RedactAlert;
 import com.akto.utils.SampleDataLogs;
 import com.akto.dto.type.URLMethods;
 import com.akto.dto.type.URLMethods.Method;
+import java.util.concurrent.atomic.AtomicInteger;
 import com.akto.testing.TestExecutor;
 import com.akto.trafficFilter.HostFilter;
 import com.akto.trafficFilter.ParamFilter;
@@ -2360,9 +2361,44 @@ public class DbAction extends ActionSupport {
         SlackSender.sendAlert(accountId, apiTestStatusAlert, testingRun.getSelectedSlackChannelId());
     }
 
+    private static AtomicInteger tagHitCount = new AtomicInteger(0);
+    private static AtomicInteger tagMissCount = new AtomicInteger(0);
+
+    private List<CollectionTags> checkTagsNeedUpdates(List<CollectionTags> tags, int apiCollectionId) {
+        
+        if(tags == null || tags.isEmpty()){
+            return null;
+        }
+
+        StringBuilder combinedTags = new StringBuilder();
+        tags.sort(Comparator.comparing(CollectionTags::getKeyName));
+
+        for (CollectionTags ctag : tags) {
+            if (combinedTags.length() > 0) {
+                combinedTags.append(", ");
+            }
+            combinedTags.append(ctag.getKeyName()).append("=").append(ctag.getValue());
+
+        }
+
+        String singleTagString = combinedTags.toString();
+        if (ParamFilter.isNewEntry(Context.accountId.get(), apiCollectionId, "", "", singleTagString)) {
+            tagMissCount.incrementAndGet();
+            loggerMaker.info("New tags found for apiCollectionId: " + apiCollectionId
+                + " accountId: " + Context.accountId.get() + " Bloom filter tagMissCount: " + tagMissCount.get());
+            return tags;
+        }
+
+        // Monitor bloom filter efficacy
+        tagHitCount.incrementAndGet();
+        loggerMaker.info("Skipping tags updates, already present for apiCollectionId: " + apiCollectionId
+                + " accountId: " + Context.accountId.get() + " Bloom filter tagHitCount: " + tagHitCount.get());
+        return null;
+    }
+
     public String createCollectionSimpleForVpc() {
         try {
-            DbLayer.createCollectionSimpleForVpc(vxlanId, vpcId, tagsList);
+            DbLayer.createCollectionSimpleForVpc(vxlanId, vpcId, checkTagsNeedUpdates(tagsList, vxlanId));
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error in createCollectionSimpleForVpc " + e.toString());
             return Action.ERROR.toUpperCase();
@@ -2372,7 +2408,7 @@ public class DbAction extends ActionSupport {
 
     public String createCollectionForHostAndVpc() {
         try {
-            DbLayer.createCollectionForHostAndVpc(host, colId, vpcId, tagsList);
+            DbLayer.createCollectionForHostAndVpc(host, colId, vpcId, checkTagsNeedUpdates(tagsList, colId));
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error in createCollectionForHostAndVpc " + e.toString());
             return Action.ERROR.toUpperCase();

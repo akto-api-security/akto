@@ -550,8 +550,8 @@ public class DbLayer {
             return tags;
         }
 
-        Set<CollectionTags> mergedTags = new HashSet<>(apiCollection.getTagsList());
-        mergedTags.addAll(tags);
+        Set<CollectionTags> mergedTags = new HashSet<>(tags);
+        mergedTags.addAll(apiCollection.getTagsList());
 
         tags = new ArrayList<>(mergedTags);
 
@@ -566,11 +566,21 @@ public class DbLayer {
 
         ApiCollection apiCollection = ApiCollectionsDao.instance.findOne(filters);
         String userEnv = vpcId;
+        boolean vpcIdAlreadyExists = false;
+        
         if (userEnv != null && apiCollection != null && apiCollection.getUserSetEnvType() != null) {
             userEnv = apiCollection.getUserSetEnvType();
             if (!userEnv.contains(vpcId)) {
                 userEnv += ", " + vpcId;
+            } else {
+                vpcIdAlreadyExists = true;
             }
+        }
+
+        // Skip update for existing apiCollection if vpc and tags are same.
+        if ( apiCollection != null && (vpcId == null || vpcIdAlreadyExists) && (tags == null || tags.isEmpty())) {
+            loggerMaker.info("No new tags or vpcId, Updates skipped for collectionId: " + vxlanId);
+            return;
         }
 
         Bson update = Updates.combine(
@@ -616,11 +626,20 @@ public class DbLayer {
 
         ApiCollection apiCollection = ApiCollectionsDao.instance.findOne(Filters.eq(ApiCollection.HOST_NAME, host));
         String userEnv = vpcId;
+        boolean vpcIdAlreadyExists = false;
         if (userEnv != null && apiCollection != null && apiCollection.getUserSetEnvType() != null) {
             userEnv = apiCollection.getUserSetEnvType();
             if (!userEnv.contains(vpcId)) {
                 userEnv += ", " + vpcId;
+            } else {
+                vpcIdAlreadyExists = true;
             }
+        }
+
+        // Skip update for existing apiCollection if vpc and tags are same.
+        if ( apiCollection != null && (vpcId == null || vpcIdAlreadyExists) && (tags == null || tags.isEmpty())) {
+            loggerMaker.info("No new tags or vpcId, Updates skipped for collectionId: " + id);
+            return;
         }
 
         Bson updates = Updates.combine(
@@ -1152,12 +1171,26 @@ public class DbLayer {
         ObjectId summaryObjectId = new ObjectId(summaryId);
         FindOneAndUpdateOptions options = new FindOneAndUpdateOptions();
         options.returnDocument(ReturnDocument.AFTER);
+        Bson update = Updates.combine(
+            Updates.set(TestingRunResultSummary.END_TIMESTAMP, Context.now()),
+            Updates.set(TestingRunResultSummary.STATE, state)
+        );
+        if(totalCountIssues != null){
+            boolean hasAnyIssue = false;
+            for(Map.Entry<String, Integer> entry : totalCountIssues.entrySet()){
+                if(entry.getValue() > 0){
+                    hasAnyIssue = true;
+                    break;
+                }
+            }
+            if(hasAnyIssue){
+                update = Updates.combine(update, Updates.set(TestingRunResultSummary.COUNT_ISSUES, totalCountIssues));
+            }
+        }
         return TestingRunResultSummariesDao.instance.getMCollection().findOneAndUpdate(
                 Filters.eq(Constants.ID, summaryObjectId),
-                Updates.combine(
-                        Updates.set(TestingRunResultSummary.END_TIMESTAMP, Context.now()),
-                        Updates.set(TestingRunResultSummary.STATE, state)
-                ),options);
+                update
+            ,options);
     }
 
     public static List<Integer> fetchDeactivatedCollections() {
