@@ -377,6 +377,7 @@ public class InventoryAction extends UserAction {
         List<BasicDBObject> list = new ArrayList<>();
         if((collection.getHostName() == null || collection.getHostName().isEmpty()) && collection.getId() != AllAPIsGroup.ALL_APIS_GROUP_ID){
             Bson filter = Filters.and(
+                    SingleTypeInfoDao.filterForHostHeader(0, false),
                     Filters.in(SingleTypeInfo._COLLECTION_IDS, apiCollectionId),
                     Filters.nin(SingleTypeInfo._API_COLLECTION_ID, deactivatedCollections)
             );
