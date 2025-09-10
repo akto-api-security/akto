@@ -985,7 +985,7 @@ function HomeDashboard() {
                         <Text variant='headingMd'>-</Text>
                     </VerticalStack>
                     <VerticalStack gap={1}>
-                        <Box style={{ minHeight: '36px' }}><Text color="subdued">3rd party Components</Text></Box>
+                        <Box style={{ minHeight: '36px' }}><Text color="subdued">Third party Components</Text></Box>
                         <Text variant='headingMd'>{mcpTotals.thirdPartyApis ?? '-'}</Text>
                     </VerticalStack>
                      <VerticalStack gap={1}>
