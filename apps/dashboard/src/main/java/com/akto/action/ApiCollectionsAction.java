@@ -1193,7 +1193,7 @@ public class ApiCollectionsAction extends UserAction {
                 );
                 this.mcpDataCount = (int) ApiInfoDao.instance.count(thirdPartyFilter);
                 break;
-            case "OPEN_ALERTS":
+            case "RECENT_OPEN_ALERTS":
                 Bson openAlertsFilter = Filters.and(
                         Filters.or(Filters.eq("markedBy", ""), Filters.eq("markedBy", null))
                 );
@@ -1201,27 +1201,20 @@ public class ApiCollectionsAction extends UserAction {
                 // Optimize: Use projection to fetch only required fields (type and lastDetected)
                 // This reduces network transfer and memory usage
                 Bson projection = Projections.include("type", "lastDetected", "resourceName");
-                List<McpAuditInfo> openAlerts = McpAuditInfoDao.instance.findAll(openAlertsFilter, projection);
-                this.mcpDataCount = openAlerts.size();
+                
+                // Sort by lastDetected descending and limit to 2 most recent alerts
+                List<Bson> alertsPipeline = new ArrayList<>();
+                alertsPipeline.add(Aggregates.match(openAlertsFilter));
+                alertsPipeline.add(Aggregates.project(projection));
+                alertsPipeline.add(Aggregates.sort(Sorts.descending("lastDetected")));
+                alertsPipeline.add(Aggregates.limit(2));
+                
+                List<McpAuditInfo> openAlerts = McpAuditInfoDao.instance.getMCollection().aggregate(alertsPipeline, McpAuditInfo.class).into(new ArrayList<>());
 
-                // Create response with type and lastDetected timestamp (epoch)
-                if (!openAlerts.isEmpty()) {
-                    List<BasicDBObject> alertDetails = new ArrayList<>();
-                    for (McpAuditInfo alert : openAlerts) {
-                        BasicDBObject alertInfo = new BasicDBObject();
-                        alertInfo.put("type", alert.getType());
-                        alertInfo.put("resourceName", alert.getResourceName());
-                        alertInfo.put("lastDetected", alert.getLastDetected());
-                        alertDetails.add(alertInfo);
-                    }
-
-                    // Set the response object with count and alert details
-                    if (this.response == null) {
-                        this.response = new BasicDBObject();
-                    }
-                    this.response.put("count", this.mcpDataCount);
-                    this.response.put("alertDetails", alertDetails);
+                if (this.response == null) {
+                    this.response = new BasicDBObject();
                 }
+                this.response.put("alertDetails", openAlerts);
                 break;
             case "CRITICAL_APIS":
                 Bson criticalApisFilter = Filters.and(

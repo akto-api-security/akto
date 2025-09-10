@@ -389,7 +389,7 @@ function HomeDashboard() {
             api.getApiInfoForMissingData(0, endTimestamp),
             api.fetchMcpdata('TOTAL_APIS'),
             api.fetchMcpdata('THIRD_PARTY_APIS'),
-            api.fetchMcpdata('OPEN_ALERTS'),
+            api.fetchMcpdata('RECENT_OPEN_ALERTS'),
             api.fetchMcpdata('CRITICAL_APIS'),
             api.fetchMcpdata('TOOLS'),
             api.fetchMcpdata('PROMPTS'),
@@ -409,7 +409,6 @@ function HomeDashboard() {
         let missingApiInfoData = results[5].status === 'fulfilled' ? results[5].value : {}
         let mcpTotalApis = results[6]?.status === 'fulfilled' ? (results[6].value?.mcpDataCount ?? null) : null
         let mcpThirdParty = results[7]?.status === 'fulfilled' ? (results[7].value?.mcpDataCount ?? null) : null
-        let mcpOpenAlerts = results[8]?.status === 'fulfilled' ? (results[8].value?.mcpDataCount ?? null) : null
         let mcpOpenAlertsDetails = results[8]?.status === 'fulfilled' ? (results[8].value?.response?.alertDetails ?? []) : []
         let mcpCriticalApis = results[9]?.status === 'fulfilled' ? (results[9].value?.mcpDataCount ?? null) : null
         let mcpTools = results[10]?.status === 'fulfilled' ? (results[10].value?.mcpDataCount ?? null) : null
@@ -440,7 +439,7 @@ function HomeDashboard() {
 
         buildEndpointsCount(fetchEndpointsCountResp)
 
-        setMcpTotals({ mcpTotalApis: mcpTotalApis, thirdPartyApis: mcpThirdParty, newApis7Days: null, openAlerts: mcpOpenAlerts, criticalApis: mcpCriticalApis, tools: mcpTools, prompts: mcpPrompts, resources: mcpResources, server: mcpServer,policyGuardrailApis: mcpPolicyGuardrailApis })
+        setMcpTotals({ mcpTotalApis: mcpTotalApis, thirdPartyApis: mcpThirdParty, newApis7Days: null, criticalApis: mcpCriticalApis, tools: mcpTools, prompts: mcpPrompts, resources: mcpResources, server: mcpServer,policyGuardrailApis: mcpPolicyGuardrailApis })
         setMcpOpenAlertDetails(Array.isArray(mcpOpenAlertsDetails) ? mcpOpenAlertsDetails.slice(0, 2) : [])
         setMcpTopApplications(Array.isArray(mcpTopApps) ? mcpTopApps : [])
         fetchMcpApiCallStats(mcpStatsTimeRange, func.timeNow());
