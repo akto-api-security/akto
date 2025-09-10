@@ -227,12 +227,10 @@ public class TestResultsStatsAction extends UserAction {
         // Stage 5: Count matching documents and return single result
         pipeline.add(Aggregates.count("count"));
 
-        // Performance monitoring in development/debug mode
         if (shouldRunExplain()) {
             explainAggregationPipeline(pipeline);
         }
 
-        // Execute aggregation with proper resource cleanup
         MongoCursor<BasicDBObject> cursor = TestingRunResultDao.instance.getMCollection()
                 .aggregate(pipeline, BasicDBObject.class).cursor();
 
@@ -245,6 +243,7 @@ public class TestResultsStatsAction extends UserAction {
         cursor.close();
         return resultCount;
     }
+
 
     private void explainAggregationPipeline(List<Bson> pipeline) {
         try {
