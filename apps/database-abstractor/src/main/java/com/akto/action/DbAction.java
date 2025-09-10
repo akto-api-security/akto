@@ -142,6 +142,11 @@ public class DbAction extends ActionSupport {
             "this\\s*website\\s*is\\s*using\\s*a\\s*security\\s*service\\s*to\\s*protect\\s*itself\\s*from\\s*online\\s*attacks|" +
             "ray\\s*id.*blocked|blocked.*ray\\s*id)"; // Ray ID blocked variants
 
+    // Precompile regex patterns to avoid recompiling on every check
+    private static final Pattern PATTERN_CLOUDFLARE = Pattern.compile(REGEX_CLOUDFLARE, Pattern.CASE_INSENSITIVE);
+    private static final Pattern PATTERN_429 = Pattern.compile(REGEX_429);
+    private static final Pattern PATTERN_5XX = Pattern.compile(REGEX_5XX);
+
     public List<BulkUpdates> getWritesForTestingRunIssues() {
         return writesForTestingRunIssues;
     }
@@ -1913,6 +1918,12 @@ public class DbAction extends ActionSupport {
 
     public String insertTestingRunResults() {
         try {
+                if (Context.accountId.get() == null || Context.accountId.get() == 0) {
+                    Context.accountId.set(1000000);
+                }
+            } catch (Exception ignore) {
+            }
+        try {
             Map<String, WorkflowNodeDetails> data = new HashMap<>();
             try {
                 if (this.testingRunResult != null && this.testingRunResult.get("workflowTest") != null) {
@@ -1988,26 +1999,29 @@ public class DbAction extends ActionSupport {
                                 }
                             }
                         } catch (Exception ig) {
+                            loggerMaker.errorAndAddToDb(ig, "Error while extracting message from test result: " + ig.toString());
                         }
                         if (message != null) {
-                            if (Pattern.compile(REGEX_CLOUDFLARE, Pattern.CASE_INSENSITIVE).matcher(message).find()) {
+                            if (PATTERN_CLOUDFLARE.matcher(message).find()) {
                                 cloudflareErrors = 1;
                             }
-                            if (Pattern.compile(REGEX_429).matcher(message).find()) {
+                            if (PATTERN_429.matcher(message).find()) {
                                 rateLimit429 = 1;
                             }
-                            if (Pattern.compile(REGEX_5XX).matcher(message).find()) {
+                            if (PATTERN_5XX.matcher(message).find()) {
                                 server5xx = 1;
                             }
                         }
                     }
                 } catch (Exception ig) {
+                    loggerMaker.errorAndAddToDb(ig, "Error while analyzing test results for apiErrors: " + ig.toString());
                 }
                 apiErrors.put("cloudflare", cloudflareErrors);
                 apiErrors.put("429", rateLimit429);
                 apiErrors.put("5xx", server5xx);
                 testingRunResult.setApiErrors(apiErrors);
             } catch (Exception ig) {
+                loggerMaker.errorAndAddToDb(ig, "Error while computing apiErrors before insert: " + ig.toString());
             }
 
             DbLayer.insertTestingRunResults(testingRunResult);
