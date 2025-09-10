@@ -171,3 +171,67 @@ jobs:
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
           SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
+        
+      - name: Push git tag Mini-Runtime
+        if: ${{ github.event.inputs.mini-runtime == 'true' }}
+        id: tag_version
+        uses: mathieudutour/github-tag-action@v6.1
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          custom_tag: vmini-runtime-${{ github.event.inputs.release_version }}
+
+      - name: Create a GitHub release Mini-Runtime
+        if: ${{ github.event.inputs.mini-runtime == 'true' }}
+        uses: ncipollo/release-action@v1.12.0
+        with:
+          tag: ${{ steps.tag_version.outputs.new_tag }}
+          name: Release ${{ steps.tag_version.outputs.new_tag }}
+          omitBody: true
+
+      - name: Push git tag Mini-Testing
+        if: ${{ github.event.inputs.mini-testing == 'true' }}
+        id: tag_mini_testing
+        uses: mathieudutour/github-tag-action@v6.1
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          custom_tag: vmini-testing-${{ github.event.inputs.release_version }}
+
+      - name: Create a GitHub release Mini-Testing
+        if: ${{ github.event.inputs.mini-testing == 'true' }}
+        uses: ncipollo/release-action@v1.12.0
+        with:
+          tag: ${{ steps.tag_mini_testing.outputs.new_tag }}
+          name: Release ${{ steps.tag_mini_testing.outputs.new_tag }}
+          omitBody: true
+
+      - name: Push git tag Testing-Db-Layer
+        if: ${{ github.event.inputs.testing-db-layer == 'true' }}
+        id: tag_testing_db_layer
+        uses: mathieudutour/github-tag-action@v6.1
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          custom_tag: vtesting-db-layer-${{ github.event.inputs.release_version }}
+
+      - name: Create a GitHub release Testing-Db-Layer
+        if: ${{ github.event.inputs.testing-db-layer == 'true' }}
+        uses: ncipollo/release-action@v1.12.0
+        with:
+          tag: ${{ steps.tag_testing_db_layer.outputs.new_tag }}
+          name: Release ${{ steps.tag_testing_db_layer.outputs.new_tag }}
+          omitBody: true
+
+      - name: Push git tag Mini-Runtime-Service
+        if: ${{ github.event.inputs.mini-runtime-service == 'true' }}
+        id: tag_mini_runtime_service
+        uses: mathieudutour/github-tag-action@v6.1
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          custom_tag: vmini-runtime-service-${{ github.event.inputs.release_version }}
+
+      - name: Create a GitHub release Mini-Runtime-Service
+        if: ${{ github.event.inputs.mini-runtime-service == 'true' }}
+        uses: ncipollo/release-action@v1.12.0
+        with:
+          tag: ${{ steps.tag_mini_runtime_service.outputs.new_tag }}
+          name: Release ${{ steps.tag_mini_runtime_service.outputs.new_tag }}
+          omitBody: true
