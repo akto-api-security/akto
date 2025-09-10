@@ -930,11 +930,11 @@ function SingleTestRunPage() {
                       <Text variant="bodyMd">API request error statistics breakdown:</Text>
                       <VerticalStack gap="1">
                         <Text variant="bodySm">• 429 errors: {allTestResultsStats.count429}</Text>
-                        <Text variant="bodySm">• 5xx errors: {allTestResultsStats.count500}</Text>
+                        <Text variant="bodySm">• 5XX errors: {allTestResultsStats.count500}</Text>
                         <Text variant="bodySm">• Cloudflare errors: {allTestResultsStats.countCloudflare}</Text>
                       </VerticalStack>
                       <Box paddingBlockStart="1" borderBlockStartWidth="1" borderColor="border-subdued">
-                        <Text variant="bodySm" color="subdued" fontWeight="medium">Approximate counts based on sampled data. Includes totals shown above.</Text>
+                        <Text variant="bodySm" color="subdued" fontWeight="medium">Approximate counts based on sampled data.</Text>
                       </Box>
                     </VerticalStack>
                   } 
@@ -964,7 +964,7 @@ function SingleTestRunPage() {
                       {(() => { const sev = severityFor(allTestResultsStats.count500); return (
                         <div className={`badge-wrapper-${sev.toUpperCase()}`}>
                           <Badge>
-                            5xx: {allTestResultsStats.count500}
+                            5XX: {allTestResultsStats.count500}
                           </Badge>
                         </div>
                       )})()}

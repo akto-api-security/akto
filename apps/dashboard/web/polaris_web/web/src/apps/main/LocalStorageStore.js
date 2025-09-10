@@ -66,15 +66,39 @@ localStore = persist(localStore,{name: 'Akto-tests-store',storage: createJSONSto
 
 const LocalStore = create(localStore);
 
-// window.addEventListener('storage', (event) => {
-//   const isFromAkto = (window.IS_SAAS === 'true' && event.url.includes("akto") || event.url.includes("dashboard"))
-//   if(event.key === 'undefined' && isFromAkto) {
-//     const newStorageValue = JSON.parse(event.newValue)
-//     LocalStore.setState({
-//       subCategoryMap: newStorageValue.state.subCategoryMap
-//     });
-//   }
-// });
+export const localStorePersistSync = (store) => {
+  const storageEventCallback = (event) => {
+   const hasNonEmptySubCategoryMap = (newValue) => {
+        // Rehydration should only occur if the persisted LocalStore has been updated with a non-empty subCategoryMap
+        try {
+            const parsedNewValue = JSON.parse(newValue);
+            const state = parsedNewValue?.state; // zustand persists state under 'state' key
+            const subCategoryMap = state?.subCategoryMap;
+
+            return subCategoryMap && typeof subCategoryMap === 'object' && Object.keys(subCategoryMap).length !== 0;
+        } catch (err) {
+            // do nothing
+        }
+        
+        return false; // default to false if any error or unexpected structure
+    }
+
+    if ((event.storageArea === localStorage) && (event.key === store.persist.getOptions().name) && hasNonEmptySubCategoryMap(event.newValue)) {
+        /*
+        * Rehydrate LocalStore from localStorage in the current tab when the persisted zustand store in localStorage is updated by a different tab.
+        * https://zustand.docs.pmnd.rs/integrations/persisting-store-data#rehydrate
+        * https://zustand.docs.pmnd.rs/integrations/persisting-store-data#how-can-i-rehydrate-on-storage-event
+        */
+        store.persist.rehydrate();
+    }
+  }
+
+  window.addEventListener('storage', storageEventCallback)
+
+  return () => {
+    window.removeEventListener('storage', storageEventCallback)
+  }
+}
 
 export default LocalStore
 

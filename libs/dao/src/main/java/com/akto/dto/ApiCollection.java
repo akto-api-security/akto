@@ -424,6 +424,13 @@ public class ApiCollection {
         return false;
     }
 
+    public boolean isGuardRailCollection() {
+        if (!CollectionUtils.isEmpty(this.getTagsList())) {
+            return this.getTagsList().stream().anyMatch(t -> Constants.AKTO_GUARD_RAIL_TAG.equals(t.getKeyName()));
+        }
+        return false;
+    }
+
     public String getSseCallbackUrl() {
         return sseCallbackUrl;
     }   
