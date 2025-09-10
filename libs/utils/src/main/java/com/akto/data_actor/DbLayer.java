@@ -249,7 +249,7 @@ public class DbLayer {
         return ApiInfoDao.instance.findAll(new BasicDBObject());
     }
 
-    public static List<BasicDBObject> fetchApiRateLimits(ApiInfo.ApiInfoKey lastApiInfoKey) {
+    public static List<ApiInfo> fetchApiRateLimits(ApiInfo.ApiInfoKey lastApiInfoKey) {
         // Filter for documents that have both rateLimits and rateLimitConfidence fields
         Bson existsFilter = Filters.and(
             Filters.ne("rateLimits", null),
@@ -290,13 +290,7 @@ public class DbLayer {
             Sorts.ascending("_id.url")
         );
         
-        List<BasicDBObject> results = ApiInfoDao.instance.getMCollection()
-            .find(filters, BasicDBObject.class)
-            .projection(projection)
-            .sort(sort)
-            .limit(limit)
-            .into(new ArrayList<>());
-        return results;
+        return ApiInfoDao.instance.findAll(filters, 0 , limit, sort, projection);
     }
     
     public static List<ApiInfo> fetchNonTrafficApiInfos() {
