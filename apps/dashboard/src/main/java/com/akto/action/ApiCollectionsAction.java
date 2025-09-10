@@ -96,6 +96,8 @@ public class ApiCollectionsAction extends UserAction {
     int mcpDataCount;
     @Setter
     String type;
+    @Getter
+    List<McpAuditInfo> auditAlerts;
 
     public List<ApiInfoKey> getApiList() {
         return apiList;
@@ -1202,19 +1204,11 @@ public class ApiCollectionsAction extends UserAction {
                 // This reduces network transfer and memory usage
                 Bson projection = Projections.include("type", "lastDetected", "resourceName");
                 
-                // Sort by lastDetected descending and limit to 2 most recent alerts
-                List<Bson> alertsPipeline = new ArrayList<>();
-                alertsPipeline.add(Aggregates.match(openAlertsFilter));
-                alertsPipeline.add(Aggregates.project(projection));
-                alertsPipeline.add(Aggregates.sort(Sorts.descending("lastDetected")));
-                alertsPipeline.add(Aggregates.limit(2));
-                
-                List<McpAuditInfo> openAlerts = McpAuditInfoDao.instance.getMCollection().aggregate(alertsPipeline, McpAuditInfo.class).into(new ArrayList<>());
+                // Get 2 most recent alerts sorted by lastDetected
+                this.auditAlerts = McpAuditInfoDao.instance.findAll(openAlertsFilter,0, 2, Sorts.descending("lastDetected"), projection);
 
-                if (this.response == null) {
-                    this.response = new BasicDBObject();
-                }
-                this.response.put("alertDetails", openAlerts);
+                this.response = new BasicDBObject();
+                this.response.put("alertDetails", auditAlerts);
                 break;
             case "CRITICAL_APIS":
                 Bson criticalApisFilter = Filters.and(
