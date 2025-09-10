@@ -1,4 +1,5 @@
 import React, { useEffect, useReducer, useState, useCallback } from 'react'
+import { useNavigate } from 'react-router-dom'
 import api from './api';
 import func from '@/util/func';
 import observeFunc from "../observe/transform"
@@ -110,13 +111,11 @@ function HomeDashboard() {
     const [mcpStatsTimeRange, setMcpStatsTimeRange] = useState(func.timeNow() - statsOptions[8].value)
     const [policyGuardrailStatsTimeRange, setPolicyGuardrailStatsTimeRange] = useState(func.timeNow() - statsOptions[8].value)
 
-    // Function to handle navigation to audit page with MCP context
+    // Function to handle navigation to audit page
+    const navigate = useNavigate();
     const handleMcpAuditNavigation = useCallback(() => {
-        // Set dashboard category to MCP Security before navigating
-        PersistStore.getState().setDashboardCategory('MCP Security');
-        // Navigate to audit page
-        window.location.href = '/dashboard/observe/audit';
-    }, [])
+        navigate('/dashboard/observe/audit');
+    }, [navigate])
 
     const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), values.ranges[2]);
 
@@ -1198,7 +1197,7 @@ function HomeDashboard() {
                                     <VerticalStack gap={1}>
                                         <Text variant='bodyMd' fontWeight='semibold'>{alert?.resourceName || '-'}</Text>
                                         <Text variant='bodyMd' color='text'>{alert?.type || '-'}</Text>
-                                        <Text color='subdued' variant='bodySm'>{alert?.lastDetected || '-'}</Text>
+                                        <Text color='subdued' variant='bodySm'>{alert?.lastDetected ? func.prettifyEpoch(alert.lastDetected) : '-'}</Text>
                                     </VerticalStack>
                                 </Box>
                             </Box>
