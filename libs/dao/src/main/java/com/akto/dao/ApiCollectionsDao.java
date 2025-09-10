@@ -389,13 +389,7 @@ public class ApiCollectionsDao extends AccountsContextDaoWithRbac<ApiCollection>
             // Merge non-group counts
             countMap.putAll(nonGroupCounts);
             
-            // Merge group counts (handle potential overlaps)
-            for (Map.Entry<Integer, Integer> entry : groupCounts.entrySet()) {
-                int apiCollectionId = entry.getKey();
-                int count = entry.getValue();
-                int existingCount = countMap.getOrDefault(apiCollectionId, 0);
-                countMap.put(apiCollectionId, existingCount + count);
-            }
+            countMap.putAll(groupCounts);
         } catch (Exception e) {
             e.printStackTrace();
         } finally {
