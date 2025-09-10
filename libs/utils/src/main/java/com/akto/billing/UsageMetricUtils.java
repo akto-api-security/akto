@@ -116,6 +116,7 @@ public class UsageMetricUtils {
     }
 
     public static void syncUsageMetricWithMixpanel(UsageMetric usageMetric) {
+        String distinct_id = "";
         try {
             String organizationId = usageMetric.getOrganizationId();
             Organization organization = OrganizationsDao.instance.findOne(
@@ -131,7 +132,7 @@ public class UsageMetricUtils {
             String adminEmail = organization.getAdminEmail();
             String dashboardMode = usageMetric.getDashboardMode();
             String eventName = String.valueOf(usageMetric.getMetricType());
-            String distinct_id = adminEmail + "_" + dashboardMode;
+            distinct_id = adminEmail + "_" + dashboardMode;
 
             JSONObject props = getUsageMetricsProps(usageMetric, organization);
 
@@ -140,7 +141,7 @@ public class UsageMetricUtils {
             AktoMixpanel aktoMixpanel = new AktoMixpanel();
             aktoMixpanel.sendEvent(distinct_id, eventName, props);
         } catch (Exception e) {
-            cacheLoggerMaker.errorAndAddToDb("Failed to execute usage metric in Mixpanel. Error - " + e.getMessage(), LoggerMaker.LogDb.DASHBOARD);
+            cacheLoggerMaker.errorAndAddToDb("Failed to execute usage metric in Mixpanel for distinct_id: " + distinct_id + ". Error - " + e.getMessage(), LoggerMaker.LogDb.DASHBOARD);
         }
     }
 
