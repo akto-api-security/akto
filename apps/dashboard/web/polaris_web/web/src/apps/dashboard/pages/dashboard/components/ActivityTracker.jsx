@@ -48,7 +48,9 @@ function ActivityTracker({ latestActivity }) {
                                         ) : null}
                                     </Box>
                                     <Box>
-                                        <div style={{marginBlock: '5px'}}><Text variant="bodyMd">{event.description}</Text></div>
+                                        <div style={{marginBlock: '5px'}}>
+                                            <Text variant="bodyMd">{event.description}{event.user ? ` by ${event.user}` : ''}</Text>
+                                        </div>
                                     </Box>
                                 </HorizontalStack>
                                 <div style={{marginBlock: '5px'}}>
