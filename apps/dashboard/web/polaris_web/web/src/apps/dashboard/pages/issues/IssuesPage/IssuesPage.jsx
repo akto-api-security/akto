@@ -645,42 +645,49 @@ function IssuesPage() {
         await api.fetchIssues(skip, limit, filterStatus, filterCollectionsId, filterSeverity, filterSubCategory, sortKey, sortOrder, startTimestamp, endTimestamp, activeCollections, filterCompliance).then((issuesDataRes) => {
             const uniqueIssuesMap = new Map()
             issuesDataRes.issues.forEach(item => {
-                const key = `${item.id.testSubCategory}|${item.severity}|${item.testRunIssueStatus}`
+                const key = `${item?.id?.testSubCategory || ''}|${item?.severity || ''}|${item?.testRunIssueStatus || ''}`
                 if (!uniqueIssuesMap.has(key)) {
                     uniqueIssuesMap.set(key, {
-                        id: item.id,
-                        issueName: item.id.testSubCategory,
-                        severity: item.severity,
-                        testRunIssueStatus: item.testRunIssueStatus,
-                        creationTime: item.creationTime,
-                        ignoreReason: item.ignoreReason,
-                        severityType: item.severity,
-                        issueStatus: item.issueStatus,
-                        compliance: item.compliance || [],
+                        id: item?.id,
+                        issueName: item?.id?.testSubCategory,
+                        severity: item?.severity,
+                        testRunIssueStatus: item?.testRunIssueStatus,
+                        creationTime: item?.creationTime,
+                        ignoreReason: item?.ignoreReason,
+                        severityType: item?.severity,
+                        issueStatus: item?.issueStatus,
+                        compliance: item?.compliance || [],
                         testRunName: "Test Run",
-                        domains: [(hostNameMap[item?.id?.apiInfoKey?.apiCollectionId] !== null ? hostNameMap[item?.id?.apiInfoKey?.apiCollectionId] : apiCollectionMap[item?.id?.apiInfoKey?.apiCollectionId])],
+                        domains: [
+                            (item?.id?.apiInfoKey?.apiCollectionId && hostNameMap[item?.id?.apiInfoKey?.apiCollectionId] !== null)
+                                ? hostNameMap[item?.id?.apiInfoKey?.apiCollectionId]
+                                : (item?.id?.apiInfoKey?.apiCollectionId ? apiCollectionMap[item?.id?.apiInfoKey?.apiCollectionId] : null)
+                        ],
                         urls: [{
                             method: item?.id?.apiInfoKey?.method,
                             url: item?.id?.apiInfoKey?.url,
-                            id: JSON.stringify(item?.id),
+                            id: item?.id ? JSON.stringify(item.id) : '',
                             issueDescription: item?.description,
                             jiraIssueUrl: item?.jiraIssueUrl || "",
                         }],
+                        numberOfEndpoints: 1
                     })
                 } else {
                     const existingIssue = uniqueIssuesMap.get(key)
-                    const domain = (hostNameMap[item?.id?.apiInfoKey?.apiCollectionId] !== null ? hostNameMap[item?.id?.apiInfoKey?.apiCollectionId] : apiCollectionMap[item?.id?.apiInfoKey?.apiCollectionId])
-                    if (!existingIssue.domains.includes(domain)) {
+                    const domain = (item?.id?.apiInfoKey?.apiCollectionId && hostNameMap[item?.id?.apiInfoKey?.apiCollectionId] !== null)
+                        ? hostNameMap[item?.id?.apiInfoKey?.apiCollectionId]
+                        : (item?.id?.apiInfoKey?.apiCollectionId ? apiCollectionMap[item?.id?.apiInfoKey?.apiCollectionId] : null)
+                    if (domain && !existingIssue.domains.includes(domain)) {
                         existingIssue.domains.push(domain)
                     }
                     existingIssue.urls.push({
                         method: item?.id?.apiInfoKey?.method,
                         url: item?.id?.apiInfoKey?.url,
-                        id: JSON.stringify(item?.id),
+                        id: item?.id ? JSON.stringify(item.id) : '',
                         issueDescription: item?.description,
                         jiraIssueUrl: item?.jiraIssueUrl || ""
                     })
-                    existingIssue.numberOfEndpoints += 1
+                    existingIssue.numberOfEndpoints = (existingIssue.numberOfEndpoints || 1) + 1
                 }
             })
             issueItem = Array.from(uniqueIssuesMap.values())
