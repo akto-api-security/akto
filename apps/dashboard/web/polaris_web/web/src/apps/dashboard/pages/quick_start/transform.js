@@ -14,6 +14,7 @@ import BitBucketSource from "./components/BitBucketSource"
 import GithubSource from "./components/GithubSource"
 import AktoJax from "./components/AktoJax"  
 import McpScan from "./components/McpScan" 
+import McpRecon from "./components/McpRecon" 
 
 
 const mirroringObj = {
@@ -211,6 +212,15 @@ const mcpScanObj = {
     docsUrl: 'https://docs.akto.io/mcp-import',
     key: "MCP_SCAN",
     component : <McpScan/>
+}
+
+const mcpReconObj = {    
+    icon: '/public/mcp.svg',
+    label: "MCP Recon",
+    text: "Use our MCP Recon feature to discover and catalog MCP-compatible servers across your network IP ranges for comprehensive security analysis.",   
+    docsUrl: 'https://docs.akto.io/mcp-recon',
+    key: "MCP_RECON",
+    component : <McpRecon/>
 }
 
 const dockerObj = {
@@ -1097,7 +1107,7 @@ const quickStartFunc = {
 
         // MCP Scan
         const mcpScan = [
-            mcpScanObj
+            mcpScanObj, mcpReconObj
         ];
 
         // Akto SDK

@@ -13,7 +13,7 @@ import testingApi from "../testing/api"
 import PersistStore from '../../../main/PersistStore';
 import { DashboardBanner } from './components/DashboardBanner';
 import SummaryCard from './new_components/SummaryCard';
-import { ArrowUpMinor, ArrowDownMinor } from '@shopify/polaris-icons';
+import { ArrowUpMinor, ArrowDownMinor, AlertMinor } from '@shopify/polaris-icons';
 import TestSummaryCardsList from './new_components/TestSummaryCardsList';
 import InfoCard from './new_components/InfoCard';
 import ProgressBarChart from './new_components/ProgressBarChart';
@@ -1193,11 +1193,20 @@ function HomeDashboard() {
                         mcpOpenAlertDetails.map((alert, idx) => (
                             <Box key={`open-alert-${idx}`} onClick={handleMcpAuditNavigation} style={{cursor: 'pointer'}}>
                                 <Box padding="4" background="bg-surface" borderRadius="2" borderColor="border" borderWidth="2">
-                                    <VerticalStack gap={1}>
-                                        <Text variant='bodyMd' fontWeight='semibold'>{alert?.resourceName || '-'}</Text>
-                                        <Text variant='bodyMd' color='text'>{alert?.type || '-'}</Text>
-                                        <Text color='subdued' variant='bodySm'>{alert?.lastDetected ? func.prettifyEpoch(alert.lastDetected) : '-'}</Text>
-                                    </VerticalStack>
+                                    <HorizontalStack align="center" gap={3}>
+                                        <Box style={{ flex: 1 }}>
+                                            <VerticalStack gap={1}>
+                                                <Text variant='bodyMd' fontWeight='semibold'>{alert?.resourceName || '-'}</Text>
+                                                <Text variant='bodyMd' color='text'>{alert?.type || '-'}</Text>
+                                                <Text color='subdued' variant='bodySm'>{alert?.lastDetected ? func.prettifyEpoch(alert.lastDetected) : '-'}</Text>
+                                            </VerticalStack>
+                                        </Box>
+                                        <Box paddingInlineEnd="2">
+                                            <div style={{ fontSize: '32px' }}>
+                                                <Icon source={AlertMinor} color="warning" />
+                                            </div>
+                                        </Box>
+                                    </HorizontalStack>
                                 </Box>
                             </Box>
                         ))
@@ -1296,8 +1305,8 @@ function HomeDashboard() {
         gridComponents = [
             {id: 'mcp-api-requests', component: mcpApiRequestsCard},
             {id: 'policy-guardrails', component: policyGuardrailsCard},
-            {id: 'mcp-discovery', component: mcpDiscoveryMiniCard},
-            {id: 'mcp-top-applications', component: mcpTopApplicationsCard},
+          //  {id: 'mcp-discovery', component: mcpDiscoveryMiniCard},
+          //  {id: 'mcp-top-applications', component: mcpTopApplicationsCard},
           //  {id: 'mcp-risk', component: mcpRiskDetectionsMiniCard},
             {id: 'mcp-open-alerts', component: mcpOpenAlertsCard},
             {id: 'mcp-types-table', component: mcpTypesTableCard},
