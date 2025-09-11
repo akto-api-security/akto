@@ -14,7 +14,6 @@ import transform from "../transform"
 import SpinnerCentered from "@/apps/dashboard/components/progress/SpinnerCentered"
 import { CellType } from "@/apps/dashboard/components/tables/rows/GithubRow"
 import CreateNewCollectionModal from "./CreateNewCollectionModal"
-import TooltipText from "@/apps/dashboard/components/shared/TooltipText"
 import SummaryCardInfo from "@/apps/dashboard/components/shared/SummaryCardInfo"
 import collectionApi from "./api"
 import CollectionsPageBanner from "./component/CollectionsPageBanner"
@@ -207,11 +206,10 @@ const convertToNewData = (collectionsArr, sensitiveInfoMap, severityInfoMap, cov
         }
         return{
             ...c,
-            detected: func.prettifyEpoch(c.startTs),
             icon: CircleTickMajor,
             nextUrl: "/dashboard/observe/inventory/"+ c.id,
             envType: c?.envType?.map(func.formatCollectionType),
-            displayNameComp: (<Box maxWidth="30vw"><Text fontWeight="medium">{c.displayName}</Text></Box>),
+            displayNameComp: (<Box maxWidth="30vw"><Text truncate fontWeight="medium">{c.displayName}</Text></Box>),
             testedEndpoints: c.urlsCount === 0 ? 0 : (coverageMap[c.id] ? coverageMap[c.id] : 0),
             sensitiveInRespTypes: sensitiveInfoMap[c.id] ? sensitiveInfoMap[c.id] : [],
             severityInfo: severityInfoMap[c.id] ? severityInfoMap[c.id] : {},

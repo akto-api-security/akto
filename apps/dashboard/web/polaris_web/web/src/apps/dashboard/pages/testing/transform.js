@@ -712,7 +712,7 @@ const transform = {
       const date = new Date(obj.startTimestamp * 1000)
       return{
         ...obj,
-        prettifiedSeverities: observeFunc.getIssuesList(obj.countIssues || {"HIGH" : 0, "MEDIUM": 0, "LOW": 0}),
+        prettifiedSeverities: observeFunc.getIssuesList(obj.countIssues || {"CRITICAL": 0, "HIGH" : 0, "MEDIUM": 0, "LOW": 0}),
         startTime: date.toLocaleString('en-US',{timeZone: window.TIME_ZONE === 'Us/Pacific' ? 'America/Los_Angeles' : window.TIME_ZONE}) + " on " +  date.toLocaleDateString('en-US',{timeZone: window.TIME_ZONE === 'Us/Pacific' ? 'America/Los_Angeles' : window.TIME_ZONE}),
         id: obj.hexId
       }
