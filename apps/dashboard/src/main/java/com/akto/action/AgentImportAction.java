@@ -189,12 +189,17 @@ public class AgentImportAction extends UserAction{
         }
     }
     
+    private final static ObjectMapper mapper = new ObjectMapper();
+
     private String convertToMessage(String url, Map<String, List<String>> requestHeaders, String requestBody, OriginalHttpResponse response) throws Exception {
         Map<String, String> result = new HashMap<>();
         
+        Map<String, String> requestHeadersFlat = flattenHeaders(requestHeaders);
+        Map<String, String> responseHeadersFlat = flattenHeaders(response.getHeaders());
+        
         result.put("akto_account_id", Context.accountId.get() + "");
         result.put("path", url);
-        result.put("requestHeaders", new ObjectMapper().writeValueAsString(requestHeaders));
+        result.put("requestHeaders", mapper.writeValueAsString(requestHeadersFlat));
         result.put("method", requestBody != null ? "POST" : "GET");
         result.put("requestPayload", requestBody != null ? requestBody : "");
         result.put("responsePayload", response.getBody());
@@ -206,9 +211,21 @@ public class AgentImportAction extends UserAction{
         result.put("contentType", getContentTypeFromHeaders(response.getHeaders()));
         result.put("source", HttpResponseParams.Source.HAR.name());
         
-        result.put("responseHeaders", new ObjectMapper().writeValueAsString(response.getHeaders()));
+        result.put("responseHeaders", mapper.writeValueAsString(responseHeadersFlat));
         
-        return new ObjectMapper().writeValueAsString(result);
+        return mapper.writeValueAsString(result);
+    }
+    
+    private Map<String, String> flattenHeaders(Map<String, List<String>> headers) {
+        Map<String, String> flattened = new HashMap<>();
+        if (headers != null) {
+            for (Map.Entry<String, List<String>> entry : headers.entrySet()) {
+                if (entry.getValue() != null && !entry.getValue().isEmpty()) {
+                    flattened.put(entry.getKey(), entry.getValue().get(0));
+                }
+            }
+        }
+        return flattened;
     }
     
     private String getContentTypeFromHeaders(Map<String, List<String>> headers) {
