@@ -193,6 +193,14 @@ const api = {
             data: {url, testRoleId, requestBody}
         })
     },
+
+    initiateMCPRecon(ipRange, authKey, authValue, dashboardUrl) {
+        return request({
+            url: '/api/initiateMCPRecon',
+            method: 'post',
+            data: {ipRange, authKey, authValue, dashboardUrl}
+        })
+    },
 }
 
 export default api

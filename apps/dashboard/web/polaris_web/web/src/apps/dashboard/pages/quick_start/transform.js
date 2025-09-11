@@ -16,6 +16,7 @@ import AktoJax from "./components/AktoJax"
 import McpScan from "./components/McpScan" 
 import AiAgentScan from "./components/AiAgentScan"
 import { isApiSecurityCategory, isGenAISecurityCategory, isMCPSecurityCategory } from "../../../main/labelHelper"
+import McpRecon from "./components/McpRecon"
 
 
 const mirroringObj = {
@@ -212,7 +213,7 @@ const geminiObj = {
     text: "Import Google Gemini models seamlessly into AKTO.",
     docsUrl: 'https://docs.akto.io/ai-security',
     key: "GEMINI",
-    component : <AiAgentScan 
+    component : <AiAgentScan
         description="Import your Gemini models, seamlessly in AKTO."
         defaultRequestBody={{
             "contents": [{"parts": [{"text": "Why is the sky blue?"}]}]
@@ -227,7 +228,7 @@ const openAIObj = {
     text: "Import OpenAI models seamlessly into AKTO.",
     docsUrl: 'https://docs.akto.io/ai-security',
     key: "OPENAI",
-    component : <AiAgentScan 
+    component : <AiAgentScan
         description="Import your OpenAI models, seamlessly in AKTO."
         defaultRequestBody={{
             "model": "gpt-3.5-turbo",
@@ -243,7 +244,7 @@ const claudeObj = {
     text: "Import Anthropic Claude models seamlessly into AKTO.",
     docsUrl: 'https://docs.akto.io/ai-security',
     key: "CLAUDE",
-    component : <AiAgentScan 
+    component : <AiAgentScan
         description="Import your Claude models, seamlessly in AKTO."
         defaultRequestBody={{
             "model": "claude-3-opus-20240229",
@@ -260,7 +261,7 @@ const deepseekObj = {
     text: "Import DeepSeek models seamlessly into AKTO.",
     docsUrl: 'https://docs.akto.io/ai-security',
     key: "DEEPSEEK",
-    component : <AiAgentScan 
+    component : <AiAgentScan
         description="Import your DeepSeek models, seamlessly in AKTO."
         defaultRequestBody={{
             "model": "deepseek-chat",
@@ -276,7 +277,7 @@ const llamaObj = {
     text: "Import Meta Llama models seamlessly into AKTO.",
     docsUrl: 'https://docs.akto.io/ai-security',
     key: "LLAMA",
-    component : <AiAgentScan 
+    component : <AiAgentScan
         description="Import your Llama models, seamlessly in AKTO."
         defaultRequestBody={{
             "model": "llama3.2",
@@ -292,7 +293,7 @@ const grokObj = {
     text: "Import xAI Grok models seamlessly into AKTO.",
     docsUrl: 'https://docs.akto.io/ai-security',
     key: "GROK",
-    component : <AiAgentScan 
+    component : <AiAgentScan
         description="Import your Grok models, seamlessly in AKTO."
         defaultRequestBody={{
             "model": "grok-beta",
@@ -308,7 +309,7 @@ const customAIObj = {
     text: "Import your custom AI models seamlessly into AKTO.",
     docsUrl: 'https://docs.akto.io/ai-security',
     key: "CUSTOM_AI",
-    component : <AiAgentScan 
+    component : <AiAgentScan
         description="Import your custom AI models, seamlessly in AKTO."
         defaultRequestBody={{
             "prompt": "Why is the sky blue?"
@@ -324,7 +325,7 @@ const awsBedrockObj = {
     text: "Import AWS Bedrock AI agents seamlessly into AKTO.",
     docsUrl: 'https://docs.akto.io/ai-agent-security',
     key: "AWS_BEDROCK",
-    component : <AiAgentScan 
+    component : <AiAgentScan
         description="Import your AWS Bedrock AI agents, seamlessly in AKTO."
         defaultRequestBody={{
             "modelId": "anthropic.claude-v2",
@@ -345,7 +346,7 @@ const azureAIFoundryObj = {
     text: "Import Azure AI Foundry agents seamlessly into AKTO.",
     docsUrl: 'https://docs.akto.io/ai-agent-security',
     key: "AZURE_AI_FOUNDRY",
-    component : <AiAgentScan 
+    component : <AiAgentScan
         description="Import your Azure AI Foundry agents, seamlessly in AKTO."
         defaultRequestBody={{
             "messages": [{"role": "user", "content": "Why is the sky blue?"}],
@@ -362,7 +363,7 @@ const databricksObj = {
     text: "Import Databricks AI agents seamlessly into AKTO.",
     docsUrl: 'https://docs.akto.io/ai-agent-security',
     key: "DATABRICKS",
-    component : <AiAgentScan 
+    component : <AiAgentScan
         description="Import your Databricks AI agents, seamlessly in AKTO."
         defaultRequestBody={{
             "prompt": "Why is the sky blue?",
@@ -378,7 +379,7 @@ const googleVertexAIObj = {
     text: "Import Google Vertex AI agents seamlessly into AKTO.",
     docsUrl: 'https://docs.akto.io/ai-agent-security',
     key: "GOOGLE_VERTEX_AI",
-    component : <AiAgentScan 
+    component : <AiAgentScan
         description="Import your Google Vertex AI agents, seamlessly in AKTO."
         defaultRequestBody={{
             "instances": [{"content": "Why is the sky blue?"}],
@@ -398,7 +399,7 @@ const ibmWatsonxObj = {
     text: "Import IBM Watsonx AI agents seamlessly into AKTO.",
     docsUrl: 'https://docs.akto.io/ai-agent-security',
     key: "IBM_WATSONX",
-    component : <AiAgentScan 
+    component : <AiAgentScan
         description="Import your IBM Watsonx AI agents, seamlessly in AKTO."
         defaultRequestBody={{
             "input": "Why is the sky blue?",
@@ -418,7 +419,7 @@ const customAgentObj = {
     text: "Import your custom AI agents seamlessly into AKTO.",
     docsUrl: 'https://docs.akto.io/ai-agent-security',
     key: "CUSTOM_AGENT",
-    component : <AiAgentScan 
+    component : <AiAgentScan
         description="Import your custom AI agents, seamlessly in AKTO."
         defaultRequestBody={{
             "query": "Why is the sky blue?"
@@ -427,13 +428,22 @@ const customAgentObj = {
     />
 }
 
-const mcpScanObj = {    
+const mcpScanObj = {
     icon: '/public/mcp.svg',
     label: "MCP Import",
     text: "You can use Akto's MCP import to capture traffic and instantly send it to your dashboard for real-time insights.",   
     docsUrl: 'https://docs.akto.io/mcp-import',
     key: "MCP_SCAN",
     component : <McpScan/>
+}
+
+const mcpReconObj = {
+    icon: '/public/mcp.svg',
+    label: "MCP Recon",
+    text: "Use our MCP Recon feature to discover and catalog MCP-compatible servers across your network IP ranges for comprehensive security analysis.",
+    docsUrl: 'https://docs.akto.io/mcp-recon',
+    key: "MCP_RECON",
+    component : <McpRecon/>
 }
 
 const dockerObj = {
@@ -1328,7 +1338,7 @@ const quickStartFunc = {
 
         // MCP Scan
         const mcpScan = [
-            mcpScanObj
+            mcpScanObj, mcpReconObj
         ];
 
         // Akto SDK
@@ -1336,11 +1346,11 @@ const quickStartFunc = {
             goObj, javaObj, nodejsObj, pythonObj
         ];
 
-        if(func.checkLocal()){
-            return {
-                "Manual": manual
-            }
-        }
+       if(func.checkLocal()){
+           return {
+               "Manual": manual
+           }
+       }
 
         let connectors = {}
 
