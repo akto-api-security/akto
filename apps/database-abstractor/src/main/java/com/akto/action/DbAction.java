@@ -1926,6 +1926,12 @@ public class DbAction extends ActionSupport {
 
     public String insertTestingRunResults() {
         try {
+            if (Context.accountId.get() == null || Context.accountId.get() == 0) {
+                Context.accountId.set(1000000);
+            }
+        } catch (Exception ignore) {
+        }
+        try {
             Map<String, WorkflowNodeDetails> data = new HashMap<>();
             try {
                 if (this.testingRunResult != null && this.testingRunResult.get("workflowTest") != null) {
@@ -1978,7 +1984,12 @@ public class DbAction extends ActionSupport {
 
             // submit async job to compute apiErrors and update only if any error flag > 0
             final TestingRunResult trrForAsync = testingRunResult;
+            final Integer capturedAccountId = Context.accountId.get();
             apiErrorsService.submit(() -> {
+                // ensure DAO operations in this thread use the correct account context
+                if (capturedAccountId != null) {
+                    Context.accountId.set(capturedAccountId);
+                }
                 try {
                     Map<String, Integer> apiErrors = new HashMap<>();
                     int cloudflareErrors = 0;
@@ -2042,6 +2053,8 @@ public class DbAction extends ActionSupport {
                     }
                 } catch (Exception t) {
                     loggerMaker.errorAndAddToDb(t, "Unexpected error in async apiErrors computation: " + t.toString());
+                } finally {
+                    try { Context.accountId.remove(); } catch (Exception ignore) {}
                 }
             });
         } catch (Exception e) {
