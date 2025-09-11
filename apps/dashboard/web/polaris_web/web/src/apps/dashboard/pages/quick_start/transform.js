@@ -17,6 +17,7 @@ import McpScan from "./components/McpScan"
 import AiAgentScan from "./components/AiAgentScan"
 import { isApiSecurityCategory, isGenAISecurityCategory, isMCPSecurityCategory } from "../../../main/labelHelper"
 import McpRecon from "./components/McpRecon"
+import McpProxy from "./components/McpProxy"
 
 
 const mirroringObj = {
@@ -444,6 +445,15 @@ const mcpReconObj = {
     docsUrl: 'https://docs.akto.io/mcp-recon',
     key: "MCP_RECON",
     component : <McpRecon/>
+}
+
+const mcpProxyObj = {
+    icon: '/public/mcp.svg',
+    label: "MCP Proxy Gateway",
+    text: "A secure gateway that enforces guardrails and advanced threat protection for all requests to your MCP servers, ensuring safe and compliant communication.",
+    docsUrl: 'https://docs.akto.io/akto-mcp-proxy',
+    key: "MCP_PROXY",
+    component : <McpProxy/>
 }
 
 const dockerObj = {
@@ -1338,7 +1348,7 @@ const quickStartFunc = {
 
         // MCP Scan
         const mcpScan = [
-            mcpScanObj, mcpReconObj
+            mcpScanObj, mcpReconObj, mcpProxyObj
         ];
 
         // Akto SDK
@@ -1400,7 +1410,7 @@ const quickStartFunc = {
         // Combine all categories into connectorsList
         let connectorsList = [
             gcpObj, kubernetesObj, fargateObj, nginxObj, burpObj, postmanObj,
-            openApiObj, beanStalkObj, eksObj, dockerObj, envoyObj, mcpScanObj,
+            openApiObj, beanStalkObj, eksObj, dockerObj, envoyObj, mcpScanObj, mcpProxyObj,
             harFileUploadObj, kongObj, tcpObj, mirroringObj, hybridSaasObj, apiInventoryFromSourceCodeObj,
             ebpfObj, ebpfMTLSObj, istioObj, pythonObj, awsApiGatewayObj, awsLambdaObj,
             apigeeObj, azureObj, cloudflareObj, f5Obj, goObj, haproxyObj, javaObj, kongmeshObj, layer7Obj, nodejsObj, openshiftObj, threescaleObj, githubObj, gitlabObj, bitbucketObj, aktoJaxObj
