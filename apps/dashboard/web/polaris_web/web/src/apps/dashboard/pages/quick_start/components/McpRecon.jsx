@@ -34,16 +34,18 @@ const McpRecon = () => {
         }
 
         setLoading(true)
-        api.initiateMCPRecon(ipRange, authKey, authValue, window.location.origin).then((res) => {
-            func.setToast(true, false, "MCP Recon initiated successfully. Discovering and cataloging MCP servers in the specified IP range.")
-        }).catch((err) => {
-            console.error("Error initiating MCP recon:", err)
-            func.setToast(true, true, "Failed to initiate MCP reconnaissance. Please check your IP range and try again.")
-        }).finally(() => {
-            setLoading(false)
-            setIpRange('')
-            setRequireAuth(false)
-        })
+        setLoading(false)
+        // TODO: uncomment when backend is ready
+//         api.initiateMCPRecon(ipRange, authKey, authValue, window.location.origin).then((res) => {
+//             func.setToast(true, false, "MCP Recon initiated successfully. Discovering and cataloging MCP servers in the specified IP range.")
+//         }).catch((err) => {
+//             console.error("Error initiating MCP recon:", err)
+//             func.setToast(true, true, "Failed to initiate MCP reconnaissance. Please check your IP range and try again.")
+//         }).finally(() => {
+//             setLoading(false)
+//             setIpRange('')
+//             setRequireAuth(false)
+//         })
     }
 
     return (
