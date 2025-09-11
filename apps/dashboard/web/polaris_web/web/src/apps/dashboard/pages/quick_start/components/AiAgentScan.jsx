@@ -28,7 +28,6 @@ const AiAgentScan = ({ description = "Import your AI agents, seamlessly in AKTO.
                 setTestRole(testRoles[0].value)
             }
         } catch (error) {
-            console.error("Error fetching test roles:", error)
         }
     }
 
@@ -57,9 +56,6 @@ const AiAgentScan = ({ description = "Import your AI agents, seamlessly in AKTO.
             setUseCustomRequestBody(false)
             setUseTestRole(false)
             setTestRole(testRolesArr[0]?.value || '')
-        } catch (error) {
-            console.error("Error importing AI agent:", error)
-            func.setToast(true, true, "Failed to import AI agent. Please try again.")
         } finally {
             setLoading(false)
         }

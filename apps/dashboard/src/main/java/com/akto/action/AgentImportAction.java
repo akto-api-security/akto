@@ -177,6 +177,9 @@ public class AgentImportAction extends UserAction{
 
             loggerMaker.info("Successfully received response from URL", LoggerMaker.LogDb.DASHBOARD);
             
+            // Remove x-akto-ignore header before converting to message
+            headers.remove(Constants.AKTO_IGNORE_FLAG);
+
             String message = convertToMessage(url, headers, requestBody, response);
             saveToDatabase(Arrays.asList(message));
 
