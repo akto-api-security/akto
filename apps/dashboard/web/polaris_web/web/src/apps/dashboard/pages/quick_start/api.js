@@ -185,6 +185,14 @@ const api = {
             data: {serverUrl, authKey, authValue, dashboardUrl}
         })
     },
+
+    importFromUrl(url, testRoleId, requestBody) {
+        return request({
+            url: '/api/importFromUrl',
+            method: 'post',
+            data: {url, testRoleId, requestBody}
+        })
+    },
 }
 
 export default api
