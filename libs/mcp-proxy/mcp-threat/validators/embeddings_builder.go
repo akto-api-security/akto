@@ -1,4 +1,4 @@
-package utils
+package validators
 
 import (
 	"encoding/gob"
