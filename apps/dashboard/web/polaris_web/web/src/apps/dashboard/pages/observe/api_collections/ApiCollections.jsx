@@ -280,7 +280,7 @@ function ApiCollections(props) {
     const userRole = window.USER_ROLE
 
     const navigate = useNavigate();
-    const [data, setData] = useState({'all': [], 'hostname':[], 'groups': [], 'custom': [], 'deactivated': [], 'Untracked': []})
+    const [data, setData] = useState({'all': [], 'hostname':[], 'groups': [], 'custom': [], 'deactivated': [], 'untracked': []})
     const [active, setActive] = useState(false);
     const [loading, setLoading] = useState(false)
           
@@ -525,7 +525,7 @@ function ApiCollections(props) {
         
 
         setHasUsageEndpoints(hasUserEndpoints)
-        res['Untracked'] = untrackedCollections
+        res['untracked'] = untrackedCollections
         
         setData(res);
         setEnvTypeMap(envTypeObj);
@@ -577,7 +577,7 @@ function ApiCollections(props) {
                     });
                     
                     updatedCategorized.deactivated = updatedDeactivatedCollections;
-                    updatedCategorized['Untracked'] = untrackedCollections;
+                    updatedCategorized['untracked'] = untrackedCollections;
                     
                     setData(updatedCategorized);
                     
