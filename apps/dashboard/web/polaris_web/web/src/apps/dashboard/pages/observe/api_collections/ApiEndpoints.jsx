@@ -52,7 +52,8 @@ const headings = [
         value: "riskScoreComp",
         textValue: "riskScore",
         sortActive: true,
-        
+        filterKey: 'riskScore',
+        showFilter:true
     },{
         text:"Issues",
         title: "Issues",
@@ -245,6 +246,7 @@ function ApiEndpoints(props) {
     const [description, setDescription] = useState("");
     const [isEditingDescription, setIsEditingDescription] = useState(false)
     const [editableDescription, setEditableDescription] = useState(description)
+    const [currentKey, setCurrentKey] = useState(Date.now()); // to force remount InlineEditableText component
 
 
     // the values used here are defined at the server.
@@ -290,17 +292,19 @@ function ApiEndpoints(props) {
                 api.fetchApisFromStis(apiCollectionId),
                 api.fetchApiInfosForCollection(apiCollectionId),
                 api.fetchAPIsFromSourceCode(apiCollectionId),
-                api.loadSensitiveParameters(apiCollectionId),
                 api.getSeveritiesCountPerCollection(apiCollectionId),
                 IssuesApi.fetchIssues(0, 1000, ["OPEN"], [apiCollectionId], null, null, null, null, null, null, true, null)
             ];
+            
             let results = await Promise.allSettled(apiPromises);
             let stisEndpoints =  results[0].status === 'fulfilled' ? results[0].value : {};
             let apiInfosData = results[1].status === 'fulfilled' ? results[1].value : {};
             sourceCodeData = results[2].status === 'fulfilled' ? results[2].value : {};
-            sensitiveParamsResp =  results[3].status === 'fulfilled' ? results[3].value : {};
-            apiInfoSeverityMap = results[4].status === 'fulfilled' ? results[4].value : {};
-            let issuesDataResp = results[5].status === 'fulfilled' ? results[5].value : {};
+            apiInfoSeverityMap = results[3].status === 'fulfilled' ? results[3].value : {};
+            let issuesDataResp = results[4].status === 'fulfilled' ? results[4].value : {};
+            
+            // Initialize with empty sensitive params for fast UI loading
+            sensitiveParamsResp = { data: { endpoints: [] } };
             setShowEmptyScreen(stisEndpoints?.list !== undefined && stisEndpoints?.list?.length === 0)
             apiEndpointsInCollection = stisEndpoints?.list !== undefined && stisEndpoints.list.map(x => { return { ...x._id, startTs: x.startTs, changesCount: x.changesCount, shadow: x.shadow ? x.shadow : false } })
             apiInfoListInCollection = apiInfosData.apiInfoList
@@ -440,6 +444,60 @@ function ApiEndpoints(props) {
         setApiEndpoints(apiEndpointsInCollection)
         setApiInfoList(apiInfoListInCollection)
         setUnusedEndpoints(unusedEndpointsInCollection)
+        
+        // Load sensitive parameters asynchronously and update the data when ready
+        if (!isQueryPage) {
+            // Use setTimeout to ensure state is set before we try to update it
+            setTimeout(() => {
+                api.loadSensitiveParameters(apiCollectionId).then((sensitiveResp) => {
+                    // Process the sensitive params
+                    let sensitiveParams = sensitiveResp.data.endpoints;
+                    let sensitiveParamsMap = {};
+                    
+                    sensitiveParams.forEach(p => {
+                        let position = p.responseCode > -1 ? "response" : "request";
+                        let key = p.method + " " + p.url + " " + p.apiCollectionId;
+                        if (!sensitiveParamsMap[key]) sensitiveParamsMap[key] = new Set();
+                        
+                        if (!p.subType) {
+                            p.subType = { name: "CUSTOM" };
+                        }
+                        
+                        sensitiveParamsMap[key].add({ name: p.subType, position: position});
+                    });
+                    let currentPrettyData = [...data['all']];
+                    currentPrettyData.forEach(apiEndpoint => {
+                        const key = apiEndpoint.method + " " + apiEndpoint.endpoint + " " + apiEndpoint.apiCollectionId;
+                        const allSensitive = new Set(), sensitiveInResp = [], sensitiveInReq = [];
+
+                        sensitiveParamsMap[key]?.forEach(({ name, position }) => {
+                            allSensitive.add(name);
+                            (position === 'response' ? sensitiveInResp : sensitiveInReq).push(name);
+                        });
+
+                        const sensitiveTags = [...func.convertSensitiveTags(allSensitive)]
+
+                        Object.assign(apiEndpoint, {
+                            sensitive: allSensitive,
+                            sensitiveTags,
+                            sensitiveInReq: [...func.convertSensitiveTags(sensitiveInReq)],
+                            sensitiveInResp: [...func.convertSensitiveTags(sensitiveInResp)],
+                            sensitiveTagsComp: transform.prettifySubtypes(sensitiveTags)
+                        });
+                    })
+
+                    data['all'] = currentPrettyData
+                    data['sensitive'] = currentPrettyData.filter(x => x.sensitive && x.sensitive.size > 0)
+                    data['high_risk'] = currentPrettyData.filter(x=> x.riskScore >= 4)
+                    data['new'] = currentPrettyData.filter(x=> x.isNew)
+                    data['no_auth'] = currentPrettyData.filter(x => x.open)
+                    setEndpointData(data)
+                    setCurrentKey(Date.now()) // force remount InlineEditableText component to reset filters
+                }).catch((err) => {
+                    console.error("Failed to load sensitive parameters:", err);
+                });
+            }, 100); // Small delay to ensure state is set
+        }
     }
 
     useEffect(() => {
@@ -1056,7 +1114,7 @@ function ApiEndpoints(props) {
     )
 
     const apiEndpointTable = [<GithubSimpleTable
-        key="api-endpoint-table"
+        key={currentKey}
         pageLimit={50}
         data={endpointData[selectedTab]}
         sortOptions={sortOptions}
