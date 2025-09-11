@@ -66,7 +66,7 @@ const AiAgentScan = ({ description = "Import your AI agents, seamlessly in AKTO.
     }
 
     const goToDocs = () => {
-        window.open(docsLink)
+        window.open(docsLink, '_blank', 'noopener,noreferrer')
     }
 
     return (
