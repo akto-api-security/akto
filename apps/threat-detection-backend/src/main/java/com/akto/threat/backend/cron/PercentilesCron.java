@@ -9,12 +9,8 @@ import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.Filters;
 import org.bson.conversions.Bson;
 
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.time.Instant;
+import java.util.*;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -26,6 +22,7 @@ public class PercentilesCron {
     private static final LoggerMaker logger = new LoggerMaker(PercentilesCron.class);
     private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
     private final MongoClient mongoClient;
+    private static final int DEFAULT_BASELINE_DAYS = 2;
 
     public PercentilesCron(MongoClient mongoClient) {
         this.mongoClient = mongoClient;
@@ -62,7 +59,11 @@ public class PercentilesCron {
             int apiCollectionId = Integer.parseInt(parts[0]);
             String url = parts[1];
             String method = parts[2];
-            PercentilesResult r = calculatePercentiles(accountId, apiCollectionId, url, method);
+
+            // Fetch last baseline days of distribution data
+            List<ApiDistributionDataModel> distributionData = fetchDistributionDocs(DEFAULT_BASELINE_DAYS, accountId, apiCollectionId, url, method);
+            PercentilesResult r = calculatePercentiles(distributionData, DEFAULT_BASELINE_DAYS);
+
             try {
                 ApiInfoDao.instance.getMCollection().updateOne(
                         ApiInfoDao.getFilter(url, method, apiCollectionId),
@@ -82,31 +83,58 @@ public class PercentilesCron {
         }
     }
 
-    private PercentilesResult calculatePercentiles(String accountId, int apiCollectionId, String url, String method) {
+    /**
+     * Fetches distribution documents for the given API over the past baseLinePeriod days.
+     */
+    public List<ApiDistributionDataModel> fetchDistributionDocs(int baseLinePeriod, String accountId, int apiCollectionId, String url, String method) {
         MongoCollection<ApiDistributionDataModel> coll = this.mongoClient
                 .getDatabase(accountId)
                 .getCollection("api_distribution_data", ApiDistributionDataModel.class);
 
-        Map<String, Long> bucketToCount = new HashMap<>();
+        // We store windowStart as epoch/60 (minutes since epoch). Filter using this within baseline period.
+        long currentMinutesSinceEpoch = Instant.now().getEpochSecond() / 60;
+        long baselineMinutes = (long) baseLinePeriod * 24L * 60L;
+        long lowerBoundWindowStart = currentMinutesSinceEpoch - baselineMinutes;
 
         Bson filter = Filters.and(
                 Filters.eq("apiCollectionId", apiCollectionId),
                 Filters.eq("url", url),
-                Filters.eq("method", method)
+                Filters.eq("method", method),
+                Filters.gte("windowStart", (int) lowerBoundWindowStart)
         );
 
+        List<ApiDistributionDataModel> docs = new ArrayList<>();
         try (MongoCursor<ApiDistributionDataModel> cursor = coll.find(filter).iterator()) {
             while (cursor.hasNext()) {
-                ApiDistributionDataModel doc = cursor.next();
-                if (doc.distribution == null) continue;
-                for (Map.Entry<String, Integer> e : doc.distribution.entrySet()) {
-                    bucketToCount.merge(e.getKey(), e.getValue() == null ? 0L : e.getValue().longValue(), Long::sum);
-                }
+                docs.add(cursor.next());
+            }
+        }
+        return docs;
+    }
+
+    /**
+     * Calculate percentiles from a list of distribution docs.
+     */
+    public PercentilesResult calculatePercentiles(List<ApiDistributionDataModel> distributionData, int baselinePeriodDays) {
+        Map<String, Long> bucketToCount = new HashMap<>();
+
+        for (ApiDistributionDataModel doc : distributionData) {
+            if (doc.distribution == null) continue;
+            for (Map.Entry<String, Integer> e : doc.distribution.entrySet()) {
+                bucketToCount.merge(e.getKey(), e.getValue() == null ? 0L : e.getValue().longValue(), Long::sum);
             }
         }
 
         List<String> bucketOrder = Arrays.asList("b1","b2","b3","b4","b5","b6","b7","b8","b9","b10","b11","b12","b13","b14");
         List<Integer> bucketUpperBounds = Arrays.asList(10, 50, 100, 250, 500, 1000, 2500, 5000, 10000, 20000, 35000, 50000, 100000, Integer.MAX_VALUE);
+        List<Integer> bucketLowerBounds = new ArrayList<>(bucketUpperBounds.size());
+        for (int i = 0; i < bucketUpperBounds.size(); i++) {
+            if (i == 0) {
+                bucketLowerBounds.add(0);
+            } else {
+                bucketLowerBounds.add(bucketUpperBounds.get(i - 1));
+            }
+        }
 
         long totalUsers = 0;
         for (String b : bucketOrder) totalUsers += bucketToCount.getOrDefault(b, 0L);
@@ -122,15 +150,15 @@ public class PercentilesCron {
             String b = bucketOrder.get(i);
             long countInBucket = bucketToCount.getOrDefault(b, 0L);
             cumulative += countInBucket;
-            int upper = bucketUpperBounds.get(i);
-            if (p50Val == null && cumulative >= p50Target) p50Val = upper;
-            if (p75Val == null && cumulative >= p75Target) p75Val = upper;
-            if (p90Val == null && cumulative >= p90Target) { p90Val = upper; break; }
+            int lower = bucketLowerBounds.get(i);
+            if (p50Val == null && cumulative >= p50Target) p50Val = lower;
+            if (p75Val == null && cumulative >= p75Target) p75Val = lower;
+            if (p90Val == null && cumulative >= p90Target) { p90Val = lower; break; }
         }
 
-        if (p50Val == null) p50Val = bucketUpperBounds.get(bucketUpperBounds.size() - 1);
-        if (p75Val == null) p75Val = bucketUpperBounds.get(bucketUpperBounds.size() - 1);
-        if (p90Val == null) p90Val = bucketUpperBounds.get(bucketUpperBounds.size() - 1);
+        if (p50Val == null) p50Val = bucketLowerBounds.get(bucketLowerBounds.size() - 1);
+        if (p75Val == null) p75Val = bucketLowerBounds.get(bucketLowerBounds.size() - 1);
+        if (p90Val == null) p90Val = bucketLowerBounds.get(bucketLowerBounds.size() - 1);
         return new PercentilesResult(p50Val, p75Val, p90Val);
     }
 
