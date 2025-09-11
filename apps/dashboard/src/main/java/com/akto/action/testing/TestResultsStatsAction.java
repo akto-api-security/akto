@@ -9,7 +9,6 @@ import com.mongodb.BasicDBObject;
 import com.mongodb.ExplainVerbosity;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.Aggregates;
-import com.mongodb.client.model.Accumulators;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.Sorts;
@@ -34,9 +33,6 @@ public class TestResultsStatsAction extends UserAction {
 
     @Getter
     private int count = 0;
-
-    @Getter
-    private boolean fromApiErrors = false;
 
     /**
      * HTTP 429 Rate Limiting Pattern
@@ -87,7 +83,6 @@ public class TestResultsStatsAction extends UserAction {
      */
     public static final String REGEX_CLOUDFLARE = "(error\\s*1[0-9]{3}|error\\s*10[0-9]{3}|" + // CF-specific error
                                                                                                // codes
-            "\\\"code\\\"\\s*:\\s*(10[0-9]{2}|1[0-9]{3,5})|" + // API error codes in JSON
             "attention\\s*required.*cloudflare|" + // Challenge page identifier
             "managed\\s*challenge.*cloudflare|cloudflare.*managed\\s*challenge|" + // Managed challenge variations
             "interactive\\s*challenge.*cloudflare|cloudflare.*interactive\\s*challenge|" + // Interactive challenges
@@ -204,13 +199,6 @@ public class TestResultsStatsAction extends UserAction {
      * Optimized for performance with proper indexing hints and limits
      */
     private int getCountByPattern(ObjectId testingRunResultSummaryId, String regex) {
-        if (hasApiErrors(testingRunResultSummaryId)) {
-            this.fromApiErrors = true;
-            return getCountFromApiErrors(testingRunResultSummaryId);
-        }
-
-        this.fromApiErrors = false;
-
         List<Bson> pipeline = new ArrayList<>();
 
         // Stage 1: Filter documents by summary ID and ensure testResults.message exists
@@ -255,70 +243,6 @@ public class TestResultsStatsAction extends UserAction {
         return resultCount;
     }
 
-    private boolean hasApiErrors(ObjectId testingRunResultSummaryId) {
-        try {
-            String key = resolveApiErrorsKey();
-            if (key == null)
-                return false;
-            BasicDBObject filter = new BasicDBObject("testRunResultSummaryId", testingRunResultSummaryId)
-                    .append("vulnerable", false)
-                    .append("apiErrors." + key, new BasicDBObject("$exists", true));
-            return TestingRunResultDao.instance.getMCollection().find(filter).limit(1).first() != null;
-        } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(e, "Error checking apiErrors existence: " + e.getMessage());
-            return false;
-        }
-    }
-
-    private int getCountFromApiErrors(ObjectId testingRunResultSummaryId) {
-        String key = resolveApiErrorsKey();
-        if (key == null)
-            return 0;
-
-        List<Bson> pipeline = new ArrayList<>();
-
-        pipeline.add(Aggregates.match(
-                Filters.and(
-                        Filters.eq("testRunResultSummaryId", testingRunResultSummaryId),
-                        Filters.eq("vulnerable", false),
-                        Filters.exists("apiErrors." + key, true))));
-
-        pipeline.add(Aggregates.group(null, Accumulators.sum("count", "$apiErrors." + key)));
-
-        MongoCursor<BasicDBObject> cursor = TestingRunResultDao.instance.getMCollection()
-                .aggregate(pipeline, BasicDBObject.class).cursor();
-
-        int resultCount = 0;
-        if (cursor.hasNext()) {
-            BasicDBObject result = cursor.next();
-            Number n = (Number) result.get("count");
-            resultCount = n != null ? n.intValue() : 0;
-        }
-        cursor.close();
-        return resultCount;
-    }
-
-    private String resolveApiErrorsKey() {
-        String type = this.patternType == null ? null : this.patternType.trim().toUpperCase();
-        if (type == null)
-            return null;
-        switch (type) {
-            case "HTTP_429":
-            case "429":
-            case "RATE_LIMIT":
-                return "429";
-            case "HTTP_5XX":
-            case "5XX":
-            case "SERVER_ERROR":
-                return "5xx";
-            case "CLOUDFLARE":
-            case "CDN":
-            case "CF":
-                return "cloudflare";
-            default:
-                return null;
-        }
-    }
 
     private void explainAggregationPipeline(List<Bson> pipeline) {
         try {
