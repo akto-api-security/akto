@@ -1,122 +1,139 @@
-import { Box, Button, ButtonGroup, Divider, Text, TextField, VerticalStack } from '@shopify/polaris';
-import { useState } from 'react'
-import InformationBannerComponent from './shared/InformationBannerComponent';
-import PasswordTextField from '../../../components/layouts/PasswordTextField';
+import { Box, Button, ButtonGroup, Checkbox, Divider, Text, TextField, VerticalStack } from '@shopify/polaris';
+import { useState, useEffect } from 'react'
 import api from '../api';
 import func from "@/util/func"
 import Dropdown from '../../../components/layouts/Dropdown';
+import testingApi from '../../testing/api'
 
-const AiAgentScan = () => {
+const AiAgentScan = ({ description = "Import your AI agents, seamlessly in AKTO.", defaultRequestBody = { "model": "llama3.2", "prompt": "Why is the sky blue?" }, docsLink = "https://docs.akto.io/ai-security" }) => {
     const [loading, setLoading] = useState(false)
-    
-    const [openaiUrl, setOpenaiUrl] = useState('https://api.openai.com/v1')
-    const [openaiApiKey, setOpenaiApiKey] = useState('')
-    const [model, setModel] = useState('gpt-4o-mini')
-    const [maxRequests, setMaxRequests] = useState('100')
+    const [url, setUrl] = useState('')
+    const [useCustomRequestBody, setUseCustomRequestBody] = useState(false)
+    const [customRequestBody, setCustomRequestBody] = useState('')
+    const [useTestRole, setUseTestRole] = useState(false)
+    const [testRole, setTestRole] = useState('')
+    const [testRolesArr, setTestRolesArr] = useState([])
 
-    const goToDocs = () => {
-        window.open("https://docs.akto.io/ai-agent-scan")
+    const fetchTestRoles = async () => {
+        try {
+            const testRolesResponse = await testingApi.fetchTestRoles()
+            const testRoles = testRolesResponse.testRoles.map(testRole => {
+                return {
+                    "label": testRole.name,
+                    "value": testRole.hexId
+                }
+            })
+            setTestRolesArr(testRoles)
+            if (testRoles.length > 0) {
+                setTestRole(testRoles[0].value)
+            }
+        } catch (error) {
+            console.error("Error fetching test roles:", error)
+        }
     }
 
-    const primaryAction = () => {
-        if(openaiUrl?.length == 0 || openaiUrl == undefined) {
-            func.setToast(true, true, "Please enter a valid OpenAI URL.")
+    useEffect(() => {
+        fetchTestRoles()
+    }, [])
+
+    const handleImport = async () => {
+        if (!url || url.length === 0) {
+            func.setToast(true, true, "Please enter a valid URL.")
             return
         }
 
-        if(openaiApiKey?.length == 0 || openaiApiKey == undefined) {
-            func.setToast(true, true, "Please enter a valid OpenAI API Key.")
-            return
-        }
-
-        const maxRequestsNum = parseInt(maxRequests)
-        if(isNaN(maxRequestsNum) || maxRequestsNum < 1 || maxRequestsNum > 10000) {
-            func.setToast(true, true, "Max requests must be between 1 and 10000.")
-            return
-        }
+        const requestBodyToSend = useCustomRequestBody 
+            ? customRequestBody 
+            : JSON.stringify(defaultRequestBody)
 
         setLoading(true)
-        api.initiateAiAgentImport(openaiUrl, openaiApiKey, model, maxRequestsNum, window.location.origin).then(() => {
-            func.setToast(true, false, "AI Agent Scan initiated successfully. Please check your dashboard for updates.")
-        }).catch((err) => {
-            console.error("Error initiating AI agent scan:", err)
-            func.setToast(true, true, "Failed to initiate AI Agent Scan. Please check your configuration.")
-        }).finally(() => {
+        try {
+            const testRoleToSend = useTestRole ? testRole : null
+            await api.importFromUrl(url, testRoleToSend, requestBodyToSend || null)
+            func.setToast(true, false, "AI agent imported successfully.")
+            // Reset form
+            setUrl('')
+            setCustomRequestBody('')
+            setUseCustomRequestBody(false)
+            setUseTestRole(false)
+            setTestRole(testRolesArr[0]?.value || '')
+        } catch (error) {
+            console.error("Error importing AI agent:", error)
+            func.setToast(true, true, "Failed to import AI agent. Please try again.")
+        } finally {
             setLoading(false)
-            setOpenaiUrl('https://api.openai.com/v1')
-            setOpenaiApiKey('')
-            setModel('gpt-4o-mini')
-            setMaxRequests('100')
-        })
+        }
+    }
+
+    const goToDocs = () => {
+        window.open(docsLink)
     }
 
     return (
         <div className='card-items'>
             <Text variant='bodyMd'>
-                Use AI agents to automatically explore and scan your application. The AI agent will intelligently navigate your site, 
-                discover APIs, and send the captured traffic to your dashboard for real-time analysis.
+                {description}
             </Text>
-
-            <InformationBannerComponent docsUrl="https://docs.akto.io/ai-agent-scan"
-                    content="Configure your OpenAI API key and model to enable AI-powered scanning " 
-            />
 
             <Box paddingBlockStart={3}><Divider /></Box>
 
-            <VerticalStack gap="2">
+            <VerticalStack gap="4">
                 <TextField 
-                    label="OpenAI API URL" 
-                    value={openaiUrl} 
-                    type='url' 
-                    onChange={(value) => setOpenaiUrl(value)} 
-                    placeholder='https://api.openai.com/v1'
-                    helpText="Enter your OpenAI API endpoint URL. For OpenAI, use the default. For local models, enter your local endpoint."
-                />
-                
-                <PasswordTextField 
-                    label="OpenAI API Key" 
-                    setField={setOpenaiApiKey} 
-                    onFunc={true} 
-                    field={openaiApiKey}
-                    placeholder='sk-...'
-                />
-                
-                <Dropdown
-                    label="Model"
-                    menuItems={[
-                        { value: "gpt-4o", label: "GPT-4o", id: "gpt-4o" },
-                        { value: "gpt-4o-mini", label: "GPT-4o Mini", id: "gpt-4o-mini" },
-                        { value: "gpt-4-turbo", label: "GPT-4 Turbo", id: "gpt-4-turbo" },
-                        { value: "gpt-3.5-turbo", label: "GPT-3.5 Turbo", id: "gpt-3.5-turbo" },
-                        { value: "ollama/llama3.2", label: "Ollama - Llama 3.2", id: "ollama-llama3.2" },
-                        { value: "ollama/qwen2.5-coder", label: "Ollama - Qwen 2.5 Coder", id: "ollama-qwen2.5-coder" },
-                    ]}
-                    initial={model}
-                    selected={(val) => setModel(val)}
+                    label="AI Endpoint URL" 
+                    value={url} 
+                    onChange={setUrl} 
+                    placeholder="https://api.example.com/ai-agent"
+                    type="url"
+                    helpText="Enter the AI endpoint URL"
                 />
 
-                <TextField 
-                    label="Max Requests" 
-                    value={maxRequests} 
-                    type='number' 
-                    onChange={(value) => setMaxRequests(value)} 
-                    placeholder='100'
-                    helpText="Maximum number of requests the AI agent will make (1-10000)"
+                <Checkbox
+                    label="Use custom request body"
+                    checked={useCustomRequestBody}
+                    onChange={setUseCustomRequestBody}
                 />
-                
-                <div style={{height:"20px"}}></div>
 
-                <ButtonGroup>
-                    <Button 
-                        onClick={primaryAction} 
-                        primary 
-                        disabled={openaiUrl?.length == 0 || openaiApiKey?.length == 0} 
-                        loading={loading}
-                    >
-                        Start AI Scan
-                    </Button>
-                    <Button onClick={goToDocs}>Go to docs</Button>
-                </ButtonGroup>
+                {useCustomRequestBody && (
+                    <TextField 
+                        label="Custom Request Body" 
+                        value={customRequestBody} 
+                        onChange={setCustomRequestBody} 
+                        placeholder='{"key": "value"}'
+                        multiline={4}
+                        helpText="Enter JSON request body"
+                    />
+                )}
+
+                <Checkbox
+                    label="Use test role for authentication"
+                    checked={useTestRole}
+                    onChange={setUseTestRole}
+                />
+
+                {useTestRole && testRolesArr.length > 0 && (
+                    <Dropdown
+                        label="Test Role"
+                        menuItems={testRolesArr}
+                        initial={testRole}
+                        selected={setTestRole}
+                    />
+                )}
+
+                <Box paddingBlockStart={2}>
+                    <ButtonGroup>
+                        <Button 
+                            onClick={handleImport} 
+                            primary 
+                            disabled={!url || url.length === 0} 
+                            loading={loading}
+                        >
+                            Import
+                        </Button>
+                        <Button onClick={goToDocs}>
+                            Go to docs
+                        </Button>
+                    </ButtonGroup>
+                </Box>
             </VerticalStack>
         </div>
     )

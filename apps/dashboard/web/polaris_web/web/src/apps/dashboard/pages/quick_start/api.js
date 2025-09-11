@@ -186,11 +186,11 @@ const api = {
         })
     },
 
-    initiateAiAgentImport(openaiUrl, openaiApiKey, model, maxRequests, dashboardUrl) {
+    importFromUrl(url, testRoleId, requestBody) {
         return request({
-            url: '/api/initiateAiAgentImport',
+            url: '/api/importFromUrl',
             method: 'post',
-            data: {openaiUrl, openaiApiKey, model, maxRequests, dashboardUrl}
+            data: {url, testRoleId, requestBody}
         })
     },
 }
