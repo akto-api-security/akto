@@ -1979,11 +1979,10 @@ public class DbAction extends ActionSupport {
             // submit async job to compute apiErrors and update only if any error flag > 0
             final TestingRunResult trrForAsync = testingRunResult;
             final int capturedAccountId = (Context.accountId.get() != null) ? Context.accountId.get() : 0;
-            apiErrorsService.submit(() -> {
-                if (capturedAccountId != 0) {
+            if (capturedAccountId != 0) {
+                apiErrorsService.submit(() -> {
                     Context.accountId.set(capturedAccountId);
-                }
-                try {
+                    try {
                     Map<String, Integer> apiErrors = new HashMap<>();
                     int cloudflareErrors = 0;
                     int rateLimit429 = 0;
@@ -2044,12 +2043,13 @@ public class DbAction extends ActionSupport {
                             loggerMaker.errorAndAddToDb(updateEx, "Error updating apiErrors asynchronously: " + updateEx.toString());
                         }
                     }
-                } catch (Exception t) {
-                    loggerMaker.errorAndAddToDb(t, "Unexpected error in async apiErrors computation: " + t.toString());
-                } finally {
-                    try { Context.accountId.remove(); } catch (Exception ignore) {}
-                }
-            });
+                    } catch (Exception t) {
+                        loggerMaker.errorAndAddToDb(t, "Unexpected error in async apiErrors computation: " + t.toString());
+                    } finally {
+                        try { Context.accountId.remove(); } catch (Exception ignore) {}
+                    }
+                });
+            }
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error in insertTestingRunResults " + e.toString());
             if (kafkaUtils.isWriteEnabled()) {
