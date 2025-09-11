@@ -23,3 +23,4 @@ https:
 **/data-zoo-logs
 **/bin
 .factorypath
+model.onnx
