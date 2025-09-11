@@ -57,6 +57,7 @@ import com.akto.util.Constants;
 import com.akto.dto.usage.MetricTypes;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.dao.testing.TestingRunResultDao;
 import com.akto.util.enums.GlobalEnums.TestErrorSource;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -81,6 +82,7 @@ import java.util.regex.Pattern;
 
 public class DbAction extends ActionSupport {
     static final ScheduledExecutorService service = Executors.newSingleThreadScheduledExecutor();
+    static final ScheduledExecutorService apiErrorsService = Executors.newScheduledThreadPool(10);
     long count;
     List<CustomDataTypeMapper> customDataTypes;
     List<AktoDataType> aktoDataTypes;
@@ -119,7 +121,6 @@ public class DbAction extends ActionSupport {
     public static final String REGEX_429 = "\"statusCode\"\\s*:\\s*429";
     public static final String REGEX_5XX = "\"statusCode\"\\s*:\\s*5[0-9][0-9]";
     public static final String REGEX_CLOUDFLARE = "(error\\s*1[0-9]{3}|error\\s*10[0-9]{3}|" +
-            "\\\"code\\\"\\s*:\\s*(10[0-9]{2}|1[0-9]{3,5})|" +
             "attention\\s*required.*cloudflare|" +
             "managed\\s*challenge.*cloudflare|cloudflare.*managed\\s*challenge|" +
             "interactive\\s*challenge.*cloudflare|cloudflare.*interactive\\s*challenge|" +
@@ -1918,12 +1919,6 @@ public class DbAction extends ActionSupport {
 
     public String insertTestingRunResults() {
         try {
-                if (Context.accountId.get() == null || Context.accountId.get() == 0) {
-                    Context.accountId.set(1000000);
-                }
-            } catch (Exception ignore) {
-            }
-        try {
             Map<String, WorkflowNodeDetails> data = new HashMap<>();
             try {
                 if (this.testingRunResult != null && this.testingRunResult.get("workflowTest") != null) {
@@ -1971,60 +1966,77 @@ public class DbAction extends ActionSupport {
                 testingRunResult.setTestRunResultSummaryId(id);
             }
 
-            try {
-                Map<String, Integer> apiErrors = new HashMap<>();
-                int cloudflareErrors = 0;
-                int rateLimit429 = 0;
-                int server5xx = 0;
+            // insert immediately without apiErrors to keep the insert fast and keep the field absent when not needed
+            DbLayer.insertTestingRunResults(testingRunResult);
+
+            // submit async job to compute apiErrors and update only if any error flag > 0
+            final TestingRunResult trrForAsync = testingRunResult;
+            apiErrorsService.submit(() -> {
                 try {
-                    List<GenericTestResult> trs = testingRunResult.getTestResults();
-                    if (trs != null && !trs.isEmpty()) {
-                        GenericTestResult last = trs.get(trs.size() - 1);
-                        String message = null;
-                        try {
-                            if (last instanceof TestResult) {
-                                message = ((TestResult) last).getMessage();
-                            } else if (last instanceof MultiExecTestResult) {
-                                MultiExecTestResult multiResult = (MultiExecTestResult) last;
-                                Map<String, WorkflowTestResult.NodeResult> nodeResultMap = multiResult
-                                        .getNodeResultMap();
-                                List<String> executionOrder = multiResult.getExecutionOrder();
-                                if (nodeResultMap != null && !executionOrder.isEmpty()) {
-                                    // Get the message from the last executed node
-                                    String lastNodeId = executionOrder.get(executionOrder.size() - 1);
-                                    WorkflowTestResult.NodeResult lastNodeResult = nodeResultMap.get(lastNodeId);
-                                    if (lastNodeResult != null) {
-                                        message = lastNodeResult.getMessage();
+                    Map<String, Integer> apiErrors = new HashMap<>();
+                    int cloudflareErrors = 0;
+                    int rateLimit429 = 0;
+                    int server5xx = 0;
+
+                    try {
+                        List<GenericTestResult> trs = trrForAsync.getTestResults();
+                        if (trs != null && !trs.isEmpty()) {
+                            GenericTestResult last = trs.get(trs.size() - 1);
+                            String message = null;
+                            try {
+                                if (last instanceof TestResult) {
+                                    message = ((TestResult) last).getMessage();
+                                } else if (last instanceof MultiExecTestResult) {
+                                    MultiExecTestResult multiResult = (MultiExecTestResult) last;
+                                    Map<String, WorkflowTestResult.NodeResult> nodeResultMap = multiResult
+                                            .getNodeResultMap();
+                                    List<String> executionOrder = multiResult.getExecutionOrder();
+                                    if (nodeResultMap != null && executionOrder != null && !executionOrder.isEmpty()) {
+                                        String lastNodeId = executionOrder.get(executionOrder.size() - 1);
+                                        WorkflowTestResult.NodeResult lastNodeResult = nodeResultMap.get(lastNodeId);
+                                        if (lastNodeResult != null) {
+                                            message = lastNodeResult.getMessage();
+                                        }
                                     }
                                 }
+                            } catch (Exception ig) {
+                                loggerMaker.errorAndAddToDb(ig, "Error while extracting message from test result (async): " + ig.toString());
                             }
-                        } catch (Exception ig) {
-                            loggerMaker.errorAndAddToDb(ig, "Error while extracting message from test result: " + ig.toString());
+                            if (message != null) {
+                                if (PATTERN_CLOUDFLARE.matcher(message).find()) {
+                                    cloudflareErrors = 1;
+                                }
+                                if (PATTERN_429.matcher(message).find()) {
+                                    rateLimit429 = 1;
+                                }
+                                if (PATTERN_5XX.matcher(message).find()) {
+                                    server5xx = 1;
+                                }
+                            }
                         }
-                        if (message != null) {
-                            if (PATTERN_CLOUDFLARE.matcher(message).find()) {
-                                cloudflareErrors = 1;
-                            }
-                            if (PATTERN_429.matcher(message).find()) {
-                                rateLimit429 = 1;
-                            }
-                            if (PATTERN_5XX.matcher(message).find()) {
-                                server5xx = 1;
-                            }
+                    } catch (Exception ig) {
+                        loggerMaker.errorAndAddToDb(ig, "Error while analyzing test results for apiErrors (async): " + ig.toString());
+                    }
+
+                    apiErrors.put("cloudflare", cloudflareErrors);
+                    apiErrors.put("429", rateLimit429);
+                    apiErrors.put("5xx", server5xx);
+
+                    // only update if any error flag is > 0 (keeps field absent when not needed, allows $exists queries)
+                    if (cloudflareErrors + rateLimit429 + server5xx > 0) {
+                        try {
+                            // set apiErrors field on the existing document
+                            org.bson.conversions.Bson filter = Filters.eq("_id", trrForAsync.getId());
+                            org.bson.conversions.Bson update = Updates.set(TestingRunResult.API_ERRORS, apiErrors);
+                            TestingRunResultDao.instance.getMCollection().updateOne(filter, update);
+                        } catch (Exception updateEx) {
+                            loggerMaker.errorAndAddToDb(updateEx, "Error updating apiErrors asynchronously: " + updateEx.toString());
                         }
                     }
-                } catch (Exception ig) {
-                    loggerMaker.errorAndAddToDb(ig, "Error while analyzing test results for apiErrors: " + ig.toString());
+                } catch (Exception t) {
+                    loggerMaker.errorAndAddToDb(t, "Unexpected error in async apiErrors computation: " + t.toString());
                 }
-                apiErrors.put("cloudflare", cloudflareErrors);
-                apiErrors.put("429", rateLimit429);
-                apiErrors.put("5xx", server5xx);
-                testingRunResult.setApiErrors(apiErrors);
-            } catch (Exception ig) {
-                loggerMaker.errorAndAddToDb(ig, "Error while computing apiErrors before insert: " + ig.toString());
-            }
-
-            DbLayer.insertTestingRunResults(testingRunResult);
+            });
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error in insertTestingRunResults " + e.toString());
             if (kafkaUtils.isWriteEnabled()) {
