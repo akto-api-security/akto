@@ -10,15 +10,11 @@ import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.testing.AuthMechanism;
 import com.akto.dto.testing.TestRoles;
 import com.akto.dto.traffic.CollectionTags;
-import com.akto.dto.RecordedLoginFlowInput;
 import com.akto.log.LoggerMaker;
 import com.akto.testing.ApiExecutor;
 import com.akto.util.Constants;
-import com.akto.util.RecordedLoginFlowUtil;
 import com.akto.utils.Utils;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.mongodb.BasicDBList;
-import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.FindOneAndUpdateOptions;
 import com.mongodb.client.model.ReturnDocument;
@@ -29,7 +25,6 @@ import lombok.Setter;
 import org.apache.commons.lang3.StringUtils;
 import org.bson.types.ObjectId;
 
-import java.io.File;
 import java.net.URL;
 import java.util.*;
 import java.util.concurrent.Executors;
@@ -91,39 +86,28 @@ public class AgentImportAction extends UserAction{
             }
             
             hostName = hostName.toLowerCase().trim();
-            
+            int id = hostName.hashCode();
+
             // Check if collection already exists for this host
-            ApiCollection existingCollection = ApiCollectionsDao.instance.findOne(Filters.eq(ApiCollection.HOST_NAME, hostName));
+            ApiCollection existingCollection = ApiCollectionsDao.instance.findOne(Filters.eq(Constants.ID, id));
             if (existingCollection != null) {
                 apiCollectionId = existingCollection.getId();
                 loggerMaker.info("Found existing API collection with ID: " + apiCollectionId + " for host: " + hostName, LoggerMaker.LogDb.DASHBOARD);
-                
                 // Add Gen AI tag if not already present
                 addGenAiTagIfNeeded(existingCollection);
                 return;
             }
             
-            // Create new collection using ApiCollectionsAction (DRY principle)
-            ApiCollectionsAction collectionsAction = new ApiCollectionsAction();
-            collectionsAction.setSession(this.getSession());
-            collectionsAction.setCollectionName(hostName);
-            String result = collectionsAction.createCollection();
+            // Create new collection using DAO
+            ApiCollection newCollection = ApiCollection.createManualCollection(id, hostName);
+
+            // Insert the new collection
+            ApiCollectionsDao.instance.insertOne(newCollection);
+            apiCollectionId = newCollection.getId();
             
-            if (result.equalsIgnoreCase(Action.SUCCESS)) {
-                List<ApiCollection> apiCollections = collectionsAction.getApiCollections();
-                if (apiCollections != null && !apiCollections.isEmpty()) {
-                    ApiCollection newCollection = apiCollections.get(0);
-                    apiCollectionId = newCollection.getId();
-                    
-                    // Add Gen AI tag to the new collection
-                    addGenAiTagToCollection(apiCollectionId);
-                    loggerMaker.info("Created new API collection with ID: " + apiCollectionId + " for host: " + hostName, LoggerMaker.LogDb.DASHBOARD);
-                } else {
-                    throw new Exception("Failed to get created collection");
-                }
-            } else {
-                throw new Exception("Failed to create collection: " + result);
-            }
+            // Add Gen AI tag to the new collection
+            addGenAiTagToCollection(apiCollectionId);
+            loggerMaker.info("Created new API collection with ID: " + apiCollectionId + " for host: " + hostName, LoggerMaker.LogDb.DASHBOARD);
             
         } catch (Exception e) {
             loggerMaker.error("Error creating API collection from URL: " + e.getMessage(), LoggerMaker.LogDb.DASHBOARD);
@@ -173,50 +157,16 @@ public class AgentImportAction extends UserAction{
             Map<String, List<String>> headers = new HashMap<>();
             headers.put("Content-Type", Arrays.asList("application/json"));
 
+            String method = !StringUtils.isEmpty(requestBody) ? "POST" : "GET";
+            OriginalHttpRequest request = new OriginalHttpRequest(url, "", method, requestBody, headers, "HTTP/1.1");
+            
             if (!StringUtils.isEmpty(testRoleId)) {
                 TestRoles testRole = TestRolesDao.instance.findOne(Filters.eq(Constants.ID, new ObjectId(testRoleId)));
                 if (testRole != null) {
                     AuthMechanism authMechanism = testRole.findDefaultAuthMechanism();
-                    if (authMechanism != null) {
-                        RecordedLoginFlowInput recordedLoginFlowInput = authMechanism.getRecordedLoginFlowInput();
-                        if (recordedLoginFlowInput != null) {
-                            try {
-                                String payload = recordedLoginFlowInput.getContent().toString();
-                                File tmpOutputFile = File.createTempFile("output", ".json");
-                                File tmpErrorFile = File.createTempFile("recordedFlowOutput", ".txt");
-                                
-                                RecordedLoginFlowUtil.triggerFlow(recordedLoginFlowInput.getTokenFetchCommand(), payload, tmpOutputFile.getPath(), tmpErrorFile.getPath(), getSUser().getId());
-                                String token = RecordedLoginFlowUtil.fetchToken(tmpOutputFile.getPath(), tmpErrorFile.getPath());
-                                
-                                BasicDBObject parseToken = BasicDBObject.parse(token);
-                                if (parseToken != null) {
-                                    loggerMaker.info("Got authentication tokens from test role");
-                                    BasicDBList allCookies = (BasicDBList) parseToken.get("all_cookies");
-                                    if (allCookies != null && !allCookies.isEmpty()) {
-                                        StringBuilder cookieHeader = new StringBuilder();
-                                        for (Object cookie : allCookies) {
-                                            BasicDBObject cookieObj = (BasicDBObject) cookie;
-                                            if (cookieHeader.length() > 0) {
-                                                cookieHeader.append("; ");
-                                            }
-                                            cookieHeader.append(cookieObj.get("name")).append("=").append(cookieObj.get("value"));
-                                        }
-                                        headers.put("Cookie", Arrays.asList(cookieHeader.toString()));
-                                    }
-                                }
-                                
-                                tmpOutputFile.delete();
-                                tmpErrorFile.delete();
-                            } catch (Exception e) {
-                                loggerMaker.error("Error while fetching authentication tokens: " + e.getMessage(), LoggerMaker.LogDb.DASHBOARD);
-                            }
-                        }
-                    }
+                    authMechanism.addAuthToRequest(request, false);
                 }
             }
-
-            String method = !StringUtils.isEmpty(requestBody) ? "POST" : "GET";
-            OriginalHttpRequest request = new OriginalHttpRequest(url, "", method, requestBody, headers, "HTTP/1.1");
             
             OriginalHttpResponse response = ApiExecutor.sendRequest(request, false, null, false, new ArrayList<>(), false);
 
@@ -275,7 +225,7 @@ public class AgentImportAction extends UserAction{
         
         loggerMaker.info("Saving imported data to database for collection: " + apiCollectionId, LoggerMaker.LogDb.DASHBOARD);
         
-        Utils.pushDataToKafka(apiCollectionId, topic, messages, new ArrayList<>(), false, true, true);
+        Utils.pushDataToKafka(apiCollectionId, topic, messages, new ArrayList<>(), true, true, true);
         
         loggerMaker.info("Successfully saved imported data to database", LoggerMaker.LogDb.DASHBOARD);
     }
