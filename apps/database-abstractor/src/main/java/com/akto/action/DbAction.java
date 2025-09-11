@@ -1978,9 +1978,9 @@ public class DbAction extends ActionSupport {
 
             // submit async job to compute apiErrors and update only if any error flag > 0
             final TestingRunResult trrForAsync = testingRunResult;
-            final Integer capturedAccountId = Context.accountId.get();
+            final int capturedAccountId = (Context.accountId.get() != null) ? Context.accountId.get() : 0;
             apiErrorsService.submit(() -> {
-                if (capturedAccountId != null) {
+                if (capturedAccountId != 0) {
                     Context.accountId.set(capturedAccountId);
                 }
                 try {
