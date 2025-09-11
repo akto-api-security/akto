@@ -83,7 +83,6 @@ public class TestResultsStatsAction extends UserAction {
      */
     public static final String REGEX_CLOUDFLARE = "(error\\s*1[0-9]{3}|error\\s*10[0-9]{3}|" + // CF-specific error
                                                                                                // codes
-            "\\\"code\\\"\\s*:\\s*(10[0-9]{2}|1[0-9]{3,5})|" + // API error codes in JSON
             "attention\\s*required.*cloudflare|" + // Challenge page identifier
             "managed\\s*challenge.*cloudflare|cloudflare.*managed\\s*challenge|" + // Managed challenge variations
             "interactive\\s*challenge.*cloudflare|cloudflare.*interactive\\s*challenge|" + // Interactive challenges
