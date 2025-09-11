@@ -52,7 +52,8 @@ const headings = [
         value: "riskScoreComp",
         textValue: "riskScore",
         sortActive: true,
-        
+        filterKey: 'riskScore',
+        showFilter:true
     },{
         text:"Issues",
         title: "Issues",

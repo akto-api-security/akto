@@ -53,7 +53,7 @@ function About() {
     const [mergingOnVersions, setMergingOnVersions] = useState(false)
     const [retrospective, setRetrospective] = useState(false)
     const [compulsoryDescription, setCompulsoryDescription] = useState({
-        falsePositive: true,
+        falsePositive: false,
         noTimeToFix: false,
         acceptableFix: false
     })

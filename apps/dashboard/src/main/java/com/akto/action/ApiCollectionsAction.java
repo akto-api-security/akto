@@ -9,6 +9,7 @@ import com.akto.dto.*;
 import com.akto.service.ApiCollectionUrlService;
 import com.akto.util.Pair;
 import com.akto.util.enums.GlobalEnums;
+import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 
 import lombok.Getter;
 import org.bson.conversions.Bson;
@@ -1336,8 +1337,11 @@ public class ApiCollectionsAction extends UserAction {
 
 
             default:
-                addActionError("Invalid filter type: " + filterType);
-                return Action.ERROR.toUpperCase();
+                if(Context.contextSource.get().equals(CONTEXT_SOURCE.MCP)){
+                    addActionError("Invalid filter type: " + filterType);
+                    return Action.ERROR.toUpperCase();
+                }
+                
         }
 
 
