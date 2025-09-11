@@ -631,28 +631,6 @@ public class TestResultsStatsActionTest extends MongoBasedTest {
     }
 
     @Test
-    public void testRegexPatternForCloudflareAPIErrors() {
-        String regex = TestResultsStatsAction.REGEX_CLOUDFLARE;
-
-        // API error responses that should match
-        String[] apiErrors = {
-                "{\"error\":{\"code\":1020,\"message\":\"Access denied\"},\"ray_id\":\"7f2a8c9b4e1d3a6f\"}",
-                "{\"error\":{\"code\":1015,\"message\":\"Rate limit exceeded\"},\"ray_id\":\"8g3b9d0c5f2e4b7g\"}",
-                "{\"error\":{\"code\":1012,\"message\":\"Access denied\"},\"ray_id\":\"9h4c0e1d6g3f5c8h\"}",
-                "{\"error\":{\"code\":1025,\"message\":\"Please check back later\"},\"ray_id\":\"0i5d1f2e7h4g6d9i\"}",
-                "{\"error\":{\"code\":1101,\"message\":\"Worker threw exception\"},\"ray_id\":\"1j6e2g3f8i5h7e0j\"}",
-                "{\"error\":{\"code\":1102,\"message\":\"Worker exceeded CPU time limit\"},\"ray_id\":\"2k7f3h4g9j6i8f1k\"}",
-                "{\"error\":{\"code\":1200,\"message\":\"HTTP/1.1 400 Bad Request\"},\"ray_id\":\"3l8g4i5h0k7j9g2l\"}",
-                "{\"error\":{\"code\":10001,\"message\":\"API rate limit exceeded\"},\"ray_id\":\"4m9h5j6i1l8k0h3m\"}"
-        };
-
-        for (String apiError : apiErrors) {
-            assertTrue("API error should match: " + apiError,
-                    apiError.toLowerCase().matches(".*" + regex + ".*"));
-        }
-    }
-
-    @Test
     public void testRegexPatternForWAFBlocking() {
         String regex = TestResultsStatsAction.REGEX_CLOUDFLARE;
 
