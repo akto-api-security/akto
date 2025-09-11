@@ -276,6 +276,21 @@ export default function LeftNav() {
                 key: "5",
             },
             {
+                label: (
+                    <Text variant="bodyMd" fontWeight="medium">
+                        Prompt Playground
+                    </Text>
+                ),
+                icon: AutomationFilledMajor,
+                onClick: () => {
+                    handleSelect("dashboard_prompt_playground");
+                    navigate("/dashboard/prompt-playground");
+                    setActive("normal");
+                },
+                selected: leftNavSelected === "dashboard_prompt_playground",
+                key: "prompt_playground",
+            },
+            {
                 url: "#",
                 label: (
                     <Text
