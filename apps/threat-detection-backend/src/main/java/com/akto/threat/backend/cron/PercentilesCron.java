@@ -64,22 +64,29 @@ public class PercentilesCron {
             List<ApiDistributionDataModel> distributionData = fetchDistributionDocs(DEFAULT_BASELINE_DAYS, accountId, apiCollectionId, url, method);
             PercentilesResult r = calculatePercentiles(distributionData, DEFAULT_BASELINE_DAYS);
 
-            try {
-                ApiInfoDao.instance.getMCollection().updateOne(
-                        ApiInfoDao.getFilter(url, method, apiCollectionId),
-                        Updates.combine(
-                                Updates.set("rateLimits.p50", r.p50),
-                                Updates.set("rateLimits.p75", r.p75),
-                                Updates.set("rateLimits.p90", r.p90)
-                        ),
-                        new UpdateOptions().upsert(false)
-                );
-                logger.infoAndAddToDb("Updated rateLimits for apiCollectionId " + apiCollectionId + " url " + url + " method " + method,
-                        LoggerMaker.LogDb.RUNTIME);
-            } catch (Exception e) {
-                logger.errorAndAddToDb("Failed updating rateLimits for apiCollectionId " + apiCollectionId + " url " + url + " method " + method + ": " + e.getMessage(),
-                        LoggerMaker.LogDb.RUNTIME);
-            }
+            updateApiInfo(r, apiCollectionId, url, method);
+        }
+    }
+
+    /**
+     * Updates ApiInfo collection with the given percentiles.
+     */
+    public void updateApiInfo(PercentilesResult r, int apiCollectionId, String url, String method) {
+        try {
+            ApiInfoDao.instance.getMCollection().updateOne(
+                    ApiInfoDao.getFilter(url, method, apiCollectionId),
+                    Updates.combine(
+                            Updates.set("rateLimits.p50", r.p50),
+                            Updates.set("rateLimits.p75", r.p75),
+                            Updates.set("rateLimits.p90", r.p90)
+                    ),
+                    new UpdateOptions().upsert(false)
+            );
+            logger.infoAndAddToDb("Updated rateLimits for apiCollectionId " + apiCollectionId + " url " + url + " method " + method,
+                    LoggerMaker.LogDb.RUNTIME);
+        } catch (Exception e) {
+            logger.errorAndAddToDb("Failed updating rateLimits for apiCollectionId " + apiCollectionId + " url " + url + " method " + method + ": " + e.getMessage(),
+                    LoggerMaker.LogDb.RUNTIME);
         }
     }
 
@@ -162,10 +169,10 @@ public class PercentilesCron {
         return new PercentilesResult(p50Val, p75Val, p90Val);
     }
 
-    private static class PercentilesResult {
+    public static class PercentilesResult {
         final int p50;
         final int p75;
         final int p90;
-        PercentilesResult(int p50, int p75, int p90) { this.p50 = p50; this.p75 = p75; this.p90 = p90; }
+        public PercentilesResult(int p50, int p75, int p90) { this.p50 = p50; this.p75 = p75; this.p90 = p90; }
     }
 }
