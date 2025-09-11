@@ -1,66 +1,33 @@
-import { Box, Card, Text, VerticalStack, HorizontalStack, DataTable } from '@shopify/polaris';
+import { Box, Text, HorizontalStack, DataTable } from '@shopify/polaris';
 import ChartypeComponent from './ChartypeComponent';
 import observeFunc from "../../observe/transform";
 import InfoCard from '../../dashboard/new_components/InfoCard';
+import { isMCPSecurityCategory, isGenAISecurityCategory } from '../../../../main/labelHelper';
+import { mcpCategoryTestData, genAICategoryTestData, apiCategoryTestData } from './dummyData';
 
-function CategoryWiseScoreGraph({ categoriesData, totalTests }) {
-    // Create test data from categoriesData with randomly distributed pass counts
-    const categoryTestData = categoriesData && Object.keys(categoriesData).length > 0
-        ? (() => {
-            const categories = Object.entries(categoriesData).map(([categoryName, data]) => ({
-                categoryName: categoryName,
-                fail: data.text || 0,
-                pass: 0
-            }));
+function CategoryWiseScoreGraph({  }) {
 
-            // Calculate total failures
-            const totalFail = categories.reduce((sum, cat) => sum + cat.fail, 0);
-            const totalPass = Math.max(0, (totalTests || 0) - totalFail);
-
-            // Distribute pass counts among categories using fixed weight pattern
-            if (totalPass > 0 && categories.length > 0) {
-                let remainingPass = totalPass;
-
-                // Fixed weight pattern: 13, 71, 8, 69, 14, 16, then repeat
-                const weightPattern = [13, 71, 8, 69, 14, 16];
-                const weights = categories.map((_, index) => weightPattern[index % weightPattern.length]);
-                const totalWeight = weights.slice(0, categories.length - 1).reduce((sum, w) => sum + w, 0);
-
-                // Distribute passes proportionally based on weights
-                categories.forEach((cat, index) => {
-                    if (index === categories.length - 1) {
-                        // Give remaining passes to last category to ensure exact total
-                        cat.pass = remainingPass;
-                    } else {
-                        const passCount = Math.floor((weights[index] / totalWeight) * (totalPass - 1));
-                        cat.pass = passCount;
-                        remainingPass -= passCount;
-                    }
-                });
-            }
-
-            return categories;
-        })()
-        : [];
+    // Select appropriate data based on dashboard category
+    let categoryTestData;
+    if (isMCPSecurityCategory()) {
+        categoryTestData = mcpCategoryTestData;
+    } else if (isGenAISecurityCategory()) {
+        categoryTestData = genAICategoryTestData;
+    }
 
     // Calculate totals
     const totalPass = categoryTestData.reduce((sum, cat) => sum + cat.pass, 0);
     const totalFail = categoryTestData.reduce((sum, cat) => sum + cat.fail, 0);
     const total = totalPass + totalFail;
-    const passPercentage = ((totalPass / total) * 100).toFixed(2);
-    const failPercentage = ((totalFail / total) * 100).toFixed(2);
-
     // Prepare data for ChartypeComponent
     const chartData = {
         'Passed': {
             text: totalPass,
             color: '#54b074',
-            percentage: passPercentage
         },
         'Failed': {
             text: totalFail,
-            color: '#f05352',
-            percentage: failPercentage
+            color: '#f05352'
         }
     };
 
@@ -80,7 +47,7 @@ function CategoryWiseScoreGraph({ categoriesData, totalTests }) {
             cat.categoryName,
             <HorizontalStack gap={"1"}>
                 <Text><span style={{ color: textColor, fontWeight: '500' }}>{passed ? passRate : failRate}% {labelText}</span></Text>
-                <Text color='subdued'>({passed ? cat.pass : cat.fail}/{categoryTotal})</Text>
+                <Text color='subdued'>({passed ? cat.pass : cat.fail}/{categoryTotal+cat.skip})</Text>
             </HorizontalStack>
         ];
     });
