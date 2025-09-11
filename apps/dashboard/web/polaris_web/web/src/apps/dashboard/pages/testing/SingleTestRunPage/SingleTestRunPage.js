@@ -15,6 +15,7 @@ import {
   ProgressBar,
   Tooltip,
   Banner,
+  Modal,
 } from '@shopify/polaris';
 
 import {
@@ -24,7 +25,6 @@ import {
   ReportMinor,
   RefreshMajor,
   CustomersMinor,
-  CircleAlertMajor,
   PlusMinor,
   SettingsMinor,
   ViewMajor
@@ -174,6 +174,7 @@ function SingleTestRunPage() {
   const localSubCategoryMap = LocalStore.getState().subCategoryMap
   const [useLocalSubCategoryData, setUseLocalSubCategoryData] = useState(false)
   const [copyUpdateTable, setCopyUpdateTable] = useState("");
+  const [confirmationModal, setConfirmationModal] = useState(false);
 
   const tableTabMap = {
     vulnerable: "VULNERABLE",
@@ -745,6 +746,25 @@ function SingleTestRunPage() {
         }}
         callFromOutside={updateTable}
       />
+    <Modal
+        open={confirmationModal}
+        onClose={() => setConfirmationModal(false)}
+        title="Re-Calculate issues count"
+        primaryAction={{
+          content: 'Re-Calculate',
+          onAction: () => handleRefreshTableCount(currentSummary.hexId),
+        }}
+        secondaryActions={[
+          {
+            content: 'Cancel',
+            onAction: () => setConfirmationModal(false),
+          },
+        ]}
+      >
+        <Modal.Section>
+          <Text>Are you sure you want to re-calculate issues count? This will recalculate the total number of issues based on the latest test results and may affect the FIXED or IGNORED issues in the current testing run</Text>
+        </Modal.Section>
+      </Modal>
     </>
   )
 
@@ -838,6 +858,7 @@ function SingleTestRunPage() {
     await api.handleRefreshTableCount(summaryHexId).then((res) => {
       func.setToast(true, false, "Re-calculating issues count")
       setSecondaryPopover(false)
+      setConfirmationModal(false)
     })
   }
 
@@ -930,11 +951,11 @@ function SingleTestRunPage() {
                       <Text variant="bodyMd">API request error statistics breakdown:</Text>
                       <VerticalStack gap="1">
                         <Text variant="bodySm">• 429 errors: {allTestResultsStats.count429}</Text>
-                        <Text variant="bodySm">• 5xx errors: {allTestResultsStats.count500}</Text>
+                        <Text variant="bodySm">• 5XX errors: {allTestResultsStats.count500}</Text>
                         <Text variant="bodySm">• Cloudflare errors: {allTestResultsStats.countCloudflare}</Text>
                       </VerticalStack>
                       <Box paddingBlockStart="1" borderBlockStartWidth="1" borderColor="border-subdued">
-                        <Text variant="bodySm" color="subdued" fontWeight="medium">Approximate counts based on sampled data. Includes totals shown above.</Text>
+                        <Text variant="bodySm" color="subdued" fontWeight="medium">Approximate counts based on sampled data.</Text>
                       </Box>
                     </VerticalStack>
                   } 
@@ -964,7 +985,7 @@ function SingleTestRunPage() {
                       {(() => { const sev = severityFor(allTestResultsStats.count500); return (
                         <div className={`badge-wrapper-${sev.toUpperCase()}`}>
                           <Badge>
-                            5xx: {allTestResultsStats.count500}
+                            5XX: {allTestResultsStats.count500}
                           </Badge>
                         </div>
                       )})()}
@@ -1028,7 +1049,7 @@ function SingleTestRunPage() {
       {
         content: 'Re-Calculate Issues Count',
         icon: RefreshMajor,
-        onAction: () => { handleRefreshTableCount(currentSummary.hexId) }
+        onAction: () => { setConfirmationModal(true) }
       }
     ]
   })

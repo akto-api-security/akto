@@ -39,7 +39,7 @@ function TestRunResultFlyout(props) {
     const [workItemType, setWorkItemType] = useState('')
 
     const [description, setDescription] = useState("")
-    const [editDescription, setEditDescription] = useState(description)
+    const [editDescription, setEditDescription] = useState("")
     const [isEditingDescription, setIsEditingDescription] = useState(false)
 
     // modify testing run result and headers
@@ -94,19 +94,21 @@ function TestRunResultFlyout(props) {
 
     const handleSaveDescription = async () => {
         setIsEditingDescription(false);
-        
-        if(editDescription === description) {
-            return
+        if (editDescription === description) {
+            return;
         }
-        await testingApi.updateIssueDescription(issueDetails.id, editDescription)
-            .then(() => {
-                setDescription(editDescription);
-                func.setToast(true, false, "Description saved successfully");
-            })
-            .catch((err) => {
-                console.error("Failed to save description:", err);
-                func.setToast(true, true, "Failed to save description");
-            })
+        try {
+            await testingApi.updateIssueDescription(issueDetails.id, editDescription);
+            setDescription(editDescription);
+            func.setToast(true, false, "Description saved successfully");
+            // Use state variable for updates, no need to re-fetch
+            if (typeof props.setIssueDetails === 'function') {
+                props.setIssueDetails({ ...issueDetails, description: editDescription });
+            }
+        } catch (err) {
+            console.error("Failed to save description:", err);
+            func.setToast(true, true, "Failed to save description");
+        }
     }
 
     useEffect(() => {
@@ -260,7 +262,7 @@ function TestRunResultFlyout(props) {
                         {
                             isEditingDescription ? (
                                 <InlineEditableText
-                                    textValue={editDescription}
+                                    textValue={editDescription || ""}
                                     setTextValue={setEditDescription}
                                     handleSaveClick={handleSaveDescription}
                                     setIsEditing={setIsEditingDescription}
@@ -449,18 +451,21 @@ function TestRunResultFlyout(props) {
         }
         activityEvents.push(createdEvent)
 
+
         if (issue.testRunIssueStatus === 'IGNORED') {
             const ignoredEvent = {
-                description: <Text>Issue marked as <b>IGNORED</b> - {issue.ignoreReason || 'No reason provided'}</Text>,
+                description: `Issue marked as IGNORED - ${issue.ignoreReason || 'No reason provided'}`,
                 timestamp: issue.lastUpdated,
+                user: issue.lastUpdatedBy || 'System'
             }
             activityEvents.push(ignoredEvent)
         }
 
         if (issue.testRunIssueStatus === 'FIXED') {
             const fixedEvent = {
-                description: <Text>Issue marked as <b>FIXED</b></Text>,
+                description: `Issue marked as FIXED`,
                 timestamp: issue.lastUpdated,
+                user: issue.lastUpdatedBy || 'System'
             }
             activityEvents.push(fixedEvent)
         }

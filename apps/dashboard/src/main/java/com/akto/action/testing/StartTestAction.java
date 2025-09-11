@@ -747,7 +747,7 @@ public class StartTestAction extends UserAction {
                 .map(testingRunResult -> getTestingIssueIdFromRunResult(testingRunResult))
                 .distinct()
                 .collect(Collectors.toList());
-        return Filters.and(Filters.in(Constants.ID, issueIdsList), Filters.eq(TestingRunIssues.TEST_RUN_ISSUES_STATUS, TestRunIssueStatus.IGNORED));
+        return Filters.and(Filters.in(Constants.ID, issueIdsList), Filters.in(TestingRunIssues.TEST_RUN_ISSUES_STATUS, Arrays.asList(TestRunIssueStatus.IGNORED, TestRunIssueStatus.FIXED)));
     }
 
     private Map<String, Integer> getCountMapForQueryMode(ObjectId testingRunResultSummaryId, QueryMode queryMode, int accountId){
@@ -877,7 +877,7 @@ public class StartTestAction extends UserAction {
             loggerMaker.debugAndAddToDb("[" + (Context.now() - timeNow) + "] Fetched testing run results of size: " + testingRunResults.size(), LogDb.DASHBOARD);
             timeNow = Context.now();
             if(queryMode.equals(QueryMode.VULNERABLE) || queryMode.equals(QueryMode.IGNORED_ISSUES)) {
-                List<TestRunIssueStatus> ignoreStatuses = queryMode.equals(QueryMode.IGNORED_ISSUES) ? Arrays.asList(TestRunIssueStatus.OPEN, TestRunIssueStatus.FIXED) : Arrays.asList(TestRunIssueStatus.IGNORED);
+                List<TestRunIssueStatus> ignoreStatuses = queryMode.equals(QueryMode.IGNORED_ISSUES) ? Arrays.asList(TestRunIssueStatus.OPEN) : Arrays.asList(TestRunIssueStatus.IGNORED, TestRunIssueStatus.FIXED);
                 BasicDBObject issueMetaDataMap = prepareIssueMetaDataMap(testingRunResults, ignoreStatuses);
                 removeTestingRunResultsByIssues(testingRunResults, (Map<String, String>) issueMetaDataMap.get("statuses"));
                 this.issuesDescriptionMap = (Map<String, String>) issueMetaDataMap.get("descriptions");

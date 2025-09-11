@@ -9,13 +9,13 @@ import com.akto.dto.*;
 import com.akto.service.ApiCollectionUrlService;
 import com.akto.util.Pair;
 import com.akto.util.enums.GlobalEnums;
+import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 
 import lombok.Getter;
 import org.bson.conversions.Bson;
 
 import com.akto.action.observe.Utils;
 import com.akto.dao.*;
-import com.akto.dao.McpAuditInfoDao;
 import com.akto.dao.threat_detection.ApiHitCountInfoDao;
 import com.akto.billing.UsageMetricUtils;
 import com.akto.dao.context.Context;
@@ -33,7 +33,6 @@ import com.akto.dto.testing.CustomTestingEndpoints;
 import com.akto.dto.CollectionConditions.ConditionUtils;
 import com.akto.dto.rbac.UsersCollectionsList;
 import com.akto.dto.type.SingleTypeInfo;
-import com.akto.dao.SingleTypeInfoDao;
 import com.akto.listener.RuntimeListener;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
@@ -1338,8 +1337,11 @@ public class ApiCollectionsAction extends UserAction {
 
 
             default:
-                addActionError("Invalid filter type: " + filterType);
-                return Action.ERROR.toUpperCase();
+                if(Context.contextSource.get().equals(CONTEXT_SOURCE.MCP)){
+                    addActionError("Invalid filter type: " + filterType);
+                    return Action.ERROR.toUpperCase();
+                }
+                
         }
 
 

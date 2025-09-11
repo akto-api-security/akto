@@ -240,7 +240,7 @@ export default function Header() {
                                 <img src="/public/akto_name_with_logo.svg" alt="Akto Logo" style={{ maxWidth: '78px' }} />
                             </div>
 
-                            <Box minWidth='150px'>
+                            <Box minWidth='170px'>
                                 <Dropdown
                                     menuItems={[
                                         { value: "API Security", label: "API Security", id: "api-security" },

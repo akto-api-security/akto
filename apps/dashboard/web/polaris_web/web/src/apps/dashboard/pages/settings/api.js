@@ -682,6 +682,15 @@ const settingRequests = {
             method: 'post',
             data: {}
         })
+    },
+    updateCompulsoryDescription(compulsoryDescription) {
+        return request({
+            url: '/api/updateCompulsoryDescription',
+            method: 'post',
+            data: {
+                compulsoryDescription
+            }
+        })
     }
 }
 

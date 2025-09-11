@@ -142,6 +142,9 @@ public class AccountSettings {
     private int lastUpdatedTestingIssuesCount;
     public static final String LAST_UPDATED_TESTING_ISSUES_COUNT = "lastUpdatedTestingIssuesCount";
 
+    public static final String COMPULSORY_DESCRIPTION = "compulsoryDescription";
+    private Map<String, Boolean> compulsoryDescription = new HashMap<>();
+
     public AccountSettings() {
     }
 
@@ -501,5 +504,13 @@ public class AccountSettings {
 
     public void setJiraTicketUrlMap(Map<String, String> jiraTicketUrlMap) {
         this.jiraTicketUrlMap = jiraTicketUrlMap;
+    }
+
+    public Map<String, Boolean> getCompulsoryDescription() {
+        return this.compulsoryDescription;
+    }
+
+    public void setCompulsoryDescription(Map<String, Boolean> compulsoryDescription) {
+        this.compulsoryDescription = compulsoryDescription;
     }
 }

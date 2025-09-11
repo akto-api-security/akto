@@ -186,6 +186,14 @@ const api = {
         })
     },
 
+    importFromUrl(url, testRoleId, requestBody) {
+        return request({
+            url: '/api/importFromUrl',
+            method: 'post',
+            data: {url, testRoleId, requestBody}
+        })
+    },
+
     initiateMCPRecon(ipRange, authKey, authValue, dashboardUrl) {
         return request({
             url: '/api/initiateMCPRecon',

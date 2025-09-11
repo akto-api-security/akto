@@ -1219,8 +1219,6 @@ function HomeDashboard() {
             }
             title={'Open Audit Alerts'}
             titleToolTip={'MCP open audit alerts detected in your workspace'}
-            linkText={'View more'}
-            linkUrl={'/dashboard/observe/audit'}
             linkText={mcpOpenAlertDetails && mcpOpenAlertDetails.length > 0 ? 'View more' : undefined}
             linkUrl={undefined}
             onLinkClick={mcpOpenAlertDetails && mcpOpenAlertDetails.length > 0 ? handleMcpAuditNavigation : undefined}

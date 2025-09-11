@@ -6,7 +6,7 @@ import Store from "../../../store";
 import func from "@/util/func";
 import { MarkFulfilledMinor, ReportMinor, ExternalMinor } from '@shopify/polaris-icons';
 import PersistStore from "../../../../main/PersistStore";
-import { ActionList, Button, HorizontalGrid, HorizontalStack, IndexFiltersMode, Popover } from "@shopify/polaris";
+import { ActionList, Button, HorizontalGrid, HorizontalStack, IndexFiltersMode, Popover, Modal, TextField, Text, VerticalStack } from "@shopify/polaris";
 import EmptyScreensLayout from "../../../components/banners/EmptyScreensLayout";
 import { ISSUES_PAGE_DOCS_URL } from "../../../../main/onboardingData";
 import {SelectCollectionComponent} from "../../testing/TestRunsPage/TestrunsBannerComponent"
@@ -185,6 +185,17 @@ function IssuesPage() {
     const [projectId, setProjectId] = useState('')
     const [workItemType, setWorkItemType] = useState('')
     const [issuesByApis, setIssuesByApis] = useState({});
+    
+    // Compulsory description modal states
+    const [compulsoryDescriptionModal, setCompulsoryDescriptionModal] = useState(false)
+    const [pendingIgnoreAction, setPendingIgnoreAction] = useState(null)
+    const [mandatoryDescription, setMandatoryDescription] = useState("")
+    const [modalLoading, setModalLoading] = useState(false)
+    const [compulsorySettings, setCompulsorySettings] = useState({
+        falsePositive: false,
+        noTimeToFix: false,
+        acceptableFix: false
+    })
 
     const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), values.ranges[5])
 
@@ -259,6 +270,22 @@ function IssuesPage() {
         }
     }, [])
 
+    // Fetch compulsory description settings
+    useEffect(() => {
+        const fetchCompulsorySettings = async () => {
+            try {
+                const {resp} = await settingFunctions.fetchAdminInfo();
+                
+                if (resp?.compulsoryDescription) {
+                    setCompulsorySettings(resp.compulsoryDescription);
+                }
+            } catch (error) {
+                console.error("Error fetching compulsory settings:", error);
+            }
+        };
+        fetchCompulsorySettings();
+    }, []);
+
     const [searchParams, setSearchParams] = useSearchParams();
     const resultId = searchParams.get("result")
 
@@ -326,6 +353,44 @@ function IssuesPage() {
         })
     }
 
+    // Use keys directly for reasons and compulsorySettings
+    const requiresDescription = (reasonKey) => {
+        return compulsorySettings[reasonKey] || false;
+    };
+
+
+    const handleIgnoreWithDescription = () => {
+        if (pendingIgnoreAction && mandatoryDescription.trim()) {
+            // Use the same endpoint as TestRunResultFlyout.jsx for description update
+            const updatePromises = pendingIgnoreAction.items.map(item => 
+                testingApi.updateIssueDescription(item, mandatoryDescription)
+            );
+            Promise.allSettled(updatePromises).then(() => {
+                performBulkIgnoreAction(pendingIgnoreAction.items, pendingIgnoreAction.reason, mandatoryDescription);
+                setCompulsoryDescriptionModal(false);
+                setPendingIgnoreAction(null);
+                setMandatoryDescription("");
+            });
+        }
+    };
+
+    useEffect(() => {
+        if (compulsoryDescriptionModal && pendingIgnoreAction && pendingIgnoreAction.items?.length > 0) {
+            setMandatoryDescription("");
+            setModalLoading(false);
+        }
+    }, [compulsoryDescriptionModal, pendingIgnoreAction]);
+
+    const performBulkIgnoreAction = (items, ignoreReason, description = "") => {
+        api.bulkUpdateIssueStatus(items, "IGNORED", ignoreReason, { description }).then((res) => {
+            setToast(true, false, `Issue${items.length === 1 ? "" : "s"} ignored${description ? " with description" : ""}`);
+            if (items.length === 1 && typeof setMandatoryDescription === 'function') {
+                setMandatoryDescription(description);
+            }
+            resetResourcesSelected();
+        });
+    };
+
     let promotedBulkActions = (selectedResources) => {
         let items
         if(selectedResources.length > 0 && typeof selectedResources[0][0] === 'string') {
@@ -335,11 +400,13 @@ function IssuesPage() {
             items = selectedResources.map((item) => JSON.parse(item))
         }
         
-        function ignoreAction(ignoreReason){
-            api.bulkUpdateIssueStatus(items, "IGNORED", ignoreReason, {} ).then((res) => {
-                setToast(true, false, `Issue${items.length==1 ? "" : "s"} ignored`)
-                resetResourcesSelected()
-            })
+        function ignoreAction(reasonKey){
+            if (requiresDescription(reasonKey)) {
+                setPendingIgnoreAction({ items, reason: reasonKey });
+                setCompulsoryDescriptionModal(true);
+                return;
+            }
+            performBulkIgnoreAction(items, reasonKey);
         }
         
         function reopenAction(){
@@ -382,36 +449,41 @@ function IssuesPage() {
             })
         }
         
-        let issues = [{
-            content: 'False positive',
-            onAction: () => { ignoreAction("False positive") }
-        },
-        {
-            content: 'Acceptable risk',
-            onAction: () => { ignoreAction("Acceptable risk") }
-        },
-        {
-            content: 'No time to fix',
-            onAction: () => { ignoreAction("No time to fix") }
-        },
-        {
-            content: 'Export selected Issues',
-            onAction: () => { openVulnerabilityReport(items, false) }
-        },
-        {
-            content: 'Export selected Issues summary',
-            onAction: () => { openVulnerabilityReport(items, true) }
-        },
-        {
-            content: 'Create jira ticket',
-            onAction: () => { createJiraTicketBulk() },
-            disabled: (window.JIRA_INTEGRATED === 'false')
-        },
-        {
-            content: 'Create azure work item',
-            onAction: () => { createAzureBoardWorkItemBulk() },
-            disabled: (window.AZURE_BOARDS_INTEGRATED === 'false')
-        }]
+        let issues = [
+            {
+                content: 'False positive',
+                key: 'falsePositive',
+                onAction: () => { ignoreAction('falsePositive') }
+            },
+            {
+                content: 'Acceptable fix',
+                key: 'acceptableFix',
+                onAction: () => { ignoreAction('acceptableFix') }
+            },
+            {
+                content: 'No time to fix',
+                key: 'noTimeToFix',
+                onAction: () => { ignoreAction('noTimeToFix') }
+            },
+            {
+                content: 'Export selected Issues',
+                onAction: () => { openVulnerabilityReport(items, false) }
+            },
+            {
+                content: 'Export selected Issues summary',
+                onAction: () => { openVulnerabilityReport(items, true) }
+            },
+            {
+                content: 'Create jira ticket',
+                onAction: () => { createJiraTicketBulk() },
+                disabled: (window.JIRA_INTEGRATED === 'false')
+            },
+            {
+                content: 'Create azure work item',
+                onAction: () => { createAzureBoardWorkItemBulk() },
+                disabled: (window.AZURE_BOARDS_INTEGRATED === 'false')
+            }
+        ];
         
         let reopen =  [{
             content: 'Reopen',
@@ -573,42 +645,49 @@ function IssuesPage() {
         await api.fetchIssues(skip, limit, filterStatus, filterCollectionsId, filterSeverity, filterSubCategory, sortKey, sortOrder, startTimestamp, endTimestamp, activeCollections, filterCompliance).then((issuesDataRes) => {
             const uniqueIssuesMap = new Map()
             issuesDataRes.issues.forEach(item => {
-                const key = `${item?.id?.testSubCategory}|${item?.severity}|${item?.unread.toString()}`
+                const key = `${item?.id?.testSubCategory || ''}|${item?.severity || ''}|${item?.testRunIssueStatus || ''}`
                 if (!uniqueIssuesMap.has(key)) {
                     uniqueIssuesMap.set(key, {
                         id: item?.id,
-                        severity: func.toSentenceCase(item?.severity),
-                        compliance: Object.keys(subCategoryMap[item?.id?.testSubCategory]?.compliance?.mapComplianceToListClauses || {}),
-                        severityType: item?.severity,
                         issueName: item?.id?.testSubCategory,
-                        category: item?.id?.testSubCategory,
-                        numberOfEndpoints: 1,
+                        severity: item?.severity,
+                        testRunIssueStatus: item?.testRunIssueStatus,
                         creationTime: item?.creationTime,
-                        issueStatus: item?.unread.toString(),
+                        ignoreReason: item?.ignoreReason,
+                        severityType: item?.severity,
+                        issueStatus: item?.issueStatus,
+                        compliance: item?.compliance || [],
                         testRunName: "Test Run",
-                        domains: [(hostNameMap[item?.id?.apiInfoKey?.apiCollectionId] !== null ? hostNameMap[item?.id?.apiInfoKey?.apiCollectionId] : apiCollectionMap[item?.id?.apiInfoKey?.apiCollectionId])],
+                        domains: [
+                            (item?.id?.apiInfoKey?.apiCollectionId && hostNameMap[item?.id?.apiInfoKey?.apiCollectionId] !== null)
+                                ? hostNameMap[item?.id?.apiInfoKey?.apiCollectionId]
+                                : (item?.id?.apiInfoKey?.apiCollectionId ? apiCollectionMap[item?.id?.apiInfoKey?.apiCollectionId] : null)
+                        ],
                         urls: [{
                             method: item?.id?.apiInfoKey?.method,
                             url: item?.id?.apiInfoKey?.url,
-                            id: JSON.stringify(item?.id),
+                            id: item?.id ? JSON.stringify(item.id) : '',
                             issueDescription: item?.description,
                             jiraIssueUrl: item?.jiraIssueUrl || "",
                         }],
+                        numberOfEndpoints: 1
                     })
                 } else {
                     const existingIssue = uniqueIssuesMap.get(key)
-                    const domain = (hostNameMap[item?.id?.apiInfoKey?.apiCollectionId] !== null ? hostNameMap[item?.id?.apiInfoKey?.apiCollectionId] : apiCollectionMap[item?.id?.apiInfoKey?.apiCollectionId])
-                    if (!existingIssue.domains.includes(domain)) {
+                    const domain = (item?.id?.apiInfoKey?.apiCollectionId && hostNameMap[item?.id?.apiInfoKey?.apiCollectionId] !== null)
+                        ? hostNameMap[item?.id?.apiInfoKey?.apiCollectionId]
+                        : (item?.id?.apiInfoKey?.apiCollectionId ? apiCollectionMap[item?.id?.apiInfoKey?.apiCollectionId] : null)
+                    if (domain && !existingIssue.domains.includes(domain)) {
                         existingIssue.domains.push(domain)
                     }
                     existingIssue.urls.push({
                         method: item?.id?.apiInfoKey?.method,
                         url: item?.id?.apiInfoKey?.url,
-                        id: JSON.stringify(item?.id),
+                        id: item?.id ? JSON.stringify(item.id) : '',
                         issueDescription: item?.description,
                         jiraIssueUrl: item?.jiraIssueUrl || ""
                     })
-                    existingIssue.numberOfEndpoints += 1
+                    existingIssue.numberOfEndpoints = (existingIssue.numberOfEndpoints || 1) + 1
                 }
             })
             issueItem = Array.from(uniqueIssuesMap.values())
@@ -657,21 +736,21 @@ function IssuesPage() {
 
         await api.fetchIssues(0, 20000, filterStatus, filterCollectionsId, filterSeverity, filterSubCategory, "severity", -1, startTimestamp, endTimestamp, activeCollections, filterCompliance).then((issuesDataRes) => {
             issuesDataRes.issues.forEach((item) => {
-                    const issue = {
-                        id: item?.id,
-                        severityVal: func.toSentenceCase(item?.severity),
-                        complianceVal: Object.keys(subCategoryMap[item?.id?.testSubCategory]?.compliance?.mapComplianceToListClauses || {}),
-                        issueName: item?.id?.testSubCategory,
-                        category: subCategoryMap[item?.id?.testSubCategory]?.superCategory?.shortName,
-                        numberOfEndpoints: 1,
-                        creationTime: func.prettifyEpoch(item?.creationTime),
-                        issueStatus: item?.unread.toString() === 'false' ? "read" : "unread",
-                        domainVal:[(hostNameMap[item?.id?.apiInfoKey?.apiCollectionId] !== null ? hostNameMap[item?.id?.apiInfoKey?.apiCollectionId] : apiCollectionMap[item?.id?.apiInfoKey?.apiCollectionId])],
-                        url:`${item?.id?.apiInfoKey?.method} ${item?.id?.apiInfoKey?.url}`
-                    }
-                    issueItems.push(issue)
-                })
-
+                if (!item || !item.id || !item.id.testSubCategory || !subCategoryMap[item.id.testSubCategory]) return;
+                const issue = {
+                    id: item.id,
+                    severityVal: func.toSentenceCase(item.severity),
+                    complianceVal: Object.keys(subCategoryMap[item.id.testSubCategory]?.compliance?.mapComplianceToListClauses || {}),
+                    issueName: item.id.testSubCategory,
+                    category: subCategoryMap[item.id.testSubCategory]?.superCategory?.shortName,
+                    numberOfEndpoints: 1,
+                    creationTime: func.prettifyEpoch(item.creationTime),
+                    issueStatus: item.unread && item.unread.toString() === 'false' ? "read" : "unread",
+                    domainVal:[(item.id.apiInfoKey && hostNameMap[item.id.apiInfoKey.apiCollectionId] !== null ? hostNameMap[item.id.apiInfoKey.apiCollectionId] : apiCollectionMap[item.id.apiInfoKey.apiCollectionId])],
+                    url:`${item.id.apiInfoKey?.method || ""} ${item.id.apiInfoKey?.url || ""}`
+                }
+                issueItems.push(issue)
+            })
         }).catch((e) => {
             func.setToast(true, true, e.message)
         })
@@ -838,6 +917,40 @@ function IssuesPage() {
                 issueType={workItemType}
                 isAzureModal={true}
             />
+            
+            <Modal
+                open={compulsoryDescriptionModal}
+                onClose={() => setCompulsoryDescriptionModal(false)}
+                title="Description Required"
+                primaryAction={{
+                    content: modalLoading ? 'Loading...' : 'Confirm',
+                    onAction: handleIgnoreWithDescription,
+                    disabled: mandatoryDescription.trim().length === 0 || modalLoading
+                }}
+                secondaryActions={[
+                    {
+                        content: 'Cancel',
+                        onAction: () => setCompulsoryDescriptionModal(false)
+                    }
+                ]}
+            >
+                <Modal.Section>
+                    <VerticalStack gap="4">
+                        <Text variant="bodyMd">
+                            A description is required for this action based on your account settings. Please provide a reason for marking these issues as "{pendingIgnoreAction?.reason}".
+                        </Text>
+                        <TextField
+                            label="Description"
+                            value={mandatoryDescription}
+                            onChange={setMandatoryDescription}
+                            multiline={4}
+                            autoComplete="off"
+                            placeholder="Please provide a description for this action..."
+                            disabled={modalLoading}
+                        />
+                    </VerticalStack>
+                </Modal.Section>
+            </Modal>
         </>
     )
 }
