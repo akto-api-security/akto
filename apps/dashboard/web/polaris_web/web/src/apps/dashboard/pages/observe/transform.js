@@ -429,7 +429,7 @@ const transform = {
                     Object.keys(sortedSeverityInfo).length > 0 ? Object.keys(sortedSeverityInfo).map((key,index)=>{
                         return(
                             <div className={`badge-wrapper-${key}`}>
-                                <Badge size="small" key={index}>{sortedSeverityInfo[key].toString()}</Badge>
+                                <Badge size="small" key={index}>{Math.max(sortedSeverityInfo[key], 0).toString()}</Badge>
                             </div>
                         )
                     }):
