@@ -94,6 +94,7 @@ public class MaliciousTrafficDetectorTask implements Task {
 
   private static final HttpRequestParams requestParams = new HttpRequestParams();
   private static final HttpResponseParams responseParams = new HttpResponseParams();
+  private static final FilterConfig ipApiRateLimitFilter = Utils.getipApiRateLimitFilter();
   private static Supplier<String> lazyToString;
   private DistributionCalculator distributionCalculator;
   private ThreatDetector threatDetector = new ThreatDetector();
@@ -268,17 +269,6 @@ public class MaliciousTrafficDetectorTask implements Task {
     List<SchemaConformanceError> errors = null; 
 
     if (apiDistributionEnabled) {
-
-      // TODO: Remove this hack
-      FilterConfig ipApiRateLimitFilter = new FilterConfig("IpApiRateLimited", null, null, null);
-      Info info = new Info();
-      info.setName("IpApiRFateLimited");
-      info.setCategory(new Category("ApiAbuse", "ApiAbuse", "ApiAbuse"));
-      info.setSubCategory("RateLimiting");
-      info.setSeverity("MEDIUM");
-      ipApiRateLimitFilter.setInfo(info);
-
-
       String apiCollectionIdStr = Integer.toString(apiCollectionId);
       String distributionKey = Utils.buildApiDistributionKey(apiCollectionIdStr, url, method.toString());
       String ipApiCmsKey = Utils.buildIpApiCmsDataKey(actor, apiCollectionIdStr, url, method.toString());
@@ -293,7 +283,8 @@ public class MaliciousTrafficDetectorTask implements Task {
       long count = this.distributionCalculator.getSlidingWindowCount(ipApiCmsKey, curEpochMin, ratelimitConfig.getPeriod());
 
       if (count > ratelimit) {
-        logger.debugAndAddToDb("Ratelimit hit for url " + apiInfoKey.getUrl() + " actor " + actor + " ratelimitConfig " + ratelimitConfig.toString());
+        logger.debugAndAddToDb("Ratelimit hit for url " + apiInfoKey.getUrl() + " actor: " + actor + " ratelimitConfig " + ratelimitConfig.toString());
+        // TODO: Mitigation period must be respected
         SampleMaliciousRequest maliciousReq = Utils.buildSampleMaliciousRequest(actor, responseParam, ipApiRateLimitFilter, metadata, errors);
         generateAndPushMaliciousEventRequest(ipApiRateLimitFilter, actor, responseParam, maliciousReq, EventType.EVENT_TYPE_AGGREGATED);
       }
@@ -303,6 +294,11 @@ public class MaliciousTrafficDetectorTask implements Task {
       boolean hasPassedFilter = false; 
 
       logger.debug("Evaluating filter condition for url " + apiInfoKey.getUrl() + " filterId " + apiFilter.getId());
+
+      // Skip this filter, as it's handled by apiDistributionenabled
+      if(apiFilter.getId().equals(ipApiRateLimitFilter.getId())){
+        continue;
+      }
 
       if(apiFilter.getInfo().getCategory().getName().equalsIgnoreCase("SchemaConform")) {
         logger.debug("SchemaConform filter found for url {} filterId {}", apiInfoKey.getUrl(), apiFilter.getId());

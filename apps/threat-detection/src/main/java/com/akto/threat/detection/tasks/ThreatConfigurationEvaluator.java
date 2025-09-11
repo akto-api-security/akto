@@ -108,7 +108,8 @@ public class ThreatConfigurationEvaluator {
             return Constants.RATE_LIMIT_UNLIMITED_REQUESTS;
         }
 
-        long apiConfidence = this.apiCountCacheLayer.get(baseKey + Constants.API_RATE_LIMIT_CONFIDENCE);
+        // Divide by 10 because in redis we stored long value.
+        float apiConfidence = this.apiCountCacheLayer.get(baseKey + Constants.API_RATE_LIMIT_CONFIDENCE) / 10.0f;
         if (apiConfidence < rule.getRateLimitConfidence()) {
             logger.debug("Rate limiting skipped API rateLimitConfidence: " + apiConfidence
                     + " lower than configured confidence: " + rule.getRateLimitConfidence());
@@ -132,10 +133,10 @@ public class ThreatConfigurationEvaluator {
             this.apiInfos = dataActor.fetchApiRateLimits(null);
 
             if (apiInfos == null || apiInfos.isEmpty()) {
-                logger.warnAndAddToDb("No api infos found for account");
+                logger.warnAndAddToDb("No api infos found for accountId: " + Context.accountId.get());
                 return;
             }
-            logger.debug(apiInfos.size() + ": APIs found for account " + Context.accountId.get());
+            logger.debug(apiInfos.size() + ": APIs found for accountId: " + Context.accountId.get());
 
             for (ApiInfo apiInfo : this.apiInfos) {
 
@@ -146,9 +147,10 @@ public class ThreatConfigurationEvaluator {
                 Map<String, Integer> rateLimits = apiInfo.getRateLimits();
 
                 String baseKey = Constants.RATE_LIMIT_CACHE_PREFIX + apiInfo.getId().toString();
-                // TODO: float to long conversion???
+                // float to long multiply by 10
+                // 0.8 -> 8
                 this.apiCountCacheLayer.set(baseKey + ":" + Constants.API_RATE_LIMIT_CONFIDENCE,
-                        (long) apiInfo.getRateLimitConfidence());
+                        (long) (apiInfo.getRateLimitConfidence() * 10));
 
                 // Store each percentile value separately in cache
                 for (String percentileKey : Arrays.asList(Constants.P50_CACHE_KEY, Constants.P75_CACHE_KEY,
