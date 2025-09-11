@@ -16,7 +16,7 @@ Proxied:  https://mcp-proxy.akto.io/proxy/https/mcp.example.com/api/endpoint
 
 Steps:
 1. Remove "://" from your MCP server URL
-2. Prefix with: https://mcp-proxy.akto.io/proxy/
+2. Prefix with https://mcp-proxy.akto.io/proxy/
 3. Your MCP requests will now route through Akto's proxy`
 
     const mcpProxyComponent = (
@@ -32,7 +32,7 @@ Steps:
               onClickFunc={()=> copyCommandUtil(mcpProxyExample)} 
               dataString={mcpProxyExample} 
               language="text" 
-              minHeight="200px" 
+              minHeight="400px" 
             />
           </VerticalStack>
 
