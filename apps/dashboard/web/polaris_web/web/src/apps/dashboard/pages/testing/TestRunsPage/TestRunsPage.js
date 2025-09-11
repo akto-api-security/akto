@@ -19,7 +19,8 @@ import TitleWithInfo from "@/apps/dashboard/components/shared/TitleWithInfo";
 import ApiCollectionCoverageGraph from "./ApiCollectionCoverageGraph";
 import ApisTestedOverTimeGraph from './ApisTestedOverTimeGraph';
 import TestRunOverTimeGraph from './TestRunOverTimeGraph';
-import { getDashboardCategory, mapLabel } from "../../../../main/labelHelper";
+import { getDashboardCategory, isApiSecurityCategory, mapLabel } from "../../../../main/labelHelper";
+import CategoryWiseScoreGraph from "./CategoryWiseScoreGraph";
 /*
   {
     text:"", // req. -> The text to be shown wherever the header is being shown
@@ -166,6 +167,7 @@ const [severityMap, setSeverityMap] = useState({})
 const [subCategoryInfo, setSubCategoryInfo] = useState({})
 const [collapsible, setCollapsible] = useState(true)
 const [hasUserInitiatedTestRuns, setHasUserInitiatedTestRuns] = useState(false)
+const [totalNumberOfTests, setTotalNumberOfTests] = useState(0)
 
   async function fetchTableData(sortKey, sortOrder, skip, limit, filters, filterOperators, queryValue) {
     setLoading(true);
@@ -231,6 +233,13 @@ const [hasUserInitiatedTestRuns, setHasUserInitiatedTestRuns] = useState(false)
       } 
       return true
     })
+
+    // Calculate total number of tests
+    const sumOfTests = ret.reduce((sum, item) => {
+      const numTests = item?.number_of_tests;
+      return sum + (typeof numTests === 'number' ? numTests : 0);
+    }, 0);
+    setTotalNumberOfTests(sumOfTests);
 
     setLoading(false);
     return { value: ret, total: total };
@@ -338,6 +347,9 @@ const SummaryCardComponent = () =>{
                     chartSize={190}
                 />
               </HorizontalGrid>
+              {(func.isDemoAccount() && !isApiSecurityCategory()) ? (
+                <CategoryWiseScoreGraph key={"category-score-graph"} categoriesData={subCategoryInfo} totalTests={totalNumberOfTests}/>
+              ) : null}
               <HorizontalGrid columns={2} gap={4}>
                 <ApiCollectionCoverageGraph />
                 <TestRunOverTimeGraph />
