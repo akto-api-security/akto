@@ -258,6 +258,9 @@ public class TestingRunResultDao extends AccountsContextDaoWithRbac<TestingRunRe
         fieldNames = new String[]{TestingRunResult.REQUIRES_CONFIG};
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, false);
 
+        // Index on apiErrors map to speed up existence and aggregation queries
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(), new String[]{TestingRunResult.API_ERRORS}, false);
+
         fieldNames = new String[]{getFilterKeyString()};
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, false);
 
