@@ -168,12 +168,12 @@ const PromptResponse = () => {
 
             {/* Response Display Area - scrollable */}
             <Box 
-                background="bg-surface" 
                 style={{
                     flex: 1,
                     overflowY: 'auto',
                     padding: '24px',
-                    paddingBottom: '150px' // Space for sticky input
+                    paddingBottom: '150px', // Space for sticky input
+                    backgroundColor: agentResponse ? (agentResponse.isSafe ? '#F7FFFC' : '#FFF7F7') : '#F6F6F7'
                 }}
             >
                 {isLoading ? (
