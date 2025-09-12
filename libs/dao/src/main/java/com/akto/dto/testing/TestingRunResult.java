@@ -58,6 +58,9 @@ public class TestingRunResult implements Comparable<TestingRunResult> {
     public static final String ERRORS_LIST = "errorsList";
     private  List<String> errorsList;
 
+    public static final String API_ERRORS = "apiErrors";
+    private Map<String, Integer> apiErrors;
+
     public static final String REQUIRES_CONFIG = TEST_RESULTS + ".0." + TestResult.REQUIRES_CONFIG;
 
     private WorkflowTest workflowTest;
@@ -381,6 +384,14 @@ public class TestingRunResult implements Comparable<TestingRunResult> {
 
     public void setMultiExecTestResults(List<MultiExecTestResult> multiExecTestResults) {
         this.multiExecTestResults = multiExecTestResults;
+    }
+
+    public Map<String, Integer> getApiErrors() {
+        return apiErrors;
+    }
+
+    public void setApiErrors(Map<String, Integer> apiErrors) {
+        this.apiErrors = apiErrors;
     }
 
 }

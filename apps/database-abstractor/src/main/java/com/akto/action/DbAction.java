@@ -57,6 +57,7 @@ import com.akto.util.Constants;
 import com.akto.dto.usage.MetricTypes;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.dao.testing.TestingRunResultDao;
 import com.akto.util.enums.GlobalEnums.TestErrorSource;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -77,9 +78,11 @@ import java.util.*;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.regex.Pattern;
 
 public class DbAction extends ActionSupport {
     static final ScheduledExecutorService service = Executors.newSingleThreadScheduledExecutor();
+    static final ScheduledExecutorService apiErrorsService = Executors.newScheduledThreadPool(10);
     long count;
     List<CustomDataTypeMapper> customDataTypes;
     List<AktoDataType> aktoDataTypes;
@@ -115,6 +118,42 @@ public class DbAction extends ActionSupport {
     private ModuleInfo moduleInfo;
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(DbAction.class, LogDb.DB_ABS);
+    public static final String REGEX_429 = "\"statusCode\"\\s*:\\s*429";
+    public static final String REGEX_5XX = "\"statusCode\"\\s*:\\s*5[0-9][0-9]";
+    public static final String REGEX_CLOUDFLARE = "(error\\s*1[0-9]{3}|error\\s*10[0-9]{3}|" + // CF-specific error
+                                                                                               // codes
+            "attention\\s*required.*cloudflare|" + // Challenge page identifier
+            "managed\\s*challenge.*cloudflare|cloudflare.*managed\\s*challenge|" + // Managed challenge variations
+            "interactive\\s*challenge.*cloudflare|cloudflare.*interactive\\s*challenge|" + // Interactive challenges
+            "under\\s*attack.*cloudflare|cloudflare.*under\\s*attack|" + // Under attack mode
+            "ddos\\s*protection.*cloudflare|cloudflare.*ddos|" + // DDoS protection
+            "anti[-\\s]*ddos.*cloudflare|cloudflare.*anti[-\\s]*ddos|" + // Anti-DDoS phrasing
+            "ddos\\s*attack\\s*mitigation|attack\\s*mitigation.*cloudflare|" + // DDoS attack mitigation
+            "ddos\\s*protection.*under\\s*attack.*enabled|under\\s*attack.*mode.*enabled|" + // Under attack mode
+                                                                                             // enabled
+            "(blocked|denied|limited|restricted).*cloudflare|" + // Generic blocking with CF context
+            "cloudflare.*(blocked|denied|limited|restricted|security)|" + // CF context with blocking
+            "waf.*cloudflare|cloudflare.*waf|" + // WAF by Cloudflare
+            "\\bweb\\s*application\\s*firewall\\b|\\bWAF\\b|waf\\s*rule\\s*triggered|waf\\s*(block|security|alert|protection)|"
+            + // WAF mentions without CF
+            "rate.*limit.*cloudflare|cloudflare.*rate.*limit|" + // Rate limiting by CF
+            "checking.*browser.*cloudflare|browser\\s*integrity\\s*check|verifying.*browser.*supports|" + // Browser
+                                                                                                          // check
+                                                                                                          // challenge
+            "security.*check.*cloudflare|security.*verification.*cloudflare|" + // Security checks/verification
+            "verification.*cloudflare|additional.*security.*cloudflare|" + // Additional security verification
+            "security\\s*challenge.*cloudflare|cloudflare.*security\\s*challenge|" + // Security challenge variations
+            "interactive\\s*challenge.*required|challenge.*required.*cloudflare|" + // Interactive challenge
+                                                                                    // requirements
+            "captcha\\s*verification|complete.*security\\s*check.*prove.*not.*robot|" + // CAPTCHA verification patterns
+            "this\\s*website\\s*is\\s*using\\s*a\\s*security\\s*service\\s*to\\s*protect\\s*itself\\s*from\\s*online\\s*attacks|"
+            + // Common CF block text
+            "ray\\s*id.*blocked|blocked.*ray\\s*id)"; // Ray ID blocked variants
+
+    // Precompile regex patterns to avoid recompiling on every check
+    private static final Pattern PATTERN_CLOUDFLARE = Pattern.compile(REGEX_CLOUDFLARE, Pattern.CASE_INSENSITIVE);
+    private static final Pattern PATTERN_429 = Pattern.compile(REGEX_429);
+    private static final Pattern PATTERN_5XX = Pattern.compile(REGEX_5XX);
 
     public List<BulkUpdates> getWritesForTestingRunIssues() {
         return writesForTestingRunIssues;
@@ -1887,7 +1926,6 @@ public class DbAction extends ActionSupport {
 
     public String insertTestingRunResults() {
         try {
-
             Map<String, WorkflowNodeDetails> data = new HashMap<>();
             try {
                 if (this.testingRunResult != null && this.testingRunResult.get("workflowTest") != null) {
@@ -1902,23 +1940,26 @@ public class DbAction extends ActionSupport {
                     }
                 }
             } catch (Exception e) {
-                loggerMaker.errorAndAddToDb(e, "Error in insertTestingRunResults mapNodeIdToWorkflowNodeDetails" + e.toString());
+                loggerMaker.errorAndAddToDb(e,
+                        "Error in insertTestingRunResults mapNodeIdToWorkflowNodeDetails" + e.toString());
                 e.printStackTrace();
             }
-            TestingRunResult testingRunResult = objectMapper.readValue(this.testingRunResult.toJson(), TestingRunResult.class);
+            TestingRunResult testingRunResult = objectMapper.readValue(this.testingRunResult.toJson(),
+                    TestingRunResult.class);
 
             try {
                 if (!data.isEmpty()) {
                     testingRunResult.getWorkflowTest().setMapNodeIdToWorkflowNodeDetails(data);
                 }
             } catch (Exception e) {
-                loggerMaker.errorAndAddToDb(e, "Error in insertTestingRunResults mapNodeIdToWorkflowNodeDetails2" + e.toString());
+                loggerMaker.errorAndAddToDb(e,
+                        "Error in insertTestingRunResults mapNodeIdToWorkflowNodeDetails2" + e.toString());
                 e.printStackTrace();
             }
 
-            if(testingRunResult.getSingleTestResults()!=null){
+            if (testingRunResult.getSingleTestResults() != null) {
                 testingRunResult.setTestResults(new ArrayList<>(testingRunResult.getSingleTestResults()));
-            }else if(testingRunResult.getMultiExecTestResults() !=null){
+            } else if (testingRunResult.getMultiExecTestResults() != null) {
                 testingRunResult.setTestResults(new ArrayList<>(testingRunResult.getMultiExecTestResults()));
             }
 
@@ -1932,7 +1973,83 @@ public class DbAction extends ActionSupport {
                 testingRunResult.setTestRunResultSummaryId(id);
             }
 
+            // insert immediately without apiErrors to keep the insert fast and keep the field absent when not needed
             DbLayer.insertTestingRunResults(testingRunResult);
+
+            // submit async job to compute apiErrors and update only if any error flag > 0
+            final TestingRunResult trrForAsync = testingRunResult;
+            final int capturedAccountId = (Context.accountId.get() != null) ? Context.accountId.get() : 0;
+            if (capturedAccountId != 0) {
+                apiErrorsService.submit(() -> {
+                    Context.accountId.set(capturedAccountId);
+                    try {
+                    Map<String, Integer> apiErrors = new HashMap<>();
+                    int cloudflareErrors = 0;
+                    int rateLimit429 = 0;
+                    int server5xx = 0;
+
+                    try {
+                        List<GenericTestResult> trs = trrForAsync.getTestResults();
+                        if (trs != null && !trs.isEmpty()) {
+                            GenericTestResult last = trs.get(trs.size() - 1);
+                            String message = null;
+                            try {
+                                if (last instanceof TestResult) {
+                                    message = ((TestResult) last).getMessage();
+                                } else if (last instanceof MultiExecTestResult) {
+                                    MultiExecTestResult multiResult = (MultiExecTestResult) last;
+                                    Map<String, WorkflowTestResult.NodeResult> nodeResultMap = multiResult
+                                            .getNodeResultMap();
+                                    List<String> executionOrder = multiResult.getExecutionOrder();
+                                    if (nodeResultMap != null && executionOrder != null && !executionOrder.isEmpty()) {
+                                        String lastNodeId = executionOrder.get(executionOrder.size() - 1);
+                                        WorkflowTestResult.NodeResult lastNodeResult = nodeResultMap.get(lastNodeId);
+                                        if (lastNodeResult != null) {
+                                            message = lastNodeResult.getMessage();
+                                        }
+                                    }
+                                }
+                            } catch (Exception ig) {
+                                loggerMaker.errorAndAddToDb(ig, "Error while extracting message from test result (async): " + ig.toString());
+                            }
+                            if (message != null) {
+                                if (PATTERN_CLOUDFLARE.matcher(message).find()) {
+                                    cloudflareErrors = 1;
+                                }
+                                if (PATTERN_429.matcher(message).find()) {
+                                    rateLimit429 = 1;
+                                }
+                                if (PATTERN_5XX.matcher(message).find()) {
+                                    server5xx = 1;
+                                }
+                            }
+                        }
+                    } catch (Exception ig) {
+                        loggerMaker.errorAndAddToDb(ig, "Error while analyzing test results for apiErrors (async): " + ig.toString());
+                    }
+
+                    apiErrors.put("cloudflare", cloudflareErrors);
+                    apiErrors.put("429", rateLimit429);
+                    apiErrors.put("5xx", server5xx);
+
+                    // only update if any error flag is > 0 (keeps field absent when not needed, allows $exists queries)
+                    if (cloudflareErrors + rateLimit429 + server5xx > 0) {
+                        try {
+                            // set apiErrors field on the existing document
+                            org.bson.conversions.Bson filter = Filters.eq(Constants.ID, trrForAsync.getId());
+                            org.bson.conversions.Bson update = Updates.set(TestingRunResult.API_ERRORS, apiErrors);
+                            TestingRunResultDao.instance.getMCollection().updateOne(filter, update);
+                        } catch (Exception updateEx) {
+                            loggerMaker.errorAndAddToDb(updateEx, "Error updating apiErrors asynchronously: " + updateEx.toString());
+                        }
+                    }
+                    } catch (Exception t) {
+                        loggerMaker.errorAndAddToDb(t, "Unexpected error in async apiErrors computation: " + t.toString());
+                    } finally {
+                        try { Context.accountId.remove(); } catch (Exception ignore) {}
+                    }
+                });
+            }
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error in insertTestingRunResults " + e.toString());
             if (kafkaUtils.isWriteEnabled()) {
