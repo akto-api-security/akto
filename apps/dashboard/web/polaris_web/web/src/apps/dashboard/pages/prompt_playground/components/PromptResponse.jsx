@@ -1,5 +1,5 @@
-import { Box, Button, Divider, Select, Text, TextField, VerticalStack, HorizontalStack, Card } from "@shopify/polaris"
-import { PlayMinor } from "@shopify/polaris-icons"
+import { Box, Button, Divider, Select, Text, TextField, VerticalStack, HorizontalStack, Card, Tooltip, Icon } from "@shopify/polaris"
+import { InfoMinor, PlayMinor, SettingsMajor } from "@shopify/polaris-icons"
 import { useEffect, useState } from "react";
 import PromptPlaygroundStore from "../promptPlaygroundStore"
 import Store from "../../../store";
@@ -69,11 +69,15 @@ Agent: ${agentOptions.find(a => a.value === selectedAgent)?.label}
         <Box>
             <VerticalStack gap="0">
                 {/* Header Section */}
-                <Box padding="4" background="bg-surface">
-                    <VerticalStack gap="5">
-                        {/* Title and Agent Selection */}
-                        <HorizontalStack align="space-between" blockAlign="center">
-                            <Text variant="headingLg" as="h2" fontWeight="semibold" color="text">Agent Response</Text>
+                <div className="editor-header">
+                    <HorizontalStack gap={"1"}>
+                        <Text variant="headingSm" as="h5" truncate>Agent Response</Text>
+                        <Tooltip content={`Info`} preferredPosition="below" dismissOnMouseOut>
+                            <Icon source={InfoMinor}/> 
+                        </Tooltip>
+                    </HorizontalStack>
+            
+                    <HorizontalStack gap={2}>
                             <Box width="200px">
                                 <Select
                                     label=""
@@ -83,11 +87,15 @@ Agent: ${agentOptions.find(a => a.value === selectedAgent)?.label}
                                     onChange={setSelectedAgent}
                                 />
                             </Box>
-                        </HorizontalStack>
-                    </VerticalStack>
-                </Box>
-
+                        <Button id={"save-button"} onClick={() => []} size="micro">
+                            <Icon source={SettingsMajor} />
+                        </Button>
+                    </HorizontalStack>
+                </div>
+    
                 <Divider />
+ 
+
 
                 {/* Response Display Area */}
                 <Box padding="5" background="bg-surface-secondary" minHeight="350px">
