@@ -597,7 +597,7 @@ public void testFetchTestResultsStatsCount_UsesApiErrorsWhenPresent() {
 
     String result = action.fetchTestResultsStatsCount();
     assertEquals("SUCCESS", result);
-    assertEquals(4, action.getCount()); // Should be 2 + 1 + 1 = 4
+    assertEquals(3, action.getCount()); 
     assertTrue(action.isFromApiErrors());
 }
 

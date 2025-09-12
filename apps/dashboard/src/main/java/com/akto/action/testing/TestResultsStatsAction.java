@@ -1,40 +1,3 @@
-package com.akto.action.testing;
-
-import com.akto.action.UserAction;
-import com.akto.dao.context.Context;
-import com.akto.dao.testing.TestingRunResultDao;
-import com.akto.log.LoggerMaker;
-import com.akto.log.LoggerMaker.LogDb;
-import com.mongodb.BasicDBObject;
-import com.mongodb.ExplainVerbosity;
-import com.mongodb.client.MongoCursor;
-import com.mongodb.client.model.Aggregates;
-import com.mongodb.client.model.Filters;
-import com.mongodb.client.model.Projections;
-import com.mongodb.client.model.Sorts;
-import lombok.Getter;
-import org.bson.Document;
-import com.akto.dto.testing.TestingRunResult;
-import org.bson.conversions.Bson;
-import org.bson.types.ObjectId;
-import com.mongodb.ConnectionString;
-import com.akto.DaoInit;
-
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-
-public class TestResultsStatsAction extends UserAction {
-
-    private static final LoggerMaker loggerMaker = new LoggerMaker(TestResultsStatsAction.class, LogDb.DASHBOARD);
-
-    private String testingRunResultSummaryHexId;
-    private String testingRunHexId;
-    private String patternType; // required: one of [HTTP_429, HTTP_5XX, CLOUDFLARE]
-
-    @Getter
-    private int count = 0;
-
     /**
      * HTTP 429 Rate Limiting Pattern
      * Detects JSON responses with statusCode: 429 indicating rate limiting.
@@ -143,7 +106,13 @@ public class TestResultsStatsAction extends UserAction {
 
             String description = describePattern(resolvedRegex);
 
-            this.count = getCountByPattern(testingRunResultSummaryId, resolvedRegex);
+            if (hasApiErrors(testingRunResultSummaryId)) {
+                this.count = getCountFromApiErrors(testingRunResultSummaryId);
+                this.fromApiErrors = true; //For UNIT TESTS
+            } else {
+                this.count = getCountByPattern(testingRunResultSummaryId, resolvedRegex);
+                this.fromApiErrors = false;
+            }
 
             loggerMaker.debugAndAddToDb(
                     "Found " + count + " requests matching " + description + " for test summary: "
@@ -157,6 +126,10 @@ public class TestResultsStatsAction extends UserAction {
         }
 
         return SUCCESS.toUpperCase();
+    }
+
+    public boolean isFromApiErrors() {
+        return this.fromApiErrors;
     }
 
     /**
@@ -265,27 +238,23 @@ public class TestResultsStatsAction extends UserAction {
     }
 
     private int getCountFromApiErrors(ObjectId testingRunResultSummaryId) {
-        String key = resolveApiErrorsKey();
-        if (key == null) return 0;
-
         List<Bson> pipeline = new ArrayList<>();
         pipeline.add(Aggregates.match(
                 Filters.and(
                         Filters.eq("testRunResultSummaryId", testingRunResultSummaryId),
                         Filters.eq("vulnerable", false),
-                        Filters.exists("apiErrors." + key, true)
+                        Filters.exists("apiErrors", true)
                 )));
-        pipeline.add(Aggregates.group(null, Accumulators.sum("count", "$apiErrors." + key)));
+        pipeline.add(Aggregates.count("count"));
 
-        MongoCursor<Document> cursor = TestingRunResultDao.instance.getMCollection()
-                .aggregate(pipeline, Document.class)
+        MongoCursor<BasicDBObject> cursor = TestingRunResultDao.instance.getMCollection()
+                .aggregate(pipeline, BasicDBObject.class)
                 .cursor();
 
         int resultCount = 0;
         if (cursor.hasNext()) {
-            Document result = cursor.next();
-            Number n = result.get("count", Number.class);
-            resultCount = n != null ? n.intValue() : 0;
+            BasicDBObject result = cursor.next();
+            resultCount = result.getInt("count", 0);
         }
         cursor.close();
         return resultCount;
