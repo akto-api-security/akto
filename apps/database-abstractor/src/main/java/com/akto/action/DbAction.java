@@ -2036,7 +2036,7 @@ public class DbAction extends ActionSupport {
                     if (cloudflareErrors + rateLimit429 + server5xx > 0) {
                         try {
                             // set apiErrors field on the existing document
-                            org.bson.conversions.Bson filter = Filters.eq("_id", trrForAsync.getId());
+                            org.bson.conversions.Bson filter = Filters.eq(Constants.ID, trrForAsync.getId());
                             org.bson.conversions.Bson update = Updates.set(TestingRunResult.API_ERRORS, apiErrors);
                             TestingRunResultDao.instance.getMCollection().updateOne(filter, update);
                         } catch (Exception updateEx) {
