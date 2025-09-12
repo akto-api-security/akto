@@ -9,7 +9,6 @@ import com.mongodb.BasicDBObject;
 import com.mongodb.ExplainVerbosity;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.Aggregates;
-import com.mongodb.client.model.Accumulators;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.Sorts;
@@ -35,9 +34,6 @@ public class TestResultsStatsAction extends UserAction {
 
     @Getter
     private int count = 0;
-
-    @Getter
-    private boolean fromApiErrors = false;
 
     /**
      * HTTP 429 Rate Limiting Pattern
@@ -204,13 +200,6 @@ public class TestResultsStatsAction extends UserAction {
      * Optimized for performance with proper indexing hints and limits
      */
     private int getCountByPattern(ObjectId testingRunResultSummaryId, String regex) {
-        if (hasApiErrors(testingRunResultSummaryId)) {
-            this.fromApiErrors = true;
-            return getCountFromApiErrors(testingRunResultSummaryId);
-        }
-
-        this.fromApiErrors = false;
-
         List<Bson> pipeline = new ArrayList<>();
 
         // Stage 1: Filter documents by summary ID and ensure testResults.message exists
@@ -254,6 +243,7 @@ public class TestResultsStatsAction extends UserAction {
         cursor.close();
         return resultCount;
     }
+
 
     private boolean hasApiErrors(ObjectId testingRunResultSummaryId) {
         try {
@@ -322,6 +312,7 @@ public class TestResultsStatsAction extends UserAction {
                 return null;
         }
     }
+
 
     private void explainAggregationPipeline(List<Bson> pipeline) {
         try {

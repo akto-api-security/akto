@@ -1,4 +1,5 @@
 import React, { useEffect, useReducer, useState, useCallback } from 'react'
+import { useNavigate } from 'react-router-dom'
 import api from './api';
 import func from '@/util/func';
 import observeFunc from "../observe/transform"
@@ -12,7 +13,7 @@ import testingApi from "../testing/api"
 import PersistStore from '../../../main/PersistStore';
 import { DashboardBanner } from './components/DashboardBanner';
 import SummaryCard from './new_components/SummaryCard';
-import { ArrowUpMinor, ArrowDownMinor } from '@shopify/polaris-icons';
+import { ArrowUpMinor, ArrowDownMinor, AlertMinor } from '@shopify/polaris-icons';
 import TestSummaryCardsList from './new_components/TestSummaryCardsList';
 import InfoCard from './new_components/InfoCard';
 import ProgressBarChart from './new_components/ProgressBarChart';
@@ -86,9 +87,12 @@ function HomeDashboard() {
     const [oldRiskScore, setOldRiskScore] = useState(0)
     const [showTestingComponents, setShowTestingComponents] = useState(false)
     const [customRiskScoreAvg, setCustomRiskScoreAvg] = useState(0)
-    const [mcpTotals, setMcpTotals] = useState({ mcpTotalApis: null, thirdPartyApis: null, newApis7Days: null, openAlerts: null, criticalApis: null })
+    const [mcpTotals, setMcpTotals] = useState({ mcpTotalApis: null, thirdPartyApis: null, newApis7Days: null, openAlerts: null, criticalApis: null, policyGuardrailApis: null })
+    const [mcpOpenAlertDetails, setMcpOpenAlertDetails] = useState([])
     const [mcpApiCallStats, setMcpApiCallStats] = useState([])
-    
+    const [policyGuardrailStats, setPolicyGuardrailStats] = useState([])
+    const [mcpTopApplications, setMcpTopApplications] = useState([])
+
     // MCP API Requests time selector state
     const statsOptions = [
         {label: "15 minutes", value: 15*60},
@@ -104,7 +108,14 @@ function HomeDashboard() {
         {label: "1 year", value: 365*24*60*60},
         {label: "All time", value: 10*365*24*60*60} // 10 years as a proxy for all time
     ]
-    const [mcpStatsTimeRange, setMcpStatsTimeRange] = useState(func.timeNow() - statsOptions[6].value)
+    const [mcpStatsTimeRange, setMcpStatsTimeRange] = useState(func.timeNow() - statsOptions[8].value)
+    const [policyGuardrailStatsTimeRange, setPolicyGuardrailStatsTimeRange] = useState(func.timeNow() - statsOptions[8].value)
+
+    // Function to handle navigation to audit page
+    const navigate = useNavigate();
+    const handleMcpAuditNavigation = useCallback(() => {
+        navigate('/dashboard/observe/audit');
+    }, [navigate])
 
     const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), values.ranges[2]);
 
@@ -183,6 +194,71 @@ function HomeDashboard() {
             setShowTestingComponents(finalResult && finalResult.length > 0)
         });
     }
+
+    const fetchPolicyGuardrailStats = async (startTs, endTs) => {
+        try {
+            // Get collections with guard-rail tag
+            const guardRailCollections = allCollections.filter(collection => {
+                return collection.envType && collection.envType.some(envType =>
+                    envType.keyName === 'guard-rail' && envType.value === 'Guard Rail'
+                );
+            });
+
+            if (guardRailCollections.length === 0) {
+                // Generate empty data points for the time range
+                const emptyData = generateTimeSeriesWithGaps(startTs, endTs, {});
+                setPolicyGuardrailStats(emptyData);
+                return;
+            }
+
+            // Fetch API call stats for each guard-rail collection and their URLs
+            const promises = [];
+            guardRailCollections.forEach(collection => {
+                // Check if the collection has urls array and it's not empty
+                if (collection.urls && Array.isArray(collection.urls) && collection.urls.length > 0) {
+                    collection.urls.forEach(urlString => {
+                        // Split the URL string by space to get url and method
+                        const parts = urlString.split(' ');
+                        const url = parts[0];
+                        const method = parts[1];
+
+                        // Create a promise for each URL/method combination
+                        promises.push(
+                            observeApi.fetchApiCallStats(collection.id, url, method, startTs, endTs)
+                                .catch(err => {
+                                    return null;
+                                })
+                        );
+                    });
+                } else {
+                    // Skip collections without urls array or with empty urls array
+                }
+            });
+
+            const results = await Promise.all(promises);
+
+            // Aggregate the results
+            const aggregatedStats = {};
+            results.forEach(result => {
+                if (result && result.result && result.result.apiCallStats) {
+                    result.result.apiCallStats.forEach(stat => {
+                        const ts = stat.ts * 60 * 1000; // Convert to milliseconds
+                        if (!aggregatedStats[ts]) {
+                            aggregatedStats[ts] = 0;
+                        }
+                        aggregatedStats[ts] += stat.count;
+                    });
+                }
+            });
+
+            // Generate complete time series with gaps filled as zeros
+            const chartData = generateTimeSeriesWithGaps(startTs, endTs, aggregatedStats);
+
+            setPolicyGuardrailStats(chartData);
+        } catch (error) {
+            setPolicyGuardrailStats([]);
+        }
+    };
 
     const fetchMcpApiCallStats = async (startTs, endTs) => {
         try {
@@ -313,12 +389,14 @@ function HomeDashboard() {
             api.getApiInfoForMissingData(0, endTimestamp),
             api.fetchMcpdata('TOTAL_APIS'),
             api.fetchMcpdata('THIRD_PARTY_APIS'),
-            api.fetchMcpdata('OPEN_ALERTS'),
+            api.fetchMcpdata('RECENT_OPEN_ALERTS'),
             api.fetchMcpdata('CRITICAL_APIS'),
             api.fetchMcpdata('TOOLS'),
             api.fetchMcpdata('PROMPTS'),
             api.fetchMcpdata('RESOURCES'),
-            api.fetchMcpdata('MCP_SERVER')
+            api.fetchMcpdata('MCP_SERVER'),
+            api.fetchMcpdata('POLICY_GUARDRAIL_APIS'),
+            api.fetchMcpdata('TOP_3_APPLICATIONS_BY_TRAFFIC')
         ];
 
         let results = await Promise.allSettled(apiPromises);
@@ -331,12 +409,14 @@ function HomeDashboard() {
         let missingApiInfoData = results[5].status === 'fulfilled' ? results[5].value : {}
         let mcpTotalApis = results[6]?.status === 'fulfilled' ? (results[6].value?.mcpDataCount ?? null) : null
         let mcpThirdParty = results[7]?.status === 'fulfilled' ? (results[7].value?.mcpDataCount ?? null) : null
-        let mcpOpenAlerts = results[8]?.status === 'fulfilled' ? (results[8].value?.mcpDataCount ?? null) : null
+        let mcpOpenAlertsDetails = results[8]?.status === 'fulfilled' ? (results[8].value?.response?.alertDetails ?? []) : []
         let mcpCriticalApis = results[9]?.status === 'fulfilled' ? (results[9].value?.mcpDataCount ?? null) : null
         let mcpTools = results[10]?.status === 'fulfilled' ? (results[10].value?.mcpDataCount ?? null) : null
         let mcpPrompts = results[11]?.status === 'fulfilled' ? (results[11].value?.mcpDataCount ?? null) : null
         let mcpResources = results[12]?.status === 'fulfilled' ? (results[12].value?.mcpDataCount ?? null) : null
         let mcpServer = results[13]?.status === 'fulfilled' ? (results[13].value?.mcpDataCount ?? null) : null
+        let mcpPolicyGuardrailApis = results[14]?.status === 'fulfilled' ? (results[14].value?.mcpDataCount ?? null) : null
+        let mcpTopApps = results[15]?.status === 'fulfilled' ? (results[15].value?.response?.topApplications ?? []) : []
         const totalRedundantApis = missingApiInfoData?.redundantApiInfoKeys || 0
         const totalMissingApis = missingApiInfoData?.totalMissing|| 0
 
@@ -359,7 +439,9 @@ function HomeDashboard() {
 
         buildEndpointsCount(fetchEndpointsCountResp)
 
-        setMcpTotals({ mcpTotalApis: mcpTotalApis, thirdPartyApis: mcpThirdParty, newApis7Days: null, openAlerts: mcpOpenAlerts, criticalApis: mcpCriticalApis, tools: mcpTools, prompts: mcpPrompts, resources: mcpResources, server: mcpServer })
+        setMcpTotals({ mcpTotalApis: mcpTotalApis, thirdPartyApis: mcpThirdParty, newApis7Days: null, criticalApis: mcpCriticalApis, tools: mcpTools, prompts: mcpPrompts, resources: mcpResources, server: mcpServer,policyGuardrailApis: mcpPolicyGuardrailApis })
+        setMcpOpenAlertDetails(Array.isArray(mcpOpenAlertsDetails) ? mcpOpenAlertsDetails.slice(0, 2) : [])
+        setMcpTopApplications(Array.isArray(mcpTopApps) ? mcpTopApps : [])
         fetchMcpApiCallStats(mcpStatsTimeRange, func.timeNow());
         setLoading(false)
     }
@@ -374,6 +456,13 @@ function HomeDashboard() {
             fetchMcpApiCallStats(mcpStatsTimeRange, func.timeNow());
         }
     }, [mcpStatsTimeRange, allCollections])
+
+    // Fetch Policy Guardrail stats when time range changes
+    useEffect(() => {
+        if (allCollections && allCollections.length > 0) {
+            fetchPolicyGuardrailStats(policyGuardrailStatsTimeRange, func.timeNow());
+        }
+    }, [policyGuardrailStatsTimeRange, allCollections])
 
     async function getActionItemsDataAndCount() {
         const data = await fetchActionItemsData();
@@ -712,15 +801,8 @@ function HomeDashboard() {
             variant: 'heading2xl'
         }
 
-        const openAlertsItem = {
-            title: 'Open Alerts',
-            data: mcpTotals.openAlerts ?? '-',
-            variant: 'heading2xl',
-            color: 'critical'
-        }
 
         summaryInfo.unshift(totalRequestsItem)
-        summaryInfo.push(openAlertsItem)
     }
 
     const summaryComp = (
@@ -894,20 +976,20 @@ function HomeDashboard() {
             component={
                 <HorizontalGrid columns={4} gap={6}>
                     <VerticalStack gap={1}>
-                        <Text color="subdued">Components</Text>
+                        <Box style={{ minHeight: '36px' }}><Text color="subdued">Components</Text></Box>
                         <Text variant='headingMd'>{mcpTotals.mcpTotalApis ?? '-'}</Text>
                     </VerticalStack>
                     <VerticalStack gap={1}>
-                        <Text color="subdued">Services</Text>
+                        <Box style={{ minHeight: '36px' }}><Text color="subdued">Services</Text></Box>
                         <Text variant='headingMd'>-</Text>
                     </VerticalStack>
                     <VerticalStack gap={1}>
-                        <Text color="subdued">3rd party Components</Text>
+                        <Box style={{ minHeight: '36px' }}><Text color="subdued">Third party Components</Text></Box>
                         <Text variant='headingMd'>{mcpTotals.thirdPartyApis ?? '-'}</Text>
                     </VerticalStack>
-                    <VerticalStack gap={1}>
-                        <Text color="subdued">Identities</Text>
-                        <Text variant='headingMd'>-</Text>
+                     <VerticalStack gap={1}>
+                        <Box style={{ minHeight: '36px' }}><Text color="subdued">Policy Guardrail APIs</Text></Box>
+                        <Text variant='headingMd'>{mcpTotals.policyGuardrailApis ?? '-'}</Text>
                     </VerticalStack>
                 </HorizontalGrid>
             }
@@ -923,19 +1005,19 @@ function HomeDashboard() {
             component={
                 <HorizontalGrid columns={4} gap={6}>
                     <VerticalStack gap={1}>
-                        <Text color="subdued">Critical MCP Components</Text>
+                        <Box style={{ minHeight: '36px' }}><Text color="subdued">Critical MCP Components</Text></Box>
                         <Text variant='headingMd'>{mcpTotals.criticalApis ?? '-'}</Text>
                     </VerticalStack>
                     <VerticalStack gap={1}>
-                        <Text color="subdued">AI security</Text>
+                        <Box style={{ minHeight: '36px' }}><Text color="subdued">AI security</Text></Box>
                         <Text variant='headingMd'>-</Text>
                     </VerticalStack>
                     <VerticalStack gap={1}>
-                        <Text color="subdued">MCP security</Text>
+                        <Box style={{ minHeight: '36px' }}><Text color="subdued">MCP security</Text></Box>
                         <Text variant='headingMd'>-</Text>
                     </VerticalStack>
                     <VerticalStack gap={1}>
-                        <Text color="subdued">CVE's</Text>
+                        <Box style={{ minHeight: '36px' }}><Text color="subdued">CVE's</Text></Box>
                         <Text variant='headingMd'>-</Text>
                     </VerticalStack>
                 </HorizontalGrid>
@@ -1014,7 +1096,7 @@ function HomeDashboard() {
                     <HorizontalStack align="end">
                         <Dropdown
                             menuItems={statsOptions}
-                            initial={statsOptions[6].label}
+                            initial={statsOptions[8].label}
                             selected={(timeInSeconds) => {
                                 setMcpStatsTimeRange(func.timeNow() - timeInSeconds);
                             }}
@@ -1052,6 +1134,127 @@ function HomeDashboard() {
             linkUrl={''}
         />
     )
+
+    // Policy Guardrails graph component
+    const policyGuardrailSeries = policyGuardrailStats
+    const hasPolicyGuardrailData = Array.isArray(policyGuardrailSeries) && policyGuardrailSeries.length > 0 && policyGuardrailSeries.some(p => p && p[1] > 0)
+    const policyGuardrailsCard = (
+        <InfoCard
+            component={
+                <Box paddingBlockStart={'2'}>
+                    <HorizontalStack align="end">
+                        <Dropdown
+                            menuItems={statsOptions}
+                            initial={statsOptions[8].label}
+                            selected={(timeInSeconds) => {
+                                setPolicyGuardrailStatsTimeRange(func.timeNow() - timeInSeconds);
+                            }}
+                        />
+                    </HorizontalStack>
+                    {hasPolicyGuardrailData ? (
+                        <GraphMetric
+                            key={`policy-guardrail-stats-${policyGuardrailStatsTimeRange}`}
+                            data={[{
+                                data: policyGuardrailSeries,
+                                color: '',
+                                name: 'Policy Guardrails'
+                            }]}
+                            type='spline'
+                            color='#00AA5B'
+                            areaFillHex='true'
+                            height='250'
+                            title=''
+                            subtitle=''
+                            defaultChartOptions={defaultMcpChartOptions(false)}
+                            backgroundColor='#ffffff'
+                            text='true'
+                            inputMetrics={[]}
+                        />
+                    ) : (
+                        <Box minHeight="250px" paddingBlockStart="8">
+                            <Text alignment='center' color='subdued'>No policy guardrail requests in the selected period</Text>
+                        </Box>
+                    )}
+                </Box>
+            }
+            title={'Policy Guardrails'}
+            titleToolTip={'Policy guardrail request volume trend for collections with guard-rail tag over time'}
+            linkText={''}
+            linkUrl={''}
+        />
+    )
+
+    // MCP-only Open Alerts card
+    const mcpOpenAlertsCard = (
+        <InfoCard
+            component={
+                <VerticalStack gap={3}>
+                    {mcpOpenAlertDetails && mcpOpenAlertDetails.length > 0 ? (
+                        mcpOpenAlertDetails.map((alert, idx) => (
+                            <Box key={`open-alert-${idx}`} onClick={handleMcpAuditNavigation} style={{cursor: 'pointer'}}>
+                                <Box padding="4" background="bg-surface" borderRadius="2" borderColor="border" borderWidth="2">
+                                    <HorizontalStack align="center" gap={3}>
+                                        <Box style={{ flex: 1 }}>
+                                            <VerticalStack gap={1}>
+                                                <Text variant='bodyMd' fontWeight='semibold'>{alert?.resourceName || '-'}</Text>
+                                                <Text variant='bodyMd' color='text'>{alert?.type || '-'}</Text>
+                                                <Text color='subdued' variant='bodySm'>{alert?.lastDetected ? func.prettifyEpoch(alert.lastDetected) : '-'}</Text>
+                                            </VerticalStack>
+                                        </Box>
+                                        <Box paddingInlineEnd="2">
+                                            <div style={{ fontSize: '32px' }}>
+                                                <Icon source={AlertMinor} color="warning" />
+                                            </div>
+                                        </Box>
+                                    </HorizontalStack>
+                                </Box>
+                            </Box>
+                        ))
+                    ) : (
+                        <Box paddingBlockStart="1">
+                            <Text alignment='center' color='subdued'>No recent open audit alerts</Text>
+                        </Box>
+                    )}
+                </VerticalStack>
+            }
+            title={'Open Audit Alerts'}
+            titleToolTip={'MCP open audit alerts detected in your workspace'}
+            linkText={mcpOpenAlertDetails && mcpOpenAlertDetails.length > 0 ? 'View more' : undefined}
+            linkUrl={undefined}
+            onLinkClick={mcpOpenAlertDetails && mcpOpenAlertDetails.length > 0 ? handleMcpAuditNavigation : undefined}
+        />
+    )
+
+     // MCP-only Top Applications by Traffic card
+        const hasTopApps = Array.isArray(mcpTopApplications) && mcpTopApplications.length > 0
+        const mcpTopApplicationsCard = (
+            hasTopApps ? (
+                <InfoCard
+                    component={
+                        <Box>
+                            <VerticalStack gap={3}>
+                                {mcpTopApplications.map((app, idx) => (
+                                    <HorizontalStack key={`top-app-${idx}`} align="space-between">
+                                        <Text variant='bodyMd' color='text'>{app?.name ?? '-'}</Text>
+                                        <Box paddingInlineStart="2" paddingInlineEnd="2" background="bg-fill-info" borderRadius="5">
+                                            <Text variant='bodySm' color='text-on-primary'>
+                                                {app?.hitCount != null ? app.hitCount.toLocaleString() + ' requests' : '-'}
+                                            </Text>
+                                        </Box>
+                                    </HorizontalStack>
+                                ))}
+                            </VerticalStack>
+                        </Box>
+                    }
+                    title={'Top MCP Collections by Traffic'}
+                    titleToolTip={'Top 3 MCP collections ranked by total request volume'}
+                    linkText={''}
+                    linkUrl={''}
+                />
+            ) : (
+                <EmptyCard title="Top Applications by Traffic" subTitleComponent={<Text alignment='center' color='subdued'>No application traffic data</Text>} />
+            )
+        )
 
     const newDomainsComponent = <InfoCard
         component={
@@ -1098,20 +1301,39 @@ function HomeDashboard() {
 
     if (isMCPSecurityCategory()) {
         gridComponents = [
-            {id: 'mcp-discovery', component: mcpDiscoveryMiniCard},
-            {id: 'mcp-risk', component: mcpRiskDetectionsMiniCard},
-            {id: 'mcp-types-table', component: mcpTypesTableCard},
             {id: 'mcp-api-requests', component: mcpApiRequestsCard},
+            {id: 'policy-guardrails', component: policyGuardrailsCard},
+          //  {id: 'mcp-discovery', component: mcpDiscoveryMiniCard},
+          //  {id: 'mcp-top-applications', component: mcpTopApplicationsCard},
+          //  {id: 'mcp-risk', component: mcpRiskDetectionsMiniCard},
+            {id: 'mcp-open-alerts', component: mcpOpenAlertsCard},
+            {id: 'mcp-types-table', component: mcpTypesTableCard},
             ...gridComponents
         ]
     }
 
     const gridComponent = (
-        <HorizontalGrid gap={5} columns={2}>
-            {gridComponents.map(({id, component}) => (
-                <div key={id}>{component}</div>
-            ))}
-        </HorizontalGrid>
+        isMCPSecurityCategory() ? (
+            <VerticalStack gap={5}>
+                {/* First row with MCP Components Requests and Policy Guardrails side by side */}
+                <HorizontalGrid gap={5} columns={2}>
+                    {mcpApiRequestsCard}
+                    {policyGuardrailsCard}
+                </HorizontalGrid>
+                {/* Second row with equal columns for remaining components */}
+                <HorizontalGrid gap={5} columns={2}>
+                    {gridComponents.slice(2).map(({id, component}) => (
+                        <div key={id}>{component}</div>
+                    ))}
+                </HorizontalGrid>
+            </VerticalStack>
+        ) : (
+            <HorizontalGrid gap={5} columns={2}>
+                {gridComponents.map(({id, component}) => (
+                    <div key={id}>{component}</div>
+                ))}
+            </HorizontalGrid>
+         )
     )
 
     const components = [

@@ -21,7 +21,6 @@ import org.bson.types.ObjectId;
 import org.junit.Test;
 import com.mongodb.client.model.Updates;
 
-
 import java.util.*;
 import static org.junit.Assert.*;
 
@@ -540,6 +539,7 @@ public class TestResultsStatsActionTest extends MongoBasedTest {
     }
 
     @Test
+
 public void testFetchTestResultsStatsCount_UsesApiErrorsWhenPresent() {
     TestingRunResultDao.instance.getMCollection().drop();
     ObjectId testingRunResultSummaryId = new ObjectId();
@@ -637,6 +637,7 @@ public void testFetchTestResultsStatsCount_UsesApiErrorsWhenPresent() {
     }
 
     @Test
+
     public void testFetchTestResultsStatsCount_WithCloudflareResponses() {
         // Clear and setup test data
         TestingRunResultDao.instance.getMCollection().drop();
@@ -796,7 +797,8 @@ public void testFetchTestResultsStatsCount_UsesApiErrorsWhenPresent() {
                 "Error 10005: Access denied by security rule",
                 "Error 10006: Website temporarily disabled"
         };
-
+always use string literals, for all string fields.
+i.e. instead of _id, use Constants._ID and define it somewhere [ I think it's already defined somewhere ].
         for (String errorCode : errorCodes) {
             assertTrue("Error code should match: " + errorCode,
                     errorCode.toLowerCase().matches(".*" + regex + ".*"));

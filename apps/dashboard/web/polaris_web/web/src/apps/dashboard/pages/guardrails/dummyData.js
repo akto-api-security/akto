@@ -1,3 +1,4 @@
+import { Badge } from "@shopify/polaris"
 
 const guardRailDummyData = {
     "apiCollectionIds": [],
@@ -129,35 +130,55 @@ const sampleDataMap = {
 
 const policies = [
     {
-        severityComp: "HIGH",
+        id: "policy-1",
+        severity: "HIGH",
+        severityComp: <div className={`badge-wrapper-HIGH`}>
+             <Badge size="small">HIGH</Badge>
+        </div>,
         policy: "PII Redaction Guardrail",
         category: "PII and Sensitive data",
         yaml: "id: PII_REDACTION_1\r\ninfo:\r\n  name: \"PII Redaction Guardrail\"\r\n  category: \"PII and Sensitive Data\"\r\n  description: >\r\n    \"Guardrail designed to detect and redact Personal Identifiable Information (PII) such as email addresses, social security numbers, credit card numbers, and phone numbers in responses. Deployable as a standalone validator or as a proxy for client-server communication to prevent PII disclosure.\"\r\nfilters:\r\n  request_payload:\r\n    - pattern: \"(name|address|ssn|social security|phone number|email|credit card|password)\"\r\n      type: regex\r\n      case_sensitive: false\r\n      description: \"Detects PII-related keywords in input requests\"\r\n  response_payload:\r\n    - pattern: \"\\\\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\\\.[A-Za-z]{2,}\\\\b\"\r\n      type: regex\r\n      description: \"Detects email addresses in response\"\r\n      action:\r\n        type: redact\r\n        replacement: \"[EMAIL_REDACTED]\"\r\n    - pattern: \"\\\\b\\\\d{3}-\\\\d{2}-\\\\d{4}\\\\b\"\r\n      type: regex\r\n      description: \"Detects Social Security Numbers in response\"\r\n      action:\r\n        type: redact\r\n        replacement: \"[SSN_REDACTED]\"\r\n    - pattern: \"\\\\b\\\\d{4}-\\\\d{4}-\\\\d{4}-\\\\d{4}\\\\b\"\r\n      type: regex\r\n      description: \"Detects credit card numbers in response\"\r\n      action:\r\n        type: redact\r\n        replacement: \"[CREDIT_CARD_REDACTED]\"\r\n    - pattern: \"\\\\b\\\\d{3}-\\\\d{3}-\\\\d{4}\\\\b\"\r\n      type: regex\r\n      description: \"Detects phone numbers in response\"\r\n      action:\r\n        type: redact\r\n        replacement: \"[PHONE_REDACTED]\"",
         createdTs: "Sep 1, 2025"
     },
     {
-        severityComp: "HIGH",
+        id: "policy-2",
+        severity: "HIGH",
+        severityComp: <div className={`badge-wrapper-HIGH`}>
+                <Badge size="small">HIGH</Badge>
+        </div>,
         policy: "Banned words filter",
         category: "Content Moderation",
         yaml: "id: BANNED_WORDS_FILTER_1\r\ninfo:\r\n  name: \"Banned Words Filter Guardrail\"\r\n  category: \"Content Moderation\"\r\n  description: >\r\n    \"Guardrail designed to detect and redact banned words in both input requests and responses. Deployable as a standalone validator or as a proxy for client-server communication to prevent the use of prohibited language.\"\r\nfilters:\r\n  request_payload:\r\n    - pattern: \"\\\\b(prohibited|banned|offensive|inappropriate|explicit)\\\\b\"\r\n      type: regex\r\n      case_sensitive: false\r\n      description: \"Detects banned words in input requests\"\r\n  response_payload:\r\n    - pattern: \"\\\\b(prohibited|banned|offensive|inappropriate|explicit)\\\\b\"\r\n      type: regex\r\n      description: \"Detects banned words in response\"\r\n      action:\r\n        type: redact\r\n        replacement: \"[REDACTED]\"",
         createdTs: "Sep 1, 2025"
     },
     {
-        severityComp: "HIGH",
+        id: "policy-3",
+        severity: "HIGH",
+        severityComp: <div className={`badge-wrapper-HIGH`}>
+                    <Badge size="small">HIGH</Badge>
+            </div>,
         policy: "Sensitive data redaction",
         category: "PII and Sensitive data",
         yaml: "id: SENSITIVE_DATA_REDACTION_1\r\ninfo:\r\n  name: \"Sensitive Data Redaction Guardrail\"\r\n  category: \"PII and Sensitive Data\"\r\n  description: >\r\n    \"Guardrail designed to detect and redact sensitive data such as AWS keys, secret tokens, Stripe private keys, and database passwords in both input requests and responses. Deployable as a standalone validator or as a proxy for client-server communication to prevent sensitive data disclosure.\"\r\nfilters:\r\n  request_payload:\r\n    - pattern: \"(aws_key|aws_access_key|aws_secret_key|secret_token|stripe_private_key|database_password|api_key|auth_token)\"\r\n      type: regex\r\n      case_sensitive: false\r\n      description: \"Detects sensitive data-related keywords in input requests\"\r\n  response_payload:\r\n    - pattern: \"\\\\bAKIA[0-9A-Z]{16}\\\\b\"\r\n      type: regex\r\n      description: \"Detects AWS Access Key IDs in response\"\r\n      action:\r\n        type: redact\r\n        replacement: \"[AWS_KEY_REDACTED]\"\r\n    - pattern: \"\\\\b[A-Za-z0-9\/+=]{40}\\\\b\"\r\n      type: regex\r\n      description: \"Detects AWS Secret Access Keys in response\"\r\n      action:\r\n        type: redact\r\n        replacement: \"[AWS_SECRET_REDACTED]\"\r\n    - pattern: \"\\\\b(sk|pk)_live_[0-9a-zA-Z]{24}\\\\b\"\r\n      type: regex\r\n      description: \"Detects Stripe private keys in response\"\r\n      action:\r\n        type: redact\r\n        replacement: \"[STRIPE_KEY_REDACTED]\"\r\n    - pattern: \"\\\\b(secret_token|auth_token)=[A-Za-z0-9_\\\\-]{20,}\\\\b\"\r\n      type: regex\r\n      description: \"Detects secret tokens or auth tokens in response\"\r\n      action:\r\n        type: redact\r\n        replacement: \"[TOKEN_REDACTED]\"\r\n    - pattern: \"\\\\b(database_password|db_pass)=[A-Za-z0-9@#$%^&*]{8,}\\\\b\"\r\n      type: regex\r\n      description: \"Detects database passwords in response\"\r\n      action:\r\n        type: redact\r\n        replacement: \"[DB_PASSWORD_REDACTED]\"",
         createdTs: "Sep 1, 2025"
     },
     {
-        severityComp: "HIGH",
+        id: "policy-4",
+        severity: "HIGH",
+        severityComp: <div className={`badge-wrapper-HIGH`}>
+        <Badge size="small">HIGH</Badge>
+   </div>,
         policy: "Injection prevention",
         category: "Command Injection Attack Prevention",
         yaml: "id: INJECTION_PREVENTION_1\r\ninfo:\r\n  name: \"Injection Attack Prevention\"\r\n  category: \"Security\"\r\n  description: >\r\n    \"Guardrail designed to detect and block potential injection attacks, such as SQL injection, command injection, or script injection, in both input requests and responses. Deployable as a standalone validator or as a proxy for client-server communication to prevent malicious code execution.\"\r\nfilters:\r\n  request_payload:\r\n    - pattern: \"(\\bSELECT\\b|\\bINSERT\\b|\\bUPDATE\\b|\\bDELETE\\b|\\bDROP\\b|\\bUNION\\b|\\b--\\b|\\b;\\b|\\bexec\\b|\\bexecute\\b|\\b\\\\|\\bscript\\b|\\beval\\b|\\balert\\b|\\bonerror\\b|\\bjavascript\\b)\"\r\n      type: regex\r\n      case_sensitive: false\r\n      description: \"Detects potential SQL, command, or script injection patterns in input requests\"\r\n  response_payload:\r\n    - pattern: \"(\\bSELECT\\b|\\bINSERT\\b|\\bUPDATE\\b|\\bDELETE\\b|\\bDROP\\b|\\bUNION\\b|\\b--\\b|\\b;\\b|\\bexec\\b|\\bexecute\\b|\\b\\\\|\\bscript\\b|\\beval\\b|\\balert\\b|\\bonerror\\b|\\bjavascript\\b)\"\r\n      type: regex\r\n      description: \"Detects potential SQL, command, or script injection patterns in response\"\r\n      action:\r\n        type: redact\r\n        replacement: \"[INJECTION_ATTEMPT_REDACTED]\"",
         createdTs: "Sep 1, 2025"
     },
     {
-        severityComp: "HIGH",
+        id: "policy-5",
+        severity: "HIGH",
+        severityComp: <div className={`badge-wrapper-HIGH`}>
+        <Badge size="small">HIGH</Badge>
+   </div>,
         policy: "Competitor Analysis Protection",
         category: "Competitor Analysis Protection",
         yaml: "id: COMPETITOR_ANALYSIS_PROTECTION_1\r\ninfo:\r\n  name: \"Competitor Analysis Protection\"\r\n  category: \"Confidentiality\"\r\n  description: >\r\n    \"Guardrail designed to detect and redact information related to competitor analysis, such as mentions of rival companies, market research data, or strategic business intelligence, in both input requests and responses. Deployable as a standalone validator or as a proxy for client-server communication to prevent unauthorized disclosure of competitive insights.\"\r\nfilters:\r\n  request_payload:\r\n    - pattern: \"(competitor|rival|market share|business intelligence|competitive analysis|benchmark|industry report|swot analysis)\"\r\n      type: regex\r\n      case_sensitive: false\r\n      description: \"Detects competitor-related keywords in input requests\"\r\n  response_payload:\r\n    - pattern: \"\\\\b(competitor|rival|benchmark|swot)\\\\b\"\r\n      type: regex\r\n      description: \"Detects competitor mentions in response\"\r\n      action:\r\n        type: redact\r\n        replacement: \"[COMPETITOR_INFO_REDACTED]\"\r\n    - pattern: \"\\\\b(company name|product name|market data|revenue figures|strategy details)\\\\b\"\r\n      type: regex\r\n      description: \"Detects specific business intelligence terms in response\"\r\n      action:\r\n        type: redact\r\n        replacement: \"[BUSINESS_DATA_REDACTED]\"",

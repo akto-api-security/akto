@@ -99,7 +99,11 @@ function GuardrailDetection() {
         discoveredTs: dayjs(x.timestamp*1000).format("DD-MM-YYYY HH:mm:ss"),
         sourceIPComponent: x?.ip || "-",
         type: x?.type || "-",
-        severityComp:  severity
+        severityComp:  (
+          <div className={`badge-wrapper-${severity}`}>
+              <Badge size="small">{severity}</Badge>
+          </div>
+        )
         
       };
     });
@@ -396,7 +400,6 @@ function GuardrailDetection() {
             </HorizontalStack>
         </Box>,
         <GithubSimpleTable
-            key={data.length}
             resourceName={resourceName}
             useNewRow={true}
             headers={headings}
@@ -409,6 +412,7 @@ function GuardrailDetection() {
             emptyStateMarkup={emptyStateMarkup}   
             onRowClick={rowClicked}    
             rowClickable={true} 
+            hardCodedKey={true}
         ></GithubSimpleTable>,
          <SampleDetails
                 title={"Attacker payload"}
