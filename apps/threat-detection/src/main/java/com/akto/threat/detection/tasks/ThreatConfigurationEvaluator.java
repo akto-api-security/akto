@@ -99,8 +99,10 @@ public class ThreatConfigurationEvaluator {
 
     public long getApiRateLimitFromCache(ApiInfoKey apiInfoKey, RatelimitConfigItem rule) {
         String baseKey = Constants.RATE_LIMIT_CACHE_PREFIX + apiInfoKey.toString() + ":";
-
-        long rateLimit = this.apiCountCacheLayer.get(baseKey + rule.getAutoThreshold().getPercentile());
+        
+        // Use the period from the rule as the time window, defaulting to "5" if not specified
+        String timeWindow = rule.getPeriod() > 0 ? String.valueOf(rule.getPeriod()) : "5";
+        long rateLimit = this.apiCountCacheLayer.get(baseKey + timeWindow + ":" + rule.getAutoThreshold().getPercentile());
 
         if (rateLimit == 0) {
             logger.debug("Rate limiting skipped no ratelimits found for api: " + apiInfoKey.toString() + " percentile: "
@@ -144,7 +146,7 @@ public class ThreatConfigurationEvaluator {
                     continue;
                 }
 
-                Map<String, Integer> rateLimits = apiInfo.getRateLimits();
+                Map<String, Map<String, Integer>> rateLimits = apiInfo.getRateLimits();
 
                 String baseKey = Constants.RATE_LIMIT_CACHE_PREFIX + apiInfo.getId().toString();
                 // float to long multiply by 10
@@ -152,23 +154,36 @@ public class ThreatConfigurationEvaluator {
                 this.apiCountCacheLayer.set(baseKey + ":" + Constants.API_RATE_LIMIT_CONFIDENCE,
                         (long) (apiInfo.getRateLimitConfidence() * 10));
 
-                // Store each percentile value separately in cache
-                for (String percentileKey : Arrays.asList(Constants.P50_CACHE_KEY, Constants.P75_CACHE_KEY,
-                        Constants.P90_CACHE_KEY)) {
-                    int numRequests = rateLimits.getOrDefault(percentileKey, Constants.RATE_LIMIT_UNLIMITED_REQUESTS);
+                // Iterate through each time window
+                /** Structure of ratelimits is MinutesWindow: RateLimitValues
+                 * {
+                 *  "5": {"p50": 100, "p75": 120, "p90": 300},
+                 *  "15": {"p50": 100, "p75": 120, "p90": 300},
+                 * }
+                 */
 
-                    if (numRequests == Constants.RATE_LIMIT_UNLIMITED_REQUESTS) {
-                        continue;
-                    }
+                for (Map.Entry<String, Map<String, Integer>> timeWindowEntry : rateLimits.entrySet()) {
+                    String timeWindow = timeWindowEntry.getKey();
+                    Map<String, Integer> metrics = timeWindowEntry.getValue();
+                    
+                    // Store each percentile value separately in cache
+                    for (String percentileKey : Arrays.asList(Constants.P50_CACHE_KEY, Constants.P75_CACHE_KEY,
+                            Constants.P90_CACHE_KEY)) {
+                        int numRequests = metrics.getOrDefault(percentileKey, Constants.RATE_LIMIT_UNLIMITED_REQUESTS);
 
-                    // Apply rate-limits to only high confidence
-                    // TODO: use the default rule confidence.
-                    if (!(apiInfo.getRateLimitConfidence() > RATE_LIMIT_CONFIDENCE_THRESHOLD)) {
-                        continue;
+                        if (numRequests == Constants.RATE_LIMIT_UNLIMITED_REQUESTS) {
+                            continue;
+                        }
+
+                        // Apply rate-limits to only high confidence
+                        // TODO: use the default rule confidence.
+                        if (!(apiInfo.getRateLimitConfidence() > RATE_LIMIT_CONFIDENCE_THRESHOLD)) {
+                            continue;
+                        }
+                        // Include time window in the cache key
+                        this.apiCountCacheLayer.set(baseKey + ":" + timeWindow + ":" + percentileKey, numRequests);
                     }
-                    this.apiCountCacheLayer.set(baseKey + ":" + percentileKey, numRequests);
                 }
-
             }
 
         } catch (Exception e) {
