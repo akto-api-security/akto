@@ -15,6 +15,7 @@ import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.Sorts;
 import lombok.Getter;
 import org.bson.Document;
+import com.akto.dto.testing.TestingRunResult;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 import com.mongodb.ConnectionString;
@@ -256,17 +257,17 @@ public class TestResultsStatsAction extends UserAction {
 
     private boolean hasApiErrors(ObjectId testingRunResultSummaryId) {
         try {
-            String key = resolveApiErrorsKey();
-            if (key == null) return false;
-
             Bson filter = Filters.and(
                     Filters.eq("testRunResultSummaryId", testingRunResultSummaryId),
                     Filters.eq("vulnerable", false),
-                    Filters.exists("apiErrors." + key, true)
+                    Filters.exists("apiErrors", true)
             );
 
-            long count = TestingRunResultDao.instance.getRawCollection().countDocuments(filter);
-            return count > 0;
+            TestingRunResult doc = TestingRunResultDao.instance.getMCollection()
+                    .find(filter)
+                    .projection(Projections.include("_id"))
+                    .first();
+            return doc != null;
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error checking apiErrors existence: " + e.getMessage());
             return false;
@@ -286,8 +287,8 @@ public class TestResultsStatsAction extends UserAction {
                 )));
         pipeline.add(Aggregates.group(null, Accumulators.sum("count", "$apiErrors." + key)));
 
-        MongoCursor<Document> cursor = TestingRunResultDao.instance.getRawCollection()
-                .aggregate(pipeline)
+        MongoCursor<Document> cursor = TestingRunResultDao.instance.getMCollection()
+                .aggregate(pipeline, Document.class)
                 .cursor();
 
         int resultCount = 0;
@@ -326,7 +327,7 @@ public class TestResultsStatsAction extends UserAction {
         try {
             loggerMaker.debugAndAddToDb("=== RUNNING AGGREGATION EXPLAIN ===", LogDb.DASHBOARD);
 
-            Document explainResult = TestingRunResultDao.instance.getRawCollection()
+            Document explainResult = TestingRunResultDao.instance.getMCollection()
                     .aggregate(pipeline)
                     .explain(ExplainVerbosity.EXECUTION_STATS);
 
@@ -466,7 +467,7 @@ public class TestResultsStatsAction extends UserAction {
         try {
             loggerMaker.debugAndAddToDb("=== LISTING ALL INDEXES ===", LogDb.DASHBOARD);
 
-            List<Document> indexes = TestingRunResultDao.instance.getRawCollection()
+            List<Document> indexes = TestingRunResultDao.instance.getMCollection()
                     .listIndexes().into(new ArrayList<>());
 
             for (Document index : indexes) {

@@ -33,7 +33,7 @@ public class TestResultsStatsActionTest extends MongoBasedTest {
         TestingRunResultDao.instance.createIndicesIfAbsent();
 
         // Check if the partial index exists
-        List<Document> indexes = TestingRunResultDao.instance.getRawCollection().listIndexes().into(new ArrayList<>());
+        List<Document> indexes = TestingRunResultDao.instance.getMCollection().listIndexes().into(new ArrayList<>());
         System.out.println("All indexes in testingRunResults collection:");
         for (Document idx : indexes) {
             System.out.println("  Index name: " + idx.getString("name"));
@@ -92,11 +92,11 @@ public class TestResultsStatsActionTest extends MongoBasedTest {
         pipeline.add(Aggregates.limit(10000));
 
         // Execute with explain to check index usage
-        AggregateIterable<Document> aggregation = TestingRunResultDao.instance.getRawCollection()
+        AggregateIterable<TestingRunResult> aggregation = TestingRunResultDao.instance.getMCollection()
                 .aggregate(pipeline);
 
         // Get explain results
-        Document explainResult = TestingRunResultDao.instance.getRawCollection()
+        Document explainResult = TestingRunResultDao.instance.getMCollection()
                 .aggregate(pipeline)
                 .explain(ExplainVerbosity.EXECUTION_STATS);
 
@@ -559,7 +559,7 @@ public void testFetchTestResultsStatsCount_UsesApiErrorsWhenPresent() {
     TestingRunResultDao.instance.insertMany(testingRunResults);
 
     // Fix: Use proper Filters and Updates - set apiErrors map with correct structure
-    TestingRunResultDao.instance.getRawCollection().updateOne(
+    TestingRunResultDao.instance.getMCollection().updateOne(
             Filters.and(
                 Filters.eq("testRunResultSummaryId", testingRunResultSummaryId),
                 Filters.eq("apiInfoKey.url", "/api-errors-map-0")
@@ -567,7 +567,7 @@ public void testFetchTestResultsStatsCount_UsesApiErrorsWhenPresent() {
             Updates.set("apiErrors", new Document("429", 2).append("5xx", 0).append("cloudflare", 0))
     );
     
-    TestingRunResultDao.instance.getRawCollection().updateOne(
+    TestingRunResultDao.instance.getMCollection().updateOne(
             Filters.and(
                 Filters.eq("testRunResultSummaryId", testingRunResultSummaryId),
                 Filters.eq("apiInfoKey.url", "/api-errors-map-1")
@@ -575,7 +575,7 @@ public void testFetchTestResultsStatsCount_UsesApiErrorsWhenPresent() {
             Updates.set("apiErrors", new Document("429", 1))
     );
     
-    TestingRunResultDao.instance.getRawCollection().updateOne(
+    TestingRunResultDao.instance.getMCollection().updateOne(
             Filters.and(
                 Filters.eq("testRunResultSummaryId", testingRunResultSummaryId),
                 Filters.eq("apiInfoKey.url", "/api-errors-map-2")
