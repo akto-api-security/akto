@@ -2,8 +2,6 @@ package com.akto.dto;
 
 import com.akto.dao.context.Context;
 import com.akto.dto.type.URLMethods;
-import com.akto.dto.type.URLStatic;
-import com.akto.dto.type.URLTemplate;
 import com.akto.util.Util;
 
 import org.bson.codecs.pojo.annotations.BsonIgnore;
@@ -49,7 +47,7 @@ public class ApiInfo {
     private int lastCalculatedTime;
 
     public static final String RATELIMITS = "rateLimits";
-    private Map<Integer, Map<String, Integer>> rateLimits;
+    private Map<String, Map<String, Integer>> rateLimits;
     
     public static final String RATE_LIMIT_CONFIDENCE = "rateLimitConfidence";
     private float rateLimitConfidence;
@@ -150,9 +148,9 @@ public class ApiInfo {
         defaultMetrics.put("max_requests", -1);
         
         // Initialize for 5, 15, and 30 minute windows
-        this.rateLimits.put(5, new HashMap<>(defaultMetrics));
-        this.rateLimits.put(15, new HashMap<>(defaultMetrics));
-        this.rateLimits.put(30, new HashMap<>(defaultMetrics));
+        this.rateLimits.put("5", new HashMap<>(defaultMetrics));
+        this.rateLimits.put("15", new HashMap<>(defaultMetrics));
+        this.rateLimits.put("30", new HashMap<>(defaultMetrics));
              
         this.apiAccessTypes = new HashSet<>();
         this.allAuthTypesFound = new HashSet<>();
@@ -214,7 +212,7 @@ public class ApiInfo {
         this.apiAccessTypes.addAll(that.getApiAccessTypes());
 
         // Merge rateLimits - for each time window, take the maximum value for each metric
-        for (Integer timeWindow: that.rateLimits.keySet()) {
+        for (String timeWindow: that.rateLimits.keySet()) {
             Map<String, Integer> thatMetrics = that.rateLimits.get(timeWindow);
             Map<String, Integer> thisMetrics = this.rateLimits.get(timeWindow);
             
@@ -385,11 +383,11 @@ public class ApiInfo {
         this.lastCalculatedTime = lastCalculatedTime;
     }
 
-    public Map<Integer, Map<String, Integer>> getRateLimits() {
+    public Map<String, Map<String, Integer>> getRateLimits() {
         return rateLimits;
     }
 
-    public void setRateLimits(Map<Integer, Map<String, Integer>> rateLimits) {
+    public void setRateLimits(Map<String, Map<String, Integer>> rateLimits) {
         this.rateLimits = rateLimits;
     }
 
