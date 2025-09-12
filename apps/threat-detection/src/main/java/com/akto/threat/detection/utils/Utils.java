@@ -8,6 +8,8 @@ import java.util.Map;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.RawApiMetadata;
 import com.akto.dto.monitoring.FilterConfig;
+import com.akto.dto.test_editor.Category;
+import com.akto.dto.test_editor.Info;
 import com.akto.proto.generated.threat_detection.message.sample_request.v1.Metadata;
 import com.akto.proto.generated.threat_detection.message.sample_request.v1.SampleMaliciousRequest;
 import com.akto.proto.generated.threat_detection.message.sample_request.v1.SchemaConformanceError;
@@ -25,6 +27,17 @@ public class Utils {
 
     public static String buildApiDistributionKey(String apiCollectionId, String url, String method) {
         return apiCollectionId + "|" + url + "|" + method;
+    }
+
+    public static FilterConfig getipApiRateLimitFilter() {
+        FilterConfig ipApiRateLimitFilter = new FilterConfig("IpApiRateLimited", null, null, null);
+        Info info = new Info();
+        info.setName("IpApiRateLimited");
+        info.setCategory(new Category("ApiAbuse", "ApiAbuse", "ApiAbuse"));
+        info.setSubCategory("RateLimiting");
+        info.setSeverity("MEDIUM");
+        ipApiRateLimitFilter.setInfo(info);
+        return ipApiRateLimitFilter;
     }
 
     public static SampleMaliciousRequest buildSampleMaliciousRequest(String actor, HttpResponseParams responseParam, FilterConfig apiFilter, RawApiMetadata metadata, List<SchemaConformanceError> errors) {

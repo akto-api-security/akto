@@ -36,19 +36,40 @@ public class DistributionCalculator {
             new Range(50001, 100000, "b13"), new Range(100001, Integer.MAX_VALUE, "b14")
     );
 
-    public void updateFrequencyBuckets(String apiKey, long currentEpochMin, String cmsKey) {
+    /**
+     * Get the end of the window for a given current epoch minute and window size.
+     * Example:
+     * currentEpochMin = 12:01,12:02,12:03,12:04,12:05, windowSize = 5, return 12:05
+     * currentEpochMin = 12:06,12:07,12:08,12:09,12:10, windowSize = 5, return 12:10
+     */
+    public static long getWindowEnd(long currentEpochMin, int windowSize) {
+        return ((currentEpochMin - 1) / windowSize + 1) * windowSize;
+    }
+
+    /**
+     * Get the start of the window for a given window end and window size.
+     * Example:
+     * windowEnd = 12:05, windowSize = 5, return 12:01
+     * windowEnd = 12:10, windowSize = 5, return 12:06
+     */
+    public static long getWindowStart(long windowEnd, int windowSize) {
+        return windowEnd - windowSize + 1;
+    }
+
+    public void updateFrequencyBuckets(String apiKey, long currentEpochMin, String ipApiCmsKey) {
         // Increment CMS for current minute
-        cmsCounterLayer.increment(cmsKey, String.valueOf(currentEpochMin));
+        cmsCounterLayer.increment(ipApiCmsKey, String.valueOf(currentEpochMin));
 
         for (int windowSize : Arrays.asList(5, 15, 30)) {
+
             // Tumbling windows of 5, 15, and 30 minutes
-            // 12:00, 12:05, 12:10, etc.
-            // Requests coming in at 12:02, 12:03 will be counted in the 12:00 window
-            long windowEnd = ((currentEpochMin - 1) / windowSize + 1) * windowSize;
-            long windowStart = windowEnd - windowSize + 1;
+            // Windows: [12:01-12:05], [12:06-12:10], [12:11-12:15], etc.
+            long windowEnd = getWindowEnd(currentEpochMin, windowSize);
+            long windowStart = getWindowStart(windowEnd, windowSize);
             String compositeKey = windowSize + "|" + windowStart;
 
-            long count = getCountInRange(cmsKey, windowStart, windowEnd);
+            // Example: Requests times: 12:01, 12:02, 12:03 -> Window: [12:01-12:05] -> Count: 3
+            long count = getCountInRange(ipApiCmsKey, windowStart, windowEnd);
             String newBucket = getBucketLabel(count);
             String oldBucket = getBucketLabel(count - 1);
 
@@ -73,13 +94,36 @@ public class DistributionCalculator {
     }
 
     /**
-     * Get the total count of IP|API calls made in the specified time range.
-     * Example Output: Count of IP|API calls in 5 minutes.
+     *   TUMBLING (Fixed blocks):
+     *   [12:01-12:05] [12:06-12:10] [12:11-12:15]
+     *   ↑             ↑             ↑
+     *   All requests   All requests  All requests
+     *   at 12:03       at 12:08      at 12:13
+     *   check here     check here    check here
      */
-    private long getCountInRange(String key, long startEpochMin, long endEpochMin) {
+    private long getCountInRange(String ipApiCmsKey, long startEpochMin, long endEpochMin) {
         long sum = 0;
         for (long ts = startEpochMin; ts <= endEpochMin; ts++) {
-            sum += cmsCounterLayer.estimateCount(key, String.valueOf(ts));
+            sum += cmsCounterLayer.estimateCount(ipApiCmsKey, String.valueOf(ts));
+        }
+        return sum;
+    }
+
+    /**
+     *  SLIDING (Moving window):
+         [11:59-12:03] at 12:03
+          [12:00-12:04] at 12:04
+           [12:01-12:05] at 12:05
+            [12:02-12:06] at 12:06
+             ↑
+          Window moves with current time
+     */
+    public long getSlidingWindowCount(String ipApiCmsKey, long currentEpochMin, int windowSize) {
+        long endEpochMin = currentEpochMin;
+        long startEpochMin = currentEpochMin - windowSize + 1;
+        long sum = 0;
+        for (long ts = startEpochMin; ts <= endEpochMin; ts++) {
+            sum += cmsCounterLayer.estimateCount(ipApiCmsKey, String.valueOf(ts));
         }
         return sum;
     }

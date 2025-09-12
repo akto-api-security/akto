@@ -125,6 +125,11 @@ public class DbActor extends DataActor {
         return DbLayer.fetchApiInfos();
     }
 
+    
+    public List<ApiInfo> fetchApiRateLimits(ApiInfo.ApiInfoKey lastApiInfoKey) {
+        return DbLayer.fetchApiRateLimits(lastApiInfoKey);
+    }
+
     public List<ApiInfo> fetchNonTrafficApiInfos() {
         return DbLayer.fetchNonTrafficApiInfos();
     }
