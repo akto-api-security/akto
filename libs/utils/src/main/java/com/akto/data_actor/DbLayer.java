@@ -246,7 +246,7 @@ public class DbLayer {
     }
 
     public static List<ApiInfo> fetchApiInfos() {
-        return ApiInfoDao.instance.findAll(new BasicDBObject());
+        return ApiInfoDao.instance.findAll(new BasicDBObject(), Projections.exclude(ApiInfo.RATELIMITS));
     }
 
     public static List<ApiInfo> fetchApiRateLimits(ApiInfo.ApiInfoKey lastApiInfoKey) {
