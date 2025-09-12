@@ -114,7 +114,11 @@ const PromptEditor = ({ fetchAllPrompts }) => {
                         <HorizontalStack gap={"1"}>
                             <div ref={ref} />
                             <Text variant="headingSm" as="h5" truncate>Prompt Configuration</Text>
-                            <Tooltip content={`Info`} preferredPosition="below" dismissOnMouseOut>
+                            <Tooltip 
+                                content="Configure and test prompt injection attacks against AI agents. Define attack patterns, detection rules, and severity levels to evaluate agent security."
+                                preferredPosition="below" 
+                                dismissOnMouseOut
+                            >
                                 <Icon source={InfoMinor}/> 
                             </Tooltip>
                             <Tooltip content="Copy Content" dismissOnMouseOut preferredPosition="below">
