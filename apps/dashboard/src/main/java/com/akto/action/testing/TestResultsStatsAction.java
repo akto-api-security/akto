@@ -1,3 +1,41 @@
+package com.akto.action.testing;
+
+import com.akto.action.UserAction;
+import com.akto.dao.context.Context;
+import com.akto.dao.testing.TestingRunResultDao;
+import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
+import com.mongodb.BasicDBObject;
+import com.mongodb.ExplainVerbosity;
+import com.mongodb.client.MongoCursor;
+import com.mongodb.client.model.Aggregates;
+import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Projections;
+import com.mongodb.client.model.Sorts;
+import lombok.Getter;
+import org.bson.Document;
+import com.akto.dto.testing.TestingRunResult;
+import org.bson.conversions.Bson;
+import org.bson.types.ObjectId;
+import com.mongodb.ConnectionString;
+import com.akto.DaoInit;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+
+public class TestResultsStatsAction extends UserAction {
+
+    private static final LoggerMaker loggerMaker = new LoggerMaker(TestResultsStatsAction.class, LogDb.DASHBOARD);
+
+    private String testingRunResultSummaryHexId;
+    private String testingRunHexId;
+    private String patternType; // required: one of [HTTP_429, HTTP_5XX, CLOUDFLARE]
+
+    @Getter
+    private int count = 0;
+    private boolean fromApiErrors = false;
+
     /**
      * HTTP 429 Rate Limiting Pattern
      * Detects JSON responses with statusCode: 429 indicating rate limiting.
@@ -250,7 +288,6 @@
         MongoCursor<BasicDBObject> cursor = TestingRunResultDao.instance.getMCollection()
                 .aggregate(pipeline, BasicDBObject.class)
                 .cursor();
-
         int resultCount = 0;
         if (cursor.hasNext()) {
             BasicDBObject result = cursor.next();

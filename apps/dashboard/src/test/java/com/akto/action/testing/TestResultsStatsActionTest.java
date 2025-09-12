@@ -797,8 +797,6 @@ public void testFetchTestResultsStatsCount_UsesApiErrorsWhenPresent() {
                 "Error 10005: Access denied by security rule",
                 "Error 10006: Website temporarily disabled"
         };
-always use string literals, for all string fields.
-i.e. instead of _id, use Constants._ID and define it somewhere [ I think it's already defined somewhere ].
         for (String errorCode : errorCodes) {
             assertTrue("Error code should match: " + errorCode,
                     errorCode.toLowerCase().matches(".*" + regex + ".*"));
