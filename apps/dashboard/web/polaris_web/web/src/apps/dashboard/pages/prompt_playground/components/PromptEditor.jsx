@@ -33,6 +33,7 @@ const PromptEditor = ({ fetchAllPrompts }) => {
     const promptsObj = PromptPlaygroundStore(state => state.promptsObj)
     const selectedPrompt = PromptPlaygroundStore(state => state.selectedPrompt)
     const setCurrentContent = PromptPlaygroundStore(state => state.setCurrentContent)
+    const setTriggerTest = PromptPlaygroundStore(state => state.setTriggerTest)
 
     const [ isEdited, setIsEdited ] = useState(false)
     const [ editorInstance, _setEditorInstance ] = useState()
@@ -56,14 +57,9 @@ const PromptEditor = ({ fetchAllPrompts }) => {
         const Editor = editorInstanceRef.current
         const currentContent = Editor.getValue()
         
-        // Save current content to store
+        // Save current content to store and trigger test
         setCurrentContent(currentContent)
-        
-        setToastConfig({
-            isActive: true,
-            isError: false,
-            message: "Test started! Check the Agent Response panel for results."
-        })
+        setTriggerTest(true)
         
         // The actual test execution will be handled by the PromptResponse component
         setIsEdited(false)
@@ -117,9 +113,7 @@ const PromptEditor = ({ fetchAllPrompts }) => {
                     <div className="editor-header">
                         <HorizontalStack gap={"1"}>
                             <div ref={ref} />
-                            <Tooltip content={""} width="wide">
-                                <Text variant="headingSm" as="h5" truncate>Prompt Configuration</Text>
-                            </Tooltip>
+                            <Text variant="headingSm" as="h5" truncate>Prompt Configuration</Text>
                             <Tooltip content={`Info`} preferredPosition="below" dismissOnMouseOut>
                                 <Icon source={InfoMinor}/> 
                             </Tooltip>
@@ -128,7 +122,7 @@ const PromptEditor = ({ fetchAllPrompts }) => {
                             </Tooltip>
                         </HorizontalStack>
                 
-                        <Button id={"save-button"} disabled={!isEdited} onClick={() => []} size="slim">Run Test</Button>
+                        <Button id={"save-button"} onClick={handleRunTest} primary size="slim">Run Prompt</Button>
                     </div>
         
                     <Divider />

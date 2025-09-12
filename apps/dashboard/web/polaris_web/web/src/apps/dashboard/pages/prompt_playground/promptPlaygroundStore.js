@@ -9,7 +9,8 @@ const initialState = {
     isTestRunning: false,
     selectedModel: 'gpt-4',
     temperature: 0.7,
-    maxTokens: 2048
+    maxTokens: 2048,
+    triggerTest: false
 }
 
 const PromptPlaygroundStore = create(
@@ -22,7 +23,8 @@ const PromptPlaygroundStore = create(
         setIsTestRunning: (isTestRunning) => set({ isTestRunning }),
         setSelectedModel: (selectedModel) => set({ selectedModel }),
         setTemperature: (temperature) => set({ temperature }),
-        setMaxTokens: (maxTokens) => set({ maxTokens })
+        setMaxTokens: (maxTokens) => set({ maxTokens }),
+        setTriggerTest: (triggerTest) => set({ triggerTest })
     }), { name: 'PromptPlaygroundStore' })
 )
 
