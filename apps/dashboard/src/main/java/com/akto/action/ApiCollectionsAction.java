@@ -127,16 +127,16 @@ public class ApiCollectionsAction extends UserAction {
     public List<ApiCollection> fillApiCollectionsUrlCount(List<ApiCollection> apiCollections, Bson filter) {
         int tsRandom = Context.now();
         loggerMaker.debugAndAddToDb("fillApiCollectionsUrlCount started: " + tsRandom, LoggerMaker.LogDb.DASHBOARD);
-        Map<Integer, Integer> countMap = ApiCollectionsDao.instance.buildEndpointsCountToApiCollectionMap(filter);
+        Map<Integer, Integer> countMap = ApiCollectionsDao.instance.buildEndpointsCountToApiCollectionMapOptimized(filter, apiCollections);
         loggerMaker.debugAndAddToDb("fillApiCollectionsUrlCount buildEndpointsCountToApiCollectionMap done: " + tsRandom, LoggerMaker.LogDb.DASHBOARD);
 
         for (ApiCollection apiCollection: apiCollections) {
             int apiCollectionId = apiCollection.getId();
             Integer count = countMap.get(apiCollectionId);
             int fallbackCount = apiCollection.getUrls()!=null ? apiCollection.getUrls().size() : apiCollection.getUrlsCount();
-            // if (apiCollectionId == RuntimeListener.VULNERABLE_API_COLLECTION_ID) {
-            //     fallbackCount = 200;
-            // }
+            if (apiCollectionId == RuntimeListener.VULNERABLE_API_COLLECTION_ID) {
+                fallbackCount = 200;
+            }
             if (count != null && (apiCollection.getHostName() != null)) {
                 apiCollection.setUrlsCount(count);
             } else if(ApiCollection.Type.API_GROUP.equals(apiCollection.getType())){
