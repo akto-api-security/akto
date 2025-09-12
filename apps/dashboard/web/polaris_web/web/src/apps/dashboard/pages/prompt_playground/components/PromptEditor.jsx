@@ -113,7 +113,9 @@ const PromptEditor = ({ fetchAllPrompts }) => {
                     <div className="editor-header">
                         <HorizontalStack gap={"1"}>
                             <div ref={ref} />
-                            <Text variant="headingSm" as="h5" truncate>Prompt Configuration</Text>
+                            <Text variant="headingSm" as="h5" truncate>
+                                {selectedPrompt?.label || 'Prompt Configuration'}
+                            </Text>
                             <Tooltip 
                                 content="Configure and test prompt injection attacks against AI agents. Define attack patterns, detection rules, and severity levels to evaluate agent security."
                                 preferredPosition="below" 

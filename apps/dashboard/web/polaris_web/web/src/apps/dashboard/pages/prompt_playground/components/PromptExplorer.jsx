@@ -149,32 +149,36 @@ const PromptExplorer = ({addCustomPrompt}) => {
     },[])
 
     function getItems(aktoItems){
-        const arr = aktoItems.map(obj => ({
-            ...obj,
-            selected: selectedCategory === (obj.key+obj.param),
-            icon: selectedCategory === (obj.key+obj.param) ? ChevronDownMinor : ChevronRightMinor,
-            subNavigationItems: obj.subNavigationItems.map((item)=>{
-                return{
-                    label: (
-                        <Tooltip content={item.label} dismissOnMouseOut width="wide" preferredPosition="below">
-                            <div className={item.label === selectedPrompt?.label ? "active-left-test" : ""}>
-                                <Text 
-                                    variant={item.label === selectedPrompt?.label ? "headingSm" : "bodyMd"} as="h4" 
-                                    color={item.label === selectedPrompt?.label ? "default" : "subdued"} truncate
-                                >
-                                    {item.label} 
-                                </Text>
-                            </div>
-                        </Tooltip>
-                    ),
-                    onClick: (()=> {
-                        navigate(`/dashboard/prompt-playground/${item.value}`)
-                        setSelectedPrompt(item)                        
-                    }),
-                    key: item.value
-                }
-            })
-        }))
+        const arr = aktoItems.map(obj => {
+            const isExpanded = selectedCategory === (obj.key+obj.param);
+            return {
+                ...obj,
+                selected: isExpanded,
+                icon: isExpanded ? ChevronDownMinor : ChevronRightMinor,
+                onClick: () => selectedFunc(obj.key+obj.param), // Add onClick to make category clickable
+                subNavigationItems: obj.subNavigationItems.map((item)=>{
+                    return{
+                        label: (
+                            <Tooltip content={item.label} dismissOnMouseOut width="wide" preferredPosition="below">
+                                <div className={item.label === selectedPrompt?.label ? "active-left-test" : ""}>
+                                    <Text 
+                                        variant={item.label === selectedPrompt?.label ? "headingSm" : "bodyMd"} as="h4" 
+                                        color={item.label === selectedPrompt?.label ? "default" : "subdued"} truncate
+                                    >
+                                        {item.label} 
+                                    </Text>
+                                </div>
+                            </Tooltip>
+                        ),
+                        onClick: (()=> {
+                            navigate(`/dashboard/prompt-playground/${item.value}`)
+                            setSelectedPrompt(item)                        
+                        }),
+                        key: item.value
+                    }
+                })
+            }
+        })
         return arr
     }
     
