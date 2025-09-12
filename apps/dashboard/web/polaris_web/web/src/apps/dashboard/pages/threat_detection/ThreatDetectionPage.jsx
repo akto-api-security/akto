@@ -73,6 +73,7 @@ function ThreatDetectionPage() {
     const [currentRefId, setCurrentRefId] = useState('')
     const [rowDataList, setRowDataList] = useState([])
     const [moreInfoData, setMoreInfoData] = useState({})
+    const [currentEventId, setCurrentEventId] = useState('')
     const initialVal = values.ranges[3]
     const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), initialVal);
     const [showDetails, setShowDetails] = useState(false);
@@ -108,6 +109,7 @@ function ThreatDetectionPage() {
                 }) 
                 setRowDataList(rowData)
                 setCurrentRefId(data?.refId)
+                setCurrentEventId(data?.id)
                 setShowDetails(true)
                 setMoreInfoData({
                     url: data.url,
@@ -171,6 +173,7 @@ function ThreatDetectionPage() {
                 key={"sus-sample-details"}
                 moreInfoData={moreInfoData}
                 threatFiltersMap={threatFiltersMap}
+                eventId={currentEventId}
             />
             
 
@@ -187,7 +190,9 @@ function ThreatDetectionPage() {
             {detectedAt: -1},
             startTimestamp,
             endTimestamp,
-            2000
+            [],
+            2000,
+            'EVENTS'
         );
         // Transform to match the mongoDB format
         let jsonData = (res?.maliciousEvents || []).map(ev => ({

@@ -7,6 +7,8 @@ import com.akto.dto.traffic.SuspectSampleData;
 import com.akto.dto.type.URLMethods;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchAlertFiltersResponse;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ListMaliciousRequestsResponse;
+import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.UpdateMaliciousEventStatusRequest;
+import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.UpdateMaliciousEventStatusResponse;
 import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.HashMap;
@@ -42,6 +44,11 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
   int startTimestamp, endTimestamp;
   List<String> types;
   List<String> latestAttack;
+  String eventId;
+  String status;
+  boolean updateSuccess;
+  String updateMessage;
+  String statusFilter;
 
   // TODO: remove this, use API Executor.
   private final CloseableHttpClient httpClient;
@@ -82,6 +89,10 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
 
     List<String> templates = getTemplates(latestAttack);
     filter.put("latestAttack", templates);
+
+    if (this.statusFilter != null) {
+      filter.put("statusFilter", this.statusFilter);
+    }
 
     Map<String, Integer> time_range = new HashMap<>();
     if (this.startTimestamp > 0) {
@@ -132,7 +143,8 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
                             smr.getSubCategory(),
                             smr.getEventTypeVal(),
                             smr.getPayload(),
-                            smr.getMetadata()))
+                            smr.getMetadata(),
+                            smr.getStatus()))
                     .collect(Collectors.toList());
                 this.total = m.getTotal();
               });
@@ -191,6 +203,41 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
       String responseBody = EntityUtils.toString(resp.getEntity());
     } catch (Exception e) {
       e.printStackTrace();
+      return ERROR.toUpperCase();
+    }
+
+    return SUCCESS.toUpperCase();
+  }
+
+  public String updateMaliciousEventStatus() {
+    HttpPost post = new HttpPost(
+            String.format("%s/api/dashboard/update_malicious_event_status", this.getBackendUrl()));
+    post.addHeader("Authorization", "Bearer " + this.getApiToken());
+    post.addHeader("Content-Type", "application/json");
+
+    UpdateMaliciousEventStatusRequest request = UpdateMaliciousEventStatusRequest.newBuilder()
+        .setEventId(this.eventId)
+        .setStatus(this.status)
+        .build();
+
+    String msg = ProtoMessageUtils.toString(request).orElse("{}");
+    StringEntity requestEntity = new StringEntity(msg, ContentType.APPLICATION_JSON);
+    post.setEntity(requestEntity);
+
+    try (CloseableHttpResponse resp = this.httpClient.execute(post)) {
+      String responseBody = EntityUtils.toString(resp.getEntity());
+      
+      ProtoMessageUtils.<UpdateMaliciousEventStatusResponse>toProtoMessage(
+          UpdateMaliciousEventStatusResponse.class, responseBody)
+          .ifPresent(
+              response -> {
+                this.updateSuccess = response.getSuccess();
+                this.updateMessage = response.getMessage();
+              });
+    } catch (Exception e) {
+      e.printStackTrace();
+      this.updateSuccess = false;
+      this.updateMessage = "Error updating status: " + e.getMessage();
       return ERROR.toUpperCase();
     }
 
@@ -316,5 +363,45 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
 
   public void setLatestAttack(List<String> latestAttack) {
     this.latestAttack = latestAttack;
+  }
+
+  public String getEventId() {
+    return eventId;
+  }
+
+  public void setEventId(String eventId) {
+    this.eventId = eventId;
+  }
+
+  public String getStatus() {
+    return status;
+  }
+
+  public void setStatus(String status) {
+    this.status = status;
+  }
+
+  public boolean isUpdateSuccess() {
+    return updateSuccess;
+  }
+
+  public void setUpdateSuccess(boolean updateSuccess) {
+    this.updateSuccess = updateSuccess;
+  }
+
+  public String getUpdateMessage() {
+    return updateMessage;
+  }
+
+  public void setUpdateMessage(String updateMessage) {
+    this.updateMessage = updateMessage;
+  }
+
+  public String getStatusFilter() {
+    return statusFilter;
+  }
+
+  public void setStatusFilter(String statusFilter) {
+    this.statusFilter = statusFilter;
   }
 }

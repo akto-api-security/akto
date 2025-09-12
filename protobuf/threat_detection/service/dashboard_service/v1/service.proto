@@ -27,6 +27,7 @@ message ListMaliciousRequestsResponse {
       string ref_id = 15;
       string event_type_val = 16;
       string metadata = 17;
+      string status = 18;
     }
     repeated MaliciousEvent malicious_events = 1;
     uint64 total = 2;
@@ -46,6 +47,7 @@ message ListMaliciousRequestsRequest {
       repeated string types = 5;
       repeated string sub_category = 6;
       repeated string latest_attack = 7;
+      optional string status_filter = 8;
     }
 
     // The number of alerts to return
@@ -252,6 +254,16 @@ message ModifyThreatActorStatusRequest {
 }
 
 message ModifyThreatActorStatusResponse {  
+}
+
+message UpdateMaliciousEventStatusRequest {
+  string event_id = 1;
+  string status = 2;
+}
+
+message UpdateMaliciousEventStatusResponse {
+  bool success = 1;
+  string message = 2;
 }
 
 message GetThreatConfigurationRequest {

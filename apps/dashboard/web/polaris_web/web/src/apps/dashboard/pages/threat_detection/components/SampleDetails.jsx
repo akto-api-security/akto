@@ -5,19 +5,20 @@ import LayoutWithTabs from "../../../components/layouts/LayoutWithTabs";
 import func from "@/util/func";
 import { useEffect, useState } from "react";
 import testingApi from "../../testing/api"
+import threatDetectionApi from "../api"
 import MarkdownViewer from "../../../components/shared/MarkdownViewer";
 import TooltipText from "../../../components/shared/TooltipText";
 import ActivityTracker from "../../dashboard/components/ActivityTracker";
-import ApiSchema from "../../observe/api_collections/ApiSchema";
 
 function SampleDetails(props) {
-    const { showDetails, setShowDetails, data, title, moreInfoData, threatFiltersMap } = props
+    const { showDetails, setShowDetails, data, title, moreInfoData, threatFiltersMap, eventId } = props
     let currentTemplateObj = threatFiltersMap[moreInfoData?.templateId]
 
     let severity = currentTemplateObj?.severity || "HIGH"
     const [remediationText, setRemediationText] = useState("")
     const [latestActivity, setLatestActivity] = useState([])
     const [showModal, setShowModal] = useState(false);
+    const [triageLoading, setTriageLoading] = useState(false);
 
     const fetchRemediationInfo = async() => {
         if(moreInfoData?.templateId !== undefined){
@@ -81,21 +82,6 @@ function SampleDetails(props) {
         component: <ActivityTracker latestActivity={latestActivity} />
     }
 
-
-    const SchemaTab = {
-        id: 'schema',
-        content: "Schema",
-        component:  <Box paddingBlockStart={"4"}> 
-            <ApiSchema
-                apiInfo={{
-                    apiCollectionId: moreInfoData?.apiCollectionId,
-                    url: moreInfoData?.url,
-                    method: moreInfoData?.method
-                }}
-            />
-        </Box>
-    }
-
     const ValuesTab = {
         id: 'values',
         content: "Values",
@@ -127,6 +113,25 @@ function SampleDetails(props) {
     const openTest = (id) => {
         const navigateUrl = window.location.origin + "/dashboard/protection/threat-policy?policy=" + id
         window.open(navigateUrl, "_blank")
+    }
+
+    const handleTriageEvent = async () => {
+        if (!eventId) return;
+        
+        setTriageLoading(true);
+        try {
+            const response = await threatDetectionApi.updateMaliciousEventStatus(eventId, "TRIAGE");
+            if (response?.updateSuccess) {
+                // You can show a success toast here if you have a toast component
+                console.log("Event successfully marked as triage");
+            } else {
+                console.error("Failed to mark event as triage");
+            }
+        } catch (error) {
+            console.error("Error marking event as triage:", error);
+        } finally {
+            setTriageLoading(false);
+        }
     }
 
     function TitleComponent () {
@@ -161,6 +166,14 @@ function SampleDetails(props) {
                         </VerticalStack>
                     </Box>
                     <HorizontalStack gap={"2"} wrap={false}>
+                        <Button 
+                            size="slim" 
+                            onClick={handleTriageEvent}
+                            loading={triageLoading}
+                            disabled={!eventId}
+                        >
+                            Triage Event
+                        </Button>
                         <Modal
                             activator={<Button destructive size="slim" onClick={() => setShowModal(!showModal)}>Block IPs</Button>}
                             open={showModal}

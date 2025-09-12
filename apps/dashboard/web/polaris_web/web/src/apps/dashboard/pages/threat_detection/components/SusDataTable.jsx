@@ -5,11 +5,12 @@ import { CellType } from "../../../components/tables/rows/GithubRow";
 import GetPrettifyEndpoint from "../../observe/GetPrettifyEndpoint";
 import PersistStore from "../../../../main/PersistStore";
 import func from "../../../../../util/func";
-import { Badge } from "@shopify/polaris";
+import { Badge, IndexFiltersMode } from "@shopify/polaris";
 import dayjs from "dayjs";
 import SessionStore from "../../../../main/SessionStore";
 import { labelMap } from "../../../../main/labelHelperMap";
 import { formatActorId } from "../utils/formatUtils";
+import useTable from "../../../components/tables/TableContext";
 
 const resourceName = {
   singular: "sample",
@@ -83,6 +84,38 @@ function SusDataTable({ currDateRange, rowClicked }) {
   const [loading, setLoading] = useState(true);
   const collectionsMap = PersistStore((state) => state.collectionsMap);
   const threatFiltersMap = SessionStore((state) => state.threatFiltersMap);
+  const [currentTab, setCurrentTab] = useState('events');
+  const [selected, setSelected] = useState(0)
+
+  const tableTabs = [
+    {
+      content: 'Events',
+      onAction: () => { setCurrentTab('events') },
+      id: 'events',
+      index: 0 
+    },
+    {
+      content: 'Active',
+      onAction: () => { setCurrentTab('active') },
+      id: 'active',
+      index: 0 
+    },
+    {
+      content: 'Triaged',
+      onAction: () => { setCurrentTab('triaged') },
+      id: 'triaged',
+      index: 1 
+    }
+  ]
+
+  const handleSelectedTab = (selectedIndex) => {
+    setLoading(true)
+    setSelected(selectedIndex)
+    setTimeout(()=>{
+        setLoading(false)
+    },200)
+  }
+
 
 
   async function fetchData(
@@ -125,7 +158,9 @@ function SusDataTable({ currDateRange, rowClicked }) {
       sort,
       startTimestamp,
       endTimestamp,
-      latestAttack
+      latestAttack,
+      50,
+      currentTab.toUpperCase(),
     );
 //    setSubCategoryChoices(distinctSubCategories);
     let total = res.total;
@@ -235,13 +270,16 @@ function SusDataTable({ currDateRange, rowClicked }) {
       loading={loading}
       fetchData={fetchData}
       filters={filters}
-      selectable={false}
-      hasRowActions={true}
-      getActions={() => []}
-      hideQueryField={true}
+      selectable={true}
+
       headings={headers}
       useNewRow={true}
       condensedHeight={true}
+      tableTabs={tableTabs}
+      selected={selected}
+      onSelect={handleSelectedTab}
+      mode={IndexFiltersMode.Default}
+      hideQueryField={true}
     />
   );
 }

@@ -23,8 +23,9 @@ import com.mongodb.client.*;
 import com.mongodb.client.model.Filters;
 
 import java.util.*;
+import java.util.List;
 
-import com.mongodb.client.model.Indexes;
+import com.mongodb.client.model.Updates;
 import org.bson.Document;
 import org.bson.conversions.Bson;
 
@@ -183,6 +184,23 @@ public class MaliciousEventService {
       query.append("filterId", new Document("$in", filter.getLatestAttackList()));
     }
 
+    // Handle status filter
+    if (filter.hasStatusFilter()) {
+      String statusFilter = filter.getStatusFilter();
+      if ("TRIAGE".equals(statusFilter)) {
+        query.append("status", "TRIAGE");
+      } else if ("ACTIVE".equals(statusFilter)) {
+        // For Events tab: show null, empty, or ACTIVE status
+        List<Document> orConditions = Arrays.asList(
+          new Document("status", new Document("$exists", false)),
+          new Document("status", null),
+          new Document("status", ""),
+          new Document("status", "ACTIVE")
+        );
+        query.append("$or", orConditions);
+      }
+    }
+
     if (filter.hasDetectedAtTimeRange()) {
       TimeRangeFilter timeRange = filter.getDetectedAtTimeRange();
       long start = timeRange.hasStart() ? timeRange.getStart() : 0;
@@ -222,6 +240,7 @@ public class MaliciousEventService {
                 .setRefId(evt.getRefId())
                 .setEventTypeVal(evt.getEventType().toString())
                 .setMetadata(metadata)
+                .setStatus(evt.getStatus() != null ? evt.getStatus().toString() : "ACTIVE")
                 .build());
       }
       return ListMaliciousRequestsResponse.newBuilder()
@@ -234,5 +253,25 @@ public class MaliciousEventService {
   public void createIndexIfAbsent(String accountId) {
     ThreatUtils.createIndexIfAbsent(accountId, mongoClient);
     shouldNotCreateIndexes.put(accountId, true);
+  }
+
+  public boolean updateMaliciousEventStatus(String accountId, String eventId, String status) {
+    try {
+      MongoCollection<MaliciousEventModel> coll =
+          this.mongoClient
+              .getDatabase(accountId)
+              .getCollection(
+                  MongoDBCollection.ThreatDetection.MALICIOUS_EVENTS, MaliciousEventModel.class);
+      
+      MaliciousEventModel.Status eventStatus = MaliciousEventModel.Status.valueOf(status.toUpperCase());
+      
+      Bson filter = Filters.eq("_id", eventId);
+      Bson update = Updates.set("status", eventStatus.toString());
+      
+      return coll.updateOne(filter, update).getModifiedCount() > 0;
+    } catch (Exception e) {
+      logger.error("Error updating malicious event status", e);
+      return false;
+    }
   }
 }

@@ -15,6 +15,8 @@ import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.Th
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatActorFilterRequest;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatCategoryWiseCountRequest;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatSeverityWiseCountRequest;
+import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.UpdateMaliciousEventStatusRequest;
+import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.UpdateMaliciousEventStatusResponse;
 import com.akto.threat.backend.service.MaliciousEventService;
 import com.akto.threat.backend.service.ThreatActorService;
 import com.akto.threat.backend.service.ThreatApiService;
@@ -365,6 +367,37 @@ public class DashboardRouter implements ARouter {
                         req.getLatestAttackList()
                     )
                 ).ifPresent(s -> ctx.response().setStatusCode(200).end(s));
+            });
+
+        router
+            .post("/update_malicious_event_status")
+            .blockingHandler(ctx -> {
+                RequestBody reqBody = ctx.body();
+                UpdateMaliciousEventStatusRequest req = ProtoMessageUtils.<
+                    UpdateMaliciousEventStatusRequest
+                >toProtoMessage(
+                    UpdateMaliciousEventStatusRequest.class,
+                    reqBody.asString()
+                ).orElse(null);
+
+                if (req == null) {
+                    ctx.response().setStatusCode(400).end("Invalid request");
+                    return;
+                }
+
+                boolean success = dsService.updateMaliciousEventStatus(
+                    ctx.get("accountId"),
+                    req.getEventId(),
+                    req.getStatus()
+                );
+
+                UpdateMaliciousEventStatusResponse resp = UpdateMaliciousEventStatusResponse.newBuilder()
+                    .setSuccess(success)
+                    .setMessage(success ? "Status updated successfully" : "Failed to update status")
+                    .build();
+
+                ProtoMessageUtils.toString(resp)
+                    .ifPresent(s -> ctx.response().setStatusCode(200).end(s));
             });
 
 
