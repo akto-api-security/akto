@@ -4177,6 +4177,12 @@ public class InitializerListener implements ServletContextListener {
         FeatureAccess featureAccess = organization.getFeatureWiseAllowed().getOrDefault(MetricTypes.ACTIVE_ENDPOINTS.name(), new FeatureAccess(false));
         int usageLimit = featureAccess.getUsageLimit();
 
+        if (organization.getAdminEmail() == null ||
+                organization.getAdminEmail().contains("@akto.io") ||
+                usageLimit == 25) {
+            return;
+        }
+
         String txt = String.format("API endpoint count mismatch for %s %s acc: %s billing: %s dashboard: %s limit: %s",
                 organization.getId(), organization.getAdminEmail(), accountId, billingCount, dashboardCount, usageLimit);
         UsageMetricUtils.sendToUsageSlack(txt);
