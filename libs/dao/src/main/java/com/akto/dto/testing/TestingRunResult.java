@@ -47,12 +47,21 @@ public class TestingRunResult implements Comparable<TestingRunResult> {
     private int endTimestamp;
     public static final String TEST_RUN_RESULT_SUMMARY_ID = "testRunResultSummaryId";
     private ObjectId testRunResultSummaryId;
-
     public static final String IS_IGNORED_RESULT = "isIgnoredResult";
-    private boolean isIgnoredResult ;
+    private boolean isIgnoredResult;
+    @BsonIgnore
+    private String testRunResultSummaryHexId;
+    @BsonIgnore
+    private List<TestResult> singleTestResults;
+    @BsonIgnore
+    private List<MultiExecTestResult> multiExecTestResults;
+
 
     public static final String ERRORS_LIST = "errorsList";
     private  List<String> errorsList;
+
+    public static final String API_ERRORS = "apiErrors";
+    private Map<String, Integer> apiErrors;
 
     public static final String REQUIRES_CONFIG = TEST_RESULTS + ".0." + TestResult.REQUIRES_CONFIG;
 
@@ -257,6 +266,15 @@ public class TestingRunResult implements Comparable<TestingRunResult> {
         this.workflowTest = workflowTest;
     }
 
+    public String getTestRunResultSummaryHexId() {
+        if (testRunResultSummaryHexId == null) return this.testRunResultSummaryId.toHexString();
+        return this.testRunResultSummaryHexId;
+    }
+
+    public void setTestRunResultSummaryHexId(String testRunResultSummaryHexId) {
+        this.testRunResultSummaryHexId = testRunResultSummaryHexId;
+    }
+
     @Override
     public String toString() {
         return "TestingRunResult{" +
@@ -363,4 +381,28 @@ public class TestingRunResult implements Comparable<TestingRunResult> {
     public void setIgnoredResult(boolean isIgnoredResult) {
         this.isIgnoredResult = isIgnoredResult;
     }
+
+    public List<TestResult> getSingleTestResults() {
+        return singleTestResults;
+    }
+
+    public void setSingleTestResults(List<TestResult> singleTestResults) {
+        this.singleTestResults = singleTestResults;
+    }
+    public List<MultiExecTestResult> getMultiExecTestResults() {
+        return multiExecTestResults;
+    }
+
+    public void setMultiExecTestResults(List<MultiExecTestResult> multiExecTestResults) {
+        this.multiExecTestResults = multiExecTestResults;
+    }
+
+    public Map<String, Integer> getApiErrors() {
+        return apiErrors;
+    }
+
+    public void setApiErrors(Map<String, Integer> apiErrors) {
+        this.apiErrors = apiErrors;
+    }
+
 }

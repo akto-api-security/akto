@@ -87,7 +87,6 @@ public class TestResultsStatsAction extends UserAction {
      */
     public static final String REGEX_CLOUDFLARE = "(error\\s*1[0-9]{3}|error\\s*10[0-9]{3}|" + // CF-specific error
                                                                                                // codes
-            "\\\"code\\\"\\s*:\\s*(10[0-9]{2}|1[0-9]{3,5})|" + // API error codes in JSON
             "attention\\s*required.*cloudflare|" + // Challenge page identifier
             "managed\\s*challenge.*cloudflare|cloudflare.*managed\\s*challenge|" + // Managed challenge variations
             "interactive\\s*challenge.*cloudflare|cloudflare.*interactive\\s*challenge|" + // Interactive challenges
@@ -258,12 +257,16 @@ public class TestResultsStatsAction extends UserAction {
     private boolean hasApiErrors(ObjectId testingRunResultSummaryId) {
         try {
             String key = resolveApiErrorsKey();
-            if (key == null)
-                return false;
-            BasicDBObject filter = new BasicDBObject("testRunResultSummaryId", testingRunResultSummaryId)
-                    .append("vulnerable", false)
-                    .append("apiErrors." + key, new BasicDBObject("$exists", true));
-            return TestingRunResultDao.instance.getMCollection().find(filter).limit(1).first() != null;
+            if (key == null) return false;
+
+            Bson filter = Filters.and(
+                    Filters.eq("testRunResultSummaryId", testingRunResultSummaryId),
+                    Filters.eq("vulnerable", false),
+                    Filters.exists("apiErrors." + key, true)
+            );
+
+            long count = TestingRunResultDao.instance.getRawCollection().countDocuments(filter);
+            return count > 0;
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error checking apiErrors existence: " + e.getMessage());
             return false;
@@ -272,26 +275,25 @@ public class TestResultsStatsAction extends UserAction {
 
     private int getCountFromApiErrors(ObjectId testingRunResultSummaryId) {
         String key = resolveApiErrorsKey();
-        if (key == null)
-            return 0;
+        if (key == null) return 0;
 
         List<Bson> pipeline = new ArrayList<>();
-
         pipeline.add(Aggregates.match(
                 Filters.and(
                         Filters.eq("testRunResultSummaryId", testingRunResultSummaryId),
                         Filters.eq("vulnerable", false),
-                        Filters.exists("apiErrors." + key, true))));
-
+                        Filters.exists("apiErrors." + key, true)
+                )));
         pipeline.add(Aggregates.group(null, Accumulators.sum("count", "$apiErrors." + key)));
 
-        MongoCursor<BasicDBObject> cursor = TestingRunResultDao.instance.getMCollection()
-                .aggregate(pipeline, BasicDBObject.class).cursor();
+        MongoCursor<Document> cursor = TestingRunResultDao.instance.getRawCollection()
+                .aggregate(pipeline)
+                .cursor();
 
         int resultCount = 0;
         if (cursor.hasNext()) {
-            BasicDBObject result = cursor.next();
-            Number n = (Number) result.get("count");
+            Document result = cursor.next();
+            Number n = result.get("count", Number.class);
             resultCount = n != null ? n.intValue() : 0;
         }
         cursor.close();
