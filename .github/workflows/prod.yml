@@ -178,7 +178,7 @@ jobs:
         uses: mathieudutour/github-tag-action@v6.1
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          custom_tag: vmini-runtime-${{ github.event.inputs.release_version }}
+          custom_tag: mini-runtime-${{ github.event.inputs.release_version }}
 
       - name: Create a GitHub release Mini-Runtime
         if: ${{ github.event.inputs.mini-runtime == 'true' }}
@@ -194,7 +194,7 @@ jobs:
         uses: mathieudutour/github-tag-action@v6.1
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          custom_tag: vmini-testing-${{ github.event.inputs.release_version }}
+          custom_tag: mini-testing-${{ github.event.inputs.release_version }}
 
       - name: Create a GitHub release Mini-Testing
         if: ${{ github.event.inputs.mini-testing == 'true' }}
@@ -210,7 +210,7 @@ jobs:
         uses: mathieudutour/github-tag-action@v6.1
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          custom_tag: vtesting-db-layer-${{ github.event.inputs.release_version }}
+          custom_tag: testing-db-layer-${{ github.event.inputs.release_version }}
 
       - name: Create a GitHub release Testing-Db-Layer
         if: ${{ github.event.inputs.testing-db-layer == 'true' }}
@@ -226,7 +226,7 @@ jobs:
         uses: mathieudutour/github-tag-action@v6.1
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          custom_tag: vmini-runtime-service-${{ github.event.inputs.release_version }}
+          custom_tag: mini-runtime-service-${{ github.event.inputs.release_version }}
 
       - name: Create a GitHub release Mini-Runtime-Service
         if: ${{ github.event.inputs.mini-runtime-service == 'true' }}
