@@ -14,6 +14,7 @@ import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.Sorts;
 import lombok.Getter;
 import org.bson.Document;
+import com.akto.dto.testing.TestingRunResult;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 import com.mongodb.ConnectionString;
@@ -33,6 +34,7 @@ public class TestResultsStatsAction extends UserAction {
 
     @Getter
     private int count = 0;
+    private boolean fromApiErrors = false;
 
     /**
      * HTTP 429 Rate Limiting Pattern
@@ -142,7 +144,13 @@ public class TestResultsStatsAction extends UserAction {
 
             String description = describePattern(resolvedRegex);
 
-            this.count = getCountByPattern(testingRunResultSummaryId, resolvedRegex);
+            if (hasApiErrors(testingRunResultSummaryId)) {
+                this.count = getCountFromApiErrors(testingRunResultSummaryId);
+                this.fromApiErrors = true; //For UNIT TESTS
+            } else {
+                this.count = getCountByPattern(testingRunResultSummaryId, resolvedRegex);
+                this.fromApiErrors = false;
+            }
 
             loggerMaker.debugAndAddToDb(
                     "Found " + count + " requests matching " + description + " for test summary: "
@@ -156,6 +164,10 @@ public class TestResultsStatsAction extends UserAction {
         }
 
         return SUCCESS.toUpperCase();
+    }
+
+    public boolean isFromApiErrors() {
+        return this.fromApiErrors;
     }
 
     /**
@@ -244,11 +256,75 @@ public class TestResultsStatsAction extends UserAction {
     }
 
 
+    private boolean hasApiErrors(ObjectId testingRunResultSummaryId) {
+        try {
+            Bson filter = Filters.and(
+                    Filters.eq("testRunResultSummaryId", testingRunResultSummaryId),
+                    Filters.eq("vulnerable", false),
+                    Filters.exists("apiErrors", true)
+            );
+
+            TestingRunResult doc = TestingRunResultDao.instance.getMCollection()
+                    .find(filter)
+                    .projection(Projections.include("_id"))
+                    .first();
+            return doc != null;
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error checking apiErrors existence: " + e.getMessage());
+            return false;
+        }
+    }
+
+    private int getCountFromApiErrors(ObjectId testingRunResultSummaryId) {
+        List<Bson> pipeline = new ArrayList<>();
+        pipeline.add(Aggregates.match(
+                Filters.and(
+                        Filters.eq("testRunResultSummaryId", testingRunResultSummaryId),
+                        Filters.eq("vulnerable", false),
+                        Filters.exists("apiErrors", true)
+                )));
+        pipeline.add(Aggregates.count("count"));
+
+        MongoCursor<BasicDBObject> cursor = TestingRunResultDao.instance.getMCollection()
+                .aggregate(pipeline, BasicDBObject.class)
+                .cursor();
+        int resultCount = 0;
+        if (cursor.hasNext()) {
+            BasicDBObject result = cursor.next();
+            resultCount = result.getInt("count", 0);
+        }
+        cursor.close();
+        return resultCount;
+    }
+
+    private String resolveApiErrorsKey() {
+        String type = this.patternType == null ? null : this.patternType.trim().toUpperCase();
+        if (type == null)
+            return null;
+        switch (type) {
+            case "HTTP_429":
+            case "429":
+            case "RATE_LIMIT":
+                return "429";
+            case "HTTP_5XX":
+            case "5XX":
+            case "SERVER_ERROR":
+                return "5xx";
+            case "CLOUDFLARE":
+            case "CDN":
+            case "CF":
+                return "cloudflare";
+            default:
+                return null;
+        }
+    }
+
+
     private void explainAggregationPipeline(List<Bson> pipeline) {
         try {
             loggerMaker.debugAndAddToDb("=== RUNNING AGGREGATION EXPLAIN ===", LogDb.DASHBOARD);
 
-            Document explainResult = TestingRunResultDao.instance.getRawCollection()
+            Document explainResult = TestingRunResultDao.instance.getMCollection()
                     .aggregate(pipeline)
                     .explain(ExplainVerbosity.EXECUTION_STATS);
 
@@ -388,7 +464,7 @@ public class TestResultsStatsAction extends UserAction {
         try {
             loggerMaker.debugAndAddToDb("=== LISTING ALL INDEXES ===", LogDb.DASHBOARD);
 
-            List<Document> indexes = TestingRunResultDao.instance.getRawCollection()
+            List<Document> indexes = TestingRunResultDao.instance.getMCollection()
                     .listIndexes().into(new ArrayList<>());
 
             for (Document index : indexes) {
