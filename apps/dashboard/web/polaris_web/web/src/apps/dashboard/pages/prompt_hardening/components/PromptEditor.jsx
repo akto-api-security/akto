@@ -127,8 +127,8 @@ const PromptEditor = ({ fetchAllPrompts }) => {
                                 <Button icon={ClipboardMinor} plain onClick={() => {}} />
                             </Tooltip>
                         </HorizontalStack>
-                
-                        <Button id={"save-button"} onClick={handleRunTest} primary size="slim">Run Prompt</Button>
+
+                        {/* <Button id={"save-button"} onClick={handleRunTest} primary size="slim">Run Prompt</Button> */}
                     </div>
         
                     <Divider />
