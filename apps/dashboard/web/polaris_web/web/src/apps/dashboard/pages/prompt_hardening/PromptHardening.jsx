@@ -9,18 +9,18 @@ import PromptEditor from "./components/PromptEditor"
 import PromptResponse from "./components/PromptResponse"
 import SpinnerCentered from "../../components/progress/SpinnerCentered"
 
-import PromptPlaygroundStore from "./promptPlaygroundStore"
+import PromptHardeningStore from "./promptHardeningStore"
 import PersistStore from "../../../main/PersistStore"
 
 import TitleWithInfo from "@/apps/dashboard/components/shared/TitleWithInfo"
 
-import "./PromptPlayground.css"
+import "./PromptHardening.css"
 
-const PromptPlayground = () => {
+const PromptHardening = () => {
     const navigate = useNavigate()
 
-    const setPromptsObj = PromptPlaygroundStore(state => state.setPromptsObj)
-    const setSelectedPrompt = PromptPlaygroundStore(state => state.setSelectedPrompt)
+    const setPromptsObj = PromptHardeningStore(state => state.setPromptsObj)
+    const setSelectedPrompt = PromptHardeningStore(state => state.setSelectedPrompt)
     const setActive = PersistStore(state => state.setActive)
 
     const [loading, setLoading] = useState(true)
@@ -757,9 +757,9 @@ notes: "Verifies rate limiting is working."`,
                 <Button onClick={handleExit} icon={ExitMajor} plain/>
                 <HorizontalStack gap={"2"}>
                     <TitleWithInfo 
-                        docsUrl={"https://docs.akto.io/prompt-playground/concepts"} 
-                        tooltipContent={"Prompt playground for testing AI security"} 
-                        titleText={"Prompt Playground"} 
+                        docsUrl={"https://docs.akto.io/prompt-hardening/concepts"}
+                        tooltipContent={"Prompt hardening for testing AI security"}
+                        titleText={"Prompt Hardening"} 
                     />
                 </HorizontalStack>
             </HorizontalStack>
@@ -774,7 +774,7 @@ notes: "Verifies rate limiting is working."`,
 
     useEffect(() => {
         const path = window.location.pathname;
-        const pathArr = path.split("prompt-playground")
+        const pathArr = path.split("prompt-hardening")
         if(pathArr[1] && pathArr[1].length < 2){
             navigate(defaultId)
         }
@@ -799,4 +799,4 @@ notes: "Verifies rate limiting is working."`,
     )
 }
 
-export default PromptPlayground
+export default PromptHardening

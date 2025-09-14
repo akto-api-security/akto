@@ -1,7 +1,7 @@
 import { Box, Button, Divider, Select, Text, TextField, VerticalStack, HorizontalStack, Card, Tooltip, Icon } from "@shopify/polaris"
 import { InfoMinor, PlayMinor } from "@shopify/polaris-icons"
 import { useEffect, useState } from "react";
-import PromptPlaygroundStore from "../promptPlaygroundStore"
+import PromptHardeningStore from "../promptHardeningStore"
 import Store from "../../../store";
 
 const PromptResponse = () => {
@@ -12,10 +12,10 @@ const PromptResponse = () => {
     const [isLoading, setIsLoading] = useState(false)
     const [showFollowUpInput, setShowFollowUpInput] = useState(false)
     
-    const currentContent = PromptPlaygroundStore(state => state.currentContent)
-    const selectedPrompt = PromptPlaygroundStore(state => state.selectedPrompt)
-    const triggerTest = PromptPlaygroundStore(state => state.triggerTest)
-    const setTriggerTest = PromptPlaygroundStore(state => state.setTriggerTest)
+    const currentContent = PromptHardeningStore(state => state.currentContent)
+    const selectedPrompt = PromptHardeningStore(state => state.selectedPrompt)
+    const triggerTest = PromptHardeningStore(state => state.triggerTest)
+    const setTriggerTest = PromptHardeningStore(state => state.setTriggerTest)
 
     const agentOptions = [
         {label: 'Security Agent (GPT-4)', value: 'security-gpt-4'},

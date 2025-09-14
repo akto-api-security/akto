@@ -4,16 +4,16 @@ import { useNavigate } from "react-router-dom"
 import { Badge, Box, Button, HorizontalStack, Icon, Navigation, Text, TextField, Tooltip, VerticalStack } from "@shopify/polaris"
 import {ChevronDownMinor, ChevronRightMinor, SearchMinor, CirclePlusMinor} from "@shopify/polaris-icons"
 
-import PromptPlaygroundStore from "../promptPlaygroundStore"
+import PromptHardeningStore from "../promptHardeningStore"
 import TitleWithInfo from "@/apps/dashboard/components/shared/TitleWithInfo"
 
-import "../PromptPlayground.css"
+import "../PromptHardening.css"
 
 const PromptExplorer = ({addCustomPrompt}) => {
 
-    const promptsObj = PromptPlaygroundStore(state => state.promptsObj)
-    const selectedPrompt = PromptPlaygroundStore(state => state.selectedPrompt)
-    const setSelectedPrompt = PromptPlaygroundStore(state => state.setSelectedPrompt)
+    const promptsObj = PromptHardeningStore(state => state.promptsObj)
+    const selectedPrompt = PromptHardeningStore(state => state.selectedPrompt)
+    const setSelectedPrompt = PromptHardeningStore(state => state.setSelectedPrompt)
 
     const [selectedCategory, setSelectedCategory] = useState('none')
     const [customItems, setCustomItems] = useState({items: [] , count : 0})

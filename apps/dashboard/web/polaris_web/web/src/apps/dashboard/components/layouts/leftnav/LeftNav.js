@@ -278,17 +278,17 @@ export default function LeftNav() {
             {
                 label: (
                     <Text variant="bodyMd" fontWeight="medium">
-                        Prompt Playground
+                        Prompt Hardening
                     </Text>
                 ),
                 icon: AutomationFilledMajor,
                 onClick: () => {
-                    handleSelect("dashboard_prompt_playground");
-                    navigate("/dashboard/prompt-playground");
+                    handleSelect("dashboard_prompt_hardening");
+                    navigate("/dashboard/prompt-hardening");
                     setActive("normal");
                 },
-                selected: leftNavSelected === "dashboard_prompt_playground",
-                key: "prompt_playground",
+                selected: leftNavSelected === "dashboard_prompt_hardening",
+                key: "prompt_hardening",
             },
             {
                 url: "#",

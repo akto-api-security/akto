@@ -5,7 +5,7 @@ import { Box, Button, Divider, HorizontalStack, Text, VerticalStack, Badge, Tool
 import { ClipboardMinor, InfoMinor, PlayMinor } from "@shopify/polaris-icons"
 
 import Store from "../../../store";
-import PromptPlaygroundStore from "../promptPlaygroundStore";
+import PromptHardeningStore from "../promptHardeningStore";
 
 import func from "@/util/func";
 
@@ -30,10 +30,10 @@ const PromptEditor = ({ fetchAllPrompts }) => {
     const ref = useRef(null)
 
     const setToastConfig = Store(state => state.setToastConfig)
-    const promptsObj = PromptPlaygroundStore(state => state.promptsObj)
-    const selectedPrompt = PromptPlaygroundStore(state => state.selectedPrompt)
-    const setCurrentContent = PromptPlaygroundStore(state => state.setCurrentContent)
-    const setTriggerTest = PromptPlaygroundStore(state => state.setTriggerTest)
+    const promptsObj = PromptHardeningStore(state => state.promptsObj)
+    const selectedPrompt = PromptHardeningStore(state => state.selectedPrompt)
+    const setCurrentContent = PromptHardeningStore(state => state.setCurrentContent)
+    const setTriggerTest = PromptHardeningStore(state => state.setTriggerTest)
 
     const [ isEdited, setIsEdited ] = useState(false)
     const [ editorInstance, _setEditorInstance ] = useState()

@@ -13,7 +13,7 @@ const initialState = {
     triggerTest: false
 }
 
-const PromptPlaygroundStore = create(
+const PromptHardeningStore = create(
     devtools((set) => ({
         ...initialState,
         setPromptsObj: (promptsObj) => set({ promptsObj }),
@@ -25,7 +25,7 @@ const PromptPlaygroundStore = create(
         setTemperature: (temperature) => set({ temperature }),
         setMaxTokens: (maxTokens) => set({ maxTokens }),
         setTriggerTest: (triggerTest) => set({ triggerTest })
-    }), { name: 'PromptPlaygroundStore' })
+    }), { name: 'PromptHardeningStore' })
 )
 
-export default PromptPlaygroundStore
+export default PromptHardeningStore

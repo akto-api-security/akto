@@ -30,7 +30,7 @@ import About from "../dashboard/pages/settings/about/About";
 import ThreatConfiguration from "../dashboard/pages/settings/threat_configuration/ThreatConfiguration";
 import Metrics from "../dashboard/pages/settings/metrics/Metrics";
 import TestEditor from "../dashboard/pages/test_editor/TestEditor";
-import PromptPlayground from "../dashboard/pages/prompt_playground/PromptPlayground";
+import PromptHardening from "../dashboard/pages/prompt_hardening/PromptHardening";
 import DataTypes from "../dashboard/pages/observe/data_types/DataTypes";
 import IssuesPage from "../dashboard/pages/issues/IssuesPage/IssuesPage";
 import CompliancePage from "../dashboard/pages/issues/IssuesPage/CompliancePage";
@@ -474,12 +474,12 @@ const router = createBrowserRouter([
                 element: <TestEditor/>
             },
             {
-                path: "prompt-playground/:promptId",
-                element: <PromptPlayground/>
+                path: "prompt-hardening/:promptId",
+                element: <PromptHardening/>
             },
             {
-                path: "prompt-playground",
-                element: <PromptPlayground/>
+                path: "prompt-hardening",
+                element: <PromptHardening/>
             },
             {
                 path: "onboarding",
