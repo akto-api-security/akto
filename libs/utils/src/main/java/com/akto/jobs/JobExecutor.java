@@ -16,9 +16,14 @@ import com.mongodb.client.model.FindOneAndUpdateOptions;
 import com.mongodb.client.model.ReturnDocument;
 import com.mongodb.client.model.Updates;
 import com.slack.api.Slack;
+import java.util.Arrays;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.ArrayList;
+import java.util.List;
 import org.bson.types.ObjectId;
+import org.slf4j.helpers.MessageFormatter;
+import org.slf4j.event.Level;
 
 public abstract class JobExecutor<T extends JobParams> {
     private static final LoggerMaker logger = new LoggerMaker(JobExecutor.class);
@@ -26,6 +31,8 @@ public abstract class JobExecutor<T extends JobParams> {
     protected final Class<T> paramClass;
     private static final Slack SLACK_INSTANCE = Slack.getInstance();
     private static final ExecutorService SLACK_EXECUTOR = Executors.newSingleThreadExecutor();
+
+    private final List<String> jobLogs = new ArrayList<>();
 
     public JobExecutor(Class<T> paramClass) {
         this.paramClass = paramClass;
@@ -49,7 +56,16 @@ public abstract class JobExecutor<T extends JobParams> {
             logger.error("Error occurred while executing the job. Not re-scheduling. {}", executedJob, e);
         }
         handleRecurringJob(executedJob);
-        sendSlackAlert(job, errorMessage);
+        String capturedLogs = "";
+        if (!jobLogs.isEmpty()) {
+            StringBuilder sb = new StringBuilder();
+            for (String line : jobLogs) {
+                sb.append(line).append('\n');
+            }
+            capturedLogs = sb.toString();
+            jobLogs.clear();
+        }
+        sendSlackAlert(job, errorMessage, capturedLogs);
     }
 
     private Job logSuccess(ObjectId id) {
@@ -111,6 +127,32 @@ public abstract class JobExecutor<T extends JobParams> {
         );
     }
 
+    protected void logAndCollect(Level level, String message, Object... vars) {
+        try {
+            switch (level) {
+                case ERROR:
+                    logger.error(message, vars);
+                    break;
+                case WARN:
+                    logger.warn(message, vars);
+                    break;
+                case DEBUG:
+                    logger.debug(message, vars);
+                    break;
+                default:
+                    logger.info(message, vars);
+                    break;
+            }
+            if (level == Level.ERROR) {
+                vars = MessageFormatter.trimmedCopy(vars);
+            }
+            String formatted = MessageFormatter.arrayFormat(message, vars).getMessage();
+            jobLogs.add("[" + level + "]: " + formatted);
+        } catch (Exception e) {
+            logger.error("Error logging message: " + message, e);
+        }
+    }
+
     private Job reScheduleJob(Job job) {
         int now = Context.now();
         return JobsDao.instance.getMCollection().findOneAndUpdate(
@@ -144,7 +186,7 @@ public abstract class JobExecutor<T extends JobParams> {
         );
     }
 
-    private void sendSlackAlert(Job job, String errorMessage) {
+    private void sendSlackAlert(Job job, String errorMessage, String capturedLogs) {
         int targetAccountId = job.getAccountId();
         SLACK_EXECUTOR.submit(() -> {
             Context.accountId.set(1000000);
@@ -161,6 +203,10 @@ public abstract class JobExecutor<T extends JobParams> {
 
                     if (errorMessage != null) {
                         message.append(" | Error: ").append(errorMessage);
+                    }
+
+                    if (capturedLogs != null && !capturedLogs.isEmpty()) {
+                        message.append("\n\nLogs:\n").append(capturedLogs);
                     }
 
                     CustomTextAlert customTextAlert = new CustomTextAlert(message.toString());
