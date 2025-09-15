@@ -15,6 +15,7 @@ import {
   ProgressBar,
   Tooltip,
   Banner,
+  Modal,
 } from '@shopify/polaris';
 
 import {
@@ -161,10 +162,19 @@ function SingleTestRunPage() {
   const [testingRunResultSummariesObj, setTestingRunResultSummariesObj] = useState({})
   const [allResultsLength, setAllResultsLength] = useState(undefined)
   const [currentSummary, setCurrentSummary] = useState('')
+  const [testResultsStatsCount, setTestResultsStatsCount] = useState(0)
+  const [allTestResultsStats, setAllTestResultsStats] = useState({
+    count429: 0,
+    count500: 0,
+    countCloudflare: 0,
+    totalCount: 0
+  })
+
   const localCategoryMap = LocalStore.getState().categoryMap
   const localSubCategoryMap = LocalStore.getState().subCategoryMap
   const [useLocalSubCategoryData, setUseLocalSubCategoryData] = useState(false)
   const [copyUpdateTable, setCopyUpdateTable] = useState("");
+  const [confirmationModal, setConfirmationModal] = useState(false);
 
   const tableTabMap = {
     vulnerable: "VULNERABLE",
@@ -221,6 +231,38 @@ function SingleTestRunPage() {
     })
   }
 
+  async function fetchTestResultsStats(testingRunHexId, testingRunResultSummaryHexId) {
+    try {
+      if (testingRunHexId && testingRunResultSummaryHexId) {
+        const reqBase = { testingRunHexId: testingRunHexId, testingRunResultSummaryHexId: testingRunResultSummaryHexId }
+        
+        const [res429, res5xx, resCf] = await Promise.allSettled([
+          api.fetchTestResultsStatsCount({ ...reqBase, patternType: 'HTTP_429' }),
+          api.fetchTestResultsStatsCount({ ...reqBase, patternType: 'HTTP_5XX' }),
+          api.fetchTestResultsStatsCount({ ...reqBase, patternType: 'CLOUDFLARE' })
+        ]);
+
+        const count429 = res429.status === 'fulfilled' ? (res429.value || 0) : 0;
+        const count500 = res5xx.status === 'fulfilled' ? (res5xx.value || 0) : 0;
+        const countCloudflare = resCf.status === 'fulfilled' ? (resCf.value || 0) : 0;
+
+        setTestResultsStatsCount(count429);
+        setAllTestResultsStats({
+          count429,
+          count500,
+          countCloudflare,
+          totalCount: count429 + count500 + countCloudflare
+        });
+      } else {
+        setTestResultsStatsCount(0);
+        setAllTestResultsStats({ count429: 0, count500: 0, countCloudflare: 0, totalCount: 0 });
+      }
+    } catch (error) {
+      setTestResultsStatsCount(0);
+      setAllTestResultsStats({ count429: 0, count500: 0, countCloudflare: 0, totalCount: 0 });
+    }
+  }
+
   async function setSummary(summary, initialCall = false) {
     setTempLoading((prev) => {
       prev.running = false;
@@ -244,6 +286,12 @@ function SingleTestRunPage() {
     });
     let updateTable = currentSummary.hexId !== summary.hexId;
     setCurrentSummary(summary);
+    
+    // Fetch test results stats for the new summary
+    if (summary && summary.hexId) {
+      fetchTestResultsStats(hexId, summary.hexId);
+    }
+    
     if (!initialCall && updateTable) {
       setUpdateTable(Date.now().toString())
     }
@@ -330,7 +378,7 @@ function SingleTestRunPage() {
   }
 
   const getApiEndpointsMap = (endpoints, type) => {
-    if(type == null || type === undefined || type === "COLLECTION_WISE"){
+    if(type === null || type === undefined || type === "COLLECTION_WISE"){
       return endpoints.map(endpoint => ({
         label: endpoint.id.url,
         value: endpoint.id.url
@@ -577,7 +625,7 @@ function SingleTestRunPage() {
     setUpdateTable("")
 
     sortOptions = sortOptions.map(option => {
-      if (selectedIndex === 0 || selectedIndex == 5) {
+      if (selectedIndex === 0 || selectedIndex === 5) {
         if (option.label === 'Severity') {
           return { ...option, columnIndex: 3 }
         } else if (option.label === 'Run time') {
@@ -698,6 +746,25 @@ function SingleTestRunPage() {
         }}
         callFromOutside={updateTable}
       />
+    <Modal
+        open={confirmationModal}
+        onClose={() => setConfirmationModal(false)}
+        title="Re-Calculate issues count"
+        primaryAction={{
+          content: 'Re-Calculate',
+          onAction: () => handleRefreshTableCount(currentSummary.hexId),
+        }}
+        secondaryActions={[
+          {
+            content: 'Cancel',
+            onAction: () => setConfirmationModal(false),
+          },
+        ]}
+      >
+        <Modal.Section>
+          <Text>Are you sure you want to re-calculate issues count? This will recalculate the total number of issues based on the latest test results and may affect the FIXED or IGNORED issues in the current testing run</Text>
+        </Modal.Section>
+      </Modal>
     </>
   )
 
@@ -791,6 +858,7 @@ function SingleTestRunPage() {
     await api.handleRefreshTableCount(summaryHexId).then((res) => {
       func.setToast(true, false, "Re-calculating issues count")
       setSecondaryPopover(false)
+      setConfirmationModal(false)
     })
   }
 
@@ -846,12 +914,11 @@ function SingleTestRunPage() {
               const sev = item.split(' ')
               const tempSev = sev.length > 1 ? sev[1].toUpperCase() : ''
               return (
-                <div className={`badge-wrapper-${tempSev}`}>
-                  <Badge key={item}>{item}</Badge>
+                <div key={item} className={`badge-wrapper-${tempSev}`}>
+                  <Badge>{item}</Badge>
                 </div>
               )
             }
-
             )}
           <Button plain monochrome onClick={() => setUpdateTable(Date.now().toString())}><Tooltip content="Refresh page" dismissOnMouseOut> <Icon source={RefreshMajor} /></Tooltip></Button>
         </HorizontalStack>
@@ -873,10 +940,73 @@ function SingleTestRunPage() {
             <Box><Icon color="subdued" source={PriceLookupMinor} /></Box>
             <Text color="subdued" variant="bodyMd">{getHeadingStatus(selectedTestRun)}</Text>
           </HorizontalStack>
+          {allTestResultsStats.totalCount > 0 && (
+            <>
+              <Box width="1px" borderColor="border-subdued" borderInlineStartWidth="1" minHeight='16px' />
+              <HorizontalStack gap={"1"}>
+                <Box><Icon color="subdued" source={CircleInformationMajor} /></Box>
+                <Tooltip 
+                  content={
+                    <VerticalStack gap="2">
+                      <Text variant="bodyMd">API request error statistics breakdown:</Text>
+                      <VerticalStack gap="1">
+                        <Text variant="bodySm">• 429 errors: {allTestResultsStats.count429}</Text>
+                        <Text variant="bodySm">• 5XX errors: {allTestResultsStats.count500}</Text>
+                        <Text variant="bodySm">• Cloudflare errors: {allTestResultsStats.countCloudflare}</Text>
+                      </VerticalStack>
+                      <Box paddingBlockStart="1" borderBlockStartWidth="1" borderColor="border-subdued">
+                        <Text variant="bodySm" color="subdued" fontWeight="medium">Approximate counts based on sampled data.</Text>
+                      </Box>
+                    </VerticalStack>
+                  } 
+                  hasUnderline={false}
+                >
+                  <HorizontalStack gap="1" align="center">
+                    <Text color="subdued" fontWeight="medium" variant="bodyMd" style={{ cursor: 'pointer' }}>API error stats:</Text>
+                  </HorizontalStack>
+                </Tooltip>
+                {(() => {
+                  const total = currentSummary?.testResultsCount || 0;
+                  const severityFor = (count) => {
+                    const percentage = total > 0 ? (count / total) * 100 : 0;
+                    if (percentage > 70) return 'CRITICAL';
+                    if (percentage >= 40) return 'HIGH';
+                    return 'MEDIUM';
+                  }
+                  return (
+                    <HorizontalStack gap="2" align="center">
+                      {(() => { const sev = severityFor(allTestResultsStats.count429); return (
+                        <div className={`badge-wrapper-${sev.toUpperCase()}`}>
+                          <Badge>
+                            429: {allTestResultsStats.count429}
+                          </Badge>
+                        </div>
+                      )})()}
+                      {(() => { const sev = severityFor(allTestResultsStats.count500); return (
+                        <div className={`badge-wrapper-${sev.toUpperCase()}`}>
+                          <Badge>
+                            5XX: {allTestResultsStats.count500}
+                          </Badge>
+                        </div>
+                      )})()}
+                      {(() => { const sev = severityFor(allTestResultsStats.countCloudflare); return (
+                        <div className={`badge-wrapper-${sev.toUpperCase()}`}>
+                          <Badge>
+                          Cloudflare errors: {allTestResultsStats.countCloudflare}
+                          </Badge>
+                        </div>
+                      )})()}
+                    </HorizontalStack>
+                  );
+                })()}
+              </HorizontalStack>
+            </>
+          )}
         </HorizontalStack>
       </VerticalStack>
     </Box>
   )
+
 
   let moreActionsList = transform.getActions(selectedTestRun)
   moreActionsList.push({
@@ -919,7 +1049,7 @@ function SingleTestRunPage() {
       {
         content: 'Re-Calculate Issues Count',
         icon: RefreshMajor,
-        onAction: () => { handleRefreshTableCount(currentSummary.hexId) }
+        onAction: () => { setConfirmationModal(true) }
       }
     ]
   })

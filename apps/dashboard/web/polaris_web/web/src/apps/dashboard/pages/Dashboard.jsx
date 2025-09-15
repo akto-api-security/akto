@@ -8,7 +8,7 @@ import "./dashboard.css"
 import func from "@/util/func"
 import transform from "./testing/transform";
 import PersistStore from "../../main/PersistStore";
-import LocalStore from "../../main/LocalStorageStore";
+import LocalStore, { localStorePersistSync } from "../../main/LocalStorageStore";
 import ConfirmationModal from "../components/shared/ConfirmationModal";
 import AlertsBanner from "./AlertsBanner";
 import dashboardFunc from "./transform";
@@ -113,7 +113,7 @@ function Dashboard() {
     },[trafficAlerts.length])
 
     useEffect(() => {
-        if((allCollections && allCollections.length === 0) || (Object.keys(collectionsMap).length === 0)){
+        if(((allCollections && allCollections.length === 0) || (Object.keys(collectionsMap).length === 0)) && location.pathname !== "/dashboard/observe/inventory"){
             fetchAllCollections()
         }
         if (!subCategoryMap || (Object.keys(subCategoryMap).length === 0)) {
@@ -145,6 +145,12 @@ function Dashboard() {
                 localStorage.removeItem(key);
             }
         });
+
+        const cleanUpLocalStorePersistSync = localStorePersistSync(LocalStore);
+
+        return () => {
+            cleanUpLocalStorePersistSync();
+        };
     }, [])
 
     useEffect(() => {

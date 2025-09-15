@@ -429,7 +429,7 @@ const transform = {
                     Object.keys(sortedSeverityInfo).length > 0 ? Object.keys(sortedSeverityInfo).map((key,index)=>{
                         return(
                             <div className={`badge-wrapper-${key}`}>
-                                <Badge size="small" key={index}>{sortedSeverityInfo[key].toString()}</Badge>
+                                <Badge size="small" key={index}>{Math.max(sortedSeverityInfo[key], 0).toString()}</Badge>
                             </div>
                         )
                     }):
@@ -758,6 +758,43 @@ const transform = {
             
             setDelta(data[data.length-1] - data[0])
         }
+    },
+
+    getUntrackedApisCollapsibleRow: (untrackedApis) => {
+        return (
+            <tr style={{padding: '0px !important', borderTop: '1px solid #dde0e4'}}>
+                <td colSpan={8} style={{padding: '0px !important', width: '100%'}}>
+                    {untrackedApis.map((api, index) => {
+                        const borderStyle = index < (untrackedApis.length - 1) ? {borderBlockEndWidth: 1} : {}
+                        return (
+                            <Box
+                                padding={"2"}
+                                paddingInlineStart={"4"}
+                                key={index}
+                                borderColor="border-subdued"
+                                {...borderStyle}
+                                width="100%"
+                            >
+                                <div style={{ display: "flex", alignItems: "center", width: "100%" }}>
+                                    <HorizontalStack gap="2" align="start" blockAlign="center">
+                                        <GetPrettifyEndpoint 
+                                            method={api.method} 
+                                            url={api.url} 
+                                            isNew={false}
+                                        />
+                                    </HorizontalStack>
+                                    <div style={{ marginLeft: "auto" }}>
+                                        <Text color="subdued" fontWeight="semibold">
+                                            {api.urlType || "STATIC"}
+                                        </Text>
+                                    </div>
+                                </div>
+                            </Box>
+                        )
+                    })}
+                </td>
+            </tr>
+        )
     }
 }
 

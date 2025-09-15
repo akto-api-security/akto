@@ -23,3 +23,11 @@ export function getDashboardCategory() {
 export function isMCPSecurityCategory() {
   return getDashboardCategory() === 'MCP Security';
 }
+
+export function isGenAISecurityCategory() {
+  return getDashboardCategory() === 'Gen AI';
+}
+
+export function isApiSecurityCategory() {
+  return getDashboardCategory() === 'API Security';
+}
