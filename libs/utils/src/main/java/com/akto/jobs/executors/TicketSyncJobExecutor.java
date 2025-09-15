@@ -182,7 +182,7 @@ public class TicketSyncJobExecutor extends JobExecutor<TicketSyncJobParams> {
                     continue;
                 }
 
-                logAndCollect(Level.DEBUG, "Found {} statues mapped with akto status {}. Using the first one", jiraStatuses.size(),
+                logAndCollect(Level.DEBUG, "Found {} jira statuses mapped with akto status {}. Using the first one", jiraStatuses.size(),
                     aktoStatus);
 
                 // Use the first mapped status as the target
@@ -206,7 +206,7 @@ public class TicketSyncJobExecutor extends JobExecutor<TicketSyncJobParams> {
                     updateJobHeartbeat(job);
                     if (transitionsMap.isEmpty()) {
                         logAndCollect(Level.INFO, "No transitions found for issues with Akto status: {} to Jira status: {}",
-                                    aktoStatus, targetJiraStatus);
+                            aktoStatus, targetJiraStatus);
                         continue;
                     }
 
@@ -240,7 +240,7 @@ public class TicketSyncJobExecutor extends JobExecutor<TicketSyncJobParams> {
                     }
 
                     if (success) {
-                        logAndCollect(Level.INFO, "Successfully transitioned {} Jira tickets to status: {}. ticketIds: {}",
+                        logAndCollect(Level.DEBUG, "Successfully transitioned {} Jira tickets to status: {}. ticketIds: {}",
                             issueKeys.size(), targetJiraStatus, issueKeys);
                         // Update last updated timestamp in Akto
                         List<WriteModel<TestingRunIssues>> writeModels = new ArrayList<>();
@@ -254,7 +254,6 @@ public class TicketSyncJobExecutor extends JobExecutor<TicketSyncJobParams> {
 
                         if (!writeModels.isEmpty()) {
                             TestingRunIssuesDao.instance.getMCollection().bulkWrite(writeModels);
-                            logAndCollect(Level.INFO, "Updated last updated timestamp for {} Akto issues", writeModels.size());
                         }
                     } else {
                         logAndCollect(Level.ERROR, "Failed to transition Jira tickets to status: {}. ticketIds: {}", targetJiraStatus,
@@ -262,7 +261,7 @@ public class TicketSyncJobExecutor extends JobExecutor<TicketSyncJobParams> {
                     }
                 } catch (Exception e) {
                     logAndCollect(Level.ERROR, "Error getting transitions or performing bulk transition for Akto status: {} to Jira status: {}",
-                                aktoStatus, targetJiraStatus, e);
+                        aktoStatus, targetJiraStatus, e);
                 }
             }
         } catch (Exception e) {
@@ -283,20 +282,20 @@ public class TicketSyncJobExecutor extends JobExecutor<TicketSyncJobParams> {
                 try {
                     BasicDBObject jiraIssue = jiraIssues.get(issue.getTicketId());
                     if (jiraIssue == null) {
-                        logAndCollect(Level.DEBUG, "No Jira issue found for ticket ID: {}", issue.getTicketId());
+                        logAndCollect(Level.INFO, "No Jira issue found for ticket ID: {}", issue.getTicketId());
                         continue;
                     }
 
                     String jiraStatus = jiraIssue.getString("ticketStatus");
                     if (jiraStatus == null) {
-                        logAndCollect(Level.DEBUG, "No status found in Jira issue for ticket ID: {}", issue.getTicketId());
+                        logAndCollect(Level.INFO, "No status found in Jira issue for ticket ID: {}", issue.getTicketId());
                         continue;
                     }
 
                     String aktoStatus = jiraToAktoStatusMapping.get(jiraStatus);
                     if (aktoStatus == null) {
-                        logAndCollect(Level.DEBUG, "No Akto status mapping found for Jira status: {} (ticket ID: {})",
-                                  jiraStatus, issue.getTicketId());
+                        logAndCollect(Level.INFO, "No Akto status mapping found for Jira status: {} (ticket ID: {})",
+                            jiraStatus, issue.getTicketId());
                         continue;
                     }
 
