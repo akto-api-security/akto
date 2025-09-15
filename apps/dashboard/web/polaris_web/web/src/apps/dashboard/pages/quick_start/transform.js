@@ -38,6 +38,15 @@ const apigeeObj = {
     component: <AddOnComponenet/>
 }
 
+const iisObj = {
+    icon: '/public/iis.svg',
+    label: "IIS",
+    text: "IIS setup is recommended if you are using Microsoft's Internet Information Services to host your applications.",
+    docsUrl: 'https://docs.akto.io/traffic-connector/api-gateways/connect-akto-with-iis',
+    key: "IIS",
+    component: <AddOnComponenet/>
+}
+
 const githubObj = {
     icon: '/public/github.svg',
     label: "GitHub",
@@ -1305,7 +1314,7 @@ const quickStartFunc = {
 
         // API Gateways
         const apiGateways = [
-            apigeeObj, azureObj, cloudflareObj, f5Obj, kongmeshObj, layer7Obj, threescaleObj, nginxObj, haproxyObj, envoyObj, istioObj, kongObj, ibmapiconnectObj, citrixObj, azureappserviceObj, mulesoftObj
+            apigeeObj, iisObj, azureObj, cloudflareObj, f5Obj, kongmeshObj, layer7Obj, threescaleObj, nginxObj, haproxyObj, envoyObj, istioObj, kongObj, ibmapiconnectObj, citrixObj, azureappserviceObj, mulesoftObj
         ];
 
         // Mirroring
@@ -1413,7 +1422,7 @@ const quickStartFunc = {
             openApiObj, beanStalkObj, eksObj, dockerObj, envoyObj, mcpScanObj, mcpProxyObj,
             harFileUploadObj, kongObj, tcpObj, mirroringObj, hybridSaasObj, apiInventoryFromSourceCodeObj,
             ebpfObj, ebpfMTLSObj, istioObj, pythonObj, awsApiGatewayObj, awsLambdaObj,
-            apigeeObj, azureObj, cloudflareObj, f5Obj, goObj, haproxyObj, javaObj, kongmeshObj, layer7Obj, nodejsObj, openshiftObj, threescaleObj, githubObj, gitlabObj, bitbucketObj, aktoJaxObj
+            apigeeObj, iisObj, azureObj, cloudflareObj, f5Obj, goObj, haproxyObj, javaObj, kongmeshObj, layer7Obj, nodejsObj, openshiftObj, threescaleObj, githubObj, gitlabObj, bitbucketObj, aktoJaxObj
         ]
 
         if(isGenAISecurityCategory()){
