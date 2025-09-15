@@ -275,7 +275,7 @@ export default function LeftNav() {
                 ],
                 key: "5",
             },
-            {
+            ...(dashboardCategory === "Gen AI" ? [{
                 label: (
                     <Text variant="bodyMd" fontWeight="medium">
                         Prompt Hardening
@@ -289,7 +289,7 @@ export default function LeftNav() {
                 },
                 selected: leftNavSelected === "dashboard_prompt_hardening",
                 key: "prompt_hardening",
-            },
+            }] : []),
             {
                 url: "#",
                 label: (
