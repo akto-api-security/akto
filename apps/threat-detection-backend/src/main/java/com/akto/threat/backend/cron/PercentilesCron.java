@@ -17,6 +17,7 @@ import java.util.concurrent.TimeUnit;
 import com.mongodb.client.model.Updates;
 import com.mongodb.client.model.UpdateOptions;
 import com.akto.utils.ThreatApiDistributionUtils;
+import com.akto.dao.context.Context;
 
 public class PercentilesCron {
 
@@ -34,9 +35,17 @@ public class PercentilesCron {
         scheduler.scheduleAtFixedRate(new Runnable() {
             public void run() {
                 try {
+                    try {
+                        int accId = Integer.parseInt(accountId);
+                        Context.accountId.set(accId);
+                    } catch (Exception ignore) {
+                        // keep context unset if accountId isn't a number
+                    }
                     runOnce(accountId);
                 } catch (Exception e) {
                     logger.errorAndAddToDb("error in PercentilesCron: accountId " + accountId + " " + e.getMessage(), LoggerMaker.LogDb.RUNTIME);
+                } finally {
+                    Context.resetContextThreadLocals();
                 }
             }
         }, 0, 2, TimeUnit.DAYS);
