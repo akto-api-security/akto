@@ -14,6 +14,7 @@ import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.Sorts;
 import lombok.Getter;
 import org.bson.Document;
+import com.akto.dto.testing.TestingRunResult;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 import com.mongodb.ConnectionString;
@@ -33,6 +34,7 @@ public class TestResultsStatsAction extends UserAction {
 
     @Getter
     private int count = 0;
+    private boolean fromApiErrors = false;
 
     /**
      * HTTP 429 Rate Limiting Pattern
@@ -51,65 +53,34 @@ public class TestResultsStatsAction extends UserAction {
     public static final String REGEX_5XX = "\"statusCode\"\\s*:\\s*5[0-9][0-9]";
 
     /**
-     * Cloudflare Security and CDN Error Pattern
-     * Detects various Cloudflare blocking scenarios and error conditions:
+     * Cloudflare Error Detection Pattern
      * 
-     * Error Codes:
-     * - 1xxx series (1000-1999): DNS resolution, firewall, security blocking
-     * - 10xxx series (10000+): API limits, configuration issues
-     * - Specific codes: 1012 (access denied), 1015 (rate limited), 1020 (access
-     * denied)
+     * This regex ONLY detects specific Cloudflare blocking/error scenarios that indicate
+     * infrastructure problems or security blocking, NOT normal API authentication errors.
      * 
-     * Security Blocking:
-     * - WAF (Web Application Firewall) triggered blocks
-     * - Cloudflare security service protection messages
-     * - Access denied and rate limiting scenarios
-     * - Attention Required pages shown to users
-     * 
-     * Note: Excludes cf-ray headers which are present on all Cloudflare responses
-     * including successful 2xx codes.
+     * 1. Explicit Cloudflare blocking messages  
+     * 2. WAF blocking responses
      * 
      * References:
-     * -
-     * -
-     * https://developers.cloudflare.com/support/troubleshooting/http-status-codes/cloudflare-1xxx-errors/
+     * - https://developers.cloudflare.com/support/troubleshooting/http-status-codes/cloudflare-1xxx-errors/
      * - https://developers.cloudflare.com/waf/
-     * - https://developers.cloudflare.com/fundamentals/reference/cloudflare-ray-id/
-     * - Error page types:
-     * https://developers.cloudflare.com/rules/custom-errors/reference/error-page-types/
-     * - Block pages:
-     * https://developers.cloudflare.com/cloudflare-one/policies/gateway/block-page/
-     * - Custom errors: https://developers.cloudflare.com/rules/custom-errors/
      */
-    public static final String REGEX_CLOUDFLARE = "(error\\s*1[0-9]{3}|error\\s*10[0-9]{3}|" + // CF-specific error
-                                                                                               // codes
-            "attention\\s*required.*cloudflare|" + // Challenge page identifier
-            "managed\\s*challenge.*cloudflare|cloudflare.*managed\\s*challenge|" + // Managed challenge variations
-            "interactive\\s*challenge.*cloudflare|cloudflare.*interactive\\s*challenge|" + // Interactive challenges
-            "under\\s*attack.*cloudflare|cloudflare.*under\\s*attack|" + // Under attack mode
-            "ddos\\s*protection.*cloudflare|cloudflare.*ddos|" + // DDoS protection
-            "anti[-\\s]*ddos.*cloudflare|cloudflare.*anti[-\\s]*ddos|" + // Anti-DDoS phrasing
-            "ddos\\s*attack\\s*mitigation|attack\\s*mitigation.*cloudflare|" + // DDoS attack mitigation
-            "ddos\\s*protection.*under\\s*attack.*enabled|under\\s*attack.*mode.*enabled|" + // Under attack mode
-                                                                                             // enabled
-            "(blocked|denied|limited|restricted).*cloudflare|" + // Generic blocking with CF context
-            "cloudflare.*(blocked|denied|limited|restricted|security)|" + // CF context with blocking
-            "waf.*cloudflare|cloudflare.*waf|" + // WAF by Cloudflare
-            "\\bweb\\s*application\\s*firewall\\b|\\bWAF\\b|waf\\s*rule\\s*triggered|waf\\s*(block|security|alert|protection)|"
-            + // WAF mentions without CF
-            "rate.*limit.*cloudflare|cloudflare.*rate.*limit|" + // Rate limiting by CF
-            "checking.*browser.*cloudflare|browser\\s*integrity\\s*check|verifying.*browser.*supports|" + // Browser
-                                                                                                          // check
-                                                                                                          // challenge
-            "security.*check.*cloudflare|security.*verification.*cloudflare|" + // Security checks/verification
-            "verification.*cloudflare|additional.*security.*cloudflare|" + // Additional security verification
-            "security\\s*challenge.*cloudflare|cloudflare.*security\\s*challenge|" + // Security challenge variations
-            "interactive\\s*challenge.*required|challenge.*required.*cloudflare|" + // Interactive challenge
-                                                                                    // requirements
-            "captcha\\s*verification|complete.*security\\s*check.*prove.*not.*robot|" + // CAPTCHA verification patterns
-            "this\\s*website\\s*is\\s*using\\s*a\\s*security\\s*service\\s*to\\s*protect\\s*itself\\s*from\\s*online\\s*attacks|"
-            + // Common CF block text
-            "ray\\s*id.*blocked|blocked.*ray\\s*id)"; // Ray ID blocked variants
+    public static final String REGEX_CLOUDFLARE =
+    "(?i)\"responsePayload\"\\s*:\\s*.*(" + 
+    // ==== CLOUDFLARE BRANDED BLOCKING PAGES ====
+    // Reference: https://developers.cloudflare.com/fundamentals/reference/under-attack-mode/
+    // Matches official CF blocking page titles/messages
+    "attention\\s+required.*cloudflare|" +
+    "cloudflare.*security\\s+check|" +
+    
+    // ==== WAF EXPLICIT BLOCKING ====
+    // Reference: https://developers.cloudflare.com/waf/
+    // Only matches explicit WAF blocking messages, not normal errors
+    "blocked\\s+by\\s+cloudflare\\s+waf|" +
+    "cloudflare\\s+waf.*blocked" +
+    ")";
+
+
 
     public String fetchTestResultsStatsCount() {
         try {
@@ -142,7 +113,13 @@ public class TestResultsStatsAction extends UserAction {
 
             String description = describePattern(resolvedRegex);
 
-            this.count = getCountByPattern(testingRunResultSummaryId, resolvedRegex);
+            if (hasApiErrors(testingRunResultSummaryId)) {
+                this.count = getCountFromApiErrors(testingRunResultSummaryId);
+                this.fromApiErrors = true; //For UNIT TESTS
+            } else {
+                this.count = getCountByPattern(testingRunResultSummaryId, resolvedRegex);
+                this.fromApiErrors = false;
+            }
 
             loggerMaker.debugAndAddToDb(
                     "Found " + count + " requests matching " + description + " for test summary: "
@@ -156,6 +133,10 @@ public class TestResultsStatsAction extends UserAction {
         }
 
         return SUCCESS.toUpperCase();
+    }
+
+    public boolean isFromApiErrors() {
+        return this.fromApiErrors;
     }
 
     /**
@@ -244,11 +225,75 @@ public class TestResultsStatsAction extends UserAction {
     }
 
 
+    private boolean hasApiErrors(ObjectId testingRunResultSummaryId) {
+        try {
+            Bson filter = Filters.and(
+                    Filters.eq("testRunResultSummaryId", testingRunResultSummaryId),
+                    Filters.eq("vulnerable", false),
+                    Filters.exists("apiErrors", true)
+            );
+
+            TestingRunResult doc = TestingRunResultDao.instance.getMCollection()
+                    .find(filter)
+                    .projection(Projections.include("_id"))
+                    .first();
+            return doc != null;
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error checking apiErrors existence: " + e.getMessage());
+            return false;
+        }
+    }
+
+    private int getCountFromApiErrors(ObjectId testingRunResultSummaryId) {
+        List<Bson> pipeline = new ArrayList<>();
+        pipeline.add(Aggregates.match(
+                Filters.and(
+                        Filters.eq("testRunResultSummaryId", testingRunResultSummaryId),
+                        Filters.eq("vulnerable", false),
+                        Filters.exists("apiErrors", true)
+                )));
+        pipeline.add(Aggregates.count("count"));
+
+        MongoCursor<BasicDBObject> cursor = TestingRunResultDao.instance.getMCollection()
+                .aggregate(pipeline, BasicDBObject.class)
+                .cursor();
+        int resultCount = 0;
+        if (cursor.hasNext()) {
+            BasicDBObject result = cursor.next();
+            resultCount = result.getInt("count", 0);
+        }
+        cursor.close();
+        return resultCount;
+    }
+
+    private String resolveApiErrorsKey() {
+        String type = this.patternType == null ? null : this.patternType.trim().toUpperCase();
+        if (type == null)
+            return null;
+        switch (type) {
+            case "HTTP_429":
+            case "429":
+            case "RATE_LIMIT":
+                return "429";
+            case "HTTP_5XX":
+            case "5XX":
+            case "SERVER_ERROR":
+                return "5xx";
+            case "CLOUDFLARE":
+            case "CDN":
+            case "CF":
+                return "cloudflare";
+            default:
+                return null;
+        }
+    }
+
+
     private void explainAggregationPipeline(List<Bson> pipeline) {
         try {
             loggerMaker.debugAndAddToDb("=== RUNNING AGGREGATION EXPLAIN ===", LogDb.DASHBOARD);
 
-            Document explainResult = TestingRunResultDao.instance.getRawCollection()
+            Document explainResult = TestingRunResultDao.instance.getMCollection()
                     .aggregate(pipeline)
                     .explain(ExplainVerbosity.EXECUTION_STATS);
 
@@ -388,7 +433,7 @@ public class TestResultsStatsAction extends UserAction {
         try {
             loggerMaker.debugAndAddToDb("=== LISTING ALL INDEXES ===", LogDb.DASHBOARD);
 
-            List<Document> indexes = TestingRunResultDao.instance.getRawCollection()
+            List<Document> indexes = TestingRunResultDao.instance.getMCollection()
                     .listIndexes().into(new ArrayList<>());
 
             for (Document index : indexes) {

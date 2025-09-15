@@ -54,6 +54,9 @@ public class TestingRunResult implements Comparable<TestingRunResult> {
     public static final String ERRORS_LIST = "errorsList";
     private  List<String> errorsList;
 
+    public static final String API_ERRORS = "apiErrors";
+    private Map<String, Integer> apiErrors;
+
     public static final String REQUIRES_CONFIG = TEST_RESULTS + ".0." + TestResult.REQUIRES_CONFIG;
 
     public static final String WORKFLOW_TEST = "workflowTest";
@@ -362,5 +365,13 @@ public class TestingRunResult implements Comparable<TestingRunResult> {
 
     public void setIgnoredResult(boolean isIgnoredResult) {
         this.isIgnoredResult = isIgnoredResult;
+    }
+
+    public Map<String, Integer> getApiErrors() {
+        return apiErrors;
+    }
+
+    public void setApiErrors(Map<String, Integer> apiErrors) {
+        this.apiErrors = apiErrors;
     }
 }
