@@ -16,6 +16,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import com.mongodb.client.model.Updates;
 import com.mongodb.client.model.UpdateOptions;
+import com.akto.utils.ThreatApiDistributionUtils;
 
 public class PercentilesCron {
 
@@ -132,20 +133,12 @@ public class PercentilesCron {
             }
         }
 
-        List<String> bucketOrder = Arrays.asList("b1","b2","b3","b4","b5","b6","b7","b8","b9","b10","b11","b12","b13","b14");
-        List<Integer> bucketUpperBounds = Arrays.asList(10, 50, 100, 250, 500, 1000, 2500, 5000, 10000, 20000, 35000, 50000, 100000, Integer.MAX_VALUE);
-        List<Integer> bucketLowerBounds = new ArrayList<>(bucketUpperBounds.size());
-        for (int i = 0; i < bucketUpperBounds.size(); i++) {
-            if (i == 0) {
-                bucketLowerBounds.add(0);
-            } else {
-                bucketLowerBounds.add(bucketUpperBounds.get(i - 1));
-            }
-        }
+        List<String> bucketOrder = ThreatApiDistributionUtils.getBucketOrder();
+        List<Integer> bucketLowerBounds = ThreatApiDistributionUtils.getBucketLowerBounds();
 
         long totalUsers = 0;
         for (String b : bucketOrder) totalUsers += bucketToCount.getOrDefault(b, 0L);
-        if (totalUsers <= 0) return new PercentilesResult(0, 0, 0);
+        if (totalUsers <= 0) return new PercentilesResult(-1, -1, -1);
 
         double p50Target = totalUsers * 0.5d;
         double p75Target = totalUsers * 0.75d;
