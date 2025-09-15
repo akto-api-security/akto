@@ -101,9 +101,9 @@ function SusDataTable({ currDateRange, rowClicked }) {
       index: 0 
     },
     {
-      content: 'Triaged',
-      onAction: () => { setCurrentTab('triaged') },
-      id: 'triaged',
+      content: 'Triage',
+      onAction: () => { setCurrentTab('triage') },
+      id: 'triage',
       index: 1 
     }
   ]

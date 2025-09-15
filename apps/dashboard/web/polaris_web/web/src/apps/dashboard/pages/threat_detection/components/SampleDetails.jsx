@@ -11,7 +11,7 @@ import TooltipText from "../../../components/shared/TooltipText";
 import ActivityTracker from "../../dashboard/components/ActivityTracker";
 
 function SampleDetails(props) {
-    const { showDetails, setShowDetails, data, title, moreInfoData, threatFiltersMap, eventId } = props
+    const { showDetails, setShowDetails, data, title, moreInfoData, threatFiltersMap, eventId, eventStatus, onStatusUpdate } = props
     let currentTemplateObj = threatFiltersMap[moreInfoData?.templateId]
 
     let severity = currentTemplateObj?.severity || "HIGH"
@@ -118,17 +118,23 @@ function SampleDetails(props) {
     const handleTriageEvent = async () => {
         if (!eventId) return;
         
+        const isTriaged = eventStatus === 'TRIAGE';
+        const newStatus = isTriaged ? 'ACTIVE' : 'TRIAGE';
+        
         setTriageLoading(true);
         try {
-            const response = await threatDetectionApi.updateMaliciousEventStatus(eventId, "TRIAGE");
+            const response = await threatDetectionApi.updateMaliciousEventStatus(eventId, newStatus);
             if (response?.updateSuccess) {
-                // You can show a success toast here if you have a toast component
-                console.log("Event successfully marked as triage");
+                console.log(`Event successfully marked as ${newStatus.toLowerCase()}`);
+                // Update parent state instead of refreshing page
+                if (onStatusUpdate) {
+                    onStatusUpdate(newStatus);
+                }
             } else {
-                console.error("Failed to mark event as triage");
+                console.error(`Failed to update event status`);
             }
         } catch (error) {
-            console.error("Error marking event as triage:", error);
+            console.error("Error updating event status:", error);
         } finally {
             setTriageLoading(false);
         }
@@ -172,7 +178,7 @@ function SampleDetails(props) {
                             loading={triageLoading}
                             disabled={!eventId}
                         >
-                            Triage Event
+                            {eventStatus === 'TRIAGE' ? 'Untriage Event' : 'Triage Event'}
                         </Button>
                         <Modal
                             activator={<Button destructive size="slim" onClick={() => setShowModal(!showModal)}>Block IPs</Button>}
