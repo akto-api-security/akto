@@ -10,6 +10,7 @@ import func from "../../../../../util/func"
 import transform from "./transform";
 import api from "../api"
 import { CellType } from "../../../components/tables/rows/GithubRow"
+import { getDashboardCategory } from "../../../../main/labelHelper"
 
 
 const sortOptions = [
@@ -81,9 +82,12 @@ function TestSuite() {
         const subCategoryMap = await transform.getSubCategoryMap(LocalStore);
         const all = [], by_akto = [], custom = [];
 
-        const fetchedData = await api.fetchAllTestSuites();
-        
+        // Get dashboard category using the existing helper function
+        const dashboardCategory = getDashboardCategory();
 
+        const fetchedData = await api.fetchAllTestSuites();
+
+        // Process default test suites from backend and filter based on account type
         fetchedData?.defaultTestSuites?.forEach((testSuiteItem) => {
             const categoriesCoveredList = [];
             const testSet = new Set(testSuiteItem?.subCategoryList||[]);
@@ -92,7 +96,22 @@ function TestSuite() {
                     categoriesCoveredList.push(key);
                 }
             });
-            if(testSuiteItem?.suiteType === "OWASP") {
+
+            // Filter based on dashboard category using suiteType
+            let shouldInclude = false;
+
+            if (dashboardCategory === 'MCP Security') {
+                // For MCP Security, only show test suites with MCP_SECURITY suiteType
+                shouldInclude = testSuiteItem.suiteType === 'MCP_SECURITY';
+            } else if (dashboardCategory === 'Gen AI') {
+                // For Gen AI (AI Agent Security), only show test suites with AI_AGENT_SECURITY suiteType
+                shouldInclude = testSuiteItem.suiteType === 'AI_AGENT_SECURITY';
+            } else {
+                // For API Security, show test suites with OWASP suiteType (default API security)
+                shouldInclude = testSuiteItem.suiteType === 'OWASP';
+            }
+
+            if (shouldInclude) {
                 const aktoTestSuite = transform.getPrettifiedObj(testSuiteItem, categoriesCoveredList, true);
                 all.push(aktoTestSuite);
                 by_akto.push(aktoTestSuite);
