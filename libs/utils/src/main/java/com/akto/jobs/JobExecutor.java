@@ -32,7 +32,7 @@ public abstract class JobExecutor<T extends JobParams> {
     private static final Slack SLACK_INSTANCE = Slack.getInstance();
     private static final ExecutorService SLACK_EXECUTOR = Executors.newSingleThreadExecutor();
 
-    private final List<String> slackLogs = new ArrayList<>();
+    private final List<String> jobLogs = new ArrayList<>();
 
     public JobExecutor(Class<T> paramClass) {
         this.paramClass = paramClass;
@@ -57,13 +57,13 @@ public abstract class JobExecutor<T extends JobParams> {
         }
         handleRecurringJob(executedJob);
         String capturedLogs = "";
-        if (!slackLogs.isEmpty()) {
+        if (!jobLogs.isEmpty()) {
             StringBuilder sb = new StringBuilder();
-            for (String line : slackLogs) {
+            for (String line : jobLogs) {
                 sb.append(line).append('\n');
             }
             capturedLogs = sb.toString();
-            slackLogs.clear();
+            jobLogs.clear();
         }
         sendSlackAlert(job, errorMessage, capturedLogs);
     }
@@ -143,12 +143,11 @@ public abstract class JobExecutor<T extends JobParams> {
                     logger.info(message, vars);
                     break;
             }
-            Throwable e = MessageFormatter.getThrowableCandidate(vars);
-            if (level == Level.ERROR && e != null) {
-                vars = Arrays.copyOf(vars, vars.length - 1);
+            if (level == Level.ERROR) {
+                vars = MessageFormatter.trimmedCopy(vars);
             }
             String formatted = MessageFormatter.arrayFormat(message, vars).getMessage();
-            slackLogs.add("[" + level + "] " + this.getClass().getSimpleName() + ": " + formatted);
+            jobLogs.add("[" + level + "]: " + formatted);
         } catch (Exception e) {
             logger.error("Error logging message: " + message, e);
         }
