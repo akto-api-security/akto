@@ -41,7 +41,7 @@ public class PercentilesCronTest {
         PercentilesCron cron = new PercentilesCron(null);
         List<ApiDistributionDataModel> data = Collections.emptyList();
 
-        Object result = cron.calculatePercentiles(data, 2);
+        Object result = cron.calculatePercentiles(data, 2, 5);
         int[] vals = extractPercentiles(result);
 
         assertEquals(-1, vals[0]);
@@ -62,7 +62,7 @@ public class PercentilesCronTest {
                 docWithBuckets(mapOf("b3", 25))
         );
 
-        Object result = cron.calculatePercentiles(data, 2);
+        Object result = cron.calculatePercentiles(data, 2, 5);
         int[] vals = extractPercentiles(result);
 
         assertEquals(0, vals[0]);
@@ -83,7 +83,7 @@ public class PercentilesCronTest {
                 docWithBuckets(mapOf("b6", 100))
         );
 
-        Object result = cron.calculatePercentiles(data, 2);
+        Object result = cron.calculatePercentiles(data, 2, 5);
         int[] vals = extractPercentiles(result);
 
         assertEquals(100, vals[0]);
@@ -99,7 +99,7 @@ public class PercentilesCronTest {
                 docWithBuckets(mapOf("b14", 10_000))
         );
 
-        Object result = cron.calculatePercentiles(data, 2);
+        Object result = cron.calculatePercentiles(data, 2, 5);
         int[] vals = extractPercentiles(result);
 
         assertEquals(100000, vals[0]);
@@ -118,12 +118,31 @@ public class PercentilesCronTest {
                 docWithBuckets(mapOf("b1", 50, "b2", 25, "b3", 25))
         );
 
-        Object result = cron.calculatePercentiles(data, 2);
+        Object result = cron.calculatePercentiles(data, 2, 5);
         int[] vals = extractPercentiles(result);
 
         assertEquals(0, vals[0]);
         assertEquals(10, vals[1]);
         assertEquals(50, vals[2]);
+    }
+
+    @Test
+    public void computesMaxRequestsAsMaxSumAcrossWindows() throws Exception {
+        PercentilesCron cron = new PercentilesCron(null);
+        // window totals: 10, 30, 25 -> max_requests should be 30
+        List<ApiDistributionDataModel> data = Arrays.asList(
+                docWithBuckets(mapOf("b1", 10)),
+                docWithBuckets(mapOf("b1", 20, "b2", 10)),
+                docWithBuckets(mapOf("b2", 25))
+        );
+
+        Object result = cron.calculatePercentiles(data, 2, 5);
+        Class<?> c = result.getClass();
+        Field f = c.getDeclaredField("maxRequests");
+        f.setAccessible(true);
+        int maxRequests = (int) f.get(result);
+
+        assertEquals(30, maxRequests);
     }
 
 }

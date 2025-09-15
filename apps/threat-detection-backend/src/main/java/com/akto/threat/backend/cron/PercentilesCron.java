@@ -62,39 +62,42 @@ public class PercentilesCron {
             String url = parts[1];
             String method = parts[2];
 
-            // Ensure there exists at least one record that is MIN_INITIAL_AGE_DAYS old
-            if (!hasMinimumInitialAge(accountId, apiCollectionId, url, method, MIN_INITIAL_AGE_DAYS)) {
-                logger.infoAndAddToDb("Skipping rateLimits update due to insufficient data age for apiCollectionId " + apiCollectionId +
-                        " url " + url + " method " + method, LoggerMaker.LogDb.RUNTIME);
-                continue;
+            for (int windowSize : Arrays.asList(5, 15, 30)) {
+                // Ensure there exists at least one record that is MIN_INITIAL_AGE_DAYS old for this window size
+                if (!hasMinimumInitialAge(accountId, apiCollectionId, url, method, MIN_INITIAL_AGE_DAYS, windowSize)) {
+                    logger.infoAndAddToDb("Skipping rateLimits update due to insufficient data age for apiCollectionId " + apiCollectionId +
+                            " url " + url + " method " + method + " windowSize " + windowSize, LoggerMaker.LogDb.RUNTIME);
+                    continue;
+                }
+
+                // Fetch last baseline days of distribution data for this window size
+                List<ApiDistributionDataModel> distributionData = fetchDistributionDocs(DEFAULT_BASELINE_DAYS, accountId, apiCollectionId, url, method, windowSize);
+                PercentilesResult r = calculatePercentiles(distributionData, DEFAULT_BASELINE_DAYS, windowSize);
+
+                updateApiInfo(r, apiCollectionId, url, method, windowSize);
             }
-
-            // Fetch last baseline days of distribution data
-            List<ApiDistributionDataModel> distributionData = fetchDistributionDocs(DEFAULT_BASELINE_DAYS, accountId, apiCollectionId, url, method);
-            PercentilesResult r = calculatePercentiles(distributionData, DEFAULT_BASELINE_DAYS);
-
-            updateApiInfo(r, apiCollectionId, url, method);
         }
     }
 
     /**
      * Updates ApiInfo collection with the given percentiles.
      */
-    public void updateApiInfo(PercentilesResult r, int apiCollectionId, String url, String method) {
+    public void updateApiInfo(PercentilesResult r, int apiCollectionId, String url, String method, int windowSize) {
         try {
             ApiInfoDao.instance.getMCollection().updateOne(
                     ApiInfoDao.getFilter(url, method, apiCollectionId),
                     Updates.combine(
-                            Updates.set("rateLimits.p50", r.p50),
-                            Updates.set("rateLimits.p75", r.p75),
-                            Updates.set("rateLimits.p90", r.p90)
+                            Updates.set("rateLimits." + windowSize + ".p50", r.p50),
+                            Updates.set("rateLimits." + windowSize + ".p75", r.p75),
+                            Updates.set("rateLimits." + windowSize + ".p90", r.p90),
+                            Updates.set("rateLimits." + windowSize + ".max_requests", r.maxRequests)
                     ),
                     new UpdateOptions().upsert(false)
             );
-            logger.infoAndAddToDb("Updated rateLimits for apiCollectionId " + apiCollectionId + " url " + url + " method " + method,
+            logger.infoAndAddToDb("Updated rateLimits for apiCollectionId " + apiCollectionId + " url " + url + " method " + method + " windowSize " + windowSize,
                     LoggerMaker.LogDb.RUNTIME);
         } catch (Exception e) {
-            logger.errorAndAddToDb("Failed updating rateLimits for apiCollectionId " + apiCollectionId + " url " + url + " method " + method + ": " + e.getMessage(),
+            logger.errorAndAddToDb("Failed updating rateLimits for apiCollectionId " + apiCollectionId + " url " + url + " method " + method + " windowSize " + windowSize + ": " + e.getMessage(),
                     LoggerMaker.LogDb.RUNTIME);
         }
     }
@@ -102,7 +105,7 @@ public class PercentilesCron {
     /**
      * Fetches distribution documents for the given API over the past baseLinePeriod days.
      */
-    public List<ApiDistributionDataModel> fetchDistributionDocs(int baseLinePeriod, String accountId, int apiCollectionId, String url, String method) {
+    public List<ApiDistributionDataModel> fetchDistributionDocs(int baseLinePeriod, String accountId, int apiCollectionId, String url, String method, int windowSize) {
         MongoCollection<ApiDistributionDataModel> coll = this.mongoClient
                 .getDatabase(accountId)
                 .getCollection("api_distribution_data", ApiDistributionDataModel.class);
@@ -116,6 +119,7 @@ public class PercentilesCron {
                 Filters.eq("apiCollectionId", apiCollectionId),
                 Filters.eq("url", url),
                 Filters.eq("method", method),
+                Filters.eq("windowSize", windowSize),
                 Filters.gte("windowStart", (int) lowerBoundWindowStart)
         );
 
@@ -132,7 +136,7 @@ public class PercentilesCron {
      * Returns true if there exists at least one record with windowStart timestamp
      * that is at least minAgeDays old from now for the given API key.
      */
-    public boolean hasMinimumInitialAge(String accountId, int apiCollectionId, String url, String method, int minAgeDays) {
+    public boolean hasMinimumInitialAge(String accountId, int apiCollectionId, String url, String method, int minAgeDays, int windowSize) {
         MongoCollection<ApiDistributionDataModel> coll = this.mongoClient
                 .getDatabase(accountId)
                 .getCollection("api_distribution_data", ApiDistributionDataModel.class);
@@ -145,6 +149,7 @@ public class PercentilesCron {
                 Filters.eq("apiCollectionId", apiCollectionId),
                 Filters.eq("url", url),
                 Filters.eq("method", method),
+                Filters.eq("windowSize", windowSize),
                 Filters.lte("windowStart", (int) thresholdWindowStart)
         );
 
@@ -156,14 +161,19 @@ public class PercentilesCron {
     /**
      * Calculate percentiles from a list of distribution docs.
      */
-    public PercentilesResult calculatePercentiles(List<ApiDistributionDataModel> distributionData, int baselinePeriodDays) {
+    public PercentilesResult calculatePercentiles(List<ApiDistributionDataModel> distributionData, int baselinePeriodDays, int windowSize) {
         Map<String, Long> bucketToCount = new HashMap<>();
+        long maxRequests = 0;
 
         for (ApiDistributionDataModel doc : distributionData) {
             if (doc.distribution == null) continue;
+            long docTotal = 0;
             for (Map.Entry<String, Integer> e : doc.distribution.entrySet()) {
-                bucketToCount.merge(e.getKey(), e.getValue() == null ? 0L : e.getValue().longValue(), Long::sum);
+                long val = e.getValue() == null ? 0L : e.getValue().longValue();
+                bucketToCount.merge(e.getKey(), val, Long::sum);
+                docTotal += val;
             }
+            if (docTotal > maxRequests) maxRequests = docTotal;
         }
 
         List<String> bucketOrder = ThreatApiDistributionUtils.getBucketOrder();
@@ -171,7 +181,7 @@ public class PercentilesCron {
 
         long totalUsers = 0;
         for (String b : bucketOrder) totalUsers += bucketToCount.getOrDefault(b, 0L);
-        if (totalUsers <= 0) return new PercentilesResult(-1, -1, -1);
+        if (totalUsers <= 0) return new PercentilesResult(-1, -1, -1, (int) maxRequests);
 
         double p50Target = totalUsers * 0.5d;
         double p75Target = totalUsers * 0.75d;
@@ -192,13 +202,14 @@ public class PercentilesCron {
         if (p50Val == null) p50Val = bucketLowerBounds.get(bucketLowerBounds.size() - 1);
         if (p75Val == null) p75Val = bucketLowerBounds.get(bucketLowerBounds.size() - 1);
         if (p90Val == null) p90Val = bucketLowerBounds.get(bucketLowerBounds.size() - 1);
-        return new PercentilesResult(p50Val, p75Val, p90Val);
+        return new PercentilesResult(p50Val, p75Val, p90Val, (int) maxRequests);
     }
 
     public static class PercentilesResult {
         final int p50;
         final int p75;
         final int p90;
-        public PercentilesResult(int p50, int p75, int p90) { this.p50 = p50; this.p75 = p75; this.p90 = p90; }
+        final int maxRequests;
+        public PercentilesResult(int p50, int p75, int p90, int maxRequests) { this.p50 = p50; this.p75 = p75; this.p90 = p90; this.maxRequests = maxRequests; }
     }
 }
