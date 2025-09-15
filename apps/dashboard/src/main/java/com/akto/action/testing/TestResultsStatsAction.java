@@ -58,10 +58,8 @@ public class TestResultsStatsAction extends UserAction {
      * This regex ONLY detects specific Cloudflare blocking/error scenarios that indicate
      * infrastructure problems or security blocking, NOT normal API authentication errors.
      * 
-     * ONLY MATCHES:
-     * 1. Cloudflare 1xxx error codes (1000-1999 series)
-     * 2. Explicit Cloudflare blocking messages  
-     * 3. WAF blocking responses
+     * 1. Explicit Cloudflare blocking messages  
+     * 2. WAF blocking responses
      * 
      * References:
      * - https://developers.cloudflare.com/support/troubleshooting/http-status-codes/cloudflare-1xxx-errors/
@@ -69,13 +67,6 @@ public class TestResultsStatsAction extends UserAction {
      */
     public static final String REGEX_CLOUDFLARE =
     "(?i)\"responsePayload\"\\s*:\\s*.*(" + 
-    
-    // ==== CLOUDFLARE 1XXX ERROR CODES ====
-    // Reference: https://developers.cloudflare.com/support/troubleshooting/http-status-codes/cloudflare-1xxx-errors/
-    // Matches only "Error 1xxx" format (1000-1999) - official CF error page format
-    // Examples: "Error 1020: Access denied", "Error 1015: You are being rate limited"
-    "error\\s+1[0-9]{3}\\s*:|" +
-    
     // ==== CLOUDFLARE BRANDED BLOCKING PAGES ====
     // Reference: https://developers.cloudflare.com/fundamentals/reference/under-attack-mode/
     // Matches official CF blocking page titles/messages

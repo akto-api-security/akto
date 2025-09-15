@@ -209,15 +209,7 @@ public class TestResultsStatsActionTest extends MongoBasedTest {
         String regex = TestResultsStatsAction.REGEX_CLOUDFLARE;
 
         // ==== TRUE POSITIVES: These SHOULD match (actual Cloudflare blocking) ====
-        
-        // Official Cloudflare 1xxx error codes
-        assertTrue("Error 1020 should match", 
-            "{\"responsePayload\": \"Error 1020: Access denied\"}".toLowerCase().matches(".*" + regex + ".*"));
-        assertTrue("Error 1015 rate limited should match",
-            "{\"responsePayload\": \"Error 1015: You are being rate limited\"}".toLowerCase().matches(".*" + regex + ".*"));
-        assertTrue("Error 1000 DNS should match", 
-            "{\"responsePayload\": \"Error 1000: DNS points to prohibited IP\"}".toLowerCase().matches(".*" + regex + ".*"));
-        
+
         // Official Cloudflare blocking page messages
         assertTrue("Attention Required Cloudflare should match",
             "{\"responsePayload\": \"Attention Required! | Cloudflare\"}".toLowerCase().matches(".*" + regex + ".*"));
@@ -272,17 +264,14 @@ public class TestResultsStatsActionTest extends MongoBasedTest {
         String regex = TestResultsStatsAction.REGEX_CLOUDFLARE;
 
         // ==== EDGE CASES - Should NOT match ====
-        
-        // Error codes outside 1xxx range (should not match)
+
+        // Error codes outside Cloudflare documented patterns (non-1xxx examples)
         assertFalse("Error 500 should not match",
             "{\"responsePayload\": \"Error 500: Internal Server Error\"}".toLowerCase().matches(".*" + regex + ".*"));
-        assertFalse("Error 2000 should not match (outside 1xxx range)",
+        assertFalse("Error 2000 should not match",
             "{\"responsePayload\": \"Error 2000: Some other error\"}".toLowerCase().matches(".*" + regex + ".*"));
         
         // Error mention without proper format
-        assertFalse("Generic error mention should not match",
-            "{\"responsePayload\": \"There was an error 1020 in processing\"}".toLowerCase().matches(".*" + regex + ".*"));
-        
         // Cloudflare in non-blocking context (normal success)
         assertFalse("Normal Cloudflare usage should not match",
             "{\"responsePayload\": \"Data served via Cloudflare CDN\"}".toLowerCase().matches(".*" + regex + ".*"));
@@ -292,18 +281,8 @@ public class TestResultsStatsActionTest extends MongoBasedTest {
         // Partial matches that shouldn't trigger
         assertFalse("Partial attention should not match",
             "{\"responsePayload\": \"Attention: Please review your settings\"}".toLowerCase().matches(".*" + regex + ".*"));
-        
-        // ==== VALID CLOUDFLARE ERRORS - Should match ====
-        
-        // All 1xxx error codes with proper format
-        assertTrue("Error 1001 should match",
-            "{\"responsePayload\": \"Error 1001: DNS resolution error\"}".toLowerCase().matches(".*" + regex + ".*"));
-        assertTrue("Error 1999 should match (boundary)",
-            "{\"responsePayload\": \"Error 1999: Some Cloudflare error\"}".toLowerCase().matches(".*" + regex + ".*"));
-        
-        // Case insensitive matching
-        assertTrue("Mixed case should match",
-            "{\"responsePayload\": \"ERROR 1020: ACCESS DENIED\"}".toLowerCase().matches(".*" + regex + ".*"));
+
+        // Case insensitive matching for non-1xxx documented patterns
         assertTrue("Mixed case Cloudflare should match",
             "{\"responsePayload\": \"CloudFlare Security Check Required\"}".toLowerCase().matches(".*" + regex + ".*"));
     }
@@ -769,8 +748,9 @@ public void testFetchTestResultsStatsCount_UsesApiErrorsWhenPresent() {
         String result = action.fetchTestResultsStatsCount();
 
         assertEquals("SUCCESS", result);
-        // Should find only 6 actual Cloudflare blocking scenarios, NOT the OAuth error or benign responses
-        assertEquals(6, action.getCount());
+        // After parking 1xxx detection, only non-1xxx patterns should match: 
+        // "Attention Required", "Cloudflare security check", and explicit WAF block → total 3
+        assertEquals(3, action.getCount());
         assertTrue(action.getActionErrors().isEmpty());
     }
 
@@ -778,10 +758,9 @@ public void testFetchTestResultsStatsCount_UsesApiErrorsWhenPresent() {
     public void testRegexPatternForHTMLErrorPagesWithNewRegex() {
         String regex = TestResultsStatsAction.REGEX_CLOUDFLARE;
 
-        // HTML error pages that SHOULD match (contain proper patterns)
+        // HTML error pages that SHOULD match (contain proper patterns - not relying on 1xxx codes)
         String[] htmlErrorsShouldMatch = {
-                "{\"responsePayload\": \"<!DOCTYPE html><html><head><title>Attention Required! | Cloudflare</title></head><body><h1>Sorry, you have been blocked</h1></body></html>\"}",
-                "{\"responsePayload\": \"<!DOCTYPE html><html><head><title>Security Check - Cloudflare</title></head><body><div class=\\\"error-code\\\">Error 1020: Access denied</div></body></html>\"}",
+                "{\"responsePayload\": \"<!DOCTYPE html><html><head><title>Attention Required! | Cloudflare</title></head><body><h1>Sorry, you have been blocked</h1></body></html>\"}"
         };
 
         for (String html : htmlErrorsShouldMatch) {
@@ -831,14 +810,16 @@ public void testFetchTestResultsStatsCount_UsesApiErrorsWhenPresent() {
     }
 
     @Test 
-    public void testSpecificUserProvidedExample() {
+    public void testOAuthInvalidTokenBehindCloudflareShouldNotMatch() {
         String regex = TestResultsStatsAction.REGEX_CLOUDFLARE;
         
-        // This is the EXACT example provided by the user that should NOT be flagged as Cloudflare error
-        String userExample = "{\"responsePayload\":\"{\\\"error\\\":\\\"invalid_token\\\",\\\"error_description\\\":\\\"Invalid access token\\\"}\",\"responseHeaders\":\"{\\\"date\\\":\\\"Mon, 15 Sep 2025 04:40:03 GMT\\\",\\\"server\\\":\\\"cloudflare\\\",\\\"cf-ray\\\":\\\"97f5719bcc3c13cf-ORD\\\",\\\"vary\\\":\\\"accept-encoding\\\",\\\"x-frame-options\\\":\\\"DENY\\\",\\\"permissions-policy\\\":\\\"microphone=(), geolocation=(), payment=(), gyroscope=(), magnetometer=(), camera=()\\\",\\\"www-authenticate\\\":\\\"Bearer realm=\\\\\\\"oauth\\\\\\\", error=\\\\\\\"invalid_token\\\\\\\", error_description=\\\\\\\"Invalid access token\\\\\\\"\\\",\\\"x-qtest-request-id\\\":\\\"613102ec5e3f9d4a72acadd8\\\",\\\"cf-cache-status\\\":\\\"DYNAMIC\\\",\\\"pragma\\\":\\\"no-cache\\\",\\\"content-security-policy\\\":\\\"default-src 'self' 'unsafe-inline'; base-uri 'self'; style-src * 'unsafe-inline'; script-src * 'unsafe-inline' 'unsafe-eval'; connect-src *; img-src * blob: data:; font-src * data:; frame-src *\\\",\\\"x-content-type-options\\\":\\\"nosniff\\\",\\\"x-robots-tag\\\":\\\"noindex\\\",\\\"referrer-policy\\\":\\\"strict-origin-when-cross-origin\\\",\\\"content-type\\\":\\\"application/json;charset=UTF-8\\\",\\\"cache-control\\\":\\\"no-store\\\"}\",\"statusCode\":401}";
+        // Sanitized representation of the OAuth invalid_token case (no timestamps or unique IDs)
+        String userExample = "{\"responsePayload\":\"{\\\"error\\\":\\\"invalid_token\\\",\\\"error_description\\\":\\\"Invalid access token\\\"}\"," +
+                "\"responseHeaders\":\"{\\\"server\\\":\\\"cloudflare\\\",\\\"cf-ray\\\":\\\"<redacted-ray-id>\\\",\\\"www-authenticate\\\":\\\"Bearer realm=\\\\\\\"oauth\\\\\\\", error=\\\\\\\"invalid_token\\\\\\\", error_description=\\\\\\\"Invalid access token\\\\\\\"\\\"}\"," +
+                "\"statusCode\":401}";
         
-        // THIS IS THE KEY TEST: User's OAuth error should NOT be flagged as Cloudflare error
-        assertFalse("User's OAuth error example should NOT be flagged as Cloudflare error", 
+        // THIS IS THE KEY TEST: OAuth invalid_token behind Cloudflare headers should NOT be flagged as Cloudflare error
+        assertFalse("OAuth invalid_token behind Cloudflare should NOT be flagged as Cloudflare error", 
             userExample.toLowerCase().matches(".*" + regex + ".*"));
     }
 
@@ -847,12 +828,6 @@ public void testFetchTestResultsStatsCount_UsesApiErrorsWhenPresent() {
         String regex = TestResultsStatsAction.REGEX_CLOUDFLARE;
 
         // ==== DOCUMENTED PATTERNS THAT SHOULD MATCH ====
-        
-        // 1. Cloudflare 1xxx error codes (Official format: "Error 1xxx:")
-        assertTrue("Error 1020 should match", 
-            "{\"responsePayload\": \"Error 1020: Access denied\"}".toLowerCase().matches(".*" + regex + ".*"));
-        assertTrue("Error 1015 should match", 
-            "{\"responsePayload\": \"Error 1015: You are being rate limited\"}".toLowerCase().matches(".*" + regex + ".*"));
         
         // 2. Attention Required pattern (Official Cloudflare blocking page)
         assertTrue("Attention Required should match", 
@@ -883,6 +858,33 @@ public void testFetchTestResultsStatsCount_UsesApiErrorsWhenPresent() {
         // Generic WAF messages (not Cloudflare-specific)
         assertFalse("Generic WAF should not match",
             "{\"responsePayload\": \"WAF blocked request\"}".toLowerCase().matches(".*" + regex + ".*"));
+    }
+
+    @Test
+    public void testCloudflareShouldNotMatch_GojekInternalServerError() {
+        String regex = TestResultsStatsAction.REGEX_CLOUDFLARE;
+
+        // Payload based on the screenshot: GoJek business error, not a Cloudflare block
+        String gojekPayload =
+            "{\"responsePayload\": \"{\\\"error\\\":{\\\"code\\\":\\\"1000\\\",\\\"description\\\":\\\"internal server error\\\"}," +
+            "\\\"errors\\\":[{\\\"code\\\":\\\"GoPay-1000\\\",\\\"message\\\":\\\"Don't worry, we're fixing this. Please try again after some time.\\\"}]," +
+            "\\\"success\\\":false}\"}";
+
+        assertFalse("GoJek internal server error should NOT be flagged as Cloudflare",
+            gojekPayload.toLowerCase().matches(".*" + regex + ".*"));
+    }
+
+    @Test
+    public void testCloudflareShouldNotMatch_ErrorCode1000BenignJson() {
+        String regex = TestResultsStatsAction.REGEX_CLOUDFLARE;
+
+        String sample =
+            "{\"responsePayload\": \"{\\\"error\\\":{\\\"code\\\":1000,\\\"description\\\":\\\"hello\\\"}}\"," +
+            " \"responseHeaders\": \"{\\\"server\\\":\\\"cloudflare\\\",\\\"cf-ray\\\":\\\"<redacted-ray-id>\\\"}\"," +
+            " \"statusCode\": 403}";
+
+        assertFalse("Benign JSON with error.code=1000 should NOT be flagged as Cloudflare",
+            sample.toLowerCase().matches(".*" + regex + ".*"));
     }
 
 }
