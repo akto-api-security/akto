@@ -37,16 +37,16 @@ public class PercentilesCronTest {
     }
 
     @Test
-    public void returnsZerosForEmptyData() throws Exception {
+    public void returnsNegativesForEmptyData() throws Exception {
         PercentilesCron cron = new PercentilesCron(null);
         List<ApiDistributionDataModel> data = Collections.emptyList();
 
         Object result = cron.calculatePercentiles(data, 2);
         int[] vals = extractPercentiles(result);
 
-        assertEquals(0, vals[0]);
-        assertEquals(0, vals[1]);
-        assertEquals(0, vals[2]);
+        assertEquals(-1, vals[0]);
+        assertEquals(-1, vals[1]);
+        assertEquals(-1, vals[2]);
     }
 
     @Test

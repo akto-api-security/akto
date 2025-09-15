@@ -24,6 +24,7 @@ public class PercentilesCron {
     private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
     private final MongoClient mongoClient;
     private static final int DEFAULT_BASELINE_DAYS = 2;
+    private static final int MIN_INITIAL_AGE_DAYS = 2;
 
     public PercentilesCron(MongoClient mongoClient) {
         this.mongoClient = mongoClient;
@@ -38,7 +39,7 @@ public class PercentilesCron {
                     logger.errorAndAddToDb("error in PercentilesCron: accountId " + accountId + " " + e.getMessage(), LoggerMaker.LogDb.RUNTIME);
                 }
             }
-        }, 0, 10, TimeUnit.MINUTES);
+        }, 0, 2, TimeUnit.DAYS);
     }
 
     public void runOnce(String accountId) {
@@ -60,6 +61,13 @@ public class PercentilesCron {
             int apiCollectionId = Integer.parseInt(parts[0]);
             String url = parts[1];
             String method = parts[2];
+
+            // Ensure there exists at least one record that is MIN_INITIAL_AGE_DAYS old
+            if (!hasMinimumInitialAge(accountId, apiCollectionId, url, method, MIN_INITIAL_AGE_DAYS)) {
+                logger.infoAndAddToDb("Skipping rateLimits update due to insufficient data age for apiCollectionId " + apiCollectionId +
+                        " url " + url + " method " + method, LoggerMaker.LogDb.RUNTIME);
+                continue;
+            }
 
             // Fetch last baseline days of distribution data
             List<ApiDistributionDataModel> distributionData = fetchDistributionDocs(DEFAULT_BASELINE_DAYS, accountId, apiCollectionId, url, method);
@@ -118,6 +126,31 @@ public class PercentilesCron {
             }
         }
         return docs;
+    }
+
+    /**
+     * Returns true if there exists at least one record with windowStart timestamp
+     * that is at least minAgeDays old from now for the given API key.
+     */
+    public boolean hasMinimumInitialAge(String accountId, int apiCollectionId, String url, String method, int minAgeDays) {
+        MongoCollection<ApiDistributionDataModel> coll = this.mongoClient
+                .getDatabase(accountId)
+                .getCollection("api_distribution_data", ApiDistributionDataModel.class);
+
+        long currentMinutesSinceEpoch = Instant.now().getEpochSecond() / 60;
+        long minAgeMinutes = (long) minAgeDays * 24L * 60L;
+        long thresholdWindowStart = currentMinutesSinceEpoch - minAgeMinutes;
+
+        Bson filter = Filters.and(
+                Filters.eq("apiCollectionId", apiCollectionId),
+                Filters.eq("url", url),
+                Filters.eq("method", method),
+                Filters.lte("windowStart", (int) thresholdWindowStart)
+        );
+
+        try (MongoCursor<ApiDistributionDataModel> cursor = coll.find(filter).limit(1).iterator()) {
+            return cursor.hasNext();
+        }
     }
 
     /**
