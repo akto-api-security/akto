@@ -21,6 +21,7 @@ public class Constants {
     // IP API ratelimit cache keys
     public static final String RATE_LIMIT_CACHE_PREFIX = "ratelimit:";
     public static final String API_RATE_LIMIT_CONFIDENCE = "rateLimitConfidence";
+    public static final String API_RATE_LIMIT_MITIGATION = "mitigation";
     public static final int RATE_LIMIT_UNLIMITED_REQUESTS = -1;
     public static final String P50_CACHE_KEY = "p50";
     public static final String P75_CACHE_KEY = "p75";

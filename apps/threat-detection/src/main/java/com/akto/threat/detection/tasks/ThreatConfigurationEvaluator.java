@@ -94,15 +94,17 @@ public class ThreatConfigurationEvaluator {
             } catch (Exception e) {
                 logger.error("Error during scheduled resync of API infos", e);
             }
-        }, 15, 15, TimeUnit.MINUTES); 
+        }, 15, 15, TimeUnit.MINUTES);
     }
 
     public long getApiRateLimitFromCache(ApiInfoKey apiInfoKey, RatelimitConfigItem rule) {
         String baseKey = Constants.RATE_LIMIT_CACHE_PREFIX + apiInfoKey.toString() + ":";
-        
-        // Use the period from the rule as the time window, defaulting to "5" if not specified
+
+        // Use the period from the rule as the time window, defaulting to "5" if not
+        // specified
         String timeWindow = rule.getPeriod() > 0 ? String.valueOf(rule.getPeriod()) : "5";
-        long rateLimit = this.apiCountCacheLayer.get(baseKey + timeWindow + ":" + rule.getAutoThreshold().getPercentile());
+        long rateLimit = this.apiCountCacheLayer
+                .get(baseKey + timeWindow + ":" + rule.getAutoThreshold().getPercentile());
 
         if (rateLimit == 0) {
             logger.debug("Rate limiting skipped no ratelimits found for api: " + apiInfoKey.toString() + " percentile: "
@@ -155,10 +157,11 @@ public class ThreatConfigurationEvaluator {
                         (long) (apiInfo.getRateLimitConfidence() * 10));
 
                 // Iterate through each time window
-                /** Structure of ratelimits is MinutesWindow: RateLimitValues
+                /**
+                 * Structure of ratelimits is MinutesWindow: RateLimitValues
                  * {
-                 *  "5": {"p50": 100, "p75": 120, "p90": 300},
-                 *  "15": {"p50": 100, "p75": 120, "p90": 300},
+                 * "5": {"p50": 100, "p75": 120, "p90": 300},
+                 * "15": {"p50": 100, "p75": 120, "p90": 300},
                  * }
                  */
 
@@ -291,5 +294,26 @@ public class ThreatConfigurationEvaluator {
     public long getRatelimit(ApiInfoKey apiInfoKey) {
         RatelimitConfigItem rule = getDefaultRateLimitConfig();
         return getApiRateLimitFromCache(apiInfoKey, rule);
+    }
+
+    /**
+     * Check and set if actor was already marked as malicious due to ratelimit
+     * exceeded.
+     * Don't send more events to BE till mitigation period is over.
+     */
+
+    public boolean isActorInMitigationPeriod(String ipApiCmsKey, RatelimitConfigItem rule) {
+        return this.apiCountCacheLayer.fetchLongDataFromRedis(
+                Constants.RATE_LIMIT_CACHE_PREFIX + ipApiCmsKey + ":" + Constants.API_RATE_LIMIT_MITIGATION) > 0;
+    }
+
+    /**
+     * Set a key in redis with rule.getMitigationPeriod expiry.
+     * Example:  14.3.2.1:collId:/users/orders:mitigation : 300 , expiry 300 seconds
+     */
+    public void setActorInMitigationPeriod(String ipApiCmsKey, RatelimitConfigItem rule) {
+        this.apiCountCacheLayer.setLongWithExpiry(
+                Constants.RATE_LIMIT_CACHE_PREFIX + ipApiCmsKey + ":" + Constants.API_RATE_LIMIT_MITIGATION,
+                rule.getMitigationPeriod(), rule.getMitigationPeriod() * 60);
     }
 }

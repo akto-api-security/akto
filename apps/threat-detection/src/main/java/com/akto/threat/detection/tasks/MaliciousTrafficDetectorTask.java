@@ -272,21 +272,28 @@ public class MaliciousTrafficDetectorTask implements Task {
       String apiCollectionIdStr = Integer.toString(apiCollectionId);
       String distributionKey = Utils.buildApiDistributionKey(apiCollectionIdStr, url, method.toString());
       String ipApiCmsKey = Utils.buildIpApiCmsDataKey(actor, apiCollectionIdStr, url, method.toString());
-      long curEpochMin = responseParam.getTime()/60;
+      long curEpochMin = responseParam.getTime() / 60;
       this.distributionCalculator.updateFrequencyBuckets(distributionKey, curEpochMin, ipApiCmsKey);
 
       // Check and raise alert for RateLimits
       RatelimitConfigItem ratelimitConfig = this.threatConfigEvaluator.getDefaultRateLimitConfig();
       long ratelimit = this.threatConfigEvaluator.getRatelimit(apiInfoKey);
 
-      // TODO: API infos must store the data for the same period as the rule.
-      long count = this.distributionCalculator.getSlidingWindowCount(ipApiCmsKey, curEpochMin, ratelimitConfig.getPeriod());
+      long count = this.distributionCalculator.getSlidingWindowCount(ipApiCmsKey, curEpochMin,
+          ratelimitConfig.getPeriod());
 
-      if (count > ratelimit) {
-        logger.debugAndAddToDb("Ratelimit hit for url " + apiInfoKey.getUrl() + " actor: " + actor + " ratelimitConfig " + ratelimitConfig.toString());
-        // TODO: Mitigation period must be respected
-        SampleMaliciousRequest maliciousReq = Utils.buildSampleMaliciousRequest(actor, responseParam, ipApiRateLimitFilter, metadata, errors);
-        generateAndPushMaliciousEventRequest(ipApiRateLimitFilter, actor, responseParam, maliciousReq, EventType.EVENT_TYPE_AGGREGATED);
+      if (count > ratelimit && !this.threatConfigEvaluator.isActorInMitigationPeriod(ipApiCmsKey, ratelimitConfig)) {
+        logger.debugAndAddToDb("Ratelimit hit for url " + apiInfoKey.getUrl() + " actor: " + actor + " ratelimitConfig "
+            + ratelimitConfig.toString());
+
+        // Send event to BE.
+        SampleMaliciousRequest maliciousReq = Utils.buildSampleMaliciousRequest(actor, responseParam,
+            ipApiRateLimitFilter, metadata, errors);
+        generateAndPushMaliciousEventRequest(ipApiRateLimitFilter, actor, responseParam, maliciousReq,
+            EventType.EVENT_TYPE_AGGREGATED);
+        
+        // cool-off sending to BE till mitigationPeriod is over
+        this.threatConfigEvaluator.setActorInMitigationPeriod(ipApiCmsKey, ratelimitConfig);
       }
     }
 
