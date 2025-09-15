@@ -134,6 +134,10 @@ public class ThreatConfigurationEvaluator {
 
     public void resyncApiInfos() {
         try {
+            if(this.apiCountCacheLayer == null){
+                logger.warn("Skipping ratelimiting, redis not available");
+                return;
+            }
             this.apiInfos = dataActor.fetchApiRateLimits(null);
 
             if (apiInfos == null || apiInfos.isEmpty()) {
