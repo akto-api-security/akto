@@ -208,51 +208,104 @@ public class TestResultsStatsActionTest extends MongoBasedTest {
     public void testRegexPatternForCloudflareBlocked() {
         String regex = TestResultsStatsAction.REGEX_CLOUDFLARE;
 
-        assertTrue("Error 1020 should match", "Error 1020: Access denied".toLowerCase().matches(".*" + regex + ".*"));
+        // ==== TRUE POSITIVES: These SHOULD match (actual Cloudflare blocking) ====
+        
+        // Official Cloudflare 1xxx error codes
+        assertTrue("Error 1020 should match", 
+            "{\"responsePayload\": \"Error 1020: Access denied\"}".toLowerCase().matches(".*" + regex + ".*"));
         assertTrue("Error 1015 rate limited should match",
-                "Error 1015: You are being rate limited".toLowerCase().matches(".*" + regex + ".*"));
+            "{\"responsePayload\": \"Error 1015: You are being rate limited\"}".toLowerCase().matches(".*" + regex + ".*"));
+        assertTrue("Error 1000 DNS should match", 
+            "{\"responsePayload\": \"Error 1000: DNS points to prohibited IP\"}".toLowerCase().matches(".*" + regex + ".*"));
+        
+        // Official Cloudflare blocking page messages
         assertTrue("Attention Required Cloudflare should match",
-                "Attention Required! | Cloudflare".toLowerCase().matches(".*" + regex + ".*"));
-        assertTrue("Blocked Cloudflare should match",
-                "User blocked by Cloudflare".toLowerCase().matches(".*" + regex + ".*"));
-        assertTrue("Security service protect should match",
-                "This website is using a security service to protect itself from online attacks.".toLowerCase()
-                        .matches(".*" + regex + ".*"));
-        assertTrue("Ray ID blocked should match", "Ray ID ABC blocked".toLowerCase().matches(".*" + regex + ".*"));
-
-        // Should NOT match benign 2xx with cf-ray header
-        assertFalse("cf-ray header alone should not match",
-                "{\"statusCode\":200, \"headers\":{\"cf-ray\":\"abc\"}}".toLowerCase().matches(".*" + regex + ".*"));
+            "{\"responsePayload\": \"Attention Required! | Cloudflare\"}".toLowerCase().matches(".*" + regex + ".*"));
+        assertTrue("Cloudflare security check should match",
+            "{\"responsePayload\": \"Cloudflare security check in progress\"}".toLowerCase().matches(".*" + regex + ".*"));
+        
+        // WAF specific blocking
+        assertTrue("WAF blocking should match",
+            "{\"responsePayload\": \"Request blocked by Cloudflare WAF\"}".toLowerCase().matches(".*" + regex + ".*"));
+        assertTrue("Cloudflare WAF blocked should match",
+            "{\"responsePayload\": \"Cloudflare WAF rule blocked this request\"}".toLowerCase().matches(".*" + regex + ".*"));
     }
 
     @Test
-    public void testCloudflareCfRayHeadersDoNotMatch() {
+    public void testRegexPatternForCloudflareNegatives() {
         String regex = TestResultsStatsAction.REGEX_CLOUDFLARE;
 
-        String[] benignHeaders = new String[] {
-                "{\"statusCode\": 200, \"headers\": {\"cf-ray\": \"7f9e7f2ad9be2a3c-DEL\", \"server\": \"cloudflare\"}}",
-                "{\"statusCode\": 204, \"headers\": {\"cf-ray\": \"72f0a1b7ce4321ab-LHR\"}}",
-                "{\"statusCode\": 302, \"headers\": {\"cf-ray\": \"6a5d1e2f3c4b9abc-SIN\", \"cf-cache-status\": \"HIT\"}}",
-                "{\"statusCode\": 200, \"headers\": {\"server\": \"cloudflare\", \"cf-ray\": \"8090abcd1234efgh-BOM\"}}"
-        };
+        // ==== FALSE POSITIVES PREVENTION: These should NOT match ====
+        
+        // The specific example from user - OAuth error behind Cloudflare should NOT be flagged
+        String oauthErrorExample = "{\"responsePayload\":\"{\\\"error\\\":\\\"invalid_token\\\",\\\"error_description\\\":\\\"Invalid access token\\\"}\",\"responseHeaders\":\"{\\\"date\\\":\\\"Mon, 15 Sep 2025 04:40:03 GMT\\\",\\\"server\\\":\\\"cloudflare\\\",\\\"cf-ray\\\":\\\"97f5719bcc3c13cf-ORD\\\",\\\"vary\\\":\\\"accept-encoding\\\",\\\"x-frame-options\\\":\\\"DENY\\\",\\\"permissions-policy\\\":\\\"microphone=(), geolocation=(), payment=(), gyroscope=(), magnetometer=(), camera=()\\\",\\\"www-authenticate\\\":\\\"Bearer realm=\\\\\\\"oauth\\\\\\\", error=\\\\\\\"invalid_token\\\\\\\", error_description=\\\\\\\"Invalid access token\\\\\\\"\\\",\\\"x-qtest-request-id\\\":\\\"613102ec5e3f9d4a72acadd8\\\",\\\"cf-cache-status\\\":\\\"DYNAMIC\\\",\\\"pragma\\\":\\\"no-cache\\\",\\\"content-security-policy\\\":\\\"default-src 'self' 'unsafe-inline'; base-uri 'self'; style-src * 'unsafe-inline'; script-src * 'unsafe-inline' 'unsafe-eval'; connect-src *; img-src * blob: data:; font-src * data:; frame-src *\\\",\\\"x-content-type-options\\\":\\\"nosniff\\\",\\\"x-robots-tag\\\":\\\"noindex\\\",\\\"referrer-policy\\\":\\\"strict-origin-when-cross-origin\\\",\\\"content-type\\\":\\\"application/json;charset=UTF-8\\\",\\\"cache-control\\\":\\\"no-store\\\"}\",\"statusCode\":401}";
+        assertFalse("OAuth invalid_token error should NOT be flagged as Cloudflare error", 
+            oauthErrorExample.toLowerCase().matches(".*" + regex + ".*"));
 
-        for (String h : benignHeaders) {
-            assertFalse("Benign cf-ray header should not match: " + h, h.toLowerCase().matches(".*" + regex + ".*"));
-        }
+        // Normal API errors with Cloudflare headers should NOT match
+        assertFalse("Normal cf-ray header should not match",
+                "{\"statusCode\":200, \"headers\":{\"cf-ray\":\"abc\"}}".toLowerCase().matches(".*" + regex + ".*"));
+        
+        // Authentication errors behind Cloudflare should NOT match
+        assertFalse("API authentication error should not match",
+            "{\"responsePayload\":\"{\\\"error\\\":\\\"unauthorized\\\"}\", \"headers\":{\"server\":\"cloudflare\"}}".toLowerCase().matches(".*" + regex + ".*"));
+        
+        // Normal 401/403 API responses should NOT match
+        assertFalse("Normal 401 should not match",
+            "{\"statusCode\": 401, \"responsePayload\":\"{\\\"message\\\":\\\"Unauthorized\\\"}\"}".toLowerCase().matches(".*" + regex + ".*"));
+        
+        // API rate limiting (non-Cloudflare) should NOT match
+        assertFalse("API rate limit should not match",
+            "{\"responsePayload\":\"{\\\"error\\\":\\\"rate_limit_exceeded\\\"}\"}".toLowerCase().matches(".*" + regex + ".*"));
+        
+        // Normal successful responses through Cloudflare should NOT match
+        assertFalse("Successful response should not match",
+            "{\"statusCode\": 200, \"responsePayload\":\"{\\\"data\\\":\\\"success\\\"}\", \"headers\":{\"server\":\"cloudflare\"}}".toLowerCase().matches(".*" + regex + ".*"));
+        
+        // Business logic errors should NOT match
+        assertFalse("Business logic error should not match",
+            "{\"responsePayload\":\"{\\\"error\\\":\\\"user_not_found\\\"}\"}".toLowerCase().matches(".*" + regex + ".*"));
+    }
 
-        String[] blockedSamples = new String[] {
-                "{\"statusCode\": 403, \"body\": \"Error 1020: Access denied\"}",
-                "{\"statusCode\": 429, \"body\": \"You are being rate limited by Cloudflare\"}",
-                "{\"statusCode\": 403, \"body\": \"Attention Required! | Cloudflare\"}",
-                "{\"statusCode\": 403, \"body\": \"This website is using a security service to protect itself from online attacks.\"}",
-                "{\"statusCode\": 403, \"body\": \"Ray ID XYZ blocked\"}",
-                "{\"statusCode\": 403, \"body\": \"WAF rule triggered: Malicious request detected\"}",
-                "{\"statusCode\": 403, \"body\": \"WAF block: SQL injection attempt detected\"}"
-        };
+    @Test
+    public void testCloudflareEdgeCasesAndBoundaryConditions() {
+        String regex = TestResultsStatsAction.REGEX_CLOUDFLARE;
 
-        for (String s : blockedSamples) {
-            assertTrue("Blocked sample should match: " + s, s.toLowerCase().matches(".*" + regex + ".*"));
-        }
+        // ==== EDGE CASES - Should NOT match ====
+        
+        // Error codes outside 1xxx range (should not match)
+        assertFalse("Error 500 should not match",
+            "{\"responsePayload\": \"Error 500: Internal Server Error\"}".toLowerCase().matches(".*" + regex + ".*"));
+        assertFalse("Error 2000 should not match (outside 1xxx range)",
+            "{\"responsePayload\": \"Error 2000: Some other error\"}".toLowerCase().matches(".*" + regex + ".*"));
+        
+        // Error mention without proper format
+        assertFalse("Generic error mention should not match",
+            "{\"responsePayload\": \"There was an error 1020 in processing\"}".toLowerCase().matches(".*" + regex + ".*"));
+        
+        // Cloudflare in non-blocking context (normal success)
+        assertFalse("Normal Cloudflare usage should not match",
+            "{\"responsePayload\": \"Data served via Cloudflare CDN\"}".toLowerCase().matches(".*" + regex + ".*"));
+        assertFalse("Cloudflare performance mention should not match",
+            "{\"responsePayload\": \"Optimized by Cloudflare\"}".toLowerCase().matches(".*" + regex + ".*"));
+        
+        // Partial matches that shouldn't trigger
+        assertFalse("Partial attention should not match",
+            "{\"responsePayload\": \"Attention: Please review your settings\"}".toLowerCase().matches(".*" + regex + ".*"));
+        
+        // ==== VALID CLOUDFLARE ERRORS - Should match ====
+        
+        // All 1xxx error codes with proper format
+        assertTrue("Error 1001 should match",
+            "{\"responsePayload\": \"Error 1001: DNS resolution error\"}".toLowerCase().matches(".*" + regex + ".*"));
+        assertTrue("Error 1999 should match (boundary)",
+            "{\"responsePayload\": \"Error 1999: Some Cloudflare error\"}".toLowerCase().matches(".*" + regex + ".*"));
+        
+        // Case insensitive matching
+        assertTrue("Mixed case should match",
+            "{\"responsePayload\": \"ERROR 1020: ACCESS DENIED\"}".toLowerCase().matches(".*" + regex + ".*"));
+        assertTrue("Mixed case Cloudflare should match",
+            "{\"responsePayload\": \"CloudFlare Security Check Required\"}".toLowerCase().matches(".*" + regex + ".*"));
     }
 
     @Test
@@ -637,7 +690,6 @@ public void testFetchTestResultsStatsCount_UsesApiErrorsWhenPresent() {
     }
 
     @Test
-
     public void testFetchTestResultsStatsCount_WithCloudflareResponses() {
         // Clear and setup test data
         TestingRunResultDao.instance.getMCollection().drop();
@@ -646,23 +698,20 @@ public void testFetchTestResultsStatsCount_UsesApiErrorsWhenPresent() {
 
         List<TestingRunResult> testingRunResults = new ArrayList<>();
 
-        // Create test results with various Cloudflare blocking scenarios
-        String[] cloudflareErrors = {
-                "{\"statusCode\": 403, \"body\": \"Error 1020: Access denied\"}",
-                "{\"statusCode\": 429, \"body\": \"Error 1015: You are being rate limited\"}",
-                "{\"statusCode\": 403, \"body\": \"Attention Required! | Cloudflare\"}",
-                "{\"statusCode\": 403, \"body\": \"User blocked by Cloudflare\"}",
-                "{\"statusCode\": 403, \"body\": \"This website is using a security service to protect itself from online attacks.\"}",
-                "{\"statusCode\": 403, \"body\": \"Ray ID XYZ123 blocked\"}",
-                "{\"statusCode\": 403, \"body\": \"WAF rule triggered: SQL injection detected\"}",
-                "{\"statusCode\": 403, \"body\": \"WAF block: Malicious payload detected\"}",
-                "{\"statusCode\": 403, \"body\": \"Error 1012: Access denied\"}"
+        // Create test results with ACTUAL Cloudflare blocking scenarios (should match new regex)
+        String[] actualCloudflareErrors = {
+            "{\"responsePayload\": \"Error 1020: Access denied\"}",
+            "{\"responsePayload\": \"Error 1015: You are being rate limited\"}",
+            "{\"responsePayload\": \"Attention Required! | Cloudflare\"}",
+            "{\"responsePayload\": \"Cloudflare security check in progress\"}",
+            "{\"responsePayload\": \"Request blocked by Cloudflare WAF\"}",
+            "{\"responsePayload\": \"Error 1012: Access denied\"}"
         };
 
-        for (int i = 0; i < cloudflareErrors.length; i++) {
-            TestResult cloudflareErrorResult = new TestResult(cloudflareErrors[i],
+        for (int i = 0; i < actualCloudflareErrors.length; i++) {
+            TestResult cloudflareErrorResult = new TestResult(actualCloudflareErrors[i],
                     "", new ArrayList<>(), 100.0, false, TestResult.Confidence.HIGH, null);
-            ApiInfo.ApiInfoKey apiInfoKey = new ApiInfo.ApiInfoKey(1, "/cf-test-" + i, URLMethods.Method.POST);
+            ApiInfo.ApiInfoKey apiInfoKey = new ApiInfo.ApiInfoKey(1, "/cf-block-" + i, URLMethods.Method.POST);
             TestingRunResult runResult = new TestingRunResult(
                     testingRunId, apiInfoKey, "CLOUDFLARE_BLOCK", "CLOUDFLARE_BLOCK_TEST",
                     Arrays.asList(cloudflareErrorResult), false, new ArrayList<SingleTypeInfo>(),
@@ -671,7 +720,19 @@ public void testFetchTestResultsStatsCount_UsesApiErrorsWhenPresent() {
             testingRunResults.add(runResult);
         }
 
-        // Add some benign responses that should NOT match
+        // Add the specific OAuth error example that should NOT match
+        String oauthError = "{\"responsePayload\":\"{\\\"error\\\":\\\"invalid_token\\\",\\\"error_description\\\":\\\"Invalid access token\\\"}\",\"responseHeaders\":\"{\\\"date\\\":\\\"Mon, 15 Sep 2025 04:40:03 GMT\\\",\\\"server\\\":\\\"cloudflare\\\",\\\"cf-ray\\\":\\\"97f5719bcc3c13cf-ORD\\\"}\",\"statusCode\":401}";
+        TestResult oauthErrorResult = new TestResult(oauthError,
+                "", new ArrayList<>(), 100.0, false, TestResult.Confidence.HIGH, null);
+        ApiInfo.ApiInfoKey oauthKey = new ApiInfo.ApiInfoKey(1, "/oauth-error", URLMethods.Method.POST);
+        TestingRunResult oauthRunResult = new TestingRunResult(
+                testingRunId, oauthKey, "OAUTH_ERROR", "OAUTH_ERROR_TEST",
+                Arrays.asList(oauthErrorResult), false, new ArrayList<SingleTypeInfo>(),
+                80, Context.now(), Context.now(), testingRunResultSummaryId,
+                null, new ArrayList<TestingRunResult.TestLog>());
+        testingRunResults.add(oauthRunResult);
+
+        // Add other benign responses that should NOT match
         String[] benignResponses = {
                 "{\"statusCode\": 200, \"headers\": {\"cf-ray\": \"7f9e7f2ad9be2a3c-DEL\"}}",
                 "{\"statusCode\": 204, \"headers\": {\"cf-ray\": \"72f0a1b7ce4321ab-LHR\"}}",
@@ -680,7 +741,7 @@ public void testFetchTestResultsStatsCount_UsesApiErrorsWhenPresent() {
 
         for (int i = 0; i < benignResponses.length; i++) {
             TestResult benignResult = new TestResult(benignResponses[i],
-                    "", new ArrayList<>(), 100.0, false, TestResult.Confidence.HIGH, null);
+                "", new ArrayList<>(), 100.0, false, TestResult.Confidence.HIGH, null);
             ApiInfo.ApiInfoKey apiInfoKey = new ApiInfo.ApiInfoKey(1, "/benign-" + i, URLMethods.Method.GET);
             TestingRunResult runResult = new TestingRunResult(
                     testingRunId, apiInfoKey, "BENIGN_TEST", "BENIGN_TEST",
@@ -708,25 +769,34 @@ public void testFetchTestResultsStatsCount_UsesApiErrorsWhenPresent() {
         String result = action.fetchTestResultsStatsCount();
 
         assertEquals("SUCCESS", result);
-        assertEquals(9, action.getCount()); // Should find 9 Cloudflare blocking scenarios, excluding benign responses
+        // Should find only 6 actual Cloudflare blocking scenarios, NOT the OAuth error or benign responses
+        assertEquals(6, action.getCount());
         assertTrue(action.getActionErrors().isEmpty());
     }
 
     @Test
-    public void testRegexPatternForCloudflareHTMLErrorPages() {
+    public void testRegexPatternForHTMLErrorPagesWithNewRegex() {
         String regex = TestResultsStatsAction.REGEX_CLOUDFLARE;
 
-        // HTML error pages that should match
-        String[] htmlErrors = {
-                "<!DOCTYPE html><html><head><title>Attention Required! | Cloudflare</title></head><body><h1>Sorry, you have been blocked</h1></body></html>",
-                "<!DOCTYPE html><html><head><title>Just a moment...</title></head><body><p>DDoS protection by Cloudflare</p></body></html>",
-                "<!DOCTYPE html><html><head><title>Security Check - Cloudflare</title></head><body><div class=\"error-code\">Error 1020: Access denied</div></body></html>",
-                "<!DOCTYPE html><html><head><title>Under Attack Mode - Cloudflare</title></head><body><h1>Website Under Attack Mode</h1></body></html>",
-                "<html><body><h1>Checking your browser before accessing the website.</h1><p>DDoS protection by Cloudflare</p></body></html>"
+        // HTML error pages that SHOULD match (contain proper patterns)
+        String[] htmlErrorsShouldMatch = {
+                "{\"responsePayload\": \"<!DOCTYPE html><html><head><title>Attention Required! | Cloudflare</title></head><body><h1>Sorry, you have been blocked</h1></body></html>\"}",
+                "{\"responsePayload\": \"<!DOCTYPE html><html><head><title>Security Check - Cloudflare</title></head><body><div class=\\\"error-code\\\">Error 1020: Access denied</div></body></html>\"}",
         };
 
-        for (String html : htmlErrors) {
-            assertTrue("HTML error page should match: " + html.substring(0, Math.min(100, html.length())),
+        for (String html : htmlErrorsShouldMatch) {
+            assertTrue("HTML error page with proper pattern should match: " + html.substring(0, Math.min(100, html.length())),
+                    html.toLowerCase().matches(".*" + regex + ".*"));
+        }
+
+        // HTML pages that should NOT match (generic content, no specific error patterns)
+        String[] htmlErrorsShouldNotMatch = {
+                "{\"responsePayload\": \"<!DOCTYPE html><html><head><title>Just a moment...</title></head><body><p>Loading...</p></body></html>\"}",
+                "{\"responsePayload\": \"<html><body><h1>Checking your browser</h1><p>Please wait</p></body></html>\"}"
+        };
+
+        for (String html : htmlErrorsShouldNotMatch) {
+            assertFalse("Generic HTML page should NOT match: " + html.substring(0, Math.min(100, html.length())),
                     html.toLowerCase().matches(".*" + regex + ".*"));
         }
     }
@@ -735,171 +805,84 @@ public void testFetchTestResultsStatsCount_UsesApiErrorsWhenPresent() {
     public void testRegexPatternForWAFBlocking() {
         String regex = TestResultsStatsAction.REGEX_CLOUDFLARE;
 
-        // WAF blocking messages that should match
-        String[] wafMessages = {
-                "WAF Alert: SQL injection attempt detected and blocked by Cloudflare security rules",
-                "WAF Block: Cross-site scripting (XSS) attack prevented by Web Application Firewall",
-                "WAF Security: Malicious payload detected in request headers - access denied",
-                "WAF Protection: Command injection attempt blocked by security policy",
-                "WAF Triggered: Suspicious file upload blocked by Cloudflare WAF rules",
-                "WAF Defense: Directory traversal attack prevented by Web Application Firewall",
-                "WAF Alert: Server-side template injection attempt blocked",
-                "WAF Security: XML external entity (XXE) attack prevented",
-                "WAF Block: LDAP injection attempt detected and denied",
-                "WAF Protection: Remote file inclusion attack blocked by security rules"
+        // WAF blocking messages that SHOULD match (explicit Cloudflare WAF blocking)
+        String[] wafMessagesShouldMatch = {
+                "{\"responsePayload\": \"Request blocked by Cloudflare WAF\"}",
+                "{\"responsePayload\": \"Cloudflare WAF rule blocked this request\"}",
+                "{\"responsePayload\": \"Cloudflare WAF security check failed\"}"
         };
 
-        for (String wafMessage : wafMessages) {
-            assertTrue("WAF message should match: " + wafMessage,
-                    wafMessage.toLowerCase().matches(".*" + regex + ".*"));
+        for (String wafMessage : wafMessagesShouldMatch) {
+            assertTrue("Explicit Cloudflare WAF message should match: " + wafMessage,
+                wafMessage.toLowerCase().matches(".*" + regex + ".*"));
+        }
+
+        // Generic WAF messages that should NOT match (could be from any WAF, not specifically Cloudflare)
+        String[] wafMessagesShouldNotMatch = {
+                "{\"responsePayload\": \"WAF Alert: SQL injection attempt detected\"}",
+                "{\"responsePayload\": \"WAF Block: Cross-site scripting attack prevented\"}",
+                "{\"responsePayload\": \"Web Application Firewall blocked this request\"}"
+        };
+
+        for (String wafMessage : wafMessagesShouldNotMatch) {
+            assertFalse("Generic WAF message should NOT match: " + wafMessage,
+                wafMessage.toLowerCase().matches(".*" + regex + ".*"));
         }
     }
 
-    
-
-    @Test
-    public void testRegexPatternForSpecificCloudflareErrorCodes() {
+    @Test 
+    public void testSpecificUserProvidedExample() {
         String regex = TestResultsStatsAction.REGEX_CLOUDFLARE;
-
-        // Test specific Cloudflare error codes
-        String[] errorCodes = {
-                "Error 1000: DNS points to prohibited IP",
-                "Error 1001: DNS resolution error",
-                "Error 1002: DNS points to prohibited IP",
-                "Error 1003: Direct IP access not allowed",
-                "Error 1004: Host not configured to serve web traffic over HTTPS",
-                "Error 1005: Country or region blocked by administrator",
-                "Error 1006: Access denied due to robot activity",
-                "Error 1007: Access denied due to proxy traffic",
-                "Error 1008: Access denied due to VPN traffic",
-                "Error 1009: Access denied due to banned country",
-                "Error 1010: The owner of this website bans your access based on your browser",
-                "Error 1011: Access denied due to hotlinking",
-                "Error 1012: Access denied",
-                "Error 1013: HTTP hostname and TLS SNI hostname mismatch",
-                "Error 1014: CNAME Cross-User Banned",
-                "Error 1015: You are being rate limited",
-                "Error 1016: Origin DNS error",
-                "Error 1017: Origin web server connection failed",
-                "Error 1018: Could not route to the origin server",
-                "Error 1019: Compute server error",
-                "Error 1020: Access denied",
-                "Error 1021: The request is not allowed",
-                "Error 1022: The request is not allowed",
-                "Error 1023: Access is denied",
-                "Error 1024: Please check back later",
-                "Error 1025: Please check back later",
-                "Error 10000: Unknown error",
-                "Error 10001: Country blocked",
-                "Error 10002: Suspected bot activity",
-                "Error 10003: Request denied for security reasons",
-                "Error 10004: Too many requests",
-                "Error 10005: Access denied by security rule",
-                "Error 10006: Website temporarily disabled"
-        };
-        for (String errorCode : errorCodes) {
-            assertTrue("Error code should match: " + errorCode,
-                    errorCode.toLowerCase().matches(".*" + regex + ".*"));
-        }
+        
+        // This is the EXACT example provided by the user that should NOT be flagged as Cloudflare error
+        String userExample = "{\"responsePayload\":\"{\\\"error\\\":\\\"invalid_token\\\",\\\"error_description\\\":\\\"Invalid access token\\\"}\",\"responseHeaders\":\"{\\\"date\\\":\\\"Mon, 15 Sep 2025 04:40:03 GMT\\\",\\\"server\\\":\\\"cloudflare\\\",\\\"cf-ray\\\":\\\"97f5719bcc3c13cf-ORD\\\",\\\"vary\\\":\\\"accept-encoding\\\",\\\"x-frame-options\\\":\\\"DENY\\\",\\\"permissions-policy\\\":\\\"microphone=(), geolocation=(), payment=(), gyroscope=(), magnetometer=(), camera=()\\\",\\\"www-authenticate\\\":\\\"Bearer realm=\\\\\\\"oauth\\\\\\\", error=\\\\\\\"invalid_token\\\\\\\", error_description=\\\\\\\"Invalid access token\\\\\\\"\\\",\\\"x-qtest-request-id\\\":\\\"613102ec5e3f9d4a72acadd8\\\",\\\"cf-cache-status\\\":\\\"DYNAMIC\\\",\\\"pragma\\\":\\\"no-cache\\\",\\\"content-security-policy\\\":\\\"default-src 'self' 'unsafe-inline'; base-uri 'self'; style-src * 'unsafe-inline'; script-src * 'unsafe-inline' 'unsafe-eval'; connect-src *; img-src * blob: data:; font-src * data:; frame-src *\\\",\\\"x-content-type-options\\\":\\\"nosniff\\\",\\\"x-robots-tag\\\":\\\"noindex\\\",\\\"referrer-policy\\\":\\\"strict-origin-when-cross-origin\\\",\\\"content-type\\\":\\\"application/json;charset=UTF-8\\\",\\\"cache-control\\\":\\\"no-store\\\"}\",\"statusCode\":401}";
+        
+        // THIS IS THE KEY TEST: User's OAuth error should NOT be flagged as Cloudflare error
+        assertFalse("User's OAuth error example should NOT be flagged as Cloudflare error", 
+            userExample.toLowerCase().matches(".*" + regex + ".*"));
     }
 
     @Test
-    public void testRegexPatternForUnderAttackMode() {
+    public void testRegexPatternComprehensiveSummary() {
         String regex = TestResultsStatsAction.REGEX_CLOUDFLARE;
 
-        // Under attack mode messages
-        String[] underAttackMessages = {
-                "Website under attack mode activated by Cloudflare",
-                "This website is currently under attack and has activated Cloudflare protection",
-                "Under attack mode: additional security measures by Cloudflare",
-                "Cloudflare under attack mode: Please wait while we check your browser",
-                "DDoS protection: under attack mode enabled for this website",
-                "Security check in progress - under attack mode by Cloudflare"
-        };
+        // ==== DOCUMENTED PATTERNS THAT SHOULD MATCH ====
+        
+        // 1. Cloudflare 1xxx error codes (Official format: "Error 1xxx:")
+        assertTrue("Error 1020 should match", 
+            "{\"responsePayload\": \"Error 1020: Access denied\"}".toLowerCase().matches(".*" + regex + ".*"));
+        assertTrue("Error 1015 should match", 
+            "{\"responsePayload\": \"Error 1015: You are being rate limited\"}".toLowerCase().matches(".*" + regex + ".*"));
+        
+        // 2. Attention Required pattern (Official Cloudflare blocking page)
+        assertTrue("Attention Required should match", 
+            "{\"responsePayload\": \"Attention Required! | Cloudflare\"}".toLowerCase().matches(".*" + regex + ".*"));
+        
+        // 3. Cloudflare security check pattern
+        assertTrue("Security check should match", 
+            "{\"responsePayload\": \"Cloudflare security check in progress\"}".toLowerCase().matches(".*" + regex + ".*"));
+        
+        // 4. Explicit WAF blocking (Cloudflare-specific)
+        assertTrue("WAF blocking should match", 
+            "{\"responsePayload\": \"Request blocked by Cloudflare WAF\"}".toLowerCase().matches(".*" + regex + ".*"));
 
-        for (String message : underAttackMessages) {
-            assertTrue("Under attack message should match: " + message,
-                    message.toLowerCase().matches(".*" + regex + ".*"));
-        }
+        // ==== PATTERNS THAT SHOULD NOT MATCH (FALSE POSITIVES PREVENTION) ====
+        
+        // OAuth/API authentication errors
+        assertFalse("OAuth error should not match",
+            "{\"responsePayload\":\"{\\\"error\\\":\\\"invalid_token\\\"}\"}".toLowerCase().matches(".*" + regex + ".*"));
+        
+        // Normal responses with Cloudflare headers
+        assertFalse("cf-ray header alone should not match",
+            "{\"headers\":{\"cf-ray\":\"abc\", \"server\":\"cloudflare\"}}".toLowerCase().matches(".*" + regex + ".*"));
+        
+        // Generic error codes (non-1xxx)
+        assertFalse("Error 500 should not match",
+            "{\"responsePayload\": \"Error 500: Internal Server Error\"}".toLowerCase().matches(".*" + regex + ".*"));
+        
+        // Generic WAF messages (not Cloudflare-specific)
+        assertFalse("Generic WAF should not match",
+            "{\"responsePayload\": \"WAF blocked request\"}".toLowerCase().matches(".*" + regex + ".*"));
     }
 
-    @Test
-    public void testRegexPatternForDDoSProtection() {
-        String regex = TestResultsStatsAction.REGEX_CLOUDFLARE;
-
-        // DDoS protection messages
-        String[] ddosMessages = {
-                "DDoS protection by Cloudflare activated",
-                "Cloudflare DDoS protection: request being verified",
-                "Anti-DDoS measures enabled by Cloudflare",
-                "DDoS attack mitigation in progress - protected by Cloudflare",
-                "Cloudflare is protecting this website from DDoS attacks"
-        };
-
-        for (String ddosMessage : ddosMessages) {
-            assertTrue("DDoS message should match: " + ddosMessage,
-                    ddosMessage.toLowerCase().matches(".*" + regex + ".*"));
-        }
-    }
-
-    @Test
-    public void testRegexPatternForSecurityChecks() {
-        String regex = TestResultsStatsAction.REGEX_CLOUDFLARE;
-
-        // Security check messages
-        String[] securityMessages = {
-                "Security check required by Cloudflare",
-                "Cloudflare security check: verifying your browser",
-                "Additional security verification by Cloudflare required",
-                "Security challenge activated by Cloudflare protection",
-                "Cloudflare security screening in progress"
-        };
-
-        for (String securityMessage : securityMessages) {
-            assertTrue("Security message should match: " + securityMessage,
-                    securityMessage.toLowerCase().matches(".*" + regex + ".*"));
-        }
-    }
-
-    @Test
-    public void testRegexPatternForRayIdBlocked() {
-        String regex = TestResultsStatsAction.REGEX_CLOUDFLARE;
-
-        // Ray ID blocking scenarios
-        String[] rayIdMessages = {
-                "Ray ID 7f2a8c9b4e1d3a6f blocked due to security violation",
-                "Request blocked - Ray ID: 8g3b9d0c5f2e4b7g",
-                "Access denied: Ray ID 9h4c0e1d6g3f5c8h blocked",
-                "Security violation - Ray ID abc123def456 blocked",
-                "Ray ID XYZ789 blocked by security policy"
-        };
-
-        for (String rayMessage : rayIdMessages) {
-            assertTrue("Ray ID blocked message should match: " + rayMessage,
-                    rayMessage.toLowerCase().matches(".*" + regex + ".*"));
-        }
-    }
-
-    @Test
-    public void testRegexPatternForBenignCloudflareTraffic() {
-        String regex = TestResultsStatsAction.REGEX_CLOUDFLARE;
-
-        // These should NOT match - benign Cloudflare traffic
-        String[] benignMessages = {
-                "{\"statusCode\": 200, \"headers\": {\"cf-ray\": \"7f9e7f2ad9be2a3c-DEL\", \"server\": \"cloudflare\"}}",
-                "{\"statusCode\": 201, \"headers\": {\"cf-ray\": \"72f0a1b7ce4321ab-LHR\"}}",
-                "{\"statusCode\": 204, \"headers\": {\"cf-ray\": \"6a5d1e2f3c4b9abc-SIN\", \"cf-cache-status\": \"HIT\"}}",
-                "{\"statusCode\": 301, \"headers\": {\"server\": \"cloudflare\", \"cf-ray\": \"8090abcd1234efgh-BOM\"}}",
-                "{\"statusCode\": 302, \"headers\": {\"server\": \"cloudflare\"}}",
-                "Successful response via Cloudflare CDN",
-                "Content delivered by Cloudflare edge server",
-                "Response cached by Cloudflare",
-                "Static content served through Cloudflare network"
-        };
-
-        for (String benignMessage : benignMessages) {
-            assertFalse("Benign Cloudflare traffic should NOT match: " + benignMessage,
-                    benignMessage.toLowerCase().matches(".*" + regex + ".*"));
-        }
-    }
 }

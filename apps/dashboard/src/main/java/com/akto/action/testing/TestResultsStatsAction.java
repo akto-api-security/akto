@@ -53,65 +53,43 @@ public class TestResultsStatsAction extends UserAction {
     public static final String REGEX_5XX = "\"statusCode\"\\s*:\\s*5[0-9][0-9]";
 
     /**
-     * Cloudflare Security and CDN Error Pattern
-     * Detects various Cloudflare blocking scenarios and error conditions:
+     * Cloudflare Error Detection Pattern
      * 
-     * Error Codes:
-     * - 1xxx series (1000-1999): DNS resolution, firewall, security blocking
-     * - 10xxx series (10000+): API limits, configuration issues
-     * - Specific codes: 1012 (access denied), 1015 (rate limited), 1020 (access
-     * denied)
+     * This regex ONLY detects specific Cloudflare blocking/error scenarios that indicate
+     * infrastructure problems or security blocking, NOT normal API authentication errors.
      * 
-     * Security Blocking:
-     * - WAF (Web Application Firewall) triggered blocks
-     * - Cloudflare security service protection messages
-     * - Access denied and rate limiting scenarios
-     * - Attention Required pages shown to users
-     * 
-     * Note: Excludes cf-ray headers which are present on all Cloudflare responses
-     * including successful 2xx codes.
+     * ONLY MATCHES:
+     * 1. Cloudflare 1xxx error codes (1000-1999 series)
+     * 2. Explicit Cloudflare blocking messages  
+     * 3. WAF blocking responses
      * 
      * References:
-     * -
-     * -
-     * https://developers.cloudflare.com/support/troubleshooting/http-status-codes/cloudflare-1xxx-errors/
+     * - https://developers.cloudflare.com/support/troubleshooting/http-status-codes/cloudflare-1xxx-errors/
      * - https://developers.cloudflare.com/waf/
-     * - https://developers.cloudflare.com/fundamentals/reference/cloudflare-ray-id/
-     * - Error page types:
-     * https://developers.cloudflare.com/rules/custom-errors/reference/error-page-types/
-     * - Block pages:
-     * https://developers.cloudflare.com/cloudflare-one/policies/gateway/block-page/
-     * - Custom errors: https://developers.cloudflare.com/rules/custom-errors/
      */
-    public static final String REGEX_CLOUDFLARE = "(error\\s*1[0-9]{3}|error\\s*10[0-9]{3}|" + // CF-specific error
-                                                                                               // codes
-            "attention\\s*required.*cloudflare|" + // Challenge page identifier
-            "managed\\s*challenge.*cloudflare|cloudflare.*managed\\s*challenge|" + // Managed challenge variations
-            "interactive\\s*challenge.*cloudflare|cloudflare.*interactive\\s*challenge|" + // Interactive challenges
-            "under\\s*attack.*cloudflare|cloudflare.*under\\s*attack|" + // Under attack mode
-            "ddos\\s*protection.*cloudflare|cloudflare.*ddos|" + // DDoS protection
-            "anti[-\\s]*ddos.*cloudflare|cloudflare.*anti[-\\s]*ddos|" + // Anti-DDoS phrasing
-            "ddos\\s*attack\\s*mitigation|attack\\s*mitigation.*cloudflare|" + // DDoS attack mitigation
-            "ddos\\s*protection.*under\\s*attack.*enabled|under\\s*attack.*mode.*enabled|" + // Under attack mode
-                                                                                             // enabled
-            "(blocked|denied|limited|restricted).*cloudflare|" + // Generic blocking with CF context
-            "cloudflare.*(blocked|denied|limited|restricted|security)|" + // CF context with blocking
-            "waf.*cloudflare|cloudflare.*waf|" + // WAF by Cloudflare
-            "\\bweb\\s*application\\s*firewall\\b|\\bWAF\\b|waf\\s*rule\\s*triggered|waf\\s*(block|security|alert|protection)|"
-            + // WAF mentions without CF
-            "rate.*limit.*cloudflare|cloudflare.*rate.*limit|" + // Rate limiting by CF
-            "checking.*browser.*cloudflare|browser\\s*integrity\\s*check|verifying.*browser.*supports|" + // Browser
-                                                                                                          // check
-                                                                                                          // challenge
-            "security.*check.*cloudflare|security.*verification.*cloudflare|" + // Security checks/verification
-            "verification.*cloudflare|additional.*security.*cloudflare|" + // Additional security verification
-            "security\\s*challenge.*cloudflare|cloudflare.*security\\s*challenge|" + // Security challenge variations
-            "interactive\\s*challenge.*required|challenge.*required.*cloudflare|" + // Interactive challenge
-                                                                                    // requirements
-            "captcha\\s*verification|complete.*security\\s*check.*prove.*not.*robot|" + // CAPTCHA verification patterns
-            "this\\s*website\\s*is\\s*using\\s*a\\s*security\\s*service\\s*to\\s*protect\\s*itself\\s*from\\s*online\\s*attacks|"
-            + // Common CF block text
-            "ray\\s*id.*blocked|blocked.*ray\\s*id)"; // Ray ID blocked variants
+    public static final String REGEX_CLOUDFLARE =
+    "(?i)\"responsePayload\"\\s*:\\s*.*(" + 
+    
+    // ==== CLOUDFLARE 1XXX ERROR CODES ====
+    // Reference: https://developers.cloudflare.com/support/troubleshooting/http-status-codes/cloudflare-1xxx-errors/
+    // Matches only "Error 1xxx" format (1000-1999) - official CF error page format
+    // Examples: "Error 1020: Access denied", "Error 1015: You are being rate limited"
+    "error\\s+1[0-9]{3}\\s*:|" +
+    
+    // ==== CLOUDFLARE BRANDED BLOCKING PAGES ====
+    // Reference: https://developers.cloudflare.com/fundamentals/reference/under-attack-mode/
+    // Matches official CF blocking page titles/messages
+    "attention\\s+required.*cloudflare|" +
+    "cloudflare.*security\\s+check|" +
+    
+    // ==== WAF EXPLICIT BLOCKING ====
+    // Reference: https://developers.cloudflare.com/waf/
+    // Only matches explicit WAF blocking messages, not normal errors
+    "blocked\\s+by\\s+cloudflare\\s+waf|" +
+    "cloudflare\\s+waf.*blocked" +
+    ")";
+
+
 
     public String fetchTestResultsStatsCount() {
         try {
