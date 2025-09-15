@@ -275,7 +275,7 @@ export default function LeftNav() {
                 ],
                 key: "5",
             },
-            ...(dashboardCategory === "Gen AI" ? [{
+            ...(dashboardCategory === "Gen AI" && window.STIGG_CUSTOMER_ID === "11a2926b-249e-448d-957d-0d65c731db72" ? [{
                 label: (
                     <Text variant="bodyMd" fontWeight="medium">
                         Prompt Hardening
