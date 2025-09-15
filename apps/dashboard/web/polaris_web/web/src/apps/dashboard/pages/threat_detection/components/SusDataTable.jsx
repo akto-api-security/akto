@@ -11,6 +11,7 @@ import SessionStore from "../../../../main/SessionStore";
 import { labelMap } from "../../../../main/labelHelperMap";
 import { formatActorId } from "../utils/formatUtils";
 import useTable from "../../../components/tables/TableContext";
+import threatDetectionRequests from "../api";
 
 const resourceName = {
   singular: "sample",
@@ -74,7 +75,7 @@ const sortOptions = [
 
 let filters = [];
 
-function SusDataTable({ currDateRange, rowClicked }) {
+function SusDataTable({ currDateRange, rowClicked, triggerRefresh }) {
   const getTimeEpoch = (key) => {
     return Math.floor(Date.parse(currDateRange.period[key]) / 1000);
   };
@@ -115,6 +116,78 @@ function SusDataTable({ currDateRange, rowClicked }) {
         setLoading(false)
     },200)
   }
+
+  const handleBulkTriage = async (selectedIds) => {
+    console.log("Selected IDs for triage:", selectedIds);
+    // selectedIds are already the IDs, no need to map
+    try {
+      const response = await threatDetectionRequests.bulkUpdateMaliciousEventStatus(selectedIds, 'TRIAGE');
+      if (response?.updateSuccess) {
+        func.setToast(true, false, `${response.updatedCount || selectedIds.length} event${selectedIds.length === 1 ? '' : 's'} triaged successfully`);
+        // Trigger table refresh if callback provided
+        if (triggerRefresh) {
+          triggerRefresh();
+        }
+      } else {
+        func.setToast(true, true, 'Failed to triage events');
+      }
+    } catch (error) {
+      console.error("Error triaging events:", error);
+      func.setToast(true, true, 'Error triaging events');
+    }
+  };
+
+  const handleBulkUntriage = async (selectedIds) => {
+    console.log("Selected IDs for untriage:", selectedIds);
+    // selectedIds are already the IDs, no need to map
+    try {
+      const response = await threatDetectionRequests.bulkUpdateMaliciousEventStatus(selectedIds, 'ACTIVE');
+      if (response?.updateSuccess) {
+        func.setToast(true, false, `${response.updatedCount || selectedIds.length} event${selectedIds.length === 1 ? '' : 's'} untriaged successfully`);
+        // Trigger table refresh if callback provided
+        if (triggerRefresh) {
+          triggerRefresh();
+        }
+      } else {
+        func.setToast(true, true, 'Failed to untriage events');
+      }
+    } catch (error) {
+      console.error("Error untriaging events:", error);
+      func.setToast(true, true, 'Error untriaging events');
+    }
+  };
+
+  const promotedBulkActions = (selectedIds) => {
+    console.log("promotedBulkActions called with IDs:", selectedIds);
+    const actions = [];
+    
+    // selectedIds are just the IDs (strings), not objects
+    // We need to pass these IDs directly to the handlers
+    
+    // Show triage action for Events and Active tabs
+    if (currentTab === 'events' || currentTab === 'active') {
+      actions.push({
+        content: `Triage ${selectedIds.length} event${selectedIds.length === 1 ? '' : 's'}`,
+        onAction: () => {
+          const confirmationMessage = `Are you sure you want to triage ${selectedIds.length} event${selectedIds.length === 1 ? '' : 's'}?`;
+          func.showConfirmationModal(confirmationMessage, "Triage", () => handleBulkTriage(selectedIds));
+        },
+      });
+    }
+    
+    // Show untriage action for Triage tab
+    if (currentTab === 'triage') {
+      actions.push({
+        content: `Untriage ${selectedIds.length} event${selectedIds.length === 1 ? '' : 's'}`,
+        onAction: () => {
+          const confirmationMessage = `Are you sure you want to untriage ${selectedIds.length} event${selectedIds.length === 1 ? '' : 's'}?`;
+          func.showConfirmationModal(confirmationMessage, "Untriage", () => handleBulkUntriage(selectedIds));
+        },
+      });
+    }
+    
+    return actions;
+  };
 
 
 
@@ -271,7 +344,7 @@ function SusDataTable({ currDateRange, rowClicked }) {
       fetchData={fetchData}
       filters={filters}
       selectable={true}
-
+      promotedBulkActions={promotedBulkActions}
       headings={headers}
       useNewRow={true}
       condensedHeight={true}

@@ -167,7 +167,7 @@ function ThreatDetectionPage() {
         <SusDataTable key={`sus-data-table-${triggerTableRefresh}`}
             currDateRange={currDateRange}
             rowClicked={rowClicked}
-            triggerRefresh={triggerTableRefresh}
+            triggerRefresh={() => setTriggerTableRefresh(prev => prev + 1)}
         />,
         !showNewTab ? <NormalSampleDetails
             title={"Attacker payload"}

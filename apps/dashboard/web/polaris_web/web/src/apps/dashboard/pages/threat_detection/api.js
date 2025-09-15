@@ -169,6 +169,16 @@ const threatDetectionRequests = {
                 status: status
             }
         })
+    },
+    bulkUpdateMaliciousEventStatus(eventIds, status) {
+        return request({
+            url: '/api/bulkUpdateMaliciousEventStatus',
+            method: 'post',
+            data: {
+                eventIds: eventIds,
+                status: status
+            }
+        })
     }
 }
 export default threatDetectionRequests
