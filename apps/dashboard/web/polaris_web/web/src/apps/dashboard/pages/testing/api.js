@@ -61,6 +61,17 @@ export default {
         })
         return resp
     },
+    async analyzeVulnerability(responseOutput, vulnerabilityType) {
+        const resp = await request({
+            url: '/api/analyze_vulnerability',
+            method: 'post',
+            data: {
+                responseOutput: responseOutput,
+                vulnerabilityType: vulnerabilityType
+            }
+        })
+        return resp
+    },
     async fetchAllSubCategories(fetchOnlyActive, mode, skip, limit) {
         const resp = await request({
             url: 'api/fetchAllSubCategories',

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useState, useRef } from 'react'
 import FlyLayout from '../../../components/layouts/FlyLayout'
 import func from '@/util/func'
 import transform from '../transform'
@@ -42,8 +42,11 @@ function TestRunResultFlyout(props) {
     const [editDescription, setEditDescription] = useState("")
     const [isEditingDescription, setIsEditingDescription] = useState(false)
 
+    const [llmHighlights, setLlmHighlights] = useState([])
+
     // modify testing run result and headers
     const infoStateFlyout = infoState && infoState.length > 0 ? infoState.filter((item) => item.title !== 'Jira') : []
+    
     const fetchRemediationInfo = useCallback (async (testId) => {
         if (testId && testId.length > 0) {
             await testingApi.fetchRemediationInfo(testId).then((resp) => {
@@ -118,6 +121,27 @@ function TestRunResultFlyout(props) {
             setRemediationText(remediationSrc)
         }
     }, [selectedTestRunResult.testCategoryId, remediationSrc])
+
+    useEffect(() => {
+        async function fetchLlmHighlights() {
+            if (!selectedTestRunResult?.testResults) return;
+            // Prepare payload for LLM
+            const payload = {
+                actualResponse: selectedTestRunResult.actualResponse,
+                attemptedResponse: selectedTestRunResult.attemptedResponse,
+                testResults: selectedTestRunResult.testResults,
+                // Add more fields as needed
+            }
+            // Call new LLM API (replace with actual endpoint)
+            try {
+                const resp = await api.getVulnerableHighlightsFromLLM(payload)
+                setLlmHighlights(resp.highlights || [])
+            } catch (e) {
+                setLlmHighlights([])
+            }
+        }
+        fetchLlmHighlights()
+    }, [selectedTestRunResult])
 
     function ignoreAction(ignoreReason){
         const severity = (selectedTestRunResult && selectedTestRunResult.vulnerable) ? issueDetails.severity : "";
@@ -338,60 +362,147 @@ function TestRunResultFlyout(props) {
     const dataStoreTime = 2 * 30 * 24 * 60 * 60;
     const dataExpired = func.timeNow() - (selectedTestRunResult?.endTimestamp || func.timeNow()) > dataStoreTime
 
-    const ValuesTab = typeof selectedTestRunResult === "object" ? useMemo(() => {
+    // Component that handles vulnerability analysis only when mounted
+    const ValuesTabContent = React.memo(() => {
+        const [localVulnerabilityHighlights, setLocalVulnerabilityHighlights] = useState({});
+        const [localIsAnalyzing, setLocalIsAnalyzing] = useState(false);
+        const hasAnalyzedRef = useRef(false);
+        
+        useEffect(() => {
+            console.log('ValuesTabContent mounted, checking if should analyze:', {
+                hasAnalyzed: hasAnalyzedRef.current,
+                isVulnerable: selectedTestRunResult?.vulnerable,
+                hasTestResults: !!selectedTestRunResult?.testResults
+            });
+            
+            // Only analyze once when this tab content is first mounted
+            if (!hasAnalyzedRef.current && selectedTestRunResult?.vulnerable && selectedTestRunResult?.testResults) {
+                hasAnalyzedRef.current = true;
+                
+                const vulnerabilityType = issueDetails?.testCategory?.includes('XSS') ? 'XSS' : 
+                                        issueDetails?.testCategory?.includes('SQL') ? 'SQL_INJECTION' :
+                                        issueDetails?.testCategory?.includes('SENSITIVE') ? 'SENSITIVE_DATA' :
+                                        issueDetails?.testCategory?.includes('ERROR') ? 'ERROR_DISCLOSURE' :
+                                        issueDetails?.testCategory?.includes('PATH') ? 'PATH_TRAVERSAL' : 'XSS';
+                
+                console.log('Starting vulnerability analysis for type:', vulnerabilityType);
+                setLocalIsAnalyzing(true);
+                
+                // Analyze only the response bodies
+                const analysisPromises = selectedTestRunResult.testResults.map(async (result, idx) => {
+                    // Parse the message if it's a string
+                    let messageObj = result.message;
+                    if (typeof messageObj === 'string') {
+                        try {
+                            messageObj = JSON.parse(messageObj);
+                        } catch (e) {
+                            console.error('Failed to parse message string for idx', idx, e);
+                            return null;
+                        }
+                    }
+
+                    if (messageObj && messageObj.response && messageObj.response.body) {
+                        try {
+                            console.log('Sending response body for analysis, idx', idx, ':', messageObj.response.body);
+                            const response = await testingApi.analyzeVulnerability(
+                                messageObj.response.body,
+                                vulnerabilityType
+                            );
+
+                            console.log('Vulnerability API response for idx', idx, ':', response);
+
+                            // The backend might return the result in analysisResult field or directly
+                            const analysisData = response.analysisResult || response;
+
+                            if (analysisData && analysisData.vulnerableSegments && analysisData.vulnerableSegments.length > 0) {
+                                // Add vulnerability type and severity from the test results to each segment
+                                const enhancedSegments = analysisData.vulnerableSegments.map(segment => ({
+                                    ...segment,
+                                    vulnerabilityType: issueDetails?.testCategory || vulnerabilityType,
+                                    severity: issueDetails?.severity || 'HIGH'
+                                }));
+                                console.log('Setting vulnerability highlights for idx', idx, ':', enhancedSegments);
+                                setLocalVulnerabilityHighlights(prev => {
+                                    const newState = {
+                                        ...prev,
+                                        [idx]: enhancedSegments
+                                    };
+                                    console.log('New vulnerability highlights state:', newState);
+                                    return newState;
+                                });
+                            } else {
+                                console.log('No vulnerable segments found for idx', idx);
+                            }
+                            return { idx, success: true };
+                        } catch (error) {
+                            console.error('Failed to analyze vulnerability for result', idx, error);
+                            return { idx, success: false };
+                        }
+                    }
+                    return null;
+                });
+                
+                Promise.allSettled(analysisPromises).finally(() => {
+                    setLocalIsAnalyzing(false);
+                });
+            }
+        }, []); // Empty dependency array - only run once on mount
+        
+        if (dataExpired && !selectedTestRunResult?.vulnerable) {
+            return dataExpiredComponent;
+        }
+        
+        if (!selectedTestRunResult?.testResults) {
+            return null;
+        }
+        
+        console.log('ValuesTabContent rendering with localVulnerabilityHighlights:', localVulnerabilityHighlights);
+        
+        return (
+            <Box paddingBlockStart={3} paddingInlineEnd={4} paddingInlineStart={4}>
+                <SampleDataList
+                    key="Sample values"
+                    heading={"Attempt"}
+                    minHeight={"30vh"}
+                    vertical={true}
+                    sampleData={selectedTestRunResult?.testResults.map((result, idx) => {
+                        if (result.errors && result.errors.length > 0) {
+                            let errorList = result.errors.join(", ");
+                            return { errorList: errorList }
+                        }
+                        // Use LLM highlights if available
+                        let highlightPaths = llmHighlights[idx]?.highlightPaths || [];
+                        let vulnerableText = llmHighlights[idx]?.vulnerableText || "";
+                        // Add vulnerability highlights only for response
+                        let vulnerabilitySegments = localVulnerabilityHighlights[idx] || [];
+                        console.log('Mapping vulnerabilitySegments for idx', idx, ':', vulnerabilitySegments);
+                        if (result.originalMessage || result.message) {
+                            return {
+                                originalMessage: result.originalMessage,
+                                message: result.message,
+                                highlightPaths,
+                                vulnerableText,
+                                vulnerabilitySegments
+                            }
+                        }
+                        return { errorList: "No data found" }
+                    })}
+                    isNewDiff={true}
+                    vulnerable={selectedTestRunResult?.vulnerable}
+                    isAnalyzingVulnerabilities={localIsAnalyzing}
+                />
+            </Box>
+        );
+    });
+    
+    const ValuesTab = useMemo(() => {
+        if (typeof selectedTestRunResult !== "object") return null;
         return {
             id: 'values',
             content: "Values",
-            component: (dataExpired && !selectedTestRunResult?.vulnerable)
-                ? dataExpiredComponent :
-                (selectedTestRunResult.testResults &&
-                    <Box paddingBlockStart={3} paddingInlineEnd={4} paddingInlineStart={4}><SampleDataList
-                        key="Sample values"
-                        heading={"Attempt"}
-                        minHeight={"30vh"}
-                        vertical={true}
-                        sampleData={selectedTestRunResult?.testResults.map((result) => {
-                            if (result.errors && result.errors.length > 0) {
-                                let errorList = result.errors.join(", ");
-                                return { errorList: errorList }
-                            }
-                            if (result.originalMessage || result.message) {
-                                return { originalMessage: result.originalMessage, message: result.message, highlightPaths: [] }
-                            }
-                            return { errorList: "No data found" }
-                        })}
-                        isNewDiff={true}
-                        vulnerable={selectedTestRunResult?.vulnerable}
-                        isVulnerable={selectedTestRunResult.vulnerable}
-                    />
-                    </Box>)
+            component: <ValuesTabContent />
         }
-    }, [JSON.stringify(selectedTestRunResult)]) : <></>
-
-    const moreInfoComponent = (
-        infoStateFlyout.length > 0 ?
-        <VerticalStack gap={"5"}>
-            {infoStateFlyout.map((item, index) => {
-                return(
-                    <VerticalStack gap={"5"} key={index}>
-                        <VerticalStack gap={"2"} >
-                            <HorizontalStack gap="1_5-experimental">
-                                <Box><Icon source={item.icon} color='subdued'/></Box>
-                                <TitleWithInfo
-                                    textProps={{variant:"bodyMd", fontWeight:"semibold", color:"subdued"}}
-                                    titleText={item.title}
-                                    tooltipContent={item.tooltipContent}
-                                />
-                            </HorizontalStack>
-                            {item?.content}
-                        </VerticalStack>
-                        {index !== infoStateFlyout.length - 1 ? <Divider /> : null}
-                    </VerticalStack>
-                )
-            })}
-        </VerticalStack>
-        : null
-    )
+    }, [selectedTestRunResult, llmHighlights, dataExpired, issueDetails])
 
     function RowComp ({cardObj}){
         const {title, value, tooltipContent} = cardObj
@@ -430,9 +541,7 @@ function TestRunResultFlyout(props) {
                     </Box>
                 </VerticalStack>
                 <Divider />
-                {testResultDetailsComp}
-                <Divider />
-                {moreInfoComponent}  
+                {testResultDetailsComp}  
             </VerticalStack>
         </Box>
     )
@@ -510,7 +619,7 @@ function TestRunResultFlyout(props) {
     const tabsComponent = (
         <LayoutWithTabs
             key={issueDetails?.id}
-            tabs={issueDetails?.id ? [overviewTab,timelineTab,ValuesTab, remediationTab]: [attemptTab]}
+            tabs={issueDetails?.id ? [overviewTab,timelineTab,ValuesTab, remediationTab].filter(Boolean): [attemptTab]}
             currTab = {() => {}}
         />
     )
