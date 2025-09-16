@@ -101,6 +101,50 @@ public class DbLayer {
         return ApiInfoDao.instance.findAll(new BasicDBObject());
     }
 
+    public static List<ApiInfo> fetchApiRateLimits(ApiInfo.ApiInfoKey lastApiInfoKey) {
+        // Filter for documents that have both rateLimits and rateLimitConfidence fields
+        Bson existsFilter = Filters.and(
+            Filters.ne("rateLimits", null),
+            Filters.ne("rateLimitConfidence", null)
+        );
+        
+        Bson filters = existsFilter;
+        
+        // Add pagination filter if lastApiInfoKey is provided
+        if (lastApiInfoKey != null) {
+            // Create proper compound key comparison for pagination
+            // This handles the compound _id structure properly
+            Bson paginationFilter = Filters.or(
+                Filters.gt("_id.apiCollectionId", lastApiInfoKey.getApiCollectionId()),
+                Filters.and(
+                    Filters.eq("_id.apiCollectionId", lastApiInfoKey.getApiCollectionId()),
+                    Filters.gt("_id.method", lastApiInfoKey.getMethod())
+                ),
+                Filters.and(
+                    Filters.eq("_id.apiCollectionId", lastApiInfoKey.getApiCollectionId()),
+                    Filters.eq("_id.method", lastApiInfoKey.getMethod()),
+                    Filters.gt("_id.url", lastApiInfoKey.getUrl())
+                )
+            );
+            filters = Filters.and(existsFilter, paginationFilter);
+        }
+
+        int limit = 1000;
+        
+        Bson projection = Projections.fields(
+            Projections.include("_id", "rateLimits", "rateLimitConfidence")
+        );
+        
+        // Ensure consistent ordering with compound _id sorting
+        Bson sort = Sorts.orderBy(
+            Sorts.ascending("_id.apiCollectionId"),
+            Sorts.ascending("_id.method"), 
+            Sorts.ascending("_id.url")
+        );
+        
+        return ApiInfoDao.instance.findAll(filters, 0, limit, sort, projection);
+    }
+
     public static List<ApiInfo> fetchNonTrafficApiInfos() {
         List<ApiCollection> nonTrafficApiCollections = ApiCollectionsDao.instance.fetchNonTrafficApiCollections();
         List<Integer> apiCollectionIds = new ArrayList<>();
