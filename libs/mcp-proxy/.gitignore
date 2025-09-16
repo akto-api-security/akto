@@ -30,3 +30,5 @@ vendor/
 .vscode/
 .idea/
 *.swp
+
+mcp-threat/models/*

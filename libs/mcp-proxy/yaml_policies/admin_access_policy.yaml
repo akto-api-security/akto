@@ -1,0 +1,14 @@
+id: AdminAccessDetection
+filter:
+  request_payload:
+    - contains_either:
+        - admin
+        - root
+        - sudo
+        - privilege
+        - superuser
+        - administrator
+        - escalate
+        - elevate
+    - regex: >-
+        (?i)(?:admin|root|sudo|privilege|superuser|administrator)\s*[:=]\s*["']?[^"'\s]+["']?

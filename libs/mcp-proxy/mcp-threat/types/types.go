@@ -84,8 +84,16 @@ type LLMConfig struct {
 
 // AppConfig represents the main application configuration
 type AppConfig struct {
-	LLM   LLMConfig `json:"llm"`
-	Debug bool      `json:"debug"`
+	LLM      LLMConfig    `json:"llm"`
+	Policies PolicyConfig `json:"policies"`
+	Debug    bool         `json:"debug"`
+}
+
+// PolicyConfig represents policy validation configuration
+type PolicyConfig struct {
+	Enabled        bool   `json:"enabled"`
+	PoliciesDir    string `json:"policies_dir"`
+	ReloadOnChange bool   `json:"reload_on_change"`
 }
 
 // ChatMessage represents a message in the LLM conversation

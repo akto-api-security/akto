@@ -1,0 +1,24 @@
+id: SensitiveDataDetection
+filter:
+  request_payload:
+    - contains_either:
+        - password
+        - secret
+        - token
+        - api_key
+        - credential
+        - private_key
+        - access_token
+        - refresh_token
+    - regex: >-
+        (?i)(?:password|secret|token|key|credential)\s*[:=]\s*["']?[^"'\s]+["']?
+  response_payload:
+    - contains_either:
+        - password
+        - secret
+        - token
+        - api_key
+        - credential
+        - private_key
+        - access_token
+        - refresh_token

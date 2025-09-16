@@ -1,0 +1,25 @@
+id: PhishingDetection
+filter:
+  request_payload:
+    - regex: >-
+        (?m)(?:^Exception in thread
+        "[^"]*"\s*$|\b(?:java|javax|jakarta)(?:\.[\w$]+)*\.[A-Z][\w$]*E(?:xception|rror)\b|\b(?:org|com)(?:\.[\w$]+)*\.[A-Z][\w$]*E(?:xception|rror)\b|^\s*at\s+(?:ja(?:vax?|karta)|org|com)\.(?:[\w$]+\.)+[\w$<>]+\([^()\r\n]*\)\s*$|^\s*goroutine\s+\d+\s+\[[^\]]*]:\s*$|^\s*panic:\s+.+$|^\s*Traceback\s+\(most
+        recent call last\):\s*$|^\s*File\s+".+?",\s+line\s+\d+,\s+in\s+\w+\s*$)
+    - contains_either:
+        - verify your account
+        - update payment info
+        - account suspended
+        - click this link
+        - urgent action required
+        - confirm identity
+        - security alert
+        - unauthorized access
+        - login credentials
+        - immediate verification
+    - nlp_classification:
+        category: phishing
+        gt: 0.7
+  response_payload:
+    - nlp_classification:
+        category: phishing
+        gt: 0.6

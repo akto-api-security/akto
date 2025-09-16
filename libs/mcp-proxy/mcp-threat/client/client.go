@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/akto-api-security/akto/libs/mcp-proxy/mcp-threat/constants"
+	"github.com/akto-api-security/akto/libs/mcp-proxy/mcp-threat/policies"
 	"github.com/akto-api-security/akto/libs/mcp-proxy/mcp-threat/providers"
 	"github.com/akto-api-security/akto/libs/mcp-proxy/mcp-threat/types"
 	"github.com/akto-api-security/akto/libs/mcp-proxy/mcp-threat/validators"
@@ -16,6 +17,7 @@ type MCPValidator struct {
 	providerType      string
 	provider          providers.LLMProvider
 	keywordDetector   *validators.KeywordDetector
+	policyValidator   *policies.PolicyValidator
 	requestValidator  *validators.RequestValidator
 	responseValidator *validators.ResponseValidator
 }
@@ -30,6 +32,11 @@ func NewMCPValidator(providerType string, providerConfig map[string]interface{})
 
 	// Create validators
 	keywordDetector := validators.NewKeywordDetector()
+
+	// Create policy validator with default policies directory
+	policyManager := policies.NewFilePolicyManager("./yaml_policies")
+	policyValidator := policies.NewPolicyValidator(policyManager)
+
 	requestValidator := validators.NewRequestValidator(provider)
 	responseValidator := validators.NewResponseValidator(provider)
 
@@ -37,6 +44,7 @@ func NewMCPValidator(providerType string, providerConfig map[string]interface{})
 		providerType:      providerType,
 		provider:          provider,
 		keywordDetector:   keywordDetector,
+		policyValidator:   policyValidator,
 		requestValidator:  requestValidator,
 		responseValidator: responseValidator,
 	}, nil
@@ -71,7 +79,25 @@ func NewMCPValidatorWithConfig(config *types.AppConfig) (*MCPValidator, error) {
 		providerConfig["model"] = config.LLM.Model
 	}
 
-	return NewMCPValidator(config.LLM.ProviderType, providerConfig)
+	// Create the base validator
+	validator, err := NewMCPValidator(config.LLM.ProviderType, providerConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	// Update policy configuration if provided
+	if config.Policies.Enabled {
+		policiesDir := config.Policies.PoliciesDir
+		if policiesDir == "" {
+			policiesDir = "./yaml_policies" // Default directory
+		}
+
+		// Create new policy manager with configured directory
+		policyManager := policies.NewFilePolicyManager(policiesDir)
+		validator.policyValidator = policies.NewPolicyValidator(policyManager)
+	}
+
+	return validator, nil
 }
 
 // Validate is a generic validation method that handles request/response automatically
@@ -99,6 +125,12 @@ func (mv *MCPValidator) Validate(ctx context.Context, payload interface{}, toolD
 	keywordResponse := mv.keywordDetector.Validate(ctx, request)
 	if keywordResponse.Verdict != nil && keywordResponse.Verdict.IsMaliciousRequest {
 		return keywordResponse
+	}
+
+	// Run policy validation after keyword detection
+	policyResponse := mv.policyValidator.Validate(ctx, request)
+	if policyResponse.Verdict != nil && policyResponse.Verdict.IsMaliciousRequest {
+		return policyResponse
 	}
 
 	return mv.detectValidationType(payload).Validate(ctx, request)
@@ -150,6 +182,58 @@ func (mv *MCPValidator) detectValidationType(payload interface{}) validators.Val
 
 	// Default to request validator
 	return mv.requestValidator
+}
+
+// ValidateRequest validates a request payload using only policy validation
+func (mv *MCPValidator) ValidateRequest(ctx context.Context, payload interface{}, toolDescription *string) *types.ValidationResponse {
+	// Serialize payload to string
+	var payloadStr string
+	switch v := payload.(type) {
+	case string:
+		payloadStr = v
+	default:
+		if jsonData, err := json.Marshal(v); err == nil {
+			payloadStr = string(jsonData)
+		} else {
+			response := types.NewValidationResponse()
+			response.SetError(fmt.Sprintf("failed to serialize payload: %v", err))
+			return response
+		}
+	}
+
+	request := &types.ValidationRequest{
+		MCPPayload:      payloadStr,
+		ToolDescription: toolDescription,
+	}
+
+	// Run only policy validation for requests
+	return mv.policyValidator.ValidateRequest(ctx, request)
+}
+
+// ValidateResponse validates a response payload using only policy validation
+func (mv *MCPValidator) ValidateResponse(ctx context.Context, payload interface{}, toolDescription *string) *types.ValidationResponse {
+	// Serialize payload to string
+	var payloadStr string
+	switch v := payload.(type) {
+	case string:
+		payloadStr = v
+	default:
+		if jsonData, err := json.Marshal(v); err == nil {
+			payloadStr = string(jsonData)
+		} else {
+			response := types.NewValidationResponse()
+			response.SetError(fmt.Sprintf("failed to serialize payload: %v", err))
+			return response
+		}
+	}
+
+	request := &types.ValidationRequest{
+		MCPPayload:      payloadStr,
+		ToolDescription: toolDescription,
+	}
+
+	// Run only policy validation for responses
+	return mv.policyValidator.ValidateResponse(ctx, request)
 }
 
 // Close cleans up resources
