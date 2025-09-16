@@ -12,6 +12,7 @@ import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.Li
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ListThreatActorsRequest;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ModifyThreatActorStatusRequest;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ModifyThreatActorStatusResponse;
+import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.RatelimitConfig;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatConfiguration;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.Actor;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ActorId;
@@ -24,6 +25,7 @@ import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.Li
 import com.akto.ProtoMessageUtils;
 import com.akto.threat.backend.constants.MongoDBCollection;
 import com.akto.threat.backend.db.ActorInfoModel;
+import com.akto.threat.backend.dto.RateLimitConfigDTO;
 import com.akto.threat.backend.db.SplunkIntegrationModel;
 import com.akto.threat.backend.db.MaliciousEventModel.EventType;
 import com.akto.threat.backend.utils.ThreatUtils;
@@ -59,6 +61,7 @@ public class ThreatActorService {
         .getCollection(MongoDBCollection.ThreatDetection.THREAT_CONFIGURATION, Document.class);
     Document doc = coll.find().first();
     if (doc != null) {
+        // Handle actor configuration
         Object actorIdObj = doc.get("actor");
         if (actorIdObj instanceof List) {
             List<?> actorIdList = (List<?>) actorIdObj;
@@ -76,6 +79,12 @@ public class ThreatActorService {
             }
             builder.setActor(actorBuilder);
         }
+        
+        // Handle ratelimit configuration using DTO
+        RatelimitConfig rateLimitConfig = RateLimitConfigDTO.parseFromDocument(doc);
+        if (rateLimitConfig != null) {
+            builder.setRatelimitConfig(rateLimitConfig);
+        }
     }
     return builder.build();
 }
@@ -87,9 +96,11 @@ public class ThreatActorService {
             .getDatabase(accountId)
             .getCollection(MongoDBCollection.ThreatDetection.THREAT_CONFIGURATION, Document.class);
 
+    Document newDoc = new Document();
+    
     // Prepare a list of actorId documents
-    List<Document> actorIdDocs = new ArrayList<>();
     if (updatedConfig.hasActor()) {
+        List<Document> actorIdDocs = new ArrayList<>();
         Actor actor = updatedConfig.getActor();
         for (ActorId actorId : actor.getActorIdList()) {
             Document actorIdDoc = new Document();
@@ -99,8 +110,17 @@ public class ThreatActorService {
             if (!actorId.getPattern().isEmpty()) actorIdDoc.append("pattern", actorId.getPattern());
             actorIdDocs.add(actorIdDoc);
         }
+        newDoc.append("actor", actorIdDocs);
     }
-    Document newDoc = new Document("actor", actorIdDocs);
+    
+    // Prepare rate limit config documents using DTO
+    if (updatedConfig.hasRatelimitConfig()) {
+        Document ratelimitConfigDoc = RateLimitConfigDTO.toDocument(updatedConfig.getRatelimitConfig());
+        if (ratelimitConfigDoc != null) {
+            newDoc.append("ratelimitConfig", ratelimitConfigDoc.get("ratelimitConfig"));
+        }
+    }
+    
     Document existingDoc = coll.find().first();
 
     if (existingDoc != null) {
@@ -110,9 +130,12 @@ public class ThreatActorService {
         coll.insertOne(newDoc);
     }
 
-    // Set the actor in the returned proto
+    // Set the actor and ratelimitConfig in the returned proto
     if (updatedConfig.hasActor()) {
         builder.setActor(updatedConfig.getActor());
+    }
+    if (updatedConfig.hasRatelimitConfig()) {
+        builder.setRatelimitConfig(updatedConfig.getRatelimitConfig());
     }
     return builder.build();
 }

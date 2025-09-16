@@ -1,9 +1,7 @@
 package com.akto.threat.detection.tasks;
 
 import java.time.Duration;
-import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
@@ -32,6 +30,8 @@ import com.akto.dto.RawApiMetadata;
 import com.akto.dto.api_protection_parse_layer.AggregationRules;
 import com.akto.dto.api_protection_parse_layer.Rule;
 import com.akto.dto.monitoring.FilterConfig;
+import com.akto.dto.test_editor.Category;
+import com.akto.dto.test_editor.Info;
 import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.type.URLMethods;
 import com.akto.hybrid_parsers.HttpCallParser;
@@ -43,6 +43,7 @@ import com.akto.proto.generated.threat_detection.message.malicious_event.v1.Mali
 import com.akto.proto.generated.threat_detection.message.malicious_event.v1.MaliciousEventMessage;
 import com.akto.proto.generated.threat_detection.message.sample_request.v1.SampleMaliciousRequest;
 import com.akto.proto.generated.threat_detection.message.sample_request.v1.SchemaConformanceError;
+import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.RatelimitConfig.RatelimitConfigItem;
 import com.akto.proto.http_response_param.v1.HttpResponseParam;
 import com.akto.proto.http_response_param.v1.StringList;
 import com.akto.rules.TestPlugin;
@@ -93,10 +94,12 @@ public class MaliciousTrafficDetectorTask implements Task {
 
   private static final HttpRequestParams requestParams = new HttpRequestParams();
   private static final HttpResponseParams responseParams = new HttpResponseParams();
+  private static final FilterConfig ipApiRateLimitFilter = Utils.getipApiRateLimitFilter();
   private static Supplier<String> lazyToString;
   private DistributionCalculator distributionCalculator;
   private ThreatDetector threatDetector = new ThreatDetector();
   private boolean apiDistributionEnabled;
+  private ApiCountCacheLayer apiCacheCountLayer;
 
   public MaliciousTrafficDetectorTask(
       KafkaConfig trafficConfig, KafkaConfig internalConfig, RedisClient redisClient, DistributionCalculator distributionCalculator, boolean apiDistributionEnabled) throws Exception {
@@ -121,7 +124,6 @@ public class MaliciousTrafficDetectorTask implements Task {
 
     this.httpCallParser = new HttpCallParser(120, 1000);
     
-    this.threatConfigEvaluator = new ThreatConfigurationEvaluator(null);
 
     this.windowBasedThresholdNotifier =
         new WindowBasedThresholdNotifier(
@@ -130,11 +132,13 @@ public class MaliciousTrafficDetectorTask implements Task {
     
     if (redisClient != null) {
         this.apiCache = redisClient.connect();
+        this.apiCacheCountLayer = new ApiCountCacheLayer(redisClient);
         this.apiCountWindowBasedThresholdNotifier = new WindowBasedThresholdNotifier(
-          new ApiCountCacheLayer(redisClient),
+          apiCacheCountLayer,
           new WindowBasedThresholdNotifier.Config(100, 10 * 60));
     }
 
+    this.threatConfigEvaluator = new ThreatConfigurationEvaluator(null, dataActor, apiCacheCountLayer);
     this.internalKafka = new KafkaProtoProducer(internalConfig);
     this.rawApiFactory = new RawApiMetadataFactory(new IPLookupClient());
     this.distributionCalculator = distributionCalculator;
@@ -262,19 +266,46 @@ public class MaliciousTrafficDetectorTask implements Task {
         this.apiCountWindowBasedThresholdNotifier.incrementApiHitcount(apiHitCountKey, responseParam.getTime(), RedisKeyInfo.API_COUNTER_SORTED_SET);
     }
     
+    List<SchemaConformanceError> errors = null; 
+
     if (apiDistributionEnabled) {
       String apiCollectionIdStr = Integer.toString(apiCollectionId);
       String distributionKey = Utils.buildApiDistributionKey(apiCollectionIdStr, url, method.toString());
       String ipApiCmsKey = Utils.buildIpApiCmsDataKey(actor, apiCollectionIdStr, url, method.toString());
-      long curEpochMin = responseParam.getTime()/60;
+      long curEpochMin = responseParam.getTime() / 60;
       this.distributionCalculator.updateFrequencyBuckets(distributionKey, curEpochMin, ipApiCmsKey);
+
+      // Check and raise alert for RateLimits
+      RatelimitConfigItem ratelimitConfig = this.threatConfigEvaluator.getDefaultRateLimitConfig();
+      long ratelimit = this.threatConfigEvaluator.getRatelimit(apiInfoKey);
+
+      long count = this.distributionCalculator.getSlidingWindowCount(ipApiCmsKey, curEpochMin,
+          ratelimitConfig.getPeriod());
+
+      if (count > ratelimit && !this.threatConfigEvaluator.isActorInMitigationPeriod(ipApiCmsKey, ratelimitConfig)) {
+        logger.debugAndAddToDb("Ratelimit hit for url " + apiInfoKey.getUrl() + " actor: " + actor + " ratelimitConfig "
+            + ratelimitConfig.toString());
+
+        // Send event to BE.
+        SampleMaliciousRequest maliciousReq = Utils.buildSampleMaliciousRequest(actor, responseParam,
+            ipApiRateLimitFilter, metadata, errors);
+        generateAndPushMaliciousEventRequest(ipApiRateLimitFilter, actor, responseParam, maliciousReq,
+            EventType.EVENT_TYPE_AGGREGATED);
+        
+        // cool-off sending to BE till mitigationPeriod is over
+        this.threatConfigEvaluator.setActorInMitigationPeriod(ipApiCmsKey, ratelimitConfig);
+      }
     }
 
-    List<SchemaConformanceError> errors = null; 
     for (FilterConfig apiFilter : apiFilters.values()) {
       boolean hasPassedFilter = false; 
 
       logger.debug("Evaluating filter condition for url " + apiInfoKey.getUrl() + " filterId " + apiFilter.getId());
+
+      // Skip this filter, as it's handled by apiDistributionenabled
+      if(apiFilter.getId().equals(ipApiRateLimitFilter.getId())){
+        continue;
+      }
 
       if(apiFilter.getInfo().getCategory().getName().equalsIgnoreCase("SchemaConform")) {
         logger.debug("SchemaConform filter found for url {} filterId {}", apiInfoKey.getUrl(), apiFilter.getId());
