@@ -142,7 +142,7 @@ public class Main {
     }
     
     private static boolean isProtoKafkaEnabled() {
-        if (DataActor.actualAccountId == 1752208054) {
+        if (DataActor.actualAccountId == 1752208054 || DataActor.actualAccountId == 1753806619) {
             return true;
         }
         return false;
