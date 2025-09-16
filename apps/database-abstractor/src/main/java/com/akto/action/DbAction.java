@@ -284,6 +284,20 @@ public class DbAction extends ActionSupport {
         return deltaUsage;
     }
 
+    @Getter
+    @Setter
+    private String awsAccountIds;
+
+    public String fetchAwsAccountIdsForApiGatewayLogging() {
+
+        AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
+        if (accountSettings != null && accountSettings.getAwsAccountIdsForApiGatewayLogging() != null) {
+            awsAccountIds = accountSettings.getAwsAccountIdsForApiGatewayLogging();
+        }
+
+        return Action.SUCCESS.toUpperCase();
+    }
+
     public void setDeltaUsage(int deltaUsage) {
         this.deltaUsage = deltaUsage;
     }
