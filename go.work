@@ -1,3 +1,5 @@
 go 1.24.2
 
 use ./libs/mcp-proxy
+
+use ./libs/mcp-guardrails
