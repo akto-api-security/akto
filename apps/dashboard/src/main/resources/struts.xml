@@ -2949,6 +2949,64 @@
             </result>
         </action>
 
+        <action name="api/addAwsAccountIdsForApiGatewayLogging" class="com.akto.action.quick_start.AwsAction" method="addAwsAccountIdsForApiGatewayLogging">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">AWS_API_GATEWAY</param>
+                <param name="accessType">READ_WRITE</param>
+                <param name="actionDescription">User added AWS account IDs for API Gateway logging</param>
+            </interceptor-ref>
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <interceptor-ref name="usageInterceptor">
+                <param name="featureLabel">AWS_API_GATEWAY</param>
+            </interceptor-ref>
+            <result name="SUCCESS"  type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="UNAUTHORIZED" type="json">
+                 <param name="statusCode">403</param>
+                 <param name="ignoreHierarchy">false</param>
+                 <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/fetchAwsAccountIdsForApiGatewayLogging" class="com.akto.action.quick_start.AwsAction" method="fetchAwsAccountIdsForApiGatewayLogging">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">AWS_API_GATEWAY</param>
+                <param name="accessType">READ_WRITE</param>
+                <param name="actionDescription">AWS account IDs for API Gateway logging</param>
+            </interceptor-ref>
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <interceptor-ref name="usageInterceptor">
+                <param name="featureLabel">AWS_API_GATEWAY</param>
+            </interceptor-ref>
+            <result name="SUCCESS"  type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="UNAUTHORIZED" type="json">
+                 <param name="statusCode">403</param>
+                 <param name="ignoreHierarchy">false</param>
+                 <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
         <action name="api/fetchCollections" class="com.akto.action.PostmanAction" method="fetchCollections">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
