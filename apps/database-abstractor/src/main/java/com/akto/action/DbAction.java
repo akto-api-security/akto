@@ -609,6 +609,10 @@ public class DbAction extends ActionSupport {
                         if (entry.getKey().equalsIgnoreCase("isUrlParam")) {
                             continue;
                         }
+                        if (entry.getKey().equalsIgnoreCase("url") && DataInsertionPreChecks.shouldSkipUrl(accId, entry.getValue().toString())) {
+                            ignore = true;
+                            break;
+                        }
                         if (entry.getKey().equalsIgnoreCase("apiCollectionId")) {
                             String valStr = entry.getValue().toString();
                             int val = Integer.valueOf(valStr);
@@ -2226,7 +2230,6 @@ public class DbAction extends ActionSupport {
                             gson.toJson(gson.fromJson(updates.get(0), Map.class).get("val")), SuspectSampleData.class);
                     
                     if (DataInsertionPreChecks.shouldSkipUrl(accId, sd.getUrl())) {
-                        loggerMaker.errorAndAddToDb("Skipping SuspectSampleData insert due to pre-checks: " + sd.getUrl());
                         continue;
                     }
                     
