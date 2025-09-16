@@ -33,7 +33,8 @@ func NewMCPValidator(providerType string, providerConfig map[string]interface{})
 	keywordDetector := validators.NewKeywordDetector()
 	requestValidator := validators.NewRequestValidator(provider)
 	responseValidator := validators.NewResponseValidator(provider)
-	semanticDetector, err := validators.NewSemanticDetectorFromGob("/Users/nayanantiya/work/git/akto_cyborg/libs/mcp-proxy/mcp-threat/models/tokenizer.json", "/Users/nayanantiya/work/git/akto_cyborg/libs/mcp-proxy/mcp-threat/models/model.onnx", "/opt/homebrew/Cellar/onnxruntime/1.22.2_2/lib/libonnxruntime.dylib", "/Users/nayanantiya/work/git/akto_cyborg/libs/mcp-proxy/mcp-threat/models/embeddings.gob", 0.75)
+	semanticDetector, err := validators.NewSemanticDetectorFromGob(
+		"/Users/nayanantiya/work/git/akto_cyborg/libs/mcp-proxy/mcp-threat/models/tokenizer.json", "/Users/nayanantiya/work/git/akto_cyborg/libs/mcp-proxy/mcp-threat/models/model.onnx", "/opt/homebrew/Cellar/onnxruntime/1.22.2_2/lib/libonnxruntime.dylib", "/Users/nayanantiya/work/git/akto_cyborg/libs/mcp-proxy/mcp-threat/models/embeddings.gob", 0.75)
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to create semantic detector: %w", err)
@@ -103,17 +104,15 @@ func (mv *MCPValidator) Validate(ctx context.Context, payload interface{}, toolD
 		ToolDescription: toolDescription,
 	}
 
-	keywordResponse := mv.keywordDetector.Validate(ctx, request)
-	if keywordResponse.Verdict != nil && keywordResponse.Verdict.IsMaliciousRequest {
-		return keywordResponse
-	}
+	// keywordResponse := mv.keywordDetector.Validate(ctx, request)
+	// if keywordResponse.Verdict != nil && keywordResponse.Verdict.IsMaliciousRequest {
+	// 	return keywordResponse
+	// }
 
 	semanticResponse := mv.semanticDetector.Validate(ctx, request)
-	if semanticResponse.Verdict != nil && semanticResponse.Verdict.IsMaliciousRequest {
-		return semanticResponse
-	}
+	return semanticResponse
 
-	return mv.detectValidationType(payload).Validate(ctx, request)
+	//return mv.detectValidationType(payload).Validate(ctx, request)
 }
 
 // detectValidationType returns the appropriate LLM validator (request/response)

@@ -143,10 +143,8 @@ func NewSemanticDetectorFromGob(tokenizerPath, modelPath, libonnxPath, gobPath s
 	sess, err := ort.NewAdvancedSession(
 		modelPath,
 		[]string{"input_ids", "attention_mask", "token_type_ids"},
-		//[]string{"input_ids", "attention_mask"},
 		[]string{"last_hidden_state"},
 		[]ort.Value{inputTensor, attnTensor, tokenTypeTensor},
-		//[]ort.Value{inputTensor, attnTensor},
 		[]ort.Value{outputTensor},
 		nil,
 	)
@@ -218,7 +216,7 @@ func (d *SemanticDetector) Validate(ctx context.Context, request *types.Validati
 	// 	matchedKeyword, score, isMatch, err = d.Detect(payloadStr)
 	// }
 
-	matchedKeyword, score, isMatch, err = d.DetectBatchOpt(payloadStr)
+	matchedKeyword, score, isMatch, err = d.DetectBatch(payloadStr)
 
 	if err != nil {
 		response.SetError(fmt.Sprintf("semantic detection failed: %v", err))
@@ -463,7 +461,8 @@ func (d *SemanticDetector) DetectBatchOpt(text string) (matchedKeyword string, s
 		processedText = extractJSONValuesSafe(text)
 	}
 
-	ngrams := generateNGramsInRange(processedText, 2, 3)
+	ngrams := generateNGramsInRange(processedText, 2, 5)
+	log.Println("Total n-grams generated:", len(ngrams))
 	if len(ngrams) == 0 {
 		return "", 0, false, nil
 	}
