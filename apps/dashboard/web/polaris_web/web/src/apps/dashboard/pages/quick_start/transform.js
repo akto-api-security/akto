@@ -18,7 +18,7 @@ import AiAgentScan from "./components/AiAgentScan"
 import { isApiSecurityCategory, isGenAISecurityCategory, isMCPSecurityCategory } from "../../../main/labelHelper"
 import McpRecon from "./components/McpRecon"
 import McpProxy from "./components/McpProxy"
-
+import AwsLogAccountComponent from "./components/shared/AwsLogAccountComponent"
 
 const mirroringObj = {
     icon: '/public/aws.svg',
@@ -636,7 +636,7 @@ const awsApiGatewayObj = {
     label: "AWS API Gateway",
     text: "Akto-AWS-API-Gateway setup is recommended if you are using AWS API Gateway.",
     docsUrl: 'https://docs.akto.io/traffic-connector/aws-services/aws-api-gateway',
-    component: <AddOnComponenet/>,
+    component: <AddOnComponenet featureLabel="AWS_API_GATEWAY" featureComponent={<AwsLogAccountComponent/>}/>,
     key: "AWS_API_GATEWAY",
 }
 
@@ -1286,8 +1286,6 @@ const yaml_kubernetes = [
     `          - name: AKTO_MONGO_CONN`,
     `            value: "<AKTO_MONGO_CONN>"`,
 ]
-
-
 
 const quickStartFunc = {
 
