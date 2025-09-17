@@ -13,19 +13,24 @@ import (
 
 // GuardrailEngine is the main engine that applies all guardrails
 type GuardrailEngine struct {
-	config     *GuardrailConfig
-	patterns   []SensitiveDataPattern
-	filters    []ContentFilter
-	rateLimiter *RateLimiter
-	mutex      sync.RWMutex
+	config         *GuardrailConfig
+	patterns       []SensitiveDataPattern
+	filters        []ContentFilter
+	rateLimiter    *RateLimiter
+	templateClient *TemplateClient
+	templates      map[string]YamlTemplate
+	configs        map[string]MCPGuardrailConfig
+	mutex          sync.RWMutex
 }
 
 // NewGuardrailEngine creates a new guardrail engine with the given configuration
 func NewGuardrailEngine(config *GuardrailConfig) *GuardrailEngine {
 	engine := &GuardrailEngine{
-		config:   config,
-		patterns: getDefaultSensitivePatterns(),
-		filters:  getDefaultContentFilters(),
+		config:    config,
+		patterns:  getDefaultSensitivePatterns(),
+		filters:   getDefaultContentFilters(),
+		templates: make(map[string]YamlTemplate),
+		configs:   make(map[string]MCPGuardrailConfig),
 	}
 
 	if config.EnableRateLimiting {
@@ -35,13 +40,20 @@ func NewGuardrailEngine(config *GuardrailConfig) *GuardrailEngine {
 	return engine
 }
 
+// NewGuardrailEngineWithClient creates a new guardrail engine with a template client
+func NewGuardrailEngineWithClient(config *GuardrailConfig, templateClient *TemplateClient) *GuardrailEngine {
+	engine := NewGuardrailEngine(config)
+	engine.templateClient = templateClient
+	return engine
+}
+
 // ProcessResponse applies all configured guardrails to an MCP response
 func (g *GuardrailEngine) ProcessResponse(response *MCPResponse) *GuardrailResult {
 	result := &GuardrailResult{
 		SanitizedResponse: response,
-		Blocked:          false,
-		Warnings:         []string{},
-		Logs:             []LogEntry{},
+		Blocked:           false,
+		Warnings:          []string{},
+		Logs:              []LogEntry{},
 	}
 
 	g.mutex.RLock()
@@ -326,8 +338,8 @@ func (g *GuardrailEngine) logOperation(result *GuardrailResult) {
 		Level:     g.config.LogLevel,
 		Message:   "Guardrail operation completed",
 		Data: map[string]interface{}{
-			"blocked":     result.Blocked,
-			"warnings":    result.Warnings,
+			"blocked":      result.Blocked,
+			"warnings":     result.Warnings,
 			"block_reason": result.BlockReason,
 		},
 	}
@@ -359,4 +371,109 @@ func (g *GuardrailEngine) UpdateConfig(config *GuardrailConfig) {
 	g.mutex.Lock()
 	defer g.mutex.Unlock()
 	g.config = config
-} 
+}
+
+// LoadTemplatesFromAPI loads guardrail templates from the database API
+func (g *GuardrailEngine) LoadTemplatesFromAPI() error {
+	if g.templateClient == nil {
+		return fmt.Errorf("template client not configured")
+	}
+
+	g.mutex.Lock()
+	defer g.mutex.Unlock()
+
+	// Fetch all active templates
+	templates, err := g.templateClient.FetchGuardrailTemplates(true)
+	if err != nil {
+		return fmt.Errorf("failed to fetch templates: %w", err)
+	}
+
+	// Update internal templates map
+	g.templates = make(map[string]YamlTemplate)
+	for _, template := range templates {
+		g.templates[template.ID] = template
+	}
+
+	// Fetch parsed configurations
+	configs, err := g.templateClient.FetchGuardrailConfigs(false)
+	if err != nil {
+		return fmt.Errorf("failed to fetch configurations: %w", err)
+	}
+
+	g.configs = configs
+
+	log.Printf("Loaded %d templates and %d configurations from API", len(g.templates), len(g.configs))
+	return nil
+}
+
+// LoadTemplatesByType loads guardrail templates of a specific type from the database API
+func (g *GuardrailEngine) LoadTemplatesByType(guardrailType string) error {
+	if g.templateClient == nil {
+		return fmt.Errorf("template client not configured")
+	}
+
+	g.mutex.Lock()
+	defer g.mutex.Unlock()
+
+	templates, err := g.templateClient.FetchGuardrailTemplatesByType(guardrailType)
+	if err != nil {
+		return fmt.Errorf("failed to fetch templates by type: %w", err)
+	}
+
+	// Update templates for this type
+	for _, template := range templates {
+		g.templates[template.ID] = template
+	}
+
+	log.Printf("Loaded %d templates for type %s from API", len(templates), guardrailType)
+	return nil
+}
+
+// RefreshTemplates refreshes templates from the API
+func (g *GuardrailEngine) RefreshTemplates() error {
+	return g.LoadTemplatesFromAPI()
+}
+
+// GetTemplate returns a specific template by ID
+func (g *GuardrailEngine) GetTemplate(templateID string) (*YamlTemplate, bool) {
+	g.mutex.RLock()
+	defer g.mutex.RUnlock()
+
+	template, exists := g.templates[templateID]
+	return &template, exists
+}
+
+// GetConfig returns a specific configuration by ID
+func (g *GuardrailEngine) GetConfig(configID string) (*MCPGuardrailConfig, bool) {
+	g.mutex.RLock()
+	defer g.mutex.RUnlock()
+
+	config, exists := g.configs[configID]
+	return &config, exists
+}
+
+// GetAllTemplates returns all loaded templates
+func (g *GuardrailEngine) GetAllTemplates() map[string]YamlTemplate {
+	g.mutex.RLock()
+	defer g.mutex.RUnlock()
+
+	// Return a copy to avoid concurrent access issues
+	templates := make(map[string]YamlTemplate)
+	for k, v := range g.templates {
+		templates[k] = v
+	}
+	return templates
+}
+
+// GetAllConfigs returns all loaded configurations
+func (g *GuardrailEngine) GetAllConfigs() map[string]MCPGuardrailConfig {
+	g.mutex.RLock()
+	defer g.mutex.RUnlock()
+
+	// Return a copy to avoid concurrent access issues
+	configs := make(map[string]MCPGuardrailConfig)
+	for k, v := range g.configs {
+		configs[k] = v
+	}
+	return configs
+}

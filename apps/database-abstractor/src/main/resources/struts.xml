@@ -1738,6 +1738,62 @@
             </result>
         </action>
 
+        <!-- MCP Guardrails API endpoints -->
+        <action name="api/mcp/fetchGuardrailTemplates" class="com.akto.action.MCPGuardrailsAction" method="fetchMCPGuardrailTemplates">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/mcp/fetchGuardrailTemplatesByType" class="com.akto.action.MCPGuardrailsAction" method="fetchMCPGuardrailTemplatesByType">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/mcp/fetchGuardrailConfigs" class="com.akto.action.MCPGuardrailsAction" method="fetchMCPGuardrailConfigs">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/mcp/fetchGuardrailTemplate" class="com.akto.action.MCPGuardrailsAction" method="fetchMCPGuardrailTemplate">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/mcp/fetchGuardrailTypes" class="com.akto.action.MCPGuardrailsAction" method="fetchMCPGuardrailTypes">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
     </package>
 
 </struts>

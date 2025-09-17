@@ -1,0 +1,64 @@
+# Sample MCP Guardrail YAML Template
+id: "data_sanitization_basic"
+type: "DATA_SANITIZATION"
+enabled: true
+priority: 100
+
+configuration:
+  sensitiveFields:
+    - "password"
+    - "api_key"
+    - "secret"
+    - "token"
+    - "private_key"
+    - "access_token"
+    - "refresh_token"
+  
+  patterns:
+    - name: "Credit Card"
+      pattern: "\\b(?:\\d[ -]*?){13,16}\\b"
+      replacement: "***CREDIT_CARD***"
+    
+    - name: "Social Security Number"
+      pattern: "\\b\\d{3}-?\\d{2}-?\\d{4}\\b"
+      replacement: "***SSN***"
+    
+    - name: "Email Address"
+      pattern: "\\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Z|a-z]{2,}\\b"
+      replacement: "***EMAIL***"
+    
+    - name: "Phone Number"
+      pattern: "\\b\\(?\\d{3}\\)?[-.\\s]?\\d{3}[-.\\s]?\\d{4}\\b"
+      replacement: "***PHONE***"
+
+  validationRules:
+    method: "required"
+    
+  outputFilters:
+    - "block_sensitive"
+    - "warn_on_pii"
+
+info:
+  name: "Basic Data Sanitization"
+  description: "Removes sensitive data patterns from MCP responses"
+  details: "This guardrail template provides basic data sanitization by detecting and redacting common sensitive data patterns such as credit cards, SSNs, emails, and phone numbers."
+  purpose: "Protect sensitive information from being exposed in MCP responses"
+  category:
+    name: "data_protection"
+    displayName: "Data Protection"
+    shortName: "DP"
+    description: "Templates focused on protecting sensitive data"
+  severity: "HIGH"
+  tags:
+    - "pii"
+    - "data_protection"
+    - "sanitization"
+    - "compliance"
+  applicableScenarios:
+    - "customer_data_handling"
+    - "financial_services"
+    - "healthcare"
+    - "general_compliance"
+  dependencies: []
+  enabled: true
+  priority: 100

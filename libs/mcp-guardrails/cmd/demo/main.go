@@ -41,8 +41,44 @@ func main() {
 		LogLevel:      "INFO",
 	}
 
-	// Create the guardrail engine
-	engine := guardrails.NewGuardrailEngine(config)
+	// Create template client (optional - for fetching templates from database)
+	templateClient := guardrails.NewTemplateClient("http://localhost:8080")
+
+	// Create the guardrail engine with template client
+	engine := guardrails.NewGuardrailEngineWithClient(config, templateClient)
+
+	// Demo: Template Fetching (optional)
+	fmt.Println("\n0. Template Fetching Demo")
+	fmt.Println("-------------------------")
+
+	// Check if the API is available
+	if err := templateClient.HealthCheck(); err != nil {
+		fmt.Printf("API health check failed (this is expected if database-abstractor is not running): %v\n", err)
+		fmt.Println("Continuing with default patterns...")
+	} else {
+		fmt.Println("✓ API health check passed")
+
+		// Try to load templates from API
+		if err := engine.LoadTemplatesFromAPI(); err != nil {
+			fmt.Printf("Failed to load templates from API: %v\n", err)
+			fmt.Println("Continuing with default patterns...")
+		} else {
+			fmt.Println("✓ Successfully loaded templates from API")
+
+			// Show loaded templates
+			templates := engine.GetAllTemplates()
+			configs := engine.GetAllConfigs()
+			fmt.Printf("Loaded %d templates and %d configurations\n", len(templates), len(configs))
+
+			for id, template := range templates {
+				if template.Info != nil {
+					fmt.Printf("- Template: %s (%s) - Author: %s\n", id, template.Info.Name, template.Author)
+				} else {
+					fmt.Printf("- Template: %s - Author: %s\n", id, template.Author)
+				}
+			}
+		}
+	}
 
 	// Demo 1: Data Sanitization
 	fmt.Println("\n1. Data Sanitization Demo")
