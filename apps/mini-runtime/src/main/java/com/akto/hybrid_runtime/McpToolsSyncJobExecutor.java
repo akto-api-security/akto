@@ -107,12 +107,10 @@ public class McpToolsSyncJobExecutor {
                     normalizedSampleDataSet);
                 List<HttpResponseParams> resourcesResponseList = handleMcpResourceDiscovery(apiCollection,
                     normalizedSampleDataSet);
-                List<HttpResponseParams> promptsResponseList = handleMcpPromptsDiscovery(apiCollection, normalizedSampleDataSet);
                 List<HttpResponseParams> responseParamsToProcess = new ArrayList<>();
                 responseParamsToProcess.addAll(initResponseList);
                 responseParamsToProcess.addAll(toolsResponseList);
                 responseParamsToProcess.addAll(resourcesResponseList);
-                responseParamsToProcess.addAll(promptsResponseList);
                 processResponseParams(apiConfig, responseParamsToProcess);
             } catch (Exception e) {
                 logger.error("Error while running MCP sync job for apiCollectionId: {} and hostname: {}",
@@ -275,66 +273,6 @@ public class McpToolsSyncJobExecutor {
         }
         return responseParamsList;
     }
-
-    private List<HttpResponseParams> handleMcpPromptsDiscovery(ApiCollection apiCollection,
-                                                                Set<String> normalizedSampleDataSet) {
-        String host = apiCollection.getHostName();
-
-        List<HttpResponseParams> responseParamsList = new ArrayList<>();
-        try {
-            if (mcpServerCapabilities != null && mcpServerCapabilities.getPrompts() == null) {
-                logger.debug("Skipping prompts discovery as MCP server capabilities do not support prompts.");
-                return responseParamsList;
-            }
-            Pair<JSONRPCResponse, HttpResponseParams> promptsListResponsePair = getMcpMethodResponse(
-                    host, McpSchema.METHOD_PROMPT_LIST, MCP_PROMPTS_LIST_REQUEST_JSON, apiCollection);
-
-            if (promptsListResponsePair.getSecond() != null && !normalizedSampleDataSet.contains(
-                    McpSchema.METHOD_PROMPT_LIST)) {
-                responseParamsList.add(promptsListResponsePair.getSecond());
-            }
-            logger.debug("Received prompts/list response. Processing prompts.....");
-
-            McpSchema.ListPromptsResult promptsResult = JSONUtils.fromJson(promptsListResponsePair.getFirst().getResult(),
-                    McpSchema.ListPromptsResult.class);
-
-            if (promptsResult != null && !CollectionUtils.isEmpty(promptsResult.getPrompts())) {
-                int id = 2;
-                String urlWithQueryParams = promptsListResponsePair.getSecond().getRequestParams().getURL();
-                String toolsCallRequestHeaders = buildHeaders(host);
-
-                for (McpSchema.Prompt prompt : promptsResult.getPrompts()) {
-                    if (normalizedSampleDataSet.contains(McpSchema.METHOD_PROMPT_GET + "/" + prompt.getName())) {
-                        logger.debug("Skipping prompt {} as it is already present in the db.", prompt.getName());
-                        continue;
-                    }
-                    JSONRPCRequest request = new JSONRPCRequest(
-                            McpSchema.JSONRPC_VERSION,
-                            McpSchema.METHOD_PROMPT_GET,
-                            id++,
-                            new ReadResourceRequest(prompt.getName())
-                    );
-
-                    HttpResponseParams readResourceHttpResponseParams = convertToAktoFormat(apiCollection.getId(),
-                            urlWithQueryParams,
-                            toolsCallRequestHeaders,
-                            HttpMethod.POST.name(),
-                            mapper.writeValueAsString(request),
-                            new OriginalHttpResponse("", Collections.emptyMap(), HttpStatus.SC_OK));
-
-                    if (readResourceHttpResponseParams != null) {
-                        responseParamsList.add(readResourceHttpResponseParams);
-                    }
-                }
-            } else {
-                logger.debug("Skipping as List Prompt Result is null or Prompts are empty");
-            }
-        } catch (Exception e) {
-            logger.error("Error while discovering mcp prompts for hostname: {}", host, e);
-        }
-        return responseParamsList;
-    }
-
     private void processResponseParams(APIConfig apiConfig, List<HttpResponseParams> responseParamsList) {
         if (CollectionUtils.isEmpty(responseParamsList)) {
             logger.debug("No response params to process for MCP sync job.");
