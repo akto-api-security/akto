@@ -158,6 +158,10 @@ jobs:
             echo "::set-output name=image::$ECR_REGISTRY/akto-internal:$IMAGE_TAG"
           fi
 
+          cd ../data-ingestion-service
+          docker buildx build --platform linux/arm64/v8,linux/amd64 -t $ECR_REGISTRY/data-ingestion-service:$IMAGE_TAG_1 . --push
+          echo "::set-output name=image::$ECR_REGISTRY/data-ingestion-service:$IMAGE_TAG"
+
       - name: Configure AWS Credentials for ECR
         uses: aws-actions/configure-aws-credentials@v1
         with:
