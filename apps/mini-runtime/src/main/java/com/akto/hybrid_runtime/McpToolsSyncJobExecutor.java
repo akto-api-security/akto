@@ -61,8 +61,6 @@ public class McpToolsSyncJobExecutor {
         "{\"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"" + McpSchema.METHOD_TOOLS_LIST + "\", \"params\": {}}";
     private static final String MCP_RESOURCE_LIST_REQUEST_JSON =
         "{\"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"" + McpSchema.METHOD_RESOURCES_LIST + "\", \"params\": {}}";
-    private static final String MCP_PROMPTS_LIST_REQUEST_JSON =
-            "{\"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"" + McpSchema.METHOD_PROMPT_LIST + "\", \"params\": {}}";
     private static final String LOCAL_IP = "127.0.0.1";
     private ServerCapabilities mcpServerCapabilities = null;
 
@@ -273,6 +271,7 @@ public class McpToolsSyncJobExecutor {
         }
         return responseParamsList;
     }
+
     private void processResponseParams(APIConfig apiConfig, List<HttpResponseParams> responseParamsList) {
         if (CollectionUtils.isEmpty(responseParamsList)) {
             logger.debug("No response params to process for MCP sync job.");
