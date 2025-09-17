@@ -48,8 +48,8 @@ public class LLMRule {
          */
         boolean urlPossibleMatch = false;
         if (endpoints != null) {
-            for (String possibleUrl : endpoints) {
-                if (url.contains(possibleUrl)) {
+            for (String endpoint : endpoints) {
+                if (url.contains(endpoint)) {
                     urlPossibleMatch = true;
                     break;
                 }
@@ -116,12 +116,12 @@ public class LLMRule {
                     null, null),
             new LLMRule(
                     "Ollama",
-                    Arrays.asList(""),
+                    Arrays.asList(),
                     Arrays.asList("/api/generate","/api/chat"), 
                     Arrays.asList("\"model\"")),
             new LLMRule(
                     "Custom",
-                    Arrays.asList(""),
+                    Arrays.asList(),
                     Arrays.asList("/v1/completions","/v1/chat/completions"), 
                     Arrays.asList("\"model\""))
 
