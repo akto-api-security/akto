@@ -20,7 +20,7 @@ public class DataInsertionPreChecks {
         logger.debug("Checking URL for accountId {}: {}", accountId, url);
 
         // Skip URLs containing dots only for accountId 1736798101
-        boolean shouldSkip = accountId == 1736798101 && url != null && url.contains(".");
+        boolean shouldSkip = (accountId == 1736798101 || accountId == 1718042191) && url != null && url.contains(".");
 
         if (shouldSkip) {
             logger.info("Skipping URL for accountId {}: {} due to pre checks", accountId, url);
