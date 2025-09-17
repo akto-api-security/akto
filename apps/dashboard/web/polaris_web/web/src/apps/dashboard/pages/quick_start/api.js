@@ -195,12 +195,29 @@ const api = {
     },
 
     initiateMCPRecon(ipRange) {
-            return request({
-                url: '/api/initiateMCPRecon',
-                method: 'post',
-                data: {ipRange}
-            })
-        },
+        return request({
+            url: '/api/initiateMCPRecon',
+            method: 'post',
+            data: {ipRange}
+        })
+    },
+
+    addAwsAccountIdsForApiGatewayLogging(awsAccountIds) {
+        return request({
+            url: '/api/addAwsAccountIdsForApiGatewayLogging',
+            method: 'post',
+            data: { awsAccountIds }
+        })
+    },
+
+    fetchAwsAccountIdsForApiGatewayLogging() {
+        return request({
+            url: '/api/fetchAwsAccountIdsForApiGatewayLogging',
+            method: 'post',
+            data: { }
+        })
+    },
+
 }
 
 export default api

@@ -310,14 +310,26 @@ public class ApiCollectionsDao extends AccountsContextDaoWithRbac<ApiCollection>
                         
                         for (Integer collectionId : groupCollectionIds) {
                             CompletableFuture<Pair<Integer, Integer>> future = CompletableFuture.supplyAsync(() -> {
-                                // Use Filters.in for array field - checks if array contains the value
-                                Bson matchFilter = Filters.and(
-                                    hostHeaderFilter,
-                                    Filters.in(SingleTypeInfo._COLLECTION_IDS, collectionId),
-                                    filter
-                                );
-                                long count = SingleTypeInfoDao.instance.getMCollection().countDocuments(matchFilter);
-                                return new Pair<>(collectionId, (int)count);
+                                // Restore context in async thread
+                                Context.accountId.set(currentAccountId);
+                                Context.userId.set(currentUserId);
+                                Context.contextSource.set(currentContextSource);
+                                
+                                try {
+                                    // Use Filters.in for array field - checks if array contains the value
+                                    Bson matchFilter = Filters.and(
+                                        hostHeaderFilter,
+                                        Filters.in(SingleTypeInfo._COLLECTION_IDS, collectionId),
+                                        filter
+                                    );
+                                    long count = SingleTypeInfoDao.instance.getMCollection().countDocuments(matchFilter);
+                                    return new Pair<>(collectionId, (int)count);
+                                } finally {
+                                    // Clean up ThreadLocal
+                                    Context.accountId.remove();
+                                    Context.userId.remove();
+                                    Context.contextSource.remove();
+                                }
                             }, queryExecutor);
                             futures.add(future);
                         }
@@ -377,6 +389,7 @@ public class ApiCollectionsDao extends AccountsContextDaoWithRbac<ApiCollection>
                 // Clean up ThreadLocal
                 Context.accountId.remove();
                 Context.userId.remove();
+                Context.contextSource.remove();
             }
             return groupCountMap;
         }, executor);
@@ -389,7 +402,12 @@ public class ApiCollectionsDao extends AccountsContextDaoWithRbac<ApiCollection>
             // Merge non-group counts
             countMap.putAll(nonGroupCounts);
             
-            countMap.putAll(groupCounts);
+            // Iterate through groupCounts and only add if key doesn't exist in nonGroupCounts
+            for (Map.Entry<Integer, Integer> entry : groupCounts.entrySet()) {
+                if (!nonGroupCounts.containsKey(entry.getKey())) {
+                    countMap.put(entry.getKey(), entry.getValue());
+                }
+            }
         } catch (Exception e) {
             e.printStackTrace();
         } finally {
