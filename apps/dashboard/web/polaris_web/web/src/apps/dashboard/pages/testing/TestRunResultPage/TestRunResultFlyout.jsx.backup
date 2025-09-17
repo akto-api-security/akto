@@ -393,72 +393,59 @@ function TestRunResultFlyout(props) {
                             }
                         }
 
-                        if (messageObj && messageObj.response && messageObj.response.body) {
-                            try {
-                                // Minimal payload structure for optimal LLM analysis
-                                const testResultData = {
-                                    testContext: {
-                                        category: selectedTestRunResult?.testCategoryId || selectedTestRunResult?.testCategory || 'UNKNOWN',
-                                        description: issueDetails?.description || selectedTestRunResult?.name || '',
-                                        severity: issueDetails?.severity || 'HIGH',
-                                        cwe: issueDetails?.cwe || []
-                                    },
-                                    request: {
-                                        method: messageObj.request?.method || 'GET',
-                                        url: messageObj.request?.url || '',
-                                        contentType: messageObj.request?.headers?.['content-type'] || 'application/json',
-                                        authorization: messageObj.request?.headers?.['authorization'] || null,
-                                        userAgent: messageObj.request?.headers?.['user-agent'] || null,
-                                        xForwardedFor: messageObj.request?.headers?.['x-forwarded-for'] || null,
-                                        origin: messageObj.request?.headers?.['origin'] || null,
-                                        referer: messageObj.request?.headers?.['referer'] || null
-                                    },
-                                    response: {
-                                        statusCode: messageObj.response?.statusCode || 200,
-                                        headers: messageObj.response?.headers || {},
-                                        body: messageObj.response?.body || ''
-                                    }
-                                };
-                            
-                                const response = await testingApi.analyzeVulnerability(
-                                    JSON.stringify(testResultData)
-                                );
+                    if (messageObj && messageObj.response && messageObj.response.body) {
+                        try {
+                            console.log('Sending response body for analysis, idx', idx, ':', messageObj.response.body);
+                            const response = await testingApi.analyzeVulnerability(
+                                messageObj.response.body,
+                                vulnerabilityType
+                            );
 
-                                const analysisData = response.analysisResult || response;
+                            console.log('Vulnerability API response for idx', idx, ':', response);
 
-                                if (analysisData?.vulnerableSegments?.length > 0) {
-                                    const enhancedSegments = analysisData.vulnerableSegments.map(segment => ({
-                                        ...segment,
-                                        vulnerabilityType: selectedTestRunResult?.testCategoryId || selectedTestRunResult?.testCategory || 'UNKNOWN',
-                                        severity: issueDetails?.severity || 'HIGH'
-                                    }));
+                            // The backend might return the result in analysisResult field or directly
+                            const analysisData = response.analysisResult || response;
 
-                                    setLocalVulnerabilityHighlights(prev => ({
+                            if (analysisData && analysisData.vulnerableSegments && analysisData.vulnerableSegments.length > 0) {
+                                // Add vulnerability type and severity from the test results to each segment
+                            const analysisData = response.analysisResult || response;
+
+                            if (analysisData?.vulnerableSegments?.length > 0) {
+                                const enhancedSegments = analysisData.vulnerableSegments.map(segment => ({
+                                    ...segment,
+                                    vulnerabilityType: issueDetails?.testCategory || vulnerabilityType,
+                                    severity: issueDetails?.severity || 'HIGH'
+                                }));
+                                console.log('Setting vulnerability highlights for idx', idx, ':', enhancedSegments);
+
+                                setLocalVulnerabilityHighlights(prev => ({
+                                    ...prev,
+                                    [idx]: enhancedSegments
+                                }));
+                            } else {
+                                setLocalVulnerabilityHighlights(prev => {
+                                    const newState = {
                                         ...prev,
                                         [idx]: enhancedSegments
-                                    }));
-                                } else {
-                                    setLocalVulnerabilityHighlights(prev => {
-                                        const newState = { ...prev };
-                                        delete newState[idx];
-                                        return newState;
-                                    });
-                                }
-                                return { idx, success: true };
-                            } catch (error) {
-                                console.error('Failed to analyze vulnerability for result', idx, error);
-                                return { idx, success: false };
+                                    };
+                                    console.log('New vulnerability highlights state:', newState);
+                                    return newState;
+                                });
+                            } else {
+                                console.log('No vulnerable segments found for idx', idx);
                             }
+                            return { idx, success: true };
+                        } catch (error) {
+                            console.error('Failed to analyze vulnerability for result', idx, error);
+                            return { idx, success: false };
                         }
-                        return null;
-                    });
+                    }
+                    return null;
+                });
                 
-                    Promise.allSettled(analysisPromises).finally(() => {
-                        setLocalIsAnalyzing(false);
-                    });
-                }, 60);
-
-                return () => clearTimeout(timeoutId);
+                Promise.allSettled(analysisPromises).finally(() => {
+                    setLocalIsAnalyzing(false);
+                });
             }
         }, [selectedTestRunResult?.id]);
         
@@ -470,6 +457,7 @@ function TestRunResultFlyout(props) {
             return null;
         }
         
+        console.log('ValuesTabContent rendering with localVulnerabilityHighlights:', localVulnerabilityHighlights);
         
         return (
             <Box paddingBlockStart={3} paddingInlineEnd={4} paddingInlineStart={4}>
@@ -488,6 +476,7 @@ function TestRunResultFlyout(props) {
                         let vulnerableText = llmHighlights[idx]?.vulnerableText || "";
                         // Add vulnerability highlights only for response
                         let vulnerabilitySegments = localVulnerabilityHighlights[idx] || [];
+                        console.log('Mapping vulnerabilitySegments for idx', idx, ':', vulnerabilitySegments);
                         if (result.originalMessage || result.message) {
                             return {
                                 originalMessage: result.originalMessage,
@@ -502,7 +491,6 @@ function TestRunResultFlyout(props) {
                     isNewDiff={true}
                     vulnerable={selectedTestRunResult?.vulnerable}
                     isAnalyzingVulnerabilities={localIsAnalyzing}
-                    vulnerabilityAnalysisError={vulnerabilityAnalysisError}
                 />
             </Box>
         );

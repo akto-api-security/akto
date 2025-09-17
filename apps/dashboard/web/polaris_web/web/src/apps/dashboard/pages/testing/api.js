@@ -61,13 +61,12 @@ export default {
         })
         return resp
     },
-    async analyzeVulnerability(responseOutput, vulnerabilityType) {
+    async analyzeVulnerability(responseOutput) {
         const resp = await request({
             url: '/api/analyze_vulnerability',
             method: 'post',
             data: {
-                responseOutput: responseOutput,
-                vulnerabilityType: vulnerabilityType
+                responseOutput: responseOutput
             }
         })
         return resp
