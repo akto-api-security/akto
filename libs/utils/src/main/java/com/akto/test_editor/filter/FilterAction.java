@@ -326,6 +326,13 @@ public final class FilterAction {
         }
 
         String reqBody = rawApi.getRequest().getBody();
+
+        // Strip BOM before processing for regex filters to avoid false positives with SOAP payloads
+        if (filterActionRequest.getOperand() != null &&
+            filterActionRequest.getOperand().equals(TestEditorEnums.DataOperands.REGEX.toString())) {
+            reqBody = Utils.stripBOM(reqBody);
+        }
+        
         return applyFilterOnPayload(filterActionRequest, reqBody);
     }
 
@@ -341,6 +348,13 @@ public final class FilterAction {
         }
 
         String reqBody = response.getBody();
+
+        // Strip BOM before processing for regex filters to avoid false positives with SOAP payloads
+        if (filterActionRequest.getOperand() != null &&
+            filterActionRequest.getOperand().equals(TestEditorEnums.DataOperands.REGEX.toString())) {
+            reqBody = Utils.stripBOM(reqBody);
+        }
+
         return applyFilterOnPayload(filterActionRequest, reqBody);
     }
 
