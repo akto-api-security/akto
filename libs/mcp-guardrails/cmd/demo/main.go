@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/akto/mcp-guardrails"
+	"github.com/akto-api-security/akto/libs/mcp-guardrails"
 )
 
 func main() {
@@ -17,26 +17,26 @@ func main() {
 		EnableDataSanitization: true,
 		SensitiveFields:        []string{"password", "api_key", "secret", "token"},
 		RedactionPatterns:      []string{},
-		
+
 		EnableContentFiltering: true,
 		BlockedKeywords:        []string{"malicious", "dangerous", "exploit"},
 		AllowedDomains:         []string{"example.com", "api.example.com"},
-		
+
 		EnableRateLimiting: true,
 		RateLimitConfig: guardrails.RateLimitConfig{
 			RequestsPerMinute: 100,
 			BurstSize:         10,
 			WindowSize:        time.Minute,
 		},
-		
+
 		EnableInputValidation: true,
 		ValidationRules: map[string]string{
 			"method": "required",
 		},
-		
+
 		EnableOutputFiltering: true,
 		OutputFilters:         []string{"block_sensitive"},
-		
+
 		EnableLogging: true,
 		LogLevel:      "INFO",
 	}
@@ -47,7 +47,7 @@ func main() {
 	// Demo 1: Data Sanitization
 	fmt.Println("\n1. Data Sanitization Demo")
 	fmt.Println("-------------------------")
-	
+
 	responseWithSensitiveData := &guardrails.MCPResponse{
 		ID: "demo_1",
 		Result: json.RawMessage(`{
@@ -68,16 +68,16 @@ func main() {
 	}
 
 	result := engine.ProcessResponse(responseWithSensitiveData)
-	
+
 	if result.Blocked {
 		fmt.Printf("❌ Response blocked: %s\n", result.BlockReason)
 	} else {
 		fmt.Println("✅ Response processed successfully")
-		
+
 		if len(result.Warnings) > 0 {
 			fmt.Printf("⚠️  Warnings: %v\n", result.Warnings)
 		}
-		
+
 		if result.SanitizedResponse != nil {
 			fmt.Println("🔒 Data sanitization applied")
 			// Show sanitized result
@@ -89,7 +89,7 @@ func main() {
 	// Demo 2: Content Filtering
 	fmt.Println("\n2. Content Filtering Demo")
 	fmt.Println("-------------------------")
-	
+
 	// Add custom content filter
 	customFilter := guardrails.ContentFilter{
 		Type:        "keyword",
@@ -108,7 +108,7 @@ func main() {
 	}
 
 	result = engine.ProcessResponse(responseWithInternalInfo)
-	
+
 	if result.Blocked {
 		fmt.Printf("❌ Response blocked: %s\n", result.BlockReason)
 	} else {
@@ -121,7 +121,7 @@ func main() {
 	// Demo 3: Rate Limiting
 	fmt.Println("\n3. Rate Limiting Demo")
 	fmt.Println("---------------------")
-	
+
 	request := &guardrails.MCPRequest{
 		ID:     "demo_3",
 		Method: "tools/list",
@@ -141,7 +141,7 @@ func main() {
 	// Demo 4: Input Validation
 	fmt.Println("\n4. Input Validation Demo")
 	fmt.Println("-------------------------")
-	
+
 	// Valid request
 	validRequest := &guardrails.MCPRequest{
 		ID:     "demo_4_valid",
@@ -173,7 +173,7 @@ func main() {
 	// Demo 5: Custom Patterns
 	fmt.Println("\n5. Custom Patterns Demo")
 	fmt.Println("-----------------------")
-	
+
 	// Add custom sensitive pattern
 	customPattern := guardrails.SensitiveDataPattern{
 		Name:        "employee_id",
@@ -195,12 +195,12 @@ func main() {
 	}
 
 	result = engine.ProcessResponse(responseWithEmployeeData)
-	
+
 	if result.Blocked {
 		fmt.Printf("❌ Response blocked: %s\n", result.BlockReason)
 	} else {
 		fmt.Println("✅ Response processed successfully")
-		
+
 		if result.SanitizedResponse != nil {
 			fmt.Println("🔒 Custom pattern applied")
 			sanitizedBytes, _ := json.MarshalIndent(result.SanitizedResponse.Result, "", "  ")
@@ -211,13 +211,13 @@ func main() {
 	// Demo 6: Logging
 	fmt.Println("\n6. Logging Demo")
 	fmt.Println("---------------")
-	
+
 	if len(result.Logs) > 0 {
 		fmt.Println("📝 Log entries generated:")
 		for i, logEntry := range result.Logs {
-			fmt.Printf("  %d. [%s] %s - %s\n", 
-				i+1, 
-				logEntry.Level, 
+			fmt.Printf("  %d. [%s] %s - %s\n",
+				i+1,
+				logEntry.Level,
 				logEntry.Timestamp.Format("15:04:05"),
 				logEntry.Message)
 		}
@@ -225,4 +225,4 @@ func main() {
 
 	fmt.Println("\n🎉 MCP Guardrails Demo Complete!")
 	fmt.Println("The library is ready to be integrated into your MCP proxy server.")
-} 
+}
