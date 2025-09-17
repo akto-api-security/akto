@@ -57,10 +57,7 @@ public class McpReconRequestDao extends AccountsContextDao<McpReconRequest> {
         public static final String STARTED_AT = "started_at";
         public static final String FINISHED_AT = "finished_at";
         public static final String CREATED_AT = "created_at";
-        public static final String AUTH_HEADERS = "auth_headers";
-        public static final String BATCH_SIZE = "batch_size";
         public static final String TIMEOUT = "timeout";
-        public static final String MAX_CONCURRENT = "max_concurrent";
-        public static final String SERVERS_FOUND = "servers_found";
+
     }
 }

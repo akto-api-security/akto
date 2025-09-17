@@ -2934,7 +2934,6 @@
                 <param name="includeProperties">^actionErrors.*</param>
             </result>
             <result name="SUCCESS" type="json">
-                <param name="includeProperties">requestId</param>
             </result>
             <interceptor-ref name="usageInterceptor">
                 <param name="featureLabel">MCP_SECURITY</param>

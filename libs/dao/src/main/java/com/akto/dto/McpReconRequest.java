@@ -52,16 +52,6 @@ public class McpReconRequest {
         this.createdAt = createdAt;
     }
 
-    public McpReconRequest(String id, int accountId, String ipRange, int startedAt, int finishedAt, String status, int serversFound) {
-        this._id = id;
-        this.accountId = accountId;
-        this.ipRange = ipRange;
-        this.startedAt = startedAt;
-        this.finishedAt = finishedAt;
-        this.status = status;
-        this.serversFound = serversFound;
-    }
-
     // Status constants
     public static final String STATUS_PENDING = "Pending";
     public static final String STATUS_IN_PROGRESS = "In Progress";

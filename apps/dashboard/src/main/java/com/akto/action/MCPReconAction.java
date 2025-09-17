@@ -33,6 +33,8 @@ public class MCPReconAction extends UserAction {
 
             // Insert the request into the mcp_recon_requests collection
             McpReconRequestDao.instance.insertOne(reconRequest);
+            this.requestId = reconRequest.get_id();
+            loggerMaker.info("MCP Recon request created with ID: " + this.requestId, LogDb.DASHBOARD);
             return Action.SUCCESS.toUpperCase();
 
         } catch (Exception e) {
@@ -48,5 +50,13 @@ public class MCPReconAction extends UserAction {
 
     public void setRequestId(String requestId) {
         this.requestId = requestId;
+    }
+
+    public String getIpRange() {
+        return ipRange;
+    }
+
+    public void setIpRange(String ipRange) {
+        this.ipRange = ipRange;
     }
 }
