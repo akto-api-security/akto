@@ -54,6 +54,7 @@ import com.akto.trafficFilter.HostFilter;
 import com.akto.trafficFilter.ParamFilter;
 import com.akto.usage.UsageMetricCalculator;
 import com.akto.util.Constants;
+import com.akto.util.DataInsertionPreChecks;
 import com.akto.dto.usage.MetricTypes;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
@@ -488,6 +489,12 @@ public class DbAction extends ActionSupport {
             for (BasicDBObject obj: apiInfoList) {
                 ApiInfo apiInfo = objectMapper.readValue(obj.toJson(), ApiInfo.class);
                 ApiInfoKey id = apiInfo.getId();
+                
+                // Skip URLs based on validation rules
+                if (DataInsertionPreChecks.shouldSkipUrl(accountId, id.getUrl())) {
+                    continue;
+                }
+                
                 if (UsageMetricCalculator.getDeactivated().contains(id.getApiCollectionId())) {
                     continue;
                 }
@@ -556,6 +563,10 @@ public class DbAction extends ActionSupport {
                                 }
                             } else if(entry.getKey().equalsIgnoreCase(SingleTypeInfo._URL)){
                                 url = entry.getValue().toString();
+                                // Skip URLs based on validation rules
+                                if (DataInsertionPreChecks.shouldSkipUrl(accId, url)) {
+                                    ignore = true;
+                                }
                             } else if(entry.getKey().equalsIgnoreCase(SingleTypeInfo._METHOD)){
                                 method = entry.getValue().toString();
                                 if ("OPTIONS".equals(method) || "CONNECT".equals(method)) {
@@ -611,6 +622,10 @@ public class DbAction extends ActionSupport {
                     for (Map.Entry<String, Object> entry : bulkUpdate.getFilters().entrySet()) {
                         if (entry.getKey().equalsIgnoreCase("isUrlParam")) {
                             continue;
+                        }
+                        if (entry.getKey().equalsIgnoreCase("url") && DataInsertionPreChecks.shouldSkipUrl(accId, entry.getValue().toString())) {
+                            ignore = true;
+                            break;
                         }
                         if (entry.getKey().equalsIgnoreCase("apiCollectionId")) {
                             String valStr = entry.getValue().toString();
@@ -720,6 +735,11 @@ public class DbAction extends ActionSupport {
                     String url = (String) mObj.get("url");
                     String method = (String) mObj.get("method");
 
+                    // Skip URLs based on validation rules
+                    if (DataInsertionPreChecks.shouldSkipUrl(accId, url)) {
+                        continue;
+                    }
+
                     if ("OPTIONS".equals(method) || "CONNECT".equals(method)) {
                         continue;
                     }
@@ -785,6 +805,7 @@ public class DbAction extends ActionSupport {
                     Bson filters = Filters.empty();
                     int apiCollectionId = 0;
                     boolean ignore = false;
+                    String url = null;
                     for (Map.Entry<String, Object> entry : bulkUpdate.getFilters().entrySet()) {
                         if (entry.getKey().equalsIgnoreCase("_id.apiCollectionId") ) {
                             String valStr = entry.getValue().toString();
@@ -799,6 +820,14 @@ public class DbAction extends ActionSupport {
                             String valStr = entry.getValue().toString();
                             int val = Integer.valueOf(valStr);
                             filters = Filters.and(filters, Filters.eq(entry.getKey(), val));
+                        } else if(entry.getKey().equalsIgnoreCase("_id.url")) {
+                            url = entry.getValue().toString();
+                            // Skip URLs based on validation rules
+                            if (DataInsertionPreChecks.shouldSkipUrl(accId, url)) {
+                                ignore = true;
+                                break;
+                            }
+                            filters = Filters.and(filters, Filters.eq(entry.getKey(), entry.getValue()));
                         } else {
                             filters = Filters.and(filters, Filters.eq(entry.getKey(), entry.getValue()));
                             try {
@@ -2203,8 +2232,8 @@ public class DbAction extends ActionSupport {
     }
 
     public String bulkWriteSuspectSampleData() {
+        int accId = Context.accountId.get();
         if (kafkaUtils.isWriteEnabled()) {
-            int accId = Context.accountId.get();
             kafkaUtils.insertData(writesForSuspectSampleData, "bulkWriteSuspectSampleData", accId);
         } else {
             ArrayList<WriteModel<SuspectSampleData>> writes = new ArrayList<>();
@@ -2213,6 +2242,16 @@ public class DbAction extends ActionSupport {
                 try {
                     SuspectSampleData sd = objectMapper.readValue(
                             gson.toJson(gson.fromJson(updates.get(0), Map.class).get("val")), SuspectSampleData.class);
+                    
+                    if (DataInsertionPreChecks.shouldSkipUrl(accId, sd.getUrl())) {
+                        continue;
+                    }
+                    
+                    if (sd.getUrl() == null || sd.getUrl().isEmpty()) {
+                        loggerMaker.errorAndAddToDb("Skipping SuspectSampleData insert due to null or empty URL: " + gson.toJson(sd));
+                        continue;
+                    }
+                    
                     writes.add(new InsertOneModel<SuspectSampleData>(sd));
                 } catch (Exception e) {
                     loggerMaker.errorAndAddToDb(e, "Error in bulkWriteSuspectSampleData " + e.toString());
