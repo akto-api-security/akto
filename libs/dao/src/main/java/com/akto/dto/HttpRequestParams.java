@@ -9,6 +9,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import com.akto.util.HttpRequestResponseUtils;
+
 public class HttpRequestParams {
     public String method; // POST
     public String url;
@@ -85,6 +87,11 @@ public class HttpRequestParams {
 
     public Map<String, List<String>> getHeaders() {
         return headers;
+    }
+
+    public boolean isJsonRequest() {
+        String acceptableContentType = HttpRequestResponseUtils.getAcceptableContentType(this.headers);
+        return acceptableContentType != null && acceptableContentType.equals(OriginalHttpRequest.JSON_CONTENT_TYPE);
     }
 
     public void setHeaders(Map<String, List<String>> headers) {
