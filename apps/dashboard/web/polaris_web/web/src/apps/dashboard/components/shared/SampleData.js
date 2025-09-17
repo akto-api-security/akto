@@ -146,6 +146,66 @@ function highlightHeaders(data, ref, getLineNumbers){
   })
 }
 
+function highlightVulnerabilities(vulnerabilitySegments, ref) {
+  if (!vulnerabilitySegments || !Array.isArray(vulnerabilitySegments) || vulnerabilitySegments.length === 0) {
+    return;
+  }
+  
+  const text = ref.getValue();
+  if (!text) {
+    return;
+  }
+  
+  console.log('Highlighting', vulnerabilitySegments.length, 'vulnerability segments in text of length', text.length);
+  
+  vulnerabilitySegments.forEach((segment, index) => {
+    console.log(`Processing segment ${index}:`, segment);
+    
+    if (segment.start !== undefined && segment.end !== undefined && 
+        segment.start >= 0 && segment.end <= text.length && segment.start < segment.end) {
+      
+      // Convert character positions to line/column positions
+      try {
+        const startPos = ref.getModel().getPositionAt(segment.start);
+        const endPos = ref.getModel().getPositionAt(segment.end);
+        
+        if (startPos && endPos) {
+          console.log(`Creating highlight from ${startPos.lineNumber}:${startPos.column} to ${endPos.lineNumber}:${endPos.column}`);
+          
+          ref.createDecorationsCollection([{
+            range: new monaco.Range(startPos.lineNumber, startPos.column, endPos.lineNumber, endPos.column),
+            options: {
+              inlineClassName: "vulnerability-highlight",
+              hoverMessage: [
+                {
+                  supportHtml: true,
+                  value: `**<span style="color:#8B45FF;">VULNERABILITY DETECTED</span>**`
+                },
+                {
+                  supportHtml: true,
+                  value: `**Type:** ${segment.vulnerabilityType || 'Unknown'}`
+                },
+                {
+                  supportHtml: true,
+                  value: `**Severity:** ${segment.severity || 'High'}`
+                }
+              ]
+            }
+          }]);
+          
+          console.log('Successfully created vulnerability highlight');
+        } else {
+          console.warn('Could not get position for segment:', segment);
+        }
+      } catch (error) {
+        console.error('Error creating vulnerability highlight:', error, segment);
+      }
+    } else {
+      console.warn('Invalid segment bounds:', segment, 'text length:', text.length);
+    }
+  });
+}
+
 function SampleData(props) {
 
     let {showDiff, data, minHeight, editorLanguage, currLine, getLineNumbers, readOnly, getEditorData, wordWrap} = props;
@@ -306,6 +366,9 @@ function SampleData(props) {
         highlightPaths(data?.highlightPaths, instance);
         if(data.headersMap){
           highlightHeaders(data, instance,getLineNumbers)
+        }
+        if(data.vulnerabilitySegments){
+          highlightVulnerabilities(data.vulnerabilitySegments, instance);
         }
       }
     }

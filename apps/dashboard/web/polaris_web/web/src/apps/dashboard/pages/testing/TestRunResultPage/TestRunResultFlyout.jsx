@@ -42,7 +42,6 @@ function TestRunResultFlyout(props) {
     const [editDescription, setEditDescription] = useState("")
     const [isEditingDescription, setIsEditingDescription] = useState(false)
 
-    const [llmHighlights, setLlmHighlights] = useState([])
     const [vulnerabilityAnalysisError, setVulnerabilityAnalysisError] = useState(null)
 
     // modify testing run result and headers
@@ -123,26 +122,6 @@ function TestRunResultFlyout(props) {
         }
     }, [selectedTestRunResult.testCategoryId, remediationSrc])
 
-    useEffect(() => {
-        async function fetchLlmHighlights() {
-            if (!selectedTestRunResult?.testResults) return;
-            // Prepare payload for LLM
-            const payload = {
-                actualResponse: selectedTestRunResult.actualResponse,
-                attemptedResponse: selectedTestRunResult.attemptedResponse,
-                testResults: selectedTestRunResult.testResults,
-                // Add more fields as needed
-            }
-            // Call new LLM API (replace with actual endpoint)
-            try {
-                const resp = await api.getVulnerableHighlightsFromLLM(payload)
-                setLlmHighlights(resp.highlights || [])
-            } catch (e) {
-                setLlmHighlights([])
-            }
-        }
-        fetchLlmHighlights()
-    }, [selectedTestRunResult])
 
     function ignoreAction(ignoreReason){
         const severity = (selectedTestRunResult && selectedTestRunResult.vulnerable) ? issueDetails.severity : "";
@@ -365,8 +344,8 @@ function TestRunResultFlyout(props) {
 
     // Component that handles vulnerability analysis only when mounted
     const ValuesTabContent = React.memo(() => {
-        const [localVulnerabilityHighlights, setLocalVulnerabilityHighlights] = useState({});
-        const [localIsAnalyzing, setLocalIsAnalyzing] = useState(false);
+        const [vulnerabilityHighlights, setVulnerabilityHighlights] = useState({});
+        const [isAnalyzing, setIsAnalyzing] = useState(false);
         const hasAnalyzedRef = useRef(false);
         
         useEffect(() => {
@@ -377,7 +356,7 @@ function TestRunResultFlyout(props) {
             if (!hasAnalyzedRef.current && selectedTestRunResult?.vulnerable && selectedTestRunResult?.testResults && isVulnerabilityHighlightingEnabled) {
                 hasAnalyzedRef.current = true;
                 
-                setLocalIsAnalyzing(true);
+                setIsAnalyzing(true);
                 setVulnerabilityAnalysisError(null);
 
                 const timeoutId = setTimeout(() => {
@@ -397,6 +376,7 @@ function TestRunResultFlyout(props) {
                             try {
                                 // Minimal payload structure for optimal LLM analysis
                                 const testResultData = {
+                                    testResultId: selectedTestRunResult?.id ? `${selectedTestRunResult.id}_${idx}` : null,
                                     testContext: {
                                         category: selectedTestRunResult?.testCategoryId || selectedTestRunResult?.testCategory || 'UNKNOWN',
                                         description: issueDetails?.description || selectedTestRunResult?.name || '',
@@ -423,8 +403,10 @@ function TestRunResultFlyout(props) {
                                 const response = await testingApi.analyzeVulnerability(
                                     JSON.stringify(testResultData)
                                 );
+                                console.log('Raw API response:', response);
 
                                 const analysisData = response.analysisResult || response;
+                                console.log('Analysis data:', analysisData);
 
                                 if (analysisData?.vulnerableSegments?.length > 0) {
                                     const enhancedSegments = analysisData.vulnerableSegments.map(segment => ({
@@ -433,12 +415,13 @@ function TestRunResultFlyout(props) {
                                         severity: issueDetails?.severity || 'HIGH'
                                     }));
 
-                                    setLocalVulnerabilityHighlights(prev => ({
+                                    console.log(`Setting vulnerability highlights for idx ${idx}:`, enhancedSegments);
+                                    setVulnerabilityHighlights(prev => ({
                                         ...prev,
                                         [idx]: enhancedSegments
                                     }));
                                 } else {
-                                    setLocalVulnerabilityHighlights(prev => {
+                                    setVulnerabilityHighlights(prev => {
                                         const newState = { ...prev };
                                         delete newState[idx];
                                         return newState;
@@ -454,7 +437,7 @@ function TestRunResultFlyout(props) {
                     });
                 
                     Promise.allSettled(analysisPromises).finally(() => {
-                        setLocalIsAnalyzing(false);
+                        setIsAnalyzing(false);
                     });
                 }, 60);
 
@@ -483,17 +466,13 @@ function TestRunResultFlyout(props) {
                             let errorList = result.errors.join(", ");
                             return { errorList: errorList }
                         }
-                        // Use LLM highlights if available
-                        let highlightPaths = llmHighlights[idx]?.highlightPaths || [];
-                        let vulnerableText = llmHighlights[idx]?.vulnerableText || "";
                         // Add vulnerability highlights only for response
-                        let vulnerabilitySegments = localVulnerabilityHighlights[idx] || [];
+                        let vulnerabilitySegments = vulnerabilityHighlights[idx] || [];
+                        console.log(`Mapping vulnerabilitySegments for idx ${idx}:`, vulnerabilitySegments);
                         if (result.originalMessage || result.message) {
                             return {
                                 originalMessage: result.originalMessage,
                                 message: result.message,
-                                highlightPaths,
-                                vulnerableText,
                                 vulnerabilitySegments
                             }
                         }
@@ -501,7 +480,7 @@ function TestRunResultFlyout(props) {
                     })}
                     isNewDiff={true}
                     vulnerable={selectedTestRunResult?.vulnerable}
-                    isAnalyzingVulnerabilities={localIsAnalyzing}
+                    isAnalyzingVulnerabilities={isAnalyzing}
                     vulnerabilityAnalysisError={vulnerabilityAnalysisError}
                 />
             </Box>
@@ -515,7 +494,7 @@ function TestRunResultFlyout(props) {
             content: "Values",
             component: <ValuesTabContent />
         }
-    }, [selectedTestRunResult, llmHighlights, dataExpired, issueDetails])
+    }, [selectedTestRunResult, dataExpired, issueDetails])
 
     function RowComp ({cardObj}){
         const {title, value, tooltipContent} = cardObj
