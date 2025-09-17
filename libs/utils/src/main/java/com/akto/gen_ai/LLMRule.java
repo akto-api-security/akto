@@ -117,7 +117,7 @@ public class LLMRule {
             new LLMRule(
                     "Ollama",
                     Arrays.asList(""),
-                    Arrays.asList("/api/generate","api/chat"), 
+                    Arrays.asList("/api/generate","/api/chat"), 
                     Arrays.asList("\"model\"")),
             new LLMRule(
                     "Custom",
