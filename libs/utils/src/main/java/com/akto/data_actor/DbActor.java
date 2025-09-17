@@ -678,6 +678,19 @@ public class DbActor extends DataActor {
         DbLayer.insertMCPAuditDataLog(auditInfo);
     }
 
+
+    public List<McpReconRequest> fetchPendingMcpReconRequests() {
+        return DbLayer.fetchPendingMcpReconRequests();
+    }
+
+    public void updateMcpReconRequestStatus(String requestId, String status, int serversFound, int startedAt, int finishedAt) {
+        DbLayer.updateMcpReconRequestStatus(requestId, status, serversFound, startedAt, finishedAt);
+    }
+
+    public void storeMcpReconResultsBatch(List<BasicDBObject> serverDataList) {
+        DbLayer.storeMcpReconResultsBatch(serverDataList);
+    }
+
     public List<SlackWebhook> fetchSlackWebhooks() {
         return DbLayer.fetchSlackWebhooks();
     }
