@@ -68,49 +68,39 @@ public class ApiDistributionDataService {
         return ApiDistributionDataResponsePayload.newBuilder().build();
     }
 
-    public FetchApiDistributionDataResponse getDistributionStats(String accountId, FetchApiDistributionDataRequest fetchApiDistributionDataRequest) {
-
-        MongoCollection<ApiDistributionDataModel> coll =
-        this.mongoClient
-            .getDatabase(accountId)
-            .getCollection("api_distribution_data", ApiDistributionDataModel.class);
-
-        Bson filter = Filters.and(
-            Filters.eq("apiCollectionId", fetchApiDistributionDataRequest.getApiCollectionId()),
-            Filters.eq("url", fetchApiDistributionDataRequest.getUrl()),
-            Filters.eq("method", fetchApiDistributionDataRequest.getMethod()),
-            Filters.eq("windowSize", 5),
-            Filters.gte("windowStart", fetchApiDistributionDataRequest.getStartWindow()),
-            Filters.lte("windowStart", fetchApiDistributionDataRequest.getEndWindow())
-        );
+    public static List<BucketStats> fetchBucketStats(String accountId, Bson filters, MongoClient mongoClient) {
+        MongoCollection<ApiDistributionDataModel> coll = mongoClient
+                .getDatabase(accountId)
+                .getCollection("api_distribution_data", ApiDistributionDataModel.class);
 
         Map<String, List<Integer>> bucketToValues = new HashMap<>();
-        try (MongoCursor<ApiDistributionDataModel> cursor = coll.find(filter).iterator()) {
+        try (MongoCursor<ApiDistributionDataModel> cursor = coll.find(filters).iterator()) {
             while (cursor.hasNext()) {
                 ApiDistributionDataModel doc = cursor.next();
-                if (doc.distribution == null) continue;
+                if (doc.distribution == null)
+                    continue;
 
                 for (Map.Entry<String, Integer> entry : doc.distribution.entrySet()) {
                     bucketToValues.computeIfAbsent(entry.getKey(), k -> new ArrayList<>())
-                                  .add(entry.getValue());
+                            .add(entry.getValue());
                 }
             }
         }
         
-        FetchApiDistributionDataResponse.Builder responseBuilder = FetchApiDistributionDataResponse.newBuilder();
+        List<BucketStats> bucketStats = new ArrayList<>();
 
         for (Map.Entry<String, List<Integer>> entry : bucketToValues.entrySet()) {
             String bucket = entry.getKey();
             List<Integer> values = entry.getValue();
             if (values.isEmpty()) continue;
-
+    
             Collections.sort(values);
             int min = values.get(0);
             int max = values.get(values.size() - 1);
             int p25 = percentile(values, 25);
             int p50 = percentile(values, 50); // median
             int p75 = percentile(values, 75);
-
+    
             BucketStats stats = BucketStats.newBuilder()
                 .setBucketLabel(bucket)
                 .setMin(min)
@@ -119,14 +109,31 @@ public class ApiDistributionDataService {
                 .setP50(p50)
                 .setP75(p75)
                 .build();
-
-            responseBuilder.addBucketStats(stats);
+    
+            bucketStats.add(stats);
         }
+    
+        return bucketStats;
+
+    }
+
+    public FetchApiDistributionDataResponse getDistributionStats(String accountId, FetchApiDistributionDataRequest fetchApiDistributionDataRequest) {
+        Bson filter = Filters.and(
+            Filters.eq("apiCollectionId", fetchApiDistributionDataRequest.getApiCollectionId()),
+            Filters.eq("url", fetchApiDistributionDataRequest.getUrl()),
+            Filters.eq("method", fetchApiDistributionDataRequest.getMethod()),
+            Filters.eq("windowSize", 5),
+            Filters.gte("windowStart", 1726461999 / 60),
+            Filters.lte("windowStart", 1757997999 / 60)
+        );
+        
+        FetchApiDistributionDataResponse.Builder responseBuilder = FetchApiDistributionDataResponse.newBuilder();
+        responseBuilder.addAllBucketStats(fetchBucketStats(accountId, filter, this.mongoClient));
 
         return responseBuilder.build();
     }
 
-    private int percentile(List<Integer> sorted, int p) {
+    private static int percentile(List<Integer> sorted, int p) {
         if (sorted.isEmpty()) return 0;
         int index = (int) Math.ceil(p / 100.0 * sorted.size()) - 1;
         return sorted.get(Math.max(0, Math.min(index, sorted.size() - 1)));

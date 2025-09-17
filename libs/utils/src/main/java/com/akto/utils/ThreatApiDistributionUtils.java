@@ -2,6 +2,8 @@ package com.akto.utils;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.HashMap;
+import java.util.Map;
 
 public class ThreatApiDistributionUtils {
 
@@ -25,28 +27,23 @@ public class ThreatApiDistributionUtils {
             new Range(50001, 100000, "b13"), new Range(100001, Integer.MAX_VALUE, "b14")
     );
 
+    private static final Map<String, Range> LABEL_TO_RANGE_MAP = new HashMap<>();
+    static {
+        for (Range range : BUCKET_RANGES) {
+            LABEL_TO_RANGE_MAP.put(range.label, range);
+        }
+    }
+
     public static List<Range> getBucketRanges() {
         return BUCKET_RANGES;
     }
 
-    public static List<String> getBucketOrder() {
-        return Arrays.asList("b1","b2","b3","b4","b5","b6","b7","b8","b9","b10","b11","b12","b13","b14");
+    public static int getBucketUpperBound(String bucketLabel){
+        return LABEL_TO_RANGE_MAP.get(bucketLabel).max;
     }
 
-    public static List<Integer> getBucketUpperBounds() {
-        return Arrays.asList(10, 50, 100, 250, 500, 1000, 2500, 5000, 10000, 20000, 35000, 50000, 100000, Integer.MAX_VALUE);
+    public static int getBucketLowerBound(String bucketLabel){
+        return LABEL_TO_RANGE_MAP.get(bucketLabel).min;
     }
 
-    public static List<Integer> getBucketLowerBounds() {
-        List<Integer> upperBounds = getBucketUpperBounds();
-        List<Integer> lowerBounds = Arrays.asList(new Integer[upperBounds.size()]);
-        for (int i = 0; i < upperBounds.size(); i++) {
-            if (i == 0) {
-                lowerBounds.set(i, 0);
-            } else {
-                lowerBounds.set(i, upperBounds.get(i - 1));
-            }
-        }
-        return lowerBounds;
-    }
 }

@@ -1,8 +1,11 @@
 package com.akto.threat.backend.cron;
 
 import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
+import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.BucketStats;
 import com.akto.dao.ApiInfoDao;
 import com.akto.threat.backend.db.ApiDistributionDataModel;
+import com.akto.threat.backend.service.ApiDistributionDataService;
 import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoCursor;
@@ -21,7 +24,7 @@ import com.akto.dao.context.Context;
 
 public class PercentilesCron {
 
-    private static final LoggerMaker logger = new LoggerMaker(PercentilesCron.class);
+    private static final LoggerMaker logger = new LoggerMaker(PercentilesCron.class, LogDb.THREAT_DETECTION);
     private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
     private final MongoClient mongoClient;
     private static final int DEFAULT_BASELINE_DAYS = 2;
@@ -43,13 +46,14 @@ public class PercentilesCron {
                     }
                     runOnce(accountId);
                 } catch (Exception e) {
-                    logger.errorAndAddToDb("error in PercentilesCron: accountId " + accountId + " " + e.getMessage(), LoggerMaker.LogDb.RUNTIME);
+                    logger.errorAndAddToDb("error in PercentilesCron: accountId " + accountId + " " + e.getMessage());
                 } finally {
                     Context.resetContextThreadLocals();
                 }
             }
         }, 0, 2, TimeUnit.DAYS);
     }
+
 
     public void runOnce(String accountId) {
         MongoCollection<ApiDistributionDataModel> coll = this.mongoClient
@@ -75,13 +79,13 @@ public class PercentilesCron {
                 // Ensure there exists at least one record that is MIN_INITIAL_AGE_DAYS old for this window size
                 if (!hasMinimumInitialAge(accountId, apiCollectionId, url, method, MIN_INITIAL_AGE_DAYS, windowSize)) {
                     logger.infoAndAddToDb("Skipping rateLimits update due to insufficient data age for apiCollectionId " + apiCollectionId +
-                            " url " + url + " method " + method + " windowSize " + windowSize, LoggerMaker.LogDb.RUNTIME);
+                            " url " + url + " method " + method + " windowSize " + windowSize);
                     continue;
                 }
 
                 // Fetch last baseline days of distribution data for this window size
-                List<ApiDistributionDataModel> distributionData = fetchDistributionDocs(DEFAULT_BASELINE_DAYS, accountId, apiCollectionId, url, method, windowSize);
-                PercentilesResult r = calculatePercentiles(distributionData, DEFAULT_BASELINE_DAYS, windowSize);
+                List<BucketStats> distributionData = fetchBucketStats(DEFAULT_BASELINE_DAYS, accountId, apiCollectionId, url, method, windowSize);
+                PercentilesResult r = calculatePercentiles(distributionData);
 
                 updateApiInfo(r, apiCollectionId, url, method, windowSize);
             }
@@ -111,35 +115,33 @@ public class PercentilesCron {
         }
     }
 
+
+    private long getWindowStartForBaselinePeriod(int baselinePeriodDays) {
+        // We store windowStart as epoch/60 (minutes since epoch). 
+        long currentMinutesSinceEpoch = Context.now() / 60;
+        long baselineMinutes = (long) baselinePeriodDays * 24L * 60L;
+        long lowerBoundWindowStart = currentMinutesSinceEpoch - baselineMinutes; 
+ 
+        return lowerBoundWindowStart;
+    }
+
     /**
      * Fetches distribution documents for the given API over the past baseLinePeriod days.
      */
-    public List<ApiDistributionDataModel> fetchDistributionDocs(int baseLinePeriod, String accountId, int apiCollectionId, String url, String method, int windowSize) {
-        MongoCollection<ApiDistributionDataModel> coll = this.mongoClient
-                .getDatabase(accountId)
-                .getCollection("api_distribution_data", ApiDistributionDataModel.class);
-
-        // We store windowStart as epoch/60 (minutes since epoch). Filter using this within baseline period.
-        long currentMinutesSinceEpoch = Instant.now().getEpochSecond() / 60;
-        long baselineMinutes = (long) baseLinePeriod * 24L * 60L;
-        long lowerBoundWindowStart = currentMinutesSinceEpoch - baselineMinutes;
+    public List<BucketStats> fetchBucketStats(int baseLinePeriod, String accountId, int apiCollectionId, String url, String method, int windowSize) {
 
         Bson filter = Filters.and(
                 Filters.eq("apiCollectionId", apiCollectionId),
                 Filters.eq("url", url),
                 Filters.eq("method", method),
                 Filters.eq("windowSize", windowSize),
-                Filters.gte("windowStart", (int) lowerBoundWindowStart)
+                Filters.gte("windowStart", (int) getWindowStartForBaselinePeriod(baseLinePeriod))
         );
 
-        List<ApiDistributionDataModel> docs = new ArrayList<>();
-        try (MongoCursor<ApiDistributionDataModel> cursor = coll.find(filter).iterator()) {
-            while (cursor.hasNext()) {
-                docs.add(cursor.next());
-            }
-        }
-        return docs;
+        return ApiDistributionDataService.fetchBucketStats(accountId, filter, mongoClient);
     }
+
+
 
     /**
      * Returns true if there exists at least one record with windowStart timestamp
@@ -150,16 +152,12 @@ public class PercentilesCron {
                 .getDatabase(accountId)
                 .getCollection("api_distribution_data", ApiDistributionDataModel.class);
 
-        long currentMinutesSinceEpoch = Instant.now().getEpochSecond() / 60;
-        long minAgeMinutes = (long) minAgeDays * 24L * 60L;
-        long thresholdWindowStart = currentMinutesSinceEpoch - minAgeMinutes;
-
         Bson filter = Filters.and(
                 Filters.eq("apiCollectionId", apiCollectionId),
                 Filters.eq("url", url),
                 Filters.eq("method", method),
                 Filters.eq("windowSize", windowSize),
-                Filters.lte("windowStart", (int) thresholdWindowStart)
+                Filters.lte("windowStart", (int) getWindowStartForBaselinePeriod(minAgeDays))
         );
 
         try (MongoCursor<ApiDistributionDataModel> cursor = coll.find(filter).limit(1).iterator()) {
@@ -170,27 +168,20 @@ public class PercentilesCron {
     /**
      * Calculate percentiles from a list of distribution docs.
      */
-    public PercentilesResult calculatePercentiles(List<ApiDistributionDataModel> distributionData, int baselinePeriodDays, int windowSize) {
-        Map<String, Long> bucketToCount = new HashMap<>();
-        long maxRequests = 0;
-
-        for (ApiDistributionDataModel doc : distributionData) {
-            if (doc.distribution == null) continue;
-            long docTotal = 0;
-            for (Map.Entry<String, Integer> e : doc.distribution.entrySet()) {
-                long val = e.getValue() == null ? 0L : e.getValue().longValue();
-                bucketToCount.merge(e.getKey(), val, Long::sum);
-                docTotal += val;
-            }
-            if (docTotal > maxRequests) maxRequests = docTotal;
-        }
-
-        List<String> bucketOrder = ThreatApiDistributionUtils.getBucketOrder();
-        List<Integer> bucketLowerBounds = ThreatApiDistributionUtils.getBucketLowerBounds();
+    public PercentilesResult calculatePercentiles(List<BucketStats> bucketStats) {
 
         long totalUsers = 0;
-        for (String b : bucketOrder) totalUsers += bucketToCount.getOrDefault(b, 0L);
-        if (totalUsers <= 0) return new PercentilesResult(-1, -1, -1, (int) maxRequests);
+
+        /**
+         * (288 windows in a day for every 5 minutes)
+         *                                Time:5:00, 5:05, .. 7:00,  8:00,  9:00
+         *  Example: B1(500-1000 Api Calls)-> [ 39,   20, ..  40,   100K,    5k]
+         *
+         *  TODO: What value should we pick for number of users from each bucket windows???
+         *  Choosing p75 for now
+         */
+        for (BucketStats bstats : bucketStats) totalUsers += bstats.getP75();
+        if (totalUsers <= 0) return new PercentilesResult(-1, -1, -1, -1);
 
         double p50Target = totalUsers * 0.5d;
         double p75Target = totalUsers * 0.75d;
@@ -198,20 +189,23 @@ public class PercentilesCron {
 
         long cumulative = 0;
         Integer p50Val = null, p75Val = null, p90Val = null;
-        for (int i = 0; i < bucketOrder.size(); i++) {
-            String b = bucketOrder.get(i);
-            long countInBucket = bucketToCount.getOrDefault(b, 0L);
+
+        bucketStats.sort(Comparator.comparingInt(b -> Integer.parseInt(b.getBucketLabel().substring(1))));
+
+        for (BucketStats bstats: bucketStats) {
+            long countInBucket = bstats.getP75();
             cumulative += countInBucket;
-            int lower = bucketLowerBounds.get(i);
-            if (p50Val == null && cumulative >= p50Target) p50Val = lower;
-            if (p75Val == null && cumulative >= p75Target) p75Val = lower;
-            if (p90Val == null && cumulative >= p90Target) { p90Val = lower; break; }
+            if (p50Val == null && cumulative >= p50Target) p50Val = ThreatApiDistributionUtils.getBucketUpperBound(bstats.getBucketLabel());
+            if (p75Val == null && cumulative >= p75Target) p75Val = ThreatApiDistributionUtils.getBucketUpperBound(bstats.getBucketLabel());
+            if (p90Val == null && cumulative >= p90Target) { p90Val = ThreatApiDistributionUtils.getBucketUpperBound(bstats.getBucketLabel()); break; }
         }
 
-        if (p50Val == null) p50Val = bucketLowerBounds.get(bucketLowerBounds.size() - 1);
-        if (p75Val == null) p75Val = bucketLowerBounds.get(bucketLowerBounds.size() - 1);
-        if (p90Val == null) p90Val = bucketLowerBounds.get(bucketLowerBounds.size() - 1);
-        return new PercentilesResult(p50Val, p75Val, p90Val, (int) maxRequests);
+        // If percentiles not found, use the last bucket's upper bound (max value)
+        if (p50Val == null) p50Val = ThreatApiDistributionUtils.getBucketUpperBound("b14");
+        if (p75Val == null) p75Val = ThreatApiDistributionUtils.getBucketUpperBound("b14");
+        if (p90Val == null) p90Val = ThreatApiDistributionUtils.getBucketUpperBound("b14");
+
+        return new PercentilesResult(p50Val, p75Val, p90Val, -1);
     }
 
     public static class PercentilesResult {
