@@ -383,6 +383,9 @@ public class DaoInit {
         CodeAnalysisCollectionDao.instance.createIndicesIfAbsent();
         CodeAnalysisApiInfoDao.instance.createIndicesIfAbsent();
         JobsDao.instance.createIndicesIfAbsent();
+        McpReconRequestDao.instance.createIndicesIfAbsent();
+        McpReconResultDao.instance.createIndicesIfAbsent();
+
     }
 
 }

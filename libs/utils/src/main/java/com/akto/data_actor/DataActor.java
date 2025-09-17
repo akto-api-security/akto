@@ -307,4 +307,10 @@ public abstract class DataActor {
     public abstract List<SlackWebhook> fetchSlackWebhooks();
 
     public abstract void insertMCPAuditDataLog(McpAuditInfo auditInfo);
+
+    public abstract List<McpReconRequest> fetchPendingMcpReconRequests();
+
+    public abstract void updateMcpReconRequestStatus(String requestId, String status, int serversFound, int startedAt, int finishedAt);
+    
+    public abstract void storeMcpReconResultsBatch(List<BasicDBObject> serverDataList);
 }
