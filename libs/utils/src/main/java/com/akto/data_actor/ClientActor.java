@@ -4159,7 +4159,8 @@ public class ClientActor extends DataActor {
         obj.put("serversFound", serversFound);
         if(status.equals(McpReconRequest.STATUS_IN_PROGRESS))
             obj.put("startedAt", startedAt);
-        obj.put("finishedAt", finishedAt);
+        else
+            obj.put("finishedAt", finishedAt);
 
         OriginalHttpRequest request = new OriginalHttpRequest(url + "/updateMcpReconRequestStatus", "", "POST", obj.toString(), headers, "");
         try {
