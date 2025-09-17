@@ -435,7 +435,7 @@ const mcpWrapperObj = {
     label: "MCP Wrapper",
     text: "MCP Wrapper helps you detect MCP servers configured on your laptop or desktop, giving you full visibility into their requests and responses.",   
     docsUrl: 'https://docs.akto.io/mcp-watch',
-    key: "MCP_WATCH",
+    key: "MCP_WRAPPER",
     component: <McpWrapper/>
 }
 
