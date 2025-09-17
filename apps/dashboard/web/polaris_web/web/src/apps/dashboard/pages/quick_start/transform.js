@@ -2,6 +2,7 @@ import {Avatar, Badge} from "@shopify/polaris"
 import PostmanSource from "./components/PostmanSource"
 import BurpSource from "./components/BurpSource"
 import HybridSaasSource from "./components/HybridSaasSource"
+import McpWrapper from "./components/McpWrapper"
 import AwsSource from "./components/AwsSource"
 import FargateSource from "./components/FargateSource"
 import Kubernetes from "./components/Kubernetes"
@@ -436,6 +437,15 @@ const customAgentObj = {
         }}
         docsLink='https://docs.akto.io/ai-agent-security'
     />
+}
+
+const mcpWrapperObj = {
+    icon: '/public/mcp.svg',
+    label: "MCP Wrapper",
+    text: "MCP Wrapper helps you detect MCP servers configured on your laptop or desktop, giving you full visibility into their requests and responses.",   
+    docsUrl: 'https://docs.akto.io/mcp-watch',
+    key: "MCP_WRAPPER",
+    component: <McpWrapper/>
 }
 
 const mcpScanObj = {
@@ -1355,7 +1365,7 @@ const quickStartFunc = {
 
         // MCP Scan
         const mcpScan = [
-            mcpScanObj, mcpReconObj, mcpProxyObj
+            mcpScanObj, mcpReconObj, mcpProxyObj, mcpWrapperObj
         ];
 
         // Akto SDK
@@ -1417,7 +1427,7 @@ const quickStartFunc = {
         // Combine all categories into connectorsList
         let connectorsList = [
             gcpObj, kubernetesObj, fargateObj, nginxObj, burpObj, postmanObj,
-            openApiObj, beanStalkObj, eksObj, dockerObj, envoyObj, mcpScanObj, mcpProxyObj,
+            openApiObj, beanStalkObj, eksObj, dockerObj, envoyObj, mcpScanObj, mcpProxyObj, mcpWrapperObj,
             harFileUploadObj, kongObj, tcpObj, mirroringObj, hybridSaasObj, apiInventoryFromSourceCodeObj,
             ebpfObj, ebpfMTLSObj, istioObj, pythonObj, awsApiGatewayObj, awsLambdaObj,
             apigeeObj, iisObj, azureObj, cloudflareObj, f5Obj, goObj, haproxyObj, javaObj, kongmeshObj, layer7Obj, nodejsObj, openshiftObj, threescaleObj, githubObj, gitlabObj, bitbucketObj, aktoJaxObj
