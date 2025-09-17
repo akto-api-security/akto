@@ -51,18 +51,22 @@ public class TestResultsStatsAction extends UserAction {
     public static final String REGEX_5XX = "\"statusCode\"\\s*:\\s*5[0-9][0-9]";
 
     public static final String REGEX_CLOUDFLARE =
-    "(?i)\"responsePayload\"\\s*:\\s*.*(" + 
-    // ==== CLOUDFLARE BRANDED BLOCKING PAGES ====
-    // Reference: https://developers.cloudflare.com/fundamentals/reference/under-attack-mode/
-    // Matches official CF blocking page titles/messages
-    "attention\\s+required.*cloudflare|" +
-    "cloudflare.*security\\s+check|" +
+    "(?is).*\"response\".*\"body\".*(" +
     
-    // ==== WAF EXPLICIT BLOCKING ====
-    // Reference: https://developers.cloudflare.com/waf/
-    // Only matches explicit WAF blocking messages, not normal errors
-    "blocked\\s+by\\s+cloudflare\\s+waf|" +
-    "cloudflare\\s+waf.*blocked" +
+    // ==== REAL CLOUDFLARE BRANDED BLOCKING PAGES ====
+    // Reference: https://developers.cloudflare.com/fundamentals/reference/under-attack-mode/
+    "attention\\s+required.*cloudflare|" +
+    
+    // ==== HTML TITLE CONTAINS CLOUDFLARE ====
+    // Reference: https://developers.cloudflare.com/rules/custom-errors/edit-error-pages/
+    "<title>[^<]*cloudflare[^<]*</title>|" +
+    
+    // ==== CLOUDFLARE STRUCTURAL ELEMENTS ====  
+    // Reference: https://developers.cloudflare.com/rules/custom-errors/
+    "cf-error-details|" +
+
+    "access\\s+denied.*cloudflare" +         
+    
     ")";
 
     public String fetchTestResultsStatsCount() {
