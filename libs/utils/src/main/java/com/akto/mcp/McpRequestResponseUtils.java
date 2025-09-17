@@ -20,7 +20,8 @@ import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
 
-import static com.akto.util.Constants.*;
+import static com.akto.util.Constants.AKTO_MCP_RESOURCES_TAG;
+import static com.akto.util.Constants.AKTO_MCP_TOOLS_TAG;
 
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public final class McpRequestResponseUtils {
