@@ -403,10 +403,8 @@ function TestRunResultFlyout(props) {
                                 const response = await testingApi.analyzeVulnerability(
                                     JSON.stringify(testResultData)
                                 );
-                                console.log('Raw API response:', response);
 
                                 const analysisData = response.analysisResult || response;
-                                console.log('Analysis data:', analysisData);
 
                                 if (analysisData?.vulnerableSegments?.length > 0) {
                                     const enhancedSegments = analysisData.vulnerableSegments.map(segment => ({
@@ -415,7 +413,6 @@ function TestRunResultFlyout(props) {
                                         severity: issueDetails?.severity || 'HIGH'
                                     }));
 
-                                    console.log(`Setting vulnerability highlights for idx ${idx}:`, enhancedSegments);
                                     setVulnerabilityHighlights(prev => ({
                                         ...prev,
                                         [idx]: enhancedSegments
@@ -468,7 +465,6 @@ function TestRunResultFlyout(props) {
                         }
                         // Add vulnerability highlights only for response
                         let vulnerabilitySegments = vulnerabilityHighlights[idx] || [];
-                        console.log(`Mapping vulnerabilitySegments for idx ${idx}:`, vulnerabilitySegments);
                         if (result.originalMessage || result.message) {
                             return {
                                 originalMessage: result.originalMessage,

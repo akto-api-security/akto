@@ -62,13 +62,11 @@ function SampleDataComponent(props) {
             const requestData = transform.mergeDataObjs(lineReqObj, requestHeaderObj, requestPayloadObj)
             const responseData = transform.mergeDataObjs(lineResObj, responseHeaderObj, responsePayloadObj)
 
-            console.log('SampleDataComponent: Setting vulnerability segments (diff mode):', sampleData?.vulnerabilitySegments);
             setSampleJsonData({
                 request: requestData,
                 response: { ...responseData, vulnerabilitySegments: sampleData?.vulnerabilitySegments }
             })
         }else{
-            console.log('SampleDataComponent: Setting vulnerability segments (normal mode):', sampleData?.vulnerabilitySegments);
             setSampleJsonData({ 
                 request: { message: transform.formatData(requestJson,"http"), original: transform.formatData(originalRequestJson,"http"), highlightPaths:requestJson?.highlightPaths }, 
                 response: { message: transform.formatData(responseJson,"http"), original: transform.formatData(originalResponseJson,"http"), highlightPaths:responseJson?.highlightPaths, vulnerabilitySegments: sampleData?.vulnerabilitySegments },

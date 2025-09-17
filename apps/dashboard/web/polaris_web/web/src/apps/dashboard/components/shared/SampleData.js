@@ -156,11 +156,7 @@ function highlightVulnerabilities(vulnerabilitySegments, ref) {
     return;
   }
   
-  console.log('Highlighting', vulnerabilitySegments.length, 'vulnerability segments in text of length', text.length);
-  
   vulnerabilitySegments.forEach((segment, index) => {
-    console.log(`Processing segment ${index}:`, segment);
-    
     if (segment.start !== undefined && segment.end !== undefined && 
         segment.start >= 0 && segment.end <= text.length && segment.start < segment.end) {
       
@@ -170,8 +166,6 @@ function highlightVulnerabilities(vulnerabilitySegments, ref) {
         const endPos = ref.getModel().getPositionAt(segment.end);
         
         if (startPos && endPos) {
-          console.log(`Creating highlight from ${startPos.lineNumber}:${startPos.column} to ${endPos.lineNumber}:${endPos.column}`);
-          
           ref.createDecorationsCollection([{
             range: new monaco.Range(startPos.lineNumber, startPos.column, endPos.lineNumber, endPos.column),
             options: {
@@ -192,16 +186,10 @@ function highlightVulnerabilities(vulnerabilitySegments, ref) {
               ]
             }
           }]);
-          
-          console.log('Successfully created vulnerability highlight');
-        } else {
-          console.warn('Could not get position for segment:', segment);
         }
       } catch (error) {
         console.error('Error creating vulnerability highlight:', error, segment);
       }
-    } else {
-      console.warn('Invalid segment bounds:', segment, 'text length:', text.length);
     }
   });
 }
