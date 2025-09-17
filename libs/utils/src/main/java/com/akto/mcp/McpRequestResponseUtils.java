@@ -112,19 +112,6 @@ public final class McpRequestResponseUtils {
                     }
                     break;
 
-                case McpSchema.METHOD_PROMPT_GET:
-                    if (params != null && StringUtils.isNotBlank(params.getName())) {
-                        url = HttpResponseParams.addPathParamToUrl(url, params.getName());
-
-                        // Create audit info for MCP Resource read
-                        auditInfo = new McpAuditInfo(
-                                Context.now(), "", AKTO_MCP_PROMPTS_TAG, 0,
-                                params.getName(), "", null,
-                                responseParams.getRequestParams().getApiCollectionId()
-                        );
-                    }
-                    break;
-
                 default:
                     break;
             }
