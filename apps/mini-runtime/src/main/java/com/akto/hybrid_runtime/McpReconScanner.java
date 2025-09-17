@@ -520,7 +520,11 @@ public class McpReconScanner {
                 HttpPost request = new HttpPost(baseUrl + endpoint);
                 request.setHeader("Content-Type", "application/json");
                 request.setHeader("Accept", "application/json");
-                request.setEntity(new StringEntity(Objects.requireNonNull(JSONUtils.getString(initRequest))));
+                String jsonString = JSONUtils.getString(initRequest);
+                if (jsonString == null) {
+                    continue; // Skip this endpoint if JSON serialization fails
+                }
+                request.setEntity(new StringEntity(jsonString));
                 
                 try (CloseableHttpResponse response = httpClient.execute(request)) {
                     if (response.getStatusLine().getStatusCode() == HttpStatus.SC_OK) {
@@ -667,7 +671,11 @@ public class McpReconScanner {
             if (authHeaders != null) {
                 authHeaders.forEach(httpPost::setHeader);
             }
-            httpPost.setEntity(new StringEntity(JSONUtils.getString(request)));
+            String jsonString = JSONUtils.getString(request);
+            if (jsonString == null) {
+                return new ArrayList<>();
+            }
+            httpPost.setEntity(new StringEntity(jsonString));
             
             try (CloseableHttpResponse response = httpClient.execute(httpPost)) {
                 if (response.getStatusLine().getStatusCode() == HttpStatus.SC_OK) {
@@ -698,7 +706,11 @@ public class McpReconScanner {
             if (authHeaders != null) {
                 authHeaders.forEach(httpPost::setHeader);
             }
-            httpPost.setEntity(new StringEntity(JSONUtils.getString(request)));
+            String jsonString = JSONUtils.getString(request);
+            if (jsonString == null) {
+                return new ArrayList<>();
+            }
+            httpPost.setEntity(new StringEntity(jsonString));
             
             try (CloseableHttpResponse response = httpClient.execute(httpPost)) {
                 if (response.getStatusLine().getStatusCode() == HttpStatus.SC_OK) {
@@ -729,7 +741,11 @@ public class McpReconScanner {
             if (authHeaders != null) {
                 authHeaders.forEach(httpPost::setHeader);
             }
-            httpPost.setEntity(new StringEntity(JSONUtils.getString(request)));
+            String jsonString = JSONUtils.getString(request);
+            if (jsonString == null) {
+                return new ArrayList<>();
+            }
+            httpPost.setEntity(new StringEntity(jsonString));
             
             try (CloseableHttpResponse response = httpClient.execute(httpPost)) {
                 if (response.getStatusLine().getStatusCode() == HttpStatus.SC_OK) {
