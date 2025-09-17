@@ -4030,4 +4030,91 @@ public class ClientActor extends DataActor {
             return;
         }
     }
+
+    public List<McpReconRequest> fetchPendingMcpReconRequests() {
+        Map<String, List<String>> headers = buildHeaders();
+        List<McpReconRequest> mcpReconRequests = new ArrayList<>();
+        loggerMaker.infoAndAddToDb("fetchPendingMcpReconRequests api called ", LoggerMaker.LogDb.RUNTIME);
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/fetchPendingMcpReconRequests", "", "POST", null, headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb("invalid response in fetchPendingMcpReconRequests", LoggerMaker.LogDb.RUNTIME);
+            }
+            BasicDBObject payloadObj;
+            try {
+                payloadObj =  BasicDBObject.parse(responsePayload);
+
+                BasicDBList pendingMcpReconRequests = (BasicDBList) payloadObj.get("mcp_recon_requests");
+
+                for (Object obj: pendingMcpReconRequests) {
+                    BasicDBObject aObj = (BasicDBObject) obj;
+                    McpReconRequest col = objectMapper.readValue(aObj.toJson(), McpReconRequest.class);
+                    mcpReconRequests.add(col);
+                }
+            } catch(Exception e) {
+                loggerMaker.errorAndAddToDb("error extracting response in fetchPendingMcpReconRequests" + e, LoggerMaker.LogDb.RUNTIME);
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in fetchPendingMcpReconRequests" + e, LoggerMaker.LogDb.RUNTIME);
+        }
+        loggerMaker.infoAndAddToDb("fetchPendingMcpReconRequests api called size " + mcpReconRequests.size(), LoggerMaker.LogDb.RUNTIME);
+        return mcpReconRequests;
+    }
+
+    /**
+     * Update MCP recon request status
+     */
+    public void updateMcpReconRequestStatus(String requestId, String status, int serversFound, int startedAt,  int finishedAt) {
+        Map<String, List<String>> headers = buildHeaders();
+        loggerMaker.infoAndAddToDb("updateMcpReconRequestStatus api called for requestId: " + requestId + " status: " + status + " serversFound: " + serversFound, LoggerMaker.LogDb.RUNTIME);
+        
+        BasicDBObject obj = new BasicDBObject();
+        obj.put("requestId", requestId);
+        obj.put("status", status);
+        obj.put("serversFound", serversFound);
+        if(status.equals(McpReconRequest.STATUS_IN_PROGRESS))
+            obj.put("startedAt", startedAt);
+        obj.put("finishedAt", finishedAt);
+        
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/updateMcpReconRequestStatus", "", "POST", obj.toString(), headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb("non 2xx response in updateMcpReconRequestStatus", LoggerMaker.LogDb.RUNTIME);
+                return;
+            }
+            loggerMaker.infoAndAddToDb("Successfully updated MCP recon request status for requestId: " + requestId, LoggerMaker.LogDb.RUNTIME);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in updateMcpReconRequestStatus" + e, LoggerMaker.LogDb.RUNTIME);
+        }
+    }
+
+    /**
+     * Batch store MCP recon results
+     */
+    public void storeMcpReconResultsBatch(List<BasicDBObject> serverDataList) {
+        Map<String, List<String>> headers = buildHeaders();
+        loggerMaker.infoAndAddToDb("storeMcpReconResultsBatch api called with " + serverDataList.size() + " servers", LoggerMaker.LogDb.RUNTIME);
+        
+        BasicDBObject obj = new BasicDBObject();
+        obj.put("servers", serverDataList);
+        
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/storeMcpReconResultsBatch", "", "POST", obj.toString(), headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb("non 2xx response in storeMcpReconResultsBatch", LoggerMaker.LogDb.RUNTIME);
+                return;
+            }
+            loggerMaker.infoAndAddToDb("Successfully stored " + serverDataList.size() + " MCP recon results in batch", LoggerMaker.LogDb.RUNTIME);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in storeMcpReconResultsBatch" + e, LoggerMaker.LogDb.RUNTIME);
+        }
+    }
+
+
 }
