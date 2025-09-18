@@ -155,12 +155,12 @@ public final class McpRequestResponseUtils {
         try {
             String responseBody = responseParams.getPayload();
             if (StringUtils.isEmpty(responseBody)) {
-                return Collections.singletonList(responseParams);
+                return Collections.emptyList();
             }
 
             String extractedData = extractDataFromResponse(responseBody);
             if (StringUtils.isEmpty(extractedData)) {
-                return Collections.singletonList(responseParams);
+                return Collections.emptyList();
             }
 
             JSONRPCResponse jsonRpcResponse;
@@ -169,10 +169,10 @@ public final class McpRequestResponseUtils {
                     extractedData);
             } catch (Exception e) {
                 logger.error("Error parsing tools list response as JSON-RPC. Skipping adding tools/call samples");
-                return Collections.singletonList(responseParams);
+                return Collections.emptyList();
             }
             if (jsonRpcResponse == null || jsonRpcResponse.getResult() == null) {
-                return Collections.singletonList(responseParams);
+                return Collections.emptyList();
             }
 
             ListToolsResult toolsResult;
@@ -180,11 +180,11 @@ public final class McpRequestResponseUtils {
                 toolsResult = JSONUtils.fromJson(jsonRpcResponse.getResult(), ListToolsResult.class);
             } catch (Exception e) {
                 logger.error("Error parsing tools list result from extracted data", e);
-                return Collections.singletonList(responseParams);
+                return Collections.emptyList();
             }
 
             if (toolsResult == null || CollectionUtils.isEmpty(toolsResult.getTools())) {
-                return Collections.singletonList(responseParams);
+                return Collections.emptyList();
             }
 
             // Generate one HttpResponseParams per tool by copying original and replacing
@@ -221,7 +221,7 @@ public final class McpRequestResponseUtils {
             logger.error("Error handling tools/list for streamable http", e);
         }
 
-        return Collections.singletonList(responseParams);
+        return Collections.emptyList();
     }
 
     private static void modifyOriginalHttpMessage(HttpResponseParams responseParams, String newRequestPayload) {
