@@ -162,12 +162,10 @@ public final class McpRequestResponseUtils {
             }
 
             String extractedData = extractDataFromResponse(responseBody);
-            logger.info("extractedData: {}", extractedData);
             if (StringUtils.isEmpty(extractedData)) {
                 return Collections.singletonList(responseParams);
             }
 
-            // Parse tools list result from extracted data
             JSONRPCResponse jsonRpcResponse = (JSONRPCResponse) McpSchema.deserializeJsonRpcMessage(OBJECT_MAPPER,
                 extractedData);
             if (jsonRpcResponse == null || jsonRpcResponse.getResult() == null) {
@@ -204,8 +202,7 @@ public final class McpRequestResponseUtils {
                 if (cloned.getRequestParams() != null) {
                     cloned.getRequestParams().setPayload(newReqString);
                 }
-                // Clear response payload as this represents an inferred request to call the
-                // tool
+
                 cloned.setPayload("");
                 modifyOriginalHttpMessage(cloned, newReqString);
                 handleMcpMethodCall(new McpJsonRpcModel(
@@ -246,7 +243,7 @@ public final class McpRequestResponseUtils {
                 }
             }
         } catch (Exception e) {
-            logger.error("Error extracting data from SSE response", e);
+            logger.error("Error extracting data for tools list response", e);
         }
         return null;
     }
