@@ -57,27 +57,31 @@ function GithubServerTable(props) {
   const { selectedItems, selectItems, applyFilter } = useTable();
 
   const handleRemoveAppliedFilter = (key) => {
-    let temp = appliedFilters
-    temp = temp.filter((filter) => {
+    console.log('Removing filter with key:', key);
+    console.log('Current appliedFilters before removal:', appliedFilters);
+    let temp = appliedFilters.filter((filter) => {
       return filter.key != key
     })
-    props?.appliedFilters?.forEach((defaultAppliedFilter) => {
-      if (key === defaultAppliedFilter.key) {
-        temp.push(defaultAppliedFilter)
-      }
-    })
+    console.log('Filters after removal:', temp);
     setAppliedFilters(temp);
-    let tempFilters = filtersMap
+
+    // Create a deep copy to avoid mutation issues
+    let tempFilters = {...filtersMap}
     tempFilters[currentPageKey] = {
-      'filters': temp,
+      'filters': [...temp], // Ensure we copy the array
       'sort': pageFiltersMap?.sort || []
     }
+    console.log('Setting filtersMap to:', tempFilters);
     setFiltersMap(tempFilters)
   }
   
 
   const filterMode = (pageFiltersMap?.filters?.length > 0) ? IndexFiltersMode.Filtering : (props?.mode ? props.mode : IndexFiltersMode.Filtering)
-  const initialStateFilters = tableFunc.mergeFilters(props.appliedFilters || [], (pageFiltersMap?.filters || []),props.disambiguateLabel, handleRemoveAppliedFilter)
+  const getCurrentPersistentFilters = () => {
+    const currentPageFilters = filtersMap[currentPageKey];
+    return tableFunc.mergeFilters(props.appliedFilters || [], (currentPageFilters?.filters || []),props.disambiguateLabel, handleRemoveAppliedFilter)
+  }
+  const initialStateFilters = getCurrentPersistentFilters()
   const { mode, setMode } = useSetIndexFiltersMode(filterMode);
   const [sortSelected, setSortSelected] = useState(tableFunc.getInitialSortSelected(props.sortOptions, pageFiltersMap))
   const [data, setData] = useState([]);
@@ -107,17 +111,24 @@ function GithubServerTable(props) {
   }, [])
 
   useEffect(()=> {
-    let queryFilters 
+    console.log('useEffect triggered for currentPageKey:', currentPageKey);
+    let queryFilters
     if (performance.getEntriesByType('navigation')[0].type === 'reload') {
       queryFilters = []
     }else{
       queryFilters = tableFunc.getFiltersMapFromUrl(decodeURIComponent(searchParams.get("filters") || ""), props?.disambiguateLabel, handleRemoveAppliedFilter, currentPageKey)
     }
-    const currentFilters = tableFunc.mergeFilters(queryFilters,initialStateFilters,props?.disambiguateLabel, handleRemoveAppliedFilter)
+    console.log('Query filters from URL:', queryFilters);
+    const currentPersistentFilters = getCurrentPersistentFilters()
+    console.log('Current persistent filters:', currentPersistentFilters);
+    const currentFilters = tableFunc.mergeFilters(queryFilters, currentPersistentFilters, props?.disambiguateLabel, handleRemoveAppliedFilter)
+    console.log('Merged filters:', currentFilters);
     setAppliedFilters((prev) => {
       if(func.deepComparison(prev, currentFilters)){
+        console.log('Filters unchanged, not updating');
         return prev
       }else{
+        console.log('Updating filters from', prev, 'to', currentFilters);
         return currentFilters;
       }
     })

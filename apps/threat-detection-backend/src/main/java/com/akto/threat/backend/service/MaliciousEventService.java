@@ -19,7 +19,6 @@ import com.akto.threat.backend.constants.MongoDBCollection;
 import com.akto.threat.backend.db.MaliciousEventModel;
 import com.akto.threat.backend.utils.KafkaUtils;
 import com.akto.threat.backend.utils.ThreatUtils;
-import com.akto.threat.backend.cache.TriagedEventCache;
 import com.mongodb.client.*;
 import com.mongodb.client.model.Filters;
 
@@ -288,20 +287,7 @@ public class MaliciousEventService {
       
       boolean updateSuccess = coll.updateOne(filter, update).getModifiedCount() > 0;
       
-      if (updateSuccess) {
-        String url = event.getLatestApiEndpoint();
-        String filterId = event.getFilterId();
-        
-        if ("UNDER_REVIEW".equals(status.toUpperCase())) {
-          // Add to cache when marked for review
-          TriagedEventCache.addToTriagedCache(accountId, url, filterId);
-          logger.debug("Added to cache after marking for review: " + url + ":" + filterId);
-        } else if ("ACTIVE".equals(status.toUpperCase())) {
-          // Remove from cache when reactivated
-          TriagedEventCache.removeFromTriagedCache(accountId, url, filterId);
-          logger.debug("Removed from cache after reactivation: " + url + ":" + filterId);
-        }
-      }
+      // Cache will be updated automatically during next DB insertion check
       
       return updateSuccess;
     } catch (Exception e) {
@@ -341,18 +327,7 @@ public class MaliciousEventService {
         
         if (updateSuccess) {
           updatedCount++;
-          String url = event.getLatestApiEndpoint();
-          String filterId = event.getFilterId();
-          
-          if ("TRIAGE".equals(status.toUpperCase())) {
-            // Add to cache when triaged
-            TriagedEventCache.addToTriagedCache(accountId, url, filterId);
-            logger.debug("Added to cache after bulk triage: " + url + ":" + filterId);
-          } else if ("ACTIVE".equals(status.toUpperCase())) {
-            // Remove from cache when untriaged
-            TriagedEventCache.removeFromTriagedCache(accountId, url, filterId);
-            logger.debug("Removed from cache after bulk untriage: " + url + ":" + filterId);
-          }
+          // Cache will be updated automatically during next DB insertion check
         }
       }
       
@@ -448,20 +423,7 @@ public class MaliciousEventService {
       
       long modifiedCount = coll.updateMany(query, update).getModifiedCount();
       
-      // Update cache for each modified event
-      if (modifiedCount > 0) {
-        for (MaliciousEventModel event : eventsToUpdate) {
-          String url = event.getLatestApiEndpoint();
-          String filterId = event.getFilterId();
-          
-          if ("UNDER_REVIEW".equals(status.toUpperCase()) || "IGNORED".equals(status.toUpperCase())) {
-            TriagedEventCache.addToTriagedCache(accountId, url, filterId);
-          } else if ("ACTIVE".equals(status.toUpperCase())) {
-            TriagedEventCache.removeFromTriagedCache(accountId, url, filterId);
-          }
-        }
-        logger.info("Updated cache for " + eventsToUpdate.size() + " events");
-      }
+      // Cache will be updated automatically during next DB insertion checks
       
       return (int) modifiedCount;
     } catch (Exception e) {

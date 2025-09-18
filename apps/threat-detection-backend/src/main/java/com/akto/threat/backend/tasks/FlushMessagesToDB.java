@@ -10,7 +10,7 @@ import com.akto.threat.backend.db.MaliciousEventModel;
 import com.akto.threat.backend.db.SplunkIntegrationModel;
 import com.akto.threat.backend.service.MaliciousEventService;
 import com.akto.threat.backend.utils.SplunkEvent;
-import com.akto.threat.backend.cache.TriagedEventCache;
+import com.akto.threat.backend.cache.IgnoredEventCache;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -67,6 +67,9 @@ public class FlushMessagesToDB {
     this.kafkaConfig = kafkaConfig;
 
     this.mClient = mongoClient;
+
+    // Set MongoClient for IgnoredEventCache
+    IgnoredEventCache.setMongoClient(mongoClient);
   }
 
   public void run() {
@@ -84,9 +87,6 @@ public class FlushMessagesToDB {
             if (records.isEmpty()) {
               continue;
             }
-
-            // Cleanup cache periodically (every 5 minutes)
-            TriagedEventCache.cleanupExpiredCacheEntries();
 
             processRecords(records);
 
@@ -152,33 +152,15 @@ public class FlushMessagesToDB {
           break;
         }
         
-        // First check cache for triaged URL+filter combination
-        if (TriagedEventCache.isTriagedInCache(accountId, event.getLatestApiEndpoint(), event.getFilterId())) {
-            logger.info("Skipping insertion of malicious event due to cached triaged event with same URL+filter combination: " + 
-                       event.getLatestApiEndpoint() + " + " + event.getFilterId());
-            break;
-        }
-        
-        // If not in cache, check database and update cache if needed
-        MongoCollection<MaliciousEventModel> collection = this.mClient
-            .getDatabase(accountId + "")
-            .getCollection(eventType, MaliciousEventModel.class);
-            
-        Bson triageFilter = Filters.and(
-            Filters.eq("latestApiEndpoint", event.getLatestApiEndpoint()),
-            Filters.eq("filterId", event.getFilterId()),
-            Filters.eq("status", "TRIAGE")
-        );
-        
-        MaliciousEventModel existingTriagedEvent = collection.find(triageFilter).first();
-        
-        if (existingTriagedEvent != null) {
-            // Add to cache for future lookups
-            TriagedEventCache.addToTriagedCache(accountId, event.getLatestApiEndpoint(), event.getFilterId());
-            logger.info("Skipping insertion of malicious event due to existing triaged event with same URL+filter combination: " + 
+        // Check cache for ignored URL+filter combination (cache will auto-refresh from DB if needed)
+        if (IgnoredEventCache.isIgnoredInCache(accountId, event.getLatestApiEndpoint(), event.getFilterId())) {
+            logger.debug("Skipping insertion of malicious event due to ignored status for: " +
                        event.getLatestApiEndpoint() + " + " + event.getFilterId());
         } else {
-            // No triaged event exists, safe to insert
+            // No ignored event exists, safe to insert
+            MongoCollection<MaliciousEventModel> collection = this.mClient
+                .getDatabase(accountId + "")
+                .getCollection(eventType, MaliciousEventModel.class);
             collection.insertOne(event);
         }
         break;

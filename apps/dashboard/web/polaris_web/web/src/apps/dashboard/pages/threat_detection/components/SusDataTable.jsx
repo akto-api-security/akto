@@ -254,6 +254,14 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh }) {
 
   const handleIgnoreAllFiltered = async () => {
     console.log("Ignoring all filtered events with filters:", currentFilters);
+
+    // Validate that both URL and filterId filters are present for ignore operation
+    if (!currentFilters.url || currentFilters.url.length === 0 ||
+        !currentFilters.latestAttack || currentFilters.latestAttack.length === 0) {
+      func.setToast(true, true, 'Both URL and Attack Type filters are required to ignore events. This prevents accidentally blocking too many future events.');
+      return;
+    }
+
     try {
       const response = await threatDetectionRequests.bulkUpdateFilteredEvents(
         currentFilters.actor || [],
@@ -281,6 +289,14 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh }) {
 
   const handleDeleteAllFiltered = async () => {
     console.log("Deleting all filtered events with filters:", currentFilters);
+
+    // Validate that both URL and filterId filters are present for filter-based operations
+    if (!currentFilters.url || currentFilters.url.length === 0 ||
+        !currentFilters.latestAttack || currentFilters.latestAttack.length === 0) {
+      func.setToast(true, true, 'Both URL and Attack Type filters are required for filter-based operations. This ensures precise targeting of events.');
+      return;
+    }
+
     try {
       const response = await threatDetectionRequests.bulkDeleteFilteredEvents(
         currentFilters.actor || [],
@@ -307,6 +323,14 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh }) {
 
   const handleMarkAllFilteredForReview = async () => {
     console.log("Marking all filtered events for review with filters:", currentFilters);
+
+    // Validate that both URL and filterId filters are present for filter-based operations
+    if (!currentFilters.url || currentFilters.url.length === 0 ||
+        !currentFilters.latestAttack || currentFilters.latestAttack.length === 0) {
+      func.setToast(true, true, 'Both URL and Attack Type filters are required for filter-based operations. This ensures precise targeting of events.');
+      return;
+    }
+
     try {
       const response = await threatDetectionRequests.bulkUpdateFilteredEvents(
         currentFilters.actor || [],
@@ -334,6 +358,14 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh }) {
 
   const handleRemoveAllFilteredFromReview = async () => {
     console.log("Removing all filtered events from review with filters:", currentFilters);
+
+    // Validate that both URL and filterId filters are present for filter-based operations
+    if (!currentFilters.url || currentFilters.url.length === 0 ||
+        !currentFilters.latestAttack || currentFilters.latestAttack.length === 0) {
+      func.setToast(true, true, 'Both URL and Attack Type filters are required for filter-based operations. This ensures precise targeting of events.');
+      return;
+    }
+
     try {
       const response = await threatDetectionRequests.bulkUpdateFilteredEvents(
         currentFilters.actor || [],
@@ -388,10 +420,17 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh }) {
         actions.push({
           content: `Mark for Review ${eventText}`,
           onAction: () => {
-            const confirmationMessage = `Are you sure you want to mark ${eventText} for review?`;
+            // Validate filters for filter-based operations
             if (useFilterBasedUpdate) {
+              if (!currentFilters.url || currentFilters.url.length === 0 ||
+                  !currentFilters.latestAttack || currentFilters.latestAttack.length === 0) {
+                func.setToast(true, true, 'Both URL and Attack Type filters are required for filter-based operations. This ensures precise targeting of events.');
+                return;
+              }
+              const confirmationMessage = `Are you sure you want to mark ${eventText} for review?`;
               func.showConfirmationModal(confirmationMessage, "Mark for Review", () => handleMarkAllFilteredForReview());
             } else {
+              const confirmationMessage = `Are you sure you want to mark ${eventText} for review?`;
               func.showConfirmationModal(confirmationMessage, "Mark for Review", () => handleBulkMarkForReview(selectedIds));
             }
           },
@@ -400,10 +439,17 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh }) {
         actions.push({
           content: `Ignore ${eventText}`,
           onAction: () => {
-            const confirmationMessage = `Are you sure you want to ignore ${eventText}?`;
+            // Validate filters for ignore operation when using filter-based update
             if (useFilterBasedUpdate) {
+              if (!currentFilters.url || currentFilters.url.length === 0 ||
+                  !currentFilters.latestAttack || currentFilters.latestAttack.length === 0) {
+                func.setToast(true, true, 'Both URL and Attack Type filters are required to ignore events. This prevents accidentally blocking too many future events.');
+                return;
+              }
+              const confirmationMessage = `Are you sure you want to ignore ${eventText}?\n\nNote: Future events matching these URL and Attack Type combinations will be automatically blocked.`;
               func.showConfirmationModal(confirmationMessage, "Ignore", () => handleIgnoreAllFiltered());
             } else {
+              const confirmationMessage = `Are you sure you want to ignore ${eventText}?`;
               func.showConfirmationModal(confirmationMessage, "Ignore", () => handleBulkIgnore(selectedIds));
             }
           },
@@ -413,10 +459,17 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh }) {
         actions.push({
           content: `Remove from Review ${eventText}`,
           onAction: () => {
-            const confirmationMessage = `Are you sure you want to remove ${eventText} from review?`;
+            // Validate filters for filter-based operations
             if (useFilterBasedUpdate) {
+              if (!currentFilters.url || currentFilters.url.length === 0 ||
+                  !currentFilters.latestAttack || currentFilters.latestAttack.length === 0) {
+                func.setToast(true, true, 'Both URL and Attack Type filters are required for filter-based operations. This ensures precise targeting of events.');
+                return;
+              }
+              const confirmationMessage = `Are you sure you want to remove ${eventText} from review?`;
               func.showConfirmationModal(confirmationMessage, "Remove from Review", () => handleRemoveAllFilteredFromReview());
             } else {
+              const confirmationMessage = `Are you sure you want to remove ${eventText} from review?`;
               func.showConfirmationModal(confirmationMessage, "Remove from Review", () => handleBulkRemoveFromReview(selectedIds));
             }
           },
@@ -425,10 +478,17 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh }) {
         actions.push({
           content: `Ignore ${eventText}`,
           onAction: () => {
-            const confirmationMessage = `Are you sure you want to ignore ${eventText}?`;
+            // Validate filters for ignore operation when using filter-based update
             if (useFilterBasedUpdate) {
+              if (!currentFilters.url || currentFilters.url.length === 0 ||
+                  !currentFilters.latestAttack || currentFilters.latestAttack.length === 0) {
+                func.setToast(true, true, 'Both URL and Attack Type filters are required to ignore events. This prevents accidentally blocking too many future events.');
+                return;
+              }
+              const confirmationMessage = `Are you sure you want to ignore ${eventText}?\n\nNote: Future events matching these URL and Attack Type combinations will be automatically blocked.`;
               func.showConfirmationModal(confirmationMessage, "Ignore", () => handleIgnoreAllFiltered());
             } else {
+              const confirmationMessage = `Are you sure you want to ignore ${eventText}?`;
               func.showConfirmationModal(confirmationMessage, "Ignore", () => handleBulkIgnore(selectedIds));
             }
           },
@@ -438,10 +498,17 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh }) {
         actions.push({
           content: `Reactivate ${eventText}`,
           onAction: () => {
-            const confirmationMessage = `Are you sure you want to reactivate ${eventText}?`;
+            // Validate filters for filter-based operations
             if (useFilterBasedUpdate) {
+              if (!currentFilters.url || currentFilters.url.length === 0 ||
+                  !currentFilters.latestAttack || currentFilters.latestAttack.length === 0) {
+                func.setToast(true, true, 'Both URL and Attack Type filters are required for filter-based operations. This ensures precise targeting of events.');
+                return;
+              }
+              const confirmationMessage = `Are you sure you want to reactivate ${eventText}?`;
               func.showConfirmationModal(confirmationMessage, "Reactivate", () => handleRemoveAllFilteredFromReview());
             } else {
+              const confirmationMessage = `Are you sure you want to reactivate ${eventText}?`;
               func.showConfirmationModal(confirmationMessage, "Reactivate", () => handleBulkRemoveFromReview(selectedIds));
             }
           },
@@ -452,10 +519,17 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh }) {
       actions.push({
         content: `Delete ${eventText}`,
         onAction: () => {
-          const confirmationMessage = `Are you sure you want to permanently delete ${eventText}? This action cannot be undone.`;
+          // Validate filters for filter-based operations
           if (useFilterBasedUpdate) {
+            if (!currentFilters.url || currentFilters.url.length === 0 ||
+                !currentFilters.latestAttack || currentFilters.latestAttack.length === 0) {
+              func.setToast(true, true, 'Both URL and Attack Type filters are required for filter-based operations. This ensures precise targeting of events.');
+              return;
+            }
+            const confirmationMessage = `Are you sure you want to permanently delete ${eventText}? This action cannot be undone.`;
             func.showConfirmationModal(confirmationMessage, "Delete", () => handleDeleteAllFiltered());
           } else {
+            const confirmationMessage = `Are you sure you want to permanently delete ${eventText}? This action cannot be undone.`;
             func.showConfirmationModal(confirmationMessage, "Delete", () => handleBulkDelete(selectedIds));
           }
         },
@@ -556,14 +630,6 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh }) {
     return { value: ret, total: total };
   }
 
-  const attackTypeChoices = Object.keys(threatFiltersMap).length === 0 ? [] : Object.entries(threatFiltersMap).map(([key, value]) => {
-    return {
-      label: value?._id || key,
-      value: value?._id || key
-    }
-  })
-  
-
   async function fillFilters() {
     const res = await api.fetchFiltersThreatTable();
     let urlChoices = res?.urls
@@ -575,6 +641,12 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh }) {
       return { label: x, value: x };
     });
 
+    const attackTypeChoices = Object.keys(threatFiltersMap).length === 0 ? [] : Object.entries(threatFiltersMap).map(([key, value]) => {
+      return {
+        label: value?._id || key,
+        value: value?._id || key
+      }
+    })
 
     filters = [
       {
@@ -610,7 +682,7 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh }) {
 
   useEffect(() => {
     fillFilters();
-  }, []);
+  }, [threatFiltersMap]);
 
   function disambiguateLabel(key, value) {
     switch (key) {
