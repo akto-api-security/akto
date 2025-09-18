@@ -33,13 +33,15 @@ func NewMCPValidator(providerType string, providerConfig map[string]interface{})
 	keywordDetector := validators.NewKeywordDetector()
 	requestValidator := validators.NewRequestValidator(provider)
 	responseValidator := validators.NewResponseValidator(provider)
+	promptInjectionValidator := validators.NewPromptValidator()
 
 	return &MCPValidator{
-		providerType:      providerType,
-		provider:          provider,
-		keywordDetector:   keywordDetector,
-		requestValidator:  requestValidator,
-		responseValidator: responseValidator,
+		providerType:             providerType,
+		provider:                 provider,
+		keywordDetector:          keywordDetector,
+		requestValidator:         requestValidator,
+		responseValidator:        responseValidator,
+		promptInjectionValidator: promptInjectionValidator,
 	}, nil
 }
 

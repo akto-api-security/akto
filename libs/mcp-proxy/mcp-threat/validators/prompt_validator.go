@@ -34,12 +34,26 @@ const (
 
 func init() {
 	wd, err := os.Getwd()
+	fmt.Println("Working dir:", wd)
 	if err != nil {
 		log.Printf("failed to get working dir: %v", err)
 	}
 
 	modelPath := filepath.Join(wd, modelRelPath)
 	tokenizerPath := filepath.Join(wd, tokenizerRelPath)
+	modelsDir := filepath.Join(wd, "mcp-threat/transformers/models/prompt-injection/onnx/")
+	fmt.Println("Models dir:", modelsDir)
+
+	// List files in modelsDir
+	files, err := os.ReadDir(modelsDir)
+	if err != nil {
+		fmt.Printf("Error reading models directory: %v\n", err)
+	} else {
+		fmt.Println("Files in models directory:")
+		for _, file := range files {
+			fmt.Printf("  - %s\n", file.Name())
+		}
+	}
 
 	fmt.Println("Model path:", modelPath)
 	fmt.Println("Tokenizer path:", tokenizerPath)
