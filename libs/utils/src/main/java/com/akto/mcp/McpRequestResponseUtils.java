@@ -158,7 +158,15 @@ public final class McpRequestResponseUtils {
                 return Collections.emptyList();
             }
 
-            String extractedData = extractDataFromResponse(responseBody);
+            responseBody = responseBody.trim();
+            String extractedData;
+            if ((responseBody.startsWith("{") && responseBody.endsWith("}")) || (responseBody.startsWith("[")
+                && responseBody.endsWith("]"))) {
+                extractedData = responseBody;
+            } else {
+                extractedData = extractDataFromResponse(responseBody); // in case of streamable http
+            }
+
             if (StringUtils.isEmpty(extractedData)) {
                 return Collections.emptyList();
             }
