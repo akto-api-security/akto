@@ -9,6 +9,8 @@ import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.Fe
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ListMaliciousRequestsResponse;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.UpdateMaliciousEventStatusRequest;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.UpdateMaliciousEventStatusResponse;
+import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.BulkUpdateMaliciousEventStatusRequest;
+import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.BulkUpdateMaliciousEventStatusResponse;
 import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.HashMap;
@@ -49,6 +51,13 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
   boolean updateSuccess;
   String updateMessage;
   String statusFilter;
+  List<String> eventIds;
+  int updatedCount;
+  List<String> actors;
+  String newStatus;
+  boolean deleteSuccess;
+  String deleteMessage;
+  int deletedCount;
 
   // TODO: remove this, use API Executor.
   private final CloseableHttpClient httpClient;
@@ -244,6 +253,198 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
     return SUCCESS.toUpperCase();
   }
 
+  public String bulkUpdateMaliciousEventStatus() {
+    HttpPost post = new HttpPost(
+            String.format("%s/api/dashboard/bulk_update_malicious_event_status", this.getBackendUrl()));
+    post.addHeader("Authorization", "Bearer " + this.getApiToken());
+    post.addHeader("Content-Type", "application/json");
+
+    BulkUpdateMaliciousEventStatusRequest request = BulkUpdateMaliciousEventStatusRequest.newBuilder()
+        .addAllEventIds(this.eventIds)
+        .setStatus(this.status)
+        .build();
+
+    String msg = ProtoMessageUtils.toString(request).orElse("{}");
+    StringEntity requestEntity = new StringEntity(msg, ContentType.APPLICATION_JSON);
+    post.setEntity(requestEntity);
+
+    try (CloseableHttpResponse resp = this.httpClient.execute(post)) {
+      String responseBody = EntityUtils.toString(resp.getEntity());
+      
+      ProtoMessageUtils.<BulkUpdateMaliciousEventStatusResponse>toProtoMessage(
+          BulkUpdateMaliciousEventStatusResponse.class, responseBody)
+          .ifPresent(
+              response -> {
+                this.updateSuccess = response.getSuccess();
+                this.updateMessage = response.getMessage();
+                this.updatedCount = response.getUpdatedCount();
+              });
+    } catch (Exception e) {
+      e.printStackTrace();
+      this.updateSuccess = false;
+      this.updateMessage = "Error bulk updating status: " + e.getMessage();
+      this.updatedCount = 0;
+      return ERROR.toUpperCase();
+    }
+
+    return SUCCESS.toUpperCase();
+  }
+
+  public String bulkUpdateFilteredEvents() {
+    // First fetch all events matching the filters
+    Map<String, Object> filter = new HashMap<>();
+    if (this.actors != null && !this.actors.isEmpty()) {
+      filter.put("ips", this.actors);
+    }
+    if (this.urls != null && !this.urls.isEmpty()) {
+      filter.put("urls", this.urls);
+    }
+    if (this.types != null && !this.types.isEmpty()) {
+      filter.put("types", this.types);
+    }
+    if (this.latestAttack != null && !this.latestAttack.isEmpty()) {
+      List<String> templates = getTemplates(latestAttack);
+      filter.put("latestAttack", templates);
+    }
+    if (this.statusFilter != null) {
+      filter.put("statusFilter", this.statusFilter);
+    }
+
+    Map<String, Integer> time_range = new HashMap<>();
+    if (this.startTimestamp > 0) {
+      time_range.put("start", this.startTimestamp);
+    }
+    if (this.endTimestamp > 0) {
+      time_range.put("end", this.endTimestamp);
+    }
+    filter.put("detected_at_time_range", time_range);
+
+    // Call backend to bulk update filtered events
+    HttpPost post = new HttpPost(
+            String.format("%s/api/dashboard/bulk_update_filtered_events", this.getBackendUrl()));
+    post.addHeader("Authorization", "Bearer " + this.getApiToken());
+    post.addHeader("Content-Type", "application/json");
+
+    Map<String, Object> body = new HashMap<String, Object>() {{
+      put("filter", filter);
+      put("status", newStatus);
+    }};
+    
+    String msg = objectMapper.valueToTree(body).toString();
+    StringEntity requestEntity = new StringEntity(msg, ContentType.APPLICATION_JSON);
+    post.setEntity(requestEntity);
+
+    try (CloseableHttpResponse resp = this.httpClient.execute(post)) {
+      String responseBody = EntityUtils.toString(resp.getEntity());
+      Map<String, Object> response = objectMapper.readValue(responseBody, Map.class);
+      
+      this.updateSuccess = (Boolean) response.getOrDefault("success", false);
+      this.updatedCount = (Integer) response.getOrDefault("updatedCount", 0);
+      this.updateMessage = (String) response.getOrDefault("message", "");
+    } catch (Exception e) {
+      e.printStackTrace();
+      this.updateSuccess = false;
+      this.updateMessage = "Error bulk updating filtered events: " + e.getMessage();
+      this.updatedCount = 0;
+      return ERROR.toUpperCase();
+    }
+
+    return SUCCESS.toUpperCase();
+  }
+
+  public String bulkDeleteMaliciousEvents() {
+    HttpPost post = new HttpPost(
+            String.format("%s/api/dashboard/bulk_delete_malicious_events", this.getBackendUrl()));
+    post.addHeader("Authorization", "Bearer " + this.getApiToken());
+    post.addHeader("Content-Type", "application/json");
+
+    Map<String, Object> body = new HashMap<String, Object>() {{
+      put("eventIds", eventIds);
+    }};
+
+    String msg = objectMapper.valueToTree(body).toString();
+    StringEntity requestEntity = new StringEntity(msg, ContentType.APPLICATION_JSON);
+    post.setEntity(requestEntity);
+
+    try (CloseableHttpResponse resp = this.httpClient.execute(post)) {
+      String responseBody = EntityUtils.toString(resp.getEntity());
+      Map<String, Object> response = objectMapper.readValue(responseBody, Map.class);
+
+      this.deleteSuccess = (Boolean) response.getOrDefault("deleteSuccess", false);
+      this.deletedCount = (Integer) response.getOrDefault("deletedCount", 0);
+      this.deleteMessage = (String) response.getOrDefault("deleteMessage", "");
+    } catch (Exception e) {
+      e.printStackTrace();
+      this.deleteSuccess = false;
+      this.deleteMessage = "Error deleting events: " + e.getMessage();
+      this.deletedCount = 0;
+      return ERROR.toUpperCase();
+    }
+
+    return SUCCESS.toUpperCase();
+  }
+
+  public String bulkDeleteFilteredEvents() {
+    // Build filter same as bulkUpdateFilteredEvents
+    Map<String, Object> filter = new HashMap<>();
+    if (this.actors != null && !this.actors.isEmpty()) {
+      filter.put("ips", this.actors);
+    }
+    if (this.urls != null && !this.urls.isEmpty()) {
+      filter.put("urls", this.urls);
+    }
+    if (this.types != null && !this.types.isEmpty()) {
+      filter.put("types", this.types);
+    }
+    if (this.latestAttack != null && !this.latestAttack.isEmpty()) {
+      List<String> templates = getTemplates(latestAttack);
+      filter.put("latestAttack", templates);
+    }
+    if (this.statusFilter != null) {
+      filter.put("statusFilter", this.statusFilter);
+    }
+
+    Map<String, Integer> time_range = new HashMap<>();
+    if (this.startTimestamp > 0) {
+      time_range.put("start", this.startTimestamp);
+    }
+    if (this.endTimestamp > 0) {
+      time_range.put("end", this.endTimestamp);
+    }
+    filter.put("detected_at_time_range", time_range);
+
+    // Call backend to delete filtered events
+    HttpPost post = new HttpPost(
+            String.format("%s/api/dashboard/bulk_delete_filtered_events", this.getBackendUrl()));
+    post.addHeader("Authorization", "Bearer " + this.getApiToken());
+    post.addHeader("Content-Type", "application/json");
+
+    Map<String, Object> body = new HashMap<String, Object>() {{
+      put("filter", filter);
+    }};
+
+    String msg = objectMapper.valueToTree(body).toString();
+    StringEntity requestEntity = new StringEntity(msg, ContentType.APPLICATION_JSON);
+    post.setEntity(requestEntity);
+
+    try (CloseableHttpResponse resp = this.httpClient.execute(post)) {
+      String responseBody = EntityUtils.toString(resp.getEntity());
+      Map<String, Object> response = objectMapper.readValue(responseBody, Map.class);
+
+      this.deleteSuccess = (Boolean) response.getOrDefault("deleteSuccess", false);
+      this.deletedCount = (Integer) response.getOrDefault("deletedCount", 0);
+      this.deleteMessage = (String) response.getOrDefault("deleteMessage", "");
+    } catch (Exception e) {
+      e.printStackTrace();
+      this.deleteSuccess = false;
+      this.deleteMessage = "Error deleting filtered events: " + e.getMessage();
+      this.deletedCount = 0;
+      return ERROR.toUpperCase();
+    }
+
+    return SUCCESS.toUpperCase();
+  }
+
   public List<SuspectSampleData> getSampleData() {
     return sampleData;
   }
@@ -403,5 +604,61 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
 
   public void setStatusFilter(String statusFilter) {
     this.statusFilter = statusFilter;
+  }
+
+  public List<String> getEventIds() {
+    return eventIds;
+  }
+
+  public void setEventIds(List<String> eventIds) {
+    this.eventIds = eventIds;
+  }
+
+  public int getUpdatedCount() {
+    return updatedCount;
+  }
+
+  public void setUpdatedCount(int updatedCount) {
+    this.updatedCount = updatedCount;
+  }
+
+  public List<String> getActors() {
+    return actors;
+  }
+
+  public void setActors(List<String> actors) {
+    this.actors = actors;
+  }
+
+  public String getNewStatus() {
+    return newStatus;
+  }
+
+  public void setNewStatus(String newStatus) {
+    this.newStatus = newStatus;
+  }
+
+  public boolean isDeleteSuccess() {
+    return deleteSuccess;
+  }
+
+  public void setDeleteSuccess(boolean deleteSuccess) {
+    this.deleteSuccess = deleteSuccess;
+  }
+
+  public String getDeleteMessage() {
+    return deleteMessage;
+  }
+
+  public void setDeleteMessage(String deleteMessage) {
+    this.deleteMessage = deleteMessage;
+  }
+
+  public int getDeletedCount() {
+    return deletedCount;
+  }
+
+  public void setDeletedCount(int deletedCount) {
+    this.deletedCount = deletedCount;
   }
 }

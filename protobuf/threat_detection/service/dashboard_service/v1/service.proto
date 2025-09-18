@@ -266,6 +266,17 @@ message UpdateMaliciousEventStatusResponse {
   string message = 2;
 }
 
+message BulkUpdateMaliciousEventStatusRequest {
+  repeated string event_ids = 1;
+  string status = 2;
+}
+
+message BulkUpdateMaliciousEventStatusResponse {
+  bool success = 1;
+  string message = 2;
+  int32 updated_count = 3;
+}
+
 message GetThreatConfigurationRequest {
 }
 

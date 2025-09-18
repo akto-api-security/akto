@@ -19,6 +19,7 @@ import com.akto.threat.backend.constants.MongoDBCollection;
 import com.akto.threat.backend.db.MaliciousEventModel;
 import com.akto.threat.backend.utils.KafkaUtils;
 import com.akto.threat.backend.utils.ThreatUtils;
+import com.akto.threat.backend.cache.TriagedEventCache;
 import com.mongodb.client.*;
 import com.mongodb.client.model.Filters;
 
@@ -187,8 +188,10 @@ public class MaliciousEventService {
     // Handle status filter
     if (filter.hasStatusFilter()) {
       String statusFilter = filter.getStatusFilter();
-      if ("TRIAGE".equals(statusFilter)) {
-        query.append("status", "TRIAGE");
+      if ("UNDER_REVIEW".equals(statusFilter)) {
+        query.append("status", "UNDER_REVIEW");
+      } else if ("IGNORED".equals(statusFilter)) {
+        query.append("status", "IGNORED");
       } else if ("ACTIVE".equals(statusFilter)) {
         // For Events tab: show null, empty, or ACTIVE status
         List<Document> orConditions = Arrays.asList(
@@ -263,15 +266,307 @@ public class MaliciousEventService {
               .getCollection(
                   MongoDBCollection.ThreatDetection.MALICIOUS_EVENTS, MaliciousEventModel.class);
       
+      // First get the event to retrieve URL and filterId for cache management
+      // Try both id and _id fields
+      MaliciousEventModel event = coll.find(Filters.eq("id", eventId)).first();
+      if (event == null) {
+        event = coll.find(Filters.eq("_id", eventId)).first();
+      }
+      if (event == null) {
+        logger.warn("Event not found for id: " + eventId);
+        return false;
+      }
+      
       MaliciousEventModel.Status eventStatus = MaliciousEventModel.Status.valueOf(status.toUpperCase());
       
-      Bson filter = Filters.eq("_id", eventId);
+      // Use OR to match either id or _id field
+      Bson filter = Filters.or(
+          Filters.eq("id", eventId),
+          Filters.eq("_id", eventId)
+      );
       Bson update = Updates.set("status", eventStatus.toString());
       
-      return coll.updateOne(filter, update).getModifiedCount() > 0;
+      boolean updateSuccess = coll.updateOne(filter, update).getModifiedCount() > 0;
+      
+      if (updateSuccess) {
+        String url = event.getLatestApiEndpoint();
+        String filterId = event.getFilterId();
+        
+        if ("UNDER_REVIEW".equals(status.toUpperCase())) {
+          // Add to cache when marked for review
+          TriagedEventCache.addToTriagedCache(accountId, url, filterId);
+          logger.debug("Added to cache after marking for review: " + url + ":" + filterId);
+        } else if ("ACTIVE".equals(status.toUpperCase())) {
+          // Remove from cache when reactivated
+          TriagedEventCache.removeFromTriagedCache(accountId, url, filterId);
+          logger.debug("Removed from cache after reactivation: " + url + ":" + filterId);
+        }
+      }
+      
+      return updateSuccess;
     } catch (Exception e) {
       logger.error("Error updating malicious event status", e);
       return false;
+    }
+  }
+
+  public int bulkUpdateMaliciousEventStatus(String accountId, List<String> eventIds, String status) {
+    int updatedCount = 0;
+    try {
+      logger.info("Bulk updating events for account " + accountId + " with IDs: " + eventIds + " to status: " + status);
+      
+      MongoCollection<MaliciousEventModel> coll =
+          this.mongoClient
+              .getDatabase(accountId)
+              .getCollection(
+                  MongoDBCollection.ThreatDetection.MALICIOUS_EVENTS, MaliciousEventModel.class);
+      
+      MaliciousEventModel.Status eventStatus = MaliciousEventModel.Status.valueOf(status.toUpperCase());
+      
+      for (String eventId : eventIds) {
+        // MongoDB uses 'id' field, not '_id' for the MaliciousEventModel
+        // Try both id and _id to be safe
+        MaliciousEventModel event = coll.find(Filters.eq("_id", eventId)).first();
+        if (event == null) {
+          logger.warn("Event not found for id: " + eventId);
+          continue;
+        }
+        
+        // Use the same field that worked for finding the event
+        Bson filter = Filters.eq("_id", eventId);
+        Bson update = Updates.set("status", eventStatus.toString());
+        
+        boolean updateSuccess = coll.updateOne(filter, update).getModifiedCount() > 0;
+        logger.debug("Update result for ID " + eventId + ": " + updateSuccess);
+        
+        if (updateSuccess) {
+          updatedCount++;
+          String url = event.getLatestApiEndpoint();
+          String filterId = event.getFilterId();
+          
+          if ("TRIAGE".equals(status.toUpperCase())) {
+            // Add to cache when triaged
+            TriagedEventCache.addToTriagedCache(accountId, url, filterId);
+            logger.debug("Added to cache after bulk triage: " + url + ":" + filterId);
+          } else if ("ACTIVE".equals(status.toUpperCase())) {
+            // Remove from cache when untriaged
+            TriagedEventCache.removeFromTriagedCache(accountId, url, filterId);
+            logger.debug("Removed from cache after bulk untriage: " + url + ":" + filterId);
+          }
+        }
+      }
+      
+      return updatedCount;
+    } catch (Exception e) {
+      logger.error("Error bulk updating malicious event status", e);
+      return updatedCount;
+    }
+  }
+
+  public int bulkUpdateFilteredEvents(String accountId, Map<String, Object> filter, String status) {
+    try {
+      MongoCollection<MaliciousEventModel> coll =
+          this.mongoClient
+              .getDatabase(accountId)
+              .getCollection(
+                  MongoDBCollection.ThreatDetection.MALICIOUS_EVENTS, MaliciousEventModel.class);
+      
+      // Build query from filter
+      Document query = new Document();
+      
+      // Handle ips/actors filter
+      List<String> ips = (List<String>) filter.get("ips");
+      if (ips != null && !ips.isEmpty()) {
+        query.append("actor", new Document("$in", ips));
+      }
+      
+      // Handle urls filter
+      List<String> urls = (List<String>) filter.get("urls");
+      if (urls != null && !urls.isEmpty()) {
+        query.append("latestApiEndpoint", new Document("$in", urls));
+      }
+      
+      // Handle types filter
+      List<String> types = (List<String>) filter.get("types");
+      if (types != null && !types.isEmpty()) {
+        query.append("type", new Document("$in", types));
+      }
+      
+      // Handle latestAttack filter
+      List<String> latestAttack = (List<String>) filter.get("latestAttack");
+      if (latestAttack != null && !latestAttack.isEmpty()) {
+        query.append("filterId", new Document("$in", latestAttack));
+      }
+      
+      // Handle time range
+      Map<String, Integer> timeRange = (Map<String, Integer>) filter.get("detected_at_time_range");
+      if (timeRange != null) {
+        Integer start = timeRange.get("start");
+        Integer end = timeRange.get("end");
+        Document timeQuery = new Document();
+        if (start != null) {
+          timeQuery.append("$gte", start);
+        }
+        if (end != null) {
+          timeQuery.append("$lte", end);
+        }
+        if (!timeQuery.isEmpty()) {
+          query.append("detectedAt", timeQuery);
+        }
+      }
+      
+      // Handle status filter (for current tab)
+      String statusFilter = (String) filter.get("statusFilter");
+      if ("UNDER_REVIEW".equals(statusFilter)) {
+        query.append("status", "UNDER_REVIEW");
+      } else if ("IGNORED".equals(statusFilter)) {
+        query.append("status", "IGNORED");
+      } else if ("ACTIVE".equals(statusFilter) || "EVENTS".equals(statusFilter)) {
+        // For Events tab: show null, empty, or ACTIVE status
+        List<Document> orConditions = Arrays.asList(
+          new Document("status", new Document("$exists", false)),
+          new Document("status", null),
+          new Document("status", ""),
+          new Document("status", "ACTIVE")
+        );
+        query.append("$or", orConditions);
+      }
+      
+      logger.info("Bulk updating events with filter: " + query.toJson() + " to status: " + status);
+      
+      // Get all matching events for cache management
+      List<MaliciousEventModel> eventsToUpdate = new ArrayList<>();
+      try (MongoCursor<MaliciousEventModel> cursor = coll.find(query).cursor()) {
+        while (cursor.hasNext()) {
+          eventsToUpdate.add(cursor.next());
+        }
+      }
+      
+      // Perform bulk update
+      MaliciousEventModel.Status eventStatus = MaliciousEventModel.Status.valueOf(status.toUpperCase());
+      Bson update = Updates.set("status", eventStatus.toString());
+      
+      long modifiedCount = coll.updateMany(query, update).getModifiedCount();
+      
+      // Update cache for each modified event
+      if (modifiedCount > 0) {
+        for (MaliciousEventModel event : eventsToUpdate) {
+          String url = event.getLatestApiEndpoint();
+          String filterId = event.getFilterId();
+          
+          if ("UNDER_REVIEW".equals(status.toUpperCase()) || "IGNORED".equals(status.toUpperCase())) {
+            TriagedEventCache.addToTriagedCache(accountId, url, filterId);
+          } else if ("ACTIVE".equals(status.toUpperCase())) {
+            TriagedEventCache.removeFromTriagedCache(accountId, url, filterId);
+          }
+        }
+        logger.info("Updated cache for " + eventsToUpdate.size() + " events");
+      }
+      
+      return (int) modifiedCount;
+    } catch (Exception e) {
+      logger.error("Error bulk updating filtered events", e);
+      return 0;
+    }
+  }
+
+  public int bulkDeleteMaliciousEvents(String accountId, List<String> eventIds) {
+    try {
+      MongoCollection<MaliciousEventModel> coll =
+          this.mongoClient
+              .getDatabase(accountId)
+              .getCollection(
+                  MongoDBCollection.ThreatDetection.MALICIOUS_EVENTS, MaliciousEventModel.class);
+
+      Document query = new Document("_id", new Document("$in", eventIds));
+      long deletedCount = coll.deleteMany(query).getDeletedCount();
+
+      logger.info("Deleted " + deletedCount + " malicious events");
+      return (int) deletedCount;
+    } catch (Exception e) {
+      logger.error("Error bulk deleting malicious events", e);
+      return 0;
+    }
+  }
+
+  public int bulkDeleteFilteredEvents(String accountId, Map<String, Object> filter) {
+    try {
+      MongoCollection<MaliciousEventModel> coll =
+          this.mongoClient
+              .getDatabase(accountId)
+              .getCollection(
+                  MongoDBCollection.ThreatDetection.MALICIOUS_EVENTS, MaliciousEventModel.class);
+
+      // Build query from filter (same as bulkUpdateFilteredEvents)
+      Document query = new Document();
+
+      // Handle ips/actors filter
+      List<String> ips = (List<String>) filter.get("ips");
+      if (ips != null && !ips.isEmpty()) {
+        query.append("actor", new Document("$in", ips));
+      }
+
+      // Handle urls filter
+      List<String> urls = (List<String>) filter.get("urls");
+      if (urls != null && !urls.isEmpty()) {
+        query.append("latestApiEndpoint", new Document("$in", urls));
+      }
+
+      // Handle types filter
+      List<String> types = (List<String>) filter.get("types");
+      if (types != null && !types.isEmpty()) {
+        query.append("type", new Document("$in", types));
+      }
+
+      // Handle latestAttack filter
+      List<String> latestAttack = (List<String>) filter.get("latestAttack");
+      if (latestAttack != null && !latestAttack.isEmpty()) {
+        query.append("filterId", new Document("$in", latestAttack));
+      }
+
+      // Handle time range
+      Map<String, Integer> timeRange = (Map<String, Integer>) filter.get("detected_at_time_range");
+      if (timeRange != null) {
+        Integer start = timeRange.get("start");
+        Integer end = timeRange.get("end");
+        Document timeQuery = new Document();
+        if (start != null) {
+          timeQuery.append("$gte", start);
+        }
+        if (end != null) {
+          timeQuery.append("$lte", end);
+        }
+        if (!timeQuery.isEmpty()) {
+          query.append("detectedAt", timeQuery);
+        }
+      }
+
+      // Handle status filter
+      String statusFilter = (String) filter.get("statusFilter");
+      if ("UNDER_REVIEW".equals(statusFilter)) {
+        query.append("status", "UNDER_REVIEW");
+      } else if ("IGNORED".equals(statusFilter)) {
+        query.append("status", "IGNORED");
+      } else if ("ACTIVE".equals(statusFilter) || "EVENTS".equals(statusFilter)) {
+        // For Events tab: show null, empty, or ACTIVE status
+        List<Document> orConditions = Arrays.asList(
+          new Document("status", new Document("$exists", false)),
+          new Document("status", null),
+          new Document("status", ""),
+          new Document("status", "ACTIVE")
+        );
+        query.append("$or", orConditions);
+      }
+
+      logger.info("Bulk deleting events with filter: " + query.toJson());
+
+      long deletedCount = coll.deleteMany(query).getDeletedCount();
+
+      logger.info("Deleted " + deletedCount + " filtered malicious events");
+      return (int) deletedCount;
+    } catch (Exception e) {
+      logger.error("Error bulk deleting filtered events", e);
+      return 0;
     }
   }
 }

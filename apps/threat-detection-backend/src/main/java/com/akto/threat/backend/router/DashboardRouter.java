@@ -17,12 +17,16 @@ import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.Th
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatSeverityWiseCountRequest;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.UpdateMaliciousEventStatusRequest;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.UpdateMaliciousEventStatusResponse;
+import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.BulkUpdateMaliciousEventStatusRequest;
+import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.BulkUpdateMaliciousEventStatusResponse;
 import com.akto.threat.backend.service.MaliciousEventService;
 import com.akto.threat.backend.service.ThreatActorService;
 import com.akto.threat.backend.service.ThreatApiService;
 import io.vertx.core.Vertx;
 import io.vertx.ext.web.RequestBody;
 import io.vertx.ext.web.Router;
+import java.util.List;
+import java.util.Map;
 
 public class DashboardRouter implements ARouter {
 
@@ -400,6 +404,169 @@ public class DashboardRouter implements ARouter {
                     .ifPresent(s -> ctx.response().setStatusCode(200).end(s));
             });
 
+        router
+            .post("/bulk_update_malicious_event_status")
+            .blockingHandler(ctx -> {
+                RequestBody reqBody = ctx.body();
+                BulkUpdateMaliciousEventStatusRequest req = ProtoMessageUtils.<
+                    BulkUpdateMaliciousEventStatusRequest
+                >toProtoMessage(
+                    BulkUpdateMaliciousEventStatusRequest.class,
+                    reqBody.asString()
+                ).orElse(null);
+
+                if (req == null) {
+                    ctx.response().setStatusCode(400).end("Invalid request");
+                    return;
+                }
+
+                int updatedCount = dsService.bulkUpdateMaliciousEventStatus(
+                    ctx.get("accountId"),
+                    req.getEventIdsList(),
+                    req.getStatus()
+                );
+
+                BulkUpdateMaliciousEventStatusResponse resp = BulkUpdateMaliciousEventStatusResponse.newBuilder()
+                    .setSuccess(updatedCount > 0)
+                    .setMessage(updatedCount > 0 ? 
+                        String.format("Successfully updated %d events", updatedCount) : 
+                        "Failed to update events")
+                    .setUpdatedCount(updatedCount)
+                    .build();
+
+                ProtoMessageUtils.toString(resp)
+                    .ifPresent(s -> ctx.response().setStatusCode(200).end(s));
+            });
+
+        router
+            .post("/bulk_update_filtered_events")
+            .blockingHandler(ctx -> {
+                RequestBody reqBody = ctx.body();
+                Map<String, Object> request = null;
+                try {
+                    request = new com.fasterxml.jackson.databind.ObjectMapper().readValue(
+                        reqBody.asString(), Map.class);
+                } catch (Exception e) {
+                    ctx.response().setStatusCode(400).end("Invalid request");
+                    return;
+                }
+
+                if (request == null) {
+                    ctx.response().setStatusCode(400).end("Invalid request");
+                    return;
+                }
+
+                Map<String, Object> filter = (Map<String, Object>) request.get("filter");
+                String status = (String) request.get("status");
+                
+                int updatedCount = dsService.bulkUpdateFilteredEvents(
+                    ctx.get("accountId"),
+                    filter,
+                    status
+                );
+
+                Map<String, Object> response = new java.util.HashMap<>();
+                response.put("success", updatedCount > 0);
+                response.put("updatedCount", updatedCount);
+                response.put("message", updatedCount > 0 ? 
+                    String.format("Successfully updated %d events", updatedCount) : 
+                    "No events updated");
+
+                try {
+                    String jsonResponse = new com.fasterxml.jackson.databind.ObjectMapper()
+                        .writeValueAsString(response);
+                    ctx.response().setStatusCode(200).end(jsonResponse);
+                } catch (Exception e) {
+                    ctx.response().setStatusCode(500).end("Error generating response");
+                }
+            });
+
+
+        router
+            .post("/bulk_delete_malicious_events")
+            .blockingHandler(ctx -> {
+                RequestBody reqBody = ctx.body();
+                Map<String, Object> request = null;
+                try {
+                    request = new com.fasterxml.jackson.databind.ObjectMapper().readValue(
+                        reqBody.asString(), Map.class);
+                } catch (Exception e) {
+                    ctx.response().setStatusCode(400).end("Invalid request");
+                    return;
+                }
+
+                if (request == null) {
+                    ctx.response().setStatusCode(400).end("Invalid request");
+                    return;
+                }
+
+                List<String> eventIds = (List<String>) request.get("eventIds");
+                if (eventIds == null || eventIds.isEmpty()) {
+                    ctx.response().setStatusCode(400).end("No event IDs provided");
+                    return;
+                }
+
+                int deletedCount = dsService.bulkDeleteMaliciousEvents(
+                    ctx.get("accountId"),
+                    eventIds
+                );
+
+                Map<String, Object> response = new java.util.HashMap<>();
+                response.put("deleteSuccess", deletedCount > 0);
+                response.put("deletedCount", deletedCount);
+                response.put("deleteMessage", deletedCount > 0 ?
+                    String.format("Successfully deleted %d events", deletedCount) :
+                    "No events deleted");
+
+                try {
+                    String jsonResponse = new com.fasterxml.jackson.databind.ObjectMapper()
+                        .writeValueAsString(response);
+                    ctx.response().setStatusCode(200).end(jsonResponse);
+                } catch (Exception e) {
+                    ctx.response().setStatusCode(500).end("Error generating response");
+                }
+            });
+
+        router
+            .post("/bulk_delete_filtered_events")
+            .blockingHandler(ctx -> {
+                RequestBody reqBody = ctx.body();
+                Map<String, Object> request = null;
+                try {
+                    request = new com.fasterxml.jackson.databind.ObjectMapper().readValue(
+                        reqBody.asString(), Map.class);
+                } catch (Exception e) {
+                    ctx.response().setStatusCode(400).end("Invalid request");
+                    return;
+                }
+
+                if (request == null) {
+                    ctx.response().setStatusCode(400).end("Invalid request");
+                    return;
+                }
+
+                Map<String, Object> filter = (Map<String, Object>) request.get("filter");
+
+                int deletedCount = dsService.bulkDeleteFilteredEvents(
+                    ctx.get("accountId"),
+                    filter
+                );
+
+                Map<String, Object> response = new java.util.HashMap<>();
+                response.put("deleteSuccess", deletedCount > 0);
+                response.put("deletedCount", deletedCount);
+                response.put("deleteMessage", deletedCount > 0 ?
+                    String.format("Successfully deleted %d events", deletedCount) :
+                    "No events deleted");
+
+                try {
+                    String jsonResponse = new com.fasterxml.jackson.databind.ObjectMapper()
+                        .writeValueAsString(response);
+                    ctx.response().setStatusCode(200).end(jsonResponse);
+                } catch (Exception e) {
+                    ctx.response().setStatusCode(500).end("Error generating response");
+                }
+            });
 
         return router;
     }

@@ -504,7 +504,7 @@ function GithubServerTable(props) {
                     flush: true
                   }
                 ]}
-                promotedBulkActions={props.selectable ? props.promotedBulkActions && props.promotedBulkActions(bulkActionResources) : []}
+                promotedBulkActions={props.selectable ? props.promotedBulkActions && props.promotedBulkActions(allResourcesSelected ? 'All' : bulkActionResources) : []}
                 hasZebraStriping={props.hasZebraStriping || false}
                 sortable={sortableColumns}
                 sortColumnIndex={activeColumnSort.columnIndex}

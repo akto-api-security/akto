@@ -179,6 +179,46 @@ const threatDetectionRequests = {
                 status: status
             }
         })
+    },
+    bulkUpdateFilteredEvents(actors, urls, types, latestAttack, startTimestamp, endTimestamp, statusFilter, newStatus) {
+        return request({
+            url: '/api/bulkUpdateFilteredEvents',
+            method: 'post',
+            data: {
+                actors: actors,
+                urls: urls,
+                types: types,
+                latestAttack: latestAttack,
+                startTimestamp: startTimestamp,
+                endTimestamp: endTimestamp,
+                statusFilter: statusFilter,
+                newStatus: newStatus
+            }
+        })
+    },
+    bulkDeleteMaliciousEvents(eventIds) {
+        return request({
+            url: '/api/bulkDeleteMaliciousEvents',
+            method: 'post',
+            data: {
+                eventIds: eventIds
+            }
+        })
+    },
+    bulkDeleteFilteredEvents(actors, urls, types, latestAttack, startTimestamp, endTimestamp, statusFilter) {
+        return request({
+            url: '/api/bulkDeleteFilteredEvents',
+            method: 'post',
+            data: {
+                actors: actors,
+                urls: urls,
+                types: types,
+                latestAttack: latestAttack,
+                startTimestamp: startTimestamp,
+                endTimestamp: endTimestamp,
+                statusFilter: statusFilter
+            }
+        })
     }
 }
 export default threatDetectionRequests

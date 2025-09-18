@@ -1,4 +1,4 @@
-import { Badge, Box, Button, Divider, HorizontalStack, Modal, Text, Tooltip, VerticalStack } from "@shopify/polaris";
+import { Badge, Box, Button, Divider, HorizontalStack, Modal, Text, Tooltip, VerticalStack, Popover, ActionList } from "@shopify/polaris";
 import FlyLayout from "../../../components/layouts/FlyLayout";
 import SampleDataList from "../../../components/shared/SampleDataList";
 import LayoutWithTabs from "../../../components/layouts/LayoutWithTabs";
@@ -19,6 +19,7 @@ function SampleDetails(props) {
     const [latestActivity, setLatestActivity] = useState([])
     const [showModal, setShowModal] = useState(false);
     const [triageLoading, setTriageLoading] = useState(false);
+    const [actionPopoverActive, setActionPopoverActive] = useState(false);
 
     const fetchRemediationInfo = async() => {
         if(moreInfoData?.templateId !== undefined){
@@ -115,11 +116,10 @@ function SampleDetails(props) {
         window.open(navigateUrl, "_blank")
     }
 
-    const handleTriageEvent = async () => {
+    const handleStatusChange = async (newStatus) => {
         if (!eventId) return;
-        
-        const isTriaged = eventStatus === 'TRIAGE';
-        const newStatus = isTriaged ? 'ACTIVE' : 'TRIAGE';
+
+        setActionPopoverActive(false);
         
         setTriageLoading(true);
         try {
@@ -130,8 +130,12 @@ function SampleDetails(props) {
                 if (onStatusUpdate) {
                     onStatusUpdate(newStatus);
                 }
+                const statusText = newStatus === 'UNDER_REVIEW' ? 'marked for review' :
+                                 newStatus === 'IGNORED' ? 'ignored' : 'reactivated';
+                func.setToast(true, false, `Event ${statusText} successfully`);
             } else {
                 console.error(`Failed to update event status`);
+                func.setToast(true, true, 'Failed to update event status');
             }
         } catch (error) {
             console.error("Error updating event status:", error);
@@ -172,14 +176,40 @@ function SampleDetails(props) {
                         </VerticalStack>
                     </Box>
                     <HorizontalStack gap={"2"} wrap={false}>
-                        <Button 
-                            size="slim" 
-                            onClick={handleTriageEvent}
-                            loading={triageLoading}
-                            disabled={!eventId}
+                        <Popover
+                            active={actionPopoverActive}
+                            activator={
+                                <Button
+                                    size="slim"
+                                    onClick={() => setActionPopoverActive(!actionPopoverActive)}
+                                    disclosure
+                                    loading={triageLoading}
+                                    disabled={!eventId}
+                                >
+                                    Event Actions
+                                </Button>
+                            }
+                            onClose={() => setActionPopoverActive(false)}
                         >
-                            {eventStatus === 'TRIAGE' ? 'Untriage Event' : 'Triage Event'}
-                        </Button>
+                            <ActionList
+                                items={[
+                                    eventStatus === 'UNDER_REVIEW' || eventStatus === 'TRIAGE' ? {
+                                        content: 'Reactivate',
+                                        onAction: () => handleStatusChange('ACTIVE'),
+                                    } : {
+                                        content: 'Mark for Review',
+                                        onAction: () => handleStatusChange('UNDER_REVIEW'),
+                                    },
+                                    eventStatus === 'IGNORED' ? {
+                                        content: 'Reactivate',
+                                        onAction: () => handleStatusChange('ACTIVE'),
+                                    } : {
+                                        content: 'Ignore',
+                                        onAction: () => handleStatusChange('IGNORED'),
+                                    }
+                                ].filter(item => item)}
+                            />
+                        </Popover>
                         <Modal
                             activator={<Button destructive size="slim" onClick={() => setShowModal(!showModal)}>Block IPs</Button>}
                             open={showModal}

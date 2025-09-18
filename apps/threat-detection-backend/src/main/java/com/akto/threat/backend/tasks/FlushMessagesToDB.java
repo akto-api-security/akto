@@ -3,8 +3,6 @@ package com.akto.threat.backend.tasks;
 import com.akto.dao.context.Context;
 import com.akto.kafka.KafkaConfig;
 import com.akto.log.LoggerMaker;
-import com.akto.log.LoggerMaker.LogDb;
-import com.akto.runtime.utils.Utils;
 import com.akto.threat.backend.constants.KafkaTopic;
 import com.akto.threat.backend.constants.MongoDBCollection;
 import com.akto.threat.backend.db.AggregateSampleMaliciousEventModel;
@@ -12,11 +10,11 @@ import com.akto.threat.backend.db.MaliciousEventModel;
 import com.akto.threat.backend.db.SplunkIntegrationModel;
 import com.akto.threat.backend.service.MaliciousEventService;
 import com.akto.threat.backend.utils.SplunkEvent;
+import com.akto.threat.backend.cache.TriagedEventCache;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.Gson;
-import com.mongodb.client.FindIterable;
 import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.model.BulkWriteOptions;
@@ -31,7 +29,6 @@ import java.util.concurrent.Executors;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
-import org.apache.kafka.common.serialization.StringDeserializer;
 import org.bson.Document;
 import org.bson.conversions.Bson;
 
@@ -88,6 +85,9 @@ public class FlushMessagesToDB {
               continue;
             }
 
+            // Cleanup cache periodically (every 5 minutes)
+            TriagedEventCache.cleanupExpiredCacheEntries();
+
             processRecords(records);
 
             if (!records.isEmpty()) {
@@ -96,6 +96,7 @@ public class FlushMessagesToDB {
           }
         });
   }
+
 
   private void processRecords(ConsumerRecords<String, String> records) {
     records.forEach(
@@ -151,10 +152,35 @@ public class FlushMessagesToDB {
           break;
         }
         
-        this.mClient
+        // First check cache for triaged URL+filter combination
+        if (TriagedEventCache.isTriagedInCache(accountId, event.getLatestApiEndpoint(), event.getFilterId())) {
+            logger.info("Skipping insertion of malicious event due to cached triaged event with same URL+filter combination: " + 
+                       event.getLatestApiEndpoint() + " + " + event.getFilterId());
+            break;
+        }
+        
+        // If not in cache, check database and update cache if needed
+        MongoCollection<MaliciousEventModel> collection = this.mClient
             .getDatabase(accountId + "")
-            .getCollection(eventType, MaliciousEventModel.class)
-            .insertOne(event);
+            .getCollection(eventType, MaliciousEventModel.class);
+            
+        Bson triageFilter = Filters.and(
+            Filters.eq("latestApiEndpoint", event.getLatestApiEndpoint()),
+            Filters.eq("filterId", event.getFilterId()),
+            Filters.eq("status", "TRIAGE")
+        );
+        
+        MaliciousEventModel existingTriagedEvent = collection.find(triageFilter).first();
+        
+        if (existingTriagedEvent != null) {
+            // Add to cache for future lookups
+            TriagedEventCache.addToTriagedCache(accountId, event.getLatestApiEndpoint(), event.getFilterId());
+            logger.info("Skipping insertion of malicious event due to existing triaged event with same URL+filter combination: " + 
+                       event.getLatestApiEndpoint() + " + " + event.getFilterId());
+        } else {
+            // No triaged event exists, safe to insert
+            collection.insertOne(event);
+        }
         break;
       default:
         throw new IllegalArgumentException("Invalid event type");

@@ -33,7 +33,8 @@ public class MaliciousEventModel {
 
   public enum Status {
     ACTIVE,
-    TRIAGE
+    UNDER_REVIEW,
+    IGNORED
   }
 
   public MaliciousEventModel() {}
