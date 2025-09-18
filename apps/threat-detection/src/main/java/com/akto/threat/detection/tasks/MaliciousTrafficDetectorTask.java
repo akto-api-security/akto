@@ -307,6 +307,11 @@ public class MaliciousTrafficDetectorTask implements Task {
         continue;
       }
 
+      // Skip SuccessfulExploit category filters
+      if (apiFilter.getInfo().getCategory().getName().equalsIgnoreCase("SuccessfulExploit")) {
+        continue;
+      }
+
       if(apiFilter.getInfo().getCategory().getName().equalsIgnoreCase("SchemaConform")) {
         logger.debug("SchemaConform filter found for url {} filterId {}", apiInfoKey.getUrl(), apiFilter.getId());
         String apiSchema = getApiSchema(apiCollectionId);
