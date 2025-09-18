@@ -25,12 +25,19 @@ var detector *transformers.Detector
 const (
 	// These files need to be downloaded separately.
 	// ref:
-	modelRelPath         = "mcp-threat/transformers/models/prompt-injection/onnx/model.onnx"
-	tokenizerRelPath     = "mcp-threat/transformers/models/prompt-injection/onnx/tokenizer.json"
-	libonnxRuntimePath   = "/opt/homebrew/lib/libonnxruntime.dylib"
-	PromptUpperThreshold = 0.9
-	PromptLowerThreshold = 0.4
+	modelRelPath               = "mcp-threat/transformers/models/prompt-injection/onnx/model.onnx"
+	tokenizerRelPath           = "mcp-threat/transformers/models/prompt-injection/onnx/tokenizer.json"
+	libonnxRuntimePathForMacOS = "/opt/homebrew/lib/libonnxruntime.dylib"
+	PromptUpperThreshold       = 0.9
+	PromptLowerThreshold       = 0.4
 )
+
+func getLibonnxRuntimePath() string {
+	if path := os.Getenv("LIBONNX_RUNTIME_PATH"); path != "" {
+		return path
+	}
+	return libonnxRuntimePathForMacOS
+}
 
 func init() {
 	wd, err := os.Getwd()
@@ -58,7 +65,7 @@ func init() {
 	fmt.Println("Model path:", modelPath)
 	fmt.Println("Tokenizer path:", tokenizerPath)
 
-	detector, err = transformers.NewDetector(tokenizerPath, modelPath, libonnxRuntimePath)
+	detector, err = transformers.NewDetector(tokenizerPath, modelPath, getLibonnxRuntimePath())
 	if err != nil {
 		log.Printf("failed to create detector: %v", err)
 	}
