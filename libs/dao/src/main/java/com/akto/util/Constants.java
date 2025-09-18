@@ -73,5 +73,6 @@ public class Constants {
     public static final String AKTO_MCP_RESOURCE = "RESOURCE";
     public static final String AKTO_MCP_PROMPT = "PROMPT";
     public static final String AKTO_MCP_SERVER = "SERVER";
+    public static final String STATUS_PENDING = "Pending";
 
 }

@@ -5,6 +5,7 @@ import com.akto.dao.context.Context;
 import com.akto.dto.McpReconRequest;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.util.Constants;
 import com.opensymphony.xwork2.Action;
 
 public class MCPReconAction extends UserAction {
@@ -27,13 +28,13 @@ public class MCPReconAction extends UserAction {
             McpReconRequest reconRequest = new McpReconRequest(
                 Context.accountId.get(),
                 ipRange,
-                McpReconRequest.STATUS_PENDING,
+                Constants.STATUS_PENDING,
                 Context.now()
             );
 
             // Insert the request into the mcp_recon_requests collection
             McpReconRequestDao.instance.insertOne(reconRequest);
-            this.requestId = reconRequest.get_id();
+            this.requestId = String.valueOf(reconRequest.get_id());
             loggerMaker.info("MCP Recon request created with ID: " + this.requestId, LogDb.DASHBOARD);
             return Action.SUCCESS.toUpperCase();
 
