@@ -1,5 +1,6 @@
 package com.akto.dao;
 
+import com.akto.dao.context.Context;
 import com.akto.dto.McpReconRequest;
 
 /**
@@ -22,45 +23,25 @@ public class McpReconRequestDao extends AccountsContextDao<McpReconRequest> {
         return McpReconRequest.class;
     }
 
-    /**
-     * Create indexes for the collection
-     * Indexes on: ip_range, status, account_id, and compound indexes
-     */
+
     public void createIndicesIfAbsent() {
-        // Single field indexes
-        MCollection.createIndexIfAbsent(getDBName(), getCollName(),
-                new String[] { Fields.IP_RANGE }, false);
-        MCollection.createIndexIfAbsent(getDBName(), getCollName(),
-                new String[] { Fields.STATUS }, false);
-        MCollection.createIndexIfAbsent(getDBName(), getCollName(),
-                new String[] { Fields.ACCOUNT_ID }, false);
 
-        // Compound indexes for common queries
-        MCollection.createIndexIfAbsent(getDBName(), getCollName(),
-                new String[] { Fields.ACCOUNT_ID, Fields.STATUS }, false);
-        MCollection.createIndexIfAbsent(getDBName(), getCollName(),
-                new String[] { Fields.ACCOUNT_ID, Fields.IP_RANGE }, false);
-        MCollection.createIndexIfAbsent(getDBName(), getCollName(),
-                new String[] { Fields.STATUS, Fields.STARTED_AT }, false);
-        MCollection.createIndexIfAbsent(getDBName(), getCollName(),
-                new String[] { Fields.ACCOUNT_ID, Fields.STATUS, Fields.CREATED_AT }, false);
-    }
+        boolean exists = false;
+        for (String col: clients[0].getDatabase(Context.accountId.get()+"").listCollectionNames()){
+            if (getCollName().equalsIgnoreCase(col)){
+                exists = true;
+                break;
+            }
+        }
 
-    /**
-     * Constants for common field names
-     */
-    public static class Fields {
-        public static final String ID = "_id";
-        public static final String ACCOUNT_ID = "account_id";
-        public static final String IP_RANGE = "ip_range";
-        public static final String STATUS = "status";
-        public static final String STARTED_AT = "started_at";
-        public static final String FINISHED_AT = "finished_at";
-        public static final String CREATED_AT = "created_at";
-        public static final String AUTH_HEADERS = "auth_headers";
-        public static final String BATCH_SIZE = "batch_size";
-        public static final String TIMEOUT = "timeout";
-        public static final String MAX_CONCURRENT = "max_concurrent";
-        public static final String SERVERS_FOUND = "servers_found";
+        if (!exists) {
+            clients[0].getDatabase(Context.accountId.get()+"").createCollection(getCollName());
+        }
+
+
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(),new String[] {  McpReconRequest.STATUS, McpReconRequest.ACCOUNT_ID }, false);
+
+        MCollection.createIndexIfAbsent(getDBName(), getCollName(),
+                new String[] { McpReconRequest.ACCOUNT_ID, McpReconRequest.STATUS, McpReconRequest.CREATED_AT }, false);
     }
 }

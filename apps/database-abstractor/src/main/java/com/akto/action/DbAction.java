@@ -134,7 +134,7 @@ public class DbAction extends ActionSupport {
     private int finishedAt;
     
     @Getter @Setter
-    private List<BasicDBObject> serverDataList;
+    private List<McpReconResult> serverDataList;
 
     private ModuleInfo moduleInfo;
 

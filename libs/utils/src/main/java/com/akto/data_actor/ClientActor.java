@@ -4179,7 +4179,7 @@ public class ClientActor extends DataActor {
     /**
      * Batch store MCP recon results
      */
-    public void storeMcpReconResultsBatch(List<BasicDBObject> serverDataList) {
+    public void storeMcpReconResultsBatch(List<McpReconResult> serverDataList) {
         Map<String, List<String>> headers = buildHeaders();
         loggerMaker.infoAndAddToDb("storeMcpReconResultsBatch api called with " + serverDataList.size() + " servers", LoggerMaker.LogDb.RUNTIME);
 

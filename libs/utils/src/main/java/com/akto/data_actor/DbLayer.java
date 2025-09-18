@@ -1783,31 +1783,31 @@ public class DbLayer {
 
     public static List<McpReconRequest> fetchPendingMcpReconRequests() {
         // Fetch all requests where status is "Pending"
-        Bson filter = Filters.eq(McpReconRequestDao.Fields.STATUS, McpReconRequest.STATUS_PENDING);
+        Bson filter = Filters.eq(McpReconRequest.STATUS, McpReconRequest.STATUS_PENDING);
         return McpReconRequestDao.instance.findAll(filter);
     }
 
     public static void updateMcpReconRequestStatus(String requestId, String newStatus, int serversFound, int startedAt, int finishedAt) {
         ObjectId requestObjId = new ObjectId(requestId);
-        Bson filter = Filters.eq(McpReconRequestDao.Fields.ID, requestObjId);
+        Bson filter = Filters.eq(McpReconRequest.ID, requestObjId);
         Bson updates;
         if (newStatus.equals(McpReconRequest.STATUS_IN_PROGRESS)) {
             updates = Updates.combine(
-                    Updates.set(McpReconRequestDao.Fields.STATUS, newStatus),
-                    Updates.set(McpReconRequestDao.Fields.STARTED_AT, startedAt)
+                    Updates.set(McpReconRequest.STATUS, newStatus),
+                    Updates.set(McpReconRequest.STARTED_AT, startedAt)
             );
         } else {   // For completed or failed status
             updates = Updates.combine(
-                    Updates.set(McpReconRequestDao.Fields.STATUS, newStatus),
-                    Updates.set(McpReconRequestDao.Fields.SERVERS_FOUND, serversFound),
-                    Updates.set(McpReconRequestDao.Fields.FINISHED_AT, finishedAt)
+                    Updates.set(McpReconRequest.STATUS, newStatus),
+                    Updates.set(McpReconRequest.SERVERS_FOUND, serversFound),
+                    Updates.set(McpReconRequest.FINISHED_AT, finishedAt)
             );
         }
         McpReconRequestDao.instance.updateOneNoUpsert(filter, updates);
     }
 
-    public static void storeMcpReconResultsBatch(List<BasicDBObject> serverDataList) {
+    public static void storeMcpReconResultsBatch(List<McpReconResult> serverDataList) {
         // Batch store MCP server discovery results using DAO
-        McpReconResultDao.instance.insertManyServerResults(serverDataList);
+        McpReconResultDao.instance.insertMany(serverDataList);
     }
 }

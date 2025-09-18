@@ -687,7 +687,7 @@ public class DbActor extends DataActor {
         DbLayer.updateMcpReconRequestStatus(requestId, status, serversFound, startedAt, finishedAt);
     }
 
-    public void storeMcpReconResultsBatch(List<BasicDBObject> serverDataList) {
+    public void storeMcpReconResultsBatch(List<McpReconResult> serverDataList) {
         DbLayer.storeMcpReconResultsBatch(serverDataList);
     }
 
