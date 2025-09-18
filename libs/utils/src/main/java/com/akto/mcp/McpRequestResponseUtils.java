@@ -189,7 +189,7 @@ public final class McpRequestResponseUtils {
 
             // Generate one HttpResponseParams per tool by copying original and replacing
             // request with tools/call
-            List<HttpResponseParams> out = new java.util.ArrayList<>();
+            List<HttpResponseParams> out = new ArrayList<>();
             int id = 2;
             String url = responseParams.getRequestParams().getURL();
             url = url.replace(McpSchema.METHOD_TOOLS_LIST, McpSchema.METHOD_TOOLS_CALL);
@@ -233,7 +233,7 @@ public final class McpRequestResponseUtils {
             origReq.remove("responseHeaders");
             responseParams.setOrig(JSONUtils.getString(origReq));
         } catch (Exception e) {
-            logger.error("Error parsing original HTTP message as JSON. Not update sample data for MCP tools/call", e);
+            logger.error("Error parsing original HTTP message as JSON. Not updating sample data for MCP tools/call", e);
         }
     }
 
