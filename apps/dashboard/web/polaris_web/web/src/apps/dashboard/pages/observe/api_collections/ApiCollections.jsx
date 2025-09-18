@@ -657,11 +657,16 @@ function ApiCollections(props) {
         const csvFileName = definedTableTabs[selected] + " Collections.csv"
         const selectedResourcesSet = new Set(selectedResources)
         if (!loading) {
+            const wrapCsvValue = (value) => {
+                const s = (value === null || value === undefined) ? '-' : String(value);
+                return '"' + s.replace(/"/g, '""') + '"';
+            }
+
             let headerTextToValueMap = Object.fromEntries(headers.map(x => [x.text, x.isText === CellType.TEXT ? x.value : x.textValue]).filter(x => x[0]?.length > 0));
             let csv = Object.keys(headerTextToValueMap).join(",") + "\r\n"
             data['all'].forEach(i => {
                 if(selectedResources.length === 0 || selectedResourcesSet.has(i.id)){
-                    csv += Object.values(headerTextToValueMap).map(h => (i[h] || "-")).join(",") + "\r\n"
+                    csv += Object.values(headerTextToValueMap).map(h => wrapCsvValue(i[h])).join(",") + "\r\n"
                 }
             })
             let blob = new Blob([csv], {
