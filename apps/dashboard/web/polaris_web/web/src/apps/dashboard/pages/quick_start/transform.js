@@ -16,7 +16,7 @@ import GithubSource from "./components/GithubSource"
 import AktoJax from "./components/AktoJax"  
 import McpScan from "./components/McpScan" 
 import AiAgentScan from "./components/AiAgentScan"
-import { isApiSecurityCategory, isGenAISecurityCategory, isMCPSecurityCategory } from "../../../main/labelHelper"
+import { isApiSecurityCategory, isGenAISecurityCategory, isMCPSecurityCategory, isAgenticSecurityCategory } from "../../../main/labelHelper"
 import McpRecon from "./components/McpRecon"
 import McpProxy from "./components/McpProxy"
 import AwsLogAccountComponent from "./components/shared/AwsLogAccountComponent"
@@ -1390,6 +1390,13 @@ const quickStartFunc = {
             connectors["MCP Scan"] = mcpScan
         }
 
+        if(isAgenticSecurityCategory()){
+            // Agentic Security gets both MCP and AI Agent connectors
+            connectors["MCP Scan"] = mcpScan
+            connectors["AI Agent Security"] = aiAgentConnectors
+            connectors["AI Model Security"] = aiScanConnectors
+        }
+
         if(isApiSecurityCategory()){
             connectors["DAST"] = crawler
         }
@@ -1434,6 +1441,14 @@ const quickStartFunc = {
         ]
 
         if(isGenAISecurityCategory()){
+            connectorsList = connectorsList.concat([
+                geminiObj, openAIObj, claudeObj, deepseekObj, llamaObj, grokObj, customAIObj,
+                awsBedrockObj, azureAIFoundryObj, databricksObj, googleVertexAIObj, ibmWatsonxObj, customAgentObj
+            ])
+        }
+
+        if(isAgenticSecurityCategory()){
+            // Agentic Security gets all AI/ML connectors plus MCP connectors
             connectorsList = connectorsList.concat([
                 geminiObj, openAIObj, claudeObj, deepseekObj, llamaObj, grokObj, customAIObj,
                 awsBedrockObj, azureAIFoundryObj, databricksObj, googleVertexAIObj, ibmWatsonxObj, customAgentObj

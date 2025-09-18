@@ -450,6 +450,43 @@ export default function LeftNav() {
                     }
                 ]
             }] : []),
+            ...(dashboardCategory === "Agentic Security" ? [{
+                label: (
+                    <Text variant="bodyMd" fontWeight="medium">
+                        Agentic Guardrails
+                    </Text>
+                ),
+                icon: LockMajor,
+                onClick: () => {
+                    handleSelect("dashboard_agentic_guardrails");
+                    navigate("/dashboard/guardrails/activity");
+                    setActive("normal");
+                },
+                selected: leftNavSelected.includes("_guardrails"),
+                url: "#",
+                key: "11",
+                subNavigationItems: [
+                    {
+                        label: "Guardrails Activity",
+                        onClick: () => {
+                            navigate("/dashboard/guardrails/activity");
+                            handleSelect("dashboard_guardrails_activity");
+                            setActive("active");
+                        },
+                        selected: leftNavSelected === "dashboard_guardrails_activity",
+                    },
+                    {
+                        label: "Guardrails Policies",
+                        onClick: () => {
+                            navigate("/dashboard/guardrails/policies");
+                            handleSelect("dashboard_guardrails_policies");
+                            setActive("active");
+                        },
+                        selected:
+                            leftNavSelected === "dashboard_guardrails_policies",
+                    }
+                ]
+            }] : [])
         ]
 
         const exists = items.find(item => item.key === "quick_start")
