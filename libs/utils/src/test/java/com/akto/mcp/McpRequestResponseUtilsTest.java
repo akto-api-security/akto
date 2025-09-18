@@ -11,7 +11,6 @@ import com.akto.dto.HttpRequestParams;
 import com.akto.dto.HttpResponseParams;
 import com.akto.jsonrpc.JsonRpcUtils;
 import com.akto.mcp.McpRequestResponseUtils;
-import com.akto.mcp.McpJsonRpcModel;
 import com.akto.util.Pair;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -47,7 +46,8 @@ public class McpRequestResponseUtilsTest {
         String url = "http://localhost:8080/mcp?sessionId=abc123";
         HttpResponseParams responseParams = createHttpResponseParams(payload, url);
         HttpResponseParams afterJsonRpc = JsonRpcUtils.parseJsonRpcResponse(responseParams);
-        HttpResponseParams afterMcp = McpRequestResponseUtils.parseMcpResponseParams(afterJsonRpc);
+        java.util.List<HttpResponseParams> afterMcpList = McpRequestResponseUtils.parseMcpResponseParams(afterJsonRpc);
+        HttpResponseParams afterMcp = afterMcpList.get(0);
         URL finalUrl = new URL(afterMcp.getRequestParams().getURL());
         Assertions.assertTrue(finalUrl.getPath().endsWith("/tools/call/testTool"));
         Assertions.assertEquals("sessionId=abc123", finalUrl.getQuery());
@@ -59,7 +59,8 @@ public class McpRequestResponseUtilsTest {
         String url = "http://localhost:8080/mcp?token=xyz";
         HttpResponseParams responseParams = createHttpResponseParams(payload, url);
         HttpResponseParams afterJsonRpc = JsonRpcUtils.parseJsonRpcResponse(responseParams);
-        HttpResponseParams afterMcp = McpRequestResponseUtils.parseMcpResponseParams(afterJsonRpc);
+        java.util.List<HttpResponseParams> afterMcpList = McpRequestResponseUtils.parseMcpResponseParams(afterJsonRpc);
+        HttpResponseParams afterMcp = afterMcpList.get(0);
         URL finalUrl = new URL(afterMcp.getRequestParams().getURL());
         Assertions.assertTrue(finalUrl.getPath().endsWith("/tools/call"));
         Assertions.assertEquals("token=xyz", finalUrl.getQuery());
@@ -71,7 +72,8 @@ public class McpRequestResponseUtilsTest {
         String url = "http://localhost:8080/mcp?token=xyz";
         HttpResponseParams responseParams = createHttpResponseParams(payload, url);
         HttpResponseParams afterJsonRpc = JsonRpcUtils.parseJsonRpcResponse(responseParams);
-        HttpResponseParams afterMcp = McpRequestResponseUtils.parseMcpResponseParams(afterJsonRpc);
+        java.util.List<HttpResponseParams> afterMcpList = McpRequestResponseUtils.parseMcpResponseParams(afterJsonRpc);
+        HttpResponseParams afterMcp = afterMcpList.get(0);
         URL finalUrl = new URL(afterMcp.getRequestParams().getURL());
         Assertions.assertTrue(finalUrl.getPath().endsWith("/tools/call"));
         Assertions.assertEquals("token=xyz", finalUrl.getQuery());
@@ -83,7 +85,8 @@ public class McpRequestResponseUtilsTest {
         String url = "http://localhost:8080/mcp?foo=bar";
         HttpResponseParams responseParams = createHttpResponseParams(payload, url);
         HttpResponseParams afterJsonRpc = JsonRpcUtils.parseJsonRpcResponse(responseParams);
-        HttpResponseParams afterMcp = McpRequestResponseUtils.parseMcpResponseParams(afterJsonRpc);
+        java.util.List<HttpResponseParams> afterMcpList = McpRequestResponseUtils.parseMcpResponseParams(afterJsonRpc);
+        HttpResponseParams afterMcp = afterMcpList.get(0);
         URL finalUrl = new URL(afterMcp.getRequestParams().getURL());
         Assertions.assertTrue(finalUrl.getPath().endsWith("/tools/list"));
         Assertions.assertEquals("foo=bar", finalUrl.getQuery());
@@ -95,7 +98,8 @@ public class McpRequestResponseUtilsTest {
         String url = "http://localhost:8080/api?x=1";
         HttpResponseParams responseParams = createHttpResponseParams(payload, url);
         HttpResponseParams afterJsonRpc = JsonRpcUtils.parseJsonRpcResponse(responseParams);
-        HttpResponseParams afterMcp = McpRequestResponseUtils.parseMcpResponseParams(afterJsonRpc);
+        java.util.List<HttpResponseParams> afterMcpList = McpRequestResponseUtils.parseMcpResponseParams(afterJsonRpc);
+        HttpResponseParams afterMcp = afterMcpList.get(0);
         URL finalUrl = new URL(afterMcp.getRequestParams().getURL());
         Assertions.assertTrue(finalUrl.getPath().endsWith("/other/method"));
         Assertions.assertEquals("x=1", finalUrl.getQuery());
@@ -112,7 +116,8 @@ public class McpRequestResponseUtilsTest {
         } catch (Exception e) {
             afterJsonRpc = responseParams;
         }
-        HttpResponseParams afterMcp = McpRequestResponseUtils.parseMcpResponseParams(afterJsonRpc);
+        java.util.List<HttpResponseParams> afterMcpList = McpRequestResponseUtils.parseMcpResponseParams(afterJsonRpc);
+        HttpResponseParams afterMcp = afterMcpList.get(0);
         Assertions.assertEquals(url, afterMcp.getRequestParams().getURL());
     }
 
@@ -125,7 +130,8 @@ public class McpRequestResponseUtilsTest {
         HttpResponseParams responseParams = new HttpResponseParams();
         responseParams.setRequestParams(reqParams);
         HttpResponseParams afterJsonRpc = JsonRpcUtils.parseJsonRpcResponse(responseParams);
-        HttpResponseParams afterMcp = McpRequestResponseUtils.parseMcpResponseParams(afterJsonRpc);
+        java.util.List<HttpResponseParams> afterMcpList = McpRequestResponseUtils.parseMcpResponseParams(afterJsonRpc);
+        HttpResponseParams afterMcp = afterMcpList.get(0);
         Assertions.assertEquals(url, afterMcp.getRequestParams().getURL());
     }
 
@@ -145,7 +151,8 @@ public class McpRequestResponseUtilsTest {
         String url = "http://localhost:8080/mcp";
         HttpResponseParams responseParams = createHttpResponseParams(payload, url);
         HttpResponseParams afterJsonRpc = JsonRpcUtils.parseJsonRpcResponse(responseParams);
-        HttpResponseParams afterMcp = McpRequestResponseUtils.parseMcpResponseParams(afterJsonRpc);
+        java.util.List<HttpResponseParams> afterMcpList = McpRequestResponseUtils.parseMcpResponseParams(afterJsonRpc);
+        HttpResponseParams afterMcp = afterMcpList.get(0);
         URL finalUrl = new URL(afterMcp.getRequestParams().getURL());
         Assertions.assertTrue(finalUrl.getPath().endsWith("/tools/call"));
     }
@@ -156,7 +163,8 @@ public class McpRequestResponseUtilsTest {
         String url = "http://localhost:8080/mcp";
         HttpResponseParams responseParams = createHttpResponseParams(payload, url);
         HttpResponseParams afterJsonRpc = JsonRpcUtils.parseJsonRpcResponse(responseParams);
-        HttpResponseParams afterMcp = McpRequestResponseUtils.parseMcpResponseParams(afterJsonRpc);
+        java.util.List<HttpResponseParams> afterMcpList = McpRequestResponseUtils.parseMcpResponseParams(afterJsonRpc);
+        HttpResponseParams afterMcp = afterMcpList.get(0);
         URL finalUrl = new URL(afterMcp.getRequestParams().getURL());
         Assertions.assertTrue(finalUrl.getPath().endsWith("/tools/call"));
     }
@@ -167,7 +175,8 @@ public class McpRequestResponseUtilsTest {
         String url = "http://localhost:8080/mcp/?foo=bar";
         HttpResponseParams responseParams = createHttpResponseParams(payload, url);
         HttpResponseParams afterJsonRpc = JsonRpcUtils.parseJsonRpcResponse(responseParams);
-        HttpResponseParams afterMcp = McpRequestResponseUtils.parseMcpResponseParams(afterJsonRpc);
+        java.util.List<HttpResponseParams> afterMcpList = McpRequestResponseUtils.parseMcpResponseParams(afterJsonRpc);
+        HttpResponseParams afterMcp = afterMcpList.get(0);
         URL finalUrl = new URL(afterMcp.getRequestParams().getURL());
         Assertions.assertTrue(finalUrl.getPath().endsWith("/tools/list"));
         Assertions.assertEquals("foo=bar", finalUrl.getQuery());
@@ -179,7 +188,8 @@ public class McpRequestResponseUtilsTest {
         String url = "http://localhost:8080/mcp%20space?foo=bar";
         HttpResponseParams responseParams = createHttpResponseParams(payload, url);
         HttpResponseParams afterJsonRpc = JsonRpcUtils.parseJsonRpcResponse(responseParams);
-        HttpResponseParams afterMcp = McpRequestResponseUtils.parseMcpResponseParams(afterJsonRpc);
+        java.util.List<HttpResponseParams> afterMcpList = McpRequestResponseUtils.parseMcpResponseParams(afterJsonRpc);
+        HttpResponseParams afterMcp = afterMcpList.get(0);
         URL finalUrl = new URL(afterMcp.getRequestParams().getURL());
         Assertions.assertTrue(finalUrl.getPath().contains("mcp%20space"));
         Assertions.assertTrue(finalUrl.getPath().endsWith("/tools/list"));
@@ -219,7 +229,8 @@ public class McpRequestResponseUtilsTest {
         String url = "http://localhost:8080/mcp?foo=bar&baz=qux";
         HttpResponseParams responseParams = createHttpResponseParams(payload, url);
         HttpResponseParams afterJsonRpc = JsonRpcUtils.parseJsonRpcResponse(responseParams);
-        HttpResponseParams afterMcp = McpRequestResponseUtils.parseMcpResponseParams(afterJsonRpc);
+        java.util.List<HttpResponseParams> afterMcpList = McpRequestResponseUtils.parseMcpResponseParams(afterJsonRpc);
+        HttpResponseParams afterMcp = afterMcpList.get(0);
         URL finalUrl = new URL(afterMcp.getRequestParams().getURL());
         Assertions.assertTrue(finalUrl.getPath().endsWith("/tools/call/testTool"));
         Assertions.assertEquals("foo=bar&baz=qux", finalUrl.getQuery());
@@ -231,7 +242,8 @@ public class McpRequestResponseUtilsTest {
         String url = "http://localhost:8080/mcp?foo=bar&baz=qux";
         HttpResponseParams responseParams = createHttpResponseParams(payload, url);
         HttpResponseParams afterJsonRpc = JsonRpcUtils.parseJsonRpcResponse(responseParams);
-        HttpResponseParams afterMcp = McpRequestResponseUtils.parseMcpResponseParams(afterJsonRpc);
+        java.util.List<HttpResponseParams> afterMcpList = McpRequestResponseUtils.parseMcpResponseParams(afterJsonRpc);
+        HttpResponseParams afterMcp = afterMcpList.get(0);
         URL finalUrl = new URL(afterMcp.getRequestParams().getURL());
         Assertions.assertTrue(finalUrl.getPath().endsWith("/tools/call"));
         Assertions.assertEquals("foo=bar&baz=qux", finalUrl.getQuery());
@@ -243,7 +255,8 @@ public class McpRequestResponseUtilsTest {
         String url = "http://localhost:8080/mcp?foo=bar&baz=qux";
         HttpResponseParams responseParams = createHttpResponseParams(payload, url);
         HttpResponseParams afterJsonRpc = JsonRpcUtils.parseJsonRpcResponse(responseParams);
-        HttpResponseParams afterMcp = McpRequestResponseUtils.parseMcpResponseParams(afterJsonRpc);
+        java.util.List<HttpResponseParams> afterMcpList = McpRequestResponseUtils.parseMcpResponseParams(afterJsonRpc);
+        HttpResponseParams afterMcp = afterMcpList.get(0);
         URL finalUrl = new URL(afterMcp.getRequestParams().getURL());
         Assertions.assertTrue(finalUrl.getPath().endsWith("/tools/list"));
         Assertions.assertEquals("foo=bar&baz=qux", finalUrl.getQuery());
@@ -255,7 +268,8 @@ public class McpRequestResponseUtilsTest {
         String url = "http://localhost:8080/api?foo=bar&baz=qux";
         HttpResponseParams responseParams = createHttpResponseParams(payload, url);
         HttpResponseParams afterJsonRpc = JsonRpcUtils.parseJsonRpcResponse(responseParams);
-        HttpResponseParams afterMcp = McpRequestResponseUtils.parseMcpResponseParams(afterJsonRpc);
+        java.util.List<HttpResponseParams> afterMcpList = McpRequestResponseUtils.parseMcpResponseParams(afterJsonRpc);
+        HttpResponseParams afterMcp = afterMcpList.get(0);
         URL finalUrl = new URL(afterMcp.getRequestParams().getURL());
         Assertions.assertTrue(finalUrl.getPath().endsWith("/other/method"));
         Assertions.assertEquals("foo=bar&baz=qux", finalUrl.getQuery());
@@ -272,7 +286,8 @@ public class McpRequestResponseUtilsTest {
         } catch (Exception e) {
             afterJsonRpc = responseParams;
         }
-        HttpResponseParams afterMcp = McpRequestResponseUtils.parseMcpResponseParams(afterJsonRpc);
+        java.util.List<HttpResponseParams> afterMcpList = McpRequestResponseUtils.parseMcpResponseParams(afterJsonRpc);
+        HttpResponseParams afterMcp = afterMcpList.get(0);
         URL finalUrl = new URL(afterMcp.getRequestParams().getURL());
         Assertions.assertEquals("foo=bar&baz=qux", finalUrl.getQuery());
     }
@@ -283,7 +298,8 @@ public class McpRequestResponseUtilsTest {
         String url = "http://localhost:8080/mcp%20space?foo=bar&baz=qux";
         HttpResponseParams responseParams = createHttpResponseParams(payload, url);
         HttpResponseParams afterJsonRpc = JsonRpcUtils.parseJsonRpcResponse(responseParams);
-        HttpResponseParams afterMcp = McpRequestResponseUtils.parseMcpResponseParams(afterJsonRpc);
+        java.util.List<HttpResponseParams> afterMcpList = McpRequestResponseUtils.parseMcpResponseParams(afterJsonRpc);
+        HttpResponseParams afterMcp = afterMcpList.get(0);
         URL finalUrl = new URL(afterMcp.getRequestParams().getURL());
         Assertions.assertTrue(finalUrl.getPath().contains("mcp%20space"));
         Assertions.assertTrue(finalUrl.getPath().endsWith("/tools/list"));
