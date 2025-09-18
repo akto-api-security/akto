@@ -187,6 +187,7 @@ function ThreatDetectionPage() {
             {detectedAt: -1},
             startTimestamp,
             endTimestamp,
+            [],
             2000
         );
         // Transform to match the mongoDB format
