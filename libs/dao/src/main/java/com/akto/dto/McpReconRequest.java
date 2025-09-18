@@ -3,7 +3,6 @@ package com.akto.dto;
 import lombok.Getter;
 import lombok.Setter;
 import org.bson.codecs.pojo.annotations.BsonId;
-import org.bson.codecs.pojo.annotations.BsonProperty;
 
 /**
  * DTO for MCP Recon Requests
@@ -17,25 +16,18 @@ public class McpReconRequest {
     @BsonId
     private String _id;  // MongoDB _id as String
 
-    @BsonProperty("account_id")
     private int accountId;
 
-    @BsonProperty("ip_range")
     private String ipRange;
 
-    @BsonProperty("started_at")
     private int startedAt;  // Unix timestamp
 
-    @BsonProperty("finished_at")
     private int finishedAt; // Unix timestamp
 
-    @BsonProperty("status")
     private String status;  // Pending, In Progress, Completed, Failed
 
-    @BsonProperty("servers_found")
     private int serversFound;
 
-    @BsonProperty("created_at")
     private int createdAt;  // Unix timestamp when request was created
 
     // Constructors

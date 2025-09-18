@@ -22,26 +22,12 @@ public class McpReconRequestDao extends AccountsContextDao<McpReconRequest> {
         return McpReconRequest.class;
     }
 
-    /**
-     * Create indexes for the collection
-     * Indexes on: ip_range, status, account_id, and compound indexes
-     */
-    public void createIndicesIfAbsent() {
-        // Single field indexes
-        MCollection.createIndexIfAbsent(getDBName(), getCollName(),
-                new String[] { Fields.IP_RANGE }, false);
-        MCollection.createIndexIfAbsent(getDBName(), getCollName(),
-                new String[] { Fields.STATUS }, false);
-        MCollection.createIndexIfAbsent(getDBName(), getCollName(),
-                new String[] { Fields.ACCOUNT_ID }, false);
 
-        // Compound indexes for common queries
+    public void createIndicesIfAbsent() {
+
         MCollection.createIndexIfAbsent(getDBName(), getCollName(),
-                new String[] { Fields.ACCOUNT_ID, Fields.STATUS }, false);
-        MCollection.createIndexIfAbsent(getDBName(), getCollName(),
-                new String[] { Fields.ACCOUNT_ID, Fields.IP_RANGE }, false);
-        MCollection.createIndexIfAbsent(getDBName(), getCollName(),
-                new String[] { Fields.STATUS, Fields.STARTED_AT }, false);
+                new String[] {  Fields.STATUS, Fields.ACCOUNT_ID }, false);
+
         MCollection.createIndexIfAbsent(getDBName(), getCollName(),
                 new String[] { Fields.ACCOUNT_ID, Fields.STATUS, Fields.CREATED_AT }, false);
     }
@@ -51,13 +37,13 @@ public class McpReconRequestDao extends AccountsContextDao<McpReconRequest> {
      */
     public static class Fields {
         public static final String ID = "_id";
-        public static final String ACCOUNT_ID = "account_id";
-        public static final String IP_RANGE = "ip_range";
+        public static final String ACCOUNT_ID = "accountId";
+        public static final String IP_RANGE = "ipRange";
         public static final String STATUS = "status";
-        public static final String STARTED_AT = "started_at";
-        public static final String FINISHED_AT = "finished_at";
-        public static final String CREATED_AT = "created_at";
-        public static final String TIMEOUT = "timeout";
+        public static final String STARTED_AT = "startedAt";
+        public static final String FINISHED_AT = "finishedAt";
+        public static final String CREATED_AT = "createdAt";
+        public static final String SERVERS_FOUND = "serversFound";
 
     }
 }

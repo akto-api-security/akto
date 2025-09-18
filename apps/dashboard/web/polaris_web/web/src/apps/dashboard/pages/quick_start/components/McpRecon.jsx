@@ -39,7 +39,6 @@ const McpRecon = () => {
         api.initiateMCPRecon(ipRange).then((res) => {
             func.setToast(true, false, "MCP Recon initiated successfully. Discovering and cataloging MCP servers in the specified IP range.")
         }).catch((err) => {
-            console.error("Error initiating MCP recon:", err)
             func.setToast(true, true, "Failed to initiate MCP reconnaissance. Please check your IP range and try again.")
         }).finally(() => {
             setLoading(false)
