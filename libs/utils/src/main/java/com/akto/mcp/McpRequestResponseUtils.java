@@ -30,8 +30,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import lombok.AccessLevel;
-import lombok.NoArgsConstructor;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 
@@ -155,7 +153,6 @@ public final class McpRequestResponseUtils {
 
     private static List<HttpResponseParams> handleToolsListForStreamableHttp(HttpResponseParams responseParams) {
         try {
-
             String responseBody = responseParams.getPayload();
             if (StringUtils.isEmpty(responseBody)) {
                 return Collections.singletonList(responseParams);
@@ -166,8 +163,14 @@ public final class McpRequestResponseUtils {
                 return Collections.singletonList(responseParams);
             }
 
-            JSONRPCResponse jsonRpcResponse = (JSONRPCResponse) McpSchema.deserializeJsonRpcMessage(OBJECT_MAPPER,
-                extractedData);
+            JSONRPCResponse jsonRpcResponse;
+            try {
+                jsonRpcResponse = (JSONRPCResponse) McpSchema.deserializeJsonRpcMessage(OBJECT_MAPPER,
+                    extractedData);
+            } catch (Exception e) {
+                logger.error("Error parsing tools list response as JSON-RPC. Skipping adding tools/call samples");
+                return Collections.singletonList(responseParams);
+            }
             if (jsonRpcResponse == null || jsonRpcResponse.getResult() == null) {
                 return Collections.singletonList(responseParams);
             }
