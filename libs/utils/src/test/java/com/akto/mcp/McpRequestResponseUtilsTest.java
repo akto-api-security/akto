@@ -305,4 +305,80 @@ public class McpRequestResponseUtilsTest {
         Assertions.assertTrue(finalUrl.getPath().endsWith("/tools/list"));
         Assertions.assertEquals("foo=bar&baz=qux", finalUrl.getQuery());
     }
+
+    @Test
+    public void testMcpToolsListWithResponsePayload() throws Exception {
+        String payload = "{ \"jsonrpc\": \"2.0\", \"method\": \"tools/list\", \"id\": 1 }";
+        String url = "http://localhost:8080/mcp";
+        HttpResponseParams responseParams = createHttpResponseParams(payload, url);
+        
+        // Set the response payload with 2 tools
+        String responsePayload = "data: {\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"tools\":[{\"name\":\"scan_running_hashes\",\"description\":\"Scan hashes from running processes using VirusTotal and return a summarized threat report.\",\"inputSchema\":{\"properties\":{},\"type\":\"object\"},\"outputSchema\":{\"properties\":{\"result\":{\"title\":\"Result\",\"type\":\"string\"}},\"required\":[\"result\"],\"title\":\"_WrappedResult\",\"type\":\"object\",\"x-fastmcp-wrap-result\":true}},{\"name\":\"example_usage\",\"description\":\"Example usage message for Claude users.\",\"inputSchema\":{\"properties\":{},\"type\":\"object\"},\"outputSchema\":{\"properties\":{\"result\":{\"title\":\"Result\",\"type\":\"string\"}},\"required\":[\"result\"],\"title\":\"_WrappedResult\",\"type\":\"object\",\"x-fastmcp-wrap-result\":true}}]}}";
+        responseParams.setPayload(responsePayload);
+        
+        HttpResponseParams afterJsonRpc = JsonRpcUtils.parseJsonRpcResponse(responseParams);
+        java.util.List<HttpResponseParams> afterMcpList = McpRequestResponseUtils.parseMcpResponseParams(afterJsonRpc);
+        
+        // Should return 3 items: original tools/list + 2 tools/call requests
+        Assertions.assertEquals(3, afterMcpList.size());
+        
+        // First item should be the original tools/list request
+        HttpResponseParams originalRequest = afterMcpList.get(0);
+        URL originalUrl = new URL(originalRequest.getRequestParams().getURL());
+        Assertions.assertTrue(originalUrl.getPath().endsWith("/tools/list"));
+        
+        // Next two items should be tools/call requests for each tool
+        HttpResponseParams firstToolCall = afterMcpList.get(1);
+        URL firstToolUrl = new URL(firstToolCall.getRequestParams().getURL());
+        Assertions.assertTrue(firstToolUrl.getPath().endsWith("/tools/call/scan_running_hashes"));
+        
+        HttpResponseParams secondToolCall = afterMcpList.get(2);
+        URL secondToolUrl = new URL(secondToolCall.getRequestParams().getURL());
+        Assertions.assertTrue(secondToolUrl.getPath().endsWith("/tools/call/example_usage"));
+    }
+
+    @Test
+    public void testMcpToolsCallNormalRequest() throws Exception {
+        // Mock DataActor to avoid NullPointerException during audit log insertion
+        com.akto.data_actor.DataActor mockDataActor = Mockito.mock(com.akto.data_actor.DataActor.class);
+        Mockito.doNothing().when(mockDataActor).insertMCPAuditDataLog(Mockito.any());
+        java.lang.reflect.Field field = com.akto.mcp.McpRequestResponseUtils.class.getDeclaredField("dataActor");
+        field.setAccessible(true);
+        field.set(null, mockDataActor);
+
+        String payload = "{ \"jsonrpc\": \"2.0\", \"method\": \"tools/call\", \"params\": { \"name\": \"testTool\" }, \"id\": 1 }";
+        String url = "http://localhost:8080/mcp";
+        HttpResponseParams responseParams = createHttpResponseParams(payload, url);
+        
+        HttpResponseParams afterJsonRpc = JsonRpcUtils.parseJsonRpcResponse(responseParams);
+        java.util.List<HttpResponseParams> afterMcpList = McpRequestResponseUtils.parseMcpResponseParams(afterJsonRpc);
+        
+        // Should return only 1 item for normal tools/call request
+        Assertions.assertEquals(1, afterMcpList.size());
+        
+        HttpResponseParams result = afterMcpList.get(0);
+        URL finalUrl = new URL(result.getRequestParams().getURL());
+        Assertions.assertTrue(finalUrl.getPath().endsWith("/tools/call/testTool"));
+    }
+
+    @Test
+    public void testMcpToolsListWithInvalidResponse() throws Exception {
+        String payload = "{ \"jsonrpc\": \"2.0\", \"method\": \"tools/list\", \"id\": 1 }";
+        String url = "http://localhost:8080/mcp";
+        HttpResponseParams responseParams = createHttpResponseParams(payload, url);
+        
+        // Set invalid response payload (malformed JSON)
+        String invalidResponsePayload = "data: {\"jsonrpc\":hnhn w\"2.0\",\"id\":1,\"result\":{\"tools\":[{\"name\":\"scan_running_hashes\",\"description\":\"Scan hashes from running processes using VirusTotal and return a summarized threat report.\",\"inputSchema\":{\"properties\":{},\"type\":\"object\"},\"outputSchema\":{\"properties\":{\"result\":{\"title\":\"Result\",\"type\":\"string\"}},\"required\":[\"result\"],\"title\":\"_WrappedResult\",\"type\":\"object\",\"x-fastmcp-wrap-result\":true}},{\"name\":\"example_usage\",\"description\":\"Example usage message for Claude users.\",\"inputSchema\":{\"properties\":{},\"type\":\"object\"},\"outputSchema\":{\"properties\":{\"result\":{\"title\":\"Result\",\"type\":\"string\"}},\"required\":[\"result\"],\"title\":\"_WrappedResult\",\"type\":\"object\",\"x-fastmcp-wrap-result\":true}}]}}";
+        responseParams.setPayload(invalidResponsePayload);
+        
+        HttpResponseParams afterJsonRpc = JsonRpcUtils.parseJsonRpcResponse(responseParams);
+        java.util.List<HttpResponseParams> afterMcpList = McpRequestResponseUtils.parseMcpResponseParams(afterJsonRpc);
+        
+        // Should return only 1 item (original tools/list request) when response is invalid
+        Assertions.assertEquals(1, afterMcpList.size());
+        
+        HttpResponseParams result = afterMcpList.get(0);
+        URL finalUrl = new URL(result.getRequestParams().getURL());
+        Assertions.assertTrue(finalUrl.getPath().endsWith("/tools/list"));
+    }
 }
