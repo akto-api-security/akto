@@ -1144,6 +1144,42 @@ public class Utils {
         return responseBuilder.toString();
     }
 
+    /**
+     * Strips Byte Order Mark (BOM) from the beginning of a string.
+     * Common BOMs include:
+     * - UTF-8 BOM: \uFEFF (EF BB BF in bytes)
+     * - UTF-16 BE BOM: \uFEFF
+     * - UTF-16 LE BOM: \uFFFE
+     *
+     * @param input The input string that may contain a BOM
+     * @return The string with BOM removed if present, otherwise the original string
+     */
+    public static String stripBOM(String input) {
+        if (input == null || input.isEmpty()) {
+            return input;
+        }
+
+        // Check for UTF-8 BOM (most common in SOAP/XML)
+        if (input.charAt(0) == '\uFEFF') {
+            return input.substring(1);
+        }
+
+        // Check for UTF-16 LE BOM
+        if (input.charAt(0) == '\uFFFE') {
+            return input.substring(1);
+        }
+
+        // Check for byte sequence representation (ï»¿ is the display of UTF-8 BOM)
+        if (input.length() >= 3 &&
+            input.charAt(0) == 'ï' &&
+            input.charAt(1) == '»' &&
+            input.charAt(2) == '¿') {
+            return input.substring(3);
+        }
+
+        return input;
+    }
+
     public final static String _MAGIC = "$magic";
     public final static String MAGIC_CONTEXT = "$magic_context";
 

@@ -201,6 +201,23 @@ const api = {
             data: {ipRange, authKey, authValue, dashboardUrl}
         })
     },
+
+    addAwsAccountIdsForApiGatewayLogging(awsAccountIds) {
+        return request({
+            url: '/api/addAwsAccountIdsForApiGatewayLogging',
+            method: 'post',
+            data: { awsAccountIds }
+        })
+    },
+
+    fetchAwsAccountIdsForApiGatewayLogging() {
+        return request({
+            url: '/api/fetchAwsAccountIdsForApiGatewayLogging',
+            method: 'post',
+            data: { }
+        })
+    },
+
 }
 
 export default api

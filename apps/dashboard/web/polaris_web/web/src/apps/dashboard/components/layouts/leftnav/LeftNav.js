@@ -359,7 +359,7 @@ export default function LeftNav() {
                         },
                     ],
                 }] : []),
-                ...(window?.STIGG_FEATURE_WISE_ALLOWED?.AI_AGENTS?.isGranted && dashboardCategory!=="MCP Security" ? [{
+                ...(window?.STIGG_FEATURE_WISE_ALLOWED?.AI_AGENTS?.isGranted && dashboardCategory==="API Security" ? [{
                 label: (
                     <Text variant="bodyMd" fontWeight="medium">
                         AI Agents
