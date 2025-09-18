@@ -9,9 +9,6 @@ import org.bson.types.ObjectId;
 @Getter
 public class McpReconRequest {
 
-    public static final String ID = "_id";
-    private ObjectId _id;  // MongoDB _id as String
-
     public static final String ACCOUNT_ID = "accountId";
     private int accountId;
 
@@ -38,15 +35,6 @@ public class McpReconRequest {
         // Default constructor
     }
 
-    public McpReconRequest(ObjectId id, int accountId, String ipRange, String status) {
-        this._id = id;
-        this.accountId = accountId;
-        this.ipRange = ipRange;
-        this.status = status;
-        this.startedAt = 0;
-        this.finishedAt = 0;
-    }
-
     public McpReconRequest(int accountId, String ipRange,String status, int createdAt) {
         this.accountId = accountId;
         this.ipRange = ipRange;
@@ -57,7 +45,6 @@ public class McpReconRequest {
     @Override
     public String toString() {
         return "McpReconRequest{" +
-                "id='" + _id + '\'' +
                 ", accountId=" + accountId +
                 ", ipRange='" + ipRange + '\'' +
                 ", startedAt=" + startedAt +

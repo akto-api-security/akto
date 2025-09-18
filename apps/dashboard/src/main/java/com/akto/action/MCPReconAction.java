@@ -34,8 +34,6 @@ public class MCPReconAction extends UserAction {
 
             // Insert the request into the mcp_recon_requests collection
             McpReconRequestDao.instance.insertOne(reconRequest);
-            this.requestId = String.valueOf(reconRequest.get_id());
-            loggerMaker.info("MCP Recon request created with ID: " + this.requestId, LogDb.DASHBOARD);
             return Action.SUCCESS.toUpperCase();
 
         } catch (Exception e) {
