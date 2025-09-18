@@ -48,19 +48,9 @@ func init() {
 
 	modelPath := filepath.Join(wd, modelRelPath)
 	tokenizerPath := filepath.Join(wd, tokenizerRelPath)
-	modelsDir := filepath.Join(wd, "mcp-threat/transformers/models/prompt-injection/onnx/")
-	fmt.Println("Models dir:", modelsDir)
 
-	// List files in modelsDir
-	files, err := os.ReadDir(modelsDir)
-	if err != nil {
-		fmt.Printf("Error reading models directory: %v\n", err)
-	} else {
-		fmt.Println("Files in models directory:")
-		for _, file := range files {
-			fmt.Printf("  - %s\n", file.Name())
-		}
-	}
+	listFilesInRelDir(wd, "mcp-threat/transformers/models/prompt-injection/onnx/")
+	listFilesInAbsDir("/usr/local/lib/")
 
 	fmt.Println("Model path:", modelPath)
 	fmt.Println("Tokenizer path:", tokenizerPath)
@@ -68,6 +58,25 @@ func init() {
 	detector, err = transformers.NewDetector(tokenizerPath, modelPath, getLibonnxRuntimePath())
 	if err != nil {
 		log.Printf("failed to create detector: %v", err)
+	}
+}
+
+func listFilesInRelDir(wd, dir string) {
+	absDir := filepath.Join(wd, dir)
+	listFilesInAbsDir(absDir)
+}
+
+func listFilesInAbsDir(absDir string) {
+	fmt.Println("Absolute dir:", absDir)
+	// List files in absDir
+	files, err := os.ReadDir(absDir)
+	if err != nil {
+		fmt.Printf("Error reading %s directory: %v\n", absDir, err)
+	} else {
+		fmt.Printf("Files in %s directory:\n", absDir)
+		for _, file := range files {
+			fmt.Printf("  - %s\n", file.Name())
+		}
 	}
 }
 
