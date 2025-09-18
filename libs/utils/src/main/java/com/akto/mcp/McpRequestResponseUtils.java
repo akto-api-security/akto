@@ -9,21 +9,36 @@ import com.akto.jsonrpc.JsonRpcUtils;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.mcp.McpJsonRpcModel.McpParams;
+import com.akto.mcp.McpSchema.JSONRPCResponse;
+import com.akto.mcp.McpSchema.JsonSchema;
+import com.akto.mcp.McpSchema.ListToolsResult;
+import com.akto.mcp.McpSchema.Tool;
 import com.akto.util.JSONUtils;
 import com.akto.util.Pair;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.module.SimpleModule;
+import io.swagger.oas.inflector.examples.ExampleBuilder;
+import io.swagger.oas.inflector.examples.models.Example;
+import io.swagger.oas.inflector.processors.JsonNodeExampleSerializer;
+import io.swagger.util.Json;
+import io.swagger.v3.oas.models.media.Schema;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 
 import static com.akto.util.Constants.AKTO_MCP_RESOURCES_TAG;
 import static com.akto.util.Constants.AKTO_MCP_TOOLS_TAG;
 
-@NoArgsConstructor(access = AccessLevel.PRIVATE)
+
 public final class McpRequestResponseUtils {
 
     private static final LoggerMaker logger = new LoggerMaker(McpRequestResponseUtils.class, LogDb.RUNTIME);
@@ -34,15 +49,23 @@ public final class McpRequestResponseUtils {
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
     private static DataActor dataActor = DataActorFactory.fetchInstance();
 
-    public static HttpResponseParams parseMcpResponseParams(HttpResponseParams responseParams) {
+    public static List<HttpResponseParams> parseMcpResponseParams(HttpResponseParams responseParams) {
         String requestPayload = responseParams.getRequestParams().getPayload();
 
         Pair<Boolean, McpJsonRpcModel> mcpRequest = isMcpRequest(responseParams);
         if (!mcpRequest.getFirst()) {
-            return responseParams;
+            return Arrays.asList(responseParams);
         }
+
         handleMcpMethodCall(mcpRequest.getSecond(), requestPayload, responseParams);
-        return responseParams;
+
+        List<HttpResponseParams> responseParamsList = new ArrayList<>();
+        responseParamsList.add(responseParams);
+        if (McpSchema.METHOD_TOOLS_LIST.equals(mcpRequest.getSecond().getMethod())) {
+            List<HttpResponseParams> expanded = handleToolsListForStreamableHttp(responseParams);
+            responseParamsList.addAll(expanded);
+        }
+        return responseParamsList;
     }
 
     public static Pair<Boolean, McpJsonRpcModel> isMcpRequest(HttpResponseParams responseParams) {
@@ -95,8 +118,8 @@ public final class McpRequestResponseUtils {
                         url = HttpResponseParams.addPathParamToUrl(url, params.getName());
                         String name = params.getName() != null ? params.getName() : "";
                         auditInfo = new McpAuditInfo(
-                                Context.now(), "", AKTO_MCP_TOOLS_TAG, 0,
-                                name, "", null, responseParams.getRequestParams().getApiCollectionId()
+                            Context.now(), "", AKTO_MCP_TOOLS_TAG, 0,
+                            name, "", null, responseParams.getRequestParams().getApiCollectionId()
 
                         );
                     }
@@ -107,8 +130,8 @@ public final class McpRequestResponseUtils {
                         url = HttpResponseParams.addPathParamToUrl(url, params.getUri());
                         String uri = params.getUri() != null ? params.getUri() : "";
                         auditInfo = new McpAuditInfo(
-                                Context.now(), "", AKTO_MCP_RESOURCES_TAG, 0,
-                                uri, "", null, responseParams.getRequestParams().getApiCollectionId()
+                            Context.now(), "", AKTO_MCP_RESOURCES_TAG, 0,
+                            uri, "", null, responseParams.getRequestParams().getApiCollectionId()
                         );
                     }
                     break;
@@ -128,5 +151,119 @@ public final class McpRequestResponseUtils {
             }
         }
         responseParams.getRequestParams().setUrl(url);
+    }
+
+    private static List<HttpResponseParams> handleToolsListForStreamableHttp(HttpResponseParams responseParams) {
+        try {
+
+            String responseBody = responseParams.getPayload();
+            if (StringUtils.isEmpty(responseBody)) {
+                return Collections.singletonList(responseParams);
+            }
+
+            String extractedData = extractDataFromResponse(responseBody);
+            logger.info("extractedData: {}", extractedData);
+            if (StringUtils.isEmpty(extractedData)) {
+                return Collections.singletonList(responseParams);
+            }
+
+            // Parse tools list result from extracted data
+            JSONRPCResponse jsonRpcResponse = (JSONRPCResponse) McpSchema.deserializeJsonRpcMessage(OBJECT_MAPPER,
+                extractedData);
+            if (jsonRpcResponse == null || jsonRpcResponse.getResult() == null) {
+                return Collections.singletonList(responseParams);
+            }
+
+            ListToolsResult toolsResult;
+            try {
+                toolsResult = JSONUtils.fromJson(jsonRpcResponse.getResult(), ListToolsResult.class);
+            } catch (Exception e) {
+                logger.error("Error parsing tools list result from extracted data", e);
+                return Collections.singletonList(responseParams);
+            }
+
+            if (toolsResult == null || CollectionUtils.isEmpty(toolsResult.getTools())) {
+                return Collections.singletonList(responseParams);
+            }
+
+            // Generate one HttpResponseParams per tool by copying original and replacing
+            // request with tools/call
+            List<HttpResponseParams> out = new java.util.ArrayList<>();
+            int id = 2;
+            String url = responseParams.getRequestParams().getURL();
+            url = url.replace(McpSchema.METHOD_TOOLS_LIST, McpSchema.METHOD_TOOLS_CALL);
+            for (Tool tool : toolsResult.getTools()) {
+                McpSchema.JSONRPCRequest newReq = new McpSchema.JSONRPCRequest(
+                    McpSchema.JSONRPC_VERSION,
+                    McpSchema.METHOD_TOOLS_CALL,
+                    id++,
+                    new McpSchema.CallToolRequest(tool.getName(), generateExampleArguments(tool.getInputSchema())));
+                String newReqString = JSONUtils.getString(newReq);
+                HttpResponseParams cloned = responseParams.copy();
+                cloned.getRequestParams().setUrl(url);
+                if (cloned.getRequestParams() != null) {
+                    cloned.getRequestParams().setPayload(newReqString);
+                }
+                // Clear response payload as this represents an inferred request to call the
+                // tool
+                cloned.setPayload("");
+                modifyOriginalHttpMessage(cloned, newReqString);
+                handleMcpMethodCall(new McpJsonRpcModel(
+                        McpSchema.JSONRPC_VERSION,
+                        McpSchema.METHOD_TOOLS_CALL,
+                        new McpParams(tool.getName(), null), String.valueOf(id)),
+                    cloned.getRequestParams().getPayload(),
+                    cloned);
+                out.add(cloned);
+            }
+            return out;
+        } catch (Exception e) {
+            logger.error("Error handling tools/list for streamable http", e);
+        }
+
+        return Collections.singletonList(responseParams);
+    }
+
+    private static void modifyOriginalHttpMessage(HttpResponseParams responseParams, String newRequestPayload) {
+        String origReqJson = responseParams.getOrig();
+        try {
+            Map<String, Object> origReq = JSONUtils.getMap(origReqJson);
+            origReq.put("requestPayload", newRequestPayload);
+            origReq.remove("responsePayload");
+            origReq.remove("responseHeaders");
+            responseParams.setOrig(JSONUtils.getString(origReq));
+        } catch (Exception e) {
+            logger.error("Error parsing original HTTP message as JSON. Not update sample data for MCP tools/call", e);
+        }
+    }
+
+    private static String extractDataFromResponse(String responseBody) {
+        try {
+            String[] lines = responseBody.split("\n");
+            for (String line : lines) {
+                if (line.startsWith("data:")) {
+                    return line.substring(5).trim();
+                }
+            }
+        } catch (Exception e) {
+            logger.error("Error extracting data from SSE response", e);
+        }
+        return null;
+    }
+
+    public static Map<String, Object> generateExampleArguments(JsonSchema inputSchema) {
+        if (inputSchema == null) {
+            return Collections.emptyMap();
+        }
+        try {
+            String inputSchemaJson = OBJECT_MAPPER.writeValueAsString(inputSchema);
+            Schema<?> openApiSchema = io.swagger.v3.core.util.Json.mapper().readValue(inputSchemaJson, Schema.class);
+            Example example = ExampleBuilder.fromSchema(openApiSchema, null);
+            Json.mapper().registerModule(new SimpleModule().addSerializer(new JsonNodeExampleSerializer()));
+            return JSONUtils.getMap(Json.pretty(example));
+        } catch (Exception e) {
+            logger.error("Failed to generate example arguments using OpenAPI ExampleBuilder", e);
+            return Collections.emptyMap();
+        }
     }
 }

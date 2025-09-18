@@ -37,7 +37,6 @@ import com.akto.test_editor.filter.data_operands_impl.ValidationResult;
 import com.akto.usage.OrgUtils;
 import com.akto.hybrid_runtime.APICatalogSync;
 import com.akto.hybrid_runtime.Main;
-import com.akto.hybrid_runtime.MergeLogicLocal;
 import com.akto.hybrid_runtime.URLAggregator;
 import com.akto.util.Pair;
 import com.akto.util.Constants;
@@ -50,7 +49,6 @@ import java.io.IOException;
 import java.util.*;
 import java.util.Map.Entry;
 import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -872,8 +870,8 @@ public class HttpCallParser {
             List<HttpResponseParams> responseParamsList = GraphQLUtils.getUtils().parseGraphqlResponseParam(httpResponseParam);
             if (responseParamsList.isEmpty()) {
                 HttpResponseParams jsonRpcResponse = JsonRpcUtils.parseJsonRpcResponse(httpResponseParam);
-                HttpResponseParams mcpResponseParams = McpRequestResponseUtils.parseMcpResponseParams(jsonRpcResponse);
-                filteredResponseParams.add(mcpResponseParams);
+                List<HttpResponseParams> mcpResponseParamsList = McpRequestResponseUtils.parseMcpResponseParams(jsonRpcResponse);
+                filteredResponseParams.addAll(mcpResponseParamsList);
             } else {
                 filteredResponseParams.addAll(responseParamsList);
                 loggerMaker.infoAndAddToDb("Adding " + responseParamsList.size() + "new graphql endpoints in inventory");

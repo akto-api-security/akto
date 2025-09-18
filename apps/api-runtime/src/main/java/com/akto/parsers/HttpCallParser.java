@@ -31,16 +31,12 @@ import com.akto.runtime.utils.Utils;
 import com.akto.test_editor.execution.VariableResolver;
 import com.akto.test_editor.filter.data_operands_impl.ValidationResult;
 import com.akto.usage.UsageMetricCalculator;
-import com.akto.util.JSONUtils;
 import com.akto.util.http_util.CoreHTTPClient;
 import com.akto.util.Constants;
 import com.akto.util.DbMode;
-import com.akto.util.HttpRequestResponseUtils;
-import com.google.gson.Gson;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.*;
 import okhttp3.*;
-import org.apache.commons.lang3.StringUtils;
 import org.bson.conversions.Bson;
 
 import java.io.IOException;
@@ -560,8 +556,8 @@ public class HttpCallParser {
             List<HttpResponseParams> responseParamsList = GraphQLUtils.getUtils().parseGraphqlResponseParam(httpResponseParam);
             if (responseParamsList.isEmpty()) {
                 HttpResponseParams jsonRpcResponse = JsonRpcUtils.parseJsonRpcResponse(httpResponseParam);
-                HttpResponseParams mcpResponseParams = McpRequestResponseUtils.parseMcpResponseParams(jsonRpcResponse);
-                filteredResponseParams.add(mcpResponseParams);
+                List<HttpResponseParams> mcpResponseParamsList = McpRequestResponseUtils.parseMcpResponseParams(jsonRpcResponse);
+                filteredResponseParams.addAll(mcpResponseParamsList);
             } else {
                 filteredResponseParams.addAll(responseParamsList);
                 loggerMaker.infoAndAddToDb("Adding " + responseParamsList.size() + "new graphql endpoints in invetory",LogDb.RUNTIME);
