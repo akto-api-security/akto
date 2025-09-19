@@ -1313,7 +1313,13 @@ public class ClientActor extends DataActor {
         OriginalHttpRequest request = new OriginalHttpRequest(url + "/fetchSetup", "", "GET", null, headers, "");
         try {
             OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
-            String responsePayload = response.getBody();
+            String responsePayload;
+            try {
+                responsePayload = response.getBody();
+            } catch (Exception e) {
+                responsePayload = "";
+                loggerMaker.errorAndAddToDb(e, "error getting response payload in fetchSetupObject " + e, LoggerMaker.LogDb.RUNTIME);
+            }
             if (response.getStatusCode() != 200 || responsePayload == null) {
                 loggerMaker.errorAndAddToDb("non 2xx response in updateCidrList", LoggerMaker.LogDb.RUNTIME);
                 return null;

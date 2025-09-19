@@ -50,9 +50,10 @@ public class InitializerListener implements ServletContextListener {
                     synchronized (IngestionAction.trafficDiscoveryQueue) {
                         int size = IngestionAction.trafficDiscoveryQueue.size()> processingQueueThreshold ? processingQueueThreshold : IngestionAction.trafficDiscoveryQueue.size();
                         for (int i = 0; i < size; i++) {
-                            toProcess.add(IngestionAction.trafficDiscoveryQueue.poll());
+                            HttpResponseParams poll = IngestionAction.trafficDiscoveryQueue.poll();
+                            if(poll == null) continue;
+                            toProcess.add(poll);
                             loggerMaker.info("Processing element " + (i + 1) + " from traffic discovery queue");
-                            IngestionAction.trafficDiscoveryQueue.remove(0); //Remove processed elements from the queue
                         }
                     }
                     com.akto.hybrid_runtime.Main.processData(toProcess);
