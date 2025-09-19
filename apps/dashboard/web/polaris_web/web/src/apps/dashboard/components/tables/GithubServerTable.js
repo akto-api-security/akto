@@ -57,15 +57,19 @@ function GithubServerTable(props) {
   const { selectedItems, selectItems, applyFilter } = useTable();
 
   const handleRemoveAppliedFilter = (key) => {
-    let temp = appliedFilters.filter((filter) => {
+    let temp = appliedFilters
+    temp = temp.filter((filter) => {
       return filter.key != key
+    })
+    props?.appliedFilters?.forEach((defaultAppliedFilter) => {
+      if (key === defaultAppliedFilter.key) {
+        temp.push(defaultAppliedFilter)
+      }
     })
     setAppliedFilters(temp);
 
-    // Create a deep copy to avoid mutation issues
-    let tempFilters = {...filtersMap}
     tempFilters[currentPageKey] = {
-      'filters': [...temp], // Ensure we copy the array
+      'filters': temp,
       'sort': pageFiltersMap?.sort || []
     }
     setFiltersMap(tempFilters)
@@ -73,11 +77,7 @@ function GithubServerTable(props) {
   
 
   const filterMode = (pageFiltersMap?.filters?.length > 0) ? IndexFiltersMode.Filtering : (props?.mode ? props.mode : IndexFiltersMode.Filtering)
-  const getCurrentPersistentFilters = () => {
-    const currentPageFilters = filtersMap[currentPageKey];
-    return tableFunc.mergeFilters(props.appliedFilters || [], (currentPageFilters?.filters || []),props.disambiguateLabel, handleRemoveAppliedFilter)
-  }
-  const initialStateFilters = getCurrentPersistentFilters()
+  const initialStateFilters = tableFunc.mergeFilters(props.appliedFilters || [], (pageFiltersMap?.filters || []),props.disambiguateLabel, handleRemoveAppliedFilter)
   const { mode, setMode } = useSetIndexFiltersMode(filterMode);
   const [sortSelected, setSortSelected] = useState(tableFunc.getInitialSortSelected(props.sortOptions, pageFiltersMap))
   const [data, setData] = useState([]);
@@ -113,8 +113,7 @@ function GithubServerTable(props) {
     }else{
       queryFilters = tableFunc.getFiltersMapFromUrl(decodeURIComponent(searchParams.get("filters") || ""), props?.disambiguateLabel, handleRemoveAppliedFilter, currentPageKey)
     }
-    const currentPersistentFilters = getCurrentPersistentFilters()
-    const currentFilters = tableFunc.mergeFilters(queryFilters, currentPersistentFilters, props?.disambiguateLabel, handleRemoveAppliedFilter)
+    const currentFilters = tableFunc.mergeFilters(queryFilters,initialStateFilters,props?.disambiguateLabel, handleRemoveAppliedFilter)
     setAppliedFilters((prev) => {
       if(func.deepComparison(prev, currentFilters)){
         return prev

@@ -293,7 +293,7 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh }) {
     // Validate that both URL and filterId filters are present for filter-based operations
     if (!currentFilters.url || currentFilters.url.length === 0 ||
         !currentFilters.latestAttack || currentFilters.latestAttack.length === 0) {
-      func.setToast(true, true, 'Both URL and Attack Type filters are required for filter-based operations. This ensures precise targeting of events.');
+      func.setToast(true, true, 'Both URL and Attack Type filters are required for filter-based operations.');
       return;
     }
 
@@ -327,7 +327,7 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh }) {
     // Validate that both URL and filterId filters are present for filter-based operations
     if (!currentFilters.url || currentFilters.url.length === 0 ||
         !currentFilters.latestAttack || currentFilters.latestAttack.length === 0) {
-      func.setToast(true, true, 'Both URL and Attack Type filters are required for filter-based operations. This ensures precise targeting of events.');
+      func.setToast(true, true, 'Both URL and Attack Type filters are required for filter-based operations.');
       return;
     }
 
@@ -362,7 +362,7 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh }) {
     // Validate that both URL and filterId filters are present for filter-based operations
     if (!currentFilters.url || currentFilters.url.length === 0 ||
         !currentFilters.latestAttack || currentFilters.latestAttack.length === 0) {
-      func.setToast(true, true, 'Both URL and Attack Type filters are required for filter-based operations. This ensures precise targeting of events.');
+      func.setToast(true, true, 'Both URL and Attack Type filters are required for filter-based operations.');
       return;
     }
 
@@ -424,7 +424,7 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh }) {
             if (useFilterBasedUpdate) {
               if (!currentFilters.url || currentFilters.url.length === 0 ||
                   !currentFilters.latestAttack || currentFilters.latestAttack.length === 0) {
-                func.setToast(true, true, 'Both URL and Attack Type filters are required for filter-based operations. This ensures precise targeting of events.');
+                func.setToast(true, true, 'Both URL and Attack Type filters are required for filter-based operations.');
                 return;
               }
               const confirmationMessage = `Are you sure you want to mark ${eventText} for review?`;
@@ -463,7 +463,7 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh }) {
             if (useFilterBasedUpdate) {
               if (!currentFilters.url || currentFilters.url.length === 0 ||
                   !currentFilters.latestAttack || currentFilters.latestAttack.length === 0) {
-                func.setToast(true, true, 'Both URL and Attack Type filters are required for filter-based operations. This ensures precise targeting of events.');
+                func.setToast(true, true, 'Both URL and Attack Type filters are required for filter-based operations.');
                 return;
               }
               const confirmationMessage = `Are you sure you want to remove ${eventText} from review?`;
@@ -502,7 +502,7 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh }) {
             if (useFilterBasedUpdate) {
               if (!currentFilters.url || currentFilters.url.length === 0 ||
                   !currentFilters.latestAttack || currentFilters.latestAttack.length === 0) {
-                func.setToast(true, true, 'Both URL and Attack Type filters are required for filter-based operations. This ensures precise targeting of events.');
+                func.setToast(true, true, 'Both URL and Attack Type filters are required for filter-based operations.');
                 return;
               }
               const confirmationMessage = `Are you sure you want to reactivate ${eventText}?`;
@@ -523,7 +523,7 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh }) {
           if (useFilterBasedUpdate) {
             if (!currentFilters.url || currentFilters.url.length === 0 ||
                 !currentFilters.latestAttack || currentFilters.latestAttack.length === 0) {
-              func.setToast(true, true, 'Both URL and Attack Type filters are required for filter-based operations. This ensures precise targeting of events.');
+              func.setToast(true, true, 'Both URL and Attack Type filters are required for filter-based operations.');
               return;
             }
             const confirmationMessage = `Are you sure you want to permanently delete ${eventText}? This action cannot be undone.`;
