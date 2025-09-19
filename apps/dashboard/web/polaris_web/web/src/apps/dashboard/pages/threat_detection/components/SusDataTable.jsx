@@ -119,186 +119,93 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh }) {
     },200)
   }
 
-  const handleBulkIgnore = async (selectedIds) => {
-    console.log("Selected IDs for ignore:", selectedIds);
-
-    if (!selectedIds || selectedIds.length === 0) {
-      console.error("No IDs selected for ignore");
-      func.setToast(true, true, 'No events selected');
-      return;
-    }
-
-    const validIds = selectedIds.filter(id => id != null && id !== '');
-    console.log("Valid IDs for ignore:", validIds);
-
-    if (validIds.length === 0) {
-      console.error("No valid IDs found");
-      func.setToast(true, true, 'No valid events selected');
-      return;
-    }
-
-    try {
-      const response = await threatDetectionRequests.bulkUpdateMaliciousEventStatus(validIds, 'IGNORED');
-      console.log("Ignore response:", response);
-      if (response?.updateSuccess) {
-        func.setToast(true, false, `${response.updatedCount || validIds.length} event${validIds.length === 1 ? '' : 's'} ignored successfully`);
-        if (triggerRefresh) {
-          triggerRefresh();
-        }
-      } else {
-        console.error("Failed to ignore events, response:", response);
-        func.setToast(true, true, `Failed to ignore events: ${response?.updateMessage || 'Unknown error'}`);
-      }
-    } catch (error) {
-      console.error("Error ignoring events - full error:", error);
-      func.setToast(true, true, 'Error ignoring events');
-    }
-  };
-
-  const handleBulkDelete = async (selectedIds) => {
-    console.log("Selected IDs for deletion:", selectedIds);
-
-    if (!selectedIds || selectedIds.length === 0) {
-      console.error("No IDs selected for deletion");
-      func.setToast(true, true, 'No events selected');
-      return;
-    }
-
-    const validIds = selectedIds.filter(id => id != null && id !== '');
-    console.log("Valid IDs for deletion:", validIds);
-
-    if (validIds.length === 0) {
-      console.error("No valid IDs found");
-      func.setToast(true, true, 'No valid events selected');
-      return;
-    }
-
-    try {
-      const response = await threatDetectionRequests.bulkDeleteMaliciousEvents(validIds);
-      console.log("Delete response:", response);
-      if (response?.deleteSuccess) {
-        func.setToast(true, false, `${response.deletedCount || validIds.length} event${validIds.length === 1 ? '' : 's'} deleted successfully`);
-        if (triggerRefresh) {
-          triggerRefresh();
-        }
-      } else {
-        console.error("Failed to delete events, response:", response);
-        func.setToast(true, true, `Failed to delete events: ${response?.deleteMessage || 'Unknown error'}`);
-      }
-    } catch (error) {
-      console.error("Error deleting events - full error:", error);
-      func.setToast(true, true, 'Error deleting events');
-    }
-  };
-
-  const handleBulkMarkForReview = async (selectedIds) => {
-    console.log("Selected IDs for review:", selectedIds);
-    // selectedIds are already the IDs, no need to map
-    
-    // Check if selectedIds is empty or has invalid values
-    if (!selectedIds || selectedIds.length === 0) {
-      console.error("No IDs selected for review");
-      func.setToast(true, true, 'No events selected');
-      return;
-    }
-    
-    // Filter out any null/undefined IDs
-    const validIds = selectedIds.filter(id => id != null && id !== '');
-    console.log("Valid IDs for review:", validIds);
-    
-    if (validIds.length === 0) {
-      console.error("No valid IDs found");
-      func.setToast(true, true, 'No valid events selected');
-      return;
-    }
-    
-    try {
-      const response = await threatDetectionRequests.bulkUpdateMaliciousEventStatus(validIds, 'UNDER_REVIEW');
-      console.log("Review response:", response);
-      if (response?.updateSuccess) {
-        func.setToast(true, false, `${response.updatedCount || validIds.length} event${validIds.length === 1 ? '' : 's'} marked for review successfully`);
-        // Trigger table refresh if callback provided
-        if (triggerRefresh) {
-          triggerRefresh();
-        }
-      } else {
-        console.error("Failed to mark events for review, response:", response);
-        func.setToast(true, true, `Failed to mark events for review: ${response?.updateMessage || 'Unknown error'}`);
-      }
-    } catch (error) {
-      console.error("Error marking events for review - full error:", error);
-      console.error("Error response:", error.response);
-      func.setToast(true, true, 'Error marking events for review');
-    }
-  };
-
-  const handleBulkRemoveFromReview = async (selectedIds) => {
-    console.log("Selected IDs for removing from review:", selectedIds);
-    // selectedIds are already the IDs, no need to map
-    try {
-      const response = await threatDetectionRequests.bulkUpdateMaliciousEventStatus(selectedIds, 'ACTIVE');
-      if (response?.updateSuccess) {
-        func.setToast(true, false, `${response.updatedCount || selectedIds.length} event${selectedIds.length === 1 ? '' : 's'} removed from review successfully`);
-        // Trigger table refresh if callback provided
-        if (triggerRefresh) {
-          triggerRefresh();
-        }
-      } else {
-        func.setToast(true, true, 'Failed to remove events from review');
-      }
-    } catch (error) {
-      console.error("Error removing events from review:", error);
-      func.setToast(true, true, 'Error removing events from review');
-    }
-  };
-
-  const handleIgnoreAllFiltered = async () => {
-    console.log("Ignoring all filtered events with filters:", currentFilters);
-
-    // Validate that both URL and filterId filters are present for ignore operation
+  // Helper function to validate filter requirements for bulk operations
+  const validateFiltersForBulkOperation = (operationType = 'operation') => {
     if (!currentFilters.url || currentFilters.url.length === 0 ||
         !currentFilters.latestAttack || currentFilters.latestAttack.length === 0) {
-      func.setToast(true, true, 'Both URL and Attack Type filters are required to ignore events. This prevents accidentally blocking too many future events.');
+      const message = operationType === 'ignore'
+        ? 'Both URL and Attack Type filters are required to ignore events. This prevents accidentally blocking too many future events.'
+        : 'Both URL and Attack Type filters are required for filter-based operations. This ensures precise targeting of events.';
+      func.setToast(true, true, message);
+      return false;
+    }
+    return true;
+  }
+
+  // Generic handler for bulk operations on selected IDs
+  const handleBulkOperation = async (selectedIds, operation, newState = null) => {
+    const actionLabels = {
+      ignore: { ing: 'ignoring', ed: 'ignored' },
+      delete: { ing: 'deleting', ed: 'deleted' },
+      markForReview: { ing: 'marking for review', ed: 'marked for review' },
+      removeFromReview: { ing: 'removing from review', ed: 'removed from review' }
+    };
+
+    const label = actionLabels[operation];
+    console.log(`Selected IDs for ${label.ing}:`, selectedIds);
+
+    if (!selectedIds || selectedIds.length === 0) {
+      console.error(`No IDs selected for ${label.ing}`);
+      func.setToast(true, true, 'No events selected');
+      return;
+    }
+
+    const validIds = selectedIds.filter(id => id != null && id !== '');
+    console.log(`Valid IDs for ${label.ing}:`, validIds);
+
+    if (validIds.length === 0) {
+      console.error("No valid IDs found");
+      func.setToast(true, true, 'No valid events selected');
       return;
     }
 
     try {
-      const response = await threatDetectionRequests.bulkUpdateFilteredEvents(
-        currentFilters.actor || [],
-        currentFilters.url || [],
-        currentFilters.type || [],
-        currentFilters.latestAttack || [],
-        startTimestamp,
-        endTimestamp,
-        currentTab.toUpperCase(),
-        'IGNORED'
-      );
-      if (response?.updateSuccess) {
-        func.setToast(true, false, `${response.updatedCount || 0} events ignored successfully`);
+      let response;
+      if (operation === 'delete') {
+        response = await threatDetectionRequests.bulkDeleteMaliciousEvents(validIds);
+      } else {
+        response = await threatDetectionRequests.bulkUpdateMaliciousEventStatus(validIds, newState);
+      }
+
+      console.log(`${operation} response:`, response);
+      const isSuccess = operation === 'delete' ? response?.deleteSuccess : response?.updateSuccess;
+      const count = operation === 'delete' ? response?.deletedCount : response?.updatedCount;
+      const errorMessage = operation === 'delete' ? response?.deleteMessage : response?.updateMessage;
+
+      if (isSuccess) {
+        func.setToast(true, false, `${count || validIds.length} event${validIds.length === 1 ? '' : 's'} ${label.ed} successfully`);
         if (triggerRefresh) {
           triggerRefresh();
         }
       } else {
-        func.setToast(true, true, 'Failed to ignore filtered events');
+        console.error(`Failed to ${operation} events, response:`, response);
+        func.setToast(true, true, `Failed to ${operation} events: ${errorMessage || 'Unknown error'}`);
       }
     } catch (error) {
-      console.error("Error ignoring filtered events:", error);
-      func.setToast(true, true, 'Error ignoring filtered events');
+      console.error(`Error ${label.ing} events - full error:`, error);
+      func.setToast(true, true, `Error ${label.ing} events`);
     }
-  };
+  }
 
-  const handleDeleteAllFiltered = async () => {
-    console.log("Deleting all filtered events with filters:", currentFilters);
+  // Generic handler for filtered bulk operations
+  const handleFilteredOperation = async (operation, newState = null) => {
+    const actionLabels = {
+      ignore: { ing: 'ignoring', ed: 'ignored' },
+      delete: { ing: 'deleting', ed: 'deleted' },
+      markForReview: { ing: 'marking for review', ed: 'marked for review' },
+      removeFromReview: { ing: 'removing from review', ed: 'removed from review' }
+    };
 
-    // Validate that both URL and filterId filters are present for filter-based operations
-    if (!currentFilters.url || currentFilters.url.length === 0 ||
-        !currentFilters.latestAttack || currentFilters.latestAttack.length === 0) {
-      func.setToast(true, true, 'Both URL and Attack Type filters are required for filter-based operations.');
-      return;
-    }
+    const label = actionLabels[operation];
+    console.log(`${label.ing} all filtered events with filters:`, currentFilters);
+
+    // Validate filters
+    const validationType = operation === 'ignore' ? 'ignore' : undefined;
+    if (!validateFiltersForBulkOperation(validationType)) return;
 
     try {
-      const response = await threatDetectionRequests.bulkDeleteFilteredEvents(
+      let response;
+      const filterParams = [
         currentFilters.actor || [],
         currentFilters.url || [],
         currentFilters.type || [],
@@ -306,90 +213,43 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh }) {
         startTimestamp,
         endTimestamp,
         currentTab.toUpperCase()
-      );
-      if (response?.deleteSuccess) {
-        func.setToast(true, false, `${response.deletedCount || 0} events deleted successfully`);
+      ];
+
+      if (operation === 'delete') {
+        response = await threatDetectionRequests.bulkDeleteFilteredEvents(...filterParams);
+      } else {
+        response = await threatDetectionRequests.bulkUpdateFilteredEvents(...filterParams, newState);
+      }
+
+      const isSuccess = operation === 'delete' ? response?.deleteSuccess : response?.updateSuccess;
+      const count = operation === 'delete' ? response?.deletedCount : response?.updatedCount;
+
+      if (isSuccess) {
+        func.setToast(true, false, `${count || 0} events ${label.ed} successfully`);
         if (triggerRefresh) {
           triggerRefresh();
         }
       } else {
-        func.setToast(true, true, 'Failed to delete filtered events');
+        func.setToast(true, true, `Failed to ${operation === 'delete' ? 'delete' : operation} filtered events`);
       }
     } catch (error) {
-      console.error("Error deleting filtered events:", error);
-      func.setToast(true, true, 'Error deleting filtered events');
+      console.error(`Error ${label.ing} filtered events:`, error);
+      func.setToast(true, true, `Error ${label.ing} filtered events`);
     }
-  };
+  }
 
-  const handleMarkAllFilteredForReview = async () => {
-    console.log("Marking all filtered events for review with filters:", currentFilters);
+  // Simplified handler functions using the generic handlers
+  const handleBulkIgnore = (selectedIds) => handleBulkOperation(selectedIds, 'ignore', 'IGNORED');
+  const handleBulkDelete = (selectedIds) => handleBulkOperation(selectedIds, 'delete');
+  const handleBulkMarkForReview = (selectedIds) => handleBulkOperation(selectedIds, 'markForReview', 'UNDER_REVIEW');
+  const handleBulkRemoveFromReview = (selectedIds) => handleBulkOperation(selectedIds, 'removeFromReview', 'ACTIVE');
 
-    // Validate that both URL and filterId filters are present for filter-based operations
-    if (!currentFilters.url || currentFilters.url.length === 0 ||
-        !currentFilters.latestAttack || currentFilters.latestAttack.length === 0) {
-      func.setToast(true, true, 'Both URL and Attack Type filters are required for filter-based operations.');
-      return;
-    }
+  // Simplified filtered operation handlers
+  const handleIgnoreAllFiltered = () => handleFilteredOperation('ignore', 'IGNORED');
+  const handleDeleteAllFiltered = () => handleFilteredOperation('delete');
+  const handleMarkAllFilteredForReview = () => handleFilteredOperation('markForReview', 'UNDER_REVIEW');
+  const handleRemoveAllFilteredFromReview = () => handleFilteredOperation('removeFromReview', 'ACTIVE');
 
-    try {
-      const response = await threatDetectionRequests.bulkUpdateFilteredEvents(
-        currentFilters.actor || [],
-        currentFilters.url || [],
-        currentFilters.type || [],
-        currentFilters.latestAttack || [],
-        startTimestamp,
-        endTimestamp,
-        currentTab.toUpperCase(),
-        'UNDER_REVIEW'
-      );
-      if (response?.updateSuccess) {
-        func.setToast(true, false, `${response.updatedCount || 0} events marked for review successfully`);
-        if (triggerRefresh) {
-          triggerRefresh();
-        }
-      } else {
-        func.setToast(true, true, 'Failed to mark filtered events for review');
-      }
-    } catch (error) {
-      console.error("Error marking filtered events for review:", error);
-      func.setToast(true, true, 'Error marking filtered events for review');
-    }
-  };
-
-  const handleRemoveAllFilteredFromReview = async () => {
-    console.log("Removing all filtered events from review with filters:", currentFilters);
-
-    // Validate that both URL and filterId filters are present for filter-based operations
-    if (!currentFilters.url || currentFilters.url.length === 0 ||
-        !currentFilters.latestAttack || currentFilters.latestAttack.length === 0) {
-      func.setToast(true, true, 'Both URL and Attack Type filters are required for filter-based operations.');
-      return;
-    }
-
-    try {
-      const response = await threatDetectionRequests.bulkUpdateFilteredEvents(
-        currentFilters.actor || [],
-        currentFilters.url || [],
-        currentFilters.type || [],
-        currentFilters.latestAttack || [],
-        startTimestamp,
-        endTimestamp,
-        currentTab.toUpperCase(),
-        'ACTIVE'
-      );
-      if (response?.updateSuccess) {
-        func.setToast(true, false, `${response.updatedCount || 0} events removed from review successfully`);
-        if (triggerRefresh) {
-          triggerRefresh();
-        }
-      } else {
-        func.setToast(true, true, 'Failed to remove filtered events from review');
-      }
-    } catch (error) {
-      console.error("Error removing filtered events from review:", error);
-      func.setToast(true, true, 'Error removing filtered events from review');
-    }
-  };
 
   const promotedBulkActions = (selectedIds) => {
     console.log("promotedBulkActions called with IDs:", selectedIds);
@@ -422,11 +282,7 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh }) {
           onAction: () => {
             // Validate filters for filter-based operations
             if (useFilterBasedUpdate) {
-              if (!currentFilters.url || currentFilters.url.length === 0 ||
-                  !currentFilters.latestAttack || currentFilters.latestAttack.length === 0) {
-                func.setToast(true, true, 'Both URL and Attack Type filters are required for filter-based operations.');
-                return;
-              }
+              if (!validateFiltersForBulkOperation()) return;
               const confirmationMessage = `Are you sure you want to mark ${eventText} for review?`;
               func.showConfirmationModal(confirmationMessage, "Mark for Review", () => handleMarkAllFilteredForReview());
             } else {
@@ -441,11 +297,7 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh }) {
           onAction: () => {
             // Validate filters for ignore operation when using filter-based update
             if (useFilterBasedUpdate) {
-              if (!currentFilters.url || currentFilters.url.length === 0 ||
-                  !currentFilters.latestAttack || currentFilters.latestAttack.length === 0) {
-                func.setToast(true, true, 'Both URL and Attack Type filters are required to ignore events. This prevents accidentally blocking too many future events.');
-                return;
-              }
+              if (!validateFiltersForBulkOperation('ignore')) return;
               const confirmationMessage = `Are you sure you want to ignore ${eventText}?\n\nNote: Future events matching these URL and Attack Type combinations will be automatically blocked.`;
               func.showConfirmationModal(confirmationMessage, "Ignore", () => handleIgnoreAllFiltered());
             } else {
@@ -461,11 +313,7 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh }) {
           onAction: () => {
             // Validate filters for filter-based operations
             if (useFilterBasedUpdate) {
-              if (!currentFilters.url || currentFilters.url.length === 0 ||
-                  !currentFilters.latestAttack || currentFilters.latestAttack.length === 0) {
-                func.setToast(true, true, 'Both URL and Attack Type filters are required for filter-based operations.');
-                return;
-              }
+              if (!validateFiltersForBulkOperation()) return;
               const confirmationMessage = `Are you sure you want to remove ${eventText} from review?`;
               func.showConfirmationModal(confirmationMessage, "Remove from Review", () => handleRemoveAllFilteredFromReview());
             } else {
@@ -480,11 +328,7 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh }) {
           onAction: () => {
             // Validate filters for ignore operation when using filter-based update
             if (useFilterBasedUpdate) {
-              if (!currentFilters.url || currentFilters.url.length === 0 ||
-                  !currentFilters.latestAttack || currentFilters.latestAttack.length === 0) {
-                func.setToast(true, true, 'Both URL and Attack Type filters are required to ignore events. This prevents accidentally blocking too many future events.');
-                return;
-              }
+              if (!validateFiltersForBulkOperation('ignore')) return;
               const confirmationMessage = `Are you sure you want to ignore ${eventText}?\n\nNote: Future events matching these URL and Attack Type combinations will be automatically blocked.`;
               func.showConfirmationModal(confirmationMessage, "Ignore", () => handleIgnoreAllFiltered());
             } else {
@@ -500,11 +344,7 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh }) {
           onAction: () => {
             // Validate filters for filter-based operations
             if (useFilterBasedUpdate) {
-              if (!currentFilters.url || currentFilters.url.length === 0 ||
-                  !currentFilters.latestAttack || currentFilters.latestAttack.length === 0) {
-                func.setToast(true, true, 'Both URL and Attack Type filters are required for filter-based operations.');
-                return;
-              }
+              if (!validateFiltersForBulkOperation()) return;
               const confirmationMessage = `Are you sure you want to reactivate ${eventText}?`;
               func.showConfirmationModal(confirmationMessage, "Reactivate", () => handleRemoveAllFilteredFromReview());
             } else {
@@ -521,11 +361,7 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh }) {
         onAction: () => {
           // Validate filters for filter-based operations
           if (useFilterBasedUpdate) {
-            if (!currentFilters.url || currentFilters.url.length === 0 ||
-                !currentFilters.latestAttack || currentFilters.latestAttack.length === 0) {
-              func.setToast(true, true, 'Both URL and Attack Type filters are required for filter-based operations.');
-              return;
-            }
+            if (!validateFiltersForBulkOperation()) return;
             const confirmationMessage = `Are you sure you want to permanently delete ${eventText}? This action cannot be undone.`;
             func.showConfirmationModal(confirmationMessage, "Delete", () => handleDeleteAllFiltered());
           } else {
@@ -545,10 +381,10 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh }) {
     sortKey,
     sortOrder,
     skip,
-    limit,
+    _limit,
     filters,
-    filterOperators,
-    queryValue
+    _filterOperators,
+    _queryValue
   ) {
     setLoading(true);
     let sourceIpsFilter = [],
