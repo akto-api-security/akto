@@ -132,7 +132,8 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
                             smr.getSubCategory(),
                             smr.getEventTypeVal(),
                             smr.getPayload(),
-                            smr.getMetadata()))
+                            smr.getMetadata(),
+                            smr.getSuccessful()))
                     .collect(Collectors.toList());
                 this.total = m.getTotal();
               });

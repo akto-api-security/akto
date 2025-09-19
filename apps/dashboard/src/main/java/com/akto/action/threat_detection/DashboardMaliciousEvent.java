@@ -20,6 +20,7 @@ public class DashboardMaliciousEvent {
   private String eventType;
   private String payload;
   private String metadata;
+  private boolean successful;
 
   public DashboardMaliciousEvent() {}
 
@@ -39,7 +40,8 @@ public class DashboardMaliciousEvent {
       String subCategory,
       String eventType,
       String payload,
-      String metadata) {
+      String metadata,
+      boolean successful) {
     this.id = id;
     this.actor = actor;
     this.filter_id = filter;
@@ -56,6 +58,7 @@ public class DashboardMaliciousEvent {
     this.eventType = eventType;
     this.payload = payload;
     this.metadata = metadata;
+    this.successful = successful;
   }
 
   public String getId() {
@@ -184,6 +187,14 @@ public class DashboardMaliciousEvent {
 
   public void setMetadata(String metadata) {
     this.metadata = metadata;
+  }
+
+  public boolean isSuccessful() {
+    return successful;
+  }
+
+  public void setSuccessful(boolean successful) {
+    this.successful = successful;
   }
 
 }
