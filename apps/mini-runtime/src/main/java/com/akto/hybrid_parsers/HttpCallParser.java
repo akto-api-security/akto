@@ -23,6 +23,7 @@ import com.akto.dto.traffic.CollectionTags;
 import com.akto.dto.traffic_metrics.TrafficMetrics;
 import com.akto.dto.type.URLMethods.Method;
 import com.akto.dto.usage.MetricTypes;
+import com.akto.gen_ai.GenAiCollectionUtils;
 import com.akto.graphql.GraphQLUtils;
 import com.akto.jsonrpc.JsonRpcUtils;
 import com.akto.log.LoggerMaker;
@@ -606,13 +607,27 @@ public class HttpCallParser {
         this.apiCollectionIdTagsSyncTimestampMap.put(apiCollectionId, Context.now());
 
         if (CollectionUtils.isEmpty(apiCollection.getTagsList()) || apiCollection.getTagsList().stream()
-            .noneMatch(t -> "mcp-server".equals(t.getKeyName()))) {
+            .noneMatch(t -> Constants.AKTO_MCP_SERVER_TAG.equals(t.getKeyName()))) {
             Optional<CollectionTags> mcpServerTagOpt = getMcpServerTag(httpResponseParams);
             if (tagsList == null) {
                 tagsList = new ArrayList<>();
             }
             if (mcpServerTagOpt.isPresent()) {
                 tagsList.add(mcpServerTagOpt.get());
+            }
+        }
+
+        if (CollectionUtils.isEmpty(apiCollection.getTagsList()) || apiCollection.getTagsList().stream()
+                .noneMatch(t -> Constants.AKTO_GEN_AI_TAG.equals(t.getKeyName()))) {
+            Pair<Boolean, String> llmCollectionTag = GenAiCollectionUtils.checkAndTagLLMCollection(httpResponseParams);
+            if (tagsList == null) {
+                tagsList = new ArrayList<>();
+            }
+            if (llmCollectionTag.getFirst()) {
+                tagsList.add(new CollectionTags(Context.now(),
+                        Constants.AKTO_GEN_AI_TAG,
+                        llmCollectionTag.getSecond(),
+                        TagSource.KUBERNETES));
             }
         }
 
@@ -956,7 +971,7 @@ public class HttpCallParser {
 
     private Optional<CollectionTags> getMcpServerTag(HttpResponseParams responseParams) {
         if (McpRequestResponseUtils.isMcpRequest(responseParams).getFirst()) {
-            return Optional.of(new CollectionTags(Context.now(), "mcp-server", "MCP Server", TagSource.KUBERNETES));
+            return Optional.of(new CollectionTags(Context.now(), Constants.AKTO_MCP_SERVER_TAG, "MCP Server", TagSource.KUBERNETES));
         }
         return Optional.empty();
     }
