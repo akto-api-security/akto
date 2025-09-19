@@ -385,7 +385,7 @@ function TestRunResultFlyout(props) {
                             try {
                                 // Minimal payload structure for optimal LLM analysis
                                 const testResultData = {
-                                    testResultId: selectedTestRunResult?.id ? `${selectedTestRunResult.id}_${idx}` : null,
+                                    resultId: selectedTestRunResult?.id ? `${selectedTestRunResult.id}_${idx}` : null,
                                     testContext: {
                                         category: selectedTestRunResult?.testCategoryId || selectedTestRunResult?.testCategory || 'UNKNOWN',
                                         description: issueDetails?.description || selectedTestRunResult?.name || '',
@@ -410,7 +410,8 @@ function TestRunResultFlyout(props) {
                                 };
                             
                                 const response = await testingApi.analyzeVulnerability(
-                                    JSON.stringify(testResultData)
+                                    JSON.stringify(testResultData),
+                                    'redteaming'
                                 );
 
                                 const analysisData = response.analysisResult || response;
