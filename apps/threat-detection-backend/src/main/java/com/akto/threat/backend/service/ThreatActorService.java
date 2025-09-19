@@ -201,61 +201,26 @@ public class ThreatActorService {
                     .cursor()) {
                 while (cursor2.hasNext()) {
                     Document doc2 = cursor2.next();
-                    String url = doc2.getString("latestApiEndpoint");
-                    String subCategory = doc2.getString("filterId");
-                    String severity = doc2.getString("severity");
-                    String method = doc2.getString("latestApiMethod");
-                    Long detectedAt = doc2.getLong("detectedAt");
-                    
-                    // Skip if essential fields are null
-                    if (url == null || detectedAt == null) {
-                        continue;
-                    }
-                    
-                    ActivityData.Builder activityBuilder = ActivityData.newBuilder()
-                        .setUrl(url)
-                        .setDetectedAt(detectedAt);
-                    
-                    if (subCategory != null) {
-                        activityBuilder.setSubCategory(subCategory);
-                    }
-                    if (severity != null) {
-                        activityBuilder.setSeverity(severity);
-                    }
-                    if (method != null) {
-                        activityBuilder.setMethod(method);
-                    }
-                    
-                    activityDataList.add(activityBuilder.build());
+                    activityDataList.add(ActivityData.newBuilder()
+                        .setUrl(doc2.getString("latestApiEndpoint"))
+                        .setDetectedAt(doc2.getLong("detectedAt"))
+                        .setSubCategory(doc2.getString("filterId"))
+                        .setSeverity(doc2.getString("severity"))
+                        .setMethod(doc2.getString("latestApiMethod"))
+                        .build());
                 }
             }
 
-            ListThreatActorResponse.ThreatActor.Builder actorBuilder = ListThreatActorResponse.ThreatActor.newBuilder()
-                .setId(actorId != null ? actorId : "");
-                
-            String endpoint = doc.getString("latestApiEndpoint");
-            if (endpoint != null) actorBuilder.setLatestApiEndpoint(endpoint);
-            
-            String method = doc.getString("latestApiMethod");
-            if (method != null) actorBuilder.setLatestApiMethod(method);
-            
-            String ip = doc.getString("latestApiIp");
-            if (ip != null) actorBuilder.setLatestApiIp(ip);
-            
-            Long discoveredAt = doc.getLong("discoveredAt");
-            if (discoveredAt != null) actorBuilder.setDiscoveredAt(discoveredAt);
-            
-            String country = doc.getString("country");
-            if (country != null) actorBuilder.setCountry(country);
-            
-            String latestSubCategory = doc.getString("latestSubCategory");
-            if (latestSubCategory != null) actorBuilder.setLatestSubcategory(latestSubCategory);
-            
-            if (!activityDataList.isEmpty()) {
-                actorBuilder.addAllActivityData(activityDataList);
-            }
-            
-            actors.add(actorBuilder.build());
+            actors.add(ListThreatActorResponse.ThreatActor.newBuilder()
+                .setId(actorId)
+                .setLatestApiEndpoint(doc.getString("latestApiEndpoint"))
+                .setLatestApiMethod(doc.getString("latestApiMethod"))
+                .setLatestApiIp(doc.getString("latestApiIp"))
+                .setDiscoveredAt(doc.getLong("discoveredAt"))
+                .setCountry(doc.getString("country"))
+                .setLatestSubcategory(doc.getString("latestSubCategory"))
+                .addAllActivityData(activityDataList)
+                .build());
         }
 
         return ListThreatActorResponse.newBuilder().addAllActors(actors).setTotal(total).build();

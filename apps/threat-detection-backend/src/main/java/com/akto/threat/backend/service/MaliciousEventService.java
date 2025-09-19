@@ -265,12 +265,7 @@ public class MaliciousEventService {
               .getCollection(
                   MongoDBCollection.ThreatDetection.MALICIOUS_EVENTS, MaliciousEventModel.class);
       
-      // First get the event to retrieve URL and filterId for cache management
-      // Try both id and _id fields
-      MaliciousEventModel event = coll.find(Filters.eq("id", eventId)).first();
-      if (event == null) {
-        event = coll.find(Filters.eq("_id", eventId)).first();
-      }
+      MaliciousEventModel event = coll.find(Filters.eq("_id", eventId)).first();
       if (event == null) {
         logger.warn("Event not found for id: " + eventId);
         return false;
@@ -278,17 +273,10 @@ public class MaliciousEventService {
       
       MaliciousEventModel.Status eventStatus = MaliciousEventModel.Status.valueOf(status.toUpperCase());
       
-      // Use OR to match either id or _id field
-      Bson filter = Filters.or(
-          Filters.eq("id", eventId),
-          Filters.eq("_id", eventId)
-      );
+      Bson filter = Filters.eq("_id", eventId);
       Bson update = Updates.set("status", eventStatus.toString());
       
-      boolean updateSuccess = coll.updateOne(filter, update).getModifiedCount() > 0;
-      
-      // Cache will be updated automatically during next DB insertion check
-      
+      boolean updateSuccess = coll.updateOne(filter, update).getModifiedCount() > 0;      
       return updateSuccess;
     } catch (Exception e) {
       logger.error("Error updating malicious event status", e);
@@ -310,15 +298,12 @@ public class MaliciousEventService {
       MaliciousEventModel.Status eventStatus = MaliciousEventModel.Status.valueOf(status.toUpperCase());
       
       for (String eventId : eventIds) {
-        // MongoDB uses 'id' field, not '_id' for the MaliciousEventModel
-        // Try both id and _id to be safe
         MaliciousEventModel event = coll.find(Filters.eq("_id", eventId)).first();
         if (event == null) {
           logger.warn("Event not found for id: " + eventId);
           continue;
         }
         
-        // Use the same field that worked for finding the event
         Bson filter = Filters.eq("_id", eventId);
         Bson update = Updates.set("status", eventStatus.toString());
         
@@ -327,7 +312,6 @@ public class MaliciousEventService {
         
         if (updateSuccess) {
           updatedCount++;
-          // Cache will be updated automatically during next DB insertion check
         }
       }
       
