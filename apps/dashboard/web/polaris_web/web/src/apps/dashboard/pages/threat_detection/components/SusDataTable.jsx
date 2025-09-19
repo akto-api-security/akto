@@ -273,104 +273,72 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh }) {
       useFilterBasedUpdate = false;
     }
 
-    // Action buttons based on current tab
-    if (eventCount > 0) {
-      if (currentTab === 'active') {
-        // Mark for Review button
-        actions.push({
-          content: `Mark for Review ${eventText}`,
-          onAction: () => {
-            // Validate filters for filter-based operations
-            if (useFilterBasedUpdate) {
-              if (!validateFiltersForBulkOperation()) return;
-              const confirmationMessage = `Are you sure you want to mark ${eventText} for review?`;
-              func.showConfirmationModal(confirmationMessage, "Mark for Review", () => handleMarkAllFilteredForReview());
-            } else {
-              const confirmationMessage = `Are you sure you want to mark ${eventText} for review?`;
-              func.showConfirmationModal(confirmationMessage, "Mark for Review", () => handleBulkMarkForReview(selectedIds));
-            }
-          },
-        });
-        // Ignore button
-        actions.push({
-          content: `Ignore ${eventText}`,
-          onAction: () => {
-            // Validate filters for ignore operation when using filter-based update
-            if (useFilterBasedUpdate) {
-              if (!validateFiltersForBulkOperation('ignore')) return;
-              const confirmationMessage = `Are you sure you want to ignore ${eventText}?\n\nNote: Future events matching these URL and Attack Type combinations will be automatically blocked.`;
-              func.showConfirmationModal(confirmationMessage, "Ignore", () => handleIgnoreAllFiltered());
-            } else {
-              const confirmationMessage = `Are you sure you want to ignore ${eventText}?`;
-              func.showConfirmationModal(confirmationMessage, "Ignore", () => handleBulkIgnore(selectedIds));
-            }
-          },
-        });
-      } else if (currentTab === 'under_review') {
-        // Remove from Review button
-        actions.push({
-          content: `Remove from Review ${eventText}`,
-          onAction: () => {
-            // Validate filters for filter-based operations
-            if (useFilterBasedUpdate) {
-              if (!validateFiltersForBulkOperation()) return;
-              const confirmationMessage = `Are you sure you want to remove ${eventText} from review?`;
-              func.showConfirmationModal(confirmationMessage, "Remove from Review", () => handleRemoveAllFilteredFromReview());
-            } else {
-              const confirmationMessage = `Are you sure you want to remove ${eventText} from review?`;
-              func.showConfirmationModal(confirmationMessage, "Remove from Review", () => handleBulkRemoveFromReview(selectedIds));
-            }
-          },
-        });
-        // Ignore button
-        actions.push({
-          content: `Ignore ${eventText}`,
-          onAction: () => {
-            // Validate filters for ignore operation when using filter-based update
-            if (useFilterBasedUpdate) {
-              if (!validateFiltersForBulkOperation('ignore')) return;
-              const confirmationMessage = `Are you sure you want to ignore ${eventText}?\n\nNote: Future events matching these URL and Attack Type combinations will be automatically blocked.`;
-              func.showConfirmationModal(confirmationMessage, "Ignore", () => handleIgnoreAllFiltered());
-            } else {
-              const confirmationMessage = `Are you sure you want to ignore ${eventText}?`;
-              func.showConfirmationModal(confirmationMessage, "Ignore", () => handleBulkIgnore(selectedIds));
-            }
-          },
-        });
-      } else if (currentTab === 'ignored') {
-        // Unignore (reactivate) button
-        actions.push({
-          content: `Reactivate ${eventText}`,
-          onAction: () => {
-            // Validate filters for filter-based operations
-            if (useFilterBasedUpdate) {
-              if (!validateFiltersForBulkOperation()) return;
-              const confirmationMessage = `Are you sure you want to reactivate ${eventText}?`;
-              func.showConfirmationModal(confirmationMessage, "Reactivate", () => handleRemoveAllFilteredFromReview());
-            } else {
-              const confirmationMessage = `Are you sure you want to reactivate ${eventText}?`;
-              func.showConfirmationModal(confirmationMessage, "Reactivate", () => handleBulkRemoveFromReview(selectedIds));
-            }
-          },
-        });
-      }
+    if (eventCount === 0) return actions;
 
-      // Delete button for all tabs
-      actions.push({
-        content: `Delete ${eventText}`,
+    // Helper function to create an action button
+    const createAction = (label, actionType, validationType = null, includeWarning = false) => {
+      const warningText = includeWarning
+        ? '\n\nNote: Future events matching these URL and Attack Type combinations will be automatically blocked.'
+        : '';
+
+      return {
+        content: `${label} ${eventText}`,
         onAction: () => {
-          // Validate filters for filter-based operations
           if (useFilterBasedUpdate) {
-            if (!validateFiltersForBulkOperation()) return;
-            const confirmationMessage = `Are you sure you want to permanently delete ${eventText}? This action cannot be undone.`;
-            func.showConfirmationModal(confirmationMessage, "Delete", () => handleDeleteAllFiltered());
+            if (!validateFiltersForBulkOperation(validationType)) return;
+            const message = actionType === 'delete'
+              ? `Are you sure you want to permanently delete ${eventText}? This action cannot be undone.`
+              : `Are you sure you want to ${label.toLowerCase()} ${eventText}?${warningText}`;
+            const handlers = {
+              markForReview: handleMarkAllFilteredForReview,
+              ignore: handleIgnoreAllFiltered,
+              removeFromReview: handleRemoveAllFilteredFromReview,
+              reactivate: handleRemoveAllFilteredFromReview,
+              delete: handleDeleteAllFiltered
+            };
+            func.showConfirmationModal(message, label, handlers[actionType]);
           } else {
-            const confirmationMessage = `Are you sure you want to permanently delete ${eventText}? This action cannot be undone.`;
-            func.showConfirmationModal(confirmationMessage, "Delete", () => handleBulkDelete(selectedIds));
+            const message = actionType === 'delete'
+              ? `Are you sure you want to permanently delete ${eventText}? This action cannot be undone.`
+              : includeWarning && actionType === 'ignore'
+                ? `Are you sure you want to ${label.toLowerCase()} ${eventText}?`
+                : `Are you sure you want to ${label.toLowerCase()} ${eventText}?`;
+            const handlers = {
+              markForReview: () => handleBulkMarkForReview(selectedIds),
+              ignore: () => handleBulkIgnore(selectedIds),
+              removeFromReview: () => handleBulkRemoveFromReview(selectedIds),
+              reactivate: () => handleBulkRemoveFromReview(selectedIds),
+              delete: () => handleBulkDelete(selectedIds)
+            };
+            func.showConfirmationModal(message, label, handlers[actionType]);
           }
         },
-      });
-    }
+      };
+    };
+
+    // Define actions for each tab
+    const tabActions = {
+      'active': [
+        { label: 'Mark for Review', type: 'markForReview' },
+        { label: 'Ignore', type: 'ignore', validationType: 'ignore', warning: true }
+      ],
+      'under_review': [
+        { label: 'Remove from Review', type: 'removeFromReview' },
+        { label: 'Ignore', type: 'ignore', validationType: 'ignore', warning: true }
+      ],
+      'ignored': [
+        { label: 'Reactivate', type: 'reactivate' }
+      ]
+    };
+
+    // Add tab-specific actions
+    const currentTabActions = tabActions[currentTab] || [];
+    currentTabActions.forEach(({ label, type, validationType, warning }) => {
+      actions.push(createAction(label, type, validationType, warning));
+    });
+
+    // Delete button for all tabs
+    actions.push(createAction('Delete', 'delete'));
 
     return actions;
   };
