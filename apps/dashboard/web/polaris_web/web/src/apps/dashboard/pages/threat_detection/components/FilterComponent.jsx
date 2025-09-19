@@ -7,7 +7,7 @@ import DropdownSearch from "../../../components/shared/DropdownSearch";
 import { useSearchParams } from "react-router-dom";
 import { getDashboardCategory } from "../../../../main/labelHelper";
 
-function FilterComponent({ includeCategoryNameEquals, excludeCategoryNameEquals, titleText, readOnly = false }) {
+function FilterComponent({ includeCategoryNameEquals, excludeCategoryNameEquals, titleText, readOnly = false, validateOnSave }) {
     const[searchParams] = useSearchParams()
     const filteredPolicy = searchParams.get("policy")
     const [ogData, setOgData] = useState({ message: "" })
@@ -61,6 +61,15 @@ function FilterComponent({ includeCategoryNameEquals, excludeCategoryNameEquals,
     }, [])
 
     async function onSave() {
+        // Run validation if provided
+        if (validateOnSave) {
+            const validationResult = validateOnSave(data);
+            if (!validationResult.isValid) {
+                func.setToast(true, true, validationResult.errorMessage);
+                return;
+            }
+        }
+
         await api.saveFilterYamlTemplate(data)
         func.setToast(true, false, 'Saved filter template')
     }
