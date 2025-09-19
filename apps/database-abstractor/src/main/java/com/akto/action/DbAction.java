@@ -490,8 +490,8 @@ public class DbAction extends ActionSupport {
                 ApiInfo apiInfo = objectMapper.readValue(obj.toJson(), ApiInfo.class);
                 ApiInfoKey id = apiInfo.getId();
                 
-                // Skip URLs based on validation rules
-                if (DataInsertionPreChecks.shouldSkipUrl(accountId, id.getUrl())) {
+                // Skip URLs based on validation rules (use 0 for response code as it's not available in ApiInfo)
+                if (DataInsertionPreChecks.shouldSkipUrl(accountId, id.getUrl(), 0)) {
                     continue;
                 }
                 
@@ -549,6 +549,7 @@ public class DbAction extends ActionSupport {
                     for (BulkUpdates bulkUpdate : writesForSti) {
                         boolean ignore = false;
                         int apiCollectionId = -1;
+                        int responseCode = 0; // Default to 0 if not provided
                         String url = null, method = null, param = null;
                         for (Map.Entry<String, Object> entry : bulkUpdate.getFilters().entrySet()) {
                             if (entry.getKey().equalsIgnoreCase(SingleTypeInfo._API_COLLECTION_ID)) {
@@ -563,10 +564,9 @@ public class DbAction extends ActionSupport {
                                 }
                             } else if(entry.getKey().equalsIgnoreCase(SingleTypeInfo._URL)){
                                 url = entry.getValue().toString();
-                                // Skip URLs based on validation rules
-                                if (DataInsertionPreChecks.shouldSkipUrl(accId, url)) {
-                                    ignore = true;
-                                }
+                            } else if(entry.getKey().equalsIgnoreCase(SingleTypeInfo._RESPONSE_CODE)){
+                                String valStr = entry.getValue().toString();
+                                responseCode = Integer.valueOf(valStr);
                             } else if(entry.getKey().equalsIgnoreCase(SingleTypeInfo._METHOD)){
                                 method = entry.getValue().toString();
                                 if ("OPTIONS".equals(method) || "CONNECT".equals(method)) {
@@ -575,6 +575,10 @@ public class DbAction extends ActionSupport {
                             } else if(entry.getKey().equalsIgnoreCase(SingleTypeInfo._PARAM)){
                                 param = entry.getValue().toString();
                             }
+                        }
+                        // Check URL skip rules after we have all the parameters
+                        if (url != null && DataInsertionPreChecks.shouldSkipUrl(accId, url, responseCode)) {
+                            ignore = true;
                         }
                         if (!ignore && apiCollectionId != -1 && url != null && method != null && param!=null) {
                             boolean isNew = ParamFilter.isNewEntry(accId, apiCollectionId, url, method, param);
@@ -619,15 +623,20 @@ public class DbAction extends ActionSupport {
                 for (BulkUpdates bulkUpdate: writesForSti) {
                     List<Bson> filters = new ArrayList<>();
                     boolean ignore = false;
+                    String url = null;
+                    int responseCode = 0; // Default to 0 if not provided
                     for (Map.Entry<String, Object> entry : bulkUpdate.getFilters().entrySet()) {
                         if (entry.getKey().equalsIgnoreCase("isUrlParam")) {
                             continue;
                         }
-                        if (entry.getKey().equalsIgnoreCase("url") && DataInsertionPreChecks.shouldSkipUrl(accId, entry.getValue().toString())) {
-                            ignore = true;
-                            break;
-                        }
-                        if (entry.getKey().equalsIgnoreCase("apiCollectionId")) {
+                        if (entry.getKey().equalsIgnoreCase("url")) {
+                            url = entry.getValue().toString();
+                            filters.add(Filters.eq(entry.getKey(), entry.getValue()));
+                        } else if (entry.getKey().equalsIgnoreCase("responseCode")) {
+                            String valStr = entry.getValue().toString();
+                            responseCode = Integer.valueOf(valStr);
+                            filters.add(Filters.eq(entry.getKey(), responseCode));
+                        } else if (entry.getKey().equalsIgnoreCase("apiCollectionId")) {
                             String valStr = entry.getValue().toString();
                             int val = Integer.valueOf(valStr);
                             if (ignoreHosts.contains(val)) {
@@ -635,13 +644,14 @@ public class DbAction extends ActionSupport {
                                 break;
                             }
                             filters.add(Filters.eq(entry.getKey(), val));
-                        } else if (entry.getKey().equalsIgnoreCase("responseCode")) {
-                            String valStr = entry.getValue().toString();
-                            int val = Integer.valueOf(valStr);
-                            filters.add(Filters.eq(entry.getKey(), val));
                         } else {
                             filters.add(Filters.eq(entry.getKey(), entry.getValue()));
                         }
+                    }
+
+                    // Check URL skip rules after processing
+                    if (!ignore && url != null && DataInsertionPreChecks.shouldSkipUrl(accId, url, responseCode)) {
+                        ignore = true;
                     }
                     if (ignore) {
                         ignoreCount++;
@@ -736,7 +746,7 @@ public class DbAction extends ActionSupport {
                     String method = (String) mObj.get("method");
 
                     // Skip URLs based on validation rules
-                    if (DataInsertionPreChecks.shouldSkipUrl(accId, url)) {
+                    if (DataInsertionPreChecks.shouldSkipUrl(accId, url, responseCode)) {
                         continue;
                     }
 
@@ -822,8 +832,8 @@ public class DbAction extends ActionSupport {
                             filters = Filters.and(filters, Filters.eq(entry.getKey(), val));
                         } else if(entry.getKey().equalsIgnoreCase("_id.url")) {
                             url = entry.getValue().toString();
-                            // Skip URLs based on validation rules
-                            if (DataInsertionPreChecks.shouldSkipUrl(accId, url)) {
+                            // Skip URLs based on validation rules (use 0 for response code)
+                            if (DataInsertionPreChecks.shouldSkipUrl(accId, url, 0)) {
                                 ignore = true;
                                 break;
                             }
@@ -2243,7 +2253,8 @@ public class DbAction extends ActionSupport {
                     SuspectSampleData sd = objectMapper.readValue(
                             gson.toJson(gson.fromJson(updates.get(0), Map.class).get("val")), SuspectSampleData.class);
                     
-                    if (DataInsertionPreChecks.shouldSkipUrl(accId, sd.getUrl())) {
+                    // Use 0 for response code as it's not available in SuspectSampleData
+                    if (DataInsertionPreChecks.shouldSkipUrl(accId, sd.getUrl(), 0)) {
                         continue;
                     }
                     
