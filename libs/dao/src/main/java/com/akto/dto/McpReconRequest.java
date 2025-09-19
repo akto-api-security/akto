@@ -1,6 +1,7 @@
 package com.akto.dto;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.Setter;
 import org.bson.codecs.pojo.annotations.BsonIgnore;
@@ -8,6 +9,7 @@ import org.bson.types.ObjectId;
 
 @Setter
 @Getter
+@AllArgsConstructor
 public class McpReconRequest {
 
     public static final String ID = "_id";

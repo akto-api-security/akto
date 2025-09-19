@@ -15,6 +15,8 @@ import java.util.Map;
 
 @Getter
 @Setter
+@AllArgsConstructor
+
 public class McpReconResult {
 
     public static final String MCP_RECON_REQUEST_ID = "mcpReconRequestId";
