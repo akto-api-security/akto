@@ -1783,24 +1783,23 @@ public class DbLayer {
 
     public static List<McpReconRequest> fetchPendingMcpReconRequests() {
         // Fetch all requests where status is "Pending"
-        Bson filter = Filters.eq(McpReconRequest.STATUS, McpReconRequest.STATUS_PENDING);
+        Bson filter = Filters.eq(McpReconRequest.STATUS, Constants.STATUS_PENDING);
         return McpReconRequestDao.instance.findAll(filter);
     }
 
-    public static void updateMcpReconRequestStatus(String requestId, String newStatus, int serversFound, int startedAt, int finishedAt) {
-        ObjectId requestObjId = new ObjectId(requestId);
-        Bson filter = Filters.eq(McpReconRequest.ID, requestObjId);
+    public static void updateMcpReconRequestStatus(Object requestId, String newStatus, int serversFound) {
+        Bson filter = Filters.eq(McpReconRequest.ID, requestId);
         Bson updates;
-        if (newStatus.equals(McpReconRequest.STATUS_IN_PROGRESS)) {
+        if (newStatus.equals(Constants.STATUS_IN_PROGRESS)) {
             updates = Updates.combine(
                     Updates.set(McpReconRequest.STATUS, newStatus),
-                    Updates.set(McpReconRequest.STARTED_AT, startedAt)
+                    Updates.set(McpReconRequest.STARTED_AT, Context.now())
             );
         } else {   // For completed or failed status
             updates = Updates.combine(
                     Updates.set(McpReconRequest.STATUS, newStatus),
                     Updates.set(McpReconRequest.SERVERS_FOUND, serversFound),
-                    Updates.set(McpReconRequest.FINISHED_AT, finishedAt)
+                    Updates.set(McpReconRequest.FINISHED_AT, Context.now())
             );
         }
         McpReconRequestDao.instance.updateOneNoUpsert(filter, updates);

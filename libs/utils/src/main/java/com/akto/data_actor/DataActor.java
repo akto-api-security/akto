@@ -374,7 +374,7 @@ public abstract class DataActor {
 
     public abstract List<McpReconRequest> fetchPendingMcpReconRequests();
 
-    public abstract void updateMcpReconRequestStatus(String requestId, String status, int serversFound, int startedAt, int finishedAt);
+    public abstract void updateMcpReconRequestStatus(String requestId, String status, int serversFound);
 
     public abstract void storeMcpReconResultsBatch(List<McpReconResult> serverDataList);
 

@@ -2813,7 +2813,7 @@ public class DbAction extends ActionSupport {
     
     public String updateMcpReconRequestStatus() {
         try {
-            DbLayer.updateMcpReconRequestStatus(requestId, newStatus, serversFound, startedAt, finishedAt);
+            DbLayer.updateMcpReconRequestStatus(new ObjectId(this.requestId), newStatus, serversFound);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error in updateMcpReconRequestStatus " + e.toString());
             return Action.ERROR.toUpperCase();

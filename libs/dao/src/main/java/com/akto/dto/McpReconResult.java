@@ -12,13 +12,10 @@ import java.util.Map;
 /**
  * DTO representing the result of an MCP reconnaissance scan
  */
+
 @Getter
 @Setter
-@AllArgsConstructor
 public class McpReconResult {
-
-    public static final String ID = "_id";
-    private ObjectId _id;
 
     public static final String MCP_RECON_REQUEST_ID = "mcpReconRequestId";
     private ObjectId mcpReconRequestId;
@@ -69,21 +66,5 @@ public class McpReconResult {
     public McpReconResult() {
     }
 
-    public McpReconResult(ObjectId mcpReconRequestId, String ip, int port, String url, boolean verified, String detectionMethod, String timestamp, String type, String endpoint, String protocolVersion, Map<String, Object> serverInfo, Map<String, Object> capabilities, List<Map<String, Object>> tools, List<Map<String, Object>> resources, List<Map<String, Object>> prompts) {
-        this.mcpReconRequestId = mcpReconRequestId;
-        this.ip = ip;
-        this.port = port;
-        this.url = url;
-        this.verified = verified;
-        this.detectionMethod = detectionMethod;
-        this.timestamp = timestamp;
-        this.type = type;
-        this.endpoint = endpoint;
-        this.protocolVersion = protocolVersion;
-        this.serverInfo = serverInfo;
-        this.capabilities = capabilities;
-        this.tools = tools;
-        this.resources = resources;
-        this.prompts = prompts;
-    }
+
 }

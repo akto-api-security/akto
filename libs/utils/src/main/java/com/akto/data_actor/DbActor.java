@@ -683,8 +683,8 @@ public class DbActor extends DataActor {
         return DbLayer.fetchPendingMcpReconRequests();
     }
 
-    public void updateMcpReconRequestStatus(String requestId, String status, int serversFound, int startedAt, int finishedAt) {
-        DbLayer.updateMcpReconRequestStatus(requestId, status, serversFound, startedAt, finishedAt);
+    public void updateMcpReconRequestStatus(String requestId, String status, int serversFound) {
+        DbLayer.updateMcpReconRequestStatus(requestId, status, serversFound);
     }
 
     public void storeMcpReconResultsBatch(List<McpReconResult> serverDataList) {

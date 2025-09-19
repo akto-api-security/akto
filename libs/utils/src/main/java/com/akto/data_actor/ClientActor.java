@@ -6,6 +6,7 @@ import com.akto.dto.graph.SvcToSvcGraphEdge;
 import com.akto.dto.graph.SvcToSvcGraphNode;
 import com.akto.dto.settings.DataControlSettings;
 import com.akto.testing.ApiExecutor;
+import com.akto.util.Constants;
 import com.auth0.jwt.JWT;
 import com.auth0.jwt.interfaces.DecodedJWT;
 import com.akto.bulk_update_util.ApiInfoBulkUpdate;
@@ -4149,7 +4150,7 @@ public class ClientActor extends DataActor {
     /**
      * Update MCP recon request status
      */
-    public void updateMcpReconRequestStatus(String requestId, String status, int serversFound, int startedAt,  int finishedAt) {
+    public void updateMcpReconRequestStatus(String requestId, String status, int serversFound) {
         Map<String, List<String>> headers = buildHeaders();
         loggerMaker.infoAndAddToDb("updateMcpReconRequestStatus api called for requestId: " + requestId + " status: " + status + " serversFound: " + serversFound, LoggerMaker.LogDb.RUNTIME);
 
@@ -4157,10 +4158,10 @@ public class ClientActor extends DataActor {
         obj.put("requestId", requestId);
         obj.put("status", status);
         obj.put("serversFound", serversFound);
-        if(status.equals(McpReconRequest.STATUS_IN_PROGRESS))
-            obj.put("startedAt", startedAt);
+        if(status.equals(Constants.STATUS_IN_PROGRESS))
+            obj.put("startedAt", Context.now());
         else
-            obj.put("finishedAt", finishedAt);
+            obj.put("finishedAt", Context.now());
 
         OriginalHttpRequest request = new OriginalHttpRequest(url + "/updateMcpReconRequestStatus", "", "POST", obj.toString(), headers, "");
         try {
