@@ -15,80 +15,17 @@
 }
 
 .vulnerability-highlight{
-    background-color: rgba(139, 69, 255, 0.2);
-    color: #6B46C1 !important;
-    font-weight: 600 !important;
-    text-decoration: underline !important;
-    text-decoration-style: wavy !important;
-    text-decoration-color: #8B45FF !important;
-    text-underline-offset: 2px !important;
-    border-radius: 2px !important;
-    padding: 1px 2px !important;
-    transition: all 0.2s ease !important;
-}
-
-/* More specific selector for Monaco Editor */
-.monaco-editor .vulnerability-highlight{
     background-color: rgba(139, 69, 255, 0.2) !important;
     color: #6B46C1 !important;
     font-weight: 600 !important;
-    text-decoration: underline !important;
-    text-decoration-style: wavy !important;
-    text-decoration-color: #8B45FF !important;
-    text-underline-offset: 2px !important;
     border-radius: 2px !important;
     padding: 1px 2px !important;
     transition: all 0.2s ease !important;
-}
-
-/* Even more specific for Monaco Editor view lines */
-.monaco-editor .view-line .vulnerability-highlight{
-    background-color: rgba(139, 69, 255, 0.2) !important;
-    color: #6B46C1 !important;
-    font-weight: 600 !important;
-    text-decoration: underline !important;
-    text-decoration-style: wavy !important;
-    text-decoration-color: #8B45FF !important;
-    text-underline-offset: 2px !important;
-    border-radius: 2px !important;
-    padding: 1px 2px !important;
-    transition: all 0.2s ease !important;
-}
-
-/* Target the specific span elements created by Monaco */
-.monaco-editor .view-line span.vulnerability-highlight{
-    background-color: rgba(139, 69, 255, 0.2) !important;
-    color: #6B46C1 !important;
-    font-weight: 600 !important;
-    text-decoration: underline !important;
-    text-decoration-style: wavy !important;
-    text-decoration-color: #8B45FF !important;
-    text-underline-offset: 2px !important;
-    border-radius: 2px !important;
-    padding: 1px 2px !important;
-    transition: all 0.2s ease !important;
-}
-
-/* Style for the vulnerability highlight icon */
-.vulnerability-highlight-icon{
-    color: #8B45FF !important;
-    font-size: 12px !important;
-    margin-left: 2px !important;
-    background-color: rgba(139, 69, 255, 0.2);
-    color: #6B46C1 !important;
-    font-weight: 600 !important;
-    text-decoration: underline;
-    text-decoration-style: wavy;
-    text-decoration-color: #8B45FF;
-    text-underline-offset: 2px;
-    border-radius: 2px;
-    padding: 1px 2px;
-    transition: all 0.2s ease;
 }
 
 .vulnerability-highlight:hover{
-    background-color: rgba(139, 69, 255, 0.35);
-    box-shadow: 0 0 8px rgba(139, 69, 255, 0.5);
+    background-color: rgba(139, 69, 255, 0.35) !important;
+    box-shadow: 0 0 8px rgba(139, 69, 255, 0.5) !important;
 }
 
 .deleted-block{

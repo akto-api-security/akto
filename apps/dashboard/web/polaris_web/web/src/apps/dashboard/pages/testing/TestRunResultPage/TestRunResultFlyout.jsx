@@ -342,11 +342,20 @@ function TestRunResultFlyout(props) {
     const dataStoreTime = 2 * 30 * 24 * 60 * 60;
     const dataExpired = func.timeNow() - (selectedTestRunResult?.endTimestamp || func.timeNow()) > dataStoreTime
 
+    // Move state outside to prevent reset on component recreation
+    const hasAnalyzedRef = useRef(false);
+    const [vulnerabilityHighlights, setVulnerabilityHighlights] = useState({});
+    const [isAnalyzing, setIsAnalyzing] = useState(false);
+    
+    // Reset analysis flag and highlights when test result changes
+    useEffect(() => {
+        hasAnalyzedRef.current = false;
+        setVulnerabilityHighlights({});
+        setIsAnalyzing(false);
+    }, [selectedTestRunResult?.id]);
+    
     // Component that handles vulnerability analysis only when mounted
     const ValuesTabContent = React.memo(() => {
-        const [vulnerabilityHighlights, setVulnerabilityHighlights] = useState({});
-        const [isAnalyzing, setIsAnalyzing] = useState(false);
-        const hasAnalyzedRef = useRef(false);
         
         useEffect(() => {
             // Check if vulnerability highlighting is enabled (use existing GPT feature flag)
@@ -458,22 +467,24 @@ function TestRunResultFlyout(props) {
                     heading={"Attempt"}
                     minHeight={"30vh"}
                     vertical={true}
-                    sampleData={selectedTestRunResult?.testResults.map((result, idx) => {
-                        if (result.errors && result.errors.length > 0) {
-                            let errorList = result.errors.join(", ");
-                            return { errorList: errorList }
-                        }
-                        // Add vulnerability highlights only for response
-                        let vulnerabilitySegments = vulnerabilityHighlights[idx] || [];
-                        if (result.originalMessage || result.message) {
-                            return {
-                                originalMessage: result.originalMessage,
-                                message: result.message,
-                                vulnerabilitySegments
+                    sampleData={useMemo(() => {
+                        return selectedTestRunResult?.testResults.map((result, idx) => {
+                            if (result.errors && result.errors.length > 0) {
+                                let errorList = result.errors.join(", ");
+                                return { errorList: errorList }
                             }
-                        }
-                        return { errorList: "No data found" }
-                    })}
+                            // Add vulnerability highlights only for response
+                            let vulnerabilitySegments = vulnerabilityHighlights[idx] || [];
+                            if (result.originalMessage || result.message) {
+                                return {
+                                    originalMessage: result.originalMessage,
+                                    message: result.message,
+                                    vulnerabilitySegments
+                                }
+                            }
+                            return { errorList: "No data found" }
+                        });
+                    }, [selectedTestRunResult?.testResults, vulnerabilityHighlights])}
                     isNewDiff={true}
                     vulnerable={selectedTestRunResult?.vulnerable}
                     isAnalyzingVulnerabilities={isAnalyzing}

@@ -169,21 +169,7 @@ function highlightVulnerabilities(vulnerabilitySegments, ref) {
           ref.createDecorationsCollection([{
             range: new monaco.Range(startPos.lineNumber, startPos.column, endPos.lineNumber, endPos.column),
             options: {
-              inlineClassName: "vulnerability-highlight",
-              hoverMessage: [
-                {
-                  supportHtml: true,
-                  value: `**<span style="color:#8B45FF;">VULNERABILITY DETECTED</span>**`
-                },
-                {
-                  supportHtml: true,
-                  value: `**Type:** ${segment.vulnerabilityType || 'Unknown'}`
-                },
-                {
-                  supportHtml: true,
-                  value: `**Severity:** ${segment.severity || 'High'}`
-                }
-              ]
+              inlineClassName: "vulnerability-highlight"
             }
           }]);
         }
