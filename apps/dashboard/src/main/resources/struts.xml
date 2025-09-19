@@ -2920,6 +2920,36 @@
             </result>
         </action>
 
+        <action name="api/initiateMCPRecon" class="com.akto.action.MCPReconAction" method="initiateMCPRecon">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">MCP_SECURITY</param>
+                <param name="accessType">READ_WRITE</param>
+                <param name="actionDescription">User initiated MCP reconnaissance</param>
+            </interceptor-ref>
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="SUCCESS" type="json">
+            </result>
+            <interceptor-ref name="usageInterceptor">
+                <param name="featureLabel">MCP_SECURITY</param>
+            </interceptor-ref>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="UNAUTHORIZED" type="json">
+                 <param name="statusCode">403</param>
+                 <param name="ignoreHierarchy">false</param>
+                 <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
         <action name="api/importFromUrl" class="com.akto.action.AgentImportAction" method="importFromUrl">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />

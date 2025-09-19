@@ -194,11 +194,11 @@ const api = {
         })
     },
 
-    initiateMCPRecon(ipRange, authKey, authValue, dashboardUrl) {
+    initiateMCPRecon(ipRange) {
         return request({
             url: '/api/initiateMCPRecon',
             method: 'post',
-            data: {ipRange, authKey, authValue, dashboardUrl}
+            data: {ipRange}
         })
     },
 
