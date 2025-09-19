@@ -257,24 +257,30 @@ message ModifyThreatActorStatusResponse {
 }
 
 message UpdateMaliciousEventStatusRequest {
-  string event_id = 1;
-  string status = 2;
+  // One of these should be provided
+  optional string event_id = 1;  // For single event update
+  repeated string event_ids = 2;  // For bulk update by IDs
+  optional ListMaliciousRequestsRequest.Filter filter = 3;  // For filtered update
+
+  string status = 4;  // The new status to set
 }
 
 message UpdateMaliciousEventStatusResponse {
   bool success = 1;
   string message = 2;
+  int32 updated_count = 3;
 }
 
-message BulkUpdateMaliciousEventStatusRequest {
-  repeated string event_ids = 1;
-  string status = 2;
+message DeleteMaliciousEventsRequest {
+  // One of these should be provided
+  repeated string event_ids = 1;  // For delete by IDs
+  optional ListMaliciousRequestsRequest.Filter filter = 2;  // For filtered delete
 }
 
-message BulkUpdateMaliciousEventStatusResponse {
+message DeleteMaliciousEventsResponse {
   bool success = 1;
   string message = 2;
-  int32 updated_count = 3;
+  int32 deleted_count = 3;
 }
 
 message GetThreatConfigurationRequest {

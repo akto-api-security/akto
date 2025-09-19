@@ -123,7 +123,7 @@ function SampleDetails(props) {
         
         setTriageLoading(true);
         try {
-            const response = await threatDetectionApi.updateMaliciousEventStatus(eventId, newStatus);
+            const response = await threatDetectionApi.updateMaliciousEventStatus({ eventId: eventId, status: newStatus });
             if (response?.updateSuccess) {
                 console.log(`Event successfully marked as ${newStatus.toLowerCase()}`);
                 // Update parent state instead of refreshing page

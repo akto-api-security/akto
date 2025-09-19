@@ -17,8 +17,8 @@ import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.Th
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatSeverityWiseCountRequest;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.UpdateMaliciousEventStatusRequest;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.UpdateMaliciousEventStatusResponse;
-import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.BulkUpdateMaliciousEventStatusRequest;
-import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.BulkUpdateMaliciousEventStatusResponse;
+import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.DeleteMaliciousEventsRequest;
+import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.DeleteMaliciousEventsResponse;
 import com.akto.threat.backend.service.MaliciousEventService;
 import com.akto.threat.backend.service.ThreatActorService;
 import com.akto.threat.backend.service.ThreatApiService;
@@ -27,6 +27,8 @@ import io.vertx.ext.web.RequestBody;
 import io.vertx.ext.web.Router;
 import java.util.List;
 import java.util.Map;
+import java.util.HashMap;
+import java.util.ArrayList;
 
 public class DashboardRouter implements ARouter {
 
@@ -42,6 +44,38 @@ public class DashboardRouter implements ARouter {
         this.dsService = dsService;
         this.threatActorService = threatActorService;
         this.threatApiService = threatApiService;
+    }
+
+    private Map<String, Object> convertProtoFilterToMap(ListMaliciousRequestsRequest.Filter protoFilter) {
+        Map<String, Object> filterMap = new HashMap<>();
+
+        if (!protoFilter.getActorsList().isEmpty()) {
+            filterMap.put("ips", new ArrayList<>(protoFilter.getActorsList()));
+        }
+        if (!protoFilter.getUrlsList().isEmpty()) {
+            filterMap.put("urls", new ArrayList<>(protoFilter.getUrlsList()));
+        }
+        if (!protoFilter.getTypesList().isEmpty()) {
+            filterMap.put("types", new ArrayList<>(protoFilter.getTypesList()));
+        }
+        if (!protoFilter.getLatestAttackList().isEmpty()) {
+            filterMap.put("latestAttack", new ArrayList<>(protoFilter.getLatestAttackList()));
+        }
+        if (protoFilter.hasStatusFilter()) {
+            filterMap.put("statusFilter", protoFilter.getStatusFilter());
+        }
+        if (protoFilter.hasDetectedAtTimeRange()) {
+            Map<String, Integer> timeRange = new HashMap<>();
+            if (protoFilter.getDetectedAtTimeRange().hasStart()) {
+                timeRange.put("start", (int) protoFilter.getDetectedAtTimeRange().getStart());
+            }
+            if (protoFilter.getDetectedAtTimeRange().hasEnd()) {
+                timeRange.put("end", (int) protoFilter.getDetectedAtTimeRange().getEnd());
+            }
+            filterMap.put("detected_at_time_range", timeRange);
+        }
+
+        return filterMap;
     }
 
     @Override
@@ -389,51 +423,36 @@ public class DashboardRouter implements ARouter {
                     return;
                 }
 
-                int updatedCount = dsService.updateMaliciousEventStatus(
-                    ctx.get("accountId"),
-                    java.util.Arrays.asList(req.getEventId()),
-                    null,
-                    req.getStatus()
-                );
-                boolean success = updatedCount > 0;
+                // Determine which type of update to perform
+                List<String> eventIds = null;
+                Map<String, Object> filterMap = null;
 
-                UpdateMaliciousEventStatusResponse resp = UpdateMaliciousEventStatusResponse.newBuilder()
-                    .setSuccess(success)
-                    .setMessage(success ? "Status updated successfully" : "Failed to update status")
-                    .build();
-
-                ProtoMessageUtils.toString(resp)
-                    .ifPresent(s -> ctx.response().setStatusCode(200).end(s));
-            });
-
-        router
-            .post("/bulk_update_malicious_event_status")
-            .blockingHandler(ctx -> {
-                RequestBody reqBody = ctx.body();
-                BulkUpdateMaliciousEventStatusRequest req = ProtoMessageUtils.<
-                    BulkUpdateMaliciousEventStatusRequest
-                >toProtoMessage(
-                    BulkUpdateMaliciousEventStatusRequest.class,
-                    reqBody.asString()
-                ).orElse(null);
-
-                if (req == null) {
-                    ctx.response().setStatusCode(400).end("Invalid request");
+                if (req.hasEventId()) {
+                    // Single event update
+                    eventIds = java.util.Arrays.asList(req.getEventId());
+                } else if (!req.getEventIdsList().isEmpty()) {
+                    // Bulk update by IDs
+                    eventIds = req.getEventIdsList();
+                } else if (req.hasFilter()) {
+                    // Filtered update - convert proto filter to Map
+                    filterMap = convertProtoFilterToMap(req.getFilter());
+                } else {
+                    ctx.response().setStatusCode(400).end("Must provide event_id, event_ids, or filter");
                     return;
                 }
 
                 int updatedCount = dsService.updateMaliciousEventStatus(
                     ctx.get("accountId"),
-                    req.getEventIdsList(),
-                    null,
+                    eventIds,
+                    filterMap,
                     req.getStatus()
                 );
 
-                BulkUpdateMaliciousEventStatusResponse resp = BulkUpdateMaliciousEventStatusResponse.newBuilder()
+                UpdateMaliciousEventStatusResponse resp = UpdateMaliciousEventStatusResponse.newBuilder()
                     .setSuccess(updatedCount > 0)
-                    .setMessage(updatedCount > 0 ? 
-                        String.format("Successfully updated %d events", updatedCount) : 
-                        "Failed to update events")
+                    .setMessage(updatedCount > 0 ?
+                        String.format("Successfully updated %d event(s)", updatedCount) :
+                        "No events updated")
                     .setUpdatedCount(updatedCount)
                     .build();
 
@@ -442,136 +461,52 @@ public class DashboardRouter implements ARouter {
             });
 
         router
-            .post("/bulk_update_filtered_events")
+            .post("/delete_malicious_events")
             .blockingHandler(ctx -> {
                 RequestBody reqBody = ctx.body();
-                Map<String, Object> request = null;
-                try {
-                    request = new com.fasterxml.jackson.databind.ObjectMapper().readValue(
-                        reqBody.asString(), Map.class);
-                } catch (Exception e) {
+                DeleteMaliciousEventsRequest req = ProtoMessageUtils.<
+                    DeleteMaliciousEventsRequest
+                >toProtoMessage(
+                    DeleteMaliciousEventsRequest.class,
+                    reqBody.asString()
+                ).orElse(null);
+
+                if (req == null) {
                     ctx.response().setStatusCode(400).end("Invalid request");
                     return;
                 }
 
-                if (request == null) {
-                    ctx.response().setStatusCode(400).end("Invalid request");
-                    return;
-                }
+                // Determine which type of delete to perform
+                List<String> eventIds = null;
+                Map<String, Object> filterMap = null;
 
-                Map<String, Object> filter = (Map<String, Object>) request.get("filter");
-                String status = (String) request.get("status");
-                
-                int updatedCount = dsService.updateMaliciousEventStatus(
-                    ctx.get("accountId"),
-                    null,
-                    filter,
-                    status
-                );
-
-                Map<String, Object> response = new java.util.HashMap<>();
-                response.put("success", updatedCount > 0);
-                response.put("updatedCount", updatedCount);
-                response.put("message", updatedCount > 0 ? 
-                    String.format("Successfully updated %d events", updatedCount) : 
-                    "No events updated");
-
-                try {
-                    String jsonResponse = new com.fasterxml.jackson.databind.ObjectMapper()
-                        .writeValueAsString(response);
-                    ctx.response().setStatusCode(200).end(jsonResponse);
-                } catch (Exception e) {
-                    ctx.response().setStatusCode(500).end("Error generating response");
-                }
-            });
-
-
-        router
-            .post("/bulk_delete_malicious_events")
-            .blockingHandler(ctx -> {
-                RequestBody reqBody = ctx.body();
-                Map<String, Object> request = null;
-                try {
-                    request = new com.fasterxml.jackson.databind.ObjectMapper().readValue(
-                        reqBody.asString(), Map.class);
-                } catch (Exception e) {
-                    ctx.response().setStatusCode(400).end("Invalid request");
-                    return;
-                }
-
-                if (request == null) {
-                    ctx.response().setStatusCode(400).end("Invalid request");
-                    return;
-                }
-
-                List<String> eventIds = (List<String>) request.get("eventIds");
-                if (eventIds == null || eventIds.isEmpty()) {
-                    ctx.response().setStatusCode(400).end("No event IDs provided");
+                if (!req.getEventIdsList().isEmpty()) {
+                    // Delete by IDs
+                    eventIds = req.getEventIdsList();
+                } else if (req.hasFilter()) {
+                    // Filtered delete - convert proto filter to Map
+                    filterMap = convertProtoFilterToMap(req.getFilter());
+                } else {
+                    ctx.response().setStatusCode(400).end("Must provide event_ids or filter");
                     return;
                 }
 
                 int deletedCount = dsService.deleteMaliciousEvents(
                     ctx.get("accountId"),
                     eventIds,
-                    null
+                    filterMap
                 );
 
-                Map<String, Object> response = new java.util.HashMap<>();
-                response.put("deleteSuccess", deletedCount > 0);
-                response.put("deletedCount", deletedCount);
-                response.put("deleteMessage", deletedCount > 0 ?
-                    String.format("Successfully deleted %d events", deletedCount) :
-                    "No events deleted");
+                DeleteMaliciousEventsResponse resp = DeleteMaliciousEventsResponse.newBuilder()
+                    .setSuccess(deletedCount > 0)
+                    .setMessage(deletedCount > 0 ?
+                        String.format("Successfully deleted %d event(s)", deletedCount) :
+                        "No events deleted")
+                    .setDeletedCount(deletedCount)
+                    .build();
 
-                try {
-                    String jsonResponse = new com.fasterxml.jackson.databind.ObjectMapper()
-                        .writeValueAsString(response);
-                    ctx.response().setStatusCode(200).end(jsonResponse);
-                } catch (Exception e) {
-                    ctx.response().setStatusCode(500).end("Error generating response");
-                }
-            });
-
-        router
-            .post("/bulk_delete_filtered_events")
-            .blockingHandler(ctx -> {
-                RequestBody reqBody = ctx.body();
-                Map<String, Object> request = null;
-                try {
-                    request = new com.fasterxml.jackson.databind.ObjectMapper().readValue(
-                        reqBody.asString(), Map.class);
-                } catch (Exception e) {
-                    ctx.response().setStatusCode(400).end("Invalid request");
-                    return;
-                }
-
-                if (request == null) {
-                    ctx.response().setStatusCode(400).end("Invalid request");
-                    return;
-                }
-
-                Map<String, Object> filter = (Map<String, Object>) request.get("filter");
-
-                int deletedCount = dsService.deleteMaliciousEvents(
-                    ctx.get("accountId"),
-                    null,
-                    filter
-                );
-
-                Map<String, Object> response = new java.util.HashMap<>();
-                response.put("deleteSuccess", deletedCount > 0);
-                response.put("deletedCount", deletedCount);
-                response.put("deleteMessage", deletedCount > 0 ?
-                    String.format("Successfully deleted %d events", deletedCount) :
-                    "No events deleted");
-
-                try {
-                    String jsonResponse = new com.fasterxml.jackson.databind.ObjectMapper()
-                        .writeValueAsString(response);
-                    ctx.response().setStatusCode(200).end(jsonResponse);
-                } catch (Exception e) {
-                    ctx.response().setStatusCode(500).end("Error generating response");
-                }
+                ProtoMessageUtils.toString(resp)
+                    .ifPresent(s -> ctx.response().setStatusCode(200).end(s));
             });
 
         return router;

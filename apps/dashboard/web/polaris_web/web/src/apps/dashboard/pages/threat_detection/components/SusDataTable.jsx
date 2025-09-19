@@ -158,9 +158,9 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh }) {
     try {
       let response;
       if (operation === 'delete') {
-        response = await threatDetectionRequests.bulkDeleteMaliciousEvents(validIds);
+        response = await threatDetectionRequests.deleteMaliciousEvents({ eventIds: validIds });
       } else {
-        response = await threatDetectionRequests.bulkUpdateMaliciousEventStatus(validIds, newState);
+        response = await threatDetectionRequests.updateMaliciousEventStatus({ eventIds: validIds, status: newState });
       }
 
       const isSuccess = operation === 'delete' ? response?.deleteSuccess : response?.updateSuccess;
@@ -208,9 +208,26 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh }) {
       ];
 
       if (operation === 'delete') {
-        response = await threatDetectionRequests.bulkDeleteFilteredEvents(...filterParams);
+        response = await threatDetectionRequests.deleteMaliciousEvents({
+          actors: filterParams[0],
+          urls: filterParams[1],
+          types: filterParams[2],
+          latestAttack: filterParams[3],
+          startTimestamp: filterParams[4],
+          endTimestamp: filterParams[5],
+          statusFilter: filterParams[6]
+        });
       } else {
-        response = await threatDetectionRequests.bulkUpdateFilteredEvents(...filterParams, newState);
+        response = await threatDetectionRequests.updateMaliciousEventStatus({
+          actors: filterParams[0],
+          urls: filterParams[1],
+          types: filterParams[2],
+          latestAttack: filterParams[3],
+          startTimestamp: filterParams[4],
+          endTimestamp: filterParams[5],
+          statusFilter: filterParams[6],
+          status: newState
+        });
       }
 
       const isSuccess = operation === 'delete' ? response?.deleteSuccess : response?.updateSuccess;

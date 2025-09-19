@@ -8754,75 +8754,14 @@
             </result>
         </action>
 
-        <action name="api/bulkUpdateMaliciousEventStatus"
+        <action name="api/deleteMaliciousEvents"
             class="com.akto.action.threat_detection.SuspectSampleDataAction"
-            method="bulkUpdateMaliciousEventStatus">
-            <interceptor-ref name="json" />
-            <interceptor-ref name="defaultStack" />
-            <result name="UNAUTHORIZED" type="json">
-                 <param name="statusCode">403</param>
-                 <param name="ignoreHierarchy">false</param>
-                 <param name="includeProperties">^actionErrors.*</param>
-            </result>
-            <result name="FORBIDDEN" type="json">
-                <param name="statusCode">403</param>
-                <param name="ignoreHierarchy">false</param>
-                <param
-                    name="includeProperties">^actionErrors.*</param>
-            </result>
-            <result name="SUCCESS" type="json"> </result>
-            <result name="ERROR" type="json">
-                <param name="statusCode">422</param>
-                <param name="ignoreHierarchy">false</param>
-                <param
-                    name="includeProperties">^actionErrors.*</param>
-            </result>
-        </action>
-
-        <action name="api/bulkDeleteMaliciousEvents"
-            class="com.akto.action.threat_detection.SuspectSampleDataAction"
-            method="bulkDeleteMaliciousEvents">
+            method="deleteMaliciousEvents">
             <interceptor-ref name="json" />
             <interceptor-ref name="defaultStack" />
             <result name="SUCCESS" type="json" />
             <result name="ERROR" type="json">
                 <param name="statusCode">422</param>
-            </result>
-        </action>
-
-        <action name="api/bulkDeleteFilteredEvents"
-            class="com.akto.action.threat_detection.SuspectSampleDataAction"
-            method="bulkDeleteFilteredEvents">
-            <interceptor-ref name="json" />
-            <interceptor-ref name="defaultStack" />
-            <result name="SUCCESS" type="json" />
-            <result name="ERROR" type="json">
-                <param name="statusCode">422</param>
-            </result>
-        </action>
-
-        <action name="api/bulkUpdateFilteredEvents"
-            class="com.akto.action.threat_detection.SuspectSampleDataAction"
-            method="bulkUpdateFilteredEvents">
-            <interceptor-ref name="json" />
-            <interceptor-ref name="defaultStack" />
-            <result name="UNAUTHORIZED" type="json">
-                 <param name="statusCode">403</param>
-                 <param name="ignoreHierarchy">false</param>
-                 <param name="includeProperties">^actionErrors.*</param>
-            </result>
-            <result name="FORBIDDEN" type="json">
-                <param name="statusCode">403</param>
-                <param name="ignoreHierarchy">false</param>
-                <param
-                    name="includeProperties">^actionErrors.*</param>
-            </result>
-            <result name="SUCCESS" type="json"> </result>
-            <result name="ERROR" type="json">
-                <param name="statusCode">422</param>
-                <param name="ignoreHierarchy">false</param>
-                <param
-                    name="includeProperties">^actionErrors.*</param>
             </result>
         </action>
 

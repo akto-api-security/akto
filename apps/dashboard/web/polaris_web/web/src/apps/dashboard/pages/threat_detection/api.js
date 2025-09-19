@@ -160,64 +160,20 @@ const threatDetectionRequests = {
             data: {actorIp, status}
         })
     },
-    updateMaliciousEventStatus(eventId, status) {
+    updateMaliciousEventStatus(data) {
+        // Handles all cases: single event (eventId), bulk (eventIds), or filter-based
         return request({
             url: '/api/updateMaliciousEventStatus',
             method: 'post',
-            data: {
-                eventId: eventId,
-                status: status
-            }
+            data: data
         })
     },
-    bulkUpdateMaliciousEventStatus(eventIds, status) {
+    deleteMaliciousEvents(data) {
+        // Handles both bulk delete (eventIds) and filter-based delete
         return request({
-            url: '/api/bulkUpdateMaliciousEventStatus',
+            url: '/api/deleteMaliciousEvents',
             method: 'post',
-            data: {
-                eventIds: eventIds,
-                status: status
-            }
-        })
-    },
-    bulkUpdateFilteredEvents(actors, urls, types, latestAttack, startTimestamp, endTimestamp, statusFilter, newStatus) {
-        return request({
-            url: '/api/bulkUpdateFilteredEvents',
-            method: 'post',
-            data: {
-                actors: actors,
-                urls: urls,
-                types: types,
-                latestAttack: latestAttack,
-                startTimestamp: startTimestamp,
-                endTimestamp: endTimestamp,
-                statusFilter: statusFilter,
-                newStatus: newStatus
-            }
-        })
-    },
-    bulkDeleteMaliciousEvents(eventIds) {
-        return request({
-            url: '/api/bulkDeleteMaliciousEvents',
-            method: 'post',
-            data: {
-                eventIds: eventIds
-            }
-        })
-    },
-    bulkDeleteFilteredEvents(actors, urls, types, latestAttack, startTimestamp, endTimestamp, statusFilter) {
-        return request({
-            url: '/api/bulkDeleteFilteredEvents',
-            method: 'post',
-            data: {
-                actors: actors,
-                urls: urls,
-                types: types,
-                latestAttack: latestAttack,
-                startTimestamp: startTimestamp,
-                endTimestamp: endTimestamp,
-                statusFilter: statusFilter
-            }
+            data: data
         })
     }
 }
