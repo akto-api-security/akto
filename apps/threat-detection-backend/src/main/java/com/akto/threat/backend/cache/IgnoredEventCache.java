@@ -3,6 +3,7 @@ package com.akto.threat.backend.cache;
 import com.akto.log.LoggerMaker;
 import com.akto.threat.backend.service.MaliciousEventService;
 import com.akto.threat.backend.constants.MongoDBCollection;
+import com.akto.threat.backend.constants.StatusConstants;
 import com.akto.threat.backend.db.MaliciousEventModel;
 import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoCollection;
@@ -56,7 +57,7 @@ public class IgnoredEventCache {
                 .getDatabase(accountId)
                 .getCollection(MongoDBCollection.ThreatDetection.MALICIOUS_EVENTS, MaliciousEventModel.class);
 
-            Bson filter = Filters.eq("status", "IGNORED");
+            Bson filter = Filters.eq("status", StatusConstants.IGNORED);
 
             try (MongoCursor<MaliciousEventModel> cursor = collection.find(filter).cursor()) {
                 while (cursor.hasNext()) {

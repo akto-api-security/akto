@@ -142,19 +142,15 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh }) {
     };
 
     const label = actionLabels[operation];
-    console.log(`Selected IDs for ${label.ing}:`, selectedIds);
 
     if (!selectedIds || selectedIds.length === 0) {
-      console.error(`No IDs selected for ${label.ing}`);
       func.setToast(true, true, 'No events selected');
       return;
     }
 
     const validIds = selectedIds.filter(id => id != null && id !== '');
-    console.log(`Valid IDs for ${label.ing}:`, validIds);
 
     if (validIds.length === 0) {
-      console.error("No valid IDs found");
       func.setToast(true, true, 'No valid events selected');
       return;
     }
@@ -167,7 +163,6 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh }) {
         response = await threatDetectionRequests.bulkUpdateMaliciousEventStatus(validIds, newState);
       }
 
-      console.log(`${operation} response:`, response);
       const isSuccess = operation === 'delete' ? response?.deleteSuccess : response?.updateSuccess;
       const count = operation === 'delete' ? response?.deletedCount : response?.updatedCount;
       const errorMessage = operation === 'delete' ? response?.deleteMessage : response?.updateMessage;
@@ -178,11 +173,9 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh }) {
           triggerRefresh();
         }
       } else {
-        console.error(`Failed to ${operation} events, response:`, response);
         func.setToast(true, true, `Failed to ${operation} events: ${errorMessage || 'Unknown error'}`);
       }
     } catch (error) {
-      console.error(`Error ${label.ing} events - full error:`, error);
       func.setToast(true, true, `Error ${label.ing} events`);
     }
   }
@@ -197,7 +190,6 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh }) {
     };
 
     const label = actionLabels[operation];
-    console.log(`${label.ing} all filtered events with filters:`, currentFilters);
 
     // Validate filters
     const validationType = operation === 'ignore' ? 'ignore' : undefined;
@@ -233,7 +225,6 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh }) {
         func.setToast(true, true, `Failed to ${operation === 'delete' ? 'delete' : operation} filtered events`);
       }
     } catch (error) {
-      console.error(`Error ${label.ing} filtered events:`, error);
       func.setToast(true, true, `Error ${label.ing} filtered events`);
     }
   }
@@ -252,7 +243,6 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh }) {
 
 
   const promotedBulkActions = (selectedIds) => {
-    console.log("promotedBulkActions called with IDs:", selectedIds);
     const actions = [];
 
     // Determine the count to display

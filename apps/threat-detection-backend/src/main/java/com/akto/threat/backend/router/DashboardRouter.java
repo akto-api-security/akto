@@ -389,11 +389,13 @@ public class DashboardRouter implements ARouter {
                     return;
                 }
 
-                boolean success = dsService.updateMaliciousEventStatus(
+                int updatedCount = dsService.updateMaliciousEventStatus(
                     ctx.get("accountId"),
-                    req.getEventId(),
+                    java.util.Arrays.asList(req.getEventId()),
+                    null,
                     req.getStatus()
                 );
+                boolean success = updatedCount > 0;
 
                 UpdateMaliciousEventStatusResponse resp = UpdateMaliciousEventStatusResponse.newBuilder()
                     .setSuccess(success)
@@ -420,9 +422,10 @@ public class DashboardRouter implements ARouter {
                     return;
                 }
 
-                int updatedCount = dsService.bulkUpdateMaliciousEventStatus(
+                int updatedCount = dsService.updateMaliciousEventStatus(
                     ctx.get("accountId"),
                     req.getEventIdsList(),
+                    null,
                     req.getStatus()
                 );
 
@@ -459,8 +462,9 @@ public class DashboardRouter implements ARouter {
                 Map<String, Object> filter = (Map<String, Object>) request.get("filter");
                 String status = (String) request.get("status");
                 
-                int updatedCount = dsService.bulkUpdateFilteredEvents(
+                int updatedCount = dsService.updateMaliciousEventStatus(
                     ctx.get("accountId"),
+                    null,
                     filter,
                     status
                 );
@@ -506,9 +510,10 @@ public class DashboardRouter implements ARouter {
                     return;
                 }
 
-                int deletedCount = dsService.bulkDeleteMaliciousEvents(
+                int deletedCount = dsService.deleteMaliciousEvents(
                     ctx.get("accountId"),
-                    eventIds
+                    eventIds,
+                    null
                 );
 
                 Map<String, Object> response = new java.util.HashMap<>();
@@ -547,8 +552,9 @@ public class DashboardRouter implements ARouter {
 
                 Map<String, Object> filter = (Map<String, Object>) request.get("filter");
 
-                int deletedCount = dsService.bulkDeleteFilteredEvents(
+                int deletedCount = dsService.deleteMaliciousEvents(
                     ctx.get("accountId"),
+                    null,
                     filter
                 );
 
