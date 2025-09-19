@@ -992,10 +992,6 @@ public class Main {
                    loggerMaker.info("Committing offset at position: " + lastLogSyncOffsetMRS);
                }
 
-               if (tryForCollectionName(payload.toString())) {
-                   continue;
-               }
-
 
                HttpRequestParams requestParams = payload.getRequestParams();
                String debugHost = Utils.printDebugHostLog(payload);
