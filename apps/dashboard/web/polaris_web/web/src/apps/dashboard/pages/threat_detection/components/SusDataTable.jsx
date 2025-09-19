@@ -39,6 +39,12 @@ const headers = [
     title: "Attack type",
   },
   {
+    text: "Successful",
+    value: "successfulComp",
+    title: "Successful",
+    maxWidth: "90px",
+  },
+  {
     text: "Collection",
     value: "apiCollectionName",
     title: "Collection",
@@ -116,6 +122,7 @@ function SusDataTable({ currDateRange, rowClicked }) {
       latestAttack = filters?.latestAttack
     }
     const sort = { [sortKey]: sortOrder };
+    const successfulFilter = filters?.successful; 
     const res = await api.fetchSuspectSampleData(
       skip,
       sourceIpsFilter,
@@ -147,12 +154,24 @@ function SusDataTable({ currDateRange, rowClicked }) {
         discoveredTs: dayjs(x.timestamp*1000).format("DD-MM-YYYY HH:mm:ss"),
         sourceIPComponent: x?.ip || "-",
         type: x?.type || "-",
+        successfulComp: (
+          <Badge size="small">{x?.successful ? "True" : "False"}</Badge>
+        ),
         severityComp: (<div className={`badge-wrapper-${severity}`}>
                           <Badge size="small">{func.toSentenceCase(severity)}</Badge>
                       </div>
         )
       };
     });
+    if (successfulFilter && Array.isArray(successfulFilter) && successfulFilter.length > 0) {
+      const wantTrue = successfulFilter.includes('true');
+      const wantFalse = successfulFilter.includes('false');
+      if (wantTrue && !wantFalse) {
+        ret = ret.filter(r => r?.successful === true);
+      } else if (!wantTrue && wantFalse) {
+        ret = ret.filter(r => r?.successful === false);
+      }
+    }
     setLoading(false);
     return { value: ret, total: total };
   }
@@ -204,6 +223,16 @@ function SusDataTable({ currDateRange, rowClicked }) {
         label: 'Latest attack sub-category',
         type: 'select',
         choices: attackTypeChoices,
+        multiple: true
+      },
+      {
+        key: 'successful',
+        label: 'Successful',
+        title: 'Successful',
+        choices: [
+          { label: 'True', value: 'true' },
+          { label: 'False', value: 'false' }
+        ],
         multiple: true
       },
     ];

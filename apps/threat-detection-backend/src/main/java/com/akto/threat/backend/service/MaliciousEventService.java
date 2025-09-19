@@ -75,6 +75,7 @@ public class MaliciousEventService {
             .setSeverity(evt.getSeverity())
             .setType(evt.getType())
             .setMetadata(evt.getMetadata().toString())
+            .setSuccessful(false)
             .build();
 
     this.kafka.send(
@@ -222,6 +223,7 @@ public class MaliciousEventService {
                 .setRefId(evt.getRefId())
                 .setEventTypeVal(evt.getEventType().toString())
                 .setMetadata(metadata)
+                .setSuccessful(evt.isSuccessful())
                 .build());
       }
       return ListMaliciousRequestsResponse.newBuilder()
