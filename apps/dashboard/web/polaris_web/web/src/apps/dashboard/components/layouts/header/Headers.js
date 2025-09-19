@@ -245,7 +245,7 @@ export default function Header() {
                                     menuItems={[
                                         { value: "API Security", label: "API Security", id: "api-security" },
                                         { value: "MCP Security", label: "MCP Security", id: "mcp-security" },
-                                        { value: "Gen AI", label: "AI Agent Security", id: "gen-ai" },
+                                        { value: "Agentic Security", label: "Agentic Security", id: "agentic-security" },
                                     ]}
                                     initial={dashboardCategory || "API Security"}
                                     selected={(val) => handleDashboardChange(val)}

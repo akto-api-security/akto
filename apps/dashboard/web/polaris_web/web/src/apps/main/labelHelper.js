@@ -31,3 +31,7 @@ export function isGenAISecurityCategory() {
 export function isApiSecurityCategory() {
   return getDashboardCategory() === 'API Security';
 }
+
+export function isAgenticSecurityCategory() {
+  return getDashboardCategory() === 'Agentic Security';
+}
