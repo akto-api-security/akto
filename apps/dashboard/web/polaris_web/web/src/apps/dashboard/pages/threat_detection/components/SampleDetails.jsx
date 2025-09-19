@@ -125,7 +125,6 @@ function SampleDetails(props) {
         try {
             const response = await threatDetectionApi.updateMaliciousEventStatus({ eventId: eventId, status: newStatus });
             if (response?.updateSuccess) {
-                console.log(`Event successfully marked as ${newStatus.toLowerCase()}`);
                 // Update parent state instead of refreshing page
                 if (onStatusUpdate) {
                     onStatusUpdate(newStatus);
@@ -134,11 +133,9 @@ function SampleDetails(props) {
                                  newStatus === 'IGNORED' ? 'ignored' : 'reactivated';
                 func.setToast(true, false, `Event ${statusText} successfully`);
             } else {
-                console.error(`Failed to update event status`);
                 func.setToast(true, true, 'Failed to update event status');
             }
         } catch (error) {
-            console.error("Error updating event status:", error);
         } finally {
             setTriageLoading(false);
         }
