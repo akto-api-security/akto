@@ -611,25 +611,18 @@ public class DbAction extends ActionSupport {
                     boolean ignore = false;
                     String url = null;
                     int responseCode = 0; // Default to 0 if not provided
-                    // First pass to collect values
-                    for (Map.Entry<String, Object> entry : bulkUpdate.getFilters().entrySet()) {
-                        if (entry.getKey().equalsIgnoreCase("url")) {
-                            url = entry.getValue().toString();
-                        } else if (entry.getKey().equalsIgnoreCase("responseCode")) {
-                            String valStr = entry.getValue().toString();
-                            responseCode = Integer.valueOf(valStr);
-                        }
-                    }
-                    // Check URL skip rules with response code
-                    if (url != null && DataInsertionPreChecks.shouldSkipUrl(accId, url, responseCode)) {
-                        ignore = true;
-                    }
-                    // Second pass for other filters
                     for (Map.Entry<String, Object> entry : bulkUpdate.getFilters().entrySet()) {
                         if (entry.getKey().equalsIgnoreCase("isUrlParam")) {
                             continue;
                         }
-                        if (entry.getKey().equalsIgnoreCase("apiCollectionId")) {
+                        if (entry.getKey().equalsIgnoreCase("url")) {
+                            url = entry.getValue().toString();
+                            filters.add(Filters.eq(entry.getKey(), entry.getValue()));
+                        } else if (entry.getKey().equalsIgnoreCase("responseCode")) {
+                            String valStr = entry.getValue().toString();
+                            responseCode = Integer.valueOf(valStr);
+                            filters.add(Filters.eq(entry.getKey(), responseCode));
+                        } else if (entry.getKey().equalsIgnoreCase("apiCollectionId")) {
                             String valStr = entry.getValue().toString();
                             int val = Integer.valueOf(valStr);
                             if (ignoreHosts.contains(val)) {
@@ -637,13 +630,14 @@ public class DbAction extends ActionSupport {
                                 break;
                             }
                             filters.add(Filters.eq(entry.getKey(), val));
-                        } else if (entry.getKey().equalsIgnoreCase("responseCode")) {
-                            String valStr = entry.getValue().toString();
-                            int val = Integer.valueOf(valStr);
-                            filters.add(Filters.eq(entry.getKey(), val));
                         } else {
                             filters.add(Filters.eq(entry.getKey(), entry.getValue()));
                         }
+                    }
+
+                    // Check URL skip rules after processing
+                    if (!ignore && url != null && DataInsertionPreChecks.shouldSkipUrl(accId, url, responseCode)) {
+                        ignore = true;
                     }
                     if (ignore) {
                         ignoreCount++;
