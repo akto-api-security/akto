@@ -68,6 +68,9 @@ public class McpReconResult {
     public static final String DISCOVERED_AT = "discoveredAt";
     private int discoveredAt;
 
+    public static final String ACCOUNT_ID = "accountId";
+    private int accountId;
+
     public McpReconResult() {
     }
 
