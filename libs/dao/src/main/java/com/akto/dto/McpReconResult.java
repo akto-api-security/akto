@@ -65,6 +65,9 @@ public class McpReconResult {
     public static final String PROMPTS = "prompts";
     private List<Map<String, Object>> prompts;
 
+    public static final String DISCOVERED_AT = "discoveredAt";
+    private int discoveredAt;
+
     public McpReconResult() {
     }
 
