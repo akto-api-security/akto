@@ -2,16 +2,14 @@ package com.akto.hybrid_runtime;
 
 import com.akto.dao.context.Context;
 import com.akto.data_actor.DataActorFactory;
-import com.akto.dto.ApiCollection;
-import com.akto.dto.HttpResponseParams;
-import com.akto.dto.McpReconRequest;
+import com.akto.dto.*;
 import com.akto.dto.traffic.CollectionTags;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
-import com.akto.dto.McpScanResult;
-import com.akto.dto.McpServer;
+import com.akto.util.Constants;
 import com.mongodb.BasicDBObject;
 import org.apache.commons.lang3.StringUtils;
+import org.bson.types.ObjectId;
 
 import java.util.*;
 import java.util.concurrent.*;
@@ -133,9 +131,10 @@ public class McpReconSyncJobExecutor {
             // Convert McpReconRequest DTOs to McpReconConfig
             for (McpReconRequest request : pendingRequests) {
                 McpReconConfig config = new McpReconConfig();
-                config.setRequestId(request.get_id());
+                config.setRequestId(request.getId());
+                config.setRequestIdHex(request.getHexId());
                 config.setAccountId(request.getAccountId()); 
-                config.setName("MCP_Recon_" + request.get_id());
+                config.setName("MCP_Recon_" + request.getId());
                 config.setIpRange(request.getIpRange());
                 config.setEnabled(true);
                 
@@ -144,11 +143,9 @@ public class McpReconSyncJobExecutor {
                 // Update status to "In Progress"
                 int currentTime = Context.now();
                 DataActorFactory.fetchInstance().updateMcpReconRequestStatus(
-                    request.get_id(),
-                    McpReconRequest.STATUS_IN_PROGRESS,
-                    0,  // serversFound is 0 when starting
-                    currentTime,  // startedAt
-                    0  // finishedAt is 0 when starting
+                    request.getHexId(),
+                    Constants.STATUS_IN_PROGRESS,
+                    0
                 );
             }
         } catch (Exception e) {
@@ -197,7 +194,7 @@ public class McpReconSyncJobExecutor {
      * Optimized cache check with expiration and size management
      */
     private boolean shouldSkipScan(McpReconConfig config) {
-        String cacheKey = config.getRequestId();
+        String cacheKey = config.getRequestIdHex();
         ScanCacheEntry cached = scanCache.get(cacheKey);
         
         if (cached == null) {
@@ -262,7 +259,7 @@ public class McpReconSyncJobExecutor {
                 config.getIpRange(), duration, result.getServersFound()));
             
             // Update cache
-            scanCache.put(config.getRequestId(), new ScanCacheEntry(result, System.currentTimeMillis()));
+            scanCache.put(config.getRequestIdHex(), new ScanCacheEntry(result, System.currentTimeMillis()));
             
             // Return task result
             return new ScanTaskResult(config, result, duration);
@@ -277,11 +274,9 @@ public class McpReconSyncJobExecutor {
      * Process and store scan results
      */
     private void processScanResults(List<ScanTaskResult> scanResults) {
-        List<HttpResponseParams> allResponseParams = new ArrayList<>();
-        
         // Batch size for database insertions
         final int BATCH_SIZE = 500;
-        List<BasicDBObject> serverBatch = new ArrayList<>();
+        List<McpReconResult> serverBatch = new ArrayList<>();
         
         for (ScanTaskResult taskResult : scanResults) {
             if (taskResult.result == null || taskResult.result.getServers() == null) {
@@ -294,32 +289,34 @@ public class McpReconSyncJobExecutor {
             // Prepare batch data for scan results
             int discoveryTimestamp = Context.now();
             for (McpServer server : taskResult.result.getServers()) {
-                BasicDBObject serverData = new BasicDBObject();
+
+                McpReconResult mcpReconResult = new McpReconResult();
 
                 // Add MCP recon request ID
-                serverData.put("mcp_recon_request_id", taskResult.config.getRequestId());
+                mcpReconResult.setMcpReconRequestId((new ObjectId(taskResult.config.requestIdHex)));
+                mcpReconResult.setAccountId(taskResult.config.accountId);
 
                 // Add all server parameters
-                serverData.put("ip", server.getIp());
-                serverData.put("port", server.getPort());
-                serverData.put("url", server.getUrl());
-                serverData.put("verified", server.isVerified());
-                serverData.put("detection_method", server.getDetectionMethod());
-                serverData.put("timestamp", server.getTimestamp());
-                serverData.put("type", server.getType());
-                serverData.put("endpoint", server.getEndpoint());
-                serverData.put("protocol_version", server.getProtocolVersion());
-                serverData.put("server_info", server.getServerInfo());
-                serverData.put("capabilities", server.getCapabilities());
-                serverData.put("tools", server.getTools());
-                serverData.put("resources", server.getResources());
-                serverData.put("prompts", server.getPrompts());
+                mcpReconResult.setIp(server.getIp());
+                mcpReconResult.setPort(server.getPort());
+                mcpReconResult.setUrl(server.getUrl());
+                mcpReconResult.setVerified(server.isVerified());
+                mcpReconResult.setDetectionMethod(server.getDetectionMethod());
+                mcpReconResult.setTimestamp(server.getTimestamp());
+                mcpReconResult.setType(server.getType());
+                mcpReconResult.setEndpoint(server.getEndpoint());
+                mcpReconResult.setProtocolVersion(server.getProtocolVersion());
+                mcpReconResult.setServerInfo(server.getServerInfo());
+                mcpReconResult.setCapabilities(server.getCapabilities());
+                mcpReconResult.setTools(server.getTools());
+                mcpReconResult.setResources(server.getResources());
+                mcpReconResult.setPrompts(server.getPrompts());
 
                 // Add discovery timestamp
-                serverData.put("discovered_at", discoveryTimestamp);
+                mcpReconResult.setDiscoveredAt(discoveryTimestamp);
 
                 // Add to batch
-                serverBatch.add(serverData);
+                serverBatch.add(mcpReconResult);
                 
                 // Insert when batch is full
                 if (serverBatch.size() >= BATCH_SIZE) {
@@ -347,20 +344,18 @@ public class McpReconSyncJobExecutor {
             int serversFound = 0;
             
             if (taskResult.result != null) {
-                status = McpReconRequest.STATUS_COMPLETED;
+                status = Constants.STATUS_COMPLETED;
                 serversFound = taskResult.result.getServersFound();
             } else {
-                status = McpReconRequest.STATUS_FAILED;
+                status = Constants.STATUS_FAILED;
             }
             
             // Update MCP recon request status with results completed or failed
             int finishedAt = Context.now();
             DataActorFactory.fetchInstance().updateMcpReconRequestStatus(
-                taskResult.config.getRequestId(),
+                taskResult.config.requestIdHex,
                 status,
-                serversFound,
-                0,  // startedAt (not updating when finishing)
-                finishedAt
+                serversFound
             );
             
         } catch (Exception e) {
@@ -389,7 +384,8 @@ public class McpReconSyncJobExecutor {
      * Configuration class for MCP recon scans
      */
     private static class McpReconConfig {
-        private String requestId;  // MongoDB request ID
+        private ObjectId requestId;  // MongoDB request ID
+        private String requestIdHex;
         private int accountId;
         private String name;
         private String ipRange;
@@ -420,9 +416,24 @@ public class McpReconSyncJobExecutor {
         }
         
         // Getters and setters
-        public String getRequestId() { return requestId; }
-        public void setRequestId(String requestId) { this.requestId = requestId; }
-        
+
+
+        public ObjectId getRequestId() {
+            return requestId;
+        }
+
+        public void setRequestId(ObjectId requestId) {
+            this.requestId = requestId;
+        }
+
+        public String getRequestIdHex() {
+            return requestIdHex;
+        }
+
+        public void setRequestIdHex(String requestIdHex) {
+            this.requestIdHex = requestIdHex;
+        }
+
         public int getAccountId() { return accountId; }
         public void setAccountId(int accountId) { this.accountId = accountId; }
         
