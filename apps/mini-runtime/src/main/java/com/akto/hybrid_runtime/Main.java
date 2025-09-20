@@ -494,7 +494,7 @@ public class Main {
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb(e, "Error while executing MCP Recon Sync Job");
             }
-        }, 0, 2, TimeUnit.MINUTES);
+        }, 0, 24, TimeUnit.HOURS);
 
         if(isDbMergingModeEnabled()){
             runDBMaintenanceJob(apiConfig);

@@ -253,6 +253,9 @@ public class DaoInit {
         ClassModel<JobParams> jobParams = ClassModel.builder(JobParams.class).enableDiscriminator(true).build();
         ClassModel<TLSAuthParam> tlsAuthClassModel = ClassModel.builder(TLSAuthParam.class).enableDiscriminator(true).build();
         ClassModel<CollectionTags> collectionTagsModel = ClassModel.builder(CollectionTags.class).enableDiscriminator(true).build();
+        ClassModel<McpReconResult> mcpReconResultClassModel = ClassModel.builder(McpReconResult.class).enableDiscriminator(true).build();
+        ClassModel<McpReconRequest> mcpReconRequestClassModel = ClassModel.builder(McpReconRequest.class).enableDiscriminator(true).build();
+
 
         CodecRegistry pojoCodecRegistry = fromProviders(PojoCodecProvider.builder().register(
                 configClassModel, signupInfoClassModel, apiAuthClassModel, attempResultModel, urlTemplateModel,
@@ -282,7 +285,7 @@ public class DaoInit {
                 yamlNodeDetails, multiExecTestResultClassModel, workflowTestClassModel, dependencyNodeClassModel, paramInfoClassModel,
                         nodeClassModel, connectionClassModel, edgeClassModel, replaceDetailClassModel, modifyHostDetailClassModel, fileUploadClassModel
                 ,fileUploadLogClassModel, codeAnalysisCollectionClassModel, codeAnalysisApiLocationClassModel, codeAnalysisApiInfoClassModel, codeAnalysisApiInfoKeyClassModel,
-                riskScoreTestingEndpointsClassModel, OrganizationFlagsClassModel, jobParams, tlsAuthClassModel, collectionTagsModel).automatic(true).build());
+                riskScoreTestingEndpointsClassModel, OrganizationFlagsClassModel, jobParams, tlsAuthClassModel, collectionTagsModel, mcpReconResultClassModel, mcpReconRequestClassModel).automatic(true).build());
 
         final CodecRegistry customEnumCodecs = CodecRegistries.fromCodecs(
                 new EnumCodec<>(Conditions.Operator.class),

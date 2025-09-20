@@ -4046,7 +4046,7 @@ public class ClientActor extends DataActor {
             try {
                 payloadObj =  BasicDBObject.parse(responsePayload);
 
-                BasicDBList pendingMcpReconRequests = (BasicDBList) payloadObj.get("mcp_recon_requests");
+                BasicDBList pendingMcpReconRequests = (BasicDBList) payloadObj.get("mcpReconRequests");
 
                 for (Object obj: pendingMcpReconRequests) {
                     BasicDBObject aObj = (BasicDBObject) obj;
@@ -4066,17 +4066,14 @@ public class ClientActor extends DataActor {
     /**
      * Update MCP recon request status
      */
-    public void updateMcpReconRequestStatus(String requestId, String status, int serversFound, int startedAt,  int finishedAt) {
+    public void updateMcpReconRequestStatus(String requestId, String status, int serversFound) {
         Map<String, List<String>> headers = buildHeaders();
         loggerMaker.infoAndAddToDb("updateMcpReconRequestStatus api called for requestId: " + requestId + " status: " + status + " serversFound: " + serversFound, LoggerMaker.LogDb.RUNTIME);
         
         BasicDBObject obj = new BasicDBObject();
         obj.put("requestId", requestId);
-        obj.put("status", status);
+        obj.put("newStatus", status);
         obj.put("serversFound", serversFound);
-        if(status.equals(McpReconRequest.STATUS_IN_PROGRESS))
-            obj.put("startedAt", startedAt);
-        obj.put("finishedAt", finishedAt);
         
         OriginalHttpRequest request = new OriginalHttpRequest(url + "/updateMcpReconRequestStatus", "", "POST", obj.toString(), headers, "");
         try {
@@ -4095,14 +4092,40 @@ public class ClientActor extends DataActor {
     /**
      * Batch store MCP recon results
      */
-    public void storeMcpReconResultsBatch(List<BasicDBObject> serverDataList) {
+    public void storeMcpReconResultsBatch(List<McpReconResult> serverDataList) {
         Map<String, List<String>> headers = buildHeaders();
         loggerMaker.infoAndAddToDb("storeMcpReconResultsBatch api called with " + serverDataList.size() + " servers", LoggerMaker.LogDb.RUNTIME);
+
+        // Convert McpReconResult objects to BasicDBObject for JSON serialization
+        List<Document> docs = new ArrayList<>();
+        for (McpReconResult r : serverDataList) {
+            Document d = new Document()
+                    .append("mcpReconRequestId", r.getMcpReconRequestId())
+                    .append("ip", r.getIp())
+                    .append("port", r.getPort())
+                    .append("url", r.getUrl())
+                    .append("verified", r.isVerified())
+                    .append("detectionMethod", r.getDetectionMethod())
+                    .append("timestamp", r.getTimestamp())
+                    .append("type", r.getType())
+                    .append("endpoint", r.getEndpoint())
+                    .append("protocolVersion", r.getProtocolVersion())
+                    .append("serverInfo", r.getServerInfo())
+                    .append("capabilities", r.getCapabilities())
+                    .append("tools", r.getTools())
+                    .append("resources", r.getResources())
+                    .append("prompts", r.getPrompts())
+                    .append("discoveredAt", r.getDiscoveredAt())
+                    .append("accountId", r.getAccountId());
+
+            docs.add(d);
+        }
+
+        Document wrapper = new Document("serverDataList", docs);
+        String jsonBody = wrapper.toJson();
+
         
-        BasicDBObject obj = new BasicDBObject();
-        obj.put("servers", serverDataList);
-        
-        OriginalHttpRequest request = new OriginalHttpRequest(url + "/storeMcpReconResultsBatch", "", "POST", obj.toString(), headers, "");
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/storeMcpReconResultsBatch", "", "POST", jsonBody, headers, "");
         try {
             OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
             String responsePayload = response.getBody();
