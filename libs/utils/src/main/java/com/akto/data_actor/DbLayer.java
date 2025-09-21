@@ -1780,4 +1780,33 @@ public class DbLayer {
     public static List<SlackWebhook> fetchSlackWebhooks() {
         return SlackWebhooksDao.instance.findAll(Filters.empty());
     }
+
+    public static List<McpReconRequest> fetchPendingMcpReconRequests() {
+        // Fetch all requests where status is "Pending"
+        Bson filter = Filters.eq(McpReconRequest.STATUS, Constants.STATUS_PENDING);
+        return McpReconRequestDao.instance.findAll(filter);
+    }
+
+    public static void updateMcpReconRequestStatus(Object requestId, String newStatus, int serversFound) {
+        Bson filter = Filters.eq(McpReconRequest.ID, requestId);
+        Bson updates;
+        if (newStatus.equals(Constants.STATUS_IN_PROGRESS)) {
+            updates = Updates.combine(
+                    Updates.set(McpReconRequest.STATUS, newStatus),
+                    Updates.set(McpReconRequest.STARTED_AT, Context.now())
+            );
+        } else {   // For completed or failed status
+            updates = Updates.combine(
+                    Updates.set(McpReconRequest.STATUS, newStatus),
+                    Updates.set(McpReconRequest.SERVERS_FOUND, serversFound),
+                    Updates.set(McpReconRequest.FINISHED_AT, Context.now())
+            );
+        }
+        McpReconRequestDao.instance.updateOneNoUpsert(filter, updates);
+    }
+
+    public static void storeMcpReconResultsBatch(List<McpReconResult> serverDataList) {
+        // Batch store MCP server discovery results using DAO
+        McpReconResultDao.instance.insertMany(serverDataList);
+    }
 }

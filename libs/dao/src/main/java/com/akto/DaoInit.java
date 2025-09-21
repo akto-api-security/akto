@@ -407,6 +407,8 @@ public class DaoInit {
         RBACDao.instance.createIndicesIfAbsent();
         RuntimeMetricsDao.instance.createIndicesIfAbsent();
         JobsDao.instance.createIndicesIfAbsent();
+        McpReconRequestDao.instance.createIndicesIfAbsent();
+        McpReconResultDao.instance.createIndicesIfAbsent();
     }
 
 }

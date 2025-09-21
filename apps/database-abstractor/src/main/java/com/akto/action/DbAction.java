@@ -8,6 +8,7 @@ import com.akto.dao.traffic_collector.TrafficCollectorMetricsDao;
 import com.akto.data_actor.DbLayer;
 import com.akto.dto.*;
 import com.akto.dto.ApiInfo.ApiInfoKey;
+import com.akto.dto.McpReconRequest;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.billing.Tokens;
 import com.akto.dto.billing.UningestedApiOverage;
@@ -112,6 +113,28 @@ public class DbAction extends ActionSupport {
     String openApiSchema;
     @Getter @Setter
     McpAuditInfo auditInfo;
+    
+    // MCP Recon fields
+    @Getter @Setter
+    private List<McpReconRequest> mcpReconRequests;
+    
+    @Getter @Setter
+    private String requestId;
+    
+    @Getter @Setter
+    private String newStatus;
+    
+    @Getter @Setter
+    private int serversFound;
+    
+    @Getter @Setter
+    private int startedAt;
+    
+    @Getter @Setter
+    private int finishedAt;
+    
+    @Getter @Setter
+    private List<McpReconResult> serverDataList;
 
     private ModuleInfo moduleInfo;
 
@@ -2783,6 +2806,37 @@ public class DbAction extends ActionSupport {
         } catch (Exception e) {
             e.printStackTrace();
             loggerMaker.errorAndAddToDb(e, "Error insertMCPAuditDataLog " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+    
+    // MCP Recon methods
+    public String fetchPendingMcpReconRequests() {
+        try {
+            mcpReconRequests = DbLayer.fetchPendingMcpReconRequests();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in fetchPendingMcpReconRequests " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+    
+    public String updateMcpReconRequestStatus() {
+        try {
+            DbLayer.updateMcpReconRequestStatus(new ObjectId(this.requestId), newStatus, serversFound);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in updateMcpReconRequestStatus " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+    
+    public String storeMcpReconResultsBatch() {
+        try {
+            DbLayer.storeMcpReconResultsBatch(serverDataList);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in storeMcpReconResultsBatch " + e.toString());
             return Action.ERROR.toUpperCase();
         }
         return Action.SUCCESS.toUpperCase();
