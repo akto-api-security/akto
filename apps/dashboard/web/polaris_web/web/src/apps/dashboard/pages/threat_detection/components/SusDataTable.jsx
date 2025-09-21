@@ -121,6 +121,7 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh }) {
 
   // Helper function to validate filter requirements for bulk operations
   const validateFiltersForBulkOperation = (operationType = 'operation') => {
+    // Check if both URL and Attack Type filters are present
     if (!currentFilters.url || currentFilters.url.length === 0 ||
         !currentFilters.latestAttack || currentFilters.latestAttack.length === 0) {
       const message = operationType === 'ignore'
@@ -129,6 +130,18 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh }) {
       func.setToast(true, true, message);
       return false;
     }
+
+    // Check if any other filters are applied (only URL and attack category are allowed)
+    const hasOtherFilters = (currentFilters.actor && currentFilters.actor.length > 0) ||
+                           (currentFilters.type && currentFilters.type.length > 0) ||
+                           (currentFilters.apiCollectionId && currentFilters.apiCollectionId.length > 0);
+    
+    if (hasOtherFilters) {
+      const message = 'Only URL and Attack Category filters are allowed for bulk operations. Please remove other filters (Actor, Type, Collection) and try again.';
+      func.setToast(true, true, message);
+      return false;
+    }
+
     return true;
   }
 
