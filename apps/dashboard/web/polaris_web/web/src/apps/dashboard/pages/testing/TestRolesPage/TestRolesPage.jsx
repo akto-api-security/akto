@@ -80,19 +80,7 @@ function TestRolesPage(){
 
     const getActions = (item) => {
 
-        const actionItems = [{
-            items: [
-                {
-                    content: 'Access matrix',
-                    onAction: () => navigate("access-matrix", {state: {
-                        name: item.name,
-                        scopeRoles: item?.scopeRoles || [],
-                        endpoints: item.endpointLogicalGroup.testingEndpoints,
-                        authWithCondList: item.authWithCondList
-                    }})
-                }
-            ]
-        }]
+        const actionItems = [{ items: [] }]
 
         // if(item.name !== 'ATTACKER_TOKEN_ALL') {
         if(item.createdBy !== 'System') {
@@ -107,6 +95,10 @@ function TestRolesPage(){
                 destructive: true
             }
             actionItems[0].items.push(removeActionItem)
+        }
+
+        if (actionItems.length === 0 || (actionItems[0] && actionItems[0].items.length === 0)) {
+            return []
         }
 
         return actionItems
@@ -143,6 +135,16 @@ function TestRolesPage(){
     const tableCountObj = func.getTabsCount(definedTableTabs, data)
     const tableTabs = func.getTableTabsContent(definedTableTabs, tableCountObj, setSelectedTab, selectedTab, tabsInfo)
 
+    const anyRowHasActions = (() => {
+        const rows = data[selectedTab] || []
+        for (let i = 0; i < rows.length; i++) {
+            const actions = getActions(rows[i])
+            if (actions && actions.length > 0) {
+                return true
+            }
+        }
+        return false
+    })()
 
     useEffect(() => {
         setLoading(true);
@@ -195,7 +197,7 @@ function TestRolesPage(){
                     loading={loading}
                     onRowClick={onTestRoleClick}
                     getActions={getActions}
-                    hasRowActions={true}
+                    hasRowActions={anyRowHasActions}
                     useNewRow={true}
                     sortOptions={sortOptions}
                 />
