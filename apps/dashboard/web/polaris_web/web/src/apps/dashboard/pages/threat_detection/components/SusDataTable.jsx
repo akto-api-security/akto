@@ -122,7 +122,10 @@ function SusDataTable({ currDateRange, rowClicked }) {
       latestAttack = filters?.latestAttack
     }
     const sort = { [sortKey]: sortOrder };
-    const successfulFilterValue = Array.isArray(filters?.successful) ? filters?.successful?.[0] : filters?.successful; 
+    const successfulFilterValue = Array.isArray(filters?.successful) ? filters?.successful?.[0] : filters?.successful;
+    const successfulBool = (successfulFilterValue === true || successfulFilterValue === 'true') ? true
+                          : (successfulFilterValue === false || successfulFilterValue === 'false') ? false
+                          : undefined;
     const res = await api.fetchSuspectSampleData(
       skip,
       sourceIpsFilter,
@@ -133,8 +136,8 @@ function SusDataTable({ currDateRange, rowClicked }) {
       startTimestamp,
       endTimestamp,
       latestAttack,
-      undefined, 
-      successfulFilterValue ? [successfulFilterValue] : []
+      undefined,
+      successfulBool
     );
 //    setSubCategoryChoices(distinctSubCategories);
     let total = res.total;
