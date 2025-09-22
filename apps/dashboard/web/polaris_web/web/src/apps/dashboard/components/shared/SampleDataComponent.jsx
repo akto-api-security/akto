@@ -34,8 +34,8 @@ function SampleDataComponent(props) {
             setIpObj({sourceIP: parsed?.ip, destIP: parsed?.destIp})
         }
         
-        let responseJson = func.responseJson(parsed, sampleData?.highlightPaths, metadata)
-        let requestJson = func.requestJson(parsed, sampleData?.highlightPaths, metadata)
+        let responseJson = func.responseJson(parsed, sampleData?.highlightPaths || [], metadata)
+        let requestJson = func.requestJson(parsed, sampleData?.highlightPaths || [], metadata)
 
         let responseTime = parsed?.responseTime;
         setResponseTime(responseTime)
@@ -46,8 +46,8 @@ function SampleDataComponent(props) {
         } catch {
           originalParsed = undefined
         }
-        let originalResponseJson = func.responseJson(originalParsed, sampleData?.highlightPaths)
-        let originalRequestJson = func.requestJson(originalParsed, sampleData?.highlightPaths)
+        let originalResponseJson = func.responseJson(originalParsed, sampleData?.highlightPaths || [])
+        let originalRequestJson = func.requestJson(originalParsed, sampleData?.highlightPaths || [])
 
         if(isNewDiff){
             let lineReqObj = transform.getFirstLine(originalRequestJson?.firstLine,requestJson?.firstLine)
@@ -64,12 +64,12 @@ function SampleDataComponent(props) {
 
             setSampleJsonData({
                 request: requestData,
-                response: responseData
+                response: { ...responseData, vulnerabilitySegments: sampleData?.vulnerabilitySegments }
             })
         }else{
             setSampleJsonData({ 
                 request: { message: transform.formatData(requestJson,"http"), original: transform.formatData(originalRequestJson,"http"), highlightPaths:requestJson?.highlightPaths }, 
-                response: { message: transform.formatData(responseJson,"http"), original: transform.formatData(originalResponseJson,"http"), highlightPaths:responseJson?.highlightPaths },
+                response: { message: transform.formatData(responseJson,"http"), original: transform.formatData(originalResponseJson,"http"), highlightPaths:responseJson?.highlightPaths, vulnerabilitySegments: sampleData?.vulnerabilitySegments },
             })
         }
       }, [sampleData, metadata])

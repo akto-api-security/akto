@@ -145,6 +145,11 @@ public class AccountSettings {
     public static final String COMPULSORY_DESCRIPTION = "compulsoryDescription";
     private Map<String, Boolean> compulsoryDescription = new HashMap<>();
 
+    @Getter
+    @Setter
+    private String awsAccountIdsForApiGatewayLogging;
+    public static final String AWS_ACCOUNT_IDS_FOR_API_GATEWAY_LOGGING = "awsAccountIdsForApiGatewayLogging";
+
     public AccountSettings() {
     }
 

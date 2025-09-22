@@ -2,6 +2,7 @@ import {Avatar, Badge} from "@shopify/polaris"
 import PostmanSource from "./components/PostmanSource"
 import BurpSource from "./components/BurpSource"
 import HybridSaasSource from "./components/HybridSaasSource"
+import McpWrapper from "./components/McpWrapper"
 import AwsSource from "./components/AwsSource"
 import FargateSource from "./components/FargateSource"
 import Kubernetes from "./components/Kubernetes"
@@ -18,7 +19,7 @@ import AiAgentScan from "./components/AiAgentScan"
 import { isApiSecurityCategory, isGenAISecurityCategory, isMCPSecurityCategory } from "../../../main/labelHelper"
 import McpRecon from "./components/McpRecon"
 import McpProxy from "./components/McpProxy"
-
+import AwsLogAccountComponent from "./components/shared/AwsLogAccountComponent"
 
 const mirroringObj = {
     icon: '/public/aws.svg',
@@ -35,6 +36,15 @@ const apigeeObj = {
     text: "Apigee setup is recommended if you are using Google's Apigee API Management platform to design, secure, and scale your APIs.",
     docsUrl: 'https://docs.akto.io/traffic-connector/gcp-services/connect-akto-with-apigee',
     key: "Apigee",
+    component: <AddOnComponenet/>
+}
+
+const iisObj = {
+    icon: '/public/iis.svg',
+    label: "IIS",
+    text: "IIS setup is recommended if you are using Microsoft's Internet Information Services to host your applications.",
+    docsUrl: 'https://docs.akto.io/traffic-connector/api-gateways/connect-akto-with-iis',
+    key: "IIS",
     component: <AddOnComponenet/>
 }
 
@@ -429,6 +439,15 @@ const customAgentObj = {
     />
 }
 
+const mcpWrapperObj = {
+    icon: '/public/mcp.svg',
+    label: "MCP Wrapper",
+    text: "MCP Wrapper helps you detect MCP servers configured on your laptop or desktop, giving you full visibility into their requests and responses.",   
+    docsUrl: 'https://docs.akto.io/mcp-watch',
+    key: "MCP_WRAPPER",
+    component: <McpWrapper/>
+}
+
 const mcpScanObj = {
     icon: '/public/mcp.svg',
     label: "MCP Import",
@@ -627,7 +646,7 @@ const awsApiGatewayObj = {
     label: "AWS API Gateway",
     text: "Akto-AWS-API-Gateway setup is recommended if you are using AWS API Gateway.",
     docsUrl: 'https://docs.akto.io/traffic-connector/aws-services/aws-api-gateway',
-    component: <AddOnComponenet/>,
+    component: <AddOnComponenet featureLabel="AWS_API_GATEWAY" featureComponent={<AwsLogAccountComponent/>}/>,
     key: "AWS_API_GATEWAY",
 }
 
@@ -1305,7 +1324,7 @@ const quickStartFunc = {
 
         // API Gateways
         const apiGateways = [
-            apigeeObj, azureObj, cloudflareObj, f5Obj, kongmeshObj, layer7Obj, threescaleObj, nginxObj, haproxyObj, envoyObj, istioObj, kongObj, ibmapiconnectObj, citrixObj, azureappserviceObj, mulesoftObj
+            apigeeObj, iisObj, azureObj, cloudflareObj, f5Obj, kongmeshObj, layer7Obj, threescaleObj, nginxObj, haproxyObj, envoyObj, istioObj, kongObj, ibmapiconnectObj, citrixObj, azureappserviceObj, mulesoftObj
         ];
 
         // Mirroring
@@ -1348,7 +1367,7 @@ const quickStartFunc = {
 
         // MCP Scan
         const mcpScan = [
-            mcpScanObj, mcpReconObj, mcpProxyObj
+            mcpScanObj, mcpReconObj, mcpProxyObj, mcpWrapperObj
         ];
 
         // Akto SDK
@@ -1410,10 +1429,10 @@ const quickStartFunc = {
         // Combine all categories into connectorsList
         let connectorsList = [
             gcpObj, kubernetesObj, fargateObj, nginxObj, burpObj, postmanObj,
-            openApiObj, beanStalkObj, eksObj, dockerObj, envoyObj, mcpScanObj, mcpProxyObj,
+            openApiObj, beanStalkObj, eksObj, dockerObj, envoyObj, mcpScanObj, mcpProxyObj, mcpWrapperObj,
             harFileUploadObj, kongObj, tcpObj, mirroringObj, hybridSaasObj, apiInventoryFromSourceCodeObj,
             ebpfObj, ebpfMTLSObj, istioObj, pythonObj, awsApiGatewayObj, awsLambdaObj,
-            apigeeObj, azureObj, cloudflareObj, f5Obj, goObj, haproxyObj, javaObj, kongmeshObj, layer7Obj, nodejsObj, openshiftObj, threescaleObj, githubObj, gitlabObj, bitbucketObj, aktoJaxObj
+            apigeeObj, iisObj, azureObj, cloudflareObj, f5Obj, goObj, haproxyObj, javaObj, kongmeshObj, layer7Obj, nodejsObj, openshiftObj, threescaleObj, githubObj, gitlabObj, bitbucketObj, aktoJaxObj
         ]
 
         if(isGenAISecurityCategory()){

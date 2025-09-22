@@ -2920,6 +2920,36 @@
             </result>
         </action>
 
+        <action name="api/initiateMCPRecon" class="com.akto.action.MCPReconAction" method="initiateMCPRecon">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">MCP_SECURITY</param>
+                <param name="accessType">READ_WRITE</param>
+                <param name="actionDescription">User initiated MCP reconnaissance</param>
+            </interceptor-ref>
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="SUCCESS" type="json">
+            </result>
+            <interceptor-ref name="usageInterceptor">
+                <param name="featureLabel">MCP_SECURITY</param>
+            </interceptor-ref>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="UNAUTHORIZED" type="json">
+                 <param name="statusCode">403</param>
+                 <param name="ignoreHierarchy">false</param>
+                 <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
         <action name="api/importFromUrl" class="com.akto.action.AgentImportAction" method="importFromUrl">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
@@ -2935,6 +2965,64 @@
             </result>
             <interceptor-ref name="usageInterceptor">
                 <param name="featureLabel">AI_ASSET_COUNT</param>
+            </interceptor-ref>
+            <result name="SUCCESS"  type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="UNAUTHORIZED" type="json">
+                 <param name="statusCode">403</param>
+                 <param name="ignoreHierarchy">false</param>
+                 <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/addAwsAccountIdsForApiGatewayLogging" class="com.akto.action.quick_start.AwsAction" method="addAwsAccountIdsForApiGatewayLogging">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">AWS_API_GATEWAY</param>
+                <param name="accessType">READ_WRITE</param>
+                <param name="actionDescription">User added AWS account IDs for API Gateway logging</param>
+            </interceptor-ref>
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <interceptor-ref name="usageInterceptor">
+                <param name="featureLabel">AWS_API_GATEWAY</param>
+            </interceptor-ref>
+            <result name="SUCCESS"  type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="UNAUTHORIZED" type="json">
+                 <param name="statusCode">403</param>
+                 <param name="ignoreHierarchy">false</param>
+                 <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/fetchAwsAccountIdsForApiGatewayLogging" class="com.akto.action.quick_start.AwsAction" method="fetchAwsAccountIdsForApiGatewayLogging">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">AWS_API_GATEWAY</param>
+                <param name="accessType">READ_WRITE</param>
+                <param name="actionDescription">AWS account IDs for API Gateway logging</param>
+            </interceptor-ref>
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <interceptor-ref name="usageInterceptor">
+                <param name="featureLabel">AWS_API_GATEWAY</param>
             </interceptor-ref>
             <result name="SUCCESS"  type="json"/>
             <result name="ERROR" type="json">
@@ -6762,6 +6850,28 @@
                  <param name="statusCode">403</param>
                  <param name="ignoreHierarchy">false</param>
                  <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/analyze_vulnerability" class="com.akto.action.gpt.VulnerabilityAnalysisAction" method="analyzeVulnerability">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">ASK_GPT</param>
+                <param name="accessType">READ_WRITE</param>
+                <param name="actionDescription">User analyzed response for vulnerabilities</param>
+            </interceptor-ref>
+
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
             </result>
         </action>
 

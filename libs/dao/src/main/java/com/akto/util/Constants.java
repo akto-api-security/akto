@@ -18,6 +18,16 @@ public class Constants {
     public static final String AKTO_THREAT_PROTECTION_BACKEND_HOST = "tbs.akto.io";
     public static final String AKTO_THREAT_DETECTION_CACHE_PREFIX = "akto:threat:schema:";
 
+    // IP API ratelimit cache keys
+    public static final String RATE_LIMIT_CACHE_PREFIX = "ratelimit:";
+    public static final String API_RATE_LIMIT_CONFIDENCE = "rateLimitConfidence";
+    public static final String API_RATE_LIMIT_MITIGATION = "mitigation";
+    public static final int RATE_LIMIT_UNLIMITED_REQUESTS = -1;
+    public static final String P50_CACHE_KEY = "p50";
+    public static final String P75_CACHE_KEY = "p75";
+    public static final String P90_CACHE_KEY = "p90";
+    public static final String MAX_REQUESTS_CACHE_KEY= "max_requests";
+
     public static final String AWS_ACCOUNT_ID = "AWS_ACCOUNT_ID";
 
     public static final int ONE_MONTH_TIMESTAMP = (60 * 60 * 24 * 30) ;
@@ -63,5 +73,6 @@ public class Constants {
     public static final String AKTO_MCP_RESOURCE = "RESOURCE";
     public static final String AKTO_MCP_PROMPT = "PROMPT";
     public static final String AKTO_MCP_SERVER = "SERVER";
+    public static final String STATUS_PENDING = "Pending";
 
 }
