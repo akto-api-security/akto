@@ -15,12 +15,20 @@ import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.Th
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatActorFilterRequest;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatCategoryWiseCountRequest;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatSeverityWiseCountRequest;
+import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.UpdateMaliciousEventStatusRequest;
+import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.UpdateMaliciousEventStatusResponse;
+import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.DeleteMaliciousEventsRequest;
+import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.DeleteMaliciousEventsResponse;
 import com.akto.threat.backend.service.MaliciousEventService;
 import com.akto.threat.backend.service.ThreatActorService;
 import com.akto.threat.backend.service.ThreatApiService;
 import io.vertx.core.Vertx;
 import io.vertx.ext.web.RequestBody;
 import io.vertx.ext.web.Router;
+import java.util.List;
+import java.util.Map;
+import java.util.HashMap;
+import java.util.ArrayList;
 
 public class DashboardRouter implements ARouter {
 
@@ -36,6 +44,38 @@ public class DashboardRouter implements ARouter {
         this.dsService = dsService;
         this.threatActorService = threatActorService;
         this.threatApiService = threatApiService;
+    }
+
+    private Map<String, Object> convertProtoFilterToMap(ListMaliciousRequestsRequest.Filter protoFilter) {
+        Map<String, Object> filterMap = new HashMap<>();
+
+        if (!protoFilter.getActorsList().isEmpty()) {
+            filterMap.put("ips", new ArrayList<>(protoFilter.getActorsList()));
+        }
+        if (!protoFilter.getUrlsList().isEmpty()) {
+            filterMap.put("urls", new ArrayList<>(protoFilter.getUrlsList()));
+        }
+        if (!protoFilter.getTypesList().isEmpty()) {
+            filterMap.put("types", new ArrayList<>(protoFilter.getTypesList()));
+        }
+        if (!protoFilter.getLatestAttackList().isEmpty()) {
+            filterMap.put("latestAttack", new ArrayList<>(protoFilter.getLatestAttackList()));
+        }
+        if (protoFilter.hasStatusFilter()) {
+            filterMap.put("statusFilter", protoFilter.getStatusFilter());
+        }
+        if (protoFilter.hasDetectedAtTimeRange()) {
+            Map<String, Integer> timeRange = new HashMap<>();
+            if (protoFilter.getDetectedAtTimeRange().hasStart()) {
+                timeRange.put("start", (int) protoFilter.getDetectedAtTimeRange().getStart());
+            }
+            if (protoFilter.getDetectedAtTimeRange().hasEnd()) {
+                timeRange.put("end", (int) protoFilter.getDetectedAtTimeRange().getEnd());
+            }
+            filterMap.put("detected_at_time_range", timeRange);
+        }
+
+        return filterMap;
     }
 
     @Override
@@ -367,6 +407,107 @@ public class DashboardRouter implements ARouter {
                 ).ifPresent(s -> ctx.response().setStatusCode(200).end(s));
             });
 
+        router
+            .post("/update_malicious_event_status")
+            .blockingHandler(ctx -> {
+                RequestBody reqBody = ctx.body();
+                UpdateMaliciousEventStatusRequest req = ProtoMessageUtils.<
+                    UpdateMaliciousEventStatusRequest
+                >toProtoMessage(
+                    UpdateMaliciousEventStatusRequest.class,
+                    reqBody.asString()
+                ).orElse(null);
+
+                if (req == null) {
+                    ctx.response().setStatusCode(400).end("Invalid request");
+                    return;
+                }
+
+                // Determine which type of update to perform
+                List<String> eventIds = null;
+                Map<String, Object> filterMap = null;
+
+                if (req.hasEventId()) {
+                    // Single event update
+                    eventIds = java.util.Arrays.asList(req.getEventId());
+                } else if (!req.getEventIdsList().isEmpty()) {
+                    // Bulk update by IDs
+                    eventIds = req.getEventIdsList();
+                } else if (req.hasFilter()) {
+                    // Filtered update - convert proto filter to Map
+                    filterMap = convertProtoFilterToMap(req.getFilter());
+                } else {
+                    ctx.response().setStatusCode(400).end("Must provide event_id, event_ids, or filter");
+                    return;
+                }
+
+                int updatedCount = dsService.updateMaliciousEventStatus(
+                    ctx.get("accountId"),
+                    eventIds,
+                    filterMap,
+                    req.getStatus()
+                );
+
+                UpdateMaliciousEventStatusResponse resp = UpdateMaliciousEventStatusResponse.newBuilder()
+                    .setSuccess(updatedCount > 0)
+                    .setMessage(updatedCount > 0 ?
+                        String.format("Successfully updated %d event(s)", updatedCount) :
+                        "No events updated")
+                    .setUpdatedCount(updatedCount)
+                    .build();
+
+                ProtoMessageUtils.toString(resp)
+                    .ifPresent(s -> ctx.response().setStatusCode(200).end(s));
+            });
+
+        router
+            .post("/delete_malicious_events")
+            .blockingHandler(ctx -> {
+                RequestBody reqBody = ctx.body();
+                DeleteMaliciousEventsRequest req = ProtoMessageUtils.<
+                    DeleteMaliciousEventsRequest
+                >toProtoMessage(
+                    DeleteMaliciousEventsRequest.class,
+                    reqBody.asString()
+                ).orElse(null);
+
+                if (req == null) {
+                    ctx.response().setStatusCode(400).end("Invalid request");
+                    return;
+                }
+
+                // Determine which type of delete to perform
+                List<String> eventIds = null;
+                Map<String, Object> filterMap = null;
+
+                if (!req.getEventIdsList().isEmpty()) {
+                    // Delete by IDs
+                    eventIds = req.getEventIdsList();
+                } else if (req.hasFilter()) {
+                    // Filtered delete - convert proto filter to Map
+                    filterMap = convertProtoFilterToMap(req.getFilter());
+                } else {
+                    ctx.response().setStatusCode(400).end("Must provide event_ids or filter");
+                    return;
+                }
+
+                int deletedCount = dsService.deleteMaliciousEvents(
+                    ctx.get("accountId"),
+                    eventIds,
+                    filterMap
+                );
+
+                DeleteMaliciousEventsResponse resp = DeleteMaliciousEventsResponse.newBuilder()
+                    .setSuccess(deletedCount > 0)
+                    .setMessage(deletedCount > 0 ?
+                        String.format("Successfully deleted %d event(s)", deletedCount) :
+                        "No events deleted")
+                    .setDeletedCount(deletedCount)
+                    .build();
+
+                ProtoMessageUtils.toString(resp)
+                    .ifPresent(s -> ctx.response().setStatusCode(200).end(s));
+            });
 
         return router;
     }

@@ -73,6 +73,9 @@ function ThreatDetectionPage() {
     const [currentRefId, setCurrentRefId] = useState('')
     const [rowDataList, setRowDataList] = useState([])
     const [moreInfoData, setMoreInfoData] = useState({})
+    const [currentEventId, setCurrentEventId] = useState('')
+    const [currentEventStatus, setCurrentEventStatus] = useState('')
+    const [triggerTableRefresh, setTriggerTableRefresh] = useState(0)
     const initialVal = values.ranges[3]
     const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), initialVal);
     const [showDetails, setShowDetails] = useState(false);
@@ -108,6 +111,8 @@ function ThreatDetectionPage() {
                 }) 
                 setRowDataList(rowData)
                 setCurrentRefId(data?.refId)
+                setCurrentEventId(data?.id)
+                setCurrentEventStatus(data?.status || '')
                 setShowDetails(true)
                 setMoreInfoData({
                     url: data.url,
@@ -121,6 +126,12 @@ function ThreatDetectionPage() {
         }
         
       }
+
+    const handleStatusUpdate = (newStatus) => {
+        setCurrentEventStatus(newStatus)
+        // Force table refresh by incrementing the trigger
+        setTriggerTableRefresh(prev => prev + 1)
+    }
 
       useEffect(() => {
         const fetchThreatCategoryCount = async () => {
@@ -153,9 +164,10 @@ function ThreatDetectionPage() {
 
     const components = [
         <ChartComponent subCategoryCount={subCategoryCount} severityCountMap={severityCountMap} />,
-        <SusDataTable key={"sus-data-table"}
+        <SusDataTable key={`sus-data-table-${triggerTableRefresh}`}
             currDateRange={currDateRange}
-            rowClicked={rowClicked} 
+            rowClicked={rowClicked}
+            triggerRefresh={() => setTriggerTableRefresh(prev => prev + 1)}
         />,
         !showNewTab ? <NormalSampleDetails
             title={"Attacker payload"}
@@ -171,6 +183,9 @@ function ThreatDetectionPage() {
                 key={"sus-sample-details"}
                 moreInfoData={moreInfoData}
                 threatFiltersMap={threatFiltersMap}
+                eventId={currentEventId}
+                eventStatus={currentEventStatus}
+                onStatusUpdate={handleStatusUpdate}
             />
             
 
@@ -188,7 +203,8 @@ function ThreatDetectionPage() {
             startTimestamp,
             endTimestamp,
             [],
-            2000
+            2000,
+            'EVENTS'
         );
         // Transform to match the mongoDB format
         let jsonData = (res?.maliciousEvents || []).map(ev => ({

@@ -23,11 +23,18 @@ public class MaliciousEventModel {
   private String refId;
   private String severity;
   private String metadata;
+  private Status status;
 
 
   public enum EventType {
     SINGLE,
     AGGREGATED
+  }
+
+  public enum Status {
+    ACTIVE,
+    UNDER_REVIEW,
+    IGNORED
   }
 
   public MaliciousEventModel() {}
@@ -49,7 +56,8 @@ public class MaliciousEventModel {
     this.severity = builder.severity;
     this.type = builder.type;
     this.refId = builder.refId;
-    this.metadata = builder.metadata; 
+    this.metadata = builder.metadata;
+    this.status = builder.status != null ? builder.status : Status.ACTIVE;
   }
 
   public static class Builder {
@@ -68,7 +76,8 @@ public class MaliciousEventModel {
     private String refId;
     private String type;
     private String severity;
-    private String metadata; 
+    private String metadata;
+    private Status status;
 
     public Builder setFilterId(String filterId) {
       this.filterId = filterId;
@@ -147,6 +156,11 @@ public class MaliciousEventModel {
 
     public Builder setMetadata(String metadata) { 
       this.metadata = metadata;
+      return this;
+    }
+
+    public Builder setStatus(Status status) {
+      this.status = status;
       return this;
     }
 
@@ -293,6 +307,14 @@ public class MaliciousEventModel {
   
   public void setSeverity(String severity) {
     this.severity = severity;
+  }
+
+  public Status getStatus() {
+    return status != null ? status : Status.ACTIVE;
+  }
+
+  public void setStatus(Status status) {
+    this.status = status;
   }
 
 }
