@@ -146,6 +146,40 @@ function highlightHeaders(data, ref, getLineNumbers){
   })
 }
 
+function highlightVulnerabilities(vulnerabilitySegments, ref) {
+  if (!vulnerabilitySegments || !Array.isArray(vulnerabilitySegments) || vulnerabilitySegments.length === 0) {
+    return;
+  }
+  
+  const text = ref.getValue();
+  if (!text) {
+    return;
+  }
+  
+  vulnerabilitySegments.forEach((segment, index) => {
+    if (segment.start !== undefined && segment.end !== undefined && 
+        segment.start >= 0 && segment.end <= text.length && segment.start < segment.end) {
+      
+      // Convert character positions to line/column positions
+      try {
+        const startPos = ref.getModel().getPositionAt(segment.start);
+        const endPos = ref.getModel().getPositionAt(segment.end);
+        
+        if (startPos && endPos) {
+          ref.createDecorationsCollection([{
+            range: new monaco.Range(startPos.lineNumber, startPos.column, endPos.lineNumber, endPos.column),
+            options: {
+              inlineClassName: "vulnerability-highlight"
+            }
+          }]);
+        }
+      } catch (error) {
+        console.error('Error creating vulnerability highlight:', error, segment);
+      }
+    }
+  });
+}
+
 function SampleData(props) {
 
     let {showDiff, data, minHeight, editorLanguage, currLine, getLineNumbers, readOnly, getEditorData, wordWrap} = props;
@@ -306,6 +340,9 @@ function SampleData(props) {
         highlightPaths(data?.highlightPaths, instance);
         if(data.headersMap){
           highlightHeaders(data, instance,getLineNumbers)
+        }
+        if(data.vulnerabilitySegments){
+          highlightVulnerabilities(data.vulnerabilitySegments, instance);
         }
       }
     }
