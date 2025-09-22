@@ -47,7 +47,7 @@ message ListMaliciousRequestsRequest {
       repeated string types = 5;
       repeated string sub_category = 6;
       repeated string latest_attack = 7;
-      repeated string successful = 8; // "true" or "false"
+      optional bool successful = 8;
     }
 
     // The number of alerts to return

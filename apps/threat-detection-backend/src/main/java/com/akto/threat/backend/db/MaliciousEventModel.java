@@ -171,7 +171,7 @@ public class MaliciousEventModel {
     this.metadata = metadata;
   }
 
-  public Boolean isSuccessful() {
+  public Boolean getSuccessful() {
     return successful;
   }
 

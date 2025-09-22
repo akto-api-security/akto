@@ -189,7 +189,7 @@ public class DashboardMaliciousEvent {
     this.metadata = metadata;
   }
 
-  public boolean isSuccessful() {
+  public boolean getSuccessful() {
     return successful;
   }
 

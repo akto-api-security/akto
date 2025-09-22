@@ -180,11 +180,11 @@ public class MaliciousEventService {
       query.append("subCategory", new Document("$in", filter.getSubCategoryList()));
     }
 
-    if (!filter.getSuccessfulList().isEmpty()) {
-      String val = filter.getSuccessfulList().get(0);
-      if ("true".equalsIgnoreCase(val)) {
+    if (filter.hasSuccessful()) {
+      boolean val = filter.getSuccessful();
+      if (val) {
         query.append("successful", true);
-      } else if ("false".equalsIgnoreCase(val)) {
+      } else {
         query.append("$or", Arrays.asList(
             new Document("successful", false),
             new Document("successful", new Document("$exists", false))
@@ -235,7 +235,7 @@ public class MaliciousEventService {
                 .setRefId(evt.getRefId())
                 .setEventTypeVal(evt.getEventType().toString())
                 .setMetadata(metadata)
-                .setSuccessful(evt.isSuccessful() != null ? evt.isSuccessful() : false)
+                .setSuccessful(evt.getSuccessful() != null ? evt.getSuccessful() : false)
                 .build());
       }
       return ListMaliciousRequestsResponse.newBuilder()
