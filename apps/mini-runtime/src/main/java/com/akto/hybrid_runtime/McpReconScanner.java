@@ -8,17 +8,6 @@ import com.akto.util.JSONUtils;
 import com.akto.util.McpConstants;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.http.HttpEntity;
-import org.apache.http.HttpStatus;
-import org.apache.http.client.config.RequestConfig;
-import org.apache.http.client.methods.CloseableHttpResponse;
-import org.apache.http.client.methods.HttpGet;
-import org.apache.http.client.methods.HttpPost;
-import org.apache.http.entity.StringEntity;
-import org.apache.http.impl.client.CloseableHttpClient;
-import org.apache.http.impl.client.HttpClientBuilder;
-import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
-import org.apache.http.util.EntityUtils;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.Socket;
@@ -28,6 +17,9 @@ import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import com.akto.dto.OriginalHttpRequest;
+import com.akto.dto.OriginalHttpResponse;
+import com.akto.testing.ApiExecutor;
 
 public class McpReconScanner {
     
@@ -40,12 +32,16 @@ public class McpReconScanner {
     private final int batchSize;
     private final ExecutorService executorService;
     private final Semaphore semaphore;
-    private final CloseableHttpClient httpClient;
-    
+
     // Cache for DNS lookups and failed IPs
     private final ConcurrentHashMap<String, Boolean> dnsCache = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, Long> failedIpCache = new ConcurrentHashMap<>();
     
+    // Pooling and batching configuration
+    private static final int MAX_TOTAL_TARGETS = 100_000; // Absolute max IP:port pairs to process
+    private static final int DEFAULT_MAX_BATCH_SIZE = 1000; // Default batch size for very large lists
+    private static final int MAX_QUEUE_SIZE = 10_000; // Max queue size for thread pool
+
     public McpReconScanner() {
         this(100, 2000, 500);
     }
@@ -53,39 +49,21 @@ public class McpReconScanner {
     public McpReconScanner(int maxConcurrent, int timeout, int batchSize) {
         this.maxConcurrent = maxConcurrent;
         this.timeout = timeout;
-        this.batchSize = batchSize;
-        // Use cached thread pool for better thread reuse
+        // If batchSize is too large, reduce it
+        if (batchSize > DEFAULT_MAX_BATCH_SIZE) {
+            logger.warn("Batch size too large, reducing to " + DEFAULT_MAX_BATCH_SIZE);
+            this.batchSize = DEFAULT_MAX_BATCH_SIZE;
+        } else {
+            this.batchSize = batchSize;
+        }
         this.executorService = new ThreadPoolExecutor(
-            maxConcurrent / 2,  // Core pool size
-            maxConcurrent,      // Maximum pool size
-            60L, TimeUnit.SECONDS,  // Keep alive time
-            new LinkedBlockingQueue<>(maxConcurrent * 2),  // Bounded queue
-            new ThreadPoolExecutor.CallerRunsPolicy()  // Handle overflow
+            maxConcurrent / 2,
+            maxConcurrent,
+            60L, TimeUnit.SECONDS,
+            new LinkedBlockingQueue<>(MAX_QUEUE_SIZE),
+            new ThreadPoolExecutor.CallerRunsPolicy()
         );
         this.semaphore = new Semaphore(maxConcurrent);
-        
-        // Optimized HTTP client with enhanced connection pooling
-        PoolingHttpClientConnectionManager connectionManager = new PoolingHttpClientConnectionManager();
-        connectionManager.setMaxTotal(maxConcurrent * 2);  // Increase total connections
-        connectionManager.setDefaultMaxPerRoute(50);  // Increase per-route connections
-        connectionManager.setValidateAfterInactivity(2000);  // Validate idle connections
-        
-        RequestConfig requestConfig = RequestConfig.custom()
-            .setSocketTimeout(timeout)
-            .setConnectTimeout(timeout)
-            .setConnectionRequestTimeout(timeout / 2)  // Reduce wait time for connection
-            .setCircularRedirectsAllowed(false)
-            .setMaxRedirects(2)  // Limit redirects
-            .build();
-            
-        this.httpClient = HttpClientBuilder.create()
-            .setConnectionManager(connectionManager)
-            .setDefaultRequestConfig(requestConfig)
-            .setConnectionReuseStrategy((response, context) -> true)  // Always reuse connections
-            .setKeepAliveStrategy((response, context) -> 30000)  // Keep connections alive for 30s
-            .setMaxConnPerRoute(50)
-            .setMaxConnTotal(maxConcurrent * 2)
-            .build();
     }
     
     /**
@@ -94,12 +72,16 @@ public class McpReconScanner {
     public McpScanResult scanIpRange(String ipRange) {
         long startTime = System.currentTimeMillis();
         McpScanResult result = new McpScanResult();
-        
         try {
             // Parse IP ranges
             List<String> allIps = parseIpRanges(ipRange);
             int totalIps = allIps.size();
-            
+            if (totalIps * McpConstants.COMMON_MCP_PORTS.size() > MAX_TOTAL_TARGETS) {
+                logger.warn("Too many IP:port pairs to scan (" + (totalIps * McpConstants.COMMON_MCP_PORTS.size()) + "). Limiting to first " + (MAX_TOTAL_TARGETS / McpConstants.COMMON_MCP_PORTS.size()) + " IPs.");
+                allIps = allIps.subList(0, MAX_TOTAL_TARGETS / McpConstants.COMMON_MCP_PORTS.size());
+                totalIps = allIps.size();
+            }
+
             logger.info(String.format("Starting optimized scan of %d IPs", totalIps));
             
             List<McpServer> allServers = new ArrayList<>();
@@ -449,116 +431,29 @@ public class McpReconScanner {
     
     private McpServer checkSseEndpoint(String baseUrl, String ip, int port) {
         List<String> sseEndpoints = Arrays.asList("/sse", "/mcp/sse", "/mcp/stream", "/messages", "/events");
-        
         for (String endpoint : sseEndpoints) {
             try {
-                HttpGet request = new HttpGet(baseUrl + endpoint);
-                request.setHeader("Accept", "text/event-stream");
-                request.setHeader("Cache-Control", "no-cache");
-                
-                try (CloseableHttpResponse response = httpClient.execute(request)) {
-                    if (response.getStatusLine().getStatusCode() == HttpStatus.SC_OK) {
-                        String contentType = response.getFirstHeader("Content-Type") != null ? 
-                            response.getFirstHeader("Content-Type").getValue() : "";
-                        
-                        if (contentType.contains("text/event-stream")) {
-                            // Read sample data
-                            HttpEntity entity = response.getEntity();
-                            String content = EntityUtils.toString(entity).toLowerCase();
-                            
-                            // Check for MCP keywords
-                            for (String indicator : McpConstants.MCP_INDICATORS) {
-                                if (content.contains(indicator.toLowerCase())) {
-                                    McpServer server = new McpServer();
-                                    server.setIp(ip);
-                                    server.setPort(port);
-                                    server.setUrl(baseUrl);
-                                    server.setVerified(true);
-                                    server.setDetectionMethod("SSE");
-                                    server.setTimestamp(new Date().toString());
-                                    server.setType("SSE");
-                                    server.setEndpoint(endpoint);
-                                    return server;
-                                }
-                            }
-                        }
-                    }
-                }
-            } catch (Exception e) {
-                // Continue to next endpoint
-            }
-        }
-        
-        return null;
-    }
-    
-    private McpServer checkJsonRpcEndpoint(String baseUrl, String ip, int port) {
-        List<String> jsonRpcEndpoints = Arrays.asList("/mcp", "/mcp/v1", "/jsonrpc", "/rpc", "/api/mcp");
-        
-        Map<String, Object> initRequest = new HashMap<>();
-        initRequest.put("jsonrpc", McpConstants.JSONRPC_VERSION);
-        initRequest.put("id", 1);
-        initRequest.put("method", McpConstants.JSONRPC_METHOD_INITIALIZE);
-        
-        Map<String, Object> params = new HashMap<>();
-        params.put("protocolVersion", McpConstants.MCP_PROTOCOL_VERSION);
-        
-        Map<String, Object> capabilities = new HashMap<>();
-        capabilities.put("roots", Collections.singletonMap("listChanged", true));
-        capabilities.put("sampling", new HashMap<>());
-        params.put("capabilities", capabilities);
-        
-        Map<String, Object> clientInfo = new HashMap<>();
-        clientInfo.put("name", "mcp-recon-scanner");
-        clientInfo.put("version", "2.0.0");
-        params.put("clientInfo", clientInfo);
-        
-        initRequest.put("params", params);
-        
-        for (String endpoint : jsonRpcEndpoints) {
-            try {
-                HttpPost request = new HttpPost(baseUrl + endpoint);
-                request.setHeader("Content-Type", "application/json");
-                request.setHeader("Accept", "application/json");
-                String jsonString = JSONUtils.getString(initRequest);
-                if (jsonString == null) {
-                    continue; // Skip this endpoint if JSON serialization fails
-                }
-                request.setEntity(new StringEntity(jsonString));
-                
-                try (CloseableHttpResponse response = httpClient.execute(request)) {
-                    if (response.getStatusLine().getStatusCode() == HttpStatus.SC_OK) {
-                        HttpEntity entity = response.getEntity();
-                        String content = EntityUtils.toString(entity);
-                        Map<String, Object> jsonResponse = JSONUtils.getMap(content);
-                        
-                        if (jsonResponse != null && "2.0".equals(jsonResponse.get("jsonrpc"))) {
-                            Map<String, Object> result = (Map<String, Object>) jsonResponse.get("result");
-                            if (result != null && (result.containsKey("protocolVersion") || result.containsKey("serverInfo"))) {
+                String url = baseUrl + endpoint;
+                Map<String, List<String>> headers = new HashMap<>();
+                headers.put("Accept", Collections.singletonList("text/event-stream"));
+                headers.put("Cache-Control", Collections.singletonList("no-cache"));
+                OriginalHttpRequest request = new OriginalHttpRequest(url, "", "GET", null, headers, "");
+                OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, new ArrayList<>());
+                if (response.getStatusCode() == 200) {
+                    String contentType = response.getHeaders().getOrDefault("Content-Type", Collections.singletonList("")).get(0);
+                    if (contentType != null && contentType.contains("text/event-stream")) {
+                        String content = response.getBody() != null ? response.getBody().toLowerCase() : "";
+                        for (String indicator : McpConstants.MCP_INDICATORS) {
+                            if (content.contains(indicator.toLowerCase())) {
                                 McpServer server = new McpServer();
                                 server.setIp(ip);
                                 server.setPort(port);
                                 server.setUrl(baseUrl);
                                 server.setVerified(true);
-                                server.setDetectionMethod("JSON-RPC");
+                                server.setDetectionMethod("SSE");
                                 server.setTimestamp(new Date().toString());
-                                server.setType("JSON-RPC");
+                                server.setType("SSE");
                                 server.setEndpoint(endpoint);
-                                if (result.get("protocolVersion") != null) {
-                                    server.setProtocolVersion((String) result.get("protocolVersion"));
-                                }
-                                if (result.get("serverInfo") != null) {
-                                    server.setServerInfo((Map<String, Object>) result.get("serverInfo"));
-                                }
-                                if (result.get("capabilities") != null) {
-                                    server.setCapabilities((Map<String, Object>) result.get("capabilities"));
-                                }
-                                
-                                // Try to get tools, resources, prompts
-                                server.setTools(getToolsList(baseUrl + endpoint, null));
-                                server.setResources(getResourcesList(baseUrl + endpoint, null));
-                                server.setPrompts(getPromptsList(baseUrl + endpoint, null));
-                                
                                 return server;
                             }
                         }
@@ -568,42 +463,101 @@ public class McpReconScanner {
                 // Continue to next endpoint
             }
         }
-        
         return null;
     }
     
-    private McpServer checkHttpEndpoints(String baseUrl, String ip, int port) {
-        for (String endpoint : McpConstants.MCP_ENDPOINTS.subList(0, Math.min(4, McpConstants.MCP_ENDPOINTS.size()))) {
+    private McpServer checkJsonRpcEndpoint(String baseUrl, String ip, int port) {
+        List<String> jsonRpcEndpoints = Arrays.asList("/mcp", "/mcp/v1", "/jsonrpc", "/rpc", "/api/mcp");
+        Map<String, Object> initRequest = new HashMap<>();
+        initRequest.put("jsonrpc", McpConstants.JSONRPC_VERSION);
+        initRequest.put("id", 1);
+        initRequest.put("method", McpConstants.JSONRPC_METHOD_INITIALIZE);
+        Map<String, Object> params = new HashMap<>();
+        params.put("protocolVersion", McpConstants.MCP_PROTOCOL_VERSION);
+        Map<String, Object> capabilities = new HashMap<>();
+        capabilities.put("roots", Collections.singletonMap("listChanged", true));
+        capabilities.put("sampling", new HashMap<>());
+        params.put("capabilities", capabilities);
+        Map<String, Object> clientInfo = new HashMap<>();
+        clientInfo.put("name", "mcp-recon-scanner");
+        clientInfo.put("version", "2.0.0");
+        params.put("clientInfo", clientInfo);
+        initRequest.put("params", params);
+        for (String endpoint : jsonRpcEndpoints) {
             try {
-                HttpGet request = new HttpGet(baseUrl + endpoint);
-                
-                try (CloseableHttpResponse response = httpClient.execute(request)) {
-                    HttpEntity entity = response.getEntity();
-                    String content = EntityUtils.toString(entity);
-                    
-                    if (isLikelyMcp(content)) {
-                        McpServer server = new McpServer();
-                        server.setIp(ip);
-                        server.setPort(port);
-                        server.setUrl(baseUrl);
-                        server.setVerified(true);
-                        server.setDetectionMethod("HTTP");
-                        server.setTimestamp(new Date().toString());
-                        server.setEndpoint(endpoint);
-                        
-                        List<String> detectedIndicators = getDetectedIndicators(content);
-                        Map<String, Object> serverInfo = new HashMap<>();
-                        serverInfo.put("detectedIndicators", detectedIndicators);
-                        server.setServerInfo(serverInfo);
-                        
-                        return server;
+                String url = baseUrl + endpoint;
+                Map<String, List<String>> headers = new HashMap<>();
+                headers.put("Content-Type", Collections.singletonList("application/json"));
+                headers.put("Accept", Collections.singletonList("application/json"));
+                String jsonString = JSONUtils.getString(initRequest);
+                if (jsonString == null) continue;
+                OriginalHttpRequest request = new OriginalHttpRequest(url, "", "POST", jsonString, headers, "");
+                OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, new ArrayList<>());
+                if (response.getStatusCode() == 200) {
+                    String content = response.getBody();
+                    Map<String, Object> jsonResponse = JSONUtils.getMap(content);
+                    if (jsonResponse != null && "2.0".equals(jsonResponse.get("jsonrpc"))) {
+                        Map<String, Object> result = (Map<String, Object>) jsonResponse.get("result");
+                        if (result != null && (result.containsKey("protocolVersion") || result.containsKey("serverInfo"))) {
+                            McpServer server = new McpServer();
+                            server.setIp(ip);
+                            server.setPort(port);
+                            server.setUrl(baseUrl);
+                            server.setVerified(true);
+                            server.setDetectionMethod("JSON-RPC");
+                            server.setTimestamp(new Date().toString());
+                            server.setType("JSON-RPC");
+                            server.setEndpoint(endpoint);
+                            if (result.get("protocolVersion") != null) {
+                                server.setProtocolVersion((String) result.get("protocolVersion"));
+                            }
+                            if (result.get("serverInfo") != null) {
+                                server.setServerInfo((Map<String, Object>) result.get("serverInfo"));
+                            }
+                            if (result.get("capabilities") != null) {
+                                server.setCapabilities((Map<String, Object>) result.get("capabilities"));
+                            }
+                            server.setTools(getToolsList(url, null));
+                            server.setResources(getResourcesList(url, null));
+                            server.setPrompts(getPromptsList(url, null));
+                            return server;
+                        }
                     }
                 }
             } catch (Exception e) {
                 // Continue to next endpoint
             }
         }
-        
+        return null;
+    }
+    
+    private McpServer checkHttpEndpoints(String baseUrl, String ip, int port) {
+        for (String endpoint : McpConstants.MCP_ENDPOINTS.subList(0, Math.min(4, McpConstants.MCP_ENDPOINTS.size()))) {
+            try {
+                String url = baseUrl + endpoint;
+                Map<String, List<String>> headers = new HashMap<>();
+                OriginalHttpRequest request = new OriginalHttpRequest(url, "", "GET", null, headers, "");
+                OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, new ArrayList<>());
+                String content = response.getBody();
+                if (isLikelyMcp(content)) {
+                    McpServer server = new McpServer();
+                    server.setIp(ip);
+                    server.setPort(port);
+                    server.setUrl(baseUrl);
+                    server.setVerified(true);
+                    server.setDetectionMethod("HTTP");
+                    server.setTimestamp(new Date().toString());
+                    server.setEndpoint(endpoint);
+                    List<String> detectedIndicators = getDetectedIndicators(content);
+                    Map<String, Object> serverInfo = new HashMap<>();
+                    serverInfo.put("detectedIndicators", detectedIndicators);
+                    server.setServerInfo(serverInfo);
+                    return server;
+                }
+            } catch (Exception e) {
+                // Continue to next endpoint
+            }
+        }
         return null;
     }
     
@@ -660,31 +614,28 @@ public class McpReconScanner {
     
     private List<Map<String, Object>> getToolsList(String url, Map<String, String> authHeaders) {
         try {
-            Map<String, Object> request = new HashMap<>();
-            request.put("jsonrpc", McpConstants.JSONRPC_VERSION);
-            request.put("id", 2);
-            request.put("method", McpConstants.JSONRPC_METHOD_TOOLS_LIST);
-            request.put("params", new HashMap<>());
-            
-            HttpPost httpPost = new HttpPost(url);
-            httpPost.setHeader("Content-Type", "application/json");
+            Map<String, Object> requestObj = new HashMap<>();
+            requestObj.put("jsonrpc", McpConstants.JSONRPC_VERSION);
+            requestObj.put("id", 2);
+            requestObj.put("method", McpConstants.JSONRPC_METHOD_TOOLS_LIST);
+            requestObj.put("params", new HashMap<>());
+            Map<String, List<String>> headers = new HashMap<>();
+            headers.put("Content-Type", Collections.singletonList("application/json"));
             if (authHeaders != null) {
-                authHeaders.forEach(httpPost::setHeader);
+                for (Map.Entry<String, String> entry : authHeaders.entrySet()) {
+                    headers.put(entry.getKey(), Collections.singletonList(entry.getValue()));
+                }
             }
-            String jsonString = JSONUtils.getString(request);
-            if (jsonString == null) {
-                return new ArrayList<>();
-            }
-            httpPost.setEntity(new StringEntity(jsonString));
-            
-            try (CloseableHttpResponse response = httpClient.execute(httpPost)) {
-                if (response.getStatusLine().getStatusCode() == HttpStatus.SC_OK) {
-                    String content = EntityUtils.toString(response.getEntity());
-                    Map<String, Object> jsonResponse = JSONUtils.getMap(content);
-                    if (jsonResponse != null && jsonResponse.containsKey("result")) {
-                        Map<String, Object> result = (Map<String, Object>) jsonResponse.get("result");
-                        return (List<Map<String, Object>>) result.get("tools");
-                    }
+            String jsonString = JSONUtils.getString(requestObj);
+            if (jsonString == null) return new ArrayList<>();
+            OriginalHttpRequest request = new OriginalHttpRequest(url, "", "POST", jsonString, headers, "");
+            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, new ArrayList<>());
+            if (response.getStatusCode() == 200) {
+                String content = response.getBody();
+                Map<String, Object> jsonResponse = JSONUtils.getMap(content);
+                if (jsonResponse != null && jsonResponse.containsKey("result")) {
+                    Map<String, Object> result = (Map<String, Object>) jsonResponse.get("result");
+                    return (List<Map<String, Object>>) result.get("tools");
                 }
             }
         } catch (Exception e) {
@@ -695,31 +646,28 @@ public class McpReconScanner {
     
     private List<Map<String, Object>> getResourcesList(String url, Map<String, String> authHeaders) {
         try {
-            Map<String, Object> request = new HashMap<>();
-            request.put("jsonrpc", McpConstants.JSONRPC_VERSION);
-            request.put("id", 3);
-            request.put("method", McpConstants.JSONRPC_METHOD_RESOURCES_LIST);
-            request.put("params", new HashMap<>());
-            
-            HttpPost httpPost = new HttpPost(url);
-            httpPost.setHeader("Content-Type", "application/json");
+            Map<String, Object> requestObj = new HashMap<>();
+            requestObj.put("jsonrpc", McpConstants.JSONRPC_VERSION);
+            requestObj.put("id", 3);
+            requestObj.put("method", McpConstants.JSONRPC_METHOD_RESOURCES_LIST);
+            requestObj.put("params", new HashMap<>());
+            Map<String, List<String>> headers = new HashMap<>();
+            headers.put("Content-Type", Collections.singletonList("application/json"));
             if (authHeaders != null) {
-                authHeaders.forEach(httpPost::setHeader);
+                for (Map.Entry<String, String> entry : authHeaders.entrySet()) {
+                    headers.put(entry.getKey(), Collections.singletonList(entry.getValue()));
+                }
             }
-            String jsonString = JSONUtils.getString(request);
-            if (jsonString == null) {
-                return new ArrayList<>();
-            }
-            httpPost.setEntity(new StringEntity(jsonString));
-            
-            try (CloseableHttpResponse response = httpClient.execute(httpPost)) {
-                if (response.getStatusLine().getStatusCode() == HttpStatus.SC_OK) {
-                    String content = EntityUtils.toString(response.getEntity());
-                    Map<String, Object> jsonResponse = JSONUtils.getMap(content);
-                    if (jsonResponse != null && jsonResponse.containsKey("result")) {
-                        Map<String, Object> result = (Map<String, Object>) jsonResponse.get("result");
-                        return (List<Map<String, Object>>) result.get("resources");
-                    }
+            String jsonString = JSONUtils.getString(requestObj);
+            if (jsonString == null) return new ArrayList<>();
+            OriginalHttpRequest request = new OriginalHttpRequest(url, "", "POST", jsonString, headers, "");
+            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, new ArrayList<>());
+            if (response.getStatusCode() == 200) {
+                String content = response.getBody();
+                Map<String, Object> jsonResponse = JSONUtils.getMap(content);
+                if (jsonResponse != null && jsonResponse.containsKey("result")) {
+                    Map<String, Object> result = (Map<String, Object>) jsonResponse.get("result");
+                    return (List<Map<String, Object>>) result.get("resources");
                 }
             }
         } catch (Exception e) {
@@ -730,31 +678,28 @@ public class McpReconScanner {
     
     private List<Map<String, Object>> getPromptsList(String url, Map<String, String> authHeaders) {
         try {
-            Map<String, Object> request = new HashMap<>();
-            request.put("jsonrpc", McpConstants.JSONRPC_VERSION);
-            request.put("id", 4);
-            request.put("method", McpConstants.JSONRPC_METHOD_PROMPTS_LIST);
-            request.put("params", new HashMap<>());
-            
-            HttpPost httpPost = new HttpPost(url);
-            httpPost.setHeader("Content-Type", "application/json");
+            Map<String, Object> requestObj = new HashMap<>();
+            requestObj.put("jsonrpc", McpConstants.JSONRPC_VERSION);
+            requestObj.put("id", 4);
+            requestObj.put("method", McpConstants.JSONRPC_METHOD_PROMPTS_LIST);
+            requestObj.put("params", new HashMap<>());
+            Map<String, List<String>> headers = new HashMap<>();
+            headers.put("Content-Type", Collections.singletonList("application/json"));
             if (authHeaders != null) {
-                authHeaders.forEach(httpPost::setHeader);
+                for (Map.Entry<String, String> entry : authHeaders.entrySet()) {
+                    headers.put(entry.getKey(), Collections.singletonList(entry.getValue()));
+                }
             }
-            String jsonString = JSONUtils.getString(request);
-            if (jsonString == null) {
-                return new ArrayList<>();
-            }
-            httpPost.setEntity(new StringEntity(jsonString));
-            
-            try (CloseableHttpResponse response = httpClient.execute(httpPost)) {
-                if (response.getStatusLine().getStatusCode() == HttpStatus.SC_OK) {
-                    String content = EntityUtils.toString(response.getEntity());
-                    Map<String, Object> jsonResponse = JSONUtils.getMap(content);
-                    if (jsonResponse != null && jsonResponse.containsKey("result")) {
-                        Map<String, Object> result = (Map<String, Object>) jsonResponse.get("result");
-                        return (List<Map<String, Object>>) result.get("prompts");
-                    }
+            String jsonString = JSONUtils.getString(requestObj);
+            if (jsonString == null) return new ArrayList<>();
+            OriginalHttpRequest request = new OriginalHttpRequest(url, "", "POST", jsonString, headers, "");
+            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, new ArrayList<>());
+            if (response.getStatusCode() == 200) {
+                String content = response.getBody();
+                Map<String, Object> jsonResponse = JSONUtils.getMap(content);
+                if (jsonResponse != null && jsonResponse.containsKey("result")) {
+                    Map<String, Object> result = (Map<String, Object>) jsonResponse.get("result");
+                    return (List<Map<String, Object>>) result.get("prompts");
                 }
             }
         } catch (Exception e) {
@@ -765,11 +710,8 @@ public class McpReconScanner {
     
     public void shutdown() {
         try {
-            // Clear caches
             dnsCache.clear();
             failedIpCache.clear();
-            
-            // Shutdown executor service gracefully
             executorService.shutdown();
             if (!executorService.awaitTermination(5, TimeUnit.SECONDS)) {
                 executorService.shutdownNow();
@@ -777,9 +719,6 @@ public class McpReconScanner {
                     logger.error("Executor service did not terminate");
                 }
             }
-            
-            // Close HTTP client
-            httpClient.close();
         } catch (Exception e) {
             logger.error("Error shutting down scanner", e);
         }
@@ -795,3 +734,4 @@ public class McpReconScanner {
         }
     }
 }
+
