@@ -122,7 +122,7 @@ function SusDataTable({ currDateRange, rowClicked }) {
       latestAttack = filters?.latestAttack
     }
     const sort = { [sortKey]: sortOrder };
-    const successfulFilter = filters?.successful; 
+    const successfulFilterValue = Array.isArray(filters?.successful) ? filters?.successful?.[0] : filters?.successful; 
     const res = await api.fetchSuspectSampleData(
       skip,
       sourceIpsFilter,
@@ -132,7 +132,9 @@ function SusDataTable({ currDateRange, rowClicked }) {
       sort,
       startTimestamp,
       endTimestamp,
-      latestAttack
+      latestAttack,
+      undefined, 
+      successfulFilterValue ? [successfulFilterValue] : []
     );
 //    setSubCategoryChoices(distinctSubCategories);
     let total = res.total;
@@ -163,15 +165,6 @@ function SusDataTable({ currDateRange, rowClicked }) {
         )
       };
     });
-    if (successfulFilter && Array.isArray(successfulFilter) && successfulFilter.length > 0) {
-      const wantTrue = successfulFilter.includes('true');
-      const wantFalse = successfulFilter.includes('false');
-      if (wantTrue && !wantFalse) {
-        ret = ret.filter(r => r?.successful === true);
-      } else if (!wantTrue && wantFalse) {
-        ret = ret.filter(r => r?.successful === false);
-      }
-    }
     setLoading(false);
     return { value: ret, total: total };
   }
@@ -233,7 +226,7 @@ function SusDataTable({ currDateRange, rowClicked }) {
           { label: 'True', value: 'true' },
           { label: 'False', value: 'false' }
         ],
-        multiple: true
+        singleSelect: true
       },
     ];
   }

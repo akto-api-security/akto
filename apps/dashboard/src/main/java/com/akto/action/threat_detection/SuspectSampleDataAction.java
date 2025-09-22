@@ -42,6 +42,7 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
   int startTimestamp, endTimestamp;
   List<String> types;
   List<String> latestAttack;
+  List<String> successful; 
 
   // TODO: remove this, use API Executor.
   private final CloseableHttpClient httpClient;
@@ -78,6 +79,10 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
 
     if(this.types != null && !this.types.isEmpty()){
       filter.put("types", this.types);
+    }
+
+    if (this.successful != null && !this.successful.isEmpty()) {
+      filter.put("successful", this.successful);
     }
 
     List<String> templates = getTemplates(latestAttack);
@@ -317,5 +322,13 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
 
   public void setLatestAttack(List<String> latestAttack) {
     this.latestAttack = latestAttack;
+  }
+
+  public List<String> getSuccessful() {
+    return successful;
+  }
+
+  public void setSuccessful(List<String> successful) {
+    this.successful = successful;
   }
 }
