@@ -145,11 +145,11 @@ const SetUserEnvPopupComponent = ({ popover, setPopover, tags, apiCollectionIds,
             const envTypes = tags?.[apiCollectionId]
 
             envTypes?.map((envType) => {
-                if(envType?.keyName === "envType") {
-                    if(envType?.value?.toLowerCase() === "staging" || envType?.value?.toLowerCase() === "production") {
+                if(envType?.keyName === "envType" || envType?.keyName === "userSetEnvType") {
+                    if(  (envType?.keyName === "envType" && (envType?.value?.toLowerCase() === "staging" || envType?.value?.toLowerCase() === "production"))) {
                         setSelectedEnvType(envType?.value?.toLowerCase())
-                    } else {
-                        setAllEnvTypes((prev) => [...prev, envType])
+                    } else if (envType?.keyName === "userSetEnvType") {
+                        setAllEnvTypes((prev) => [...prev, { ...envType, keyName: "env" }])
                     }
                 } else {
                     setAllEnvTypes((prev) => [...prev, envType])
