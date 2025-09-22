@@ -246,34 +246,20 @@ public class MaliciousEventService {
 
   public int updateMaliciousEventStatus(String accountId, List<String> eventIds, Map<String, Object> filterMap, String status) {
     try {
-      MongoCollection<MaliciousEventModel> coll =
-          this.mongoClient
-              .getDatabase(accountId)
-              .getCollection(
-                  MongoDBCollection.ThreatDetection.MALICIOUS_EVENTS, MaliciousEventModel.class);
-
+      MongoCollection<MaliciousEventModel> coll = getMaliciousEventCollection(accountId);
       MaliciousEventModel.Status eventStatus = MaliciousEventModel.Status.valueOf(status.toUpperCase());
       Bson update = Updates.set("status", eventStatus.toString());
 
-      Document query;
-      String logMessage;
-
-      if (eventIds != null && !eventIds.isEmpty()) {
-        // Update by event IDs
-        query = new Document("_id", new Document("$in", eventIds));
-        logMessage = "Updating events by IDs: " + eventIds + " to status: " + status;
-      } else if (filterMap != null && !filterMap.isEmpty()) {
-        // Update by filter criteria
-        query = buildQueryFromFilter(filterMap);
-        logMessage = "Updating events by filter: " + query.toJson() + " to status: " + status;
-      } else {
-        logger.warn("Neither eventIds nor filterMap provided for update");
+      Document query = buildQuery(eventIds, filterMap, "update");
+      if (query == null) {
         return 0;
       }
 
+      String logMessage = String.format("Updating events %s to status: %s", 
+          getQueryDescription(eventIds, filterMap), status);
       logger.info(logMessage);
+      
       long modifiedCount = coll.updateMany(query, update).getModifiedCount();
-
       return (int) modifiedCount;
     } catch (Exception e) {
       logger.error("Error updating malicious event status", e);
@@ -281,40 +267,56 @@ public class MaliciousEventService {
     }
   }
 
-
   public int deleteMaliciousEvents(String accountId, List<String> eventIds, Map<String, Object> filterMap) {
     try {
-      MongoCollection<MaliciousEventModel> coll =
-          this.mongoClient
-              .getDatabase(accountId)
-              .getCollection(
-                  MongoDBCollection.ThreatDetection.MALICIOUS_EVENTS, MaliciousEventModel.class);
-
-      Document query;
-      String logMessage;
-
-      if (eventIds != null && !eventIds.isEmpty()) {
-        // Delete by event IDs
-        query = new Document("_id", new Document("$in", eventIds));
-        logMessage = "Deleting events by IDs: " + eventIds;
-      } else if (filterMap != null && !filterMap.isEmpty()) {
-        // Delete by filter criteria
-        query = buildQueryFromFilter(filterMap);
-        logMessage = "Deleting events by filter: " + query.toJson();
-      } else {
-        logger.warn("Neither eventIds nor filterMap provided for deletion");
+      MongoCollection<MaliciousEventModel> coll = getMaliciousEventCollection(accountId);
+      
+      Document query = buildQuery(eventIds, filterMap, "delete");
+      if (query == null) {
         return 0;
       }
 
+      String logMessage = "Deleting events " + getQueryDescription(eventIds, filterMap);
       logger.info(logMessage);
+      
       long deletedCount = coll.deleteMany(query).getDeletedCount();
       logger.info("Deleted " + deletedCount + " malicious events");
-
+      
       return (int) deletedCount;
     } catch (Exception e) {
       logger.error("Error deleting malicious events", e);
       return 0;
     }
+  }
+
+  private MongoCollection<MaliciousEventModel> getMaliciousEventCollection(String accountId) {
+    return this.mongoClient
+        .getDatabase(accountId)
+        .getCollection(
+            MongoDBCollection.ThreatDetection.MALICIOUS_EVENTS, MaliciousEventModel.class);
+  }
+
+  private Document buildQuery(List<String> eventIds, Map<String, Object> filterMap, String operation) {
+    if (eventIds != null && !eventIds.isEmpty()) {
+      // Query by event IDs
+      return new Document("_id", new Document("$in", eventIds));
+    } else if (filterMap != null && !filterMap.isEmpty()) {
+      // Query by filter criteria
+      return buildQueryFromFilter(filterMap);
+    } else {
+      logger.warn("Neither eventIds nor filterMap provided for " + operation);
+      return null;
+    }
+  }
+
+  private String getQueryDescription(List<String> eventIds, Map<String, Object> filterMap) {
+    if (eventIds != null && !eventIds.isEmpty()) {
+      return "by IDs: " + eventIds;
+    } else if (filterMap != null && !filterMap.isEmpty()) {
+      Document query = buildQueryFromFilter(filterMap);
+      return "by filter: " + query.toJson();
+    }
+    return "";
   }
 
 

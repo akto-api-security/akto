@@ -31,6 +31,8 @@ import org.apache.http.impl.client.HttpClients;
 import org.apache.http.util.EntityUtils;
 
 import static com.akto.action.threat_detection.utils.ThreatsUtils.getTemplates;
+import lombok.Getter;
+import lombok.Setter;
 
 public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
 
@@ -49,18 +51,18 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
   int startTimestamp, endTimestamp;
   List<String> types;
   List<String> latestAttack;
-  String eventId;
-  String status;
-  boolean updateSuccess;
-  String updateMessage;
-  String statusFilter;
-  List<String> eventIds;
-  int updatedCount;
-  List<String> actors;
-  String newStatus;
-  boolean deleteSuccess;
-  String deleteMessage;
-  int deletedCount;
+  @Getter @Setter String eventId;
+  @Getter @Setter String status;
+  @Getter @Setter boolean updateSuccess;
+  @Getter @Setter String updateMessage;
+  @Getter @Setter String statusFilter;
+  @Getter @Setter List<String> eventIds;
+  @Getter @Setter int updatedCount;
+  @Getter @Setter List<String> actors;
+  @Getter @Setter String newStatus;
+  @Getter @Setter boolean deleteSuccess;
+  @Getter @Setter String deleteMessage;
+  @Getter @Setter int deletedCount;
 
   // TODO: remove this, use API Executor.
   private final CloseableHttpClient httpClient;
@@ -499,99 +501,4 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
     this.latestAttack = latestAttack;
   }
 
-  public String getEventId() {
-    return eventId;
-  }
-
-  public void setEventId(String eventId) {
-    this.eventId = eventId;
-  }
-
-  public String getStatus() {
-    return status;
-  }
-
-  public void setStatus(String status) {
-    this.status = status;
-  }
-
-  public boolean isUpdateSuccess() {
-    return updateSuccess;
-  }
-
-  public void setUpdateSuccess(boolean updateSuccess) {
-    this.updateSuccess = updateSuccess;
-  }
-
-  public String getUpdateMessage() {
-    return updateMessage;
-  }
-
-  public void setUpdateMessage(String updateMessage) {
-    this.updateMessage = updateMessage;
-  }
-
-  public String getStatusFilter() {
-    return statusFilter;
-  }
-
-  public void setStatusFilter(String statusFilter) {
-    this.statusFilter = statusFilter;
-  }
-
-  public List<String> getEventIds() {
-    return eventIds;
-  }
-
-  public void setEventIds(List<String> eventIds) {
-    this.eventIds = eventIds;
-  }
-
-  public int getUpdatedCount() {
-    return updatedCount;
-  }
-
-  public void setUpdatedCount(int updatedCount) {
-    this.updatedCount = updatedCount;
-  }
-
-  public List<String> getActors() {
-    return actors;
-  }
-
-  public void setActors(List<String> actors) {
-    this.actors = actors;
-  }
-
-  public String getNewStatus() {
-    return newStatus;
-  }
-
-  public void setNewStatus(String newStatus) {
-    this.newStatus = newStatus;
-  }
-
-  public boolean isDeleteSuccess() {
-    return deleteSuccess;
-  }
-
-  public void setDeleteSuccess(boolean deleteSuccess) {
-    this.deleteSuccess = deleteSuccess;
-  }
-
-  public String getDeleteMessage() {
-    return deleteMessage;
-  }
-
-  public void setDeleteMessage(String deleteMessage) {
-    this.deleteMessage = deleteMessage;
-  }
-
-  public int getDeletedCount() {
-    return deletedCount;
-  }
-
-  public void setDeletedCount(int deletedCount) {
-    this.deletedCount = deletedCount;
-  }
 }
