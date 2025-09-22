@@ -1191,4 +1191,34 @@ public class DbLayer {
     public static void insertMCPAuditDataLog(McpAuditInfo auditInfo) {
         McpAuditInfoDao.instance.insertOne(auditInfo);
     }
+
+    public static List<McpReconRequest> fetchPendingMcpReconRequests() {
+        // Fetch all requests where status is "Pending"
+        Bson filter = Filters.eq(McpReconRequest.STATUS, Constants.STATUS_PENDING);
+        return McpReconRequestDao.instance.findAll(filter);
+    }
+
+    public static void updateMcpReconRequestStatus(String requestId, String newStatus, int serversFound) {
+        ObjectId requestObjId = new ObjectId(requestId);
+        Bson filter = Filters.eq(McpReconRequest.ID, requestObjId);
+        Bson updates;
+        if (newStatus.equals(Constants.STATUS_IN_PROGRESS)) {
+            updates = Updates.combine(
+                Updates.set(McpReconRequest.STATUS, newStatus),
+                Updates.set(McpReconRequest.STARTED_AT, Context.now())
+            );
+        } else {   // For completed or failed status
+            updates = Updates.combine(
+                Updates.set(McpReconRequest.STATUS, newStatus),
+                Updates.set(McpReconRequest.SERVERS_FOUND, serversFound),
+                Updates.set(McpReconRequest.FINISHED_AT, Context.now())
+            );
+        }
+        McpReconRequestDao.instance.updateOneNoUpsert(filter, updates);
+    }
+    
+    public static void storeMcpReconResultsBatch(List<McpReconResult> serverDataList) {
+        // Batch store MCP server discovery results using DAO
+        McpReconResultDao.instance.insertMany(serverDataList);
+    }
 }
