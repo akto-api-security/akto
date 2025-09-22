@@ -15,7 +15,7 @@ import java.util.*;
 public class CategoryWiseStatsUtils {
 
     public enum DataSource {
-        TESTING,
+        REDTEAMING,
         THREAT_DETECTION, 
         GUARDRAILS
     }
@@ -34,7 +34,7 @@ public class CategoryWiseStatsUtils {
         List<String> relevantCategories = getRelevantCategories(dataSource, dashboardCategory);
         
         switch (dataSource) {
-            case TESTING:
+            case REDTEAMING:
                 return getTestingCategoryWiseScores(startTimestamp, endTimestamp, relevantCategories);
             case THREAT_DETECTION:
                 return getThreatDetectionCategoryWiseScores(startTimestamp, endTimestamp, relevantCategories);
@@ -54,7 +54,7 @@ public class CategoryWiseStatsUtils {
         }
         
         switch (dataSource) {
-            case TESTING:
+            case REDTEAMING:
                 return getTestingCategoriesForDashboard(dashboardCategory);
             case THREAT_DETECTION:
                 return getThreatDetectionCategoriesForDashboard(dashboardCategory);
@@ -127,9 +127,9 @@ public class CategoryWiseStatsUtils {
         // Use existing TestTemplateUtils to get categories for the context
         GlobalEnums.TestCategory[] testCategories = TestTemplateUtils.getAllTestCategoriesWithinContext(contextSource);
         
-        // Convert enum display names to strings
+        // Convert enum to database format
         for (GlobalEnums.TestCategory category : testCategories) {
-            categories.add(category.getDisplayName());
+            categories.add(category.getName());
         }
         
         return categories;

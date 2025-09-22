@@ -5,13 +5,13 @@ import InfoCard from '../../dashboard/new_components/InfoCard';
 import { getDashboardCategory, mapLabel } from '../../../../main/labelHelper';
 import { mcpCategoryTestData, genAICategoryTestData, apiCategoryTestData } from './dummyData';
 import api from '../api';
-import threatDetectionApi from '../../threat_detection/api';
 import { useState, useEffect } from 'react';
+import func from "@/util/func";
 
 function CategoryWiseScoreGraph({ 
     startTimestamp, 
     endTimestamp, 
-    dataSource = 'testing', // 'testing', 'threat_detection', 'guardrails'
+    dataSource = 'redteaming', // 'redteaming', 'threat_detection', 'guardrails'
     title,
     apiEndpoint,
     fallbackData
@@ -29,7 +29,7 @@ function CategoryWiseScoreGraph({
         }
         
         switch (dataSource) {
-            case 'testing':
+            case 'redteaming':
                 return api.fetchCategoryWiseScores;
             case 'threat_detection':
                 // Add threat detection API call when available
@@ -62,6 +62,14 @@ function CategoryWiseScoreGraph({
         const fetchCategoryData = async () => {
             try {
                 setLoading(true);
+                
+                // For demo accounts, always use demo data and skip API calls
+                if (func.isDemoAccount()) {
+                    setCategoryTestData(getDefaultFallbackData());
+                    return;
+                }
+                
+                // For non-demo accounts, try to fetch real data
                 const apiCall = getApiCall();
                 
                 if (apiCall) {
@@ -72,13 +80,13 @@ function CategoryWiseScoreGraph({
                     }
                 }
                 
-                // Fallback to dummy data if no real data is available or no API
-                setCategoryTestData(getDefaultFallbackData());
+                // If no data is available, show empty state (no fallback to dummy data)
+                setCategoryTestData([]);
                 
             } catch (error) {
                 console.error('Error fetching category wise data:', error);
-                // Fallback to dummy data on error
-                setCategoryTestData(getDefaultFallbackData());
+                // On error, show empty state for non-demo accounts
+                setCategoryTestData([]);
             } finally {
                 setLoading(false);
             }
@@ -96,7 +104,7 @@ function CategoryWiseScoreGraph({
     };
 
     const getTooltip = () => {
-        const context = dataSource === 'testing' ? 'test results' : 
+        const context = dataSource === 'redteaming' ? 'results' : 
                        dataSource === 'threat_detection' ? 'threat detection results' :
                        dataSource === 'guardrails' ? 'policy enforcement results' : 'results';
         
@@ -105,14 +113,13 @@ function CategoryWiseScoreGraph({
 
     const getChartSubtitle = () => {
         switch (dataSource) {
-            case 'testing':
-                return mapLabel('Total tests', dashboardCategory);
             case 'threat_detection':
                 return mapLabel('Total threats', dashboardCategory);
             case 'guardrails':
                 return mapLabel('Total policies', dashboardCategory);
+            case 'redteaming':
             default:
-                return mapLabel('Total items', dashboardCategory);
+                return mapLabel('Total tests', dashboardCategory);
         }
     };
 
@@ -126,6 +133,11 @@ function CategoryWiseScoreGraph({
         );
     }
 
+    // If no data available, don't show the component for non-demo accounts
+    if (!func.isDemoAccount() && (!categoryTestData || categoryTestData.length === 0)) {
+        return null;
+    }
+    
     // Calculate totals (skipped metric commented out for now)
     const totalPass = categoryTestData.reduce((sum, cat) => sum + (cat.pass || 0), 0);
     const totalFail = categoryTestData.reduce((sum, cat) => sum + (cat.fail || 0), 0);
@@ -266,18 +278,25 @@ function CategoryWiseScoreGraph({
                     />
                 </Box>
 
-                {/* Category Table */}
+                {/* Category Table with Scroll */}
                 <Box>
-                    <DataTable
-                        columnContentTypes={[
-                            'text',
-                            'text'
-                        ]}
-                        headings={[]}
-                        rows={tableRows}
-                        increasedTableDensity
-                        hoverable={false}
-                    />
+                    <div style={{ 
+                        maxHeight: '300px', 
+                        overflowY: 'auto',
+                        border: '1px solid #e1e3e5',
+                        borderRadius: '6px'
+                    }}>
+                        <DataTable
+                            columnContentTypes={[
+                                'text',
+                                'text'
+                            ]}
+                            headings={[]}
+                            rows={tableRows}
+                            increasedTableDensity
+                            hoverable={false}
+                        />
+                    </div>
                 </Box>
             </HorizontalStack>}
         />

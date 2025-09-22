@@ -300,6 +300,8 @@ public class TestingRunResultDao extends AccountsContextDaoWithRbac<TestingRunRe
         
         // Stage 1: Match filters for time range and category filtering (INDEXED)
         List<Bson> matchFilters = new ArrayList<>();
+        
+        // Time range filter
         if (startTimestamp > 0 && endTimestamp > 0) {
             matchFilters.add(Filters.gte(TestingRunResult.END_TIMESTAMP, startTimestamp));
             matchFilters.add(Filters.lte(TestingRunResult.END_TIMESTAMP, endTimestamp));
@@ -314,17 +316,16 @@ public class TestingRunResultDao extends AccountsContextDaoWithRbac<TestingRunRe
             pipeline.add(Aggregates.match(Filters.and(matchFilters)));
         }
         
-        // Stage 2: SIMPLIFIED Group by testSuperType - calculate all counts in one stage
+        // Stage 2: Group by testSuperType - calculate all counts in one stage
         pipeline.add(Aggregates.group(
             "$testSuperType",
-            Accumulators.sum("totalCount", 1),
-            // Simple pass count: not vulnerable
+            // Pass count: not vulnerable
             Accumulators.sum("passCount", new BasicDBObject("$cond", Arrays.asList(
                 new BasicDBObject("$eq", Arrays.asList("$vulnerable", false)), 1, 0))),
-            // Simple fail count: vulnerable  
+            // Fail count: vulnerable  
             Accumulators.sum("failCount", new BasicDBObject("$cond", Arrays.asList(
                 new BasicDBObject("$eq", Arrays.asList("$vulnerable", true)), 1, 0))),
-            // SIMPLIFIED skip detection: check if errorsList exists and has elements
+            // Skip detection: check if errorsList exists and has elements
             Accumulators.sum("skipCount", new BasicDBObject("$cond", Arrays.asList(
                 new BasicDBObject("$and", Arrays.asList(
                     new BasicDBObject("$isArray", "$errorsList"),
@@ -347,22 +348,22 @@ public class TestingRunResultDao extends AccountsContextDaoWithRbac<TestingRunRe
         pipeline.add(Aggregates.sort(Sorts.ascending("categoryName")));
         
         // Execute aggregation with optimizations
-        MongoCursor<BasicDBObject> cursor = this.getMCollection()
+        List<Map<String, Object>> results = new ArrayList<>();
+        try (MongoCursor<BasicDBObject> cursor = this.getMCollection()
                 .aggregate(pipeline, BasicDBObject.class)
                 .allowDiskUse(true) // Allow disk usage for large datasets
-                .cursor();
-        
-        List<Map<String, Object>> results = new ArrayList<>();
-        while (cursor.hasNext()) {
-            BasicDBObject result = cursor.next();
-            Map<String, Object> categoryScore = new HashMap<>();
-            categoryScore.put("categoryName", result.getString("categoryName"));
-            categoryScore.put("pass", result.getInt("passCount", 0));
-            categoryScore.put("fail", result.getInt("failCount", 0));
-            categoryScore.put("skip", result.getInt("skipCount", 0));
-            results.add(categoryScore);
+                .cursor()) {
+            
+            while (cursor.hasNext()) {
+                BasicDBObject result = cursor.next();
+                Map<String, Object> categoryScore = new HashMap<>();
+                categoryScore.put("categoryName", result.getString("categoryName"));
+                categoryScore.put("pass", result.getInt("passCount", 0));
+                categoryScore.put("fail", result.getInt("failCount", 0));
+                categoryScore.put("skip", result.getInt("skipCount", 0));
+                results.add(categoryScore);
+            }
         }
-        cursor.close();
         
         return results;
     }

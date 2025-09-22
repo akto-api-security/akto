@@ -99,7 +99,7 @@ public class StartTestAction extends UserAction {
     private List<Map<String, Object>> categoryWiseScores = new ArrayList<>();
     
     private String dashboardCategory;
-    private String dataSource = "redteaming"; // Default to testing
+    private String dataSource = "redteaming"; // Default to redteaming
     
     public void setDashboardCategory(String dashboardCategory) {
         this.dashboardCategory = dashboardCategory;
@@ -1198,7 +1198,7 @@ public class StartTestAction extends UserAction {
                     break;
                 case "redteaming":
                 default:
-                    sourceType = CategoryWiseStatsUtils.DataSource.TESTING;
+                    sourceType = CategoryWiseStatsUtils.DataSource.REDTEAMING;
                     break;
             }
             
