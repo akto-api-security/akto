@@ -12,7 +12,7 @@ const McpRecon = () => {
     const [requireAuth, setRequireAuth] = useState(false)
 
     const goToDocs = () => {
-        window.open("https://docs.akto.io")
+        window.open("https://docs.akto.io/mcp-recon")
     }
 
     const primaryAction = () => {
