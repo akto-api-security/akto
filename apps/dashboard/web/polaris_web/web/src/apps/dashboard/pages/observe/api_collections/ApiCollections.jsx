@@ -208,6 +208,7 @@ const convertToNewData = (collectionsArr, sensitiveInfoMap, severityInfoMap, cov
             ...c,
             icon: CircleTickMajor,
             nextUrl: "/dashboard/observe/inventory/"+ c.id,
+            envTypeOriginal: c?.envType,
             envType: c?.envType?.map(func.formatCollectionType),
             displayNameComp: (<Box maxWidth="30vw"><Text truncate fontWeight="medium">{c.displayName}</Text></Box>),
             testedEndpoints: c.urlsCount === 0 ? 0 : (coverageMap[c.id] ? coverageMap[c.id] : 0),
@@ -238,7 +239,7 @@ const categorizeCollections = (prettifyArray) => {
     
     prettifyArray.forEach((c) => {
         // Build environment map
-        envTypeObj[c.id] = c.envType;
+        envTypeObj[c.id] = c.envTypeOriginal;
         collectionMap.set(c.id, c);
         
         // Categorize collections in single pass
