@@ -101,6 +101,7 @@ import AuditData from "../dashboard/pages/observe/AuditData";
 import ComingSoonPage from "../dashboard/components/shared/ComingSoonPage";
 import GuardrailDetection    from "../dashboard/pages/guardrails/GuardrailDetection";
 import GuardrailPolicies   from "../dashboard/pages/guardrails/GuardrailPolicies";
+import DeploymentConfigs from "../dashboard/pages/settings/deployment_config/DeploymentConfigs";
 
 // if you add a component in a new path, please verify the search implementation in function -> 'getSearchItemsArr' in func.js
 
@@ -461,6 +462,11 @@ const router = createBrowserRouter([
                     {
                         path: 'undo-demerge-apis',
                         element: <UndoDemergedApis/>
+                    }
+                    ,
+                    {
+                        path: 'deployment-configs',
+                        element: <DeploymentConfigs/>
                     }
                 ]
             },

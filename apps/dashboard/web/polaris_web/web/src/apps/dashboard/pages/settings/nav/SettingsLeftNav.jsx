@@ -148,6 +148,12 @@ const SettingsLeftNav = () => {
                         icon: ChatMajor,
                         selected: page === "help",
                         onClick: () => navigate("/dashboard/settings/help")
+                    },
+                    {
+                        label: 'Deployment configs',
+                        icon: AdjustMinor,
+                        selected: page === "deployment-configs",
+                        onClick: () => navigate("/dashboard/settings/deployment-configs")
                     }
                 ]}
             />
