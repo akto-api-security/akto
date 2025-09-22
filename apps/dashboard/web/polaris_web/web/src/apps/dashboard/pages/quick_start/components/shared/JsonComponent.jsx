@@ -3,7 +3,7 @@ import React from 'react'
 import SampleData from '../../../../components/shared/SampleData'
 import { ClipboardMinor } from "@shopify/polaris-icons"
 
-function JsonComponent({dataString, onClickFunc, title, toolTipContent, language, minHeight}) {
+function JsonComponent({dataString, onClickFunc, title, toolTipContent, language, minHeight, readOnly = false, getEditorData}) {
 
   let data = {message:dataString}
 
@@ -15,7 +15,7 @@ function JsonComponent({dataString, onClickFunc, title, toolTipContent, language
                 <Button icon={ClipboardMinor} plain  onClick={() => onClickFunc()}/>
             </Tooltip>
         </div>
-        <SampleData data={data} language={language} minHeight={minHeight}/>
+        <SampleData data={data} language={language} minHeight={minHeight} readOnly={readOnly} getEditorData={getEditorData} />
     </VerticalStack>
   )
 }
