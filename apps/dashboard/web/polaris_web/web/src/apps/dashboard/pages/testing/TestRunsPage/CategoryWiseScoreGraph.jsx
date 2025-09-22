@@ -1,61 +1,252 @@
-import { Box, Text, HorizontalStack, DataTable } from '@shopify/polaris';
+import { Box, Text, HorizontalStack, DataTable, VerticalStack } from '@shopify/polaris';
 import ChartypeComponent from './ChartypeComponent';
 import observeFunc from "../../observe/transform";
 import InfoCard from '../../dashboard/new_components/InfoCard';
-import { isMCPSecurityCategory, isGenAISecurityCategory } from '../../../../main/labelHelper';
+import { getDashboardCategory, mapLabel } from '../../../../main/labelHelper';
 import { mcpCategoryTestData, genAICategoryTestData, apiCategoryTestData } from './dummyData';
+import api from '../api';
+import threatDetectionApi from '../../threat_detection/api';
+import { useState, useEffect } from 'react';
 
-function CategoryWiseScoreGraph({  }) {
+function CategoryWiseScoreGraph({ 
+    startTimestamp, 
+    endTimestamp, 
+    dataSource = 'testing', // 'testing', 'threat_detection', 'guardrails'
+    title,
+    apiEndpoint,
+    fallbackData
+}) {
+    const [categoryTestData, setCategoryTestData] = useState([]);
+    const [loading, setLoading] = useState(true);
 
-    // Select appropriate data based on dashboard category
-    let categoryTestData;
-    if (isMCPSecurityCategory()) {
-        categoryTestData = mcpCategoryTestData;
-    } else if (isGenAISecurityCategory()) {
-        categoryTestData = genAICategoryTestData;
+    // Get current dashboard category
+    const dashboardCategory = getDashboardCategory();
+    
+    // Determine the appropriate API call and fallback data
+    const getApiCall = () => {
+        if (apiEndpoint) {
+            return apiEndpoint;
+        }
+        
+        switch (dataSource) {
+            case 'testing':
+                return api.fetchCategoryWiseScores;
+            case 'threat_detection':
+                // Add threat detection API call when available
+                return null;
+            case 'guardrails':
+                // Add guardrails API call when available
+                return null;
+            default:
+                return api.fetchCategoryWiseScores;
+        }
+    };
+
+    const getDefaultFallbackData = () => {
+        if (fallbackData) {
+            return fallbackData;
+        }
+        
+        switch (dashboardCategory) {
+            case 'MCP Security':
+                return mcpCategoryTestData;
+            case 'Gen AI':
+                return genAICategoryTestData;
+            case 'API Security':
+            default:
+                return apiCategoryTestData || [];
+        }
+    };
+
+    useEffect(() => {
+        const fetchCategoryData = async () => {
+            try {
+                setLoading(true);
+                const apiCall = getApiCall();
+                
+                if (apiCall) {
+                    const response = await apiCall(startTimestamp, endTimestamp, dashboardCategory, dataSource);
+                    if (response && response.length > 0) {
+                        setCategoryTestData(response);
+                        return;
+                    }
+                }
+                
+                // Fallback to dummy data if no real data is available or no API
+                setCategoryTestData(getDefaultFallbackData());
+                
+            } catch (error) {
+                console.error('Error fetching category wise data:', error);
+                // Fallback to dummy data on error
+                setCategoryTestData(getDefaultFallbackData());
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchCategoryData();
+    }, [startTimestamp, endTimestamp, dataSource, apiEndpoint, dashboardCategory]);
+
+    // Get dynamic title and labels based on data source and dashboard category
+    const getTitle = () => {
+        if (title) return title;
+        
+        const baseTitle = "Category wise scores";
+        return mapLabel(baseTitle, dashboardCategory);
+    };
+
+    const getTooltip = () => {
+        const context = dataSource === 'testing' ? 'test results' : 
+                       dataSource === 'threat_detection' ? 'threat detection results' :
+                       dataSource === 'guardrails' ? 'policy enforcement results' : 'results';
+        
+        return `Comprehensive breakdown of ${context} by category, showing pass/fail percentages, counts, and skipped items with visual indicators.`;
+    };
+
+    const getChartSubtitle = () => {
+        switch (dataSource) {
+            case 'testing':
+                return mapLabel('Total tests', dashboardCategory);
+            case 'threat_detection':
+                return mapLabel('Total threats', dashboardCategory);
+            case 'guardrails':
+                return mapLabel('Total policies', dashboardCategory);
+            default:
+                return mapLabel('Total items', dashboardCategory);
+        }
+    };
+
+    if (loading) {
+        return (
+            <InfoCard
+                title={getTitle()}
+                titleToolTip={getTooltip()}
+                component={<Box padding="4"><Text>Loading...</Text></Box>}
+            />
+        );
     }
 
-    // Calculate totals
-    const totalPass = categoryTestData.reduce((sum, cat) => sum + cat.pass, 0);
-    const totalFail = categoryTestData.reduce((sum, cat) => sum + cat.fail, 0);
-    const total = totalPass + totalFail;
-    // Prepare data for ChartypeComponent
+    // Calculate totals (skipped metric commented out for now)
+    const totalPass = categoryTestData.reduce((sum, cat) => sum + (cat.pass || 0), 0);
+    const totalFail = categoryTestData.reduce((sum, cat) => sum + (cat.fail || 0), 0);
+    // const totalSkip = categoryTestData.reduce((sum, cat) => sum + (cat.skip || 0), 0);
+    const total = totalPass + totalFail; // + totalSkip;
+    
+    // Prepare data for ChartypeComponent with dynamic labels based on data source
+    const getStatusLabels = () => {
+        switch (dataSource) {
+            case 'redteaming':
+                return { 
+                    pass: 'Passed', 
+                    fail: 'Failed', 
+                    skip: 'Skipped',
+                    hasSkip: true 
+                };
+            case 'threat_detection':
+                return { 
+                    pass: 'Safe', 
+                    fail: 'Threat', 
+                    skip: 'Skipped',
+                    hasSkip: false 
+                };
+            case 'guardrails':
+                return { 
+                    pass: 'Allowed', 
+                    fail: 'Blocked', 
+                    skip: 'Skipped',
+                    hasSkip: false 
+                };
+            default:
+                return { 
+                    pass: 'Passed', 
+                    fail: 'Failed', 
+                    skip: 'Skipped',
+                    hasSkip: true 
+                };
+        }
+    };
+
+    const statusLabels = getStatusLabels();
+    
+    // Build chart data - only include skip if it exists and has data
     const chartData = {
-        'Passed': {
+        [statusLabels.pass]: {
             text: totalPass,
             color: '#54b074',
         },
-        'Failed': {
+        [statusLabels.fail]: {
             text: totalFail,
             color: '#f05352'
         }
     };
 
-    // Prepare table rows for category breakdown
-    const tableRows = categoryTestData.map(cat => {
-        const categoryTotal = cat.pass + cat.fail;
-        const passRateNumber = categoryTotal === 0 ? 0 : Number(((cat.pass / categoryTotal) * 100).toFixed(0));
-        const passRate = categoryTotal === 0 ? 0.0 : Number(((cat.pass / categoryTotal) * 100).toFixed(2));
-        const failRate = categoryTotal === 0 ? 0.0 : Number(((cat.fail / categoryTotal) * 100).toFixed(2));
+    // Skip metric commented out for now
+    // if (statusLabels.hasSkip && totalSkip > 0) {
+    //     chartData[statusLabels.skip] = {
+    //         text: totalSkip,
+    //         color: '#ffa500'
+    //     };
+    // }
 
-        // Use inline styles with the actual green/red colors instead of Polaris color props
-        const passed = passRateNumber > 50;
-        const textColor = passed ? '#54b074' : '#f05352';
-        const labelText = passed ? 'Pass' : 'Fail';
+    // Prepare table rows for category breakdown with comprehensive stats
+    const tableRows = categoryTestData.map(cat => {
+        const passCount = cat.pass || 0;
+        const failCount = cat.fail || 0;
+        // const skipCount = cat.skip || 0; // Commented out for now
+        const executedTotal = passCount + failCount; // Only executed tests
+        // const grandTotal = executedTotal + skipCount; // All tests
+        
+        // Calculate percentages based on executed tests only
+        const passRate = executedTotal === 0 ? 0 : Number(((passCount / executedTotal) * 100).toFixed(1));
+        const failRate = executedTotal === 0 ? 0 : Number(((failCount / executedTotal) * 100).toFixed(1));
+        
+        // Determine dominant result (>= for tie-breaking towards pass)
+        const passed = passCount >= failCount;
+        const primaryColor = passed ? '#54b074' : '#f05352';
+        const primaryRate = passed ? passRate : failRate;
+        const primaryLabel = passed ? statusLabels.pass : statusLabels.fail;
 
         return [
             cat.categoryName,
-            <HorizontalStack gap={"1"}>
-                <Text><span style={{ color: textColor, fontWeight: '500' }}>{passed ? passRate : failRate}% {labelText}</span></Text>
-                <Text color='subdued'>({passed ? cat.pass : cat.fail}/{categoryTotal+cat.skip})</Text>
+            <VerticalStack gap="2">
+                {/* Main result indicator */}
+                <HorizontalStack gap="1" align="center">
+                    <div style={{ 
+                        width: '8px', 
+                        height: '8px', 
+                        borderRadius: '50%', 
+                        backgroundColor: primaryColor 
+                    }} />
+                    <Text>
+                        <span style={{ color: primaryColor, fontWeight: '600' }}>
+                            {executedTotal === 0 ? '0%' : `${primaryRate}%`} {executedTotal === 0 ? 'No data' : primaryLabel}
+                        </span>
+                    </Text>
+                </HorizontalStack>
+                
+                {/* Detailed breakdown with visual indicators */}
+                <HorizontalStack gap="3">
+                    <Text variant="bodySm" color='subdued'>
+                        <span style={{ color: '#54b074', fontWeight: '500' }}>✓{passCount}</span>
+                    </Text>
+                    <Text variant="bodySm" color='subdued'>
+                        <span style={{ color: '#f05352', fontWeight: '500' }}>✗{failCount}</span>
+                    </Text>
+                    {/* Skip count commented out for now */}
+                    {/* {statusLabels.hasSkip && skipCount > 0 && (
+                        <Text variant="bodySm" color='subdued'>
+                            <span style={{ color: '#ffa500', fontWeight: '500' }}>⊘{skipCount}</span>
+                        </Text>
+                    )} */}
             </HorizontalStack>
+            </VerticalStack>
         ];
     });
 
     return (
         <InfoCard
-            title={"Category wise scores"}
-            titleToolTip="Breakdown of test results by category, showing pass rates and counts for each."
+            title={getTitle()}
+            titleToolTip={getTooltip()}
             component={<HorizontalStack gap="8" align="center" wrap={false}>
                 {/* Chart and Legend using ChartypeComponent */}
                 <Box>
@@ -63,7 +254,7 @@ function CategoryWiseScoreGraph({  }) {
                         data={chartData}
                         title=""
                         charTitle={observeFunc.formatNumberWithCommas(total)}
-                        chartSubtitle="Total tests"
+                        chartSubtitle={getChartSubtitle()}
                         reverse={false}
                         isNormal={true}
                         boxHeight="250px"
