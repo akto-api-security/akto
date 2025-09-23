@@ -1,5 +1,5 @@
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards"
-import { Text, HorizontalStack, Button, Popover, Modal, IndexFiltersMode, VerticalStack, Box, Checkbox, ActionList, Icon } from "@shopify/polaris"
+import { Text, HorizontalStack, Button, Popover, Modal, IndexFiltersMode, VerticalStack, Box, Checkbox, ActionList, Icon, Tooltip } from "@shopify/polaris"
 import api from "../api"
 import { useEffect, useState } from "react"
 import func from "@/util/func"
@@ -140,6 +140,14 @@ const headings = [
         title: "Collection",
         showFilter: true,
         filterKey: "apiCollectionName",
+    },
+    {
+        text: "Tags",
+        value: "tagsComp",
+        textValue: "tagsString",
+        title: "Tags",
+        showFilter: true,
+        filterKey: "tagsString",
     },
     {
         text: "Description",
@@ -406,6 +414,28 @@ function ApiEndpoints(props) {
         }
         
         const prettifyData = transform.prettifyEndpointsData(allEndpoints)
+
+        // enrich with collection tags (env types) for API group view
+        const collectionTagsMap = {}
+        ;(allCollections || []).forEach((c) => {
+            const envType = c?.envType
+            const envTypeList = envType?.map(func.formatCollectionType) || []
+            collectionTagsMap[c.id] = {
+                list: envTypeList,
+                comp: getTagsCompactComponent(envTypeList, 2),
+                str: envTypeList.join(" ")
+            }
+        })
+
+        prettifyData.forEach((obj) => {
+            const t = collectionTagsMap[obj.apiCollectionId]
+            if (t) {
+                obj.tagsComp = t.comp
+                obj.tagsString = t.str
+            } else {
+                obj.tagsString = ""
+            }
+        })
 
         const zombie = prettifyData.filter(
             obj => obj.sources && // Check that obj.sources is not null or undefined
@@ -854,13 +884,20 @@ function ApiEndpoints(props) {
         let requestObj = {key: "COLLECTION",filteredItems: filteredEndpoints,apiCollectionId: Number(apiCollectionId)}
         const activePrompts = dashboardFunc.getPrompts(requestObj)
         setPrompts(activePrompts)
+        
+    }
+
+    function getTagsCompactComponent(envTypeList) {
+        const list = envTypeList || []
+        // Use shared badge renderer to show 1 tag and a +N badge with tooltip inline
+        return transform.getCollectionTypeList(list, 1, false)
     }
 
     function getCollectionTypeListComp(collectionsObj) {
         const envType = collectionsObj?.envType
-        const envTypeList = envType?.map(func.formatCollectionType)
+        const envTypeList = envType?.map(func.formatCollectionType) || []
 
-        return transform.getCollectionTypeList(envTypeList, 3, true)
+        return getTagsCompactComponent(envTypeList)
     }
 
     const collectionsObj = (allCollections && allCollections.length > 0) ? allCollections.filter(x => Number(x.id) === Number(apiCollectionId))[0] : {}
@@ -1122,7 +1159,7 @@ function ApiEndpoints(props) {
         filters={[]}
         disambiguateLabel={disambiguateLabel}
         headers={headers.filter(x => {
-            if (!isApiGroup && x.text === 'Collection') {
+            if (!isApiGroup && (x.text === 'Collection' || x.text === 'Tags')) {
                 return false;
             }
             return true;
@@ -1134,7 +1171,7 @@ function ApiEndpoints(props) {
         getFilteredItems={getFilteredItems}
         mode={IndexFiltersMode.Default}
         headings={headings.filter(x => {
-            if (!isApiGroup && x.text === 'Collection') {
+            if (!isApiGroup && (x.text === 'Collection' || x.text === 'Tags')) {
                 return false;
             }
             return true;
