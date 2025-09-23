@@ -182,17 +182,6 @@ public class MaliciousEventService {
       query.append("subCategory", new Document("$in", filter.getSubCategoryList()));
     }
 
-    if (filter.hasSuccessfulExploit()) {
-      boolean val = filter.getSuccessfulExploit();
-      if (val) {
-        query.append("successfulExploit", true);
-      } else {
-        query.append("$or", Arrays.asList(
-            new Document("successfulExploit", false),
-            new Document("successfulExploit", new Document("$exists", false))
-        ));
-      }
-    }
 
     if (!filter.getLatestAttackList().isEmpty()) {
       query.append("filterId", new Document("$in", filter.getLatestAttackList()));
@@ -209,6 +198,22 @@ public class MaliciousEventService {
       long end = timeRange.hasEnd() ? timeRange.getEnd() : Long.MAX_VALUE;
 
       query.append("detectedAt", new Document("$gte", start).append("$lte", end));
+    }
+
+    if (filter.hasSuccessfulExploit()) {
+      boolean val = filter.getSuccessfulExploit();
+      if (val) {
+        query.append("successfulExploit", true);
+      } else {
+        List<Document> andConditions = new ArrayList<>();
+        andConditions.add(new Document(query));
+        andConditions.add(new Document("$or", Arrays.asList(
+            new Document("successfulExploit", false),
+            new Document("successfulExploit", new Document("$exists", false))
+        )));
+        query.clear();
+        query.append("$and", andConditions);
+      }
     }
 
     long total = coll.countDocuments(query);
