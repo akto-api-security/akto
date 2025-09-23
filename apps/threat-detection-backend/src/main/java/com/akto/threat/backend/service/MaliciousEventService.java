@@ -75,6 +75,7 @@ public class MaliciousEventService {
             .setSeverity(evt.getSeverity())
             .setType(evt.getType())
             .setMetadata(evt.getMetadata().toString())
+            .setSuccessful(false)
             .build();
 
     this.kafka.send(
@@ -179,6 +180,18 @@ public class MaliciousEventService {
       query.append("subCategory", new Document("$in", filter.getSubCategoryList()));
     }
 
+    if (filter.hasSuccessful()) {
+      boolean val = filter.getSuccessful();
+      if (val) {
+        query.append("successful", true);
+      } else {
+        query.append("$or", Arrays.asList(
+            new Document("successful", false),
+            new Document("successful", new Document("$exists", false))
+        ));
+      }
+    }
+
     if (!filter.getLatestAttackList().isEmpty()) {
       query.append("filterId", new Document("$in", filter.getLatestAttackList()));
     }
@@ -222,6 +235,7 @@ public class MaliciousEventService {
                 .setRefId(evt.getRefId())
                 .setEventTypeVal(evt.getEventType().toString())
                 .setMetadata(metadata)
+                .setSuccessful(evt.getSuccessful() != null ? evt.getSuccessful() : false)
                 .build());
       }
       return ListMaliciousRequestsResponse.newBuilder()

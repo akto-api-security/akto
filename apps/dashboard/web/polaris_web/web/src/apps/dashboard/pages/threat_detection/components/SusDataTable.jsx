@@ -39,6 +39,12 @@ const headers = [
     title: "Attack type",
   },
   {
+    text: "Successful",
+    value: "successfulComp",
+    title: "Successful",
+    maxWidth: "90px",
+  },
+  {
     text: "Collection",
     value: "apiCollectionName",
     title: "Collection",
@@ -116,6 +122,10 @@ function SusDataTable({ currDateRange, rowClicked }) {
       latestAttack = filters?.latestAttack
     }
     const sort = { [sortKey]: sortOrder };
+    const successfulFilterValue = Array.isArray(filters?.successful) ? filters?.successful?.[0] : filters?.successful;
+    const successfulBool = (successfulFilterValue === true || successfulFilterValue === 'true') ? true
+                          : (successfulFilterValue === false || successfulFilterValue === 'false') ? false
+                          : undefined;
     const res = await api.fetchSuspectSampleData(
       skip,
       sourceIpsFilter,
@@ -125,7 +135,9 @@ function SusDataTable({ currDateRange, rowClicked }) {
       sort,
       startTimestamp,
       endTimestamp,
-      latestAttack
+      latestAttack,
+      undefined,
+      successfulBool
     );
 //    setSubCategoryChoices(distinctSubCategories);
     let total = res.total;
@@ -147,6 +159,9 @@ function SusDataTable({ currDateRange, rowClicked }) {
         discoveredTs: dayjs(x.timestamp*1000).format("DD-MM-YYYY HH:mm:ss"),
         sourceIPComponent: x?.ip || "-",
         type: x?.type || "-",
+        successfulComp: (
+          <Badge size="small">{x?.successful ? "True" : "False"}</Badge>
+        ),
         severityComp: (<div className={`badge-wrapper-${severity}`}>
                           <Badge size="small">{func.toSentenceCase(severity)}</Badge>
                       </div>
@@ -205,6 +220,16 @@ function SusDataTable({ currDateRange, rowClicked }) {
         type: 'select',
         choices: attackTypeChoices,
         multiple: true
+      },
+      {
+        key: 'successful',
+        label: 'Successful',
+        title: 'Successful',
+        choices: [
+          { label: 'True', value: 'true' },
+          { label: 'False', value: 'false' }
+        ],
+        singleSelect: true
       },
     ];
   }

@@ -23,6 +23,7 @@ public class MaliciousEventModel {
   private String refId;
   private String severity;
   private String metadata;
+  private Boolean successful;
 
 
   public enum EventType {
@@ -50,6 +51,7 @@ public class MaliciousEventModel {
     this.type = builder.type;
     this.refId = builder.refId;
     this.metadata = builder.metadata; 
+    this.successful = builder.successful;
   }
 
   public static class Builder {
@@ -69,6 +71,7 @@ public class MaliciousEventModel {
     private String type;
     private String severity;
     private String metadata; 
+    private Boolean successful;
 
     public Builder setFilterId(String filterId) {
       this.filterId = filterId;
@@ -150,6 +153,11 @@ public class MaliciousEventModel {
       return this;
     }
 
+    public Builder setSuccessful(Boolean successful) {
+      this.successful = successful;
+      return this;
+    }
+
     public MaliciousEventModel build() {
       return new MaliciousEventModel(this);
     }
@@ -161,6 +169,14 @@ public class MaliciousEventModel {
 
   public void setMetadata(String metadata) {
     this.metadata = metadata;
+  }
+
+  public Boolean getSuccessful() {
+    return successful;
+  }
+
+  public void setSuccessful(Boolean successful) {
+    this.successful = successful;
   }
 
   public String getId() {
