@@ -142,6 +142,14 @@ const headings = [
         filterKey: "apiCollectionName",
     },
     {
+        text: "Tags",
+        value: "tagsComp",
+        textValue: "tagsString",
+        title: "Tags",
+        showFilter: true,
+        filterKey: "tagsString",
+    },
+    {
         text: "Description",
         value: "descriptionComp",
         textValue: "description",
@@ -406,6 +414,28 @@ function ApiEndpoints(props) {
         }
         
         const prettifyData = transform.prettifyEndpointsData(allEndpoints)
+
+        // enrich with collection tags (env types) for API group view
+        const collectionTagsMap = {}
+        ;(allCollections || []).forEach((c) => {
+            const envType = c?.envType
+            const envTypeList = envType?.map(func.formatCollectionType) || []
+            collectionTagsMap[c.id] = {
+                list: envTypeList,
+                comp: transform.getCollectionTypeList(envTypeList, 3, true),
+                str: envTypeList.join(" ")
+            }
+        })
+
+        prettifyData.forEach((obj) => {
+            const t = collectionTagsMap[obj.apiCollectionId]
+            if (t) {
+                obj.tagsComp = t.comp
+                obj.tagsString = t.str
+            } else {
+                obj.tagsString = ""
+            }
+        })
 
         const zombie = prettifyData.filter(
             obj => obj.sources && // Check that obj.sources is not null or undefined
@@ -854,6 +884,7 @@ function ApiEndpoints(props) {
         let requestObj = {key: "COLLECTION",filteredItems: filteredEndpoints,apiCollectionId: Number(apiCollectionId)}
         const activePrompts = dashboardFunc.getPrompts(requestObj)
         setPrompts(activePrompts)
+        
     }
 
     function getCollectionTypeListComp(collectionsObj) {
@@ -1122,7 +1153,7 @@ function ApiEndpoints(props) {
         filters={[]}
         disambiguateLabel={disambiguateLabel}
         headers={headers.filter(x => {
-            if (!isApiGroup && x.text === 'Collection') {
+            if (!isApiGroup && (x.text === 'Collection' || x.text === 'Tags')) {
                 return false;
             }
             return true;
@@ -1134,7 +1165,7 @@ function ApiEndpoints(props) {
         getFilteredItems={getFilteredItems}
         mode={IndexFiltersMode.Default}
         headings={headings.filter(x => {
-            if (!isApiGroup && x.text === 'Collection') {
+            if (!isApiGroup && (x.text === 'Collection' || x.text === 'Tags')) {
                 return false;
             }
             return true;
