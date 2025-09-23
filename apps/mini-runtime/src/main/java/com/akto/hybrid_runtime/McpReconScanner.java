@@ -636,7 +636,15 @@ public class McpReconScanner {
                 Map<String, Object> jsonResponse = JSONUtils.getMap(content);
                 if (jsonResponse != null && jsonResponse.containsKey("result")) {
                     Map<String, Object> result = (Map<String, Object>) jsonResponse.get("result");
-                    return (List<McpSchema.Tool>) result.get("tools");
+                    Object toolsObj = result.get("tools");
+                    if (toolsObj != null) {
+                        ObjectMapper mapper = new ObjectMapper();
+                        return mapper.convertValue(
+                                toolsObj,
+                                mapper.getTypeFactory().constructCollectionType(List.class, McpSchema.Tool.class)
+                        );
+                    }
+                    return new ArrayList<>();
                 }
             }
         } catch (Exception e) {
@@ -668,7 +676,15 @@ public class McpReconScanner {
                 Map<String, Object> jsonResponse = JSONUtils.getMap(content);
                 if (jsonResponse != null && jsonResponse.containsKey("result")) {
                     Map<String, Object> result = (Map<String, Object>) jsonResponse.get("result");
-                    return (List<McpSchema.Resource>) result.get("resources");
+                    Object toolsObj = result.get("resources");
+                    if (toolsObj != null) {
+                        ObjectMapper mapper = new ObjectMapper();
+                        return mapper.convertValue(
+                                toolsObj,
+                                mapper.getTypeFactory().constructCollectionType(List.class, McpSchema.Resource.class)
+                        );
+                    }
+                    return new ArrayList<>();
                 }
             }
         } catch (Exception e) {
@@ -700,7 +716,15 @@ public class McpReconScanner {
                 Map<String, Object> jsonResponse = JSONUtils.getMap(content);
                 if (jsonResponse != null && jsonResponse.containsKey("result")) {
                     Map<String, Object> result = (Map<String, Object>) jsonResponse.get("result");
-                    return (List<McpSchema.Prompt>) result.get("prompts");
+                    Object toolsObj = result.get("tools");
+                    if (toolsObj != null) {
+                        ObjectMapper mapper = new ObjectMapper();
+                        return mapper.convertValue(
+                                toolsObj,
+                                mapper.getTypeFactory().constructCollectionType(List.class, McpSchema.Prompt.class)
+                        );
+                    }
+                    return new ArrayList<>();
                 }
             }
         } catch (Exception e) {

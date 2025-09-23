@@ -555,7 +555,7 @@ public class McpReconSyncJobExecutor {
                 }
             }
         } catch (Exception e) {
-            logger.error("Error while discovering mcp tools for hostname: {}", host, e);
+            logger.error("Error while discovering mcp resources for hostname: {}", host, e);
         }
         return responseParamsList;
     }
