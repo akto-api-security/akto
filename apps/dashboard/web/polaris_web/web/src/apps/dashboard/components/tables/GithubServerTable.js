@@ -67,7 +67,7 @@ function GithubServerTable(props) {
       }
     })
     setAppliedFilters(temp);
-    let tempFilters = filtersMap
+
     tempFilters[currentPageKey] = {
       'filters': temp,
       'sort': pageFiltersMap?.sort || []
@@ -107,7 +107,7 @@ function GithubServerTable(props) {
   }, [])
 
   useEffect(()=> {
-    let queryFilters 
+    let queryFilters
     if (performance.getEntriesByType('navigation')[0].type === 'reload') {
       queryFilters = []
     }else{

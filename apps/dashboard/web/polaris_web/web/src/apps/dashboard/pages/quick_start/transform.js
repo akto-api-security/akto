@@ -1297,6 +1297,8 @@ const yaml_kubernetes = [
     `            value: "<AKTO_MONGO_CONN>"`,
 ]
 
+
+
 const quickStartFunc = {
 
     getConnectorsListCategorized: function () {

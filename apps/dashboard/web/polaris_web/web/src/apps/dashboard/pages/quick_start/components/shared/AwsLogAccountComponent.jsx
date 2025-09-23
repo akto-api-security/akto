@@ -26,10 +26,10 @@ function AwsLogAccountComponent() {
     return (
         <Box paddingBlockStart={4}>
             <VerticalStack gap={4}>
-                <Text >Input the AWS account IDs, for which the API gateway logging service will be scraping the logs</Text>
+                <Text >Input the AWS Role ARNs, for which the API gateway logging service will be scraping the logs</Text>
                 <TextField
-                    label="AWS Account IDs"
-                    placeholder="Account IDs (comma separated)"
+                    label="AWS Role ARNs"
+                    placeholder="Role ARNs (comma separated)"
                     value={accountIds}
                     onChange={(value) => setAccountIds(value)}
                     multiline

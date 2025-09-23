@@ -27,8 +27,10 @@ function CollectionComponent(props) {
     const [apiEndpoints, setApiEndpoints] = useState({})
     const initialRegexText = (condition && condition?.type === 'REGEX') ? (condition?.data?.regex || '') : ''
     const initialHostRegexText = (condition && condition?.type === 'HOST_REGEX') ? (condition?.data?.host_regex || '') : ''
+    const initialTagsText = (condition && condition?.type === 'TAGS') ? (condition?.data?.query || '') : ''
     const [regexText, setRegexText] = useState(initialRegexText)
     const [hostRegexText, setHostRegexText] = useState(initialHostRegexText)
+    const [tagsText, setTagsText] = useState(initialTagsText)
     const dashboardCategory = PersistStore(state => state.dashboardCategory)
 
     useEffect(() => {
@@ -154,6 +156,8 @@ function CollectionComponent(props) {
                 return {}
             case "HOST_REGEX":
                 return {}
+            case "TAGS":
+                return {}
             default:
                 return {}
         }
@@ -177,6 +181,10 @@ function CollectionComponent(props) {
             {
                 label: 'Host name matches regex',
                 value: 'HOST_REGEX'
+            },
+            {
+                label: 'Tags',
+                value: 'TAGS'
             }
         ]}
             initial={condition.type}
@@ -194,6 +202,11 @@ function CollectionComponent(props) {
     const handleHostRegexText = (val) => {
         setHostRegexText(val)
         dispatch({ type: "overwrite", index: index, key: "data", obj: {"host_regex":val } })
+    }
+
+    const handleTagsText = (val) => {
+        setTagsText(val)
+        dispatch({ type: "overwrite", index: index, key: "data", obj: {"query":val } })
     }
 
     const component = (condition, index) => {
@@ -219,6 +232,10 @@ function CollectionComponent(props) {
             case "HOST_REGEX":
                 return(
                     <TextField onChange={(val) => handleHostRegexText(val)} value={hostRegexText} />
+                )
+            case "TAGS":
+                return(
+                    <TextField onChange={(val) => handleTagsText(val)} value={tagsText} />
                 )
             default:
                 break;

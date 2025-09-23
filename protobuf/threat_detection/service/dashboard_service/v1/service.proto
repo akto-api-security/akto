@@ -27,7 +27,8 @@ message ListMaliciousRequestsResponse {
       string ref_id = 15;
       string event_type_val = 16;
       string metadata = 17;
-      bool successful_exploit = 18;
+      string status = 18;
+      bool successful_exploit = 19;
     }
     repeated MaliciousEvent malicious_events = 1;
     uint64 total = 2;
@@ -47,7 +48,8 @@ message ListMaliciousRequestsRequest {
       repeated string types = 5;
       repeated string sub_category = 6;
       repeated string latest_attack = 7;
-      optional bool successful_exploit = 8;
+      optional string status_filter = 8;
+      optional bool successful_exploit = 9;
     }
 
     // The number of alerts to return
@@ -254,6 +256,33 @@ message ModifyThreatActorStatusRequest {
 }
 
 message ModifyThreatActorStatusResponse {  
+}
+
+message UpdateMaliciousEventStatusRequest {
+  // One of these should be provided
+  optional string event_id = 1;  // For single event update
+  repeated string event_ids = 2;  // For bulk update by IDs
+  optional ListMaliciousRequestsRequest.Filter filter = 3;  // For filtered update
+
+  string status = 4;  // The new status to set
+}
+
+message UpdateMaliciousEventStatusResponse {
+  bool success = 1;
+  string message = 2;
+  int32 updated_count = 3;
+}
+
+message DeleteMaliciousEventsRequest {
+  // One of these should be provided
+  repeated string event_ids = 1;  // For delete by IDs
+  optional ListMaliciousRequestsRequest.Filter filter = 2;  // For filtered delete
+}
+
+message DeleteMaliciousEventsResponse {
+  bool success = 1;
+  string message = 2;
+  int32 deleted_count = 3;
 }
 
 message GetThreatConfigurationRequest {
