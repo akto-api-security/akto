@@ -42,7 +42,7 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
   int startTimestamp, endTimestamp;
   List<String> types;
   List<String> latestAttack;
-  Boolean successful; 
+  Boolean successfulExploit; 
 
   // TODO: remove this, use API Executor.
   private final CloseableHttpClient httpClient;
@@ -81,8 +81,8 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
       filter.put("types", this.types);
     }
 
-    if (this.successful != null) {
-      filter.put("successful", this.successful);
+    if (this.successfulExploit != null) {
+      filter.put("successfulExploit", this.successfulExploit);
     }
 
     List<String> templates = getTemplates(latestAttack);
@@ -138,7 +138,7 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
                             smr.getEventTypeVal(),
                             smr.getPayload(),
                             smr.getMetadata(),
-                            smr.getSuccessful()))
+                            smr.getSuccessfulExploit()))
                     .collect(Collectors.toList());
                 this.total = m.getTotal();
               });
@@ -324,11 +324,11 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
     this.latestAttack = latestAttack;
   }
 
-  public Boolean getSuccessful() {
-    return successful;
+  public Boolean getSuccessfulExploit() {
+    return successfulExploit;
   }
 
-  public void setSuccessful(Boolean successful) {
-    this.successful = successful;
+  public void setSuccessfulExploit(Boolean successfulExploit) {
+    this.successfulExploit = successfulExploit;
   }
 }

@@ -246,7 +246,7 @@ function ThreatDetectionPage() {
                                             prefix: <Box><Icon source={FileMinor} /></Box>
                                         },
                                         {
-                                            content: 'Configure Exploits',
+                                            content: 'Configure Successful Exploits',
                                             onAction: () => navigate('/dashboard/protection/configure-exploits'),
                                             prefix: <Box><Icon source={FileMinor} /></Box>
                                         }

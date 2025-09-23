@@ -16,7 +16,7 @@ const threatDetectionRequests = {
         })
     },
 
-    fetchSuspectSampleData(skip, ips, apiCollectionIds, urls, types, sort, startTimestamp, endTimestamp, latestAttack, limit, successful) {
+    fetchSuspectSampleData(skip, ips, apiCollectionIds, urls, types, sort, startTimestamp, endTimestamp, latestAttack, limit, successfulExploit) {
         return request({
             url: '/api/fetchSuspectSampleData',
             method: 'post',
@@ -31,7 +31,7 @@ const threatDetectionRequests = {
                 endTimestamp: endTimestamp,
                 latestAttack: latestAttack || [],
                 limit: limit || 50,
-                ...(typeof successful === 'boolean' ? { successful } : {})
+                ...(typeof successfulExploit === 'boolean' ? { successfulExploit } : {})
             }
         })
     },

@@ -39,9 +39,9 @@ const headers = [
     title: "Attack type",
   },
   {
-    text: "Successful",
+    text: "successfulExploit",
     value: "successfulComp",
-    title: "Successful",
+    title: "Successful Exploit",
     maxWidth: "90px",
   },
   {
@@ -122,7 +122,7 @@ function SusDataTable({ currDateRange, rowClicked }) {
       latestAttack = filters?.latestAttack
     }
     const sort = { [sortKey]: sortOrder };
-    const successfulFilterValue = Array.isArray(filters?.successful) ? filters?.successful?.[0] : filters?.successful;
+    const successfulFilterValue = Array.isArray(filters?.successfulExploit) ? filters?.successfulExploit?.[0] : filters?.successfulExploit;
     const successfulBool = (successfulFilterValue === true || successfulFilterValue === 'true') ? true
                           : (successfulFilterValue === false || successfulFilterValue === 'false') ? false
                           : undefined;
@@ -160,7 +160,7 @@ function SusDataTable({ currDateRange, rowClicked }) {
         sourceIPComponent: x?.ip || "-",
         type: x?.type || "-",
         successfulComp: (
-          <Badge size="small">{x?.successful ? "True" : "False"}</Badge>
+          <Badge size="small">{x?.successfulExploit ? "True" : "False"}</Badge>
         ),
         severityComp: (<div className={`badge-wrapper-${severity}`}>
                           <Badge size="small">{func.toSentenceCase(severity)}</Badge>
@@ -222,9 +222,9 @@ function SusDataTable({ currDateRange, rowClicked }) {
         multiple: true
       },
       {
-        key: 'successful',
-        label: 'Successful',
-        title: 'Successful',
+        key: 'successfulExploit',
+        label: 'Successful Exploit',
+        title: 'Successful Exploit',
         choices: [
           { label: 'True', value: 'true' },
           { label: 'False', value: 'false' }

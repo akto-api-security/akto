@@ -24,7 +24,6 @@ import com.mongodb.client.model.Filters;
 
 import java.util.*;
 
-import com.mongodb.client.model.Indexes;
 import org.bson.Document;
 import org.bson.conversions.Bson;
 
@@ -75,7 +74,7 @@ public class MaliciousEventService {
             .setSeverity(evt.getSeverity())
             .setType(evt.getType())
             .setMetadata(evt.getMetadata().toString())
-            .setSuccessful(false)
+            .setSuccessfulExploit(evt.getSuccessfulExploit())
             .build();
 
     this.kafka.send(
@@ -180,14 +179,14 @@ public class MaliciousEventService {
       query.append("subCategory", new Document("$in", filter.getSubCategoryList()));
     }
 
-    if (filter.hasSuccessful()) {
-      boolean val = filter.getSuccessful();
+    if (filter.hasSuccessfulExploit()) {
+      boolean val = filter.getSuccessfulExploit();
       if (val) {
-        query.append("successful", true);
+        query.append("successfulExploit", true);
       } else {
         query.append("$or", Arrays.asList(
-            new Document("successful", false),
-            new Document("successful", new Document("$exists", false))
+            new Document("successfulExploit", false),
+            new Document("successfulExploit", new Document("$exists", false))
         ));
       }
     }
@@ -235,7 +234,7 @@ public class MaliciousEventService {
                 .setRefId(evt.getRefId())
                 .setEventTypeVal(evt.getEventType().toString())
                 .setMetadata(metadata)
-                .setSuccessful(evt.getSuccessful() != null ? evt.getSuccessful() : false)
+                .setSuccessfulExploit(evt.getSuccessfulExploit() != null ? evt.getSuccessfulExploit() : false)
                 .build());
       }
       return ListMaliciousRequestsResponse.newBuilder()

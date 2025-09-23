@@ -28,6 +28,9 @@ public class Constants {
     public static final String P90_CACHE_KEY = "p90";
     public static final String MAX_REQUESTS_CACHE_KEY= "max_requests";
 
+    // Threat module, successful exploit category
+    public static final String THREAT_PROTECTION_SUCCESSFUL_EXPLOIT_CATEGORY = "SuccessfulExploit";
+
     public static final String AWS_ACCOUNT_ID = "AWS_ACCOUNT_ID";
 
     public static final int ONE_MONTH_TIMESTAMP = (60 * 60 * 24 * 30) ;
