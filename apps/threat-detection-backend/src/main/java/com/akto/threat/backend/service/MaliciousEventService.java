@@ -242,7 +242,7 @@ public class MaliciousEventService {
                 .setRefId(evt.getRefId())
                 .setEventTypeVal(evt.getEventType().toString())
                 .setMetadata(metadata)
-                .setStatus(evt.getStatus() != null ? evt.getStatus().toString() : StatusConstants.ACTIVE),
+                .setStatus(evt.getStatus() != null ? evt.getStatus().toString() : StatusConstants.ACTIVE)
                 .setSuccessfulExploit(evt.getSuccessfulExploit() != null ? evt.getSuccessfulExploit() : false)
                 .build());
       }
