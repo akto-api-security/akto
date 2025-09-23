@@ -5,7 +5,6 @@ import com.akto.dto.ApiInfo;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.CollectionConditions.MethodCondition;
 import com.akto.dto.testing.TagsTestingEndpoints;
-import com.akto.dto.testing.TagsTestingEndpoints;
 import com.akto.dto.type.URLMethods.Method;
 import com.mongodb.BasicDBObject;
 
@@ -83,10 +82,6 @@ public abstract class TestingEndpoints {
                     break;
                 case HOST_REGEX:
                     condition = new HostRegexTestingEndpoints(operator, data.getString("host_regex"));
-                    break;
-                case TAGS:
-                    String q = (data != null) ? data.getString("query") : null;
-                    condition = new TagsTestingEndpoints(operator, q);
                     break;
                 case TAGS:
                     String q = (data != null) ? data.getString("query") : null;
