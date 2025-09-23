@@ -27,7 +27,7 @@ message ListMaliciousRequestsResponse {
       string ref_id = 15;
       string event_type_val = 16;
       string metadata = 17;
-      bool successful = 18;
+      bool successful_exploit = 18;
     }
     repeated MaliciousEvent malicious_events = 1;
     uint64 total = 2;
@@ -47,7 +47,7 @@ message ListMaliciousRequestsRequest {
       repeated string types = 5;
       repeated string sub_category = 6;
       repeated string latest_attack = 7;
-      optional bool successful = 8;
+      optional bool successful_exploit = 8;
     }
 
     // The number of alerts to return
