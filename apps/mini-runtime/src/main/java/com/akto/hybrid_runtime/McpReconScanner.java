@@ -4,6 +4,7 @@ import com.akto.dto.McpServer;
 import com.akto.dto.McpScanResult;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.mcp.McpSchema;
 import com.akto.util.JSONUtils;
 import com.akto.util.McpConstants;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -612,7 +613,7 @@ public class McpReconScanner {
         return detected;
     }
     
-    private List<Map<String, Object>> getToolsList(String url, Map<String, String> authHeaders) {
+    private List<McpSchema.Tool> getToolsList(String url, Map<String, String> authHeaders) {
         try {
             Map<String, Object> requestObj = new HashMap<>();
             requestObj.put("jsonrpc", McpConstants.JSONRPC_VERSION);
@@ -635,7 +636,7 @@ public class McpReconScanner {
                 Map<String, Object> jsonResponse = JSONUtils.getMap(content);
                 if (jsonResponse != null && jsonResponse.containsKey("result")) {
                     Map<String, Object> result = (Map<String, Object>) jsonResponse.get("result");
-                    return (List<Map<String, Object>>) result.get("tools");
+                    return (List<McpSchema.Tool>) result.get("tools");
                 }
             }
         } catch (Exception e) {
@@ -644,7 +645,7 @@ public class McpReconScanner {
         return new ArrayList<>();
     }
     
-    private List<Map<String, Object>> getResourcesList(String url, Map<String, String> authHeaders) {
+    private List<McpSchema.Resource> getResourcesList(String url, Map<String, String> authHeaders) {
         try {
             Map<String, Object> requestObj = new HashMap<>();
             requestObj.put("jsonrpc", McpConstants.JSONRPC_VERSION);
@@ -667,7 +668,7 @@ public class McpReconScanner {
                 Map<String, Object> jsonResponse = JSONUtils.getMap(content);
                 if (jsonResponse != null && jsonResponse.containsKey("result")) {
                     Map<String, Object> result = (Map<String, Object>) jsonResponse.get("result");
-                    return (List<Map<String, Object>>) result.get("resources");
+                    return (List<McpSchema.Resource>) result.get("resources");
                 }
             }
         } catch (Exception e) {
@@ -676,7 +677,7 @@ public class McpReconScanner {
         return new ArrayList<>();
     }
     
-    private List<Map<String, Object>> getPromptsList(String url, Map<String, String> authHeaders) {
+    private List<McpSchema.Prompt> getPromptsList(String url, Map<String, String> authHeaders) {
         try {
             Map<String, Object> requestObj = new HashMap<>();
             requestObj.put("jsonrpc", McpConstants.JSONRPC_VERSION);
@@ -699,7 +700,7 @@ public class McpReconScanner {
                 Map<String, Object> jsonResponse = JSONUtils.getMap(content);
                 if (jsonResponse != null && jsonResponse.containsKey("result")) {
                     Map<String, Object> result = (Map<String, Object>) jsonResponse.get("result");
-                    return (List<Map<String, Object>>) result.get("prompts");
+                    return (List<McpSchema.Prompt>) result.get("prompts");
                 }
             }
         } catch (Exception e) {
