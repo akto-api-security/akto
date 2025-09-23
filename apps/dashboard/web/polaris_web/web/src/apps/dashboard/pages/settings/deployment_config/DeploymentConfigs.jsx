@@ -22,11 +22,10 @@ import {
     SettingsMajor, 
     RefreshMajor
 } from "@shopify/polaris-icons";
-import dummyData from "./dummy_data";
 import deploymentConfigApi from "./api";
 
 const DeploymentConfigs = () => {
-    const [deployments, setDeployments] = useState(dummyData.initialDeployments);
+    const [deployments, setDeployments] = useState([]);
     const [selectedDeploymentId, setSelectedDeploymentId] = useState(null);
     const [isAddEnvOpen, setIsAddEnvOpen] = useState(false);
     const [isEditEnvOpen, setIsEditEnvOpen] = useState(false);
@@ -51,9 +50,6 @@ const DeploymentConfigs = () => {
                 setDeployments(response.deploymentConfigs);
             }
         } catch (error) {
-            console.error('Failed to fetch deployment configs:', error);
-            // Fallback to dummy data on error
-            setDeployments(dummyData.initialDeployments);
         }
     };
 
@@ -100,8 +96,6 @@ const DeploymentConfigs = () => {
             
             closeDeleteConfirm();
         } catch (error) {
-            console.error('Failed to delete environment variable:', error);
-            // Fallback to local state update
             setDeployments(prev => prev.map(dep => dep.id === selectedDeployment.id ? ({...dep, envVars: dep.envVars.filter(e => e.key !== deletingKey)}) : dep));
             closeDeleteConfirm();
         }
@@ -127,8 +121,6 @@ const DeploymentConfigs = () => {
             setNewKey("");
             setNewValue("");
         } catch (error) {
-            console.error('Failed to add/update environment variable:', error);
-            // Fallback to local state update
             const updated = deployments.map(dep => {
                 if (dep.id !== selectedDeployment.id) return dep;
                 const exists = dep.envVars.some(e => e.key === newKey);
@@ -156,8 +148,6 @@ const DeploymentConfigs = () => {
             setNewKey("");
             setNewValue("");
         } catch (error) {
-            console.error('Failed to edit environment variable:', error);
-            // Fallback to local state update
             const updated = deployments.map(dep => {
                 if (dep.id !== selectedDeployment.id) return dep;
                 return {
@@ -182,13 +172,11 @@ const DeploymentConfigs = () => {
     const EmptyDeploymentsState = () => (
         <EmptyState
             heading="No deployments configured"
-            image="https://cdn.shopify.com/s/files/1/0262/4071/2726/files/emptystate-files.png"
         >
             <p>Set up your first deployment configuration to manage environment variables.</p>
         </EmptyState>
     );
 
-    // no inline empty state component required now
 
     return (
         <Page 

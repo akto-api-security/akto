@@ -2,6 +2,7 @@ package com.akto.dao.deployment;
 
 import com.akto.dao.AccountsContextDao;
 import com.akto.dto.deployment.DeploymentConfig;
+import com.akto.dto.deployment.EnvVariable;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;
 import com.mongodb.BasicDBObject;
@@ -32,7 +33,7 @@ public class DeploymentConfigDao extends AccountsContextDao<DeploymentConfig> {
         return instance.findAll(new BasicDBObject());
     }
 
-    public boolean updateEnvVars(String deploymentId, List<DeploymentConfig.EnvVariable> envVars) {
+    public boolean updateEnvVars(String deploymentId, List<EnvVariable> envVars) {
         return instance.updateOne(
             Filters.eq(DeploymentConfig.ID, deploymentId),
             Updates.combine(
@@ -42,7 +43,7 @@ public class DeploymentConfigDao extends AccountsContextDao<DeploymentConfig> {
         ) != null;
     }
 
-    public boolean addEnvVariable(String deploymentId, DeploymentConfig.EnvVariable envVariable) {
+    public boolean addEnvVariable(String deploymentId, EnvVariable envVariable) {
         return instance.updateOne(
             Filters.eq(DeploymentConfig.ID, deploymentId),
             Updates.combine(

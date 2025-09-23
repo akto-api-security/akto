@@ -531,7 +531,7 @@
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
-                <param name="featureLabel">DEPLOYMENT_CONFIG</param>
+                <param name="featureLabel">USER_CONFIG</param>
                 <param name="accessType">READ</param>
             </interceptor-ref>
 
@@ -553,7 +553,7 @@
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
-                <param name="featureLabel">DEPLOYMENT_CONFIG</param>
+                <param name="featureLabel">USER_CONFIG</param>
                 <param name="accessType">WRITE</param>
             </interceptor-ref>
 
@@ -575,7 +575,7 @@
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
-                <param name="featureLabel">DEPLOYMENT_CONFIG</param>
+                <param name="featureLabel">USER_CONFIG</param>
                 <param name="accessType">WRITE</param>
             </interceptor-ref>
 
@@ -597,7 +597,7 @@
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
-                <param name="featureLabel">DEPLOYMENT_CONFIG</param>
+                <param name="featureLabel">USER_CONFIG</param>
                 <param name="accessType">WRITE</param>
             </interceptor-ref>
 
@@ -619,7 +619,7 @@
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
-                <param name="featureLabel">DEPLOYMENT_CONFIG</param>
+                <param name="featureLabel">USER_CONFIG</param>
                 <param name="accessType">WRITE</param>
             </interceptor-ref>
 
@@ -641,7 +641,7 @@
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
-                <param name="featureLabel">DEPLOYMENT_CONFIG</param>
+                <param name="featureLabel">USER_CONFIG</param>
                 <param name="accessType">WRITE</param>
             </interceptor-ref>
 
@@ -663,7 +663,7 @@
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="roleAccessInterceptor">
-                <param name="featureLabel">DEPLOYMENT_CONFIG</param>
+                <param name="featureLabel">USER_CONFIG</param>
                 <param name="accessType">WRITE</param>
             </interceptor-ref>
 
