@@ -1,5 +1,5 @@
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards"
-import { Text, HorizontalStack, Button, Popover, Modal, IndexFiltersMode, VerticalStack, Box, Checkbox, ActionList, Icon } from "@shopify/polaris"
+import { Text, HorizontalStack, Button, Popover, Modal, IndexFiltersMode, VerticalStack, Box, Checkbox, ActionList, Icon, Tooltip } from "@shopify/polaris"
 import api from "../api"
 import { useEffect, useState } from "react"
 import func from "@/util/func"
@@ -422,7 +422,7 @@ function ApiEndpoints(props) {
             const envTypeList = envType?.map(func.formatCollectionType) || []
             collectionTagsMap[c.id] = {
                 list: envTypeList,
-                comp: transform.getCollectionTypeList(envTypeList, 3, true),
+                comp: getTagsCompactComponent(envTypeList, 2),
                 str: envTypeList.join(" ")
             }
         })
@@ -887,11 +887,31 @@ function ApiEndpoints(props) {
         
     }
 
+    function getTagsCompactComponent(envTypeList, visibleCount = 2) {
+        const list = envTypeList || []
+        const visible = list.slice(0, visibleCount)
+        const hidden = list.slice(visibleCount)
+        const visibleComp = transform.getCollectionTypeList(visible, visible.length, true)
+        const allTooltip = list.join(", ")
+        return (
+            <Tooltip content={allTooltip} dismissOnMouseOut>
+                <Box style={{ cursor: 'pointer' }}>
+                    <HorizontalStack gap="1">
+                        {visibleComp}
+                        {hidden.length > 0 ? (
+                            <Text>(+{hidden.length} more)</Text>
+                        ) : null}
+                    </HorizontalStack>
+                </Box>
+            </Tooltip>
+        )
+    }
+
     function getCollectionTypeListComp(collectionsObj) {
         const envType = collectionsObj?.envType
-        const envTypeList = envType?.map(func.formatCollectionType)
+        const envTypeList = envType?.map(func.formatCollectionType) || []
 
-        return transform.getCollectionTypeList(envTypeList, 3, true)
+        return getTagsCompactComponent(envTypeList, 2)
     }
 
     const collectionsObj = (allCollections && allCollections.length > 0) ? allCollections.filter(x => Number(x.id) === Number(apiCollectionId))[0] : {}
