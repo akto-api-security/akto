@@ -887,31 +887,17 @@ function ApiEndpoints(props) {
         
     }
 
-    function getTagsCompactComponent(envTypeList, visibleCount = 2) {
+    function getTagsCompactComponent(envTypeList) {
         const list = envTypeList || []
-        const visible = list.slice(0, visibleCount)
-        const hidden = list.slice(visibleCount)
-        const visibleComp = transform.getCollectionTypeList(visible, visible.length, true)
-        const allTooltip = list.join(", ")
-        return (
-            <Tooltip content={allTooltip} dismissOnMouseOut>
-                <Box style={{ cursor: 'pointer' }}>
-                    <HorizontalStack gap="1">
-                        {visibleComp}
-                        {hidden.length > 0 ? (
-                            <Text>(+{hidden.length} more)</Text>
-                        ) : null}
-                    </HorizontalStack>
-                </Box>
-            </Tooltip>
-        )
+        // Use shared badge renderer to show 1 tag and a +N badge with tooltip inline
+        return transform.getCollectionTypeList(list, 1, false)
     }
 
     function getCollectionTypeListComp(collectionsObj) {
         const envType = collectionsObj?.envType
         const envTypeList = envType?.map(func.formatCollectionType) || []
 
-        return getTagsCompactComponent(envTypeList, 2)
+        return getTagsCompactComponent(envTypeList)
     }
 
     const collectionsObj = (allCollections && allCollections.length > 0) ? allCollections.filter(x => Number(x.id) === Number(apiCollectionId))[0] : {}
