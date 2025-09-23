@@ -624,5 +624,18 @@ export default {
             method: 'post',
             data: { testingRunId }
         })
+    },
+    async fetchCategoryWiseScores(startTimestamp, endTimestamp, dashboardCategory, dataSource = 'testing') {
+        const resp = await request({
+            url: '/api/fetchCategoryWiseScores',
+            method: 'post',
+            data: {
+                startTimestamp,
+                endTimestamp,
+                dashboardCategory,
+                dataSource
+            }
+        })
+        return resp
     }
 }
