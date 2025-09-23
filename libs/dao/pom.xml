@@ -163,6 +163,11 @@
             <artifactId>fastjson2</artifactId>
             <version>2.0.58</version>
         </dependency>
+        <dependency>
+            <groupId>com.akto.libs.utils</groupId>
+            <artifactId>utils</artifactId>
+            <version>${project.version}</version>
+        </dependency>
     </dependencies>
     <build>
         <plugins>
