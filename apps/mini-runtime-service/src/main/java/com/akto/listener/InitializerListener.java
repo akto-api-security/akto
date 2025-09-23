@@ -12,6 +12,7 @@ import java.util.concurrent.locks.ReentrantLock;
 import com.akto.action.IngestionAction;
 import com.akto.dto.HttpResponseParams;
 import com.akto.log.LoggerMaker;
+import org.apache.commons.lang3.StringUtils;
 
 public class InitializerListener implements ServletContextListener {
 
@@ -26,13 +27,15 @@ public class InitializerListener implements ServletContextListener {
             : 5000; // Time after which to process the queue if inactive
     private int jobInterval = System.getenv("AKTO_TRAFFIC_PROCESSING_JOB_INTERVAL") != null && !System.getenv("AKTO_TRAFFIC_PROCESSING_JOB_INTERVAL").isEmpty()
             ? Integer.parseInt(System.getenv("AKTO_TRAFFIC_PROCESSING_JOB_INTERVAL"))
-            : 10; // Interval for the scheduled job
+            : 1; // Interval for the scheduled job
+    private final String containerVersion = StringUtils.isEmpty(System.getenv("AKTO_CONTAINER_VERSION")) ? "1.50.0" : System.getenv("AKTO_CONTAINER_VERSION");
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(InitializerListener.class, LoggerMaker.LogDb.RUNTIME);
     private static boolean processingStarted = false;
     @Override
     public void contextInitialized(ServletContextEvent sce) {
         scheduler = Executors.newSingleThreadScheduledExecutor();
+        loggerMaker.info("Container is running on the latest version: " + containerVersion);
         scheduler.scheduleAtFixedRate(() -> {
             try {
                 if(processingStarted) {
@@ -68,7 +71,7 @@ public class InitializerListener implements ServletContextListener {
             } finally {
                 processingStarted = false; // Reset the flag after processing
             }
-        }, 0, jobInterval, TimeUnit.MILLISECONDS);
+        }, 0, jobInterval, TimeUnit.SECONDS);
     }
 
     @Override
