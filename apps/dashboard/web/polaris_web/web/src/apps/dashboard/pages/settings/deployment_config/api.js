@@ -9,30 +9,6 @@ const deploymentConfigApi = {
         })
     },
 
-    addDeploymentConfig(deploymentId, deploymentName, deploymentType, envVars = []) {
-        return request({
-            url: '/api/addDeploymentConfig',
-            method: 'post',
-            data: {
-                deploymentId,
-                deploymentName,
-                deploymentType,
-                envVars
-            }
-        })
-    },
-
-    updateDeploymentConfig(deploymentId, envVars) {
-        return request({
-            url: '/api/updateDeploymentConfig',
-            method: 'post',
-            data: {
-                deploymentId,
-                envVars
-            }
-        })
-    },
-
     addEnvVariable(deploymentId, envKey, envValue, editable = true) {
         return request({
             url: '/api/addEnvVariable',
@@ -65,16 +41,6 @@ const deploymentConfigApi = {
             data: {
                 deploymentId,
                 envKey
-            }
-        })
-    },
-
-    deleteDeploymentConfig(deploymentId) {
-        return request({
-            url: '/api/deleteDeploymentConfig',
-            method: 'post',
-            data: {
-                deploymentId
             }
         })
     }

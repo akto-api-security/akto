@@ -549,49 +549,6 @@
             </result>
         </action>
 
-        <action name="api/addDeploymentConfig" class="com.akto.action.settings.DeploymentConfigAction" method="addDeploymentConfig">
-            <interceptor-ref name="json"/>
-            <interceptor-ref name="defaultStack" />
-            <interceptor-ref name="roleAccessInterceptor">
-                <param name="featureLabel">USER_CONFIG</param>
-                <param name="accessType">WRITE</param>
-            </interceptor-ref>
-
-            <result name="FORBIDDEN" type="json">
-                <param name="statusCode">403</param>
-                <param name="ignoreHierarchy">false</param>
-                <param name="includeProperties">^actionErrors.*</param>
-            </result>
-            <result name="SUCCESS" type="json"/>
-
-            <result name="ERROR" type="json">
-                <param name="statusCode">422</param>
-                <param name="ignoreHierarchy">false</param>
-                <param name="includeProperties">^actionErrors.*</param>
-            </result>
-        </action>
-
-        <action name="api/updateDeploymentConfig" class="com.akto.action.settings.DeploymentConfigAction" method="updateDeploymentConfig">
-            <interceptor-ref name="json"/>
-            <interceptor-ref name="defaultStack" />
-            <interceptor-ref name="roleAccessInterceptor">
-                <param name="featureLabel">USER_CONFIG</param>
-                <param name="accessType">WRITE</param>
-            </interceptor-ref>
-
-            <result name="FORBIDDEN" type="json">
-                <param name="statusCode">403</param>
-                <param name="ignoreHierarchy">false</param>
-                <param name="includeProperties">^actionErrors.*</param>
-            </result>
-            <result name="SUCCESS" type="json"/>
-
-            <result name="ERROR" type="json">
-                <param name="statusCode">422</param>
-                <param name="ignoreHierarchy">false</param>
-                <param name="includeProperties">^actionErrors.*</param>
-            </result>
-        </action>
 
         <action name="api/addEnvVariable" class="com.akto.action.settings.DeploymentConfigAction" method="addEnvVariable">
             <interceptor-ref name="json"/>
@@ -659,27 +616,6 @@
             </result>
         </action>
 
-        <action name="api/deleteDeploymentConfig" class="com.akto.action.settings.DeploymentConfigAction" method="deleteDeploymentConfig">
-            <interceptor-ref name="json"/>
-            <interceptor-ref name="defaultStack" />
-            <interceptor-ref name="roleAccessInterceptor">
-                <param name="featureLabel">USER_CONFIG</param>
-                <param name="accessType">WRITE</param>
-            </interceptor-ref>
-
-            <result name="FORBIDDEN" type="json">
-                <param name="statusCode">403</param>
-                <param name="ignoreHierarchy">false</param>
-                <param name="includeProperties">^actionErrors.*</param>
-            </result>
-            <result name="SUCCESS" type="json"/>
-
-            <result name="ERROR" type="json">
-                <param name="statusCode">422</param>
-                <param name="ignoreHierarchy">false</param>
-                <param name="includeProperties">^actionErrors.*</param>
-            </result>
-        </action>
 
         <action name="signup-email" class="com.akto.action.SignupAction" method="registerViaEmail">
             <interceptor-ref name="json"/>
