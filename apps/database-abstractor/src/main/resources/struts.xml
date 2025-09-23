@@ -112,6 +112,28 @@
             </result>
         </action>
 
+        <action name="api/fetchAwsAccountIdsForApiGatewayLogging" class="com.akto.action.DbAction" method="fetchAwsAccountIdsForApiGatewayLogging">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/fetchApiRateLimits" class="com.akto.action.DbAction" method="fetchApiRateLimits">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
         <action name="api/fetchNonTrafficApiInfos" class="com.akto.action.DbAction" method="fetchNonTrafficApiInfos">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
@@ -1728,6 +1750,39 @@
         </action>
 
         <action name="api/bulkWriteOverageInfo" class="com.akto.action.DbAction" method="bulkWriteOverageInfo">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/fetchPendingMcpReconRequests" class="com.akto.action.DbAction" method="fetchPendingMcpReconRequests">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/updateMcpReconRequestStatus" class="com.akto.action.DbAction" method="updateMcpReconRequestStatus">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/storeMcpReconResultsBatch" class="com.akto.action.DbAction" method="storeMcpReconResultsBatch">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <result name="SUCCESS" type="json"/>

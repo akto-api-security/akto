@@ -8,6 +8,7 @@ import com.akto.dao.traffic_collector.TrafficCollectorMetricsDao;
 import com.akto.data_actor.DbLayer;
 import com.akto.dto.*;
 import com.akto.dto.ApiInfo.ApiInfoKey;
+import com.akto.dto.McpReconRequest;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.billing.Tokens;
 import com.akto.dto.billing.UningestedApiOverage;
@@ -48,11 +49,13 @@ import com.akto.utils.RedactAlert;
 import com.akto.utils.SampleDataLogs;
 import com.akto.dto.type.URLMethods;
 import com.akto.dto.type.URLMethods.Method;
+import java.util.concurrent.atomic.AtomicInteger;
 import com.akto.testing.TestExecutor;
 import com.akto.trafficFilter.HostFilter;
 import com.akto.trafficFilter.ParamFilter;
 import com.akto.usage.UsageMetricCalculator;
 import com.akto.util.Constants;
+import com.akto.util.DataInsertionPreChecks;
 import com.akto.dto.usage.MetricTypes;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
@@ -110,6 +113,28 @@ public class DbAction extends ActionSupport {
     String openApiSchema;
     @Getter @Setter
     McpAuditInfo auditInfo;
+    
+    // MCP Recon fields
+    @Getter @Setter
+    private List<McpReconRequest> mcpReconRequests;
+    
+    @Getter @Setter
+    private String requestId;
+    
+    @Getter @Setter
+    private String newStatus;
+    
+    @Getter @Setter
+    private int serversFound;
+    
+    @Getter @Setter
+    private int startedAt;
+    
+    @Getter @Setter
+    private int finishedAt;
+    
+    @Getter @Setter
+    private List<McpReconResult> serverDataList;
 
     private ModuleInfo moduleInfo;
 
@@ -283,6 +308,20 @@ public class DbAction extends ActionSupport {
         return deltaUsage;
     }
 
+    @Getter
+    @Setter
+    private String awsAccountIds;
+
+    public String fetchAwsAccountIdsForApiGatewayLogging() {
+
+        AccountSettings accountSettings = AccountSettingsDao.instance.findOne(AccountSettingsDao.generateFilter());
+        if (accountSettings != null && accountSettings.getAwsAccountIdsForApiGatewayLogging() != null) {
+            awsAccountIds = accountSettings.getAwsAccountIdsForApiGatewayLogging();
+        }
+
+        return Action.SUCCESS.toUpperCase();
+    }
+
     public void setDeltaUsage(int deltaUsage) {
         this.deltaUsage = deltaUsage;
     }
@@ -413,6 +452,24 @@ public class DbAction extends ActionSupport {
         return Action.SUCCESS.toUpperCase();
     }
 
+    @Getter @Setter
+    private ApiInfoKey lastApiInfoKey;
+    @Getter @Setter
+    List<ApiInfo> apiInfoRateLimits = new ArrayList<>();
+
+    public String fetchApiRateLimits() {
+        try {
+            loggerMaker.info("init fetchApiRateLimits account id: " + Context.accountId.get());
+            apiInfoRateLimits = DbLayer.fetchApiRateLimits(lastApiInfoKey);
+        } catch (Exception e) {
+            e.printStackTrace();
+            loggerMaker.error("fetchApiRateLimits account id: " + Context.accountId.get());
+            loggerMaker.errorAndAddToDb(e, "error in fetchApiRateLimits" + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
     public String fetchNonTrafficApiInfos() {
         try {
             apiInfos = DbLayer.fetchNonTrafficApiInfos();
@@ -455,6 +512,12 @@ public class DbAction extends ActionSupport {
             for (BasicDBObject obj: apiInfoList) {
                 ApiInfo apiInfo = objectMapper.readValue(obj.toJson(), ApiInfo.class);
                 ApiInfoKey id = apiInfo.getId();
+                
+                // Skip URLs based on validation rules (use 0 for response code as it's not available in ApiInfo)
+                if (DataInsertionPreChecks.shouldSkipUrl(accountId, id.getUrl(), 0)) {
+                    continue;
+                }
+                
                 if (UsageMetricCalculator.getDeactivated().contains(id.getApiCollectionId())) {
                     continue;
                 }
@@ -509,6 +572,7 @@ public class DbAction extends ActionSupport {
                     for (BulkUpdates bulkUpdate : writesForSti) {
                         boolean ignore = false;
                         int apiCollectionId = -1;
+                        int responseCode = 0; // Default to 0 if not provided
                         String url = null, method = null, param = null;
                         for (Map.Entry<String, Object> entry : bulkUpdate.getFilters().entrySet()) {
                             if (entry.getKey().equalsIgnoreCase(SingleTypeInfo._API_COLLECTION_ID)) {
@@ -523,6 +587,9 @@ public class DbAction extends ActionSupport {
                                 }
                             } else if(entry.getKey().equalsIgnoreCase(SingleTypeInfo._URL)){
                                 url = entry.getValue().toString();
+                            } else if(entry.getKey().equalsIgnoreCase(SingleTypeInfo._RESPONSE_CODE)){
+                                String valStr = entry.getValue().toString();
+                                responseCode = Integer.valueOf(valStr);
                             } else if(entry.getKey().equalsIgnoreCase(SingleTypeInfo._METHOD)){
                                 method = entry.getValue().toString();
                                 if ("OPTIONS".equals(method) || "CONNECT".equals(method)) {
@@ -531,6 +598,10 @@ public class DbAction extends ActionSupport {
                             } else if(entry.getKey().equalsIgnoreCase(SingleTypeInfo._PARAM)){
                                 param = entry.getValue().toString();
                             }
+                        }
+                        // Check URL skip rules after we have all the parameters
+                        if (url != null && DataInsertionPreChecks.shouldSkipUrl(accId, url, responseCode)) {
+                            ignore = true;
                         }
                         if (!ignore && apiCollectionId != -1 && url != null && method != null && param!=null) {
                             boolean isNew = ParamFilter.isNewEntry(accId, apiCollectionId, url, method, param);
@@ -575,11 +646,20 @@ public class DbAction extends ActionSupport {
                 for (BulkUpdates bulkUpdate: writesForSti) {
                     List<Bson> filters = new ArrayList<>();
                     boolean ignore = false;
+                    String url = null;
+                    int responseCode = 0; // Default to 0 if not provided
                     for (Map.Entry<String, Object> entry : bulkUpdate.getFilters().entrySet()) {
                         if (entry.getKey().equalsIgnoreCase("isUrlParam")) {
                             continue;
                         }
-                        if (entry.getKey().equalsIgnoreCase("apiCollectionId")) {
+                        if (entry.getKey().equalsIgnoreCase("url")) {
+                            url = entry.getValue().toString();
+                            filters.add(Filters.eq(entry.getKey(), entry.getValue()));
+                        } else if (entry.getKey().equalsIgnoreCase("responseCode")) {
+                            String valStr = entry.getValue().toString();
+                            responseCode = Integer.valueOf(valStr);
+                            filters.add(Filters.eq(entry.getKey(), responseCode));
+                        } else if (entry.getKey().equalsIgnoreCase("apiCollectionId")) {
                             String valStr = entry.getValue().toString();
                             int val = Integer.valueOf(valStr);
                             if (ignoreHosts.contains(val)) {
@@ -587,13 +667,14 @@ public class DbAction extends ActionSupport {
                                 break;
                             }
                             filters.add(Filters.eq(entry.getKey(), val));
-                        } else if (entry.getKey().equalsIgnoreCase("responseCode")) {
-                            String valStr = entry.getValue().toString();
-                            int val = Integer.valueOf(valStr);
-                            filters.add(Filters.eq(entry.getKey(), val));
                         } else {
                             filters.add(Filters.eq(entry.getKey(), entry.getValue()));
                         }
+                    }
+
+                    // Check URL skip rules after processing
+                    if (!ignore && url != null && DataInsertionPreChecks.shouldSkipUrl(accId, url, responseCode)) {
+                        ignore = true;
                     }
                     if (ignore) {
                         ignoreCount++;
@@ -687,6 +768,11 @@ public class DbAction extends ActionSupport {
                     String url = (String) mObj.get("url");
                     String method = (String) mObj.get("method");
 
+                    // Skip URLs based on validation rules
+                    if (DataInsertionPreChecks.shouldSkipUrl(accId, url, responseCode)) {
+                        continue;
+                    }
+
                     if ("OPTIONS".equals(method) || "CONNECT".equals(method)) {
                         continue;
                     }
@@ -752,6 +838,7 @@ public class DbAction extends ActionSupport {
                     Bson filters = Filters.empty();
                     int apiCollectionId = 0;
                     boolean ignore = false;
+                    String url = null;
                     for (Map.Entry<String, Object> entry : bulkUpdate.getFilters().entrySet()) {
                         if (entry.getKey().equalsIgnoreCase("_id.apiCollectionId") ) {
                             String valStr = entry.getValue().toString();
@@ -766,6 +853,14 @@ public class DbAction extends ActionSupport {
                             String valStr = entry.getValue().toString();
                             int val = Integer.valueOf(valStr);
                             filters = Filters.and(filters, Filters.eq(entry.getKey(), val));
+                        } else if(entry.getKey().equalsIgnoreCase("_id.url")) {
+                            url = entry.getValue().toString();
+                            // Skip URLs based on validation rules (use 0 for response code)
+                            if (DataInsertionPreChecks.shouldSkipUrl(accId, url, 0)) {
+                                ignore = true;
+                                break;
+                            }
+                            filters = Filters.and(filters, Filters.eq(entry.getKey(), entry.getValue()));
                         } else {
                             filters = Filters.and(filters, Filters.eq(entry.getKey(), entry.getValue()));
                             try {
@@ -2170,8 +2265,8 @@ public class DbAction extends ActionSupport {
     }
 
     public String bulkWriteSuspectSampleData() {
+        int accId = Context.accountId.get();
         if (kafkaUtils.isWriteEnabled()) {
-            int accId = Context.accountId.get();
             kafkaUtils.insertData(writesForSuspectSampleData, "bulkWriteSuspectSampleData", accId);
         } else {
             ArrayList<WriteModel<SuspectSampleData>> writes = new ArrayList<>();
@@ -2180,6 +2275,17 @@ public class DbAction extends ActionSupport {
                 try {
                     SuspectSampleData sd = objectMapper.readValue(
                             gson.toJson(gson.fromJson(updates.get(0), Map.class).get("val")), SuspectSampleData.class);
+                    
+                    // Use 0 for response code as it's not available in SuspectSampleData
+                    if (DataInsertionPreChecks.shouldSkipUrl(accId, sd.getUrl(), 0)) {
+                        continue;
+                    }
+                    
+                    if (sd.getUrl() == null || sd.getUrl().isEmpty()) {
+                        loggerMaker.errorAndAddToDb("Skipping SuspectSampleData insert due to null or empty URL: " + gson.toJson(sd));
+                        continue;
+                    }
+                    
                     writes.add(new InsertOneModel<SuspectSampleData>(sd));
                 } catch (Exception e) {
                     loggerMaker.errorAndAddToDb(e, "Error in bulkWriteSuspectSampleData " + e.toString());
@@ -2342,9 +2448,44 @@ public class DbAction extends ActionSupport {
         SlackSender.sendAlert(accountId, apiTestStatusAlert, testingRun.getSelectedSlackChannelId());
     }
 
+    private static AtomicInteger tagHitCount = new AtomicInteger(0);
+    private static AtomicInteger tagMissCount = new AtomicInteger(0);
+
+    private List<CollectionTags> checkTagsNeedUpdates(List<CollectionTags> tags, int apiCollectionId) {
+        
+        if(tags == null || tags.isEmpty()){
+            return null;
+        }
+
+        StringBuilder combinedTags = new StringBuilder();
+        tags.sort(Comparator.comparing(CollectionTags::getKeyName));
+
+        for (CollectionTags ctag : tags) {
+            if (combinedTags.length() > 0) {
+                combinedTags.append(", ");
+            }
+            combinedTags.append(ctag.getKeyName()).append("=").append(ctag.getValue());
+
+        }
+
+        String singleTagString = combinedTags.toString();
+        if (ParamFilter.isNewEntry(Context.accountId.get(), apiCollectionId, "", "", singleTagString)) {
+            tagMissCount.incrementAndGet();
+            loggerMaker.info("New tags found for apiCollectionId: " + apiCollectionId
+                + " accountId: " + Context.accountId.get() + " Bloom filter tagMissCount: " + tagMissCount.get());
+            return tags;
+        }
+
+        // Monitor bloom filter efficacy
+        tagHitCount.incrementAndGet();
+        loggerMaker.info("Skipping tags updates, already present for apiCollectionId: " + apiCollectionId
+                + " accountId: " + Context.accountId.get() + " Bloom filter tagHitCount: " + tagHitCount.get());
+        return null;
+    }
+
     public String createCollectionSimpleForVpc() {
         try {
-            DbLayer.createCollectionSimpleForVpc(vxlanId, vpcId, tagsList);
+            DbLayer.createCollectionSimpleForVpc(vxlanId, vpcId, checkTagsNeedUpdates(tagsList, vxlanId));
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error in createCollectionSimpleForVpc " + e.toString());
             return Action.ERROR.toUpperCase();
@@ -2354,7 +2495,7 @@ public class DbAction extends ActionSupport {
 
     public String createCollectionForHostAndVpc() {
         try {
-            DbLayer.createCollectionForHostAndVpc(host, colId, vpcId, tagsList);
+            DbLayer.createCollectionForHostAndVpc(host, colId, vpcId, checkTagsNeedUpdates(tagsList, colId));
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error in createCollectionForHostAndVpc " + e.toString());
             return Action.ERROR.toUpperCase();
@@ -2665,6 +2806,37 @@ public class DbAction extends ActionSupport {
         } catch (Exception e) {
             e.printStackTrace();
             loggerMaker.errorAndAddToDb(e, "Error insertMCPAuditDataLog " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+    
+    // MCP Recon methods
+    public String fetchPendingMcpReconRequests() {
+        try {
+            mcpReconRequests = DbLayer.fetchPendingMcpReconRequests();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in fetchPendingMcpReconRequests " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+    
+    public String updateMcpReconRequestStatus() {
+        try {
+            DbLayer.updateMcpReconRequestStatus(new ObjectId(this.requestId), newStatus, serversFound);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in updateMcpReconRequestStatus " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+    
+    public String storeMcpReconResultsBatch() {
+        try {
+            DbLayer.storeMcpReconResultsBatch(serverDataList);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in storeMcpReconResultsBatch " + e.toString());
             return Action.ERROR.toUpperCase();
         }
         return Action.SUCCESS.toUpperCase();

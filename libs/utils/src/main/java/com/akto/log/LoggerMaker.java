@@ -168,6 +168,14 @@ public class LoggerMaker  {
         logger.debug(msg, vars);
     }
 
+    public void info(String msg, Object... vars){
+        logger.info(msg, vars);
+    }
+
+    public void warn(String msg, Object... vars){
+        logger.warn(msg, vars);
+    }
+
     protected String basicError(String err, LogDb db) {
         if(Context.accountId.get() != null){
             err = String.format("%s\nAccount id: %d", err, Context.accountId.get());
