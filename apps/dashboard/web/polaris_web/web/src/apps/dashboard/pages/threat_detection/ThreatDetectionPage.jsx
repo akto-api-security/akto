@@ -19,6 +19,7 @@ import InfoCard from "../dashboard/new_components/InfoCard";
 import BarGraph from "../../components/charts/BarGraph";
 import SessionStore from "../../../main/SessionStore";
 import { getDashboardCategory, mapLabel } from "../../../main/labelHelper";
+import { useNavigate } from "react-router-dom";
 
 const convertToGraphData = (severityMap) => {
     let dataArr = []
@@ -69,6 +70,7 @@ const ChartComponent = ({ subCategoryCount, severityCountMap }) => {
   };
 
 function ThreatDetectionPage() {
+    const navigate = useNavigate();
     const [loading, setLoading] = useState(false);
     const [currentRefId, setCurrentRefId] = useState('')
     const [rowDataList, setRowDataList] = useState([])
@@ -257,6 +259,11 @@ function ThreatDetectionPage() {
                                         {
                                             content: 'Export',
                                             onAction: () => exportJson(),
+                                            prefix: <Box><Icon source={FileMinor} /></Box>
+                                        },
+                                        {
+                                            content: 'Configure Successful Exploits',
+                                            onAction: () => navigate('/dashboard/protection/configure-exploits'),
                                             prefix: <Box><Icon source={FileMinor} /></Box>
                                         }
                                     ]

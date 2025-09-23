@@ -4,6 +4,7 @@ import java.io.BufferedReader;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import org.ahocorasick.trie.Trie;
@@ -77,6 +78,17 @@ public class ThreatDetector {
             return false;
         }
 
+    }
+
+    public boolean isSuccessfulExploit(List<FilterConfig> successfulExploitFilters,
+            RawApi rawApi, ApiInfoKey apiInfoKey) {
+        for (FilterConfig filter : successfulExploitFilters) {
+            if (validateFilterForRequest(filter, rawApi, apiInfoKey)) {
+                logger.debug("Exploit successful for ApiInfo {}, filterId {}", apiInfoKey.toString(), filter.getId());
+                return true;
+            }
+        }
+        return false;
     }
 
     private boolean validateFilterForRequest(

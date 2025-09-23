@@ -41,6 +41,12 @@ const headers = [
     title: "Attack type",
   },
   {
+    text: "successfulExploit",
+    value: "successfulComp",
+    title: "Successful Exploit",
+    maxWidth: "90px",
+  },
+  {
     text: "Collection",
     value: "apiCollectionName",
     title: "Collection",
@@ -408,6 +414,10 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh }) {
     });
     
     const sort = { [sortKey]: sortOrder };
+    const successfulFilterValue = Array.isArray(filters?.successfulExploit) ? filters?.successfulExploit?.[0] : filters?.successfulExploit;
+    const successfulBool = (successfulFilterValue === true || successfulFilterValue === 'true') ? true
+                          : (successfulFilterValue === false || successfulFilterValue === 'false') ? false
+                          : undefined;
     const res = await api.fetchSuspectSampleData(
       skip,
       sourceIpsFilter,
@@ -420,6 +430,7 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh }) {
       latestAttack,
       50,
       currentTab.toUpperCase(),
+      successfulBool
     );
 
     // Store the total count for filtered results
@@ -444,6 +455,9 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh }) {
         discoveredTs: dayjs(x.timestamp*1000).format("DD-MM-YYYY HH:mm:ss"),
         sourceIPComponent: x?.ip || "-",
         type: x?.type || "-",
+        successfulComp: (
+          <Badge size="small">{x?.successfulExploit ? "True" : "False"}</Badge>
+        ),
         severityComp: (<div className={`badge-wrapper-${severity}`}>
                           <Badge size="small">{func.toSentenceCase(severity)}</Badge>
                       </div>
@@ -500,6 +514,16 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh }) {
         type: 'select',
         choices: attackTypeChoices,
         multiple: true
+      },
+      {
+        key: 'successfulExploit',
+        label: 'Successful Exploit',
+        title: 'Successful Exploit',
+        choices: [
+          { label: 'True', value: 'true' },
+          { label: 'False', value: 'false' }
+        ],
+        singleSelect: true
       },
     ];
   }

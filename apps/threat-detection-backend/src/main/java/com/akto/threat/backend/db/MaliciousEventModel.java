@@ -23,6 +23,7 @@ public class MaliciousEventModel {
   private String refId;
   private String severity;
   private String metadata;
+  private Boolean successfulExploit;
   private Status status;
 
 
@@ -56,8 +57,8 @@ public class MaliciousEventModel {
     this.severity = builder.severity;
     this.type = builder.type;
     this.refId = builder.refId;
-    this.metadata = builder.metadata;
     this.status = builder.status != null ? builder.status : Status.ACTIVE;
+    this.successfulExploit = builder.successfulExploit;
   }
 
   public static class Builder {
@@ -76,8 +77,9 @@ public class MaliciousEventModel {
     private String refId;
     private String type;
     private String severity;
-    private String metadata;
+    private String metadata; 
     private Status status;
+    private Boolean successfulExploit;
 
     public Builder setFilterId(String filterId) {
       this.filterId = filterId;
@@ -159,6 +161,11 @@ public class MaliciousEventModel {
       return this;
     }
 
+    public Builder setSuccessfulExploit(Boolean successfulExploit) {
+      this.successfulExploit = successfulExploit;
+      return this;
+    }
+
     public Builder setStatus(Status status) {
       this.status = status;
       return this;
@@ -175,6 +182,14 @@ public class MaliciousEventModel {
 
   public void setMetadata(String metadata) {
     this.metadata = metadata;
+  }
+
+  public Boolean getSuccessfulExploit() {
+    return successfulExploit;
+  }
+
+  public void setSuccessfulExploit(Boolean successfulExploit) {
+    this.successfulExploit = successfulExploit;
   }
 
   public String getId() {
