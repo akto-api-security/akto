@@ -21,6 +21,7 @@ import McpRecon from "./components/McpRecon"
 import McpProxy from "./components/McpProxy"
 import AwsLogAccountComponent from "./components/shared/AwsLogAccountComponent"
 import McpGateway from "./McpGateway"
+import AIAgentsGateway from "./AIAgentsGateway"
 
 const mirroringObj = {
     icon: '/public/aws.svg',
@@ -354,34 +355,19 @@ const awsBedrockObj = {
 const aiAgentGlobalProxy = {
     icon: '/public/aws_bedrock.svg',
     label: "AI Agent Global Proxy",
-    text: "Secure, policy-enforced global proxy for all AI agent traffic.",
+    text: "A publicly hosted secure gateway that enforces guardrails and advanced threat protection for all requests to your public AI agents, ensuring safe and compliant communication.",
     docsUrl: 'https://docs.akto.io/akto-agent-proxy',
     key: "AI_AGENT_GLOBAL_PROXY",
-    component : <AiAgentScan
-        description="Route your AI agent requests through Akto's global proxy with guardrails and threat protection."
-        defaultRequestBody={{
-            "messages": [{"role": "user", "content": "Why is the sky blue?"}],
-            "max_tokens": 256
-        }}
-        docsLink='https://docs.akto.io/akto-agent-proxy'
-    />
+    component : <AIAgentsGateway />
 }
 
 const aiAgentGateway = {
     icon: '/public/aws_bedrock.svg',
     label: "AI Agent Gateway",
-    text: "Centralized gateway to manage and secure AI agent API access.",
+    text: "AI agent proxy gateway to be deployed on premise for securing AI agents in your network",
     docsUrl: 'https://docs.akto.io/akto-agent-proxy',
     key: "AI_AGENT_GATEWAY",
-    component : <AiAgentScan
-        description="Connect AI agents via Akto's gateway to enforce policies, auth, and observability."
-        defaultRequestBody={{
-            "messages": [{"role": "user", "content": "Why is the sky blue?"}],
-            "temperature": 0.7,
-            "max_tokens": 256
-        }}
-        docsLink='https://docs.akto.io/akto-agent-proxy'
-    />
+    component : <AIAgentsGateway />
 }
 
 const azureAIFoundryObj = {
@@ -502,7 +488,7 @@ const mcpReconObj = {
 const mcpProxyObj = {
     icon: '/public/mcp.svg',
     label: "MCP Global Proxy",
-    text: "A secure gateway that enforces guardrails and advanced threat protection for all requests to your MCP servers, ensuring safe and compliant communication.",
+    text: "A publicly hostedsecure gateway that enforces guardrails and advanced threat protection for all requests to your public MCP servers, ensuring safe and compliant communication.",
     docsUrl: 'https://docs.akto.io/akto-mcp-proxy',
     key: "MCP_PROXY",
     component : <McpProxy/>
@@ -511,7 +497,7 @@ const mcpProxyObj = {
 const mcpGateway = {
     icon: '/public/mcp.svg',
     label: "MCP Gateway",
-    text: "Central gateway for routing MCP traffic with auth, rate limits, and observability.",
+    text: "MCP proxy gateway to be deployed on premise for securing MCP servers in your network.",
     docsUrl: 'https://docs.akto.io/akto-mcp-proxy',
     key: "MCP_GATEWAY",
     component : <McpGateway/>
