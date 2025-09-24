@@ -511,9 +511,9 @@ const mcpProxyObj = {
 const mcpGateway = {
     icon: '/public/mcp.svg',
     label: "MCP Gateway",
-    text: "A secure gateway that enforces guardrails and advanced threat protection for all requests to your MCP servers, ensuring safe and compliant communication.",
+    text: "Central gateway for routing MCP traffic with auth, rate limits, and observability.",
     docsUrl: 'https://docs.akto.io/akto-mcp-proxy',
-    key: "MCP_PROXY",
+    key: "MCP_GATEWAY",
     component : <McpGateway/>
 }
 
