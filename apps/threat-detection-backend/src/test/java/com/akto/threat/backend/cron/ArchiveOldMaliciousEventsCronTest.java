@@ -73,7 +73,7 @@ public class ArchiveOldMaliciousEventsCronTest {
     public void testFetchRetentionDays_InvalidFallsBack() throws Exception {
         when(mongoDatabase.getCollection(eq("threat_configuration"), eq(Document.class))).thenReturn(cfgCollection);
         when(cfgCollection.find()).thenReturn(mock(com.mongodb.client.FindIterable.class));
-        Document cfg = new Document("archivalDays", 45);
+        Document cfg = new Document("archivalDays", 15);
         when(cfgCollection.find().first()).thenReturn(cfg);
 
         Method m = ArchiveOldMaliciousEventsCron.class.getDeclaredMethod("fetchRetentionDays", MongoDatabase.class);
