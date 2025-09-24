@@ -45,7 +45,7 @@ const CenterViewType = {
 
 
 const headers = [
-    ...(isMCPSecurityCategory() ? [{
+    ...(isMCPSecurityCategory() && window.ACTIVE_ACCOUNT === 1669322524 ? [{
         title: "",
         text: "",
         value: "iconComp",
@@ -219,7 +219,7 @@ const convertToNewData = (collectionsArr, sensitiveInfoMap, severityInfoMap, cov
             nextUrl: "/dashboard/observe/inventory/"+ c.id,
             envTypeOriginal: c?.envType,
             envType: c?.envType?.map(func.formatCollectionType),
-            ...(isMCPSecurityCategory() ? {
+            ...(isMCPSecurityCategory() && window.ACTIVE_ACCOUNT === 1669322524 ? {
                 iconComp: (<Box><img src={c.displayName?.toLowerCase().startsWith('mcp') ? MCPIcon : LaptopIcon} alt="icon" style={{width: '24px', height: '24px'}} /></Box>)
             } : {}),
             displayNameComp: (<Box maxWidth="30vw"><Text truncate fontWeight="medium">{c.displayName}</Text></Box>),
