@@ -77,7 +77,7 @@ public class ArchiveOldMaliciousEventsCron implements Runnable {
                         // leave context unset for non-numeric db names
                     }
                     if (accId != null) {
-                        processDatabase(dbName, nowSeconds);
+                        archiveOldMaliciousEvents(dbName, nowSeconds);
                     } else {
                         logger.infoAndAddToDb("Skipping archive for db as context wasn't set: " + dbName, LoggerMaker.LogDb.RUNTIME);
                     }
@@ -97,7 +97,7 @@ public class ArchiveOldMaliciousEventsCron implements Runnable {
                 || "config".equals(dbName);
     }
 
-    private void processDatabase(String dbName, long nowSeconds) {
+    private void archiveOldMaliciousEvents(String dbName, long nowSeconds) {
         MongoDatabase db = mongoClient.getDatabase(dbName);
         if (!ensureCollectionExists(db, DEST_COLLECTION)) {
             logger.infoAndAddToDb("Archive collection missing, skipping db: " + dbName, LoggerMaker.LogDb.RUNTIME);
@@ -204,12 +204,11 @@ public class ArchiveOldMaliciousEventsCron implements Runnable {
 
         if (approxCount <= MAX_SOURCE_DOCS) return;
 
-        long toRemove = approxCount - MAX_SOURCE_DOCS;
         long totalDeleted = 0L;
-        logger.infoAndAddToDb("Starting overflow trim in db " + dbName + ": approxCount=" + approxCount + ", toRemove=" + toRemove, LoggerMaker.LogDb.RUNTIME);
+        logger.infoAndAddToDb("Starting overflow trim in db " + dbName + ": approxCount=" + approxCount + ", overCap=" + (approxCount - MAX_SOURCE_DOCS), LoggerMaker.LogDb.RUNTIME);
 
-        while (toRemove > 0) {
-            int batch = (int) Math.min(BATCH_SIZE, toRemove);
+        while (true) {
+            int batch = BATCH_SIZE;
 
             List<Document> oldestDocs = new ArrayList<>(batch);
             try (MongoCursor<Document> cursor = source
@@ -233,11 +232,9 @@ public class ArchiveOldMaliciousEventsCron implements Runnable {
             long deleted = deleteByIds(source, ids, dbName);
 
             totalDeleted += deleted;
-            toRemove -= deleted;
 
-            if (deleted < batch) {
-                break;
-            }
+            if (deleted < batch) break; 
+            if (totalDeleted >= MAX_DELETES_PER_ITERATION) break;
         }
 
         if (totalDeleted > 0) {
