@@ -45,7 +45,7 @@ const getCompliances = () => {
     const isMCP = isMCPSecurityCategory();
     const isAgenticSecurity = isGenAISecurityCategory();
 
-    if (isDemoAccount && isMCP && isAgenticSecurity) {
+    if (isDemoAccount && (isMCP || isAgenticSecurity) {
         // Different compliances for demo account + MCP + Agentic Security
         return ["OWASP Agentic", "OWASP LLM", "NIST AI Risk Management Framework","MITRE ATLAS","CIS Controls", "CMMC", "CSA CCM", "Cybersecurity Maturity Model Certification (CMMC)", "FISMA", "FedRAMP", "GDPR", "HIPAA", "ISO 27001", "NIST 800-171", "NIST 800-53", "PCI DSS", "SOC 2", "OWASP"];
     }
