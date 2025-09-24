@@ -228,7 +228,7 @@ const agentDiscoveryData = {
             },
             {
                 id: 'llm-call',
-                label: 'POST /v1/chat/completions',
+                label: 'POST /trail/v1/chat/completions',
                 type: 'LLM Call',
                 description: 'Large Language Model API call',
                 x: 700,
