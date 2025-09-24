@@ -5,6 +5,8 @@ import java.util.List;
 import java.util.HashMap;
 import java.util.Map;
 
+import lombok.Getter;
+
 public class ThreatApiDistributionUtils {
 
     public static class Range {
@@ -27,6 +29,7 @@ public class ThreatApiDistributionUtils {
             new Range(50001, 100000, "b13"), new Range(100001, Integer.MAX_VALUE, "b14")
     );
 
+    @Getter 
     private static final Map<String, Range> LABEL_TO_RANGE_MAP = new HashMap<>();
     static {
         for (Range range : BUCKET_RANGES) {
@@ -46,4 +49,9 @@ public class ThreatApiDistributionUtils {
         return LABEL_TO_RANGE_MAP.get(bucketLabel).min;
     }
 
+    public static int percentile(List<Integer> sorted, int p) {
+        if (sorted.isEmpty()) return 0;
+        int index = (int) Math.ceil(p / 100.0 * sorted.size()) - 1;
+        return sorted.get(Math.max(0, Math.min(index, sorted.size() - 1)));
+    }
 }

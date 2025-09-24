@@ -15,6 +15,8 @@ import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.Bu
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchApiDistributionDataRequest;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchApiDistributionDataResponse;
 import com.akto.threat.backend.db.ApiDistributionDataModel;
+import com.akto.threat.backend.db.ApiRateLimitBucketStatisticsModel;
+import com.akto.utils.ThreatApiDistributionUtils;
 import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoCursor;
@@ -36,6 +38,9 @@ public class ApiDistributionDataService {
 
     public ApiDistributionDataResponsePayload saveApiDistributionData(String accountId, ApiDistributionDataRequestPayload payload) {
         List<WriteModel<ApiDistributionDataModel>> bulkUpdates = new ArrayList<>();
+        
+        
+        Map<String, List<ApiDistributionDataRequestPayload.DistributionData>> frequencyBuckets = new HashMap<>();
 
         for (ApiDistributionDataRequestPayload.DistributionData protoData : payload.getDistributionDataList()) {
             Bson filter = Filters.and(
@@ -55,6 +60,12 @@ public class ApiDistributionDataService {
                 Updates.set("windowStart", protoData.getWindowStartEpochMin())
             );
 
+            
+            frequencyBuckets.computeIfAbsent(
+                    ApiRateLimitBucketStatisticsModel.getBucketStatsDocIdForApi(protoData.getApiCollectionId(),
+                            protoData.getMethod(), protoData.getUrl(), protoData.getWindowSize()),
+                    k -> new ArrayList<>()).add(protoData);
+
             UpdateOptions options = new UpdateOptions().upsert(true);
 
             bulkUpdates.add(new UpdateOneModel<>(filter, update, options));
@@ -65,6 +76,7 @@ public class ApiDistributionDataService {
             .getCollection("api_distribution_data", ApiDistributionDataModel.class)
             .bulkWrite(bulkUpdates, new BulkWriteOptions().ordered(false));
 
+        ApiRateLimitBucketStatisticsModel.calculateStatistics(accountId, this.mongoClient, frequencyBuckets);
         return ApiDistributionDataResponsePayload.newBuilder().build();
     }
 
@@ -97,9 +109,9 @@ public class ApiDistributionDataService {
             Collections.sort(values);
             int min = values.get(0);
             int max = values.get(values.size() - 1);
-            int p25 = percentile(values, 25);
-            int p50 = percentile(values, 50); // median
-            int p75 = percentile(values, 75);
+            int p25 = ThreatApiDistributionUtils.percentile(values, 25);
+            int p50 = ThreatApiDistributionUtils.percentile(values, 50); // median
+            int p75 = ThreatApiDistributionUtils.percentile(values, 75);
     
             BucketStats stats = BucketStats.newBuilder()
                 .setBucketLabel(bucket)
@@ -131,12 +143,6 @@ public class ApiDistributionDataService {
         responseBuilder.addAllBucketStats(fetchBucketStats(accountId, filter, this.mongoClient));
 
         return responseBuilder.build();
-    }
-
-    private static int percentile(List<Integer> sorted, int p) {
-        if (sorted.isEmpty()) return 0;
-        int index = (int) Math.ceil(p / 100.0 * sorted.size()) - 1;
-        return sorted.get(Math.max(0, Math.min(index, sorted.size() - 1)));
     }
 
 }
