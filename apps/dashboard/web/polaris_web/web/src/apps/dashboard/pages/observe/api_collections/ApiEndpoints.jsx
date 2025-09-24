@@ -34,6 +34,7 @@ import InlineEditableText from "../../../components/shared/InlineEditableText"
 import IssuesApi from "../../issues/api"
 import SequencesFlow from "./SequencesFlow"
 import { getDashboardCategory, mapLabel } from "../../../../main/labelHelper"
+import AgentDiscoverGraph from "./AgentDiscoverGraph"
 
 const headings = [
     {
@@ -1221,6 +1222,7 @@ function ApiEndpoints(props) {
                 />] : showSequencesFlow ? [
                 <SequencesFlow key="sequences-flow" apiCollectionId={apiCollectionId}  />
             ] : [
+                func.isDemoAccount() ? <AgentDiscoverGraph apiCollectionId={apiCollectionId} /> : <></>,
                 (coverageInfo[apiCollectionId] === 0 || !(coverageInfo.hasOwnProperty(apiCollectionId)) ? <TestrunsBannerComponent key={"testrunsBanner"} onButtonClick={() => setRunTests(true)} isInventory={true}  disabled={collectionsObj?.isOutOfTestingScope || false}/> : null),
                 <div className="apiEndpointsTable" key="table">
                     {apiEndpointTable}
