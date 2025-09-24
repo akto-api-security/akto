@@ -1,5 +1,7 @@
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards"
 import { Text, Button, IndexFiltersMode, Box, Popover, ActionList, ResourceItem, Avatar,  HorizontalStack, Icon} from "@shopify/polaris"
+import MCPIcon from "@/assets/MCP_Icon.svg"
+import LaptopIcon from "@/assets/Laptop.svg"
 import { HideMinor, ViewMinor,FileMinor } from '@shopify/polaris-icons';
 import api from "../api"
 import dashboardApi from "../../dashboard/api"
@@ -33,7 +35,7 @@ import ReactFlow, {
   
   } from 'react-flow-renderer';
 import SetUserEnvPopupComponent from "./component/SetUserEnvPopupComponent";
-import { getDashboardCategory, mapLabel } from "../../../../main/labelHelper";
+import { getDashboardCategory, mapLabel, isMCPSecurityCategory } from "../../../../main/labelHelper";
   
 const CenterViewType = {
     Table: 0,
@@ -43,6 +45,13 @@ const CenterViewType = {
 
 
 const headers = [
+    ...(isMCPSecurityCategory() ? [{
+        title: "",
+        text: "",
+        value: "iconComp",
+        isText: CellType.TEXT,
+        boxWidth: '24px'
+    }] : []),
     {
         title: mapLabel("API collection name", getDashboardCategory()),
         text: mapLabel("API collection name", getDashboardCategory()),
@@ -210,6 +219,9 @@ const convertToNewData = (collectionsArr, sensitiveInfoMap, severityInfoMap, cov
             nextUrl: "/dashboard/observe/inventory/"+ c.id,
             envTypeOriginal: c?.envType,
             envType: c?.envType?.map(func.formatCollectionType),
+            ...(isMCPSecurityCategory() ? {
+                iconComp: (<Box><img src={c.displayName?.toLowerCase().startsWith('mcp') ? MCPIcon : LaptopIcon} alt="icon" style={{width: '24px', height: '24px'}} /></Box>)
+            } : {}),
             displayNameComp: (<Box maxWidth="30vw"><Text truncate fontWeight="medium">{c.displayName}</Text></Box>),
             testedEndpoints: c.urlsCount === 0 ? 0 : (coverageMap[c.id] ? coverageMap[c.id] : 0),
             sensitiveInRespTypes: sensitiveInfoMap[c.id] ? sensitiveInfoMap[c.id] : [],
