@@ -68,12 +68,14 @@ const ArchivalConfigComponent = ({ title, description }) => {
             <Divider />
             <LegacyCard.Section>
                 <VerticalStack gap="4">
-                    <Dropdown
-                        menuItems={options}
-                        selected={(val) => onChange(val)}
-                        label="Archival Time"
-                        initial={() => archivalDays}
-                    />
+                    <Box width="200px">
+                        <Dropdown
+                            menuItems={options}
+                            selected={(val) => onChange(val)}
+                            label="Archival Time"
+                            initial={() => archivalDays}
+                        />
+                    </Box>
                 </VerticalStack>
             </LegacyCard.Section>
         </LegacyCard>

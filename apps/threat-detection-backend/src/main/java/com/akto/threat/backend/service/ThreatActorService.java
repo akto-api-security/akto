@@ -135,7 +135,7 @@ public class ThreatActorService {
 
     {
         int val = updatedConfig.getArchivalDays();
-        if (val == 30 || val == 60 || val == 90) {
+        if (val >= 30 && val <= 90) {
             newDoc.append("archivalDays", val);
         }
     }
@@ -158,7 +158,7 @@ public class ThreatActorService {
     }
     {
         int val = updatedConfig.getArchivalDays();
-        if (val == 30 || val == 60 || val == 90) {
+        if (val >= 30 && val <= 90) {
             builder.setArchivalDays(val);
         }
     }
