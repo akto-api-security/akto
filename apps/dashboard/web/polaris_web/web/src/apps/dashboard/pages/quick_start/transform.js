@@ -451,7 +451,7 @@ const mcpWrapperObj = {
 const agenticShieldObj = {
     icon: '/public/mcp.svg',
     label: "Agentic Shield",
-    text: "Agentic Shield provides runtime protection and discovery of LLMs/AI Agents on your local environment",
+    text: "Agentic Shield provides runtime protection and discovery of LLMs/AI Agents on your local environment.",
     docsUrl: 'https://docs.akto.io/agentic-shield',
     key: "AGENTIC_SHIELD",
     component: <AgenticShield/>
