@@ -404,6 +404,10 @@ const learnMoreObject = {
                 content:"How to configure Threat Actor",
                 value:"https://docs.akto.io/api-protection/concepts/threat-actors"
             },
+            {
+                content: "How to configure Dynamic Rate Limits",
+                value: "https://docs.akto.io/api-protection/concepts/api-rate-limit"
+            }
         ],
     },
     dashboard_settings_tags:{
