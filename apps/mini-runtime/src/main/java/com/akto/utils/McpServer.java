@@ -1,8 +1,8 @@
-package com.akto.dto;
+package com.akto.utils;
 
+import com.akto.mcp.McpSchema.Prompt;
 import com.akto.mcp.McpSchema.Resource;
 import com.akto.mcp.McpSchema.Tool;
-import com.akto.mcp.McpSchema.Prompt;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.Setter;

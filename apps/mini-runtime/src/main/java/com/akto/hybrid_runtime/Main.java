@@ -485,11 +485,12 @@ public class Main {
 
         // schedule MCP Recon Sync job for 2 mins
         loggerMaker.info("Scheduling MCP Recon Sync Job");
+        APIConfig finalApiConfigRecon = apiConfig;
         scheduler.scheduleAtFixedRate(() -> {
             Context.accountId.set(DataActor.actualAccountId);
             try {
                 loggerMaker.infoAndAddToDb("Executing MCP Recon Sync job");
-                McpReconSyncJobExecutor.INSTANCE.runJob();
+                McpReconSyncJobExecutor.INSTANCE.runJob(finalApiConfigRecon);
                 loggerMaker.infoAndAddToDb("Finished executing MCP Recon Sync job");
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb(e, "Error while executing MCP Recon Sync Job");

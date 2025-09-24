@@ -1,12 +1,12 @@
 package com.akto.hybrid_runtime;
 
-import com.akto.dto.McpServer;
-import com.akto.dto.McpScanResult;
+import com.akto.utils.McpScanResult;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.mcp.McpSchema;
 import com.akto.util.JSONUtils;
 import com.akto.util.McpConstants;
+import com.akto.utils.McpServer;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.commons.lang3.StringUtils;
 import java.net.InetAddress;
