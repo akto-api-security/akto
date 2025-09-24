@@ -34,6 +34,7 @@ public class ArchiveOldMaliciousEventsCron implements Runnable {
     private static final long MIN_RETENTION_DAYS = 30L;
     private static final long MAX_RETENTION_DAYS = 90L;
     private static final long MAX_SOURCE_DOCS = 400_000L; // cap size
+    private static final long MAX_DELETES_PER_ITERATION = 100_000L; // cap per cron iteration
 
     private final MongoClient mongoClient;
     private final ScheduledExecutorService scheduler;
@@ -110,6 +111,7 @@ public class ArchiveOldMaliciousEventsCron implements Runnable {
         MongoCollection<Document> dest = db.getCollection(DEST_COLLECTION, Document.class);
 
         int totalMoved = 0;
+        long deletesThisIteration = 0L;
 
         while (true) {
             long iterationStartNanos = System.nanoTime();
@@ -135,11 +137,17 @@ public class ArchiveOldMaliciousEventsCron implements Runnable {
 
             long deleted = deleteByIds(source, ids, dbName);
             totalMoved += (int) deleted;
+            deletesThisIteration += deleted;
 
             long iterationElapsedMs = (System.nanoTime() - iterationStartNanos) / 1_000_000L;
             logger.infoAndAddToDb("Archive loop iteration in db " + dbName + ": batch=" + batch.size() + ", deleted=" + deleted + ", tookMs=" + iterationElapsedMs, LoggerMaker.LogDb.RUNTIME);
 
             if (batch.size() < BATCH_SIZE) {
+                break;
+            }
+
+            if (deletesThisIteration >= MAX_DELETES_PER_ITERATION) {
+                logger.infoAndAddToDb("Reached delete cap (" + MAX_DELETES_PER_ITERATION + ") for this iteration in db " + dbName + ", stopping further deletes", LoggerMaker.LogDb.RUNTIME);
                 break;
             }
         }
@@ -150,7 +158,11 @@ public class ArchiveOldMaliciousEventsCron implements Runnable {
 
         // Enforce collection size cap by trimming oldest docs beyond 400k.
         try {
-            trimCollectionIfExceedsCap(dbName, source, dest);
+            if (deletesThisIteration < MAX_DELETES_PER_ITERATION) {
+                trimCollectionIfExceedsCap(dbName, source, dest);
+            } else {
+                logger.infoAndAddToDb("Skipping trim step as delete cap reached in db " + dbName, LoggerMaker.LogDb.RUNTIME);
+            }
         } catch (Exception e) {
             logger.errorAndAddToDb("Error trimming collection to cap in db " + dbName + ": " + e.getMessage(), LoggerMaker.LogDb.RUNTIME);
         }
