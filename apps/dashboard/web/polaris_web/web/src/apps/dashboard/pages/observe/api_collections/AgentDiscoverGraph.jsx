@@ -61,7 +61,7 @@ function AgentNode({ data }) {
                   </Box>
                   <HorizontalStack gap={1} align="center">
                     <Icon source={IconComponent} color="base" />
-                    <Box width='110px'>
+                    <Box width={component.category==="ai-model" ? "160px" : "110px"}>
                       <Text variant="bodySm" color="base">
                         {component.label}
                       </Text>
