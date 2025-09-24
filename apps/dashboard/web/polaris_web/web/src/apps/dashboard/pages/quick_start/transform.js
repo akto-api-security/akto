@@ -2,7 +2,7 @@ import {Avatar, Badge} from "@shopify/polaris"
 import PostmanSource from "./components/PostmanSource"
 import BurpSource from "./components/BurpSource"
 import HybridSaasSource from "./components/HybridSaasSource"
-import McpWrapper from "./components/McpWrapper"
+import AgenticShield from "./components/AgenticShield"
 import AwsSource from "./components/AwsSource"
 import FargateSource from "./components/FargateSource"
 import Kubernetes from "./components/Kubernetes"
@@ -441,11 +441,20 @@ const customAgentObj = {
 
 const mcpWrapperObj = {
     icon: '/public/mcp.svg',
-    label: "MCP Wrapper",
-    text: "MCP Wrapper helps you detect MCP servers configured on your laptop or desktop, giving you full visibility into their requests and responses.",   
-    docsUrl: 'https://docs.akto.io/mcp-watch',
-    key: "MCP_WRAPPER",
-    component: <McpWrapper/>
+    label: "MCP Endpoint Shield",
+    text: "MCP Endpoint Shield provides runtime security and auto-discovery of local MCP servers configured on your machine, requiring no changes to your setup.",
+    docsUrl: 'https://docs.akto.io/mcp-endpoint-shield',
+    key: "MCP_ENDPOINT_SHIELD",
+    component: <AddOnComponenet/>
+}
+
+const agenticShieldObj = {
+    icon: '/public/mcp.svg',
+    label: "Agentic Shield",
+    text: "Agentic Shield provides runtime protection and discovery of LLMs/AI Agents on your local environment.",
+    docsUrl: 'https://docs.akto.io/agentic-shield',
+    key: "AGENTIC_SHIELD",
+    component: <AgenticShield/>
 }
 
 const mcpScanObj = {
@@ -1362,7 +1371,7 @@ const quickStartFunc = {
         ]
 
         const aiAgentConnectors = [
-            awsBedrockObj, azureAIFoundryObj, databricksObj, googleVertexAIObj, ibmWatsonxObj, customAgentObj
+            awsBedrockObj, azureAIFoundryObj, databricksObj, googleVertexAIObj, ibmWatsonxObj, customAgentObj, agenticShieldObj
         ]
 
         // MCP Scan
@@ -1438,7 +1447,7 @@ const quickStartFunc = {
         if(isGenAISecurityCategory()){
             connectorsList = connectorsList.concat([
                 geminiObj, openAIObj, claudeObj, deepseekObj, llamaObj, grokObj, customAIObj,
-                awsBedrockObj, azureAIFoundryObj, databricksObj, googleVertexAIObj, ibmWatsonxObj, customAgentObj
+                awsBedrockObj, azureAIFoundryObj, databricksObj, googleVertexAIObj, ibmWatsonxObj, customAgentObj, agenticShieldObj
             ])
         }
 
