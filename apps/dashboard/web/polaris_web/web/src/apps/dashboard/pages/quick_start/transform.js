@@ -355,7 +355,7 @@ const aiAgentGlobalProxy = {
     icon: '/public/aws_bedrock.svg',
     label: "AI Agent Global Proxy",
     text: "Secure, policy-enforced global proxy for all AI agent traffic.",
-    docsUrl: 'https://docs.akto.io/ai-agent-security',
+    docsUrl: 'https://docs.akto.io/akto-agent-proxy',
     key: "AI_AGENT_GLOBAL_PROXY",
     component : <AiAgentScan
         description="Route your AI agent requests through Akto's global proxy with guardrails and threat protection."
@@ -363,7 +363,7 @@ const aiAgentGlobalProxy = {
             "messages": [{"role": "user", "content": "Why is the sky blue?"}],
             "max_tokens": 256
         }}
-        docsLink='https://docs.akto.io/ai-agent-security'
+        docsLink='https://docs.akto.io/akto-agent-proxy'
     />
 }
 
@@ -371,7 +371,7 @@ const aiAgentGateway = {
     icon: '/public/aws_bedrock.svg',
     label: "AI Agent Gateway",
     text: "Centralized gateway to manage and secure AI agent API access.",
-    docsUrl: 'https://docs.akto.io/ai-agent-security',
+    docsUrl: 'https://docs.akto.io/akto-agent-proxy',
     key: "AI_AGENT_GATEWAY",
     component : <AiAgentScan
         description="Connect AI agents via Akto's gateway to enforce policies, auth, and observability."
@@ -380,7 +380,7 @@ const aiAgentGateway = {
             "temperature": 0.7,
             "max_tokens": 256
         }}
-        docsLink='https://docs.akto.io/ai-agent-security'
+        docsLink='https://docs.akto.io/akto-agent-proxy'
     />
 }
 
