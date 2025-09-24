@@ -707,6 +707,14 @@ const learnMoreObject = {
             }
         ]
     },
+    dashboard_protection_configure_exploits: {
+        docsLink: [
+            {
+                content: "How to configure Successful Exploits",
+                value: "https://docs.akto.io/api-protection/concepts/successful-exploits"
+            }
+        ]
+    }
 }
 
 export { HOMEDASHBOARD_VIDEO_LENGTH, HOMEDASHBOARD_VIDEO_URL, HOMEDASHBOARD_VIDEO_THUMBNAIL,
