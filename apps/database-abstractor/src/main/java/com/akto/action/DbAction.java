@@ -29,6 +29,9 @@ import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.testing.*;
 import com.akto.dto.testing.config.TestScript;
 import com.akto.dto.testing.sources.TestSourceConfig;
+import com.akto.dto.deployment.DeploymentConfig;
+import com.akto.dto.deployment.EnvVariable;
+import com.akto.dao.deployment.DeploymentConfigDao;
 import com.akto.dto.threat_detection.ApiHitCountInfo;
 import com.akto.dto.traffic.CollectionTags;
 import com.akto.dto.traffic.SampleData;
@@ -3958,5 +3961,196 @@ public class DbAction extends ActionSupport {
 
     public void setUrlType(String urlType) {
         this.urlType = urlType;
+    }
+
+    // Deployment configuration fields
+    private List<DeploymentConfig> deploymentConfigs;
+    private String deploymentId;
+    private String deploymentName;
+    private String deploymentType;
+    private List<EnvVariable> envVars;
+    private String envKey;
+    private String envValue;
+    private boolean editable;
+
+    // Deployment configuration getters and setters
+    public List<DeploymentConfig> getDeploymentConfigs() {
+        return deploymentConfigs;
+    }
+
+    public void setDeploymentConfigs(List<DeploymentConfig> deploymentConfigs) {
+        this.deploymentConfigs = deploymentConfigs;
+    }
+
+    public String getDeploymentId() {
+        return deploymentId;
+    }
+
+    public void setDeploymentId(String deploymentId) {
+        this.deploymentId = deploymentId;
+    }
+
+    public String getDeploymentName() {
+        return deploymentName;
+    }
+
+    public void setDeploymentName(String deploymentName) {
+        this.deploymentName = deploymentName;
+    }
+
+    public String getDeploymentType() {
+        return deploymentType;
+    }
+
+    public void setDeploymentType(String deploymentType) {
+        this.deploymentType = deploymentType;
+    }
+
+    public List<EnvVariable> getEnvVars() {
+        return envVars;
+    }
+
+    public void setEnvVars(List<EnvVariable> envVars) {
+        this.envVars = envVars;
+    }
+
+    public String getEnvKey() {
+        return envKey;
+    }
+
+    public void setEnvKey(String envKey) {
+        this.envKey = envKey;
+    }
+
+    public String getEnvValue() {
+        return envValue;
+    }
+
+    public void setEnvValue(String envValue) {
+        this.envValue = envValue;
+    }
+
+    public boolean isEditable() {
+        return editable;
+    }
+
+    public void setEditable(boolean editable) {
+        this.editable = editable;
+    }
+
+    // Deployment configuration API methods
+    public String fetchAllDeploymentConfigs() {
+        try {
+            deploymentConfigs = DeploymentConfigDao.instance.findAll();
+            return SUCCESS;
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in fetchAllDeploymentConfigs " + e.toString());
+            return ERROR;
+        }
+    }
+
+    public String addEnvVariable() {
+        try {
+            if (deploymentId == null || envKey == null || envValue == null) {
+                addActionError("Missing required parameters: deploymentId, envKey, envValue");
+                return ERROR;
+            }
+
+            DeploymentConfig config = DeploymentConfigDao.instance.findById(deploymentId);
+            if (config == null) {
+                addActionError("Deployment configuration not found");
+                return ERROR;
+            }
+
+            List<EnvVariable> currentEnvVars = config.getEnvVars() != null ? config.getEnvVars() : new ArrayList<>();
+            EnvVariable newEnvVar = new EnvVariable(envKey, envValue, editable);
+            currentEnvVars.add(newEnvVar);
+
+            boolean success = DeploymentConfigDao.instance.updateEnvVars(deploymentId, currentEnvVars);
+            if (!success) {
+                addActionError("Failed to add environment variable");
+                return ERROR;
+            }
+
+            return SUCCESS;
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in addEnvVariable " + e.toString());
+            return ERROR;
+        }
+    }
+
+    public String updateEnvVariable() {
+        try {
+            if (deploymentId == null || envKey == null || envValue == null) {
+                addActionError("Missing required parameters: deploymentId, envKey, envValue");
+                return ERROR;
+            }
+
+            DeploymentConfig config = DeploymentConfigDao.instance.findById(deploymentId);
+            if (config == null) {
+                addActionError("Deployment configuration not found");
+                return ERROR;
+            }
+
+            List<EnvVariable> currentEnvVars = config.getEnvVars() != null ? config.getEnvVars() : new ArrayList<>();
+            boolean found = false;
+            for (EnvVariable envVar : currentEnvVars) {
+                if (envKey.equals(envVar.getKey())) {
+                    envVar.setValue(envValue);
+                    found = true;
+                    break;
+                }
+            }
+
+            if (!found) {
+                addActionError("Environment variable not found");
+                return ERROR;
+            }
+
+            boolean success = DeploymentConfigDao.instance.updateEnvVars(deploymentId, currentEnvVars);
+            if (!success) {
+                addActionError("Failed to update environment variable");
+                return ERROR;
+            }
+
+            return SUCCESS;
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in updateEnvVariable " + e.toString());
+            return ERROR;
+        }
+    }
+
+    public String removeEnvVariable() {
+        try {
+            if (deploymentId == null || envKey == null) {
+                addActionError("Missing required parameters: deploymentId, envKey");
+                return ERROR;
+            }
+
+            DeploymentConfig config = DeploymentConfigDao.instance.findById(deploymentId);
+            if (config == null) {
+                addActionError("Deployment configuration not found");
+                return ERROR;
+            }
+
+            List<EnvVariable> currentEnvVars = config.getEnvVars() != null ? config.getEnvVars() : new ArrayList<>();
+            boolean removed = currentEnvVars.removeIf(envVar -> envKey.equals(envVar.getKey()));
+
+            if (!removed) {
+                addActionError("Environment variable not found");
+                return ERROR;
+            }
+
+            boolean success = DeploymentConfigDao.instance.updateEnvVars(deploymentId, currentEnvVars);
+            if (!success) {
+                addActionError("Failed to remove environment variable");
+                return ERROR;
+            }
+
+            return SUCCESS;
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in removeEnvVariable " + e.toString());
+            return ERROR;
+        }
     }
 }
