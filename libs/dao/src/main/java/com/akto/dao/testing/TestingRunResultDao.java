@@ -359,7 +359,6 @@ public class TestingRunResultDao extends AccountsContextDaoWithRbac<TestingRunRe
                 String categoryName = result.getString("categoryName");
                 Map<String, Object> categoryScore = new HashMap<>();
                 categoryScore.put("categoryName", categoryName);
-                categoryScore.put("displayName", getDisplayNameFromCategoryName(categoryName));
                 categoryScore.put("pass", result.getInt("passCount", 0));
                 categoryScore.put("fail", result.getInt("failCount", 0));
                 categoryScore.put("skip", result.getInt("skipCount", 0));
@@ -370,21 +369,5 @@ public class TestingRunResultDao extends AccountsContextDaoWithRbac<TestingRunRe
         return results;
     }
 
-    /**
-     * Simple helper method to get display name from category name using GlobalEnums
-     * Checks both name and shortName fields to find the matching category
-     */
-    private String getDisplayNameFromCategoryName(String categoryName) {
-        // Look through all TestCategory enums to find matching category
-        for (GlobalEnums.TestCategory category : GlobalEnums.TestCategory.values()) {
-            // Check if this category matches either name or shortName
-            if (category.getName().equals(categoryName) || category.getShortName().equals(categoryName)) {
-                return category.getDisplayName();
-            }
-        }
-        
-        // Fallback to original category name if not found
-        return categoryName;
-    }
 
 }

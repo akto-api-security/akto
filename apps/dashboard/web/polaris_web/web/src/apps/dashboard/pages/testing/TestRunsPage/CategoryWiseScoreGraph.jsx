@@ -7,6 +7,7 @@ import { mcpCategoryTestData, genAICategoryTestData, apiCategoryTestData } from 
 import api from '../api';
 import { useState, useEffect } from 'react';
 import func from "@/util/func";
+import LocalStore from "../../../../main/LocalStorageStore";
 
 function CategoryWiseScoreGraph({ 
     startTimestamp, 
@@ -21,6 +22,9 @@ function CategoryWiseScoreGraph({
 
     // Get current dashboard category
     const dashboardCategory = getDashboardCategory();
+    
+    // Get category map from local storage
+    const categoryMap = LocalStore.getState().categoryMap;
     
     // Determine the appropriate API call and fallback data
     const getApiCall = () => {
@@ -219,7 +223,7 @@ function CategoryWiseScoreGraph({
         const primaryLabel = passed ? statusLabels.pass : statusLabels.fail;
 
         return [
-            cat.displayName || cat.categoryName,
+            (categoryMap && categoryMap[cat.categoryName]?.displayName) || cat.categoryName,
             <VerticalStack gap="2">
                 {/* Main result indicator */}
                 <HorizontalStack gap="1" align="center">
