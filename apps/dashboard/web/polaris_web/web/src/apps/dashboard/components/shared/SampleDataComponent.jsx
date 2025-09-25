@@ -13,7 +13,7 @@ import transform from './customDiffEditor';
 
 function SampleDataComponent(props) {
 
-    const { type, sampleData, minHeight, showDiff, isNewDiff, metadata } = props;
+    const { type, sampleData, minHeight, showDiff, isNewDiff, metadata, readOnly = false, getEditorData = () => {}, showResponse = true } = props;
     const [sampleJsonData, setSampleJsonData] = useState({ request: { message: "" }, response: { message: "" } });
     const [popoverActive, setPopoverActive] = useState({});
     const [lineNumbers, setLineNumbers] = useState({request: [], response: []})
@@ -33,8 +33,7 @@ function SampleDataComponent(props) {
         if (parsed?.ip != null && parsed?.destIp != null) {
             setIpObj({sourceIP: parsed?.ip, destIP: parsed?.destIp})
         }
-        
-        let responseJson = func.responseJson(parsed, sampleData?.highlightPaths || [], metadata)
+        let responseJson = showResponse ? func.responseJson(parsed, sampleData?.highlightPaths || [], metadata) : {}
         let requestJson = func.requestJson(parsed, sampleData?.highlightPaths || [], metadata)
 
         let responseTime = parsed?.responseTime;
@@ -69,7 +68,7 @@ function SampleDataComponent(props) {
         }else{
             setSampleJsonData({ 
                 request: { message: transform.formatData(requestJson,"http"), original: transform.formatData(originalRequestJson,"http"), highlightPaths:requestJson?.highlightPaths }, 
-                response: { message: transform.formatData(responseJson,"http"), original: transform.formatData(originalResponseJson,"http"), highlightPaths:responseJson?.highlightPaths, vulnerabilitySegments: sampleData?.vulnerabilitySegments },
+                response: showResponse ? { message: transform.formatData(responseJson,"http"), original: transform.formatData(originalResponseJson,"http"), highlightPaths:responseJson?.highlightPaths, vulnerabilitySegments: sampleData?.vulnerabilitySegments } : {},
             })
         }
       }, [sampleData, metadata])
@@ -254,7 +253,7 @@ function SampleDataComponent(props) {
                 </Box>
             </LegacyCard.Section>
             <LegacyCard.Section flush>
-                <SampleData data={sampleJsonData[type]} minHeight={minHeight || "400px"} useDynamicHeight={props?.useDynamicHeight || false} showDiff={showDiff} editorLanguage="custom_http" currLine={currentLineActive} getLineNumbers={getLineNumbers}/>
+                {sampleJsonData[type] ? <SampleData data={sampleJsonData[type]} minHeight={minHeight || "400px"} useDynamicHeight={props?.useDynamicHeight || false} showDiff={showDiff} editorLanguage="custom_http" currLine={currentLineActive} getLineNumbers={getLineNumbers} readOnly={readOnly} getEditorData={getEditorData}/> : null}
             </LegacyCard.Section>
         </Box>
     )

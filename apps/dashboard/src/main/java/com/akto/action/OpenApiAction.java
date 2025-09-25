@@ -217,16 +217,17 @@ public class OpenApiAction extends UserAction implements ServletResponseAware {
                 new Model(),
                 new HashMap<>(),
                 Source.OPEN_API,
-                new BasicDBObject(),
-                accountId
+                new ArrayList<>(),
+                accountId,
+                apiCollectionId
             );
             DiscoveryAgentRunDao.instance.insertOne(discoveryAgentRun);
             if(accountId != 1000_000){
                 executorService.schedule(new Runnable() {
                     public void run() {
                         // putting in 1 common account which will be used to help my agent in polling with x-api-key
-                        Context.accountId.set(1000_000);
-                        DiscoveryAgentRunDao.instance.insertOne(discoveryAgentRun);
+                            Context.accountId.set(1000_000);
+                            DiscoveryAgentRunDao.instance.insertOne(discoveryAgentRun);
                         }
                     }, 0, TimeUnit.SECONDS);
             }

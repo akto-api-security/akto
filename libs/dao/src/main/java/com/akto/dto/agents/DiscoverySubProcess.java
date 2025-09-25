@@ -29,4 +29,7 @@ public class DiscoverySubProcess {
     int processedApisTillNow;
     String currentUrlString;
     State state;
+    int endTimestamp;
+    int startTimestamp;
+    Map<String,String> userInputData;
 }

@@ -198,7 +198,7 @@ const router = createBrowserRouter([
                                 element: <AuditData/>
                             },
                             {
-                                path: "open-api-upload",
+                                path: ":apiCollectionId/open-api-upload",
                                 element: <OpenApiAgentTester/>
                             }
                         ]
