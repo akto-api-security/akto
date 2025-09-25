@@ -4,6 +4,7 @@ import com.akto.dto.*;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.billing.Tokens;
 import com.akto.dto.dependency_flow.Node;
+import com.akto.dto.deployment.DeploymentConfig;
 import com.akto.dto.filter.MergedUrls;
 import com.akto.dto.jobs.JobExecutorType;
 import com.akto.dto.jobs.JobParams;
@@ -313,4 +314,7 @@ public abstract class DataActor {
     public abstract void updateMcpReconRequestStatus(String requestId, String status, int serversFound);
     
     public abstract void storeMcpReconResultsBatch(List<McpReconResult> serverDataList);
+
+    // Deployment configuration (read-only for clients)
+    public abstract DeploymentConfig fetchDeploymentConfigById(String deploymentId);
 }

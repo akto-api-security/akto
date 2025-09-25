@@ -77,6 +77,17 @@ public class Main {
 
     static boolean isDashboardInstance = false;
 
+    private static void initEnvConfig() {
+        try {
+            String deploymentId = System.getenv("DEPLOYMENT_ID");
+            if (deploymentId == null || deploymentId.isEmpty()) return;
+            com.akto.dto.deployment.DeploymentConfig dc = dataActor.fetchDeploymentConfigById(deploymentId);
+            EnvConfig.hydrate(dc);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "initEnvConfig failed: " + e.getMessage());
+        }
+    }
+
     public static boolean tryForCollectionName(String message) {
         boolean ret = false;
         try {
@@ -253,6 +264,7 @@ public class Main {
 
     // REFERENCE: https://www.oreilly.com/library/view/kafka-the-definitive/9781491936153/ch04.html (But how do we Exit?)
     public static void main(String[] args) {
+        initEnvConfig();
         //String mongoURI = System.getenv("AKTO_MONGO_CONN");;
         String configName = System.getenv("AKTO_CONFIG_NAME");
         String topicName = getTopicName();

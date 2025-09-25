@@ -114,6 +114,27 @@ public class ClientActor extends DataActor {
         return dbAbsHost + "/api";
     }
 
+    @Override
+    public DeploymentConfig fetchDeploymentConfigById(String deploymentId) {
+        Map<String, List<String>> headers = buildHeaders();
+        String endpoint = url + "/fetchDeploymentConfigById?deploymentId=" + deploymentId;
+        OriginalHttpRequest request = new OriginalHttpRequest(endpoint, "", "GET", null, headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
+            if (response.getStatusCode() != 200 || response.getBody() == null) {
+                loggerMaker.errorAndAddToDb("non 2xx in fetchDeploymentConfigById", LoggerMaker.LogDb.RUNTIME);
+                return null;
+            }
+            BasicDBObject payloadObj = BasicDBObject.parse(response.getBody());
+            BasicDBObject dcObj = (BasicDBObject) payloadObj.get("deploymentConfig");
+            if (dcObj == null) return null;
+            return objectMapper.readValue(dcObj.toJson(), DeploymentConfig.class);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in fetchDeploymentConfigById " + e, LoggerMaker.LogDb.RUNTIME);
+            return null;
+        }
+    }
+
     public AccountSettings fetchAccountSettings() {
         AccountSettings acc = null;
         for (int i=0; i < 5; i++) {
