@@ -1,38 +1,32 @@
 package com.akto.dto.mcp;
 
-import java.util.List;
-import java.util.Map;
+import com.akto.dto.test_editor.ConfigParserResult;
+import com.akto.dto.test_editor.ExecutorConfigParserResult;
+import com.akto.dto.test_editor.Info;
 
 public class MCPGuardrailConfig {
-    
     private String id;
-    private String name;
-    private String description;
-    private String version;
-    private String author;
+    public static final String ID = "id";
+    private ConfigParserResult filter;
+    public static final String FILTER = "filter";
+    public static final String CREATED_AT = "createdAt";
     private int createdAt;
+    public static final String UPDATED_AT = "updatedAt";
     private int updatedAt;
+    public static final String _AUTHOR = "author";
+    private String author;
+    public static final String _CONTENT = "content";
     private String content;
-    private String type;
-    private boolean enabled;
-    private int priority;
-    private Map<String, Object> configuration;
-    private List<String> sensitiveFields;
-    private Map<String, String> validationRules;
-    private List<String> outputFilters;
-    private Map<String, Object> rateLimitConfig;
+    public static final String _INFO = "info";
+    private Info info;
+    private ExecutorConfigParserResult executor;
 
-    public MCPGuardrailConfig() {}
-
-    public MCPGuardrailConfig(String id, String name, String description, String version, 
-                             String type, boolean enabled, int priority) {
+    public MCPGuardrailConfig(String id, ConfigParserResult filter) {
         this.id = id;
-        this.name = name;
-        this.description = description;
-        this.version = version;
-        this.type = type;
-        this.enabled = enabled;
-        this.priority = priority;
+        this.filter = filter;
+    }
+
+    public MCPGuardrailConfig() {
     }
 
     public String getId() {
@@ -43,36 +37,12 @@ public class MCPGuardrailConfig {
         this.id = id;
     }
 
-    public String getName() {
-        return name;
+    public ConfigParserResult getFilter() {
+        return filter;
     }
 
-    public void setName(String name) {
-        this.name = name;
-    }
-
-    public String getDescription() {
-        return description;
-    }
-
-    public void setDescription(String description) {
-        this.description = description;
-    }
-
-    public String getVersion() {
-        return version;
-    }
-
-    public void setVersion(String version) {
-        this.version = version;
-    }
-
-    public String getAuthor() {
-        return author;
-    }
-
-    public void setAuthor(String author) {
-        this.author = author;
+    public void setFilter(ConfigParserResult filter) {
+        this.filter = filter;
     }
 
     public int getCreatedAt() {
@@ -91,6 +61,14 @@ public class MCPGuardrailConfig {
         this.updatedAt = updatedAt;
     }
 
+    public String getAuthor() {
+        return author;
+    }
+
+    public void setAuthor(String author) {
+        this.author = author;
+    }
+
     public String getContent() {
         return content;
     }
@@ -99,67 +77,20 @@ public class MCPGuardrailConfig {
         this.content = content;
     }
 
-    public String getType() {
-        return type;
+    public ExecutorConfigParserResult getExecutor() {
+        return executor;
     }
 
-    public void setType(String type) {
-        this.type = type;
+    public void setExecutor(ExecutorConfigParserResult executor) {
+        this.executor = executor;
     }
 
-    public boolean isEnabled() {
-        return enabled;
+
+    public Info getInfo() {
+        return info;
     }
 
-    public void setEnabled(boolean enabled) {
-        this.enabled = enabled;
-    }
-
-    public int getPriority() {
-        return priority;
-    }
-
-    public void setPriority(int priority) {
-        this.priority = priority;
-    }
-
-    public Map<String, Object> getConfiguration() {
-        return configuration;
-    }
-
-    public void setConfiguration(Map<String, Object> configuration) {
-        this.configuration = configuration;
-    }
-
-    public List<String> getSensitiveFields() {
-        return sensitiveFields;
-    }
-
-    public void setSensitiveFields(List<String> sensitiveFields) {
-        this.sensitiveFields = sensitiveFields;
-    }
-
-    public Map<String, String> getValidationRules() {
-        return validationRules;
-    }
-
-    public void setValidationRules(Map<String, String> validationRules) {
-        this.validationRules = validationRules;
-    }
-
-    public List<String> getOutputFilters() {
-        return outputFilters;
-    }
-
-    public void setOutputFilters(List<String> outputFilters) {
-        this.outputFilters = outputFilters;
-    }
-
-    public Map<String, Object> getRateLimitConfig() {
-        return rateLimitConfig;
-    }
-
-    public void setRateLimitConfig(Map<String, Object> rateLimitConfig) {
-        this.rateLimitConfig = rateLimitConfig;
+    public void setInfo(Info info) {
+        this.info = info;
     }
 }

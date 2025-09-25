@@ -20,6 +20,13 @@ func NewTemplateClient(baseURL string) *TemplateClient {
 	}
 }
 
+// NewTemplateClientWithAuth creates a new template client with authentication
+func NewTemplateClientWithAuth(baseURL, token string) *TemplateClient {
+	client := NewTemplateClient(baseURL)
+	client.AuthToken = token
+	return client
+}
+
 // FetchGuardrailTemplates fetches all active guardrail templates from the API
 func (c *TemplateClient) FetchGuardrailTemplates(activeOnly bool) ([]YamlTemplate, error) {
 	endpoint := "/api/mcp/fetchGuardrailTemplates"
@@ -136,6 +143,11 @@ func (c *TemplateClient) makeRequest(method, endpoint string, params url.Values)
 	}
 
 	req.Header.Set("Accept", "application/json")
+
+	// Add authentication header if token is provided
+	if c.AuthToken != "" {
+		req.Header.Set("Authorization", "Bearer "+c.AuthToken)
+	}
 
 	httpResp, err := c.HTTPClient.Do(req)
 	if err != nil {

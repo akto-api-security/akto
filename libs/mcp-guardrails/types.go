@@ -167,4 +167,5 @@ type APIResponse struct {
 type TemplateClient struct {
 	BaseURL    string
 	HTTPClient *http.Client
+	AuthToken  string
 }

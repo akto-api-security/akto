@@ -9,6 +9,10 @@ import com.akto.data_actor.DbLayer;
 import com.akto.dto.*;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.McpReconRequest;
+import com.akto.dao.mcp.MCPGuardrailYamlTemplateDao;
+import com.akto.dto.mcp.MCPGuardrailConfig;
+import com.akto.dto.mcp.MCPGuardrailType;
+import com.mongodb.client.model.Filters;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.billing.Tokens;
 import com.akto.dto.billing.UningestedApiOverage;
@@ -135,6 +139,28 @@ public class DbAction extends ActionSupport {
     
     @Getter @Setter
     private List<McpReconResult> serverDataList;
+
+    // MCP Guardrails fields
+    @Getter @Setter
+    private List<YamlTemplate> mcpGuardrailTemplates;
+    
+    @Getter @Setter
+    private Map<String, MCPGuardrailConfig> mcpGuardrailConfigs;
+    
+    @Getter @Setter
+    private YamlTemplate mcpGuardrailTemplate;
+    
+    @Getter @Setter
+    private String templateId;
+    
+    @Getter @Setter
+    private String guardrailType;
+    
+    @Getter @Setter
+    private boolean includeYamlContent = true;
+    
+    @Getter @Setter
+    private boolean activeOnly = true;
 
     private ModuleInfo moduleInfo;
 
@@ -2840,6 +2866,112 @@ public class DbAction extends ActionSupport {
             return Action.ERROR.toUpperCase();
         }
         return Action.SUCCESS.toUpperCase();
+    }
+
+    /**
+     * Fetch all MCP Guardrail YAML templates
+     */
+    public String fetchMCPGuardrailTemplates() {
+        try {
+            if (activeOnly) {
+                mcpGuardrailTemplates = MCPGuardrailYamlTemplateDao.instance.fetchActiveTemplates();
+            } else {
+                mcpGuardrailTemplates = MCPGuardrailYamlTemplateDao.instance.findAll(Filters.empty());
+            }
+            
+            loggerMaker.infoAndAddToDb("Fetched " + mcpGuardrailTemplates.size() + " MCP Guardrail templates", LogDb.DASHBOARD);
+            return Action.SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error fetching MCP Guardrail templates: " + e.toString());
+            addActionError("Failed to fetch MCP Guardrail templates");
+            return Action.ERROR.toUpperCase();
+        }
+    }
+
+    /**
+     * Fetch MCP Guardrail templates by type
+     */
+    public String fetchMCPGuardrailTemplatesByType() {
+        try {
+            if (guardrailType == null || guardrailType.trim().isEmpty()) {
+                addActionError("Guardrail type is required");
+                return Action.ERROR.toUpperCase();
+            }
+            
+            mcpGuardrailTemplates = MCPGuardrailYamlTemplateDao.instance.fetchTemplatesByType(guardrailType.toUpperCase());
+            
+            loggerMaker.infoAndAddToDb("Fetched " + mcpGuardrailTemplates.size() + " MCP Guardrail templates for type: " + guardrailType, LogDb.DASHBOARD);
+            return Action.SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error fetching MCP Guardrail templates by type: " + e.toString());
+            addActionError("Failed to fetch MCP Guardrail templates by type");
+            return Action.ERROR.toUpperCase();
+        }
+    }
+
+    /**
+     * Fetch parsed MCP Guardrail configurations
+     */
+    public String fetchMCPGuardrailConfigs() {
+        try {
+            mcpGuardrailConfigs = MCPGuardrailYamlTemplateDao.instance.fetchMCPGuardrailConfig(includeYamlContent);
+            
+            loggerMaker.infoAndAddToDb("Fetched " + mcpGuardrailConfigs.size() + " MCP Guardrail configurations", LogDb.DASHBOARD);
+            return Action.SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error fetching MCP Guardrail configurations: " + e.toString());
+            addActionError("Failed to fetch MCP Guardrail configurations");
+            return Action.ERROR.toUpperCase();
+        }
+    }
+
+    /**
+     * Fetch a specific MCP Guardrail template by ID
+     */
+    public String fetchMCPGuardrailTemplate() {
+        try {
+            if (templateId == null || templateId.trim().isEmpty()) {
+                addActionError("Template ID is required");
+                return Action.ERROR.toUpperCase();
+            }
+            
+            mcpGuardrailTemplate = MCPGuardrailYamlTemplateDao.instance.findOne("id", templateId);
+            
+            if (mcpGuardrailTemplate == null) {
+                addActionError("MCP Guardrail template not found");
+                return Action.ERROR.toUpperCase();
+            }
+            
+            loggerMaker.infoAndAddToDb("Fetched MCP Guardrail template: " + templateId, LogDb.DASHBOARD);
+            return Action.SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error fetching MCP Guardrail template: " + e.toString());
+            addActionError("Failed to fetch MCP Guardrail template");
+            return Action.ERROR.toUpperCase();
+        }
+    }
+
+    /**
+     * Get available MCP Guardrail types
+     */
+    public String fetchMCPGuardrailTypes() {
+        try {
+            // Return all available types as a simple list
+            MCPGuardrailType[] types = MCPGuardrailType.values();
+            StringBuilder typesJson = new StringBuilder("[");
+            for (int i = 0; i < types.length; i++) {
+                if (i > 0) typesJson.append(",");
+                typesJson.append("\"").append(types[i].name()).append("\"");
+            }
+            typesJson.append("]");
+            
+            loggerMaker.infoAndAddToDb("Fetched MCP Guardrail types", LogDb.DASHBOARD);
+            return Action.SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error fetching MCP Guardrail types: " + e.toString());
+            addActionError("Failed to fetch MCP Guardrail types");
+            return Action.ERROR.toUpperCase();
+        }
     }
 
     public List<CustomDataTypeMapper> getCustomDataTypes() {

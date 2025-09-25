@@ -477,3 +477,64 @@ func (g *GuardrailEngine) GetAllConfigs() map[string]MCPGuardrailConfig {
 	}
 	return configs
 }
+
+// StartTemplateFetcher starts the background service to fetch templates periodically
+func (g *GuardrailEngine) StartTemplateFetcher(interval time.Duration) {
+	if g.templateClient == nil {
+		log.Println("Template client not configured, skipping template fetcher")
+		return
+	}
+
+	go func() {
+		ticker := time.NewTicker(interval)
+		defer ticker.Stop()
+
+		// Initial fetch
+		if err := g.LoadTemplatesFromAPI(); err != nil {
+			log.Printf("Initial template fetch failed: %v", err)
+		} else {
+			log.Printf("Initial templates loaded successfully")
+		}
+
+		// Periodic fetching
+		for range ticker.C {
+			if err := g.LoadTemplatesFromAPI(); err != nil {
+				log.Printf("Template refresh failed: %v", err)
+			} else {
+				log.Printf("Templates refreshed successfully")
+			}
+		}
+	}()
+}
+
+// ProcessMCPRequest is a convenience function for MCP proxy integration
+// It processes an MCP request and returns a result that can be used to determine
+// whether to allow, block, or modify the request
+func (g *GuardrailEngine) ProcessMCPRequest(requestData []byte) (*GuardrailResult, error) {
+	var request MCPRequest
+	if err := json.Unmarshal(requestData, &request); err != nil {
+		return &GuardrailResult{
+			Blocked:     true,
+			BlockReason: "Invalid request format",
+			Warnings:    []string{fmt.Sprintf("Failed to parse request: %v", err)},
+		}, nil
+	}
+
+	return g.ProcessRequest(&request), nil
+}
+
+// ProcessMCPResponse is a convenience function for MCP proxy integration
+// It processes an MCP response and returns a result that can be used to determine
+// whether to allow, block, or modify the response
+func (g *GuardrailEngine) ProcessMCPResponse(responseData []byte) (*GuardrailResult, error) {
+	var response MCPResponse
+	if err := json.Unmarshal(responseData, &response); err != nil {
+		return &GuardrailResult{
+			Blocked:     true,
+			BlockReason: "Invalid response format",
+			Warnings:    []string{fmt.Sprintf("Failed to parse response: %v", err)},
+		}, nil
+	}
+
+	return g.ProcessResponse(&response), nil
+}

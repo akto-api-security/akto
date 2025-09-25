@@ -1794,7 +1794,7 @@
         </action>
 
         <!-- MCP Guardrails API endpoints -->
-        <action name="api/mcp/fetchGuardrailTemplates" class="com.akto.action.MCPGuardrailsAction" method="fetchMCPGuardrailTemplates">
+        <action name="api/mcp/fetchGuardrailTemplates" class="com.akto.action.DbAction" method="fetchMCPGuardrailTemplates">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <result name="SUCCESS" type="json"/>
@@ -1805,7 +1805,7 @@
             </result>
         </action>
 
-        <action name="api/mcp/fetchGuardrailTemplatesByType" class="com.akto.action.MCPGuardrailsAction" method="fetchMCPGuardrailTemplatesByType">
+        <action name="api/mcp/fetchGuardrailTemplatesByType" class="com.akto.action.DbAction" method="fetchMCPGuardrailTemplatesByType">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <result name="SUCCESS" type="json"/>
@@ -1816,7 +1816,7 @@
             </result>
         </action>
 
-        <action name="api/mcp/fetchGuardrailConfigs" class="com.akto.action.MCPGuardrailsAction" method="fetchMCPGuardrailConfigs">
+        <action name="api/mcp/fetchGuardrailConfigs" class="com.akto.action.DbAction" method="fetchMCPGuardrailConfigs">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <result name="SUCCESS" type="json"/>
@@ -1827,7 +1827,7 @@
             </result>
         </action>
 
-        <action name="api/mcp/fetchGuardrailTemplate" class="com.akto.action.MCPGuardrailsAction" method="fetchMCPGuardrailTemplate">
+        <action name="api/mcp/fetchGuardrailTemplate" class="com.akto.action.DbAction" method="fetchMCPGuardrailTemplate">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <result name="SUCCESS" type="json"/>
@@ -1838,7 +1838,7 @@
             </result>
         </action>
 
-        <action name="api/mcp/fetchGuardrailTypes" class="com.akto.action.MCPGuardrailsAction" method="fetchMCPGuardrailTypes">
+        <action name="api/mcp/fetchGuardrailTypes" class="com.akto.action.DbAction" method="fetchMCPGuardrailTypes">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
             <result name="SUCCESS" type="json"/>
