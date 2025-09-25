@@ -1,8 +1,10 @@
-package com.akto.dto;
+package com.akto.utils;
 
+import com.akto.mcp.McpSchema.Prompt;
+import com.akto.mcp.McpSchema.Resource;
+import com.akto.mcp.McpSchema.Tool;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
-import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 import java.util.List;
@@ -27,9 +29,9 @@ public class McpServer {
     private String protocolVersion;
     private Map<String, Object> serverInfo;
     private Map<String, Object> capabilities;
-    private List<Map<String, Object>> tools;
-    private List<Map<String, Object>> resources;
-    private List<Map<String, Object>> prompts;
+    private List<Tool> tools;
+    private List<Resource> resources;
+    private List<Prompt> prompts;
 
     public McpServer() {}
 

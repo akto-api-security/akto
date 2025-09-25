@@ -64,7 +64,6 @@ import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
-import com.slack.api.Slack;
 
 import org.bson.BsonReader;
 import org.bson.Document;
@@ -4021,9 +4020,19 @@ public class ClientActor extends DataActor {
 
     public void insertMCPAuditDataLog(McpAuditInfo auditInfo) {
         Map<String, List<String>> headers = buildHeaders();
-        BasicDBObject obj = new BasicDBObject();
-        obj.put("auditInfo", auditInfo);
-        OriginalHttpRequest request = new OriginalHttpRequest(url + "/insertMCPAuditDataLog", "", "POST", obj.toString(), headers, "");
+            Document d = new Document()
+                    .append("lastDetected", auditInfo.getLastDetected())
+                    .append("markedBy", auditInfo.getMarkedBy())
+                    .append("type", auditInfo.getType())
+                    .append("updatedTimestamp", auditInfo.getUpdatedTimestamp())
+                    .append("resourceName", auditInfo.getResourceName())
+                    .append("remarks",auditInfo.getRemarks())
+                    .append("apiAccessTypes", auditInfo.getApiAccessTypes())
+                    .append("hostCollectionId", auditInfo.getHostCollectionId());
+
+        Document wrapper = new Document("auditInfo", d);
+        String jsonBody = wrapper.toJson();
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/insertMCPAuditDataLog", "", "POST", jsonBody, headers, "");
         try {
             OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
             String responsePayload = response.getBody();
