@@ -10062,7 +10062,7 @@
                 <param name="includeProperties">^actionErrors.*</param>
             </result>
             <interceptor-ref name="usageInterceptor">
-                <param name="featureLabel">STATIC_DISCOVERY_AI_AGENTS, AI_AGENTS</param>
+                <param name="featureLabel">STATIC_DISCOVERY_AI_AGENTS AI_AGENTS</param>
             </interceptor-ref>
             <result name="SUCCESS"  type="json"></result>
             <result name="ERROR" type="json">
@@ -10179,7 +10179,7 @@
                 <param name="includeProperties">^actionErrors.*</param>
             </result>
             <interceptor-ref name="usageInterceptor">
-                <param name="featureLabel">AI_AGENTS, STATIC_DISCOVERY_AI_AGENTS</param>
+                <param name="featureLabel">AI_AGENTS STATIC_DISCOVERY_AI_AGENTS</param>
             </interceptor-ref>
             <result name="SUCCESS"  type="json"></result>
             <result name="ERROR" type="json">
@@ -10235,7 +10235,7 @@
                 <param name="includeProperties">^actionErrors.*</param>
             </result>
             <interceptor-ref name="usageInterceptor">
-                <param name="featureLabel">AI_AGENTS, STATIC_DISCOVERY_AI_AGENTS</param>
+                <param name="featureLabel">AI_AGENTS STATIC_DISCOVERY_AI_AGENTS</param>
             </interceptor-ref>
             <result name="SUCCESS"  type="json"></result>
             <result name="ERROR" type="json">
