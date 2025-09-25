@@ -1,5 +1,4 @@
 package com.akto.dto;
-
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.Setter;
@@ -56,13 +55,13 @@ public class McpReconResult {
     private Map<String, Object> capabilities;
 
     public static final String TOOLS = "tools";
-    private List<Map<String, Object>> tools;
+    private List<Map<String, Object>>  tools;
 
     public static final String RESOURCES = "resources";
     private List<Map<String, Object>> resources;
 
     public static final String PROMPTS = "prompts";
-    private List<Map<String, Object>> prompts;
+    private List<Map<String, Object>>  prompts;
 
     public static final String DISCOVERED_AT = "discoveredAt";
     private int discoveredAt;

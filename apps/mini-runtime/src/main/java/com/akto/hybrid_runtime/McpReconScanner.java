@@ -1,11 +1,12 @@
 package com.akto.hybrid_runtime;
 
-import com.akto.dto.McpServer;
-import com.akto.dto.McpScanResult;
+import com.akto.utils.McpScanResult;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.mcp.McpSchema;
 import com.akto.util.JSONUtils;
 import com.akto.util.McpConstants;
+import com.akto.utils.McpServer;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.commons.lang3.StringUtils;
 import java.net.InetAddress;
@@ -612,7 +613,7 @@ public class McpReconScanner {
         return detected;
     }
     
-    private List<Map<String, Object>> getToolsList(String url, Map<String, String> authHeaders) {
+    private List<McpSchema.Tool> getToolsList(String url, Map<String, String> authHeaders) {
         try {
             Map<String, Object> requestObj = new HashMap<>();
             requestObj.put("jsonrpc", McpConstants.JSONRPC_VERSION);
@@ -635,7 +636,15 @@ public class McpReconScanner {
                 Map<String, Object> jsonResponse = JSONUtils.getMap(content);
                 if (jsonResponse != null && jsonResponse.containsKey("result")) {
                     Map<String, Object> result = (Map<String, Object>) jsonResponse.get("result");
-                    return (List<Map<String, Object>>) result.get("tools");
+                    Object toolsObj = result.get("tools");
+                    if (toolsObj != null) {
+                        ObjectMapper mapper = new ObjectMapper();
+                        return mapper.convertValue(
+                                toolsObj,
+                                mapper.getTypeFactory().constructCollectionType(List.class, McpSchema.Tool.class)
+                        );
+                    }
+                    return new ArrayList<>();
                 }
             }
         } catch (Exception e) {
@@ -644,7 +653,7 @@ public class McpReconScanner {
         return new ArrayList<>();
     }
     
-    private List<Map<String, Object>> getResourcesList(String url, Map<String, String> authHeaders) {
+    private List<McpSchema.Resource> getResourcesList(String url, Map<String, String> authHeaders) {
         try {
             Map<String, Object> requestObj = new HashMap<>();
             requestObj.put("jsonrpc", McpConstants.JSONRPC_VERSION);
@@ -667,7 +676,15 @@ public class McpReconScanner {
                 Map<String, Object> jsonResponse = JSONUtils.getMap(content);
                 if (jsonResponse != null && jsonResponse.containsKey("result")) {
                     Map<String, Object> result = (Map<String, Object>) jsonResponse.get("result");
-                    return (List<Map<String, Object>>) result.get("resources");
+                    Object toolsObj = result.get("resources");
+                    if (toolsObj != null) {
+                        ObjectMapper mapper = new ObjectMapper();
+                        return mapper.convertValue(
+                                toolsObj,
+                                mapper.getTypeFactory().constructCollectionType(List.class, McpSchema.Resource.class)
+                        );
+                    }
+                    return new ArrayList<>();
                 }
             }
         } catch (Exception e) {
@@ -676,7 +693,7 @@ public class McpReconScanner {
         return new ArrayList<>();
     }
     
-    private List<Map<String, Object>> getPromptsList(String url, Map<String, String> authHeaders) {
+    private List<McpSchema.Prompt> getPromptsList(String url, Map<String, String> authHeaders) {
         try {
             Map<String, Object> requestObj = new HashMap<>();
             requestObj.put("jsonrpc", McpConstants.JSONRPC_VERSION);
@@ -699,7 +716,15 @@ public class McpReconScanner {
                 Map<String, Object> jsonResponse = JSONUtils.getMap(content);
                 if (jsonResponse != null && jsonResponse.containsKey("result")) {
                     Map<String, Object> result = (Map<String, Object>) jsonResponse.get("result");
-                    return (List<Map<String, Object>>) result.get("prompts");
+                    Object toolsObj = result.get("tools");
+                    if (toolsObj != null) {
+                        ObjectMapper mapper = new ObjectMapper();
+                        return mapper.convertValue(
+                                toolsObj,
+                                mapper.getTypeFactory().constructCollectionType(List.class, McpSchema.Prompt.class)
+                        );
+                    }
+                    return new ArrayList<>();
                 }
             }
         } catch (Exception e) {

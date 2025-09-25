@@ -3,13 +3,19 @@ package com.akto.hybrid_runtime;
 import com.akto.dao.context.Context;
 import com.akto.data_actor.DataActorFactory;
 import com.akto.dto.*;
+import com.akto.dto.McpReconResult;
 import com.akto.dto.traffic.CollectionTags;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.mcp.McpSchema;
 import com.akto.util.Constants;
-import com.mongodb.BasicDBObject;
+import com.akto.utils.McpScanResult;
+import com.akto.utils.McpServer;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.http.HttpStatus;
 import org.bson.types.ObjectId;
+import org.springframework.http.HttpMethod;
 
 import java.util.*;
 import java.util.concurrent.*;
@@ -59,7 +65,7 @@ public class McpReconSyncJobExecutor {
     /**
      * Main entry point for the job
      */
-    public void runJob() {
+    public void runJob(APIConfig apiConfig) {
         logger.info("Starting MCP Recon Sync Job");
         
         try {
@@ -106,7 +112,7 @@ public class McpReconSyncJobExecutor {
             
             // Process and store scan results
             if (!scanResults.isEmpty()) {
-                processScanResults(scanResults);
+                processScanResults(scanResults, apiConfig);
             }
             
             logger.info(String.format("MCP Recon Sync Job completed. Processed %d scans", scanResults.size()));
@@ -273,7 +279,7 @@ public class McpReconSyncJobExecutor {
     /**
      * Process and store scan results
      */
-    private void processScanResults(List<ScanTaskResult> scanResults) {
+    private void processScanResults(List<ScanTaskResult> scanResults, APIConfig apiConfig) {
         // Batch size for database insertions
         final int BATCH_SIZE = 500;
         List<McpReconResult> serverBatch = new ArrayList<>();
@@ -308,15 +314,19 @@ public class McpReconSyncJobExecutor {
                 mcpReconResult.setProtocolVersion(server.getProtocolVersion());
                 mcpReconResult.setServerInfo(server.getServerInfo());
                 mcpReconResult.setCapabilities(server.getCapabilities());
-                mcpReconResult.setTools(server.getTools());
-                mcpReconResult.setResources(server.getResources());
-                mcpReconResult.setPrompts(server.getPrompts());
 
                 // Add discovery timestamp
                 mcpReconResult.setDiscoveredAt(discoveryTimestamp);
 
                 // Add to batch
                 serverBatch.add(mcpReconResult);
+
+                List<HttpResponseParams> toolsResponseList = toolsDiscovery(server);
+                List<HttpResponseParams> resourcesResponseList = resourcesDiscovery(server);
+                List<HttpResponseParams> responseParamsToProcess = new ArrayList<>();
+                responseParamsToProcess.addAll(toolsResponseList);
+                responseParamsToProcess.addAll(resourcesResponseList);
+                McpToolsSyncJobExecutor.processResponseParams(apiConfig, responseParamsToProcess);
                 
                 // Insert when batch is full
                 if (serverBatch.size() >= BATCH_SIZE) {
@@ -483,4 +493,77 @@ public class McpReconSyncJobExecutor {
             this.timestamp = timestamp;
         }
     }
+
+
+    private List<HttpResponseParams> toolsDiscovery(McpServer mcpServer) {
+        String host = mcpServer.getUrl();
+        ObjectMapper mapper = new ObjectMapper();
+
+        List<HttpResponseParams> responseParamsList = new ArrayList<>();
+        try {
+            int id = 1;
+            String toolsCallRequestHeaders = buildHeaders(host);
+            for (McpSchema.Tool tool : mcpServer.getTools()) {
+                McpSchema.JSONRPCRequest request = new McpSchema.JSONRPCRequest(
+                        McpSchema.JSONRPC_VERSION,
+                        McpSchema.METHOD_TOOLS_CALL,
+                        id++,
+                        new McpSchema.CallToolRequest(tool.getName(), McpToolsSyncJobExecutor.generateExampleArguments(tool.getInputSchema()))
+                );
+
+                HttpResponseParams toolsCallHttpResponseParams = McpToolsSyncJobExecutor.convertToAktoFormat(0,
+                        mcpServer.getUrl(),
+                        toolsCallRequestHeaders,
+                        HttpMethod.POST.name(),
+                        mapper.writeValueAsString(request),
+                        new OriginalHttpResponse("", Collections.emptyMap(), HttpStatus.SC_OK));
+
+                if (toolsCallHttpResponseParams != null) {
+                    responseParamsList.add(toolsCallHttpResponseParams);
+                }
+            }
+        } catch (Exception e) {
+            logger.error("Error while discovering mcp tools for hostname: {}", host, e);
+        }
+        return responseParamsList;
+    }
+
+
+    private List<HttpResponseParams> resourcesDiscovery(McpServer mcpServer) {
+        String host = mcpServer.getUrl();
+        ObjectMapper mapper = new ObjectMapper();
+
+        List<HttpResponseParams> responseParamsList = new ArrayList<>();
+        try {
+            int id = 1;
+            String resourceCallRequestHeaders = buildHeaders(host);
+            for (McpSchema.Resource resource : mcpServer.getResources()) {
+                McpSchema.JSONRPCRequest request = new McpSchema.JSONRPCRequest(
+                        McpSchema.JSONRPC_VERSION,
+                        McpSchema.METHOD_RESOURCES_READ,
+                        id++,
+                        new McpSchema.ReadResourceRequest(resource.getUri())
+                );
+
+                HttpResponseParams readResourceHttpResponseParams = McpToolsSyncJobExecutor.convertToAktoFormat(0,
+                        mcpServer.getUrl(),
+                        resourceCallRequestHeaders,
+                        HttpMethod.POST.name(),
+                        mapper.writeValueAsString(request),
+                        new OriginalHttpResponse("", Collections.emptyMap(), HttpStatus.SC_OK));
+
+                if (readResourceHttpResponseParams != null) {
+                    responseParamsList.add(readResourceHttpResponseParams);
+                }
+            }
+        } catch (Exception e) {
+            logger.error("Error while discovering mcp resources for hostname: {}", host, e);
+        }
+        return responseParamsList;
+    }
+
+    private String buildHeaders(String host) {
+        return "{\"Content-Type\":\"application/json\",\"Accept\":\"*/*\",\"host\":\"" + host + "\"}";
+    }
 }
+

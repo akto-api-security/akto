@@ -57,11 +57,11 @@ public class McpToolsSyncJobExecutor {
 
     private static final LoggerMaker logger = new LoggerMaker(McpToolsSyncJobExecutor.class, LogDb.RUNTIME);
     private static final ObjectMapper mapper = new ObjectMapper();
-    private static final String MCP_TOOLS_LIST_REQUEST_JSON =
+    public static final String MCP_TOOLS_LIST_REQUEST_JSON =
         "{\"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"" + McpSchema.METHOD_TOOLS_LIST + "\", \"params\": {}}";
-    private static final String MCP_RESOURCE_LIST_REQUEST_JSON =
+    public static final String MCP_RESOURCE_LIST_REQUEST_JSON =
         "{\"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"" + McpSchema.METHOD_RESOURCES_LIST + "\", \"params\": {}}";
-    private static final String LOCAL_IP = "127.0.0.1";
+    public static final String LOCAL_IP = "127.0.0.1";
     private ServerCapabilities mcpServerCapabilities = null;
 
     public static final McpToolsSyncJobExecutor INSTANCE = new McpToolsSyncJobExecutor();
@@ -272,7 +272,7 @@ public class McpToolsSyncJobExecutor {
         return responseParamsList;
     }
 
-    private void processResponseParams(APIConfig apiConfig, List<HttpResponseParams> responseParamsList) {
+    public static void processResponseParams(APIConfig apiConfig, List<HttpResponseParams> responseParamsList) {
         if (CollectionUtils.isEmpty(responseParamsList)) {
             logger.debug("No response params to process for MCP sync job.");
             return;
@@ -291,7 +291,7 @@ public class McpToolsSyncJobExecutor {
         );
     }
 
-    private Map<String, Object> generateExampleArguments(JsonSchema inputSchema) {
+    public static Map<String, Object> generateExampleArguments(JsonSchema inputSchema) {
         if (inputSchema == null) {
             return Collections.emptyMap();
         }
@@ -307,7 +307,7 @@ public class McpToolsSyncJobExecutor {
         }
     }
 
-    private Pair<JSONRPCResponse, HttpResponseParams> getMcpMethodResponse(String host, String mcpMethod,
+    public Pair<JSONRPCResponse, HttpResponseParams> getMcpMethodResponse(String host, String mcpMethod,
         String mcpMethodRequestJson, ApiCollection apiCollection) throws Exception {
         OriginalHttpRequest mcpRequest = createRequest(host, mcpMethod, mcpMethodRequestJson);
         String jsonrpcResponse = sendRequest(mcpRequest);
@@ -320,8 +320,9 @@ public class McpToolsSyncJobExecutor {
             throw new Exception(errorMessage);
         }
 
+        int apiCollectionId = apiCollection != null ? apiCollection.getId() : 0;
         HttpResponseParams responseParams = convertToAktoFormat(
-            apiCollection.getId(),
+            apiCollectionId,
             mcpRequest.getPathWithQueryParams(),
             buildHeaders(host),
             HttpMethod.POST.name(),
@@ -357,7 +358,7 @@ public class McpToolsSyncJobExecutor {
         }
     }
 
-    private HttpResponseParams convertToAktoFormat(int apiCollectionId, String path, String requestHeaders, String method,
+    public static HttpResponseParams convertToAktoFormat(int apiCollectionId, String path, String requestHeaders, String method,
         String body, OriginalHttpResponse response) {
         Map<String, Object> value = new HashMap<>();
 

@@ -1,8 +1,7 @@
-package com.akto.dto;
+package com.akto.utils;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;
-import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 import java.util.List;
