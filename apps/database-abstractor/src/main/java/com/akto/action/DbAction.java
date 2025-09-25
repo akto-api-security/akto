@@ -79,6 +79,7 @@ import java.util.*;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.regex.Pattern;
 
 public class DbAction extends ActionSupport {
     static final ScheduledExecutorService service = Executors.newSingleThreadScheduledExecutor();
@@ -1473,11 +1474,21 @@ public class DbAction extends ActionSupport {
         try {
             String regex = System.getenv("PERSIST_RUNTIME_LOG_REGEX");
 
-            if(regex == null || log == null || log.getLog().isEmpty()){
+            if(HIGHER_STI_LIMIT_ACCOUNT_IDS.contains(Context.accountId.get())){
+                regex = "adjustallotment|gethotelpayment|book_v3";
+            }
+
+            if(regex == null || log == null){
                 return false;
             }
 
-            return log.getLog().matches(regex);
+            String text = log.getLog();
+            if (text == null || text.isEmpty()) {
+                return false;
+            }
+
+            Pattern p = Pattern.compile(regex, Pattern.CASE_INSENSITIVE);
+            return p.matcher(text).find();
 
         } catch (Exception ignore) {
             loggerMaker.error("Failed to check logs persistence");
