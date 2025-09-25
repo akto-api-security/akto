@@ -661,6 +661,29 @@ public class DbLayer {
 
     public static void insertRuntimeLog(Log log) {
         RuntimeLogsDao.instance.insertOne(log);
+        try {
+            if (shouldPersistRuntimeLog(log)) {
+                RuntimePersistentLogsDao.instance.insertOne(log);
+            }
+        } catch (Exception e) {
+            // Best-effort persistence; never block main logging path
+            loggerMaker.errorAndAddToDb(e, "dual-write persistent runtime log failed: " + e.getMessage());
+        }
+    }
+
+    private static boolean shouldPersistRuntimeLog(Log log) {
+        try {
+            String regex = System.getenv("PERSIST_RUNTIME_LOG_REGEX");
+            if (regex != null && !regex.trim().isEmpty()) {
+                String text = log != null ? log.getLog() : null;
+                if (text != null && text.matches(regex)) {
+                    return true;
+                }
+            }
+        } catch (Exception ignore) {
+            loggerMaker.error("Failed to check logs persistence");
+        }
+        return false;
     }
 
     public static void insertAnalyserLog(Log log) {
