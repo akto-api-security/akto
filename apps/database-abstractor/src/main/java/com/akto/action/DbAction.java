@@ -78,11 +78,6 @@ import com.google.gson.Gson;
 import com.akto.dto.deployment.DeploymentConfig;
 import com.akto.dto.deployment.EnvVariable;
 import com.akto.dao.deployment.DeploymentConfigDao;
-import lombok.Setter;
-// removed deployment-config imports
-// import com.akto.dto.deployment.DeploymentConfig;
-// import com.akto.dto.deployment.EnvVariable;
-// import com.akto.dao.deployment.DeploymentConfigDao;
 
 import java.util.*;
 import java.util.concurrent.Executors;
