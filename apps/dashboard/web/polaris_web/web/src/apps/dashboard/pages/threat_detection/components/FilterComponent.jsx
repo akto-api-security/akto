@@ -88,6 +88,20 @@ function FilterComponent({ includeCategoryNameEquals, excludeCategoryNameEquals,
         }
     }
 
+    async function onDeleteClick() {
+        if (!id) {
+            func.setToast(true, true, 'No policy selected to delete')
+            return
+        }
+        func.showConfirmationModal(
+            'Are you sure you want to delete this filter template? This action cannot be undone.',
+            'Delete',
+            async () => {
+                await onDelete()
+            }
+        )
+    }
+
     return (
         <LegacyCard>
             <LegacyCard.Section flush>
@@ -97,7 +111,7 @@ function FilterComponent({ includeCategoryNameEquals, excludeCategoryNameEquals,
                         {!readOnly && (
                             <HorizontalStack gap="2">
                                 {showDelete && (
-                                    <Button outline size="slim" onClick={onDelete}>
+                                    <Button outline size="slim" onClick={onDeleteClick}>
                                         Delete
                                     </Button>
                                 )}
