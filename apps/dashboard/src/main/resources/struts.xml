@@ -10443,6 +10443,9 @@
                 <param name="ignoreHierarchy">false</param>
                 <param name="includeProperties">^actionErrors.*</param>
             </result>
+            <interceptor-ref name="usageInterceptor">
+                <param name="featureLabel">STATIC_DISCOVERY_AI_AGENTS</param>
+            </interceptor-ref>
             <result name="SUCCESS"  type="json">
                 <param name="root">response</param>
             </result>
