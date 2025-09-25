@@ -43,6 +43,7 @@ function TestRunResultFlyout(props) {
     const [isEditingDescription, setIsEditingDescription] = useState(false)
 
     const [vulnerabilityAnalysisError, setVulnerabilityAnalysisError] = useState(null)
+    const [refreshFlag, setRefreshFlag] = useState(Date.now().toString())
 
     // modify testing run result and headers
     const infoStateFlyout = infoState && infoState.length > 0 ? infoState.filter((item) => item.title !== 'Jira') : []
@@ -345,14 +346,6 @@ function TestRunResultFlyout(props) {
     // Move state outside to prevent reset on component recreation
     const hasAnalyzedRef = useRef(false);
     const [vulnerabilityHighlights, setVulnerabilityHighlights] = useState({});
-    const [isAnalyzing, setIsAnalyzing] = useState(false);
-    
-    // Reset analysis flag and highlights when test result changes
-    useEffect(() => {
-        hasAnalyzedRef.current = false;
-        setVulnerabilityHighlights({});
-        setIsAnalyzing(false);
-    }, [selectedTestRunResult?.id]);
     
     // Component that handles vulnerability analysis only when mounted
     const ValuesTabContent = React.memo(() => {
@@ -364,8 +357,6 @@ function TestRunResultFlyout(props) {
 
             if (!hasAnalyzedRef.current && selectedTestRunResult?.vulnerable && selectedTestRunResult?.testResults && isVulnerabilityHighlightingEnabled) {
                 hasAnalyzedRef.current = true;
-                
-                setIsAnalyzing(true);
                 setVulnerabilityAnalysisError(null);
 
                 const timeoutId = setTimeout(() => {
@@ -427,6 +418,9 @@ function TestRunResultFlyout(props) {
                                         ...prev,
                                         [idx]: enhancedSegments
                                     }));
+                                    setTimeout(() => {
+                                        setRefreshFlag(Date.now().toString());
+                                    }, 10)
                                 } else {
                                     setVulnerabilityHighlights(prev => {
                                         const newState = { ...prev };
@@ -444,13 +438,12 @@ function TestRunResultFlyout(props) {
                     });
                 
                     Promise.allSettled(analysisPromises).finally(() => {
-                        setIsAnalyzing(false);
                     });
                 }, 60);
 
                 return () => clearTimeout(timeoutId);
             }
-        }, [selectedTestRunResult?.id]);
+        }, [selectedTestRunResult?.id,]);
         
         if (dataExpired && !selectedTestRunResult?.vulnerable) {
             return dataExpiredComponent;
@@ -468,8 +461,8 @@ function TestRunResultFlyout(props) {
                     heading={"Attempt"}
                     minHeight={"30vh"}
                     vertical={true}
-                    sampleData={useMemo(() => {
-                        return selectedTestRunResult?.testResults.map((result, idx) => {
+                    sampleData={
+                        selectedTestRunResult?.testResults.map((result, idx) => {
                             if (result.errors && result.errors.length > 0) {
                                 let errorList = result.errors.join(", ");
                                 return { errorList: errorList }
@@ -484,11 +477,9 @@ function TestRunResultFlyout(props) {
                                 }
                             }
                             return { errorList: "No data found" }
-                        });
-                    }, [selectedTestRunResult?.testResults, vulnerabilityHighlights])}
+                        })}
                     isNewDiff={true}
                     vulnerable={selectedTestRunResult?.vulnerable}
-                    isAnalyzingVulnerabilities={isAnalyzing}
                     vulnerabilityAnalysisError={vulnerabilityAnalysisError}
                 />
             </Box>
@@ -502,7 +493,7 @@ function TestRunResultFlyout(props) {
             content: "Values",
             component: <ValuesTabContent />
         }
-    }, [selectedTestRunResult, dataExpired, issueDetails])
+    }, [selectedTestRunResult, dataExpired, issueDetails, refreshFlag])
 
     function RowComp ({cardObj}){
         const {title, value, tooltipContent} = cardObj

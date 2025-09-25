@@ -325,11 +325,11 @@ public class TestingRunResultDao extends AccountsContextDaoWithRbac<TestingRunRe
             // Fail count: vulnerable  
             Accumulators.sum("failCount", new BasicDBObject("$cond", Arrays.asList(
                 new BasicDBObject("$eq", Arrays.asList("$vulnerable", true)), 1, 0))),
-            // Skip detection: check if errorsList exists and has elements
+            // Skip detection: check if testResults.errors exists and has elements
             Accumulators.sum("skipCount", new BasicDBObject("$cond", Arrays.asList(
                 new BasicDBObject("$and", Arrays.asList(
-                    new BasicDBObject("$isArray", "$errorsList"),
-                    new BasicDBObject("$gt", Arrays.asList(new BasicDBObject("$size", "$errorsList"), 0))
+                    new BasicDBObject("$isArray", "$testResults.errors"),
+                    new BasicDBObject("$gt", Arrays.asList(new BasicDBObject("$size", "$testResults.errors"), 0))
                 )), 1, 0)))
         ));
         
@@ -356,8 +356,9 @@ public class TestingRunResultDao extends AccountsContextDaoWithRbac<TestingRunRe
             
             while (cursor.hasNext()) {
                 BasicDBObject result = cursor.next();
+                String categoryName = result.getString("categoryName");
                 Map<String, Object> categoryScore = new HashMap<>();
-                categoryScore.put("categoryName", result.getString("categoryName"));
+                categoryScore.put("categoryName", categoryName);
                 categoryScore.put("pass", result.getInt("passCount", 0));
                 categoryScore.put("fail", result.getInt("failCount", 0));
                 categoryScore.put("skip", result.getInt("skipCount", 0));
@@ -367,5 +368,6 @@ public class TestingRunResultDao extends AccountsContextDaoWithRbac<TestingRunRe
         
         return results;
     }
+
 
 }

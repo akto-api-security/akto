@@ -24,6 +24,7 @@ function SampleDataComponent(props) {
     const ref = useRef(null)
 
     useEffect(()=>{
+
         let parsed;
         try{
           parsed = JSON.parse(sampleData?.message)
@@ -48,6 +49,10 @@ function SampleDataComponent(props) {
         let originalResponseJson = func.responseJson(originalParsed, sampleData?.highlightPaths || [])
         let originalRequestJson = func.requestJson(originalParsed, sampleData?.highlightPaths || [])
 
+        // --- PATCH: propagate vulnerabilitySegments from sampleData to both request and response ---
+        // This ensures SampleData receives the correct segments for highlighting
+        const vulnerabilitySegments = sampleData?.vulnerabilitySegments || [];
+
         if(isNewDiff){
             let lineReqObj = transform.getFirstLine(originalRequestJson?.firstLine,requestJson?.firstLine)
             let lineResObj = transform.getFirstLine(originalResponseJson?.firstLine,responseJson?.firstLine)
@@ -63,12 +68,12 @@ function SampleDataComponent(props) {
 
             setSampleJsonData({
                 request: requestData,
-                response: { ...responseData, vulnerabilitySegments: sampleData?.vulnerabilitySegments }
+                response: { ...responseData, vulnerabilitySegments }
             })
         }else{
             setSampleJsonData({ 
                 request: { message: transform.formatData(requestJson,"http"), original: transform.formatData(originalRequestJson,"http"), highlightPaths:requestJson?.highlightPaths }, 
-                response: showResponse ? { message: transform.formatData(responseJson,"http"), original: transform.formatData(originalResponseJson,"http"), highlightPaths:responseJson?.highlightPaths, vulnerabilitySegments: sampleData?.vulnerabilitySegments } : {},
+                response: showResponse ? { message: transform.formatData(responseJson,"http"), original: transform.formatData(originalResponseJson,"http"), highlightPaths:responseJson?.highlightPaths, vulnerabilitySegments } : {},
             })
         }
       }, [sampleData, metadata])
@@ -176,8 +181,6 @@ function SampleDataComponent(props) {
 
     const getLineNumbers = (linesArr) =>{
         setLineNumbers((prev)=>{
-            // prev[type] = linesArr.slice();
-            // console.log(prev[type].length, type);
             return {...prev, [type]: linesArr.slice()}
         })
     }
