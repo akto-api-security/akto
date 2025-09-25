@@ -1457,11 +1457,32 @@ public class DbAction extends ActionSupport {
             }
             Log dbLog = new Log(log.getString("log"), log.getString("key"), log.getInt("timestamp"));
             DbLayer.insertRuntimeLog(dbLog);
+
+            if(shouldPersistRuntimeLog(dbLog)){
+                DbLayer.insertPersistentRuntimeLog(dbLog);
+            }
+
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error in insertRuntimeLog " + e.toString());
             return Action.ERROR.toUpperCase();
         }
         return Action.SUCCESS.toUpperCase();
+    }
+
+    private static boolean shouldPersistRuntimeLog(Log log) {
+        try {
+            String regex = System.getenv("PERSIST_RUNTIME_LOG_REGEX");
+
+            if(regex == null || log == null || log.getLog().isEmpty()){
+                return false;
+            }
+
+            return log.getLog().matches(regex);
+
+        } catch (Exception ignore) {
+            loggerMaker.error("Failed to check logs persistence");
+        }
+        return false;
     }
 
     public String insertAnalyserLog() {
