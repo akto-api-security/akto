@@ -99,9 +99,9 @@ import GmailWebhookCore from "../dashboard/pages/settings/integrations/gmailWebh
 import GmailWebhook from "../dashboard/pages/settings/integrations/gmailWebhooks/GmailWebhook";
 import McpSecurityPage from "../dashboard/pages/mcp-security/McpSecurityPage.jsx";
 import AuditData from "../dashboard/pages/observe/AuditData";
-import ComingSoonPage from "../dashboard/components/shared/ComingSoonPage";
 import GuardrailDetection    from "../dashboard/pages/guardrails/GuardrailDetection";
 import GuardrailPolicies   from "../dashboard/pages/guardrails/GuardrailPolicies";
+import OpenApiAgentTester from "../dashboard/pages/observe/OpenApiAgentTester";
 
 // if you add a component in a new path, please verify the search implementation in function -> 'getSearchItemsArr' in func.js
 
@@ -197,7 +197,10 @@ const router = createBrowserRouter([
                             {
                                 path: "audit",
                                 element: <AuditData/>
-
+                            },
+                            {
+                                path: ":apiCollectionId/open-api-upload",
+                                element: <OpenApiAgentTester/>
                             }
                         ]
                     },

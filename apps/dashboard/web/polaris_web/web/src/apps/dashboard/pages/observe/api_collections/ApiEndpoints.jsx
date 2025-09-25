@@ -6,7 +6,7 @@ import func from "@/util/func"
 import GithubSimpleTable from "../../../components/tables/GithubSimpleTable";
 import {useLocation, useNavigate, useParams } from "react-router-dom"
 import { saveAs } from 'file-saver'
-import {FileMinor, HideMinor, ViewMinor} from '@shopify/polaris-icons';
+import {FileMinor, HideMinor, ViewMinor, MagicMinor} from '@shopify/polaris-icons';
 import "./api_inventory.css"
 import ApiDetails from "./ApiDetails"
 import UploadFile from "../../../components/shared/UploadFile"
@@ -256,6 +256,7 @@ function ApiEndpoints(props) {
     const [isEditingDescription, setIsEditingDescription] = useState(false)
     const [editableDescription, setEditableDescription] = useState(description)
     const [currentKey, setCurrentKey] = useState(Date.now()); // to force remount InlineEditableText component
+    const hasAccessToDiscoveryAgent = window.STIGG_FEATURE_WISE_ALLOWED && window.STIGG_FEATURE_WISE_ALLOWED['STATIC_DISCOVERY_AI_AGENTS'] && window.STIGG_FEATURE_WISE_ALLOWED['STATIC_DISCOVERY_AI_AGENTS'].isGranted
 
 
     // the values used here are defined at the server.
@@ -764,16 +765,19 @@ function ApiEndpoints(props) {
           }          
     }
 
-    function uploadOpenApiFile(file) {
+    function uploadOpenApiFile(file, isAiAgent = false) {
         setOpenAPIfile(file)
-        if (!isApiGroup && !(collectionsObj?.hostName && collectionsObj?.hostName?.length > 0) && !sourcesBackfilled) {
+        if(isAiAgent){
+            uploadOpenFileWithSource("OPEN_API", file, isAiAgent)
+        }
+        else if (!isApiGroup && !(collectionsObj?.hostName && collectionsObj?.hostName?.length > 0) && !sourcesBackfilled) {
             setShowSourceDialog(true)
         } else {
             uploadOpenFileWithSource(null, file)
         }
     }
 
-    function uploadOpenFileWithSource(source, file) {
+    function uploadOpenFileWithSource(source, file, isAiAgent = false) {
         const reader = new FileReader();
         if (!file) {
             file = openAPIfile
@@ -784,6 +788,7 @@ function ApiEndpoints(props) {
             const formData = new FormData();
             formData.append("openAPIString", reader.result)
             formData.append("apiCollectionId", apiCollectionId);
+            formData.append("triggeredWithAIAgent", isAiAgent);
             if (source) {
                 formData.append("source", source)
             }
@@ -796,7 +801,11 @@ function ApiEndpoints(props) {
                 else {
                     func.setToast(true, false, "Your Openapi file has been successfully processed")
                 }
-                fetchData()
+                if(isAiAgent) {
+                    window.open("/dashboard/observe/" + apiCollectionId + "/open-api-upload", "_blank")
+                } else {
+                    fetchData()
+                }
             }).catch(err => {
                 console.log(err);
                 if (err.message.includes(404)) {
@@ -986,6 +995,25 @@ function ApiEndpoints(props) {
                                                             <Icon source={FileMinor} />
                                                         </Box>
                                                         <Text>Upload har file</Text>
+                                                    </div>
+                                                )}
+                                                primary={false} 
+                                            />
+                                        </Box>)
+                                    },
+                                    !isApiGroup && !(isHostnameCollection)  && hasAccessToDiscoveryAgent && {
+                                        content: '',
+                                        prefix: (<Box width="160px" >
+                                            <UploadFile
+                                                fileFormat=".json"
+                                                fileChanged={file => {uploadOpenApiFile(file, true); setExportOpen(false)}}
+                                                tooltipText="Test using AI Agent"
+                                                label={(
+                                                    <div style={{ display: "flex", gap:'6px' }}>
+                                                        <Box>
+                                                            <Icon source={MagicMinor} />
+                                                        </Box>
+                                                        <Text>Upload using AI</Text>
                                                     </div>
                                                 )}
                                                 primary={false} 

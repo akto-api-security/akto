@@ -4,6 +4,7 @@ import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.ApiInfoDao;
 import com.akto.dao.SampleDataDao;
 import com.akto.dao.SingleTypeInfoDao;
+import com.akto.dao.agents.DiscoveryAgentRunDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.file.FilesDao;
 import com.akto.dao.upload.FileUploadLogsDao;
@@ -12,6 +13,10 @@ import com.akto.dto.ApiCollection;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.HttpResponseParams.Source;
+import com.akto.dto.agents.Agent;
+import com.akto.dto.agents.DiscoveryAgentRun;
+import com.akto.dto.agents.Model;
+import com.akto.dto.agents.State;
 import com.akto.dto.files.File;
 import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.SingleTypeInfo;
@@ -38,6 +43,7 @@ import io.swagger.parser.OpenAPIParser;
 import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.parser.core.models.ParseOptions;
 import io.swagger.v3.parser.core.models.SwaggerParseResult;
+import lombok.Setter;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.struts2.interceptor.ServletResponseAware;
@@ -47,8 +53,10 @@ import org.bson.types.ObjectId;
 import javax.servlet.http.HttpServletResponse;
 import java.io.*;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -144,6 +152,9 @@ public class OpenApiAction extends UserAction implements ServletResponseAware {
     private static final String OPEN_API = "OpenAPI";
     private Source source = null;
 
+    @Setter
+    private boolean triggeredWithAIAgent;
+
     public String importDataFromOpenApiSpec(){
 
         int accountId = Context.accountId.get();
@@ -185,6 +196,42 @@ public class OpenApiAction extends UserAction implements ServletResponseAware {
         if (source == null && apiInfoWithSource == null) {
             loggerMaker.debugAndAddToDb("No source found, setting source to OPEN_API");
             source = Source.OPEN_API;
+        }
+
+        if(triggeredWithAIAgent) {
+            // create init document for the ai agent
+            String processId = UUID.randomUUID().toString();
+            BasicDBObject agentInitDocument = new BasicDBObject();
+            agentInitDocument.put("apiCollectionId", apiCollectionId);
+            agentInitDocument.put("fileId", fileId);
+            int timestamp = Context.now();
+            int startTimestamp = -1;
+            DiscoveryAgentRun discoveryAgentRun = new DiscoveryAgentRun(
+                processId,
+                agentInitDocument,
+                Agent.DISCOVERY_AGENT,
+                timestamp,
+                startTimestamp,
+                startTimestamp,
+                State.SCHEDULED,
+                new Model(),
+                new HashMap<>(),
+                Source.OPEN_API,
+                new ArrayList<>(),
+                accountId,
+                apiCollectionId
+            );
+            DiscoveryAgentRunDao.instance.insertOne(discoveryAgentRun);
+            if(accountId != 1000_000){
+                executorService.schedule(new Runnable() {
+                    public void run() {
+                        // putting in 1 common account which will be used to help my agent in polling with x-api-key
+                            Context.accountId.set(1000_000);
+                            DiscoveryAgentRunDao.instance.insertOne(discoveryAgentRun);
+                        }
+                    }, 0, TimeUnit.SECONDS);
+            }
+            return SUCCESS.toUpperCase();
         }
 
         executorService.schedule(new Runnable() {
