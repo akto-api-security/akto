@@ -8,8 +8,8 @@ import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.MongoDatabase;
 import com.mongodb.client.model.Filters;
-import com.mongodb.client.model.ReplaceOneModel;
-import com.mongodb.client.model.ReplaceOptions;
+import com.mongodb.client.model.InsertOneModel;
+import com.mongodb.client.model.BulkWriteOptions;
 import com.mongodb.client.model.Sorts;
 import com.mongodb.client.model.WriteModel;
 import org.bson.Document;
@@ -246,17 +246,12 @@ public class ArchiveOldMaliciousEventsCron implements Runnable {
         if (docs == null || docs.isEmpty()) return;
         List<WriteModel<Document>> writes = new ArrayList<>(docs.size());
         for (Document doc : docs) {
-            Object id = doc.get("_id");
-            writes.add(new ReplaceOneModel<>(
-                    Filters.eq("_id", id),
-                    doc,
-                    new ReplaceOptions().upsert(true)
-            ));
+            writes.add(new InsertOneModel<>(doc));
         }
         final List<WriteModel<Document>> writeSnapshot = new ArrayList<>(writes);
         this.scheduler.submit(() -> {
             try {
-                dest.bulkWrite(writeSnapshot);
+                dest.bulkWrite(writeSnapshot, new BulkWriteOptions().ordered(false));
             } catch (MongoBulkWriteException bwe) {
                 logger.errorAndAddToDb("Async bulk write error archiving to " + DEST_COLLECTION + " in db " + dbName + ": " + bwe.getMessage(), LoggerMaker.LogDb.RUNTIME);
             } catch (Exception e) {
