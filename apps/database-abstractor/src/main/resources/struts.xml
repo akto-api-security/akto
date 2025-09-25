@@ -1749,8 +1749,28 @@
             </result>
         </action>
 
-        <!-- Deployment Configuration APIs -->
-        <!-- removed deployment-config CRUD routes from Cyborg -->
+        <!-- Deployment configuration polling and publishing APIs -->
+        <action name="api/sendConfig" class="com.akto.action.DbAction" method="sendConfig">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/fetchConfig" class="com.akto.action.DbAction" method="fetchConfig">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS" type="json"/>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
 
     </package>
 

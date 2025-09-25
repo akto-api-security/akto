@@ -2529,22 +2529,45 @@ public class DbAction extends ActionSupport {
         return Action.SUCCESS.toUpperCase();
     }
 
-    // Deployment configuration API methods (read-only for clients)
-    public String fetchDeploymentConfigById() {
+    // Send config (env vars) from modules on startup
+    public String sendConfig() {
         try {
             if (deploymentId == null) {
                 addActionError("Missing required parameter: deploymentId");
                 return ERROR;
             }
-            DeploymentConfig dc = DeploymentConfigDao.instance.findById(deploymentId);
-            if (dc == null) {
-                addActionError("Deployment configuration not found");
+
+            // Allow deployments without envVars; treat null as empty list
+            List<EnvVariable> vars = envVars != null ? envVars : java.util.Collections.emptyList();
+
+            boolean updated = DeploymentConfigDao.instance.updateEnvVars(deploymentId, vars);
+            if (!updated) {
+                addActionError("Failed to update deployment env vars");
                 return ERROR;
             }
-            this.deploymentConfig = dc;
             return SUCCESS;
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(e, "Error in fetchDeploymentConfigById " + e.toString());
+            loggerMaker.errorAndAddToDb(e, "Error in sendConfig " + e.toString());
+            return ERROR;
+        }
+    }
+
+    // Fetch config for modules polling periodically
+    public String fetchConfig() {
+        try {
+            if (deploymentId != null) {
+                DeploymentConfig dc = DeploymentConfigDao.instance.findById(deploymentId);
+                if (dc == null) {
+                    addActionError("Deployment configuration not found");
+                    return ERROR;
+                }
+                this.deploymentConfig = dc;
+            } else {
+                this.deploymentConfigs = DeploymentConfigDao.instance.findAllDeployments();
+            }
+            return SUCCESS;
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in fetchConfig " + e.toString());
             return ERROR;
         }
     }
@@ -3993,11 +4016,10 @@ public class DbAction extends ActionSupport {
 
     // Deployment configuration fields
     private List<DeploymentConfig> deploymentConfigs;
-    @Getter @Setter private String deploymentId;
+    @Setter private String deploymentId;
     @Getter private DeploymentConfig deploymentConfig; // response holder
 
-    // optional telemetry snapshot payload
-    @Getter @Setter private List<EnvVariable> envVars;
+    @Setter private List<EnvVariable> envVars;
 
     // Deployment configuration getters and setters
     public List<DeploymentConfig> getDeploymentConfigs() {
