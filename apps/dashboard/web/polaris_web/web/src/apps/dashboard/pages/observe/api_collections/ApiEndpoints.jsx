@@ -256,7 +256,7 @@ function ApiEndpoints(props) {
     const [isEditingDescription, setIsEditingDescription] = useState(false)
     const [editableDescription, setEditableDescription] = useState(description)
     const [currentKey, setCurrentKey] = useState(Date.now()); // to force remount InlineEditableText component
-    const hasAccessToDiscoveryAgent = window.STIGG_FEATURE_WISE_ALLOWED && window.STIGG_FEATURE_WISE_ALLOWED['STATIC_DISCOVERY_AI_AGENTS'] && window.STIGG_FEATURE_WISE_ALLOWED['STATIC_DISCOVERY_AI_AGENTS'].isGranted
+    const hasAccessToDiscoveryAgent = func.checkForFeatureSaas('STATIC_DISCOVERY_AI_AGENTS')
 
 
     // the values used here are defined at the server.
@@ -1001,7 +1001,7 @@ function ApiEndpoints(props) {
                                             />
                                         </Box>)
                                     },
-                                    !isApiGroup && !(isHostnameCollection)  && hasAccessToDiscoveryAgent && {
+                                    !isApiGroup && (!isHostnameCollection && hasAccessToDiscoveryAgent) && {
                                         content: '',
                                         prefix: (<Box width="160px" >
                                             <UploadFile
