@@ -663,6 +663,10 @@ public class DbLayer {
         RuntimeLogsDao.instance.insertOne(log);
     }
 
+    public static void insertPersistentRuntimeLog(Log log) {
+        RuntimePersistentLogsDao.instance.insertOne(log);
+    }
+
     public static void insertAnalyserLog(Log log) {
         AnalyserLogsDao.instance.insertOne(log);
     }

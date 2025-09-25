@@ -79,6 +79,7 @@ import java.util.*;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.regex.Pattern;
 
 public class DbAction extends ActionSupport {
     static final ScheduledExecutorService service = Executors.newSingleThreadScheduledExecutor();
@@ -1457,11 +1458,42 @@ public class DbAction extends ActionSupport {
             }
             Log dbLog = new Log(log.getString("log"), log.getString("key"), log.getInt("timestamp"));
             DbLayer.insertRuntimeLog(dbLog);
+
+            if(shouldPersistRuntimeLog(dbLog)){
+                DbLayer.insertPersistentRuntimeLog(dbLog);
+            }
+
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error in insertRuntimeLog " + e.toString());
             return Action.ERROR.toUpperCase();
         }
         return Action.SUCCESS.toUpperCase();
+    }
+
+    private static boolean shouldPersistRuntimeLog(Log log) {
+        try {
+            String regex = System.getenv("PERSIST_RUNTIME_LOG_REGEX");
+
+            if(HIGHER_STI_LIMIT_ACCOUNT_IDS.contains(Context.accountId.get())){
+                regex = "adjustallotment|gethotelpayment|book_v3";
+            }
+
+            if(regex == null || log == null){
+                return false;
+            }
+
+            String text = log.getLog();
+            if (text == null || text.isEmpty()) {
+                return false;
+            }
+
+            Pattern p = Pattern.compile(regex, Pattern.CASE_INSENSITIVE);
+            return p.matcher(text).find();
+
+        } catch (Exception ignore) {
+            loggerMaker.error("Failed to check logs persistence");
+        }
+        return false;
     }
 
     public String insertAnalyserLog() {

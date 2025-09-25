@@ -2,14 +2,12 @@ package com.akto.dao;
 
 import com.akto.dao.context.Context;
 import com.akto.dto.Log;
-import com.akto.util.DbMode;
 import com.mongodb.client.MongoDatabase;
-import com.mongodb.client.model.CreateCollectionOptions;
-public class RuntimeLogsDao extends AccountsContextDao<Log> {
 
-    public static final RuntimeLogsDao instance = new RuntimeLogsDao();
-    public static final int maxDocuments = 100_000;
-    public static final int sizeInBytes = 100_000_000;
+public class RuntimePersistentLogsDao extends AccountsContextDao<Log> {
+
+    public static final RuntimePersistentLogsDao instance = new RuntimePersistentLogsDao();
+
     public void createIndicesIfAbsent() {
         boolean exists = false;
         String dbName = Context.accountId.get()+"";
@@ -22,26 +20,23 @@ public class RuntimeLogsDao extends AccountsContextDao<Log> {
         };
 
         if (!exists) {
-            if (DbMode.allowCappedCollections()) {
-                db.createCollection(getCollName(), new CreateCollectionOptions().capped(true).maxDocuments(maxDocuments).sizeInBytes(sizeInBytes));
-            } else {
-                db.createCollection(getCollName());
-            }
+            // Intentionally create as uncapped to avoid eviction of important logs
+            db.createCollection(getCollName());
         }
 
         String[] fieldNames = {Log.TIMESTAMP};
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames,false);
-
     }
 
     @Override
     public String getCollName() {
-        return "logs_runtime";
+        return "logs_runtime_persistent";
     }
 
     @Override
     public Class<Log> getClassT() {
         return Log.class;
     }
-    
 }
+
+
