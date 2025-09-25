@@ -12,7 +12,6 @@ import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.Filters;
 import org.bson.conversions.Bson;
 
-import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -27,7 +26,7 @@ public class PercentilesCron {
     private static final LoggerMaker logger = new LoggerMaker(PercentilesCron.class, LogDb.THREAT_DETECTION);
     private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
     private final MongoClient mongoClient;
-    private static final int DEFAULT_BASELINE_DAYS = 2;
+    public static final int DEFAULT_BASELINE_DAYS = 2;
     private static final int MIN_INITIAL_AGE_DAYS = 2;
 
     public PercentilesCron(MongoClient mongoClient) {

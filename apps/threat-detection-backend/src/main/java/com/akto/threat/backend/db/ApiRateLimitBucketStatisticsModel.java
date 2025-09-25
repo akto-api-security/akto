@@ -11,6 +11,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ApiDistributionDataRequestPayload;
+import com.akto.threat.backend.cron.PercentilesCron;
 import com.akto.utils.ThreatApiDistributionUtils;
 import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoCollection;
@@ -27,6 +28,7 @@ public class ApiRateLimitBucketStatisticsModel {
     
     private String id; // Format: apiCollectionId_method_url_windowSize
     private List<Bucket> buckets;
+    private float rateLimitConfidence;
     
     @Data
     @NoArgsConstructor
@@ -89,14 +91,12 @@ public class ApiRateLimitBucketStatisticsModel {
             List<ApiDistributionDataRequestPayload.DistributionData> updates = entry.getValue();
             if (updates == null || updates.isEmpty()) continue;
 
-            int windowSize = updates.get(0).getWindowSize();
-            int capacity = capacityForWindowSize(windowSize);
-
             ApiRateLimitBucketStatisticsModel doc = Optional.ofNullable(coll.find(Filters.eq(ID, docId)).first())
                 .orElseGet(() -> {
                     ApiRateLimitBucketStatisticsModel m = new ApiRateLimitBucketStatisticsModel();
                     m.id = docId;
                     m.buckets = new ArrayList<>();
+                    m.rateLimitConfidence = 0.0f;
                     // Initialize all standard buckets
                     for (ThreatApiDistributionUtils.Range range : ThreatApiDistributionUtils.getBucketRanges()) {
                         m.buckets.add(new Bucket(range.label, new ArrayList<>(), new Stats(0,0,0,0,0)));
@@ -104,34 +104,52 @@ public class ApiRateLimitBucketStatisticsModel {
                     return m;
                 });
 
-            for (ApiDistributionDataRequestPayload.DistributionData u : updates) {
-                int windowStart = (int) u.getWindowStartEpochMin();
-                Map<String, Integer> dist = u.getDistributionMap();
-
-                for (Bucket bucket : doc.buckets) {
-                    int users = dist.getOrDefault(bucket.label, 0);
-                    upsertUserCount(bucket.userCounts, windowStart, users);
-                    evictToCapacity(bucket.userCounts, capacity);
-                }
-            }
-
-            for (Bucket b : doc.buckets) {
-                List<Integer> values = b.userCounts.stream().map(uc -> uc.users).collect(Collectors.toList());
-                if (values.isEmpty()) {
-                    b.stats = new Stats(0,0,0,0,0);
-                } else {
-                    Collections.sort(values);
-                    int min = values.get(0);
-                    int max = values.get(values.size() - 1);
-                    int p25 = ThreatApiDistributionUtils.percentile(values, 25);
-                    int p50 = ThreatApiDistributionUtils.percentile(values, 50);
-                    int p75 = ThreatApiDistributionUtils.percentile(values, 75);
-                    b.stats = new Stats(min, max, p25, p50, p75);
-                }
-            }
+            doc = applyUpdates(doc, updates);
 
             coll.replaceOne(Filters.eq(ID, docId), doc, new ReplaceOptions().upsert(true));
         }
+    }
+
+    static ApiRateLimitBucketStatisticsModel applyUpdates(ApiRateLimitBucketStatisticsModel doc, List<ApiDistributionDataRequestPayload.DistributionData> updates) {
+        if (doc == null) {
+            ApiRateLimitBucketStatisticsModel m = new ApiRateLimitBucketStatisticsModel();
+            m.buckets = new ArrayList<>();
+            for (ThreatApiDistributionUtils.Range range : ThreatApiDistributionUtils.getBucketRanges()) {
+                m.buckets.add(new Bucket(range.label, new ArrayList<>(), new Stats(0,0,0,0,0)));
+            }
+            doc = m;
+        }
+
+        int windowSize = updates.get(0).getWindowSize();
+        int capacity = capacityForWindowSize(windowSize);
+
+        for (ApiDistributionDataRequestPayload.DistributionData u : updates) {
+            int windowStart = (int) u.getWindowStartEpochMin();
+            Map<String, Integer> dist = u.getDistributionMap();
+
+            for (Bucket bucket : doc.buckets) {
+                int users = dist.getOrDefault(bucket.label, 0);
+                upsertUserCount(bucket.userCounts, windowStart, users);
+                evictToCapacity(bucket.userCounts, capacity);
+            }
+        }
+
+        for (Bucket b : doc.buckets) {
+            List<Integer> values = b.userCounts.stream().map(uc -> uc.users).collect(Collectors.toList());
+            if (values.isEmpty()) {
+                b.stats = new Stats(0,0,0,0,0);
+            } else {
+                Collections.sort(values);
+                int min = values.get(0);
+                int max = values.get(values.size() - 1);
+                int p25 = ThreatApiDistributionUtils.percentile(values, 25);
+                int p50 = ThreatApiDistributionUtils.percentile(values, 50);
+                int p75 = ThreatApiDistributionUtils.percentile(values, 75);
+                b.stats = new Stats(min, max, p25, p50, p75);
+            }
+        }
+
+        return doc;
     }
 
 
@@ -146,6 +164,7 @@ public class ApiRateLimitBucketStatisticsModel {
         }
     }
 
+    // Remove old windows from the start.
     private static void evictToCapacity(List<UserCountData> list, int capacity) {
         if (list == null) return;
         while (list.size() > capacity) {
@@ -154,10 +173,11 @@ public class ApiRateLimitBucketStatisticsModel {
     }
 
     private static int capacityForWindowSize(int windowSize) {
-        if (windowSize == 5) return 576;
-        if (windowSize == 15) return 192;
-        if (windowSize == 30) return 96;
-        int approx = (2 * 24 * 60) / Math.max(1, windowSize);
+        // Calculate number of windows in 5, 15, 30 minutes.
+        // Ex: 5 minute windows for 2 days will have 576 capacity.
+        
+        // TODO: Pick this from threat configuration instead. 
+        int approx = (PercentilesCron.DEFAULT_BASELINE_DAYS * 24 * 60) / Math.max(1, windowSize);
         return Math.max(1, approx);
     }
 
