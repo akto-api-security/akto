@@ -7,7 +7,7 @@ import DropdownSearch from "../../../components/shared/DropdownSearch";
 import { useSearchParams } from "react-router-dom";
 import { getDashboardCategory } from "../../../../main/labelHelper";
 
-function FilterComponent({ includeCategoryNameEquals, excludeCategoryNameEquals, titleText, readOnly = false, validateOnSave }) {
+function FilterComponent({ includeCategoryNameEquals, excludeCategoryNameEquals, titleText, readOnly = false, validateOnSave, showDelete = false }) {
     const[searchParams] = useSearchParams()
     const filteredPolicy = searchParams.get("policy")
     const [ogData, setOgData] = useState({ message: "" })
@@ -74,6 +74,20 @@ function FilterComponent({ includeCategoryNameEquals, excludeCategoryNameEquals,
         func.setToast(true, false, 'Saved filter template')
     }
 
+    async function onDelete() {
+        try {
+            if (!id) {
+                func.setToast(true, true, 'No policy selected to delete')
+                return
+            }
+            await api.deleteFilterYamlTemplate(id)
+            func.setToast(true, false, 'Deleted filter template')
+            await fetchData()
+        } catch (e) {
+            func.setToast(true, true, 'Failed to delete filter template')
+        }
+    }
+
     return (
         <LegacyCard>
             <LegacyCard.Section flush>
@@ -81,9 +95,16 @@ function FilterComponent({ includeCategoryNameEquals, excludeCategoryNameEquals,
                     <HorizontalStack padding="2" align='space-between'>
                         {titleText ? titleText : 'Threat detection filter'}
                         {!readOnly && (
-                            <Button plain monochrome removeUnderline onClick={onSave}>
-                                Save
-                            </Button>
+                            <HorizontalStack gap="2">
+                                {showDelete && (
+                                    <Button outline size="slim" onClick={onDelete}>
+                                        Delete
+                                    </Button>
+                                )}
+                                <Button outline size="slim" onClick={onSave}>
+                                    Save
+                                </Button>
+                            </HorizontalStack>
                         )}
                     </HorizontalStack>
                 </Box>
