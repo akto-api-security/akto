@@ -7,6 +7,7 @@ import com.akto.dao.SignupDao;
 import com.akto.dao.UsersDao;
 import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.context.Context;
+import com.akto.database_abstractor_authenticator.JwtAuthenticator;
 import com.akto.dto.ApiToken;
 import com.akto.dto.ApiToken.Utility;
 import com.akto.dto.SignupUserInfo;
@@ -82,6 +83,9 @@ public class UserDetailsFilter implements Filter {
         String accessTokenFromResponse = httpServletResponse.getHeader(AccessTokenAction.ACCESS_TOKEN_HEADER_NAME);
         String accessTokenFromRequest = httpServletRequest.getHeader(AccessTokenAction.ACCESS_TOKEN_HEADER_NAME);
         String contextSourceFromRequest = httpServletRequest.getHeader(AccessTokenAction.CONTEXT_SOURCE_HEADER);
+
+        String aktoSessionTokenFromRequest = httpServletRequest.getHeader(AccessTokenAction.AKTO_SESSION_TOKEN);
+
         String requestURI = httpServletRequest.getRequestURI();
 
         // get api key header
@@ -103,6 +107,18 @@ public class UserDetailsFilter implements Filter {
                 Context.contextSource.set(GlobalEnums.CONTEXT_SOURCE.API);
             }
         }
+
+        if(StringUtils.isNotEmpty(aktoSessionTokenFromRequest) && httpServletRequest.getRequestURI().contains("agent")){
+            try {
+                Jws<Claims> claims = JwtAuthenticator.authenticate(aktoSessionTokenFromRequest);
+                Context.accountId.set((int) claims.getBody().get("accountId"));
+            } catch (Exception e) {
+                e.printStackTrace();
+                httpServletResponse.sendError(403);
+                return;
+            }
+        }
+
         if (apiKeyFlag) {
             // For apiKey sessions we want to start fresh. Hence, delete any existing session and create new one
             if (session != null) session.invalidate();

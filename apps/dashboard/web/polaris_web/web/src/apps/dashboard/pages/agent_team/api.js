@@ -90,6 +90,13 @@ const api = {
             data: data 
         })
     },
+    createDiscoveryAgentRunSubprocess: async (data) => {
+        return await request({
+            url: '/api/createSubProcessNew',
+            method: 'post',
+            data: data 
+        })
+    }
 
 }
 
