@@ -174,13 +174,20 @@ public class AgentAction extends UserAction {
         return Action.SUCCESS.toUpperCase();
     }
 
+    @Setter
+    Map<String, Object> results;
+
     public String updateStateOfDiscoveryAgentRun() {
         if(processId == null || processId.isEmpty()){
             addActionError("Process id is invalid");
             return Action.ERROR.toUpperCase();
         }
         response = new BasicDBObject();
-        DiscoveryAgentRunDao.instance.updateOneNoUpsert(Filters.eq(AgentRun.PROCESS_ID, processId), Updates.set(AgentRun._STATE, State.valueOf(state)));
+        Bson update = Updates.set(AgentRun._STATE, State.valueOf(state));
+        if(results != null && !results.isEmpty()){
+            update = Updates.combine(update, Updates.set(DiscoveryAgentRun._RESULTS, results));
+        }
+        DiscoveryAgentRunDao.instance.updateOneNoUpsert(Filters.eq(AgentRun.PROCESS_ID, processId), update);
         response.put("status", "success");
         return Action.SUCCESS.toUpperCase();
     }
