@@ -219,7 +219,7 @@ function CategoryWiseScoreGraph({
         const primaryLabel = passed ? statusLabels.pass : statusLabels.fail;
 
         return [
-            cat.categoryName,
+            cat.displayName || cat.categoryName,
             <VerticalStack gap="2">
                 {/* Main result indicator */}
                 <HorizontalStack gap="1" align="center">

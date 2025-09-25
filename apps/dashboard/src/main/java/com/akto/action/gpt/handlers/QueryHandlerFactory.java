@@ -31,7 +31,7 @@ public class QueryHandlerFactory {
             case ANALYZE_REQUEST_RESPONSE_HEADERS:
                 return new FindRequestResponseHeaders(new SelfHostedLlmResultFetcherStrategy());
             case ANALYZE_VULNERABILITY:
-                return new AnalyzeVulnerability(new AsyncResultFetcherStrategy());
+                return new AnalyzeVulnerability(new SelfHostedLlmResultFetcherStrategy());
             default:
                 throw new IllegalArgumentException("Unexpected value: " + query);
         }
