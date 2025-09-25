@@ -92,6 +92,7 @@ import com.mongodb.ReadPreference;
 import com.mongodb.WriteConcern;
 import com.mongodb.client.MongoClients;
 
+
 import org.bson.codecs.configuration.CodecRegistries;
 import org.bson.codecs.configuration.CodecRegistry;
 import org.bson.codecs.pojo.ClassModel;
@@ -414,10 +415,21 @@ public class DaoInit {
 
         CodecRegistry codecRegistry = createCodecRegistry();
 
+        // Add maxTimeMS=15000 to connection string if not present
+        String connectionStr = connectionString.getConnectionString();
+        if (!connectionStr.contains("maxTimeMS")) {
+            if (connectionStr.contains("?")) {
+                connectionStr += "&maxTimeMS=15000";
+            } else {
+                connectionStr += "?maxTimeMS=15000";
+            }
+        }
+        ConnectionString modifiedConnectionString = new ConnectionString(connectionStr);
+
         MongoClientSettings clientSettings = MongoClientSettings.builder()
                 .readPreference(readPreference)
                 .writeConcern(writeConcern)
-                .applyConnectionString(connectionString)
+                .applyConnectionString(modifiedConnectionString)
                 .codecRegistry(codecRegistry)
                 .build();
 
