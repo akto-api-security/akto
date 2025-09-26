@@ -3,6 +3,8 @@ import java.util.ArrayList;
 import java.util.List;
 import javax.validation.ValidationException;
 import org.json.JSONObject;
+
+import com.akto.dao.MetaDataAnalysisDao;
 import com.mongodb.BasicDBObject;
 
 public class AnalyzeRequestResponseHeaders extends PromptHandler {
@@ -90,7 +92,7 @@ public class AnalyzeRequestResponseHeaders extends PromptHandler {
                 if (key.equalsIgnoreCase("not_found") || value.equalsIgnoreCase("not_found") || value.equalsIgnoreCase("none") || value.isEmpty()) {
                     continue;
                 }
-    
+                MetaDataAnalysisDao.instance.insertHeaderForAnalysis(key, value);
                 responses.add(key + ": " + value);
                 hasValid = true;
             }
