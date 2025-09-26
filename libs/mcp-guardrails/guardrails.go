@@ -406,50 +406,9 @@ func (g *GuardrailEngine) LoadTemplatesFromAPI() error {
 	return nil
 }
 
-// LoadTemplatesByType loads guardrail templates of a specific type from the database API
-func (g *GuardrailEngine) LoadTemplatesByType(guardrailType string) error {
-	if g.templateClient == nil {
-		return fmt.Errorf("template client not configured")
-	}
-
-	g.mutex.Lock()
-	defer g.mutex.Unlock()
-
-	templates, err := g.templateClient.FetchGuardrailTemplatesByType(guardrailType)
-	if err != nil {
-		return fmt.Errorf("failed to fetch templates by type: %w", err)
-	}
-
-	// Update templates for this type
-	for _, template := range templates {
-		g.templates[template.ID] = template
-	}
-
-	log.Printf("Loaded %d templates for type %s from API", len(templates), guardrailType)
-	return nil
-}
-
 // RefreshTemplates refreshes templates from the API
 func (g *GuardrailEngine) RefreshTemplates() error {
 	return g.LoadTemplatesFromAPI()
-}
-
-// GetTemplate returns a specific template by ID
-func (g *GuardrailEngine) GetTemplate(templateID string) (*YamlTemplate, bool) {
-	g.mutex.RLock()
-	defer g.mutex.RUnlock()
-
-	template, exists := g.templates[templateID]
-	return &template, exists
-}
-
-// GetConfig returns a specific configuration by ID
-func (g *GuardrailEngine) GetConfig(configID string) (*MCPGuardrailConfig, bool) {
-	g.mutex.RLock()
-	defer g.mutex.RUnlock()
-
-	config, exists := g.configs[configID]
-	return &config, exists
 }
 
 // GetAllTemplates returns all loaded templates

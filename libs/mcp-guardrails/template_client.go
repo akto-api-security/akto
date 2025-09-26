@@ -83,24 +83,6 @@ func (c *TemplateClient) FetchGuardrailConfigs(includeYamlContent bool) (map[str
 	return resp.McpGuardrailConfigs, nil
 }
 
-// FetchGuardrailTemplate fetches a specific guardrail template by ID
-func (c *TemplateClient) FetchGuardrailTemplate(templateID string) (*YamlTemplate, error) {
-	endpoint := "/api/mcp/fetchGuardrailTemplate"
-	params := url.Values{}
-	params.Add("templateId", templateID)
-
-	resp, err := c.makeRequest("POST", endpoint, params)
-	if err != nil {
-		return nil, fmt.Errorf("failed to fetch guardrail template: %w", err)
-	}
-
-	if len(resp.ActionErrors) > 0 {
-		return nil, fmt.Errorf("API returned errors: %v", resp.ActionErrors)
-	}
-
-	return resp.McpGuardrailTemplate, nil
-}
-
 // HealthCheck checks if the MCP Guardrails service is healthy
 func (c *TemplateClient) HealthCheck() error {
 	endpoint := "/api/mcp/health"

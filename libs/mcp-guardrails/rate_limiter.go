@@ -28,11 +28,11 @@ func (r *RateLimiter) Allow() bool {
 	defer r.mutex.Unlock()
 
 	now := time.Now()
-	
+
 	// Refill tokens based on time elapsed
 	timeElapsed := now.Sub(r.lastRefill)
 	tokensToAdd := int(timeElapsed.Minutes()) * r.config.RequestsPerMinute / 60
-	
+
 	if tokensToAdd > 0 {
 		r.tokens = min(r.config.BurstSize, r.tokens+tokensToAdd)
 		r.lastRefill = now
@@ -54,18 +54,3 @@ func min(a, b int) int {
 	}
 	return b
 }
-
-// GetRemainingTokens returns the number of remaining tokens
-func (r *RateLimiter) GetRemainingTokens() int {
-	r.mutex.Lock()
-	defer r.mutex.Unlock()
-	return r.tokens
-}
-
-// Reset resets the rate limiter
-func (r *RateLimiter) Reset() {
-	r.mutex.Lock()
-	defer r.mutex.Unlock()
-	r.tokens = r.config.BurstSize
-	r.lastRefill = time.Now()
-} 
