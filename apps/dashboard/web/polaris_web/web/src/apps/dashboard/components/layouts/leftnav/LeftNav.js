@@ -275,6 +275,21 @@ export default function LeftNav() {
                 ],
                 key: "5",
             },
+            ...(dashboardCategory === "Gen AI" && window.ACTIVE_ACCOUNT === 1667235738 ? [{
+                label: (
+                    <Text variant="bodyMd" fontWeight="medium">
+                        Prompt Hardening
+                    </Text>
+                ),
+                icon: AutomationFilledMajor,
+                onClick: () => {
+                    handleSelect("dashboard_prompt_hardening");
+                    navigate("/dashboard/prompt-hardening");
+                    setActive("normal");
+                },
+                selected: leftNavSelected === "dashboard_prompt_hardening",
+                key: "prompt_hardening",
+            }] : []),
             {
                 url: "#",
                 label: (
