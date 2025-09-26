@@ -23,3 +23,5 @@ export const genAICategoryTestData = [
     { categoryName: "Misinformation", fail: 2, pass: 2, skip: 54 },
     { categoryName: "Unbounded Consumption", fail: 1, pass: 3, skip: 99 }
 ];
+
+export const apiCategoryTestData =[]

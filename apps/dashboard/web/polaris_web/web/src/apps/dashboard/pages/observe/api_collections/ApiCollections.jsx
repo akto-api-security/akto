@@ -1,5 +1,7 @@
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards"
 import { Text, Button, IndexFiltersMode, Box, Popover, ActionList, ResourceItem, Avatar,  HorizontalStack, Icon} from "@shopify/polaris"
+import MCPIcon from "@/assets/MCP_Icon.svg"
+import LaptopIcon from "@/assets/Laptop.svg"
 import { HideMinor, ViewMinor,FileMinor } from '@shopify/polaris-icons';
 import api from "../api"
 import dashboardApi from "../../dashboard/api"
@@ -33,7 +35,7 @@ import ReactFlow, {
   
   } from 'react-flow-renderer';
 import SetUserEnvPopupComponent from "./component/SetUserEnvPopupComponent";
-import { getDashboardCategory, mapLabel } from "../../../../main/labelHelper";
+import { getDashboardCategory, mapLabel, isMCPSecurityCategory } from "../../../../main/labelHelper";
   
 const CenterViewType = {
     Table: 0,
@@ -43,6 +45,13 @@ const CenterViewType = {
 
 
 const headers = [
+    ...(isMCPSecurityCategory() && window.ACTIVE_ACCOUNT === 1669322524 ? [{
+        title: "",
+        text: "",
+        value: "iconComp",
+        isText: CellType.TEXT,
+        boxWidth: '24px'
+    }] : []),
     {
         title: mapLabel("API collection name", getDashboardCategory()),
         text: mapLabel("API collection name", getDashboardCategory()),
@@ -208,7 +217,11 @@ const convertToNewData = (collectionsArr, sensitiveInfoMap, severityInfoMap, cov
             ...c,
             icon: CircleTickMajor,
             nextUrl: "/dashboard/observe/inventory/"+ c.id,
+            envTypeOriginal: c?.envType,
             envType: c?.envType?.map(func.formatCollectionType),
+            ...(isMCPSecurityCategory() && window.ACTIVE_ACCOUNT === 1669322524 ? {
+                iconComp: (<Box><img src={c.displayName?.toLowerCase().startsWith('mcp') ? MCPIcon : LaptopIcon} alt="icon" style={{width: '24px', height: '24px'}} /></Box>)
+            } : {}),
             displayNameComp: (<Box maxWidth="30vw"><Text truncate fontWeight="medium">{c.displayName}</Text></Box>),
             testedEndpoints: c.urlsCount === 0 ? 0 : (coverageMap[c.id] ? coverageMap[c.id] : 0),
             sensitiveInRespTypes: sensitiveInfoMap[c.id] ? sensitiveInfoMap[c.id] : [],
@@ -238,7 +251,7 @@ const categorizeCollections = (prettifyArray) => {
     
     prettifyArray.forEach((c) => {
         // Build environment map
-        envTypeObj[c.id] = c.envType;
+        envTypeObj[c.id] = c.envTypeOriginal;
         collectionMap.set(c.id, c);
         
         // Categorize collections in single pass
@@ -657,11 +670,16 @@ function ApiCollections(props) {
         const csvFileName = definedTableTabs[selected] + " Collections.csv"
         const selectedResourcesSet = new Set(selectedResources)
         if (!loading) {
+            const wrapCsvValue = (value) => {
+                const s = (value === null || value === undefined) ? '-' : String(value);
+                return '"' + s.replace(/"/g, '""') + '"';
+            }
+
             let headerTextToValueMap = Object.fromEntries(headers.map(x => [x.text, x.isText === CellType.TEXT ? x.value : x.textValue]).filter(x => x[0]?.length > 0));
             let csv = Object.keys(headerTextToValueMap).join(",") + "\r\n"
             data['all'].forEach(i => {
                 if(selectedResources.length === 0 || selectedResourcesSet.has(i.id)){
-                    csv += Object.values(headerTextToValueMap).map(h => (i[h] || "-")).join(",") + "\r\n"
+                    csv += Object.values(headerTextToValueMap).map(h => wrapCsvValue(i[h])).join(",") + "\r\n"
                 }
             })
             let blob = new Blob([csv], {

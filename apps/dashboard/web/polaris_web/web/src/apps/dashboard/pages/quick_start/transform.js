@@ -2,7 +2,7 @@ import {Avatar, Badge} from "@shopify/polaris"
 import PostmanSource from "./components/PostmanSource"
 import BurpSource from "./components/BurpSource"
 import HybridSaasSource from "./components/HybridSaasSource"
-import McpWrapper from "./components/McpWrapper"
+import AgenticShield from "./components/AgenticShield"
 import AwsSource from "./components/AwsSource"
 import FargateSource from "./components/FargateSource"
 import Kubernetes from "./components/Kubernetes"
@@ -20,6 +20,8 @@ import { isApiSecurityCategory, isGenAISecurityCategory, isMCPSecurityCategory }
 import McpRecon from "./components/McpRecon"
 import McpProxy from "./components/McpProxy"
 import AwsLogAccountComponent from "./components/shared/AwsLogAccountComponent"
+import McpGateway from "./McpGateway"
+import AIAgentsGateway from "./AIAgentsGateway"
 
 const mirroringObj = {
     icon: '/public/aws.svg',
@@ -29,7 +31,6 @@ const mirroringObj = {
     key: "AWS",
     component: <AwsSource />
 }
-
 const apigeeObj = {
     icon: '/public/apigee.svg',
     label: "Apigee",
@@ -351,6 +352,24 @@ const awsBedrockObj = {
     />
 }
 
+const aiAgentGlobalProxy = {
+    icon: '/public/aws_bedrock.svg',
+    label: "AI Agent Global Proxy",
+    text: "A publicly hosted secure gateway that enforces guardrails and advanced threat protection for all requests to your public AI agents, ensuring safe and compliant communication.",
+    docsUrl: 'https://docs.akto.io/akto-agent-proxy',
+    key: "AI_AGENT_GLOBAL_PROXY",
+    component : <AIAgentsGateway />
+}
+
+const aiAgentGateway = {
+    icon: '/public/aws_bedrock.svg',
+    label: "AI Agent Gateway",
+    text: "AI agent proxy gateway to be deployed on premise for securing AI agents in your network",
+    docsUrl: 'https://docs.akto.io/akto-agent-proxy',
+    key: "AI_AGENT_GATEWAY",
+    component : <AIAgentsGateway />
+}
+
 const azureAIFoundryObj = {
     icon: '/public/azure_ai.svg',
     label: "Azure AI Foundry",
@@ -441,11 +460,20 @@ const customAgentObj = {
 
 const mcpWrapperObj = {
     icon: '/public/mcp.svg',
-    label: "MCP Wrapper",
-    text: "MCP Wrapper helps you detect MCP servers configured on your laptop or desktop, giving you full visibility into their requests and responses.",   
-    docsUrl: 'https://docs.akto.io/mcp-watch',
-    key: "MCP_WRAPPER",
-    component: <McpWrapper/>
+    label: "MCP Endpoint Shield",
+    text: "MCP Endpoint Shield provides runtime security and auto-discovery of local MCP servers configured on your machine, requiring no changes to your setup.",
+    docsUrl: 'https://docs.akto.io/mcp-endpoint-shield',
+    key: "MCP_ENDPOINT_SHIELD",
+    component: <AddOnComponenet/>
+}
+
+const agenticShieldObj = {
+    icon: '/public/mcp.svg',
+    label: "Agentic Shield",
+    text: "Agentic Shield provides runtime protection and discovery of LLMs/AI Agents on your local environment.",
+    docsUrl: 'https://docs.akto.io/agentic-shield',
+    key: "AGENTIC_SHIELD",
+    component: <AgenticShield/>
 }
 
 const mcpScanObj = {
@@ -468,11 +496,20 @@ const mcpReconObj = {
 
 const mcpProxyObj = {
     icon: '/public/mcp.svg',
-    label: "MCP Proxy Gateway",
-    text: "A secure gateway that enforces guardrails and advanced threat protection for all requests to your MCP servers, ensuring safe and compliant communication.",
+    label: "MCP Global Proxy",
+    text: "A publicly hostedsecure gateway that enforces guardrails and advanced threat protection for all requests to your public MCP servers, ensuring safe and compliant communication.",
     docsUrl: 'https://docs.akto.io/akto-mcp-proxy',
     key: "MCP_PROXY",
     component : <McpProxy/>
+}
+
+const mcpGateway = {
+    icon: '/public/mcp.svg',
+    label: "MCP Gateway",
+    text: "MCP proxy gateway to be deployed on premise for securing MCP servers in your network.",
+    docsUrl: 'https://docs.akto.io/akto-mcp-proxy',
+    key: "MCP_GATEWAY",
+    component : <McpGateway/>
 }
 
 const dockerObj = {
@@ -1297,6 +1334,8 @@ const yaml_kubernetes = [
     `            value: "<AKTO_MONGO_CONN>"`,
 ]
 
+
+
 const quickStartFunc = {
 
     getConnectorsListCategorized: function () {
@@ -1359,13 +1398,18 @@ const quickStartFunc = {
             geminiObj, openAIObj, claudeObj, deepseekObj, llamaObj, grokObj, customAIObj
         ]
 
+        const aiAgentGateways = [
+            aiAgentGlobalProxy, aiAgentGateway
+
+        ]
+
         const aiAgentConnectors = [
-            awsBedrockObj, azureAIFoundryObj, databricksObj, googleVertexAIObj, ibmWatsonxObj, customAgentObj
+            awsBedrockObj, azureAIFoundryObj, databricksObj, googleVertexAIObj, ibmWatsonxObj, customAgentObj, agenticShieldObj
         ]
 
         // MCP Scan
         const mcpScan = [
-            mcpScanObj, mcpReconObj, mcpProxyObj, mcpWrapperObj
+            mcpScanObj, mcpReconObj, mcpProxyObj, mcpGateway,mcpWrapperObj
         ];
 
         // Akto SDK
@@ -1382,6 +1426,7 @@ const quickStartFunc = {
         let connectors = {}
 
         if(isGenAISecurityCategory()){
+            connectors["AI Agent Scan"] = aiAgentGateways
             connectors["AI Agent Security"] = aiAgentConnectors
             connectors["AI Model Security"] = aiScanConnectors
         }
@@ -1427,7 +1472,7 @@ const quickStartFunc = {
         // Combine all categories into connectorsList
         let connectorsList = [
             gcpObj, kubernetesObj, fargateObj, nginxObj, burpObj, postmanObj,
-            openApiObj, beanStalkObj, eksObj, dockerObj, envoyObj, mcpScanObj, mcpProxyObj, mcpWrapperObj,
+            openApiObj, beanStalkObj, eksObj, dockerObj, envoyObj, mcpScanObj, mcpProxyObj, mcpGateway, mcpWrapperObj,
             harFileUploadObj, kongObj, tcpObj, mirroringObj, hybridSaasObj, apiInventoryFromSourceCodeObj,
             ebpfObj, ebpfMTLSObj, istioObj, pythonObj, awsApiGatewayObj, awsLambdaObj,
             apigeeObj, iisObj, azureObj, cloudflareObj, f5Obj, goObj, haproxyObj, javaObj, kongmeshObj, layer7Obj, nodejsObj, openshiftObj, threescaleObj, githubObj, gitlabObj, bitbucketObj, aktoJaxObj
@@ -1436,7 +1481,7 @@ const quickStartFunc = {
         if(isGenAISecurityCategory()){
             connectorsList = connectorsList.concat([
                 geminiObj, openAIObj, claudeObj, deepseekObj, llamaObj, grokObj, customAIObj,
-                awsBedrockObj, azureAIFoundryObj, databricksObj, googleVertexAIObj, ibmWatsonxObj, customAgentObj
+                awsBedrockObj, azureAIFoundryObj, databricksObj, googleVertexAIObj, ibmWatsonxObj, customAgentObj, agenticShieldObj
             ])
         }
 

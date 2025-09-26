@@ -7,6 +7,7 @@ import com.akto.dao.monitoring.ModuleInfoDao;
 import com.akto.dao.notifications.SlackWebhooksDao;
 import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dao.testing.*;
+import com.akto.utils.CategoryWiseStatsUtils;
 import com.akto.dao.testing.sources.TestSourceConfigsDao;
 import com.akto.dao.testing_run_findings.TestingRunIssuesDao;
 import com.akto.dto.ApiInfo;
@@ -93,6 +94,20 @@ public class StartTestAction extends UserAction {
 
     private Map<String,Long> allTestsCountMap = new HashMap<>();
     private Map<String,Integer> issuesSummaryInfoMap = new HashMap<>();
+    
+    @Getter
+    private List<Map<String, Object>> categoryWiseScores = new ArrayList<>();
+    
+    private String dashboardCategory;
+    private String dataSource = "redteaming"; // Default to redteaming
+    
+    public void setDashboardCategory(String dashboardCategory) {
+        this.dashboardCategory = dashboardCategory;
+    }
+    
+    public void setDataSource(String dataSource) {
+        this.dataSource = dataSource;
+    }
 
     private String testRoleId;
     private boolean cleanUpTestingResources;
@@ -1169,6 +1184,41 @@ public class StartTestAction extends UserAction {
         this.allTestsCountMap = result;
         return SUCCESS.toUpperCase();
     }
+
+    public String fetchCategoryWiseScores() {
+        try {
+            // Determine data source type
+            CategoryWiseStatsUtils.DataSource sourceType;
+            switch (dataSource.toLowerCase()) {
+                case "threat_detection":
+                    sourceType = CategoryWiseStatsUtils.DataSource.THREAT_DETECTION;
+                    break;
+                case "guardrails":
+                    sourceType = CategoryWiseStatsUtils.DataSource.GUARDRAILS;
+                    break;
+                case "redteaming":
+                default:
+                    sourceType = CategoryWiseStatsUtils.DataSource.REDTEAMING;
+                    break;
+            }
+            
+            // Use generic utility for aggregation - categories are handled internally
+            this.categoryWiseScores = CategoryWiseStatsUtils.getCategoryWiseScores(
+                sourceType,
+                startTimestamp, 
+                endTimestamp, 
+                dashboardCategory
+            );
+            
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error fetching category wise scores: " + e.getMessage());
+            addActionError("Error fetching category wise scores");
+            return ERROR.toUpperCase();
+        }
+        
+        return SUCCESS.toUpperCase();
+    }
+
 
     // this gives the count of total vulnerabilites and map of count of subcategories for which issues are generated.
     public String getIssueSummaryInfo(){

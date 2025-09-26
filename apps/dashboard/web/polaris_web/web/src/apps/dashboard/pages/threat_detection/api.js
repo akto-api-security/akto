@@ -16,7 +16,7 @@ const threatDetectionRequests = {
         })
     },
 
-    fetchSuspectSampleData(skip, ips, apiCollectionIds, urls, types, sort, startTimestamp, endTimestamp, latestAttack, limit) {
+    fetchSuspectSampleData(skip, ips, apiCollectionIds, urls, types, sort, startTimestamp, endTimestamp, latestAttack, limit, statusFilter, successfulExploit) {
         return request({
             url: '/api/fetchSuspectSampleData',
             method: 'post',
@@ -30,7 +30,9 @@ const threatDetectionRequests = {
                 startTimestamp: startTimestamp,
                 endTimestamp: endTimestamp,
                 latestAttack: latestAttack || [],
-                limit: limit || 50
+                limit: limit || 50,
+                statusFilter: statusFilter,
+                ...(typeof successfulExploit === 'boolean' ? { successfulExploit } : {})
             }
         })
     },
@@ -157,6 +159,22 @@ const threatDetectionRequests = {
             url: '/api/modifyThreatActorStatusCloudflare',
             method: 'post',
             data: {actorIp, status}
+        })
+    },
+    updateMaliciousEventStatus(data) {
+        // Handles all cases: single event (eventId), bulk (eventIds), or filter-based
+        return request({
+            url: '/api/updateMaliciousEventStatus',
+            method: 'post',
+            data: data
+        })
+    },
+    deleteMaliciousEvents(data) {
+        // Handles both bulk delete (eventIds) and filter-based delete
+        return request({
+            url: '/api/deleteMaliciousEvents',
+            method: 'post',
+            data: data
         })
     }
 }

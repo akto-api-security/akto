@@ -61,6 +61,17 @@ export default {
         })
         return resp
     },
+    async analyzeVulnerability(responseOutput, analysisType = 'redteaming') {
+        const resp = await request({
+            url: '/api/analyze_vulnerability',
+            method: 'post',
+            data: {
+                requestData: responseOutput,
+                analysisType: analysisType
+            }
+        })
+        return resp
+    },
     async fetchAllSubCategories(fetchOnlyActive, mode, skip, limit) {
         const resp = await request({
             url: 'api/fetchAllSubCategories',
@@ -613,5 +624,18 @@ export default {
             method: 'post',
             data: { testingRunId }
         })
+    },
+    async fetchCategoryWiseScores(startTimestamp, endTimestamp, dashboardCategory, dataSource = 'testing') {
+        const resp = await request({
+            url: '/api/fetchCategoryWiseScores',
+            method: 'post',
+            data: {
+                startTimestamp,
+                endTimestamp,
+                dashboardCategory,
+                dataSource
+            }
+        })
+        return resp
     }
 }

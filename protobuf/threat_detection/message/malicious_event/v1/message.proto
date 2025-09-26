@@ -23,6 +23,7 @@ message MaliciousEventMessage {
   string severity = 12;
   string type = 13;
   threat_detection.message.sample_request.v1.Metadata metadata = 14; 
+  bool successful_exploit = 15;
 }
 
 message MaliciousEventKafkaEnvelope {

@@ -347,8 +347,13 @@ const SummaryCardComponent = () =>{
                     chartSize={190}
                 />
               </HorizontalGrid>
-              {(func.isDemoAccount() && !isApiSecurityCategory()) ? (
-                <CategoryWiseScoreGraph key={"category-score-graph"} categoriesData={subCategoryInfo} totalTests={totalNumberOfTests}/>
+              {!isApiSecurityCategory() ? (
+                <CategoryWiseScoreGraph 
+                  key={"category-score-graph"} 
+                  startTimestamp={startTimestamp} 
+                  endTimestamp={endTimestamp}
+                  dataSource="redteaming"
+                />
               ) : null}
               <HorizontalGrid columns={2} gap={4}>
                 <ApiCollectionCoverageGraph />
