@@ -20,6 +20,7 @@ public class FilterYamlTemplateAction extends UserAction {
 
     BasicDBList templates;
     String content;
+    String templateId;
 
     public String fetchFilterYamlTemplate() {
         FilterYamlTemplateDao.deleteContextCollectionsForUser(Context.accountId.get(), Context.contextSource.get());
@@ -58,6 +59,23 @@ public class FilterYamlTemplateAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
+    public String deleteFilterYamlTemplate() {
+        try {
+            if (this.templateId == null || this.templateId.isEmpty()) {
+                throw new Exception("templateId cannot be empty");
+            }
+
+            FilterYamlTemplateDao.instance.getMCollection().deleteOne(
+                Filters.eq(Constants.ID, this.templateId)
+            );
+        } catch (Exception e) {
+            e.printStackTrace();
+            addActionError(e.getMessage());
+            return ERROR.toUpperCase();
+        }
+        return SUCCESS.toUpperCase();
+    }
+
     public BasicDBList getTemplates() {
         return templates;
     }
@@ -72,6 +90,14 @@ public class FilterYamlTemplateAction extends UserAction {
 
     public void setContent(String content) {
         this.content = content;
+    }
+
+    public String getTemplateId() {
+        return templateId;
+    }
+
+    public void setTemplateId(String templateId) {
+        this.templateId = templateId;
     }
 
 }
