@@ -120,6 +120,13 @@ public class TestTemplateUtils {
             case GEN_AI:
                 return llmCategories;
             
+            case AGENTIC:
+                // Combine both MCP and GEN_AI categories for agentic context
+                TestCategory[] agenticCategories = new TestCategory[mcpCategories.length + llmCategories.length];
+                System.arraycopy(mcpCategories, 0, agenticCategories, 0, mcpCategories.length);
+                System.arraycopy(llmCategories, 0, agenticCategories, mcpCategories.length, llmCategories.length);
+                return agenticCategories;
+            
             default:
                 return Arrays.stream(allCategories)
                     .filter(category -> !Arrays.asList(mcpCategories).contains(category) && !Arrays.asList(llmCategories).contains(category))

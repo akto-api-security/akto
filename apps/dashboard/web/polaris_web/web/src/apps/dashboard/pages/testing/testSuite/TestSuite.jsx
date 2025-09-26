@@ -103,9 +103,9 @@ function TestSuite() {
             if (dashboardCategory === 'MCP Security') {
                 // For MCP Security, only show test suites with MCP_SECURITY suiteType
                 shouldInclude = testSuiteItem.suiteType === 'MCP_SECURITY';
-            } else if (dashboardCategory === 'Gen AI') {
-                // For Gen AI (AI Agent Security), only show test suites with AI_AGENT_SECURITY suiteType
-                shouldInclude = testSuiteItem.suiteType === 'AI_AGENT_SECURITY';
+            } else if (dashboardCategory === 'Agentic Security') {
+                // For Agentic Security, show test suites with both MCP_SECURITY and AI_AGENT_SECURITY suiteTypes
+                shouldInclude = testSuiteItem.suiteType === 'MCP_SECURITY' || testSuiteItem.suiteType === 'AI_AGENT_SECURITY';
             } else {
                 // For API Security, show test suites with OWASP suiteType (default API security)
                 shouldInclude = testSuiteItem.suiteType === 'OWASP';

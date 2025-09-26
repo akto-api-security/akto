@@ -2038,14 +2038,25 @@ public class APICatalogSync {
             return new Pair<>(apiSyncLimit, MetricTypes.ACTIVE_ENDPOINTS);
         }
 
+        // For agentic billing: Use combined limit that respects both MCP and GenAI limits
         if (apiCollection.isMcpCollection()) {
+            // Get combined limit that ensures both MCP and GenAI limits are respected
+            SyncLimit combinedLimit = com.akto.billing.UsageMetricUtils.getCombinedAgenticSyncLimit(Context.accountId.get());
+            if (combinedLimit.checkLimit) {
+                return new Pair<>(combinedLimit, MetricTypes.MCP_ASSET_COUNT);
+            }
             return new Pair<>(mcpAssetsSyncLimit, MetricTypes.MCP_ASSET_COUNT);
         }
 
         if (apiCollection.isGenAICollection()) {
+            // Get combined limit that ensures both MCP and GenAI limits are respected
+            SyncLimit combinedLimit = com.akto.billing.UsageMetricUtils.getCombinedAgenticSyncLimit(Context.accountId.get());
+            if (combinedLimit.checkLimit) {
+                return new Pair<>(combinedLimit, MetricTypes.AI_ASSET_COUNT);
+            }
             return new Pair<>(aiAssetsSyncLimit, MetricTypes.AI_ASSET_COUNT);
         }
-        // add ai sync limit in future
+
         return new Pair<>(apiSyncLimit, MetricTypes.ACTIVE_ENDPOINTS);
     }
 
