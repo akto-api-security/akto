@@ -1,10 +1,11 @@
 
-import React, { useState, useEffect } from 'react';
-import { Box, Text, VerticalStack, HorizontalStack, Card, Badge, Button, Icon } from '@shopify/polaris';
+import { useState, useEffect } from 'react';
+import { Box, Text, VerticalStack, HorizontalStack, Card, Badge, Button, Icon, Avatar } from '@shopify/polaris';
 import ReactFlow, { Background, Handle, Position, getBezierPath } from 'react-flow-renderer';
 import TooltipText from '../../../components/shared/TooltipText';
 import { CustomersMinor, AutomationMajor, MagicMajor } from "@shopify/polaris-icons";
 import agentDiscoveryData from './AgentDiscoveryDummyData';
+import MCPIcon from "@/assets/MCP_Icon.svg"
 
 // Custom Node Component following ApiDependencyNode pattern
 function AgentNode({ data }) {
@@ -18,6 +19,8 @@ function AgentNode({ data }) {
         return { borderColor: '#f97316', backgroundColor: '#fff7ed' }; // Orange
       case 'ai-model':
         return { borderColor: '#ec4899', backgroundColor: '#fdf2f8' }; // Pink
+      case 'mcp':
+        return { borderColor: '#4cbebbff', backgroundColor: '#ecfdf5' }; // Yellow-Green
       default:
         return { borderColor: '#6b7280', backgroundColor: '#f9fafb' }; // Gray
     }
@@ -31,6 +34,8 @@ function AgentNode({ data }) {
         return AutomationMajor; // AI Agent icon - automation/intelligent systems
       case 'ai-model':
         return MagicMajor; // LLM/AI Model icon - AI magic/processing
+      case "mcp":
+        return MCPIcon; // Custom MCP icon
       default:
         return CustomersMinor;
     }
@@ -60,7 +65,9 @@ function AgentNode({ data }) {
                     />
                   </Box>
                   <HorizontalStack gap={1} align="center">
-                    <Icon source={IconComponent} color="base" />
+                    {typeof IconComponent === 'string' ? 
+                    <Avatar source={IconComponent} size={"extraSmall"} /> : 
+                    <Icon source={IconComponent} />}
                     <Box width={component.category==="ai-model" ? "160px" : "110px"}>
                       <Text variant="bodySm" color="base">
                         {component.label}
@@ -233,6 +240,28 @@ function AgentDiscoverGraph({ apiCollectionId }) {
       }
     });
 
+    formattedEdges.push({
+      id: 'ai-to-mcp',
+      source: 'ai-agent',
+      target: 'mcp',
+      type: 'agentEdge',
+      data: {
+        connectionType: 'MCP',
+        isExternal: false
+      }
+    });
+
+    formattedEdges.push({
+      id: 'mcp-to-api',
+      source: 'mcp',
+      target: 'external',
+      type: 'agentEdge',
+      data: {
+        connectionType: 'MCP',
+        isExternal: false
+      }
+    });
+
     return { nodes: formattedNodes, edges: formattedEdges };
   };
 
@@ -247,7 +276,7 @@ function AgentDiscoverGraph({ apiCollectionId }) {
       <Box padding="4">
         <VerticalStack gap="4">
           <HorizontalStack align="space-between">
-            <Text variant="headingMd">AI Agent Scanner Architecture</Text>
+            <Text variant="headingMd">Architecture</Text>
             <HorizontalStack gap="2">
               {Object.entries(getCategoryStats()).map(([category, count]) => (
                 <Badge key={category} status="info">
