@@ -81,8 +81,14 @@ public class Main {
         try {
             String deploymentId = System.getenv("DEPLOYMENT_ID");
             if (deploymentId == null || deploymentId.isEmpty()) return;
-            com.akto.dto.deployment.DeploymentConfig dc = dataActor.fetchDeploymentConfigById(deploymentId);
+            com.akto.dto.deployment.DeploymentConfig dc = dataActor.fetchDeploymentConfig(deploymentId);
             EnvConfig.hydrate(dc);
+            try {
+                Map<String, String> snapshot = EnvConfig.snapshot();
+                dataActor.sendDeploymentConfig(deploymentId, snapshot);
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb(e, "Failed to send deployment config after hydrate");
+            }
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "initEnvConfig failed: " + e.getMessage());
         }

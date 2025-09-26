@@ -27,7 +27,9 @@ public final class EnvConfig {
 
     public static String get(String key, String defaultValue) {
         String v = envMap.get(key);
-        return v != null ? v : defaultValue;
+        if (v != null) return v;
+        String sys = System.getenv(key);
+        return sys != null ? sys : defaultValue;
     }
 
     public static Map<String, String> snapshot() {

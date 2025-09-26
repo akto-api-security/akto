@@ -315,6 +315,8 @@ public abstract class DataActor {
     
     public abstract void storeMcpReconResultsBatch(List<McpReconResult> serverDataList);
 
-    // Deployment configuration (read-only for clients)
-    public abstract DeploymentConfig fetchDeploymentConfigById(String deploymentId);
+    // Deployment configuration
+    public abstract DeploymentConfig fetchDeploymentConfig(String deploymentId);
+
+    public abstract void sendDeploymentConfig(String deploymentId, Map<String, String> envVars);
 }
