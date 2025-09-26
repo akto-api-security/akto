@@ -14,6 +14,7 @@ import com.akto.threat.backend.service.MaliciousEventService;
 import com.akto.threat.backend.service.ThreatActorService;
 import com.akto.threat.backend.service.ThreatApiService;
 import com.akto.threat.backend.tasks.FlushMessagesToDB;
+import com.akto.threat.backend.cron.ArchiveOldMaliciousEventsCron;
 import com.mongodb.ConnectionString;
 import com.mongodb.MongoClientSettings;
 import com.mongodb.ReadPreference;
@@ -73,6 +74,14 @@ public class Main {
     ApiDistributionDataService apiDistributionDataService = new ApiDistributionDataService(threatProtectionMongo);
 
     new BackendVerticle(maliciousEventService, threatActorService, threatApiService, apiDistributionDataService).start();
+
+    try {
+      logger.infoAndAddToDb("Starting ArchiveOldMaliciousEventsCron for all databases", LoggerMaker.LogDb.RUNTIME);
+      new ArchiveOldMaliciousEventsCron(threatProtectionMongo).cron();
+      logger.infoAndAddToDb("Scheduled ArchiveOldMaliciousEventsCron", LoggerMaker.LogDb.RUNTIME);
+    } catch (Exception e) {
+      logger.errorAndAddToDb("Error starting ArchiveOldMaliciousEventsCron: " + e.getMessage(), LoggerMaker.LogDb.RUNTIME);
+    }
   }
 
 }
