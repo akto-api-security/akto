@@ -975,21 +975,21 @@ function SingleTestRunPage() {
                   }
                   return (
                     <HorizontalStack gap="2" align="center">
-                      {(() => { const sev = severityFor(allTestResultsStats.count429); return (
+                      {allTestResultsStats.count429 > 0 && (() => { const sev = severityFor(allTestResultsStats.count429); return (
                         <div className={`badge-wrapper-${sev.toUpperCase()}`}>
                           <Badge>
                             429: {allTestResultsStats.count429}
                           </Badge>
                         </div>
                       )})()}
-                      {(() => { const sev = severityFor(allTestResultsStats.count500); return (
+                      {allTestResultsStats.count500 > 0 && (() => { const sev = severityFor(allTestResultsStats.count500); return (
                         <div className={`badge-wrapper-${sev.toUpperCase()}`}>
                           <Badge>
                             5XX: {allTestResultsStats.count500}
                           </Badge>
                         </div>
                       )})()}
-                      {(() => { const sev = severityFor(allTestResultsStats.countCloudflare); return (
+                      {allTestResultsStats.countCloudflare > 0 && (() => { const sev = severityFor(allTestResultsStats.countCloudflare); return (
                         <div className={`badge-wrapper-${sev.toUpperCase()}`}>
                           <Badge>
                           Cloudflare errors: {allTestResultsStats.countCloudflare}
