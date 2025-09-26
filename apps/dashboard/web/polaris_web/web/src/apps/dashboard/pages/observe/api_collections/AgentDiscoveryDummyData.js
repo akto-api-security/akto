@@ -442,6 +442,278 @@ const agentDiscoveryData = {
             }
         ]
     },
+    "-1214040103": {
+        components: [
+            {
+                id: 'external',
+                label: 'Kite API server',
+                type: 'API Server',
+                description: 'API server',
+                x: 700,
+                y: 160,
+                status: 'active',
+                category: 'external'
+            },
+            {
+                id: 'ai-agent',
+                label: 'Cursor',
+                type: 'AI Agent',
+                description: 'Central AI agent processing requests',
+                x: 100,
+                y: 160,
+                status: 'active',
+                category: 'agent'
+            },
+            {
+                id: 'mcp',
+                label: 'mcp.kite.trade',
+                type: 'MCP Server',
+                description: 'MCP',
+                x: 400,
+                y: 160,
+                status: 'active',
+                category: 'mcp'
+            }
+        ]
+    },
+    "806508600": {
+        components: [
+            {
+                id: 'external',
+                label: 'Vulnerable API server',
+                type: 'API Server',
+                description: 'API server',
+                x: 700,
+                y: 160,
+                status: 'active',
+                category: 'external'
+            },
+            {
+                id: 'ai-agent',
+                label: 'Cursor',
+                type: 'AI Agent',
+                description: 'Central AI agent processing requests',
+                x: 100,
+                y: 160,
+                status: 'active',
+                category: 'agent'
+            },
+            {
+                id: 'mcp',
+                label: 'mcp.vulnerable.io',
+                type: 'MCP Server',
+                description: 'MCP',
+                x: 400,
+                y: 160,
+                status: 'active',
+                category: 'mcp'
+            }
+        ]
+    },
+    "1498019923": {
+        components: [
+            {
+                id: 'external',
+                label: 'LambdaTest API server',
+                type: 'API Server',
+                description: 'API server',
+                x: 700,
+                y: 160,
+                status: 'active',
+                category: 'external'
+            },
+            {
+                id: 'ai-agent',
+                label: 'Cursor',
+                type: 'AI Agent',
+                description: 'Central AI agent processing requests',
+                x: 100,
+                y: 160,
+                status: 'active',
+                category: 'agent'
+            },
+            {
+                id: 'mcp',
+                label: 'mcp-api.lambdatest.com',
+                type: 'MCP Server',
+                description: 'MCP',
+                x: 400,
+                y: 160,
+                status: 'active',
+                category: 'mcp'
+            }
+        ]
+    },
+    "1741353695": {
+        components: [
+            {
+                id: 'external',
+                label: 'Square API server',
+                type: 'API Server',
+                description: 'API server',
+                x: 700,
+                y: 160,
+                status: 'active',
+                category: 'external'
+            },
+            {
+                id: 'ai-agent',
+                label: 'Cursor',
+                type: 'AI Agent',
+                description: 'Central AI agent processing requests',
+                x: 100,
+                y: 160,
+                status: 'active',
+                category: 'agent'
+            },
+            {
+                id: 'mcp',
+                label: 'mcp.squareup.com',
+                type: 'MCP Server',
+                description: 'MCP',
+                x: 400,
+                y: 160,
+                status: 'active',
+                category: 'mcp'
+            }
+        ]
+    },
+    "369380821": {
+        components: [
+            {
+                id: 'external',
+                label: 'Test API server',
+                type: 'API Server',
+                description: 'API server',
+                x: 700,
+                y: 160,
+                status: 'active',
+                category: 'external'
+            },
+            {
+                id: 'ai-agent',
+                label: 'Cursor',
+                type: 'AI Agent',
+                description: 'Central AI agent processing requests',
+                x: 100,
+                y: 160,
+                status: 'active',
+                category: 'agent'
+            },
+            {
+                id: 'mcp',
+                label: 'mcp.testkg.com',
+                type: 'MCP Server',
+                description: 'MCP',
+                x: 400,
+                y: 160,
+                status: 'active',
+                category: 'mcp'
+            }
+        ]
+    },
+    "-134853966": {
+        components: [
+            {
+                id: 'external',
+                label: 'app.akto.io',
+                type: 'API Server',
+                description: 'API server',
+                x: 700,
+                y: 160,
+                status: 'active',
+                category: 'external'
+            },
+            {
+                id: 'ai-agent',
+                label: 'Cursor',
+                type: 'AI Agent',
+                description: 'Central AI agent processing requests',
+                x: 100,
+                y: 160,
+                status: 'active',
+                category: 'agent'
+            },
+            {
+                id: 'mcp',
+                label: 'mcp.akto.io',
+                type: 'MCP Server',
+                description: 'MCP',
+                x: 400,
+                y: 160,
+                status: 'active',
+                category: 'mcp'
+            }
+        ]
+    },
+    "-1091509450": {
+        components: [
+            {
+                id: 'external',
+                label: 'Playwright API server',
+                type: 'API Server',
+                description: 'API server',
+                x: 700,
+                y: 160,
+                status: 'active',
+                category: 'external'
+            },
+            {
+                id: 'ai-agent',
+                label: 'Cursor',
+                type: 'AI Agent',
+                description: 'Central AI agent processing requests',
+                x: 100,
+                y: 160,
+                status: 'active',
+                category: 'agent'
+            },
+            {
+                id: 'mcp',
+                label: 'playwright/mcp',
+                type: 'MCP Server',
+                description: 'MCP',
+                x: 400,
+                y: 160,
+                status: 'active',
+                category: 'mcp'
+            }
+        ]
+    },
+    "-1889683798": {
+        components: [
+            {
+                id: 'external',
+                label: 'Local file system',
+                type: 'File system',
+                description: 'API server',
+                x: 700,
+                y: 160,
+                status: 'active',
+                category: 'external'
+            },
+            {
+                id: 'ai-agent',
+                label: 'Cursor',
+                type: 'AI Agent',
+                description: 'Central AI agent processing requests',
+                x: 100,
+                y: 160,
+                status: 'active',
+                category: 'agent'
+            },
+            {
+                id: 'mcp',
+                label: 'mcp-server-text-editor',
+                type: 'MCP Server',
+                description: 'MCP',
+                x: 400,
+                y: 160,
+                status: 'active',
+                category: 'mcp'
+            }
+        ]
+    },
 }
 
 export default agentDiscoveryData;
