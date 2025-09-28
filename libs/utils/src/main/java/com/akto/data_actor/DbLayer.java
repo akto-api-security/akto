@@ -203,7 +203,7 @@ public class DbLayer {
 
         for (TestingRun testingRun : testingRunList) {
             String miniTestingServiceName = testingRun.getMiniTestingServiceName();
-            if(!miniTestingServiceName.isEmpty()) {
+            if(miniTestingServiceName != null && !miniTestingServiceName.isEmpty()) {
                 List<ModuleInfo> moduleInfos = ModuleInfoDao.instance.
                         findAll(Filters.eq(ModuleInfo.NAME, miniTestingServiceName), 0, 1,
                                 Sorts.descending(ModuleInfo.LAST_HEARTBEAT_RECEIVED));
