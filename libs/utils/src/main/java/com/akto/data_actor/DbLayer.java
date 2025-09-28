@@ -181,7 +181,7 @@ public class DbLayer {
                 try {
                     fetchAndFailOutdatedTests();
                 } catch (Exception e) {
-                    loggerMaker.errorAndAddToDb(e, "Error while updating out");
+                    loggerMaker.errorAndAddToDb(e, "Error while updating outdated tests: " + e.getMessage());
                     //Ignore
                 }
                 lastUpdatedTsMap.put(Context.accountId.get(), Context.now());
