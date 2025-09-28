@@ -181,7 +181,7 @@ public class DbLayer {
                 try {
                     fetchAndFailOutdatedTests();
                 } catch (Exception e) {
-                    loggerMaker.errorAndAddToDb(e, "Error while updating out");
+                    loggerMaker.errorAndAddToDb(e, "Error while updating outdated tests: " + e.getMessage());
                     //Ignore
                 }
                 lastUpdatedTsMap.put(Context.accountId.get(), Context.now());
@@ -203,7 +203,7 @@ public class DbLayer {
 
         for (TestingRun testingRun : testingRunList) {
             String miniTestingServiceName = testingRun.getMiniTestingServiceName();
-            if(!miniTestingServiceName.isEmpty()) {
+            if(miniTestingServiceName != null && !miniTestingServiceName.isEmpty()) {
                 List<ModuleInfo> moduleInfos = ModuleInfoDao.instance.
                         findAll(Filters.eq(ModuleInfo.NAME, miniTestingServiceName), 0, 1,
                                 Sorts.descending(ModuleInfo.LAST_HEARTBEAT_RECEIVED));
