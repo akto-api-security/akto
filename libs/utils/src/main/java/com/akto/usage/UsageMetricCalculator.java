@@ -185,27 +185,69 @@ public class UsageMetricCalculator {
     public static int calculateTestRuns(UsageMetric usageMetric) {
         int measureEpoch = usageMetric.getMeasureEpoch();
 
-        Bson demoAndDeactivatedCollFilter = excludeDemosAndDeactivated(TestingRunResult.API_INFO_KEY + "." + ApiInfo.ApiInfoKey.API_COLLECTION_ID);
+        // Get valid collection IDs (excluding demos and deactivated collections)
+        Set<Integer> validCollectionIds = getValidCollectionIds();
 
+        // Apply RBAC filtering to get user-allowed collection IDs
+        Set<Integer> rbacFilteredCollectionIds = applyRbacFiltering(validCollectionIds);
+
+        // Create optimized filters using $in instead of $nin
         List<Bson> filters = new ArrayList<Bson>(){{
             add(Filters.gt(TestingRunResult.END_TIMESTAMP, measureEpoch));
-            add(demoAndDeactivatedCollFilter);
+            add(Filters.in(TestingRunResult.API_INFO_KEY + "." + ApiInfo.ApiInfoKey.API_COLLECTION_ID, rbacFilteredCollectionIds));
         }};
 
-        // TODO: When we shift vulnerable test results into new collection completely {without making copy}, fix count here then.
+        // Use direct MongoDB count with RBAC filtering included
+        Bson testRunsFilter = Filters.and(filters);
+        int testRuns = (int) TestingRunResultDao.instance.getMCollection().countDocuments(testRunsFilter);
 
-        int testRuns = (int) TestingRunResultDao.instance.count(Filters.and(filters));
-
-        /*
-         * NOTE: not using a single nin query,
-         * because this approach uses indexes more efficiently.
-         */
-
-        filters.add(Filters.in(TestResult.TEST_RESULTS_ERRORS, getInvalidTestErrors()));
-        int invalidTestRuns = (int) TestingRunResultDao.instance.count(Filters.and(filters));
+        // Calculate invalid test runs count
+        List<Bson> invalidRunFilters = new ArrayList<>(filters);
+        invalidRunFilters.add(Filters.in(TestResult.TEST_RESULTS_ERRORS, getInvalidTestErrors()));
+        Bson invalidTestRunsFilter = Filters.and(invalidRunFilters);
+        int invalidTestRuns = (int) TestingRunResultDao.instance.getMCollection().countDocuments(invalidTestRunsFilter);
+        
         int finalCount = Math.max(testRuns - invalidTestRuns, 0);
 
         return finalCount;
+    }
+
+    /**
+     * Apply RBAC filtering to collection IDs - ensures user only sees collections they have access to
+     */
+    private static Set<Integer> applyRbacFiltering(Set<Integer> collectionIds) {
+        try {
+            if ((Context.userId.get() != null || Context.contextSource.get() != null) && Context.accountId.get() != null) {
+                List<Integer> userAllowedCollections = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
+                if (userAllowedCollections != null && !userAllowedCollections.isEmpty()) {
+                    // Intersect valid collections with user-allowed collections
+                    return collectionIds.stream()
+                        .filter(userAllowedCollections::contains)
+                        .collect(Collectors.toSet());
+                }
+            }
+        } catch (Exception e) {
+            // Fall back to original collections if RBAC filtering fails
+        }
+        return collectionIds;
+    }
+
+    /**
+     * Get valid collection IDs (all collections excluding demos and deactivated)
+     * This avoids using $nin queries in favor of $in queries
+     */
+    private static Set<Integer> getValidCollectionIds() {
+        // Get all API collections
+        List<ApiCollection> allCollections = ApiCollectionsDao.instance.findAll(Filters.empty());
+        
+        // Get demo and deactivated collection IDs
+        Set<Integer> demosAndDeactivated = getDemosAndDeactivated();
+        
+        // Filter out demos and deactivated collections
+        return allCollections.stream()
+            .map(ApiCollection::getId)
+            .filter(id -> !demosAndDeactivated.contains(id))
+            .collect(Collectors.toSet());
     }
 
     public static int calculateActiveAccounts(UsageMetric usageMetric) {
