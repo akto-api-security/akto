@@ -26,8 +26,7 @@ function FilterComponent({ includeCategoryNameEquals, excludeCategoryNameEquals,
 
         try {
             const category = getDashboardCategory();
-            const short = (category || '').split(" ")[0].toLowerCase();
-            updateThreatFiltersStore(templates, short)
+            updateThreatFiltersStore(templates, shortHand)
         } catch (e) {
             console.error(`Failed to update SessionStore threat filters: ${e?.message}`);
         }
