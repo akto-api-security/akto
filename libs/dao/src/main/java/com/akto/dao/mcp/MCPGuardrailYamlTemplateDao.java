@@ -45,8 +45,7 @@ public class MCPGuardrailYamlTemplateDao extends AccountsContextDao<YamlTemplate
     }
 
     public List<YamlTemplate> fetchTemplatesByType(String type) {
-        // Since YamlTemplate doesn't have a type field, we'll filter by tags or info content
-        // For now, we'll return all active templates and let the parser handle type filtering
+        //todo: shivam add filtering by type
         return fetchActiveTemplates();
     }
 

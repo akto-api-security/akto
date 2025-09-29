@@ -11,8 +11,12 @@ import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.McpReconRequest;
 import com.akto.dao.mcp.MCPGuardrailYamlTemplateDao;
 import com.akto.dto.mcp.MCPGuardrailConfig;
+import com.akto.dto.mcp.MCPGuardrailConfigYamlParser;
 import com.akto.dto.mcp.MCPGuardrailType;
+import com.akto.utils.MCPGuardrailUtil;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Updates;
+import org.bson.conversions.Bson;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.billing.Tokens;
 import com.akto.dto.billing.UningestedApiOverage;
@@ -48,6 +52,7 @@ import com.akto.notifications.slack.SlackAlerts;
 import com.akto.notifications.slack.SlackSender;
 import com.akto.util.enums.GlobalEnums;
 import com.akto.utils.CustomAuthUtil;
+import com.akto.util.Constants;
 import com.akto.utils.KafkaUtils;
 import com.akto.utils.RedactAlert;
 import com.akto.utils.SampleDataLogs;
@@ -162,6 +167,9 @@ public class DbAction extends ActionSupport {
     
     @Getter @Setter
     private boolean activeOnly = true;
+    
+    @Getter @Setter
+    private String content;
 
     private ModuleInfo moduleInfo;
 
@@ -3002,6 +3010,54 @@ public class DbAction extends ActionSupport {
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error fetching MCP Guardrail types: " + e.toString());
             addActionError("Failed to fetch MCP Guardrail types");
+            return Action.ERROR.toUpperCase();
+        }
+    }
+
+    /**
+     * Save MCP Guardrail YAML template
+     */
+    public String saveMCPGuardrailTemplate() {
+        try {
+            if (content == null || content.trim().isEmpty()) {
+                addActionError("Template content is required");
+
+                return Action.ERROR.toUpperCase();
+            }
+
+            // Parse the YAML content to validate it
+            MCPGuardrailConfig guardrailConfig = MCPGuardrailConfigYamlParser.parseTemplate(content);
+            
+            if (guardrailConfig.getId() == null || guardrailConfig.getId().trim().isEmpty()) {
+                addActionError("Template ID is required");
+                return Action.ERROR.toUpperCase();
+            }
+            
+            if (guardrailConfig.getFilter() == null) {
+                addActionError("Template filter configuration is required");
+                return Action.ERROR.toUpperCase();
+            }
+
+            if (!guardrailConfig.getFilter().getIsValid()) {
+                addActionError("Invalid filter configuration: " + guardrailConfig.getFilter().getErrMsg());
+                return Action.ERROR.toUpperCase();
+            }
+
+            // Get database updates for the template
+            String userEmail = "system"; // Default user email, can be overridden by request
+            List<Bson> updates = MCPGuardrailUtil.getDbUpdateForTemplate(content, userEmail);
+            
+            // Update or insert the template
+            MCPGuardrailYamlTemplateDao.instance.updateOne(
+                    Filters.eq(Constants.ID, guardrailConfig.getId()),
+                    Updates.combine(updates));
+
+            loggerMaker.infoAndAddToDb("Saved MCP Guardrail template with ID: " + guardrailConfig.getId(), LogDb.DASHBOARD);
+            return Action.SUCCESS.toUpperCase();
+            
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error saving MCP Guardrail template: " + e.toString());
+            addActionError("Failed to save MCP Guardrail template: " + e.getMessage());
             return Action.ERROR.toUpperCase();
         }
     }
