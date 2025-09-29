@@ -21,6 +21,7 @@ import com.akto.dto.ApiCollectionUsers;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.ApiInfo.AuthType;
+import com.akto.dto.rbac.UsersCollectionsList;
 import com.akto.dto.testing.TestingEndpoints;
 import com.akto.dto.type.SingleTypeInfo;
 import com.mongodb.client.model.Filters;
@@ -87,9 +88,13 @@ public class UnauthenticatedEndpoint extends TestingEndpoints {
 
     public static void updateCollections(){
         ApiCollectionUsers.reset(UNAUTHENTICATED_GROUP_ID);
+        Bson apiContextFilter = UsersCollectionsList.getApiContextFilter();
 
         List<ApiCollection> apiCollections = ApiCollectionsDao.instance.findAll(
-            Filters.ne(ApiCollection._TYPE, ApiCollection.Type.API_GROUP.toString()), Projections.include("_id")
+            Filters.and(
+                apiContextFilter,
+                Filters.ne(ApiCollection._TYPE, ApiCollection.Type.API_GROUP.toString())
+            ), Projections.include("_id")
         );
 
         Bson unauthenticatedFilter = Filters.in(

@@ -154,4 +154,24 @@ public class UsersCollectionsList {
         }
         return collectionIds;
     }
+
+    public static Bson getApiContextFilter() {
+        return Filters.and(
+            Filters.exists(ApiCollection.TAGS_STRING, false),
+            Filters.nor(
+                Filters.elemMatch(ApiCollection.TAGS_STRING, Filters.eq(CollectionTags.KEY_NAME, Constants.AKTO_MCP_SERVER_TAG)),
+                Filters.elemMatch(ApiCollection.TAGS_STRING, Filters.eq(CollectionTags.KEY_NAME, Constants.AKTO_GEN_AI_TAG))
+            )
+        );
+    }
+
+    public static Bson getApiContextFilterForAgenticTraffic() {
+        return Filters.and(
+            Filters.exists(ApiCollection.TAGS_STRING, true),
+            Filters.or(
+                Filters.elemMatch(ApiCollection.TAGS_STRING, Filters.eq(CollectionTags.KEY_NAME, Constants.AKTO_MCP_SERVER_TAG)),
+                Filters.elemMatch(ApiCollection.TAGS_STRING, Filters.eq(CollectionTags.KEY_NAME, Constants.AKTO_GEN_AI_TAG))
+            )
+        );
+    }
 }

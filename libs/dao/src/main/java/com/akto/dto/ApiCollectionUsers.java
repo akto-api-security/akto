@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -34,6 +35,7 @@ import com.akto.dto.testing.TestingEndpoints;
 import com.akto.dto.testing.custom_groups.UnauthenticatedEndpoint;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.util.Constants;
+import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.Accumulators;
@@ -151,7 +153,9 @@ public class ApiCollectionUsers {
         conditions.forEach((condition) -> {
             Bson conditionFilter = condition.returnFiltersMap().get(type);
             if(condition.getOperator().equals(TestingEndpoints.Operator.OR)){
-                orFilters.add(conditionFilter);
+                if(!conditionFilter.equals(Filters.empty())){
+                    orFilters.add(conditionFilter);
+                }
             } else {
                 filters.add(conditionFilter);
             }
@@ -159,17 +163,38 @@ public class ApiCollectionUsers {
         if(!orFilters.isEmpty()){
             filters.add(Filters.or(orFilters));
         }
-        return Filters.and(filters);
+        return filters.isEmpty() ? Filters.empty() : Filters.and(filters);
+    }
+
+    private static String getCollectionIdField(CollectionType type) {
+        String prefix = TestingEndpoints.getFilterPrefix(type);
+        if (prefix.isEmpty()) {
+            return SingleTypeInfo._API_COLLECTION_ID;
+        }
+        return prefix + "apiCollectionId";
     }
 
     private static void operationForCollectionId(List<TestingEndpoints> conditions, int apiCollectionId, Bson update, Bson matchFilter, boolean remove) {
+        // Get context collections for API source
+        Set<Integer> contextCollections = UsersCollectionsList.getContextCollectionsForUser(Context.accountId.get(), CONTEXT_SOURCE.API);
+        
         Map<CollectionType, Bson> filtersMap = new HashMap<>();
         for (CollectionType type : CollectionType.values()) {
             Bson filter = getFilters(conditions, type);
-            if(remove){
+            if(remove && !filter.equals(Filters.empty())){
                 filter = Filters.nor(filter);
             }
-            Bson finalFilter = Filters.and(matchFilter, filter);
+            Bson finalFilter = filter.equals(Filters.empty()) ? matchFilter : Filters.and(matchFilter, filter);
+            
+            // Add context collections filter based on operation type
+            if (contextCollections != null && !contextCollections.isEmpty()) {
+                String collectionIdField = getCollectionIdField(type);
+                Bson contextFilter = remove 
+                    ? Filters.nin(collectionIdField, contextCollections)  // For remove: NOT in context collections
+                    : Filters.in(collectionIdField, contextCollections);  // For add: ARE in context collections
+                finalFilter = Filters.and(finalFilter, contextFilter);
+            }
+            
             filtersMap.put(type, finalFilter);
         }
         updateCollectionsForCollectionId(filtersMap, update);
@@ -200,6 +225,19 @@ public class ApiCollectionUsers {
             operationForCollectionId(conditions, apiCollectionId, update, matchFilter, true);
         }
 
+    }
+
+    public static void keepOnlyApiCollectionId(int apiCollectionId) {
+        // Set collectionIds to contain only the specified apiCollectionId
+        Bson update = Updates.set(SingleTypeInfo._COLLECTION_IDS, Collections.singletonList(apiCollectionId));
+        Bson matchFilter = Filters.in(SingleTypeInfo._COLLECTION_IDS, apiCollectionId);
+
+        // Since conditions will be empty, directly update collections without complex filtering
+        Map<CollectionType, Bson> filtersMap = new HashMap<>();
+        for (CollectionType type : CollectionType.values()) {
+            filtersMap.put(type, matchFilter);
+        }
+        updateCollectionsForCollectionId(filtersMap, update);
     }
 
     public static void computeCollectionsForCollectionId(List<TestingEndpoints> conditions, int apiCollectionId) {
