@@ -1,21 +1,21 @@
 # MCP Guardrails Library
 
-A Go library for implementing security guardrails in Model Context Protocol (MCP) proxy servers. This library provides comprehensive data sanitization, content filtering, rate limiting, and input validation capabilities to secure MCP communications.
+A Golang library for implementing guardrails in MCP (Model Context Protocol) applications. This library fetches guardrail templates from an API and provides functions to modify requests and responses based on regex patterns defined in the templates.
 
 ## Features
 
-- **Data Sanitization**: Automatically redact sensitive information like credit cards, SSNs, emails, API keys, and passwords
-- **Content Filtering**: Block or warn about malicious content, SQL injection attempts, XSS, and other security threats
-- **Rate Limiting**: Implement token bucket rate limiting to prevent abuse
-- **Input Validation**: Validate MCP requests and parameters
-- **Output Filtering**: Filter and sanitize MCP responses
-- **Comprehensive Logging**: Detailed logging of all guardrail operations
-- **Extensible**: Easy to add custom patterns and filters
+- **Automatic Template Fetching**: Fetches guardrail templates from the API at regular intervals (default: 10 minutes)
+- **Request/Response Modification**: Modifies requests and responses based on regex patterns in templates
+- **YAML Template Parsing**: Parses YAML templates containing request_payload and response_payload filters
+- **JSON Support**: Handles both string and JSON data modification
+- **Health Monitoring**: Provides health status and template statistics
+- **Sensitive Data Detection**: Detects and sanitizes sensitive data based on patterns
+- **Thread-Safe**: All operations are thread-safe with proper locking
 
 ## Installation
 
 ```bash
-go get github.com/akto/mcp-guardrails
+go get github.com/akto-api-security/akto/libs/mcp-guardrails
 ```
 
 ## Quick Start
@@ -24,244 +24,181 @@ go get github.com/akto/mcp-guardrails
 package main
 
 import (
-    "encoding/json"
-    "log"
+    "fmt"
     "time"
-    
-    "github.com/akto/mcp-guardrails"
+    "github.com/akto-api-security/akto/libs/mcp-guardrails"
 )
 
 func main() {
-    // Create guardrail configuration
-    config := &guardrails.GuardrailConfig{
-        EnableDataSanitization: true,
-        SensitiveFields:        []string{"password", "api_key", "secret"},
-        
-        EnableContentFiltering: true,
-        BlockedKeywords:        []string{"malicious", "dangerous"},
-        
-        EnableRateLimiting: true,
-        RateLimitConfig: guardrails.RateLimitConfig{
-            RequestsPerMinute: 100,
-            BurstSize:         10,
-            WindowSize:        time.Minute,
-        },
-        
-        EnableInputValidation: true,
-        ValidationRules: map[string]string{
-            "method": "required",
-        },
-        
-        EnableLogging: true,
-        LogLevel:      "INFO",
+    // Create configuration
+    config := guardrails.ClientConfig{
+        APIURL:        "http://localhost:8082",
+        AuthToken:     "your-auth-token",
+        FetchInterval: 10 * time.Minute,
     }
 
-    // Create guardrail engine
+    // Create and start the guardrail engine
     engine := guardrails.NewGuardrailEngine(config)
+    engine.Start()
 
-    // Process MCP response
-    response := &guardrails.MCPResponse{
-        ID: "1",
-        Result: json.RawMessage(`{
-            "user": {
-                "name": "John Doe",
-                "email": "john@example.com",
-                "password": "secret123",
-                "credit_card": "1234-5678-9012-3456"
-            }
-        }`),
-    }
-
-    result := engine.ProcessResponse(response)
+    // Modify a request
+    requestData := `{"method": "test", "data": "1234-5678-9012-3456"}`
+    result := engine.ModifyRequest(requestData)
     
     if result.Blocked {
-        log.Printf("Response blocked: %s", result.BlockReason)
-        return
+        fmt.Printf("Request blocked: %s\n", result.Reason)
     }
-
-    if len(result.Warnings) > 0 {
-        log.Printf("Warnings: %v", result.Warnings)
-    }
-
-    // Use sanitized response
-    sanitizedResponse := result.SanitizedResponse
-    log.Printf("Response sanitized successfully")
 }
 ```
 
-## Configuration
+## API Reference
 
-### GuardrailConfig
+### ClientConfig
 
-The main configuration struct that controls all guardrail features:
+Configuration for the guardrail client.
 
 ```go
-type GuardrailConfig struct {
-    // Data Sanitization
-    EnableDataSanitization bool     `json:"enable_data_sanitization"`
-    SensitiveFields        []string `json:"sensitive_fields"`
-    RedactionPatterns      []string `json:"redaction_patterns"`
-    
-    // Content Filtering
-    EnableContentFiltering bool     `json:"enable_content_filtering"`
-    BlockedKeywords        []string `json:"blocked_keywords"`
-    AllowedDomains         []string `json:"allowed_domains"`
-    
-    // Rate Limiting
-    EnableRateLimiting bool          `json:"enable_rate_limiting"`
-    RateLimitConfig    RateLimitConfig `json:"rate_limit_config"`
-    
-    // Input Validation
-    EnableInputValidation bool              `json:"enable_input_validation"`
-    ValidationRules       map[string]string `json:"validation_rules"`
-    
-    // Output Filtering
-    EnableOutputFiltering bool     `json:"enable_output_filtering"`
-    OutputFilters         []string `json:"output_filters"`
-    
-    // Logging
-    EnableLogging bool   `json:"enable_logging"`
-    LogLevel      string `json:"log_level"`
+type ClientConfig struct {
+    APIURL        string        // API base URL
+    AuthToken     string        // Authentication token
+    FetchInterval time.Duration // Template fetch interval
 }
 ```
 
-### Rate Limit Configuration
+### GuardrailEngine
+
+Main engine for managing guardrails.
+
+#### Methods
+
+- `NewGuardrailEngine(config ClientConfig) *GuardrailEngine` - Creates a new engine
+- `Start()` - Starts periodic template fetching
+- `Stop()` - Stops the engine
+- `TriggerTemplateFetching() error` - Manually triggers template fetching
+- `ModifyRequest(requestData string) ModificationResult` - Modifies a request
+- `ModifyResponse(responseData string) ModificationResult` - Modifies a response
+- `ModifyRequestJSON(requestData []byte) (ModificationResult, error)` - Modifies JSON request
+- `ModifyResponseJSON(responseData []byte) (ModificationResult, error)` - Modifies JSON response
+- `GetTemplates() map[string]ParsedTemplate` - Returns all loaded templates
+- `GetTemplate(id string) (ParsedTemplate, bool)` - Returns a specific template
+- `GetTemplateStats() map[string]interface{}` - Returns template statistics
+- `SanitizeData(data string, patterns []string) string` - Sanitizes sensitive data
+- `CheckForSensitiveData(data string, patterns []string) (bool, []string)` - Checks for sensitive data
+- `IsHealthy() bool` - Checks if the engine is healthy
+- `GetHealthStatus() map[string]interface{}` - Returns detailed health status
+
+### ModificationResult
+
+Result of request/response modification.
 
 ```go
-type RateLimitConfig struct {
-    RequestsPerMinute int           `json:"requests_per_minute"`
-    BurstSize         int           `json:"burst_size"`
-    WindowSize        time.Duration `json:"window_size"`
+type ModificationResult struct {
+    Modified bool     `json:"modified"`  // Whether data was modified
+    Blocked  bool     `json:"blocked"`  // Whether request/response was blocked
+    Reason   string   `json:"reason"`   // Block reason (if blocked)
+    Warnings []string `json:"warnings"` // Warning messages
+    Data     string   `json:"data"`     // Modified data
 }
+```
+
+## Template Format
+
+Templates are YAML files with the following structure:
+
+```yaml
+id: PIIDataLeak
+filter:
+  or:
+    - request_payload:
+        regex:
+          - "\\b\\d{4}[- ]?\\d{4}[- ]?\\d{4}\\b"
+    - response_payload:
+        regex:
+          - "\\b\\d{4}[- ]?\\d{4}[- ]?\\d{4}\\b"
+info:
+  name: "PIIDataLeak"
+  description: "PII Data Leak detection"
+  severity: MEDIUM
+  category:
+    name: "PIIDataLeak"
+    displayName: "PII Data Leak"
 ```
 
 ## Usage Examples
 
-### Data Sanitization
+### Basic Usage
 
 ```go
-config := &guardrails.GuardrailConfig{
-    EnableDataSanitization: true,
-    SensitiveFields: []string{"password", "api_key", "secret"},
+// Create engine
+config := guardrails.ClientConfig{
+    APIURL:        "http://localhost:8082",
+    AuthToken:     "testing",
+    FetchInterval: 10 * time.Minute,
 }
-
 engine := guardrails.NewGuardrailEngine(config)
+engine.Start()
 
-// Add custom sensitive pattern
-customPattern := guardrails.SensitiveDataPattern{
-    Name:        "custom_id",
-    Pattern:     `\b[A-Z]{2}\d{6}\b`,
-    Replacement: "***REDACTED_ID***",
-    Description: "Custom ID format",
-}
-engine.AddSensitivePattern(customPattern)
-```
+// Modify request
+requestData := `{"method": "test", "data": "1234-5678-9012-3456"}`
+result := engine.ModifyRequest(requestData)
 
-### Content Filtering
-
-```go
-config := &guardrails.GuardrailConfig{
-    EnableContentFiltering: true,
-}
-
-engine := guardrails.NewGuardrailEngine(config)
-
-// Add custom content filter
-filter := guardrails.ContentFilter{
-    Type:        "keyword",
-    Pattern:     "internal",
-    Action:      "warn",
-    Description: "Internal information detected",
-}
-engine.AddContentFilter(filter)
-```
-
-### Rate Limiting
-
-```go
-config := &guardrails.GuardrailConfig{
-    EnableRateLimiting: true,
-    RateLimitConfig: guardrails.RateLimitConfig{
-        RequestsPerMinute: 60,
-        BurstSize:         5,
-        WindowSize:        time.Minute,
-    },
-}
-
-engine := guardrails.NewGuardrailEngine(config)
-
-// Process requests (rate limiting is automatic)
-request := &guardrails.MCPRequest{
-    ID:     "test",
-    Method: "tools/list",
-}
-
-result := engine.ProcessRequest(request)
 if result.Blocked {
-    log.Printf("Request blocked: %s", result.BlockReason)
+    log.Printf("Request blocked: %s", result.Reason)
+} else if result.Modified {
+    log.Printf("Request modified: %s", result.Data)
 }
 ```
 
-### Input Validation
+### JSON Processing
 
 ```go
-config := &guardrails.GuardrailConfig{
-    EnableInputValidation: true,
-    ValidationRules: map[string]string{
-        "method": "required",
-        "id":     "alphanumeric",
-    },
+// Process JSON request
+jsonRequest := []byte(`{"method": "test", "data": "1234-5678-9012-3456"}`)
+result, err := engine.ModifyRequestJSON(jsonRequest)
+if err != nil {
+    log.Printf("Error: %v", err)
+    return
 }
 
-engine := guardrails.NewGuardrailEngine(config)
+if result.Blocked {
+    log.Printf("JSON request blocked: %s", result.Reason)
+}
 ```
 
-## Default Patterns
+### Health Monitoring
 
-The library includes built-in patterns for common sensitive data:
+```go
+// Check health
+if !engine.IsHealthy() {
+    log.Printf("Guardrail engine is not healthy")
+}
 
-- **Credit Card Numbers**: `\b\d{4}[- ]?\d{4}[- ]?\d{4}[- ]?\d{4}\b`
-- **Social Security Numbers**: `\b\d{3}-\d{2}-\d{4}\b`
-- **Email Addresses**: `\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b`
-- **Phone Numbers**: `\b\d{3}[-.]?\d{3}[-.]?\d{4}\b`
-- **API Keys**: `(api[_-]?key|access[_-]?token|secret[_-]?key)\s*[:=]\s*["']?[A-Za-z0-9]{20,}["']?`
-- **Passwords**: `(password|passwd|pwd)\s*[:=]\s*["']?[^"'\s]+["']?`
-- **IP Addresses**: `\b(?:[0-9]{1,3}\.){3}[0-9]{1,3}\b`
-- **AWS Access Keys**: `AKIA[0-9A-Z]{16}`
-- **Private Keys**: `-----BEGIN\s+(?:RSA\s+)?PRIVATE\s+KEY-----`
+// Get detailed health status
+status := engine.GetHealthStatus()
+fmt.Printf("Health: %v\n", status["healthy"])
+fmt.Printf("Templates: %v\n", status["template_count"])
+```
 
-## Default Content Filters
+### Sensitive Data Handling
 
-Built-in content filters for security threats:
+```go
+// Check for sensitive data
+data := "My credit card is 1234-5678-9012-3456"
+patterns := []string{`\b\d{4}[- ]?\d{4}[- ]?\d{4}\b`}
 
-- **Code Execution**: `(eval|exec|system|shell_exec)`
-- **SQL Injection**: `(union\s+select|drop\s+table|delete\s+from)`
-- **XSS**: `<script[^>]*>.*?</script>`
-- **Sensitive Keywords**: `password`, `secret`, `token`, `admin`, `root`
+hasSensitive, matchedPatterns := engine.CheckForSensitiveData(data, patterns)
+if hasSensitive {
+    log.Printf("Sensitive data detected: %v", matchedPatterns)
+}
 
-## API Reference
-
-### Main Functions
-
-- `NewGuardrailEngine(config *GuardrailConfig) *GuardrailEngine`
-- `ProcessResponse(response *MCPResponse) *GuardrailResult`
-- `ProcessRequest(request *MCPRequest) *GuardrailResult`
-- `AddSensitivePattern(pattern SensitiveDataPattern)`
-- `AddContentFilter(filter ContentFilter)`
-- `UpdateConfig(config *GuardrailConfig)`
-
-### Data Structures
-
-- `MCPRequest`: MCP request structure
-- `MCPResponse`: MCP response structure
-- `GuardrailResult`: Result of guardrail processing
-- `SensitiveDataPattern`: Pattern for sensitive data detection
-- `ContentFilter`: Content filtering rule
-- `LogEntry`: Log entry structure
+// Sanitize data
+sanitized := engine.SanitizeData(data, patterns)
+log.Printf("Sanitized: %s", sanitized)
+```
 
 ## Testing
 
-Run the test suite:
+Run the tests:
 
 ```bash
 go test ./...
@@ -273,50 +210,94 @@ Run tests with coverage:
 go test -cover ./...
 ```
 
+Run benchmarks:
+
+```bash
+go test -bench=. ./...
+```
+
 ## Integration with MCP Proxy
 
-This library is designed to be integrated into MCP proxy servers. Here's a typical integration pattern:
+This library is designed to be imported by the MCP proxy application. The proxy can use it to:
+
+1. Fetch guardrail templates from the API
+2. Apply guardrails to incoming requests
+3. Apply guardrails to outgoing responses
+4. Monitor the health of the guardrail system
+
+Example integration:
 
 ```go
 // In your MCP proxy
-func handleMCPResponse(originalResponse *MCPResponse) *MCPResponse {
-    result := guardrailEngine.ProcessResponse(originalResponse)
-    
-    if result.Blocked {
-        // Return error response
-        return &MCPResponse{
-            ID: originalResponse.ID,
-            Error: &MCPError{
-                Code:    403,
-                Message: result.BlockReason,
-            },
-        }
+import "github.com/akto-api-security/akto/libs/mcp-guardrails"
+
+// Initialize guardrails
+config := guardrails.ClientConfig{
+    APIURL:        "http://localhost:8082",
+    AuthToken:     "your-token",
+    FetchInterval: 10 * time.Minute,
+}
+guardrailEngine := guardrails.NewGuardrailEngine(config)
+guardrailEngine.Start()
+
+// In your request handler
+func handleRequest(requestData []byte) ([]byte, error) {
+    result, err := guardrailEngine.ModifyRequestJSON(requestData)
+    if err != nil {
+        return nil, err
     }
     
-    // Return sanitized response
-    return result.SanitizedResponse
+    if result.Blocked {
+        return nil, fmt.Errorf("request blocked: %s", result.Reason)
+    }
+    
+    // Process the request...
+    responseData := processRequest(result.Data)
+    
+    // Apply response guardrails
+    responseResult, err := guardrailEngine.ModifyResponseJSON(responseData)
+    if err != nil {
+        return nil, err
+    }
+    
+    if responseResult.Blocked {
+        return nil, fmt.Errorf("response blocked: %s", responseResult.Reason)
+    }
+    
+    return []byte(responseResult.Data), nil
 }
 ```
 
-## Contributing
+## Configuration
 
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests for new functionality
-5. Run the test suite
-6. Submit a pull request
+The library supports the following configuration options:
+
+- `APIURL`: Base URL of the API server
+- `AuthToken`: Bearer token for API authentication
+- `FetchInterval`: How often to fetch templates (default: 10 minutes)
+
+## Error Handling
+
+The library provides comprehensive error handling:
+
+- Network errors during template fetching
+- Invalid JSON/YAML parsing
+- Regex compilation errors
+- Template validation errors
+
+All errors are logged and the library continues to operate with previously loaded templates.
+
+## Performance
+
+The library is optimized for performance:
+
+- Thread-safe operations with minimal locking
+- Efficient regex compilation and caching
+- Minimal memory allocation
+- Fast template matching
+
+Benchmark results are available in the test suite.
 
 ## License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
-
-## Security
-
-This library is designed for security but should be used as part of a comprehensive security strategy. Always:
-
-- Keep the library updated
-- Review and customize patterns for your specific needs
-- Monitor logs for security events
-- Test thoroughly in your environment
-- Consider additional security measures 
+This library is part of the Akto project and follows the same licensing terms.
