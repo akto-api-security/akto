@@ -372,4 +372,10 @@ public abstract class DataActor {
 
     public abstract void insertMCPAuditDataLog(McpAuditInfo auditInfo);
 
+    public abstract List<McpReconRequest> fetchPendingMcpReconRequests();
+
+    public abstract void updateMcpReconRequestStatus(String requestId, String status, int serversFound);
+
+    public abstract void storeMcpReconResultsBatch(List<McpReconResult> serverDataList);
+
 }
