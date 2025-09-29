@@ -534,18 +534,18 @@ const settingRequests = {
             data: {}
         })
     },
-    createCustomRole(apiCollectionIds, roleName, baseRole, defaultInviteRole) {
+    createCustomRole(apiCollectionIds, roleName, baseRole, defaultInviteRole, allowedFeaturesForUser) {
         return request({
             url: '/api/createCustomRole',
             method: 'post',
-            data: { apiCollectionIds, roleName, baseRole, defaultInviteRole }
+            data: { apiCollectionIds, roleName, baseRole, defaultInviteRole, allowedFeaturesForUser }
         })
     },
-    updateCustomRole(apiCollectionIds, roleName, baseRole, defaultInviteRole) {
+    updateCustomRole(apiCollectionIds, roleName, baseRole, defaultInviteRole, allowedFeaturesForUser) {
         return request({
             url: '/api/updateCustomRole',
             method: 'post',
-            data: {apiCollectionIds, roleName, baseRole, defaultInviteRole}
+            data: {apiCollectionIds, roleName, baseRole, defaultInviteRole, allowedFeaturesForUser}
         })
     },
     deleteCustomRole(roleName) {
@@ -660,6 +660,36 @@ const settingRequests = {
             url: '/api/downloadSamplePdf',
             method: 'post',
             data: {}
+        })
+    },
+    async deleteAllMaliciousEvents() {
+        return await request({
+            url: '/api/deleteAllMaliciousEvents',
+            method: 'post',
+            data: {}
+        })
+    },
+    getAllowedFeaturesForRBAC() {
+        return request({
+            url: '/api/allowedFeaturesForRBAC',
+            method: 'post',
+            data: {}
+        })
+    },
+    async deleteDuplicateEntries() {
+        return await request({
+            url: '/api/deleteDuplicateEntries',
+            method: 'post',
+            data: {}
+        })
+    },
+    updateCompulsoryDescription(compulsoryDescription) {
+        return request({
+            url: '/api/updateCompulsoryDescription',
+            method: 'post',
+            data: {
+                compulsoryDescription
+            }
         })
     }
 }

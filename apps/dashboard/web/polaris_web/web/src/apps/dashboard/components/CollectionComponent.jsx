@@ -6,6 +6,7 @@ import func from "@/util/func"
 import PersistStore from '../../main/PersistStore';
 import api from '../pages/testing/api';
 import Dropdown from './layouts/Dropdown';
+import { labelMap } from '../../main/labelHelperMap';
 
 const HTTP_METHODS = [
     {'label': 'GET', 'value': 'GET'},
@@ -26,8 +27,11 @@ function CollectionComponent(props) {
     const [apiEndpoints, setApiEndpoints] = useState({})
     const initialRegexText = (condition && condition?.type === 'REGEX') ? (condition?.data?.regex || '') : ''
     const initialHostRegexText = (condition && condition?.type === 'HOST_REGEX') ? (condition?.data?.host_regex || '') : ''
+    const initialTagsText = (condition && condition?.type === 'TAGS') ? (condition?.data?.query || '') : ''
     const [regexText, setRegexText] = useState(initialRegexText)
     const [hostRegexText, setHostRegexText] = useState(initialHostRegexText)
+    const [tagsText, setTagsText] = useState(initialTagsText)
+    const dashboardCategory = PersistStore(state => state.dashboardCategory)
 
     useEffect(() => {
         fetchApiEndpoints(condition.data)
@@ -83,11 +87,13 @@ function CollectionComponent(props) {
 
     const getApiEndpointsOptions = (data) => {
         return data.map(apiEndpoint => {
-            let str = func.toMethodUrlString(apiEndpoint);
+            let strLabel = func.toMethodUrlString({...apiEndpoint, shouldParse: true});
+            let strValue = func.toMethodUrlString({...apiEndpoint, shouldParse: false});
+
             return {
-                id: str,
-                label: str,
-                value: str
+                id: strValue,
+                label: strLabel,
+                value: strValue
             }
         })
     }
@@ -123,7 +129,7 @@ function CollectionComponent(props) {
                 <DropdownSearch
                     id={`api-endpoint-${index}`}
                     disabled={apiEndpoints?.endpoints == undefined || apiEndpoints.endpoints.length === 0}
-                    placeholder="Select API endpoint"
+                    placeholder={`Select ${labelMap[dashboardCategory]["API endpoint"]}`}
                     optionsList={apiEndpoints?.endpoints == undefined || typeof apiEndpoints.then == 'function' ? [] :
                         apiEndpoints.endpoints}
                     setSelected={(apiEndpoints) => {
@@ -150,6 +156,8 @@ function CollectionComponent(props) {
                 return {}
             case "HOST_REGEX":
                 return {}
+            case "TAGS":
+                return {}
             default:
                 return {}
         }
@@ -173,6 +181,10 @@ function CollectionComponent(props) {
             {
                 label: 'Host name matches regex',
                 value: 'HOST_REGEX'
+            },
+            {
+                label: 'Tags',
+                value: 'TAGS'
             }
         ]}
             initial={condition.type}
@@ -190,6 +202,11 @@ function CollectionComponent(props) {
     const handleHostRegexText = (val) => {
         setHostRegexText(val)
         dispatch({ type: "overwrite", index: index, key: "data", obj: {"host_regex":val } })
+    }
+
+    const handleTagsText = (val) => {
+        setTagsText(val)
+        dispatch({ type: "overwrite", index: index, key: "data", obj: {"query":val } })
     }
 
     const component = (condition, index) => {
@@ -215,6 +232,10 @@ function CollectionComponent(props) {
             case "HOST_REGEX":
                 return(
                     <TextField onChange={(val) => handleHostRegexText(val)} value={hostRegexText} />
+                )
+            case "TAGS":
+                return(
+                    <TextField onChange={(val) => handleTagsText(val)} value={tagsText} />
                 )
             default:
                 break;

@@ -8,6 +8,7 @@ import { SearchMinor, InfoMinor, LockMinor, ClockMinor, PasskeyMinor, LinkMinor,
 import api from "./api";
 import GetPrettifyEndpoint from "./GetPrettifyEndpoint";
 import ShowListInBadge from "../../components/shared/ShowListInBadge";
+import { getDashboardCategory } from "../../../main/labelHelper";
 
 const standardHeaders = [
     'accept', 'accept-ch', 'accept-ch-lifetime', 'accept-charset', 'accept-encoding', 'accept-language', 'accept-patch', 'accept-post', 'accept-ranges', 'access-control-allow-credentials', 'access-control-allow-headers', 'access-control-allow-methods', 'access-control-allow-origin', 'access-control-expose-headers', 'access-control-max-age', 'access-control-request-headers', 'access-control-request-method', 'age', 'allow', 'alt-svc', 'alt-used', 'authorization',
@@ -277,13 +278,13 @@ const transform = {
         }
     },
     fillSensitiveParams: (sensitiveParams, apiCollection) => {
-        sensitiveParams = sensitiveParams.reduce((z,e) => {
+        sensitiveParams = sensitiveParams && sensitiveParams.reduce((z,e) => {
             let key = [e.apiCollectionId + "-" + e.url + "-" + e.method]
             z[key] = z[key] || new Set()
             z[key].add(e.subType || {"name": "CUSTOM"})
             return z
         },{})
-        Object.entries(sensitiveParams).forEach(p => {
+        sensitiveParams && Object.entries(sensitiveParams).forEach(p => {
             let apiCollectionIndex = apiCollection.findIndex(e => {
                 return (e.apiCollectionId + "-" + e.url + "-" + e.method) === p[0]
             })
@@ -428,7 +429,7 @@ const transform = {
                     Object.keys(sortedSeverityInfo).length > 0 ? Object.keys(sortedSeverityInfo).map((key,index)=>{
                         return(
                             <div className={`badge-wrapper-${key}`}>
-                                <Badge size="small" key={index}>{sortedSeverityInfo[key].toString()}</Badge>
+                                <Badge size="small" key={index}>{Math.max(sortedSeverityInfo[key], 0).toString()}</Badge>
                             </div>
                         )
                     }):
@@ -548,6 +549,22 @@ const transform = {
     },
 
     getTruncatedUrl(url){
+        const category = getDashboardCategory();
+        if(category.includes("MCP")){
+            try {
+                const s = String(url);
+                const [path, tail = ""] = s.split(/(?=[?#])/); // keep ? or # in tail
+                const newPath = path
+                  .replace(/^.*?\/calls?(?:\/|$)/i, "/")       // keep only what's after /call or /calls
+                  .replace(/\/{2,}/g, "/");                    // collapse slashes
+                return (newPath.endsWith("/") && newPath !== "/")
+                  ? newPath.slice(0, -1) + tail
+                  : newPath + tail;
+            } catch (error) {
+                return url;
+            }
+            
+        }
         try {
             const parsedURL = new URL(url)
             const pathUrl = parsedURL.pathname.replace(/%7B/g, '{').replace(/%7D/g, '}');
@@ -741,6 +758,43 @@ const transform = {
             
             setDelta(data[data.length-1] - data[0])
         }
+    },
+
+    getUntrackedApisCollapsibleRow: (untrackedApis) => {
+        return (
+            <tr style={{padding: '0px !important', borderTop: '1px solid #dde0e4'}}>
+                <td colSpan={8} style={{padding: '0px !important', width: '100%'}}>
+                    {untrackedApis.map((api, index) => {
+                        const borderStyle = index < (untrackedApis.length - 1) ? {borderBlockEndWidth: 1} : {}
+                        return (
+                            <Box
+                                padding={"2"}
+                                paddingInlineStart={"4"}
+                                key={index}
+                                borderColor="border-subdued"
+                                {...borderStyle}
+                                width="100%"
+                            >
+                                <div style={{ display: "flex", alignItems: "center", width: "100%" }}>
+                                    <HorizontalStack gap="2" align="start" blockAlign="center">
+                                        <GetPrettifyEndpoint 
+                                            method={api.method} 
+                                            url={api.url} 
+                                            isNew={false}
+                                        />
+                                    </HorizontalStack>
+                                    <div style={{ marginLeft: "auto" }}>
+                                        <Text color="subdued" fontWeight="semibold">
+                                            {api.urlType || "STATIC"}
+                                        </Text>
+                                    </div>
+                                </div>
+                            </Box>
+                        )
+                    })}
+                </td>
+            </tr>
+        )
     }
 }
 

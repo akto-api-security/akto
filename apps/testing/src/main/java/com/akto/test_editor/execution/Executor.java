@@ -54,6 +54,8 @@ import static com.akto.runtime.utils.Utils.parseCookie;
 import org.apache.commons.lang3.StringUtils;
 import org.bson.types.ObjectId;
 
+import com.akto.util.McpSseEndpointHelper;
+
 
 public class Executor {
 
@@ -218,6 +220,9 @@ public class Executor {
                     testReq.getRequest().getHeaders().put("x-akto-original-url", Collections.singletonList(origRawApi.getRequest().getUrl()));
                     testReq.getRequest().getHeaders().put("x-akto-original-method", Collections.singletonList(origRawApi.getRequest().getMethod()));   
                 }
+
+                // Add SSE endpoint header for MCP collections
+                McpSseEndpointHelper.addSseEndpointHeader(testReq.getRequest(), apiInfoKey.getApiCollectionId());
 
                 testResponse = ApiExecutor.sendRequest(testReq.getRequest(), followRedirect, testingRunConfig, debug, testLogs, Utils.SKIP_SSRF_CHECK, false);
                 requestSent = true;
@@ -483,10 +488,23 @@ public class Executor {
                 String request = Utils.buildRequestIHttpFormat(rawApi);
 
                 String operationPrompt = "";
-                if (key.equals(Utils._MAGIC)) {
+
+                boolean isMagicContext = false;
+                // for $magic_context - no request is passed as context.
+                if (key.equals(Utils.MAGIC_CONTEXT)) {
                     operationPrompt = value.toString();
-                } else if (key.toString().startsWith(Utils._MAGIC)) {
-                    operationPrompt = key.toString().replace(Utils._MAGIC, "").trim();
+                    isMagicContext = true;
+                } else if (key.toString().startsWith(Utils.MAGIC_CONTEXT)) {
+                    operationPrompt = key.toString().replace(Utils.MAGIC_CONTEXT, "").trim();
+                    isMagicContext = true;
+                }
+
+                if (!isMagicContext) {
+                    if (key.equals(Utils._MAGIC)) {
+                        operationPrompt = value.toString();
+                    } else if (key.toString().startsWith(Utils._MAGIC)) {
+                        operationPrompt = key.toString().replace(Utils._MAGIC, "").trim();
+                    }
                 }
 
                 if (!operationPrompt.isEmpty()) {
@@ -494,7 +512,9 @@ public class Executor {
                     String operation = operationTypeLower + ": " + operationPrompt;
 
                     BasicDBObject queryData = new BasicDBObject();
-                    queryData.put(TestExecutorModifier._REQUEST, request);
+                    if (!isMagicContext) {
+                        queryData.put(TestExecutorModifier._REQUEST, request);
+                    }
                     queryData.put(TestExecutorModifier._OPERATION, operation);
                     BasicDBObject generatedData = new TestExecutorModifier().handle(queryData);
                     generatedOperationKeyValuePairs = parseGeneratedKeyValues(generatedData, operationTypeLower, value);

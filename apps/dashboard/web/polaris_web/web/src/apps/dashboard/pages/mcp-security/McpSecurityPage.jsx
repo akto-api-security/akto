@@ -14,7 +14,7 @@ function McpSecurityPage() {
     if (!stiggFeatures || Object.keys(stiggFeatures).length === 0) {
       return false;
     }
-    return stiggFeatures['MCP_SECURITY']?.isGranted || false;
+    return stiggFeatures['MCP_SECURITY']?.isGranted || true;
   }, []);
 
   const [apiCollectionIds, setApiCollectionIds] = useState([]);
@@ -82,7 +82,8 @@ function McpSecurityPage() {
     component: (
       <Box width="100%" paddingBlockStart={4}>
         <TestRunsPage
-          scopeApiCollectionIds={apiCollectionIds}
+        // Setting it to -1. When there are no MCP collections, the test results page will show all the test runs. We only need to show test runs for MCP collections only.
+          scopeApiCollectionIds={apiCollectionIds?.length > 0 ? apiCollectionIds : [-1]}
           showOnlyTable={true}
         />
       </Box>

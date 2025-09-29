@@ -8,7 +8,7 @@ import "./dashboard.css"
 import func from "@/util/func"
 import transform from "./testing/transform";
 import PersistStore from "../../main/PersistStore";
-import LocalStore from "../../main/LocalStorageStore";
+import LocalStore, { localStorePersistSync } from "../../main/LocalStorageStore";
 import ConfirmationModal from "../components/shared/ConfirmationModal";
 import AlertsBanner from "./AlertsBanner";
 import dashboardFunc from "./transform";
@@ -77,14 +77,25 @@ function Dashboard() {
     }
 
     const fetchFilterYamlTemplates = () => {
+        const category = PersistStore.getState().dashboardCategory;
+        const shortHand = category.split(" ")[0].toLowerCase();
         threatDetectionRequests.fetchFilterYamlTemplate().then((res) => {
-            let finalMap = {}
+            const maps = { mcp: {}, gen: {}, api: {} };
             res.templates.forEach((x) => {
                 let trimmed = {...x, content: '', ...x.info}
+                const name = trimmed?.category?.name?.toLowerCase();
                 delete trimmed['info']
-                finalMap[x.id] = trimmed;
+
+                if(name?.includes("mcp")) {
+                    maps.mcp[x.id] = trimmed;
+                } else if (name?.includes("gen")){
+                    maps.gen[x.id] = trimmed;
+                }else {
+                    maps.api[x.id] = trimmed;
+                }
             })
-            setThreatFiltersMap(finalMap)
+            setThreatFiltersMap(maps[shortHand])
+            
         })
     }
 
@@ -102,7 +113,7 @@ function Dashboard() {
     },[trafficAlerts.length])
 
     useEffect(() => {
-        if((allCollections && allCollections.length === 0) || (Object.keys(collectionsMap).length === 0)){
+        if(((allCollections && allCollections.length === 0) || (Object.keys(collectionsMap).length === 0)) && location.pathname !== "/dashboard/observe/inventory"){
             fetchAllCollections()
         }
         if (!subCategoryMap || (Object.keys(subCategoryMap).length === 0)) {
@@ -134,6 +145,12 @@ function Dashboard() {
                 localStorage.removeItem(key);
             }
         });
+
+        const cleanUpLocalStorePersistSync = localStorePersistSync(LocalStore);
+
+        return () => {
+            cleanUpLocalStorePersistSync();
+        };
     }, [])
 
     useEffect(() => {

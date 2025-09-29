@@ -18,18 +18,15 @@ import com.akto.threat.backend.constants.KafkaTopic;
 import com.akto.threat.backend.constants.MongoDBCollection;
 import com.akto.threat.backend.db.MaliciousEventModel;
 import com.akto.threat.backend.utils.KafkaUtils;
-import com.mongodb.client.DistinctIterable;
-import com.mongodb.client.MongoClient;
-import com.mongodb.client.MongoCollection;
-import com.mongodb.client.MongoCursor;
+import com.akto.threat.backend.utils.ThreatUtils;
+import com.akto.threat.backend.constants.StatusConstants;
+import com.mongodb.client.*;
 import com.mongodb.client.model.Filters;
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.UUID;
 
+import java.util.*;
+import java.util.List;
+
+import com.mongodb.client.model.Updates;
 import org.bson.Document;
 import org.bson.conversions.Bson;
 
@@ -38,6 +35,8 @@ public class MaliciousEventService {
   private final Kafka kafka;
   private final MongoClient mongoClient;
   private static final LoggerMaker logger = new LoggerMaker(MaliciousEventService.class);
+
+  private static final HashMap<String, Boolean> shouldNotCreateIndexes = new HashMap<>();
 
   public MaliciousEventService(
       KafkaConfig kafkaConfig, MongoClient mongoClient) {
@@ -78,6 +77,7 @@ public class MaliciousEventService {
             .setSeverity(evt.getSeverity())
             .setType(evt.getType())
             .setMetadata(evt.getMetadata().toString())
+            .setSuccessfulExploit(evt.getSuccessfulExploit())
             .build();
 
     this.kafka.send(
@@ -106,7 +106,7 @@ public class MaliciousEventService {
 
     Set<String> latestAttack =
         MaliciousEventService.<String>findDistinctFields(
-            coll, "subCategory", String.class, Filters.empty());
+            coll, "filterId", String.class, Filters.empty());
 
     Set<String> countries =
         MaliciousEventService.<String>findDistinctFields(
@@ -134,17 +134,26 @@ public class MaliciousEventService {
             coll, "latestApiEndpoint", String.class, Filters.empty());
     Set<String> subCategories =
         MaliciousEventService.<String>findDistinctFields(
-            coll, "subCategory", String.class, Filters.empty());
+            coll, "filterId", String.class, Filters.empty());
 
     return FetchAlertFiltersResponse.newBuilder().addAllActors(actors).addAllUrls(urls).addAllSubCategory(subCategories).build();
   }
 
   public ListMaliciousRequestsResponse listMaliciousRequests(
       String accountId, ListMaliciousRequestsRequest request) {
+
+    if(!shouldNotCreateIndexes.getOrDefault(accountId, false)) {
+      createIndexIfAbsent(accountId);
+    }
+
     int limit = request.getLimit();
     int skip = request.hasSkip() ? request.getSkip() : 0;
     Map<String, Integer> sort = request.getSortMap();
     ListMaliciousRequestsRequest.Filter filter = request.getFilter();
+
+    if(filter.getLatestAttackList() == null || filter.getLatestAttackList().isEmpty()) {
+      return ListMaliciousRequestsResponse.newBuilder().build();
+    }
 
     MongoCollection<MaliciousEventModel> coll =
         this.mongoClient
@@ -173,12 +182,38 @@ public class MaliciousEventService {
       query.append("subCategory", new Document("$in", filter.getSubCategoryList()));
     }
 
+
+    if (!filter.getLatestAttackList().isEmpty()) {
+      query.append("filterId", new Document("$in", filter.getLatestAttackList()));
+    }
+
+    // Handle status filter
+    if (filter.hasStatusFilter()) {
+      applyStatusFilter(query, filter.getStatusFilter());
+    }
+
     if (filter.hasDetectedAtTimeRange()) {
       TimeRangeFilter timeRange = filter.getDetectedAtTimeRange();
       long start = timeRange.hasStart() ? timeRange.getStart() : 0;
       long end = timeRange.hasEnd() ? timeRange.getEnd() : Long.MAX_VALUE;
 
       query.append("detectedAt", new Document("$gte", start).append("$lte", end));
+    }
+
+    if (filter.hasSuccessfulExploit()) {
+      boolean val = filter.getSuccessfulExploit();
+      if (val) {
+        query.append("successfulExploit", true);
+      } else {
+        List<Document> andConditions = new ArrayList<>();
+        andConditions.add(new Document(query));
+        andConditions.add(new Document("$or", Arrays.asList(
+            new Document("successfulExploit", false),
+            new Document("successfulExploit", new Document("$exists", false))
+        )));
+        query.clear();
+        query.append("$and", andConditions);
+      }
     }
 
     long total = coll.countDocuments(query);
@@ -191,6 +226,8 @@ public class MaliciousEventService {
       List<ListMaliciousRequestsResponse.MaliciousEvent> maliciousEvents = new ArrayList<>();
       while (cursor.hasNext()) {
         MaliciousEventModel evt = cursor.next();
+        String metadata = evt.getMetadata() != null ? evt.getMetadata() : "";
+
         maliciousEvents.add(
             ListMaliciousRequestsResponse.MaliciousEvent.newBuilder()
                 .setActor(evt.getActor())
@@ -209,6 +246,9 @@ public class MaliciousEventService {
                 .setType(evt.getType())
                 .setRefId(evt.getRefId())
                 .setEventTypeVal(evt.getEventType().toString())
+                .setMetadata(metadata)
+                .setStatus(evt.getStatus() != null ? evt.getStatus().toString() : StatusConstants.ACTIVE)
+                .setSuccessfulExploit(evt.getSuccessfulExploit() != null ? evt.getSuccessfulExploit() : false)
                 .build());
       }
       return ListMaliciousRequestsResponse.newBuilder()
@@ -216,5 +256,158 @@ public class MaliciousEventService {
           .addAllMaliciousEvents(maliciousEvents)
           .build();
     }
+  }
+
+  public void createIndexIfAbsent(String accountId) {
+    ThreatUtils.createIndexIfAbsent(accountId, mongoClient);
+    shouldNotCreateIndexes.put(accountId, true);
+  }
+
+  public int updateMaliciousEventStatus(String accountId, List<String> eventIds, Map<String, Object> filterMap, String status) {
+    try {
+      MongoCollection<MaliciousEventModel> coll = getMaliciousEventCollection(accountId);
+      MaliciousEventModel.Status eventStatus = MaliciousEventModel.Status.valueOf(status.toUpperCase());
+      Bson update = Updates.set("status", eventStatus.toString());
+
+      Document query = buildQuery(eventIds, filterMap, "update");
+      if (query == null) {
+        return 0;
+      }
+
+      String logMessage = String.format("Updating events %s to status: %s", 
+          getQueryDescription(eventIds, filterMap), status);
+      logger.info(logMessage);
+      
+      long modifiedCount = coll.updateMany(query, update).getModifiedCount();
+      return (int) modifiedCount;
+    } catch (Exception e) {
+      logger.error("Error updating malicious event status", e);
+      return 0;
+    }
+  }
+
+  public int deleteMaliciousEvents(String accountId, List<String> eventIds, Map<String, Object> filterMap) {
+    try {
+      MongoCollection<MaliciousEventModel> coll = getMaliciousEventCollection(accountId);
+      
+      Document query = buildQuery(eventIds, filterMap, "delete");
+      if (query == null) {
+        return 0;
+      }
+
+      String logMessage = "Deleting events " + getQueryDescription(eventIds, filterMap);
+      logger.info(logMessage);
+      
+      long deletedCount = coll.deleteMany(query).getDeletedCount();
+      logger.info("Deleted " + deletedCount + " malicious events");
+      
+      return (int) deletedCount;
+    } catch (Exception e) {
+      logger.error("Error deleting malicious events", e);
+      return 0;
+    }
+  }
+
+  private MongoCollection<MaliciousEventModel> getMaliciousEventCollection(String accountId) {
+    return this.mongoClient
+        .getDatabase(accountId)
+        .getCollection(
+            MongoDBCollection.ThreatDetection.MALICIOUS_EVENTS, MaliciousEventModel.class);
+  }
+
+  private Document buildQuery(List<String> eventIds, Map<String, Object> filterMap, String operation) {
+    if (eventIds != null && !eventIds.isEmpty()) {
+      // Query by event IDs
+      return new Document("_id", new Document("$in", eventIds));
+    } else if (filterMap != null && !filterMap.isEmpty()) {
+      // Query by filter criteria
+      return buildQueryFromFilter(filterMap);
+    } else {
+      logger.warn("Neither eventIds nor filterMap provided for " + operation);
+      return null;
+    }
+  }
+
+  private String getQueryDescription(List<String> eventIds, Map<String, Object> filterMap) {
+    if (eventIds != null && !eventIds.isEmpty()) {
+      return "by IDs: " + eventIds;
+    } else if (filterMap != null && !filterMap.isEmpty()) {
+      Document query = buildQueryFromFilter(filterMap);
+      return "by filter: " + query.toJson();
+    }
+    return "";
+  }
+
+
+  private void applyStatusFilter(Document query, String statusFilter) {
+    if (statusFilter == null) {
+      return;
+    }
+
+    if (StatusConstants.UNDER_REVIEW.equals(statusFilter)) {
+      query.append("status", StatusConstants.UNDER_REVIEW);
+    } else if (StatusConstants.IGNORED.equals(statusFilter)) {
+      query.append("status", StatusConstants.IGNORED);
+    } else if (StatusConstants.ACTIVE.equals(statusFilter) || StatusConstants.EVENTS_FILTER.equals(statusFilter)) {
+      // For Events tab: show null, empty, or ACTIVE status
+      List<Document> orConditions = Arrays.asList(
+        new Document("status", new Document("$exists", false)),
+        new Document("status", null),
+        new Document("status", ""),
+        new Document("status", StatusConstants.ACTIVE)
+      );
+      query.append("$or", orConditions);
+    }
+  }
+
+  private Document buildQueryFromFilter(Map<String, Object> filter) {
+    Document query = new Document();
+
+    // Handle ips/actors filter
+    List<String> ips = (List<String>) filter.get("ips");
+    if (ips != null && !ips.isEmpty()) {
+      query.append("actor", new Document("$in", ips));
+    }
+
+    // Handle urls filter
+    List<String> urls = (List<String>) filter.get("urls");
+    if (urls != null && !urls.isEmpty()) {
+      query.append("latestApiEndpoint", new Document("$in", urls));
+    }
+
+    // Handle types filter
+    List<String> types = (List<String>) filter.get("types");
+    if (types != null && !types.isEmpty()) {
+      query.append("type", new Document("$in", types));
+    }
+
+    // Handle latestAttack filter
+    List<String> latestAttack = (List<String>) filter.get("latestAttack");
+    if (latestAttack != null && !latestAttack.isEmpty()) {
+      query.append("filterId", new Document("$in", latestAttack));
+    }
+
+    // Handle time range
+    Map<String, Integer> timeRange = (Map<String, Integer>) filter.get("detected_at_time_range");
+    if (timeRange != null) {
+      Integer start = timeRange.get("start");
+      Integer end = timeRange.get("end");
+      Document timeQuery = new Document();
+      if (start != null) {
+        timeQuery.append("$gte", start);
+      }
+      if (end != null) {
+        timeQuery.append("$lte", end);
+      }
+      if (!timeQuery.isEmpty()) {
+        query.append("detectedAt", timeQuery);
+      }
+    }
+
+    // Handle status filter
+    String statusFilter = (String) filter.get("statusFilter");
+    applyStatusFilter(query, statusFilter);
+
+    return query;
   }
 }

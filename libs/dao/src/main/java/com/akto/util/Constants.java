@@ -15,7 +15,21 @@ public class Constants {
     public static final String TIMESTAMP = "timestamp";
 
     public static final String AWS_REGION = "AWS_REGION";
+    public static final String AKTO_THREAT_PROTECTION_BACKEND_HOST = "tbs.akto.io";
     public static final String AKTO_THREAT_DETECTION_CACHE_PREFIX = "akto:threat:schema:";
+
+    // IP API ratelimit cache keys
+    public static final String RATE_LIMIT_CACHE_PREFIX = "ratelimit:";
+    public static final String API_RATE_LIMIT_CONFIDENCE = "rateLimitConfidence";
+    public static final String API_RATE_LIMIT_MITIGATION = "mitigation";
+    public static final int RATE_LIMIT_UNLIMITED_REQUESTS = -1;
+    public static final String P50_CACHE_KEY = "p50";
+    public static final String P75_CACHE_KEY = "p75";
+    public static final String P90_CACHE_KEY = "p90";
+    public static final String MAX_REQUESTS_CACHE_KEY= "max_requests";
+
+    // Threat module, successful exploit category
+    public static final String THREAT_PROTECTION_SUCCESSFUL_EXPLOIT_CATEGORY = "SuccessfulExploit";
 
     public static final String AWS_ACCOUNT_ID = "AWS_ACCOUNT_ID";
 
@@ -43,7 +57,7 @@ public class Constants {
     public static final boolean KAFKA_DEBUG_MODE = (StringUtils.hasLength(System.getenv("KAFKA_DEBUG_MODE")) && System.getenv("KAFKA_DEBUG_MODE").equals("true"));
     public static final int MAX_REQUEST_TIMEOUT = StringUtils.hasLength(System.getenv("MAX_REQUEST_TIMEOUT")) ? Integer.parseInt(System.getenv("MAX_REQUEST_TIMEOUT")) : 15000;
     public static final int LINGER_MS_KAFKA = StringUtils.hasLength(System.getenv("LINGER_MS_KAFKA")) ?  Integer.parseInt(System.getenv("LINGER_MS_KAFKA")) : 10000;
-    public static final int MAX_WAIT_FOR_SLEEP = 3 * 60; // 3 minutes
+    public static final int MAX_WAIT_FOR_SLEEP = 60; // 1 minute
     public static final String UNDERSCORE = "_";
     public static final String AKTO_AGENT_NAME = "AKTO-AI-agents";
     public static final Model AKTO_AGENT_MODEL = new Model(AKTO_AGENT_NAME, ModelType.AZURE_OPENAI, new HashMap<>());
@@ -52,5 +66,16 @@ public class Constants {
 
     public final static String DEFAULT_AKTO_DASHBOARD_URL = "https://app.akto.io";
     public static final String AKTO_DISCOVERED_APIS_COLLECTION = "shadow_apis";
+    public static final String AKTO_MCP_SERVER_TAG = "mcp-server";
+    public static final String AKTO_GEN_AI_TAG = "gen-ai";
+    public static final String AKTO_GUARD_RAIL_TAG = "guard-rail";
+    public static final String AKTO_MCP_TOOLS_TAG = "mcp-tool";
+    public static final String AKTO_MCP_RESOURCES_TAG = "mcp-resource";
+    public static final String AKTO_MCP_PROMPTS_TAG = "mcp-prompt";
+    public static final String AKTO_MCP_TOOL = "TOOL";
+    public static final String AKTO_MCP_RESOURCE = "RESOURCE";
+    public static final String AKTO_MCP_PROMPT = "PROMPT";
+    public static final String AKTO_MCP_SERVER = "SERVER";
+    public static final String STATUS_PENDING = "Pending";
 
 }

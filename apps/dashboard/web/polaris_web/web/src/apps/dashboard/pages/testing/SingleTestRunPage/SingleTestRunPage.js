@@ -15,6 +15,7 @@ import {
   ProgressBar,
   Tooltip,
   Banner,
+  Modal,
 } from '@shopify/polaris';
 
 import {
@@ -25,7 +26,8 @@ import {
   RefreshMajor,
   CustomersMinor,
   PlusMinor,
-  SettingsMinor
+  SettingsMinor,
+  ViewMajor
 } from '@shopify/polaris-icons';
 import api from "../api";
 import observeApi from "../../observe/api";
@@ -49,6 +51,9 @@ import { produce } from "immer"
 import GithubServerTable from "../../../components/tables/GithubServerTable";
 import RunTest from '../../observe/api_collections/RunTest';
 import TableStore from '../../../components/tables/TableStore'
+import issuesFunctions from '@/apps/dashboard/pages/issues/module';
+import TestingRunEndpointsModal from './TestingRunEndpointsModal';
+
 let sortOptions = [
   { label: 'Severity', value: 'severity asc', directionLabel: 'Highest severity', sortKey: 'total_severity', columnIndex: 3 },
   { label: 'Severity', value: 'severity desc', directionLabel: 'Lowest severity', sortKey: 'total_severity', columnIndex: 3 },
@@ -130,6 +135,7 @@ function SingleTestRunPage() {
   const [workflowTest, setWorkflowTest] = useState(false);
   const [secondaryPopover, setSecondaryPopover] = useState(false)
   const setErrorsObject = TestingStore((state) => state.setErrorsObject)
+  const setTestingEndpointsApisList = TestingStore((state) => state.setTestingEndpointsApisList)
   const currentTestingRuns = []
   const [updateTable, setUpdateTable] = useState("")
   const [testRunResultsCount, setTestRunResultsCount] = useState({})
@@ -138,7 +144,8 @@ function SingleTestRunPage() {
       "SKIPPED_EXEC_NEED_CONFIG": 0,
       "VULNERABLE": 0,
       "SKIPPED_EXEC_API_REQUEST_FAILED": 0,
-      "SKIPPED_EXEC": 0
+      "SKIPPED_EXEC": 0,
+      "IGNORED_ISSUES": 0
     })  
   const [testMode, setTestMode] = useState(false)
 
@@ -155,10 +162,19 @@ function SingleTestRunPage() {
   const [testingRunResultSummariesObj, setTestingRunResultSummariesObj] = useState({})
   const [allResultsLength, setAllResultsLength] = useState(undefined)
   const [currentSummary, setCurrentSummary] = useState('')
+  const [testResultsStatsCount, setTestResultsStatsCount] = useState(0)
+  const [allTestResultsStats, setAllTestResultsStats] = useState({
+    count429: 0,
+    count500: 0,
+    countCloudflare: 0,
+    totalCount: 0
+  })
+
   const localCategoryMap = LocalStore.getState().categoryMap
   const localSubCategoryMap = LocalStore.getState().subCategoryMap
   const [useLocalSubCategoryData, setUseLocalSubCategoryData] = useState(false)
   const [copyUpdateTable, setCopyUpdateTable] = useState("");
+  const [confirmationModal, setConfirmationModal] = useState(false);
 
   const tableTabMap = {
     vulnerable: "VULNERABLE",
@@ -215,6 +231,38 @@ function SingleTestRunPage() {
     })
   }
 
+  async function fetchTestResultsStats(testingRunHexId, testingRunResultSummaryHexId) {
+    try {
+      if (testingRunHexId && testingRunResultSummaryHexId) {
+        const reqBase = { testingRunHexId: testingRunHexId, testingRunResultSummaryHexId: testingRunResultSummaryHexId }
+        
+        const [res429, res5xx, resCf] = await Promise.allSettled([
+          api.fetchTestResultsStatsCount({ ...reqBase, patternType: 'HTTP_429' }),
+          api.fetchTestResultsStatsCount({ ...reqBase, patternType: 'HTTP_5XX' }),
+          api.fetchTestResultsStatsCount({ ...reqBase, patternType: 'CLOUDFLARE' })
+        ]);
+
+        const count429 = res429.status === 'fulfilled' ? (res429.value || 0) : 0;
+        const count500 = res5xx.status === 'fulfilled' ? (res5xx.value || 0) : 0;
+        const countCloudflare = resCf.status === 'fulfilled' ? (resCf.value || 0) : 0;
+
+        setTestResultsStatsCount(count429);
+        setAllTestResultsStats({
+          count429,
+          count500,
+          countCloudflare,
+          totalCount: count429 + count500 + countCloudflare
+        });
+      } else {
+        setTestResultsStatsCount(0);
+        setAllTestResultsStats({ count429: 0, count500: 0, countCloudflare: 0, totalCount: 0 });
+      }
+    } catch (error) {
+      setTestResultsStatsCount(0);
+      setAllTestResultsStats({ count429: 0, count500: 0, countCloudflare: 0, totalCount: 0 });
+    }
+  }
+
   async function setSummary(summary, initialCall = false) {
     setTempLoading((prev) => {
       prev.running = false;
@@ -236,8 +284,15 @@ function SingleTestRunPage() {
 
       return { ...prev };
     });
+    let updateTable = currentSummary.hexId !== summary.hexId;
     setCurrentSummary(summary);
-    if (!initialCall) {
+    
+    // Fetch test results stats for the new summary
+    if (summary && summary.hexId) {
+      fetchTestResultsStats(hexId, summary.hexId);
+    }
+    
+    if (!initialCall && updateTable) {
       setUpdateTable(Date.now().toString())
     }
   }
@@ -273,6 +328,11 @@ function SingleTestRunPage() {
     }
   })
 
+  const populateTestingEndpointsApisList = (apiEndpoints) => {
+    const testingEndpointsApisList = transform.prepareTestingEndpointsApisList(apiEndpoints)
+    setTestingEndpointsApisList(testingEndpointsApisList)
+  } 
+
   const populateApiNameFilterChoices = async (testingRun) => {
     if (testingRun?.testingEndpoints) {
       const {testingEndpoints} = testingRun;
@@ -287,6 +347,10 @@ function SingleTestRunPage() {
             if (response?.apiInfoList) {
               const limitedEndpoints = response.apiInfoList.slice(
                   0, 5000);
+
+              const limitedEndpointsIds = limitedEndpoints.map(endpoint => endpoint.id);
+              populateTestingEndpointsApisList(limitedEndpointsIds);
+
               apiEndpoints = getApiEndpointsMap(limitedEndpoints, testingEndpoints.type);
             }
           } catch (error) {
@@ -296,6 +360,7 @@ function SingleTestRunPage() {
       } else if (testingEndpoints.type === "CUSTOM"
           && testingEndpoints.apisList) {
         const limitedApis = testingEndpoints.apisList.slice(0, 5000);
+        populateTestingEndpointsApisList(limitedApis);
         apiEndpoints = getApiEndpointsMap(limitedApis, testingEndpoints.type);
       }
 
@@ -313,7 +378,7 @@ function SingleTestRunPage() {
   }
 
   const getApiEndpointsMap = (endpoints, type) => {
-    if(type == null || type === undefined || type === "COLLECTION_WISE"){
+    if(type === null || type === undefined || type === "COLLECTION_WISE"){
       return endpoints.map(endpoint => ({
         label: endpoint.id.url,
         value: endpoint.id.url
@@ -358,8 +423,6 @@ function SingleTestRunPage() {
 
   const fetchTableData = async (sortKey, sortOrder, skip, limit, filters, filterOperators, queryValue) => {
     let testRunResultsRes = []
-    let totalIgnoredIssuesCount = 0
-    let ignoredIssueListCount = 0
     let localCountMap = testRunCountMap;
     const { testingRun, workflowTest, testingRunType } = testingRunResultSummariesObj
     if (testingRun === undefined) {
@@ -386,54 +449,42 @@ function SingleTestRunPage() {
     setTestingRunConfigId(testingRun.testingRunConfig?.id || -1)
     setSelectedTestRun(localSelectedTestRun);
     if (localSelectedTestRun.testingRunResultSummaryHexId) {
-      if (selectedTab === 'ignored_issues') {
-        let ignoredTestRunResults = []
-        await api.fetchIssuesByStatusAndSummaryId(localSelectedTestRun.testingRunResultSummaryHexId, ["IGNORED"], sortKey, sortOrder, skip, limit, filters).then((resp) => {
-          const ignoredIssuesTestingResult = resp?.testingRunResultList || [];
-          ignoredTestRunResults = transform.prepareTestRunResults(hexId, ignoredIssuesTestingResult, localSubCategoryMap, subCategoryFromSourceConfigMap)
-        })
-        testRunResultsRes = ignoredTestRunResults
-        totalIgnoredIssuesCount = ignoredTestRunResults.length
-      } else {
-        await api.fetchTestingRunResults(localSelectedTestRun.testingRunResultSummaryHexId, tableTabMap[selectedTab], sortKey, sortOrder, skip, limit, filters, queryValue).then(({ testingRunResults, errorEnums, issueslistCount }) => {
-          ignoredIssueListCount = issueslistCount
-          testRunResultsRes = transform.prepareTestRunResults(hexId, testingRunResults, localSubCategoryMap, subCategoryFromSourceConfigMap)
+      await api.fetchTestingRunResults(localSelectedTestRun.testingRunResultSummaryHexId, tableTabMap[selectedTab], sortKey, sortOrder, skip, limit, filters, queryValue).then(({ testingRunResults, errorEnums, issuesDescriptionMap, jiraIssuesMapForResults }) => {
+          testRunResultsRes = transform.prepareTestRunResults(hexId, testingRunResults, localSubCategoryMap, subCategoryFromSourceConfigMap, issuesDescriptionMap, jiraIssuesMapForResults)
           if (selectedTab === 'domain_unreachable' || selectedTab === 'skipped' || selectedTab === 'need_configurations') {
             errorEnums['UNKNOWN_ERROR_OCCURRED'] = "OOPS! Unknown error occurred."
             setErrorsObject(errorEnums)
             setMissingConfigs(transform.getMissingConfigs(testRunResultsRes))
           }
-        })
-        if (!func.deepComparison(copyFilters, filters) || copyUpdateTable !== updateTable) {
-          if(copyUpdateTable !== updateTable){
-            setCopyUpdateTable(updateTable)
-          }else{
-            setCopyFilters(filters)
-          }
-          await api.fetchTestRunResultsCount(localSelectedTestRun.testingRunResultSummaryHexId).then((testCountMap) => {
-            if(testCountMap !== null){
-              localCountMap = JSON.parse(JSON.stringify(testCountMap))  
-            }
-            //Assuming vulnerable count is after removing ignored issues aLL - (OOTHER COUNT + IGNORED)
-            localCountMap['IGNORED_ISSUES'] = ignoredIssueListCount
-            let countOthers = 0;
-            Object.keys(localCountMap).forEach((x) => {
-              if (x !== 'ALL') {
-                countOthers += localCountMap[x]
-              }
-            })
-            localCountMap['SECURED'] = localCountMap['ALL'] >= countOthers ? localCountMap['ALL'] - countOthers : 0
-            const orderedValues = tableTabsOrder.map(key => localCountMap[tableTabMap[key]] || 0)
-            setTestRunResultsCount(orderedValues)
-            setTestRunCountMap(JSON.parse(JSON.stringify(localCountMap)));
-          })
+      })
+      if (!func.deepComparison(copyFilters, filters) || copyUpdateTable !== updateTable) {
+        if(copyUpdateTable !== updateTable){
+          setCopyUpdateTable(updateTable)
+        }else{
+          setCopyFilters(filters)
         }
+        await api.fetchTestRunResultsCount(localSelectedTestRun.testingRunResultSummaryHexId, filters).then((testCountMap) => {
+          if(testCountMap !== null){
+            localCountMap = JSON.parse(JSON.stringify(testCountMap))  
+          }
+          let countOthers = 0;
+          Object.keys(localCountMap).forEach((x) => {
+            if (x !== 'ALL') {
+              countOthers += localCountMap[x]
+            }
+          })
+          localCountMap['SECURED'] = localCountMap['ALL'] >= countOthers ? localCountMap['ALL'] - countOthers : 0
+          localCountMap['VULNERABLE'] = Math.abs(localCountMap['VULNERABLE'] - localCountMap['IGNORED_ISSUES']);
+          const orderedValues = tableTabsOrder.map(key => localCountMap[tableTabMap[key]] || 0)
+          setTestRunResultsCount(orderedValues)
+          setTestRunCountMap(JSON.parse(JSON.stringify(localCountMap)));
+        })
       }
     }
     const key = tableTabMap[selectedTab]
-    const total = (testRunCountMap[key] !== undefined && testRunCountMap[key] !== 0) ? testRunCountMap[key] : localCountMap[key]
+    const total = localCountMap[key]
     fillTempData(testRunResultsRes, selectedTab)
-    return { value: transform.getPrettifiedTestRunResults(testRunResultsRes), total: selectedTab === 'ignored_issues' ? totalIgnoredIssuesCount : total }
+    return { value: transform.getPrettifiedTestRunResults(testRunResultsRes), total: total }
   }
 
   useEffect(() => { handleAddSettings() }, [testingRunConfigSettings])
@@ -467,6 +518,10 @@ function SingleTestRunPage() {
       }
     }
 
+    // Fetch jira integration field metadata
+    if (window.JIRA_INTEGRATED === 'true') {
+      issuesFunctions.fetchCreateIssueFieldMetaData()
+    }
   }, []);
 
   const promotedBulkActions = () => {
@@ -494,8 +549,20 @@ function SingleTestRunPage() {
       case "STOPPED":
         return "Test has been stopped";
       case "COMPLETED":
+
+        let delta = Math.abs(selectedTestRun.startTimestamp - selectedTestRun.endTimestamp);
+        let earlyFinish = "";
+        let testRunTime = testingRunResultSummariesObj?.testingRun?.testRunTime;
+        if (testRunTime == null || testRunTime == undefined || testRunTime <= 0) {
+          testRunTime = 1800;
+        }
+
+        if (delta >= testRunTime) {
+          earlyFinish = "| Test exited because max time limit reached"
+        }
+
         return `Scanned ${func.prettifyEpoch(selectedTestRun.startTimestamp)} for a duration of
-        ${func.getTimeTakenByTest(selectedTestRun.startTimestamp, selectedTestRun.endTimestamp)}`;
+        ${func.getTimeTakenByTest(selectedTestRun.startTimestamp, selectedTestRun.endTimestamp)} ${earlyFinish}`;
       case "FAILED":
       case "FAIL":
         return "Test execution has failed during run";
@@ -558,7 +625,7 @@ function SingleTestRunPage() {
     setUpdateTable("")
 
     sortOptions = sortOptions.map(option => {
-      if (selectedIndex === 0 || selectedIndex == 5) {
+      if (selectedIndex === 0 || selectedIndex === 5) {
         if (option.label === 'Severity') {
           return { ...option, columnIndex: 3 }
         } else if (option.label === 'Run time') {
@@ -620,6 +687,8 @@ function SingleTestRunPage() {
   }
   
   const [activeFromTesting, setActiveFromTesting] = useState(false)
+  
+  const [showTestingEndpointsModal, setShowTestingEndpointsModal] = useState(false)
 
   const resultTable = (
     <>
@@ -638,6 +707,12 @@ function SingleTestRunPage() {
         testRunType={testingRunResultSummariesObj?.testingRunType} 
         disabled={window.USER_ROLE === "GUEST"}
         shouldDisable={selectedTestRun.type === "CI_CD" || selectedTestRun.type === "RECURRING"}
+      />
+      <TestingRunEndpointsModal
+        key={"testing-endpoints-modal"}
+        showTestingEndpointsModal={showTestingEndpointsModal}
+        setShowTestingEndpointsModal={setShowTestingEndpointsModal}
+        testingEndpoints={testingRunResultSummariesObj?.testingRun?.testingEndpoints}
       />
       <GithubServerTable
         key={"table"}
@@ -671,6 +746,25 @@ function SingleTestRunPage() {
         }}
         callFromOutside={updateTable}
       />
+    <Modal
+        open={confirmationModal}
+        onClose={() => setConfirmationModal(false)}
+        title="Re-Calculate issues count"
+        primaryAction={{
+          content: 'Re-Calculate',
+          onAction: () => handleRefreshTableCount(currentSummary.hexId),
+        }}
+        secondaryActions={[
+          {
+            content: 'Cancel',
+            onAction: () => setConfirmationModal(false),
+          },
+        ]}
+      >
+        <Modal.Section>
+          <Text>Are you sure you want to re-calculate issues count? This will recalculate the total number of issues based on the latest test results and may affect the FIXED or IGNORED issues in the current testing run</Text>
+        </Modal.Section>
+      </Modal>
     </>
   )
 
@@ -729,7 +823,7 @@ function SingleTestRunPage() {
     runningTestsComp, <TrendChart key={tempLoading.running} hexId={hexId} setSummary={setSummary} show={true} totalVulnerabilities={tableCountObj.vulnerable} />,
     metadataComponent(), loading ? <SpinnerCentered key="loading" /> : (!workflowTest ? resultTable : workflowTestBuilder)];
 
-  const openVulnerabilityReport = async () => {
+  const openVulnerabilityReport = async (summaryMode = false) => {
     const currentPageKey = "/dashboard/testing/" + selectedTestRun?.id + "/#" + selectedTab
     let selectedFilters = filtersMap[currentPageKey]?.filters || [];
     let filtersObj = {
@@ -742,7 +836,9 @@ function SingleTestRunPage() {
 
     await api.generatePDFReport(filtersObj, []).then((res) => {
       const responseId = res.split("=")[1];
-      window.open('/dashboard/testing/summary/' + responseId.split("}")[0], '_blank');
+      const summaryModeQueryParam = summaryMode === true ? 'summaryMode=true' : '';
+      const redirectUrl = `/dashboard/testing/summary/${responseId.split("}")[0]}?${summaryModeQueryParam}`;
+      window.open(redirectUrl, '_blank');
     })
   }
 
@@ -762,6 +858,7 @@ function SingleTestRunPage() {
     await api.handleRefreshTableCount(summaryHexId).then((res) => {
       func.setToast(true, false, "Re-calculating issues count")
       setSecondaryPopover(false)
+      setConfirmationModal(false)
     })
   }
 
@@ -817,12 +914,11 @@ function SingleTestRunPage() {
               const sev = item.split(' ')
               const tempSev = sev.length > 1 ? sev[1].toUpperCase() : ''
               return (
-                <div className={`badge-wrapper-${tempSev}`}>
-                  <Badge key={item}>{item}</Badge>
+                <div key={item} className={`badge-wrapper-${tempSev}`}>
+                  <Badge>{item}</Badge>
                 </div>
               )
             }
-
             )}
           <Button plain monochrome onClick={() => setUpdateTable(Date.now().toString())}><Tooltip content="Refresh page" dismissOnMouseOut> <Icon source={RefreshMajor} /></Tooltip></Button>
         </HorizontalStack>
@@ -844,18 +940,86 @@ function SingleTestRunPage() {
             <Box><Icon color="subdued" source={PriceLookupMinor} /></Box>
             <Text color="subdued" variant="bodyMd">{getHeadingStatus(selectedTestRun)}</Text>
           </HorizontalStack>
+          {allTestResultsStats.totalCount > 0 && (
+            <>
+              <Box width="1px" borderColor="border-subdued" borderInlineStartWidth="1" minHeight='16px' />
+              <HorizontalStack gap={"1"}>
+                <Box><Icon color="subdued" source={CircleInformationMajor} /></Box>
+                <Tooltip 
+                  content={
+                    <VerticalStack gap="2">
+                      <Text variant="bodyMd">API request error statistics breakdown:</Text>
+                      <VerticalStack gap="1">
+                        <Text variant="bodySm">• 429 errors: {allTestResultsStats.count429}</Text>
+                        <Text variant="bodySm">• 5XX errors: {allTestResultsStats.count500}</Text>
+                        <Text variant="bodySm">• Cloudflare errors: {allTestResultsStats.countCloudflare}</Text>
+                      </VerticalStack>
+                      <Box paddingBlockStart="1" borderBlockStartWidth="1" borderColor="border-subdued">
+                        <Text variant="bodySm" color="subdued" fontWeight="medium">Approximate counts based on sampled data.</Text>
+                      </Box>
+                    </VerticalStack>
+                  } 
+                  hasUnderline={false}
+                >
+                  <HorizontalStack gap="1" align="center">
+                    <Text color="subdued" fontWeight="medium" variant="bodyMd" style={{ cursor: 'pointer' }}>API error stats:</Text>
+                  </HorizontalStack>
+                </Tooltip>
+                {(() => {
+                  const total = currentSummary?.testResultsCount || 0;
+                  const severityFor = (count) => {
+                    const percentage = total > 0 ? (count / total) * 100 : 0;
+                    if (percentage > 70) return 'CRITICAL';
+                    if (percentage >= 40) return 'HIGH';
+                    return 'MEDIUM';
+                  }
+                  return (
+                    <HorizontalStack gap="2" align="center">
+                      {(() => { const sev = severityFor(allTestResultsStats.count429); return (
+                        <div className={`badge-wrapper-${sev.toUpperCase()}`}>
+                          <Badge>
+                            429: {allTestResultsStats.count429}
+                          </Badge>
+                        </div>
+                      )})()}
+                      {(() => { const sev = severityFor(allTestResultsStats.count500); return (
+                        <div className={`badge-wrapper-${sev.toUpperCase()}`}>
+                          <Badge>
+                            5XX: {allTestResultsStats.count500}
+                          </Badge>
+                        </div>
+                      )})()}
+                      {(() => { const sev = severityFor(allTestResultsStats.countCloudflare); return (
+                        <div className={`badge-wrapper-${sev.toUpperCase()}`}>
+                          <Badge>
+                          Cloudflare errors: {allTestResultsStats.countCloudflare}
+                          </Badge>
+                        </div>
+                      )})()}
+                    </HorizontalStack>
+                  );
+                })()}
+              </HorizontalStack>
+            </>
+          )}
         </HorizontalStack>
       </VerticalStack>
     </Box>
   )
 
+
   let moreActionsList = transform.getActions(selectedTestRun)
   moreActionsList.push({
     title: 'Export', items: [
       {
+        content: 'Export summary report',
+        icon: ReportMinor,
+        onAction: () => openVulnerabilityReport(true)
+      },
+      {
         content: 'Export vulnerability report',
         icon: ReportMinor,
-        onAction: () => openVulnerabilityReport()
+        onAction: () => openVulnerabilityReport(false)
       }
     ]
   })
@@ -878,9 +1042,14 @@ function SingleTestRunPage() {
     title: 'More',
     items: [
       {
+        content: 'See APIs',
+        icon: ViewMajor,
+        onAction: () => { setShowTestingEndpointsModal(true) }
+      },
+      {
         content: 'Re-Calculate Issues Count',
         icon: RefreshMajor,
-        onAction: () => { handleRefreshTableCount(currentSummary.hexId) }
+        onAction: () => { setConfirmationModal(true) }
       }
     ]
   })

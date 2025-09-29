@@ -125,7 +125,7 @@ public class FilterActionRequest {
     }
 
     public RawApi fetchRawApiBasedOnContext() {
-        if (this.getContext() == "filter") {
+        if (this.getContext().equals("filter")) {
             return this.getRawApi();
         } else {
             return this.getTestRunRawApi();

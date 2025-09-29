@@ -168,7 +168,56 @@ const api = {
             method: 'post',
             data: {sourceCodeType}
         })
-    }
+    },
+
+    initiateCrawler(hostname, username, password, apiKey, dashboardUrl, testRoleHaxId, outscopeUrls) {
+        return request({
+            url: '/api/initiateCrawler',
+            method: 'post',
+            data: {hostname, username, password, apiKey, dashboardUrl, testRoleHaxId, outscopeUrls}
+        })
+    },
+
+    initiateMCPScan(serverUrl, authKey, authValue, dashboardUrl) {
+        return request({
+            url: '/api/initiateMCPScan',
+            method: 'post',
+            data: {serverUrl, authKey, authValue, dashboardUrl}
+        })
+    },
+
+    importFromUrl(url, testRoleId, requestBody) {
+        return request({
+            url: '/api/importFromUrl',
+            method: 'post',
+            data: {url, testRoleId, requestBody}
+        })
+    },
+
+    initiateMCPRecon(ipRange) {
+        return request({
+            url: '/api/initiateMCPRecon',
+            method: 'post',
+            data: {ipRange}
+        })
+    },
+
+    addAwsAccountIdsForApiGatewayLogging(awsAccountIds) {
+        return request({
+            url: '/api/addAwsAccountIdsForApiGatewayLogging',
+            method: 'post',
+            data: { awsAccountIds }
+        })
+    },
+
+    fetchAwsAccountIdsForApiGatewayLogging() {
+        return request({
+            url: '/api/fetchAwsAccountIdsForApiGatewayLogging',
+            method: 'post',
+            data: { }
+        })
+    },
+
 }
 
 export default api

@@ -246,20 +246,6 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
 
                 handleAddSettings(parentAdvanceSettingsConfig);
             
-                const getRecurringContext = (periodInSeconds) => {
-                    if (periodInSeconds === 86400) return "Daily"
-                    else if (periodInSeconds === (86400 * 30)) return "Monthly"
-                    else if (periodInSeconds === (86400 * 7)) return "Weekly"
-                    else if (periodInSeconds === -1) return "Continuously"
-                    else return "Once"
-                }
-
-                const getRunTypeLabel = (runType, periodInSeconds) => {
-                    if (!runType || runType === "CI_CD" || runType === "ONE_TIME") return "Once";
-                    else if (runType === "RECURRING") return getRecurringContext(periodInSeconds)
-                    else if (runType === "CONTINUOUS_TESTING") return "Continuously";
-                }
-
                 const hourOfTest = func.getHourFromEpoch(testIdConfig.scheduleTimestamp)
                 const hourLabel = func.getFormattedHoursUsingLabel(hourOfTest, hourlyTimes, nowLabel)
 
@@ -273,21 +259,21 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                     testRoleId: testIdConfig.testingRunConfig.testRoleId,
                     testRunTimeLabel: (testIdConfig.testRunTime === -1) ? "30 minutes" : getLabel(testRunTimeOptions, testIdConfig.testRunTime.toString())?.label,
                     testRoleLabel: getLabel(testRolesArr, testIdConfig?.testingRunConfig?.testRoleId)?.label,
-                    runTypeLabel: getRunTypeLabel(testRunType, testIdConfig?.periodInSeconds),
+                    runTypeLabel: func.getRunTypeLabel(testRunType, testIdConfig?.periodInSeconds),
                     testName: testIdConfig.name,
                     sendSlackAlert: testIdConfig?.sendSlackAlert,
                     sendMsTeamsAlert: testIdConfig?.sendMsTeamsAlert,
-                    recurringDaily: getRecurringContext(testIdConfig?.periodInSeconds) === "Daily",
-                    recurringMonthly: getRecurringContext(testIdConfig?.periodInSeconds) === "Monthly",
-                    recurringWeekly: getRecurringContext(testIdConfig?.periodInSeconds) === "Weekly",
-                    continuousTesting: getRecurringContext(testIdConfig?.periodInSeconds) === "Continuously",
+                    recurringDaily: func.getRecurringContext(testIdConfig?.periodInSeconds) === "Daily",
+                    recurringMonthly: func.getRecurringContext(testIdConfig?.periodInSeconds) === "Monthly",
+                    recurringWeekly: func.getRecurringContext(testIdConfig?.periodInSeconds) === "Weekly",
+                    continuousTesting: func.getRecurringContext(testIdConfig?.periodInSeconds) === "Continuously",
                     autoTicketingDetails: testIdConfig?.testingRunConfig?.autoTicketingDetails || initialAutoTicketingDetails,
                     hourlyLabel: hourLabel.label,
                     scheduleTimestamp: testIdConfig?.scheduleTimestamp,
                     startTimestamp: testIdConfig?.scheduleTimestamp,
                     runTypeParentLabel: testRunType,
                     miniTestingServiceName: testIdConfig?.miniTestingServiceName || "",
-                    slackChannel: testIdConfig?.slackChannel || "",
+                    slackChannel: testIdConfig?.selectedSlackChannelId || 0,
                 }));
                 setTestSuiteIds(testIdConfig?.testingRunConfig?.testSuiteIds || [])
                 setTestNameSuiteModal(testIdConfig?.name||"")
@@ -604,7 +590,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
         }
         let finalAdvancedConditions = []
 
-        if (conditions.length > 0 && conditions[0]?.data?.key?.length > 0) {
+        if (conditions.length > 0 && (conditions[0]?.data?.key?.length > 0 || conditions[0]?.data?.position?.length > 0)) {
             finalAdvancedConditions = transform.prepareConditionsForTesting(conditions)
         }
 
@@ -722,11 +708,10 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
     const handleModifyConfig = async () => {
         const settings = transform.prepareConditionsForTesting(conditions)
         let autoTicketingDetails = jiraProjectMap? testRun.autoTicketingDetails : null;
-        const editableConfigObject = transform.prepareEditableConfigObject(testRun, settings, testIdConfig.hexId,testSuiteIds,testMode,autoTicketingDetails)
+        const editableConfigObject = transform.prepareEditableConfigObject(testRun, settings, testIdConfig.hexId,testSuiteIds,autoTicketingDetails)
         await testingApi.modifyTestingRunConfig(testIdConfig?.testingRunConfig?.id, editableConfigObject).then(() => {
             func.setToast(true, false, "Modified testing run config successfully")
             setShowEditableSettings(false)
-            window.location.reload()
         })
         if(activeFromTesting){
             toggleRunTest();
@@ -951,7 +936,6 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                             {!openConfigurations ? <RunTestSuites
                                 testRun={testRun}
                                 setTestRun={setTestRun}
-                                handleRun={handleRun}
                                 handleRemoveAll={handleRemoveAll}
                                 apiCollectionName={apiCollectionName}
                                 setTestMode={setTestMode}

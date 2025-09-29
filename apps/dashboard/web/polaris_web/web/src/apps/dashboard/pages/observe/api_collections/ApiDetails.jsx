@@ -3,25 +3,30 @@ import { Box, Button, Popover, Modal, Tooltip, ActionList, VerticalStack, Horizo
 import FlyLayout from "../../../components/layouts/FlyLayout";
 import GithubCell from "../../../components/tables/cells/GithubCell";
 import SampleDataList from "../../../components/shared/SampleDataList";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import api from "../api";
 import ApiSchema from "./ApiSchema";
 import dashboardFunc from "../../transform";
 import AktoGptLayout from "../../../components/aktoGpt/AktoGptLayout";
-import func from "@/util/func"
+import func from "@/util/func" 
 import transform from "../transform";
 import ApiDependency from "./ApiDependency";
 import RunTest from "./RunTest";
 import PersistStore from "../../../../main/PersistStore";
-import values from "@/util/values";
 import gptApi from "../../../components/aktoGpt/api";
 import GraphMetric from '../../../components/GraphMetric'
-
 import { HorizontalDotsMinor, FileMinor } from "@shopify/polaris-icons"
 import LocalStore from "../../../../main/LocalStorageStore";
 import InlineEditableText from "../../../components/shared/InlineEditableText";
 import GridRows from "../../../components/shared/GridRows";
 import Dropdown from "../../../components/layouts/Dropdown";
+import ApiIssuesTab from "./ApiIssuesTab";
+
+import Highcharts from 'highcharts';
+import HighchartsMore from 'highcharts/highcharts-more';
+import { getDashboardCategory, mapLabel } from "../../../../main/labelHelper";
+
+HighchartsMore(Highcharts);
 
 const statsOptions = [
     {label: "15 minutes", value: 15*60},
@@ -34,6 +39,13 @@ const statsOptions = [
     {label: "7 days", value: 7*24*60*60}
 ]
 
+const bucketLabelMap = {
+    b1: "1-10", b2: "11-50", b3: "51-100", b4: "101-250",
+    b5: "251-500", b6: "501-1000", b7: "1001-2500", b8: "2501-5000",
+    b9: "5001-10000", b10: "10001-20000", b11: "20001-35000",
+    b12: "35001-50000", b13: "50001-100000", b14: "100001+"
+};
+
 function TechCard(props){
     const {cardObj} = props;
     return(
@@ -44,7 +56,7 @@ function TechCard(props){
 }
 
 function ApiDetails(props) {
-    const { showDetails, setShowDetails, apiDetail, headers, getStatus, isGptActive } = props
+    const { showDetails, setShowDetails, apiDetail, headers, getStatus, isGptActive, collectionIssuesData } = props
 
     const localCategoryMap = LocalStore.getState().categoryMap
     const localSubCategoryMap = LocalStore.getState().subCategoryMap
@@ -64,9 +76,14 @@ function ApiDetails(props) {
     const [editableDescription, setEditableDescription] = useState(description)
     const [useLocalSubCategoryData, setUseLocalSubCategoryData] = useState(false)
     const [apiCallStats, setApiCallStats] = useState([]); 
-    const [apiCallDistribution, setApiCallDistribution] = useState([]); // New state for distribution data
+    const [apiCallDistribution, setApiCallDistribution] = useState([]);
     const endTs = func.timeNow();
-    const [startTime, setStartTime] = useState(endTs - statsOptions[0].value)
+    const [startTime, setStartTime] = useState(endTs - statsOptions[6].value)
+    const [hasApiStats, setHasApiStats] = useState(false);
+    const [hasApiDistribution, setHasApiDistribution] = useState(false);
+    const apiStatsAvailableRef = useRef(false);
+    const apiDistributionAvailableRef = useRef(false);
+    const [selectedTabId, setSelectedTabId] = useState('values');
 
     const statusFunc = getStatus ? getStatus : (x) => {
         try {
@@ -82,104 +99,120 @@ function ApiDetails(props) {
 
     const standardHeaders = new Set(transform.getStandardHeaderList())
 
-    const getNiceBinSize = (rawSize) => {
-        const magnitude = Math.pow(10, Math.floor(Math.log10(rawSize)));
-        const leading = rawSize / magnitude;
-        if (leading <= 1) return 1 * magnitude;
-        if (leading <= 2) return 2 * magnitude;
-        if (leading <= 5) return 5 * magnitude;
-        return 10 * magnitude;
-    };
+    // const getNiceBinSize = (rawSize) => {
+    //     const magnitude = Math.pow(10, Math.floor(Math.log10(rawSize)));
+    //     const leading = rawSize / magnitude;
+    //     if (leading <= 1) return 1 * magnitude;
+    //     if (leading <= 2) return 2 * magnitude;
+    //     if (leading <= 5) return 5 * magnitude;
+    //     return 10 * magnitude;
+    // };
 
-    // Function to bin data
-    const binData = (rawData, targetBins = 10) => {
-        if (rawData.length === 0) return [];
+    // // Function to bin data
+    // const binData = (rawData, targetBins = 10) => {
+    //     if (rawData.length === 0) return [];
     
-        const sortedData = rawData.sort((a, b) => a[0] - b[0]);
-        const calls = sortedData.map(point => point[0]);
+    //     const sortedData = rawData.sort((a, b) => a[0] - b[0]);
+    //     const calls = sortedData.map(point => point[0]);
     
-        const minCalls = Math.max(0, Math.min(...calls));
-        const maxCalls = Math.max(...calls);
-        const range = maxCalls - minCalls;
+    //     const minCalls = Math.max(0, Math.min(...calls));
+    //     const maxCalls = Math.max(...calls);
+    //     const range = maxCalls - minCalls;
     
-        // ✅ Smart bin size
-        const rawBinSize = Math.ceil(range / targetBins);
-        const binSize = getNiceBinSize(rawBinSize);
+    //     // ✅ Smart bin size
+    //     const rawBinSize = Math.ceil(range / targetBins);
+    //     const binSize = getNiceBinSize(rawBinSize);
     
-        const start = Math.floor(minCalls / binSize) * binSize;
-        const end = Math.ceil(maxCalls / binSize) * binSize;
+    //     const start = Math.floor(minCalls / binSize) * binSize;
+    //     const end = Math.ceil(maxCalls / binSize) * binSize;
     
-        const bins = [];
+    //     const bins = [];
 
-        for (let i = start; i < end; i += binSize) {
-            bins.push({ range: [i, i + binSize], count: 0 });
-        }
-        // for (let i = start; i <= end; i += binSize) {
-        //     bins.push({ range: [i, i + binSize], count: 0 });
-        // }
+    //     for (let i = start; i < end; i += binSize) {
+    //         bins.push({ range: [i, i + binSize], count: 0 });
+    //     }
+    //     // for (let i = start; i <= end; i += binSize) {
+    //     //     bins.push({ range: [i, i + binSize], count: 0 });
+    //     // }
     
-        rawData.forEach(([calls, users]) => {
-            const binIndex = Math.floor((calls - start) / binSize);
-            if (binIndex >= 0 && binIndex < bins.length) {
-                bins[binIndex].count += users;
-            }
+    //     rawData.forEach(([calls, users]) => {
+    //         const binIndex = Math.floor((calls - start) / binSize);
+    //         if (binIndex >= 0 && binIndex < bins.length) {
+    //             bins[binIndex].count += users;
+    //         }
+    //     });
+    
+    //     return {
+    //         data: bins.map(bin => ({
+    //             x: (bin.range[0] + bin.range[1]) / 2,
+    //             y: bin.count,
+    //             binRange: [bin.range[0], bin.range[1]]
+    //         })).filter(bin => bin.y > 0),
+    //         binSize
+    //     };
+    // };
+
+    const updateApiCallStatsTabVisibility = () => {
+        const hasStats = apiStatsAvailableRef.current;
+        const hasDist = apiDistributionAvailableRef.current;
+        setDisabledTabs(prev => {
+            const updated = prev.filter(tab => tab !== "api-call-stats");
+            if (!hasStats && !hasDist) updated.push("api-call-stats");
+            return updated;
         });
-    
-        return {
-            data: bins.map(bin => ({
-                x: (bin.range[0] + bin.range[1]) / 2,
-                y: bin.count,
-                binRange: [bin.range[0], bin.range[1]]
-            })).filter(bin => bin.y > 0),
-            binSize
-        };
     };
 
-    // Updated fetchDistributionData with binning
     const fetchDistributionData = async () => {
         try {
             const { apiCollectionId, endpoint, method } = apiDetail;
-            const res = await api.fetchIpLevelApiCallStats(apiCollectionId, endpoint, method, startTime, endTs); // Use startTime
-            const rawData = res?.result?.apiCallStats || [];
+            const res = await api.fetchIpLevelApiCallStats(apiCollectionId, endpoint, method, Math.floor(startTime / 60),  Math.floor(endTs / 60));
     
-            const formattedData = rawData.map(({ count, users }) => [count, users]);
-            const { data: binnedData, binSize } = binData(formattedData, 10);
+            const bucketStats = res.bucketStats || [];
     
-            const chartData = [
-                {
-                    name: '', // Empty name since legend is disabled
-                    data: binnedData,
-                    color: '#1E90FF',
-                    binSize
-                }
-            ];
+            const sortedBuckets = bucketStats
+                .filter(b => b.p25 !== undefined && b.p50 !== undefined && b.p75 !== undefined)
+                .sort((a, b) => {
+                    const aIndex = parseInt(a.bucketLabel.replace("b", ""), 10);
+                    const bIndex = parseInt(b.bucketLabel.replace("b", ""), 10);
+                    return aIndex - bIndex;
+                });
     
-            setApiCallDistribution(chartData);
+            const categories = sortedBuckets.map(b => bucketLabelMap[b.bucketLabel] || b.bucketLabel);
+
+            // const categories = sortedBuckets.map(b => b.bucketLabel);
     
-            // Update disabledTabs logic to consider both stats and distribution data in ApiCallStatsTab
-            setDisabledTabs(prev => {
-                const newDisabledTabs = [...prev.filter(tab => tab !== "api-call-stats")];
-                if (
-                    (!chartData || chartData.length === 0 || !chartData[0]?.data || chartData[0].data.length === 0) &&
-                    (!apiCallStats || apiCallStats.length === 0 || !apiCallStats[0]?.data || apiCallStats[0].data.length === 0)
-                ) {
-                    newDisabledTabs.push("api-call-stats");
-                }
-                return newDisabledTabs;
-            });
-        } catch (error) {
-            console.error("Error fetching API call distribution data:", error);
+            const data = sortedBuckets.map(b => [
+                b.min ?? b.p25,  // whisker low
+                b.p25,
+                b.p50,           // median
+                b.p75,
+                b.max ?? b.p75   // whisker high
+            ]);
+    
+            const boxPlotSeries = [{
+                name: "API Call Distribution",
+                type: "boxplot",
+                data,
+                color: "#1E90FF",
+                categories
+            }];
+
+            const hasData = boxPlotSeries?.[0]?.data?.length > 0;
+            apiDistributionAvailableRef.current = hasData;
+            setApiCallDistribution(boxPlotSeries);
+            setHasApiDistribution(hasData);
+            updateApiCallStatsTabVisibility();
+
+        } catch (err) {
+            console.error("Error fetching distribution:", err);
+            apiDistributionAvailableRef.current = false;
             setApiCallDistribution([]);
-            // Update disabledTabs logic
-            setDisabledTabs(prev => {
-                const newDisabledTabs = [...prev.filter(tab => tab !== "api-call-stats")];
-                if (!apiCallStats || apiCallStats.length === 0 || !apiCallStats[0]?.data || apiCallStats[0].data.length === 0) {
-                    newDisabledTabs.push("api-call-stats");
-                }
-                return newDisabledTabs;
-            });
+            setHasApiDistribution(false);
+            updateApiCallStatsTabVisibility(hasApiStats, false);
         }
     };
+    
+    
 
     const fetchStats = async (apiCollectionId, endpoint, method) => {
         try {
@@ -192,18 +225,19 @@ function ApiDetails(props) {
                     name: 'API Calls',
                 },
             ];
+
+            const hasData = transformedData?.[0]?.data?.length > 0;
+            apiStatsAvailableRef.current = hasData;
             setApiCallStats(transformedData);
-            setDisabledTabs(prev => {
-                const newDisabledTabs = [...prev.filter(tab => tab !== "api-call-stats")];
-                if (!transformedData || transformedData.length === 0 || !transformedData[0]?.data || transformedData[0].data.length === 0) {
-                    newDisabledTabs.push("api-call-stats");
-                }
-                return newDisabledTabs;
-            });
+            setHasApiStats(hasData);
+            updateApiCallStatsTabVisibility(hasData, hasApiDistribution);
+
         } catch (error) {
             console.error("Error fetching API call stats:", error);
+            apiStatsAvailableRef.current = false;
             setApiCallStats([]);
-            setDisabledTabs(prev => [...prev.filter(tab => tab !== "api-call-stats"), "api-call-stats"]);
+            setHasApiStats(false);
+            updateApiCallStatsTabVisibility(false, hasApiDistribution);
         }
     };
 
@@ -436,6 +470,63 @@ function ApiDetails(props) {
         legend: { enabled: false },
     };
 
+    const distributionBoxplotOptions = {
+        chart: {
+            type: 'boxplot',
+            marginTop: 10,
+            marginBottom: 70,
+            marginRight: 10
+        },
+        title: { text: null },
+        subtitle: { text: null },
+        legend: { enabled: false },
+        xAxis: {
+            categories: apiCallDistribution?.[0]?.categories || [],
+            title: {
+                text: 'Api Call Count',
+                style: { fontSize: '12px' }
+            },
+            labels: {
+                style: { fontSize: '10px' },
+                rotation: 0,
+                autoRotation: false,
+                step: 1,
+                staggerLines: 2
+            }
+        },
+        yAxis: {
+            title: {
+                text: 'User Count',
+                style: { fontSize: '12px' }
+            },
+            gridLineWidth: 0
+        },
+        tooltip: {
+            shared: true,
+            useHTML: true,
+            headerFormat: '<b>{point.key}</b><br>',
+            pointFormat:
+                'Min: {point.low}<br>' +
+                'P25: {point.q1}<br>' +
+                'Median: {point.median}<br>' +
+                'P75: {point.q3}<br>' +
+                'Max: {point.high}'
+        },
+        plotOptions: {
+            boxplot: {
+                fillColor: '#f0f0f0',
+                lineWidth: 1,
+                medianColor: '#000000',
+                medianWidth: 2,
+                stemColor: '#999999',
+                stemDashStyle: 'dot',
+                whiskerColor: '#999999',
+                whiskerLength: '50%',
+            }
+        }
+    };
+    
+
     const SchemaTab = {
         id: 'schema',
         content: "Schema",
@@ -475,6 +566,16 @@ function ApiDetails(props) {
             />
         </Box>,
     }
+
+    const hasIssues = apiDetail?.severityObj && Object.values(apiDetail.severityObj).some(count => count > 0);
+
+    const IssuesTab = {
+        id: 'issues',
+        content: 'Issues',
+        component: <ApiIssuesTab apiDetail={apiDetail} collectionIssuesData={collectionIssuesData} />,
+    };
+
+
     const ApiCallStatsTab = {
         id: 'api-call-stats',
         content: 'API Call Stats',
@@ -483,7 +584,7 @@ function ApiDetails(props) {
                 <HorizontalStack align="end">
                     <Dropdown
                         menuItems={statsOptions}
-                        initial={statsOptions[0].label}
+                        initial={statsOptions[6].label}
                         selected={(timeInSeconds) => {
                             setStartTime((prev) => {
                                 if ((endTs - timeInSeconds) === prev) {
@@ -512,9 +613,7 @@ function ApiDetails(props) {
                             text='true'
                             inputMetrics={[]}
                         />
-                    ) : (
-                        <Box minHeight="330px" />
-                    )}
+                    ) : null}
                     {/* API Call Distribution Graph */}
                     {apiCallDistribution != undefined && apiCallDistribution.length > 0 && apiCallDistribution[0]?.data !== undefined && apiCallDistribution[0]?.data?.length > 0 ? (
                         <GraphMetric
@@ -527,12 +626,8 @@ function ApiDetails(props) {
                             subtitle={undefined}
                             defaultChartOptions={{
                                 ...defaultChartOptions(false),
-                                ...distributionChartOptions,
-                                xAxis: {
-                                    ...distributionChartOptions.xAxis,
-                                    tickPositions: apiCallDistribution[0]?.data?.map(point => point.binRange[0]) || [],
-                                },
-                            }}
+                                ...distributionBoxplotOptions
+                            }}                            
                             backgroundColor='#ffffff'
                             text={false}
                             inputMetrics={[]}
@@ -644,8 +739,14 @@ function ApiDetails(props) {
         headingComp,
         <LayoutWithTabs
             key="tabs"
-            tabs={[ValuesTab, SchemaTab, ApiCallStatsTab, DependencyTab]}
-            currTab={() => { }}
+            tabs={[
+                ValuesTab,
+                SchemaTab,
+                ...(hasIssues ? [IssuesTab] : []),
+                ApiCallStatsTab,
+                DependencyTab
+            ]}
+            currTab={(tab) => setSelectedTabId(tab.id)}
             disabledTabs={disabledTabs}
         />
     ]
@@ -653,7 +754,7 @@ function ApiDetails(props) {
     return (
         <div>
             <FlyLayout
-                title="API details"
+                title={`${mapLabel("API details", getDashboardCategory())}`}
                 show={showDetails}
                 setShow={setShowDetails}
                 components={components}

@@ -29,12 +29,26 @@ export default {
         return request({
             url: '/api/fetchRecentParams',
             method: 'post',
-            data: {
-                startTimestamp,
-                endTimestamp
-            }
+            data: { startTimestamp, endTimestamp }
         })
     },
+    async fetchAuditData(sortKey, sortOrder, skip, limit, filters, filterOperators) {
+        const resp = await request({
+            url: '/api/fetchAuditData',
+            method: 'post',
+            data: { sortKey, sortOrder, skip, limit, filters, filterOperators }
+        });
+        return resp;
+    },
+    async updateAuditData(hexId, remarks) {
+            const resp = await request({
+                url: '/api/updateAuditData',
+                method: 'post',
+                data: { hexId, remarks }
+            });
+            return resp;
+        },
+
     async fetchDataTypeNames() {
         const resp = await request({
             url: '/api/fetchDataTypeNames',
@@ -753,6 +767,15 @@ export default {
         })
     },
 
+    async getSensitiveInfoForCollections(type){
+        const data = (typeof type !== 'undefined' && type !== null) ? { type } : {}
+        return await request({
+            url: '/api/getSensitiveInfoForCollections',
+            method: 'post',
+            data,
+        })
+    },
+
     async getLastTrafficSeen(){
         return await request({
             url: '/api/getLastSeenTrafficInfoForCollections',
@@ -842,11 +865,15 @@ export default {
         return resp
     },
 
-    async fetchIpLevelApiCallStats(apiCollectionId, url, method, startEpoch, endEpoch) {
+    async fetchIpLevelApiCallStats(apiCollectionId, url, method, startWindow, endWindow) {
+        //url = "v1/api/test/orders"
+        //method = "POST"
+        // startWindow = 29189000
+        // endWindow = 29199000
         const resp = await request({
             url: '/api/fetchIpLevelApiCallStats',
             method: 'post',
-            data: { apiCollectionId, url, method, startEpoch, endEpoch }
+            data: {apiCollectionId, url, method, startWindow, endWindow }
         })
         return resp
     },
@@ -915,6 +942,24 @@ export default {
                 limit: 1000
             }
         })
+    },
+    allApisTestedRanges() {
+        return request({
+            url: '/api/fetchTestedApisRanges',
+            method: 'post',
+            data: {}
+        })
+    },
+
+    async getApiSequences(apiCollectionId) {
+        const resp = await request({
+            url: '/api/getApiSequences',
+            method: 'post',
+            data: {
+                apiCollectionId: apiCollectionId
+            }
+        })
+        return resp
     }
 
 }

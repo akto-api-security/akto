@@ -10,10 +10,7 @@ import { ActorDetails } from "./components/ActorDetails";
 import ThreatWorldMap from "./components/ThreatWorldMap";
 // import ThreatApiSubcategoryCount from "./components/ThreatApiSubcategoryCount";
 
-import api from "./api";
 import { HorizontalGrid, VerticalStack } from "@shopify/polaris";
-import TopThreatTypeChart from "./components/TopThreatTypeChart";
-import threatDetectionFunc from "./transform";
 import { ThreatSummary } from "./components/ThreatSummary";
 import ThreatActivityTimeline from "./components/ThreatActivityTimeline";
 import React from "react";
@@ -47,7 +44,7 @@ function ThreatActorPage() {
   const [actorDetails, setActorDetails] = useState(null);
   const [showActorDetails, setShowActorDetails] = useState(false);
 
-  const initialVal = values.ranges[0];
+  const initialVal = values.ranges[2];
   const [currDateRange, dispatchCurrDateRange] = useReducer(
     produce((draft, action) => func.dateRangeReducer(draft, action)),
     initialVal

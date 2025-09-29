@@ -21,6 +21,7 @@ public class ApiCountCacheLayer implements CounterCache {
 
     private final StatefulRedisConnection<String, Long> redis;
     private final StatefulRedisConnection<String, String> redisString;
+    private final StatefulRedisConnection<String, byte[]> redisByte;
     private final Cache<String, Long> localCache;
     private final ConcurrentLinkedQueue<Object> pendingOps;
     List<String> remainingKeys = new ArrayList<>();
@@ -31,9 +32,11 @@ public class ApiCountCacheLayer implements CounterCache {
         if (redisClient != null) {
             this.redis = redisClient.connect(new LongValueCodec());
             this.redisString = redisClient.connect();
+            this.redisByte = redisClient.connect(new com.akto.threat.detection.cache.ByteArrayCodec());
         } else {
             this.redis = null;
             this.redisString = null;
+            this.redisByte = null;
         }
         this.localCache = Caffeine.newBuilder().maximumSize(10000).expireAfterWrite(3, TimeUnit.HOURS).build();
         this.pendingOps = new ConcurrentLinkedQueue<>();
@@ -137,6 +140,43 @@ public class ApiCountCacheLayer implements CounterCache {
     public void set(String key, long val) {
         this.localCache.put(key, val);
         this.redis.async().set(key, val);
+    }
+
+    public void setLongWithExpiry(String key, long value, long expirySeconds) {
+        try {
+            this.redis.sync().setex(key, expirySeconds, value);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    public long fetchLongDataFromRedis(String key) {
+        try {
+            return this.redis.sync().get(key);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return 0L;
+        }
+    }
+
+    public void setBytesWithExpiry(String key, byte[] value, int expirySeconds) {
+        try {
+            this.redisByte.async().set(key, value);
+            if (expirySeconds > 0) {
+                this.redisByte.async().expire(key, expirySeconds);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    public byte[] fetchDataBytes(String key) {
+        try {
+            return this.redisByte.sync().get(key);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return null;
+        }
     }
     
 }

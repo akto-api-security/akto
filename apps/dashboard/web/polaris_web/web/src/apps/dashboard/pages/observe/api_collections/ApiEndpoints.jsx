@@ -1,12 +1,12 @@
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards"
-import { Text, HorizontalStack, Button, Popover, Modal, IndexFiltersMode, VerticalStack, Box, Checkbox, TextField, ActionList, Icon } from "@shopify/polaris"
+import { Text, HorizontalStack, Button, Popover, Modal, IndexFiltersMode, VerticalStack, Box, Checkbox, ActionList, Icon, Tooltip } from "@shopify/polaris"
 import api from "../api"
 import { useEffect, useState } from "react"
 import func from "@/util/func"
 import GithubSimpleTable from "../../../components/tables/GithubSimpleTable";
 import {useLocation, useNavigate, useParams } from "react-router-dom"
 import { saveAs } from 'file-saver'
-import {FileMinor} from '@shopify/polaris-icons';
+import {FileMinor, HideMinor, ViewMinor, MagicMinor} from '@shopify/polaris-icons';
 import "./api_inventory.css"
 import ApiDetails from "./ApiDetails"
 import UploadFile from "../../../components/shared/UploadFile"
@@ -31,12 +31,16 @@ import useTable from "../../../components/tables/TableContext"
 import HeadingWithTooltip from "../../../components/shared/HeadingWithTooltip"
 import { SelectSource } from "./SelectSource"
 import InlineEditableText from "../../../components/shared/InlineEditableText"
+import IssuesApi from "../../issues/api"
+import SequencesFlow from "./SequencesFlow"
+import { getDashboardCategory, mapLabel } from "../../../../main/labelHelper"
+import AgentDiscoverGraph from "./AgentDiscoverGraph"
 
 const headings = [
     {
         text: "Endpoint",
         value: "endpointComp",
-        title: "Api endpoints",
+        title: `${mapLabel("API endpoints", getDashboardCategory())}`,
         textValue: "endpoint",
         sortActive: true
     },
@@ -49,7 +53,8 @@ const headings = [
         value: "riskScoreComp",
         textValue: "riskScore",
         sortActive: true,
-        
+        filterKey: 'riskScore',
+        showFilter:true
     },{
         text:"Issues",
         title: "Issues",
@@ -111,7 +116,6 @@ const headings = [
         isText: true,
         type: CellType.TEXT,
         sortActive: true,
-        
     },
     {
         text: 'Last Tested',
@@ -139,6 +143,14 @@ const headings = [
         filterKey: "apiCollectionName",
     },
     {
+        text: "Tags",
+        value: "tagsComp",
+        textValue: "tagsString",
+        title: "Tags",
+        showFilter: true,
+        filterKey: "tagsString",
+    },
+    {
         text: "Description",
         value: "descriptionComp",
         textValue: "description",
@@ -149,13 +161,15 @@ const headings = [
 ]
 
 let headers = JSON.parse(JSON.stringify(headings))
-headers.push({
-    text: 'Method',
-    filterKey: 'method',
-    showFilter: true,
-    textValue: 'method',
-    sortActive: true
-})
+if(!getDashboardCategory().includes("MCP")){
+    headers.push({
+        text: 'Method',
+        filterKey: 'method',
+        showFilter: true,
+        textValue: 'method',
+        sortActive: true
+    })
+}
 
 headers.push({
     text: 'Sensitive params in request',
@@ -211,6 +225,7 @@ function ApiEndpoints(props) {
     const [showSourceDialog,  setShowSourceDialog] = useState(false)
     const [openAPIfile, setOpenAPIfile] = useState(null)
     const [sourcesBackfilled, setSourcesBackfilled] = useState(false)
+    const [collectionIssuesData, setCollectionIssuesData] = useState([])
 
     const [endpointData, setEndpointData] = useState({"all":[], 'sensitive': [], 'new': [], 'high_risk': [], 'no_auth': [], 'shadow': [], 'zombie': []})
     const [selectedTab, setSelectedTab] = useState("all")
@@ -219,6 +234,7 @@ function ApiEndpoints(props) {
     const [loading, setLoading] = useState(true)
     const [apiDetail, setApiDetail] = useState({})
     const [exportOpen, setExportOpen] = useState(false)
+    const [showSequencesFlow, setShowSequencesFlow] = useState(false)
 
     const filteredEndpoints = ObserveStore(state => state.filteredItems)
     const setFilteredEndpoints = ObserveStore(state => state.setFilteredItems)
@@ -239,11 +255,12 @@ function ApiEndpoints(props) {
     const [description, setDescription] = useState("");
     const [isEditingDescription, setIsEditingDescription] = useState(false)
     const [editableDescription, setEditableDescription] = useState(description)
+    const [currentKey, setCurrentKey] = useState(Date.now()); // to force remount InlineEditableText component
+    const hasAccessToDiscoveryAgent = func.checkForFeatureSaas('STATIC_DISCOVERY_AI_AGENTS')
 
 
     // the values used here are defined at the server.
     const definedTableTabs = apiCollectionId === 111111999 ? ['All', 'New', 'High risk', 'No auth', 'Shadow'] : ( apiCollectionId === 111111120 ? ['All', 'New', 'Sensitive', 'High risk', 'Shadow'] : ['All', 'New', 'Sensitive', 'High risk', 'No auth', 'Shadow', 'Zombie'] )
-
 
     const { tabsInfo } = useTable()
     const tableCountObj = func.getTabsCount(definedTableTabs, endpointData)
@@ -285,20 +302,25 @@ function ApiEndpoints(props) {
                 api.fetchApisFromStis(apiCollectionId),
                 api.fetchApiInfosForCollection(apiCollectionId),
                 api.fetchAPIsFromSourceCode(apiCollectionId),
-                api.loadSensitiveParameters(apiCollectionId),
-                api.getSeveritiesCountPerCollection(apiCollectionId)
+                api.getSeveritiesCountPerCollection(apiCollectionId),
+                IssuesApi.fetchIssues(0, 1000, ["OPEN"], [apiCollectionId], null, null, null, null, null, null, true, null)
             ];
+            
             let results = await Promise.allSettled(apiPromises);
             let stisEndpoints =  results[0].status === 'fulfilled' ? results[0].value : {};
             let apiInfosData = results[1].status === 'fulfilled' ? results[1].value : {};
             sourceCodeData = results[2].status === 'fulfilled' ? results[2].value : {};
-            sensitiveParamsResp =  results[3].status === 'fulfilled' ? results[3].value : {};
-            apiInfoSeverityMap = results[4].status === 'fulfilled' ? results[4].value : {};
+            apiInfoSeverityMap = results[3].status === 'fulfilled' ? results[3].value : {};
+            let issuesDataResp = results[4].status === 'fulfilled' ? results[4].value : {};
+            
+            // Initialize with empty sensitive params for fast UI loading
+            sensitiveParamsResp = { data: { endpoints: [] } };
             setShowEmptyScreen(stisEndpoints?.list !== undefined && stisEndpoints?.list?.length === 0)
             apiEndpointsInCollection = stisEndpoints?.list !== undefined && stisEndpoints.list.map(x => { return { ...x._id, startTs: x.startTs, changesCount: x.changesCount, shadow: x.shadow ? x.shadow : false } })
             apiInfoListInCollection = apiInfosData.apiInfoList
             unusedEndpointsInCollection = stisEndpoints.unusedEndpoints
             setIsRedacted(apiInfosData.redacted)
+            setCollectionIssuesData(issuesDataResp?.issues || []);
         }
 
         let sensitiveParams = sensitiveParamsResp.data.endpoints
@@ -395,6 +417,28 @@ function ApiEndpoints(props) {
         
         const prettifyData = transform.prettifyEndpointsData(allEndpoints)
 
+        // enrich with collection tags (env types) for API group view
+        const collectionTagsMap = {}
+        ;(allCollections || []).forEach((c) => {
+            const envType = c?.envType
+            const envTypeList = envType?.map(func.formatCollectionType) || []
+            collectionTagsMap[c.id] = {
+                list: envTypeList,
+                comp: getTagsCompactComponent(envTypeList, 2),
+                str: envTypeList.join(" ")
+            }
+        })
+
+        prettifyData.forEach((obj) => {
+            const t = collectionTagsMap[obj.apiCollectionId]
+            if (t) {
+                obj.tagsComp = t.comp
+                obj.tagsString = t.str
+            } else {
+                obj.tagsString = ""
+            }
+        })
+
         const zombie = prettifyData.filter(
             obj => obj.sources && // Check that obj.sources is not null or undefined
                    Object.keys(obj.sources).length === 1 &&
@@ -432,7 +476,60 @@ function ApiEndpoints(props) {
         setApiEndpoints(apiEndpointsInCollection)
         setApiInfoList(apiInfoListInCollection)
         setUnusedEndpoints(unusedEndpointsInCollection)
+        
+        // Load sensitive parameters asynchronously and update the data when ready
+        if (!isQueryPage) {
+            // Use setTimeout to ensure state is set before we try to update it
+            setTimeout(() => {
+                api.loadSensitiveParameters(apiCollectionId).then((sensitiveResp) => {
+                    // Process the sensitive params
+                    let sensitiveParams = sensitiveResp.data.endpoints;
+                    let sensitiveParamsMap = {};
+                    
+                    sensitiveParams.forEach(p => {
+                        let position = p.responseCode > -1 ? "response" : "request";
+                        let key = p.method + " " + p.url + " " + p.apiCollectionId;
+                        if (!sensitiveParamsMap[key]) sensitiveParamsMap[key] = new Set();
+                        
+                        if (!p.subType) {
+                            p.subType = { name: "CUSTOM" };
+                        }
+                        
+                        sensitiveParamsMap[key].add({ name: p.subType, position: position});
+                    });
+                    let currentPrettyData = [...data['all']];
+                    currentPrettyData.forEach(apiEndpoint => {
+                        const key = apiEndpoint.method + " " + apiEndpoint.endpoint + " " + apiEndpoint.apiCollectionId;
+                        const allSensitive = new Set(), sensitiveInResp = [], sensitiveInReq = [];
 
+                        sensitiveParamsMap[key]?.forEach(({ name, position }) => {
+                            allSensitive.add(name);
+                            (position === 'response' ? sensitiveInResp : sensitiveInReq).push(name);
+                        });
+
+                        const sensitiveTags = [...func.convertSensitiveTags(allSensitive)]
+
+                        Object.assign(apiEndpoint, {
+                            sensitive: allSensitive,
+                            sensitiveTags,
+                            sensitiveInReq: [...func.convertSensitiveTags(sensitiveInReq)],
+                            sensitiveInResp: [...func.convertSensitiveTags(sensitiveInResp)],
+                            sensitiveTagsComp: transform.prettifySubtypes(sensitiveTags)
+                        });
+                    })
+
+                    data['all'] = currentPrettyData
+                    data['sensitive'] = currentPrettyData.filter(x => x.sensitive && x.sensitive.size > 0)
+                    data['high_risk'] = currentPrettyData.filter(x=> x.riskScore >= 4)
+                    data['new'] = currentPrettyData.filter(x=> x.isNew)
+                    data['no_auth'] = currentPrettyData.filter(x => x.open)
+                    setEndpointData(data)
+                    setCurrentKey(Date.now()) // force remount InlineEditableText component to reset filters
+                }).catch((err) => {
+                    console.error("Failed to load sensitive parameters:", err);
+                });
+            }, 100); // Small delay to ensure state is set
+        }
     }
 
     useEffect(() => {
@@ -655,6 +752,9 @@ function ApiEndpoints(props) {
     }
 
     function disambiguateLabel(key, value) {
+        if(key.includes("dateRange")){
+            return new Date(Date.parse(value.since)).toDateString() + " - " + new Date(Date.parse(value.until)).toDateString();
+        }
         switch (key) {
             case "parameterisedEndpoint":
                 return func.convertToDisambiguateLabelObj(value, null, 1)
@@ -665,16 +765,19 @@ function ApiEndpoints(props) {
           }          
     }
 
-    function uploadOpenApiFile(file) {
+    function uploadOpenApiFile(file, isAiAgent = false) {
         setOpenAPIfile(file)
-        if (!isApiGroup && !(collectionsObj?.hostName && collectionsObj?.hostName?.length > 0) && !sourcesBackfilled) {
+        if(isAiAgent){
+            uploadOpenFileWithSource("OPEN_API", file, isAiAgent)
+        }
+        else if (!isApiGroup && !(collectionsObj?.hostName && collectionsObj?.hostName?.length > 0) && !sourcesBackfilled) {
             setShowSourceDialog(true)
         } else {
             uploadOpenFileWithSource(null, file)
         }
     }
 
-    function uploadOpenFileWithSource(source, file) {
+    function uploadOpenFileWithSource(source, file, isAiAgent = false) {
         const reader = new FileReader();
         if (!file) {
             file = openAPIfile
@@ -685,6 +788,7 @@ function ApiEndpoints(props) {
             const formData = new FormData();
             formData.append("openAPIString", reader.result)
             formData.append("apiCollectionId", apiCollectionId);
+            formData.append("triggeredWithAIAgent", isAiAgent);
             if (source) {
                 formData.append("source", source)
             }
@@ -697,7 +801,11 @@ function ApiEndpoints(props) {
                 else {
                     func.setToast(true, false, "Your Openapi file has been successfully processed")
                 }
-                fetchData()
+                if(isAiAgent) {
+                    window.open("/dashboard/observe/" + apiCollectionId + "/open-api-upload", "_blank")
+                } else {
+                    fetchData()
+                }
             }).catch(err => {
                 console.log(err);
                 if (err.message.includes(404)) {
@@ -708,6 +816,23 @@ function ApiEndpoints(props) {
                 }
             })
         }
+    }
+    
+    const showOnlyUnique = () => {
+        const endpoints = endpointData["all"]
+        // unique endpoint is who has method same and url same
+        // here endpoint can duplicated as in some cases the url doesn't start with /
+        // so matching with removing first letter if slash is first letter
+        const uniqueEndpoints = endpoints.filter((endpoint, index, self) =>
+            index === self.findIndex((t) => t.method === endpoint.method && t.endpoint.replace(/^\//, '') === endpoint.endpoint.replace(/^\//, ''))
+        )
+        const data = {}
+        data['sensitive'] = uniqueEndpoints.filter(x => x.sensitive && x.sensitive.size > 0)
+        data['high_risk'] = uniqueEndpoints.filter(x=> x.riskScore >= 4)
+        data['new'] = uniqueEndpoints.filter(x=> x.isNew)
+        data['no_auth'] = uniqueEndpoints.filter(x => x.open)
+        data['all'] = uniqueEndpoints
+        setEndpointData(data)
     }
 
     function handleFileChange(file) {
@@ -769,13 +894,20 @@ function ApiEndpoints(props) {
         let requestObj = {key: "COLLECTION",filteredItems: filteredEndpoints,apiCollectionId: Number(apiCollectionId)}
         const activePrompts = dashboardFunc.getPrompts(requestObj)
         setPrompts(activePrompts)
+        
+    }
+
+    function getTagsCompactComponent(envTypeList) {
+        const list = envTypeList || []
+        // Use shared badge renderer to show 1 tag and a +N badge with tooltip inline
+        return transform.getCollectionTypeList(list, 1, false)
     }
 
     function getCollectionTypeListComp(collectionsObj) {
         const envType = collectionsObj?.envType
-        const envTypeList = envType?.map(func.formatCollectionType)
+        const envTypeList = envType?.map(func.formatCollectionType) || []
 
-        return transform.getCollectionTypeList(envTypeList, 3, true)
+        return getTagsCompactComponent(envTypeList)
     }
 
     const collectionsObj = (allCollections && allCollections.length > 0) ? allCollections.filter(x => Number(x.id) === Number(apiCollectionId))[0] : {}
@@ -801,96 +933,135 @@ function ApiEndpoints(props) {
                 <ActionList
                     sections={[
                         {
-                            title:'Re-Compute',
+                            title: 'Switch view',
                             items: [
                                 {
-                                    content: 'Refresh',
-                                    onAction: () => { handleRefresh(); setExportOpen(false) },
+                                    content: showSequencesFlow ? "Display table view" : "Display graph view",
+                                    onAction: () => { 
+                                        setShowSequencesFlow(!showSequencesFlow); 
+                                        setExportOpen(false); 
+                                    },
+                                    prefix: <Box width="24px"> <Icon source={showSequencesFlow ? HideMinor: ViewMinor} /></Box>
                                 },
-                                isApiGroup ? {
-                                    content: 'Re-compute API Group',
-                                    onAction: () => { computeApiGroup(); setExportOpen(false) },
-                                }: {}
+                               
                             ]
                         },
-                        {
-                            title: 'Upload',
-                            items: [
-                                !isApiGroup &&{
-                                    content: '',
-                                    prefix: (<Box width="160px" >
-                                                <UploadFile
-                                                    fileFormat=".json,.yaml,.yml"
-                                                    fileChanged={file => {uploadOpenApiFile(file); setExportOpen(false)}}
-                                                    tooltipText="Upload openapi file"
-                                                    label={(
-                                                        <div style={{ display: "flex", gap:'6px' }}>
-                                                            <Box>
-                                                                <Icon source={FileMinor} />
-                                                            </Box>
-                                                            <Text>Upload OpenAPI file</Text>
-                                                        </div>
-                                                    )}
-                                                    primary={false} 
-                                                />
-                                            </Box>)
-                                },
-                                !isApiGroup && !(isHostnameCollection)  && {
-                                    content: '',
-                                    prefix:  (<Box width="160px" >
-                                        <UploadFile
-                                            fileFormat=".har"
-                                            fileChanged={file => {handleFileChange(file); setExportOpen(false)}}
-                                            tooltipText="Upload traffic(.har)"
-                                            label={(
-                                                <div style={{ display: "flex", gap:'6px' }}>
-                                                    <Box>
-                                                        <Icon source={FileMinor} />
-                                                    </Box>
-                                                    <Text>Upload har file</Text>
-                                                </div>
-                                            )}
-                                            primary={false} 
-                                        />
-                                    </Box>)
-                                }
-                            ]
-                        },
-                        {
-                            title: 'Export as',
-                            items: [
-                                {
-                                    content: 'OpenAPI spec',
-                                    onAction: () => { (selectedResourcesForPrimaryAction && selectedResourcesForPrimaryAction.length > 0) ? exportOpenApiForSelectedApi() : exportOpenApi()},
-                                },
-                                {
-                                    content: 'Postman',
-                                    onAction: () => { exportPostman(); setExportOpen(false) },
-                                },
-                                {
-                                    content: 'CSV',
-                                    onAction: () => { exportCsv(); setExportOpen(false) },
-                                }
-                            ]
-                        },
-                        {
-                            title: 'Others',
-                            items: [
-                                {
-                                    content: `${showWorkflowTests ? "Hide" : "Show"} workflow tests`,
-                                    onAction: () => { toggleWorkflowTests(); setExportOpen(false) },
-                                },
-                                {
-                                    content: '',
-                                    prefix: <Box paddingInlineStart={"2"}><Checkbox
-                                                label='Redact'
-                                                checked={redacted}
-                                                onChange={() => redactCheckBoxClicked()}
-                                            /></Box>,
-                                    onAction: () => { redactCheckBoxClicked() },
-                                }
-                            ]
-                        }
+                        ...(showSequencesFlow ? [] : [
+                            {
+                                title:'Re-Compute',
+                                items: [
+                                    {
+                                        content: 'Refresh',
+                                        onAction: () => { handleRefresh(); setExportOpen(false) },
+                                    },
+                                    isApiGroup ? {
+                                        content: 'Re-compute API Group',
+                                        onAction: () => { computeApiGroup(); setExportOpen(false) },
+                                    }: {}
+                                ]
+                            },
+                            {
+                                title: 'Upload',
+                                items: [
+                                    !isApiGroup &&{
+                                        content: '',
+                                        prefix: (<Box width="160px" >
+                                                    <UploadFile
+                                                        fileFormat=".json,.yaml,.yml"
+                                                        fileChanged={file => {uploadOpenApiFile(file); setExportOpen(false)}}
+                                                        tooltipText="Upload openapi file"
+                                                        label={(
+                                                            <div style={{ display: "flex", gap:'6px' }}>
+                                                                <Box>
+                                                                    <Icon source={FileMinor} />
+                                                                </Box>
+                                                                <Text>Upload OpenAPI file</Text>
+                                                            </div>
+                                                        )}
+                                                        primary={false} 
+                                                    />
+                                                </Box>)
+                                    },
+                                    !isApiGroup && !(isHostnameCollection)  && {
+                                        content: '',
+                                        prefix:  (<Box width="160px" >
+                                            <UploadFile
+                                                fileFormat=".har"
+                                                fileChanged={file => {handleFileChange(file); setExportOpen(false)}}
+                                                tooltipText="Upload traffic(.har)"
+                                                label={(
+                                                    <div style={{ display: "flex", gap:'6px' }}>
+                                                        <Box>
+                                                            <Icon source={FileMinor} />
+                                                        </Box>
+                                                        <Text>Upload har file</Text>
+                                                    </div>
+                                                )}
+                                                primary={false} 
+                                            />
+                                        </Box>)
+                                    },
+                                    !isApiGroup && (!isHostnameCollection && hasAccessToDiscoveryAgent) && {
+                                        content: '',
+                                        prefix: (<Box width="160px" >
+                                            <UploadFile
+                                                fileFormat=".json"
+                                                fileChanged={file => {uploadOpenApiFile(file, true); setExportOpen(false)}}
+                                                tooltipText="Test using AI Agent"
+                                                label={(
+                                                    <div style={{ display: "flex", gap:'6px' }}>
+                                                        <Box>
+                                                            <Icon source={MagicMinor} />
+                                                        </Box>
+                                                        <Text>Upload using AI</Text>
+                                                    </div>
+                                                )}
+                                                primary={false} 
+                                            />
+                                        </Box>)
+                                    }
+                                ]
+                            },
+                            {
+                                title: 'Export as',
+                                items: [
+                                    {
+                                        content: 'OpenAPI spec',
+                                        onAction: () => { (selectedResourcesForPrimaryAction && selectedResourcesForPrimaryAction.length > 0) ? exportOpenApiForSelectedApi() : exportOpenApi()},
+                                    },
+                                    {
+                                        content: 'Postman',
+                                        onAction: () => { exportPostman(); setExportOpen(false) },
+                                    },
+                                    {
+                                        content: 'CSV',
+                                        onAction: () => { exportCsv(); setExportOpen(false) },
+                                    }
+                                ]
+                            },
+                            {
+                                title: 'Others',
+                                items: [
+                                    {
+                                        content: `${showWorkflowTests ? "Hide" : "Show"} workflow tests`,
+                                        onAction: () => { toggleWorkflowTests(); setExportOpen(false) },
+                                    },
+                                    {
+                                        content: '',
+                                        prefix: <Box paddingInlineStart={"2"}><Checkbox
+                                                    label='Redact'
+                                                    checked={redacted}
+                                                    onChange={() => redactCheckBoxClicked()}
+                                                /></Box>,
+                                        onAction: () => { redactCheckBoxClicked() },
+                                    },
+                                    window?.USER_NAME?.includes("@akto.io") && {
+                                        content: 'Show only unique endpoints',
+                                        onAction: () => { showOnlyUnique() },
+                                    }
+                                ]
+                            }
+                        ])
                     ]}
                 />
                 </div>
@@ -1009,7 +1180,7 @@ function ApiEndpoints(props) {
     )
 
     const apiEndpointTable = [<GithubSimpleTable
-        key="api-endpoint-table"
+        key={currentKey}
         pageLimit={50}
         data={endpointData[selectedTab]}
         sortOptions={sortOptions}
@@ -1017,7 +1188,7 @@ function ApiEndpoints(props) {
         filters={[]}
         disambiguateLabel={disambiguateLabel}
         headers={headers.filter(x => {
-            if (!isApiGroup && x.text === 'Collection') {
+            if (!isApiGroup && (x.text === 'Collection' || x.text === 'Tags')) {
                 return false;
             }
             return true;
@@ -1029,7 +1200,7 @@ function ApiEndpoints(props) {
         getFilteredItems={getFilteredItems}
         mode={IndexFiltersMode.Default}
         headings={headings.filter(x => {
-            if (!isApiGroup && x.text === 'Collection') {
+            if (!isApiGroup && (x.text === 'Collection' || x.text === 'Tags')) {
                 return false;
             }
             return true;
@@ -1041,6 +1212,11 @@ function ApiEndpoints(props) {
         promotedBulkActions={promotedBulkActions}
         loading={tableLoading || loading}
         setSelectedResourcesForPrimaryAction={setSelectedResourcesForPrimaryAction}
+        calendarFilterKeys={{
+            "lastTested": "Last Tested",
+            "lastSeenTs": "Last Seen",
+            "detectedTs": "Discovered timestamp",
+        }}
     />,
     <ApiDetails
         key="api-details"
@@ -1049,6 +1225,7 @@ function ApiEndpoints(props) {
         apiDetail={apiDetail}
         headers={transform.getDetailsHeaders()}
         isGptActive={isGptActive}
+        collectionIssuesData={collectionIssuesData}
     />,
     ]
 
@@ -1070,7 +1247,10 @@ function ApiEndpoints(props) {
                     redirectUrl={"/dashboard/observe/inventory"}
                     learnText={"inventory"}
                     docsUrl={ENDPOINTS_PAGE_DOCS_URL}
-                />] : [
+                />] : showSequencesFlow ? [
+                <SequencesFlow key="sequences-flow" apiCollectionId={apiCollectionId}  />
+            ] : [
+                func.isDemoAccount() ? <AgentDiscoverGraph apiCollectionId={apiCollectionId} /> : <></>,
                 (coverageInfo[apiCollectionId] === 0 || !(coverageInfo.hasOwnProperty(apiCollectionId)) ? <TestrunsBannerComponent key={"testrunsBanner"} onButtonClick={() => setRunTests(true)} isInventory={true}  disabled={collectionsObj?.isOutOfTestingScope || false}/> : null),
                 <div className="apiEndpointsTable" key="table">
                     {apiEndpointTable}
@@ -1136,14 +1316,6 @@ function ApiEndpoints(props) {
       const handleTitleChange = (value) => {
         setEditableTitle(value);
       };
-
-      const handleKeyDown = (event) => {
-        if (event.key === 'Enter') {
-          handleSaveClick();
-        } else if (event.key === 'Escape') {
-            setIsEditing(false);
-        }
-      }
 
     const handleSaveDescription = () => {
         // Check for special characters

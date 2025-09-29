@@ -5,6 +5,7 @@ import { Link, Text } from '@shopify/polaris'
 import InfoCard from '../../dashboard/new_components/InfoCard'
 import dashboardApi from "../../dashboard/api.js"
 import func from '@/util/func.js'
+import { getDashboardCategory, mapLabel } from '../../../../main/labelHelper.js'
 
 const CriticalUnsecuredAPIsOverTimeGraph = ({ startTimestamp, endTimestamp, linkText, linkUrl }) => {
     const [unsecuredAPIs, setUnsecuredAPIs] = useState([])
@@ -75,11 +76,11 @@ const CriticalUnsecuredAPIsOverTimeGraph = ({ startTimestamp, endTimestamp, link
                 exportingDisabled={true}
             />
         }
-        title="Critical or high severity Unsecured APIs Over Time"
-        titleToolTip="Chart showing the number of APIs detected(risk score >= 3) each month over the past year. Helps track security trends over time."
+        title={`Critical or high severity unsecured ${mapLabel("APIs", getDashboardCategory())} Over Time`}
+        titleToolTip={`Chart showing the number of ${mapLabel("APIs", getDashboardCategory())} detected(risk score >= 3) each month over the past year. Helps track security trends over time.`}
         linkText={linkText}
         linkUrl={linkUrl}
-    /> : <EmptyCard title="Critical or high severity Unsecured APIs Over Time" subTitleComponent={showTestingComponents ? <Text alignment='center' color='subdued'>No Unsecured APIs found</Text>: runTestEmptyCardComponent} />
+    /> : <EmptyCard title={`Critical or high severity unsecured ${mapLabel("APIs", getDashboardCategory())} Over Time`} subTitleComponent={showTestingComponents ? <Text alignment='center' color='subdued'>{`No unsecured ${mapLabel("APIs", getDashboardCategory())} found`}</Text>: runTestEmptyCardComponent} />
 
     return (
         {...criticalUnsecuredAPIsOverTime}

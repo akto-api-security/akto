@@ -168,7 +168,7 @@ function TrendChart(props) {
                 count += (obj.CRITICAL + obj.HIGH + obj.MEDIUM + obj.LOW)
             })
 
-            setTotalVulnerabilites(count)
+            setTotalVulnerabilites(Math.max(count, 0))
 
             if (firstTime) {
 

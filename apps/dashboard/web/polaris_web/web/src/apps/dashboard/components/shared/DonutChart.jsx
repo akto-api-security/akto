@@ -7,7 +7,7 @@ import PersistStore from '../../../main/PersistStore';
 import observeFunc from "../../pages/observe/transform"
 
 
-function DonutChart({data, title, size,type,navUrl, isRequest, pieInnerSize}) {
+function DonutChart({data, title, size,type,navUrl, isRequest, pieInnerSize, subtitle}) {
     const chartComponentRef = useRef(null)
     const navigate = useNavigate()
     const filtersMap = PersistStore(state => state.filtersMap)
@@ -27,12 +27,59 @@ function DonutChart({data, title, size,type,navUrl, isRequest, pieInnerSize}) {
             height: size + 10,
             width: size,
             className: 'pie-chart',
-            margin: '10'
+            margin: '10',
+            events: subtitle ? {
+                render: function() {
+                    const chart = this;
+                    const centerX = chart.plotLeft + (chart.plotWidth / 2);
+                    const centerY = chart.plotTop + (chart.plotHeight / 2);
+                    
+                    // Remove old labels if they exist
+                    if (chart.titleLabel) {
+                        chart.titleLabel.destroy();
+                    }
+                    if (chart.subtitleLabel) {
+                        chart.subtitleLabel.destroy();
+                    }
+                    
+                    // Add title
+                    chart.titleLabel = chart.renderer.text(
+                        title,
+                        centerX,
+                        centerY - 5
+                    )
+                    .css({
+                        fontSize: '20px',
+                        fontWeight: '400',
+                        textAlign: 'center'
+                    })
+                    .attr({
+                        'text-anchor': 'middle'
+                    })
+                    .add();
+                    
+                    // Add subtitle
+                    chart.subtitleLabel = chart.renderer.text(
+                        subtitle,
+                        centerX,
+                        centerY + 15
+                    )
+                    .css({
+                        fontSize: '12px',
+                        color: '#666',
+                        textAlign: 'center'
+                    })
+                    .attr({
+                        'text-anchor': 'middle'
+                    })
+                    .add();
+                }
+            } : undefined
         },
         credits:{
             enabled: false,
         },
-        title:{
+        title: subtitle ? { text: null } : {
             text: title,
             y: size*0.4,
         },

@@ -9,6 +9,7 @@ import { produce } from 'immer'
 import values from "@/util/values";
 import GithubSimpleTable from '../../../components/tables/GithubSimpleTable'
 import { CellType } from '../../../components/tables/rows/GithubRow'
+import { saveAs } from 'file-saver'
 
 const headers = [
     {

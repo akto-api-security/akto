@@ -8,6 +8,7 @@ import useTable from '../../../../components/tables/TableContext';
 import GithubServerTable from '../../../../components/tables/GithubServerTable';
 import tableFunc from '../../../../components/tables/transform';
 import api from '../../api';
+import { getDashboardCategory, mapLabel } from '../../../../../main/labelHelper';
 
 function ApiChangesTable(props) {
 
@@ -18,7 +19,7 @@ function ApiChangesTable(props) {
   const [loading, setLoading] = useState(false);
   const [newEndpointsCount, setNewEndpointsCount] = useState(0)
 
-  const definedTableTabs = ['New endpoints', 'New params']
+  const definedTableTabs = [mapLabel("New endpoints", getDashboardCategory()), 'New params']
 
   const initialCount = [newEndpointsCount , newParams.length]
 
@@ -28,14 +29,49 @@ function ApiChangesTable(props) {
 
   const tableDataObj = apiChangesData.getData(selectedTab);
 
-  const handleRow = (data) => {
+  const handleRow = async (data) => {
       let headers = []
+      let transformedData = data
+      
       if(selectedTab.includes('param')){
         headers = transform.getParamHeaders() ;
+        
+        // Fetch the actual API information for this parameter's endpoint
+        const apiInfo = await api.fetchEndpoint({
+          url: data.endpoint,
+          method: data.method,
+          apiCollectionId: data.apiCollectionId
+        });
+        
+        // Use the real API data
+        transformedData = {
+          apiCollectionId: data.apiCollectionId,
+          endpoint: data.endpoint,
+          method: data.method,
+          url: data.url,
+          apiCollectionName: data.apiCollectionName,
+          added: data.added,
+          last_seen: apiInfo.data?.lastSeen ? func.prettifyEpoch(apiInfo.data.lastSeen) : data.added,
+          parameterisedEndpoint: data.method + " " + data.endpoint,
+          access_type: apiInfo.data?.apiAccessTypes?.includes("PUBLIC") ? "Public" : 
+                     apiInfo.data?.apiAccessTypes?.includes("PARTNER") ? "Partner" :
+                     apiInfo.data?.apiAccessTypes?.includes("THIRD_PARTY") ? "Third-party" : "Private",
+          auth_type: apiInfo.data?.actualAuthType?.join(", ") || "no auth type found",
+          sensitiveTags: apiInfo.data?.sensitive || [],
+          tags: apiInfo.data?.tags || [],
+          changes: data.changes || "No new changes",
+          description: apiInfo.data?.description || "",
+          severityObj: apiInfo.data?.severityObj || {},
+          riskScore: apiInfo.data?.riskScore || 0,
+          responseCodes: apiInfo.data?.responseCodes || [],
+          violations: apiInfo.data?.violations || {},
+          sources: apiInfo.data?.sources || {},
+          lastTested: apiInfo.data?.lastTested || 0
+        }
       }else{
         headers = transform.getDetailsHeaders() ;
       }
-      handleRowClick(data,headers)
+      handleRowClick(transformedData, headers)
   }
 
   function disambiguateLabel(key, value) {

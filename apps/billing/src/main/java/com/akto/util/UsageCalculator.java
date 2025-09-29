@@ -10,8 +10,8 @@ import com.akto.dto.billing.OrganizationFlags;
 import com.akto.dto.billing.OrganizationUsage;
 import com.akto.dto.usage.MetricTypes;
 import com.akto.dto.usage.UsageMetric;
-import com.akto.log.CacheLoggerMaker;
 import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import com.akto.notifications.email.SendgridEmail;
 import com.akto.stigg.StiggReporterClient;
 import com.mongodb.BasicDBList;
@@ -27,8 +27,7 @@ import java.util.*;
 import static com.akto.dto.billing.OrganizationUsage.*;
 
 public class UsageCalculator {
-    private static final LoggerMaker loggerMaker = new LoggerMaker(UsageCalculator.class);
-    private static final CacheLoggerMaker cacheLoggerMaker = new CacheLoggerMaker(UsageMetricUtils.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(UsageCalculator.class, LogDb.BILLING);
     public static final UsageCalculator instance = new UsageCalculator();
 
     private UsageCalculator() {}
@@ -133,10 +132,16 @@ public class UsageCalculator {
                 case CUSTOM_TESTS:
                     featureId = stiggConfig.getCustomTestsLabel();
                     break;
+                case AI_ASSET_COUNT:
+                    featureId = stiggConfig.getAiAssetsLabel();
+                    break;
+                case MCP_ASSET_COUNT:
+                    featureId = stiggConfig.getMcpAssetsLabel();
+                    break;
 
                 default:
-
                     loggerMaker.errorAndAddToDb("This is not a standard metric type: " + metricType, LoggerMaker.LogDb.BILLING);
+                    break;
             }
 
             if (featureId == null) {
@@ -222,7 +227,6 @@ public class UsageCalculator {
             // Calculate account wise usage and consolidated usage
             for (MetricTypes metricType : MetricTypes.values()) {
                 String metricTypeString = metricType.toString();
-                consolidatedUsage.put(metricTypeString, 0);
 
                 for (int account : accounts) {
                     UsageMetric usageMetric = UsageMetricsDao.instance.findLatestOne(
@@ -243,17 +247,22 @@ public class UsageCalculator {
                         usage = usageMetric.getUsage();
                     } else {
                         String err = "Missing account id: " + account + " orgId: " + organizationId+ " metricType: " + metricTypeString + " hour: " + hour;
-                        loggerMaker.errorAndAddToDb(err, LoggerMaker.LogDb.BILLING);
+                        loggerMaker.infoAndAddToDb(err);
                         if (!shouldProcessIncomplete(organizationId, flags)) {
-                            throw new Exception(err);
+                            continue;
                         }
                     }
 
-                    int currentConsolidateUsage = consolidatedUsage.get(metricTypeString);
+                    int currentConsolidateUsage = consolidatedUsage.getOrDefault(metricTypeString, 0);
                     int updatedConsolidateUsage = currentConsolidateUsage + usage;
 
                     consolidatedUsage.put(metricTypeString, updatedConsolidateUsage);
                 }
+            }
+
+            if (consolidatedUsage.isEmpty()) {
+                String msg = "No usage found for organization: " + organizationId + " (" + organizationName + ") skipping updates... [usageLowerBound=" + usageLowerBound + ", usageUpperBound=" + usageUpperBound + "]";
+                throw new IllegalStateException(msg);
             }
 
             int date = DateUtils.getDateYYYYMMDD(usageLowerBound);
@@ -294,8 +303,6 @@ public class UsageCalculator {
             statusAggregateUsage = false;
         }
     }
-
-
 
     public boolean isStatusDataSinks() {
         return statusDataSinks;

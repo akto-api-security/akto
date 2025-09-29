@@ -1,5 +1,7 @@
 package com.akto.runtime;
 
+import com.akto.mcp.McpSchema;
+import com.akto.util.Pair;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
@@ -76,10 +78,14 @@ public class APICatalogSync {
 
     public static final Pattern VERSION_PATTERN = Pattern.compile("\\bv([1-9][0-9]?|100)\\b");
 
-
     public static Set<MergedUrls> mergedUrls;
 
     public Map<String, FilterConfig> advancedFilterMap =  new HashMap<>();
+
+    /* Note: We have hardcoded the logic of not merging URLs for MCP Server.
+        The apiCollectionId - -1 has nothing to do with this.
+        Since we do not know the collectionId for MCP Server, we have set it to -1.
+    */
 
     public APICatalogSync(String userIdentifier,int thresh, boolean fetchAllSTI) {
         this(userIdentifier, thresh, fetchAllSTI, true);
@@ -286,9 +292,12 @@ public class APICatalogSync {
 
     }
 
-
     public static ApiMergerResult tryMergeURLsInCollection(int apiCollectionId, Boolean urlRegexMatchingEnabled, boolean mergeUrlsBasic, BloomFilter<CharSequence> existingAPIsInDb, boolean ignoreCaseInsensitiveApis, boolean mergeUrlsOnVersions) {
         ApiCollection apiCollection = ApiCollectionsDao.instance.getMeta(apiCollectionId);
+
+        if (apiCollection != null && apiCollection.isMcpCollection()) {
+            return new ApiMergerResult(new HashMap<>());
+        }
 
         Bson filterQ = null;
         if (apiCollection != null && apiCollection.getHostName() == null) {
@@ -804,18 +813,7 @@ public class APICatalogSync {
 
         URLTemplate urlTemplate = new URLTemplate(tokens, newTypes, newUrl.getMethod());
 
-        try {
-            for(MergedUrls mergedUrl : mergedUrls) {
-                if(mergedUrl.getUrl().equals(urlTemplate.getTemplateString()) &&
-                   mergedUrl.getMethod().equals(urlTemplate.getMethod().name())) {
-                    return null;
-                }
-            }
-        } catch(Exception e) {
-            loggerMaker.errorAndAddToDb("Error while creating a new URL object: " + e.getMessage(), LogDb.RUNTIME);
-        }
-
-        return urlTemplate;
+        return getMergedUrlTemplate(urlTemplate);
     }
 
 
@@ -880,23 +878,29 @@ public class APICatalogSync {
 
         if (templatizedStrTokens <= 1) {
             URLTemplate urlTemplate = new URLTemplate(newTokens, newTypes, newUrl.getMethod());
+            return getMergedUrlTemplate(urlTemplate);
+        }
+        return null;
+    }
 
-            try {
-                for(MergedUrls mergedUrl : mergedUrls) {
-                    if(mergedUrl.getUrl().equals(urlTemplate.getTemplateString()) &&
-                            mergedUrl.getMethod().equals(urlTemplate.getMethod().name())) {
-                        return null;
-                    }
+    public static URLTemplate getMergedUrlTemplate(URLTemplate urlTemplate) {
+        try {
+            for(MergedUrls mergedUrl : mergedUrls) {
+                if(mergedUrl.getUrl().equals(urlTemplate.getTemplateString()) &&
+                    mergedUrl.getMethod().equals(urlTemplate.getMethod().name())) {
+                    return null;
                 }
-            } catch(Exception e) {
-                loggerMaker.errorAndAddToDb("Error while creating a new URL object: " + e.getMessage(), LogDb.RUNTIME);
             }
 
-            return urlTemplate;
+            String mergedUrlString = urlTemplate.getTemplateString();
+            if (McpSchema.MCP_METHOD_SET.stream().anyMatch(mergedUrlString::contains)) {
+                return null;
+            }
+        } catch(Exception e) {
+            loggerMaker.errorAndAddToDb("Error while creating a new URL object: " + e.getMessage(), LogDb.RUNTIME);
         }
 
-        return null;
-
+        return urlTemplate;
     }
 
     public static void mergeUrlsAndSave(int apiCollectionId, Boolean urlRegexMatchingEnabled, boolean mergeUrlsBasic, BloomFilter<CharSequence> existingAPIsInDb,boolean ignoreCaseInsensitiveApis, boolean mergeUrlsOnVersions) {
@@ -1331,6 +1335,12 @@ public class APICatalogSync {
         for(String key: deltaInfoMap.keySet()) {
             SingleTypeInfo dbInfo = dbInfoMap.get(key);
             SingleTypeInfo deltaInfo = deltaInfoMap.get(key);
+            boolean isQueryParam = false;
+            if(deltaInfo.getParam().contains("_queryParam")) {
+                isQueryParam = true;
+                String originalParam = deltaInfo.getParam().split("_queryParam")[0];
+                deltaInfo.setParam(originalParam);
+            }
             Bson update;
 
             int inc = deltaInfo.getCount() - (dbInfo == null ? 0 : dbInfo.getCount());
@@ -1354,6 +1364,7 @@ public class APICatalogSync {
             update = Updates.combine(update, Updates.max(SingleTypeInfo.LAST_SEEN, deltaInfo.getLastSeen()));
             update = Updates.combine(update, Updates.max(SingleTypeInfo.MAX_VALUE, deltaInfo.getMaxValue()));
             update = Updates.combine(update, Updates.min(SingleTypeInfo.MIN_VALUE, deltaInfo.getMinValue()));
+            update = Updates.combine(update, Updates.set("isQueryParam", isQueryParam));
             if (source != null) {
                 Bson updateSourceMap = Updates.set(SingleTypeInfo.SOURCES + "." + source.name(), new Document("timestamp", timestamp) );
                 update = Updates.combine(update, updateSourceMap);
@@ -1843,7 +1854,7 @@ public class APICatalogSync {
     int counter = 0;
     List<String> partnerIpsList = new ArrayList<>();
     
-    public void syncWithDB(boolean syncImmediately, boolean fetchAllSTI, SyncLimit syncLimit, HttpResponseParams.Source source) {
+    public void syncWithDB(boolean syncImmediately, boolean fetchAllSTI, SyncLimit apiSyncLimit, SyncLimit mcpAssetsSyncLimit, SyncLimit aiAssetsSyncLimit, HttpResponseParams.Source source) {
         loggerMaker.infoAndAddToDb("Started sync with db! syncImmediately="+syncImmediately + " fetchAllSTI="+fetchAllSTI, LogDb.RUNTIME);
         List<WriteModel<SingleTypeInfo>> writesForParams = new ArrayList<>();
         List<WriteModel<SensitiveSampleData>> writesForSensitiveSampleData = new ArrayList<>();
@@ -1851,8 +1862,8 @@ public class APICatalogSync {
         List<WriteModel<SampleData>> writesForSampleData = new ArrayList<>();
         List<WriteModel<SensitiveParamInfo>> writesForSensitiveParamInfo = new ArrayList<>();
         Map<Integer, Boolean> apiCollectionToRedactPayload = new HashMap<>();
-        List<ApiCollection> all = ApiCollectionsDao.instance.findAll(new BasicDBObject());
-        for(ApiCollection apiCollection: all) {
+        Map<Integer, ApiCollection> apiCollectionMap = fetchAllApiCollection();
+        for(ApiCollection apiCollection: apiCollectionMap.values()) {
             apiCollectionToRedactPayload.put(apiCollection.getId(), apiCollection.getRedact());
         }
 
@@ -1860,7 +1871,7 @@ public class APICatalogSync {
 
         boolean redact = false;
         if (accountSettings != null) {
-            redact =  accountSettings.isRedactPayload();
+            redact = accountSettings.isRedactPayload() && source.equals(HttpResponseParams.Source.MIRRORING);
             if (accountSettings.getPartnerIpList() != null) {
                 partnerIpsList = accountSettings.getPartnerIpList();
             }
@@ -1871,6 +1882,12 @@ public class APICatalogSync {
             APICatalog deltaCatalog = this.delta.get(apiCollectionId);
 
             Set<Integer> demosAndDeactivatedCollections = UsageMetricCalculator.getDemosAndDeactivated();
+
+            Pair<SyncLimit, MetricTypes> syncLimitPair = getSyncLimitForApiCollection(
+                apiCollectionMap.get(apiCollectionId), apiSyncLimit,
+                mcpAssetsSyncLimit, aiAssetsSyncLimit);
+
+            SyncLimit syncLimit = syncLimitPair.getFirst();
 
             if (syncLimit.checkLimit && !demosAndDeactivatedCollections.contains(apiCollectionId)) {
 
@@ -1906,7 +1923,8 @@ public class APICatalogSync {
                     }
                 }
 
-                UsageMetricHandler.calcAndFetchFeatureAccessUsingDeltaUsage(MetricTypes.ACTIVE_ENDPOINTS, Context.accountId.get(), deltaUsage);
+                UsageMetricHandler.calcAndFetchFeatureAccessUsingDeltaUsage(syncLimitPair.getSecond(),
+                    Context.accountId.get(), deltaUsage);
             }
 
             /*
@@ -2002,6 +2020,33 @@ public class APICatalogSync {
         for(URLTemplate s: deltaCatalog.getTemplateURLToMethods().keySet()) {
             logger.info(s.getTemplateString());
         }
+    }
+
+    private Map<Integer, ApiCollection> fetchAllApiCollection() {
+        Map<Integer, ApiCollection> allCollections = new HashMap<>();
+        List<ApiCollection> apiCollections = ApiCollectionsDao.instance.findAll(new BasicDBObject());
+        for(ApiCollection apiCollection: apiCollections) {
+            allCollections.put(apiCollection.getId(), apiCollection);
+        }
+        return allCollections;
+    }
+
+    private Pair<SyncLimit, MetricTypes> getSyncLimitForApiCollection(ApiCollection apiCollection, SyncLimit apiSyncLimit,
+        SyncLimit mcpAssetsSyncLimit, SyncLimit aiAssetsSyncLimit) {
+
+        if (apiCollection == null) {
+            return new Pair<>(apiSyncLimit, MetricTypes.ACTIVE_ENDPOINTS);
+        }
+
+        if (apiCollection.isMcpCollection()) {
+            return new Pair<>(mcpAssetsSyncLimit, MetricTypes.MCP_ASSET_COUNT);
+        }
+
+        if (apiCollection.isGenAICollection()) {
+            return new Pair<>(aiAssetsSyncLimit, MetricTypes.AI_ASSET_COUNT);
+        }
+        // add ai sync limit in future
+        return new Pair<>(apiSyncLimit, MetricTypes.ACTIVE_ENDPOINTS);
     }
 
 

@@ -1,7 +1,6 @@
 package com.akto.action.testing_issues;
 
 import com.akto.action.UserAction;
-import com.akto.action.testing.Utils;
 import com.akto.dao.HistoricalDataDao;
 import com.akto.dao.RBACDao;
 import com.akto.action.testing.StartTestAction;
@@ -25,6 +24,7 @@ import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.testing.*;
+import com.akto.dto.User;
 import com.akto.dto.testing.sources.TestReports;
 import com.akto.dto.testing.sources.TestSourceConfig;
 import com.akto.log.LoggerMaker;
@@ -37,11 +37,16 @@ import com.akto.util.enums.GlobalEnums;
 import com.akto.util.enums.GlobalEnums.Severity;
 import com.akto.util.enums.GlobalEnums.TestCategory;
 import com.akto.util.enums.GlobalEnums.TestRunIssueStatus;
+import com.akto.utils.ApiInfoKeyResult;
+import com.akto.utils.TestTemplateUtils;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.*;
 import com.mongodb.client.result.InsertOneResult;
 import com.opensymphony.xwork2.Action;
+
+import lombok.Getter;
+import lombok.Setter;
 
 import org.apache.commons.lang3.StringUtils;
 import org.bson.Document;
@@ -55,6 +60,8 @@ import java.util.concurrent.TimeUnit;
 
 import static com.akto.util.Constants.ID;
 import static com.akto.util.Constants.ONE_DAY_TIMESTAMP;
+import com.akto.dao.ApiInfoDao;
+import com.akto.dto.ApiInfo.ApiInfoKey;
 
 public class IssuesAction extends UserAction {
 
@@ -81,6 +88,28 @@ public class IssuesAction extends UserAction {
     private int startEpoch;
     long endTimeStamp;
     private Map<Integer,Map<String,Integer>> severityInfo = new HashMap<>();
+
+    private Map<String, String> issuesDescriptionMap;
+
+    @Getter
+    int buaCategoryCount;
+
+    int URL_METHOD_PAIR_THRESHOLD = 1;
+    
+    @Setter
+    private boolean showTestSubCategories;
+    @Setter
+    private boolean showApiInfo;
+    @Getter
+    private List<ApiInfo> buaCategoryApiInfo = new ArrayList<>();
+    @Setter
+    String categoryType;
+    @Getter
+    int endpointsCount;
+
+    public boolean isShowApiInfo() {
+        return showApiInfo;
+    }
 
     private static final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
 
@@ -111,7 +140,7 @@ public class IssuesAction extends UserAction {
 
         if(activeCollections){
             Set<Integer> deactivatedCollections = UsageMetricCalculator.getDeactivated();
-            filters = Filters.and(filters, Filters.nin("_id.apiInfoKey.apiCollectionId", deactivatedCollections));
+            filters = Filters.and(filters, Filters.nin(TestingRunIssues.ID_API_COLLECTION_ID, deactivatedCollections));
         }
 
         Bson combinedFilters = Filters.and(filters, Filters.ne("_id.testErrorSource", "TEST_EDITOR"));
@@ -533,17 +562,18 @@ public class IssuesAction extends UserAction {
 
     public String fetchAllSubCategories() {
         boolean includeYamlContent = false;
-
+        categories = TestTemplateUtils.getAllTestCategoriesWithinContext(Context.contextSource.get());
+        // Bson filters = Filters.in(
+        //         "info.category", Arrays.asList(categories)
+        // );
         switch (mode) {
             case "runTests":
-                categories = GlobalEnums.TestCategory.values();
                 break;
             case "testEditor":
                 includeYamlContent = true;
                 break;
             default:
                 includeYamlContent = true;
-                categories = GlobalEnums.TestCategory.values();
                 testSourceConfigs = TestSourceConfigsDao.instance.findAll(Filters.empty());
         }
 
@@ -574,7 +604,7 @@ public class IssuesAction extends UserAction {
         logger.debug("status id from db to be updated " + statusToBeUpdated);
         logger.debug("status reason from db to be updated " + ignoreReason);
         Bson update = Updates.combine(Updates.set(TestingRunIssues.TEST_RUN_ISSUES_STATUS, statusToBeUpdated),
-                                        Updates.set(TestingRunIssues.LAST_UPDATED, Context.now()));
+                        Updates.set(TestingRunIssues.LAST_UPDATED, Context.now()));
 
         if (statusToBeUpdated == TestRunIssueStatus.IGNORED) { //Changing status to ignored
             update = Updates.combine(update, Updates.set(TestingRunIssues.IGNORE_REASON, ignoreReason));
@@ -598,13 +628,19 @@ public class IssuesAction extends UserAction {
         logger.debug("Issue id from db to be updated " + issueIdArray);
         logger.debug("status id from db to be updated " + statusToBeUpdated);
         logger.debug("status reason from db to be updated " + ignoreReason);
+        User user = getSUser();
+        String userLogin = user != null ? user.getLogin() : "System";
         Bson update = Updates.combine(Updates.set(TestingRunIssues.TEST_RUN_ISSUES_STATUS, statusToBeUpdated),
-                Updates.set(TestingRunIssues.LAST_UPDATED, Context.now()));
+            Updates.set(TestingRunIssues.LAST_UPDATED, Context.now()),
+            Updates.set(TestingRunIssues.LAST_UPDATED_BY, userLogin));
 
         if (statusToBeUpdated == TestRunIssueStatus.IGNORED) { //Changing status to ignored
             update = Updates.combine(update, Updates.set(TestingRunIssues.IGNORE_REASON, ignoreReason));
         } else {
             update = Updates.combine(update, Updates.unset(TestingRunIssues.IGNORE_REASON));
+        }
+        if(!StringUtils.isEmpty(this.description)) {
+            update = Updates.combine(update, Updates.set(TestingRunIssues.DESCRIPTION, this.description));
         }
         TestingRunIssuesDao.instance.updateMany(Filters.in(ID, issueIdArray), update);
 
@@ -656,66 +692,6 @@ public class IssuesAction extends UserAction {
     List<String> issueStatusQuery;
     List<TestingRunResult> testingRunResultList;
     private Map<String, List<String>> filters;
-
-    public String fetchIssuesByStatusAndSummaryId() {
-        if(latestTestingRunSummaryId == null || latestTestingRunSummaryId.isEmpty()){
-            addActionError("SummaryId is a required field and cannot be empty.");
-            return ERROR.toUpperCase();
-        }
-        if(!ObjectId.isValid(latestTestingRunSummaryId)){
-            addActionError("SummaryId is not valid");
-            return ERROR.toUpperCase();
-        }
-
-        ObjectId objectId = new ObjectId(latestTestingRunSummaryId);
-
-        Bson triFilters = Filters.and(
-                Filters.in(TestingRunIssues.TEST_RUN_ISSUES_STATUS, issueStatusQuery),
-                Filters.in(TestingRunIssues.LATEST_TESTING_RUN_SUMMARY_ID, objectId)
-        );
-        issues = TestingRunIssuesDao.instance.findAll(triFilters, Projections.include("_id"));
-        List<Bson> testingRunResultsFilterList = new ArrayList<>();
-        boolean isStoredInVulnerableCollection = VulnerableTestingRunResultDao.instance.isStoredInVulnerableCollection(objectId, true);
-        for(TestingRunIssues issue: issues) {
-            Bson filter = Filters.empty();
-            if(isStoredInVulnerableCollection){
-                filter = Filters.and(
-                    Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, new ObjectId(latestTestingRunSummaryId)),
-                    Filters.eq(TestingRunResult.API_INFO_KEY, issue.getId().getApiInfoKey()),
-                    Filters.eq(TestingRunResult.TEST_SUB_TYPE, issue.getId().getTestSubCategory())
-                );
-                
-            }else{
-                filter = Filters.and(
-                    Filters.eq(TestingRunResult.TEST_RUN_RESULT_SUMMARY_ID, new ObjectId(latestTestingRunSummaryId)),
-                    Filters.eq(TestingRunResult.VULNERABLE, true),
-                    Filters.eq(TestingRunResult.API_INFO_KEY, issue.getId().getApiInfoKey()),
-                    Filters.eq(TestingRunResult.TEST_SUB_TYPE, issue.getId().getTestSubCategory())
-                );
-            }
-            testingRunResultsFilterList.add(filter);
-        }
-
-        List<Bson> filtersList = new ArrayList<>();
-        if(!testingRunResultsFilterList.isEmpty()) filtersList.add(Filters.or(testingRunResultsFilterList));
-        Bson filtersForTestingRunResults = Utils.createFiltersForTestingReport(filters);
-        if(!filtersForTestingRunResults.equals(Filters.empty())) filtersList.add(filtersForTestingRunResults);
-        Bson sortStage = StartTestAction.prepareTestingRunResultCustomSorting(sortKey, sortOrder);
-
-        if(filtersList.isEmpty()) {
-            testingRunResultList = new ArrayList<>();
-            return SUCCESS.toUpperCase();
-        }
-
-        if(isStoredInVulnerableCollection){
-            testingRunResultList = VulnerableTestingRunResultDao.instance.fetchLatestTestingRunResultWithCustomAggregations(Filters.and(filtersList), limit, skip, sortStage);
-        }else{
-            testingRunResultList = TestingRunResultDao.instance.fetchLatestTestingRunResultWithCustomAggregations(Filters.and(filtersList), limit, skip, sortStage);
-        }
-
-        return SUCCESS.toUpperCase();
-    }
-
     List<TestingIssuesId> issuesIds;
 
     public String fetchIssuesFromResultIds(){
@@ -742,10 +718,16 @@ public class IssuesAction extends UserAction {
         Bson projection = Projections.include(
                 TestingRunResultSummary.STATE,
                 TestingRunResultSummary.START_TIMESTAMP,
-                TestingRunResultSummary.END_TIMESTAMP
-        );
+                TestingRunResultSummary.END_TIMESTAMP,
+                TestingRunResultSummary.TESTING_RUN_ID);
 
-        testingRunResultSummary = TestingRunResultSummariesDao.instance.findOne(Filters.eq(TestingRunResultSummary.ID, testingRunSummaryObj), projection);
+        testingRunResultSummary = TestingRunResultSummariesDao.instance
+                .findOne(Filters.eq(TestingRunResultSummary.ID, testingRunSummaryObj), projection);
+                
+        if (testingRunResultSummary != null && testingRunResultSummary.getTestingRunId() != null) {
+            testingRunResultSummary.setTestingRunHexId(
+                    testingRunResultSummary.getTestingRunId().toHexString());
+        }
 
         return SUCCESS.toUpperCase();
     }
@@ -787,6 +769,13 @@ public class IssuesAction extends UserAction {
         if (issuesIds != null && !issuesIds.isEmpty()) {
             filter = Filters.and(filter, Filters.in(Constants.ID, issuesIds));
         }
+
+        Set<Integer> deactivatedCollections = UsageMetricCalculator.getDeactivated();
+        filter = Filters.and(
+            filter,
+            Filters.nin(TestingRunIssues.ID_API_COLLECTION_ID, deactivatedCollections)
+        );
+
         BasicDBObject groupedId = new BasicDBObject(SingleTypeInfo._API_COLLECTION_ID, "$" + TestingRunIssues.ID_API_COLLECTION_ID)
                 .append(TestingRunIssues.KEY_SEVERITY, "$" + TestingRunIssues.KEY_SEVERITY);
         this.severityInfo = TestingRunIssuesDao.instance.getSeveritiesMapForCollections(filter, false, groupedId);
@@ -802,10 +791,105 @@ public class IssuesAction extends UserAction {
             addActionError("Description cannot be null");
             return ERROR.toUpperCase();
         }
+        
         TestingRunIssuesDao.instance.updateOneNoUpsert(Filters.eq(Constants.ID, issueId), Updates.set(TestingRunIssues.DESCRIPTION, description));
         return SUCCESS.toUpperCase();
     }
 
+    public String fetchBUACategoryCount() {
+        ApiInfoKeyResult result = com.akto.utils.Utils.fetchUniqueApiInfoKeys(
+                TestingRunIssuesDao.instance.getRawCollection(),
+                createFilters(true),
+                "_id.apiInfoKey",
+                this.showApiInfo
+        );
+        this.buaCategoryCount = result.count;
+        if (this.showApiInfo) {
+            this.buaCategoryApiInfo = result.apiInfoList;
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    public String fetchUrlsByIssues() {
+        List<Bson> pipeline = new ArrayList<>();
+
+        Bson filterQ = UsageMetricCalculator.excludeDemosAndDeactivated(TestingRunIssues.ID_API_COLLECTION_ID);
+        pipeline.add(
+                Aggregates.match(Filters.and(
+                        Filters.eq(TestingRunIssues.TEST_RUN_ISSUES_STATUS, GlobalEnums.TestRunIssueStatus.OPEN),
+                        filterQ
+                ))
+        );
+
+        try {
+            List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
+            if(collectionIds != null) {
+                pipeline.add(Aggregates.match(Filters.in(SingleTypeInfo._COLLECTION_IDS, collectionIds)));
+            }
+        } catch(Exception e){
+        }
+
+        // Group by testSubCategory and collect unique URL+Method combinations
+        BasicDBObject groupId = new BasicDBObject("testSubCategory", "$_id." + TestingIssuesId.TEST_SUB_CATEGORY);
+        pipeline.add(Aggregates.group(groupId,
+                Accumulators.addToSet("apiInfoKeySet", new BasicDBObject("url", "$_id." + TestingIssuesId.API_KEY_INFO + "." + ApiInfo.ApiInfoKey.URL)
+                        .append("method", "$_id." + TestingIssuesId.API_KEY_INFO + "." + ApiInfo.ApiInfoKey.METHOD)
+                        .append("apiCollectionId", "$_id." + TestingIssuesId.API_KEY_INFO + "." + ApiInfo.ApiInfoKey.API_COLLECTION_ID))
+        ));
+
+        // Filter to only include groups with more than the threshold of unique URL+Method combinations
+        pipeline.add(Aggregates.match(Filters.expr(
+                new BasicDBObject("$gt", Arrays.asList(
+                        new BasicDBObject("$size", "$apiInfoKeySet"),
+                        URL_METHOD_PAIR_THRESHOLD
+                ))
+        )));
+
+        if (!showTestSubCategories) {
+            try {
+                long totalCount = TestingRunIssuesDao.instance.getMCollection()
+                        .aggregate(pipeline, BasicDBObject.class)
+                        .into(new ArrayList<>())
+                        .size();
+
+                this.response = new BasicDBObject();
+                this.response.put("totalCount", (int) totalCount);
+                return SUCCESS.toUpperCase();
+            } catch (Exception e) {
+                addActionError("Error counting URLs by test subcategory");
+                return ERROR.toUpperCase();
+            }
+        }
+
+        pipeline.add(Aggregates.project(Projections.fields(
+                Projections.include("testSubCategory", "apiInfoKeySet"),
+                Projections.computed("apiInfoKeySetCount", new BasicDBObject("$size", "$apiInfoKeySet"))
+        )));
+
+        // Sort by testSubCategory
+        pipeline.add(Aggregates.sort(Sorts.ascending("testSubCategory")));
+
+        try {
+            MongoCursor<BasicDBObject> cursor = TestingRunIssuesDao.instance.getMCollection()
+                    .aggregate(pipeline, BasicDBObject.class)
+                    .cursor();
+
+            List<BasicDBObject> result = new ArrayList<>();
+            while (cursor.hasNext()) {
+                BasicDBObject doc = cursor.next();
+                result.add(doc);
+            }
+
+            this.response = new BasicDBObject();
+            this.response.put("testSubCategories", result);
+            this.response.put("totalCount", result.size());
+
+            return SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            addActionError("Error fetching URLs by test subcategory");
+            return ERROR.toUpperCase();
+        }
+    }
 
     public List<TestingRunIssues> getIssues() {
         return issues;
@@ -1089,5 +1173,13 @@ public class IssuesAction extends UserAction {
     }
     public String getDescription() {
         return description;
+    }
+
+    public Map<String, String> getIssuesDescriptionMap() {
+        return issuesDescriptionMap;
+    }
+
+    public void setIssuesDescriptionMap(Map<String, String> issuesDescriptionMap) {
+        this.issuesDescriptionMap = issuesDescriptionMap;
     }
 }

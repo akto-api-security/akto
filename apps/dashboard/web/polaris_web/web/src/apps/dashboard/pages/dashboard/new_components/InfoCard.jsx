@@ -1,7 +1,7 @@
 import { Box, Card, HorizontalStack, Link, VerticalStack } from '@shopify/polaris';
 import TitleWithInfo from "@/apps/dashboard/components/shared/TitleWithInfo"
 
-function InfoCard({component, title, titleToolTip, linkText, linkUrl, minHeight}) {
+function InfoCard({component, title, titleToolTip, linkText, linkUrl, minHeight, onLinkClick}) {
     return (
         <Card padding={5} key="info">
             
@@ -14,7 +14,13 @@ function InfoCard({component, title, titleToolTip, linkText, linkUrl, minHeight}
                                 titleText={title}
                                 textProps={{variant: 'headingMd'}}
                             />
-                            <Link url={linkUrl} target="_blank">{linkText}</Link>
+                            {linkText && (
+                                onLinkClick ? (
+                                    <Link onClick={onLinkClick} removeUnderline>{linkText}</Link>
+                                ) : (
+                                    <Link url={linkUrl} target="_blank">{linkText}</Link>
+                                )
+                            )}
                         </HorizontalStack>
                         {component}
                     </VerticalStack>

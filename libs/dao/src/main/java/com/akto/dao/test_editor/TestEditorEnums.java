@@ -24,7 +24,11 @@ public class TestEditorEnums {
         COOKIE_EXPIRE_FILTER,
         DATATYPE,
         BELONGS_TO_COLLECTIONS,
-        VALUETYPE
+        VALUETYPE,
+        MAGIC_VALIDATE,
+        NOT_MAGIC_VALIDATE,
+        CATEGORY,
+        CONFIDENCE
     }
 
     public enum CollectionOperands {
@@ -62,7 +66,8 @@ public class TestEditorEnums {
     public enum BodyOperator {
         LENGTH,
         PERCENTAGE_MATCH,
-        PERCENTAGE_MATCH_SCHEMA
+        PERCENTAGE_MATCH_SCHEMA,
+        NLP_CLASSIFICATION
     }
 
     public enum ExtractOperator {

@@ -97,9 +97,11 @@ public class ApiInfoDao extends AccountsContextDaoWithRbac<ApiInfo>{
 
     public void updateLastTestedField(ApiInfoKey apiInfoKey){
         instance.getMCollection().updateOne(
-            getFilter(apiInfoKey), 
-            Updates.set(ApiInfo.LAST_TESTED, Context.now())
-        );
+                getFilter(apiInfoKey),
+                Updates.combine(
+                        Updates.set(ApiInfo.LAST_TESTED, Context.now()),
+                        Updates.inc(ApiInfo.TOTAL_TESTED_COUNT, 1)
+                ));
     }
 
     public Map<Integer,Integer> getCoverageCount(){
@@ -227,7 +229,7 @@ public class ApiInfoDao extends AccountsContextDaoWithRbac<ApiInfo>{
         return apiInfoList;
     }
 
-    public Pair<ApiStats,ApiStats> fetchApiInfoStats(Bson collectionFilter, int startTimestamp, int endTimestamp) {
+    public Pair<ApiStats,ApiStats> fetchApiInfoStats(Bson collectionFilter, Bson apiFilter, int startTimestamp, int endTimestamp) {
         ApiStats apiStatsStart = new ApiStats(startTimestamp);
         ApiStats apiStatsEnd = new ApiStats(endTimestamp);
 
@@ -240,8 +242,8 @@ public class ApiInfoDao extends AccountsContextDaoWithRbac<ApiInfo>{
             .stream()
             .collect(Collectors.toMap(ApiCollection::getId, ApiCollection::getIsOutOfTestingScope));
 
-        // we need only end timestamp filter because data needs to be till end timestamp while start timestamp is for calculating delta
-        Bson filter = Filters.and(collectionFilter,
+        // we need only end timestamp filter because data needs to be till end timestamp while start timestamp is for calculating 
+        Bson filter = Filters.and(apiFilter,
             Filters.or(
                 Filters.lte(ApiInfo.DISCOVERED_TIMESTAMP, endTimestamp),
                 Filters.and(
@@ -253,7 +255,7 @@ public class ApiInfoDao extends AccountsContextDaoWithRbac<ApiInfo>{
         try {
             List<Integer> collectionIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(),Context.accountId.get());
             if (collectionIds != null) {
-                filter = Filters.and(Filters.in("collectionIds", collectionIds));
+                filter = Filters.and(filter, Filters.in("collectionIds", collectionIds));
             }
         } catch (Exception e){
         }

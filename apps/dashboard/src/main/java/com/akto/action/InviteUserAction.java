@@ -49,6 +49,11 @@ public class InviteUserAction extends UserAction{
 
     private static final Pattern EMAIL_PATTERN = Pattern.compile("^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$");
 
+    static {
+        commonOrganisationsMap.put("blinkhealth.com", "blinkhealth.com");
+        commonOrganisationsMap.put("blinkrx.com", "blinkhealth.com");
+    }
+
     public static String validateEmail(String email, String adminLogin) {
         if (email == null) return INVALID_EMAIL_ERROR;
 
@@ -106,6 +111,13 @@ public class InviteUserAction extends UserAction{
 
     @Override
     public String execute() {
+        inviteeEmail = inviteeEmail != null ? inviteeEmail.toLowerCase() : null;
+
+        if(inviteeEmail == null) {
+            addActionError("Invalid email");
+            return ERROR.toUpperCase();
+        }
+
         int user_id = getSUser().getId();
         loggerMaker.debugAndAddToDb(user_id + " inviting " + inviteeEmail);
 

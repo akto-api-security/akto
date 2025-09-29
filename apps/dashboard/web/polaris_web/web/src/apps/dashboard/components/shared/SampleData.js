@@ -17,8 +17,7 @@ function highlightPaths(highlightPathMap, ref){
         try {
           matches = ref.getModel().findMatches(mainKey, false, false, false, null, true);
         } catch (error) {
-          console.error(error)
-          console.log("mainKey: " + mainKey)
+          // Silently handle errors in production
         }
         matches.forEach((match) => {
           let matchDecObj ={
@@ -78,8 +77,7 @@ function highlightHeaders(data, ref, getLineNumbers){
     try {
       matchRanges = ref.getModel().findMatches(header, false, false, true, null, true, 1)
     } catch (error) {
-      console.error(error)
-      console.log("header: " + header)
+      // Silently handle errors in production
     }
     changesArr = [ ...changesArr, ...matchRanges]
     matchRanges.forEach((obj) => {
@@ -144,6 +142,59 @@ function highlightHeaders(data, ref, getLineNumbers){
       }
     }])
   })
+}
+
+function highlightVulnerabilities(vulnerabilitySegments, ref) {
+  if (!vulnerabilitySegments || !Array.isArray(vulnerabilitySegments) || vulnerabilitySegments.length === 0) {
+    return;
+  }
+
+  const text = ref.getValue();
+  if (!text) {
+    return;
+  }
+  let decorations = [];
+  vulnerabilitySegments.forEach((segment, index) => {
+    try {
+      const model = ref.getModel();
+      
+      // Method 1: Highlight by phrase (if available)
+      if (segment.phrase && typeof segment.phrase === 'string') {
+        const matches = model.findMatches(segment.phrase, false, true, false, null, true);
+        matches.forEach((match) => {
+          decorations.push({
+            range: match.range,
+            options: {
+              inlineClassName: "vulnerability-highlight",
+            }
+          });
+        });
+      }
+      
+      // Method 2: Highlight by start and end segment
+      if (segment.start !== undefined && segment.end !== undefined && 
+        segment.start >= 0 && segment.end <= text.length && segment.start < segment.end) {
+      
+      // Convert character positions to line/column positions
+        const startPos = ref.getModel().getPositionAt(segment.start);
+        const endPos = ref.getModel().getPositionAt(segment.end);
+        
+        if (startPos && endPos) {
+          ref.createDecorationsCollection([{
+            range: new monaco.Range(startPos.lineNumber, startPos.column, endPos.lineNumber, endPos.column),
+            options: {
+              inlineClassName: "vulnerability-highlight"
+            }
+          }]);
+        }
+      }
+    } catch (error) {
+      console.error('Error creating vulnerability highlight:', error, segment);
+    }
+  });
+  if (decorations.length > 0) {
+    ref._vulnDecorations = [ref.createDecorationsCollection(decorations)];
+  }
 }
 
 function SampleData(props) {
@@ -230,6 +281,17 @@ function SampleData(props) {
 
     },[currLine])
 
+    // Add effect to re-highlight vulnerabilities if they change
+    useEffect(() => {
+      if (instance && editorData) {
+        // Use backend-provided vulnerabilitySegments if available
+        const segments = Array.isArray(editorData.vulnerabilitySegments) && editorData.vulnerabilitySegments.length > 0
+          ? editorData.vulnerabilitySegments
+          : []
+        highlightVulnerabilities(segments, instance);
+      }
+    }, [instance, editorData?.vulnerabilitySegments]);
+
     function createInstance(){
         const options = {
             language: editorLanguage,
@@ -306,6 +368,9 @@ function SampleData(props) {
         highlightPaths(data?.highlightPaths, instance);
         if(data.headersMap){
           highlightHeaders(data, instance,getLineNumbers)
+        }
+        if(data.vulnerabilitySegments){
+          highlightVulnerabilities(data.vulnerabilitySegments, instance);
         }
       }
     }

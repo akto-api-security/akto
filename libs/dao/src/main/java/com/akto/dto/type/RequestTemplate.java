@@ -646,7 +646,12 @@ public class RequestTemplate {
         return parseRequestPayload(reqPayload, urlWithParams);
     }
     public static JSONObject parseRequestPayloadToJsonObject(String reqPayload, String urlWithParams) {
-        BasicDBObject queryParams = getQueryJSON(urlWithParams);
+        BasicDBObject queryParams = null;
+        try {
+            queryParams = getQueryJSONWithSuffix(urlWithParams);
+        } catch (Exception e) {
+            queryParams = new BasicDBObject();
+        }
 
         if (reqPayload == null || reqPayload.isEmpty()) {
             reqPayload = "{}";
@@ -671,7 +676,12 @@ public class RequestTemplate {
 
     public static BasicDBObject parseRequestPayload(String reqPayload, String urlWithParams) {
 
-        BasicDBObject queryParams = getQueryJSON(urlWithParams);
+        BasicDBObject queryParams = null;
+        try {
+            queryParams = getQueryJSONWithSuffix(urlWithParams);
+        } catch (Exception e) {
+            queryParams = new BasicDBObject();
+        }
 
         if (reqPayload == null || reqPayload.isEmpty()) {
             reqPayload = "{}";
@@ -694,25 +704,20 @@ public class RequestTemplate {
         return payload;
     }
 
-    public static BasicDBObject getQueryJSON(String url) {
-        BasicDBObject ret = new BasicDBObject();
-        if (url == null) {
-            return ret;
+    private static String[] splitURL(String url) {
+        if (StringUtils.isEmpty(url)) {
+            return null;
         }
-
         String[] splitURL = url.split("\\?");
-
         if (splitURL.length != 2) {
-            return ret;
+            return null;
         }
-
         String queryParamsStr = splitURL[1];
-        if (queryParamsStr == null) {
-            return ret;
-        }
-
         String[] queryParams = queryParamsStr.split("&");
+        return queryParams;
+    }
 
+    private static void addQueryParamsToPayload(BasicDBObject ret, String[] queryParams, boolean addSuffix) {
         for (String queryParam : queryParams) {
             String[] keyVal = queryParam.split("=");
             if (keyVal.length != 2) {
@@ -721,12 +726,34 @@ public class RequestTemplate {
             try {
                 keyVal[0] = URLDecoder.decode(keyVal[0], "UTF-8");
                 keyVal[1] = URLDecoder.decode(keyVal[1], "UTF-8");
-                ret.put(keyVal[0], keyVal[1]);
+                if (addSuffix) {
+                    ret.put(keyVal[0] + "_queryParam", keyVal[1]);
+                } else {
+                    ret.put(keyVal[0], keyVal[1]);
+                }
             } catch (UnsupportedEncodingException e) {
                 continue;
             }
         }
+    }
 
+    public static BasicDBObject getQueryJSON(String url) {
+        BasicDBObject ret = new BasicDBObject();
+        String[] queryParams = splitURL(url);
+        if (queryParams == null) {
+            return ret;
+        }
+        addQueryParamsToPayload(ret, queryParams, false);
+        return ret;
+    }
+
+    public static BasicDBObject getQueryJSONWithSuffix(String url) {
+        BasicDBObject ret = new BasicDBObject();
+        String[] queryParams = splitURL(url);
+        if (queryParams == null) {
+            return ret;
+        }
+        addQueryParamsToPayload(ret, queryParams, true);
         return ret;
     }
 

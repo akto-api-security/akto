@@ -88,7 +88,7 @@ public class Parser {
                 }
             }
         } catch (Exception e) {
-            loggerMaker.infoAndAddToDb("unable to parse security schemes " + e.getMessage());
+            loggerMaker.errorAndAddToDb(e, "unable to parse security schemes " + e.getMessage());
             fileLevelErrors.add(new FileUploadError("unable to parse security schemes " + e.getMessage(), FileUploadError.ErrorType.WARNING));
         }
 
@@ -98,12 +98,14 @@ public class Parser {
         }
 
         int count = 0;
+
+        loggerMaker.infoAndAddToDb("Parsing " + paths.size() + " paths from the uploaded file");
+
         for (String path : paths.keySet()) {
             String originalPath = String.copyValueOf(path.toCharArray());
             PathItem pathItem = paths.get(path);
             if (pathItem == null)
                 continue;
-
             try {
 
                 List<Server> serversFromPath = pathItem.getServers();
@@ -159,8 +161,7 @@ public class Parser {
                             }
                         }
                     } catch (Exception e) {
-                        loggerMaker.infoAndAddToDb(
-                                "unable to handle request body for " + path + " " + method + " " + e.toString());
+                        loggerMaker.errorAndAddToDb(e, "unable to handle request body for " + path + " " + method + " " + e.toString());
                         apiLevelErrors.add(new FileUploadError("Unable to parse request body: " + e.getMessage(), FileUploadError.ErrorType.ERROR));
                     }
 
@@ -202,23 +203,31 @@ public class Parser {
                             }
                         }
                     } catch (Exception e) {
-                        loggerMaker.infoAndAddToDb("unable to parse security schemes " + e.getMessage());
+                        loggerMaker.errorAndAddToDb(e, "unable to parse security schemes " + e.getMessage());
                         apiLevelErrors.add(new FileUploadError("unable to parse security schemes: " + e.getMessage(), FileUploadError.ErrorType.WARNING));
                     }
 
                     String requestHeadersString = "";
-                    URL url = new URL(path);
-                    // without host/server.
-                    String urlPath = url.getPath() + (url.getQuery() != null ? "?" + url.getQuery() : "");
-                    // Get the domain (including scheme)
-                    requestHeaders.putIfAbsent("Host", url.getHost());
+                    String urlPath = path;
+                    try {
+                        URL url = new URL(path);
+                        // without host/server.
+                        urlPath = url.getPath() + (url.getQuery() != null ? "?" + url.getQuery() : "");
+                        // Get the domain (including scheme)
+                        requestHeaders.putIfAbsent("Host", url.getHost());
+                    } catch (Exception e) {
+                        loggerMaker.errorAndAddToDb(e, "unable to parse url for " + path + " " + method + " " + e.toString());
+                    }
+
+                    if (requestHeaders == null) {
+                        requestHeaders = new HashMap<>();
+                    }
+
                     if (requestHeaders != null && !requestHeaders.isEmpty()) {
                         try {
                             requestHeadersString = mapper.writeValueAsString(requestHeaders);
                         } catch (JsonProcessingException e) {
-                            loggerMaker.infoAndAddToDb(
-                                    "unable to parse request headers for " + path + " " + method + " "
-                                            + e.getMessage());
+                            loggerMaker.errorAndAddToDb(e, "unable to parse request headers for " + path + " " + method + " " + e.getMessage());
                             apiLevelErrors.add(new FileUploadError("error while converting request headers to string: " + e.getMessage(), FileUploadError.ErrorType.ERROR));
                         }
                     }
@@ -228,7 +237,7 @@ public class Parser {
                     List<Map<String, String>> responseObjectList = new ArrayList<>();
 
                     try {
-                        loggerMaker.infoAndAddToDb("Replaying request for" + path + " " + method + ", replaying request");
+                        loggerMaker.infoAndAddToDb("Replaying request for " + path + " " + method + ", replaying request");
 
                         Map<String, List<String>> modifiedHeaders = new HashMap<>();
                         for (String key : requestHeaders.keySet()) {
@@ -255,7 +264,7 @@ public class Parser {
                             responseObject.put(mKeys.statusCode, statusCode);
                             responseObjectList.add(responseObject);
                         } catch (Exception e) {
-                            loggerMaker.infoAndAddToDb("Error while making request for " + originalHttpRequest.getFullUrlWithParams() + " : " + e.getMessage(), LogDb.DASHBOARD);
+                            loggerMaker.errorAndAddToDb(e, "Error while making request for " + originalHttpRequest.getFullUrlWithParams() + " : " + e.getMessage());
                             ApiResponses responses = operation.getResponses();
                             if (responses != null) {
                                 for (String responseCode : responses.keySet()) {
@@ -297,7 +306,7 @@ public class Parser {
                                         try {
                                             responseHeadersString = mapper.writeValueAsString(responseHeaders);
                                         } catch (Exception e1) {
-                                            loggerMaker.infoAndAddToDb("unable to handle response headers for " + path + " "
+                                            loggerMaker.errorAndAddToDb(e1, "unable to handle response headers for " + path + " "
                                                     + method + " " + e1.getMessage());
                                             apiLevelErrors.add(new FileUploadError("Replaying the request failed, reason: " + e.getMessage(), FileUploadError.ErrorType.ERROR));
                                             apiLevelErrors.add(new FileUploadError("Error while converting response headers to string from example: " +e1.getMessage(),FileUploadError.ErrorType.ERROR));
@@ -316,10 +325,8 @@ public class Parser {
                         }
 
                     } catch (Exception e) {
-                        loggerMaker.infoAndAddToDb(
-                                "unable to handle response body for " + path + " " + method + " " + e.toString());
+                        loggerMaker.errorAndAddToDb(e, "unable to handle response body for " + path + " " + method + " " + e.toString());
                         apiLevelErrors.add(new FileUploadError("Error while converting response to Akto format: " + e.getMessage(), FileUploadError.ErrorType.ERROR));
-
                     }
 
                     messageObject.put(mKeys.akto_account_id, Context.accountId.get().toString());
@@ -360,8 +367,7 @@ public class Parser {
                             log.setAktoFormat(s);
 
                         } catch (JsonProcessingException e) {
-                            loggerMaker.infoAndAddToDb("unable to parse message object for " + path + " " + method + " "
-                                    + e.getMessage());
+                            loggerMaker.errorAndAddToDb(e, "unable to parse message object for " + path + " " + method + " " + e.getMessage());
                             apiLevelErrors.add(new FileUploadError("Error while converting message to Akto format: " + e.getMessage(), FileUploadError.ErrorType.ERROR));
                             log.setAktoFormat(null);
                         }
@@ -373,9 +379,13 @@ public class Parser {
                 }
 
             } catch (Exception e) {
-                loggerMaker.infoAndAddToDb("unable to parse path item for " + path + " " + e.toString());
+                loggerMaker.errorAndAddToDb(e, "unable to parse path item for " + path + " " + e.toString());
             }
         }
+
+        loggerMaker.infoAndAddToDb("Parsed " + count + " APIs from the uploaded file");
+        loggerMaker.infoAndAddToDb("Created " + uploadLogs.size() + " entries in akto format");
+        loggerMaker.infoAndAddToDb("Found " + fileLevelErrors.size() + " errors in the uploaded file");
 
         ParserResult parserResult = new ParserResult();
         parserResult.setFileErrors(fileLevelErrors);

@@ -5,17 +5,32 @@ import api from "../api"
 import func from '@/util/func';
 import DropdownSearch from "../../../components/shared/DropdownSearch";
 import { useSearchParams } from "react-router-dom";
+import { getDashboardCategory } from "../../../../main/labelHelper";
 
-function FilterComponent() {
+function FilterComponent({ includeCategoryNameEquals, excludeCategoryNameEquals, titleText, readOnly = false, validateOnSave }) {
     const[searchParams] = useSearchParams()
     const filteredPolicy = searchParams.get("policy")
     const [ogData, setOgData] = useState({ message: "" })
     const [data, setData] = useState({ message: "" })
     const [allData, setAllData] = useState([])
     const [id, setId] = useState("")
+    const shortHand = getDashboardCategory().split(" ")[0].toLowerCase();
     const fetchData = async () => {
         await api.fetchFilterYamlTemplate().then((resp) => {
-            const temp = resp?.templates ? resp?.templates : []
+            let temp = resp?.templates ? resp?.templates : []
+            // Apply include/exclude category filters if provided
+            if (includeCategoryNameEquals && includeCategoryNameEquals.length > 0) {
+                const includeLc = includeCategoryNameEquals.toLowerCase()
+                temp = temp.filter(x => x?.info?.category?.name?.toLowerCase() === includeLc)
+            } else if (excludeCategoryNameEquals && excludeCategoryNameEquals.length > 0) {
+                const excludeLc = excludeCategoryNameEquals.toLowerCase()
+                temp = temp.filter(x => x?.info?.category?.name?.toLowerCase() !== excludeLc)
+            }
+            if(!shortHand.includes("api")){  
+                temp = temp.filter(x => x?.info?.category?.name !== undefined && x?.info?.category?.name?.toLowerCase().includes(shortHand))
+            }else{
+                temp = temp.filter(x => x?.info?.category?.name !== undefined && !x?.info?.category?.name?.toLowerCase().includes("mcp"))
+            }
             setAllData(temp)
             if (temp.length > 0) {
                 const temp2 = temp[0]
@@ -46,6 +61,15 @@ function FilterComponent() {
     }, [])
 
     async function onSave() {
+        // Run validation if provided
+        if (validateOnSave) {
+            const validationResult = validateOnSave(data);
+            if (!validationResult.isValid) {
+                func.setToast(true, true, validationResult.errorMessage);
+                return;
+            }
+        }
+
         await api.saveFilterYamlTemplate(data)
         func.setToast(true, false, 'Saved filter template')
     }
@@ -55,10 +79,12 @@ function FilterComponent() {
             <LegacyCard.Section flush>
                 <Box padding={"2"}>
                     <HorizontalStack padding="2" align='space-between'>
-                        Threat detection filter
-                        <Button plain monochrome removeUnderline onClick={onSave}>
-                            Save
-                        </Button>
+                        {titleText ? titleText : 'Threat detection filter'}
+                        {!readOnly && (
+                            <Button plain monochrome removeUnderline onClick={onSave}>
+                                Save
+                            </Button>
+                        )}
                     </HorizontalStack>
                 </Box>
             </LegacyCard.Section>
@@ -87,7 +113,7 @@ function FilterComponent() {
                 />
             </LegacyCard.Section>
             <LegacyCard.Section flush>
-                <SampleData data={ogData} editorLanguage="custom_yaml" minHeight="65vh" readOnly={false} getEditorData={setData} />
+                <SampleData data={ogData} editorLanguage="custom_yaml" minHeight="65vh" readOnly={readOnly} getEditorData={setData} />
             </LegacyCard.Section>
         </LegacyCard>
     )

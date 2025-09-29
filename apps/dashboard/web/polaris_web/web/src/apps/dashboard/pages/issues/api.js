@@ -51,11 +51,18 @@ export default {
             data: {startTimeStamp, endTimeStamp}
         })
     },
-    bulkCreateJiraTickets(issuesIds, aktoDashboardHost, projId, issueType){
+    bulkCreateJiraTickets(issuesIds, aktoDashboardHost, projId, issueType, jiraMetaData){
         return request({
             url: 'api/bulkCreateJiraTickets',
             method: 'post',
-            data: {issuesIds, aktoDashboardHost, projId, issueType}
+            data: {issuesIds, aktoDashboardHost, projId, issueType, jiraMetaData}
+        })
+    },
+    fetchCreateJiraIssueFieldMetaData() {
+        return request({
+            url: 'api/fetchCreateJiraIssueFieldMetaData',
+            method: 'post',
+            data: {}
         })
     },
     createAzureBoardsWorkItem(testingIssuesId, projectName, workItemType, aktoDashboardHostName) {
@@ -70,6 +77,20 @@ export default {
             url: 'api/bulkCreateAzureWorkItems',
             method: 'post',
             data: {testingIssuesIdList, projectName, workItemType, aktoDashboardHostName}
+        })
+    },
+    createGeneralJiraTicket(payload) {
+        return request({
+            url: 'api/createGeneralJiraTicket',
+            method: 'post',
+            data: payload
+        })
+    },
+    fetchIssuesByApis() {
+        return request({
+            url: 'api/fetchIssuesByApis',
+            method: 'post',
+            data: {}
         })
     }
 }

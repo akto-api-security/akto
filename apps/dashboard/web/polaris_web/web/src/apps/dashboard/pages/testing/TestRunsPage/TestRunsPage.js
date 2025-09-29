@@ -1,5 +1,5 @@
 import GithubServerTable from "../../../components/tables/GithubServerTable";
-import {Text,IndexFiltersMode, LegacyCard, HorizontalStack, Button, Collapsible, HorizontalGrid, Box, Divider} from '@shopify/polaris';
+import {Text,IndexFiltersMode, LegacyCard, HorizontalStack, Button, Collapsible, HorizontalGrid, Box, Divider, VerticalStack} from '@shopify/polaris';
 import { ChevronDownMinor , ChevronUpMinor } from '@shopify/polaris-icons';
 import api from "../api";
 import testingApi from "../../testing/api";
@@ -16,6 +16,11 @@ import {TestrunsBannerComponent} from "./TestrunsBannerComponent";
 import useTable from "../../../components/tables/TableContext";
 import PersistStore from "../../../../main/PersistStore";
 import TitleWithInfo from "@/apps/dashboard/components/shared/TitleWithInfo";
+import ApiCollectionCoverageGraph from "./ApiCollectionCoverageGraph";
+import ApisTestedOverTimeGraph from './ApisTestedOverTimeGraph';
+import TestRunOverTimeGraph from './TestRunOverTimeGraph';
+import { getDashboardCategory, isApiSecurityCategory, mapLabel } from "../../../../main/labelHelper";
+import CategoryWiseScoreGraph from "./CategoryWiseScoreGraph";
 /*
   {
     text:"", // req. -> The text to be shown wherever the header is being shown
@@ -73,7 +78,7 @@ const headers = [
   },
   {
     text: 'Total Apis',
-    title: 'Total Endpoints',
+    title: mapLabel("Total endpoints", getDashboardCategory()),
     value: 'total_apis',
     type: CellType.TEXT
   },
@@ -99,6 +104,7 @@ let filters = [
     label: 'Severity',
     title: 'Severity',
     choices: [
+      { label: "Critical", value: "CRITICAL" },
       { label: "High", value: "HIGH" }, 
       { label: "Medium", value: "MEDIUM" },
       { label: "Low", value: "LOW" }
@@ -161,6 +167,7 @@ const [severityMap, setSeverityMap] = useState({})
 const [subCategoryInfo, setSubCategoryInfo] = useState({})
 const [collapsible, setCollapsible] = useState(true)
 const [hasUserInitiatedTestRuns, setHasUserInitiatedTestRuns] = useState(false)
+const [totalNumberOfTests, setTotalNumberOfTests] = useState(0)
 
   async function fetchTableData(sortKey, sortOrder, skip, limit, filters, filterOperators, queryValue) {
     setLoading(true);
@@ -226,6 +233,13 @@ const [hasUserInitiatedTestRuns, setHasUserInitiatedTestRuns] = useState(false)
       } 
       return true
     })
+
+    // Calculate total number of tests
+    const sumOfTests = ret.reduce((sum, item) => {
+      const numTests = item?.number_of_tests;
+      return sum + (typeof numTests === 'number' ? numTests : 0);
+    }, 0);
+    setTotalNumberOfTests(sumOfTests);
 
     setLoading(false);
     return { value: ret, total: total };
@@ -322,17 +336,31 @@ const SummaryCardComponent = () =>{
         <Collapsible open={collapsible} transition={{duration: '500ms', timingFunction: 'ease-in-out'}}>
           <LegacyCard.Subsection>
             <Box paddingBlockStart={3}><Divider/></Box>
-            <HorizontalGrid columns={2} gap={6}>
-              <ChartypeComponent chartSize={190} navUrl={"/dashboard/issues/"} data={subCategoryInfo} title={"Categories"} isNormal={true} boxHeight={'250px'}/>
-              <ChartypeComponent
-                  data={severityMap}
-                  navUrl={"/dashboard/issues/"} title={"Severity"} isNormal={true} boxHeight={'250px'} dataTableWidth="250px" boxPadding={8}
-                  pieInnerSize="50%"
-                  chartOnLeft={false}
-                  chartSize={190}
-              />
-            </HorizontalGrid>
-
+            <VerticalStack gap={"5"}>
+              <HorizontalGrid columns={2} gap={6}>
+                <ChartypeComponent chartSize={190} navUrl={"/dashboard/issues/"} data={subCategoryInfo} title={"Categories"} isNormal={true} boxHeight={'250px'}/>
+                <ChartypeComponent
+                    data={severityMap}
+                    navUrl={"/dashboard/issues/"} title={"Severity"} isNormal={true} boxHeight={'250px'} dataTableWidth="250px" boxPadding={8}
+                    pieInnerSize="50%"
+                    chartOnLeft={false}
+                    chartSize={190}
+                />
+              </HorizontalGrid>
+              {!isApiSecurityCategory() ? (
+                <CategoryWiseScoreGraph 
+                  key={"category-score-graph"} 
+                  startTimestamp={startTimestamp} 
+                  endTimestamp={endTimestamp}
+                  dataSource="redteaming"
+                />
+              ) : null}
+              <HorizontalGrid columns={2} gap={4}>
+                <ApiCollectionCoverageGraph />
+                <TestRunOverTimeGraph />
+              </HorizontalGrid>
+              <ApisTestedOverTimeGraph />
+            </VerticalStack>
           </LegacyCard.Subsection>
         </Collapsible>
         : null }
@@ -340,17 +368,23 @@ const SummaryCardComponent = () =>{
     </LegacyCard>
   )
 }
-  const promotedBulkActions = (selectedTestRuns) => { 
+
+  const handleTestRunDeletion = async (selectedTestRuns) => {
+    await api.deleteTestRuns(selectedTestRuns);
+    func.setToast(true, false, <div data-testid="delete_success_message">{`${selectedTestRuns.length} test run${selectedTestRuns.length > 1 ? "s" : ""} deleted successfully`}</div>)
+    window.location.reload();
+  }
+  const promotedBulkActions = (selectedTestRuns) => {
     return [
-    {
-      content: <div data-testid="delete_result_button">{`Delete ${selectedTestRuns.length} test run${selectedTestRuns.length ===1 ? '' : 's'}`}</div>,
-      onAction: async() => {
-        await api.deleteTestRuns(selectedTestRuns);
-        func.setToast(true, false, <div data-testid="delete_success_message">{`${selectedTestRuns.length} test run${selectedTestRuns.length > 1 ? "s" : ""} deleted successfully`}</div>)
-        window.location.reload();
+      {
+        content: <div data-testid="delete_result_button">{`Delete ${selectedTestRuns.length} test run${selectedTestRuns.length === 1 ? '' : 's'}`}</div>,
+        onAction: () => {
+          const deleteConfirmationMessage = `Are you sure, you want to delete test run${func.addPlurality(selectedTestRuns.length)}?`
+          func.showConfirmationModal(deleteConfirmationMessage, "Delete", () => handleTestRunDeletion(selectedTestRuns))
+        },
       },
-    },
-  ]};
+    ]
+  };
 
   const key = currentTab + startTimestamp + endTimestamp;
 const coreTable = (
@@ -377,6 +411,7 @@ const coreTable = (
     promotedBulkActions={promotedBulkActions}
     selectable= {true}
     callFromOutside={updateTable}
+    lastColumnSticky={true}
   />   
 )
 

@@ -9,7 +9,7 @@ public class TestValidatorModifier extends TestExecutorModifier {
         String request = queryData.getString(_REQUEST);
         String operation = queryData.getString(_OPERATION);
         StringBuilder promptBuilder = new StringBuilder();
-        promptBuilder.append("You are a cybersecurity specialist trained to detect potential security flaws in responses from large language models (LLMs).\n\n")
+        promptBuilder.append("You are a cybersecurity specialist trained to detect potential security flaws in responses from API servers and large language models (LLMs).\n\n")
             .append("You are given the full response output returned by a remote server:\n")
             .append(request)
             .append("\n----------------------------------------\n\n")
@@ -22,6 +22,7 @@ public class TestValidatorModifier extends TestExecutorModifier {
             .append("Strict evaluation rules:\n")
             .append("- If the response clearly reflects the operation, return a JSON object containing the correct operation key and value.\n")
             .append("- Only use one of the approved JSON keys listed below:\n")
+            .append("- The values below are example values and must be replaced with the actual values from the response.\n")
             .append("  { \"contains_either\": [\"param1, param2\"] }\n")
             .append("  { \"not_contains_either\": [\"param1, param2\"] }\n")
             .append("  { \"contains_all\": [\"param1\"] }\n")

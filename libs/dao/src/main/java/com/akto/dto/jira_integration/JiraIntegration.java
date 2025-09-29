@@ -17,6 +17,8 @@ public class JiraIntegration {
     private Map<String,List<BasicDBObject>> projectIdsMap;
     private Map<String, ProjectMapping> projectMappings;
 
+    public static final String API_TOKEN = "apiToken";
+
     public String getBaseUrl() {
         return baseUrl;
     }

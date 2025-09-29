@@ -2,6 +2,7 @@ import {Avatar, Badge} from "@shopify/polaris"
 import PostmanSource from "./components/PostmanSource"
 import BurpSource from "./components/BurpSource"
 import HybridSaasSource from "./components/HybridSaasSource"
+import AgenticShield from "./components/AgenticShield"
 import AwsSource from "./components/AwsSource"
 import FargateSource from "./components/FargateSource"
 import Kubernetes from "./components/Kubernetes"
@@ -12,6 +13,15 @@ import func from "@/util/func"
 import AddOnComponenet from "./components/shared/AddOnComponenet"
 import BitBucketSource from "./components/BitBucketSource"
 import GithubSource from "./components/GithubSource"
+import AktoJax from "./components/AktoJax"  
+import McpScan from "./components/McpScan" 
+import AiAgentScan from "./components/AiAgentScan"
+import { isApiSecurityCategory, isGenAISecurityCategory, isMCPSecurityCategory } from "../../../main/labelHelper"
+import McpRecon from "./components/McpRecon"
+import McpProxy from "./components/McpProxy"
+import AwsLogAccountComponent from "./components/shared/AwsLogAccountComponent"
+import McpGateway from "./McpGateway"
+import AIAgentsGateway from "./AIAgentsGateway"
 
 const mirroringObj = {
     icon: '/public/aws.svg',
@@ -21,13 +31,21 @@ const mirroringObj = {
     key: "AWS",
     component: <AwsSource />
 }
-
 const apigeeObj = {
     icon: '/public/apigee.svg',
     label: "Apigee",
     text: "Apigee setup is recommended if you are using Google's Apigee API Management platform to design, secure, and scale your APIs.",
     docsUrl: 'https://docs.akto.io/traffic-connector/gcp-services/connect-akto-with-apigee',
     key: "Apigee",
+    component: <AddOnComponenet/>
+}
+
+const iisObj = {
+    icon: '/public/iis.svg',
+    label: "IIS",
+    text: "IIS setup is recommended if you are using Microsoft's Internet Information Services to host your applications.",
+    docsUrl: 'https://docs.akto.io/traffic-connector/api-gateways/connect-akto-with-iis',
+    key: "IIS",
     component: <AddOnComponenet/>
 }
 
@@ -190,6 +208,308 @@ const burpObj = {
     docsUrl: 'https://docs.akto.io/traffic-connector/manual/burp-suite',
     key: "BURP",
     component : <BurpSource/>
+}
+
+const aktoJaxObj = {
+    icon: '/public/aktojax.svg',
+    label: "Akto DAST",
+    text: "You can deploy Akto's DAST on your machine to automatically scan and collect API endpoints and traffic data.",   
+    docsUrl: 'https://docs.akto.io/dast/akto-dast',
+    key: "AKTODAST",
+    component : <AktoJax />
+}
+
+const geminiObj = {
+    icon: '/public/gemini.svg',
+    label: "Gemini",
+    text: "Import Google Gemini models seamlessly into AKTO.",
+    docsUrl: 'https://docs.akto.io/ai-security',
+    key: "GEMINI",
+    component : <AiAgentScan
+        description="Import your Gemini models, seamlessly in AKTO."
+        defaultRequestBody={{
+            "contents": [{"parts": [{"text": "Why is the sky blue?"}]}]
+        }}
+        docsLink='https://docs.akto.io/ai-security'
+    />
+}
+
+const openAIObj = {
+    icon: '/public/openai.svg',
+    label: "OpenAI",
+    text: "Import OpenAI models seamlessly into AKTO.",
+    docsUrl: 'https://docs.akto.io/ai-security',
+    key: "OPENAI",
+    component : <AiAgentScan
+        description="Import your OpenAI models, seamlessly in AKTO."
+        defaultRequestBody={{
+            "model": "gpt-3.5-turbo",
+            "messages": [{"role": "user", "content": "Why is the sky blue?"}]
+        }}
+        docsLink='https://docs.akto.io/ai-security'
+    />
+}
+
+const claudeObj = {
+    icon: '/public/claude.svg',
+    label: "Claude",
+    text: "Import Anthropic Claude models seamlessly into AKTO.",
+    docsUrl: 'https://docs.akto.io/ai-security',
+    key: "CLAUDE",
+    component : <AiAgentScan
+        description="Import your Claude models, seamlessly in AKTO."
+        defaultRequestBody={{
+            "model": "claude-3-opus-20240229",
+            "messages": [{"role": "user", "content": "Why is the sky blue?"}],
+            "max_tokens": 1024
+        }}
+        docsLink='https://docs.akto.io/ai-security'
+    />
+}
+
+const deepseekObj = {
+    icon: '/public/deepseek.svg',
+    label: "DeepSeek",
+    text: "Import DeepSeek models seamlessly into AKTO.",
+    docsUrl: 'https://docs.akto.io/ai-security',
+    key: "DEEPSEEK",
+    component : <AiAgentScan
+        description="Import your DeepSeek models, seamlessly in AKTO."
+        defaultRequestBody={{
+            "model": "deepseek-chat",
+            "messages": [{"role": "user", "content": "Why is the sky blue?"}]
+        }}
+        docsLink='https://docs.akto.io/ai-security'
+    />
+}
+
+const llamaObj = {
+    icon: '/public/ollama.svg',
+    label: "Llama",
+    text: "Import Meta Llama models seamlessly into AKTO.",
+    docsUrl: 'https://docs.akto.io/ai-security',
+    key: "LLAMA",
+    component : <AiAgentScan
+        description="Import your Llama models, seamlessly in AKTO."
+        defaultRequestBody={{
+            "model": "llama3.2",
+            "prompt": "Why is the sky blue?"
+        }}
+        docsLink='https://docs.akto.io/ai-security'
+    />
+}
+
+const grokObj = {
+    icon: '/public/grok.svg',
+    label: "Grok",
+    text: "Import xAI Grok models seamlessly into AKTO.",
+    docsUrl: 'https://docs.akto.io/ai-security',
+    key: "GROK",
+    component : <AiAgentScan
+        description="Import your Grok models, seamlessly in AKTO."
+        defaultRequestBody={{
+            "model": "grok-beta",
+            "messages": [{"role": "user", "content": "Why is the sky blue?"}]
+        }}
+        docsLink='https://docs.akto.io/ai-security'
+    />
+}
+
+const customAIObj = {
+    icon: '/public/ai_custom.svg',
+    label: "Bring Your Own Model",
+    text: "Import your custom AI models seamlessly into AKTO.",
+    docsUrl: 'https://docs.akto.io/ai-security',
+    key: "CUSTOM_AI",
+    component : <AiAgentScan
+        description="Import your custom AI models, seamlessly in AKTO."
+        defaultRequestBody={{
+            "prompt": "Why is the sky blue?"
+        }}
+        docsLink='https://docs.akto.io/ai-security'
+    />
+}
+
+// AI Agent Platform Objects
+const awsBedrockObj = {
+    icon: '/public/aws_bedrock.svg',
+    label: "AWS Bedrock",
+    text: "Import AWS Bedrock AI agents seamlessly into AKTO.",
+    docsUrl: 'https://docs.akto.io/ai-agent-security',
+    key: "AWS_BEDROCK",
+    component : <AiAgentScan
+        description="Import your AWS Bedrock AI agents, seamlessly in AKTO."
+        defaultRequestBody={{
+            "modelId": "anthropic.claude-v2",
+            "contentType": "application/json",
+            "accept": "application/json",
+            "body": {
+                "prompt": "\n\nHuman: Why is the sky blue?\n\nAssistant:",
+                "max_tokens_to_sample": 300
+            }
+        }}
+        docsLink='https://docs.akto.io/ai-agent-security'
+    />
+}
+
+const aiAgentGlobalProxy = {
+    icon: '/public/aws_bedrock.svg',
+    label: "AI Agent Global Proxy",
+    text: "A publicly hosted secure gateway that enforces guardrails and advanced threat protection for all requests to your public AI agents, ensuring safe and compliant communication.",
+    docsUrl: 'https://docs.akto.io/akto-agent-proxy',
+    key: "AI_AGENT_GLOBAL_PROXY",
+    component : <AIAgentsGateway />
+}
+
+const aiAgentGateway = {
+    icon: '/public/aws_bedrock.svg',
+    label: "AI Agent Gateway",
+    text: "AI agent proxy gateway to be deployed on premise for securing AI agents in your network",
+    docsUrl: 'https://docs.akto.io/akto-agent-proxy',
+    key: "AI_AGENT_GATEWAY",
+    component : <AIAgentsGateway />
+}
+
+const azureAIFoundryObj = {
+    icon: '/public/azure_ai.svg',
+    label: "Azure AI Foundry",
+    text: "Import Azure AI Foundry agents seamlessly into AKTO.",
+    docsUrl: 'https://docs.akto.io/ai-agent-security',
+    key: "AZURE_AI_FOUNDRY",
+    component : <AiAgentScan
+        description="Import your Azure AI Foundry agents, seamlessly in AKTO."
+        defaultRequestBody={{
+            "messages": [{"role": "user", "content": "Why is the sky blue?"}],
+            "max_tokens": 100,
+            "temperature": 0.7
+        }}
+        docsLink='https://docs.akto.io/ai-agent-security'
+    />
+}
+
+const databricksObj = {
+    icon: '/public/databricks.svg',
+    label: "Databricks",
+    text: "Import Databricks AI agents seamlessly into AKTO.",
+    docsUrl: 'https://docs.akto.io/ai-agent-security',
+    key: "DATABRICKS",
+    component : <AiAgentScan
+        description="Import your Databricks AI agents, seamlessly in AKTO."
+        defaultRequestBody={{
+            "prompt": "Why is the sky blue?",
+            "max_tokens": 100
+        }}
+        docsLink='https://docs.akto.io/ai-agent-security'
+    />
+}
+
+const googleVertexAIObj = {
+    icon: '/public/vertex_ai.svg',
+    label: "Google Vertex AI",
+    text: "Import Google Vertex AI agents seamlessly into AKTO.",
+    docsUrl: 'https://docs.akto.io/ai-agent-security',
+    key: "GOOGLE_VERTEX_AI",
+    component : <AiAgentScan
+        description="Import your Google Vertex AI agents, seamlessly in AKTO."
+        defaultRequestBody={{
+            "instances": [{"content": "Why is the sky blue?"}],
+            "parameters": {
+                "candidateCount": 1,
+                "maxOutputTokens": 256,
+                "temperature": 0.2
+            }
+        }}
+        docsLink='https://docs.akto.io/ai-agent-security'
+    />
+}
+
+const ibmWatsonxObj = {
+    icon: '/public/ibm_watsonx.svg',
+    label: "IBM Watsonx",
+    text: "Import IBM Watsonx AI agents seamlessly into AKTO.",
+    docsUrl: 'https://docs.akto.io/ai-agent-security',
+    key: "IBM_WATSONX",
+    component : <AiAgentScan
+        description="Import your IBM Watsonx AI agents, seamlessly in AKTO."
+        defaultRequestBody={{
+            "input": "Why is the sky blue?",
+            "model_id": "meta-llama/llama-2-70b-chat",
+            "parameters": {
+                "max_new_tokens": 100,
+                "temperature": 0.7
+            }
+        }}
+        docsLink='https://docs.akto.io/ai-agent-security'
+    />
+}
+
+const customAgentObj = {
+    icon: '/public/ai_agent_custom.svg',
+    label: "Bring Your Own AI Agent",
+    text: "Import your custom AI agents seamlessly into AKTO.",
+    docsUrl: 'https://docs.akto.io/ai-agent-security',
+    key: "CUSTOM_AGENT",
+    component : <AiAgentScan
+        description="Import your custom AI agents, seamlessly in AKTO."
+        defaultRequestBody={{
+            "query": "Why is the sky blue?"
+        }}
+        docsLink='https://docs.akto.io/ai-agent-security'
+    />
+}
+
+const mcpWrapperObj = {
+    icon: '/public/mcp.svg',
+    label: "MCP Endpoint Shield",
+    text: "MCP Endpoint Shield provides runtime security and auto-discovery of local MCP servers configured on your machine, requiring no changes to your setup.",
+    docsUrl: 'https://docs.akto.io/mcp-endpoint-shield',
+    key: "MCP_ENDPOINT_SHIELD",
+    component: <AddOnComponenet/>
+}
+
+const agenticShieldObj = {
+    icon: '/public/mcp.svg',
+    label: "Agentic Shield",
+    text: "Agentic Shield provides runtime protection and discovery of LLMs/AI Agents on your local environment.",
+    docsUrl: 'https://docs.akto.io/agentic-shield',
+    key: "AGENTIC_SHIELD",
+    component: <AgenticShield/>
+}
+
+const mcpScanObj = {
+    icon: '/public/mcp.svg',
+    label: "MCP Import",
+    text: "You can use Akto's MCP import to capture traffic and instantly send it to your dashboard for real-time insights.",   
+    docsUrl: 'https://docs.akto.io/mcp-import',
+    key: "MCP_SCAN",
+    component : <McpScan/>
+}
+
+const mcpReconObj = {
+    icon: '/public/mcp.svg',
+    label: "MCP Recon",
+    text: "Use our MCP Recon feature to discover and catalog MCP-compatible servers across your network IP ranges for comprehensive security analysis.",
+    docsUrl: 'https://docs.akto.io/mcp-recon',
+    key: "MCP_RECON",
+    component : <McpRecon/>
+}
+
+const mcpProxyObj = {
+    icon: '/public/mcp.svg',
+    label: "MCP Global Proxy",
+    text: "A publicly hostedsecure gateway that enforces guardrails and advanced threat protection for all requests to your public MCP servers, ensuring safe and compliant communication.",
+    docsUrl: 'https://docs.akto.io/akto-mcp-proxy',
+    key: "MCP_PROXY",
+    component : <McpProxy/>
+}
+
+const mcpGateway = {
+    icon: '/public/mcp.svg',
+    label: "MCP Gateway",
+    text: "MCP proxy gateway to be deployed on premise for securing MCP servers in your network.",
+    docsUrl: 'https://docs.akto.io/akto-mcp-proxy',
+    key: "MCP_GATEWAY",
+    component : <McpGateway/>
 }
 
 const dockerObj = {
@@ -363,7 +683,7 @@ const awsApiGatewayObj = {
     label: "AWS API Gateway",
     text: "Akto-AWS-API-Gateway setup is recommended if you are using AWS API Gateway.",
     docsUrl: 'https://docs.akto.io/traffic-connector/aws-services/aws-api-gateway',
-    component: <AddOnComponenet/>,
+    component: <AddOnComponenet featureLabel="AWS_API_GATEWAY" featureComponent={<AwsLogAccountComponent/>}/>,
     key: "AWS_API_GATEWAY",
 }
 
@@ -1041,7 +1361,7 @@ const quickStartFunc = {
 
         // API Gateways
         const apiGateways = [
-            apigeeObj, azureObj, cloudflareObj, f5Obj, kongmeshObj, layer7Obj, threescaleObj, nginxObj, haproxyObj, envoyObj, istioObj, kongObj, ibmapiconnectObj, citrixObj, azureappserviceObj, mulesoftObj
+            apigeeObj, iisObj, azureObj, cloudflareObj, f5Obj, kongmeshObj, layer7Obj, threescaleObj, nginxObj, haproxyObj, envoyObj, istioObj, kongObj, ibmapiconnectObj, citrixObj, azureappserviceObj, mulesoftObj
         ];
 
         // Mirroring
@@ -1069,19 +1389,59 @@ const quickStartFunc = {
             burpObj, postmanObj, harFileUploadObj, openApiObj, wsdlApiObj, graphqlApiIObj
         ];
 
+        // Crawler
+        const crawler = [
+            aktoJaxObj
+        ];
+
+        const aiScanConnectors = [
+            geminiObj, openAIObj, claudeObj, deepseekObj, llamaObj, grokObj, customAIObj
+        ]
+
+        const aiAgentGateways = [
+            aiAgentGlobalProxy, aiAgentGateway
+
+        ]
+
+        const aiAgentConnectors = [
+            awsBedrockObj, azureAIFoundryObj, databricksObj, googleVertexAIObj, ibmWatsonxObj, customAgentObj, agenticShieldObj
+        ]
+
+        // MCP Scan
+        const mcpScan = [
+            mcpScanObj, mcpReconObj, mcpProxyObj, mcpGateway,mcpWrapperObj
+        ];
+
         // Akto SDK
         const aktoSdk = [
             goObj, javaObj, nodejsObj, pythonObj
         ];
 
-        if(func.checkLocal()){
-            return {
-                "Manual": manual
-            }
+       if(func.checkLocal()){
+           return {
+               "Manual": manual
+           }
+       }
+
+        let connectors = {}
+
+        if(isGenAISecurityCategory()){
+            connectors["AI Agent Scan"] = aiAgentGateways
+            connectors["AI Agent Security"] = aiAgentConnectors
+            connectors["AI Model Security"] = aiScanConnectors
         }
 
-        return {
+        if(isMCPSecurityCategory()){
+            connectors["MCP Scan"] = mcpScan
+        }
+
+        if(isApiSecurityCategory()){
+            connectors["DAST"] = crawler
+        }
+
+        connectors = {
             "Hybrid SaaS": hybridSaas,
+            ...connectors,
             "Kubernetes": kubernetes,
             "API Gateways": apiGateways,
             "Mirroring": mirroring,
@@ -1093,6 +1453,8 @@ const quickStartFunc = {
             "Virtual Machines": vm,
             "Source Code": sourceCode,
         }
+
+        return connectors;
     },
     getSourceCodeConnectors: function () {
         const sourceCode = [
@@ -1108,13 +1470,21 @@ const quickStartFunc = {
         }
 
         // Combine all categories into connectorsList
-        const connectorsList = [
+        let connectorsList = [
             gcpObj, kubernetesObj, fargateObj, nginxObj, burpObj, postmanObj,
-            openApiObj, beanStalkObj, eksObj, dockerObj, envoyObj,
+            openApiObj, beanStalkObj, eksObj, dockerObj, envoyObj, mcpScanObj, mcpProxyObj, mcpGateway, mcpWrapperObj,
             harFileUploadObj, kongObj, tcpObj, mirroringObj, hybridSaasObj, apiInventoryFromSourceCodeObj,
             ebpfObj, ebpfMTLSObj, istioObj, pythonObj, awsApiGatewayObj, awsLambdaObj,
-            apigeeObj, azureObj, cloudflareObj, f5Obj, goObj, haproxyObj, javaObj, kongmeshObj, layer7Obj, nodejsObj, openshiftObj, threescaleObj, githubObj, gitlabObj, bitbucketObj
+            apigeeObj, iisObj, azureObj, cloudflareObj, f5Obj, goObj, haproxyObj, javaObj, kongmeshObj, layer7Obj, nodejsObj, openshiftObj, threescaleObj, githubObj, gitlabObj, bitbucketObj, aktoJaxObj
         ]
+
+        if(isGenAISecurityCategory()){
+            connectorsList = connectorsList.concat([
+                geminiObj, openAIObj, claudeObj, deepseekObj, llamaObj, grokObj, customAIObj,
+                awsBedrockObj, azureAIFoundryObj, databricksObj, googleVertexAIObj, ibmWatsonxObj, customAgentObj, agenticShieldObj
+            ])
+        }
+
         return connectorsList
     },
 

@@ -206,6 +206,7 @@ export const Subprocess = ({ agentId, processId, subProcessFromProp, triggerCall
             let data = await api.createAgentRun({
                 agent: previousAgentRun.agent,
                 data: previousAgentRun.agentInitDocument,
+                githubAccessToken: previousAgentRun.privateData?.githubAccessToken,
                 modelName: selectedModel?.id
             })
             if(data.agentRun){

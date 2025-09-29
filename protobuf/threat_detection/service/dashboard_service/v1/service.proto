@@ -26,6 +26,9 @@ message ListMaliciousRequestsResponse {
       string type = 14;
       string ref_id = 15;
       string event_type_val = 16;
+      string metadata = 17;
+      string status = 18;
+      bool successful_exploit = 19;
     }
     repeated MaliciousEvent malicious_events = 1;
     uint64 total = 2;
@@ -44,6 +47,9 @@ message ListMaliciousRequestsRequest {
       optional TimeRangeFilter detected_at_time_range = 4;
       repeated string types = 5;
       repeated string sub_category = 6;
+      repeated string latest_attack = 7;
+      optional string status_filter = 8;
+      optional bool successful_exploit = 9;
     }
 
     // The number of alerts to return
@@ -121,6 +127,7 @@ message ListThreatApiRequest {
     repeated string urls = 1;
     repeated string methods = 2;
     optional TimeRangeFilter detected_at_time_range = 3;
+    repeated string latest_attack = 4;
   }
 
   optional uint32 skip = 1;
@@ -145,6 +152,7 @@ message ListThreatApiResponse {
 message ThreatActorByCountryRequest {
   uint32 start_ts = 1;
   uint32 end_ts = 2;
+  repeated string latest_attack = 3;
 }
 
 message ThreatActorByCountryResponse {
@@ -159,6 +167,7 @@ message ThreatActorByCountryResponse {
 message ThreatCategoryWiseCountRequest {
   uint32 start_ts = 1;
   uint32 end_ts = 2;
+  repeated string latest_attack = 3;
 }
 
 message ThreatActorFilterRequest {
@@ -183,6 +192,7 @@ message ThreatCategoryWiseCountResponse {
 message ThreatSeverityWiseCountRequest {
   uint32 start_ts = 1;
   uint32 end_ts = 2;
+  repeated string latest_attack = 3;
 }
 
 message ThreatSeverityWiseCountResponse {
@@ -197,6 +207,7 @@ message ThreatSeverityWiseCountResponse {
 message DailyActorsCountRequest {
   uint32 start_ts = 1;
   uint32 end_ts = 2;
+  repeated string latest_attack = 3;
 }
 
 message DailyActorsCountResponse {
@@ -212,6 +223,7 @@ message DailyActorsCountResponse {
 message ThreatActivityTimelineRequest {
   uint32 start_ts = 1;
   uint32 end_ts = 2;
+  repeated string latest_attack = 3;
 }
 
 message ThreatActivityTimelineResponse {
@@ -246,6 +258,33 @@ message ModifyThreatActorStatusRequest {
 message ModifyThreatActorStatusResponse {  
 }
 
+message UpdateMaliciousEventStatusRequest {
+  // One of these should be provided
+  optional string event_id = 1;  // For single event update
+  repeated string event_ids = 2;  // For bulk update by IDs
+  optional ListMaliciousRequestsRequest.Filter filter = 3;  // For filtered update
+
+  string status = 4;  // The new status to set
+}
+
+message UpdateMaliciousEventStatusResponse {
+  bool success = 1;
+  string message = 2;
+  int32 updated_count = 3;
+}
+
+message DeleteMaliciousEventsRequest {
+  // One of these should be provided
+  repeated string event_ids = 1;  // For delete by IDs
+  optional ListMaliciousRequestsRequest.Filter filter = 2;  // For filtered delete
+}
+
+message DeleteMaliciousEventsResponse {
+  bool success = 1;
+  string message = 2;
+  int32 deleted_count = 3;
+}
+
 message GetThreatConfigurationRequest {
 }
 
@@ -255,9 +294,69 @@ message ActorId {
     string kind = 3; // hostname or endpoint or collection
     string pattern = 4; // regex pattern or collection id
 }
+
 message Actor {
     repeated ActorId actor_id = 1;
 }
+
+message RatelimitConfig {
+  
+  message AutomatedThreshold{
+    string percentile = 1;
+    int32 overflow_percentage = 2;
+    int32 baseline_period = 3;
+  }
+  message RatelimitConfigItem {
+    string name = 1;
+    int32 period = 2;
+    int32 max_requests = 3;
+    int32 mitigation_period = 4;
+    string action = 5;
+    string type = 6; // default or custom
+    AutomatedThreshold auto_threshold = 7;
+    string behaviour = 8; // dynamic or static
+    float rate_limit_confidence = 9;
+  }
+  repeated RatelimitConfigItem rules = 1;
+}
+
 message ThreatConfiguration {
   Actor actor = 1;
+  RatelimitConfig ratelimit_config = 2;
+}
+
+message ApiDistributionDataRequestPayload {
+  message DistributionData {
+    int32 api_collection_id = 1;
+    string url = 2;
+    string method = 3;
+    int32 window_size = 4;
+    int64 window_start_epoch_min = 5;
+    map<string, int32> distribution = 6;
+  }
+  repeated DistributionData distribution_data = 1;
+}
+
+message ApiDistributionDataResponsePayload {
+}
+
+message FetchApiDistributionDataRequest {
+    int32 api_collection_id = 1;
+    string url = 2;
+    string method = 3;
+    int32 start_window = 4;
+    int32 end_window = 5;
+}
+
+message FetchApiDistributionDataResponse {
+  repeated BucketStats bucket_stats = 1;
+}
+
+message BucketStats {
+  string bucket_label = 1; // e.g., "b1", "b2", ..., "b14"
+  optional int32 min = 2;
+  optional int32 max = 3;
+  optional int32 p25 = 4;
+  optional int32 p50 = 5; // median
+  optional int32 p75 = 6;
 }

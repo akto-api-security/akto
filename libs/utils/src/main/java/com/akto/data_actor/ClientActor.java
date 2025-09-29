@@ -83,7 +83,7 @@ public class ClientActor extends DataActor {
             BasicDBObject basicDBObject = BasicDBObject.parse(decodedPayload);
             int accId = (int) basicDBObject.getInt("accountId");
             System.out.println("checkaccount accountId log " + accId);
-            return accId == 1000000;
+            return accId == 1000000 || accId == 1752722331;
         } catch (Exception e) {
             System.out.println("checkaccount error" + e.getStackTrace());
         }
@@ -722,6 +722,49 @@ public class ClientActor extends DataActor {
             loggerMaker.errorAndAddToDb("error in fetchApiInfos" + e, LoggerMaker.LogDb.RUNTIME);
         }
         return apiInfos;
+    }
+
+    public List<ApiInfo> fetchApiRateLimits(ApiInfo.ApiInfoKey lastApiInfoKey) {
+        List<ApiInfo> allApiInfos = new ArrayList<>();
+        BasicDBObject payload = new BasicDBObject();
+        Map<String, List<String>> headers = buildHeaders();
+        OriginalHttpRequest request = new OriginalHttpRequest(url+ "/fetchApiRateLimits", "", "POST", gson.toJson(payload), headers, "");
+
+        for(int i = 0; i < 100; i++){
+            if(lastApiInfoKey != null){
+                payload.put("lastApiInfoKey", lastApiInfoKey);
+            }
+            try {
+                request.setBody(gson.toJson(payload));
+                OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+                String responsePayload = response.getBody();
+                if (response.getStatusCode() != 200 || responsePayload == null) {
+                    loggerMaker.errorAndAddToDb("invalid response in fetchApiRateLimits", LoggerMaker.LogDb.RUNTIME);
+                    return allApiInfos;
+                }
+                BasicDBObject payloadObj;
+                try {
+                    payloadObj =  BasicDBObject.parse(responsePayload);
+                    BasicDBList objList = (BasicDBList) payloadObj.get("apiInfoRateLimits");
+
+                    // All apiInfos fetched
+                    if(objList.isEmpty()){
+                        break;
+                    }
+                    for (Object obj: objList) {
+                        BasicDBObject obj2 = (BasicDBObject) obj;
+                        ApiInfo apiInfo = objectMapper.readValue(obj2.toJson(), ApiInfo.class);
+                        allApiInfos.add(apiInfo);
+                        lastApiInfoKey = apiInfo.getId();
+                    }
+                } catch(Exception e) {
+                    loggerMaker.errorAndAddToDb("error extracting response in fetchApiRateLimits" + e, LoggerMaker.LogDb.RUNTIME);
+                }
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb("error in fetchApiRateLimits" + e, LoggerMaker.LogDb.RUNTIME);
+            }
+        }
+        return allApiInfos;
     }
 
     public List<ApiInfo> fetchNonTrafficApiInfos() {

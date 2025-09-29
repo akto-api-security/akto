@@ -121,7 +121,7 @@ public class TestingIssuesHandler {
             }
 
             if(!runResult.isVulnerable()){
-                break;
+                continue; // skip if not vulnerable
             }
 
             boolean shouldCountIssue = false;
@@ -176,27 +176,22 @@ public class TestingIssuesHandler {
 
     public void handleIssuesCreationFromTestingRunResults(List<TestingRunResult> testingRunResultList, boolean triggeredByTestEditor) {
 
+        // makes the map of issueId to result {no db call}
         Map<TestingIssuesId, TestingRunResult> testingIssuesIdsMap = TestingUtils.
                 listOfIssuesIdsFromTestingRunResults(testingRunResultList, true, triggeredByTestEditor);
 
-        // loggerMaker.debugAndAddToDb(String.format("Total issue id created from TestingRunResult map : %s", testingIssuesIdsMap.size()), LogDb.TESTING);
         Bson inQuery = Filters.in(ID, testingIssuesIdsMap.keySet().toArray());
         List<TestingRunIssues> testingRunIssuesList = TestingRunIssuesDao.instance.findAll(inQuery);
 
-        // loggerMaker.debugAndAddToDb(String.format("Total list of issues from db : %s", testingRunIssuesList.size()), LogDb.TESTING);
         List<WriteModel<TestingRunIssues>> writeModelList = new ArrayList<>();
+        // this will create only the updates {status and summaryId change} for existing issues only
         writeUpdateQueryIntoWriteModel(writeModelList, testingIssuesIdsMap, testingRunIssuesList);
-        // loggerMaker.debugAndAddToDb(String.format("Total write queries after the update iterations: %s", writeModelList.size()), LogDb.TESTING);
+
+
         insertVulnerableTestsIntoIssuesCollection(writeModelList, testingIssuesIdsMap, testingRunIssuesList);
-        // loggerMaker.debugAndAddToDb(String.format("Total write queries after the insertion iterations: %s", writeModelList.size()), LogDb.TESTING);
         try {
             if (writeModelList.size() > 0) {
-                BulkWriteResult result = TestingRunIssuesDao.instance.bulkWrite(writeModelList, new BulkWriteOptions().ordered(false));
-                // loggerMaker.debugAndAddToDb(String.format("Matched records : %s", result.getMatchedCount()), LogDb.TESTING);
-                // loggerMaker.debugAndAddToDb(String.format("inserted counts : %s", result.getInsertedCount()), LogDb.TESTING);
-                // loggerMaker.debugAndAddToDb(String.format("Modified counts : %s", result.getModifiedCount()), LogDb.TESTING);
-            } else {
-                // loggerMaker.debugAndAddToDb("writeModelList is empty", LogDb.TESTING);
+                TestingRunIssuesDao.instance.bulkWrite(writeModelList, new BulkWriteOptions().ordered(false));
             }
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(String.format("Error while inserting issues into db: %s", e.toString()), LogDb.TESTING);

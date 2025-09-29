@@ -28,7 +28,8 @@ function ConfirmationModal(props) {
                 onAction: () => {
                     primaryAction()
                     closeModal()
-                }
+                },
+                destructive: /delete/i.test(String(primaryActionContent))
             }}
         >
             <Modal.Section>

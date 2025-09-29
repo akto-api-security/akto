@@ -139,6 +139,7 @@ public class YamlNodeExecutor extends NodeExecutor {
         List<String> message = new ArrayList<>();
         //String message = null;
         String savedResponses = null;
+        String eventStreamResponse = null;
         int statusCode = 0;
         List<Integer> responseTimeArr = new ArrayList<>();
         List<Integer> responseLenArr = new ArrayList<>();
@@ -193,6 +194,8 @@ public class YamlNodeExecutor extends NodeExecutor {
                 savedResponses = testResponse.getBody();
                 statusCode = testResponse.getStatusCode();
 
+                eventStreamResponse = com.akto.test_editor.Utils.buildEventStreamResponseIHttpFormat(testResponse);
+
                 if (testResponse.getBody() == null) {
                     responseLenArr.add(0);
                 } else {
@@ -209,6 +212,10 @@ public class YamlNodeExecutor extends NodeExecutor {
         if (savedResponses != null) {
             varMap.put(node.getId() + ".response.body", savedResponses);
             varMap.put(node.getId() + ".response.status_code", String.valueOf(statusCode));
+        }
+
+        if (eventStreamResponse != null) {
+            varMap.put(node.getId() + ".response.body.eventStream", eventStreamResponse);
         }
 
         // call executor's build request, which returns all rawapi by taking a rawapi argument

@@ -33,7 +33,7 @@ const InviteUserModal = ({ inviteUser, setInviteUser, toggleInviteUserModal, rol
 
         const spec = {
             inviteeName: "there",
-            inviteeEmail: inviteEmail,
+            inviteeEmail: inviteEmail?.toLowerCase(),
             websiteHostName: window.location.origin,
             inviteeRole: inviteRole,
         }

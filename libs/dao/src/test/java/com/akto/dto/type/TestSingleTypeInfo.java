@@ -163,6 +163,38 @@ public class TestSingleTypeInfo {
         assertNull(SingleTypeInfo.findLastKeyFromParam(null));
     }
 
+    @Test
+    public void testDoesNotStartWithSuperType_nullInput() {
+        assertTrue(SingleTypeInfo.doesNotStartWithSuperType(null));
+    }
+
+    @Test
+    public void testDoesNotStartWithSuperType_emptyString() {
+        assertTrue(SingleTypeInfo.doesNotStartWithSuperType(""));
+    }
+
+    @Test
+    public void testDoesNotStartWithSuperType_startsWithSuperType() {
+        for (SingleTypeInfo.SuperType superType : SingleTypeInfo.SuperType.values()) {
+            String input = superType.name() + "_SOMETHING";
+            assertFalse("Failed for input: " + input, SingleTypeInfo.doesNotStartWithSuperType(input));
+        }
+    }
+
+    @Test
+    public void testDoesNotStartWithSuperType_doesNotStartWithSuperType() {
+        assertTrue(SingleTypeInfo.doesNotStartWithSuperType("SOMETHING_BOOLEAN"));
+        assertTrue(SingleTypeInfo.doesNotStartWithSuperType("randomValue"));
+        assertFalse(SingleTypeInfo.doesNotStartWithSuperType("INTEGER32"));
+    }
+
+    @Test
+    public void testDoesNotStartWithSuperType_exactSuperType() {
+        for (SingleTypeInfo.SuperType superType : SingleTypeInfo.SuperType.values()) {
+            String input = superType.name();
+            assertFalse("Failed for input: " + input, SingleTypeInfo.doesNotStartWithSuperType(input));
+        }
+    }
 
 
 }

@@ -1,28 +1,16 @@
 package com.akto.test_editor;
 
-import java.io.IOException;
-import java.net.URI;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.TimeUnit;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
+import static com.akto.runtime.RuntimeUtil.extractAllValuesFromPayload;
 
 import com.akto.dao.billing.OrganizationsDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.ApiInfo.ApiAccessType;
 import com.akto.dto.OriginalHttpRequest;
+import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.RawApi;
 import com.akto.dto.test_editor.ExecutorSingleOperationResp;
 import com.akto.dto.testing.UrlModifierPayload;
-import static com.akto.runtime.RuntimeUtil.extractAllValuesFromPayload;
 import com.akto.test_editor.execution.Operations;
 import com.akto.util.Constants;
 import com.akto.util.DashboardMode;
@@ -38,12 +26,26 @@ import com.fasterxml.jackson.databind.node.TextNode;
 import com.google.gson.Gson;
 import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
-
+import java.io.IOException;
+import java.net.URI;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import java.util.concurrent.TimeUnit;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.RequestBody;
 import okhttp3.Response;
 import okhttp3.ResponseBody;
+import org.apache.commons.collections.MapUtils;
 
 public class Utils {
 
@@ -691,7 +693,7 @@ public class Utils {
     
     public static boolean evaluateResult(String operation, boolean currentRes, boolean newVal) {
 
-        if (operation == "and") {
+        if (operation.equals("and")) {
             return currentRes && newVal;
         }
         return currentRes || newVal;
@@ -1070,6 +1072,26 @@ public class Utils {
         return requestBuilder.toString();
     }
 
+    public static String buildEventStreamResponseIHttpFormat(OriginalHttpResponse response) {
+        if (response == null) {
+            return null;
+        }
+        Map<String, List<String>> headers = response.getHeaders();
+
+        if (isEventStream(headers)) {
+            StringBuilder responseBuilder = new StringBuilder();
+            headers.entrySet().stream()
+                .flatMap(entry -> entry.getValue().stream()
+                    .map(value -> entry.getKey() + ": " + value + "\n"))
+                .forEach(responseBuilder::append);
+            String responseBody = response.getJsonResponseBody();
+            if (responseBody != null && !responseBody.isEmpty()) {
+                return responseBuilder.append(buildEventStream(responseBody)).toString();
+            }
+        }
+        return null;
+    }
+
     public static String buildResponseIHttpFormat(RawApi rawApi) {
         StringBuilder responseBuilder = new StringBuilder();
 
@@ -1089,30 +1111,76 @@ public class Utils {
 
         String responseBody = rawApi.getResponse().getJsonResponseBody();
         if (responseBody != null && !responseBody.isEmpty()) {
-            String contentType = null;
-        
-            if (headers.containsKey("content-type")) {
-                contentType = headers.get("content-type").get(0);
-            }
-        
-            if (contentType != null && contentType.toLowerCase().contains("text/event-stream")) {
-                String[] events = responseBody.split("event:");
-                if (events.length > 2) {
-                    for (int i = events.length - 2; i < events.length; i++) {           
-                        responseBuilder.append("\n").append("event:").append(events[i].trim());
-                    }
-                } else {
-                    responseBuilder.append("\n").append(responseBody);
-                }
+            if (isEventStream(headers)) {
+                responseBuilder.append(buildEventStream(responseBody));
             } else {
                 responseBuilder.append("\n").append(responseBody);
             }
         }
-        
-        
+
         return responseBuilder.toString();
     }
 
+    private static boolean isEventStream(Map<String, List<String>> headers) {
+        if (MapUtils.isEmpty(headers)) {
+            return false;
+        }
+
+        return Optional.ofNullable(headers.get("content-type"))
+            .map(list -> list.stream().anyMatch(s -> s.toLowerCase().contains("text/event-stream")))
+            .orElse(false);
+    }
+
+    private static String buildEventStream(String responseBody) {
+        StringBuilder responseBuilder = new StringBuilder();
+        String[] events = responseBody.split("event:");
+        if (events.length > 2) {
+            for (int i = events.length - 2; i < events.length; i++) {
+                responseBuilder.append("\n").append("event:").append(events[i].trim());
+            }
+        } else {
+            responseBuilder.append("\n").append(responseBody);
+        }
+        return responseBuilder.toString();
+    }
+
+    /**
+     * Strips Byte Order Mark (BOM) from the beginning of a string.
+     * Common BOMs include:
+     * - UTF-8 BOM: \uFEFF (EF BB BF in bytes)
+     * - UTF-16 BE BOM: \uFEFF
+     * - UTF-16 LE BOM: \uFFFE
+     *
+     * @param input The input string that may contain a BOM
+     * @return The string with BOM removed if present, otherwise the original string
+     */
+    public static String stripBOM(String input) {
+        if (input == null || input.isEmpty()) {
+            return input;
+        }
+
+        // Check for UTF-8 BOM (most common in SOAP/XML)
+        if (input.charAt(0) == '\uFEFF') {
+            return input.substring(1);
+        }
+
+        // Check for UTF-16 LE BOM
+        if (input.charAt(0) == '\uFFFE') {
+            return input.substring(1);
+        }
+
+        // Check for byte sequence representation (ï»¿ is the display of UTF-8 BOM)
+        if (input.length() >= 3 &&
+            input.charAt(0) == 'ï' &&
+            input.charAt(1) == '»' &&
+            input.charAt(2) == '¿') {
+            return input.substring(3);
+        }
+
+        return input;
+    }
+
     public final static String _MAGIC = "$magic";
+    public final static String MAGIC_CONTEXT = "$magic_context";
 
 }

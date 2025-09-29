@@ -60,6 +60,7 @@ const initialState = {
     trafficAlerts: [],
     sendEventOnLogin: false,
     tableSelectedTab: {},
+    dashboardCategory: 'API Security',
 };
 
 let persistStore = (set, get) => ({
@@ -87,7 +88,7 @@ let persistStore = (set, get) => ({
     },
     setAllCollections: (allCollections) => {
         try {
-            const optimizedCollections = allCollections.map(({ id, displayName, urlsCount, deactivated, type, automated, startTs, hostName, name, description, envType, isOutOfTestingScope }) => ({
+            const optimizedCollections = allCollections.map(({ id, displayName, urlsCount, deactivated, type, automated, startTs, hostName, name, description, envType, isOutOfTestingScope, urls }) => ({
                 id,
                 displayName,
                 urlsCount,
@@ -100,6 +101,7 @@ let persistStore = (set, get) => ({
                 description,
                 envType,
                 isOutOfTestingScope,
+                urls,
             }));
             set({ allCollections: optimizedCollections });
         } catch (error) {
@@ -212,6 +214,13 @@ let persistStore = (set, get) => ({
             console.error("Error resetting store:", error);
         }
     },
+    setDashboardCategory: (dashboardCategory) => {
+        try {
+            set({ dashboardCategory });
+        } catch (error) {
+            console.error("Error setting dashboardCategory:", error);
+        }
+    },
 });
 
 persistStore = devtools(persistStore);
@@ -231,7 +240,8 @@ persistStore = persist(persistStore, {
         tableInitialState: state.tableInitialState,
         trafficAlerts: state.trafficAlerts,
         sendEventOnLogin: state.sendEventOnLogin,
-        tableSelectedTab: state.tableSelectedTab
+        tableSelectedTab: state.tableSelectedTab,
+        dashboardCategory: state.dashboardCategory
     }) 
 });
 

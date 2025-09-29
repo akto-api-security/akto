@@ -1,6 +1,7 @@
 import { Box, Button, HorizontalStack, Icon, Popover, RadioButton, Text, TextField, VerticalStack } from '@shopify/polaris'
 import { DeleteMajor } from "@shopify/polaris-icons"
 import React, { useEffect, useState } from 'react'
+import func from "@/util/func"
 import TooltipText from '../../../../components/shared/TooltipText'
 
 const SetUserEnvPopupComponent = ({ popover, setPopover, tags, apiCollectionIds, updateTags }) => {
@@ -144,11 +145,11 @@ const SetUserEnvPopupComponent = ({ popover, setPopover, tags, apiCollectionIds,
             const envTypes = tags?.[apiCollectionId]
 
             envTypes?.map((envType) => {
-                if(envType?.keyName === "envType") {
-                    if(envType?.value?.toLowerCase() === "staging" || envType?.value?.toLowerCase() === "production") {
+                if(envType?.keyName === "envType" || envType?.keyName === "userSetEnvType") {
+                    if(  (envType?.keyName === "envType" && (envType?.value?.toLowerCase() === "staging" || envType?.value?.toLowerCase() === "production"))) {
                         setSelectedEnvType(envType?.value?.toLowerCase())
-                    } else {
-                        setAllEnvTypes((prev) => [...prev, envType])
+                    } else if (envType?.keyName === "userSetEnvType") {
+                        setAllEnvTypes((prev) => [...prev, { ...envType, keyName: "env" }])
                     }
                 } else {
                     setAllEnvTypes((prev) => [...prev, envType])
@@ -184,26 +185,31 @@ const SetUserEnvPopupComponent = ({ popover, setPopover, tags, apiCollectionIds,
                         <Popover.Section>
                             <VerticalStack gap={2}>
                                 <Text variant='headingXs'>Custom Env</Text>
-                                <VerticalStack gap={2}>
+                                <VerticalStack gap={3}>
                                     {
                                         allEnvTypes.map((env) => {
                                             if (["staging", "production"].includes(env?.value?.toLowerCase())) return null
 
                                             return (
-                                                <div style={{ cursor: 'pointer' }} onClick={() => toggleTags(env, apiCollectionIds)}>
-                                                    <HorizontalStack align='space-between' gap={4}>
-                                                        <HorizontalStack >
-                                                            <Box maxWidth='150px'>
-                                                                <TooltipText textProps={{fontWeight:"bold"}} tooltip={`${env?.keyName}`} text={`${env?.keyName}`}/>
-                                                            </Box>
-                                                            <Text>=</Text>
-                                                            <Box width='150px'>
-                                                                <TooltipText tooltip={env?.value} text={env?.value}/>
-                                                            </Box>
-                                                        </HorizontalStack>
-                                                        <div style={{ cursor: 'pointer' }}><Icon source={DeleteMajor} /></div>
+                                                <HorizontalStack align='space-between' gap={4}>
+                                                    <HorizontalStack >
+                                                        <Box maxWidth='150px'>
+                                                            <TooltipText textProps={{fontWeight:"bold"}} tooltip={`${env?.keyName}`} text={`${env?.keyName}`}/>
+                                                        </Box>
+                                                        <Text>=</Text>
+                                                        <Box width='150px'>
+                                                            <TooltipText tooltip={env?.value} text={env?.value}/>
+                                                        </Box>
                                                     </HorizontalStack>
-                                                </div>
+                                                    <Button 
+                                                        icon={DeleteMajor}
+                                                        plain
+                                                        onClick={() => {
+                                                            const deleteConfirmationMessage = "Are you sure you want to delete this custom enviroment type?"
+                                                            func.showConfirmationModal(deleteConfirmationMessage, "Delete", () => toggleTags(env, apiCollectionIds) )}
+                                                        }
+                                                    />
+                                                </HorizontalStack>
                                             )
                                         })
                                     }

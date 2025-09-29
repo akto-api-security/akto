@@ -11,6 +11,7 @@ import TestRunResultFull from './TestRunResultFull';
 import TestRunResultFlyout from './TestRunResultFlyout';
 import LocalStore from '../../../../main/LocalStorageStore';
 import observeFunc from "../../observe/transform"
+import issuesFunctions from '@/apps/dashboard/pages/issues/module';
 
 let headerDetails = [
   {
@@ -113,9 +114,10 @@ function TestRunResultPage(props) {
     
   }
 
-  async function createJiraTicketApiCall(hostStr, endPointStr, issueUrl, issueDescription, issueTitle, testingIssueId,projId, issueType) {
+  async function createJiraTicketApiCall(hostStr, endPointStr, issueUrl, issueDescription, issueTitle, testingIssueId,projId, issueType, additionalIssueFields) {
+    
     const jiraMetaData = {
-      issueTitle,hostStr,endPointStr,issueUrl,issueDescription,testingIssueId
+      issueTitle,hostStr,endPointStr,issueUrl,issueDescription,testingIssueId, additionalIssueFields
     }
     let jiraInteg = await api.createJiraTicket(jiraMetaData, projId, issueType);
     return jiraInteg.jiraTicketKey
@@ -170,7 +172,17 @@ function TestRunResultPage(props) {
     setToast(true,false,"Creating Jira Ticket")
 
     let jiraTicketKey = ""
-    await createJiraTicketApiCall("Host - "+hostName, pathname, window.location.href, description, issueTitle, issueId, projId, issueType).then(async(res)=> {
+
+    const additionalIssueFields = {};
+    try {
+      const customIssueFields = issuesFunctions.prepareCustomIssueFields(projId, issueType);
+      additionalIssueFields["customIssueFields"] = customIssueFields;
+    } catch (error) {
+      setToast(true, true, "Please fill all required fields before creating a Jira ticket.");
+      return;
+    }
+
+    await createJiraTicketApiCall("Host - "+hostName, pathname, window.location.href, description, issueTitle, issueId, projId, issueType, additionalIssueFields).then(async(res)=> {
       if(res?.errorMessage) {
         setToast(true, true, res?.errorMessage)
       }

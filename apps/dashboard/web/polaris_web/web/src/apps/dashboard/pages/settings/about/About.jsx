@@ -44,14 +44,19 @@ function About() {
         return localStorage.getItem('isSubscribed') === 'true'
     })
     const [modalOpen, setModalOpen] = useState(false)
+    const [deleteMaliciousEventsModal, setDeleteMaliciousEventsModal] = useState(false)
+    const [disableMalEventButton, setDisableMalEventButton] = useState(false)
 
     const initialUrlsList = settingFunctions.getRedundantUrlOptions()
     const [selectedUrlList, setSelectedUrlsList] = useState([])
     const [miniTesting, setMiniTesting] = useState(false)
     const [mergingOnVersions, setMergingOnVersions] = useState(false)
     const [retrospective, setRetrospective] = useState(false)
-
-    const [pdf, setPdf] = useState("")
+    const [compulsoryDescription, setCompulsoryDescription] = useState({
+        falsePositive: false,
+        noTimeToFix: false,
+        acceptableFix: false
+    })
 
     const setupOptions = settingFunctions.getSetupOptions()
 
@@ -82,6 +87,9 @@ function About() {
         setSelectedUrlsList(resp.allowRedundantEndpointsList || [])
         setToggleCaseSensitiveApis(resp.handleApisCaseInsensitive || false)
         setMergingOnVersions(resp.allowMergingOnVersions || false)
+        if(resp?.compulsoryDescription && Object.keys(resp?.compulsoryDescription).length > 0) {
+            setCompulsoryDescription(resp.compulsoryDescription)
+        }
     }
 
     useEffect(()=>{
@@ -383,6 +391,58 @@ function About() {
         }
     }
 
+    const handleDeleteAllMaliciousEvents = async() => {
+        setDeleteMaliciousEventsModal(false)
+        await settingRequests.deleteAllMaliciousEvents().then(() => {
+            func.setToast(true, false, "Deleting malicious events - may take a few minutes.")
+            setDisableMalEventButton(true)
+        }).catch(() => {
+            func.setToast(true, true, "Something went wrong. Please try again.")
+        })
+    }
+
+    const handleCompulsoryToggle = async (key, checked) => {
+        const updated = { ...compulsoryDescription, [key]: checked };
+        setCompulsoryDescription(updated);
+        try {
+            await settingRequests.updateCompulsoryDescription(updated);
+            func.setToast(true, false, "Compulsory description settings updated successfully.");
+            // Re-fetch to ensure UI is fully in sync
+            await fetchDetails();
+        } catch (error) {
+            func.setToast(true, true, "Failed to update compulsory description settings.");
+        }
+    }
+
+    const compulsoryDescriptionComponent = (
+        <VerticalStack gap={4}>
+            <Text variant="headingSm">Compulsory Description Settings</Text>
+            <Text variant="bodyMd" color="subdued">
+                Configure which issue status changes require mandatory descriptions to be provided.
+            </Text>
+            <VerticalStack gap={3}>
+                <Checkbox
+                    label="False Positive - Require description when marking issues as false positive"
+                    checked={compulsoryDescription.falsePositive}
+                    onChange={(checked) => handleCompulsoryToggle('falsePositive', checked)}
+                    disabled={window.USER_ROLE !== 'ADMIN'}
+                />
+                <Checkbox
+                    label="No Time To Fix - Require description when marking issues as no time to fix"
+                    checked={compulsoryDescription.noTimeToFix}
+                    onChange={(checked) => handleCompulsoryToggle('noTimeToFix', checked)}
+                    disabled={window.USER_ROLE !== 'ADMIN'}
+                />
+                <Checkbox
+                    label="Acceptable Fix - Require description when marking issues as acceptable fix"
+                    checked={compulsoryDescription.acceptableFix}
+                    onChange={(checked) => handleCompulsoryToggle('acceptableFix', checked)}
+                    disabled={window.USER_ROLE !== 'ADMIN'}
+                />
+            </VerticalStack>
+        </VerticalStack>
+    )
+
     const redundantUrlComp = (
         <VerticalStack gap={"4"}>
             <Box width='220px'>
@@ -415,6 +475,35 @@ function About() {
                     </Box>
                 </VerticalStack>
             }
+            <VerticalStack gap={2}>
+                <Text color='subdued' variant='bodyMd'>Delete all malicious events</Text>
+                <Box width='80px'>
+                    <Button disabled={disableMalEventButton} onClick={() => setDeleteMaliciousEventsModal(true)}>Delete</Button>
+                </Box>
+            </VerticalStack>
+
+            <Modal
+                open={deleteMaliciousEventsModal}
+                primaryAction={{
+                    content: "Yes, Delete All",
+                    onAction: handleDeleteAllMaliciousEvents
+                }}
+                secondaryActions={[{
+                    content: "Cancel",
+                    onAction: () => {setDeleteMaliciousEventsModal(false)}
+                }]}
+                title="⚠️ Confirm Permanent Deletion"
+                onClose={() => {setDeleteMaliciousEventsModal(false)}}
+            >
+                <Modal.Section>
+                    <VerticalStack>
+                        <Text>You are about to permanently delete all malicious events.</Text>
+                        <Text>This action cannot be undone and all associated data will be lost forever.</Text>
+                        <br/>
+                        <Text>Are you sure you want to proceed?</Text>
+                    </VerticalStack>
+                </Modal.Section>
+            </Modal>
         </VerticalStack>
     )
     
@@ -533,6 +622,7 @@ function About() {
                                   <ToggleComponent text={"Activate regex matching in merging"} initial={newMerging} onToggle={handleNewMerging} />
                                   <ToggleComponent text={"Enable telemetry"} initial={enableTelemetry} onToggle={toggleTelemetry} />
                                   {redundantUrlComp}
+                                  {compulsoryDescriptionComponent}
                                   <VerticalStack gap={1}>
                                       <Text color="subdued">Traffic alert threshold</Text>
                                       <Box width='120px'>
@@ -554,6 +644,7 @@ function About() {
                   </LegacyCard.Section>
                   :<LegacyCard.Section title={<Text variant="headingMd">More settings</Text>}>
                     {redundantUrlComp}
+                    {compulsoryDescriptionComponent}
                   </LegacyCard.Section>
               }
             <LegacyCard.Section subdued>

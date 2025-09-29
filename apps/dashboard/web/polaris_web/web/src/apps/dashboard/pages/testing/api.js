@@ -34,13 +34,22 @@ export default {
         })
         return resp        
     },
-    async fetchTestRunResultsCount(testingRunResultSummaryHexId) {
+    async fetchTestRunResultsCount(testingRunResultSummaryHexId, filters) {
         const resp = await request({
             url: '/api/fetchTestRunResultsCount',
             method: 'post',
             data: {
-                testingRunResultSummaryHexId
+                testingRunResultSummaryHexId,
+                filters
             }
+        })
+        return resp        
+    },
+    async fetchTestResultsStatsCount(data) {
+        const resp = await request({
+            url: '/api/fetchTestResultsStatsCount',
+            method: 'post',
+            data: data
         })
         return resp        
     },
@@ -49,6 +58,17 @@ export default {
             url: 'api/fetchRemediationInfo',
             method: 'post',
             data: {testId}
+        })
+        return resp
+    },
+    async analyzeVulnerability(responseOutput, analysisType = 'redteaming') {
+        const resp = await request({
+            url: '/api/analyze_vulnerability',
+            method: 'post',
+            data: {
+                requestData: responseOutput,
+                analysisType: analysisType
+            }
         })
         return resp
     },
@@ -489,13 +509,6 @@ export default {
             data: {deltaTimeForScheduledSummaries}
         })
     },
-    fetchIssuesByStatusAndSummaryId(latestTestingRunSummaryId, issueStatusQuery, sortKey, sortOrder, skip, limit, filters) {
-        return request({
-            url: '/api/fetchIssuesByStatusAndSummaryId',
-            method: 'post',
-            data: { latestTestingRunSummaryId, issueStatusQuery, sortKey, sortOrder, skip, limit, filters }
-        })
-    },
     modifyTestingRunConfig(testingRunConfigId, editableTestingRunConfig) {
         const requestData = { testingRunConfigId, editableTestingRunConfig }
         return request({
@@ -597,5 +610,32 @@ export default {
             method: 'post',
             data: { content }
         })
+    },
+    allTestsCountsRanges() {
+        return request({
+            url: '/api/fetchTestingRunsRanges',
+            method: 'post',
+            data: {}
+        })
+    },
+    getUniqueHostsTested(testingRunId) {
+        return request({
+            url: '/api/getUniqueHostsTested',
+            method: 'post',
+            data: { testingRunId }
+        })
+    },
+    async fetchCategoryWiseScores(startTimestamp, endTimestamp, dashboardCategory, dataSource = 'testing') {
+        const resp = await request({
+            url: '/api/fetchCategoryWiseScores',
+            method: 'post',
+            data: {
+                startTimestamp,
+                endTimestamp,
+                dashboardCategory,
+                dataSource
+            }
+        })
+        return resp
     }
 }

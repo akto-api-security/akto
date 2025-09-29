@@ -9,6 +9,7 @@ import com.akto.kafka.KafkaConsumerConfig;
 import com.akto.kafka.KafkaProducerConfig;
 import com.akto.kafka.Serializer;
 import com.akto.log.LoggerMaker;
+import com.akto.threat.backend.service.ApiDistributionDataService;
 import com.akto.threat.backend.service.MaliciousEventService;
 import com.akto.threat.backend.service.ThreatActorService;
 import com.akto.threat.backend.service.ThreatApiService;
@@ -69,8 +70,9 @@ public class Main {
 
     ThreatActorService threatActorService = new ThreatActorService(threatProtectionMongo);
     ThreatApiService threatApiService = new ThreatApiService(threatProtectionMongo);
+    ApiDistributionDataService apiDistributionDataService = new ApiDistributionDataService(threatProtectionMongo);
 
-    new BackendVerticle(maliciousEventService, threatActorService, threatApiService).start();
+    new BackendVerticle(maliciousEventService, threatActorService, threatApiService, apiDistributionDataService).start();
   }
 
 }

@@ -1,23 +1,25 @@
-import { Badge, Box, Button, Divider, HorizontalStack, Modal, Text, Tooltip, VerticalStack } from "@shopify/polaris";
+import { Badge, Box, Button, Divider, HorizontalStack, Modal, Text, Tooltip, VerticalStack, Popover, ActionList } from "@shopify/polaris";
 import FlyLayout from "../../../components/layouts/FlyLayout";
 import SampleDataList from "../../../components/shared/SampleDataList";
 import LayoutWithTabs from "../../../components/layouts/LayoutWithTabs";
 import func from "@/util/func";
 import { useEffect, useState } from "react";
 import testingApi from "../../testing/api"
+import threatDetectionApi from "../api"
 import MarkdownViewer from "../../../components/shared/MarkdownViewer";
 import TooltipText from "../../../components/shared/TooltipText";
 import ActivityTracker from "../../dashboard/components/ActivityTracker";
-import ApiSchema from "../../observe/api_collections/ApiSchema";
 
 function SampleDetails(props) {
-    const { showDetails, setShowDetails, data, title, moreInfoData, threatFiltersMap } = props
+    const { showDetails, setShowDetails, data, title, moreInfoData, threatFiltersMap, eventId, eventStatus, onStatusUpdate } = props
     let currentTemplateObj = threatFiltersMap[moreInfoData?.templateId]
 
     let severity = currentTemplateObj?.severity || "HIGH"
     const [remediationText, setRemediationText] = useState("")
     const [latestActivity, setLatestActivity] = useState([])
     const [showModal, setShowModal] = useState(false);
+    const [triageLoading, setTriageLoading] = useState(false);
+    const [actionPopoverActive, setActionPopoverActive] = useState(false);
 
     const fetchRemediationInfo = async() => {
         if(moreInfoData?.templateId !== undefined){
@@ -81,21 +83,6 @@ function SampleDetails(props) {
         component: <ActivityTracker latestActivity={latestActivity} />
     }
 
-
-    const SchemaTab = {
-        id: 'schema',
-        content: "Schema",
-        component:  <Box paddingBlockStart={"4"}> 
-            <ApiSchema
-                apiInfo={{
-                    apiCollectionId: moreInfoData?.apiCollectionId,
-                    url: moreInfoData?.url,
-                    method: moreInfoData?.method
-                }}
-            />
-        </Box>
-    }
-
     const ValuesTab = {
         id: 'values',
         content: "Values",
@@ -127,6 +114,31 @@ function SampleDetails(props) {
     const openTest = (id) => {
         const navigateUrl = window.location.origin + "/dashboard/protection/threat-policy?policy=" + id
         window.open(navigateUrl, "_blank")
+    }
+
+    const handleStatusChange = async (newStatus) => {
+        if (!eventId) return;
+
+        setActionPopoverActive(false);
+        
+        setTriageLoading(true);
+        try {
+            const response = await threatDetectionApi.updateMaliciousEventStatus({ eventId: eventId, status: newStatus });
+            if (response?.updateSuccess) {
+                // Update parent state instead of refreshing page
+                if (onStatusUpdate) {
+                    onStatusUpdate(newStatus);
+                }
+                const statusText = newStatus === 'UNDER_REVIEW' ? 'marked for review' :
+                                 newStatus === 'IGNORED' ? 'ignored' : 'reactivated';
+                func.setToast(true, false, `Event ${statusText} successfully`);
+            } else {
+                func.setToast(true, true, 'Failed to update event status');
+            }
+        } catch (error) {
+        } finally {
+            setTriageLoading(false);
+        }
     }
 
     function TitleComponent () {
@@ -161,6 +173,40 @@ function SampleDetails(props) {
                         </VerticalStack>
                     </Box>
                     <HorizontalStack gap={"2"} wrap={false}>
+                        <Popover
+                            active={actionPopoverActive}
+                            activator={
+                                <Button
+                                    size="slim"
+                                    onClick={() => setActionPopoverActive(!actionPopoverActive)}
+                                    disclosure
+                                    loading={triageLoading}
+                                    disabled={!eventId}
+                                >
+                                    Event Actions
+                                </Button>
+                            }
+                            onClose={() => setActionPopoverActive(false)}
+                        >
+                            <ActionList
+                                items={[
+                                    eventStatus === 'UNDER_REVIEW' || eventStatus === 'TRIAGE' ? {
+                                        content: 'Reactivate',
+                                        onAction: () => handleStatusChange('ACTIVE'),
+                                    } : {
+                                        content: 'Mark for Review',
+                                        onAction: () => handleStatusChange('UNDER_REVIEW'),
+                                    },
+                                    eventStatus === 'IGNORED' ? {
+                                        content: 'Reactivate',
+                                        onAction: () => handleStatusChange('ACTIVE'),
+                                    } : {
+                                        content: 'Ignore',
+                                        onAction: () => handleStatusChange('IGNORED'),
+                                    }
+                                ].filter(item => item)}
+                            />
+                        </Popover>
                         <Modal
                             activator={<Button destructive size="slim" onClick={() => setShowModal(!showModal)}>Block IPs</Button>}
                             open={showModal}
@@ -185,7 +231,7 @@ function SampleDetails(props) {
     const tabsComponent = (
         <LayoutWithTabs
             key={"tabs-comp"}
-            tabs={[overviewTab, timelineTab, ValuesTab, remediationTab]}
+            tabs={ window.location.href.indexOf("guardrails") > -1 ? [ValuesTab] : [overviewTab, timelineTab, ValuesTab, remediationTab]}
             currTab = {() => {}}
         />
     )
