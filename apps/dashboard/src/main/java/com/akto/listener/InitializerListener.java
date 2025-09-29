@@ -280,7 +280,7 @@ public class InitializerListener implements ServletContextListener {
     public static String subdomain = "https://app.akto.io";
 
     // Accounts that are allowed to run API group jobs
-    private static final List<Integer> ALLOWED_API_GROUP_ACCOUNT_IDS = new ArrayList<>(Arrays.asList(1669322524, 1_000_000, 1718042191, 1664578207, 1693004074, 1685916748, 1736798101, 1723492815, 1731351930));
+    private static final List<Integer> ALLOWED_API_GROUP_ACCOUNT_IDS = new ArrayList<>(Arrays.asList(1_000_000, 1718042191, 1664578207, 1693004074, 1685916748, 1736798101, 1723492815, 1731351930));
 
     private static Map<String, String> piiFileMap;
     Crons crons = new Crons();
@@ -2314,7 +2314,7 @@ public class InitializerListener implements ServletContextListener {
                             // Run only for allowed accounts
                             logger.info("Running update custom collections for account: " + t.getId());
                             updateCustomCollections();
-                            removeCollectionIdsFromAgenticTraffic();
+                            // removeCollectionIdsFromAgenticTraffic();
                         } catch (Exception e){
                             logger.errorAndAddToDb(e, "Error while updating custom collections: " + e.getMessage(), LogDb.DASHBOARD);
                         }
