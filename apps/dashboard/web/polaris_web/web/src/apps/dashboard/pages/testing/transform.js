@@ -365,6 +365,7 @@ const transform = {
       obj['cveDisplay'] = minimizeTagList(obj['cve'])
       obj['errorsList'] = data.errorsList || []
       obj['testCategoryId'] = data.testSubType
+      obj['conversationId'] = data?.conversationId
 
       let testingRunResultHexId = data.hexId;
 
