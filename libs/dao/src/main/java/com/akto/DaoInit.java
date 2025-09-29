@@ -389,6 +389,7 @@ public class DaoInit {
 
         ApiInfoDao.instance.createIndicesIfAbsent();
         RuntimeLogsDao.instance.createIndicesIfAbsent();
+        RuntimePersistentLogsDao.instance.createIndicesIfAbsent();
         LogsDao.instance.createIndicesIfAbsent();
         DashboardLogsDao.instance.createIndicesIfAbsent();
         AnalyserLogsDao.instance.createIndicesIfAbsent();

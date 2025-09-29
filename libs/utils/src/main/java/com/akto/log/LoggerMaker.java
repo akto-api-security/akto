@@ -194,7 +194,7 @@ public class LoggerMaker  {
             String finalError = basicError(err, db);
 
             if (db.equals(LogDb.BILLING) || db.equals(LogDb.DASHBOARD)) {
-                sendToSlack(err);
+                sendToSlack(finalError);
             } else if(LogDb.DB_ABS.equals(db)){
                 service.submit(() -> {
                     try {
