@@ -82,7 +82,6 @@ function FilterComponent({ includeCategoryNameEquals, excludeCategoryNameEquals,
             const selection = pickTemplate(filtered)
             applySelection(selection)
         } catch (e) {
-            // optionally log
             console.error(`Failed to fetch threat policies error: ${e?.message}`);
         }
     }
