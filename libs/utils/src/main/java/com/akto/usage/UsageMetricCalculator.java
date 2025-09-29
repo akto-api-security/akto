@@ -27,6 +27,7 @@ import com.akto.util.Pair;
 import com.akto.util.enums.GlobalEnums.YamlTemplateSource;
 import com.google.gson.Gson;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Projections;
 import org.bson.conversions.Bson;
 
 public class UsageMetricCalculator {
@@ -188,16 +189,13 @@ public class UsageMetricCalculator {
         // Get valid collection IDs (excluding demos and deactivated collections)
         Set<Integer> validCollectionIds = getValidCollectionIds();
 
-        // Apply RBAC filtering to get user-allowed collection IDs
-        Set<Integer> rbacFilteredCollectionIds = applyRbacFiltering(validCollectionIds);
-
         // Create optimized filters using $in instead of $nin
         List<Bson> filters = new ArrayList<Bson>(){{
             add(Filters.gt(TestingRunResult.END_TIMESTAMP, measureEpoch));
-            add(Filters.in(TestingRunResult.API_INFO_KEY + "." + ApiInfo.ApiInfoKey.API_COLLECTION_ID, rbacFilteredCollectionIds));
+            add(Filters.in(TestingRunResult.API_INFO_KEY + "." + ApiInfo.ApiInfoKey.API_COLLECTION_ID, validCollectionIds));
         }};
 
-        // Use direct MongoDB count with RBAC filtering included
+        // Use direct MongoDB count (no RBAC filtering; internal cron)
         Bson testRunsFilter = Filters.and(filters);
         int testRuns = (int) TestingRunResultDao.instance.getMCollection().countDocuments(testRunsFilter);
 
@@ -212,42 +210,29 @@ public class UsageMetricCalculator {
         return finalCount;
     }
 
-    /**
-     * Apply RBAC filtering to collection IDs - ensures user only sees collections they have access to
-     */
-    private static Set<Integer> applyRbacFiltering(Set<Integer> collectionIds) {
-        try {
-            if ((Context.userId.get() != null || Context.contextSource.get() != null) && Context.accountId.get() != null) {
-                List<Integer> userAllowedCollections = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(), Context.accountId.get());
-                if (userAllowedCollections != null && !userAllowedCollections.isEmpty()) {
-                    // Intersect valid collections with user-allowed collections
-                    return collectionIds.stream()
-                        .filter(userAllowedCollections::contains)
-                        .collect(Collectors.toSet());
-                }
-            }
-        } catch (Exception e) {
-            // Fall back to original collections if RBAC filtering fails
-        }
-        return collectionIds;
-    }
+    // RBAC filtering intentionally omitted for internal cron usage
 
     /**
      * Get valid collection IDs (all collections excluding demos and deactivated)
      * This avoids using $nin queries in favor of $in queries
      */
     private static Set<Integer> getValidCollectionIds() {
-        // Get all API collections
-        List<ApiCollection> allCollections = ApiCollectionsDao.instance.findAll(Filters.empty());
-        
-        // Get demo and deactivated collection IDs
-        Set<Integer> demosAndDeactivated = getDemosAndDeactivated();
-        
-        // Filter out demos and deactivated collections
-        return allCollections.stream()
-            .map(ApiCollection::getId)
-            .filter(id -> !demosAndDeactivated.contains(id))
-            .collect(Collectors.toSet());
+        // Fetch only active collections (deactivated=false or not present) and project only _id
+        Bson activeFilter = Filters.or(
+                Filters.exists(ApiCollection._DEACTIVATED, false),
+                Filters.eq(ApiCollection._DEACTIVATED, false)
+        );
+        List<ApiCollection> activeCollections = ApiCollectionsDao.instance.findAll(activeFilter, Projections.include(ApiCollection.ID));
+
+        // Map to ids
+        Set<Integer> ids = activeCollections.stream()
+                .map(ApiCollection::getId)
+                .collect(Collectors.toSet());
+
+        // Exclude demo collections after fetching the ids
+        ids.removeAll(getDemos());
+
+        return ids;
     }
 
     public static int calculateActiveAccounts(UsageMetric usageMetric) {
