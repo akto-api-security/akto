@@ -384,14 +384,14 @@ export default function LeftNav() {
                 icon: LockMajor,
                 onClick: () => {
                     handleSelect("dashboard_mcp_guardrails");
-                    navigate("/dashboard/guardrails/activity");
+                    navigate(window.ACTIVE_ACCOUNT === 1669322524 ? "/dashboard/guardrails/activity" : "/dashboard/guardrails/policies");
                     setActive("normal");
                 },
                 selected: leftNavSelected.includes("_guardrails"),
                 url: "#",
                 key: "9",
                 subNavigationItems: [
-                    {
+                    window.ACTIVE_ACCOUNT === 1669322524 ?{
                         label: "Guardrails Activity",
                         onClick: () => {
                             navigate("/dashboard/guardrails/activity");
@@ -399,7 +399,7 @@ export default function LeftNav() {
                             setActive("active");
                         },
                         selected: leftNavSelected === "dashboard_guardrails_activity",
-                    },
+                    }: {},
                     {
                         label: "Guardrails Policies",
                         onClick: () => {
@@ -422,14 +422,14 @@ export default function LeftNav() {
                 icon: LockMajor,
                 onClick: () => {
                     handleSelect("dashboard_ai_agent_guardrails");
-                    navigate("/dashboard/guardrails/activity");
+                    navigate(window.ACTIVE_ACCOUNT === 1669322524 ? "/dashboard/guardrails/activity" : "/dashboard/guardrails/policies");
                     setActive("normal");
                 },
                 selected: leftNavSelected.includes("_guardrails"),
                 url: "#",
                 key: "10",
                 subNavigationItems: [
-                    {
+                    window.ACTIVE_ACCOUNT === 1669322524 ? {
                         label: "Guardrails Activity",
                         onClick: () => {
                             navigate("/dashboard/guardrails/activity");
@@ -437,7 +437,7 @@ export default function LeftNav() {
                             setActive("active");
                         },
                         selected: leftNavSelected === "dashboard_guardrails_activity",
-                    },
+                    }: {},
                     {
                         label: "Guardrails Policies",
                         onClick: () => {
