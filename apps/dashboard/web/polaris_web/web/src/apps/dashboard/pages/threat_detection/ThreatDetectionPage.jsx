@@ -1,4 +1,4 @@
-import { useReducer, useState, useEffect } from "react";
+import { useReducer, useState, useEffect, useCallback } from "react";
 import DateRangeFilter from "../../components/layouts/DateRangeFilter";
 import PageWithMultipleCards from "../../components/layouts/PageWithMultipleCards";
 import TitleWithInfo from "../../components/shared/TitleWithInfo";
@@ -10,7 +10,7 @@ import SampleDetails from "./components/SampleDetails";
 import threatDetectionRequests from "./api";
 import tempFunc from "./dummyData";
 import NormalSampleDetails from "./components/NormalSampleDetails";
-import { HorizontalGrid, VerticalStack, HorizontalStack, Popover, Button, ActionList, Box, Icon} from "@shopify/polaris";
+import { HorizontalGrid, VerticalStack, HorizontalStack, Popover, Button, ActionList, Box, Icon, Badge, Text} from "@shopify/polaris";
 import { FileMinor } from '@shopify/polaris-icons';
 import TopThreatTypeChart from "./components/TopThreatTypeChart";
 import api from "./api";
@@ -21,6 +21,7 @@ import SessionStore from "../../../main/SessionStore";
 import { getDashboardCategory, isApiSecurityCategory, mapLabel } from "../../../main/labelHelper";
 import { useNavigate } from "react-router-dom";
 import LineChart from "../../components/charts/LineChart";
+import P95LatencyGraph from "../../components/charts/P95LatencyGraph";
 
 const convertToGraphData = (severityMap) => {
     let dataArr = []
@@ -214,11 +215,86 @@ function ThreatDetectionPage() {
     const [subCategoryCount, setSubCategoryCount] = useState([]);
     const [severityCountMap, setSeverityCountMap] = useState([]);
     const [moreActions, setMoreActions] = useState(false);
+    const [latencyData, setLatencyData] = useState([]);
 
     const threatFiltersMap = SessionStore((state) => state.threatFiltersMap);
 
     const startTimestamp = parseInt(currDateRange.period.since.getTime()/1000)
     const endTimestamp = parseInt(currDateRange.period.until.getTime()/1000)
+
+    const isDemoMode = func.isDemoAccount();
+
+    /**
+     * Generate deterministic latency data for demo mode
+     * Creates 2 months of data with 3-day intervals for consistent demo experience
+     * @returns {Array} Array of latency data points
+     */
+    const generateLatencyData = useCallback(() => {
+        try {
+            const now = Date.now();
+            const data = [];
+            const totalDays = 60; // 2 months
+            const intervalDays = 3; // Every 3 days
+            const dataPoints = Math.floor(totalDays / intervalDays) + 1; // +1 to include today
+            
+            // Predefined latency values for consistent demo data (total 20-30ms)
+            const latencyValues = [
+                { incoming: 12.5, output: 8.2, total: 21.4 },
+                { incoming: 15.3, output: 9.8, total: 25.7 },
+                { incoming: 11.7, output: 7.4, total: 20.3 },
+                { incoming: 10.3, output: 16.1, total: 27.9 },
+                { incoming: 13.8, output: 8.6, total: 23.1 },
+                { incoming: 14.6, output: 9.9, total: 25.5 },
+                { incoming: 12.2, output: 7.5, total: 20.8 },
+                { incoming: 10.6, output: 15.6, total: 26.2 },
+                { incoming: 16.4, output: 11.8, total: 29.2 },
+                { incoming: 13.1, output: 9.3, total: 23.7 },
+                { incoming: 11.9, output: 14.2, total: 27.1 },
+                { incoming: 15.7, output: 8.9, total: 25.8 },
+                { incoming: 12.8, output: 10.4, total: 24.3 },
+                { incoming: 14.2, output: 12.1, total: 27.6 },
+                { incoming: 11.4, output: 13.7, total: 26.4 },
+                { incoming: 16.1, output: 9.5, total: 27.2 },
+                { incoming: 13.5, output: 11.2, total: 25.8 },
+                { incoming: 15.8, output: 9.6, total: 26.7 },
+                { incoming: 12.1, output: 14.8, total: 28.1 },
+                { incoming: 14.9, output: 8.7, total: 24.9 }
+            ];
+            
+            for (let i = 0; i < dataPoints; i++) {
+                const daysAgo = i * intervalDays;
+                const timestamp = now - (daysAgo * 24 * 60 * 60 * 1000);
+                
+                // Use deterministic values based on data point index
+                const latencyIndex = i % latencyValues.length;
+                const latency = latencyValues[latencyIndex];
+                
+                data.push({
+                    timestamp: Math.floor(timestamp / 1000), // Convert to seconds
+                    incomingRequestP95: latency.incoming,
+                    outputResultP95: latency.output,
+                    totalP95: latency.total
+                });
+            }
+            
+            return data.sort((a, b) => a.timestamp - b.timestamp);
+        } catch (error) {
+            console.error('Error generating latency data:', error);
+            return [];
+        }
+    }, []);
+
+    /**
+     * Handle latency click events from the P95LatencyGraph component
+     * @param {string} latencyType - Type of latency clicked (incoming, output, total)
+     */
+    const handleLatencyClick = useCallback((latencyType) => {
+        // In production, this could trigger analytics events or navigate to detailed views
+        // For now, we'll just log the event for debugging purposes
+        if (process.env.NODE_ENV === 'development') {
+            console.log('Latency clicked:', latencyType);
+        }
+    }, []);
 
     const rowClicked = async(data) => {
         if(data?.refId === undefined || data?.refId.length === 0){
@@ -290,10 +366,34 @@ function ThreatDetectionPage() {
 
         fetchThreatCategoryCount();
         fetchCountBySeverity();
-      }, [startTimestamp, endTimestamp]);
+        
+        // Generate latency data for demo mode
+        if (isDemoMode) {
+            try {
+                const latency = generateLatencyData();
+                setLatencyData(latency);
+            } catch (error) {
+                console.error('Error generating demo latency data:', error);
+                setLatencyData([]);
+            }
+        }
+      }, [startTimestamp, endTimestamp, isDemoMode]);
 
     const components = [
         <ChartComponent subCategoryCount={subCategoryCount} severityCountMap={severityCountMap} />,
+        // Add P95 latency graphs for MCP and AI Agent security in demo mode
+        ...(isDemoMode && !isApiSecurityCategory() ? [
+            <P95LatencyGraph
+                key="threat-detection-latency"
+                title="Threat Detection Latency"
+                subtitle="95th percentile latency metrics for threat-detection"
+                dataType="threat-security"
+                startTimestamp={startTimestamp}
+                endTimestamp={endTimestamp}
+                onLatencyClick={(latencyType) => console.log('Latency clicked:', latencyType)}
+                latencyData={latencyData}
+            />
+        ] : []),
         <SusDataTable key={`sus-data-table-${triggerTableRefresh}`}
             currDateRange={currDateRange}
             rowClicked={rowClicked}
