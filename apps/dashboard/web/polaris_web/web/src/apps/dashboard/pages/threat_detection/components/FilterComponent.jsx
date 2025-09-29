@@ -6,6 +6,7 @@ import func from '@/util/func';
 import DropdownSearch from "../../../components/shared/DropdownSearch";
 import { useSearchParams } from "react-router-dom";
 import { getDashboardCategory } from "../../../../main/labelHelper";
+import { updateThreatFiltersStore } from "../utils/threatFilters";
 
 function FilterComponent({ includeCategoryNameEquals, excludeCategoryNameEquals, titleText, readOnly = false, validateOnSave }) {
     const[searchParams] = useSearchParams()
@@ -15,46 +16,76 @@ function FilterComponent({ includeCategoryNameEquals, excludeCategoryNameEquals,
     const [allData, setAllData] = useState([])
     const [id, setId] = useState("")
     const shortHand = getDashboardCategory().split(" ")[0].toLowerCase();
+    // helpers: normalize and category accessor
+    const normalize = (s) => (s || '').toLowerCase()
+    const getCategory = (t) => normalize(t?.info?.category?.name)
+
+    const fetchTemplates = async () => {
+        const resp = await api.fetchFilterYamlTemplate()
+        const templates = Array.isArray(resp?.templates) ? resp.templates : []
+
+        try {
+            const category = getDashboardCategory();
+            const short = (category || '').split(" ")[0].toLowerCase();
+            updateThreatFiltersStore(templates, short)
+        } catch (e) {
+            console.error(`Failed to update SessionStore threat filters: ${e?.message}`);
+        }
+
+        return templates
+    }
+
+    const filterTemplates = (templates) => {
+        let out = templates
+
+        // include/exclude by category name
+        if (includeCategoryNameEquals && includeCategoryNameEquals.length > 0) {
+            const inc = normalize(includeCategoryNameEquals)
+            out = out.filter((t) => getCategory(t) === inc)
+        } else if (excludeCategoryNameEquals && excludeCategoryNameEquals.length > 0) {
+            const exc = normalize(excludeCategoryNameEquals)
+            out = out.filter((t) => getCategory(t) !== exc)
+        }
+
+        // shortHand-based grouping
+        if (!normalize(shortHand).includes('api')) {
+            out = out.filter((t) => t?.info?.category?.name !== undefined && getCategory(t).includes(normalize(shortHand)))
+        } else {
+            out = out.filter((t) => t?.info?.category?.name !== undefined && !getCategory(t).includes('mcp'))
+        }
+        return out
+    }
+
+    const pickTemplate = (templates) => {
+        if (!templates || templates.length === 0) return { id: undefined, content: '' }
+        if (filteredPolicy && filteredPolicy.length > 0) {
+            const chosen = templates.find((t) => t.id === filteredPolicy) || templates[0]
+            return { id: chosen?.id, content: chosen?.content || '' }
+        }
+        const first = templates[0]
+        return { id: first?.id, content: first?.content || '' }
+    }
+
+    const applySelection = ({ id, content }) => {
+        if (id === undefined) return
+        setId(id)
+        const payload = { message: content }
+        setData(payload)
+        setOgData(payload)
+    }
+
     const fetchData = async () => {
-        await api.fetchFilterYamlTemplate().then((resp) => {
-            let temp = resp?.templates ? resp?.templates : []
-            // Apply include/exclude category filters if provided
-            if (includeCategoryNameEquals && includeCategoryNameEquals.length > 0) {
-                const includeLc = includeCategoryNameEquals.toLowerCase()
-                temp = temp.filter(x => x?.info?.category?.name?.toLowerCase() === includeLc)
-            } else if (excludeCategoryNameEquals && excludeCategoryNameEquals.length > 0) {
-                const excludeLc = excludeCategoryNameEquals.toLowerCase()
-                temp = temp.filter(x => x?.info?.category?.name?.toLowerCase() !== excludeLc)
-            }
-            if(!shortHand.includes("api")){  
-                temp = temp.filter(x => x?.info?.category?.name !== undefined && x?.info?.category?.name?.toLowerCase().includes(shortHand))
-            }else{
-                temp = temp.filter(x => x?.info?.category?.name !== undefined && !x?.info?.category?.name?.toLowerCase().includes("mcp"))
-            }
-            setAllData(temp)
-            if (temp.length > 0) {
-                const temp2 = temp[0]
-                if(filteredPolicy && filteredPolicy.length > 0){
-                    setId(filteredPolicy)
-                    try{
-                        let content = temp.filter((x) => x.id === filteredPolicy)[0]?.content
-                        setData({message: content})
-                        setOgData({message: content})
-                    }catch(err){
-                        setId(temp2.id)
-                        const temp3 = { message: temp2.content }
-                        setData(temp3)
-                        setOgData(temp3)
-                    }
-                    
-                }else{
-                    setId(temp2.id)
-                    const temp3 = { message: temp2.content }
-                    setData(temp3)
-                    setOgData(temp3)
-                }
-            }
-        });
+        try {
+            const templates = await fetchTemplates()
+            const filtered = filterTemplates(templates)
+            setAllData(filtered)
+            if (filtered.length === 0) return
+            const selection = pickTemplate(filtered)
+            applySelection(selection)
+        } catch (e) {
+            // optionally log
+            console.error(`Failed to fetch threat policies error: ${e?.message}`);
+        }
     }
     useEffect(() => {
         fetchData();
