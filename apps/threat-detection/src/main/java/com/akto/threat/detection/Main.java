@@ -1,10 +1,15 @@
 package com.akto.threat.detection;
 
+import java.util.HashMap;
+
 import com.akto.DaoInit;
 import com.akto.RuntimeMode;
 import com.akto.dao.context.Context;
+import com.akto.data_actor.ClientActor;
 import com.akto.data_actor.DataActor;
 import com.akto.data_actor.DataActorFactory;
+import com.akto.dto.billing.FeatureAccess;
+import com.akto.dto.billing.Organization;
 import com.akto.dto.monitoring.ModuleInfo;
 import com.akto.kafka.KafkaConfig;
 import com.akto.kafka.KafkaConsumerConfig;
@@ -34,7 +39,30 @@ public class Main {
   private static final DataActor dataActor = DataActorFactory.fetchInstance();
 
   public static void main(String[] args) throws Exception {
-    
+
+    while (true) {
+
+      int accountId = ClientActor.getAccountId();
+
+      Organization organization = dataActor.fetchOrganization(accountId);
+      if (organization == null) {
+        logger.errorAndAddToDb("Organization not found for account id: " + accountId);
+        Thread.sleep(30000);
+        continue;
+      }
+      HashMap<String, FeatureAccess> featureWiseAllowed = organization.getFeatureWiseAllowed();
+      if(featureWiseAllowed == null) {
+          featureWiseAllowed = new HashMap<>();
+      }
+
+      FeatureAccess allowed = featureWiseAllowed.getOrDefault("THREAT_DETECTION", FeatureAccess.noAccess);
+      if (allowed.getIsGranted()) {
+        break;
+      }
+
+      Thread.sleep(30000);
+    }
+
     RedisClient localRedis = null;
 
     logger.warnAndAddToDb("aggregation rules enabled " + aggregationRulesEnabled);
