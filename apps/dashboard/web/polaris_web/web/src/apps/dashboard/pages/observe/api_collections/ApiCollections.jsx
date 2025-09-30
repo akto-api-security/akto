@@ -540,6 +540,13 @@ function ApiCollections(props) {
             }
             
             // Update sensitive info if available
+            if(sensitiveResponse == null || sensitiveResponse === undefined){
+                sensitiveResponse = {
+                    sensitiveUrlsInResponse: lastFetchedSensitiveResp?.sensitiveUrls || 0,
+                    sensitiveSubtypesInCollection: lastFetchedSensitiveResp?.sensitiveInfoMap || {}
+                }
+                
+            }
             if (sensitiveResponse) {
                 const newSensitiveInfo = {
                     sensitiveUrls: sensitiveResponse.sensitiveUrlsInResponse,
