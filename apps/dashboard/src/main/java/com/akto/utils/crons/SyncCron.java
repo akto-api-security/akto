@@ -23,10 +23,11 @@ import com.akto.utils.RiskScoreOfCollections;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.Updates;
-import static com.akto.utils.crons.UpdateSensitiveInfoInApiInfo.allowedAccounts;
+import com.akto.dao.billing.OrganizationsDao;
 
 public class SyncCron {
     private static final LoggerMaker loggerMaker = new LoggerMaker(SyncCron.class, LogDb.DASHBOARD);
+    private static final String AKTO_API_INFO_CRONS = "AKTO_API_INFO_CRONS";
     ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
 
     public void setUpUpdateCronScheduler() {
@@ -35,7 +36,7 @@ public class SyncCron {
                 AccountTask.instance.executeTask(new Consumer<Account>() {
                     @Override
                     public void accept(Account t) {
-                        if (!allowedAccounts.contains(t.getId())) {
+                        if (!OrganizationsDao.instance.checkFeatureAccess(t.getId(), AKTO_API_INFO_CRONS)) {
                             loggerMaker.debugAndAddToDb("Skipping risk info mapping for account: " + t.getId(), LogDb.DASHBOARD);
                             return;
                         }
