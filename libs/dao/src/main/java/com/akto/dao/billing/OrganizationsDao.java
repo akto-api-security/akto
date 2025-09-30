@@ -1,10 +1,13 @@
 package com.akto.dao.billing;
 
+import java.util.HashMap;
+
 import org.bson.conversions.Bson;
 
 import com.akto.dao.BillingContextDao;
 import com.akto.dao.MCollection;
 import com.akto.dao.context.Context;
+import com.akto.dto.billing.FeatureAccess;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.billing.Tokens;
 import com.mongodb.BasicDBObject;
@@ -42,6 +45,32 @@ public class OrganizationsDao extends BillingContextDao<Organization>{
     public Organization findOneByAccountId(int accountId) {
         return OrganizationsDao.instance.findOne(
                 Filters.in(Organization.ACCOUNTS, accountId));
+    }
+
+    public HashMap<String, FeatureAccess> getFeatureAccessMapByAccountId(int accountId) throws Exception {
+        Organization organization = findOneByAccountId(accountId);
+        return getFeatureAccessMapForOrg(organization);
+    }
+
+    public HashMap<String, FeatureAccess> getFeatureAccessMapForOrg(Organization organization) throws Exception {
+        if (organization == null) {
+            throw new Exception("Organization not found");
+        }
+
+        if (organization.getFeatureWiseAllowed() == null || organization.getFeatureWiseAllowed().isEmpty()) {
+            throw new Exception("feature map not found or empty for organization " + organization.getId());
+        }
+        return organization.getFeatureWiseAllowed();
+    }
+
+    public boolean checkFeatureAccess(int accountId, String featureKey) {
+        try {
+            HashMap<String, FeatureAccess> featureAccessMap = getFeatureAccessMapByAccountId(accountId);
+            FeatureAccess featureAccess = featureAccessMap.getOrDefault(featureKey, FeatureAccess.noAccess);
+            return featureAccess.getIsGranted();
+        } catch (Exception e) {
+            return false;
+        }
     }
 
     public static BasicDBObject getBillingTokenForAuth() {

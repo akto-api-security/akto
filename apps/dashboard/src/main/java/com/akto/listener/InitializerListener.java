@@ -280,7 +280,8 @@ public class InitializerListener implements ServletContextListener {
     public static String subdomain = "https://app.akto.io";
 
     // Accounts that are allowed to run API group jobs
-    private static final List<Integer> ALLOWED_API_GROUP_ACCOUNT_IDS = new ArrayList<>(Arrays.asList(1_000_000, 1718042191, 1664578207, 1693004074, 1685916748, 1736798101, 1723492815, 1731351930));
+
+    private static final String AKTO_API_GROUP_CRONS = "AKTO_API_GROUP_CRONS";
 
     private static Map<String, String> piiFileMap;
     Crons crons = new Crons();
@@ -419,10 +420,16 @@ public class InitializerListener implements ServletContextListener {
     public void updateApiGroupsForAccounts() {
         scheduler.scheduleAtFixedRate(new Runnable() {
             public void run() {
-                for (int account : ALLOWED_API_GROUP_ACCOUNT_IDS) {
-                    Context.accountId.set(account);
-                    createFirstUnauthenticatedApiGroup();
-                }
+                AccountTask.instance.executeTask(new Consumer<Account>() {
+                    @Override
+                    public void accept(Account t) {
+                        if (!OrganizationsDao.instance.checkFeatureAccess(t.getId(), AKTO_API_GROUP_CRONS)) {
+                            logger.info("Skipping update custom collections for account: " + t.getId());
+                            return;
+                        }
+                        createFirstUnauthenticatedApiGroup();
+                    }
+                }, "update-api-groups");
             }
         }, 0, 4, TimeUnit.HOURS);
     }
@@ -2306,7 +2313,7 @@ public class InitializerListener implements ServletContextListener {
                     @Override
                     public void accept(Account t) {
                         try {
-                            if(!ALLOWED_API_GROUP_ACCOUNT_IDS.contains(t.getId())){
+                            if(!OrganizationsDao.instance.checkFeatureAccess(t.getId(), AKTO_API_GROUP_CRONS)){
                                 logger.info("Skipping update custom collections for account: " + t.getId());
                                 return;
                             }

@@ -43,18 +43,8 @@ public class UsageInterceptor extends AbstractInterceptor {
             Map<String, Object> session = invocation.getInvocationContext().getSession();
             int sessionAccId = (Integer) session.get(UserDetailsFilter.ACCOUNT_ID);
 
-            Organization organization = OrganizationsDao.instance.findOne(
-                    Filters.in(Organization.ACCOUNTS, sessionAccId));
-
-            if (organization == null) {
-                throw new Exception("Organization not found");
-            }
-
-            HashMap<String, FeatureAccess> featureWiseAllowed = organization.getFeatureWiseAllowed();
-
-            if(featureWiseAllowed == null || featureWiseAllowed.isEmpty()) {
-                throw new Exception("feature map not found or empty for organization " + organization.getId());
-            }
+            Organization organization = OrganizationsDao.instance.findOneByAccountId(sessionAccId);
+            HashMap<String, FeatureAccess> featureWiseAllowed = OrganizationsDao.instance.getFeatureAccessMapForOrg(organization);
 
             int gracePeriod = organization.getGracePeriod();
 
