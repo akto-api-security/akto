@@ -166,17 +166,7 @@ public class ApiCollectionUsers {
         return filters.isEmpty() ? Filters.empty() : Filters.and(filters);
     }
 
-    private static String getCollectionIdField(CollectionType type) {
-        String prefix = TestingEndpoints.getFilterPrefix(type);
-        if (prefix.isEmpty()) {
-            return SingleTypeInfo._API_COLLECTION_ID;
-        }
-        return prefix + "apiCollectionId";
-    }
-
     private static void operationForCollectionId(List<TestingEndpoints> conditions, int apiCollectionId, Bson update, Bson matchFilter, boolean remove) {
-        // Get context collections for API source
-        Set<Integer> contextCollections = UsersCollectionsList.getContextCollectionsForUser(Context.accountId.get(), CONTEXT_SOURCE.API);
         
         Map<CollectionType, Bson> filtersMap = new HashMap<>();
         for (CollectionType type : CollectionType.values()) {
@@ -185,16 +175,6 @@ public class ApiCollectionUsers {
                 filter = Filters.nor(filter);
             }
             Bson finalFilter = filter.equals(Filters.empty()) ? matchFilter : Filters.and(matchFilter, filter);
-            
-            // Add context collections filter based on operation type
-            if (contextCollections != null && !contextCollections.isEmpty()) {
-                String collectionIdField = getCollectionIdField(type);
-                Bson contextFilter = remove 
-                    ? Filters.nin(collectionIdField, contextCollections)  // For remove: NOT in context collections
-                    : Filters.in(collectionIdField, contextCollections);  // For add: ARE in context collections
-                finalFilter = Filters.and(finalFilter, contextFilter);
-            }
-            
             filtersMap.put(type, finalFilter);
         }
         updateCollectionsForCollectionId(filtersMap, update);
