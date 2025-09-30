@@ -147,3 +147,57 @@ User input is being directly inserted into the DOM without proper encoding or sa
         role: "system"
     }
 ]
+
+// New conversation-based schema
+export const sampleConversationForChatContainer = [
+    {
+        _id: "507f1f77bcf86cd799439011",
+        conversationId: "conv_507f1f77bcf86cd799439013",
+        role: "user",
+        content: "Analyze the following API endpoint for potential security vulnerabilities",
+        creationTimestamp: 1672531200,
+        model: "claude-3-sonnet"
+    },
+    {
+        _id: "507f1f77bcf86cd799439014",
+        conversationId: "conv_507f1f77bcf86cd799439013",
+        role: "system",
+        content: `I've identified several potential security issues with this endpoint. The main concerns are:
+
+1. **SQL injection vulnerability** in the user_id parameter
+2. **Missing authentication validation**
+3. **Lack of input sanitization**`,
+        creationTimestamp: 1672531260,
+        model: "claude-3-sonnet"
+    },
+    {
+        _id: "507f1f77bcf86cd799439015",
+        conversationId: "conv_507f1f77bcf86cd799439013",
+        role: "user",
+        content: "Can you provide specific remediation steps for the SQL injection vulnerability?",
+        creationTimestamp: 1672531320,
+        model: "claude-3-sonnet"
+    },
+    {
+        _id: "507f1f77bcf86cd799439016",
+        conversationId: "conv_507f1f77bcf86cd799439013",
+        role: "system",
+        content: `To fix the **SQL injection vulnerability**:
+
+1. **Use parameterized queries** or prepared statements
+2. **Implement proper input validation** and sanitization
+3. **Use an ORM** with built-in protection
+4. **Apply the principle of least privilege** for database access`,
+        creationTimestamp: 1672531380,
+        model: "claude-3-sonnet"
+    }
+]
+
+// Available models for the chat interface
+export const availableModels = [
+    { id: 'claude-3-sonnet', name: 'Claude-3.5-sonnet' },
+    { id: 'gpt-4o', name: 'GPT-4o' },
+    { id: 'gpt-4o-mini', name: 'GPT-4o-mini' },
+    { id: 'gpt-3.5-turbo', name: 'GPT-3.5-turbo' },
+    { id: 'gemini-1.5-flash', name: 'Gemini-1.5-flash' }
+]

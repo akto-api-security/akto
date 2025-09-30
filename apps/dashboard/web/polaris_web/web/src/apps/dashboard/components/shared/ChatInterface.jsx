@@ -15,7 +15,11 @@ function ChatInterface({ conversations }) {
                 conversation.role === 'user' ? (
                     <UserMessage key={conversation._id} message={conversation.message} />
                 ) : (
-                    <AIMessage key={conversation._id} message={conversation.message} />
+                    <AIMessage 
+                        key={conversation._id} 
+                        message={conversation.content} 
+                        isStreaming={conversation.isStreaming}
+                    />
                 )
             ))}
         </Box>

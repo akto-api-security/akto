@@ -15,6 +15,7 @@ import SampleData from "../../../components/shared/SampleData";
 import transform from "../../../components/shared/customDiffEditor";
 import EmptySampleApi from "./EmptySampleApi";
 import Store from "../../../store";
+import ChatContainer from "../../../components/shared/ChatContainer";
 
 const SampleApi = () => {
 
@@ -44,6 +45,9 @@ const SampleApi = () => {
 
     const tabs = [{ id: 'request', content: 'Request' }, { id: 'response', content: 'Response'}];
     const mapCollectionIdToName = func.mapCollectionIdToName(allCollections)
+
+    const [isChatBotOpen, setIsChatBotOpen] = useState(false)
+    const [chatBotModal, setChatBotModal] = useState(false)
 
     useEffect(()=>{
         if(showEmptyLayout) return
@@ -139,6 +143,14 @@ const SampleApi = () => {
         }
     }, [testResult])
 
+    useEffect(()=>{
+        if(currentContent && currentContent.length > 0 && currentContent.includes("test_mode") && currentContent.includes(": agent")) {
+            setIsChatBotOpen(true)
+        }else{
+            setIsChatBotOpen(false)
+        }
+    }, [currentContent])
+
 
     const handleTabChange = (selectedTabIndex) => {
         setSelected(selectedTabIndex)
@@ -227,6 +239,10 @@ const SampleApi = () => {
     const intervalRef = useRef(null);
 
     const runTest = async()=>{
+        if(isChatBotOpen) {
+            setChatBotModal(true)
+            return;
+        }
         setLoading(true)
         const apiKeyInfo = {
             ...func.toMethodUrlObject(selectedApiEndpoint),
@@ -306,6 +322,9 @@ const SampleApi = () => {
     }
 
     function getResultDescription() {
+        if(isChatBotOpen) {
+            return "Chat with the agent"
+        }
         if (testResult) {
             if(testResult.testingRunResult.vulnerable){
                 let status = func.getRunResultSeverity(testResult.testingRunResult, testResult.subCategoryMap)
@@ -348,7 +367,7 @@ const SampleApi = () => {
                             </Tooltip>
                         </Box>
                     </Button>
-                    <Button id={"run-test"} disabled={showEmptyLayout || editorData?.message?.length === 0} loading={loading} primary onClick={runTest} size="slim">Run Test</Button>
+                    <Button id={"run-test"} disabled={showEmptyLayout || editorData?.message?.length === 0} loading={loading} primary onClick={runTest} size="slim">{isChatBotOpen ? "Chat" : "Run Test"}</Button>
                 </HorizontalStack>
             </div>
 
@@ -431,6 +450,16 @@ const SampleApi = () => {
                     />
 
                 </Modal.Section>
+            </Modal>
+            <Modal
+                open={chatBotModal}
+                onClose={() => setChatBotModal(false)}
+                title="Chat with the agent"
+            >
+                <Modal.Section>
+                    <ChatContainer />
+                </Modal.Section>
+                
             </Modal>
         </div>
     )
