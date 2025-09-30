@@ -45,6 +45,11 @@ public class Main {
       int accountId = ClientActor.getAccountId();
 
       Organization organization = dataActor.fetchOrganization(accountId);
+      if (organization == null) {
+        logger.errorAndAddToDb("Organization not found for account id: " + accountId);
+        Thread.sleep(30000);
+        continue;
+      }
       HashMap<String, FeatureAccess> featureWiseAllowed = organization.getFeatureWiseAllowed();
       if(featureWiseAllowed == null) {
           featureWiseAllowed = new HashMap<>();
