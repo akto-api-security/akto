@@ -156,7 +156,7 @@ public class UsersCollectionsList {
     }
 
     public static Bson getApiContextFilter() {
-        return Filters.and(
+        return Filters.or(
             Filters.exists(ApiCollection.TAGS_STRING, false),
             Filters.nor(
                 Filters.elemMatch(ApiCollection.TAGS_STRING, Filters.eq(CollectionTags.KEY_NAME, Constants.AKTO_MCP_SERVER_TAG)),
