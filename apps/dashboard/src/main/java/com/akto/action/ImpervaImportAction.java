@@ -1,9 +1,5 @@
 package com.akto.action;
 
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
@@ -15,7 +11,6 @@ import org.apache.commons.lang3.StringUtils;
 import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.ApiCollection;
-import com.akto.dto.HttpResponseParams.Source;
 import com.akto.dto.upload.FileUploadError;
 import com.akto.dto.upload.SwaggerUploadLog;
 import com.akto.imperva.model.ImpervaSchema;
@@ -39,14 +34,9 @@ public class ImpervaImportAction extends UserAction {
     private static final ExecutorService executorService = Executors.newFixedThreadPool(1);
     private static final ObjectMapper objectMapper = new ObjectMapper();
 
-    // File upload fields
-    private File impervaFile;
-    private String impervaFileContentType;
-    private String impervaFileFileName;
-
-    private boolean useHost = true;
+    // String input field
+    private String impervaString;
     private boolean generateMultipleSamples = false; // false = new logic (merged samples with responses), true = old logic (multiple samples)
-    private Source source = Source.IMPERVA; // Imperva imports treated similar to OpenAPI
 
     // Response fields
     private int totalCount;
@@ -58,31 +48,24 @@ public class ImpervaImportAction extends UserAction {
     @Override
     public String execute() {
         try {
-            if (impervaFile == null) {
-                message = "Imperva file is required";
+            if (impervaString == null || impervaString.trim().isEmpty()) {
+                addActionError("Imperva data is required");
                 return ERROR.toUpperCase();
             }
 
-            loggerMaker.debugAndAddToDb("Starting Imperva schema import from file: " + impervaFileFileName, LogDb.DASHBOARD);
-
-            // Read file content
-            String impervaJsonString = readFileContent(impervaFile);
-            if (impervaJsonString == null || impervaJsonString.trim().isEmpty()) {
-                message = "Imperva file is empty or could not be read";
-                return ERROR.toUpperCase();
-            }
+            loggerMaker.debugAndAddToDb("Starting Imperva schema import", LogDb.DASHBOARD);
 
             // Parse JSON once to ImpervaSchema object
-            ImpervaSchema impervaSchema = parseImpervaJson(impervaJsonString);
+            ImpervaSchema impervaSchema = parseImpervaJson(impervaString);
             if (impervaSchema == null) {
-                message = "Failed to parse Imperva JSON file";
+                addActionError("Failed to parse Imperva JSON file");
                 return ERROR.toUpperCase();
             }
 
             // Extract hostname from schema to create collection
             String collectionName = impervaSchema.getHostName();
             if (StringUtils.isEmpty(collectionName)) {
-                message = "Hostname not found in Imperva file";
+                addActionError("Hostname not found in Imperva file");
                 return ERROR.toUpperCase();
             }
 
@@ -105,7 +88,7 @@ public class ImpervaImportAction extends UserAction {
 
                         // Parse Imperva schema (already deserialized)
                         ParserResult parsedResult = ImpervaSchemaParser.convertImpervaSchemaToAkto(
-                            impervaSchema, null, useHost, generateMultipleSamples
+                            impervaSchema, null, true, generateMultipleSamples
                         );
 
                         List<FileUploadError> fileErrors = parsedResult.getFileErrors();
@@ -141,21 +124,11 @@ public class ImpervaImportAction extends UserAction {
 
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error during Imperva import: " + e.getMessage());
-            message = "Import failed: " + e.getMessage();
+            addActionError("Import failed: " + e.getMessage());
             return ERROR.toUpperCase();
         }
     }
 
-    private String readFileContent(File file) {
-        try (FileInputStream fis = new FileInputStream(file)) {
-            byte[] data = new byte[(int) file.length()];
-            fis.read(data);
-            return new String(data, StandardCharsets.UTF_8);
-        } catch (IOException e) {
-            loggerMaker.errorAndAddToDb(e, "Error reading uploaded file: " + e.getMessage());
-            return null;
-        }
-    }
 
     /**
      * Gets existing collection or creates a new one with the given name
