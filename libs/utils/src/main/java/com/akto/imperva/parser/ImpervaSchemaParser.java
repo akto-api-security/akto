@@ -114,6 +114,10 @@ public class ImpervaSchemaParser {
             return logs;
         }
 
+        // Parse request headers once (shared across all content-types)
+        Map<String, String> requestHeaders = parseRequestHeaders(request);
+        loggerMaker.infoAndAddToDb("Parsed " + requestHeaders.size() + " request headers from Imperva schema");
+
         // Iterate through each content-type
         for (Map.Entry<String, ParameterDrillDown[]> entry : request.getContentTypeToRequestBody().entrySet()) {
             String contentType = entry.getKey();
@@ -152,7 +156,7 @@ public class ImpervaSchemaParser {
             //     ));
             // }
             logs.addAll(generateJsonSamples(bodyParam, contentType, method, fullPath, hostName,
-                    authHeaders, uploadId, matchingResponse));
+                    authHeaders, requestHeaders, uploadId, matchingResponse));
         }
 
         return logs;
@@ -284,6 +288,7 @@ public class ImpervaSchemaParser {
         String path,
         String hostName,
         Map<String, String> authHeaders,
+        Map<String, String> requestHeaders,
         String uploadId,
         ResponseDrillDown matchingResponse
     ) {
@@ -496,6 +501,158 @@ public class ImpervaSchemaParser {
         }
 
         return authHeaders;
+    }
+
+    /**
+     * Parses request headers from RequestDrillDown.
+     * Handles both static and dynamic header values.
+     */
+    private static Map<String, String> parseRequestHeaders(RequestDrillDown request) {
+        Map<String, String> headers = new HashMap<>();
+
+        if (request == null || request.getHeaderList() == null) {
+            return headers;
+        }
+
+        try {
+            for (HeaderDto header : request.getHeaderList()) {
+                if (header == null || StringUtils.isEmpty(header.getKey())) {
+                    continue;
+                }
+
+                // Handle different header types
+                if ("COOKIE".equalsIgnoreCase(header.getType())) {
+                    // Parse cookies
+                    String cookieValue = parseCookies(header);
+                    if (!StringUtils.isEmpty(cookieValue)) {
+                        headers.put("Cookie", cookieValue);
+                    }
+                } else {
+                    // Regular HEADER type
+                    String headerValue = getHeaderValue(header);
+                    if (!StringUtils.isEmpty(headerValue)) {
+                        headers.put(header.getKey(), headerValue);
+                    }
+                }
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error parsing request headers: " + e.getMessage());
+        }
+
+        return headers;
+    }
+
+    /**
+     * Parses response headers from ResponseDrillDown.
+     */
+    private static Map<String, String> parseResponseHeaders(ResponseDrillDown response) {
+        Map<String, String> headers = new HashMap<>();
+
+        if (response == null || response.getHeaderList() == null) {
+            return headers;
+        }
+
+        try {
+            for (HeaderDto header : response.getHeaderList()) {
+                if (header == null || StringUtils.isEmpty(header.getKey())) {
+                    continue;
+                }
+
+                // Handle different header types
+                if ("COOKIE".equalsIgnoreCase(header.getType())) {
+                    // For response, cookies typically use Set-Cookie header
+                    String cookieValue = parseCookies(header);
+                    if (!StringUtils.isEmpty(cookieValue)) {
+                        // Note: Multiple Set-Cookie headers might exist, but we're simplifying here
+                        headers.put("Set-Cookie", cookieValue);
+                    }
+                } else {
+                    // Regular HEADER type
+                    String headerValue = getHeaderValue(header);
+                    if (!StringUtils.isEmpty(headerValue)) {
+                        headers.put(header.getKey(), headerValue);
+                    }
+                }
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error parsing response headers: " + e.getMessage());
+        }
+
+        return headers;
+    }
+
+    /**
+     * Gets header value from HeaderDto.
+     * Uses static value if available, otherwise generates sample from dataTypes.
+     */
+    private static String getHeaderValue(HeaderDto header) {
+        try {
+            // If header has static value
+            if (header.getHeaderWithValue() != null && header.getHeaderWithValue()
+                && !StringUtils.isEmpty(header.getValue())) {
+                return header.getValue();
+            }
+
+            // Generate sample from dataTypes
+            if (header.getDataTypes() != null && header.getDataTypes().length > 0) {
+                Object sample = generateSampleFromDataType(header.getDataTypes()[0]);
+                if (sample != null) {
+                    return sample.toString();
+                }
+            }
+
+            // Default sample value
+            return "sample-header-value";
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error getting header value for key: " + header.getKey());
+            return "sample-header-value";
+        }
+    }
+
+    /**
+     * Parses cookies from HeaderDto and formats as Cookie header value.
+     * Format: "key1=value1; key2=value2"
+     */
+    private static String parseCookies(HeaderDto header) {
+        try {
+            if (header.getCookies() == null || header.getCookies().length == 0) {
+                // If no cookies array but has value, use that
+                if (!StringUtils.isEmpty(header.getValue())) {
+                    return header.getValue();
+                }
+                return null;
+            }
+
+            StringBuilder cookieStr = new StringBuilder();
+            for (HeaderDto.CookieDto cookie : header.getCookies()) {
+                if (cookie == null || StringUtils.isEmpty(cookie.getKey())) {
+                    continue;
+                }
+
+                if (cookieStr.length() > 0) {
+                    cookieStr.append("; ");
+                }
+
+                cookieStr.append(cookie.getKey()).append("=");
+
+                // Generate cookie value from dataTypes
+                if (cookie.getDataTypes() != null && cookie.getDataTypes().length > 0) {
+                    Object sample = generateSampleFromDataType(cookie.getDataTypes()[0]);
+                    if (sample != null) {
+                        cookieStr.append(sample.toString());
+                    } else {
+                        cookieStr.append("sample-cookie-value");
+                    }
+                } else {
+                    cookieStr.append("sample-cookie-value");
+                }
+            }
+
+            return cookieStr.length() > 0 ? cookieStr.toString() : null;
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error parsing cookies");
+            return null;
+        }
     }
 
     /**
