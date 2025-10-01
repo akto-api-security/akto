@@ -375,7 +375,6 @@ public class ApiExecutor {
         return sendRequest(request, followRedirects, testingRunConfig, debug, false, testLogs, skipSSRFCheck);
     }
     
-    // For MCP HTTP transport - skips SSE check
     public static OriginalHttpResponse sendRequestSkipSse(OriginalHttpRequest request, boolean followRedirects,
         TestingRunConfig testingRunConfig, boolean debug, List<TestingRunResult.TestLog> testLogs,
         boolean skipSSRFCheck) throws Exception {
@@ -608,7 +607,8 @@ public class ApiExecutor {
 
         if (payload == null) payload = "";
         if (body == null) {// body not created by GRPC block yet
-            if (request.getHeaders().containsKey("charset")) {
+            // Create body with null MediaType for JSON-RPC requests to prevent OkHttp from adding charset parameter
+            if (request.getHeaders().containsKey("charset") || isJsonRpcRequest(request)) {
                 body = RequestBody.create(payload, null);
                 request.getHeaders().remove("charset");
             } else {
