@@ -29,6 +29,7 @@ public class GraphQLUtils {//Singleton class
 
     static {
         allowedPath.add("graphql");
+        allowedPath.add("query");
     }
 
     private GraphQLUtils() {
@@ -36,6 +37,46 @@ public class GraphQLUtils {//Singleton class
 
     public static GraphQLUtils getUtils() {
         return utils;
+    }
+
+    /**
+     * Validates if the parsed JSON object has valid GraphQL structure
+     * Checks for: "query" field, valid GraphQL syntax (query/mutation keywords),
+     * and either "operationName" or "variables" fields
+     */
+    private boolean isValidGraphQLPayload(Map jsonObject, String path) {
+        if (jsonObject == null) {
+            return false;
+        }
+
+        // If path contains "graphql", trust it's GraphQL without additional validation
+        if (path != null && path.contains("graphql")) {
+            return jsonObject.containsKey(QUERY);
+        }
+
+        // For paths like "/query", do strict validation to avoid false positives
+        Object queryObj = jsonObject.get(QUERY);
+        if (queryObj == null || !(queryObj instanceof String)) {
+            return false;
+        }
+
+        String queryString = (String) queryObj;
+        // Check if it contains GraphQL operation keywords
+        String trimmedQuery = queryString.trim().toLowerCase();
+        boolean hasGraphQLKeyword = trimmedQuery.startsWith("query") ||
+                                   trimmedQuery.startsWith("mutation") ||
+                                   trimmedQuery.startsWith("subscription") ||
+                                   trimmedQuery.startsWith("{"); // Anonymous query
+
+        if (!hasGraphQLKeyword) {
+            return false;
+        }
+
+        // Additional check: Should have both operationName and variables fields (typical GraphQL structure)
+        boolean hasOperationName = jsonObject.containsKey("operationName");
+        boolean hasVariables = jsonObject.containsKey("variables");
+
+        return hasOperationName && hasVariables;
     }
 
     public HashMap<String, Object> fieldTraversal(Field field) {
@@ -96,7 +137,6 @@ public class GraphQLUtils {//Singleton class
         }
         String requestPayload = responseParams.getRequestParams().getPayload();
         if (!isAllowedForParse || !requestPayload.contains(QUERY)) {
-            // DO NOT PARSE as it's not graphql query
             return responseParamsList;
         }
 
@@ -115,6 +155,22 @@ public class GraphQLUtils {//Singleton class
             }
         } catch (Exception e) {
             //Eat the exception
+            return responseParamsList;
+        }
+
+        // Validate GraphQL structure after parsing (single parse, no duplication)
+        if (listOfRequestPayload != null) {
+            // For array payloads, validate first element
+            if (listOfRequestPayload.length > 0 && listOfRequestPayload[0] instanceof Map) {
+                if (!isValidGraphQLPayload((Map) listOfRequestPayload[0], path)) {
+                    return responseParamsList;
+                }
+            }
+        } else if (mapOfRequestPayload != null) {
+            if (!isValidGraphQLPayload(mapOfRequestPayload, path)) {
+                return responseParamsList;
+            }
+        } else {
             return responseParamsList;
         }
 
