@@ -26,7 +26,6 @@ const ThreatActivityTimeline = ({ startTimestamp, endTimestamp, onSubCategoryCli
         const sortedTimelines = response.threatActivityTimelines.sort((a, b) => a.ts - b.ts);
         setSortedTimelines(sortedTimelines);
         const distinctSubCategories = [...new Set(response.threatActivityTimelines.flatMap(item => item.subCategoryWiseData.map(subItem => subItem.subcategory)))];
-        console.log({ response });
         const series = distinctSubCategories.map((subCategory, index) => ({
             color: COLORMAP[index % 5],
             name: subCategory,
@@ -46,10 +45,6 @@ const ThreatActivityTimeline = ({ startTimestamp, endTimestamp, onSubCategoryCli
         setSeriesData(series);
         setLoading(false);
     }
-    
-    useEffect(() => {
-        console.log('$$$ fetching threat activity timeline');
-    }, []);
 
     useEffect(() => {
         fetchThreatActivityTimeline();
