@@ -803,9 +803,9 @@ public class SingleTypeInfoDao extends AccountsContextDaoWithRbac<SingleTypeInfo
 
         // Query 1: Count ALL documents matching host filter + timestamp
         Bson filterAllWithTs = Filters.and(
+                hostFilterQ,
                 Filters.gte(SingleTypeInfo._TIMESTAMP, startTimestamp),
                 Filters.lte(SingleTypeInfo._TIMESTAMP, endTimestamp),
-                hostFilterQ,
                 userCollectionFilter
         );
 
@@ -820,10 +820,10 @@ public class SingleTypeInfoDao extends AccountsContextDaoWithRbac<SingleTypeInfo
         long excludedCount = 0;
         if (!nonHostApiCollectionIds.isEmpty()) {
             Bson filterExcludedWithTs = Filters.and(
+                    hostFilterQ,
                     Filters.gte(SingleTypeInfo._TIMESTAMP, startTimestamp),
                     Filters.lte(SingleTypeInfo._TIMESTAMP, endTimestamp),
                     Filters.in(SingleTypeInfo._API_COLLECTION_ID, nonHostApiCollectionIds),
-                    hostFilterQ,
                     userCollectionFilter
             );
 
