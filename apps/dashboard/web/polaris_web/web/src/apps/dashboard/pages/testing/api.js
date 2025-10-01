@@ -61,6 +61,17 @@ export default {
         })
         return resp
     },
+    async analyzeVulnerability(responseOutput, analysisType = 'redteaming') {
+        const resp = await request({
+            url: '/api/analyze_vulnerability',
+            method: 'post',
+            data: {
+                requestData: responseOutput,
+                analysisType: analysisType
+            }
+        })
+        return resp
+    },
     async fetchAllSubCategories(fetchOnlyActive, mode, skip, limit) {
         const resp = await request({
             url: 'api/fetchAllSubCategories',
@@ -613,5 +624,42 @@ export default {
             method: 'post',
             data: { testingRunId }
         })
+    },
+    async fetchCategoryWiseScores(startTimestamp, endTimestamp, dashboardCategory, dataSource = 'testing') {
+        const resp = await request({
+            url: '/api/fetchCategoryWiseScores',
+            method: 'post',
+            data: {
+                startTimestamp,
+                endTimestamp,
+                dashboardCategory,
+                dataSource
+            }
+        })
+        return resp
+    },
+    // async fetchConversationsFromTestRunResultHexId(testingRunResultHexId) {
+    //     const resp = await request({
+    //         url: '/api/fetchConversationsFromTestRunResultHexId',
+    //         method: 'post',
+    //         data: {
+    //             testingRunResultHexId
+    //         }
+    //     })
+    //     return resp
+    // },
+    async fetchConversationsFromTestRunResultHexId(testingRunResultHexId) {
+        const { sampleConversations } = await import('./sampleConversations.js')
+
+        // Filter conversations by testRunResultId (simulating MongoDB filter)
+        const filteredConversations = sampleConversations.filter(
+            conversation => conversation.testRunResultId === testingRunResultHexId
+        )
+
+        // Return in the same format as other API responses
+        return {
+            conversations: filteredConversations,
+            success: true
+        }
     }
 }

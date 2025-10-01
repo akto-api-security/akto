@@ -12,7 +12,7 @@ const McpRecon = () => {
     const [requireAuth, setRequireAuth] = useState(false)
 
     const goToDocs = () => {
-        window.open("https://docs.akto.io")
+        window.open("https://docs.akto.io/mcp-recon")
     }
 
     const primaryAction = () => {
@@ -21,10 +21,14 @@ const McpRecon = () => {
             return
         }
 
-        // Validate IP range format (basic validation)
+        // Validate IP range format - supports multiple comma-separated ranges
         const ipRangePattern = /^(\d{1,3}\.){3}\d{1,3}(\/\d{1,2})?$|^(\d{1,3}\.){3}\d{1,3}-(\d{1,3}\.){3}\d{1,3}$/;
-        if (!ipRangePattern.test(ipRange)) {
-            func.setToast(true, true, "Please enter a valid IP range format (e.g., 192.168.1.0/24 or 192.168.1.1-192.168.1.255)")
+        const ipRanges = ipRange.split(',').map(range => range.trim());
+        
+        // Check if all IP ranges are valid
+        const invalidRanges = ipRanges.filter(range => !ipRangePattern.test(range));
+        if (invalidRanges.length > 0) {
+            func.setToast(true, true, `Invalid IP range format: ${invalidRanges.join(', ')}. Use format like 192.168.1.0/24 or 192.168.1.1-192.168.1.255`)
             return
         }
 
@@ -35,17 +39,16 @@ const McpRecon = () => {
 
         setLoading(true)
         setLoading(false)
-        // TODO: uncomment when backend is ready
-//         api.initiateMCPRecon(ipRange, authKey, authValue, window.location.origin).then((res) => {
-//             func.setToast(true, false, "MCP Recon initiated successfully. Discovering and cataloging MCP servers in the specified IP range.")
-//         }).catch((err) => {
-//             console.error("Error initiating MCP recon:", err)
-//             func.setToast(true, true, "Failed to initiate MCP reconnaissance. Please check your IP range and try again.")
-//         }).finally(() => {
-//             setLoading(false)
-//             setIpRange('')
-//             setRequireAuth(false)
-//         })
+
+        api.initiateMCPRecon(ipRange).then((res) => {
+            func.setToast(true, false, "MCP Recon initiated successfully. Discovering and cataloging MCP servers in the specified IP range.")
+        }).catch((err) => {
+            func.setToast(true, true, "Failed to initiate MCP reconnaissance. Please check your IP range and try again.")
+        }).finally(() => {
+            setLoading(false)
+            setIpRange('')
+            setRequireAuth(false)
+        })
     }
 
     return (
@@ -62,8 +65,8 @@ const McpRecon = () => {
                     value={ipRange} 
                     type='text' 
                     onChange={(value) => setIpRange(value)} 
-                    placeholder='192.168.1.0/24 or 10.0.0.1-10.0.0.255' 
-                    helpText="Enter CIDR notation (e.g., 192.168.1.0/24) or IP range (e.g., 192.168.1.1-192.168.1.255)"
+                    placeholder='192.168.1.0/24, 10.0.0.1-10.0.0.255' 
+                    helpText="Enter CIDR notation (e.g., 192.168.1.0/24) or IP range (e.g., 192.168.1.1-192.168.1.255). Multiple ranges can be comma-separated."
                 />
 
                 <ButtonGroup>

@@ -73,6 +73,17 @@ public class ClientActor extends DataActor {
         return dbAbsHost + "/api";
     }
 
+    public static int getAccountId() throws Exception {
+        String token = System.getenv("DATABASE_ABSTRACTOR_SERVICE_TOKEN");
+        DecodedJWT jwt = JWT.decode(token);
+        String payload = jwt.getPayload();
+        byte[] decodedBytes = Base64.getUrlDecoder().decode(payload);
+        String decodedPayload = new String(decodedBytes);
+        BasicDBObject basicDBObject = BasicDBObject.parse(decodedPayload);
+        int accId = (int) basicDBObject.getInt("accountId");
+        return accId;
+    }
+
     public static boolean checkAccount() {
         try {
             String token = System.getenv("DATABASE_ABSTRACTOR_SERVICE_TOKEN");

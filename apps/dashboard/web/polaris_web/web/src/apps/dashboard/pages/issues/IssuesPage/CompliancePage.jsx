@@ -29,6 +29,7 @@ import settingFunctions from "../../settings/module.js";
 import JiraTicketCreationModal from "../../../components/shared/JiraTicketCreationModal.jsx";
 import testingApi from "../../testing/api.js"
 import issuesFunctions from '@/apps/dashboard/pages/issues/module';
+import { isMCPSecurityCategory, isGenAISecurityCategory } from "../../../../main/labelHelper";
 
 const sortOptions = [
     { label: 'Severity', value: 'severity asc', directionLabel: 'Highest', sortKey: 'severity', columnIndex: 2 },
@@ -39,7 +40,21 @@ const sortOptions = [
     { label: 'Discovered time', value: 'creationTime desc', directionLabel: 'Oldest', sortKey: 'creationTime', columnIndex: 7 },
 ];
 
-const allCompliances = ["CIS Controls", "CMMC", "CSA CCM", "Cybersecurity Maturity Model Certification (CMMC)", "FISMA", "FedRAMP", "GDPR", "HIPAA", "ISO 27001", "NIST 800-171", "NIST 800-53", "PCI DSS", "SOC 2", "OWASP"];
+const getCompliances = () => {
+    const isDemoAccount = func.isDemoAccount();
+    const isMCP = isMCPSecurityCategory();
+    const isAgenticSecurity = isGenAISecurityCategory();
+
+    if (isDemoAccount && (isMCP || isAgenticSecurity)) {
+        // Different compliances for demo account + MCP + Agentic Security
+        return ["OWASP Agentic", "OWASP LLM", "NIST AI Risk Management Framework","MITRE ATLAS","CIS Controls", "CMMC", "CSA CCM", "Cybersecurity Maturity Model Certification (CMMC)", "FISMA", "FedRAMP", "GDPR", "HIPAA", "ISO 27001", "NIST 800-171", "NIST 800-53", "PCI DSS", "SOC 2", "OWASP"];
+    }
+    
+    // Default compliances
+    return ["CIS Controls", "CMMC", "CSA CCM", "Cybersecurity Maturity Model Certification (CMMC)", "FISMA", "FedRAMP", "GDPR", "HIPAA", "ISO 27001", "NIST 800-171", "NIST 800-53", "PCI DSS", "SOC 2", "OWASP"];
+};
+
+const allCompliances = getCompliances();
 
 let filtersOptions = [
     {

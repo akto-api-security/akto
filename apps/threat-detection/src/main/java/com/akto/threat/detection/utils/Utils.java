@@ -40,7 +40,7 @@ public class Utils {
         return ipApiRateLimitFilter;
     }
 
-    public static SampleMaliciousRequest buildSampleMaliciousRequest(String actor, HttpResponseParams responseParam, FilterConfig apiFilter, RawApiMetadata metadata, List<SchemaConformanceError> errors) {
+    public static SampleMaliciousRequest buildSampleMaliciousRequest(String actor, HttpResponseParams responseParam, FilterConfig apiFilter, RawApiMetadata metadata, List<SchemaConformanceError> errors, boolean successfulExploit) {
         Metadata.Builder metadataBuilder = Metadata.newBuilder();
         if(errors != null && !errors.isEmpty()) {
             metadataBuilder.addAllSchemaErrors(errors);
@@ -53,7 +53,8 @@ public class Utils {
             .setIp(actor) // For now using actor as IP
             .setApiCollectionId(responseParam.getRequestParams().getApiCollectionId())
             .setTimestamp(responseParam.getTime())
-            .setFilterId(apiFilter.getId());
+            .setFilterId(apiFilter.getId())
+            .setSuccessfulExploit(successfulExploit);
 
         metadataBuilder.setCountryCode(metadata.getCountryCode());
         maliciousReqBuilder.setMetadata(metadataBuilder.build());

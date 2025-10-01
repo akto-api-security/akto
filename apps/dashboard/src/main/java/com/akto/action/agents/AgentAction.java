@@ -2,6 +2,7 @@ package com.akto.action.agents;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Calendar;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -13,9 +14,15 @@ import com.akto.dao.agents.AgentHealthCheckDao;
 import com.akto.dao.agents.AgentModelDao;
 import com.akto.dao.agents.AgentRunDao;
 import com.akto.dao.agents.AgentSubProcessSingleAttemptDao;
+import com.akto.dao.agents.DiscoveryAgentRunDao;
+import com.akto.dao.agents.DiscoverySubProcessDao;
 import com.akto.dao.context.Context;
+import com.akto.database_abstractor_authenticator.JwtAuthenticator;
+import com.akto.dto.HttpResponseParams.Source;
 import com.akto.dto.agents.*;
+import com.akto.har.HAR;
 import com.akto.util.Constants;
+import com.akto.utils.Utils;
 import com.amazonaws.util.StringUtils;
 import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.Filters;
@@ -23,22 +30,37 @@ import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.Updates;
 import com.opensymphony.xwork2.Action;
 
+import lombok.Getter;
+import lombok.Setter;
+
 public class AgentAction extends UserAction {
 
     Map<String, Object> data;
     String agent;
 
     List<AgentRun> agentRuns;
+    @Getter
+    List<DiscoveryAgentRun> discoveryAgentRuns;
+    @Getter
+    List<DiscoverySubProcess> discoverySubProcesses;
 
     String modelName;
     String githubAccessToken;
 
     public String getAllAgentRuns() {
         Bson filter = Filters.eq(AgentRun._STATE, State.RUNNING);
+        boolean discoveryAgent = false;
         if(!StringUtils.isNullOrEmpty(this.agent)){
             filter = Filters.and(filter, Filters.eq("agent", agent));
+            if(this.agent.equals(Agent.DISCOVERY_AGENT.name())){
+                discoveryAgent = true;
+            }
         }
-        agentRuns = AgentRunDao.instance.findAll(filter, Projections.exclude(AgentRun._AGENT_MODEL, AgentRun._PRIVATE_DATA));
+        if(discoveryAgent){
+            discoveryAgentRuns = DiscoveryAgentRunDao.instance.findAll(filter, Projections.exclude(AgentRun._AGENT_MODEL, AgentRun._PRIVATE_DATA, DiscoveryAgentRun.AGENT_INIT_DOCUMENT));
+        }else{
+            agentRuns = AgentRunDao.instance.findAll(filter, Projections.exclude(AgentRun._AGENT_MODEL, AgentRun._PRIVATE_DATA));
+        }
         return Action.SUCCESS.toUpperCase();
     }
 
@@ -152,6 +174,64 @@ public class AgentAction extends UserAction {
         return Action.SUCCESS.toUpperCase();
     }
 
+    @Setter
+    Map<String, Object> results;
+
+    public String updateStateOfDiscoveryAgentRun() {
+        if(processId == null || processId.isEmpty()){
+            addActionError("Process id is invalid");
+            return Action.ERROR.toUpperCase();
+        }
+        response = new BasicDBObject();
+        Bson update = Updates.set(AgentRun._STATE, State.valueOf(state));
+        if(results != null && !results.isEmpty()){
+            update = Updates.combine(update, Updates.set(DiscoveryAgentRun._RESULTS, results));
+        }
+        DiscoveryAgentRunDao.instance.updateOneNoUpsert(Filters.eq(AgentRun.PROCESS_ID, processId), update);
+        response.put("status", "success");
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    @Setter
+    String hostname;
+    @Setter
+    String authToken;
+
+    public String createSubProcessNew() {
+        if(processId == null || processId.isEmpty()){
+            addActionError("Process id is invalid");
+            return Action.ERROR.toUpperCase();
+        }
+        if(hostname == null || hostname.isEmpty()){
+            addActionError("Hostname is invalid");
+            return Action.ERROR.toUpperCase();
+        }
+        if(authToken == null || authToken.isEmpty()){
+            addActionError("Auth token is invalid");
+            return Action.ERROR.toUpperCase();
+        }
+        Map<String,String> userInputData = new HashMap<>();
+        userInputData.put("hostName", hostname);
+        userInputData.put("authToken", authToken);
+
+        DiscoverySubProcess subProcess = new DiscoverySubProcess(
+            this.processId,
+            "1",
+            new ArrayList<>(),  
+            new HashMap<>(),
+            0,
+            null,
+            State.RUNNING,
+            -1,
+            Context.now(),
+            userInputData
+        );
+        DiscoverySubProcessDao.instance.insertOne(subProcess);
+        response = new BasicDBObject();
+        response.put("status", "success");
+        return SUCCESS.toUpperCase();
+    }
+
     Agent[] agents;
 
     AgentRun agentRun;
@@ -185,6 +265,13 @@ public class AgentAction extends UserAction {
             return Action.ERROR.toUpperCase();
         }
         Bson processIdFilter = Filters.eq(AgentRun.PROCESS_ID, processId);
+        if(this.agent.equals(Agent.DISCOVERY_AGENT.name())){
+            DiscoveryAgentRun discoveryAgentRun = DiscoveryAgentRunDao.instance.findOne(processIdFilter);
+            if(discoveryAgentRun != null){
+                discoverySubProcesses = DiscoverySubProcessDao.instance.findAll(processIdFilter);
+            }
+            return Action.SUCCESS.toUpperCase();
+        }
 
         agentRun = AgentRunDao.instance.findOne(processIdFilter);
 
@@ -232,6 +319,35 @@ public class AgentAction extends UserAction {
         }
 
         Bson processIdFilter = Filters.eq(AgentRun.PROCESS_ID, processId);
+
+        if(this.agent.equals(Agent.DISCOVERY_AGENT.name())){
+            DiscoveryAgentRun discoveryAgentRun = DiscoveryAgentRunDao.instance.findOne(processIdFilter);
+            if(discoveryAgentRun == null){
+                addActionError("No discovery agent run found");
+                return Action.ERROR.toUpperCase();
+            }
+            Bson finalFilter = Filters.and(processIdFilter, Filters.eq(AgentSubProcessSingleAttempt.SUB_PROCESS_ID,this.subProcessId));
+            DiscoverySubProcess discoverySubProcess = DiscoverySubProcessDao.instance.findOne(finalFilter);
+            if(discoverySubProcess == null){
+                addActionError("No discovery subprocess found");
+                return Action.ERROR.toUpperCase();
+            }
+            String retryRequest = (String) this.data.get("retryRequest");
+            if(retryRequest != null){
+                Map<String,String> userInputData = discoverySubProcess.getUserInputData();
+                if(userInputData == null){
+                    userInputData = new HashMap<>();
+                }
+                userInputData.put("retryRequest", retryRequest);
+                Bson update = Updates.combine(
+                    Updates.set("userInputData", userInputData),
+                    Updates.set(DiscoverySubProcess.BAD_ERRORS, new HashMap<>()),
+                    Updates.set(AgentSubProcessSingleAttempt._STATE, State.RUNNING)
+                );
+                DiscoverySubProcessDao.instance.updateOneNoUpsert(finalFilter, update);
+            }
+            return Action.SUCCESS.toUpperCase();
+        }
 
         agentRun = AgentRunDao.instance.findOne(processIdFilter);
 
@@ -368,19 +484,77 @@ public class AgentAction extends UserAction {
         this.type = type;
     }
 
+    // polling api for discover agent
+    public String feedDiscoveryDataToAgent() {
+        response = new BasicDBObject();
+        if(StringUtils.isNullOrEmpty(this.processId)){
+            DiscoveryAgentRun discoveryAgentRun = DiscoveryAgentRunDao.instance.findOne(
+                Filters.eq(
+                    AgentRun._STATE, State.SCHEDULED.name()
+                )
+            );
+            if(discoveryAgentRun != null){
+                response.put("type", "init");
+                response.put("data", discoveryAgentRun);
+                Map<String,Object> claims = new HashMap<>();
+                claims.put("accountId", discoveryAgentRun.getAccountId());
+                String apiToken = null;
+                if(Context.accountId.get() != 1000_000){
+                    try {
+                        apiToken = JwtAuthenticator.createJWT(
+                        claims,
+                        "Akto",
+                        "invite_user",
+                        Calendar.HOUR,
+                            3
+                        );
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+                    response.put("apiToken", apiToken);
+                }
+                
+            }
+        }else{
+            DiscoveryAgentRun discoveryAgentRun = DiscoveryAgentRunDao.instance.findOne(Filters.eq(AgentRun.PROCESS_ID, this.processId));
+            DiscoverySubProcess discoverySubProcess = DiscoverySubProcessDao.instance.findLatestOne(Filters.eq("processId", discoveryAgentRun.getProcessId()));
+            if(discoverySubProcess != null){
+                response.put("type", "subTask");
+                response.put("data", discoverySubProcess);
+            }
+        }
+        
+        return SUCCESS.toUpperCase();
+    }
+
     List<AgentLog> logs;
 
     public void setLogs(List<AgentLog> logs) {
         this.logs = logs;
     }
 
+    @Setter
+    String currentProcessingUrlInDiscoveryFromAgent;
+
     public String receiveDataFromAgent() {
         response = new BasicDBObject();
+        Agent agentModule = null;
+        if(!StringUtils.isNullOrEmpty(this.agent)){
+            try{
+                agentModule = Agent.valueOf(this.agent);
+            }catch(Exception e){
+            }
+        }
         Bson filter = Filters.and(
             Filters.eq(AgentSubProcessSingleAttempt.PROCESS_ID, this.processId),
-            Filters.eq(AgentSubProcessSingleAttempt.SUB_PROCESS_ID, this.subProcessId),
-            Filters.eq(AgentSubProcessSingleAttempt.ATTEMPT_ID, this.attemptId)
+            Filters.eq(AgentSubProcessSingleAttempt.SUB_PROCESS_ID, this.subProcessId)
         );
+        if(!agentModule.equals(Agent.DISCOVERY_AGENT)){
+            filter = Filters.and(
+                filter,
+                Filters.eq(AgentSubProcessSingleAttempt.ATTEMPT_ID, this.attemptId)
+            );
+        }
         if(!StringUtils.isNullOrEmpty(type)){
             if(type.equals("logs")){
                 if(this.logs == null || this.logs.isEmpty()){
@@ -445,6 +619,59 @@ public class AgentAction extends UserAction {
                         Updates.addEachToSet(AgentSubProcessSingleAttempt.PROCESS_OUTPUT + ".outputOptions", batchedList)
                     ));
                 break;
+            case "logs_discovery":
+                DiscoverySubProcessDao.instance.updateOneNoUpsert(
+                    filter,
+                    Updates.addEachToSet(AgentSubProcessSingleAttempt._LOGS, this.logs)
+                );
+                break;
+            case "error_request":
+                String currentProcessingUrlInDiscovery = (String) this.data.get("url");
+                String currentRequestForUrl = (String) this.data.get("request");
+                String errorMessage = (String) this.data.get("error");
+                BasicDBObject badError = new BasicDBObject().append("url", currentProcessingUrlInDiscovery).append("request", currentRequestForUrl).append("error", errorMessage);
+                DiscoverySubProcess subProcess = DiscoverySubProcessDao.instance.findOne(filter);
+                subProcess.getBadErrors().put(currentProcessingUrlInDiscovery, badError);
+                DiscoverySubProcessDao.instance.updateOneNoUpsert(
+                    filter,
+                    Updates.set(DiscoverySubProcess.BAD_ERRORS, subProcess.getBadErrors())
+                );
+                break;
+            case "increment_processed_apis":
+                DiscoverySubProcessDao.instance.updateOneNoUpsert(
+                    filter,
+                    Updates.combine(
+                        Updates.inc(DiscoverySubProcess.PROCESSED_APIS_TILL_NOW, 1),
+                        Updates.set(DiscoverySubProcess.CURRENT_URL_STRING, currentProcessingUrlInDiscoveryFromAgent)
+                    )
+                );
+                break;
+            case "metadata_discovery":
+                Map<String,String> metaData = (Map<String,String>) this.data.get("metadata");
+                String name = (String) this.data.get("name");
+                BasicDBObject metaDataObject = new BasicDBObject().append("name", name).append("items", metaData);
+                if(metaData == null){
+                    return SUCCESS.toUpperCase();
+                }
+                DiscoveryAgentRunDao.instance.updateOneNoUpsert(
+                    Filters.eq(AgentRun.PROCESS_ID, this.processId),
+                    Updates.addToSet("agentStats", metaDataObject)
+                );
+                break;
+
+            case "harData":
+                HAR har = new HAR();
+                DiscoveryAgentRun discoveryAgentRun = DiscoveryAgentRunDao.instance.findOne(Filters.eq(AgentRun.PROCESS_ID, this.processId));
+                int apiCollectionId = discoveryAgentRun.getApiCollectionId();
+                String harString = (String) this.data.get("harContent");
+                try {
+                    List<String> messages = har.getMessages(harString, apiCollectionId, Context.accountId.get(), Source.HAR);
+                    List<String> harErrors = har.getErrors();
+                    Utils.pushDataToKafka(apiCollectionId, "", messages, harErrors, true, true, true);
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+                
             default:
                 break;
         }
