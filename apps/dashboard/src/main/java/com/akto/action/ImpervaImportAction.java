@@ -45,6 +45,7 @@ public class ImpervaImportAction extends UserAction {
     private String impervaFileFileName;
 
     private boolean useHost = true;
+    private boolean generateMultipleSamples = false; // false = new logic (merged samples with responses), true = old logic (multiple samples)
     private Source source = Source.IMPERVA; // Imperva imports treated similar to OpenAPI
 
     // Response fields
@@ -104,7 +105,7 @@ public class ImpervaImportAction extends UserAction {
 
                         // Parse Imperva schema (already deserialized)
                         ParserResult parsedResult = ImpervaSchemaParser.convertImpervaSchemaToAkto(
-                            impervaSchema, null, useHost
+                            impervaSchema, null, useHost, generateMultipleSamples
                         );
 
                         List<FileUploadError> fileErrors = parsedResult.getFileErrors();

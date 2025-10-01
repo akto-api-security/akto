@@ -52,9 +52,10 @@ public class ImpervaSchemaParser {
      * @param impervaJsonString The Imperva schema JSON string
      * @param uploadId Upload ID for tracking
      * @param useHost Whether to use the host from schema
+     * @param generateMultipleSamples true = old logic (multiple samples per XML child), false = new logic (merged samples with responses)
      * @return ParserResult containing parsed data and errors
      */
-    public static ParserResult convertImpervaSchemaToAkto(String impervaJsonString, String uploadId, boolean useHost) {
+    public static ParserResult convertImpervaSchemaToAkto(String impervaJsonString, String uploadId, boolean useHost, boolean generateMultipleSamples) {
         List<FileUploadError> fileLevelErrors = new ArrayList<>();
         List<SwaggerUploadLog> uploadLogs = new ArrayList<>();
 
@@ -69,7 +70,7 @@ public class ImpervaSchemaParser {
             }
 
             ImpervaSchema schema = mapper.treeToValue(dataNode, ImpervaSchema.class);
-            return convertImpervaSchemaToAkto(schema, uploadId, useHost);
+            return convertImpervaSchemaToAkto(schema, uploadId, useHost, generateMultipleSamples);
 
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error parsing Imperva schema: " + e.getMessage());
@@ -89,9 +90,10 @@ public class ImpervaSchemaParser {
      * @param schema The ImpervaSchema object
      * @param uploadId Upload ID for tracking
      * @param useHost Whether to use the host from schema
+     * @param generateMultipleSamples true = old logic (multiple samples per XML child), false = new logic (merged samples with responses)
      * @return ParserResult containing parsed data and errors
      */
-    public static ParserResult convertImpervaSchemaToAkto(ImpervaSchema schema, String uploadId, boolean useHost) {
+    public static ParserResult convertImpervaSchemaToAkto(ImpervaSchema schema, String uploadId, boolean useHost, boolean generateMultipleSamples) {
         List<FileUploadError> fileLevelErrors = new ArrayList<>();
         List<SwaggerUploadLog> uploadLogs = new ArrayList<>();
 
@@ -107,7 +109,7 @@ public class ImpervaSchemaParser {
             Map<String, String> authHeaders = parseAuthenticationInfo(schema.getAuthenticationInfo());
 
             // Extract all request samples
-            uploadLogs = extractRequestSamples(schema, authHeaders, uploadId, useHost);
+            uploadLogs = extractRequestSamples(schema, authHeaders, uploadId, useHost, generateMultipleSamples);
 
             loggerMaker.infoAndAddToDb("Generated " + uploadLogs.size() + " samples from Imperva schema");
 
@@ -126,14 +128,17 @@ public class ImpervaSchemaParser {
     /**
      * Extracts all request samples from Imperva schema.
      *
-     * For XML/SOAP: Creates one sample per child in the children array
+     * For XML/SOAP:
+     *   - If generateMultipleSamples=true: Creates one sample per child in the children array (old logic)
+     *   - If generateMultipleSamples=false: Creates one merged sample with all children (new logic)
      * For JSON: Creates one sample per element in body's dataTypes array
      */
     private static List<SwaggerUploadLog> extractRequestSamples(
         ImpervaSchema schema,
         Map<String, String> authHeaders,
         String uploadId,
-        boolean useHost
+        boolean useHost,
+        boolean generateMultipleSamples
     ) {
         List<SwaggerUploadLog> logs = new ArrayList<>();
 
@@ -166,21 +171,48 @@ public class ImpervaSchemaParser {
                 continue;
             }
 
+            // Get matching response for this content-type
+            ResponseDrillDown matchingResponse = getMatchingResponse(schema, contentType);
+
             // Determine if XML/SOAP or JSON
             if (isXmlContentType(contentType)) {
                 // XML: Generate samples from children
                 logs.addAll(generateXmlSamples(
-                    bodyParam, contentType, method, fullPath, hostName, authHeaders, uploadId
+                    bodyParam, contentType, method, fullPath, hostName, authHeaders, uploadId,
+                    generateMultipleSamples, matchingResponse
                 ));
             } else {
                 // JSON: Generate samples from dataTypes array
                 logs.addAll(generateJsonSamples(
-                    bodyParam, contentType, method, fullPath, hostName, authHeaders, uploadId
+                    bodyParam, contentType, method, fullPath, hostName, authHeaders, uploadId,
+                    matchingResponse
                 ));
             }
         }
 
         return logs;
+    }
+
+    /**
+     * Gets matching response for the given content-type from 200 responses only.
+     */
+    private static ResponseDrillDown getMatchingResponse(ImpervaSchema schema, String requestContentType) {
+        if (schema.getResponses() == null) {
+            return null;
+        }
+
+        // Only consider 200 responses
+        ResponseDrillDown response200 = schema.getResponses().get("200");
+        if (response200 == null || response200.getContentTypeToResponseBody() == null) {
+            return null;
+        }
+
+        // Check if this response has matching content-type
+        if (response200.getContentTypeToResponseBody().containsKey(requestContentType)) {
+            return response200;
+        }
+
+        return null;
     }
 
     /**
@@ -194,8 +226,9 @@ public class ImpervaSchemaParser {
     }
 
     /**
-     * For XML: Generate one sample per child in the children array.
-     * Each child represents a different API call (e.g., createProfile, updateProfile).
+     * For XML:
+     * - If generateMultipleSamples=true: Generate one sample per child in the children array (old logic)
+     * - If generateMultipleSamples=false: Generate one merged sample with all children (new logic)
      */
     private static List<SwaggerUploadLog> generateXmlSamples(
         ParameterDrillDown bodyParam,
@@ -204,7 +237,9 @@ public class ImpervaSchemaParser {
         String path,
         String hostName,
         Map<String, String> authHeaders,
-        String uploadId
+        String uploadId,
+        boolean generateMultipleSamples,
+        ResponseDrillDown matchingResponse
     ) {
         List<SwaggerUploadLog> logs = new ArrayList<>();
 
@@ -216,23 +251,56 @@ public class ImpervaSchemaParser {
             return logs;
         }
 
-        loggerMaker.infoAndAddToDb("Generating " + bodyDataType.getChildren().length + " XML samples from children");
+        if (generateMultipleSamples) {
+            // OLD LOGIC: One sample per child
+            loggerMaker.infoAndAddToDb("Generating " + bodyDataType.getChildren().length + " XML samples from children (old logic)");
 
-        // Each child represents a separate API call sample
-        for (ParameterDrillDown child : bodyDataType.getChildren()) {
+            for (ParameterDrillDown child : bodyDataType.getChildren()) {
+                try {
+                    Object sampleData = generateSampleForChild(child);
+                    String requestPayload = generateXmlString(sampleData);
+
+                    SwaggerUploadLog log = createSwaggerUploadLog(
+                        method, path, contentType, requestPayload, authHeaders, uploadId, hostName,
+                        null, null, 200
+                    );
+                    logs.add(log);
+
+                } catch (Exception e) {
+                    loggerMaker.errorAndAddToDb(e, "Error generating XML sample for child: " + child.getName());
+                }
+            }
+        } else {
+            // NEW LOGIC: One merged sample with all children
+            loggerMaker.infoAndAddToDb("Generating 1 merged XML sample with all children (new logic)");
+
             try {
-                // Generate sample for this specific child
-                Object sampleData = generateSampleForChild(child);
-                String payload = generateXmlString(sampleData);
+                // Generate merged sample with all children
+                Object mergedSample = generateSampleFromDataType(bodyDataType);
+                String requestPayload = generateXmlString(mergedSample);
 
-                // Create SwaggerUploadLog entry
+                // Extract response if available
+                String responsePayload = null;
+                Map<String, String> responseHeaders = new HashMap<>();
+                if (matchingResponse != null && matchingResponse.getContentTypeToResponseBody() != null) {
+                    ParameterDrillDown[] responseBodyArray = matchingResponse.getContentTypeToResponseBody().get(contentType);
+                    if (responseBodyArray != null && responseBodyArray.length > 0) {
+                        ParameterDrillDown responseBody = responseBodyArray[0];
+                        if (responseBody.getDataTypes() != null && responseBody.getDataTypes().length > 0) {
+                            Object responseSample = generateSampleFromDataType(responseBody.getDataTypes()[0]);
+                            responsePayload = generateXmlString(responseSample);
+                        }
+                    }
+                }
+
                 SwaggerUploadLog log = createSwaggerUploadLog(
-                    method, path, contentType, payload, authHeaders, uploadId, hostName
+                    method, path, contentType, requestPayload, authHeaders, uploadId, hostName,
+                    responsePayload, responseHeaders, 200
                 );
                 logs.add(log);
 
             } catch (Exception e) {
-                loggerMaker.errorAndAddToDb(e, "Error generating XML sample for child: " + child.getName());
+                loggerMaker.errorAndAddToDb(e, "Error generating merged XML sample");
             }
         }
 
@@ -242,6 +310,7 @@ public class ImpervaSchemaParser {
     /**
      * For JSON: Generate one sample per element in body's dataTypes array.
      * Each dataTypes element represents a different schema variation.
+     * Now includes response matching.
      */
     private static List<SwaggerUploadLog> generateJsonSamples(
         ParameterDrillDown bodyParam,
@@ -250,7 +319,8 @@ public class ImpervaSchemaParser {
         String path,
         String hostName,
         Map<String, String> authHeaders,
-        String uploadId
+        String uploadId,
+        ResponseDrillDown matchingResponse
     ) {
         List<SwaggerUploadLog> logs = new ArrayList<>();
 
@@ -259,22 +329,44 @@ public class ImpervaSchemaParser {
         // Each element in dataTypes array is a separate sample
         for (DataTypeDto dataType : bodyParam.getDataTypes()) {
             try {
-                // Generate sample including all children of this dataType
+                // Generate request sample including all children of this dataType
                 Object sampleData = generateSampleFromDataType(dataType);
 
-                String payload;
+                String requestPayload;
                 if (contentType.contains("yaml")) {
-                    payload = generateYamlString(sampleData);
+                    requestPayload = generateYamlString(sampleData);
                 } else if (contentType.contains("x-www-form-urlencoded")) {
-                    payload = generateFormUrlencodedString(sampleData);
+                    requestPayload = generateFormUrlencodedString(sampleData);
                 } else {
                     // Default to JSON
-                    payload = mapper.writeValueAsString(sampleData);
+                    requestPayload = mapper.writeValueAsString(sampleData);
+                }
+
+                // Extract response if available
+                String responsePayload = null;
+                Map<String, String> responseHeaders = new HashMap<>();
+                if (matchingResponse != null && matchingResponse.getContentTypeToResponseBody() != null) {
+                    ParameterDrillDown[] responseBodyArray = matchingResponse.getContentTypeToResponseBody().get(contentType);
+                    if (responseBodyArray != null && responseBodyArray.length > 0) {
+                        ParameterDrillDown responseBody = responseBodyArray[0];
+                        if (responseBody.getDataTypes() != null && responseBody.getDataTypes().length > 0) {
+                            Object responseSample = generateSampleFromDataType(responseBody.getDataTypes()[0]);
+
+                            if (contentType.contains("yaml")) {
+                                responsePayload = generateYamlString(responseSample);
+                            } else if (contentType.contains("x-www-form-urlencoded")) {
+                                responsePayload = generateFormUrlencodedString(responseSample);
+                            } else {
+                                responsePayload = mapper.writeValueAsString(responseSample);
+                            }
+                        }
+                    }
                 }
 
                 // Create SwaggerUploadLog entry
                 SwaggerUploadLog log = createSwaggerUploadLog(
-                    method, path, contentType, payload, authHeaders, uploadId, hostName
+                    method, path, contentType, requestPayload, authHeaders, uploadId, hostName,
+                    responsePayload, responseHeaders, 200
                 );
                 logs.add(log);
 
@@ -353,10 +445,13 @@ public class ImpervaSchemaParser {
         String method,
         String path,
         String contentType,
-        String payload,
+        String requestPayload,
         Map<String, String> authHeaders,
         String uploadId,
-        String hostName
+        String hostName,
+        String responsePayload,
+        Map<String, String> additionalResponseHeaders,
+        int statusCode
     ) throws Exception {
 
         // Build request headers
@@ -366,8 +461,14 @@ public class ImpervaSchemaParser {
             requestHeaders.put("host", hostName);
         }
 
-        // Build generic response
+        // Build response headers
         Map<String, String> responseHeaders = new HashMap<>();
+        if (additionalResponseHeaders != null) {
+            responseHeaders.putAll(additionalResponseHeaders);
+        }
+        if (responsePayload != null && !StringUtils.isEmpty(contentType)) {
+            responseHeaders.put("Content-Type", contentType);
+        }
 
         // Create aktoFormat message
         Map<String, String> messageObject = new HashMap<>();
@@ -375,11 +476,11 @@ public class ImpervaSchemaParser {
         messageObject.put(mKeys.path, path);
         messageObject.put(mKeys.method, method.toUpperCase());
         messageObject.put(mKeys.requestHeaders, mapper.writeValueAsString(requestHeaders));
-        messageObject.put(mKeys.requestPayload, payload != null ? payload : "");
+        messageObject.put(mKeys.requestPayload, requestPayload != null ? requestPayload : "");
         messageObject.put(mKeys.responseHeaders, mapper.writeValueAsString(responseHeaders));
-        messageObject.put(mKeys.responsePayload, "");
-        messageObject.put(mKeys.status, "OK");
-        messageObject.put(mKeys.statusCode, "200");
+        messageObject.put(mKeys.responsePayload, responsePayload != null ? responsePayload : "");
+        messageObject.put(mKeys.status, statusCode == 200 ? "OK" : String.valueOf(statusCode));
+        messageObject.put(mKeys.statusCode, String.valueOf(statusCode));
         messageObject.put(mKeys.ip, "null");
         messageObject.put(mKeys.time, Context.now() + "");
         messageObject.put(mKeys.type, "HTTP");
