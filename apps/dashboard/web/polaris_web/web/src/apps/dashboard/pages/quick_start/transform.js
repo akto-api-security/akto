@@ -1417,7 +1417,7 @@ const quickStartFunc = {
             goObj, javaObj, nodejsObj, pythonObj
         ];
 
-       if(func.checkLocal()){
+       if(!func.checkLocal()){
            return {
                "Manual": manual
            }

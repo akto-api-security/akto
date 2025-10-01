@@ -66,6 +66,9 @@ public class ApiCollection {
     String sseCallbackUrl;
     public static final String SSE_CALLBACK_URL = "sseCallbackUrl";
 
+    String mcpTransportType;
+    public static final String MCP_TRANSPORT_TYPE = "mcpTransportType";
+
     private static final List<String> ENV_KEYWORDS_WITH_DOT = Arrays.asList(
         "staging", "preprod", "qa", "demo", "dev", "test", "svc", 
         "localhost", "local", "intranet", "lan", "example", "invalid", 
@@ -437,5 +440,13 @@ public class ApiCollection {
 
     public void setSseCallbackUrl(String sseCallbackUrl) {
         this.sseCallbackUrl = sseCallbackUrl;
+    }
+
+    public String getMcpTransportType() {
+        return mcpTransportType;
+    }
+
+    public void setMcpTransportType(String mcpTransportType) {
+        this.mcpTransportType = mcpTransportType;
     }
 }

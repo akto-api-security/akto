@@ -374,6 +374,13 @@ public class ApiExecutor {
         boolean skipSSRFCheck) throws Exception {
         return sendRequest(request, followRedirects, testingRunConfig, debug, false, testLogs, skipSSRFCheck);
     }
+    
+    // For MCP HTTP transport - skips SSE check
+    public static OriginalHttpResponse sendRequestSkipSse(OriginalHttpRequest request, boolean followRedirects,
+        TestingRunConfig testingRunConfig, boolean debug, List<TestingRunResult.TestLog> testLogs,
+        boolean skipSSRFCheck) throws Exception {
+        return sendRequest(request, followRedirects, testingRunConfig, debug, true, testLogs, skipSSRFCheck);
+    }
 
     private static OriginalHttpResponse sendRequest(OriginalHttpRequest request, boolean followRedirects,
         TestingRunConfig testingRunConfig, boolean debug, boolean jsonRpcCheck, List<TestingRunResult.TestLog> testLogs,
