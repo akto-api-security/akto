@@ -9,7 +9,10 @@ import com.akto.imperva.model.DataTypeDto.ParameterDrillDown;
 import com.akto.open_api.parser.ParserResult;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.util.Pair;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
+import com.fasterxml.jackson.dataformat.yaml.YAMLGenerator;
 import org.apache.commons.lang3.StringUtils;
 
 import java.util.*;
@@ -27,6 +30,26 @@ public class ImpervaSchemaParser {
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(ImpervaSchemaParser.class, LogDb.DASHBOARD);
     private static final ObjectMapper mapper = new ObjectMapper();
+    private static final ObjectMapper yamlMapper = new ObjectMapper(new YAMLFactory().disable(YAMLGenerator.Feature.WRITE_DOC_START_MARKER));
+
+    // Sample value constants
+    private static final String SAMPLE_TOKEN = "sample_token";
+    private static final String SAMPLE_HEADER_VALUE = "sample-header-value";
+    private static final String SAMPLE_COOKIE_VALUE = "sample-cookie-value";
+
+    // Whitelisted content types
+    private static final Set<String> VALID_CONTENT_TYPES = new HashSet<>(Arrays.asList(
+        "application/json",
+        "application/xml",
+        "application/x-www-form-urlencoded",
+        "application/yaml",
+        "application/x-yaml",
+        "application/soap+xml",
+        "text/xml",
+        "text/plain",
+        "text/html",
+        "multipart/form-data"
+    ));
 
     // Message keys for akto format
     private interface mKeys {
@@ -66,11 +89,8 @@ public class ImpervaSchemaParser {
 
             loggerMaker.debugAndAddToDb("Processing Imperva API: " + schema.getMethod() + " " + schema.getResource(), LogDb.DASHBOARD);
 
-            // Parse authentication info
-            Map<String, String> authHeaders = parseAuthenticationInfo(schema.getAuthenticationInfo());
-
             // Extract all request samples
-            uploadLogs = extractRequestSamples(schema, authHeaders, uploadId, useHost, generateMultipleSamples);
+            uploadLogs = extractRequestSamples(schema, uploadId, useHost, generateMultipleSamples);
 
             loggerMaker.infoAndAddToDb("Generated " + uploadLogs.size() + " samples from Imperva schema");
 
@@ -96,7 +116,6 @@ public class ImpervaSchemaParser {
      */
     private static List<SwaggerUploadLog> extractRequestSamples(
         ImpervaSchema schema,
-        Map<String, String> authHeaders,
         String uploadId,
         boolean useHost,
         boolean generateMultipleSamples
@@ -114,14 +133,23 @@ public class ImpervaSchemaParser {
             return logs;
         }
 
-        // Parse request headers once (shared across all content-types)
-        Map<String, String> requestHeaders = parseRequestHeaders(request);
+        // Parse all request headers (includes auth + schema headers)
+        Map<String, String> requestHeaders = parseHeaders(request.getHeaderList(), true);
+        // Add auth headers
+        Map<String, String> authHeaders = parseAuthenticationInfo(schema.getAuthenticationInfo());
+        requestHeaders.putAll(authHeaders);
         loggerMaker.infoAndAddToDb("Parsed " + requestHeaders.size() + " request headers from Imperva schema");
 
         // Iterate through each content-type
         for (Map.Entry<String, ParameterDrillDown[]> entry : request.getContentTypeToRequestBody().entrySet()) {
             String contentType = entry.getKey();
             ParameterDrillDown[] bodyArray = entry.getValue();
+
+            // Validate content-type
+            if (!isValidContentType(contentType)) {
+                loggerMaker.infoAndAddToDb("Skipping invalid/malformed content-type: " + contentType);
+                continue;
+            }
 
             if (bodyArray == null || bodyArray.length == 0) {
                 loggerMaker.infoAndAddToDb("No body parameters found for content-type: " + contentType);
@@ -136,11 +164,16 @@ public class ImpervaSchemaParser {
                 continue;
             }
 
-            // Get matching response for this content-type
-            ResponseDrillDown matchingResponse = getMatchingResponse(schema, contentType);
+            // Get matching response for this content-type (returns headers + body)
+            Pair<Map<String, String>, ParameterDrillDown[]> matchingResponse = getMatchingResponse(schema, contentType);
+
+            Map<String, String> responseHeaders = new HashMap<>();
+            if (matchingResponse != null) {
+                responseHeaders = matchingResponse.getFirst();
+            }
 
             // will need this afterwards
-            
+
             // // Determine if XML/SOAP or JSON
             // if (isXmlContentType(contentType)) {
             //     // XML: Generate samples from children
@@ -155,17 +188,31 @@ public class ImpervaSchemaParser {
             //         matchingResponse
             //     ));
             // }
-            logs.addAll(generateJsonSamples(bodyParam, contentType, method, fullPath, hostName,
-                    authHeaders, requestHeaders, uploadId, matchingResponse));
+            // Generate samples (request/response payloads)
+            List<Pair<String, String>> samples = generateJsonSamples(bodyParam, contentType, matchingResponse);
+
+            // Create upload logs from samples
+            for (Pair<String, String> sample : samples) {
+                try {
+                    SwaggerUploadLog log = createSwaggerUploadLog(
+                        method, fullPath, contentType, sample.getFirst(), requestHeaders,
+                        uploadId, hostName, sample.getSecond(), responseHeaders, 200
+                    );
+                    logs.add(log);
+                } catch (Exception e) {
+                    loggerMaker.errorAndAddToDb(e, "Error creating upload log");
+                }
+            }
         }
 
         return logs;
     }
 
     /**
-     * Gets matching response for the given content-type from 200 responses only.
+     * Gets matching response body for the given content-type from 200 responses only.
+     * Returns Pair<responseHeaders, responseBodyArray>.
      */
-    private static ResponseDrillDown getMatchingResponse(ImpervaSchema schema, String requestContentType) {
+    private static Pair<Map<String, String>, ParameterDrillDown[]> getMatchingResponse(ImpervaSchema schema, String requestContentType) {
         if (schema.getResponses() == null) {
             return null;
         }
@@ -177,11 +224,27 @@ public class ImpervaSchemaParser {
         }
 
         // Check if this response has matching content-type
-        if (response200.getContentTypeToResponseBody().containsKey(requestContentType)) {
-            return response200;
+        if (!response200.getContentTypeToResponseBody().containsKey(requestContentType)) {
+            return null;
         }
 
-        return null;
+        // Parse headers
+        Map<String, String> responseHeaders = parseHeaders(response200.getHeaderList(), false);
+
+        // Get response body
+        ParameterDrillDown[] responseBodyArray = response200.getContentTypeToResponseBody().get(requestContentType);
+
+        return new Pair<>(responseHeaders, responseBodyArray);
+    }
+
+    /**
+     * Validates if content-type is in whitelist.
+     */
+    private static boolean isValidContentType(String contentType) {
+        if (StringUtils.isEmpty(contentType)) {
+            return false;
+        }
+        return VALID_CONTENT_TYPES.contains(contentType);
     }
 
     /**
@@ -279,20 +342,14 @@ public class ImpervaSchemaParser {
     /**
      * For JSON: Generate one sample per element in body's dataTypes array.
      * Each dataTypes element represents a different schema variation.
-     * Now includes response matching.
+     * Returns list of Pair<requestPayload, responsePayload>.
      */
-    private static List<SwaggerUploadLog> generateJsonSamples(
+    private static List<Pair<String, String>> generateJsonSamples(
         ParameterDrillDown bodyParam,
         String contentType,
-        String method,
-        String path,
-        String hostName,
-        Map<String, String> authHeaders,
-        Map<String, String> requestHeaders,
-        String uploadId,
-        ResponseDrillDown matchingResponse
+        Pair<Map<String, String>, ParameterDrillDown[]> matchingResponse
     ) {
-        List<SwaggerUploadLog> logs = new ArrayList<>();
+        List<Pair<String, String>> samples = new ArrayList<>();
 
         loggerMaker.infoAndAddToDb("Generating " + bodyParam.getDataTypes().length + " JSON samples from dataTypes array");
 
@@ -312,11 +369,10 @@ public class ImpervaSchemaParser {
                     requestPayload = mapper.writeValueAsString(sampleData);
                 }
 
-                // Extract response if available
+                // Extract response payload if available
                 String responsePayload = null;
-                Map<String, String> responseHeaders = new HashMap<>();
-                if (matchingResponse != null && matchingResponse.getContentTypeToResponseBody() != null) {
-                    ParameterDrillDown[] responseBodyArray = matchingResponse.getContentTypeToResponseBody().get(contentType);
+                if (matchingResponse != null) {
+                    ParameterDrillDown[] responseBodyArray = matchingResponse.getSecond();
                     if (responseBodyArray != null && responseBodyArray.length > 0) {
                         ParameterDrillDown responseBody = responseBodyArray[0];
                         if (responseBody.getDataTypes() != null && responseBody.getDataTypes().length > 0) {
@@ -333,19 +389,15 @@ public class ImpervaSchemaParser {
                     }
                 }
 
-                // Create SwaggerUploadLog entry
-                SwaggerUploadLog log = createSwaggerUploadLog(
-                    method, path, contentType, requestPayload, authHeaders, uploadId, hostName,
-                    responsePayload, responseHeaders, 200
-                );
-                logs.add(log);
+                // Create pair of request and response payloads
+                samples.add(new Pair<>(requestPayload, responsePayload));
 
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb(e, "Error generating JSON sample");
             }
         }
 
-        return logs;
+        return samples;
     }
 
     /**
@@ -416,16 +468,16 @@ public class ImpervaSchemaParser {
         String path,
         String contentType,
         String requestPayload,
-        Map<String, String> authHeaders,
+        Map<String, String> mergedRequestHeaders,
         String uploadId,
         String hostName,
         String responsePayload,
-        Map<String, String> additionalResponseHeaders,
+        Map<String, String> parsedResponseHeaders,
         int statusCode
     ) throws Exception {
 
-        // Build request headers
-        Map<String, String> requestHeaders = new HashMap<>(authHeaders);
+        // Add standard request headers
+        Map<String, String> requestHeaders = new HashMap<>(mergedRequestHeaders);
         requestHeaders.put("Content-Type", contentType);
         if (!StringUtils.isEmpty(hostName)) {
             requestHeaders.put("host", hostName);
@@ -433,8 +485,8 @@ public class ImpervaSchemaParser {
 
         // Build response headers
         Map<String, String> responseHeaders = new HashMap<>();
-        if (additionalResponseHeaders != null) {
-            responseHeaders.putAll(additionalResponseHeaders);
+        if (parsedResponseHeaders != null) {
+            responseHeaders.putAll(parsedResponseHeaders);
         }
         if (responsePayload != null && !StringUtils.isEmpty(contentType)) {
             responseHeaders.put("Content-Type", contentType);
@@ -488,9 +540,8 @@ public class ImpervaSchemaParser {
                         // Extract header key from format: http-req-header-<header-key>
                         if (authLocation.startsWith("http-req-header-")) {
                             String headerKey = authLocation.substring("http-req-header-".length());
-                            // Capitalize first letter for standard header format
                             if (!StringUtils.isEmpty(headerKey)) {
-                                authHeaders.put(headerKey, "sample_token");
+                                authHeaders.put(headerKey, SAMPLE_TOKEN);
                             }
                         }
                     }
@@ -504,31 +555,30 @@ public class ImpervaSchemaParser {
     }
 
     /**
-     * Parses request headers from RequestDrillDown.
-     * Handles both static and dynamic header values.
+     * Parses headers from HeaderDto array.
+     * @param headerList Array of headers to parse
+     * @param isRequest true for request headers, false for response headers
      */
-    private static Map<String, String> parseRequestHeaders(RequestDrillDown request) {
+    private static Map<String, String> parseHeaders(HeaderDto[] headerList, boolean isRequest) {
         Map<String, String> headers = new HashMap<>();
 
-        if (request == null || request.getHeaderList() == null) {
+        if (headerList == null) {
             return headers;
         }
 
         try {
-            for (HeaderDto header : request.getHeaderList()) {
+            for (HeaderDto header : headerList) {
                 if (header == null || StringUtils.isEmpty(header.getKey())) {
                     continue;
                 }
 
                 // Handle different header types
                 if ("COOKIE".equalsIgnoreCase(header.getType())) {
-                    // Parse cookies
                     String cookieValue = parseCookies(header);
                     if (!StringUtils.isEmpty(cookieValue)) {
-                        headers.put("Cookie", cookieValue);
+                        headers.put(isRequest ? "Cookie" : "Set-Cookie", cookieValue);
                     }
                 } else {
-                    // Regular HEADER type
                     String headerValue = getHeaderValue(header);
                     if (!StringUtils.isEmpty(headerValue)) {
                         headers.put(header.getKey(), headerValue);
@@ -536,46 +586,7 @@ public class ImpervaSchemaParser {
                 }
             }
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(e, "Error parsing request headers: " + e.getMessage());
-        }
-
-        return headers;
-    }
-
-    /**
-     * Parses response headers from ResponseDrillDown.
-     */
-    private static Map<String, String> parseResponseHeaders(ResponseDrillDown response) {
-        Map<String, String> headers = new HashMap<>();
-
-        if (response == null || response.getHeaderList() == null) {
-            return headers;
-        }
-
-        try {
-            for (HeaderDto header : response.getHeaderList()) {
-                if (header == null || StringUtils.isEmpty(header.getKey())) {
-                    continue;
-                }
-
-                // Handle different header types
-                if ("COOKIE".equalsIgnoreCase(header.getType())) {
-                    // For response, cookies typically use Set-Cookie header
-                    String cookieValue = parseCookies(header);
-                    if (!StringUtils.isEmpty(cookieValue)) {
-                        // Note: Multiple Set-Cookie headers might exist, but we're simplifying here
-                        headers.put("Set-Cookie", cookieValue);
-                    }
-                } else {
-                    // Regular HEADER type
-                    String headerValue = getHeaderValue(header);
-                    if (!StringUtils.isEmpty(headerValue)) {
-                        headers.put(header.getKey(), headerValue);
-                    }
-                }
-            }
-        } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(e, "Error parsing response headers: " + e.getMessage());
+            loggerMaker.errorAndAddToDb(e, "Error parsing headers: " + e.getMessage());
         }
 
         return headers;
@@ -602,10 +613,10 @@ public class ImpervaSchemaParser {
             }
 
             // Default sample value
-            return "sample-header-value";
+            return SAMPLE_HEADER_VALUE;
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error getting header value for key: " + header.getKey());
-            return "sample-header-value";
+            return SAMPLE_HEADER_VALUE;
         }
     }
 
@@ -641,10 +652,10 @@ public class ImpervaSchemaParser {
                     if (sample != null) {
                         cookieStr.append(sample.toString());
                     } else {
-                        cookieStr.append("sample-cookie-value");
+                        cookieStr.append(SAMPLE_COOKIE_VALUE);
                     }
                 } else {
-                    cookieStr.append("sample-cookie-value");
+                    cookieStr.append(SAMPLE_COOKIE_VALUE);
                 }
             }
 
@@ -729,47 +740,11 @@ public class ImpervaSchemaParser {
      */
     private static String generateYamlString(Object data) {
         try {
-            return convertToYaml(data, 0);
+            return yamlMapper.writeValueAsString(data);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error generating YAML: " + e.getMessage());
             return "";
         }
-    }
-
-    @SuppressWarnings("unchecked")
-    private static String convertToYaml(Object data, int indent) {
-        StringBuilder indentBuilder = new StringBuilder();
-        for (int i = 0; i < indent; i++) {
-            indentBuilder.append("  ");
-        }
-        String indentStr = indentBuilder.toString();
-
-        if (data instanceof Map) {
-            Map<String, Object> mapData = (Map<String, Object>) data;
-            StringBuilder yaml = new StringBuilder();
-            for (Map.Entry<String, Object> entry : mapData.entrySet()) {
-                yaml.append(indentStr).append(entry.getKey()).append(": ");
-                if (entry.getValue() instanceof Map || entry.getValue() instanceof List) {
-                    yaml.append("\n").append(convertToYaml(entry.getValue(), indent + 1));
-                } else {
-                    yaml.append(entry.getValue()).append("\n");
-                }
-            }
-            return yaml.toString();
-        } else if (data instanceof List) {
-            List<Object> listData = (List<Object>) data;
-            StringBuilder yaml = new StringBuilder();
-            for (Object item : listData) {
-                yaml.append(indentStr).append("- ");
-                if (item instanceof Map || item instanceof List) {
-                    yaml.append("\n").append(convertToYaml(item, indent + 1));
-                } else {
-                    yaml.append(item).append("\n");
-                }
-            }
-            return yaml.toString();
-        }
-        return data != null ? data.toString() : "";
     }
 
     /**
