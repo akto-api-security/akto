@@ -172,24 +172,8 @@ public class ImpervaSchemaParser {
                 responseHeaders = matchingResponse.getFirst();
             }
 
-            // will need this afterwards
-
-            // // Determine if XML/SOAP or JSON
-            // if (isXmlContentType(contentType)) {
-            //     // XML: Generate samples from children
-            //     logs.addAll(generateXmlSamples(
-            //         bodyParam, contentType, method, fullPath, hostName, authHeaders, uploadId,
-            //         generateMultipleSamples, matchingResponse
-            //     ));
-            // } else {
-            //     // JSON: Generate samples from dataTypes array
-            //     logs.addAll(generateJsonSamples(
-            //         bodyParam, contentType, method, fullPath, hostName, authHeaders, uploadId,
-            //         matchingResponse
-            //     ));
-            // }
             // Generate samples (request/response payloads)
-            List<Pair<String, String>> samples = generateJsonSamples(bodyParam, contentType, matchingResponse);
+            List<Pair<String, String>> samples = generateSamples(bodyParam, contentType, matchingResponse);
 
             // Create upload logs from samples
             for (Pair<String, String> sample : samples) {
@@ -257,147 +241,78 @@ public class ImpervaSchemaParser {
         );
     }
 
-    /**
-     * For XML:
-     * - If generateMultipleSamples=true: Generate one sample per child in the children array (old logic)
-     * - If generateMultipleSamples=false: Generate one merged sample with all children (new logic)
-     */
-    private static List<SwaggerUploadLog> generateXmlSamples(
-        ParameterDrillDown bodyParam,
-        String contentType,
-        String method,
-        String path,
-        String hostName,
-        Map<String, String> authHeaders,
-        String uploadId,
-        boolean generateMultipleSamples,
-        ResponseDrillDown matchingResponse
-    ) {
-        List<SwaggerUploadLog> logs = new ArrayList<>();
-
-        // Get first dataType (should be Object)
-        DataTypeDto bodyDataType = bodyParam.getDataTypes()[0];
-
-        if (bodyDataType.getChildren() == null || bodyDataType.getChildren().length == 0) {
-            loggerMaker.infoAndAddToDb("No children found in XML body dataType");
-            return logs;
-        }
-
-        if (generateMultipleSamples) {
-            // OLD LOGIC: One sample per child
-            loggerMaker.infoAndAddToDb("Generating " + bodyDataType.getChildren().length + " XML samples from children (old logic)");
-
-            for (ParameterDrillDown child : bodyDataType.getChildren()) {
-                try {
-                    Object sampleData = generateSampleForChild(child);
-                    String requestPayload = generateXmlString(sampleData);
-
-                    SwaggerUploadLog log = createSwaggerUploadLog(
-                        method, path, contentType, requestPayload, authHeaders, uploadId, hostName,
-                        null, null, 200
-                    );
-                    logs.add(log);
-
-                } catch (Exception e) {
-                    loggerMaker.errorAndAddToDb(e, "Error generating XML sample for child: " + child.getName());
-                }
-            }
-        } else {
-            // NEW LOGIC: One merged sample with all children
-            loggerMaker.infoAndAddToDb("Generating 1 merged XML sample with all children (new logic)");
-
-            try {
-                // Generate merged sample with all children
-                Object mergedSample = generateSampleFromDataType(bodyDataType);
-                String requestPayload = generateXmlString(mergedSample);
-
-                // Extract response if available
-                String responsePayload = null;
-                Map<String, String> responseHeaders = new HashMap<>();
-                if (matchingResponse != null && matchingResponse.getContentTypeToResponseBody() != null) {
-                    ParameterDrillDown[] responseBodyArray = matchingResponse.getContentTypeToResponseBody().get(contentType);
-                    if (responseBodyArray != null && responseBodyArray.length > 0) {
-                        ParameterDrillDown responseBody = responseBodyArray[0];
-                        if (responseBody.getDataTypes() != null && responseBody.getDataTypes().length > 0) {
-                            Object responseSample = generateSampleFromDataType(responseBody.getDataTypes()[0]);
-                            responsePayload = generateXmlString(responseSample);
-                        }
-                    }
-                }
-
-                SwaggerUploadLog log = createSwaggerUploadLog(
-                    method, path, contentType, requestPayload, authHeaders, uploadId, hostName,
-                    responsePayload, responseHeaders, 200
-                );
-                logs.add(log);
-
-            } catch (Exception e) {
-                loggerMaker.errorAndAddToDb(e, "Error generating merged XML sample");
-            }
-        }
-
-        return logs;
-    }
 
     /**
-     * For JSON: Generate one sample per element in body's dataTypes array.
-     * Each dataTypes element represents a different schema variation.
+     * Unified sample generation for all content-types.
+     * Iterates through dataTypes array - each element is a separate sample.
      * Returns list of Pair<requestPayload, responsePayload>.
      */
-    private static List<Pair<String, String>> generateJsonSamples(
+    private static List<Pair<String, String>> generateSamples(
         ParameterDrillDown bodyParam,
         String contentType,
         Pair<Map<String, String>, ParameterDrillDown[]> matchingResponse
     ) {
         List<Pair<String, String>> samples = new ArrayList<>();
 
-        loggerMaker.infoAndAddToDb("Generating " + bodyParam.getDataTypes().length + " JSON samples from dataTypes array");
+        loggerMaker.infoAndAddToDb("Generating " + bodyParam.getDataTypes().length + " samples from dataTypes array");
 
-        // Each element in dataTypes array is a separate sample
         for (DataTypeDto dataType : bodyParam.getDataTypes()) {
             try {
                 // Generate request sample including all children of this dataType
                 Object sampleData = generateSampleFromDataType(dataType);
+                String requestPayload = generatePayloadString(sampleData, contentType);
 
-                String requestPayload;
-                if (contentType.contains("yaml")) {
-                    requestPayload = generateYamlString(sampleData);
-                } else if (contentType.contains("x-www-form-urlencoded")) {
-                    requestPayload = generateFormUrlencodedString(sampleData);
-                } else {
-                    // Default to JSON
-                    requestPayload = mapper.writeValueAsString(sampleData);
-                }
+                // Generate response payload if available
+                String responsePayload = generateResponsePayload(matchingResponse, contentType);
 
-                // Extract response payload if available
-                String responsePayload = null;
-                if (matchingResponse != null) {
-                    ParameterDrillDown[] responseBodyArray = matchingResponse.getSecond();
-                    if (responseBodyArray != null && responseBodyArray.length > 0) {
-                        ParameterDrillDown responseBody = responseBodyArray[0];
-                        if (responseBody.getDataTypes() != null && responseBody.getDataTypes().length > 0) {
-                            Object responseSample = generateSampleFromDataType(responseBody.getDataTypes()[0]);
-
-                            if (contentType.contains("yaml")) {
-                                responsePayload = generateYamlString(responseSample);
-                            } else if (contentType.contains("x-www-form-urlencoded")) {
-                                responsePayload = generateFormUrlencodedString(responseSample);
-                            } else {
-                                responsePayload = mapper.writeValueAsString(responseSample);
-                            }
-                        }
-                    }
-                }
-
-                // Create pair of request and response payloads
                 samples.add(new Pair<>(requestPayload, responsePayload));
 
             } catch (Exception e) {
-                loggerMaker.errorAndAddToDb(e, "Error generating JSON sample");
+                loggerMaker.errorAndAddToDb(e, "Error generating sample");
             }
         }
 
         return samples;
+    }
+
+    /**
+     * Generates payload string based on content-type.
+     */
+    private static String generatePayloadString(Object sampleData, String contentType) throws Exception {
+        if (isXmlContentType(contentType)) {
+            return generateXmlString(sampleData);
+        } else if (contentType.contains("yaml")) {
+            return generateYamlString(sampleData);
+        } else if (contentType.contains("x-www-form-urlencoded")) {
+            return generateFormUrlencodedString(sampleData);
+        } else {
+            return mapper.writeValueAsString(sampleData);
+        }
+    }
+
+    /**
+     * Generates response payload from matching response.
+     */
+    private static String generateResponsePayload(
+        Pair<Map<String, String>, ParameterDrillDown[]> matchingResponse,
+        String contentType
+    ) throws Exception {
+        if (matchingResponse == null) {
+            return null;
+        }
+
+        ParameterDrillDown[] responseBodyArray = matchingResponse.getSecond();
+        if (responseBodyArray == null || responseBodyArray.length == 0) {
+            return null;
+        }
+
+        ParameterDrillDown responseBody = responseBodyArray[0];
+        if (responseBody.getDataTypes() == null || responseBody.getDataTypes().length == 0) {
+            return null;
+        }
+
+        Object responseSample = generateSampleFromDataType(responseBody.getDataTypes()[0]);
+        return generatePayloadString(responseSample, contentType);
     }
 
     /**
