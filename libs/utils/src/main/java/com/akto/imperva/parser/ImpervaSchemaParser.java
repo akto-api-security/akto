@@ -428,13 +428,13 @@ public class ImpervaSchemaParser {
                 return arrayData;
 
             case "string":
-                return "sample-string";
+                return "sample_string";
             case "number":
                 return 123;
             case "boolean":
                 return true;
             default:
-                return "sample-value";
+                return "sample_value";
         }
     }
 
@@ -520,8 +520,7 @@ public class ImpervaSchemaParser {
                             String headerKey = authLocation.substring("http-req-header-".length());
                             // Capitalize first letter for standard header format
                             if (!StringUtils.isEmpty(headerKey)) {
-                                String formattedHeaderKey = capitalizeHeaderKey(headerKey);
-                                authHeaders.put(formattedHeaderKey, "sample-token");
+                                authHeaders.put(headerKey, "sample_token");
                             }
                         }
                     }
@@ -532,34 +531,6 @@ public class ImpervaSchemaParser {
         }
 
         return authHeaders;
-    }
-
-    /**
-     * Capitalizes header key properly.
-     * Example: "authorization" -> "Authorization", "x-api-key" -> "X-Api-Key"
-     */
-    private static String capitalizeHeaderKey(String headerKey) {
-        if (StringUtils.isEmpty(headerKey)) {
-            return headerKey;
-        }
-
-        String[] parts = headerKey.split("-");
-        StringBuilder result = new StringBuilder();
-
-        for (int i = 0; i < parts.length; i++) {
-            if (i > 0) {
-                result.append("-");
-            }
-            String part = parts[i];
-            if (!StringUtils.isEmpty(part)) {
-                result.append(Character.toUpperCase(part.charAt(0)));
-                if (part.length() > 1) {
-                    result.append(part.substring(1).toLowerCase());
-                }
-            }
-        }
-
-        return result.toString();
     }
 
     /**
