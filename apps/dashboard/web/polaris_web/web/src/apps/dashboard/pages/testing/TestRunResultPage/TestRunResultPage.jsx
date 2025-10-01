@@ -76,6 +76,8 @@ function TestRunResultPage(props) {
   const [remediation, setRemediation] = useState("")
   const hostNameMap = PersistStore(state => state.hostNameMap)
 
+  const [conversations, setConversations] = useState([])
+
   const useFlyout = location.pathname.includes("test-editor") ? false : true
 
   const setToastConfig = Store(state => state.setToastConfig)
@@ -137,6 +139,13 @@ function TestRunResultPage(props) {
         let res = await api.fetchIssueFromTestRunResultDetails(hexId2)
         runIssues = res.runIssues;
       }
+
+      let res = await api.fetchConversationsFromTestRunResultHexId(hexId2)
+      const conversations = res?.conversations;
+      if(conversations != null) {
+        setConversations(conversations)
+      }
+
       setShowDetails(true)
     }
     setData(testingRunResult, runIssues);
@@ -256,6 +265,7 @@ function TestRunResultPage(props) {
       showDetails={showDetails}
       isIssuePage={location.pathname.includes("issues")}
       azureBoardsWorkItemUrl={azureBoardsWorkItemUrl}
+      conversations={conversations}
     />
     </>
     :

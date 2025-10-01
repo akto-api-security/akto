@@ -17,6 +17,7 @@ import WelcomeBackDetailsModal from "../components/WelcomeBackDetailsModal";
 import useTable from "../components/tables/TableContext";
 import threatDetectionRequests from "./threat_detection/api";
 import SessionStore from "../../main/SessionStore";
+import { updateThreatFiltersStore } from "./threat_detection/utils/threatFilters";
 
 function Dashboard() {
 
@@ -80,21 +81,7 @@ function Dashboard() {
         const category = PersistStore.getState().dashboardCategory;
         const shortHand = category.split(" ")[0].toLowerCase();
         threatDetectionRequests.fetchFilterYamlTemplate().then((res) => {
-            const maps = { mcp: {}, gen: {}, api: {} };
-            res.templates.forEach((x) => {
-                let trimmed = {...x, content: '', ...x.info}
-                const name = trimmed?.category?.name?.toLowerCase();
-                delete trimmed['info']
-
-                if(name?.includes("mcp")) {
-                    maps.mcp[x.id] = trimmed;
-                } else if (name?.includes("gen")){
-                    maps.gen[x.id] = trimmed;
-                }else {
-                    maps.api[x.id] = trimmed;
-                }
-            })
-            setThreatFiltersMap(maps[shortHand])
+            updateThreatFiltersStore(res?.templates || [], shortHand)
             
         })
     }

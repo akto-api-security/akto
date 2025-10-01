@@ -169,7 +169,7 @@ const headers = [
         title: "Out of Testing scope",
         text: 'Out of Testing scope',
         value: 'outOfTestingScopeComp',
-        isText: CellType.TEXT,
+        textValue: 'isOutOfTestingScope',
         filterKey: 'isOutOfTestingScope',
         tooltipContent: 'Whether the collection is excluded from testing '
     }
@@ -527,7 +527,8 @@ function ApiCollections(props) {
                     disableClick: true,
                     deactivated: false,
                     collapsibleRow: untrackedApiDataMap[collection.id] ?
-                        transform.getUntrackedApisCollapsibleRow(untrackedApiDataMap[collection.id]) : null
+                        transform.getUntrackedApisCollapsibleRow(untrackedApiDataMap[collection.id]) : null,
+                    collapsibleRowText: untrackedApiDataMap[collection.id] ? untrackedApiDataMap[collection.id].map(x => x.url).join(", ") : null
                 } : null;
             })
             .filter(Boolean);
@@ -553,6 +554,13 @@ function ApiCollections(props) {
             }
             
             // Update sensitive info if available
+            if(sensitiveResponse == null || sensitiveResponse === undefined){
+                sensitiveResponse = {
+                    sensitiveUrlsInResponse: lastFetchedSensitiveResp?.sensitiveUrls || 0,
+                    sensitiveSubtypesInCollection: lastFetchedSensitiveResp?.sensitiveInfoMap || {}
+                }
+                
+            }
             if (sensitiveResponse) {
                 const newSensitiveInfo = {
                     sensitiveUrls: sensitiveResponse.sensitiveUrlsInResponse,
@@ -676,12 +684,21 @@ function ApiCollections(props) {
             }
 
             let headerTextToValueMap = Object.fromEntries(headers.map(x => [x.text, x.isText === CellType.TEXT ? x.value : x.textValue]).filter(x => x[0]?.length > 0));
+            if(tableSelectedTab === "untracked"){
+                headerTextToValueMap['URLs'] = "collapsibleRowText"
+            }
             let csv = Object.keys(headerTextToValueMap).join(",") + "\r\n"
-            data['all'].forEach(i => {
-                if(selectedResources.length === 0 || selectedResourcesSet.has(i.id)){
+            
+            if(selectedResources.length === 0){
+                data[tableSelectedTab].forEach(i => {
                     csv += Object.values(headerTextToValueMap).map(h => wrapCsvValue(i[h])).join(",") + "\r\n"
-                }
-            })
+                })
+            }else{
+                data[tableSelectedTab].filter((i) => selectedResourcesSet.has(i.id)).forEach(i => {
+                    csv += Object.values(headerTextToValueMap).map(h => wrapCsvValue(i[h])).join(",") + "\r\n"
+                })
+            }
+
             let blob = new Blob([csv], {
                 type: "application/csvcharset=UTF-8"
             });

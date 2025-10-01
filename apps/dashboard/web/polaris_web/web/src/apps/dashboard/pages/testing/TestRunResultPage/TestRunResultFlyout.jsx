@@ -19,11 +19,12 @@ import settingFunctions from '../../settings/module.js'
 import JiraTicketCreationModal from '../../../components/shared/JiraTicketCreationModal.jsx'
 import MarkdownViewer from '../../../components/shared/MarkdownViewer.jsx'
 import InlineEditableText from '../../../components/shared/InlineEditableText.jsx'
+import ChatInterface from '../../../components/shared/ChatInterface.jsx'
 
 function TestRunResultFlyout(props) {
 
 
-    const { selectedTestRunResult, loading, issueDetails ,getDescriptionText, infoState, createJiraTicket, jiraIssueUrl, showDetails, setShowDetails, isIssuePage, remediationSrc, azureBoardsWorkItemUrl} = props
+    const { selectedTestRunResult, loading, issueDetails ,getDescriptionText, infoState, createJiraTicket, jiraIssueUrl, showDetails, setShowDetails, isIssuePage, remediationSrc, azureBoardsWorkItemUrl, conversations} = props
     const [remediationText, setRemediationText] = useState("")
     const [fullDescription, setFullDescription] = useState(false)
     const [rowItems, setRowItems] = useState([])
@@ -486,6 +487,15 @@ function TestRunResultFlyout(props) {
             </Box>
         );
     });
+
+    const conversationTab = useMemo(() => {
+        if (typeof selectedTestRunResult !== "object") return null;
+        return {
+            id: 'evidence',
+            content: "Evidence",
+            component: <ChatInterface conversations={conversations} />
+        }
+    }, [selectedTestRunResult, conversations])
     
     const ValuesTab = useMemo(() => {
         if (typeof selectedTestRunResult !== "object") return null;
@@ -495,6 +505,8 @@ function TestRunResultFlyout(props) {
             component: <ValuesTabContent />
         }
     }, [selectedTestRunResult, dataExpired, issueDetails, refreshFlag])
+
+    const finalResultTab = selectedTestRunResult?.conversationId != null && conversations?.length > 0 ? conversationTab : ValuesTab
 
     function RowComp ({cardObj}){
         const {title, value, tooltipContent} = cardObj
@@ -606,12 +618,12 @@ function TestRunResultFlyout(props) {
         </Box>
     }
 
-    const attemptTab = !selectedTestRunResult.testResults ? errorTab : ValuesTab
+    const attemptTab = !selectedTestRunResult.testResults ? errorTab : finalResultTab
 
     const tabsComponent = (
         <LayoutWithTabs
             key={issueDetails?.id}
-            tabs={issueDetails?.id ? [overviewTab,timelineTab,ValuesTab, remediationTab].filter(Boolean): [attemptTab]}
+            tabs={issueDetails?.id ? [overviewTab,timelineTab,finalResultTab, remediationTab].filter(Boolean): [attemptTab]}
             currTab = {() => {}}
         />
     )

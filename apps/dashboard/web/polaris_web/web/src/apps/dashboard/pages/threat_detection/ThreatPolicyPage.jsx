@@ -14,7 +14,7 @@ function ThreatPolicyPage() {
     const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), initialVal);
 
     const horizontalComponent = <HorizontalGrid columns={1} gap={2}>
-        <FilterComponent key={"filter-component"} excludeCategoryNameEquals={"SuccessfulExploit"}/>
+        <FilterComponent key={"filter-component"} excludeCategoryNameEquals={"SuccessfulExploit"} showDelete={true}/>
     </HorizontalGrid>
 
     const components = [
