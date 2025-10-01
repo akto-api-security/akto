@@ -22,8 +22,29 @@
 }
 
 .input-gpt .Polaris-TextField{
-    height: 4vh;
+    height: 5vh;
     font-size: 14px !important;
+}
+
+.input-dropdown .Polaris-TextField {
+    height: fit-content !important;
+    font-size: 12px !important;
+}
+
+.input-dropdown .Polaris-TextField__Backdrop {
+    border-radius: 4px !important;
+}
+
+.input-dropdown .Polaris-TextField__Suffix {
+    margin: 0px !important;
+}
+
+.Polaris-TextField__Input--suffixed {
+    padding-left: 4px !important;
+}
+
+.input-dropdown .Polaris-TextField__Input {
+    width: 140px !important;
 }
 
 .response-message .Polaris-HorizontalStack {

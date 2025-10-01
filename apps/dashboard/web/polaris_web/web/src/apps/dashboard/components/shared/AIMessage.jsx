@@ -1,4 +1,4 @@
-import { Box } from '@shopify/polaris'
+import { Box, HorizontalStack } from '@shopify/polaris'
 import Markdown from 'react-markdown'
 import { useState, useEffect } from 'react'
 
@@ -29,12 +29,9 @@ function AIMessage({ message, isStreaming = false }) {
     }, [message, isStreaming])
 
     return (
-        <Box style={{
-            backgroundColor: '#f8f9fa',
-            padding: '20px'
-        }}>
-            <Box style={{ maxWidth: '800px', margin: '0 auto' }}>
-                <Box style={{ display: 'flex', gap: '12px' }}>
+        <Box padding={"3"} borderRadius="2" background="bg-subdued">
+            <Box maxWidth='800px'>
+                <HorizontalStack gap={"3"}>
                     <Box style={{
                         width: '28px',
                         height: '28px',
@@ -66,7 +63,7 @@ function AIMessage({ message, isStreaming = false }) {
                             }} />
                         )}
                     </Box>
-                </Box>
+                </HorizontalStack>
             </Box>
             <style jsx>{`
                 @keyframes blink {

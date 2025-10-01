@@ -455,6 +455,7 @@ const SampleApi = () => {
                 open={chatBotModal}
                 onClose={() => setChatBotModal(false)}
                 title="Chat with the agent"
+                large
             >
                 <Modal.Section>
                     <ChatContainer />

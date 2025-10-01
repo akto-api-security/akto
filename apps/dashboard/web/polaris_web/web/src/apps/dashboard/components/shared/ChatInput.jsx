@@ -1,15 +1,16 @@
 import { Button, TextField } from '@shopify/polaris'
 import { SendMajor } from '@shopify/polaris-icons'
 import { useState } from 'react'
-import { ModelPicker } from '../../pages/agent_team/components/ModelPicker'
 import { availableModels } from '../../pages/testing/sampleConversations'
+import Dropdown from '../layouts/Dropdown'
 
 function ChatInput({ 
-    onSendMessage
+    onSendMessage,
+    isLoading
 }) {
     const [currentPrompt, setCurrentPrompt] = useState('')
 
-    const [currentModel, setCurrentModel] = useState(null)
+    const [currentModel, setCurrentModel] = useState(availableModels[0].id)
     const [loading, setLoading] = useState(false)
 
     const handleSubmit = () => {
@@ -32,15 +33,27 @@ function ChatInput({
         }
     }
 
+    const getValue = (val) => {
+        return availableModels.filter(c => c.id === val)[0].name
+    }
+
     const modelPicker = (
-        <ModelPicker availableModels={availableModels} selectedModel={currentModel} setSelectedModel={setCurrentModel} />
+        <div className='input-dropdown'>
+            <Dropdown
+                menuItems={availableModels.map((val) => {return {label: val.name, value: val.id}})}
+                initial={currentModel}
+                selected={setCurrentModel}
+                value={getValue(currentModel)}
+            />
+        </div>
+
     )
 
     return (
         <div className='input-gpt'>
             <TextField 
                 suffix={
-                    <Button plain onClick={() => handleSubmit()} onKeyPress={handleKeyPress} icon={SendMajor} loading={loading}/>
+                    <Button plain onClick={() => handleSubmit()} onKeyPress={handleKeyPress} icon={SendMajor} loading={loading || isLoading}/>
                 } 
                 placeholder={"Chat with the agent..."}
                 onChange={(value) => setCurrentPrompt(value)}

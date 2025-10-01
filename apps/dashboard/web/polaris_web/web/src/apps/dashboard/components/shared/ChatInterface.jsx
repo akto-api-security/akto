@@ -17,7 +17,7 @@ function ChatInterface({ conversations }) {
                 ) : (
                     <AIMessage 
                         key={conversation._id} 
-                        message={conversation.content} 
+                        message={conversation.message} 
                         isStreaming={conversation.isStreaming}
                     />
                 )
