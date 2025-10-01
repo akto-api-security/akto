@@ -9,7 +9,6 @@ import com.akto.imperva.model.DataTypeDto.ParameterDrillDown;
 import com.akto.open_api.parser.ParserResult;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.commons.lang3.StringUtils;
 
@@ -44,44 +43,6 @@ public class ImpervaSchemaParser {
         String time = "time";
         String type = "type";
         String source = "source";
-    }
-
-    /**
-     * Converts Imperva JSON schema to Akto format.
-     *
-     * @param impervaJsonString The Imperva schema JSON string
-     * @param uploadId Upload ID for tracking
-     * @param useHost Whether to use the host from schema
-     * @param generateMultipleSamples true = old logic (multiple samples per XML child), false = new logic (merged samples with responses)
-     * @return ParserResult containing parsed data and errors
-     */
-    public static ParserResult convertImpervaSchemaToAkto(String impervaJsonString, String uploadId, boolean useHost, boolean generateMultipleSamples) {
-        List<FileUploadError> fileLevelErrors = new ArrayList<>();
-        List<SwaggerUploadLog> uploadLogs = new ArrayList<>();
-
-        try {
-            // Parse JSON to ImpervaSchema model
-            JsonNode rootNode = mapper.readTree(impervaJsonString);
-            JsonNode dataNode = rootNode.get("data");
-
-            if (dataNode == null) {
-                fileLevelErrors.add(new FileUploadError("Missing 'data' node in Imperva schema", FileUploadError.ErrorType.ERROR));
-                return createErrorResult(fileLevelErrors, uploadLogs);
-            }
-
-            ImpervaSchema schema = mapper.treeToValue(dataNode, ImpervaSchema.class);
-            return convertImpervaSchemaToAkto(schema, uploadId, useHost, generateMultipleSamples);
-
-        } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(e, "Error parsing Imperva schema: " + e.getMessage());
-            fileLevelErrors.add(new FileUploadError("Failed to parse Imperva schema: " + e.getMessage(), FileUploadError.ErrorType.ERROR));
-        }
-
-        ParserResult result = new ParserResult();
-        result.setFileErrors(fileLevelErrors);
-        result.setUploadLogs(uploadLogs);
-        result.setTotalCount(uploadLogs.size());
-        return result;
     }
 
     /**
@@ -174,20 +135,24 @@ public class ImpervaSchemaParser {
             // Get matching response for this content-type
             ResponseDrillDown matchingResponse = getMatchingResponse(schema, contentType);
 
-            // Determine if XML/SOAP or JSON
-            if (isXmlContentType(contentType)) {
-                // XML: Generate samples from children
-                logs.addAll(generateXmlSamples(
-                    bodyParam, contentType, method, fullPath, hostName, authHeaders, uploadId,
-                    generateMultipleSamples, matchingResponse
-                ));
-            } else {
-                // JSON: Generate samples from dataTypes array
-                logs.addAll(generateJsonSamples(
-                    bodyParam, contentType, method, fullPath, hostName, authHeaders, uploadId,
-                    matchingResponse
-                ));
-            }
+            // will need this afterwards
+            
+            // // Determine if XML/SOAP or JSON
+            // if (isXmlContentType(contentType)) {
+            //     // XML: Generate samples from children
+            //     logs.addAll(generateXmlSamples(
+            //         bodyParam, contentType, method, fullPath, hostName, authHeaders, uploadId,
+            //         generateMultipleSamples, matchingResponse
+            //     ));
+            // } else {
+            //     // JSON: Generate samples from dataTypes array
+            //     logs.addAll(generateJsonSamples(
+            //         bodyParam, contentType, method, fullPath, hostName, authHeaders, uploadId,
+            //         matchingResponse
+            //     ));
+            // }
+            logs.addAll(generateJsonSamples(bodyParam, contentType, method, fullPath, hostName,
+                    authHeaders, uploadId, matchingResponse));
         }
 
         return logs;
