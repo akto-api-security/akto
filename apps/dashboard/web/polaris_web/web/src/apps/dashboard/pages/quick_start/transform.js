@@ -1425,21 +1425,14 @@ const quickStartFunc = {
 
         let connectors = {}
 
-        if(isGenAISecurityCategory()){
+        if(isGenAISecurityCategory() || isAgenticSecurityCategory()){
             connectors["AI Agent Scan"] = aiAgentGateways
             connectors["AI Agent Security"] = aiAgentConnectors
             connectors["AI Model Security"] = aiScanConnectors
         }
 
-        if(isMCPSecurityCategory()){
+        if(isMCPSecurityCategory() || isAgenticSecurityCategory()){
             connectors["MCP Scan"] = mcpScan
-        }
-
-        if(isAgenticSecurityCategory()){
-            // Agentic Security gets both MCP and AI Agent connectors
-            connectors["MCP Scan"] = mcpScan
-            connectors["AI Agent Security"] = aiAgentConnectors
-            connectors["AI Model Security"] = aiScanConnectors
         }
 
         if(isApiSecurityCategory()){
@@ -1485,18 +1478,10 @@ const quickStartFunc = {
             apigeeObj, iisObj, azureObj, cloudflareObj, f5Obj, goObj, haproxyObj, javaObj, kongmeshObj, layer7Obj, nodejsObj, openshiftObj, threescaleObj, githubObj, gitlabObj, bitbucketObj, aktoJaxObj
         ]
 
-        if(isGenAISecurityCategory()){
+        if(isGenAISecurityCategory() || isAgenticSecurityCategory()){
             connectorsList = connectorsList.concat([
                 geminiObj, openAIObj, claudeObj, deepseekObj, llamaObj, grokObj, customAIObj,
                 awsBedrockObj, azureAIFoundryObj, databricksObj, googleVertexAIObj, ibmWatsonxObj, customAgentObj, agenticShieldObj
-            ])
-        }
-
-        if(isAgenticSecurityCategory()){
-            // Agentic Security gets all AI/ML connectors plus MCP connectors
-            connectorsList = connectorsList.concat([
-                geminiObj, openAIObj, claudeObj, deepseekObj, llamaObj, grokObj, customAIObj,
-                awsBedrockObj, azureAIFoundryObj, databricksObj, googleVertexAIObj, ibmWatsonxObj, customAgentObj
             ])
         }
 
