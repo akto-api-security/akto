@@ -22,6 +22,7 @@ import McpProxy from "./components/McpProxy"
 import AwsLogAccountComponent from "./components/shared/AwsLogAccountComponent"
 import McpGateway from "./McpGateway"
 import AIAgentsGateway from "./AIAgentsGateway"
+import ImpervaImport from "./components/ImpervaImport"
 
 const mirroringObj = {
     icon: '/public/aws.svg',
@@ -593,6 +594,15 @@ const openApiObj = {
     docsUrl: 'https://docs.akto.io/traffic-connector/manual/openapi',
     component: <OpenApiSource/>,
     key: "OPENAPI"
+}
+
+const impervaImportObj = {
+    icon: '/public/openApi.svg',
+    label: 'Imperva Import',
+    text: 'Upload Imperva specification file to Akto to create an API inventory.',
+    docsUrl: 'https://docs.akto.io/traffic-connector/manual/imperva',
+    component: <ImpervaImport/>,
+    key: "IMPERVA_IMPORT"
 }
 
 const wsdlApiObj = {
@@ -1386,7 +1396,7 @@ const quickStartFunc = {
 
         // Manual
         const manual = [
-            burpObj, postmanObj, harFileUploadObj, openApiObj, wsdlApiObj, graphqlApiIObj
+            burpObj, postmanObj, harFileUploadObj, openApiObj, wsdlApiObj, graphqlApiIObj, impervaImportObj
         ];
 
         // Crawler
@@ -1466,13 +1476,13 @@ const quickStartFunc = {
     getConnectorsList: function () {
 
         if(func.checkLocal()){
-            return [burpObj, postmanObj, openApiObj, harFileUploadObj]
+            return [burpObj, postmanObj, openApiObj, harFileUploadObj, impervaImportObj]
         }
 
         // Combine all categories into connectorsList
         let connectorsList = [
             gcpObj, kubernetesObj, fargateObj, nginxObj, burpObj, postmanObj,
-            openApiObj, beanStalkObj, eksObj, dockerObj, envoyObj, mcpScanObj, mcpProxyObj, mcpGateway, mcpWrapperObj,
+            openApiObj, beanStalkObj, eksObj, dockerObj, envoyObj, mcpScanObj, mcpProxyObj, mcpGateway, mcpWrapperObj, impervaImportObj,
             harFileUploadObj, kongObj, tcpObj, mirroringObj, hybridSaasObj, apiInventoryFromSourceCodeObj,
             ebpfObj, ebpfMTLSObj, istioObj, pythonObj, awsApiGatewayObj, awsLambdaObj,
             apigeeObj, iisObj, azureObj, cloudflareObj, f5Obj, goObj, haproxyObj, javaObj, kongmeshObj, layer7Obj, nodejsObj, openshiftObj, threescaleObj, githubObj, gitlabObj, bitbucketObj, aktoJaxObj
