@@ -14,8 +14,14 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import com.fasterxml.jackson.dataformat.yaml.YAMLGenerator;
 import org.apache.commons.lang3.StringUtils;
+import com.akto.open_api.parser.Parser.mKeys;
+import org.apache.http.NameValuePair;
+import org.apache.http.client.utils.URLEncodedUtils;
+import org.apache.http.message.BasicNameValuePair;
 
+import java.nio.charset.StandardCharsets;
 import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * Parser for Imperva API schema JSON format.
@@ -50,23 +56,6 @@ public class ImpervaSchemaParser {
         "text/html",
         "multipart/form-data"
     ));
-
-    // Message keys for akto format
-    private interface mKeys {
-        String akto_account_id = "akto_account_id";
-        String path = "path";
-        String method = "method";
-        String requestHeaders = "requestHeaders";
-        String requestPayload = "requestPayload";
-        String responseHeaders = "responseHeaders";
-        String responsePayload = "responsePayload";
-        String status = "status";
-        String statusCode = "statusCode";
-        String ip = "ip";
-        String time = "time";
-        String type = "type";
-        String source = "source";
-    }
 
     /**
      * Converts ImpervaSchema object to Akto format.
@@ -663,26 +652,28 @@ public class ImpervaSchemaParser {
     }
 
     /**
-     * Form URL encoded string generation from object data.
+     * Form URL encoded string generation from object data using Apache HttpClient.
      */
-    @SuppressWarnings("unchecked")
     private static String generateFormUrlencodedString(Object data) {
+        if (!(data instanceof Map)) {
+            return "";
+        }
+    
         try {
-            if (data instanceof Map) {
-                Map<String, Object> mapData = (Map<String, Object>) data;
-                StringBuilder sb = new StringBuilder();
-                for (Map.Entry<String, Object> entry : mapData.entrySet()) {
-                    if (sb.length() > 0) {
-                        sb.append("&");
-                    }
-                    sb.append(entry.getKey()).append("=").append(entry.getValue());
-                }
-                return java.net.URLEncoder.encode(sb.toString(), "UTF-8");
-            }
+            Map<?, ?> rawMap = (Map<?, ?>) data;
+            List<NameValuePair> params = rawMap.entrySet().stream()
+                    .filter(entry -> entry.getKey() instanceof String && entry.getValue() != null)
+                    .map(entry -> new BasicNameValuePair(
+                            (String) entry.getKey(),
+                            entry.getValue().toString()
+                    ))
+                    .collect(Collectors.toList());
+    
+            return URLEncodedUtils.format(params, StandardCharsets.UTF_8);
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error generating form urlencoded: " + e.getMessage());
+            return "";
         }
-        return "";
     }
 
     /**
