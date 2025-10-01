@@ -33,23 +33,25 @@ public class ImpervaImportAction extends UserAction {
     private static final LoggerMaker loggerMaker = new LoggerMaker(ImpervaImportAction.class, LogDb.DASHBOARD);
     private static final ExecutorService executorService = Executors.newFixedThreadPool(1);
     private static final ObjectMapper objectMapper = new ObjectMapper();
+    private static final int MAX_10_MB = 10 * 1024 * 1024;
 
     // String input field
     private String impervaString;
     private boolean generateMultipleSamples = false; // false = new logic (merged samples with responses), true = old logic (multiple samples)
 
     // Response fields
-    private int totalCount;
-    private List<FileUploadError> errors;
-    private List<SwaggerUploadLog> uploadLogs;
     private String message;
-    private String fileId;
 
     @Override
     public String execute() {
         try {
             if (impervaString == null || impervaString.trim().isEmpty()) {
-                addActionError("Imperva data is required");
+                addActionError("Empty file uploaded");
+                return ERROR.toUpperCase();
+            }
+
+            if (impervaString.length() > MAX_10_MB) {
+                addActionError("Upload file should be less than 10 MB");
                 return ERROR.toUpperCase();
             }
 
@@ -167,20 +169,16 @@ public class ImpervaImportAction extends UserAction {
     /**
      * Parses Imperva JSON string to ImpervaSchema object
      */
-    private ImpervaSchema parseImpervaJson(String impervaJsonString) {
-        try {
-            JsonNode rootNode = objectMapper.readTree(impervaJsonString);
+    private ImpervaSchema parseImpervaJson(String impervaJsonString) throws Exception {
+        JsonNode rootNode = objectMapper.readTree(impervaJsonString);
             JsonNode dataNode = rootNode.get("data");
             if (dataNode == null) {
-                loggerMaker.errorAndAddToDb("Missing 'data' node in Imperva JSON", LogDb.DASHBOARD);
-                return null;
+                String errorMessage = "Missing 'data' node in Imperva JSON";
+                addActionError(errorMessage);
+                throw new Exception(errorMessage);
             }
             ImpervaSchema schema = objectMapper.treeToValue(dataNode, ImpervaSchema.class);
             return schema;
-        } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(e, "Error parsing Imperva JSON: " + e.getMessage());
-            return null;
-        }
     }
 
 }
