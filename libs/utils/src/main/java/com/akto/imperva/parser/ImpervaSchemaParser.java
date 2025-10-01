@@ -200,10 +200,11 @@ public class ImpervaSchemaParser {
      * Checks if content-type is XML or SOAP based.
      */
     private static boolean isXmlContentType(String contentType) {
-        return contentType != null && (
-            contentType.contains("xml") ||
-            contentType.contains("soap")
-        );
+        // return contentType != null && (
+        //     contentType.contains("xml") ||
+        //     contentType.contains("soap")
+        // );
+        return false;
     }
 
 
