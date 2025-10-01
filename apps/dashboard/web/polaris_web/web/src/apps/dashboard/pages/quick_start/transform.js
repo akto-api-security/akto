@@ -597,7 +597,7 @@ const openApiObj = {
 }
 
 const impervaImportObj = {
-    icon: '/public/openApi.svg',
+    icon: '/public/imperva.svg',
     label: 'Imperva Import',
     text: 'Upload Imperva specification file to Akto to create an API inventory.',
     docsUrl: 'https://docs.akto.io/traffic-connector/manual/imperva',
