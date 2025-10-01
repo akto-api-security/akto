@@ -38,12 +38,11 @@ public class ImpervaSchemaParser {
     private static final ObjectMapper mapper = new ObjectMapper();
     private static final ObjectMapper yamlMapper = new ObjectMapper(new YAMLFactory().disable(YAMLGenerator.Feature.WRITE_DOC_START_MARKER));
 
-    // Sample value constants
     private static final String SAMPLE_TOKEN = "sample_token";
-    private static final String SAMPLE_HEADER_VALUE = "sample-header-value";
-    private static final String SAMPLE_COOKIE_VALUE = "sample-cookie-value";
+    private static final String SAMPLE_HEADER_VALUE = "sample_header_value";
+    private static final String SAMPLE_COOKIE_VALUE = "sample_cookie_value";
+    private static final String SAMPLE_QUERY_PARAM_VALUE = "sample_query_value";
 
-    // Whitelisted content types
     private static final Set<String> VALID_CONTENT_TYPES = new HashSet<>(Arrays.asList(
         "application/json",
         "application/xml",
@@ -57,15 +56,6 @@ public class ImpervaSchemaParser {
         "multipart/form-data"
     ));
 
-    /**
-     * Converts ImpervaSchema object to Akto format.
-     *
-     * @param schema The ImpervaSchema object
-     * @param uploadId Upload ID for tracking
-     * @param useHost Whether to use the host from schema
-     * @param generateMultipleSamples true = old logic (multiple samples per XML child), false = new logic (merged samples with responses)
-     * @return ParserResult containing parsed data and errors
-     */
     public static ParserResult convertImpervaSchemaToAkto(ImpervaSchema schema, String uploadId, boolean useHost, boolean generateMultipleSamples) {
         List<FileUploadError> fileLevelErrors = new ArrayList<>();
         List<SwaggerUploadLog> uploadLogs = new ArrayList<>();
@@ -95,14 +85,6 @@ public class ImpervaSchemaParser {
         return result;
     }
 
-    /**
-     * Extracts all request samples from Imperva schema.
-     *
-     * For XML/SOAP:
-     *   - If generateMultipleSamples=true: Creates one sample per child in the children array (old logic)
-     *   - If generateMultipleSamples=false: Creates one merged sample with all children (new logic)
-     * For JSON: Creates one sample per element in body's dataTypes array
-     */
     private static List<SwaggerUploadLog> extractRequestSamples(
         ImpervaSchema schema,
         String uploadId,
@@ -122,19 +104,17 @@ public class ImpervaSchemaParser {
             return logs;
         }
 
-        // Parse all request headers (includes auth + schema headers)
         Map<String, String> requestHeaders = parseHeaders(request.getHeaderList(), true);
-        // Add auth headers
         Map<String, String> authHeaders = parseAuthenticationInfo(schema.getAuthenticationInfo());
         requestHeaders.putAll(authHeaders);
         loggerMaker.infoAndAddToDb("Parsed " + requestHeaders.size() + " request headers from Imperva schema");
 
-        // Iterate through each content-type
+        fullPath = appendQueryParamsToPath(fullPath, request.getQueryParamList());
+
         for (Map.Entry<String, ParameterDrillDown[]> entry : request.getContentTypeToRequestBody().entrySet()) {
             String contentType = entry.getKey();
             ParameterDrillDown[] bodyArray = entry.getValue();
 
-            // Validate content-type
             if (!isValidContentType(contentType)) {
                 loggerMaker.infoAndAddToDb("Skipping invalid/malformed content-type: " + contentType);
                 continue;
@@ -181,10 +161,6 @@ public class ImpervaSchemaParser {
         return logs;
     }
 
-    /**
-     * Gets matching response body for the given content-type from 200 responses only.
-     * Returns Pair<responseHeaders, responseBodyArray>.
-     */
     private static Pair<Map<String, String>, ParameterDrillDown[]> getMatchingResponse(ImpervaSchema schema, String requestContentType) {
         if (schema.getResponses() == null) {
             return null;
@@ -231,11 +207,6 @@ public class ImpervaSchemaParser {
     }
 
 
-    /**
-     * Unified sample generation for all content-types.
-     * Iterates through dataTypes array - each element is a separate sample.
-     * Returns list of Pair<requestPayload, responsePayload>.
-     */
     private static List<Pair<String, String>> generateSamples(
         ParameterDrillDown bodyParam,
         String contentType,
@@ -264,9 +235,6 @@ public class ImpervaSchemaParser {
         return samples;
     }
 
-    /**
-     * Generates payload string based on content-type.
-     */
     private static String generatePayloadString(Object sampleData, String contentType) throws Exception {
         if (isXmlContentType(contentType)) {
             return generateXmlString(sampleData);
@@ -279,9 +247,6 @@ public class ImpervaSchemaParser {
         }
     }
 
-    /**
-     * Generates response payload from matching response.
-     */
     private static String generateResponsePayload(
         Pair<Map<String, String>, ParameterDrillDown[]> matchingResponse,
         String contentType
@@ -304,24 +269,6 @@ public class ImpervaSchemaParser {
         return generatePayloadString(responseSample, contentType);
     }
 
-    /**
-     * Generates sample data for a single child (used for XML).
-     * Returns a Map with the child as the root element.
-     */
-    private static Object generateSampleForChild(ParameterDrillDown child) {
-        Map<String, Object> result = new LinkedHashMap<>();
-
-        if (child.getName() != null && child.getDataTypes() != null && child.getDataTypes().length > 0) {
-            Object childValue = generateSampleFromDataType(child.getDataTypes()[0]);
-            result.put(child.getName(), childValue);
-        }
-
-        return result;
-    }
-
-    /**
-     * Recursively generates sample from DataTypeDto (includes all children).
-     */
     private static Object generateSampleFromDataType(DataTypeDto dataType) {
         if (dataType == null || StringUtils.isEmpty(dataType.getType())) {
             return null;
@@ -364,9 +311,6 @@ public class ImpervaSchemaParser {
         }
     }
 
-    /**
-     * Creates a SwaggerUploadLog entry with the given data.
-     */
     private static SwaggerUploadLog createSwaggerUploadLog(
         String method,
         String path,
@@ -422,11 +366,6 @@ public class ImpervaSchemaParser {
         return log;
     }
 
-    /**
-     * Parses authentication information from Imperva schema.
-     * Auth location format: http-req-header-<header-key>
-     * Example: http-req-header-authorization -> extracts "authorization" as header key
-     */
     private static Map<String, String> parseAuthenticationInfo(AuthenticationInfo authInfo) {
         Map<String, String> authHeaders = new HashMap<>();
 
@@ -458,11 +397,6 @@ public class ImpervaSchemaParser {
         return authHeaders;
     }
 
-    /**
-     * Parses headers from HeaderDto array.
-     * @param headerList Array of headers to parse
-     * @param isRequest true for request headers, false for response headers
-     */
     private static Map<String, String> parseHeaders(HeaderDto[] headerList, boolean isRequest) {
         Map<String, String> headers = new HashMap<>();
 
@@ -496,10 +430,6 @@ public class ImpervaSchemaParser {
         return headers;
     }
 
-    /**
-     * Gets header value from HeaderDto.
-     * Uses static value if available, otherwise generates sample from dataTypes.
-     */
     private static String getHeaderValue(HeaderDto header) {
         try {
             // If header has static value
@@ -524,10 +454,6 @@ public class ImpervaSchemaParser {
         }
     }
 
-    /**
-     * Parses cookies from HeaderDto and formats as Cookie header value.
-     * Format: "key1=value1; key2=value2"
-     */
     private static String parseCookies(HeaderDto header) {
         try {
             if (header.getCookies() == null || header.getCookies().length == 0) {
@@ -570,11 +496,41 @@ public class ImpervaSchemaParser {
         }
     }
 
-    /**
-     * Simple XML string generation.
-     * Handles XML attributes (names starting with '-') properly.
-     * Example: "-xmlns" becomes an attribute: <element xmlns="value">
-     */
+    private static String appendQueryParamsToPath(String path, ParameterDrillDown[] queryParamList) {
+        if (queryParamList == null || queryParamList.length == 0) {
+            return path;
+        }
+    
+        try {
+            List<NameValuePair> params = Arrays.stream(queryParamList)
+                    .filter(Objects::nonNull)
+                    .filter(param -> !StringUtils.isEmpty(param.getName()))
+                    .map(param -> {
+                        String value = SAMPLE_QUERY_PARAM_VALUE;
+    
+                        if (param.getDataTypes() != null && param.getDataTypes().length > 0) {
+                            Object sample = generateSampleFromDataType(param.getDataTypes()[0]);
+                            if (sample != null) {
+                                value = sample.toString();
+                            }
+                        }
+    
+                        return new BasicNameValuePair(param.getName(), value);
+                    })
+                    .collect(Collectors.toList());
+    
+            if (params.isEmpty()) {
+                return path;
+            }
+    
+            String queryString = URLEncodedUtils.format(params, StandardCharsets.UTF_8);
+            return path + "?" + queryString;
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error appending query params to path");
+            return path;
+        }
+    }
+    
     private static String generateXmlString(Object data) {
         if (data instanceof Map) {
             @SuppressWarnings("unchecked")
