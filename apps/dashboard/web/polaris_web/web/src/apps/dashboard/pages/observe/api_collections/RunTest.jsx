@@ -1,5 +1,5 @@
 import { Box, Button, DataTable, Divider, Modal, Text, TextField, Icon, Checkbox, Badge, Banner, HorizontalStack, Link, VerticalStack, Tooltip, Popover, OptionList, ButtonGroup } from "@shopify/polaris";
-import { TickMinor, CancelMajor, SearchMinor, NoteMinor, AppsFilledMajor } from "@shopify/polaris-icons";
+import { TickMinor, CancelMajor, SearchMinor, NoteMinor, AppsFilledMajor, MagicMajor } from "@shopify/polaris-icons";
 import api, { default as observeApi } from "../api";
 import { useEffect, useReducer, useRef, useState } from "react";
 import { default as testingApi } from "../../testing/api";
@@ -16,6 +16,7 @@ import RunTestSuites from "./RunTestSuites";
 import RunTestConfiguration from "./RunTestConfiguration";
 import {createTestName,convertToLowerCaseWithUnderscores} from "./Utils"
 import settingsApi from "../../settings/api";
+import { getDashboardCategory } from "../../../../main/labelHelper";
 
 const initialAutoTicketingDetails = {
     shouldCreateTickets: false,
@@ -100,6 +101,8 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
 
     const [testNameSuiteModal, setTestNameSuiteModal] = useState("")
     const [jiraProjectMap, setJiraProjectMap] = useState(null);
+    const isAgenticCategory = getDashboardCategory() !== 'API Security'
+    const [agenticMode, setAgenticMode] = useState(false)
 
     useEffect(() => {
         if (preActivator) {
@@ -702,6 +705,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
 
     const handleButtonClick = (check) => {
         setTestMode(check);
+        setAgenticMode(false);
     }
 
     // only for configurations
@@ -786,8 +790,9 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                 onClose={toggleRunTest}
                 title={<HorizontalStack gap={4}><Text as="h2" fontWeight="semibold">Configure test</Text>
                     <ButtonGroup segmented>
-                        <Button monochrome pressed={testMode} icon={NoteMinor} onClick={() => handleButtonClick(true)}></Button>
-                        <Button monochrome pressed={!testMode} icon={AppsFilledMajor} onClick={() => handleButtonClick(false)}></Button>
+                        <Button monochrome pressed={testMode && !agenticMode} icon={NoteMinor} onClick={() => handleButtonClick(true)}></Button>
+                        <Button monochrome pressed={!testMode && !agenticMode} icon={AppsFilledMajor} onClick={() => handleButtonClick(false)}></Button>
+                        {isAgenticCategory && <Button monochrome pressed={agenticMode} icon={MagicMajor} onClick={() => {setAgenticMode(true); setTestMode(false)}}></Button>}
                     </ButtonGroup>
                 </HorizontalStack>}
                 primaryAction={{
@@ -810,7 +815,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
 
                 large
 
-                footer={testMode ? null : openConfigurations ? <Button onClick={() => openConfigurationsToggle(false)} plain><Text as="p" fontWeight="regular">Go back to test selection</Text></Button> : <Button onClick={() => openConfigurationsToggle(true)} plain><Text as="p" fontWeight="regular">Change Configurations</Text></Button>}
+                footer={testMode || agenticMode ? null : openConfigurations ? <Button onClick={() => openConfigurationsToggle(false)} plain><Text as="p" fontWeight="regular">Go back to test selection</Text></Button> : <Button onClick={() => openConfigurationsToggle(true)} plain><Text as="p" fontWeight="regular">Change Configurations</Text></Button>}
             >
                 {loading ? <SpinnerCentered /> :
                     testMode ?
@@ -932,7 +937,8 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                             </VerticalStack>
                             <AdvancedSettingsComponent dispatchConditions={dispatchConditions} conditions={conditions} />
 
-                        </Modal.Section> : <Modal.Section>
+                        </Modal.Section> : 
+                        !agenticMode ? <Modal.Section>
                             {!openConfigurations ? <RunTestSuites
                                 testRun={testRun}
                                 setTestRun={setTestRun}
@@ -949,6 +955,23 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                                     <AdvancedSettingsComponent dispatchConditions={dispatchConditions} conditions={conditions} />
                                 </>
                             }
+                        </Modal.Section>
+                        : <Modal.Section>
+                            <VerticalStack gap={"3"}>
+                                <HorizontalStack gap={"3"} align="start" wrap={false}>
+                                    <Text variant="headingMd">Name:</Text>
+                                    <div style={{ width: "60%" }}>
+                                        <TextField
+                                            placeholder="Enter test name"
+                                            value={testRun.testName}
+                                            disabled={activeFromTesting}
+                                            onChange={(testName) => setTestRun(prev => ({ ...prev, testName: testName }))}
+                                        />
+                                    </div>
+                                </HorizontalStack>
+                                {RunTestConfigurationComponent}
+                                <AdvancedSettingsComponent dispatchConditions={dispatchConditions} conditions={conditions} />
+                            </VerticalStack>
                         </Modal.Section>
                 }
             </Modal>
