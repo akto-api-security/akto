@@ -241,7 +241,7 @@ function CategoryWiseScoreGraph({
                         </span>
                     </Text>
                     <Text variant="bodySm" color='subdued'>
-                        <span style={{ color: '#54b074', fontWeight: '500' }}>(✓{passCount}</span>
+                        <span style={{ color: '#54b074', fontWeight: '500' }}>✓{passCount}</span>
                     </Text>
                     <Text variant="bodySm" color='subdued'>
                         <span style={{ color: '#f05352', fontWeight: '500' }}>✗{failCount}</span>
