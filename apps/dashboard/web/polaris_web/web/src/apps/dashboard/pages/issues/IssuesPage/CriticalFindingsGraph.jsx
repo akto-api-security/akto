@@ -55,7 +55,7 @@ const CriticalFindingsGraph = ({ startTimestamp, endTimestamp, linkText, linkUrl
         },
     }
 
-    const runTestEmptyCardComponent = <Text alignment='center' color='subdued'>There’s no data to show. <Link url="/dashboard/testing" target='_blank'>Run test</Link> to get data populated. </Text>
+    const runTestEmptyCardComponent = <Text alignment='center' color='subdued'>There's no data to show. <Link url="/dashboard/testing" target='_blank'>{mapLabel('Run test', getDashboardCategory())}</Link> to get data populated. </Text>
 
     const criticalFindings = (criticalFindingsData && criticalFindingsData.length > 0) ?
     <InfoCard

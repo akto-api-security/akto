@@ -67,7 +67,7 @@ function TestrunsBannerComponent({isInventory,onButtonClick, disabled=false}) {
             videoThumbnail={TESTING_VIDEO_THUMBNAIL}
             bodyComponent={isInventory ? null :<SelectCollectionComponent /> }
             disabled={disabled}
-            {...isInventory ? {buttonText: "Run test", disabled:disabled}: {}}
+            {...isInventory ? {buttonText: mapLabel("Run test", getDashboardCategory()), disabled:disabled}: {}}
             {...isInventory ? {onClick: () => onButtonClick(), disabled:disabled} : {}}
             {...urlsCount === 0 ? {buttonText: "Go to inventory"}: {}} 
             {...urlsCount === 0 ? {buttonUrl: "/dashboard/observe/inventory"}: {}} 

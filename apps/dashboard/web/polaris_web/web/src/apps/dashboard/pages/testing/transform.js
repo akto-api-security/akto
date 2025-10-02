@@ -1136,7 +1136,7 @@ getRowInfo(severity, apiInfo,jiraIssueUrl, sensitiveData, isIgnored, azureBoards
 
 stopTest(hexId){
   api.stopTest(hexId).then((resp) => {
-    func.setToast(true, false, "Test run stopped")
+    func.setToast(true, false, mapLabel("Test", getDashboardCategory()) + " run stopped")
   }).catch((resp) => {
     func.setToast(true, true, "Unable to stop test run")
   });
@@ -1145,7 +1145,7 @@ stopTest(hexId){
 rerunTest(hexId, refreshSummaries, shouldRefresh, selectedTestRunForRerun, testingRunResultSummaryHexId){
   api.rerunTest(hexId, selectedTestRunForRerun, testingRunResultSummaryHexId).then((resp) => {
     window.location.reload()
-    func.setToast(true, false, "Test re-run initiated")
+    func.setToast(true, false, mapLabel("Test", getDashboardCategory()) + " re-run initiated")
     if(shouldRefresh){
       setTimeout(() => {
         refreshSummaries();
@@ -1158,7 +1158,7 @@ rerunTest(hexId, refreshSummaries, shouldRefresh, selectedTestRunForRerun, testi
     if (actionErrors !== null && actionErrors !== undefined && actionErrors.length > 0) {
       additionalMessage = ", " + actionErrors[0]
     }
-    func.setToast(true, true, "Unable to re-run test" + additionalMessage);
+    func.setToast(true, true, "Unable to re-" + mapLabel("run test", getDashboardCategory()) + additionalMessage);
   });
 },
 getActionsList(hexId){

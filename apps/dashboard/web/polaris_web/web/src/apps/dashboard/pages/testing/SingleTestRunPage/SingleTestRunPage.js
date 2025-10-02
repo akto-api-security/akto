@@ -763,7 +763,7 @@ function SingleTestRunPage() {
         ]}
       >
         <Modal.Section>
-          <Text>Are you sure you want to re-calculate issues count? This will recalculate the total number of issues based on the latest test results and may affect the FIXED or IGNORED issues in the current testing run</Text>
+          <Text>{"Are you sure you want to re-calculate issues count? This will recalculate the total number of issues based on the latest" + mapLabel('test results', getDashboardCategory()) + " and may affect the FIXED or IGNORED issues in the current testing run"}</Text>
         </Modal.Section>
       </Modal>
     </>
@@ -1028,7 +1028,7 @@ function SingleTestRunPage() {
     title: 'Edit',
     items: [
       {
-        content: 'Tests',
+        content: mapLabel("More Tests", getDashboardCategory()),
         icon: PlusMinor,
         onAction: () => { setActiveFromTesting(true) }
       },
@@ -1043,7 +1043,7 @@ function SingleTestRunPage() {
     title: 'More',
     items: [
       {
-        content: 'See APIs',
+        content: 'See ' + mapLabel("APIs", getDashboardCategory()),
         icon: ViewMajor,
         onAction: () => { setShowTestingEndpointsModal(true) }
       },

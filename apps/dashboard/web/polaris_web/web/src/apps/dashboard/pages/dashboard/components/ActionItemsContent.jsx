@@ -184,7 +184,7 @@ export const ActionItemsContent = ({ actionItemsData, onCountChange }) => {
 
             createActionItem('10', 'P1', 'Remediate broken authentication issues', `${brokenAuthIssuesCount} authentication-related issues found across tested APIs`, "Development", "High", brokenAuthIssuesCount, ACTION_ITEM_TYPES.BROKEN_AUTHENTICATION_ISSUES, jiraTicketUrlMap, handleJiraIntegration, "Prevents unauthorized access and ensures proper session handling")
             ,
-            createActionItem('11', 'P2', 'Remediate frequently vulnerable endpoints', `${highValueIssuesCount} endpoint surfaced repeatedly in test results - track and prioritize for remediation`, "Security Team", "Low", highValueIssuesCount, ACTION_ITEM_TYPES.FREQUENTLY_VULNERABLE_ENDPOINTS, jiraTicketUrlMap, handleJiraIntegration, "Focuses remediation on APIs with recurring issues"),
+            createActionItem('11', 'P2', 'Remediate frequently vulnerable endpoints', `${highValueIssuesCount} endpoint surfaced repeatedly in ${mapLabel('test results', getDashboardCategory())} - track and prioritize for remediation`, "Security Team", "Low", highValueIssuesCount, ACTION_ITEM_TYPES.FREQUENTLY_VULNERABLE_ENDPOINTS, jiraTicketUrlMap, handleJiraIntegration, "Focuses remediation on APIs with recurring issues"),
 
             createActionItem('12', 'P2', 'Build remediation playbooks for common issues', `${urlsByIssuesTotalCount} common vulnerability types detected that can benefit from standardized remediation steps`, "Security & DevOps", "Low", urlsByIssuesTotalCount, ACTION_ITEM_TYPES.BUILD_REMEDIATION_PLAYBOOKS, jiraTicketUrlMap, handleJiraIntegration, "Reduces response time and improves fix consistency across teams"),
 

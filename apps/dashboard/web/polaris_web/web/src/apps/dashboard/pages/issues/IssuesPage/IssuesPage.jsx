@@ -858,7 +858,7 @@ function IssuesPage() {
                     iconSrc={"/public/alert_hexagon.svg"}
                     headingText={"No issues yet!"}
                     description={"There are currently no issues with your APIs. Haven't run your tests yet? Start testing now to prevent any potential issues."}
-                    buttonText={"Run test"}
+                    buttonText={mapLabel("Run test", getDashboardCategory())}
                     infoItems={infoItems}
                     infoTitle={"Once you have issues:"}
                     learnText={"issues"}
