@@ -86,8 +86,8 @@ const headers = [
         boxWidth: '80px'
     },
     {   
-        title: 'Test coverage',
-        text: 'Test coverage', 
+        title: mapLabel('Test', getDashboardCategory()) + ' coverage',
+        text: mapLabel('Test', getDashboardCategory()) + ' coverage', 
         value: 'coverage',
         isText: CellType.TEXT,
         tooltipContent: (<Text variant="bodySm">Percentage of endpoints tested successfully in the collection</Text>),
@@ -166,8 +166,8 @@ const headers = [
         tooltipContent: 'Description of the collection'
     },
     {
-        title: "Out of Testing scope",
-        text: 'Out of Testing scope',
+        title: "Out of " + mapLabel('Testing', getDashboardCategory()) + " scope",
+        text: 'Out of ' + mapLabel('Testing', getDashboardCategory()) + ' scope',
         value: 'outOfTestingScopeComp',
         textValue: 'isOutOfTestingScope',
         filterKey: 'isOutOfTestingScope',

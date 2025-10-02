@@ -70,8 +70,8 @@ let filters = [
   },
   {
     key: 'isRequest',
-    label: 'API call',
-    title: 'API call',
+    label: mapLabel('API', getDashboardCategory()) + ' call',
+    title: mapLabel('API', getDashboardCategory()) + ' call',
     choices: [
         {
             label:"In request",
@@ -95,15 +95,15 @@ let filters = [
   },
   {
     key: 'collectionIds',
-    label: 'API groups',
-    title: 'API groups',
+    label: mapLabel('API', getDashboardCategory()) + ' groups',
+    title: mapLabel('API', getDashboardCategory()) + ' groups',
     choices: [],
   }
 ]
 
 const resourceName = {
-    singular: 'endpoint with sensitive data',
-    plural: 'endpoints with sensitive data',
+    singular: mapLabel('endpoint', getDashboardCategory()) + ' with sensitive data',
+    plural: mapLabel('endpoints', getDashboardCategory()) + ' with sensitive data',
 };
 
 const convertDataIntoTableFormat = (endpoint, apiCollectionMap) => {
@@ -265,7 +265,7 @@ const primaryActions = (
         <PageWithMultipleCards
         title={
             <Text as="div" variant="headingLg">
-            {`Endpoints with ${subType}` }
+            {`${mapLabel('API endpoints', getDashboardCategory())} with ${subType}` }
           </Text>
         }
         backUrl="/dashboard/observe/sensitive"

@@ -29,7 +29,7 @@ import settingFunctions from "../../settings/module.js";
 import JiraTicketCreationModal from "../../../components/shared/JiraTicketCreationModal.jsx";
 import testingApi from "../../testing/api.js"
 import issuesFunctions from '@/apps/dashboard/pages/issues/module';
-import { isMCPSecurityCategory, isGenAISecurityCategory, isAgenticSecurityCategory } from "../../../../main/labelHelper";
+import { isMCPSecurityCategory, isGenAISecurityCategory, isAgenticSecurityCategory, mapLabel, getDashboardCategory  } from "../../../../main/labelHelper";
 
 const sortOptions = [
     { label: 'Severity', value: 'severity asc', directionLabel: 'Highest', sortKey: 'severity', columnIndex: 2 },
@@ -83,8 +83,8 @@ let filtersOptions = [
     },    
     {
         key: 'collectionIds',
-        label: 'API groups',
-        title: 'API groups',
+        label: mapLabel('Api', getDashboardCategory()) + ' groups',
+        title: mapLabel('Api', getDashboardCategory()) + ' groups',
         choices: [],
     },
     {
@@ -683,7 +683,7 @@ function CompliancePage() {
                     iconSrc={"/public/alert_hexagon.svg"}
                     headingText={"No issues yet!"}
                     description={"There are currently no issues with your APIs. Haven't run your tests yet? Start testing now to prevent any potential issues."}
-                    buttonText={"Run test"}
+                    buttonText={mapLabel("Run test", getDashboardCategory())}
                     infoItems={infoItems}
                     infoTitle={"Once you have issues:"}
                     learnText={"issues"}
