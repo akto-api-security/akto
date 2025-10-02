@@ -2,7 +2,7 @@ import { Box, Text, HorizontalStack, DataTable, VerticalStack } from '@shopify/p
 import ChartypeComponent from './ChartypeComponent';
 import observeFunc from "../../observe/transform";
 import InfoCard from '../../dashboard/new_components/InfoCard';
-import { getDashboardCategory, mapLabel } from '../../../../main/labelHelper';
+import { CATEGORY_AGENTIC_SECURITY, CATEGORY_API_SECURITY, CATEGORY_GEN_AI, CATEGORY_MCP_SECURITY, getDashboardCategory, mapLabel } from '../../../../main/labelHelper';
 import { mcpCategoryTestData, genAICategoryTestData, apiCategoryTestData } from './dummyData';
 import api from '../api';
 import { useState, useEffect } from 'react';
@@ -52,11 +52,13 @@ function CategoryWiseScoreGraph({
         }
         
         switch (dashboardCategory) {
-            case 'MCP Security':
+            case CATEGORY_MCP_SECURITY:
                 return mcpCategoryTestData;
-            case 'Gen AI':
+            case CATEGORY_GEN_AI:
                 return genAICategoryTestData;
-            case 'API Security':
+            case CATEGORY_AGENTIC_SECURITY:
+                return [...mcpCategoryTestData, ...genAICategoryTestData]
+            case CATEGORY_API_SECURITY:
             default:
                 return apiCategoryTestData || [];
         }

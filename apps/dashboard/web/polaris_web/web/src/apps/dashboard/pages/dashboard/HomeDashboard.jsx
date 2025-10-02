@@ -29,7 +29,7 @@ import CriticalFindingsGraph from '../issues/IssuesPage/CriticalFindingsGraph';
 import values from "@/util/values";
 import { ActionItemsContent } from './components/ActionItemsContent';
 import { fetchActionItemsData } from './components/actionItemsTransform';
-import { getDashboardCategory, isMCPSecurityCategory, mapLabel } from '../../../main/labelHelper';
+import { getDashboardCategory, isAgenticSecurityCategory, isMCPSecurityCategory, mapLabel } from '../../../main/labelHelper';
 import GraphMetric from '../../components/GraphMetric';
 import Dropdown from '../../components/layouts/Dropdown';
 
@@ -794,7 +794,7 @@ function HomeDashboard() {
 
     // MCP-only summary items
 
-    if (isMCPSecurityCategory()) {
+    if (isMCPSecurityCategory() || isAgenticSecurityCategory()) {
         const totalRequestsItem = {
             title: 'Total MCP Components',
             data: mcpTotals.mcpTotalApis ?? '-',
@@ -1299,7 +1299,7 @@ function HomeDashboard() {
             {id: 'api-type', component: apisByTypeComponent},
         ]
 
-    if (isMCPSecurityCategory()) {
+    if (isMCPSecurityCategory() || isAgenticSecurityCategory()) {
         gridComponents = [
             {id: 'mcp-api-requests', component: mcpApiRequestsCard},
             {id: 'policy-guardrails', component: policyGuardrailsCard},
@@ -1313,7 +1313,7 @@ function HomeDashboard() {
     }
 
     const gridComponent = (
-        isMCPSecurityCategory() ? (
+        (isMCPSecurityCategory() || isAgenticSecurityCategory()) ? (
             <VerticalStack gap={5}>
                 {/* First row with MCP Components Requests and Policy Guardrails side by side */}
                 <HorizontalGrid gap={5} columns={2}>
