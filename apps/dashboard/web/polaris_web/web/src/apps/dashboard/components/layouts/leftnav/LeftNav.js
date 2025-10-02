@@ -243,7 +243,7 @@ export default function LeftNav() {
                 url: "#",
                 label: (
                     <Text variant="bodyMd" fontWeight="medium">
-                        Test library
+                        {mapLabel("Test library", dashboardCategory)}
                     </Text>
                 ),
                 icon: FinancesMinor,
@@ -255,7 +255,7 @@ export default function LeftNav() {
                 selected: leftNavSelected.includes("_test_library"),
                 subNavigationItems: [
                     {
-                        label: "Tests",
+                        label: mapLabel("More Tests", dashboardCategory),
                         onClick: () => {
                             navigate("/dashboard/test-library/tests");
                             handleSelect("dashboard_test_library_tests");

@@ -64,7 +64,8 @@ export const labelMap = {
     "Tested": "Tested",
     "API Security testing": "API Security testing",
     "tests selected": "tests selected",
-    "testing": "testing"
+    "testing": "testing",
+    "Test library":"Test library"
   },
   "MCP Security": {
     "API Security Posture": "MCP Security Posture",
@@ -133,7 +134,8 @@ export const labelMap = {
     "Tested": "Scanned",
     "API Security testing": "MCP Red teaming",
     "tests selected": "probes selected",
-    "testing": "scanning"
+    "testing": "scanning",
+    "Test library":"Probe library"
   },
   "Gen AI": {
     "API Security Posture": "AI Agent Security Posture",
@@ -199,7 +201,8 @@ export const labelMap = {
     "Tested": "Scanned",
     "API Security testing": "AI Agent Red teaming",
     "tests selected": "probes selected",
-    "testing": "scanning"
+    "testing": "scanning",
+    "Test library":"Probe library"
   },
   "Agentic Security": {
     "API Security Posture": "Agentic Security Posture",
@@ -268,6 +271,7 @@ export const labelMap = {
     "Tested": "Scanned",
     "API Security testing": "Agentic Red teaming",
     "tests selected": "probes selected",
-    "testing": "scanning"
+    "testing": "scanning",
+    "Test library":"Probe library"
   },
 }

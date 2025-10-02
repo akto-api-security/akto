@@ -794,7 +794,7 @@ function HomeDashboard() {
 
     // MCP-only summary items
 
-    if (isMCPSecurityCategory() || isAgenticSecurityCategory()) {
+    if (isMCPSecurityCategory()) {
         const totalRequestsItem = {
             title: 'Total MCP Components',
             data: mcpTotals.mcpTotalApis ?? '-',
@@ -1299,7 +1299,7 @@ function HomeDashboard() {
             {id: 'api-type', component: apisByTypeComponent},
         ]
 
-    if (isMCPSecurityCategory() || isAgenticSecurityCategory()) {
+    if (isMCPSecurityCategory()) {
         gridComponents = [
             {id: 'mcp-api-requests', component: mcpApiRequestsCard},
             {id: 'policy-guardrails', component: policyGuardrailsCard},
@@ -1313,7 +1313,7 @@ function HomeDashboard() {
     }
 
     const gridComponent = (
-        (isMCPSecurityCategory() || isAgenticSecurityCategory()) ? (
+        (isMCPSecurityCategory()) ? (
             <VerticalStack gap={5}>
                 {/* First row with MCP Components Requests and Policy Guardrails side by side */}
                 <HorizontalGrid gap={5} columns={2}>
