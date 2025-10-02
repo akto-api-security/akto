@@ -785,7 +785,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                 activator={runTestRef}
                 open={active || activeFromTesting}
                 onClose={toggleRunTest}
-                title={<HorizontalStack gap={4}><Text as="h2" fontWeight="semibold">Configure test</Text>
+                title={<HorizontalStack gap={4}><Text as="h2" fontWeight="semibold">{ "Configure " + mapLabel("test", getDashboardCategory())}</Text>
                     <ButtonGroup segmented>
                         <Button monochrome pressed={testMode} icon={NoteMinor} onClick={() => handleButtonClick(true)}></Button>
                         <Button monochrome pressed={!testMode} icon={AppsFilledMajor} onClick={() => handleButtonClick(false)}></Button>
@@ -798,7 +798,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
                 }}
                 secondaryActions={[
                     countAllSelectedTests() && testMode ? {
-                        content: `${countAllSelectedTests()} tests selected` ,
+                        content: `${countAllSelectedTests()} ${mapLabel("tests selected", getDashboardCategory())}` ,
                         disabled: true,
                         plain: true,
                     } : null,

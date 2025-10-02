@@ -10,7 +10,7 @@ import func from "../../../../../util/func"
 import transform from "./transform";
 import api from "../api"
 import { CellType } from "../../../components/tables/rows/GithubRow"
-import { getDashboardCategory } from "../../../../main/labelHelper"
+import { getDashboardCategory, mapLabel } from "../../../../main/labelHelper"
 
 
 const sortOptions = [
@@ -69,8 +69,8 @@ function TestSuite() {
     ]
 
     const resourceName = {
-        singular: 'test suite',
-        plural: 'test suites',
+        singular: mapLabel('test', getDashboardCategory()) + ' suite',
+        plural: mapLabel('test', getDashboardCategory()) + ' suites',
     };
 
     const handleRowClick = (data) => {
@@ -221,7 +221,7 @@ function TestSuite() {
             title={
                 <TitleWithInfo
                     tooltipContent={"Create or manage custom test suites by combining tests across categories for simplified test execution and reusability."}
-                    titleText={"Test Suites"}
+                    titleText={mapLabel("Test", getDashboardCategory()) + " Suites"}
                     docsUrl={"https://docs.akto.io/api-security-testing/concepts/test"}
                 />
             }

@@ -118,9 +118,9 @@ const headings = [
         sortActive: true,
     },
     {
-        text: 'Last Tested',
+        text: 'Last ' + mapLabel('Tested', getDashboardCategory()),
         title: <HeadingWithTooltip 
-                title={"Last Tested"}
+                title={"Last " + mapLabel('Tested', getDashboardCategory())}
                 content={"Time when API was last tested successfully."}
             />,
         value: 'lastTestedComp',
