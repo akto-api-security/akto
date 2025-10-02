@@ -233,9 +233,9 @@ export const ActionItemsContent = ({ actionItemsData, onCountChange }) => {
         criticalCardsDataToSet.push({
             id: 'p0-top-public',
             priority: 'P0',
-            staticTitle: 'Top 3 APIs with public exposure',
-            title: 'Top 3 APIs with public exposure',
-            description: 'Top 3 APIs exposing maximum sensitive data',
+            staticTitle: 'Top 3 ' + mapLabel('APIs', getDashboardCategory()) + ' with public exposure',
+            title: 'Top 3 ' + mapLabel('APIs', getDashboardCategory()) + ' with public exposure',
+            description: 'Top 3 ' + mapLabel('APIs', getDashboardCategory()) + ' exposing maximum sensitive data',
             team: 'Security & Development',
             effort: 'High',
             count: topPublicExposedCount,

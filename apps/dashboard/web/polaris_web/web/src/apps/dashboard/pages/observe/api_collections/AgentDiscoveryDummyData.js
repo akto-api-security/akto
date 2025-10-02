@@ -1,3 +1,4 @@
+import { mapLabel, getDashboardCategory } from "../../../../main/labelHelper";
 
 const agentDiscoveryData = {
     "1756781037": {
@@ -447,8 +448,8 @@ const agentDiscoveryData = {
             {
                 id: 'external',
                 label: 'Kite API server',
-                type: 'API Server',
-                description: 'API server',
+                type: mapLabel('Api', getDashboardCategory()) + ' Server',
+                description: mapLabel('Api', getDashboardCategory()) + ' server',
                 x: 700,
                 y: 160,
                 status: 'active',
@@ -481,8 +482,8 @@ const agentDiscoveryData = {
             {
                 id: 'external',
                 label: 'Vulnerable API server',
-                type: 'API Server',
-                description: 'API server',
+                type: mapLabel('Api', getDashboardCategory()) + ' Server',
+                description: mapLabel('Api', getDashboardCategory()) + ' server',
                 x: 700,
                 y: 160,
                 status: 'active',
@@ -515,8 +516,8 @@ const agentDiscoveryData = {
             {
                 id: 'external',
                 label: 'LambdaTest API server',
-                type: 'API Server',
-                description: 'API server',
+                type: mapLabel('Api', getDashboardCategory()) + ' Server',
+                description: mapLabel('Api', getDashboardCategory()) + ' server',
                 x: 700,
                 y: 160,
                 status: 'active',
@@ -549,8 +550,8 @@ const agentDiscoveryData = {
             {
                 id: 'external',
                 label: 'Square API server',
-                type: 'API Server',
-                description: 'API server',
+                type: mapLabel('Api', getDashboardCategory()) + ' Server',
+                description: mapLabel('Api', getDashboardCategory()) + ' server',
                 x: 700,
                 y: 160,
                 status: 'active',
@@ -583,8 +584,8 @@ const agentDiscoveryData = {
             {
                 id: 'external',
                 label: 'Test API server',
-                type: 'API Server',
-                description: 'API server',
+                type: mapLabel('Api', getDashboardCategory()) + ' Server',
+                description: mapLabel('Api', getDashboardCategory()) + ' server',
                 x: 700,
                 y: 160,
                 status: 'active',
@@ -617,8 +618,8 @@ const agentDiscoveryData = {
             {
                 id: 'external',
                 label: 'app.akto.io',
-                type: 'API Server',
-                description: 'API server',
+                type: mapLabel('Api', getDashboardCategory()) + ' Server',
+                description: mapLabel('Api', getDashboardCategory()) + ' server',
                 x: 700,
                 y: 160,
                 status: 'active',
@@ -651,8 +652,8 @@ const agentDiscoveryData = {
             {
                 id: 'external',
                 label: 'Playwright API server',
-                type: 'API Server',
-                description: 'API server',
+                type: mapLabel('Api', getDashboardCategory()) + ' Server',
+                description: mapLabel('Api', getDashboardCategory()) + ' server',
                 x: 700,
                 y: 160,
                 status: 'active',
@@ -686,7 +687,7 @@ const agentDiscoveryData = {
                 id: 'external',
                 label: 'Local file system',
                 type: 'File system',
-                description: 'API server',
+                description: mapLabel('Api', getDashboardCategory()) + ' server',
                 x: 700,
                 y: 160,
                 status: 'active',

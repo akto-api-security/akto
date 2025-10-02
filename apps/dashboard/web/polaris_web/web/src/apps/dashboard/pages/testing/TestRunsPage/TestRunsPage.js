@@ -112,8 +112,8 @@ let filters = [
   },
   {
     key: 'apiCollectionId',
-    label: 'Api collection name',
-    title: 'Api collection name',
+    label: mapLabel('API', getDashboardCategory()) + ' collection name',
+    title: mapLabel('API', getDashboardCategory()) + ' collection name',
     choices: [],
 },
 ]

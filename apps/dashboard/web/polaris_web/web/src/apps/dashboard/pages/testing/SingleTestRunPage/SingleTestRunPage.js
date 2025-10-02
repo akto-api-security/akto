@@ -53,6 +53,7 @@ import RunTest from '../../observe/api_collections/RunTest';
 import TableStore from '../../../components/tables/TableStore'
 import issuesFunctions from '@/apps/dashboard/pages/issues/module';
 import TestingRunEndpointsModal from './TestingRunEndpointsModal';
+import { getDashboardCategory, mapLabel } from '../../../../main/labelHelper';
 
 let sortOptions = [
   { label: 'Severity', value: 'severity asc', directionLabel: 'Highest severity', sortKey: 'total_severity', columnIndex: 3 },
@@ -110,14 +111,14 @@ let filterOptions = [
   },
   {
     key: 'collectionIds',
-    label: 'API groups',
-    title: 'API groups',
+    label: mapLabel('API', getDashboardCategory()) + ' groups',
+    title: mapLabel('API', getDashboardCategory()) + ' groups',
     choices: [],
   },
   {
     key: 'apiNameFilter',
-    label: 'API Name',
-    title: 'API name',
+    label: mapLabel('API', getDashboardCategory()) + ' Name',
+    title: mapLabel('API', getDashboardCategory()) + ' name',
     choices: [],
   }
 ]

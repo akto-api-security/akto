@@ -222,7 +222,7 @@ function ApiDetails(props) {
                 {
                     data: res.result.apiCallStats.sort((a, b) => b.ts - a.ts).map((item) => [item.ts * 60 * 1000, item.count]),
                     color: "",
-                    name: 'API Calls',
+                    name: mapLabel('Api', getDashboardCategory()) + ' Calls',
                 },
             ];
 
@@ -427,7 +427,7 @@ function ApiDetails(props) {
         },
         xAxis: {
             title: {
-                text: 'API Call Frequency',
+                text: mapLabel('Api', getDashboardCategory()) + ' Call Frequency',
                 style: {
                     fontSize: '12px',
                 },
@@ -483,7 +483,7 @@ function ApiDetails(props) {
         xAxis: {
             categories: apiCallDistribution?.[0]?.categories || [],
             title: {
-                text: 'Api Call Count',
+                text: mapLabel('Api', getDashboardCategory()) + ' Call Count',
                 style: { fontSize: '12px' }
             },
             labels: {
@@ -578,7 +578,7 @@ function ApiDetails(props) {
 
     const ApiCallStatsTab = {
         id: 'api-call-stats',
-        content: 'API Call Stats',
+        content: mapLabel('Api', getDashboardCategory()) + ' Call Stats',
         component: 
             <Box paddingBlockStart={'4'}>
                 <HorizontalStack align="end">
@@ -606,7 +606,7 @@ function ApiDetails(props) {
                             color='#6200EA'
                             areaFillHex='true'
                             height='330'
-                            title='API Call Count'
+                            title={mapLabel('Api', getDashboardCategory()) + ' Call Count'}
                             subtitle='Number of API calls over time'
                             defaultChartOptions={defaultChartOptions(false)}
                             backgroundColor='#ffffff'

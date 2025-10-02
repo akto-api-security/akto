@@ -36,6 +36,7 @@ import testingApi from "../../testing/api.js"
 import { saveAs } from 'file-saver'
 import issuesFunctions from '@/apps/dashboard/pages/issues/module';
 import IssuesGraphsGroup from "./IssuesGraphsGroup.jsx";
+import { getDashboardCategory, mapLabel } from "../../../../main/labelHelper.js";
 
 
 const sortOptions = [
@@ -79,8 +80,8 @@ let filtersOptions = [
     },
     {
         key: 'collectionIds',
-        label: 'API groups',
-        title: 'API groups',
+        label: mapLabel('Api', getDashboardCategory()) + ' groups',
+        title: mapLabel('Api', getDashboardCategory()) + ' groups',
         choices: [],
     },
     {
