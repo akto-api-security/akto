@@ -347,7 +347,7 @@ const SummaryCardComponent = () =>{
                     chartSize={190}
                 />
               </HorizontalGrid>
-              {!isApiSecurityCategory() ? (
+              {func.isDemoAccount() && !isApiSecurityCategory() ? (
                 <CategoryWiseScoreGraph 
                   key={"category-score-graph"} 
                   startTimestamp={startTimestamp} 
@@ -355,11 +355,16 @@ const SummaryCardComponent = () =>{
                   dataSource="redteaming"
                 />
               ) : null}
-              <HorizontalGrid columns={2} gap={4}>
-                <ApiCollectionCoverageGraph />
-                <TestRunOverTimeGraph />
-              </HorizontalGrid>
-              <ApisTestedOverTimeGraph />
+                {
+                  func.isDemoAccount() && !isApiSecurityCategory() ? <></> :
+                    <VerticalStack>
+                      <HorizontalGrid columns={2} gap={4}>
+                        <ApiCollectionCoverageGraph />
+                        <TestRunOverTimeGraph />
+                      </HorizontalGrid>
+                      <ApisTestedOverTimeGraph />
+                    </VerticalStack>
+                }
             </VerticalStack>
           </LegacyCard.Subsection>
         </Collapsible>
