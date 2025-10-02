@@ -10,6 +10,7 @@ import PersistStore from "../../../../main/PersistStore";
 import transform from "../../testing/transform";
 import LocalStore from "../../../../main/LocalStorageStore";
 import AdvancedSettingsComponent from "./component/AdvancedSettingsComponent";
+import { mapLabel, getDashboardCategory } from "../../../../main/labelHelper";
 
 import { produce } from "immer"
 import RunTestSuites from "./RunTestSuites";
@@ -330,7 +331,7 @@ function RunTest({ endpoints, filtered, apiCollectionId, disabled, runTestFromOu
 
     const activator = (
         <div ref={runTestRef}>
-            <Button onClick={toggleRunTest} primary disabled={disabled || testRun.selectedCategory.length === 0} ><div data-testid="run_test_button">Run test</div></Button>
+            <Button onClick={toggleRunTest} primary disabled={disabled || testRun.selectedCategory.length === 0} ><div data-testid="run_test_button">{mapLabel('Run test', getDashboardCategory())}</div></Button>
         </div>
     );
 

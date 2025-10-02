@@ -577,7 +577,7 @@ function HomeDashboard() {
         )
     }
 
-    const runTestEmptyCardComponent = <Text alignment='center' color='subdued'>There's no data to show. <Link url="/dashboard/testing" target='_blank'>Run test</Link> to get data populated. </Text>
+    const runTestEmptyCardComponent = <Text alignment='center' color='subdued'>There's no data to show. <Link url="/dashboard/testing" target='_blank'>{mapLabel('Run test', getDashboardCategory())}</Link> to get data populated. </Text>
 
     function mapAccessTypes(apiStats, missingCount, redundantCount, apiTypeMissing) {
         if (!apiStats) return
@@ -813,9 +813,9 @@ function HomeDashboard() {
     const testSummaryCardsList = showTestingComponents ? (
         <InfoCard
             component={<TestSummaryCardsList summaryItems={testSummaryInfo} />}
-            title="Recent Tests"
-            titleToolTip="View details of recent API security tests, APIs tested and number of issues found of last 7 days."
-            linkText="Increase test coverage"
+            title={"Recent " + mapLabel("Tests", getDashboardCategory())}
+            titleToolTip={"View details of recent" + mapLabel("API security tests", getDashboardCategory()) + ", APIs tested and number of issues found of last 7 days."}
+            linkText={"Increase " + mapLabel("test coverage", getDashboardCategory())}
             linkUrl="/dashboard/testing"
         />
     ) : null

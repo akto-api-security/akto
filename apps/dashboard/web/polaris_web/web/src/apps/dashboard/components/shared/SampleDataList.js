@@ -9,6 +9,7 @@ import {
 import SampleDataComponent from './SampleDataComponent';
 import SampleData from './SampleData';
 import func from '../../../../util/func';
+import { getDashboardCategory, mapLabel } from '../../../main/labelHelper';
 
 function SchemaValidationError({ sampleData}) {
     if (!sampleData || !sampleData?.metadata) {
@@ -59,7 +60,7 @@ function SampleDataList(props) {
           </HorizontalStack>
         <Pagination
                 label={
-                  sampleData?.length==0 ? 'No test runs found' :
+                  sampleData?.length==0 ? 'No ' + mapLabel("Test runs", getDashboardCategory()) + " found" :
                   `${page+1} of ${sampleData?.length}`
                 }
                 hasPrevious = {page > 0}
