@@ -240,23 +240,13 @@ function CategoryWiseScoreGraph({
                             {executedTotal === 0 ? '0%' : `${primaryRate}%`} {executedTotal === 0 ? 'No data' : primaryLabel}
                         </span>
                     </Text>
-                </HorizontalStack>
-                
-                {/* Detailed breakdown with visual indicators */}
-                <HorizontalStack gap="3">
                     <Text variant="bodySm" color='subdued'>
                         <span style={{ color: '#54b074', fontWeight: '500' }}>✓{passCount}</span>
                     </Text>
                     <Text variant="bodySm" color='subdued'>
                         <span style={{ color: '#f05352', fontWeight: '500' }}>✗{failCount}</span>
                     </Text>
-                    {/* Skip count commented out for now */}
-                    {/* {statusLabels.hasSkip && skipCount > 0 && (
-                        <Text variant="bodySm" color='subdued'>
-                            <span style={{ color: '#ffa500', fontWeight: '500' }}>⊘{skipCount}</span>
-                        </Text>
-                    )} */}
-            </HorizontalStack>
+                </HorizontalStack>
             </VerticalStack>
         ];
     });
