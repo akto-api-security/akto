@@ -145,6 +145,17 @@ public class UsersCollectionsList {
                     Filters.elemMatch(ApiCollection.TAGS_STRING, Filters.eq(CollectionTags.KEY_NAME, Constants.AKTO_GEN_AI_TAG))
                 );
                 break;
+            case AGENTIC:
+                // For agentic context, include both MCP and GenAI collections
+                // This should only be used when user has full agentic access (both limits configured)
+                finalFilter = Filters.and(
+                    Filters.exists(ApiCollection.TAGS_STRING),
+                    Filters.or(
+                        Filters.elemMatch(ApiCollection.TAGS_STRING, Filters.eq(CollectionTags.KEY_NAME, Constants.AKTO_MCP_SERVER_TAG)),
+                        Filters.elemMatch(ApiCollection.TAGS_STRING, Filters.eq(CollectionTags.KEY_NAME, Constants.AKTO_GEN_AI_TAG))
+                    )
+                );
+                break;
             default:
                 break;
         }
