@@ -562,7 +562,8 @@ public class ApiExecutor {
 
         if (payload == null) payload = "";
         if (body == null) {// body not created by GRPC block yet
-            if (request.getHeaders().containsKey("charset")) {
+            // Create body with null MediaType for JSON-RPC requests to prevent OkHttp from adding charset parameter
+            if (request.getHeaders().containsKey("charset") || isJsonRpcRequest(request)) {
                 body = RequestBody.create(payload, null);
                 request.getHeaders().remove("charset");
             } else {
@@ -662,6 +663,13 @@ public class ApiExecutor {
             Thread.sleep(100);
         }
         throw new Exception("Timeout waiting for SSE message with id=" + id);
+    }
+
+
+    public static OriginalHttpResponse sendRequestSkipSse(OriginalHttpRequest request, boolean followRedirects,
+                                                          TestingRunConfig testingRunConfig, boolean debug, List<TestingRunResult.TestLog> testLogs,
+                                                          boolean skipSSRFCheck) throws Exception {
+        return sendRequest(request, followRedirects, testingRunConfig, debug, testLogs, skipSSRFCheck, true);
     }
 
     public static OriginalHttpResponse sendRequestWithSse(OriginalHttpRequest request, boolean followRedirects,

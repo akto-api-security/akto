@@ -74,6 +74,14 @@ public class ApiCollectionsDao extends AccountsContextDao<ApiCollection> {
         return apiCollectionsMap;
     }
 
+    public void updateTransportType(ApiCollection apiCollection, String transportType) {
+        Bson filter = Filters.eq(ApiCollection.ID, apiCollection.getId());
+        Bson update = Updates.set(ApiCollection.MCP_TRANSPORT_TYPE, transportType);
+        ApiCollectionsDao.instance.updateOne(filter, update);
+        apiCollection.setMcpTransportType(transportType);
+    }
+
+
     public List<ApiCollection> getMetaAll() {
         return ApiCollectionsDao.instance.findAll(new BasicDBObject(), Projections.exclude("urls"));
     }

@@ -1,5 +1,6 @@
 package com.akto.data_actor;
 
+import com.akto.dao.ApiCollectionsDao;
 import com.akto.dto.*;
 import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.dto.billing.Organization;
@@ -68,6 +69,11 @@ public class DbActor extends DataActor {
 
     public void updateApiCollectionNameForVxlan(int vxlanId, String name) {
         DbLayer.updateApiCollectionName(vxlanId, name);
+    }
+
+    @Override
+    public void updateTransportType(int apiCollectionId, String transportType) {
+        ApiCollectionsDao.instance.updateTransportType(ApiCollectionsDao.instance.getMeta(apiCollectionId), transportType);
     }
 
     public APIConfig fetchApiConfig(String configName) {
