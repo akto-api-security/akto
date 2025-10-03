@@ -94,7 +94,6 @@ function SequencesFlow({ apiCollectionId }) {
     try {
       setLoading(true);
       const response = await api.getApiSequences(apiCollectionId);
-      console.log('API Response:', response);
       if (response && Array.isArray(response.apiSequences) && response.apiSequences.length > 0) {
         setApiSequences(response.apiSequences);
         renderSequencesGraph(response.apiSequences);

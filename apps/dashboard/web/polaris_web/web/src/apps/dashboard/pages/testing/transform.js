@@ -24,6 +24,7 @@ import LocalStore from "../../../main/LocalStorageStore";
 import GetPrettifyEndpoint from "@/apps/dashboard/pages/observe/GetPrettifyEndpoint";
 import JiraTicketDisplay from "../../components/shared/JiraTicketDisplay";
 import { getMethod } from "../observe/GetPrettifyEndpoint";
+import { getDashboardCategory, mapLabel } from "../../../main/labelHelper";
 
 let headers = [
     {
@@ -52,7 +53,7 @@ let headers = [
       tooltipContent: "CWE tags associated with the test from akto's test library"
     },
     {
-      title: 'Number of urls',
+      title: 'Number of ' + mapLabel('URLs', getDashboardCategory()),
       value: 'totalUrls',
       type: CellType.TEXT
     },
@@ -1011,9 +1012,10 @@ getPrettifiedTestRunResults(testRunResults){
 getTestingRunResultUrl(testingResult){
   let urlString = testingResult.url
   const methodObj = func.toMethodUrlObject(urlString)
+  const finalMethod = getMethod(methodObj.url, methodObj.method);
   const truncatedUrl = observeFunc.getTruncatedUrl(methodObj.url)
   
-  return methodObj.method + " " + truncatedUrl
+  return finalMethod + " " + truncatedUrl
   
 },
 getRowInfo(severity, apiInfo,jiraIssueUrl, sensitiveData, isIgnored, azureBoardsWorkItemUrl){
@@ -1085,11 +1087,10 @@ getRowInfo(severity, apiInfo,jiraIssueUrl, sensitiveData, isIgnored, azureBoards
       tooltipContent: "Severity of the test run result"
     },
     {
-      title: "API",
+      title: mapLabel('API', getDashboardCategory()),
       value: (
         <HorizontalStack gap={"1"}>
-          <Text color="subdued" fontWeight="semibold">{apiInfo.id.method}</Text>
-          <TextComp value={observeFunc.getTruncatedUrl(apiInfo.id.url)} />
+          <GetPrettifyEndpoint method={apiInfo.id.method} url={apiInfo.id.url} />
         </HorizontalStack>
       ),
       tooltipContent: "Name of the api on which test is run"
@@ -1135,7 +1136,7 @@ getRowInfo(severity, apiInfo,jiraIssueUrl, sensitiveData, isIgnored, azureBoards
 
 stopTest(hexId){
   api.stopTest(hexId).then((resp) => {
-    func.setToast(true, false, "Test run stopped")
+    func.setToast(true, false, mapLabel("Test", getDashboardCategory()) + " run stopped")
   }).catch((resp) => {
     func.setToast(true, true, "Unable to stop test run")
   });
@@ -1144,7 +1145,7 @@ stopTest(hexId){
 rerunTest(hexId, refreshSummaries, shouldRefresh, selectedTestRunForRerun, testingRunResultSummaryHexId){
   api.rerunTest(hexId, selectedTestRunForRerun, testingRunResultSummaryHexId).then((resp) => {
     window.location.reload()
-    func.setToast(true, false, "Test re-run initiated")
+    func.setToast(true, false, mapLabel("Test", getDashboardCategory()) + " re-run initiated")
     if(shouldRefresh){
       setTimeout(() => {
         refreshSummaries();
@@ -1157,7 +1158,7 @@ rerunTest(hexId, refreshSummaries, shouldRefresh, selectedTestRunForRerun, testi
     if (actionErrors !== null && actionErrors !== undefined && actionErrors.length > 0) {
       additionalMessage = ", " + actionErrors[0]
     }
-    func.setToast(true, true, "Unable to re-run test" + additionalMessage);
+    func.setToast(true, true, "Unable to re-" + mapLabel("run test", getDashboardCategory()) + additionalMessage);
   });
 },
 getActionsList(hexId){

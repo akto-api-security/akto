@@ -13,11 +13,11 @@ function SummaryTable({testingRunResultSummaries, setSummary}) {
 
     const headers = [
         {
-            title: 'Test started',
+            title: mapLabel("Test", getDashboardCategory()) + " started",
             value: 'startTime',
         },
         {
-            title: 'Results count',
+            title: mapLabel("Results", getDashboardCategory()) + " count",
             value: 'testResultsCount'
         },
         {

@@ -2,7 +2,7 @@ import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleC
 import { Text, Button, IndexFiltersMode, Box, Popover, ActionList, ResourceItem, Avatar,  HorizontalStack, Icon} from "@shopify/polaris"
 import MCPIcon from "@/assets/MCP_Icon.svg"
 import LaptopIcon from "@/assets/Laptop.svg"
-import { HideMinor, ViewMinor,FileMinor } from '@shopify/polaris-icons';
+import { HideMinor, ViewMinor,FileMinor, AutomationMajor, MagicMajor } from '@shopify/polaris-icons';
 import api from "../api"
 import dashboardApi from "../../dashboard/api"
 import settingRequests from "../../settings/api"
@@ -35,7 +35,7 @@ import ReactFlow, {
   
   } from 'react-flow-renderer';
 import SetUserEnvPopupComponent from "./component/SetUserEnvPopupComponent";
-import { getDashboardCategory, mapLabel, isMCPSecurityCategory } from "../../../../main/labelHelper";
+import { getDashboardCategory, mapLabel, isMCPSecurityCategory, isAgenticSecurityCategory, isGenAISecurityCategory } from "../../../../main/labelHelper";
   
 const CenterViewType = {
     Table: 0,
@@ -45,7 +45,7 @@ const CenterViewType = {
 
 
 const headers = [
-    ...(isMCPSecurityCategory() && window.ACTIVE_ACCOUNT === 1669322524 ? [{
+    ...((isMCPSecurityCategory() || isAgenticSecurityCategory()) && func.isDemoAccount() ? [{
         title: "",
         text: "",
         value: "iconComp",
@@ -86,8 +86,8 @@ const headers = [
         boxWidth: '80px'
     },
     {   
-        title: 'Test coverage',
-        text: 'Test coverage', 
+        title: mapLabel('Test', getDashboardCategory()) + ' coverage',
+        text: mapLabel('Test', getDashboardCategory()) + ' coverage', 
         value: 'coverage',
         isText: CellType.TEXT,
         tooltipContent: (<Text variant="bodySm">Percentage of endpoints tested successfully in the collection</Text>),
@@ -166,8 +166,8 @@ const headers = [
         tooltipContent: 'Description of the collection'
     },
     {
-        title: "Out of Testing scope",
-        text: 'Out of Testing scope',
+        title: "Out of " + mapLabel('Testing', getDashboardCategory()) + " scope",
+        text: 'Out of ' + mapLabel('Testing', getDashboardCategory()) + ' scope',
         value: 'outOfTestingScopeComp',
         textValue: 'isOutOfTestingScope',
         filterKey: 'isOutOfTestingScope',
@@ -213,14 +213,18 @@ const convertToNewData = (collectionsArr, sensitiveInfoMap, severityInfoMap, cov
             c.rowStatus = 'critical'
             c.disableClick = true
         }
+        const tagsList = JSON.stringify(c?.tagsList || "")
         return{
             ...c,
             icon: CircleTickMajor,
             nextUrl: "/dashboard/observe/inventory/"+ c.id,
             envTypeOriginal: c?.envType,
             envType: c?.envType?.map(func.formatCollectionType),
-            ...(isMCPSecurityCategory() && window.ACTIVE_ACCOUNT === 1669322524 ? {
+            ...((isMCPSecurityCategory() || isAgenticSecurityCategory()) && func.isDemoAccount() && tagsList.includes("mcp-server") ? {
                 iconComp: (<Box><img src={c.displayName?.toLowerCase().startsWith('mcp') ? MCPIcon : LaptopIcon} alt="icon" style={{width: '24px', height: '24px'}} /></Box>)
+            } : {}),
+            ...((isGenAISecurityCategory() || isAgenticSecurityCategory()) && func.isDemoAccount() && tagsList.includes("gen-ai") ? {
+                iconComp: (<Box><Icon source={tagsList.includes("AI Agent") ? AutomationMajor : MagicMajor} color={"base"}/></Box>)
             } : {}),
             displayNameComp: (<Box maxWidth="30vw"><Text truncate fontWeight="medium">{c.displayName}</Text></Box>),
             testedEndpoints: c.urlsCount === 0 ? 0 : (coverageMap[c.id] ? coverageMap[c.id] : 0),
