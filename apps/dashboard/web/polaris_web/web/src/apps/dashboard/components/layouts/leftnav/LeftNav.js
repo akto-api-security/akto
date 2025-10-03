@@ -210,7 +210,7 @@ export default function LeftNav() {
                         selected: leftNavSelected === "dashboard_testing",
                     },
                     {
-                        label: "Test Roles",
+                        label: mapLabel("Test", dashboardCategory) + " Roles",
                         onClick: () => {
                             navigate("/dashboard/testing/roles");
                             handleSelect("dashboard_testing_roles");
@@ -228,7 +228,7 @@ export default function LeftNav() {
                         selected: leftNavSelected === "dashboard_testing_user_config",
                     },
                     {
-                        label:"Test Suite",
+                        label:mapLabel("Test", dashboardCategory) + " Suite",
                         onClick:()=>{
                             navigate("/dashboard/testing/test-suite");
                             handleSelect("dashboard_testing_test_suite");
@@ -243,7 +243,7 @@ export default function LeftNav() {
                 url: "#",
                 label: (
                     <Text variant="bodyMd" fontWeight="medium">
-                        Test library
+                        {mapLabel("Test library", dashboardCategory)}
                     </Text>
                 ),
                 icon: FinancesMinor,
@@ -255,7 +255,7 @@ export default function LeftNav() {
                 selected: leftNavSelected.includes("_test_library"),
                 subNavigationItems: [
                     {
-                        label: "Tests",
+                        label: mapLabel("More Tests", dashboardCategory),
                         onClick: () => {
                             navigate("/dashboard/test-library/tests");
                             handleSelect("dashboard_test_library_tests");
@@ -450,6 +450,43 @@ export default function LeftNav() {
                     }
                 ]
             }] : []),
+            ...(dashboardCategory === "Agentic Security" ? [{
+                label: (
+                    <Text variant="bodyMd" fontWeight="medium">
+                        Agentic Guardrails
+                    </Text>
+                ),
+                icon: LockMajor,
+                onClick: () => {
+                    handleSelect("dashboard_agentic_guardrails");
+                    navigate("/dashboard/guardrails/activity");
+                    setActive("normal");
+                },
+                selected: leftNavSelected.includes("_guardrails"),
+                url: "#",
+                key: "11",
+                subNavigationItems: [
+                    {
+                        label: "Guardrails Activity",
+                        onClick: () => {
+                            navigate("/dashboard/guardrails/activity");
+                            handleSelect("dashboard_guardrails_activity");
+                            setActive("active");
+                        },
+                        selected: leftNavSelected === "dashboard_guardrails_activity",
+                    },
+                    {
+                        label: "Guardrails Policies",
+                        onClick: () => {
+                            navigate("/dashboard/guardrails/policies");
+                            handleSelect("dashboard_guardrails_policies");
+                            setActive("active");
+                        },
+                        selected:
+                            leftNavSelected === "dashboard_guardrails_policies",
+                    }
+                ]
+            }] : [])
         ]
 
         const exists = items.find(item => item.key === "quick_start")

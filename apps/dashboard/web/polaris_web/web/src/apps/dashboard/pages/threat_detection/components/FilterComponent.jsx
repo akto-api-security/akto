@@ -5,7 +5,6 @@ import api from "../api"
 import func from '@/util/func';
 import DropdownSearch from "../../../components/shared/DropdownSearch";
 import { useSearchParams } from "react-router-dom";
-import { getDashboardCategory } from "../../../../main/labelHelper";
 import { updateThreatFiltersStore } from "../utils/threatFilters";
 
 function FilterComponent({ includeCategoryNameEquals, excludeCategoryNameEquals, titleText, readOnly = false, validateOnSave, showDelete = false }) {
@@ -15,7 +14,6 @@ function FilterComponent({ includeCategoryNameEquals, excludeCategoryNameEquals,
     const [data, setData] = useState({ message: "" })
     const [allData, setAllData] = useState([])
     const [id, setId] = useState("")
-    const shortHand = getDashboardCategory().split(" ")[0].toLowerCase();
     // helpers: normalize and category accessor
     const normalize = (s) => (s || '').toLowerCase()
     const getCategory = (t) => normalize(t?.info?.category?.name)
@@ -23,15 +21,14 @@ function FilterComponent({ includeCategoryNameEquals, excludeCategoryNameEquals,
     const fetchTemplates = async () => {
         const resp = await api.fetchFilterYamlTemplate()
         const templates = Array.isArray(resp?.templates) ? resp.templates : []
-
+        let categoryFilteredTemplates = templates;
         try {
-            const category = getDashboardCategory();
-            updateThreatFiltersStore(templates, shortHand)
+            categoryFilteredTemplates = updateThreatFiltersStore(templates)
         } catch (e) {
             console.error(`Failed to update SessionStore threat filters: ${e?.message}`);
         }
 
-        return templates
+        return categoryFilteredTemplates
     }
 
     const filterTemplates = (templates) => {
@@ -44,13 +41,6 @@ function FilterComponent({ includeCategoryNameEquals, excludeCategoryNameEquals,
         } else if (excludeCategoryNameEquals && excludeCategoryNameEquals.length > 0) {
             const exc = normalize(excludeCategoryNameEquals)
             out = out.filter((t) => getCategory(t) !== exc)
-        }
-
-        // shortHand-based grouping
-        if (!normalize(shortHand).includes('api')) {
-            out = out.filter((t) => t?.info?.category?.name !== undefined && getCategory(t).includes(normalize(shortHand)))
-        } else {
-            out = out.filter((t) => t?.info?.category?.name !== undefined && !getCategory(t).includes('mcp'))
         }
         return out
     }

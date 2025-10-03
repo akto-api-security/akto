@@ -118,9 +118,9 @@ const headings = [
         sortActive: true,
     },
     {
-        text: 'Last Tested',
+        text: 'Last ' + mapLabel('Tested', getDashboardCategory()),
         title: <HeadingWithTooltip 
-                title={"Last Tested"}
+                title={"Last " + mapLabel('Tested', getDashboardCategory())}
                 content={"Time when API was last tested successfully."}
             />,
         value: 'lastTestedComp',
@@ -572,8 +572,8 @@ function ApiEndpoints(props) {
     }, [collectionsMap[apiCollectionId]])
 
     const resourceName = {
-        singular: 'endpoint',
-        plural: 'endpoints',
+        singular: mapLabel('endpoint', getDashboardCategory()),
+        plural: mapLabel('endpoints', getDashboardCategory()),
     };
 
     const getFilteredItems = (filteredItems) => {
@@ -1124,20 +1124,20 @@ function ApiEndpoints(props) {
         if (isApiGroup) {
             ret.push(
                 {
-                    content: 'Remove from API group',
+                    content: 'Remove from ' + mapLabel('API', getDashboardCategory()) + ' group',
                     onAction: () => handleApiGroupAction(selectedResources, Operation.REMOVE)
                 }
             )
         } else {
             ret.push({
-                content: <div data-testid="add_to_api_group_button">Add to API group</div>,
+                content: <div data-testid="add_to_api_group_button">{'Add to ' + mapLabel('API', getDashboardCategory()) + ' group'}</div>,
                 onAction: () => handleApiGroupAction(selectedResources, Operation.ADD)
             })
         }
 
         if (window.USER_NAME && window.USER_NAME.endsWith("@akto.io")) {
             ret.push({
-                content: 'Delete APIs',
+                content: 'Delete ' + mapLabel('APIs', getDashboardCategory()),
                 onAction: () => deleteApis(selectedResources)
             })
         }

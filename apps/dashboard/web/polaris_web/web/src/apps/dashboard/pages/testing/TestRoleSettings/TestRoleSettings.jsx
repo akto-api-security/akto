@@ -13,6 +13,7 @@ import DescriptionCard from "./DescriptionCard";
 import AuthComponent from "./AuthComponent";
 import SavedParamComponent from "./SavedParamComponent";
 import { HARDCODED } from "./TestRoleConstants";
+import { getDashboardCategory, mapLabel } from '../../../../main/labelHelper';
 
 const selectOptions = [
   {
@@ -51,7 +52,7 @@ function TestRoleSettings() {
   const isDataInState = location.state && location?.state !== undefined && Object.keys(location?.state).length > 0
   const isDataInSearch = searchParams.get("name")
   const isNew = !isDataInState && !isDataInSearch
-  const pageTitle = isNew ? "Add test role" : "Configure test role"
+  const pageTitle = isNew ? "Add " + mapLabel("test", getDashboardCategory()) + " role" : "Configure " + mapLabel("test", getDashboardCategory()) + " role"
   const [initialItems, setInitialItems] = useState({ name: "" });
   const [conditions, dispatchConditions] = useReducer(
     produce((draft, action) => conditionsReducer(draft, action)),

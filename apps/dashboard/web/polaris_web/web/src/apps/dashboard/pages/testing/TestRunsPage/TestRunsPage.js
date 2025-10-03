@@ -41,14 +41,14 @@ import CategoryWiseScoreGraph from "./CategoryWiseScoreGraph";
 
 const headers = [
   {
-    text:"Test name",
-    title: 'Test run name',
+    text:mapLabel("Test", getDashboardCategory()) + " name",
+    title: mapLabel("Test", getDashboardCategory()) + " run name",
     value:"testName",
     itemOrder:1,
   },
   {
-    text: "Number of tests",
-    title: "Number of tests",
+    text: mapLabel("Number of tests", getDashboardCategory()),
+    title: mapLabel("Number of tests", getDashboardCategory()),
     value: "number_of_tests",
     itemOrder: 3,
     type: CellType.TEXT,
@@ -94,8 +94,8 @@ const sortOptions = [
 ];
 
 const resourceName = {
-  singular: 'test run',
-  plural: 'test runs',
+  singular: mapLabel("Test", getDashboardCategory()) + " run",
+  plural: mapLabel("Test", getDashboardCategory()) + " runs",
 };
 
 let filters = [
@@ -112,8 +112,8 @@ let filters = [
   },
   {
     key: 'apiCollectionId',
-    label: 'Api collection name',
-    title: 'Api collection name',
+    label: mapLabel('API', getDashboardCategory()) + ' collection name',
+    title: mapLabel('API', getDashboardCategory()) + ' collection name',
     choices: [],
 },
 ]
@@ -150,7 +150,7 @@ const [loading, setLoading] = useState(true);
 const [updateTable, setUpdateTable] = useState("");
 const [countMap, setCountMap] = useState({});
 
-const definedTableTabs = ['All', 'One time', 'Continuous Testing', 'Scheduled', 'CI/CD']
+const definedTableTabs = ['All', 'One time', mapLabel("Continuous Testing", getDashboardCategory()), 'Scheduled', 'CI/CD']
 const initialCount = [countMap['allTestRuns'], countMap['oneTime'], countMap['continuous'], countMap['scheduled'], countMap['cicd']]
 
 const { tabsInfo } = useTable()
@@ -207,6 +207,7 @@ const [totalNumberOfTests, setTotalNumberOfTests] = useState(0)
         });
         break;
       case "continuous_testing":
+      case "continuous_scanning":
         await api.fetchTestingDetails(
           startTimestamp, endTimestamp, sortKey, sortOrder, skip, limit, filters, "CONTINUOUS_TESTING",queryValue
         ).then(({ testingRuns, testingRunsCount, latestTestingRunResultSummaries }) => {
@@ -347,7 +348,7 @@ const SummaryCardComponent = () =>{
                     chartSize={190}
                 />
               </HorizontalGrid>
-              {!isApiSecurityCategory() ? (
+              {func.isDemoAccount() && !isApiSecurityCategory() ? (
                 <CategoryWiseScoreGraph 
                   key={"category-score-graph"} 
                   startTimestamp={startTimestamp} 
@@ -355,11 +356,16 @@ const SummaryCardComponent = () =>{
                   dataSource="redteaming"
                 />
               ) : null}
-              <HorizontalGrid columns={2} gap={4}>
-                <ApiCollectionCoverageGraph />
-                <TestRunOverTimeGraph />
-              </HorizontalGrid>
-              <ApisTestedOverTimeGraph />
+                {
+                  func.isDemoAccount() && !isApiSecurityCategory() ? <></> :
+                    <VerticalStack>
+                      <HorizontalGrid columns={2} gap={4}>
+                        <ApiCollectionCoverageGraph />
+                        <TestRunOverTimeGraph />
+                      </HorizontalGrid>
+                      <ApisTestedOverTimeGraph />
+                    </VerticalStack>
+                }
             </VerticalStack>
           </LegacyCard.Subsection>
         </Collapsible>
@@ -424,7 +430,7 @@ const components = !hasUserInitiatedTestRuns ? [<SummaryCardComponent key={"summ
     <PageWithMultipleCards
       title={
         <TitleWithInfo
-          titleText={"Test results"}
+          titleText={mapLabel('Test results', getDashboardCategory())}
           tooltipContent={"See testing run results along with compact summary of issues."}
         />
       }

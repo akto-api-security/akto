@@ -7,6 +7,7 @@ import PersistStore from '../../main/PersistStore';
 import api from '../pages/testing/api';
 import Dropdown from './layouts/Dropdown';
 import { labelMap } from '../../main/labelHelperMap';
+import {mapLabel} from '../../main/labelHelper';
 
 const HTTP_METHODS = [
     {'label': 'GET', 'value': 'GET'},
@@ -167,7 +168,7 @@ function CollectionComponent(props) {
         <Dropdown
             key={`condition-type-${index}`}
             menuItems={[{
-                label: 'Api list',
+                label: mapLabel(dashboardCategory, 'Api') + ' list',
                 value: 'CUSTOM',
             },
             {

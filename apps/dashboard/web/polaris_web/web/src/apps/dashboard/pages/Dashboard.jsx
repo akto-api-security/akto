@@ -29,7 +29,6 @@ function Dashboard() {
     const setTagCollectionsMap = PersistStore(state => state.setTagCollectionsMap)
     const setHostNameMap = PersistStore(state => state.setHostNameMap)
     const threatFiltersMap = SessionStore(state => state.threatFiltersMap);
-    const setThreatFiltersMap = SessionStore(state => state.setThreatFiltersMap);
 
     const { selectItems } = useTable()
 
@@ -78,11 +77,8 @@ function Dashboard() {
     }
 
     const fetchFilterYamlTemplates = () => {
-        const category = PersistStore.getState().dashboardCategory;
-        const shortHand = category.split(" ")[0].toLowerCase();
         threatDetectionRequests.fetchFilterYamlTemplate().then((res) => {
-            updateThreatFiltersStore(res?.templates || [], shortHand)
-            
+            updateThreatFiltersStore(res?.templates || [])
         })
     }
 

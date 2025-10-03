@@ -2,6 +2,7 @@ import func from "@/util/func";
 import observeFunc from "../observe/transform"
 import { Badge, Button, Text , HorizontalStack, Box} from "@shopify/polaris";
 import LocalStore from "../../../main/LocalStorageStore";
+import { getDashboardCategory, mapLabel } from "../../../main/labelHelper";
 
 const subCategoryMap = LocalStore.getState().subCategoryMap;
 
@@ -84,7 +85,7 @@ const transform = {
             yAxis: {
                 min: 0,
                 title: {
-                    text: 'Number of urls'
+                    text: 'Number of ' + mapLabel('URLs', getDashboardCategory())
                 }
             },
             legend: {

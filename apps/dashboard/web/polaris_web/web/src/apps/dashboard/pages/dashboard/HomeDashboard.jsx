@@ -29,7 +29,7 @@ import CriticalFindingsGraph from '../issues/IssuesPage/CriticalFindingsGraph';
 import values from "@/util/values";
 import { ActionItemsContent } from './components/ActionItemsContent';
 import { fetchActionItemsData } from './components/actionItemsTransform';
-import { getDashboardCategory, isMCPSecurityCategory, mapLabel } from '../../../main/labelHelper';
+import { getDashboardCategory, isAgenticSecurityCategory, isMCPSecurityCategory, mapLabel } from '../../../main/labelHelper';
 import GraphMetric from '../../components/GraphMetric';
 import Dropdown from '../../components/layouts/Dropdown';
 
@@ -577,7 +577,7 @@ function HomeDashboard() {
         )
     }
 
-    const runTestEmptyCardComponent = <Text alignment='center' color='subdued'>There's no data to show. <Link url="/dashboard/testing" target='_blank'>Run test</Link> to get data populated. </Text>
+    const runTestEmptyCardComponent = <Text alignment='center' color='subdued'>There's no data to show. <Link url="/dashboard/testing" target='_blank'>{mapLabel('Run test', getDashboardCategory())}</Link> to get data populated. </Text>
 
     function mapAccessTypes(apiStats, missingCount, redundantCount, apiTypeMissing) {
         if (!apiStats) return
@@ -813,9 +813,9 @@ function HomeDashboard() {
     const testSummaryCardsList = showTestingComponents ? (
         <InfoCard
             component={<TestSummaryCardsList summaryItems={testSummaryInfo} />}
-            title="Recent Tests"
-            titleToolTip="View details of recent API security tests, APIs tested and number of issues found of last 7 days."
-            linkText="Increase test coverage"
+            title={"Recent " + mapLabel("Tests", getDashboardCategory())}
+            titleToolTip={"View details of recent" + mapLabel("API security tests", getDashboardCategory()) + ", APIs tested and number of issues found of last 7 days."}
+            linkText={"Increase " + mapLabel("test coverage", getDashboardCategory())}
             linkUrl="/dashboard/testing"
         />
     ) : null
@@ -1313,7 +1313,7 @@ function HomeDashboard() {
     }
 
     const gridComponent = (
-        isMCPSecurityCategory() ? (
+        (isMCPSecurityCategory()) ? (
             <VerticalStack gap={5}>
                 {/* First row with MCP Components Requests and Policy Guardrails side by side */}
                 <HorizontalGrid gap={5} columns={2}>
