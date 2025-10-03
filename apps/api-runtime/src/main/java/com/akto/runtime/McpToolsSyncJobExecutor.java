@@ -418,7 +418,7 @@ public class McpToolsSyncJobExecutor {
                 queryParams = parts[1];
             } else if (mcpEndpoint.startsWith("/")) {
                 // If it's just a path without query params
-                path = host + mcpEndpoint;
+                path = mcpEndpoint;
             }
         }
         
@@ -490,14 +490,14 @@ public class McpToolsSyncJobExecutor {
             } catch (Exception sseException) {
                 logger.info("SSE transport failed, falling back to HTTP transport: {}", sseException.getMessage());
                 // Fall back to HTTP - no need to test, just store it
-                ApiCollectionsDao.instance.updateTransportType(apiCollection, TRANSPORT_SSE);
+                ApiCollectionsDao.instance.updateTransportType(apiCollection, TRANSPORT_HTTP);
                 return TRANSPORT_HTTP;
             }
         }
         
         // Default to HTTP if no sseCallbackUrl
         logger.info("No SSE callback URL found, using HTTP transport for: {}", apiCollection.getHostName());
-        ApiCollectionsDao.instance.updateTransportType(apiCollection, TRANSPORT_SSE);
+        ApiCollectionsDao.instance.updateTransportType(apiCollection, TRANSPORT_HTTP);
         return TRANSPORT_HTTP;
     }
 
