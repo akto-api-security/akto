@@ -17,7 +17,6 @@ import RunTestSuites from "./RunTestSuites";
 import RunTestConfiguration from "./RunTestConfiguration";
 import {createTestName,convertToLowerCaseWithUnderscores} from "./Utils"
 import settingsApi from "../../settings/api";
-import { getDashboardCategory } from "../../../../main/labelHelper";
 
 const initialAutoTicketingDetails = {
     shouldCreateTickets: false,
