@@ -5,17 +5,15 @@ import api from "../api"
 import func from '@/util/func';
 import DropdownSearch from "../../../components/shared/DropdownSearch";
 import { useSearchParams } from "react-router-dom";
-import { getDashboardCategory } from "../../../../main/labelHelper";
 import { updateThreatFiltersStore } from "../utils/threatFilters";
 
-function FilterComponent({ includeCategoryNameEquals, excludeCategoryNameEquals, titleText, readOnly = false, validateOnSave }) {
+function FilterComponent({ includeCategoryNameEquals, excludeCategoryNameEquals, titleText, readOnly = false, validateOnSave, showDelete = false }) {
     const[searchParams] = useSearchParams()
     const filteredPolicy = searchParams.get("policy")
     const [ogData, setOgData] = useState({ message: "" })
     const [data, setData] = useState({ message: "" })
     const [allData, setAllData] = useState([])
     const [id, setId] = useState("")
-    const shortHand = getDashboardCategory().split(" ")[0].toLowerCase();
     // helpers: normalize and category accessor
     const normalize = (s) => (s || '').toLowerCase()
     const getCategory = (t) => normalize(t?.info?.category?.name)
@@ -23,15 +21,14 @@ function FilterComponent({ includeCategoryNameEquals, excludeCategoryNameEquals,
     const fetchTemplates = async () => {
         const resp = await api.fetchFilterYamlTemplate()
         const templates = Array.isArray(resp?.templates) ? resp.templates : []
-
+        let categoryFilteredTemplates = templates;
         try {
-            const category = getDashboardCategory();
-            updateThreatFiltersStore(templates, shortHand)
+            categoryFilteredTemplates = updateThreatFiltersStore(templates)
         } catch (e) {
             console.error(`Failed to update SessionStore threat filters: ${e?.message}`);
         }
 
-        return templates
+        return categoryFilteredTemplates
     }
 
     const filterTemplates = (templates) => {
@@ -44,13 +41,6 @@ function FilterComponent({ includeCategoryNameEquals, excludeCategoryNameEquals,
         } else if (excludeCategoryNameEquals && excludeCategoryNameEquals.length > 0) {
             const exc = normalize(excludeCategoryNameEquals)
             out = out.filter((t) => getCategory(t) !== exc)
-        }
-
-        // shortHand-based grouping
-        if (!normalize(shortHand).includes('api')) {
-            out = out.filter((t) => t?.info?.category?.name !== undefined && getCategory(t).includes(normalize(shortHand)))
-        } else {
-            out = out.filter((t) => t?.info?.category?.name !== undefined && !getCategory(t).includes('mcp'))
         }
         return out
     }
@@ -103,6 +93,34 @@ function FilterComponent({ includeCategoryNameEquals, excludeCategoryNameEquals,
         func.setToast(true, false, 'Saved filter template')
     }
 
+    async function onDelete() {
+        try {
+            if (!id) {
+                func.setToast(true, true, 'No policy selected to delete')
+                return
+            }
+            await api.deleteFilterYamlTemplate(id)
+            func.setToast(true, false, 'Deleted filter template')
+            await fetchData()
+        } catch (e) {
+            func.setToast(true, true, 'Failed to delete filter template')
+        }
+    }
+
+    async function onDeleteClick() {
+        if (!id) {
+            func.setToast(true, true, 'No policy selected to delete')
+            return
+        }
+        func.showConfirmationModal(
+            'Are you sure you want to delete this filter template? This action cannot be undone.',
+            'Delete',
+            async () => {
+                await onDelete()
+            }
+        )
+    }
+
     return (
         <LegacyCard>
             <LegacyCard.Section flush>
@@ -110,9 +128,16 @@ function FilterComponent({ includeCategoryNameEquals, excludeCategoryNameEquals,
                     <HorizontalStack padding="2" align='space-between'>
                         {titleText ? titleText : 'Threat detection filter'}
                         {!readOnly && (
-                            <Button plain monochrome removeUnderline onClick={onSave}>
-                                Save
-                            </Button>
+                            <HorizontalStack gap="2">
+                                {showDelete && (
+                                    <Button outline size="slim" onClick={onDeleteClick}>
+                                        Delete
+                                    </Button>
+                                )}
+                                <Button outline size="slim" onClick={onSave}>
+                                    Save
+                                </Button>
+                            </HorizontalStack>
                         )}
                     </HorizontalStack>
                 </Box>

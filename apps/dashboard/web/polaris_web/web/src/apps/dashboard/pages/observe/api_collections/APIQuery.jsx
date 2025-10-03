@@ -13,6 +13,7 @@ import SaveAsCollectionModal from "./api_query_component/SaveAsCollectionModal";
 import { useSearchParams } from "react-router-dom";
 import PersistStore from "../../../../main/PersistStore";
 import collectionsApi from "./api"
+import { getDashboardCategory, mapLabel } from "../../../../main/labelHelper";
 
 function APIQuery() {
     const [conditions, dispatchConditions] = useReducer(produce((draft, action) => func.conditionsReducer(draft, action)), []);
@@ -168,7 +169,7 @@ function APIQuery() {
             <Box background={"bg-subdued"} width="100%" padding={"2"} onClick={handleToggle} key="collapsible-component-header">
                 <HorizontalStack align="space-between">
                     <Text variant="headingSm">
-                        {endpointListFromConditions.data ? apiCount > 200 ? `Listing 200 sample endpoints out of total ` + apiCount + ` endpoints` : `Listing total ` + apiCount + ` endpoints` : "Select filters to see endpoints"}
+                        {endpointListFromConditions.data ? apiCount > 200 ? `Listing 200 sample ${mapLabel("endpoints", getDashboardCategory())} out of total ` + apiCount + ` ${mapLabel("endpoints", getDashboardCategory())}` : `Listing total ` + apiCount + ` ${mapLabel("endpoints", getDashboardCategory())}` : `Select filters to see ${mapLabel("endpoints", getDashboardCategory())}`}
                     </Text>
                     <Box>
                         <Icon source={open ? ChevronDownMinor : ChevronUpMinor} />
@@ -214,7 +215,7 @@ function APIQuery() {
                                 }
                             </HorizontalStack>
                             <HorizontalStack gap={4} align="end">
-                                <Button onClick={exploreEndpoints}>Explore endpoints</Button>
+                                <Button onClick={exploreEndpoints}>Explore {mapLabel("endpoints", getDashboardCategory())}</Button>
                             </HorizontalStack>
                         </VerticalStack>
                     </Card>

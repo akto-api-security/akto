@@ -11,6 +11,7 @@ import { CellType } from "../../../components/tables/rows/GithubRow"
 import TitleWithInfo from "../../../components/shared/TitleWithInfo"
 import useTable from "../../../components/tables/TableContext"
 import TooltipText from "../../../components/shared/TooltipText"
+import { mapLabel, getDashboardCategory } from "../../../../main/labelHelper"
 
 
 const sortOptions = [
@@ -165,8 +166,8 @@ function TestRolesPage(){
     return (
         <PageWithMultipleCards
             title={<TitleWithInfo
-                titleText={"Test roles"}
-                tooltipContent={"Test roles define specific access permissions and authentication methods for API security testing scenarios."}
+                titleText={mapLabel("Test", getDashboardCategory()) + " roles"}
+                tooltipContent={`Test roles define specific access permissions and authentication methods for API ${mapLabel('security testing', getDashboardCategory())} scenarios.`}
             />}
         primaryAction = {<Button primary onClick={handleRedirect}><div data-testid="new_test_role_button">Create new test role</div></Button>}
         isFirstPage={true}
