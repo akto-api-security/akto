@@ -62,6 +62,17 @@ public class ApiCollection {
     String sseCallbackUrl;
     public static final String SSE_CALLBACK_URL = "sseCallbackUrl";
 
+    private String mcpTransportType;
+    public static final String MCP_TRANSPORT_TYPE = "mcpTransportType";
+
+    public String getMcpTransportType() {
+        return mcpTransportType;
+    }
+
+    public void setMcpTransportType(String mcpTransportType) {
+        this.mcpTransportType = mcpTransportType;
+    }
+
     public enum Type {
         API_GROUP
     }
@@ -91,7 +102,7 @@ public class ApiCollection {
             "localhost", "local", "intranet", "lan", "example", "invalid",
             "home", "corp", "priv", "localdomain", "localnet", "network",
             "int", "private");
-    
+
     private static final List<String> ENV_KEYWORDS_WITHOUT_DOT = Arrays.asList(
         "kubernetes", "internal"
     );

@@ -305,6 +305,21 @@ public class DbAction extends ActionSupport {
         return Action.SUCCESS.toUpperCase();
     }
 
+    String transportType;
+    public String updateTransportType() {
+        try {
+            ApiCollection apiCollection = ApiCollectionsDao.instance.getMeta(apiCollectionId);
+            if (apiCollection != null) {
+                ApiCollectionsDao.instance.updateTransportType(apiCollection, transportType);
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "error in updateTransportType " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+
     public String updateCidrList() {
         try {
             DbLayer.updateCidrList(cidrList);
@@ -414,9 +429,9 @@ public class DbAction extends ActionSupport {
                             }
                         }
                     }
-    
+
                     System.out.println("filters: " + filters.toString());
-    
+
                     if (isDeleteWrite) {
                         writes.add(
                                 new DeleteOneModel<>(Filters.and(filters), new DeleteOptions())
@@ -427,7 +442,7 @@ public class DbAction extends ActionSupport {
                         );
                     }
                 }
-    
+
                 DbLayer.bulkWriteSingleTypeInfo(writes);
             } catch (Exception e) {
                 String err = "Error: ";
@@ -466,7 +481,7 @@ public class DbAction extends ActionSupport {
 
                     String responseCodeStr = mObj.get("responseCode").toString();
                     int responseCode = Integer.valueOf(responseCodeStr);
-    
+
                     Bson filters = Filters.and(Filters.eq("_id.apiCollectionId", apiCollectionId),
                             Filters.eq("_id.bucketEndEpoch", bucketEndEpoch),
                             Filters.eq("_id.bucketStartEpoch", bucketStartEpoch),
@@ -474,7 +489,7 @@ public class DbAction extends ActionSupport {
                             Filters.eq("_id.responseCode", responseCode),
                             Filters.eq("_id.url", mObj.get("url")));
                     List<String> updatePayloadList = bulkUpdate.getUpdates();
-    
+
                     List<Bson> updates = new ArrayList<>();
                     for (String payload: updatePayloadList) {
                         Map<String, Object> json = gson.fromJson(payload, Map.class);
@@ -836,23 +851,23 @@ public class DbAction extends ActionSupport {
                     Filters.eq(UningestedApiOverage.METHOD, bulkUpdate.getFilters().get(UningestedApiOverage.METHOD)),
                     Filters.eq(UningestedApiOverage.URL, bulkUpdate.getFilters().get(UningestedApiOverage.URL))
                 );
-                
+
                 List<String> updatePayloadList = bulkUpdate.getUpdates();
                 List<Bson> updates = new ArrayList<>();
-                
+
                 for (String payload: updatePayloadList) {
                     Map<String, Object> json = gson.fromJson(payload, Map.class);
                     String field = (String) json.get("field");
                     Object val = json.get("val");
                     String op = (String) json.get("op");
-                    
+
                     if ("setOnInsert".equals(op)) {
                         updates.add(Updates.setOnInsert(field, val));
                     } else if ("set".equals(op)) {
                         updates.add(Updates.set(field, val));
                     }
                 }
-                
+
                 if (!updates.isEmpty()) {
                     writes.add(
                         new UpdateOneModel<>(filters, Updates.combine(updates), new UpdateOptions().upsert(true))
@@ -1129,7 +1144,7 @@ public class DbAction extends ActionSupport {
             testingRun = DbLayer.findPendingTestingRun(delta);
             if (testingRun != null) {
                 /*
-                * There is a db call involved for collectionWiseTestingEndpoints, thus this hack. 
+                * There is a db call involved for collectionWiseTestingEndpoints, thus this hack.
                 */
                 if(testingRun.getTestingEndpoints() instanceof CollectionWiseTestingEndpoints){
                     CollectionWiseTestingEndpoints ts = (CollectionWiseTestingEndpoints) testingRun.getTestingEndpoints();
@@ -1790,7 +1805,7 @@ public class DbAction extends ActionSupport {
             return Action.ERROR.toUpperCase();
         }
     }
-    
+
     public String countTestingRunResultSummaries() {
         count = DbLayer.countTestingRunResultSummaries(filter);
         return Action.SUCCESS.toUpperCase();
@@ -2773,4 +2788,11 @@ public class DbAction extends ActionSupport {
         this.testingRunPlayground = testingRunPlayground;
     }
 
+    public String getTransportType() {
+        return transportType;
+    }
+
+    public void setTransportType(String transportType) {
+        this.transportType = transportType;
+    }
 }
