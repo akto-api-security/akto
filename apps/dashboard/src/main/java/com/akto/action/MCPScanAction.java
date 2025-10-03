@@ -1,5 +1,6 @@
 package com.akto.action;
 
+import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.Collections;
 import java.util.HashSet;
@@ -19,7 +20,6 @@ import com.akto.dto.traffic.CollectionTags.TagSource;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.runtime.McpToolsSyncJobExecutor;
-import com.akto.util.Constants;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.FindOneAndUpdateOptions;
 import com.mongodb.client.model.ReturnDocument;
@@ -44,7 +44,9 @@ public class MCPScanAction extends UserAction {
         try {
 
             URL parsedUrl = new URL(serverUrl);
-            String sseEndpoint = parsedUrl.getPath() + (parsedUrl.getQuery() != null ? "?" + parsedUrl.getQuery() : "");
+            // Store the full path with query params for MCP endpoint
+            // This could be either an SSE endpoint or a standard HTTP endpoint
+            String mcpEndpoint = parsedUrl.getPath() + (parsedUrl.getQuery() != null ? "?" + parsedUrl.getQuery() : "");
             String hostName = parsedUrl.getHost();
             hostName = hostName.toLowerCase();
             hostName = hostName.trim();
@@ -56,7 +58,7 @@ public class MCPScanAction extends UserAction {
                 loggerMaker.info("ApiCollection already exists for host: " + hostName, LogDb.DASHBOARD);
             } else {
                 loggerMaker.info("Creating ApiCollection for host: " + hostName, LogDb.DASHBOARD);  
-                createdCollection = new ApiCollection(collectionId, hostName, Context.now(), new HashSet<>(), hostName, 0, false, true, sseEndpoint);
+                createdCollection = new ApiCollection(collectionId, hostName, Context.now(), new HashSet<>(), hostName, 0, false, true, mcpEndpoint);
                 ApiCollectionsDao.instance.insertOne(createdCollection);
 
                 try {
@@ -77,12 +79,12 @@ public class MCPScanAction extends UserAction {
                 return Action.ERROR.toUpperCase();
             }
 
-            //update api collection with tags and ensure sseCallbackUrl is set
+            //update api collection with tags and ensure sseCallbackUrl/mcpEndpoint is set
             Bson updates = Updates.combine(
                 Updates.setOnInsert("_id", collectionId),
                 Updates.setOnInsert("startTs", Context.now()),
                 Updates.setOnInsert("urls", new HashSet<>()),
-                Updates.set(ApiCollection.SSE_CALLBACK_URL, sseEndpoint),
+                Updates.set(ApiCollection.SSE_CALLBACK_URL, mcpEndpoint),
                 Updates.set(ApiCollection.TAGS_STRING,
                 Collections.singletonList(new CollectionTags(Context.now(), AKTO_MCP_SERVER_TAG, "MCP Server", TagSource.KUBERNETES)))
             );
@@ -112,7 +114,7 @@ public class MCPScanAction extends UserAction {
                 executorService.schedule(new Runnable() {
                     public void run() {
                         Context.accountId.set(accountId);
-                        loggerMaker.info("Starting MCP sync job for collection: {} with host: {} and SSE endpoint: {}",
+                        loggerMaker.info("Starting MCP sync job for collection: {} with host: {} and MCP endpoint: {}",
                             createdCollection.getId(), createdCollection.getHostName(), createdCollection.getSseCallbackUrl());
                         McpToolsSyncJobExecutor.INSTANCE.runJobforCollection(createdCollection, apiConfig, authHeader);
                     }
