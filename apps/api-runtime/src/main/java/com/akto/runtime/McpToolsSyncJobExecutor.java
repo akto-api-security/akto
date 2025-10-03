@@ -152,10 +152,8 @@ public class McpToolsSyncJobExecutor {
                     new Implementation("akto-api-security", "1.0.0")
                 )
             );
-            String initializeJson = JSONUtils.getString(initializeRequest);
-            logger.info("Initialize request JSON: {}", initializeJson);
             Pair<JSONRPCResponse, HttpResponseParams> responsePair = getMcpMethodResponse(
-                host, authHeader, McpSchema.METHOD_INITIALIZE, initializeJson, apiCollection);
+                host, authHeader, McpSchema.METHOD_INITIALIZE, JSONUtils.getString(initializeRequest), apiCollection);
             InitializeResult initializeResult = JSONUtils.fromJson(responsePair.getFirst().getResult(),
                 InitializeResult.class);
             if (initializeResult == null || initializeResult.getCapabilities() == null) {
@@ -420,16 +418,12 @@ public class McpToolsSyncJobExecutor {
                 queryParams = parts[1];
             } else if (mcpEndpoint.startsWith("/")) {
                 // If it's just a path without query params
-                path = mcpEndpoint;
+                path = host + mcpEndpoint;
             }
         }
         
         // Build full URL with scheme and host
-        // Assume HTTPS for MCP servers (standard practice)
-        //todo: add protocol based on the mcpEndpoint
-        String fullUrl = "https://" + host + path;
-        
-        return new OriginalHttpRequest(fullUrl, 
+        return new OriginalHttpRequest(path,
             queryParams,
             HttpMethod.POST.name(),
             mcpMethodRequestJson,
@@ -456,13 +450,7 @@ public class McpToolsSyncJobExecutor {
             if (transportType == null || transportType.isEmpty()) {
                 transportType = detectAndSetTransportType(request, apiCollection);
             }
-            
-            // Log request details for debugging
-            logger.info("Sending MCP request - URL: {}, Method: {}, Body length: {}", 
-                request.getUrl(), request.getMethod(), 
-                request.getBody() != null ? request.getBody().length() : 0);
-            logger.debug("Request body: {}", request.getBody());
-            
+
             OriginalHttpResponse response;
             if (TRANSPORT_HTTP.equals(transportType)) {
                 // Use standard HTTP POST for streamable responses
@@ -476,12 +464,6 @@ public class McpToolsSyncJobExecutor {
                 response = ApiExecutor.sendRequestWithSse(request, true, null, false,
                     new ArrayList<>(), false, true);
             }
-            
-            logger.info("Received MCP response - Status: {}, Body length: {}", 
-                response.getStatusCode(), 
-                response.getBody() != null ? response.getBody().length() : 0);
-            logger.debug("Response body: {}", response.getBody());
-            
             return response.getBody();
         } catch (Exception e) {
             logger.error("Error while making request to MCP server: {}", e.getMessage(), e);
@@ -496,57 +478,27 @@ public class McpToolsSyncJobExecutor {
                 logger.info("Attempting to detect transport type for MCP server: {}", apiCollection.getHostName());
                 
                 // Clone request for SSE detection to avoid modifying original
-                OriginalHttpRequest sseTestRequest = cloneRequest(request);
+                OriginalHttpRequest sseTestRequest = request.copy();
                 McpSseEndpointHelper.addSseEndpointHeader(sseTestRequest, apiCollection.getId());
                 ApiExecutor.sendRequestWithSse(sseTestRequest, true, null, false,
                     new ArrayList<>(), false, true);
                 
                 // If SSE works, update the collection
-                updateTransportType(apiCollection, TRANSPORT_SSE);
+                ApiCollectionsDao.instance.updateTransportType(apiCollection, TRANSPORT_SSE);
                 logger.info("Detected SSE transport for MCP server: {}", apiCollection.getHostName());
                 return TRANSPORT_SSE;
             } catch (Exception sseException) {
                 logger.info("SSE transport failed, falling back to HTTP transport: {}", sseException.getMessage());
                 // Fall back to HTTP - no need to test, just store it
-                updateTransportType(apiCollection, TRANSPORT_HTTP);
+                ApiCollectionsDao.instance.updateTransportType(apiCollection, TRANSPORT_SSE);
                 return TRANSPORT_HTTP;
             }
         }
         
         // Default to HTTP if no sseCallbackUrl
         logger.info("No SSE callback URL found, using HTTP transport for: {}", apiCollection.getHostName());
-        updateTransportType(apiCollection, TRANSPORT_HTTP);
+        ApiCollectionsDao.instance.updateTransportType(apiCollection, TRANSPORT_SSE);
         return TRANSPORT_HTTP;
-    }
-    
-    private OriginalHttpRequest cloneRequest(OriginalHttpRequest request) {
-        // Create a shallow clone to avoid modifying the original during detection
-        Map<String, List<String>> headersCopy = new HashMap<>();
-        if (request.getHeaders() != null) {
-            request.getHeaders().forEach((key, value) -> {
-                headersCopy.put(key, new ArrayList<>(value));
-            });
-        }
-        return new OriginalHttpRequest(
-            request.getUrl(),
-            request.getQueryParams(),
-            request.getMethod(),
-            request.getBody(),
-            headersCopy,
-            request.getType()
-        );
-    }
-    
-    private void updateTransportType(ApiCollection apiCollection, String transportType) {
-        try {
-            Bson filter = Filters.eq(ApiCollection.ID, apiCollection.getId());
-            Bson update = Updates.set(ApiCollection.MCP_TRANSPORT_TYPE, transportType);
-            ApiCollectionsDao.instance.updateOne(filter, update);
-            apiCollection.setMcpTransportType(transportType);
-            logger.info("Updated transport type to {} for collection: {}", transportType, apiCollection.getId());
-        } catch (Exception e) {
-            logger.warn("Failed to update transport type in database: {}", e.getMessage());
-        }
     }
 
     private HttpResponseParams convertToAktoFormat(int apiCollectionId, String path, String requestHeaders, String method,
