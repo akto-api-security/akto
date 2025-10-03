@@ -33,6 +33,10 @@ function ImpervaImport() {
         })
     }
 
+    const goToDocs = () => {
+        window.open("https://docs.akto.io/traffic-connector/manual/imperva", '_blank')
+    }
+
     return (
         <div className='card-items'>
             <Text variant='bodyMd'>
@@ -63,6 +67,7 @@ function ImpervaImport() {
                     loading={loading}>
                         Upload
                     </Button>
+                    <Button onClick={goToDocs}>Go to docs</Button>
                 </ButtonGroup>
             </VerticalStack>
         </div>
