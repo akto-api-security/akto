@@ -218,6 +218,14 @@ const api = {
         })
     },
 
+    importImpervaSchema(formData) {
+        return request({
+            url: '/api/importImpervaSchema',
+            method: 'post',
+            data: formData,
+        })
+    },
+
 }
 
 export default api
