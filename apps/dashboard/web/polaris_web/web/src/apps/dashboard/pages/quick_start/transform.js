@@ -16,7 +16,7 @@ import GithubSource from "./components/GithubSource"
 import AktoJax from "./components/AktoJax"  
 import McpScan from "./components/McpScan" 
 import AiAgentScan from "./components/AiAgentScan"
-import { isApiSecurityCategory, isGenAISecurityCategory, isMCPSecurityCategory } from "../../../main/labelHelper"
+import { isApiSecurityCategory, isGenAISecurityCategory, isMCPSecurityCategory, isAgenticSecurityCategory } from "../../../main/labelHelper"
 import McpRecon from "./components/McpRecon"
 import McpProxy from "./components/McpProxy"
 import AwsLogAccountComponent from "./components/shared/AwsLogAccountComponent"
@@ -1425,13 +1425,13 @@ const quickStartFunc = {
 
         let connectors = {}
 
-        if(isGenAISecurityCategory()){
+        if(isGenAISecurityCategory() || isAgenticSecurityCategory()){
             connectors["AI Agent Scan"] = aiAgentGateways
             connectors["AI Agent Security"] = aiAgentConnectors
             connectors["AI Model Security"] = aiScanConnectors
         }
 
-        if(isMCPSecurityCategory()){
+        if(isMCPSecurityCategory() || isAgenticSecurityCategory()){
             connectors["MCP Scan"] = mcpScan
         }
 
@@ -1478,7 +1478,7 @@ const quickStartFunc = {
             apigeeObj, iisObj, azureObj, cloudflareObj, f5Obj, goObj, haproxyObj, javaObj, kongmeshObj, layer7Obj, nodejsObj, openshiftObj, threescaleObj, githubObj, gitlabObj, bitbucketObj, aktoJaxObj
         ]
 
-        if(isGenAISecurityCategory()){
+        if(isGenAISecurityCategory() || isAgenticSecurityCategory()){
             connectorsList = connectorsList.concat([
                 geminiObj, openAIObj, claudeObj, deepseekObj, llamaObj, grokObj, customAIObj,
                 awsBedrockObj, azureAIFoundryObj, databricksObj, googleVertexAIObj, ibmWatsonxObj, customAgentObj, agenticShieldObj

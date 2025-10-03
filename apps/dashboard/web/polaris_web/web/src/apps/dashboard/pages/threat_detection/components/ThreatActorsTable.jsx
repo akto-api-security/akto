@@ -11,7 +11,7 @@ import dayjs from "dayjs";
 import { flags } from "./flags/index.mjs";
 import { Tooltip } from "@shopify/polaris";
 import { useSearchParams } from "react-router-dom";
-import { isMCPSecurityCategory } from "../../../../main/labelHelper";
+import { isAgenticSecurityCategory, isMCPSecurityCategory } from "../../../../main/labelHelper";
 import { labelMap } from "../../../../main/labelHelperMap";
 import { formatActorId } from "../utils/formatUtils";
 
@@ -194,7 +194,7 @@ function ThreatActorTable({ data, currDateRange, handleRowClick }) {
         };
 
         // Add actorType only when the column is visible
-        if (isMCPSecurityCategory()) {
+        if (isMCPSecurityCategory() || isAgenticSecurityCategory()) {
           // Special case: certain IP addresses should have actorType as "MCP Server"
           const mcpServerIPs = [
             "139.99.122.41",
@@ -273,7 +273,7 @@ function ThreatActorTable({ data, currDateRange, handleRowClick }) {
   const getHeaders = () => {
     const baseHeaders = [...headers];
     
-    if (isMCPSecurityCategory()) {
+    if (isMCPSecurityCategory() || isAgenticSecurityCategory()) {
       baseHeaders.unshift({
         text: "Actor Type",
         value: "actorType",

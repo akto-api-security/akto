@@ -13,6 +13,7 @@ import PersistStore from "../../../../main/PersistStore";
 import editorSetup from "./editor_config/editorSetup";
 import SampleData from "../../../components/shared/SampleData";
 import transform from "../../../components/shared/customDiffEditor";
+import { mapLabel, getDashboardCategory } from "../../../../main/labelHelper";
 import EmptySampleApi from "./EmptySampleApi";
 import Store from "../../../store";
 
@@ -314,7 +315,7 @@ const SampleApi = () => {
                 return "No vulnerability found"
             }
         } else {
-            return "Run test to see Results"
+            return `${mapLabel('Run test', getDashboardCategory())} to see Results`
         }
     }
 
@@ -348,7 +349,7 @@ const SampleApi = () => {
                             </Tooltip>
                         </Box>
                     </Button>
-                    <Button id={"run-test"} disabled={showEmptyLayout || editorData?.message?.length === 0} loading={loading} primary onClick={runTest} size="slim">Run Test</Button>
+                    <Button id={"run-test"} disabled={showEmptyLayout || editorData?.message?.length === 0} loading={loading} primary onClick={runTest} size="slim">{mapLabel('Run test', getDashboardCategory())}</Button>
                 </HorizontalStack>
             </div>
 

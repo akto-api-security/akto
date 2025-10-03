@@ -20,6 +20,7 @@ import JiraTicketCreationModal from '../../../components/shared/JiraTicketCreati
 import MarkdownViewer from '../../../components/shared/MarkdownViewer.jsx'
 import InlineEditableText from '../../../components/shared/InlineEditableText.jsx'
 import ChatInterface from '../../../components/shared/ChatInterface.jsx'
+import { getDashboardCategory, mapLabel } from '../../../../main/labelHelper.js'
 
 function TestRunResultFlyout(props) {
 
@@ -632,7 +633,7 @@ function TestRunResultFlyout(props) {
         <TitleComponent/>, tabsComponent
     ]
 
-    const title = isIssuePage ? "Issue details" : "Test result"
+    const title = isIssuePage ? "Issue details" : mapLabel('Test result', getDashboardCategory())
 
     return (
         <FlyLayout
