@@ -71,23 +71,21 @@ public class ImpervaImportAction extends UserAction {
                 return ERROR.toUpperCase();
             }
 
+            ApiCollection apiCollection = getOrCreateCollection(collectionName);
+            if (apiCollection == null) {
+                addActionError("Failed to create or find collection: " + collectionName);
+                return ERROR.toUpperCase();
+            }
+
+            final int collectionId = apiCollection.getId();
             final int accountId = Context.accountId.get();
+
             executorService.submit(new Runnable() {
                 public void run() {
                     Context.accountId.set(accountId);
 
                     try {
                         loggerMaker.debugAndAddToDb("Starting to process Imperva file", LogDb.DASHBOARD);
-
-                        // Create or find collection by hostname
-                        ApiCollection apiCollection = getOrCreateCollection(collectionName);
-                        if (apiCollection == null) {
-                            loggerMaker.errorAndAddToDb("Failed to create or find collection: " + collectionName, LogDb.DASHBOARD);
-                            return;
-                        }
-
-                        int collectionId = apiCollection.getId();
-
                         // Parse Imperva schema (already deserialized)
                         ParserResult parsedResult = ImpervaSchemaParser.convertImpervaSchemaToAkto(
                             impervaSchema, null, true, generateMultipleSamples
@@ -105,8 +103,10 @@ public class ImpervaImportAction extends UserAction {
                                 .collect(Collectors.toList());
 
                         String topic = System.getenv("AKTO_KAFKA_TOPIC_NAME");
-                        if (topic == null) topic = "akto.api.logs";
-
+                        if (topic == null) {
+                            topic = "akto.api.logs";
+                        }
+                        
                         try {
                             loggerMaker.debugAndAddToDb("Calling Utils.pushDataToKafka for imperva file, for apiCollection id " + collectionId, LogDb.DASHBOARD);
                             Utils.pushDataToKafka(collectionId, topic, stringMessages, stringErrors, true, false, true);
