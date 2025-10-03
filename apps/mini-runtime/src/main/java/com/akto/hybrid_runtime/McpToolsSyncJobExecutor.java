@@ -375,14 +375,14 @@ public class McpToolsSyncJobExecutor {
             } catch (Exception sseException) {
                 logger.info("SSE transport failed, falling back to HTTP transport: {}", sseException.getMessage());
                 // Fall back to HTTP - no need to test, just store it
-                dataActor.updateTransportType(apiCollection.getId(), TRANSPORT_SSE);
+                dataActor.updateTransportType(apiCollection.getId(), TRANSPORT_HTTP);
                 return TRANSPORT_HTTP;
             }
         }
 
         // Default to HTTP if no sseCallbackUrl
         logger.info("No SSE callback URL found, using HTTP transport for: {}", apiCollection.getHostName());
-        dataActor.updateTransportType(apiCollection.getId(), TRANSPORT_SSE);
+        dataActor.updateTransportType(apiCollection.getId(), TRANSPORT_HTTP);
         return TRANSPORT_HTTP;
     }
     private String sendRequest(OriginalHttpRequest request, ApiCollection apiCollection) throws Exception {
