@@ -24,4 +24,9 @@ public class Constants {
     public static final String AKTO_MCP_SERVER_TAG = "mcp-server";
     public static final String AKTO_MCP_TOOLS_TAG = "mcp-tool";
     public static final String AKTO_MCP_RESOURCES_TAG = "mcp-resource";
+
+    public static final String STATUS_PENDING = "Pending";
+    public static final String STATUS_IN_PROGRESS = "In Progress";
+    public static final String STATUS_COMPLETED = "Completed";
+    public static final String STATUS_FAILED = "Failed";
 }

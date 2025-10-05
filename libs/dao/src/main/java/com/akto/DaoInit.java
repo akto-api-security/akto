@@ -389,6 +389,7 @@ public class DaoInit {
 
         ApiInfoDao.instance.createIndicesIfAbsent();
         RuntimeLogsDao.instance.createIndicesIfAbsent();
+        RuntimePersistentLogsDao.instance.createIndicesIfAbsent();
         LogsDao.instance.createIndicesIfAbsent();
         DashboardLogsDao.instance.createIndicesIfAbsent();
         AnalyserLogsDao.instance.createIndicesIfAbsent();
@@ -407,6 +408,8 @@ public class DaoInit {
         RBACDao.instance.createIndicesIfAbsent();
         RuntimeMetricsDao.instance.createIndicesIfAbsent();
         JobsDao.instance.createIndicesIfAbsent();
+        McpReconRequestDao.instance.createIndicesIfAbsent();
+        McpReconResultDao.instance.createIndicesIfAbsent();
     }
 
 }
