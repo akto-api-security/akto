@@ -23,6 +23,7 @@ import com.akto.dto.traffic_metrics.TrafficMetrics;
 import com.akto.dto.type.URLMethods.Method;
 import com.akto.dto.usage.MetricTypes;
 import com.akto.graphql.GraphQLUtils;
+import com.akto.imperva.ImpervaUtils;
 import com.akto.jsonrpc.JsonRpcUtils;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
@@ -682,6 +683,15 @@ public class HttpCallParser {
             } else {
                 filteredResponseParams.addAll(responseParamsList);
                 loggerMaker.infoAndAddToDb("Adding " + responseParamsList.size() + "new graphql endpoints in inventory",LogDb.RUNTIME);
+            }
+
+            // Handle imperva response params (for VISA)
+            List<HttpResponseParams> impervaResponseParamsList = ImpervaUtils.parseImpervaResponse(httpResponseParam);
+            if (impervaResponseParamsList.isEmpty()) {
+                filteredResponseParams.add(httpResponseParam);
+            } else {
+                filteredResponseParams.addAll(impervaResponseParamsList);
+                loggerMaker.infoAndAddToDb("Added " + impervaResponseParamsList.size() + "new imperva endpoints in inventory");
             }
 
             if (httpResponseParam.getSource().equals(HttpResponseParams.Source.MIRRORING)) {
