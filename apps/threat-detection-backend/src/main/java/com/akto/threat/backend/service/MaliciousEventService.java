@@ -1,5 +1,6 @@
 package com.akto.threat.backend.service;
 
+import com.akto.dto.threat_detection_backend.MaliciousEventDto;
 import com.akto.dto.type.URLMethods;
 import com.akto.kafka.Kafka;
 import com.akto.kafka.KafkaConfig;
@@ -16,7 +17,6 @@ import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.Ti
 import com.akto.proto.generated.threat_detection.service.malicious_alert_service.v1.RecordMaliciousEventRequest;
 import com.akto.threat.backend.constants.KafkaTopic;
 import com.akto.threat.backend.constants.MongoDBCollection;
-import com.akto.threat.backend.db.MaliciousEventModel;
 import com.akto.threat.backend.utils.KafkaUtils;
 import com.akto.threat.backend.utils.ThreatUtils;
 import com.akto.threat.backend.constants.StatusConstants;
@@ -24,7 +24,6 @@ import com.mongodb.client.*;
 import com.mongodb.client.model.Filters;
 
 import java.util.*;
-import java.util.List;
 
 import com.mongodb.client.model.Updates;
 import org.bson.Document;
@@ -54,13 +53,13 @@ public class MaliciousEventService {
 
     EventType eventType = evt.getEventType();
 
-    MaliciousEventModel.EventType maliciousEventType =
+    MaliciousEventDto.EventType maliciousEventType =
         EventType.EVENT_TYPE_AGGREGATED.equals(eventType)
-            ? MaliciousEventModel.EventType.AGGREGATED
-            : MaliciousEventModel.EventType.SINGLE;
+            ? MaliciousEventDto.EventType.AGGREGATED
+            : MaliciousEventDto.EventType.SINGLE;
 
-    MaliciousEventModel maliciousEventModel =
-        MaliciousEventModel.newBuilder()
+    MaliciousEventDto maliciousEventModel =
+        MaliciousEventDto.newBuilder()
             .setDetectedAt(evt.getDetectedAt())
             .setActor(actor)
             .setFilterId(filterId)
@@ -87,7 +86,7 @@ public class MaliciousEventService {
   }
 
   private static <T> Set<T> findDistinctFields(
-      MongoCollection<MaliciousEventModel> coll, String fieldName, Class<T> tClass, Bson filters) {
+      MongoCollection<MaliciousEventDto> coll, String fieldName, Class<T> tClass, Bson filters) {
     DistinctIterable<T> r = coll.distinct(fieldName, filters, tClass);
     Set<T> result = new HashSet<>();
     MongoCursor<T> cursor = r.cursor();
@@ -99,10 +98,10 @@ public class MaliciousEventService {
 
   public  ThreatActorFilterResponse fetchThreatActorFilters(
       String accountId, ThreatActorFilterRequest request) {
-    MongoCollection<MaliciousEventModel> coll =
+    MongoCollection<MaliciousEventDto> coll =
         this.mongoClient
             .getDatabase(accountId)
-            .getCollection("malicious_events", MaliciousEventModel.class);
+            .getCollection("malicious_events", MaliciousEventDto.class);
 
     Set<String> latestAttack =
         MaliciousEventService.<String>findDistinctFields(
@@ -121,10 +120,10 @@ public class MaliciousEventService {
 
   public FetchAlertFiltersResponse fetchAlertFilters(
       String accountId, FetchAlertFiltersRequest request) {
-    MongoCollection<MaliciousEventModel> coll =
+    MongoCollection<MaliciousEventDto> coll =
         this.mongoClient
             .getDatabase(accountId)
-            .getCollection("malicious_events", MaliciousEventModel.class);
+            .getCollection("malicious_events", MaliciousEventDto.class);
 
     Set<String> actors =
         MaliciousEventService.<String>findDistinctFields(
@@ -155,11 +154,11 @@ public class MaliciousEventService {
       return ListMaliciousRequestsResponse.newBuilder().build();
     }
 
-    MongoCollection<MaliciousEventModel> coll =
+    MongoCollection<MaliciousEventDto> coll =
         this.mongoClient
             .getDatabase(accountId)
             .getCollection(
-                MongoDBCollection.ThreatDetection.MALICIOUS_EVENTS, MaliciousEventModel.class);
+                MongoDBCollection.ThreatDetection.MALICIOUS_EVENTS, MaliciousEventDto.class);
 
     Document query = new Document();
     if (!filter.getActorsList().isEmpty()) {
@@ -217,7 +216,7 @@ public class MaliciousEventService {
     }
 
     long total = coll.countDocuments(query);
-    try (MongoCursor<MaliciousEventModel> cursor =
+    try (MongoCursor<MaliciousEventDto> cursor =
         coll.find(query)
             .sort(new Document("detectedAt", sort.getOrDefault("detectedAt", -1)))
             .skip(skip)
@@ -225,7 +224,7 @@ public class MaliciousEventService {
             .cursor()) {
       List<ListMaliciousRequestsResponse.MaliciousEvent> maliciousEvents = new ArrayList<>();
       while (cursor.hasNext()) {
-        MaliciousEventModel evt = cursor.next();
+        MaliciousEventDto evt = cursor.next();
         String metadata = evt.getMetadata() != null ? evt.getMetadata() : "";
 
         maliciousEvents.add(
@@ -265,8 +264,8 @@ public class MaliciousEventService {
 
   public int updateMaliciousEventStatus(String accountId, List<String> eventIds, Map<String, Object> filterMap, String status) {
     try {
-      MongoCollection<MaliciousEventModel> coll = getMaliciousEventCollection(accountId);
-      MaliciousEventModel.Status eventStatus = MaliciousEventModel.Status.valueOf(status.toUpperCase());
+      MongoCollection<MaliciousEventDto> coll = getMaliciousEventCollection(accountId);
+      MaliciousEventDto.Status eventStatus = MaliciousEventDto.Status.valueOf(status.toUpperCase());
       Bson update = Updates.set("status", eventStatus.toString());
 
       Document query = buildQuery(eventIds, filterMap, "update");
@@ -288,7 +287,7 @@ public class MaliciousEventService {
 
   public int deleteMaliciousEvents(String accountId, List<String> eventIds, Map<String, Object> filterMap) {
     try {
-      MongoCollection<MaliciousEventModel> coll = getMaliciousEventCollection(accountId);
+      MongoCollection<MaliciousEventDto> coll = getMaliciousEventCollection(accountId);
       
       Document query = buildQuery(eventIds, filterMap, "delete");
       if (query == null) {
@@ -308,11 +307,11 @@ public class MaliciousEventService {
     }
   }
 
-  private MongoCollection<MaliciousEventModel> getMaliciousEventCollection(String accountId) {
+  private MongoCollection<MaliciousEventDto> getMaliciousEventCollection(String accountId) {
     return this.mongoClient
         .getDatabase(accountId)
         .getCollection(
-            MongoDBCollection.ThreatDetection.MALICIOUS_EVENTS, MaliciousEventModel.class);
+            MongoDBCollection.ThreatDetection.MALICIOUS_EVENTS, MaliciousEventDto.class);
   }
 
   private Document buildQuery(List<String> eventIds, Map<String, Object> filterMap, String operation) {

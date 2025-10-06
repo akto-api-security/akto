@@ -1,10 +1,10 @@
 package com.akto.threat.backend.dao;
 
+import com.akto.dto.threat_detection_backend.MaliciousEventDto;
 import com.akto.threat.backend.constants.MongoDBCollection;
-import com.akto.threat.backend.db.MaliciousEventModel;
 import com.mongodb.client.MongoCollection;
 
-public class MaliciousEventDao extends AccountBasedDao<MaliciousEventModel> {
+public class MaliciousEventDao extends AccountBasedDao<MaliciousEventDto> {
 
     public static final MaliciousEventDao instance = new MaliciousEventDao();
 
@@ -16,15 +16,15 @@ public class MaliciousEventDao extends AccountBasedDao<MaliciousEventModel> {
     }
 
     @Override
-    protected Class<MaliciousEventModel> getClassType() {
-        return MaliciousEventModel.class;
+    protected Class<MaliciousEventDto> getClassType() {
+        return MaliciousEventDto.class;
     }
 
-    public void insertOne(String accountId, MaliciousEventModel event) {
+    public void insertOne(String accountId, MaliciousEventDto event) {
         getCollection(accountId).insertOne(event);
     }
 
-    public MongoCollection<MaliciousEventModel> getCollection(String accountId) {
+    public MongoCollection<MaliciousEventDto> getCollection(String accountId) {
         return super.getCollection(accountId);
     }
 }
