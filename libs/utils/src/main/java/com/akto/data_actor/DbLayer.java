@@ -181,7 +181,7 @@ public class DbLayer {
                 try {
                     fetchAndFailOutdatedTests();
                 } catch (Exception e) {
-                    loggerMaker.errorAndAddToDb("Error while updating out");
+                    loggerMaker.errorAndAddToDb(e, "Error while updating outdated tests: " + e.getMessage());
                     //Ignore
                 }
                 lastUpdatedTsMap.put(Context.accountId.get(), Context.now());
@@ -203,7 +203,7 @@ public class DbLayer {
 
         for (TestingRun testingRun : testingRunList) {
             String miniTestingServiceName = testingRun.getMiniTestingServiceName();
-            if(!miniTestingServiceName.isEmpty()) {
+            if(miniTestingServiceName != null && !miniTestingServiceName.isEmpty()) {
                 List<ModuleInfo> moduleInfos = ModuleInfoDao.instance.
                         findAll(Filters.eq(ModuleInfo.NAME, miniTestingServiceName), 0, 1,
                                 Sorts.descending(ModuleInfo.LAST_HEARTBEAT_RECEIVED));
@@ -246,9 +246,53 @@ public class DbLayer {
     }
 
     public static List<ApiInfo> fetchApiInfos() {
-        return ApiInfoDao.instance.findAll(new BasicDBObject());
+        return ApiInfoDao.instance.findAll(new BasicDBObject(), Projections.exclude(ApiInfo.RATELIMITS));
     }
 
+    public static List<ApiInfo> fetchApiRateLimits(ApiInfo.ApiInfoKey lastApiInfoKey) {
+        // Filter for documents that have both rateLimits and rateLimitConfidence fields
+        Bson existsFilter = Filters.and(
+            Filters.ne("rateLimits", null),
+            Filters.ne("rateLimitConfidence", null)
+        );
+        
+        Bson filters = existsFilter;
+        
+        // Add pagination filter if lastApiInfoKey is provided
+        if (lastApiInfoKey != null) {
+            // Create proper compound key comparison for pagination
+            // This handles the compound _id structure properly
+            Bson paginationFilter = Filters.or(
+                Filters.gt("_id.apiCollectionId", lastApiInfoKey.getApiCollectionId()),
+                Filters.and(
+                    Filters.eq("_id.apiCollectionId", lastApiInfoKey.getApiCollectionId()),
+                    Filters.gt("_id.method", lastApiInfoKey.getMethod())
+                ),
+                Filters.and(
+                    Filters.eq("_id.apiCollectionId", lastApiInfoKey.getApiCollectionId()),
+                    Filters.eq("_id.method", lastApiInfoKey.getMethod()),
+                    Filters.gt("_id.url", lastApiInfoKey.getUrl())
+                )
+            );
+            filters = Filters.and(existsFilter, paginationFilter);
+        }
+
+        int limit = 1000;
+        
+        Bson projection = Projections.fields(
+            Projections.include("_id", "rateLimits", "rateLimitConfidence")
+        );
+        
+        // Ensure consistent ordering with compound _id sorting
+        Bson sort = Sorts.orderBy(
+            Sorts.ascending("_id.apiCollectionId"),
+            Sorts.ascending("_id.method"), 
+            Sorts.ascending("_id.url")
+        );
+        
+        return ApiInfoDao.instance.findAll(filters, 0 , limit, sort, projection);
+    }
+    
     public static List<ApiInfo> fetchNonTrafficApiInfos() {
         List<ApiCollection> nonTrafficApiCollections = ApiCollectionsDao.instance.fetchNonTrafficApiCollections();
         List<Integer> apiCollectionIds = new ArrayList<>();
@@ -506,8 +550,8 @@ public class DbLayer {
             return tags;
         }
 
-        Set<CollectionTags> mergedTags = new HashSet<>(apiCollection.getTagsList());
-        mergedTags.addAll(tags);
+        Set<CollectionTags> mergedTags = new HashSet<>(tags);
+        mergedTags.addAll(apiCollection.getTagsList());
 
         tags = new ArrayList<>(mergedTags);
 
@@ -522,11 +566,21 @@ public class DbLayer {
 
         ApiCollection apiCollection = ApiCollectionsDao.instance.findOne(filters);
         String userEnv = vpcId;
+        boolean vpcIdAlreadyExists = false;
+        
         if (userEnv != null && apiCollection != null && apiCollection.getUserSetEnvType() != null) {
             userEnv = apiCollection.getUserSetEnvType();
             if (!userEnv.contains(vpcId)) {
                 userEnv += ", " + vpcId;
+            } else {
+                vpcIdAlreadyExists = true;
             }
+        }
+
+        // Skip update for existing apiCollection if vpc and tags are same.
+        if ( apiCollection != null && (vpcId == null || vpcIdAlreadyExists) && (tags == null || tags.isEmpty())) {
+            loggerMaker.info("No new tags or vpcId, Updates skipped for collectionId: " + vxlanId);
+            return;
         }
 
         Bson update = Updates.combine(
@@ -572,11 +626,20 @@ public class DbLayer {
 
         ApiCollection apiCollection = ApiCollectionsDao.instance.findOne(Filters.eq(ApiCollection.HOST_NAME, host));
         String userEnv = vpcId;
+        boolean vpcIdAlreadyExists = false;
         if (userEnv != null && apiCollection != null && apiCollection.getUserSetEnvType() != null) {
             userEnv = apiCollection.getUserSetEnvType();
             if (!userEnv.contains(vpcId)) {
                 userEnv += ", " + vpcId;
+            } else {
+                vpcIdAlreadyExists = true;
             }
+        }
+
+        // Skip update for existing apiCollection if vpc and tags are same.
+        if ( apiCollection != null && (vpcId == null || vpcIdAlreadyExists) && (tags == null || tags.isEmpty())) {
+            loggerMaker.info("No new tags or vpcId, Updates skipped for collectionId: " + id);
+            return;
         }
 
         Bson updates = Updates.combine(
@@ -598,6 +661,10 @@ public class DbLayer {
 
     public static void insertRuntimeLog(Log log) {
         RuntimeLogsDao.instance.insertOne(log);
+    }
+
+    public static void insertPersistentRuntimeLog(Log log) {
+        RuntimePersistentLogsDao.instance.insertOne(log);
     }
 
     public static void insertAnalyserLog(Log log) {
@@ -1108,12 +1175,26 @@ public class DbLayer {
         ObjectId summaryObjectId = new ObjectId(summaryId);
         FindOneAndUpdateOptions options = new FindOneAndUpdateOptions();
         options.returnDocument(ReturnDocument.AFTER);
+        Bson update = Updates.combine(
+            Updates.set(TestingRunResultSummary.END_TIMESTAMP, Context.now()),
+            Updates.set(TestingRunResultSummary.STATE, state)
+        );
+        if(totalCountIssues != null){
+            boolean hasAnyIssue = false;
+            for(Map.Entry<String, Integer> entry : totalCountIssues.entrySet()){
+                if(entry.getValue() > 0){
+                    hasAnyIssue = true;
+                    break;
+                }
+            }
+            if(hasAnyIssue){
+                update = Updates.combine(update, Updates.set(TestingRunResultSummary.COUNT_ISSUES, totalCountIssues));
+            }
+        }
         return TestingRunResultSummariesDao.instance.getMCollection().findOneAndUpdate(
                 Filters.eq(Constants.ID, summaryObjectId),
-                Updates.combine(
-                        Updates.set(TestingRunResultSummary.END_TIMESTAMP, Context.now()),
-                        Updates.set(TestingRunResultSummary.STATE, state)
-                ),options);
+                update
+            ,options);
     }
 
     public static List<Integer> fetchDeactivatedCollections() {
@@ -1702,5 +1783,34 @@ public class DbLayer {
 
     public static List<SlackWebhook> fetchSlackWebhooks() {
         return SlackWebhooksDao.instance.findAll(Filters.empty());
+    }
+
+    public static List<McpReconRequest> fetchPendingMcpReconRequests() {
+        // Fetch all requests where status is "Pending"
+        Bson filter = Filters.eq(McpReconRequest.STATUS, Constants.STATUS_PENDING);
+        return McpReconRequestDao.instance.findAll(filter);
+    }
+
+    public static void updateMcpReconRequestStatus(Object requestId, String newStatus, int serversFound) {
+        Bson filter = Filters.eq(McpReconRequest.ID, requestId);
+        Bson updates;
+        if (newStatus.equals(Constants.STATUS_IN_PROGRESS)) {
+            updates = Updates.combine(
+                    Updates.set(McpReconRequest.STATUS, newStatus),
+                    Updates.set(McpReconRequest.STARTED_AT, Context.now())
+            );
+        } else {   // For completed or failed status
+            updates = Updates.combine(
+                    Updates.set(McpReconRequest.STATUS, newStatus),
+                    Updates.set(McpReconRequest.SERVERS_FOUND, serversFound),
+                    Updates.set(McpReconRequest.FINISHED_AT, Context.now())
+            );
+        }
+        McpReconRequestDao.instance.updateOneNoUpsert(filter, updates);
+    }
+
+    public static void storeMcpReconResultsBatch(List<McpReconResult> serverDataList) {
+        // Batch store MCP server discovery results using DAO
+        McpReconResultDao.instance.insertMany(serverDataList);
     }
 }

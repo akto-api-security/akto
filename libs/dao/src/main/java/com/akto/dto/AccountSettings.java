@@ -110,6 +110,11 @@ public class AccountSettings {
     @Setter
     private boolean allowMergingOnVersions;
 
+    @Getter
+    @Setter
+    private String awsAccountIdsForApiGatewayLogging;
+    public static final String AWS_ACCOUNT_IDS_FOR_API_GATEWAY_LOGGING = "awsAccountIdsForApiGatewayLogging";
+
     public AccountSettings() {
     }
 

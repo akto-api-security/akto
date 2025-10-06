@@ -11,6 +11,8 @@ import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.Accumulators;
 import com.mongodb.client.model.Aggregates;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.IndexOptions;
+import com.mongodb.client.model.Indexes;
 import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.Sorts;
 import com.mongodb.client.model.UnwindOptions;
@@ -76,6 +78,11 @@ public class ApiInfoDao extends AccountsContextDao<ApiInfo>{
 
         MCollection.createIndexIfAbsent(getDBName(), getCollName(),
                 new String[] { ApiInfo.RISK_SCORE, ApiInfo.ID_API_COLLECTION_ID }, false);
+        
+        // Create sparse index for rate limits pagination
+        IndexOptions sparseIndex = new IndexOptions().sparse(true);
+        Bson rateLimitsIndex = Indexes.ascending("rateLimits", "rateLimitConfidence", "_id");
+        createIndexIfAbsent(getDBName(), getCollName(), rateLimitsIndex, sparseIndex.name("rateLimits_confidence_id_sparse"));
     }
     
 
