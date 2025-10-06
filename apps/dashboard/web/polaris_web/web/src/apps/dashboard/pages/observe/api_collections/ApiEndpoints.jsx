@@ -1113,6 +1113,10 @@ function ApiEndpoints(props) {
         setShowApiGroupModal(false);
     }
 
+    const canShowTags = (headerName) => {
+        return (isApiGroup || isQueryPage && (headerName === 'Tags' || headerName === 'Collection'));
+    }
+
     const promotedBulkActions = (selectedResources) => {
 
         let ret = [
@@ -1188,7 +1192,7 @@ function ApiEndpoints(props) {
         filters={[]}
         disambiguateLabel={disambiguateLabel}
         headers={headers.filter(x => {
-            if (!isApiGroup && (x.text === 'Collection' || x.text === 'Tags')) {
+            if (!canShowTags(x.text)) {
                 return false;
             }
             return true;
@@ -1200,7 +1204,7 @@ function ApiEndpoints(props) {
         getFilteredItems={getFilteredItems}
         mode={IndexFiltersMode.Default}
         headings={headings.filter(x => {
-            if (!isApiGroup && (x.text === 'Collection' || x.text === 'Tags')) {
+            if (!canShowTags(x.text)) {
                 return false;
             }
             return true;
