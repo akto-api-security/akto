@@ -28,16 +28,6 @@ func (pv *PolicyValidator) Validate(ctx context.Context, request *types.Validati
 	return pv.validatePayload(ctx, request, true) // Default to request for backward compatibility
 }
 
-// ValidateRequest validates request payloads against loaded policies
-func (pv *PolicyValidator) ValidateRequest(ctx context.Context, request *types.ValidationRequest) *types.ValidationResponse {
-	return pv.validatePayload(ctx, request, true)
-}
-
-// ValidateResponse validates response payloads against loaded policies
-func (pv *PolicyValidator) ValidateResponse(ctx context.Context, request *types.ValidationRequest) *types.ValidationResponse {
-	return pv.validatePayload(ctx, request, false)
-}
-
 // validatePayload is the internal method that handles the actual validation logic
 func (pv *PolicyValidator) validatePayload(ctx context.Context, request *types.ValidationRequest, isRequest bool) *types.ValidationResponse {
 	response := types.NewValidationResponse()
