@@ -30,47 +30,56 @@ public class ImpervaUtils {
 
 
     public static List<HttpResponseParams> parseImpervaResponse(HttpResponseParams responseParams) {
-        String requestPayload = responseParams.getRequestParams().getPayload();
-
-        if (!isImpervaRequest(responseParams)) {
-            return Collections.emptyList();
-        }
-
-        Map<String, Object> payloadMap = JsonUtils.getMap(requestPayload);
-        if (payloadMap == null || payloadMap.isEmpty()) {
-            return Collections.emptyList();
-        }
-
-        List<HttpResponseParams> results = new java.util.ArrayList<>();
-
-        for (Map.Entry<String, Object> entry : payloadMap.entrySet()) {
-            String rootKey = entry.getKey();
-            Object subPayloadObj = entry.getValue();
-
-            String newUrl = HttpResponseParams.addPathParamToUrl(responseParams.getRequestParams().getURL(), rootKey);
-            String computedPayload;
-            try {
-                Map<String, Object> payloadWithRootKey = new java.util.HashMap<>();
-                payloadWithRootKey.put(rootKey, subPayloadObj);
-                computedPayload = mapper.writeValueAsString(payloadWithRootKey);
-            } catch (Exception e) {
-                logger.error("[Skipping] Error while creating JSON for Imperva Reuqest. key: {}", rootKey, e);
-                continue;
+        try {
+            if (responseParams == null || responseParams.getRequestParams() == null) {
+                return Collections.emptyList();
             }
-            final String newRequestPayload = computedPayload;
 
-            HttpResponseParams copy = responseParams.copy();
-            copy.getRequestParams().setUrl(newUrl);
-            copy.getRequestParams().setPayload(newRequestPayload);
+            String requestPayload = responseParams.getRequestParams().getPayload();
 
-            copy.setPayload("");
-            copy.setHeaders(Collections.emptyMap());
+            if (!isImpervaRequest(responseParams)) {
+                return Collections.emptyList();
+            }
 
-            modifyOriginalHttpMessage(copy, newRequestPayload);
-            results.add(copy);
+            Map<String, Object> payloadMap = JsonUtils.getMap(requestPayload);
+            if (payloadMap == null || payloadMap.isEmpty()) {
+                return Collections.emptyList();
+            }
+
+            List<HttpResponseParams> results = new java.util.ArrayList<>();
+
+            for (Map.Entry<String, Object> entry : payloadMap.entrySet()) {
+                String rootKey = entry.getKey();
+                Object subPayloadObj = entry.getValue();
+
+                String newUrl = HttpResponseParams.addPathParamToUrl(responseParams.getRequestParams().getURL(),
+                    rootKey);
+                String computedPayload;
+                try {
+                    Map<String, Object> payloadWithRootKey = new java.util.HashMap<>();
+                    payloadWithRootKey.put(rootKey, subPayloadObj);
+                    computedPayload = mapper.writeValueAsString(payloadWithRootKey);
+                } catch (Exception e) {
+                    logger.error("[Skipping] Error while creating JSON for Imperva Reuqest. key: {}", rootKey, e);
+                    continue;
+                }
+                final String newRequestPayload = computedPayload;
+
+                HttpResponseParams copy = responseParams.copy();
+                copy.getRequestParams().setUrl(newUrl);
+                copy.getRequestParams().setPayload(newRequestPayload);
+
+                copy.setPayload("");
+                copy.setHeaders(Collections.emptyMap());
+
+                modifyOriginalHttpMessage(copy, newRequestPayload);
+                results.add(copy);
+            }
+            return results;
+        } catch (Exception e) {
+            logger.error("Error parsing response in ImpervaUtils", e);
+            return Collections.emptyList();
         }
-
-        return results;
     }
 
     private static boolean isImpervaRequest(HttpResponseParams responseParams) {
@@ -91,7 +100,7 @@ public class ImpervaUtils {
             List<String> headerValues = entry.getValue();
 
             if ("host".equals(headerKey)) {
-                isHostHeaderVisa = headerValues.stream().anyMatch(header -> header.contains(VISA_HOST));
+                isHostHeaderVisa = headerValues.stream().anyMatch(VISA_HOST::equals);
             }
 
             if ("content-type".equals(headerKey)) {
