@@ -20,6 +20,7 @@ import TitleWithInfo from "@/apps/dashboard/components/shared/TitleWithInfo"
 import LocalStore from "../../../main/LocalStorageStore"
 import func from "../../../../util/func"
 import transform from "../testing/transform"
+import { getDashboardCategory, mapLabel } from "../../../main/labelHelper"
 
 const TestEditor = () => {
     const navigate = useNavigate()
@@ -121,7 +122,7 @@ const TestEditor = () => {
             <HorizontalStack gap="5">
                 <Button onClick={handleExit} icon={ExitMajor} plain/>
                 <HorizontalStack gap={"2"}>
-                    <TitleWithInfo docsUrl={"https://docs.akto.io/test-editor/concepts"} tooltipContent={"Test editor playground"} titleText={"Test Editor"} />
+                    <TitleWithInfo docsUrl={"https://docs.akto.io/test-editor/concepts"} tooltipContent={"Test editor playground"} titleText={mapLabel("Test Editor", getDashboardCategory())} />
                 </HorizontalStack>
             </HorizontalStack>
 

@@ -1,6 +1,8 @@
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards"
 import { Text, Button, IndexFiltersMode, Box, Popover, ActionList, ResourceItem, Avatar,  HorizontalStack, Icon} from "@shopify/polaris"
-import { HideMinor, ViewMinor,FileMinor } from '@shopify/polaris-icons';
+import MCPIcon from "@/assets/MCP_Icon.svg"
+import LaptopIcon from "@/assets/Laptop.svg"
+import { HideMinor, ViewMinor,FileMinor, AutomationMajor, MagicMajor } from '@shopify/polaris-icons';
 import api from "../api"
 import dashboardApi from "../../dashboard/api"
 import settingRequests from "../../settings/api"
@@ -33,7 +35,7 @@ import ReactFlow, {
   
   } from 'react-flow-renderer';
 import SetUserEnvPopupComponent from "./component/SetUserEnvPopupComponent";
-import { getDashboardCategory, mapLabel } from "../../../../main/labelHelper";
+import { getDashboardCategory, mapLabel, isMCPSecurityCategory, isAgenticSecurityCategory, isGenAISecurityCategory } from "../../../../main/labelHelper";
   
 const CenterViewType = {
     Table: 0,
@@ -43,6 +45,13 @@ const CenterViewType = {
 
 
 const headers = [
+    ...((isMCPSecurityCategory() || isAgenticSecurityCategory()) && func.isDemoAccount() ? [{
+        title: "",
+        text: "",
+        value: "iconComp",
+        isText: CellType.TEXT,
+        boxWidth: '24px'
+    }] : []),
     {
         title: mapLabel("API collection name", getDashboardCategory()),
         text: mapLabel("API collection name", getDashboardCategory()),
@@ -77,8 +86,8 @@ const headers = [
         boxWidth: '80px'
     },
     {   
-        title: 'Test coverage',
-        text: 'Test coverage', 
+        title: mapLabel('Test', getDashboardCategory()) + ' coverage',
+        text: mapLabel('Test', getDashboardCategory()) + ' coverage', 
         value: 'coverage',
         isText: CellType.TEXT,
         tooltipContent: (<Text variant="bodySm">Percentage of endpoints tested successfully in the collection</Text>),
@@ -157,10 +166,10 @@ const headers = [
         tooltipContent: 'Description of the collection'
     },
     {
-        title: "Out of Testing scope",
-        text: 'Out of Testing scope',
+        title: "Out of " + mapLabel('Testing', getDashboardCategory()) + " scope",
+        text: 'Out of ' + mapLabel('Testing', getDashboardCategory()) + ' scope',
         value: 'outOfTestingScopeComp',
-        isText: CellType.TEXT,
+        textValue: 'isOutOfTestingScope',
         filterKey: 'isOutOfTestingScope',
         tooltipContent: 'Whether the collection is excluded from testing '
     }
@@ -204,12 +213,19 @@ const convertToNewData = (collectionsArr, sensitiveInfoMap, severityInfoMap, cov
             c.rowStatus = 'critical'
             c.disableClick = true
         }
+        const tagsList = JSON.stringify(c?.tagsList || "")
         return{
             ...c,
             icon: CircleTickMajor,
             nextUrl: "/dashboard/observe/inventory/"+ c.id,
             envTypeOriginal: c?.envType,
             envType: c?.envType?.map(func.formatCollectionType),
+            ...((isMCPSecurityCategory() || isAgenticSecurityCategory()) && func.isDemoAccount() && tagsList.includes("mcp-server") ? {
+                iconComp: (<Box><img src={c.displayName?.toLowerCase().startsWith('mcp') ? MCPIcon : LaptopIcon} alt="icon" style={{width: '24px', height: '24px'}} /></Box>)
+            } : {}),
+            ...((isGenAISecurityCategory() || isAgenticSecurityCategory()) && func.isDemoAccount() && tagsList.includes("gen-ai") ? {
+                iconComp: (<Box><Icon source={tagsList.includes("AI Agent") ? AutomationMajor : MagicMajor} color={"base"}/></Box>)
+            } : {}),
             displayNameComp: (<Box maxWidth="30vw"><Text truncate fontWeight="medium">{c.displayName}</Text></Box>),
             testedEndpoints: c.urlsCount === 0 ? 0 : (coverageMap[c.id] ? coverageMap[c.id] : 0),
             sensitiveInRespTypes: sensitiveInfoMap[c.id] ? sensitiveInfoMap[c.id] : [],
@@ -515,7 +531,8 @@ function ApiCollections(props) {
                     disableClick: true,
                     deactivated: false,
                     collapsibleRow: untrackedApiDataMap[collection.id] ?
-                        transform.getUntrackedApisCollapsibleRow(untrackedApiDataMap[collection.id]) : null
+                        transform.getUntrackedApisCollapsibleRow(untrackedApiDataMap[collection.id]) : null,
+                    collapsibleRowText: untrackedApiDataMap[collection.id] ? untrackedApiDataMap[collection.id].map(x => x.url).join(", ") : null
                 } : null;
             })
             .filter(Boolean);
@@ -541,6 +558,13 @@ function ApiCollections(props) {
             }
             
             // Update sensitive info if available
+            if(sensitiveResponse == null || sensitiveResponse === undefined){
+                sensitiveResponse = {
+                    sensitiveUrlsInResponse: lastFetchedSensitiveResp?.sensitiveUrls || 0,
+                    sensitiveSubtypesInCollection: lastFetchedSensitiveResp?.sensitiveInfoMap || {}
+                }
+                
+            }
             if (sensitiveResponse) {
                 const newSensitiveInfo = {
                     sensitiveUrls: sensitiveResponse.sensitiveUrlsInResponse,
@@ -664,12 +688,21 @@ function ApiCollections(props) {
             }
 
             let headerTextToValueMap = Object.fromEntries(headers.map(x => [x.text, x.isText === CellType.TEXT ? x.value : x.textValue]).filter(x => x[0]?.length > 0));
+            if(tableSelectedTab === "untracked"){
+                headerTextToValueMap['URLs'] = "collapsibleRowText"
+            }
             let csv = Object.keys(headerTextToValueMap).join(",") + "\r\n"
-            data['all'].forEach(i => {
-                if(selectedResources.length === 0 || selectedResourcesSet.has(i.id)){
+            
+            if(selectedResources.length === 0){
+                data[tableSelectedTab].forEach(i => {
                     csv += Object.values(headerTextToValueMap).map(h => wrapCsvValue(i[h])).join(",") + "\r\n"
-                }
-            })
+                })
+            }else{
+                data[tableSelectedTab].filter((i) => selectedResourcesSet.has(i.id)).forEach(i => {
+                    csv += Object.values(headerTextToValueMap).map(h => wrapCsvValue(i[h])).join(",") + "\r\n"
+                })
+            }
+
             let blob = new Blob([csv], {
                 type: "application/csvcharset=UTF-8"
             });

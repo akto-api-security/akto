@@ -85,6 +85,7 @@ import AuditLogs from "../dashboard/pages/settings/audit_logs/AuditLogs";
 import ThreatApiPage from "../dashboard/pages/threat_detection/ThreatApiPage";
 import ThreatActorPage from "../dashboard/pages/threat_detection/ThreatActorPage";
 import ThreatPolicyPage from "../dashboard/pages/threat_detection/ThreatPolicyPage";
+import ConfigureExploitsPage from "../dashboard/pages/threat_detection/ConfigureExploitsPage";
 import TestSuite from "../dashboard/pages/testing/testSuite/TestSuite";
 import TestsTablePage from "../dashboard/pages/test_editor/tests_table/TestsTablePage";
 import Splunk from "../dashboard/pages/settings/integrations/Splunk";
@@ -98,10 +99,10 @@ import GmailWebhookCore from "../dashboard/pages/settings/integrations/gmailWebh
 import GmailWebhook from "../dashboard/pages/settings/integrations/gmailWebhooks/GmailWebhook";
 import McpSecurityPage from "../dashboard/pages/mcp-security/McpSecurityPage.jsx";
 import AuditData from "../dashboard/pages/observe/AuditData";
-import ComingSoonPage from "../dashboard/components/shared/ComingSoonPage";
 import GuardrailDetection    from "../dashboard/pages/guardrails/GuardrailDetection";
 import GuardrailPolicies   from "../dashboard/pages/guardrails/GuardrailPolicies";
 import ThreatDashboardPage from "../dashboard/pages/threat_detection/ThreatDashboardPage";
+import OpenApiAgentTester from "../dashboard/pages/observe/OpenApiAgentTester";
 
 // if you add a component in a new path, please verify the search implementation in function -> 'getSearchItemsArr' in func.js
 
@@ -197,7 +198,10 @@ const router = createBrowserRouter([
                             {
                                 path: "audit",
                                 element: <AuditData/>
-
+                            },
+                            {
+                                path: ":apiCollectionId/open-api-upload",
+                                element: <OpenApiAgentTester/>
                             }
                         ]
                     },
@@ -244,6 +248,11 @@ const router = createBrowserRouter([
                             {
                                 path: "threat-policy",
                                 element: <ThreatPolicyPage/>
+                            }
+                            ,
+                            {
+                                path: "configure-exploits",
+                                element: <ConfigureExploitsPage/>
                             }
                         ]
                     },

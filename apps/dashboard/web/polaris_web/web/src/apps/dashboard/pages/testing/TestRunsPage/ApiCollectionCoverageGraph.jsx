@@ -100,7 +100,7 @@ const ApiCollectionCoverageGraph = () => {
         />
       }
       title={mapLabel("API Collection Coverage", getDashboardCategory())}
-      titleToolTip="Overview of API testing coverage across your top collections, showing tested vs untested endpoints."
+      titleToolTip={"Overview of " + mapLabel("API testing", getDashboardCategory()) + " coverage across your top collections, showing tested vs untested endpoints."}
       linkText=""
       linkUrl=""
     />

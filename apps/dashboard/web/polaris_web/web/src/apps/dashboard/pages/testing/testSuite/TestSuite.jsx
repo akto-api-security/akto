@@ -10,7 +10,7 @@ import func from "../../../../../util/func"
 import transform from "./transform";
 import api from "../api"
 import { CellType } from "../../../components/tables/rows/GithubRow"
-import { getDashboardCategory } from "../../../../main/labelHelper"
+import { getDashboardCategory, mapLabel } from "../../../../main/labelHelper"
 
 
 const sortOptions = [
@@ -69,8 +69,8 @@ function TestSuite() {
     ]
 
     const resourceName = {
-        singular: 'test suite',
-        plural: 'test suites',
+        singular: mapLabel('test', getDashboardCategory()) + ' suite',
+        plural: mapLabel('test', getDashboardCategory()) + ' suites',
     };
 
     const handleRowClick = (data) => {
@@ -103,9 +103,9 @@ function TestSuite() {
             if (dashboardCategory === 'MCP Security') {
                 // For MCP Security, only show test suites with MCP_SECURITY suiteType
                 shouldInclude = testSuiteItem.suiteType === 'MCP_SECURITY';
-            } else if (dashboardCategory === 'Gen AI') {
-                // For Gen AI (AI Agent Security), only show test suites with AI_AGENT_SECURITY suiteType
-                shouldInclude = testSuiteItem.suiteType === 'AI_AGENT_SECURITY';
+            } else if (dashboardCategory === 'Agentic Security') {
+                // For Agentic Security, show test suites with both MCP_SECURITY and AI_AGENT_SECURITY suiteTypes
+                shouldInclude = testSuiteItem.suiteType === 'MCP_SECURITY' || testSuiteItem.suiteType === 'AI_AGENT_SECURITY';
             } else {
                 // For API Security, show test suites with OWASP suiteType (default API security)
                 shouldInclude = testSuiteItem.suiteType === 'OWASP';
@@ -221,7 +221,7 @@ function TestSuite() {
             title={
                 <TitleWithInfo
                     tooltipContent={"Create or manage custom test suites by combining tests across categories for simplified test execution and reusability."}
-                    titleText={"Test Suites"}
+                    titleText={mapLabel("Test", getDashboardCategory()) + " Suites"}
                     docsUrl={"https://docs.akto.io/api-security-testing/concepts/test"}
                 />
             }

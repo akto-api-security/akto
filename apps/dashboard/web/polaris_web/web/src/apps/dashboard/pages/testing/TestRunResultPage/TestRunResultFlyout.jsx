@@ -19,11 +19,13 @@ import settingFunctions from '../../settings/module.js'
 import JiraTicketCreationModal from '../../../components/shared/JiraTicketCreationModal.jsx'
 import MarkdownViewer from '../../../components/shared/MarkdownViewer.jsx'
 import InlineEditableText from '../../../components/shared/InlineEditableText.jsx'
+import ChatInterface from '../../../components/shared/ChatInterface.jsx'
+import { getDashboardCategory, mapLabel } from '../../../../main/labelHelper.js'
 
 function TestRunResultFlyout(props) {
 
 
-    const { selectedTestRunResult, loading, issueDetails ,getDescriptionText, infoState, createJiraTicket, jiraIssueUrl, showDetails, setShowDetails, isIssuePage, remediationSrc, azureBoardsWorkItemUrl} = props
+    const { selectedTestRunResult, loading, issueDetails ,getDescriptionText, infoState, createJiraTicket, jiraIssueUrl, showDetails, setShowDetails, isIssuePage, remediationSrc, azureBoardsWorkItemUrl, conversations} = props
     const [remediationText, setRemediationText] = useState("")
     const [fullDescription, setFullDescription] = useState(false)
     const [rowItems, setRowItems] = useState([])
@@ -43,6 +45,7 @@ function TestRunResultFlyout(props) {
     const [isEditingDescription, setIsEditingDescription] = useState(false)
 
     const [vulnerabilityAnalysisError, setVulnerabilityAnalysisError] = useState(null)
+    const [refreshFlag, setRefreshFlag] = useState(Date.now().toString())
 
     // modify testing run result and headers
     const infoStateFlyout = infoState && infoState.length > 0 ? infoState.filter((item) => item.title !== 'Jira') : []
@@ -345,27 +348,18 @@ function TestRunResultFlyout(props) {
     // Move state outside to prevent reset on component recreation
     const hasAnalyzedRef = useRef(false);
     const [vulnerabilityHighlights, setVulnerabilityHighlights] = useState({});
-    const [isAnalyzing, setIsAnalyzing] = useState(false);
-    
-    // Reset analysis flag and highlights when test result changes
-    useEffect(() => {
-        hasAnalyzedRef.current = false;
-        setVulnerabilityHighlights({});
-        setIsAnalyzing(false);
-    }, [selectedTestRunResult?.id]);
     
     // Component that handles vulnerability analysis only when mounted
     const ValuesTabContent = React.memo(() => {
         
         useEffect(() => {
             // Check if vulnerability highlighting is enabled (use existing GPT feature flag)
-            const isVulnerabilityHighlightingEnabled = window.STIGG_FEATURE_WISE_ALLOWED["AKTO_GPT_AI"] && 
-                window.STIGG_FEATURE_WISE_ALLOWED["AKTO_GPT_AI"]?.isGranted === true;
+            //const isVulnerabilityHighlightingEnabled = window.STIGG_FEATURE_WISE_ALLOWED["AKTO_GPT_AI"] && 
+            //    window.STIGG_FEATURE_WISE_ALLOWED["AKTO_GPT_AI"]?.isGranted === true;
+            const isVulnerabilityHighlightingEnabled = false;
 
             if (!hasAnalyzedRef.current && selectedTestRunResult?.vulnerable && selectedTestRunResult?.testResults && isVulnerabilityHighlightingEnabled) {
                 hasAnalyzedRef.current = true;
-                
-                setIsAnalyzing(true);
                 setVulnerabilityAnalysisError(null);
 
                 const timeoutId = setTimeout(() => {
@@ -427,6 +421,9 @@ function TestRunResultFlyout(props) {
                                         ...prev,
                                         [idx]: enhancedSegments
                                     }));
+                                    setTimeout(() => {
+                                        setRefreshFlag(Date.now().toString());
+                                    }, 10)
                                 } else {
                                     setVulnerabilityHighlights(prev => {
                                         const newState = { ...prev };
@@ -444,13 +441,12 @@ function TestRunResultFlyout(props) {
                     });
                 
                     Promise.allSettled(analysisPromises).finally(() => {
-                        setIsAnalyzing(false);
                     });
                 }, 60);
 
                 return () => clearTimeout(timeoutId);
             }
-        }, [selectedTestRunResult?.id]);
+        }, [selectedTestRunResult?.id,]);
         
         if (dataExpired && !selectedTestRunResult?.vulnerable) {
             return dataExpiredComponent;
@@ -468,8 +464,8 @@ function TestRunResultFlyout(props) {
                     heading={"Attempt"}
                     minHeight={"30vh"}
                     vertical={true}
-                    sampleData={useMemo(() => {
-                        return selectedTestRunResult?.testResults.map((result, idx) => {
+                    sampleData={
+                        selectedTestRunResult?.testResults.map((result, idx) => {
                             if (result.errors && result.errors.length > 0) {
                                 let errorList = result.errors.join(", ");
                                 return { errorList: errorList }
@@ -484,16 +480,23 @@ function TestRunResultFlyout(props) {
                                 }
                             }
                             return { errorList: "No data found" }
-                        });
-                    }, [selectedTestRunResult?.testResults, vulnerabilityHighlights])}
+                        })}
                     isNewDiff={true}
                     vulnerable={selectedTestRunResult?.vulnerable}
-                    isAnalyzingVulnerabilities={isAnalyzing}
                     vulnerabilityAnalysisError={vulnerabilityAnalysisError}
                 />
             </Box>
         );
     });
+
+    const conversationTab = useMemo(() => {
+        if (typeof selectedTestRunResult !== "object") return null;
+        return {
+            id: 'evidence',
+            content: "Evidence",
+            component: <ChatInterface conversations={conversations} />
+        }
+    }, [selectedTestRunResult, conversations])
     
     const ValuesTab = useMemo(() => {
         if (typeof selectedTestRunResult !== "object") return null;
@@ -502,7 +505,9 @@ function TestRunResultFlyout(props) {
             content: "Values",
             component: <ValuesTabContent />
         }
-    }, [selectedTestRunResult, dataExpired, issueDetails])
+    }, [selectedTestRunResult, dataExpired, issueDetails, refreshFlag])
+
+    const finalResultTab = selectedTestRunResult?.conversationId != null && conversations?.length > 0 ? conversationTab : ValuesTab
 
     function RowComp ({cardObj}){
         const {title, value, tooltipContent} = cardObj
@@ -614,12 +619,12 @@ function TestRunResultFlyout(props) {
         </Box>
     }
 
-    const attemptTab = !selectedTestRunResult.testResults ? errorTab : ValuesTab
+    const attemptTab = !selectedTestRunResult.testResults ? errorTab : finalResultTab
 
     const tabsComponent = (
         <LayoutWithTabs
             key={issueDetails?.id}
-            tabs={issueDetails?.id ? [overviewTab,timelineTab,ValuesTab, remediationTab].filter(Boolean): [attemptTab]}
+            tabs={issueDetails?.id ? [overviewTab,timelineTab,finalResultTab, remediationTab].filter(Boolean): [attemptTab]}
             currTab = {() => {}}
         />
     )
@@ -628,7 +633,7 @@ function TestRunResultFlyout(props) {
         <TitleComponent/>, tabsComponent
     ]
 
-    const title = isIssuePage ? "Issue details" : "Test result"
+    const title = isIssuePage ? "Issue details" : mapLabel('Test result', getDashboardCategory())
 
     return (
         <FlyLayout

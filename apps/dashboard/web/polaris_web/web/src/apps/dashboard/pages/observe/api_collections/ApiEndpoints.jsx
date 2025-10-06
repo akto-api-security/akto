@@ -1,12 +1,12 @@
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards"
-import { Text, HorizontalStack, Button, Popover, Modal, IndexFiltersMode, VerticalStack, Box, Checkbox, ActionList, Icon } from "@shopify/polaris"
+import { Text, HorizontalStack, Button, Popover, Modal, IndexFiltersMode, VerticalStack, Box, Checkbox, ActionList, Icon, Tooltip } from "@shopify/polaris"
 import api from "../api"
 import { useEffect, useState } from "react"
 import func from "@/util/func"
 import GithubSimpleTable from "../../../components/tables/GithubSimpleTable";
 import {useLocation, useNavigate, useParams } from "react-router-dom"
 import { saveAs } from 'file-saver'
-import {FileMinor, HideMinor, ViewMinor} from '@shopify/polaris-icons';
+import {FileMinor, HideMinor, ViewMinor, MagicMinor} from '@shopify/polaris-icons';
 import "./api_inventory.css"
 import ApiDetails from "./ApiDetails"
 import UploadFile from "../../../components/shared/UploadFile"
@@ -34,6 +34,7 @@ import InlineEditableText from "../../../components/shared/InlineEditableText"
 import IssuesApi from "../../issues/api"
 import SequencesFlow from "./SequencesFlow"
 import { getDashboardCategory, mapLabel } from "../../../../main/labelHelper"
+import AgentDiscoverGraph from "./AgentDiscoverGraph"
 
 const headings = [
     {
@@ -117,9 +118,9 @@ const headings = [
         sortActive: true,
     },
     {
-        text: 'Last Tested',
+        text: 'Last ' + mapLabel('Tested', getDashboardCategory()),
         title: <HeadingWithTooltip 
-                title={"Last Tested"}
+                title={"Last " + mapLabel('Tested', getDashboardCategory())}
                 content={"Time when API was last tested successfully."}
             />,
         value: 'lastTestedComp',
@@ -140,6 +141,14 @@ const headings = [
         title: "Collection",
         showFilter: true,
         filterKey: "apiCollectionName",
+    },
+    {
+        text: "Tags",
+        value: "tagsComp",
+        textValue: "tagsString",
+        title: "Tags",
+        showFilter: true,
+        filterKey: "tagsString",
     },
     {
         text: "Description",
@@ -247,6 +256,7 @@ function ApiEndpoints(props) {
     const [isEditingDescription, setIsEditingDescription] = useState(false)
     const [editableDescription, setEditableDescription] = useState(description)
     const [currentKey, setCurrentKey] = useState(Date.now()); // to force remount InlineEditableText component
+    const hasAccessToDiscoveryAgent = func.checkForFeatureSaas('STATIC_DISCOVERY_AI_AGENTS')
 
 
     // the values used here are defined at the server.
@@ -407,6 +417,28 @@ function ApiEndpoints(props) {
         
         const prettifyData = transform.prettifyEndpointsData(allEndpoints)
 
+        // enrich with collection tags (env types) for API group view
+        const collectionTagsMap = {}
+        ;(allCollections || []).forEach((c) => {
+            const envType = c?.envType
+            const envTypeList = envType?.map(func.formatCollectionType) || []
+            collectionTagsMap[c.id] = {
+                list: envTypeList,
+                comp: getTagsCompactComponent(envTypeList, 2),
+                str: envTypeList.join(" ")
+            }
+        })
+
+        prettifyData.forEach((obj) => {
+            const t = collectionTagsMap[obj.apiCollectionId]
+            if (t) {
+                obj.tagsComp = t.comp
+                obj.tagsString = t.str
+            } else {
+                obj.tagsString = ""
+            }
+        })
+
         const zombie = prettifyData.filter(
             obj => obj.sources && // Check that obj.sources is not null or undefined
                    Object.keys(obj.sources).length === 1 &&
@@ -540,8 +572,8 @@ function ApiEndpoints(props) {
     }, [collectionsMap[apiCollectionId]])
 
     const resourceName = {
-        singular: 'endpoint',
-        plural: 'endpoints',
+        singular: mapLabel('endpoint', getDashboardCategory()),
+        plural: mapLabel('endpoints', getDashboardCategory()),
     };
 
     const getFilteredItems = (filteredItems) => {
@@ -733,16 +765,19 @@ function ApiEndpoints(props) {
           }          
     }
 
-    function uploadOpenApiFile(file) {
+    function uploadOpenApiFile(file, isAiAgent = false) {
         setOpenAPIfile(file)
-        if (!isApiGroup && !(collectionsObj?.hostName && collectionsObj?.hostName?.length > 0) && !sourcesBackfilled) {
+        if(isAiAgent){
+            uploadOpenFileWithSource("OPEN_API", file, isAiAgent)
+        }
+        else if (!isApiGroup && !(collectionsObj?.hostName && collectionsObj?.hostName?.length > 0) && !sourcesBackfilled) {
             setShowSourceDialog(true)
         } else {
             uploadOpenFileWithSource(null, file)
         }
     }
 
-    function uploadOpenFileWithSource(source, file) {
+    function uploadOpenFileWithSource(source, file, isAiAgent = false) {
         const reader = new FileReader();
         if (!file) {
             file = openAPIfile
@@ -753,6 +788,7 @@ function ApiEndpoints(props) {
             const formData = new FormData();
             formData.append("openAPIString", reader.result)
             formData.append("apiCollectionId", apiCollectionId);
+            formData.append("triggeredWithAIAgent", isAiAgent);
             if (source) {
                 formData.append("source", source)
             }
@@ -765,7 +801,11 @@ function ApiEndpoints(props) {
                 else {
                     func.setToast(true, false, "Your Openapi file has been successfully processed")
                 }
-                fetchData()
+                if(isAiAgent) {
+                    window.open("/dashboard/observe/" + apiCollectionId + "/open-api-upload", "_blank")
+                } else {
+                    fetchData()
+                }
             }).catch(err => {
                 console.log(err);
                 if (err.message.includes(404)) {
@@ -854,13 +894,20 @@ function ApiEndpoints(props) {
         let requestObj = {key: "COLLECTION",filteredItems: filteredEndpoints,apiCollectionId: Number(apiCollectionId)}
         const activePrompts = dashboardFunc.getPrompts(requestObj)
         setPrompts(activePrompts)
+        
+    }
+
+    function getTagsCompactComponent(envTypeList) {
+        const list = envTypeList || []
+        // Use shared badge renderer to show 1 tag and a +N badge with tooltip inline
+        return transform.getCollectionTypeList(list, 1, false)
     }
 
     function getCollectionTypeListComp(collectionsObj) {
         const envType = collectionsObj?.envType
-        const envTypeList = envType?.map(func.formatCollectionType)
+        const envTypeList = envType?.map(func.formatCollectionType) || []
 
-        return transform.getCollectionTypeList(envTypeList, 3, true)
+        return getTagsCompactComponent(envTypeList)
     }
 
     const collectionsObj = (allCollections && allCollections.length > 0) ? allCollections.filter(x => Number(x.id) === Number(apiCollectionId))[0] : {}
@@ -948,6 +995,25 @@ function ApiEndpoints(props) {
                                                             <Icon source={FileMinor} />
                                                         </Box>
                                                         <Text>Upload har file</Text>
+                                                    </div>
+                                                )}
+                                                primary={false} 
+                                            />
+                                        </Box>)
+                                    },
+                                    !isApiGroup && (!isHostnameCollection && hasAccessToDiscoveryAgent) && {
+                                        content: '',
+                                        prefix: (<Box width="160px" >
+                                            <UploadFile
+                                                fileFormat=".json"
+                                                fileChanged={file => {uploadOpenApiFile(file, true); setExportOpen(false)}}
+                                                tooltipText="Test using AI Agent"
+                                                label={(
+                                                    <div style={{ display: "flex", gap:'6px' }}>
+                                                        <Box>
+                                                            <Icon source={MagicMinor} />
+                                                        </Box>
+                                                        <Text>Upload using AI</Text>
                                                     </div>
                                                 )}
                                                 primary={false} 
@@ -1058,20 +1124,20 @@ function ApiEndpoints(props) {
         if (isApiGroup) {
             ret.push(
                 {
-                    content: 'Remove from API group',
+                    content: 'Remove from ' + mapLabel('API', getDashboardCategory()) + ' group',
                     onAction: () => handleApiGroupAction(selectedResources, Operation.REMOVE)
                 }
             )
         } else {
             ret.push({
-                content: <div data-testid="add_to_api_group_button">Add to API group</div>,
+                content: <div data-testid="add_to_api_group_button">{'Add to ' + mapLabel('API', getDashboardCategory()) + ' group'}</div>,
                 onAction: () => handleApiGroupAction(selectedResources, Operation.ADD)
             })
         }
 
         if (window.USER_NAME && window.USER_NAME.endsWith("@akto.io")) {
             ret.push({
-                content: 'Delete APIs',
+                content: 'Delete ' + mapLabel('APIs', getDashboardCategory()),
                 onAction: () => deleteApis(selectedResources)
             })
         }
@@ -1113,6 +1179,10 @@ function ApiEndpoints(props) {
         </Modal>
     )
 
+    const canShowTags = () => {
+        return isApiGroup || isQueryPage;
+    }
+
     const apiEndpointTable = [<GithubSimpleTable
         key={currentKey}
         pageLimit={50}
@@ -1122,7 +1192,7 @@ function ApiEndpoints(props) {
         filters={[]}
         disambiguateLabel={disambiguateLabel}
         headers={headers.filter(x => {
-            if (!isApiGroup && x.text === 'Collection') {
+            if (!canShowTags() && (x.text === 'Collection' || x.text === 'Tags')) {
                 return false;
             }
             return true;
@@ -1134,7 +1204,7 @@ function ApiEndpoints(props) {
         getFilteredItems={getFilteredItems}
         mode={IndexFiltersMode.Default}
         headings={headings.filter(x => {
-            if (!isApiGroup && x.text === 'Collection') {
+            if (!canShowTags() && (x.text === 'Collection' || x.text === 'Tags')) {
                 return false;
             }
             return true;
@@ -1184,6 +1254,7 @@ function ApiEndpoints(props) {
                 />] : showSequencesFlow ? [
                 <SequencesFlow key="sequences-flow" apiCollectionId={apiCollectionId}  />
             ] : [
+                func.isDemoAccount() ? <AgentDiscoverGraph apiCollectionId={apiCollectionId} /> : <></>,
                 (coverageInfo[apiCollectionId] === 0 || !(coverageInfo.hasOwnProperty(apiCollectionId)) ? <TestrunsBannerComponent key={"testrunsBanner"} onButtonClick={() => setRunTests(true)} isInventory={true}  disabled={collectionsObj?.isOutOfTestingScope || false}/> : null),
                 <div className="apiEndpointsTable" key="table">
                     {apiEndpointTable}

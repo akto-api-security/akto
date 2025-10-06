@@ -14,7 +14,7 @@ import org.apache.commons.lang3.StringUtils;
 public class HttpResponseParams {
 
     public enum Source {
-        HAR, PCAP, MIRRORING, SDK, OTHER, POSTMAN, OPEN_API, BURP
+        HAR, PCAP, MIRRORING, SDK, OTHER, POSTMAN, OPEN_API, BURP, IMPERVA
     }
 
     public String accountId;

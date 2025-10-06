@@ -77,6 +77,7 @@ public class MaliciousEventService {
             .setSeverity(evt.getSeverity())
             .setType(evt.getType())
             .setMetadata(evt.getMetadata().toString())
+            .setSuccessfulExploit(evt.getSuccessfulExploit())
             .build();
 
     this.kafka.send(
@@ -181,6 +182,7 @@ public class MaliciousEventService {
       query.append("subCategory", new Document("$in", filter.getSubCategoryList()));
     }
 
+
     if (!filter.getLatestAttackList().isEmpty()) {
       query.append("filterId", new Document("$in", filter.getLatestAttackList()));
     }
@@ -196,6 +198,22 @@ public class MaliciousEventService {
       long end = timeRange.hasEnd() ? timeRange.getEnd() : Long.MAX_VALUE;
 
       query.append("detectedAt", new Document("$gte", start).append("$lte", end));
+    }
+
+    if (filter.hasSuccessfulExploit()) {
+      boolean val = filter.getSuccessfulExploit();
+      if (val) {
+        query.append("successfulExploit", true);
+      } else {
+        List<Document> andConditions = new ArrayList<>();
+        andConditions.add(new Document(query));
+        andConditions.add(new Document("$or", Arrays.asList(
+            new Document("successfulExploit", false),
+            new Document("successfulExploit", new Document("$exists", false))
+        )));
+        query.clear();
+        query.append("$and", andConditions);
+      }
     }
 
     long total = coll.countDocuments(query);
@@ -230,6 +248,7 @@ public class MaliciousEventService {
                 .setEventTypeVal(evt.getEventType().toString())
                 .setMetadata(metadata)
                 .setStatus(evt.getStatus() != null ? evt.getStatus().toString() : StatusConstants.ACTIVE)
+                .setSuccessfulExploit(evt.getSuccessfulExploit() != null ? evt.getSuccessfulExploit() : false)
                 .build());
       }
       return ListMaliciousRequestsResponse.newBuilder()

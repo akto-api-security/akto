@@ -29,6 +29,7 @@ import settingFunctions from "../../settings/module.js";
 import JiraTicketCreationModal from "../../../components/shared/JiraTicketCreationModal.jsx";
 import testingApi from "../../testing/api.js"
 import issuesFunctions from '@/apps/dashboard/pages/issues/module';
+import { isMCPSecurityCategory, isGenAISecurityCategory, isAgenticSecurityCategory, mapLabel, getDashboardCategory  } from "../../../../main/labelHelper";
 
 const sortOptions = [
     { label: 'Severity', value: 'severity asc', directionLabel: 'Highest', sortKey: 'severity', columnIndex: 2 },
@@ -39,7 +40,22 @@ const sortOptions = [
     { label: 'Discovered time', value: 'creationTime desc', directionLabel: 'Oldest', sortKey: 'creationTime', columnIndex: 7 },
 ];
 
-const allCompliances = ["CIS Controls", "CMMC", "CSA CCM", "Cybersecurity Maturity Model Certification (CMMC)", "FISMA", "FedRAMP", "GDPR", "HIPAA", "ISO 27001", "NIST 800-171", "NIST 800-53", "PCI DSS", "SOC 2", "OWASP"];
+const getCompliances = () => {
+    const isDemoAccount = func.isDemoAccount();
+    const isMCP = isMCPSecurityCategory();
+    const isGenAiSecurity = isGenAISecurityCategory();
+    const isAgenticSecurity = isAgenticSecurityCategory();
+
+    if (isDemoAccount && (isMCP || isAgenticSecurity || isGenAiSecurity)) {
+        // Different compliances for demo account + MCP + Agentic Security
+        return ["OWASP Agentic", "OWASP LLM", "NIST AI Risk Management Framework","MITRE ATLAS","CIS Controls", "CMMC", "CSA CCM", "Cybersecurity Maturity Model Certification (CMMC)", "FISMA", "FedRAMP", "GDPR", "HIPAA", "ISO 27001", "NIST 800-171", "NIST 800-53", "PCI DSS", "SOC 2", "OWASP"];
+    }
+    
+    // Default compliances
+    return ["CIS Controls", "CMMC", "CSA CCM", "Cybersecurity Maturity Model Certification (CMMC)", "FISMA", "FedRAMP", "GDPR", "HIPAA", "ISO 27001", "NIST 800-171", "NIST 800-53", "PCI DSS", "SOC 2", "OWASP"];
+};
+
+const allCompliances = getCompliances();
 
 let filtersOptions = [
     {
@@ -67,8 +83,8 @@ let filtersOptions = [
     },    
     {
         key: 'collectionIds',
-        label: 'API groups',
-        title: 'API groups',
+        label: mapLabel('Api', getDashboardCategory()) + ' groups',
+        title: mapLabel('Api', getDashboardCategory()) + ' groups',
         choices: [],
     },
     {
@@ -667,7 +683,7 @@ function CompliancePage() {
                     iconSrc={"/public/alert_hexagon.svg"}
                     headingText={"No issues yet!"}
                     description={"There are currently no issues with your APIs. Haven't run your tests yet? Start testing now to prevent any potential issues."}
-                    buttonText={"Run test"}
+                    buttonText={mapLabel("Run test", getDashboardCategory())}
                     infoItems={infoItems}
                     infoTitle={"Once you have issues:"}
                     learnText={"issues"}

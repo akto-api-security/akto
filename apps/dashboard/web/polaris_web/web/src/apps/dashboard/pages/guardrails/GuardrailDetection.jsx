@@ -406,13 +406,12 @@ function GuardrailDetection() {
             headings={headings}
             data={data}
             hideQueryField={true}
-            hidePagination={true}
-            showFooter={false}
             sortOptions={sortOptions}
             emptyStateMarkup={emptyStateMarkup}   
             onRowClick={rowClicked}    
             rowClickable={true} 
             hardCodedKey={true}
+            pageSize={20}
         ></GithubSimpleTable>,
          <SampleDetails
                 title={"Attacker payload"}

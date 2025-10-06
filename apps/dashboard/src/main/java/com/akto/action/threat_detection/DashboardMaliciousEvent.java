@@ -20,6 +20,7 @@ public class DashboardMaliciousEvent {
   private String eventType;
   private String payload;
   private String metadata;
+  private boolean successfulExploit;
   private String status;
 
   public DashboardMaliciousEvent() {}
@@ -41,6 +42,7 @@ public class DashboardMaliciousEvent {
       String eventType,
       String payload,
       String metadata,
+      boolean successfulExploit,
       String status) {
     this.id = id;
     this.actor = actor;
@@ -58,6 +60,7 @@ public class DashboardMaliciousEvent {
     this.eventType = eventType;
     this.payload = payload;
     this.metadata = metadata;
+    this.successfulExploit = successfulExploit;
     this.status = status;
   }
 
@@ -187,6 +190,14 @@ public class DashboardMaliciousEvent {
 
   public void setMetadata(String metadata) {
     this.metadata = metadata;
+  }
+
+  public boolean getSuccessfulExploit() {
+    return successfulExploit;
+  }
+
+  public void setSuccessfulExploit(boolean successfulExploit) {
+    this.successfulExploit = successfulExploit;
   }
 
   public String getStatus() {

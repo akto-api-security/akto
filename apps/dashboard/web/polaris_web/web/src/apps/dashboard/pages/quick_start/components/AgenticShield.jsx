@@ -1,9 +1,9 @@
 import { Box, Button, ButtonGroup, Divider, Text, VerticalStack } from '@shopify/polaris'
 import React from 'react'
 
-function McpWrapper() {
+function AgenticShield() {
     const goToDocs = () => {
-        window.open("https://docs.akto.io/mcp-watch")
+        window.open("https://docs.akto.io/agentic-shield")
     }
 
     return (
@@ -23,6 +23,6 @@ function McpWrapper() {
     )
 }
 
-export default McpWrapper
+export default AgenticShield
 
 
