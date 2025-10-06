@@ -101,6 +101,7 @@ import AuditData from "../dashboard/pages/observe/AuditData";
 import ComingSoonPage from "../dashboard/components/shared/ComingSoonPage";
 import GuardrailDetection    from "../dashboard/pages/guardrails/GuardrailDetection";
 import GuardrailPolicies   from "../dashboard/pages/guardrails/GuardrailPolicies";
+import ThreatDashboardPage from "../dashboard/pages/threat_detection/ThreatDashboardPage";
 
 // if you add a component in a new path, please verify the search implementation in function -> 'getSearchItemsArr' in func.js
 
@@ -224,6 +225,10 @@ const router = createBrowserRouter([
                     {
                         path: "protection",
                         children: [
+                            {
+                                path: "threat-dashboard",
+                                element: <ThreatDashboardPage/>
+                            },
                             {
                                 path: "threat-activity",
                                 element: <ThreatDetectionPage/>
