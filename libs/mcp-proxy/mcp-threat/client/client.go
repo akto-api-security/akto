@@ -102,15 +102,16 @@ func (mv *MCPValidator) Validate(ctx context.Context, payload interface{}, toolD
 		return keywordResponse
 	}
 
-	promptInjectionValidationResponse := mv.promptInjectionValidator.Validate(ctx, request)
-	// directly rejecting lower confidence values and directly accepting higher ones
-	if promptInjectionValidationResponse.Verdict != nil &&
-		(promptInjectionValidationResponse.Verdict.IsMaliciousRequest ||
-			promptInjectionValidationResponse.Verdict.Confidence < validators.PromptLowerThreshold) {
-		return promptInjectionValidationResponse
-	}
+	return mv.promptInjectionValidator.Validate(ctx, request)
 
-	return mv.detectValidationType(payload).Validate(ctx, request)
+	// directly rejecting lower confidence values and directly accepting higher ones
+	// if promptInjectionValidationResponse.Verdict != nil &&
+	// 	(promptInjectionValidationResponse.Verdict.IsMaliciousRequest ||
+	// 		promptInjectionValidationResponse.Verdict.Confidence < validators.PromptLowerThreshold) {
+	// 	return promptInjectionValidationResponse
+	// }
+
+	// return mv.detectValidationType(payload).Validate(ctx, request)
 }
 
 // detectValidationType returns the appropriate LLM validator (request/response)
