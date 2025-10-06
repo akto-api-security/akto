@@ -15,8 +15,6 @@ function ThreatSankeyChart({ startTimestamp, endTimestamp }) {
   const [loading, setLoading] = useState(true);
   const [chartData, setChartData] = useState([]);
 
-  // fetch data when timestamps change
-
   const formatCategoryName = (category) => {
     if (!category) return 'Unknown';
     

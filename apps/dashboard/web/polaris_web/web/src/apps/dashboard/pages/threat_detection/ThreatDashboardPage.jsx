@@ -92,37 +92,38 @@ function ThreatDashboardPage() {
                     const categoryCounts = severityResponse.categoryCounts
                     
                     // Convert array format to object format for ChartypeComponent
-                    const severityColors = {
-                        "CRITICAL": "#E45357",
-                        "HIGH": "#EF864C",
-                        "MEDIUM": "#F6C564",
-                        "LOW": "#6FD1A6"
-                    }
-                    
-                    const formattedSeverity = {}
-                    
+                    // Use the same severity->color mapping as other pages
+                    const severityLevels = ["CRITICAL", "HIGH", "MEDIUM", "LOW"];
+                    const severityColors = severityLevels.reduce((acc, s) => {
+                        acc[s] = func.getHexColorForSeverity(s);
+                        return acc;
+                    }, {});
+
+                    const formattedSeverity = {};
+
                     // Initialize all severities with 0
-                    Object.keys(severityColors).forEach(severity => {
+                    severityLevels.forEach((severity) => {
                         formattedSeverity[severity] = {
-                            "text": 0,
-                            "color": severityColors[severity],
-                            "filterKey": severity
-                        }
-                    })
-                    
+                            text: 0,
+                            color: severityColors[severity],
+                            filterKey: severity
+                        };
+                    });
+
                     // Update with actual counts from API
                     // The API returns data in format: [{category: "", subCategory: "MEDIUM", count: 5000}]
                     categoryCounts.forEach(item => {
-                        const severity = item.subCategory || item.severity
+                        const raw = item.subCategory || item.severity || '';
+                        const severity = String(raw).toUpperCase();
                         if (severity && severityColors[severity]) {
                             formattedSeverity[severity] = {
-                                "text": item.count || 0,
-                                "color": severityColors[severity],
-                                "filterKey": severity
-                            }
+                                text: item.count || 0,
+                                color: severityColors[severity],
+                                filterKey: severity
+                            };
                         }
-                    })
-                    
+                    });
+
                     setSeverityDistribution(formattedSeverity)
                 } 
             } catch (err) {
