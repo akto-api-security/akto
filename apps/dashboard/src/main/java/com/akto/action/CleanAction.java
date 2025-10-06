@@ -3,30 +3,41 @@ package com.akto.action;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.stream.Collectors;
 
 import org.bson.conversions.Bson;
 
+import com.akto.DaoInit;
 import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.ApiInfoDao;
+import com.akto.dao.SampleDataDao;
 import com.akto.dao.SingleTypeInfoDao;
 import com.akto.dao.context.Context;
 import com.akto.dto.ApiCollection;
 import com.akto.dto.ApiInfo;
 import com.akto.dto.ApiInfo.ApiInfoKey;
+import com.akto.dto.traffic.Key;
+import com.akto.dto.traffic.SampleData;
 import com.akto.dto.type.SingleTypeInfo;
+import com.akto.dto.type.URLMethods;
 import com.akto.dto.type.URLMethods.Method;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.Constants;
 import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
+import com.mongodb.ConnectionString;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
 import com.mongodb.client.model.Updates;
 import com.mongodb.client.result.DeleteResult;
 import com.mongodb.client.result.UpdateResult;
 import com.opensymphony.xwork2.Action;
+
+import lombok.Setter;
 
 public class CleanAction extends UserAction {
 
@@ -210,16 +221,93 @@ public class CleanAction extends UserAction {
         return Action.SUCCESS.toUpperCase();
     }
 
-    public String deleteDuplicateHosts(){
+    // take timestamp as input
+    @Setter
+    private int endTimestamp;
+    @Setter
+    private int startTimestamp;
+
+    private int doCleanup(List<Bson> filters, boolean shouldDelete, List<ApiInfo.ApiInfoKey> apiInfoKeys) {
+        int counter = 0;
+        Bson finalFilter = Filters.or(filters);
+        List<SampleData> sampleDataList = SampleDataDao.instance.findAll(finalFilter, Projections.include("_id"));
+        if(sampleDataList.isEmpty()) {
+            return 0;
+        }
+        List<Key> keys = new ArrayList<>();
+        // set of apiInfoKeys from sampleDataList
+        Set<ApiInfo.ApiInfoKey> apiInfoKeysSet = new HashSet<>();
+        for(SampleData sampleData : sampleDataList) {
+            apiInfoKeysSet.add(new ApiInfo.ApiInfoKey(sampleData.getId().getApiCollectionId(), sampleData.getId().getUrl(), sampleData.getId().getMethod()));
+        }
+        for(ApiInfo.ApiInfoKey apiInfoKey : apiInfoKeys) {
+            if(apiInfoKeysSet.contains(apiInfoKey)) {
+                continue;
+            }
+            loggerMaker.info("Deleting API without sample data: " + apiInfoKey);
+            counter++;
+            keys.add(new Key(apiInfoKey.getApiCollectionId(), apiInfoKey.getUrl(), apiInfoKey.getMethod(), -1, 0, 0));
+        }
+        if(shouldDelete) {
+            com.akto.utils.Utils.deleteApis(keys);
+        }
+        return counter;
+    }
+
+    public static void main(String[] args) {
+        DaoInit.init(new ConnectionString("mongodb://localhost:27017"));
+        Context.accountId.set(1000000);
+        CleanAction cleanAction = new CleanAction();
+        cleanAction.setRunActually(false);
+        cleanAction.setEndTimestamp(Context.now() - Constants.ONE_MONTH_TIMESTAMP);
+        cleanAction.setStartTimestamp(0);
+        cleanAction.deleteAPIsWithoutSampleDataWithTimestamp();
+    }
+
+    public String deleteAPIsWithoutSampleDataWithTimestamp() {
+        // do it collection wise
         int accountId = Context.accountId.get();
         CONTEXT_SOURCE contextSource = Context.contextSource.get();
 
         service.submit(() -> {
             Context.accountId.set(accountId);
             Context.contextSource.set(contextSource);
-           
+            int netDeletedCount = 0;
+            
+            Map<Integer, String> apiCollectionIds = ApiCollectionsDao.instance.findAll(Filters.and(Filters.exists(ApiCollection.HOST_NAME, true), Filters.ne(ApiCollection._DEACTIVATED, true)), Projections.include(ApiCollection.ID, ApiCollection.HOST_NAME)).stream().collect(Collectors.toMap(ApiCollection::getId, ApiCollection::getHostName));
+            System.out.println("ApiCollections size: " + apiCollectionIds.size());
+            for(int apiCollectionId : apiCollectionIds.keySet()) {
+                loggerMaker.debugAndAddToDb("Deleting APIs without sample data for api collection: " + apiCollectionId + " with host name: " + apiCollectionIds.get(apiCollectionId));
+                Bson hostHeaderFilter = SingleTypeInfoDao.filterForHostHeader(apiCollectionId, true);
+                Bson filter = Filters.and(hostHeaderFilter, Filters.lte(SingleTypeInfo.LAST_SEEN, endTimestamp), Filters.gte(SingleTypeInfo.LAST_SEEN, startTimestamp));
+                List<SingleTypeInfo> stis = SingleTypeInfoDao.instance.findAll(filter, Projections.include(SingleTypeInfo._URL, SingleTypeInfo._METHOD));
+                int count = 0;
+                int deletedCountForCollection = 0;
+                List<Bson> filters = new ArrayList<>();
+                List<ApiInfo.ApiInfoKey> apiInfoKeys = new ArrayList<>();
+                for(SingleTypeInfo sti : stis) {
+                    count++;
+                    if(count % 500 == 0){
+                        // 
+                        deletedCountForCollection += doCleanup(filters, this.runActually, apiInfoKeys);
+                        count = 0;
+                        filters = new ArrayList<>();
+                        apiInfoKeys = new ArrayList<>();
+                    }else{
+                        Bson filterTemp = Filters.and(Filters.eq(ApiInfo.ID_API_COLLECTION_ID, apiCollectionId), Filters.eq(ApiInfo.ID_URL, sti.getUrl()), Filters.eq(ApiInfo.ID_METHOD, sti.getMethod()));
+                        filters.add(filterTemp);
+                        apiInfoKeys.add(new ApiInfo.ApiInfoKey(apiCollectionId, sti.getUrl(), URLMethods.Method.valueOf(sti.getMethod())));
+                    }
+                }
+                if(count > 0) {
+                    deletedCountForCollection += doCleanup(filters, this.runActually, apiInfoKeys);
+                }
+                // System.out.println("Deleted APIs without sample data for api collection: " + apiCollectionId + " with host name: " + apiCollectionIds.get(apiCollectionId) + " deleted count: " + deletedCountForCollection);
+                netDeletedCount += deletedCountForCollection;
+            }
+            System.out.println("Total deleted count: " + netDeletedCount);
         });
-        return SUCCESS.toUpperCase();
+        return Action.SUCCESS.toUpperCase();
     }
 
     public List<Integer> getApiCollectionIds() {

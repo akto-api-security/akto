@@ -1,5 +1,8 @@
 package com.akto.utils.jobs;
 
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -13,6 +16,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -21,6 +25,7 @@ import java.util.stream.Collectors;
 
 import com.mongodb.client.model.Updates;
 import com.mongodb.client.model.WriteModel;
+import com.twilio.rest.autopilot.v1.assistant.task.Sample;
 
 import org.bson.conversions.Bson;
 
@@ -67,8 +72,8 @@ import static com.akto.runtime.utils.Utils.createRegexPatternFromList;
 public class CleanInventory {
 
     private static final LoggerMaker logger = new LoggerMaker(CleanInventory.class, LogDb.DASHBOARD);
-    private static final int limit = 500;
-    private static final Bson sort = Sorts.ascending(ApiInfo.ID_API_COLLECTION_ID, ApiInfo.ID_URL, ApiInfo.ID_METHOD);
+    private static final int limit = 200;
+    private static final Bson sort = Sorts.descending(ApiInfo.ID_API_COLLECTION_ID, ApiInfo.ID_URL, ApiInfo.ID_METHOD);
 
     final static ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
 
@@ -169,8 +174,16 @@ public class CleanInventory {
 
         Map<String,FilterConfig> filterMap = FilterYamlTemplateDao.fetchFilterConfig(false, yamlTemplates, true);
         Pattern pattern = createRegexPatternFromList(redundantUrlList);
+        int count = 0;
+        int netCount = 0;
         do {
             sampleDataList = SampleDataDao.instance.findAll(filters, skip, limit, sort);
+            if(skip % 5000 == 0){
+                System.out.println("Batch: " + count);
+                System.out.println("First process will be: " + sampleDataList.get(0).getId().toString()  + "....Last processed will be: "+ sampleDataList.get(sampleDataList.size() - 1).getId().toString());
+                count++;
+                System.out.println("Net count till now: "+ netCount);
+            }
             skip += limit;
             List<Key> toBeDeleted = new ArrayList<>();
             List<Key> toMove = new ArrayList<>();
@@ -233,7 +246,7 @@ public class CleanInventory {
                         // any 1 of the sample is modifiable, we print this block
                         toMove.add(sampleData.getId());
                         if(saveLogsToDB){
-                            logger.infoAndAddToDb("Filter passed, modify sample data of API: " + sampleData.getId(), LogDb.DASHBOARD);
+                            logger.debugAndAddToDb("Filter passed, modify sample data of API: " + sampleData.getId(), LogDb.DASHBOARD);
                         }else{
                             logger.debug("[BadApisUpdater] Updating bad from template API: " + sampleData.getId(), LogDb.DASHBOARD);
                         }
@@ -245,7 +258,8 @@ public class CleanInventory {
                             collectionWiseDeletionCountMap.put(sampleData.getId().getApiCollectionId(),initialCount + 1);
                             toBeDeleted.add(sampleData.getId());
                             if(saveLogsToDB){
-                                logger.infoAndAddToDb(
+                                netCount++;
+                                logger.debugAndAddToDb(
                                         "Filter passed, deleting bad api found from filter: " + sampleData.getId(), LogDb.DASHBOARD
                                 );
                             }else{
@@ -258,7 +272,7 @@ public class CleanInventory {
                                     SampleDataDao.instance.updateOneNoUpsert(Filters.eq("_id",sampleData.getId()), Updates.set(SampleData.SAMPLES,remainingSamples));
                                 }
                                 if(saveLogsToDB){
-                                    logger.infoAndAddToDb(
+                                    logger.debugAndAddToDb(
                                             "Deleting bad samples from sample data " + sampleData.getId(), LogDb.DASHBOARD
                                     );
                                 }else{
@@ -269,9 +283,9 @@ public class CleanInventory {
                     } else {
                         // other cases like: => filter from advanced filter is passed || filter from block filter fails
                         if(saveLogsToDB){
-                            logger.infoAndAddToDb(
-                                "Filter did not pass, keeping api found from filter: " + sampleData.getId(), LogDb.DASHBOARD
-                            );
+                            // logger.infoAndAddToDb(
+                            //     "Filter did not pass, keeping api found from filter: " + sampleData.getId(), LogDb.DASHBOARD
+                            // );
                         }else{
                             logger.debug("[BadApisRemover] " + isNetsparkerPresent + " Keeping API from template: " + sampleData.getId(), LogDb.DASHBOARD);
                         } 
@@ -295,13 +309,39 @@ public class CleanInventory {
 
         } while (!sampleDataList.isEmpty());
 
-        for(Map.Entry<Integer,Integer> iterator: collectionWiseDeletionCountMap.entrySet()){
-            int collId = iterator.getKey();
-            int deletionCount = iterator.getValue();
-            String name = apiCollectionMap.get(collId).getDisplayName();
-
-            if(saveLogsToDB){
-                logger.infoAndAddToDb("Total apis deleted from collection: " + name + " are: " + deletionCount, LogDb.DASHBOARD);
+        // Write deletion count logs to file
+        if(saveLogsToDB && !collectionWiseDeletionCountMap.isEmpty()){
+            // Create a descriptive filename with timestamp
+            String logFileName = "akto_api_cleanup_log.txt";
+            String logFilePath = "/Users/aryankhandelwal/Downloads/" + logFileName;
+            
+            try (BufferedWriter writer = new BufferedWriter(new FileWriter(new File(logFilePath), true))) {
+                writer.write("=== AKTO API CLEANUP LOG ===\n");
+                writer.write("Generated on: " + java.time.Instant.now() + "\n");
+                writer.write("Log file: " + logFileName + "\n");
+                writer.write("Total collections processed: " + collectionWiseDeletionCountMap.size() + "\n\n");
+                
+                writer.write("=== API Deletion Summary ===\n");
+                int totalDeletions = 0;
+                
+                for(Map.Entry<Integer,Integer> iterator: collectionWiseDeletionCountMap.entrySet()){
+                    int collId = iterator.getKey();
+                    int deletionCount = iterator.getValue();
+                    String name = apiCollectionMap.get(collId).getDisplayName();
+                    
+                    String logMessage = "Collection: " + name + " (ID: " + collId + ") - APIs deleted: " + deletionCount + "\n";
+                    writer.write(logMessage);
+                    totalDeletions += deletionCount;
+                }
+                
+                writer.write("\nTotal APIs deleted across all collections: " + totalDeletions + "\n");
+                writer.write("=== End of Deletion Summary ===\n\n");
+                writer.flush();
+                
+                logger.infoAndAddToDb("API cleanup log written to: " + logFilePath);
+                
+            } catch (IOException e) {
+                logger.errorAndAddToDb("Error writing deletion count logs to file: " + e.getMessage());
             }
         }
 
@@ -409,31 +449,36 @@ public class CleanInventory {
 
     public static int deleteApiInfosForMissingSTIs(boolean deleteAPIsInstantly){
         try {
-            Bson filterInfo = UsageMetricCalculator.excludeDemosAndDeactivated(ApiInfo.ID_API_COLLECTION_ID);
-            Bson filterQ = Filters.and(UsageMetricCalculator.excludeDemosAndDeactivated(Constants.ID));
-            Map<Integer, ApiCollection> apiCollectionMap = ApiCollectionsDao.instance.findAll(filterQ, Projections.include(ApiCollection.ID, ApiCollection.HOST_NAME)).stream().collect(Collectors.toMap(ApiCollection::getId, Function.identity()));
-            ExecutorService executor = Executors.newFixedThreadPool(20);
+            Map<Integer, ApiCollection> apiCollectionMap = ApiCollectionsDao.instance.findAll(Filters.exists(ApiCollection.HOST_NAME, true), Projections.include(ApiCollection.ID, ApiCollection.HOST_NAME)).stream().collect(Collectors.toMap(ApiCollection::getId, Function.identity()));
+            ExecutorService executor = Executors.newFixedThreadPool(50);
             List<Future<Void>> futures = new ArrayList<>();
             int accountId = Context.accountId.get();
 
             AtomicInteger counter = new AtomicInteger(0);
-            ArrayList<WriteModel<ApiInfo>> bulkUpdate = new ArrayList<>();
+            ArrayList<WriteModel<SampleData>> bulkUpdate = new ArrayList<>();
             
             for (Integer apiCollectionId : apiCollectionMap.keySet()) {
                 ApiCollection apiCollection = apiCollectionMap.get(apiCollectionId);
                 if (apiCollection == null || apiCollection.getHostName() == null || apiCollection.getHostName().isEmpty()) {
-                    logger.info("Skipping apiCollectionId: " + apiCollectionId + " as it has no hostName");
+                    // logger.info("Skipping apiCollectionId: " + apiCollectionId + " as it has no hostName");
                     continue;
                 }
                 futures.add(executor.submit(() -> {
                     Context.accountId.set(accountId);
                     try {
-                        List<ApiInfo> actualApiInfosInColl = ApiInfoDao.instance.findAll(
+                        List<SampleData> sampleDataList = SampleDataDao.instance.findAll(
                             Filters.eq(ApiInfo.ID_API_COLLECTION_ID, apiCollectionId),
                             Projections.include(Constants.ID)
                         );
+                        List<ApiInfoKey> actualApiInfosInColl = new ArrayList<>();
 
-                        logger.info("Found " + actualApiInfosInColl.size() + " apiInfos in collection: " + apiCollectionId);
+                        for(SampleData sampleData : sampleDataList) {
+                            ApiInfoKey apiInfoKey = new ApiInfoKey(apiCollectionId, sampleData.getId().getUrl(), sampleData.getId().getMethod());
+                            actualApiInfosInColl.add(apiInfoKey);
+                        }
+
+                        
+                        // logger.info("Found " + actualApiInfosInColl.size() + " apiInfos in collection: " + apiCollectionId);
                         if(actualApiInfosInColl.isEmpty()){
                             return null;
                         }
@@ -451,13 +496,13 @@ public class CleanInventory {
                             .filter(java.util.Objects::nonNull)
                             .collect(Collectors.toSet());
 
-                        logger.info("Found " + apiInfoKeys.size() + " STIs in collection: " + apiCollectionId);
-                        for (ApiInfo apiInfo : actualApiInfosInColl) {
-                            if (!apiInfoKeys.contains(apiInfo.getId())) {
+                        // logger.info("Found " + apiInfoKeys.size() + " STIs in collection: " + apiCollectionId);
+                        for (ApiInfoKey apiInfoKey : actualApiInfosInColl) {
+                            if (!apiInfoKeys.contains(apiInfoKey)) {
                                 // delete this apiInfo
                                 counter.incrementAndGet();
-                                Bson filter = ApiInfoDao.getFilter(apiInfo.getId());
-                                logger.info("Deleting apiInfo for missing STI host: " + apiInfo.getId());
+                                Bson filter = ApiInfoDao.getFilter(apiInfoKey);
+                                // logger.info("Deleting apiInfo for missing STI host: " + apiInfo.getId());
                                 if(deleteAPIsInstantly){
                                     bulkUpdate.add(new DeleteOneModel<>(filter));
                                 }
@@ -484,21 +529,13 @@ public class CleanInventory {
             }
 
             if (!bulkUpdate.isEmpty() && deleteAPIsInstantly) {
-                ApiInfoDao.instance.getMCollection().bulkWrite(bulkUpdate);
+                SampleDataDao.instance.getMCollection().bulkWrite(bulkUpdate);
             }
 
-            counter.addAndGet((int) ApiInfoDao.instance.count(
-                Filters.and(
-                    Filters.nin(ApiInfo.ID_API_COLLECTION_ID, apiCollectionMap.keySet()),
-                    filterInfo
-                )
-            ));
-
             if (deleteAPIsInstantly) {
-                ApiInfoDao.instance.deleteAll(
+                SampleDataDao.instance.deleteAll(
                 Filters.and(
-                    Filters.nin(ApiInfo.ID_API_COLLECTION_ID, apiCollectionMap.keySet()),
-                    filterInfo
+                    Filters.nin(ApiInfo.ID_API_COLLECTION_ID, apiCollectionMap.keySet())
                 ));
                 
             } else {

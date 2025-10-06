@@ -2445,60 +2445,60 @@ public class InitializerListener implements ServletContextListener {
                 SingleTypeInfo.init();
 
                 int now = Context.now();
-                if (runJobFunctions || runJobFunctionsAnyway) {
+                // if (!(runJobFunctions || runJobFunctionsAnyway)) {
 
-                    logger.debug("Starting init functions and scheduling jobs at " + now);
+                //     logger.info("Starting init functions and scheduling jobs at " + now);
 
-                    AccountTask.instance.executeTask(new Consumer<Account>() {
-                        @Override
-                        public void accept(Account account) {
-                            runInitializerFunctions();
-                        }
-                    }, "context-initializer-secondary");
-                    logger.warn("Started webhook schedulers", LogDb.DASHBOARD);
-                    setUpWebhookScheduler();
-                    logger.warn("Started traffic alert schedulers", LogDb.DASHBOARD);
-                    setUpTrafficAlertScheduler();
-                    logger.warn("Started daily schedulers", LogDb.DASHBOARD);
-                    setUpDailyScheduler();
-                    if (DashboardMode.isMetered()) {
-                        setupUsageScheduler();
-                    }
-                    updateSensitiveInfoInApiInfo.setUpSensitiveMapInApiInfoScheduler();
-                    syncCronInfo.setUpUpdateCronScheduler();
-                    setUpTestEditorTemplatesScheduler();
-                    JobsCron.instance.jobsScheduler(JobExecutorType.DASHBOARD);
-                    updateApiGroupsForAccounts(); 
-                    setupAutomatedApiGroupsScheduler();
-                    if(runJobFunctionsAnyway) {
-                        crons.trafficAlertsScheduler();
-                        // crons.insertHistoricalDataJob();
-                        // if(DashboardMode.isOnPremDeployment()){
-                        //     crons.insertHistoricalDataJobForOnPrem();
-                        // }
+                //     AccountTask.instance.executeTask(new Consumer<Account>() {
+                //         @Override
+                //         public void accept(Account account) {
+                //             runInitializerFunctions();
+                //         }
+                //     }, "context-initializer-secondary");
+                //     logger.warn("Started webhook schedulers", LogDb.DASHBOARD);
+                //     setUpWebhookScheduler();
+                //     logger.warn("Started traffic alert schedulers", LogDb.DASHBOARD);
+                //     setUpTrafficAlertScheduler();
+                //     logger.warn("Started daily schedulers", LogDb.DASHBOARD);
+                //     setUpDailyScheduler();
+                //     if (DashboardMode.isMetered()) {
+                //         setupUsageScheduler();
+                //     }
+                //     updateSensitiveInfoInApiInfo.setUpSensitiveMapInApiInfoScheduler();
+                //     syncCronInfo.setUpUpdateCronScheduler();
+                //     setUpTestEditorTemplatesScheduler();
+                //     JobsCron.instance.jobsScheduler(JobExecutorType.DASHBOARD);
+                //     updateApiGroupsForAccounts(); 
+                //     setupAutomatedApiGroupsScheduler();
+                //     if(runJobFunctionsAnyway) {
+                //         crons.trafficAlertsScheduler();
+                //         // crons.insertHistoricalDataJob();
+                //         // if(DashboardMode.isOnPremDeployment()){
+                //         //     crons.insertHistoricalDataJobForOnPrem();
+                //         // }
 
-                        // trimCappedCollectionsJob();
-                        setUpPiiAndTestSourcesScheduler();
-                        cleanInventoryJobRunner();
-                        setUpDefaultPayloadRemover();
-                        setUpDependencyFlowScheduler();
-                        tokenGeneratorCron.tokenGeneratorScheduler();
-                        crons.deleteTestRunsScheduler();
-                        setUpUpdateCustomCollections();
-                        setUpFillCollectionIdArrayJob();
+                //         // trimCappedCollectionsJob();
+                //         setUpPiiAndTestSourcesScheduler();
+                //         cleanInventoryJobRunner();
+                //         setUpDefaultPayloadRemover();
+                //         setUpDependencyFlowScheduler();
+                //         tokenGeneratorCron.tokenGeneratorScheduler();
+                //         crons.deleteTestRunsScheduler();
+                //         setUpUpdateCustomCollections();
+                //         setUpFillCollectionIdArrayJob();
                                                
 
-                        CleanInventory.cleanInventoryJobRunner();
+                //         CleanInventory.cleanInventoryJobRunner();
 
-                        MatchingJob.MatchingJobRunner();
-                    }
+                //         MatchingJob.MatchingJobRunner();
+                //     }
 
-                    int now2 = Context.now();
-                    int diffNow = now2 - now;
-                    logger.debug(String.format("Completed init functions and scheduling jobs at %d , time taken : %d", now2, diffNow));
-                } else {
-                    logger.debug("Skipping init functions and scheduling jobs at " + now);
-                }
+                //     int now2 = Context.now();
+                //     int diffNow = now2 - now;
+                //     logger.debug(String.format("Completed init functions and scheduling jobs at %d , time taken : %d", now2, diffNow));
+                // } else {
+                //     logger.debug("Skipping init functions and scheduling jobs at " + now);
+                // }
                 // setUpAktoMixpanelEndpointsScheduler();
                 //fetchGithubZip();
                 if(isSaas){
@@ -2510,43 +2510,43 @@ public class InitializerListener implements ServletContextListener {
                     }
                 }
 
-                // run backward fill job for query params
-                AccountTask.instance.executeTask(new Consumer<Account>() {
-                    @Override
-                    public void accept(Account t) {
-                        if(t.getId() == 1000000 || t.getId() == 1718042191 || t.getId() == 1736798101){
-                            Context.accountId.set(t.getId());
-                            Context.contextSource.set(com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE.API);
-                            logger.infoAndAddToDb("Starting backfill query params for account " + t.getId());
-                            int now = Context.now();
-                            BackwardCompatibility backwardCompatibility = BackwardCompatibilityDao.instance.findOne(Filters.empty());
-                            if(backwardCompatibility.getFillQueryParams() == 0){
-                                BackwardCompatibilityDao.instance.updateOne(
-                                    Filters.eq("_id", backwardCompatibility.getId()),
-                                    Updates.set("fillQueryParams", Context.now())
-                                );
-                                try {
-                                    List<ApiCollection> apiCollections = ApiCollectionsDao.instance.findAll(
-                                        Filters.and(
-                                            Filters.ne(ApiCollection._DEACTIVATED, true),
-                                            Filters.exists(ApiCollection.HOST_NAME, true)
-                                        ), Projections.include(ApiCollection.ID, ApiCollection.HOST_NAME)
-                                    );
-                                    logger.infoAndAddToDb("Fetched " + apiCollections.size() + " api collections");
-                                    SingleTypeInfo.fetchCustomDataTypes(t.getId());
-                                    for(ApiCollection apiCollection : apiCollections){
-                                        SampleDataDao.instance.backFillIsQueryParamInSingleTypeInfo(apiCollection.getId());
-                                    }
-                                    logger.infoAndAddToDb("Completed backfill query params for account " + t.getId() + " in " + (Context.now() - now) + " seconds");
-                                } catch (Exception e) {
-                                    logger.errorAndAddToDb(e, "Error while filling query params");
-                                }
+                // // run backward fill job for query params
+                // AccountTask.instance.executeTask(new Consumer<Account>() {
+                //     @Override
+                //     public void accept(Account t) {
+                //         if(t.getId() == 1000000 || t.getId() == 1718042191 || t.getId() == 1736798101){
+                //             Context.accountId.set(t.getId());
+                //             Context.contextSource.set(com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE.API);
+                //             logger.infoAndAddToDb("Starting backfill query params for account " + t.getId());
+                //             int now = Context.now();
+                //             BackwardCompatibility backwardCompatibility = BackwardCompatibilityDao.instance.findOne(Filters.empty());
+                //             if(backwardCompatibility.getFillQueryParams() == 0){
+                //                 BackwardCompatibilityDao.instance.updateOne(
+                //                     Filters.eq("_id", backwardCompatibility.getId()),
+                //                     Updates.set("fillQueryParams", Context.now())
+                //                 );
+                //                 try {
+                //                     List<ApiCollection> apiCollections = ApiCollectionsDao.instance.findAll(
+                //                         Filters.and(
+                //                             Filters.ne(ApiCollection._DEACTIVATED, true),
+                //                             Filters.exists(ApiCollection.HOST_NAME, true)
+                //                         ), Projections.include(ApiCollection.ID, ApiCollection.HOST_NAME)
+                //                     );
+                //                     logger.infoAndAddToDb("Fetched " + apiCollections.size() + " api collections");
+                //                     SingleTypeInfo.fetchCustomDataTypes(t.getId());
+                //                     for(ApiCollection apiCollection : apiCollections){
+                //                         SampleDataDao.instance.backFillIsQueryParamInSingleTypeInfo(apiCollection.getId());
+                //                     }
+                //                     logger.infoAndAddToDb("Completed backfill query params for account " + t.getId() + " in " + (Context.now() - now) + " seconds");
+                //                 } catch (Exception e) {
+                //                     logger.errorAndAddToDb(e, "Error while filling query params");
+                //                 }
                                 
-                            }
+                //             }
                             
-                        }
-                    }
-                }, "backfill-query-params");
+                //         }
+                //     }
+                // }, "backfill-query-params");
             }
         }, 0, TimeUnit.SECONDS);
 
@@ -3401,7 +3401,7 @@ public class InitializerListener implements ServletContextListener {
     }
 
     public void runInitializerFunctions() {
-        DaoInit.createIndices();
+        // DaoInit.createIndices();
 
         BackwardCompatibility backwardCompatibility = BackwardCompatibilityDao.instance.findOne(new BasicDBObject());
         if (backwardCompatibility == null) {

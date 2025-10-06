@@ -385,18 +385,18 @@ function HomeDashboard() {
             api.findTotalIssues(startTimestamp, endTimestamp),
             api.fetchApiStats(startTimestamp, endTimestamp),
             api.fetchEndpointsCount(startTimestamp, endTimestamp),
-            testingApi.fetchSeverityInfoForIssues({}, [], 0),
-            api.getApiInfoForMissingData(0, endTimestamp),
-            api.fetchMcpdata('TOTAL_APIS'),
-            api.fetchMcpdata('THIRD_PARTY_APIS'),
-            api.fetchMcpdata('RECENT_OPEN_ALERTS'),
-            api.fetchMcpdata('CRITICAL_APIS'),
-            api.fetchMcpdata('TOOLS'),
-            api.fetchMcpdata('PROMPTS'),
-            api.fetchMcpdata('RESOURCES'),
-            api.fetchMcpdata('MCP_SERVER'),
-            api.fetchMcpdata('POLICY_GUARDRAIL_APIS'),
-            api.fetchMcpdata('TOP_3_APPLICATIONS_BY_TRAFFIC')
+            // testingApi.fetchSeverityInfoForIssues({}, [], 0),
+            // api.getApiInfoForMissingData(0, endTimestamp),
+            // api.fetchMcpdata('TOTAL_APIS'),
+            // api.fetchMcpdata('THIRD_PARTY_APIS'),
+            // api.fetchMcpdata('RECENT_OPEN_ALERTS'),
+            // api.fetchMcpdata('CRITICAL_APIS'),
+            // api.fetchMcpdata('TOOLS'),
+            // api.fetchMcpdata('PROMPTS'),
+            // api.fetchMcpdata('RESOURCES'),
+            // api.fetchMcpdata('MCP_SERVER'),
+            // api.fetchMcpdata('POLICY_GUARDRAIL_APIS'),
+            // api.fetchMcpdata('TOP_3_APPLICATIONS_BY_TRAFFIC')
         ];
 
         let results = await Promise.allSettled(apiPromises);
@@ -405,20 +405,36 @@ function HomeDashboard() {
         let findTotalIssuesResp = results[1].status === 'fulfilled' ? results[1].value : {}
         let apisStatsResp = results[2].status === 'fulfilled' ? results[2].value : {}
         let fetchEndpointsCountResp = results[3].status === 'fulfilled' ? results[3].value : {}
-        let issueSeverityMap = results[4].status === 'fulfilled' ? results[4].value : {}
-        let missingApiInfoData = results[5].status === 'fulfilled' ? results[5].value : {}
-        let mcpTotalApis = results[6]?.status === 'fulfilled' ? (results[6].value?.mcpDataCount ?? null) : null
-        let mcpThirdParty = results[7]?.status === 'fulfilled' ? (results[7].value?.mcpDataCount ?? null) : null
-        let mcpOpenAlertsDetails = results[8]?.status === 'fulfilled' ? (results[8].value?.response?.alertDetails ?? []) : []
-        let mcpCriticalApis = results[9]?.status === 'fulfilled' ? (results[9].value?.mcpDataCount ?? null) : null
-        let mcpTools = results[10]?.status === 'fulfilled' ? (results[10].value?.mcpDataCount ?? null) : null
-        let mcpPrompts = results[11]?.status === 'fulfilled' ? (results[11].value?.mcpDataCount ?? null) : null
-        let mcpResources = results[12]?.status === 'fulfilled' ? (results[12].value?.mcpDataCount ?? null) : null
-        let mcpServer = results[13]?.status === 'fulfilled' ? (results[13].value?.mcpDataCount ?? null) : null
-        let mcpPolicyGuardrailApis = results[14]?.status === 'fulfilled' ? (results[14].value?.mcpDataCount ?? null) : null
-        let mcpTopApps = results[15]?.status === 'fulfilled' ? (results[15].value?.response?.topApplications ?? []) : []
-        const totalRedundantApis = missingApiInfoData?.redundantApiInfoKeys || 0
-        const totalMissingApis = missingApiInfoData?.totalMissing|| 0
+        // let issueSeverityMap = results[4].status === 'fulfilled' ? results[4].value : {}
+        // let missingApiInfoData = results[5].status === 'fulfilled' ? results[5].value : {}
+        // let mcpTotalApis = results[6]?.status === 'fulfilled' ? (results[6].value? null
+        // let mcpThirdParty = results[7]?.status === 'fulfilled' ? (results[7].value?.mcpDataCount ?? null) : null
+        // let mcpOpenAlertsDetails = results[8]?.status === 'fulfilled' ? (results[8].value?.response?.alertDetails ?? []) : []
+        // let mcpCriticalApis = results[9]?.status === 'fulfilled' ? (results[9].value?.mcpDataCount ?? null) : null
+        // let mcpTools = results[10]?.status === 'fulfilled' ? (results[10].value?.mcpDataCount ?? null) : null
+        // let mcpPrompts = results[11]?.status === 'fulfilled' ? (results[11].value?.mcpDataCount ?? null) : null
+        // let mcpResources = results[12]?.status === 'fulfilled' ? (results[12].value?.mcpDataCount ?? null) : null
+        // let mcpServer = results[13]?.status === 'fulfilled' ? (results[13].value?.mcpDataCount ?? null) : null
+        // let mcpPolicyGuardrailApis = results[14]?.status === 'fulfilled' ? (results[14].value?.mcpDataCount ?? null) : null
+        // let mcpTopApps = results[15]?.status === 'fulfilled' ? (results[15].value?.response?.topApplications ?? []) : []
+        // const totalRedundantApis = missingApiInfoData?.redundantApiInfoKeys || 0
+        // const totalMissingApis = missingApiInfoData?.totalMissing|| 0
+
+
+        let issueSeverityMap={}
+        let missingApiInfoData = {}
+        let mcpTotalApis = null
+        let mcpThirdParty = null
+        let mcpOpenAlertsDetails = []
+        let mcpCriticalApis = null
+        let mcpTools =  null
+        let mcpPrompts =  null
+        let mcpResources =  null
+        let mcpServer =  null
+        let mcpPolicyGuardrailApis =  null
+        let mcpTopApps = []
+        const totalRedundantApis = 0
+        const totalMissingApis =  0
 
         setShowBannerComponent(!userEndpoints)
 
@@ -453,7 +469,7 @@ function HomeDashboard() {
     // Fetch MCP API call stats when time range changes
     useEffect(() => {
         if (allCollections && allCollections.length > 0) {
-            fetchMcpApiCallStats(mcpStatsTimeRange, func.timeNow());
+            // fetchMcpApiCallStats(mcpStatsTimeRange, func.timeNow());
         }
     }, [mcpStatsTimeRange, allCollections])
 
@@ -482,7 +498,7 @@ function HomeDashboard() {
     }
 
     useEffect(() => {
-        getActionItemsDataAndCount();
+        // getActionItemsDataAndCount();
     }, []);
 
     function buildIssuesSummary(findTotalIssuesResp) {

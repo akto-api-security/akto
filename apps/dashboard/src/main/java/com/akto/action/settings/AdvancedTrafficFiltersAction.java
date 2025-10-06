@@ -2,6 +2,7 @@ package com.akto.action.settings;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.Executors;
@@ -11,6 +12,7 @@ import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang3.StringUtils;
 import org.bson.conversions.Bson;
 
+import com.akto.DaoInit;
 import com.akto.action.UserAction;
 import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.context.Context;
@@ -26,6 +28,7 @@ import com.akto.util.Constants;
 import com.akto.utils.TrafficFilterUtil;
 import com.akto.utils.jobs.CleanInventory;
 import com.mongodb.BasicDBObject;
+import com.mongodb.ConnectionString;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.FindOneAndUpdateOptions;
 import com.mongodb.client.model.Projections;
@@ -105,6 +108,15 @@ public class AdvancedTrafficFiltersAction extends UserAction {
     }
 
     private boolean deleteAPIsInstantly;
+    public static void main(String[] args) {
+        Context.accountId.set(1000000);
+        DaoInit.init(new ConnectionString("mongodb://localhost:27017"));
+        AdvancedTrafficFiltersAction action = new AdvancedTrafficFiltersAction();
+        action.setDeleteAPIsInstantly(false);
+        String content = "id: DEFAULT_BLOCK_FILTER\nfilter:\n  or:\n    - url:\n        regex: (\\.\\.|\\/[^\\/?]*\\.[^\\/?]*(\\?|$))\n    - response_code:\n        eq: 302\n    - response_headers:\n        for_one:\n          key:\n            eq: content-type\n          value:\n            contains_either:\n              - html\n              - text/html\n    - and:\n        - method: \n            eq: GET\n        - response_payload:\n            or: \n              - length:\n                  eq: 0\n              - eq: \"{}\"";
+        action.setYamlContent(content);
+        action.syncTrafficFromFilters();
+    }
 
     public String syncTrafficFromFilters(){
         FilterConfig filterConfig = new FilterConfig();
@@ -117,12 +129,9 @@ public class AdvancedTrafficFiltersAction extends UserAction {
                 throw new Exception("filter field cannot be empty");
             }
 
-            Set<Integer> deactivatedCollections = UsageMetricCalculator.getDeactivated();
-            deactivatedCollections.add(0);
-
             List<ApiCollection> apiCollections = ApiCollectionsDao.instance.findAll(
-                Filters.nin(Constants.ID, deactivatedCollections), Projections.include(ApiCollection.HOST_NAME, ApiCollection.NAME));
-            YamlTemplate yamlTemplate = new YamlTemplate(filterConfig.getId(), Context.now(), getSUser().getLogin(), Context.now(), this.yamlContent, null, null);
+                Filters.ne(ApiCollection._TYPE, ApiCollection.Type.API_GROUP.name()), Projections.include(ApiCollection.HOST_NAME, ApiCollection.NAME));
+            YamlTemplate yamlTemplate = new YamlTemplate(filterConfig.getId(), Context.now(), "aryan@akto.io", Context.now(), this.yamlContent, null, null);
             int accountId = Context.accountId.get();
             executorService.schedule( new Runnable() {
                 public void run() {
@@ -134,8 +143,6 @@ public class AdvancedTrafficFiltersAction extends UserAction {
                     }
                 }
             }, 0 , TimeUnit.SECONDS);
-
-            deactivatedCollections.remove(0);
             return Action.SUCCESS.toUpperCase();
         } catch (Exception e) {
             e.printStackTrace();
@@ -147,6 +154,8 @@ public class AdvancedTrafficFiltersAction extends UserAction {
     @Getter
     public int deleteApisCount;
 
+    
+
     public String deleteNonHostApiInfos() {
         try {
             int accountId = Context.accountId.get();
@@ -156,6 +165,7 @@ public class AdvancedTrafficFiltersAction extends UserAction {
                         Context.accountId.set(accountId);
                         try {
                             CleanInventory.deleteApiInfosForMissingSTIs(deleteAPIsInstantly);
+                            System.out.println("Done");
                         } catch (Exception e) {
                             e.printStackTrace();
                         }
