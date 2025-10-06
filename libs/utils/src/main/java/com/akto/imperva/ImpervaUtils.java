@@ -99,7 +99,7 @@ public class ImpervaUtils {
                         .anyMatch(header -> {
                             String lowerHeader = header.toLowerCase();
                             return WHITELISTED_CONTENT_TYPES.stream()
-                                    .anyMatch(contentType -> lowerHeader.contains(contentType));
+                                    .anyMatch(lowerHeader::contains);
                         });
             }
         }
