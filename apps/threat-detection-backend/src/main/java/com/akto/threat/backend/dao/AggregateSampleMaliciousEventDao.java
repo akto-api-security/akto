@@ -1,5 +1,6 @@
 package com.akto.threat.backend.dao;
 
+import com.akto.threat.backend.constants.MongoDBCollection;
 import com.akto.threat.backend.db.AggregateSampleMaliciousEventModel;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.model.BulkWriteOptions;
@@ -21,7 +22,7 @@ public class AggregateSampleMaliciousEventDao extends AccountBasedDao<AggregateS
 
     @Override
     protected String getCollectionName() {
-        return null; // Dynamic collection names - not used
+        return MongoDBCollection.ThreatDetection.AGGREGATE_SAMPLE_MALICIOUS_REQUESTS;
     }
 
     @Override
