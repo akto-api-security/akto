@@ -3,21 +3,22 @@ package com.akto.threat.backend.tasks;
 import com.akto.dao.context.Context;
 import com.akto.kafka.KafkaConfig;
 import com.akto.log.LoggerMaker;
+import com.akto.threat.backend.cache.IgnoredEventCache;
 import com.akto.threat.backend.constants.KafkaTopic;
 import com.akto.threat.backend.constants.MongoDBCollection;
+import com.akto.threat.backend.dao.AggregateSampleMaliciousEventDao;
+import com.akto.threat.backend.dao.MaliciousEventDao;
 import com.akto.threat.backend.db.AggregateSampleMaliciousEventModel;
 import com.akto.threat.backend.db.MaliciousEventModel;
 import com.akto.threat.backend.db.SplunkIntegrationModel;
 import com.akto.threat.backend.service.MaliciousEventService;
 import com.akto.threat.backend.utils.SplunkEvent;
-import com.akto.threat.backend.cache.IgnoredEventCache;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.Gson;
 import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoCollection;
-import com.mongodb.client.model.BulkWriteOptions;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.InsertOneModel;
 import com.mongodb.client.model.WriteModel;
@@ -138,10 +139,7 @@ public class FlushMessagesToDB {
           break;
         }
 
-        this.mClient
-            .getDatabase(accountId + "")
-            .getCollection(eventType, AggregateSampleMaliciousEventModel.class)
-            .bulkWrite(bulkUpdates, new BulkWriteOptions().ordered(false));
+        AggregateSampleMaliciousEventDao.instance.bulkWrite(accountId, eventType, bulkUpdates);
         break;
 
       case MongoDBCollection.ThreatDetection.MALICIOUS_EVENTS:
@@ -158,10 +156,7 @@ public class FlushMessagesToDB {
                        event.getLatestApiEndpoint() + " + " + event.getFilterId());
         } else {
             // No ignored event exists, safe to insert
-            MongoCollection<MaliciousEventModel> collection = this.mClient
-                .getDatabase(accountId + "")
-                .getCollection(eventType, MaliciousEventModel.class);
-            collection.insertOne(event);
+            MaliciousEventDao.instance.insertOne(accountId, event);
         }
         break;
       default:
