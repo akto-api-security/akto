@@ -85,14 +85,23 @@ public class ImpervaUtils {
         
         boolean isHostHeaderVisa = false;
         boolean isContentTypeJsonOrXml = false;
-        if (headers.containsKey("host")) {
-            List<String> hostHeaders = headers.get("host");
-            isHostHeaderVisa = hostHeaders.stream().anyMatch(header -> header.contains(VISA_HOST));
-        }
-        if (headers.containsKey("content-type")) {
-            List<String> contentTypeHeaders = headers.get("content-type");
-            isContentTypeJsonOrXml = contentTypeHeaders.stream()
-                    .anyMatch(header -> WHITELISTED_CONTENT_TYPES.contains(header.toLowerCase()));
+
+        for (Map.Entry<String, List<String>> entry : headers.entrySet()) {
+            String headerKey = entry.getKey().toLowerCase();
+            List<String> headerValues = entry.getValue();
+
+            if ("host".equals(headerKey)) {
+                isHostHeaderVisa = headerValues.stream().anyMatch(header -> header.contains(VISA_HOST));
+            }
+
+            if ("content-type".equals(headerKey)) {
+                isContentTypeJsonOrXml = headerValues.stream()
+                        .anyMatch(header -> {
+                            String lowerHeader = header.toLowerCase();
+                            return WHITELISTED_CONTENT_TYPES.stream()
+                                    .anyMatch(contentType -> lowerHeader.contains(contentType));
+                        });
+            }
         }
         return isHostHeaderVisa && isContentTypeJsonOrXml;
     }
