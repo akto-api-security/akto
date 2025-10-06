@@ -15,107 +15,126 @@ function ThreatSankeyChart({ startTimestamp, endTimestamp }) {
   const [loading, setLoading] = useState(true);
   const [chartData, setChartData] = useState([]);
 
-  const fetchCategoryData = async () => {
-    setLoading(true);
-    
-    try {
-      const res = await api.fetchThreatCategoryCount(startTimestamp, endTimestamp);
-      
-      if (res?.categoryCounts && Array.isArray(res.categoryCounts)) {
-        // API Response format: [{category: "...", subCategory: "...", count: 100}, ...]
-        const data = res.categoryCounts;
-        
-        // Create Sankey links: Total Threats -> Category
-        const sankeyLinks = [];
-        
-        // Group by category and subcategory
-        const categoryMap = {};
-        
-        data.forEach((item) => {
-          const category = item.category || item.subCategory || 'Unknown';
-          const subCategory = item.subCategory;
-          const count = item.count || 0;
-          
-          if (count > 0) {
-            if (!categoryMap[category]) {
-              categoryMap[category] = { total: 0, subcategories: {} };
-            }
-            categoryMap[category].total += count;
-            
-            if (subCategory && subCategory !== category) {
-              categoryMap[category].subcategories[subCategory] = count;
-            }
-          }
-        });
-        
-        // Create links from Total Threats to Categories
-        Object.keys(categoryMap).forEach((category) => {
-          const categoryData = categoryMap[category];
-          const formattedCategory = formatCategoryName(category);
-          
-          // Link: Total Threats -> Category
-          sankeyLinks.push({
-            from: 'Total Threats',
-            to: formattedCategory,
-            weight: categoryData.total
-          });
-          
-          // If there are subcategories, create links: Category -> Subcategory
-          Object.keys(categoryData.subcategories).forEach((subCategory) => {
-            const formattedSubCategory = formatCategoryName(subCategory);
-            if (formattedSubCategory !== formattedCategory) {
-              sankeyLinks.push({
-                from: formattedCategory,
-                to: formattedSubCategory,
-                weight: categoryData.subcategories[subCategory]
-              });
-            }
-          });
-        });
-        
-        setChartData(sankeyLinks.length > 0 ? sankeyLinks : []);
-      } else {
-        console.warn('No category data returned from API');
-        setChartData([]);
-      }
-    } catch (error) {
-      console.error('Error fetching category data:', error);
-      setChartData([]);
-    } finally {
-      setLoading(false);
-    }
-  };
+  // fetch data when timestamps change
 
   const formatCategoryName = (category) => {
     if (!category) return 'Unknown';
     
-    // Convert category codes to readable names
-    const categoryMap = {
-      'SQL_INJECTION': 'SQL Injection',
-      'XSS': 'Cross-Site Scripting',
-      'CSRF': 'CSRF Attack',
-      'SSRF': 'Server-Side Request Forgery',
-      'XXE': 'XML External Entity',
-      'RL': 'Rate Limiting',
-      'Geo': 'Geo Blocking',
-      'ipGeo': 'IP Geo Blocking',
-      'BOLA': 'Broken Object Level Auth',
-      'BFLA': 'Broken Function Level Auth',
-      'CMD_INJECTION': 'Command Injection',
-      'PATH_TRAVERSAL': 'Path Traversal',
-      'AUTHENTICATION': 'Authentication Attack',
-      'AUTHORIZATION': 'Authorization Attack'
-    };
+    // Convert category codes to readable names based on common patterns
+    const readableName = category.replace(/_/g, ' ')
+      .toLowerCase()
+      .replace(/\b\w/g, l => l.toUpperCase());
     
-    return categoryMap[category] || category.replace(/_/g, ' ');
+    return readableName;
+  };
+
+  // Generate a palette of distinct colors (returns hex strings)
+  const generateColorPalette = (count) => {
+    if (count <= 0) return [];
+    const colors = [];
+    for (let i = 0; i < count; i++) {
+      // distribute hues around the color wheel
+      const hue = Math.round((i * 360) / count);
+      const saturation = 65; // percent
+      const lightness = 50; // percent
+      colors.push(hslToHex(hue, saturation, lightness));
+    }
+    return colors;
+  };
+
+  // Convert HSL to hex
+  const hslToHex = (h, s, l) => {
+    // h: 0-360, s: 0-100, l:0-100
+    s /= 100;
+    l /= 100;
+    const k = (n) => (n + h / 30) % 12;
+    const a = s * Math.min(l, 1 - l);
+    const f = (n) => {
+      const color = l - a * Math.max(-1, Math.min(k(n) - 3, Math.min(9 - k(n), 1)));
+      return Math.round(255 * color)
+        .toString(16)
+        .padStart(2, '0');
+    };
+    return `#${f(0)}${f(8)}${f(4)}`;
   };
 
   useEffect(() => {
-    fetchCategoryData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    let mounted = true;
+    const fetchData = async () => {
+      setLoading(true);
+      try {
+        const res = await api.fetchThreatCategoryCount(startTimestamp, endTimestamp);
+
+        if (!mounted) return;
+
+        if (res?.categoryCounts && Array.isArray(res.categoryCounts)) {
+          const data = res.categoryCounts;
+          const sankeyLinks = [];
+          const categoryTotals = {};
+
+          data.forEach((item) => {
+            const category = item.category || 'Unknown';
+            const subCategory = item.subCategory || category;
+            const count = item.count || 0;
+
+            if (count > 0) {
+              if (category === subCategory) {
+                const formattedName = formatCategoryName(category);
+                sankeyLinks.push({ from: 'Total Threats', to: formattedName, weight: count });
+              } else {
+                const formattedCategory = formatCategoryName(category);
+                const formattedSubCategory = formatCategoryName(subCategory);
+                if (!categoryTotals[formattedCategory]) categoryTotals[formattedCategory] = 0;
+                categoryTotals[formattedCategory] += count;
+                sankeyLinks.push({ from: formattedCategory, to: formattedSubCategory, weight: count });
+              }
+            }
+          });
+
+          Object.keys(categoryTotals).forEach((category) => {
+            sankeyLinks.push({ from: 'Total Threats', to: category, weight: categoryTotals[category] });
+          });
+
+          setChartData(sankeyLinks.length > 0 ? sankeyLinks : []);
+        } else {
+          setChartData([]);
+        }
+      } catch (error) {
+        if (mounted) setChartData([]);
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    };
+
+    fetchData();
+    return () => { mounted = false; };
   }, [startTimestamp, endTimestamp]);
 
-  const chartOptions = {
+  // Build chart options using the dynamic node colors and link coloring
+  const chartOptions = (() => {
+    // extract unique node names from links
+    const nodeSet = new Set();
+    chartData.forEach((lnk) => {
+      if (lnk.from) nodeSet.add(lnk.from);
+      if (lnk.to) nodeSet.add(lnk.to);
+    });
+
+    const nodeList = Array.from(nodeSet);
+
+    // create palette and map to node names
+    const palette = generateColorPalette(nodeList.length || 1);
+    const colorMap = {};
+    nodeList.forEach((name, idx) => {
+      colorMap[name] = palette[idx];
+    });
+
+    // prepare nodes for Highcharts (id must match link from/to)
+    const nodes = nodeList.map((name) => ({ id: name, name, color: colorMap[name] }));
+
+    // color links by source node for visual continuity
+    const dataWithColor = chartData.map((d) => ({ ...d, color: colorMap[d.from] || '#cccccc' }));
+
+    return {
     chart: {
       height: 400,
       backgroundColor: '#ffffff'
@@ -126,14 +145,22 @@ function ThreatSankeyChart({ startTimestamp, endTimestamp }) {
     credits: {
       enabled: false
     },
+    tooltip: {
+      style: { color: '#000000' },
+      headerFormat: '',
+      pointFormat: '<b>{point.fromNode.name}</b> to <b>{point.toNode.name}</b><br/>Threats: {point.weight}',
+      nodeFormat: '<b>{point.name}</b><br/>Total: {point.sum} threats'
+    },
     series: [{
       type: 'sankey',
       name: 'Threat Flow',
       keys: ['from', 'to', 'weight'],
-      data: chartData,
+      data: dataWithColor,
+      nodes,
       dataLabels: {
         enabled: true,
         style: {
+          color: '#000000',
           fontSize: '12px',
           fontWeight: 'normal',
           textOutline: 'none'
@@ -144,21 +171,7 @@ function ThreatSankeyChart({ startTimestamp, endTimestamp }) {
       },
       nodeWidth: 30,
       nodePadding: 20,
-      colors: [
-        '#E45357', // Critical red
-        '#EF864C', // High orange
-        '#F6C564', // Medium yellow
-        '#6FD1A6', // Low green
-        '#7F56D9', // Purple
-        '#4A90E2', // Blue
-        '#50C878', // Emerald
-        '#FF6B6B'  // Light red
-      ],
-      tooltip: {
-        headerFormat: '',
-        pointFormat: '<b>{point.fromNode.name}</b> → <b>{point.toNode.name}</b>: {point.weight} threats',
-        nodeFormat: '<b>{point.name}</b>: {point.sum} threats'
-      }
+      // leave colors to nodes/link colors generated above
     }],
     plotOptions: {
       sankey: {
@@ -166,6 +179,7 @@ function ThreatSankeyChart({ startTimestamp, endTimestamp }) {
       }
     }
   };
+})();
 
   if (loading) {
     return (

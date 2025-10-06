@@ -1,7 +1,6 @@
 import React, { useEffect, useReducer, useState, useCallback } from 'react'
 import PageWithMultipleCards from "../../components/layouts/PageWithMultipleCards"
 import { Box, DataTable, HorizontalGrid, HorizontalStack, Icon, Text, VerticalStack, Badge } from '@shopify/polaris';
-import { DashboardBanner } from '../dashboard/components/DashboardBanner';
 import SummaryCard from '../dashboard/new_components/SummaryCard';
 import { ArrowUpMinor, ArrowDownMinor } from '@shopify/polaris-icons';
 import InfoCard from '../dashboard/new_components/InfoCard';
@@ -21,7 +20,6 @@ import api from './api';
 
 function ThreatDashboardPage() {
     const [loading, setLoading] = useState(true);
-    const [showBannerComponent, setShowBannerComponent] = useState(false)
     
     // Summary metrics state
     const [summaryMetrics, setSummaryMetrics] = useState({
@@ -59,10 +57,10 @@ function ThreatDashboardPage() {
 
 
     const fetchData = useCallback(async () => {
+        setLoading(true)
+
         try {
-            setLoading(true)
-            
-            // Fetch summary data from dummy data (TODO: Replace with actual API call)
+            // Row 1: Summary metrics - Use dummy data
             const summaryData = dummyData.getThreatSummaryData()
             setSummaryMetrics({
                 currentPeriod: {
@@ -78,59 +76,93 @@ function ThreatDashboardPage() {
                     activeThreats: summaryData.oldTotalActive,
                 }
             })
+
+            // Row 2: Sankey Chart and Map use APIs (handled in their components)
             
-            // Fetch threat status breakdown (dummy data)
+            // Row 3: Threat Status (dummy) and Severity Distribution (API)
+            // Threat Status - Use dummy data
             const statusData = dummyData.getThreatStatusData()
             setThreatStatusBreakdown(statusData)
 
+            // Severity Distribution - Use API
+            try {
+                const severityResponse = await api.fetchCountBySeverity(startTimestamp, endTimestamp)
+                
+                if (severityResponse?.categoryCounts && Array.isArray(severityResponse.categoryCounts)) {
+                    const categoryCounts = severityResponse.categoryCounts
+                    
+                    // Convert array format to object format for ChartypeComponent
+                    const severityColors = {
+                        "CRITICAL": "#E45357",
+                        "HIGH": "#EF864C",
+                        "MEDIUM": "#F6C564",
+                        "LOW": "#6FD1A6"
+                    }
+                    
+                    const formattedSeverity = {}
+                    
+                    // Initialize all severities with 0
+                    Object.keys(severityColors).forEach(severity => {
+                        formattedSeverity[severity] = {
+                            "text": 0,
+                            "color": severityColors[severity],
+                            "filterKey": severity
+                        }
+                    })
+                    
+                    // Update with actual counts from API
+                    // The API returns data in format: [{category: "", subCategory: "MEDIUM", count: 5000}]
+                    categoryCounts.forEach(item => {
+                        const severity = item.subCategory || item.severity
+                        if (severity && severityColors[severity]) {
+                            formattedSeverity[severity] = {
+                                "text": item.count || 0,
+                                "color": severityColors[severity],
+                                "filterKey": severity
+                            }
+                        }
+                    })
+                    
+                    setSeverityDistribution(formattedSeverity)
+                } 
+            } catch (err) {
+                // Set empty state but keep structure for display
+                const severityColors = {
+                    "CRITICAL": "#E45357",
+                    "HIGH": "#EF864C",
+                    "MEDIUM": "#F6C564",
+                    "LOW": "#6FD1A6"
+                }
+                const emptyFormattedSeverity = {}
+                Object.keys(severityColors).forEach(severity => {
+                    emptyFormattedSeverity[severity] = {
+                        "text": 0,
+                        "color": severityColors[severity],
+                        "filterKey": severity
+                    }
+                })
+                setSeverityDistribution(emptyFormattedSeverity)
+            }
 
-            // Populate top attacked hosts and APIs from dummy data first so UI shows them
-            // even if subsequent API calls fail or are slow
+            // Row 4: Top Attacked Hosts and APIs - Use dummy data
             const hostsData = dummyData.getTopHostsData()
             setTopAttackedHosts(hostsData)
-
 
             const apisData = dummyData.getTopApisData()
             setTopAttackedApis(apisData)
 
-
-            // Fetch severity distribution from API (non-fatal)
-            try {
-                const severityResponse = await api.fetchCountBySeverity(startTimestamp, endTimestamp)
-                if (severityResponse && severityResponse.countBySeverity) {
-                    const formattedSeverity = {
-                        "CRITICAL": {
-                            "text": severityResponse.countBySeverity.CRITICAL || 0,
-                            "color": "#DF2909",
-                            "filterKey": "CRITICAL"
-                        },
-                        "HIGH": {
-                            "text": severityResponse.countBySeverity.HIGH || 0,
-                            "color": "#FED3D1",
-                            "filterKey": "HIGH"
-                        },
-                        "MEDIUM": {
-                            "text": severityResponse.countBySeverity.MEDIUM || 0,
-                            "color": "#FFD79D",
-                            "filterKey": "MEDIUM"
-                        },
-                        "LOW": {
-                            "text": severityResponse.countBySeverity.LOW || 0,
-                            "color": "#E4E5E7",
-                            "filterKey": "LOW"
-                        }
-                    }
-                    setSeverityDistribution(formattedSeverity)
-                }
-            } catch (err) {
-                console.warn('Failed to fetch severity distribution, continuing with dummy/empty data', err)
-            }
-
-
-            setShowBannerComponent(false)
         } catch (error) {
             console.error('Error fetching threat detection data:', error)
-            setShowBannerComponent(true)
+            
+            // Set empty states on error
+            setSeverityDistribution({})
+            setSummaryMetrics({
+                currentPeriod: { totalAnalysed: 0, totalAttacks: 0, criticalActors: 0, activeThreats: 0 },
+                previousPeriod: { totalAnalysed: 0, totalAttacks: 0, criticalActors: 0, activeThreats: 0 }
+            })
+            setThreatStatusBreakdown({})
+            setTopAttackedHosts([])
+            setTopAttackedApis([])
         } finally {
             setLoading(false)
         }
@@ -303,9 +335,6 @@ function ThreatDashboardPage() {
         return hosts.map((host) => ([
             <Text variant='bodyMd'>{host.host}</Text>,
             <Text variant='bodySm' alignment='end'>{host.attacks}</Text>,
-            <Badge status={host.severity === 'Critical' ? 'critical' : host.severity === 'High' ? 'warning' : 'info'}>
-                {host.severity}
-            </Badge>,
             <Text variant='bodySm' alignment='end'>{host.apis}</Text>
         ]))
     }
@@ -318,8 +347,8 @@ function ThreatDashboardPage() {
             </Box>,
             <Badge>{api.method}</Badge>,
             <Text variant='bodySm' alignment='end'>{api.attacks}</Text>,
-            <Badge status={api.risk === 'Critical' ? 'critical' : api.risk === 'High' ? 'warning' : 'info'}>
-                {api.risk}
+            <Badge status={api.severity === 'Critical' ? 'critical' : api.severity === 'High' ? 'warning' : 'info'}>
+                {api.severity}
             </Badge>
         ]))
     }
@@ -330,8 +359,8 @@ function ThreatDashboardPage() {
             component={
                 <Box>
                     <DataTable
-                        columnContentTypes={['text', 'numeric', 'text', 'numeric']}
-                        headings={['Host', 'Attacks', 'Severity', 'APIs']}
+                        columnContentTypes={['text', 'numeric', 'numeric']}
+                        headings={['Host', 'Attacks', 'APIs']}
                         rows={generateHostTableRows(topAttackedHosts)}
                         hoverable={false}
                         increasedTableDensity
@@ -350,7 +379,7 @@ function ThreatDashboardPage() {
                 <Box>
                     <DataTable
                         columnContentTypes={['text', 'text', 'numeric', 'text']}
-                        headings={['Endpoint', 'Method', 'Attacks', 'Risk']}
+                        headings={['Endpoint', 'Method', 'Attacks', 'Severity']}
                         rows={generateApiTableRows(topAttackedApis)}
                         hoverable={false}
                         increasedTableDensity
