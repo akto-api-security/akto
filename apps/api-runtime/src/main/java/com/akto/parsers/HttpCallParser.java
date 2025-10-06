@@ -685,7 +685,12 @@ public class HttpCallParser {
                 loggerMaker.infoAndAddToDb("Adding " + responseParamsList.size() + "new graphql endpoints in inventory",LogDb.RUNTIME);
             }
 
-            // Handle imperva response params (for VISA)
+            /* Handle imperva response params (for VISA)
+                Visa has XML requests.
+                It works on single endpoint.
+                For VISA if domain is api.authorize.net (xml endpoint) and content-type json or xml, then we expand the
+                url and create separate HttpResponseParams object based on the root element of the xml payload.
+             */
             List<HttpResponseParams> impervaResponseParamsList = ImpervaUtils.parseImpervaResponse(httpResponseParam);
             if (impervaResponseParamsList.isEmpty()) {
                 filteredResponseParams.add(httpResponseParam);
