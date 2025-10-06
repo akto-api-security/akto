@@ -303,6 +303,9 @@ function ThreatDashboardPage() {
         return hosts.map((host) => ([
             <Text variant='bodyMd'>{host.host}</Text>,
             <Text variant='bodySm' alignment='end'>{host.attacks}</Text>,
+            <Badge status={host.severity === 'Critical' ? 'critical' : host.severity === 'High' ? 'warning' : 'info'}>
+                {host.severity}
+            </Badge>,
             <Text variant='bodySm' alignment='end'>{host.apis}</Text>
         ]))
     }
@@ -315,8 +318,8 @@ function ThreatDashboardPage() {
             </Box>,
             <Badge>{api.method}</Badge>,
             <Text variant='bodySm' alignment='end'>{api.attacks}</Text>,
-            <Badge status={api.severity === 'Critical' ? 'critical' : api.severity === 'High' ? 'warning' : 'info'}>
-                {api.severity}
+            <Badge status={api.risk === 'Critical' ? 'critical' : api.risk === 'High' ? 'warning' : 'info'}>
+                {api.risk}
             </Badge>
         ]))
     }
@@ -327,8 +330,8 @@ function ThreatDashboardPage() {
             component={
                 <Box>
                     <DataTable
-                        columnContentTypes={['text', 'numeric', 'numeric']}
-                        headings={['Host', 'Attacks', 'APIs']}
+                        columnContentTypes={['text', 'numeric', 'text', 'numeric']}
+                        headings={['Host', 'Attacks', 'Severity', 'APIs']}
                         rows={generateHostTableRows(topAttackedHosts)}
                         hoverable={false}
                         increasedTableDensity
@@ -347,7 +350,7 @@ function ThreatDashboardPage() {
                 <Box>
                     <DataTable
                         columnContentTypes={['text', 'text', 'numeric', 'text']}
-                        headings={['Endpoint', 'Method', 'Attacks', 'Severity']}
+                        headings={['Endpoint', 'Method', 'Attacks', 'Risk']}
                         rows={generateApiTableRows(topAttackedApis)}
                         hoverable={false}
                         increasedTableDensity

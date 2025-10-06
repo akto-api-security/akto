@@ -4,7 +4,7 @@ import HighchartsReact from "highcharts-react-official";
 import HighchartsSankey from "highcharts/modules/sankey";
 import InfoCard from "../../dashboard/new_components/InfoCard";
 import { Spinner } from "@shopify/polaris";
-// import api from "../api"; // TODO: Uncomment when enabling API calls
+import api from "../api";
 
 // Initialize Sankey module
 if (typeof Highcharts === 'object') {
@@ -18,10 +18,9 @@ function ThreatSankeyChart({ startTimestamp, endTimestamp }) {
   const fetchCategoryData = async () => {
     setLoading(true);
     
-    // TODO: Uncomment this section to fetch real data from API
-    /*
     try {
       const res = await api.fetchThreatCategoryCount(startTimestamp, endTimestamp);
+      
       if (res?.categoryCounts && Array.isArray(res.categoryCounts)) {
         // API Response format: [{category: "...", subCategory: "...", count: 100}, ...]
         const data = res.categoryCounts;
@@ -74,41 +73,19 @@ function ThreatSankeyChart({ startTimestamp, endTimestamp }) {
           });
         });
         
-        setChartData(sankeyLinks);
+        setChartData(sankeyLinks.length > 0 ? sankeyLinks : []);
       } else {
         console.warn('No category data returned from API');
+        setChartData([]);
       }
     } catch (error) {
       console.error('Error fetching category data:', error);
-    }
-    */
-    
-    // DUMMY DATA (Based on actual MongoDB data) - Remove this when uncommenting API code above
-    try {
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      // Based on actual DB query: ipGeo: 4874, RL: 126
-      // Creating a more comprehensive demo dataset
-      setChartData([
-        // Main categories from Total Threats
-        { from: 'Total Threats', to: 'Geo Blocking', weight: 4874 },
-        { from: 'Total Threats', to: 'Rate Limiting', weight: 126 },
-        { from: 'Total Threats', to: 'SQL Injection', weight: 450 },
-        { from: 'Total Threats', to: 'Cross-Site Scripting', weight: 380 },
-        { from: 'Total Threats', to: 'CSRF Attack', weight: 320 },
-        { from: 'Total Threats', to: 'Authentication Attack', weight: 280 },
-        { from: 'Total Threats', to: 'Other', weight: 180 },
-      ]);
-    } catch (error) {
-      console.error('Error loading dummy data:', error);
+      setChartData([]);
     } finally {
       setLoading(false);
     }
   };
 
-  // TODO: Uncomment this function when enabling API calls
-  // eslint-disable-next-line no-unused-vars
   const formatCategoryName = (category) => {
     if (!category) return 'Unknown';
     
@@ -135,6 +112,7 @@ function ThreatSankeyChart({ startTimestamp, endTimestamp }) {
 
   useEffect(() => {
     fetchCategoryData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [startTimestamp, endTimestamp]);
 
   const chartOptions = {
