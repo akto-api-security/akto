@@ -362,13 +362,13 @@ public class HttpCallParser {
         return new Pair<HttpResponseParams,FilterConfig.FILTER_TYPE>(responseParams, FILTER_TYPE.ERROR);
     }
 
-    public void syncFunction(List<HttpResponseParams> responseParams, boolean syncImmediately, boolean fetchAllSTI, AccountSettings accountSettings)  {
+    public void syncFunction(List<HttpResponseParams> responseParams, boolean syncImmediately, boolean fetchAllSTI, AccountSettings accountSettings, boolean isRecon)  {
         // USE ONLY filteredResponseParams and not responseParams
         List<HttpResponseParams> filteredResponseParams = responseParams;
         if (accountSettings != null && accountSettings.getDefaultPayloads() != null) {
             filteredResponseParams = filterDefaultPayloads(filteredResponseParams, accountSettings.getDefaultPayloads());
         }
-        filteredResponseParams = filterHttpResponseParams(filteredResponseParams, accountSettings);
+        filteredResponseParams = filterHttpResponseParams(filteredResponseParams, accountSettings, isRecon);
         boolean isHarOrPcap = aggregate(filteredResponseParams, aggregatorMap);
         apiCatalogSync.setMergeUrlsOnVersions(accountSettings.isAllowMergingOnVersions());
 
@@ -508,13 +508,16 @@ public class HttpCallParser {
         }
     }
 
-    public static boolean useHostCondition(String hostName, HttpResponseParams.Source source) {
+    public static boolean useHostCondition(String hostName, HttpResponseParams.Source source, boolean isRecon) {
         List<HttpResponseParams.Source> whiteListSource = Arrays.asList(HttpResponseParams.Source.MIRRORING);
         boolean hostNameCondition;
         if (hostName == null) {
             hostNameCondition = false;
-        } else {
-            hostNameCondition = ! ( hostName.toLowerCase().equals(hostName.toUpperCase()) );
+        } else if (isRecon) {
+            hostNameCondition = true;
+        }
+        else {
+             hostNameCondition = ! ( hostName.toLowerCase().equals(hostName.toUpperCase()) );
         }
         return whiteListSource.contains(source) &&  hostNameCondition && ApiCollection.useHost;
     }
@@ -644,7 +647,7 @@ public class HttpCallParser {
         }
     }
 
-    public int createApiCollectionId(HttpResponseParams httpResponseParam){
+    public int createApiCollectionId(HttpResponseParams httpResponseParam, boolean isRecon){
         int apiCollectionId;
         String hostName = getHeaderValue(httpResponseParam.getRequestParams().getHeaders(), "host");
 
@@ -656,7 +659,7 @@ public class HttpCallParser {
         String vpcId = System.getenv("VPC_ID");
         List<CollectionTags> tagList = CollectionTags.convertTagsFormat(httpResponseParam.getTags());
 
-        if (useHostCondition(hostName, httpResponseParam.getSource())) {
+        if (useHostCondition(hostName, httpResponseParam.getSource(), isRecon)) {
             hostName = hostName.toLowerCase();
             hostName = hostName.trim();
 
@@ -748,7 +751,7 @@ public class HttpCallParser {
         return res;
     }
 
-    public List<HttpResponseParams> filterHttpResponseParams(List<HttpResponseParams> httpResponseParamsList, AccountSettings accountSettings) {
+    public List<HttpResponseParams> filterHttpResponseParams(List<HttpResponseParams> httpResponseParamsList, AccountSettings accountSettings, boolean isRecon) {
         List<HttpResponseParams> filteredResponseParams = new ArrayList<>();
         int originalSize = httpResponseParamsList.size();
 
@@ -865,7 +868,7 @@ public class HttpCallParser {
 
             }
 
-            int apiCollectionId = createApiCollectionId(httpResponseParam);
+            int apiCollectionId = createApiCollectionId(httpResponseParam, isRecon);
 
             httpResponseParam.requestParams.setApiCollectionId(apiCollectionId);
 
