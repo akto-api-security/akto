@@ -53,7 +53,7 @@ public class ApiInfo {
     private float rateLimitConfidence;
 
     public enum AuthType {
-        UNAUTHENTICATED, BASIC, AUTHORIZATION_HEADER, JWT, API_TOKEN, BEARER, CUSTOM
+        UNAUTHENTICATED, BASIC, AUTHORIZATION_HEADER, JWT, API_TOKEN, BEARER, CUSTOM, API_KEY, MTLS
     }
 
     public enum ApiAccessType {
