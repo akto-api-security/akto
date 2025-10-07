@@ -13,6 +13,7 @@ import com.akto.dao.test_editor.TestConfigYamlParser;
 import com.akto.dao.test_editor.TestingRunPlaygroundDao;
 import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dao.test_editor.info.InfoParser;
+import com.akto.dao.testing.AgentConversationResultDao;
 import com.akto.dao.testing.DefaultTestSuitesDao;
 import com.akto.dao.testing.TestingRunResultDao;
 import com.akto.dto.Account;
@@ -28,6 +29,7 @@ import com.akto.dto.test_editor.TestingRunPlayground;
 import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.test_run_findings.TestingRunIssues;
+import com.akto.dto.testing.AgentConversationResult;
 import com.akto.dto.testing.GenericTestResult;
 import com.akto.dto.testing.MultiExecTestResult;
 import com.akto.dto.testing.TestResult;
@@ -57,6 +59,9 @@ import com.mongodb.BasicDBObject;
 import com.mongodb.client.model.*;
 import com.mongodb.client.result.InsertOneResult;
 
+import lombok.Getter;
+
+import org.apache.commons.lang3.StringUtils;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 
@@ -259,6 +264,9 @@ public class SaveTestEditorAction extends UserAction {
         return SUCCESS.toUpperCase();
     }
 
+    @Getter
+    List<AgentConversationResult> agentConversationResults;
+
     public String runTestForGivenTemplate() {
         TestExecutor executor = new TestExecutor();
         TestConfig testConfig;
@@ -365,6 +373,16 @@ public class SaveTestEditorAction extends UserAction {
         if(testingRunResult == null){
             String sample = samples.get(samples.size() - 1);
             testingRunResult = executor.runTestNew(infoKey, null, testingUtil, null, testConfig, testingRunConfig, true, testLogs, sample);
+            String conversationId = null;
+            if(testingRunResult != null){
+                if(testingRunResult.getTestResults().get(0) instanceof TestResult){
+                    TestResult testResult = (TestResult) testingRunResult.getTestResults().get(0);
+                    conversationId = testResult.getConversationId();
+                }
+                if(!StringUtils.isEmpty(conversationId)){
+                    agentConversationResults = AgentConversationResultDao.instance.findAll(Filters.eq("conversationId", conversationId));
+                }
+            }
         }
         if (testingRunResult == null) {
             testingRunResult = new TestingRunResult(

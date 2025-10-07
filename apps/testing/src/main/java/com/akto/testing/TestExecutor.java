@@ -11,6 +11,7 @@ import com.akto.dao.CustomAuthTypeDao;
 import com.akto.dao.DependencyNodeDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.test_editor.YamlTemplateDao;
+import com.akto.dao.test_editor.filter.ConfigParser;
 import com.akto.dao.testing.TestingRunResultDao;
 import com.akto.dao.testing.TestingRunResultSummariesDao;
 import com.akto.dao.testing.VulnerableTestingRunResultDao;
@@ -1066,6 +1067,14 @@ public class TestExecutor {
         // TestingConfig -> auth
         com.akto.test_editor.execution.Executor executor = new Executor();
         executor.overrideTestUrl(rawApi, testingRunConfig);
+
+
+        // run the agentic test here
+        if (ConfigParser.isFilterNodeValidForAgenticTest(filterNode)) {
+            // execute the agentic test here
+            
+        }
+
         YamlTestTemplate yamlTestTemplate = new YamlTestTemplate(apiInfoKey,filterNode, validatorNode, executorNode,
                 rawApi, varMap, auth, attackerAuthMechanism, testExecutionLogId, testingRunConfig, customAuthTypes, testConfig.getStrategy());
         YamlTestResult testResults = yamlTestTemplate.run(debug, testLogs);

@@ -250,6 +250,7 @@ const SampleApi = () => {
             apiCollectionId: selectedCollectionId
         }
 
+
         try {
             let resp = await testEditorRequests.runTestForTemplate(currentContent,apiKeyInfo,sampleDataList)
             if(resp.testingRunPlaygroundHexId !== null && resp?.testingRunPlaygroundHexId !== undefined) {

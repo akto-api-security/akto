@@ -61,6 +61,7 @@ public class Constants {
     public static final String UNDERSCORE = "_";
     public static final String AKTO_AGENT_NAME = "AKTO-AI-agents";
     public static final Model AKTO_AGENT_MODEL = new Model(AKTO_AGENT_NAME, ModelType.AZURE_OPENAI, new HashMap<>());
+    public static final String AGENT_BASE_URL = StringUtils.hasLength(System.getenv("AGENT_BASE_URL")) ? System.getenv("AGENT_BASE_URL") : "https://agent.akto.io";
 
     public final static String _AKTO = "AKTO";
 
