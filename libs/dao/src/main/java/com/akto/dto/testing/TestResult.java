@@ -27,6 +27,10 @@ public class TestResult extends GenericTestResult {
     public static final String  API_CALL_FAILED_ERROR_STRING_UNREACHABLE = "Error executing test request: Host unreachable previously";
 
 
+    
+    private String conversationId;
+    private boolean resultTypeAgentic;
+
     /*
      * This field is being used as severity.
      * Thus keeping this in sync with "enum severity".
@@ -153,6 +157,22 @@ public class TestResult extends GenericTestResult {
 
     public void setRequiresConfig(boolean requiresConfig) {
         this.requiresConfig = requiresConfig;
+    }
+
+    public String getConversationId() {
+        return conversationId;
+    }
+
+    public void setConversationId(String conversationId) {
+        this.conversationId = conversationId;
+    }
+
+    public boolean isResultTypeAgentic() {
+        return resultTypeAgentic;
+    }
+
+    public void setResultTypeAgentic(boolean resultTypeAgentic) {
+        this.resultTypeAgentic = resultTypeAgentic;
     }
 
     @Override

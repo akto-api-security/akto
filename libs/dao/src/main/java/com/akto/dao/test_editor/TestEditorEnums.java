@@ -40,7 +40,11 @@ public class TestEditorEnums {
         REQUEST_PAYLOAD,
         RESPONSE_HEADERS,
         RESPONSE_PAYLOAD,
-        RESPONSE_CODE
+        RESPONSE_CODE,
+        SOURCE_IP,
+        DESTINATION_IP,
+        COUNTRY_CODE,
+        TEST_TYPE,
     }
 
     public enum PredicateOperator {
@@ -230,7 +234,8 @@ public class TestEditorEnums {
         MODIFY_QUERY_PARAM,
         ADD_GRAPHQL_FIELD,
         ADD_UNIQUE_GRAPHQL_FIELD,
-        MODIFY_GRAPHQL_FIELD
+        MODIFY_GRAPHQL_FIELD,
+        CONVERSATIONS_LIST
     }
 
     public enum TerminalNonExecutableDataOperands {
@@ -356,6 +361,10 @@ public class TestEditorEnums {
         }
 
         return ExecutorOperandTypes.Data.toString().toLowerCase();
+    }
+
+    public static boolean isTestTypeValid(String testType) {
+        return testType.equalsIgnoreCase("AGENTIC") || testType.equalsIgnoreCase("MANUAL");
     }
 
 }
