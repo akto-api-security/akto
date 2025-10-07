@@ -341,8 +341,10 @@ public class McpToolsSyncJobExecutor {
         return new Pair<>(rpcResponse, responseParams);
     }
 
-    private OriginalHttpRequest createRequest(String host, String mcpMethod, String mcpMethodRequestJson) {
-        return new OriginalHttpRequest("",
+    private OriginalHttpRequest createRequest(String host, ApiCollection apiCollection, String mcpMethodRequestJson) {
+        String mcpEndpoint = apiCollection.getSseCallbackUrl();
+
+        return new OriginalHttpRequest(mcpEndpoint,
             null,
             HttpMethod.POST.name(),
             mcpMethodRequestJson,
