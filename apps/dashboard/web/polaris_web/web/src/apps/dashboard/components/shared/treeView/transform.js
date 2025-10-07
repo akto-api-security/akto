@@ -4,6 +4,99 @@ import PrettifyChildren from "./PrettifyChildren";
 import TooltipText from "../TooltipText";
 
 const treeViewFunc = {
+    extractServiceSuffix(displayName) {
+        // Extract service suffix from domain name
+        // Pattern: domain.name.com-service-suffix
+        // Returns: { baseDomain, serviceName } or { baseDomain: displayName, serviceName: null }
+
+        if (!displayName || typeof displayName !== 'string') {
+            return { baseDomain: displayName, serviceName: null };
+        }
+
+        // Find the first dash that appears after a domain-like structure (contains dots)
+        // The suffix can contain dashes itself (e.g., book-api, agoda-routing)
+
+        // Split by dash and find the boundary between domain and service
+        const parts = displayName.split('-');
+
+        // If no dashes or only one part, treat as domain without suffix
+        if (parts.length <= 1) {
+            return { baseDomain: displayName, serviceName: null };
+        }
+
+        // Find the first part that contains a dot (this is the domain)
+        let domainEndIndex = -1;
+        for (let i = 0; i < parts.length; i++) {
+            if (parts[i].includes('.')) {
+                domainEndIndex = i;
+            }
+        }
+
+        // If no part contains a dot, treat whole string as domain
+        if (domainEndIndex === -1) {
+            return { baseDomain: displayName, serviceName: null };
+        }
+
+        // If the last part with dot is the last part overall, no suffix
+        if (domainEndIndex === parts.length - 1) {
+            return { baseDomain: displayName, serviceName: null };
+        }
+
+        // Split into base domain and service suffix
+        const baseDomain = parts.slice(0, domainEndIndex + 1).join('-');
+        const serviceName = parts.slice(domainEndIndex + 1).join('-');
+
+        return { baseDomain, serviceName };
+    },
+
+    buildTreeForSuffixedItems(items, headers) {
+        // Group items by service name
+        const serviceGroups = {};
+
+        items.forEach(item => {
+            const serviceName = item.serviceName;
+            if (!serviceGroups[serviceName]) {
+                serviceGroups[serviceName] = [];
+            }
+            serviceGroups[serviceName].push(item);
+        });
+
+        // Build tree structure with service name as top level
+        const result = [];
+        Object.keys(serviceGroups).forEach(serviceName => {
+            const serviceItems = serviceGroups[serviceName];
+
+            // Create children nodes for each base domain
+            const children = serviceItems.map(item => ({
+                ...item,
+                level: `${serviceName}#${item.baseDomain}`,
+                isTerminal: true,
+                displayName: item.baseDomain
+            }));
+
+            // Create parent node if multiple children, otherwise return single child
+            if (children.length > 1) {
+                const mergedNode = this.mergeNodeData(children, headers);
+                result.push({
+                    ...mergedNode,
+                    level: serviceName,
+                    isTerminal: false,
+                    children: children
+                });
+            } else if (children.length === 1) {
+                // Single item under service, still show hierarchy
+                result.push({
+                    level: serviceName,
+                    isTerminal: false,
+                    children: children,
+                    ...this.mergeNodeData(children, headers)
+                });
+            }
+        });
+
+        return result;
+    },
+
     pruneTree(tree, branchFieldSplitter, reverse) {
         // Prune the tree by collapsing nodes with single children
         const keys = Object.keys(tree);
@@ -46,13 +139,47 @@ const treeViewFunc = {
             this.pruneTree(tree[key].children, branchFieldSplitter, reverse)
         })
     },
-    buildTree(items, branchField, branchFieldSplitter, reverse=false, secondaryBranch=false, secondaryBranchFieldSplitter, headers, shouldPrune) {
+    buildTree(items, branchField, branchFieldSplitter, reverse=false, secondaryBranch=false, secondaryBranchFieldSplitter, headers, shouldPrune, enableServiceSuffixMode=false) {
+        // Two-pass approach: separate items with/without service suffix
+        if (enableServiceSuffixMode) {
+            const itemsWithSuffix = [];
+            const itemsWithoutSuffix = [];
+
+            items.forEach(item => {
+                const { baseDomain, serviceName } = this.extractServiceSuffix(item?.[branchField]);
+
+                if (serviceName) {
+                    itemsWithSuffix.push({
+                        ...item,
+                        baseDomain,
+                        serviceName,
+                        originalDisplayName: item[branchField]
+                    });
+                } else {
+                    itemsWithoutSuffix.push(item);
+                }
+            });
+
+            // Build trees separately
+            const normalTree = itemsWithoutSuffix.length > 0
+                ? this.buildTree(itemsWithoutSuffix, branchField, branchFieldSplitter, reverse, secondaryBranch, secondaryBranchFieldSplitter, headers, shouldPrune, false)
+                : [];
+
+            const suffixTree = itemsWithSuffix.length > 0
+                ? this.buildTreeForSuffixedItems(itemsWithSuffix, headers)
+                : [];
+
+            // Merge results: suffix tree first, then normal tree
+            return [...suffixTree, ...normalTree];
+        }
+
+        // Original buildTree logic
         const itemsTree = {}
 
         items.forEach(item => {
             const branchFieldValue = item?.[branchField]
             let branchFieldValueParts = branchFieldValue?.split(branchFieldSplitter) || []
-            
+
             if (reverse) {
                 branchFieldValueParts.reverse()
             }
@@ -68,9 +195,9 @@ const treeViewFunc = {
                     if (secondaryBranch) {
                         const secondaryBranchFieldValue = part
                         const secondaryBranchFieldValueParts = secondaryBranchFieldValue.split(secondaryBranchFieldSplitter).filter(part => part)
-                        
+
                         if (secondaryBranchFieldValueParts.length === 2) {
-                            // delete the created leaf node 
+                            // delete the created leaf node
                             delete currentNode[part]
 
                             // create secondary branch node if it does not exist
@@ -84,9 +211,9 @@ const treeViewFunc = {
                             currentNode[part] = { isTerminal: false, children: {}, items: [] };
                         }
                     }
-                    
+
                     // Mark the node as terminal if it is the last part of the branch and set items field
-                    currentNode[part].isTerminal = true; 
+                    currentNode[part].isTerminal = true;
                     currentNode[part].items.push(item)
                 }
                 currentNode = currentNode[part].children;
