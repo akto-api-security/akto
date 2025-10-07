@@ -78,6 +78,7 @@ public class MaliciousEventService {
             .setType(evt.getType())
             .setMetadata(evt.getMetadata().toString())
             .setSuccessfulExploit(evt.getSuccessfulExploit())
+            .setLabel(evt.getLabel())
             .build();
 
     this.kafka.send(
@@ -216,6 +217,31 @@ public class MaliciousEventService {
       }
     }
 
+    if (filter.hasLabel()) {
+      String labelValue = filter.getLabel();
+      // For backward compatibility: treat null/missing label as "threat"
+      List<Document> orConditions = new ArrayList<>();
+      orConditions.add(new Document("label", labelValue));
+      if (MaliciousEventModel.Label.THREAT.getValue().equals(labelValue)) {
+        // If filtering for "threat", also include documents with null or missing label
+        orConditions.add(new Document("label", new Document("$exists", false)));
+        orConditions.add(new Document("label", null));
+        orConditions.add(new Document("label", ""));
+      }
+
+      if (orConditions.size() > 1) {
+        List<Document> andConditions = new ArrayList<>();
+        if (!query.isEmpty()) {
+          andConditions.add(new Document(query));
+        }
+        andConditions.add(new Document("$or", orConditions));
+        query.clear();
+        query.append("$and", andConditions);
+      } else {
+        query.append("label", labelValue);
+      }
+    }
+
     long total = coll.countDocuments(query);
     try (MongoCursor<MaliciousEventModel> cursor =
         coll.find(query)
@@ -249,6 +275,7 @@ public class MaliciousEventService {
                 .setMetadata(metadata)
                 .setStatus(evt.getStatus() != null ? evt.getStatus().toString() : StatusConstants.ACTIVE)
                 .setSuccessfulExploit(evt.getSuccessfulExploit() != null ? evt.getSuccessfulExploit() : false)
+                .setLabel(evt.getLabel() != null ? evt.getLabel() : "")
                 .build());
       }
       return ListMaliciousRequestsResponse.newBuilder()
@@ -407,6 +434,25 @@ public class MaliciousEventService {
     // Handle status filter
     String statusFilter = (String) filter.get("statusFilter");
     applyStatusFilter(query, statusFilter);
+
+    // Handle label filter with backward compatibility
+    String label = (String) filter.get("label");
+    if (label != null && !label.isEmpty()) {
+      List<Document> orConditions = new ArrayList<>();
+      orConditions.add(new Document("label", label));
+      if (MaliciousEventModel.Label.THREAT.getValue().equals(label)) {
+        // For backward compatibility: treat null/missing label as "threat"
+        orConditions.add(new Document("label", new Document("$exists", false)));
+        orConditions.add(new Document("label", null));
+        orConditions.add(new Document("label", ""));
+      }
+
+      if (orConditions.size() > 1) {
+        query.append("$or", orConditions);
+      } else {
+        query.append("label", label);
+      }
+    }
 
     return query;
   }

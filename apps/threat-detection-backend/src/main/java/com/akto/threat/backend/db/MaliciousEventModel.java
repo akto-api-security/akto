@@ -25,6 +25,7 @@ public class MaliciousEventModel {
   private String metadata;
   private Boolean successfulExploit;
   private Status status;
+  private String label;
 
 
   public enum EventType {
@@ -36,6 +37,38 @@ public class MaliciousEventModel {
     ACTIVE,
     UNDER_REVIEW,
     IGNORED
+  }
+
+  public enum Label {
+    THREAT("threat"),
+    GUARDRAIL("guardrail");
+
+    private final String value;
+
+    Label(String value) {
+      this.value = value;
+    }
+
+    public String getValue() {
+      return value;
+    }
+
+    public static Label fromString(String value) {
+      if (value == null || value.isEmpty()) {
+        return THREAT; // Default to THREAT for backward compatibility
+      }
+      for (Label label : Label.values()) {
+        if (label.value.equalsIgnoreCase(value)) {
+          return label;
+        }
+      }
+      return THREAT; // Default to THREAT for unknown values
+    }
+
+    @Override
+    public String toString() {
+      return value;
+    }
   }
 
   public MaliciousEventModel() {}
@@ -59,6 +92,7 @@ public class MaliciousEventModel {
     this.refId = builder.refId;
     this.status = builder.status != null ? builder.status : Status.ACTIVE;
     this.successfulExploit = builder.successfulExploit;
+    this.label = builder.label;
   }
 
   public static class Builder {
@@ -77,9 +111,10 @@ public class MaliciousEventModel {
     private String refId;
     private String type;
     private String severity;
-    private String metadata; 
+    private String metadata;
     private Status status;
     private Boolean successfulExploit;
+    private String label;
 
     public Builder setFilterId(String filterId) {
       this.filterId = filterId;
@@ -168,6 +203,11 @@ public class MaliciousEventModel {
 
     public Builder setStatus(Status status) {
       this.status = status;
+      return this;
+    }
+
+    public Builder setLabel(String label) {
+      this.label = label;
       return this;
     }
 
@@ -330,6 +370,14 @@ public class MaliciousEventModel {
 
   public void setStatus(Status status) {
     this.status = status;
+  }
+
+  public String getLabel() {
+    return label;
+  }
+
+  public void setLabel(String label) {
+    this.label = label;
   }
 
 }

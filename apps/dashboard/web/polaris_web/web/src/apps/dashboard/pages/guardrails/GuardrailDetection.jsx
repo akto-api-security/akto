@@ -1,6 +1,6 @@
-import { useReducer, useState, useEffect, useRef } from "react";
-import { Box, EmptySearchResult, HorizontalStack, Popover, ActionList, Button, Icon, Badge, Card, Text, VerticalStack} from '@shopify/polaris';
-import {FileMinor, HideMinor, ViewMinor} from '@shopify/polaris-icons';
+import { useReducer, useState, useRef, useEffect } from "react";
+import { Box, HorizontalStack, Popover, ActionList, Button, Icon, Card, Text, VerticalStack} from '@shopify/polaris';
+import {FileMinor} from '@shopify/polaris-icons';
 import DateRangeFilter from "../../components/layouts/DateRangeFilter";
 import PageWithMultipleCards from "../../components/layouts/PageWithMultipleCards";
 import func from "@/util/func";
@@ -8,70 +8,13 @@ import values from "@/util/values";
 import { produce } from "immer"
 import { getDashboardCategory, mapLabel } from "../../../main/labelHelper";
 import SessionStore from "../../../main/SessionStore";
-import GithubSimpleTable from "../../components/tables/GithubSimpleTable";
-import { labelMap } from '../../../main/labelHelperMap';
-import PersistStore from '@/apps/main/PersistStore';
-import { CellType } from "@/apps/dashboard/components/tables/rows/GithubRow";
 import TitleWithInfo from "@/apps/dashboard/components/shared/TitleWithInfo"
 import guardRailData from "./dummyData";
-import GetPrettifyEndpoint from "@/apps/dashboard/pages/observe/GetPrettifyEndpoint";
-import dayjs from "dayjs";
 import SampleDetails from "../threat_detection/components/SampleDetails";
 import Highcharts from "highcharts";
-
-
-const resourceName = {
-  singular: "sample",
-  plural: "samples",
-};
-
-const headings = [
-  {
-    text: "Severity",
-    value: "severityComp",
-    title: "Severity",
-  },
-  {
-    text: "AI Agent",
-    value: "endpointComp",
-    title: "AI Agent",
-  },
-  {
-    text: "Actor",
-    value: "actorComp",
-    title: "Actor",
-    filterKey: 'actor'
-  },
-  {
-    text: "Filter",
-    value: "filterId",
-    title: "Guardrail type",
-  },
-  {
-    text: "Discovered",
-    title: "Detected",
-    value: "discoveredTs",
-    type: CellType.TEXT,
-    sortActive: true,
-  },
-];
-
-const sortOptions = [
-  {
-    label: "Discovered time",
-    value: "detectedAt asc",
-    directionLabel: "Newest",
-    sortKey: "detectedAt",
-    columnIndex: 4,
-  },
-  {
-    label: "Discovered time",
-    value: "detectedAt desc",
-    directionLabel: "Oldest",
-    sortKey: "detectedAt",
-    columnIndex: 4,
-  },
-];
+import { LABELS } from "../threat_detection/constants";
+import SusDataTable from "../threat_detection/components/SusDataTable";
+import NormalSampleDetails from "../threat_detection/components/NormalSampleDetails";
 
 
 function GuardrailDetection() {
@@ -80,51 +23,33 @@ function GuardrailDetection() {
     const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), initialVal);
     const [moreActions, setMoreActions] = useState(false);
     const [showDetails, setShowDetails] = useState(false);
-    const [sampleData, setSampleData] = useState([])
     const [showNewTab, setShowNewTab] = useState(false)
     const [rowDataList, setRowDataList] = useState([])
     const [moreInfoData, setMoreInfoData] = useState({})
-    
-    const collectionsMap = PersistStore((state) => state.collectionsMap);
+    const [sampleData, setSampleData] = useState({})
+    const [currentEventId, setCurrentEventId] = useState(null)
+    const [currentEventStatus, setCurrentEventStatus] = useState(null)
+    const [triggerTableRefresh, setTriggerTableRefresh] = useState(0)
+
     const threatFiltersMap = SessionStore((state) => state.threatFiltersMap);
 
-    const data = guardRailData.guardRailDummyData.maliciousEvents.map((x) => {
-      const severity = threatFiltersMap[x?.filterId]?.severity || "HIGH"
-      return {
-        ...x,
-        id: x.id,
-        actorComp: x.actor,
-        endpointComp: x.url,
-        apiCollectionName: collectionsMap[x.apiCollectionId] || "-",
-        discoveredTs: dayjs(x.timestamp*1000).format("DD-MM-YYYY HH:mm:ss"),
-        sourceIPComponent: x?.ip || "-",
-        type: x?.type || "-",
-        severityComp:  (
-          <div className={`badge-wrapper-${severity}`}>
-              <Badge size="small">{severity}</Badge>
-          </div>
-        )
-        
-      };
-    });
-
-
-    const emptyStateMarkup = (
-        <EmptySearchResult
-          title={'No guardrail activity found'}
-          withIllustration
-        />
-      );
-
+    const handleStatusUpdate = () => {
+        setTriggerTableRefresh(prev => prev + 1)
+    }
 
     const rowClicked = async(data) => {
-        const tempData = {"orig": JSON.stringify(guardRailData.sampleDataMap[data.url])};
+        // Use real payload data if available, otherwise fallback to dummy data for testing
+        const payloadData = data.payload ? JSON.parse(data.payload) : guardRailData.sampleDataMap[data.url];
+        const tempData = {"orig": JSON.stringify(payloadData)};
         setShowNewTab(true)
         const sameRow = false
         if (!sameRow) {
             let rowData = [tempData];
             setRowDataList(rowData)
             setShowDetails(true)
+            setSampleData(data)
+            setCurrentEventId(data.id)
+            setCurrentEventStatus(data.status)
             setMoreInfoData({
                 url: data.url,
                 method: data.method,
@@ -399,21 +324,20 @@ function GuardrailDetection() {
                 </Box>
             </HorizontalStack>
         </Box>,
-        <GithubSimpleTable
-            resourceName={resourceName}
-            useNewRow={true}
-            headers={headings}
-            headings={headings}
-            data={data}
-            hideQueryField={true}
-            sortOptions={sortOptions}
-            emptyStateMarkup={emptyStateMarkup}   
-            onRowClick={rowClicked}    
-            rowClickable={true} 
-            hardCodedKey={true}
-            pageSize={20}
-        ></GithubSimpleTable>,
-         <SampleDetails
+        <SusDataTable
+            key={`guardrail-data-table-${triggerTableRefresh}`}
+            currDateRange={currDateRange}
+            rowClicked={rowClicked}
+            triggerRefresh={() => setTriggerTableRefresh(prev => prev + 1)}
+            label={LABELS.GUARDRAIL}
+        />,
+        !showNewTab ? <NormalSampleDetails
+            title={"Attacker payload"}
+            showDetails={showDetails}
+            setShowDetails={setShowDetails}
+            sampleData={sampleData}
+            key={"sus-sample-details"}
+        /> :  <SampleDetails
                 title={"Attacker payload"}
                 showDetails={showDetails}
                 setShowDetails={setShowDetails}
@@ -421,6 +345,9 @@ function GuardrailDetection() {
                 key={"sus-sample-details"}
                 moreInfoData={moreInfoData}
                 threatFiltersMap={threatFiltersMap}
+                eventId={currentEventId}
+                eventStatus={currentEventStatus}
+                onStatusUpdate={handleStatusUpdate}
             />
     ]
 
