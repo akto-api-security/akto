@@ -67,31 +67,35 @@ const treeViewFunc = {
             const serviceItems = serviceGroups[serviceName];
 
             // Create children nodes for each base domain
-            const children = serviceItems.map(item => ({
-                ...item,
-                level: `${serviceName}#${item.baseDomain}`,
-                isTerminal: true,
-                displayName: item.baseDomain
-            }));
+            const children = serviceItems.map(item => {
+                // Create a clean child object with only necessary fields
+                const childItem = { ...item };
+                // Remove the serviceName and use baseDomain as displayName
+                delete childItem.serviceName;
 
-            // Create parent node if multiple children, otherwise return single child
-            if (children.length > 1) {
-                const mergedNode = this.mergeNodeData(children, headers);
-                result.push({
-                    ...mergedNode,
-                    level: serviceName,
-                    isTerminal: false,
-                    children: children
-                });
-            } else if (children.length === 1) {
-                // Single item under service, still show hierarchy
-                result.push({
-                    level: serviceName,
-                    isTerminal: false,
-                    children: children,
-                    ...this.mergeNodeData(children, headers)
-                });
-            }
+                return {
+                    ...childItem,
+                    level: `${serviceName}#${item.baseDomain}`,
+                    isTerminal: true,
+                    displayName: item.baseDomain,
+                    // Preserve original display name for reference
+                    originalDisplayName: item.originalDisplayName
+                };
+            });
+
+            // Create parent node with service name as level AND displayName
+            const mergedNode = this.mergeNodeData(children, headers);
+
+            // Build parent node - displayName MUST come after mergedNode spread
+            const parentNode = {
+                ...mergedNode,
+                level: serviceName,
+                isTerminal: false,
+                children: children,
+                displayName: serviceName  // Set LAST to ensure it's not overwritten
+            };
+
+            result.push(parentNode);
         });
 
         return result;
@@ -139,40 +143,44 @@ const treeViewFunc = {
             this.pruneTree(tree[key].children, branchFieldSplitter, reverse)
         })
     },
-    buildTree(items, branchField, branchFieldSplitter, reverse=false, secondaryBranch=false, secondaryBranchFieldSplitter, headers, shouldPrune, enableServiceSuffixMode=false) {
-        // Two-pass approach: separate items with/without service suffix
-        if (enableServiceSuffixMode) {
-            const itemsWithSuffix = [];
-            const itemsWithoutSuffix = [];
+    buildTree(items, branchField, branchFieldSplitter, reverse=false, secondaryBranch=false, secondaryBranchFieldSplitter, headers, shouldPrune) {
+        // Two-pass approach: separate items with/without service suffix (always enabled)
+        const itemsWithSuffix = [];
+        const itemsWithoutSuffix = [];
 
-            items.forEach(item => {
-                const { baseDomain, serviceName } = this.extractServiceSuffix(item?.[branchField]);
+        items.forEach(item => {
+            const { baseDomain, serviceName } = this.extractServiceSuffix(item?.[branchField]);
 
-                if (serviceName) {
-                    itemsWithSuffix.push({
-                        ...item,
-                        baseDomain,
-                        serviceName,
-                        originalDisplayName: item[branchField]
-                    });
-                } else {
-                    itemsWithoutSuffix.push(item);
-                }
-            });
+            if (serviceName) {
+                // Create a copy and override displayName field to be baseDomain only
+                const itemCopy = { ...item };
+                itemCopy[branchField] = baseDomain; // Override the branchField with baseDomain
 
-            // Build trees separately
-            const normalTree = itemsWithoutSuffix.length > 0
-                ? this.buildTree(itemsWithoutSuffix, branchField, branchFieldSplitter, reverse, secondaryBranch, secondaryBranchFieldSplitter, headers, shouldPrune, false)
-                : [];
+                itemsWithSuffix.push({
+                    ...itemCopy,
+                    baseDomain,
+                    serviceName,
+                    originalDisplayName: item[branchField]
+                });
+            } else {
+                itemsWithoutSuffix.push(item);
+            }
+        });
 
-            const suffixTree = itemsWithSuffix.length > 0
-                ? this.buildTreeForSuffixedItems(itemsWithSuffix, headers)
-                : [];
+        // Build trees separately
+        const normalTree = itemsWithoutSuffix.length > 0
+            ? this.buildTreeOriginal(itemsWithoutSuffix, branchField, branchFieldSplitter, reverse, secondaryBranch, secondaryBranchFieldSplitter, headers, shouldPrune)
+            : [];
 
-            // Merge results: suffix tree first, then normal tree
-            return [...suffixTree, ...normalTree];
-        }
+        const suffixTree = itemsWithSuffix.length > 0
+            ? this.buildTreeForSuffixedItems(itemsWithSuffix, headers)
+            : [];
 
+        // Merge results: suffix tree first, then normal tree
+        return [...suffixTree, ...normalTree];
+    },
+
+    buildTreeOriginal(items, branchField, branchFieldSplitter, reverse=false, secondaryBranch=false, secondaryBranchFieldSplitter, headers, shouldPrune) {
         // Original buildTree logic
         const itemsTree = {}
 
@@ -242,30 +250,32 @@ const treeViewFunc = {
 
     mergeNodeData(children, headers) {
         let mergedNode = {};
-        
+
         headers.forEach((h) => {
             const key = this.getFinalKey(h?.value, h?.filterKey, h?.numericValue)
-            if(key !== 'displayName'){
+            // Skip displayName and level - these should not be merged from children
+            if(key !== 'displayName' && key !== 'level'){
                 mergedNode[key] = children[0][key]
-            }else{
+            }else if(key === 'displayName'){
                 if(children[0].hasOwnProperty('apiCollectionIds')){
                     mergedNode['apiCollectionIds'] = children[0].apiCollectionIds
                 }else{
                     mergedNode['apiCollectionIds'] = [children[0]['id']]
                 }
             }
-            
+
         })
-        
+
         if(children.length === 1)return mergedNode
 
         children.slice(1, children.length).forEach((c) => {
             headers.forEach((h) => {
                 const  {value, filterKey, numericValue, mergeType} = h
                 const key = this.getFinalKey(value, filterKey, numericValue)
-                if(key !== 'displayName'){
+                // Skip displayName and level - these should not be merged from children
+                if(key !== 'displayName' && key !== 'level'){
                     mergedNode[key] = mergeType(mergedNode[key], c[key])
-                }else{
+                }else if(key === 'displayName'){
                     let finalArr = []
                     if(c.hasOwnProperty('id')){
                         finalArr = [c.id]
@@ -279,7 +289,7 @@ const treeViewFunc = {
                 }
             })
         })
-    
+
         return mergedNode;
     },
 
