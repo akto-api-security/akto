@@ -25,7 +25,7 @@ public class MaliciousEventModel {
   private String metadata;
   private Boolean successfulExploit;
   private Status status;
-  private String label;
+  private Label label;
 
 
   public enum EventType {
@@ -40,35 +40,8 @@ public class MaliciousEventModel {
   }
 
   public enum Label {
-    THREAT("threat"),
-    GUARDRAIL("guardrail");
-
-    private final String value;
-
-    Label(String value) {
-      this.value = value;
-    }
-
-    public String getValue() {
-      return value;
-    }
-
-    public static Label fromString(String value) {
-      if (value == null || value.isEmpty()) {
-        return THREAT; // Default to THREAT for backward compatibility
-      }
-      for (Label label : Label.values()) {
-        if (label.value.equalsIgnoreCase(value)) {
-          return label;
-        }
-      }
-      return THREAT; // Default to THREAT for unknown values
-    }
-
-    @Override
-    public String toString() {
-      return value;
-    }
+    THREAT,
+    GUARDRAIL
   }
 
   public MaliciousEventModel() {}
@@ -114,7 +87,7 @@ public class MaliciousEventModel {
     private String metadata;
     private Status status;
     private Boolean successfulExploit;
-    private String label;
+    private Label label;
 
     public Builder setFilterId(String filterId) {
       this.filterId = filterId;
@@ -206,7 +179,7 @@ public class MaliciousEventModel {
       return this;
     }
 
-    public Builder setLabel(String label) {
+    public Builder setLabel(Label label) {
       this.label = label;
       return this;
     }
@@ -372,11 +345,11 @@ public class MaliciousEventModel {
     this.status = status;
   }
 
-  public String getLabel() {
+  public Label getLabel() {
     return label;
   }
 
-  public void setLabel(String label) {
+  public void setLabel(Label label) {
     this.label = label;
   }
 

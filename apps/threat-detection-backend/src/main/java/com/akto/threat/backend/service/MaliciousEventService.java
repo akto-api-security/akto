@@ -5,6 +5,7 @@ import com.akto.kafka.Kafka;
 import com.akto.kafka.KafkaConfig;
 import com.akto.log.LoggerMaker;
 import com.akto.proto.generated.threat_detection.message.malicious_event.event_type.v1.EventType;
+import com.akto.proto.generated.threat_detection.message.malicious_event.label.v1.Label;
 import com.akto.proto.generated.threat_detection.message.malicious_event.v1.MaliciousEventMessage;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchAlertFiltersRequest;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchAlertFiltersResponse;
@@ -44,6 +45,39 @@ public class MaliciousEventService {
     this.mongoClient = mongoClient;
   }
 
+  // Convert proto Label enum to model Label enum
+  private static MaliciousEventModel.Label convertProtoLabelToModelLabel(Label protoLabel) {
+    if (protoLabel == null || protoLabel == Label.LABEL_UNSPECIFIED) {
+      return MaliciousEventModel.Label.THREAT; // Default for backward compatibility
+    }
+
+    switch (protoLabel) {
+      case LABEL_THREAT:
+        return MaliciousEventModel.Label.THREAT;
+      case LABEL_GUARDRAIL:
+        return MaliciousEventModel.Label.GUARDRAIL;
+      default:
+        logger.debug("Unknown proto label value: " + protoLabel + ", defaulting to THREAT");
+        return MaliciousEventModel.Label.THREAT;
+    }
+  }
+
+  // Convert model Label enum to proto Label enum
+  private static Label convertModelLabelToProtoLabel(MaliciousEventModel.Label modelLabel) {
+    if (modelLabel == null) {
+      return Label.LABEL_THREAT;
+    }
+
+    switch (modelLabel) {
+      case THREAT:
+        return Label.LABEL_THREAT;
+      case GUARDRAIL:
+        return Label.LABEL_GUARDRAIL;
+      default:
+        return Label.LABEL_THREAT;
+    }
+  }
+
   public void recordMaliciousEvent(String accountId, RecordMaliciousEventRequest request) {
     MaliciousEventMessage evt = request.getMaliciousEvent();
     String actor = evt.getActor();
@@ -58,6 +92,9 @@ public class MaliciousEventService {
         EventType.EVENT_TYPE_AGGREGATED.equals(eventType)
             ? MaliciousEventModel.EventType.AGGREGATED
             : MaliciousEventModel.EventType.SINGLE;
+
+    // Convert proto enum to model enum
+    MaliciousEventModel.Label label = convertProtoLabelToModelLabel(evt.getLabel());
 
     MaliciousEventModel maliciousEventModel =
         MaliciousEventModel.newBuilder()
@@ -78,7 +115,7 @@ public class MaliciousEventService {
             .setType(evt.getType())
             .setMetadata(evt.getMetadata().toString())
             .setSuccessfulExploit(evt.getSuccessfulExploit())
-            .setLabel(evt.getLabel())
+            .setLabel(label)
             .build();
 
     this.kafka.send(
@@ -152,9 +189,9 @@ public class MaliciousEventService {
     Map<String, Integer> sort = request.getSortMap();
     ListMaliciousRequestsRequest.Filter filter = request.getFilter();
 
-    if(filter.getLatestAttackList() == null || filter.getLatestAttackList().isEmpty()) {
-      return ListMaliciousRequestsResponse.newBuilder().build();
-    }
+    // if(filter.getLatestAttackList() == null || filter.getLatestAttackList().isEmpty()) {
+    //   return ListMaliciousRequestsResponse.newBuilder().build();
+    // }
 
     MongoCollection<MaliciousEventModel> coll =
         this.mongoClient
@@ -184,9 +221,9 @@ public class MaliciousEventService {
     }
 
 
-    if (!filter.getLatestAttackList().isEmpty()) {
-      query.append("filterId", new Document("$in", filter.getLatestAttackList()));
-    }
+    // if (!filter.getLatestAttackList().isEmpty()) {
+    //   query.append("filterId", new Document("$in", filter.getLatestAttackList()));
+    // }
 
     // Handle status filter
     if (filter.hasStatusFilter()) {
@@ -218,15 +255,17 @@ public class MaliciousEventService {
     }
 
     if (filter.hasLabel()) {
-      String labelValue = filter.getLabel();
+      Label protoLabel = filter.getLabel();
+      // Convert proto enum to model enum
+      MaliciousEventModel.Label labelEnum = convertProtoLabelToModelLabel(protoLabel);
+
       // For backward compatibility: treat null/missing label as "threat"
       List<Document> orConditions = new ArrayList<>();
-      orConditions.add(new Document("label", labelValue));
-      if (MaliciousEventModel.Label.THREAT.getValue().equals(labelValue)) {
+      orConditions.add(new Document("label", labelEnum.name()));
+      if (labelEnum == MaliciousEventModel.Label.THREAT) {
         // If filtering for "threat", also include documents with null or missing label
         orConditions.add(new Document("label", new Document("$exists", false)));
         orConditions.add(new Document("label", null));
-        orConditions.add(new Document("label", ""));
       }
 
       if (orConditions.size() > 1) {
@@ -238,7 +277,7 @@ public class MaliciousEventService {
         query.clear();
         query.append("$and", andConditions);
       } else {
-        query.append("label", labelValue);
+        query.append("label", labelEnum.name());
       }
     }
 
@@ -275,7 +314,7 @@ public class MaliciousEventService {
                 .setMetadata(metadata)
                 .setStatus(evt.getStatus() != null ? evt.getStatus().toString() : StatusConstants.ACTIVE)
                 .setSuccessfulExploit(evt.getSuccessfulExploit() != null ? evt.getSuccessfulExploit() : false)
-                .setLabel(evt.getLabel() != null ? evt.getLabel() : "")
+                .setLabel(convertModelLabelToProtoLabel(evt.getLabel()))
                 .build());
       }
       return ListMaliciousRequestsResponse.newBuilder()
@@ -438,19 +477,26 @@ public class MaliciousEventService {
     // Handle label filter with backward compatibility
     String label = (String) filter.get("label");
     if (label != null && !label.isEmpty()) {
+      // Convert string to enum with case-insensitive comparison
+      MaliciousEventModel.Label labelEnum = MaliciousEventModel.Label.THREAT; // Default
+      try {
+        labelEnum = MaliciousEventModel.Label.valueOf(label.toUpperCase());
+      } catch (IllegalArgumentException e) {
+        logger.debug("Unknown label value in filter: " + label + ", defaulting to THREAT");
+      }
+
       List<Document> orConditions = new ArrayList<>();
-      orConditions.add(new Document("label", label));
-      if (MaliciousEventModel.Label.THREAT.getValue().equals(label)) {
+      orConditions.add(new Document("label", labelEnum.name()));
+      if (labelEnum == MaliciousEventModel.Label.THREAT) {
         // For backward compatibility: treat null/missing label as "threat"
         orConditions.add(new Document("label", new Document("$exists", false)));
         orConditions.add(new Document("label", null));
-        orConditions.add(new Document("label", ""));
       }
 
       if (orConditions.size() > 1) {
         query.append("$or", orConditions);
       } else {
-        query.append("label", label);
+        query.append("label", labelEnum.name());
       }
     }
 

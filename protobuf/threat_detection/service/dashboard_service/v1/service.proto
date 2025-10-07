@@ -3,6 +3,7 @@ syntax = "proto3";
 package threat_detection.service.dashboard_service.v1;
 
 import "threat_detection/message/malicious_event/event_type/v1/event_type.proto";
+import "threat_detection/message/malicious_event/label/v1/label.proto";
 
 // Dashboard service which the dashboard actions will call instead of directly calling DB
 option java_outer_classname = "DashboardServiceProto";
@@ -29,7 +30,7 @@ message ListMaliciousRequestsResponse {
       string metadata = 17;
       string status = 18;
       bool successful_exploit = 19;
-      string label = 20;
+      threat_detection.message.malicious_event.label.v1.Label label = 20;
     }
     repeated MaliciousEvent malicious_events = 1;
     uint64 total = 2;
@@ -51,7 +52,7 @@ message ListMaliciousRequestsRequest {
       repeated string latest_attack = 7;
       optional string status_filter = 8;
       optional bool successful_exploit = 9;
-      optional string label = 10;
+      optional threat_detection.message.malicious_event.label.v1.Label label = 10;
     }
 
     // The number of alerts to return
