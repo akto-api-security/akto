@@ -5,7 +5,6 @@ import com.akto.kafka.Kafka;
 import com.akto.kafka.KafkaConfig;
 import com.akto.log.LoggerMaker;
 import com.akto.proto.generated.threat_detection.message.malicious_event.event_type.v1.EventType;
-import com.akto.proto.generated.threat_detection.message.malicious_event.label.v1.Label;
 import com.akto.proto.generated.threat_detection.message.malicious_event.v1.MaliciousEventMessage;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchAlertFiltersRequest;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchAlertFiltersResponse;
@@ -45,36 +44,37 @@ public class MaliciousEventService {
     this.mongoClient = mongoClient;
   }
 
-  // Convert proto Label enum to model Label enum
-  private static MaliciousEventModel.Label convertProtoLabelToModelLabel(Label protoLabel) {
-    if (protoLabel == null || protoLabel == Label.LABEL_UNSPECIFIED) {
+  // Convert string label to model Label enum
+  private static MaliciousEventModel.Label convertStringLabelToModelLabel(String labelString) {
+    if (labelString == null || labelString.isEmpty()) {
       return MaliciousEventModel.Label.THREAT; // Default for backward compatibility
     }
 
-    switch (protoLabel) {
-      case LABEL_THREAT:
+    String normalized = labelString.toUpperCase().trim();
+    switch (normalized) {
+      case "THREAT":
         return MaliciousEventModel.Label.THREAT;
-      case LABEL_GUARDRAIL:
+      case "GUARDRAIL":
         return MaliciousEventModel.Label.GUARDRAIL;
       default:
-        logger.debug("Unknown proto label value: " + protoLabel + ", defaulting to THREAT");
+        logger.debug("Unknown label string: " + labelString + ", defaulting to THREAT");
         return MaliciousEventModel.Label.THREAT;
     }
   }
 
-  // Convert model Label enum to proto Label enum
-  private static Label convertModelLabelToProtoLabel(MaliciousEventModel.Label modelLabel) {
+  // Convert model Label enum to string
+  private static String convertModelLabelToString(MaliciousEventModel.Label modelLabel) {
     if (modelLabel == null) {
-      return Label.LABEL_THREAT;
+      return "threat";
     }
 
     switch (modelLabel) {
       case THREAT:
-        return Label.LABEL_THREAT;
+        return "threat";
       case GUARDRAIL:
-        return Label.LABEL_GUARDRAIL;
+        return "guardrail";
       default:
-        return Label.LABEL_THREAT;
+        return "threat";
     }
   }
 
@@ -117,8 +117,8 @@ public class MaliciousEventService {
             ? MaliciousEventModel.EventType.AGGREGATED
             : MaliciousEventModel.EventType.SINGLE;
 
-    // Convert proto enum to model enum
-    MaliciousEventModel.Label label = convertProtoLabelToModelLabel(evt.getLabel());
+    // Convert string label to model enum
+    MaliciousEventModel.Label label = convertStringLabelToModelLabel(evt.getLabel());
 
     MaliciousEventModel maliciousEventModel =
         MaliciousEventModel.newBuilder()
@@ -279,8 +279,8 @@ public class MaliciousEventService {
     }
 
     if (filter.hasLabel()) {
-      Label protoLabel = filter.getLabel();
-      MaliciousEventModel.Label labelEnum = convertProtoLabelToModelLabel(protoLabel);
+      String labelString = filter.getLabel();
+      MaliciousEventModel.Label labelEnum = convertStringLabelToModelLabel(labelString);
       applyLabelFilter(query, labelEnum);
     }
 
@@ -317,7 +317,7 @@ public class MaliciousEventService {
                 .setMetadata(metadata)
                 .setStatus(evt.getStatus() != null ? evt.getStatus().toString() : StatusConstants.ACTIVE)
                 .setSuccessfulExploit(evt.getSuccessfulExploit() != null ? evt.getSuccessfulExploit() : false)
-                .setLabel(convertModelLabelToProtoLabel(evt.getLabel()))
+                .setLabel(convertModelLabelToString(evt.getLabel()))
                 .build());
       }
       return ListMaliciousRequestsResponse.newBuilder()
@@ -480,13 +480,7 @@ public class MaliciousEventService {
     // Handle label filter with backward compatibility
     String label = (String) filter.get("label");
     if (label != null && !label.isEmpty()) {
-      // Convert string to enum with case-insensitive comparison
-      MaliciousEventModel.Label labelEnum = MaliciousEventModel.Label.THREAT; // Default
-      try {
-        labelEnum = MaliciousEventModel.Label.valueOf(label.toUpperCase());
-      } catch (IllegalArgumentException e) {
-        logger.debug("Unknown label value in filter: " + label + ", defaulting to THREAT");
-      }
+      MaliciousEventModel.Label labelEnum = convertStringLabelToModelLabel(label);
       applyLabelFilter(query, labelEnum);
     }
 
