@@ -338,7 +338,7 @@ public class McpReconSyncJobExecutor {
                 responseParamsToProcess.addAll(toolsResponseList);
                 responseParamsToProcess.addAll(resourcesResponseList);
                 responseParamsToProcess.addAll(endpointsResponseList);
-                McpToolsSyncJobExecutor.processResponseParams(apiConfig, responseParamsToProcess, true);
+                McpToolsSyncJobExecutor.processResponseParams(apiConfig, responseParamsToProcess);
                 
                 // Insert when batch is full
                 if (serverBatch.size() >= BATCH_SIZE) {
@@ -515,7 +515,7 @@ public class McpReconSyncJobExecutor {
                 String requestHeaders = buildHeaders(host);
                 McpSchema.JSONRPCRequest request = new McpSchema.JSONRPCRequest(
                             McpSchema.JSONRPC_VERSION,
-                            mcpServer.getEndpoint(),
+                            McpSchema.METHOD_PING,
                             String.valueOf(1),
                             new McpSchema.InitializeRequest(
                                 McpSchema.LATEST_PROTOCOL_VERSION,
@@ -536,6 +536,7 @@ public class McpReconSyncJobExecutor {
                             new OriginalHttpResponse("", Collections.emptyMap(), HttpStatus.SC_OK));
 
                     if (requestHttpResponseParams != null) {
+                        requestHttpResponseParams.setSource(HttpResponseParams.Source.MCP_RECON);
                         responseParamsList.add(requestHttpResponseParams);
                     }
 

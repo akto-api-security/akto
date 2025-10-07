@@ -362,13 +362,13 @@ public class HttpCallParser {
         return new Pair<HttpResponseParams,FilterConfig.FILTER_TYPE>(responseParams, FILTER_TYPE.ERROR);
     }
 
-    public void syncFunction(List<HttpResponseParams> responseParams, boolean syncImmediately, boolean fetchAllSTI, AccountSettings accountSettings, boolean isRecon)  {
+    public void syncFunction(List<HttpResponseParams> responseParams, boolean syncImmediately, boolean fetchAllSTI, AccountSettings accountSettings)  {
         // USE ONLY filteredResponseParams and not responseParams
         List<HttpResponseParams> filteredResponseParams = responseParams;
         if (accountSettings != null && accountSettings.getDefaultPayloads() != null) {
             filteredResponseParams = filterDefaultPayloads(filteredResponseParams, accountSettings.getDefaultPayloads());
         }
-        filteredResponseParams = filterHttpResponseParams(filteredResponseParams, accountSettings, isRecon);
+        filteredResponseParams = filterHttpResponseParams(filteredResponseParams, accountSettings);
         boolean isHarOrPcap = aggregate(filteredResponseParams, aggregatorMap);
         apiCatalogSync.setMergeUrlsOnVersions(accountSettings.isAllowMergingOnVersions());
 
@@ -508,12 +508,12 @@ public class HttpCallParser {
         }
     }
 
-    public static boolean useHostCondition(String hostName, HttpResponseParams.Source source, boolean isRecon) {
-        List<HttpResponseParams.Source> whiteListSource = Arrays.asList(HttpResponseParams.Source.MIRRORING);
+    public static boolean useHostCondition(String hostName, HttpResponseParams.Source source) {
+        List<HttpResponseParams.Source> whiteListSource = Arrays.asList(HttpResponseParams.Source.MIRRORING, HttpResponseParams.Source.MCP_RECON);
         boolean hostNameCondition;
         if (hostName == null) {
             hostNameCondition = false;
-        } else if (isRecon) {
+        } else if (source.equals(HttpResponseParams.Source.MCP_RECON)) {
             hostNameCondition = true;
         }
         else {
@@ -647,7 +647,7 @@ public class HttpCallParser {
         }
     }
 
-    public int createApiCollectionId(HttpResponseParams httpResponseParam, boolean isRecon){
+    public int createApiCollectionId(HttpResponseParams httpResponseParam){
         int apiCollectionId;
         String hostName = getHeaderValue(httpResponseParam.getRequestParams().getHeaders(), "host");
 
@@ -659,7 +659,7 @@ public class HttpCallParser {
         String vpcId = System.getenv("VPC_ID");
         List<CollectionTags> tagList = CollectionTags.convertTagsFormat(httpResponseParam.getTags());
 
-        if (useHostCondition(hostName, httpResponseParam.getSource(), isRecon)) {
+        if (useHostCondition(hostName, httpResponseParam.getSource())) {
             hostName = hostName.toLowerCase();
             hostName = hostName.trim();
 
@@ -751,7 +751,7 @@ public class HttpCallParser {
         return res;
     }
 
-    public List<HttpResponseParams> filterHttpResponseParams(List<HttpResponseParams> httpResponseParamsList, AccountSettings accountSettings, boolean isRecon) {
+    public List<HttpResponseParams> filterHttpResponseParams(List<HttpResponseParams> httpResponseParamsList, AccountSettings accountSettings) {
         List<HttpResponseParams> filteredResponseParams = new ArrayList<>();
         int originalSize = httpResponseParamsList.size();
 
@@ -763,7 +763,7 @@ public class HttpCallParser {
         Map<String, List<ExecutorNode>> executorNodesMap = ParseAndExecute.createExecutorNodeMap(apiCatalogSync.advancedFilterMap);
         for (HttpResponseParams httpResponseParam: httpResponseParamsList) {
 
-            if (httpResponseParam.getSource().equals(HttpResponseParams.Source.MIRRORING)) {
+            if (httpResponseParam.getSource().equals(HttpResponseParams.Source.MIRRORING) || httpResponseParam.getSource().equals(HttpResponseParams.Source.MCP_RECON)) {
                 TrafficMetrics.Key totalRequestsKey = getTrafficMetricsKey(httpResponseParam, TrafficMetrics.Name.TOTAL_REQUESTS_RUNTIME);
                 incTrafficMetrics(totalRequestsKey,1);
             }
@@ -868,7 +868,7 @@ public class HttpCallParser {
 
             }
 
-            int apiCollectionId = createApiCollectionId(httpResponseParam, isRecon);
+            int apiCollectionId = createApiCollectionId(httpResponseParam);
 
             httpResponseParam.requestParams.setApiCollectionId(apiCollectionId);
 
@@ -882,7 +882,7 @@ public class HttpCallParser {
                 loggerMaker.infoAndAddToDb("Adding " + responseParamsList.size() + "new graphql endpoints in inventory");
             }
 
-            if (httpResponseParam.getSource().equals(HttpResponseParams.Source.MIRRORING)) {
+            if (httpResponseParam.getSource().equals(HttpResponseParams.Source.MIRRORING) || httpResponseParam.getSource().equals(HttpResponseParams.Source.MCP_RECON)) {
                 TrafficMetrics.Key processedRequestsKey = getTrafficMetricsKey(httpResponseParam, TrafficMetrics.Name.FILTERED_REQUESTS_RUNTIME);
                 incTrafficMetrics(processedRequestsKey,1);
             }

@@ -539,7 +539,7 @@ public class Main {
                     apiConfig,
                     fetchAllSTI,
                     syncImmediately,
-                    centralKafkaTopicName, false);
+                    centralKafkaTopicName);
                 AllMetrics.instance.setRuntimeProcessLatency(System.currentTimeMillis()-start);
                 loggerMaker.info("Processed " + responseParamsToAccountMap.size() + " accounts in " + (System.currentTimeMillis()-start) + " ms");
             }
@@ -645,7 +645,7 @@ public class Main {
     public static void handleResponseParams(Map<String, List<HttpResponseParams>> responseParamsToAccountMap,
         Map<Integer, AccountInfo> accountInfoMap, boolean isDashboardInstance,
         Map<String, HttpCallParser> httpCallParserMap, APIConfig apiConfig, boolean fetchAllSTI,
-        boolean syncImmediately, String centralKafkaTopicName, boolean isRecon) {
+        boolean syncImmediately, String centralKafkaTopicName) {
         for (String accountId: responseParamsToAccountMap.keySet()) {
             int accountIdInt;
             try {
@@ -690,7 +690,7 @@ public class Main {
 
                 accWiseResponse = filterBasedOnHeaders(accWiseResponse, accountInfo.accountSettings);
                 loggerMaker.infoAndAddToDb("Initiating sync function for account: " + accountId);
-                parser.syncFunction(accWiseResponse, syncImmediately, fetchAllSTI, accountInfo.accountSettings, isRecon);
+                parser.syncFunction(accWiseResponse, syncImmediately, fetchAllSTI, accountInfo.accountSettings);
                 loggerMaker.debugInfoAddToDb("Sync function completed for account: " + accountId);
 
                 sendToCentralKafka(centralKafkaTopicName, accWiseResponse);
@@ -1047,7 +1047,7 @@ public class Main {
                 apiConfig,
                 fetchAllSTI,
                 syncImmediately,
-                centralKafkaTopicName, false);
+                centralKafkaTopicName);
         AllMetrics.instance.setRuntimeProcessLatency(System.currentTimeMillis()-start);
 
     }

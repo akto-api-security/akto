@@ -110,7 +110,7 @@ public class McpToolsSyncJobExecutor {
                 responseParamsToProcess.addAll(initResponseList);
                 responseParamsToProcess.addAll(toolsResponseList);
                 responseParamsToProcess.addAll(resourcesResponseList);
-                processResponseParams(apiConfig, responseParamsToProcess, false);
+                processResponseParams(apiConfig, responseParamsToProcess);
             } catch (Exception e) {
                 logger.error("Error while running MCP sync job for apiCollectionId: {} and hostname: {}",
                     apiCollection.getId(), apiCollection.getHostName(), e);
@@ -181,6 +181,7 @@ public class McpToolsSyncJobExecutor {
                             new OriginalHttpResponse("", Collections.emptyMap(), HttpStatus.SC_OK));
 
                     if (toolsCallHttpResponseParams != null) {
+                        toolsCallHttpResponseParams.setSource(Source.MCP_RECON);
                         responseParamsList.add(toolsCallHttpResponseParams);
                     }
                 }
@@ -273,6 +274,7 @@ public class McpToolsSyncJobExecutor {
                             new OriginalHttpResponse("", Collections.emptyMap(), HttpStatus.SC_OK));
 
                     if (readResourceHttpResponseParams != null) {
+                        readResourceHttpResponseParams.setSource(Source.MCP_RECON);
                         responseParamsList.add(readResourceHttpResponseParams);
                     }
                 }
@@ -338,7 +340,7 @@ public class McpToolsSyncJobExecutor {
         }
     }
 
-    public static void processResponseParams(APIConfig apiConfig, List<HttpResponseParams> responseParamsList, boolean isRecon) {
+    public static void processResponseParams(APIConfig apiConfig, List<HttpResponseParams> responseParamsList) {
         if (CollectionUtils.isEmpty(responseParamsList)) {
             logger.debug("No response params to process for MCP sync job.");
             return;
@@ -353,8 +355,7 @@ public class McpToolsSyncJobExecutor {
             apiConfig,
             true,
             true,
-            AccountSettings.DEFAULT_CENTRAL_KAFKA_TOPIC_NAME,
-            isRecon
+            AccountSettings.DEFAULT_CENTRAL_KAFKA_TOPIC_NAME
         );
     }
 
