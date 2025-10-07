@@ -408,6 +408,30 @@ public class DashboardRouter implements ARouter {
             });
 
         router
+            .post("/get_threat_summary_counts")
+            .blockingHandler(ctx -> {
+                RequestBody reqBody = ctx.body();
+                try {
+                    String body = reqBody.asString();
+                    org.bson.Document doc = org.bson.Document.parse(body);
+                    long startTs = doc.getLong("start_ts") != null ? doc.getLong("start_ts") : 0L;
+                    long endTs = doc.getLong("end_ts") != null ? doc.getLong("end_ts") : 0L;
+                    java.util.List<String> latestAttack = new java.util.ArrayList<>();
+                    Object la = doc.get("latestAttack");
+                    if (la instanceof java.util.List) {
+                        for (Object o : (java.util.List<?>) la) {
+                            if (o != null) latestAttack.add(o.toString());
+                        }
+                    }
+                    String resp = threatActorService.getThreatSummaryCounts(
+                        ctx.get("accountId"), startTs, endTs, latestAttack);
+                    ctx.response().setStatusCode(200).end(resp);
+                } catch (Exception e) {
+                    ctx.response().setStatusCode(400).end("Invalid request");
+                }
+            });
+
+        router
             .post("/update_malicious_event_status")
             .blockingHandler(ctx -> {
                 RequestBody reqBody = ctx.body();
