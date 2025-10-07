@@ -13,7 +13,7 @@ import org.apache.commons.lang3.StringUtils;
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public final class JsonRpcUtils {
 
-    private static final String JSONRPC_KEY = "jsonrpc";
+    public static final String JSONRPC_KEY = "jsonrpc";
 
     public static HttpResponseParams parseJsonRpcResponse(HttpResponseParams responseParams) {
         Pair<Boolean, Map<String, Object>> result = validateAndParseJsonRpc(responseParams);
