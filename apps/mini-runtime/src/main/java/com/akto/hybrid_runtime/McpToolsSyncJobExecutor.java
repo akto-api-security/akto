@@ -317,7 +317,7 @@ public class McpToolsSyncJobExecutor {
 
     public Pair<JSONRPCResponse, HttpResponseParams> getMcpMethodResponse(String host, String mcpMethod,
         String mcpMethodRequestJson, ApiCollection apiCollection) throws Exception {
-        OriginalHttpRequest mcpRequest = createRequest(host, mcpMethod, mcpMethodRequestJson);
+        OriginalHttpRequest mcpRequest = createRequest(host, apiCollection, mcpMethodRequestJson);
         String jsonrpcResponse = sendRequest(mcpRequest, apiCollection);
 
         JSONRPCResponse rpcResponse = (JSONRPCResponse) McpSchema.deserializeJsonRpcMessage(mapper, jsonrpcResponse);
