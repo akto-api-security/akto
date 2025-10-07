@@ -28,7 +28,7 @@ const generatePalette = (n) => {
   return out
 }
 
-// We keep the same export name so the import in the page doesn't change
+
 function ThreatCategoryStackedChart({ startTimestamp, endTimestamp }) {
   const [loading, setLoading] = useState(true)
   const [options, setOptions] = useState(null)
@@ -38,7 +38,7 @@ function ThreatCategoryStackedChart({ startTimestamp, endTimestamp }) {
     const load = async () => {
       setLoading(true)
       try {
-        // Use the same API as the Sankey which returns categoryCounts: [{category, subCategory, count}, ...]
+        // Using the same API as the Sankey which returns categoryCounts: [{category, subCategory, count}, ...]
         const resp = await api.fetchThreatCategoryCount(startTimestamp, endTimestamp)
         if (!mounted) return
 
