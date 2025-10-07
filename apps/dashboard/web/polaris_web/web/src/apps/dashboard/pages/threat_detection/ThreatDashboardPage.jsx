@@ -15,6 +15,7 @@ import dummyData from './dummyData';
 import observeFunc from '../observe/transform';
 import ThreatWorldMap from './components/ThreatWorldMap';
 import ThreatSankeyChart from './components/ThreatSankeyChart';
+import ThreatCategoryStackedChart from './components/ThreatCategoryStackedChart';
 import api from './api';
 
 
@@ -87,12 +88,10 @@ function ThreatDashboardPage() {
             // Severity Distribution - Use API
             try {
                 const severityResponse = await api.fetchCountBySeverity(startTimestamp, endTimestamp)
-                
+                console.log('Severity Distribution Response:', severityResponse)
                 if (severityResponse?.categoryCounts && Array.isArray(severityResponse.categoryCounts)) {
                     const categoryCounts = severityResponse.categoryCounts
                     
-                    // Convert array format to object format for ChartypeComponent
-                    // Use the same severity->color mapping as other pages
                     const severityLevels = ["CRITICAL", "HIGH", "MEDIUM", "LOW"];
                     const severityColors = severityLevels.reduce((acc, s) => {
                         acc[s] = func.getHexColorForSeverity(s);
@@ -110,8 +109,6 @@ function ThreatDashboardPage() {
                         };
                     });
 
-                    // Update with actual counts from API
-                    // The API returns data in format: [{category: "", subCategory: "MEDIUM", count: 5000}]
                     categoryCounts.forEach(item => {
                         const raw = item.subCategory || item.severity || '';
                         const severity = String(raw).toUpperCase();
@@ -407,6 +404,15 @@ function ThreatDashboardPage() {
         {id: 'row3', component: row3Cards},
         {id: 'row4', component: row4Cards}
     ]
+
+    // Row 5: Stacked category breakdown (uses same API as Sankey)
+    const row5Cards = (
+        <div>
+            <ThreatCategoryStackedChart startTimestamp={startTimestamp} endTimestamp={endTimestamp} />
+        </div>
+    )
+
+    dashboardRows.push({ id: 'row5', component: row5Cards })
 
 
     const dashboardContent = (
