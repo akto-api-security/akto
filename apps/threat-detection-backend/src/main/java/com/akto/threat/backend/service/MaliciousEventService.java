@@ -78,6 +78,30 @@ public class MaliciousEventService {
     }
   }
 
+  // Helper method to apply label filter with backward compatibility
+  private static void applyLabelFilter(Document query, MaliciousEventModel.Label labelEnum) {
+    List<Document> orConditions = new ArrayList<>();
+    orConditions.add(new Document("label", labelEnum.name()));
+
+    if (labelEnum == MaliciousEventModel.Label.THREAT) {
+      // For backward compatibility: treat null/missing label as "threat"
+      orConditions.add(new Document("label", new Document("$exists", false)));
+      orConditions.add(new Document("label", null));
+    }
+
+    if (orConditions.size() > 1) {
+      List<Document> andConditions = new ArrayList<>();
+      if (!query.isEmpty()) {
+        andConditions.add(new Document(query));
+      }
+      andConditions.add(new Document("$or", orConditions));
+      query.clear();
+      query.append("$and", andConditions);
+    } else {
+      query.append("label", labelEnum.name());
+    }
+  }
+
   public void recordMaliciousEvent(String accountId, RecordMaliciousEventRequest request) {
     MaliciousEventMessage evt = request.getMaliciousEvent();
     String actor = evt.getActor();
@@ -189,9 +213,9 @@ public class MaliciousEventService {
     Map<String, Integer> sort = request.getSortMap();
     ListMaliciousRequestsRequest.Filter filter = request.getFilter();
 
-    // if(filter.getLatestAttackList() == null || filter.getLatestAttackList().isEmpty()) {
-    //   return ListMaliciousRequestsResponse.newBuilder().build();
-    // }
+    if(filter.getLatestAttackList() == null || filter.getLatestAttackList().isEmpty()) {
+      return ListMaliciousRequestsResponse.newBuilder().build();
+    }
 
     MongoCollection<MaliciousEventModel> coll =
         this.mongoClient
@@ -221,9 +245,9 @@ public class MaliciousEventService {
     }
 
 
-    // if (!filter.getLatestAttackList().isEmpty()) {
-    //   query.append("filterId", new Document("$in", filter.getLatestAttackList()));
-    // }
+    if (!filter.getLatestAttackList().isEmpty()) {
+      query.append("filterId", new Document("$in", filter.getLatestAttackList()));
+    }
 
     // Handle status filter
     if (filter.hasStatusFilter()) {
@@ -256,29 +280,8 @@ public class MaliciousEventService {
 
     if (filter.hasLabel()) {
       Label protoLabel = filter.getLabel();
-      // Convert proto enum to model enum
       MaliciousEventModel.Label labelEnum = convertProtoLabelToModelLabel(protoLabel);
-
-      // For backward compatibility: treat null/missing label as "threat"
-      List<Document> orConditions = new ArrayList<>();
-      orConditions.add(new Document("label", labelEnum.name()));
-      if (labelEnum == MaliciousEventModel.Label.THREAT) {
-        // If filtering for "threat", also include documents with null or missing label
-        orConditions.add(new Document("label", new Document("$exists", false)));
-        orConditions.add(new Document("label", null));
-      }
-
-      if (orConditions.size() > 1) {
-        List<Document> andConditions = new ArrayList<>();
-        if (!query.isEmpty()) {
-          andConditions.add(new Document(query));
-        }
-        andConditions.add(new Document("$or", orConditions));
-        query.clear();
-        query.append("$and", andConditions);
-      } else {
-        query.append("label", labelEnum.name());
-      }
+      applyLabelFilter(query, labelEnum);
     }
 
     long total = coll.countDocuments(query);
@@ -484,20 +487,7 @@ public class MaliciousEventService {
       } catch (IllegalArgumentException e) {
         logger.debug("Unknown label value in filter: " + label + ", defaulting to THREAT");
       }
-
-      List<Document> orConditions = new ArrayList<>();
-      orConditions.add(new Document("label", labelEnum.name()));
-      if (labelEnum == MaliciousEventModel.Label.THREAT) {
-        // For backward compatibility: treat null/missing label as "threat"
-        orConditions.add(new Document("label", new Document("$exists", false)));
-        orConditions.add(new Document("label", null));
-      }
-
-      if (orConditions.size() > 1) {
-        query.append("$or", orConditions);
-      } else {
-        query.append("label", labelEnum.name());
-      }
+      applyLabelFilter(query, labelEnum);
     }
 
     return query;
