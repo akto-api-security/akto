@@ -16,6 +16,7 @@ import observeFunc from '../observe/transform';
 import ThreatWorldMap from './components/ThreatWorldMap';
 import ThreatSankeyChart from './components/ThreatSankeyChart';
 import ThreatCategoryStackedChart from './components/ThreatCategoryStackedChart';
+import GetPrettifyEndpoint from '../observe/GetPrettifyEndpoint';
 import api from './api';
 
 
@@ -340,14 +341,19 @@ function ThreatDashboardPage() {
 
     const generateApiTableRows = (apis) => {
         return apis.map((api) => ([
-            <Box maxWidth='300px'>
-                <Text variant='bodyMd'>{api.endpoint}</Text>
+            <Box maxWidth='400px'>
+                <GetPrettifyEndpoint method={api.method} url={api.endpoint} isNew={false} />
             </Box>,
-            <Badge>{api.method}</Badge>,
-            <Text variant='bodySm' alignment='end'>{api.attacks}</Text>,
-            <Badge status={api.severity === 'Critical' ? 'critical' : api.severity === 'High' ? 'warning' : 'info'}>
-                {api.severity}
-            </Badge>
+            <div style={{ textAlign: 'center' }}>
+                <Text variant='bodySm'>{api.attacks}</Text>
+            </div>,
+            <div style={{ display: 'flex', justifyContent: 'center' }}>
+                <div className={`badge-wrapper-${api.severity?.toUpperCase() || 'MEDIUM'}`}>
+                    <Badge>
+                        {api.severity}
+                    </Badge>
+                </div>
+            </div>
         ]))
     }
 
@@ -376,8 +382,8 @@ function ThreatDashboardPage() {
             component={ 
                 <Box>
                     <DataTable
-                        columnContentTypes={['text', 'text', 'numeric', 'text']}
-                        headings={['Endpoint', 'Method', 'Attacks', 'Severity']}
+                        columnContentTypes={['text', 'text', 'text']}
+                        headings={['API Endpoint', 'Attacks', 'Severity']}
                         rows={generateApiTableRows(topAttackedApis)}
                         hoverable={false}
                         increasedTableDensity
