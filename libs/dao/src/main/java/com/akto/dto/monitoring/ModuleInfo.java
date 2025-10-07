@@ -68,7 +68,8 @@ public class ModuleInfo {
         MINI_TESTING,
         K8S,
         EBPF,
-        THREAT_DETECTION
+        THREAT_DETECTION,
+        MCP_ENDPOINT_SHIELD
     }
 
 }

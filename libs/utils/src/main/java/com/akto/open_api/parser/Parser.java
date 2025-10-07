@@ -395,7 +395,7 @@ public class Parser {
     }
 
     // message keys for akto format.
-    private interface mKeys {
+    public interface mKeys {
         String akto_account_id = "akto_account_id";
         String path = "path";
         String method = "method";
