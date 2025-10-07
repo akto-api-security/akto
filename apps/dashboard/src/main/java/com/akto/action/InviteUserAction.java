@@ -52,6 +52,8 @@ public class InviteUserAction extends UserAction{
     static {
         commonOrganisationsMap.put("blinkhealth.com", "blinkhealth.com");
         commonOrganisationsMap.put("blinkrx.com", "blinkhealth.com");
+        commonOrganisationsMap.put("hollywoodbets.net ", "betsoftware.com ");
+        commonOrganisationsMap.put("betsoftware.com ", "hollywoodbets.net ");
     }
 
     public static String validateEmail(String email, String adminLogin) {
