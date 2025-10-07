@@ -24,3 +24,5 @@ https:
 **/bin
 .factorypath
 model.onnx
+test_scripts/*
+run-master.sh

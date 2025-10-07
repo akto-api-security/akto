@@ -22,6 +22,7 @@ public class DashboardMaliciousEvent {
   private String metadata;
   private boolean successfulExploit;
   private String status;
+  private String label;
 
   public DashboardMaliciousEvent() {}
 
@@ -43,7 +44,8 @@ public class DashboardMaliciousEvent {
       String payload,
       String metadata,
       boolean successfulExploit,
-      String status) {
+      String status,
+      String label) {
     this.id = id;
     this.actor = actor;
     this.filter_id = filter;
@@ -62,6 +64,7 @@ public class DashboardMaliciousEvent {
     this.metadata = metadata;
     this.successfulExploit = successfulExploit;
     this.status = status;
+    this.label = label;
   }
 
   public String getId() {
@@ -206,6 +209,14 @@ public class DashboardMaliciousEvent {
 
   public void setStatus(String status) {
     this.status = status;
+  }
+
+  public String getLabel() {
+    return label;
+  }
+
+  public void setLabel(String label) {
+    this.label = label;
   }
 
 }

@@ -44,6 +44,64 @@ public class MaliciousEventService {
     this.mongoClient = mongoClient;
   }
 
+  // Convert string label to model Label enum
+  private static MaliciousEventModel.Label convertStringLabelToModelLabel(String labelString) {
+    if (labelString == null || labelString.isEmpty()) {
+      return MaliciousEventModel.Label.THREAT; // Default for backward compatibility
+    }
+
+    String normalized = labelString.toUpperCase().trim();
+    switch (normalized) {
+      case "THREAT":
+        return MaliciousEventModel.Label.THREAT;
+      case "GUARDRAIL":
+        return MaliciousEventModel.Label.GUARDRAIL;
+      default:
+        logger.debug("Unknown label string: " + labelString + ", defaulting to THREAT");
+        return MaliciousEventModel.Label.THREAT;
+    }
+  }
+
+  // Convert model Label enum to string
+  private static String convertModelLabelToString(MaliciousEventModel.Label modelLabel) {
+    if (modelLabel == null) {
+      return "threat";
+    }
+
+    switch (modelLabel) {
+      case THREAT:
+        return "threat";
+      case GUARDRAIL:
+        return "guardrail";
+      default:
+        return "threat";
+    }
+  }
+
+  // Helper method to apply label filter with backward compatibility
+  private static void applyLabelFilter(Document query, MaliciousEventModel.Label labelEnum) {
+    List<Document> orConditions = new ArrayList<>();
+    orConditions.add(new Document("label", labelEnum.name()));
+
+    if (labelEnum == MaliciousEventModel.Label.THREAT) {
+      // For backward compatibility: treat null/missing label as "threat"
+      orConditions.add(new Document("label", new Document("$exists", false)));
+      orConditions.add(new Document("label", null));
+    }
+
+    if (orConditions.size() > 1) {
+      List<Document> andConditions = new ArrayList<>();
+      if (!query.isEmpty()) {
+        andConditions.add(new Document(query));
+      }
+      andConditions.add(new Document("$or", orConditions));
+      query.clear();
+      query.append("$and", andConditions);
+    } else {
+      query.append("label", labelEnum.name());
+    }
+  }
+
   public void recordMaliciousEvent(String accountId, RecordMaliciousEventRequest request) {
     MaliciousEventMessage evt = request.getMaliciousEvent();
     String actor = evt.getActor();
@@ -58,6 +116,9 @@ public class MaliciousEventService {
         EventType.EVENT_TYPE_AGGREGATED.equals(eventType)
             ? MaliciousEventModel.EventType.AGGREGATED
             : MaliciousEventModel.EventType.SINGLE;
+
+    // Convert string label to model enum
+    MaliciousEventModel.Label label = convertStringLabelToModelLabel(evt.getLabel());
 
     MaliciousEventModel maliciousEventModel =
         MaliciousEventModel.newBuilder()
@@ -78,6 +139,7 @@ public class MaliciousEventService {
             .setType(evt.getType())
             .setMetadata(evt.getMetadata().toString())
             .setSuccessfulExploit(evt.getSuccessfulExploit())
+            .setLabel(label)
             .build();
 
     this.kafka.send(
@@ -216,6 +278,12 @@ public class MaliciousEventService {
       }
     }
 
+    if (filter.hasLabel()) {
+      String labelString = filter.getLabel();
+      MaliciousEventModel.Label labelEnum = convertStringLabelToModelLabel(labelString);
+      applyLabelFilter(query, labelEnum);
+    }
+
     long total = coll.countDocuments(query);
     try (MongoCursor<MaliciousEventModel> cursor =
         coll.find(query)
@@ -249,6 +317,7 @@ public class MaliciousEventService {
                 .setMetadata(metadata)
                 .setStatus(evt.getStatus() != null ? evt.getStatus().toString() : StatusConstants.ACTIVE)
                 .setSuccessfulExploit(evt.getSuccessfulExploit() != null ? evt.getSuccessfulExploit() : false)
+                .setLabel(convertModelLabelToString(evt.getLabel()))
                 .build());
       }
       return ListMaliciousRequestsResponse.newBuilder()
@@ -407,6 +476,13 @@ public class MaliciousEventService {
     // Handle status filter
     String statusFilter = (String) filter.get("statusFilter");
     applyStatusFilter(query, statusFilter);
+
+    // Handle label filter with backward compatibility
+    String label = (String) filter.get("label");
+    if (label != null && !label.isEmpty()) {
+      MaliciousEventModel.Label labelEnum = convertStringLabelToModelLabel(label);
+      applyLabelFilter(query, labelEnum);
+    }
 
     return query;
   }
