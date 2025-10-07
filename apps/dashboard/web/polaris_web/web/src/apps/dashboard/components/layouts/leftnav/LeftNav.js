@@ -163,7 +163,7 @@ export default function LeftNav() {
                         },
                         selected: leftNavSelected === "dashboard_observe_sensitive",
                     },
-                    ...(dashboardCategory === "MCP Security" ? [{
+                    ...((dashboardCategory === "MCP Security" || dashboardCategory === "Agentic Security") ? [{
                         label: "Audit Data",
                         onClick: () => {
                             navigate("/dashboard/observe/audit");
