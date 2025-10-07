@@ -89,7 +89,7 @@ function ThreatDashboardPage() {
             // Severity Distribution - Use API
             try {
                 const severityResponse = await api.fetchCountBySeverity(startTimestamp, endTimestamp)
-                console.log('Severity Distribution Response:', severityResponse)
+                
                 if (severityResponse?.categoryCounts && Array.isArray(severityResponse.categoryCounts)) {
                     const categoryCounts = severityResponse.categoryCounts
                     
@@ -151,7 +151,7 @@ function ThreatDashboardPage() {
             setTopAttackedApis(apisData)
 
         } catch (error) {
-            console.error('Error fetching threat detection data:', error)
+            // console.error('Error fetching threat detection data:', error)
             
             // Set empty states on error
             setSeverityDistribution({})
@@ -321,7 +321,7 @@ function ThreatDashboardPage() {
     )
 
 
-    const row3Cards = (
+    const row5Cards = (
         <HorizontalGrid gap={5} columns={2}>
             <div>{threatStatusCard}</div>
             <div>{severityDistributionCard}</div>
@@ -403,22 +403,20 @@ function ThreatDashboardPage() {
         </HorizontalGrid>
     )
 
-
-    const dashboardRows = [
-        {id: 'summary', component: summarySection},
-        {id: 'row2', component: row2Cards},
-        {id: 'row3', component: row3Cards},
-        {id: 'row4', component: row4Cards}
-    ]
-
-    // Row 5: Stacked category breakdown (uses same API as Sankey)
-    const row5Cards = (
+    // Row 3: Stacked category breakdown (uses same API as Sankey)
+    const row3Cards = (
         <div>
             <ThreatCategoryStackedChart startTimestamp={startTimestamp} endTimestamp={endTimestamp} />
         </div>
     )
 
-    dashboardRows.push({ id: 'row5', component: row5Cards })
+    const dashboardRows = [
+        {id: 'summary', component: summarySection},
+        {id: 'row2', component: row2Cards},
+        {id: 'row3', component: row3Cards},
+        {id: 'row4', component: row4Cards},
+        {id: 'row5', component: row5Cards},
+    ]
 
 
     const dashboardContent = (
