@@ -13,6 +13,7 @@ import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.jobs.JobExecutor;
 import com.akto.jobs.utils.JobConstants;
 import com.akto.log.LoggerMaker;
+import org.slf4j.event.Level;
 import com.akto.util.Constants;
 import com.akto.util.enums.GlobalEnums.TestRunIssueStatus;
 import com.akto.util.http_util.CoreHTTPClient;
@@ -75,14 +76,14 @@ public class TicketSyncJobExecutor extends JobExecutor<TicketSyncJobParams> {
         List<TestingRunIssues> eligibleAktoIssues = TestingRunIssuesDao.instance.findAll(filter);
 
         if (eligibleJiraTickets.isEmpty() && eligibleAktoIssues.isEmpty()) {
-            logger.info("No eligible issues found for syncing");
+            logAndCollect(Level.INFO, "No eligible issues found for syncing");
             params.setLastSyncedAt(Context.now());
             updateJobParams(job, params);
             return;
         }
 
         if (eligibleJiraTickets.isEmpty()) {
-            logger.info("No Akto issues to be updated. Updating {} Jira tickets.",
+            logAndCollect(Level.INFO, "No Akto issues to be updated. Updating {} Jira tickets.",
                 eligibleAktoIssues.size());
             updateJiraTickets(jira, eligibleAktoIssues, aktoToJiraStatusMappings, job);
             params.setLastSyncedAt(Context.now());
@@ -91,7 +92,7 @@ public class TicketSyncJobExecutor extends JobExecutor<TicketSyncJobParams> {
         }
 
         if (eligibleAktoIssues.isEmpty()) {
-            logger.info("No Jira Tickets to be updated. Updating {} Akto issues.",
+            logAndCollect(Level.INFO, "No Jira Tickets to be updated. Updating {} Akto issues.",
                 eligibleJiraTickets.size());
             Bson query = Filters.and(
                 Filters.eq(TestingRunIssues.TICKET_PROJECT_KEY, projectKey),
@@ -134,7 +135,7 @@ public class TicketSyncJobExecutor extends JobExecutor<TicketSyncJobParams> {
 
         // Handle remaining Jira tickets that don't have corresponding Akto issues
         if (!eligibleJiraTickets.isEmpty()) {
-            logger.info("Found {} Jira tickets without corresponding Akto issues", eligibleJiraTickets.size());
+            logAndCollect(Level.INFO, "Found {} Jira tickets without corresponding Akto issues", eligibleJiraTickets.size());
             // Fetch Akto issues by ticket IDs
             List<String> ticketIds = new ArrayList<>(eligibleJiraTickets.keySet());
             Bson query = Filters.and(
@@ -145,7 +146,7 @@ public class TicketSyncJobExecutor extends JobExecutor<TicketSyncJobParams> {
             List<TestingRunIssues> remainingAktoIssues = TestingRunIssuesDao.instance.findAll(query);
 
             if (!remainingAktoIssues.isEmpty()) {
-                logger.info("Found {} Akto issues for remaining Jira tickets", remainingAktoIssues.size());
+                logAndCollect(Level.INFO, "Found {} Akto issues for remaining Jira tickets", remainingAktoIssues.size());
                 updateAktoIssues(remainingAktoIssues, eligibleJiraTickets, jiraToAktoStatusMappings, job);
             }
         }
@@ -177,11 +178,11 @@ public class TicketSyncJobExecutor extends JobExecutor<TicketSyncJobParams> {
                 // Get the corresponding Jira statuses for this Akto status
                 List<String> jiraStatuses = aktoToJiraStatusMappings.get(aktoStatus);
                 if (jiraStatuses == null || jiraStatuses.isEmpty()) {
-                    logger.warn("No Jira status mapping found for Akto status: {}", aktoStatus);
+                    logAndCollect(Level.INFO, "No Jira status mapping found for Akto status: {}", aktoStatus);
                     continue;
                 }
 
-                logger.debug("Found {} statues mapped with akto status {}. Using the first one", jiraStatuses.size(),
+                logAndCollect(Level.DEBUG, "Found {} jira statuses mapped with akto status {}. Using the first one", jiraStatuses.size(),
                     aktoStatus);
 
                 // Use the first mapped status as the target
@@ -204,8 +205,8 @@ public class TicketSyncJobExecutor extends JobExecutor<TicketSyncJobParams> {
 
                     updateJobHeartbeat(job);
                     if (transitionsMap.isEmpty()) {
-                        logger.info("No transitions found for issues with Akto status: {} to Jira status: {}",
-                                    aktoStatus, targetJiraStatus);
+                        logAndCollect(Level.INFO, "No transitions found for issues with Akto status: {} to Jira status: {}",
+                            aktoStatus, targetJiraStatus);
                         continue;
                     }
 
@@ -224,21 +225,22 @@ public class TicketSyncJobExecutor extends JobExecutor<TicketSyncJobParams> {
                             }
                             retryCount++;
                             if (retryCount < maxRetries) {
-                                logger.info("Retrying bulk transition (attempt {}/{})", retryCount + 1, maxRetries);
+                                logAndCollect(Level.INFO, "Retrying bulk transition (attempt {}/{})", retryCount + 1, maxRetries);
                                 Thread.sleep(2000L * retryCount); // Exponential backoff
                             }
                         } catch (Exception e) {
                             retryCount++;
                             if (retryCount < maxRetries) {
-                                logger.error("Error during bulk transition, retrying (attempt {}/{}): {}",
-                                           retryCount + 1, maxRetries, e.getMessage(), e);
+                                logAndCollect(Level.ERROR,
+                                    "Error during bulk transition, retrying (attempt {}/{}): {}", retryCount + 1,
+                                    maxRetries, e.getMessage(), e);
                                 Thread.sleep(2000L * retryCount); // Exponential backoff
                             }
                         }
                     }
 
                     if (success) {
-                        logger.info("Successfully transitioned {} Jira tickets to status: {}. ticketIds: {}",
+                        logAndCollect(Level.DEBUG, "Successfully transitioned {} Jira tickets to status: {}. ticketIds: {}",
                             issueKeys.size(), targetJiraStatus, issueKeys);
                         // Update last updated timestamp in Akto
                         List<WriteModel<TestingRunIssues>> writeModels = new ArrayList<>();
@@ -252,19 +254,18 @@ public class TicketSyncJobExecutor extends JobExecutor<TicketSyncJobParams> {
 
                         if (!writeModels.isEmpty()) {
                             TestingRunIssuesDao.instance.getMCollection().bulkWrite(writeModels);
-                            logger.info("Updated last updated timestamp for {} Akto issues", writeModels.size());
                         }
                     } else {
-                        logger.error("Failed to transition Jira tickets to status: {}. ticketIds: {}", targetJiraStatus,
+                        logAndCollect(Level.ERROR, "Failed to transition Jira tickets to status: {}. ticketIds: {}", targetJiraStatus,
                             issueKeys);
                     }
                 } catch (Exception e) {
-                    logger.error("Error getting transitions or performing bulk transition for Akto status: {} to Jira status: {}",
-                                aktoStatus, targetJiraStatus, e);
+                    logAndCollect(Level.ERROR, "Error getting transitions or performing bulk transition for Akto status: {} to Jira status: {}",
+                        aktoStatus, targetJiraStatus, e);
                 }
             }
         } catch (Exception e) {
-            logger.error("Error updating Jira tickets: {}", e.getMessage(), e);
+            logAndCollect(Level.ERROR, "Error updating Jira tickets: {}", e.getMessage(), e);
         }
     }
 
@@ -281,32 +282,32 @@ public class TicketSyncJobExecutor extends JobExecutor<TicketSyncJobParams> {
                 try {
                     BasicDBObject jiraIssue = jiraIssues.get(issue.getTicketId());
                     if (jiraIssue == null) {
-                        logger.warn("No Jira issue found for ticket ID: {}", issue.getTicketId());
+                        logAndCollect(Level.INFO, "No Jira issue found for ticket ID: {}", issue.getTicketId());
                         continue;
                     }
 
                     String jiraStatus = jiraIssue.getString("ticketStatus");
                     if (jiraStatus == null) {
-                        logger.warn("No status found in Jira issue for ticket ID: {}", issue.getTicketId());
+                        logAndCollect(Level.INFO, "No status found in Jira issue for ticket ID: {}", issue.getTicketId());
                         continue;
                     }
 
                     String aktoStatus = jiraToAktoStatusMapping.get(jiraStatus);
                     if (aktoStatus == null) {
-                        logger.warn("No Akto status mapping found for Jira status: {} (ticket ID: {})",
-                                  jiraStatus, issue.getTicketId());
+                        logAndCollect(Level.INFO, "No Akto status mapping found for Jira status: {} (ticket ID: {})",
+                            jiraStatus, issue.getTicketId());
                         continue;
                     }
 
                     TestRunIssueStatus status = TestRunIssueStatus.valueOf(aktoStatus);
 
                     if (status == issue.getTestRunIssueStatus()) {
-                        logger.info("Skipping update for issue: {}, ticketId: {} as status is already: {}", issue.getId(),
+                        logAndCollect(Level.INFO, "Skipping update for issue: {}, ticketId: {} as status is already: {}", issue.getId(),
                             issue.getTicketId(), status);
                         continue;
                     }
 
-                    logger.info("Updating issue: {}, ticketId: {} with status: {}. old status: {}", issue.getId(),
+                    logAndCollect(Level.INFO, "Updating issue: {}, ticketId: {} with status: {}. old status: {}", issue.getId(),
                         issue.getTicketId(), status, issue.getTestRunIssueStatus());
 
                     int now = Context.now();
@@ -317,18 +318,18 @@ public class TicketSyncJobExecutor extends JobExecutor<TicketSyncJobParams> {
                     );
                     writeModelList.add(new UpdateOneModel<>(query, update));
                 } catch (Exception e) {
-                    logger.error("Error processing Akto issue {}: {}", issue.getId(), e.getMessage());
+                    logAndCollect(Level.ERROR, "Error processing Akto issue {}: {}", issue.getId(), e.getMessage());
                 }
             }
 
             if (!writeModelList.isEmpty()) {
                 TestingRunIssuesDao.instance.getMCollection().bulkWrite(writeModelList);
-                logger.info("Updated {} Akto issues out of {}", writeModelList.size(), aktoIssues.size());
+                logAndCollect(Level.INFO, "Updated {} Akto issues out of {}", writeModelList.size(), aktoIssues.size());
             } else {
-                logger.info("No Akto issues to update");
+                logAndCollect(Level.INFO, "No Akto issues to update");
             }
         } catch (Exception e) {
-            logger.error("Error updating Akto issues: {}", e.getMessage(), e);
+            logAndCollect(Level.ERROR, "Error updating Akto issues: {}", e.getMessage(), e);
         }
 
         updateJobHeartbeat(job);
@@ -366,7 +367,7 @@ public class TicketSyncJobExecutor extends JobExecutor<TicketSyncJobParams> {
         // Validate that all TestRunIssueStatus values have mappings
         for (TestRunIssueStatus status : TestRunIssueStatus.values()) {
             if (!statusMappings.containsKey(status.name())) {
-                logger.warn("No Jira status mapping found for Akto status: {}", status.name());
+                logAndCollect(Level.INFO, "No Jira status mapping found for Akto status: {}", status.name());
             }
         }
 
@@ -396,7 +397,7 @@ public class TicketSyncJobExecutor extends JobExecutor<TicketSyncJobParams> {
                 updatedAfter);
             allResults.putAll(pageResults);
         } catch (Exception e) {
-            logger.error("Error fetching Jira tickets.", e);
+            logAndCollect(Level.ERROR, "Error fetching Jira tickets.", e);
             throw e;
         }
 
