@@ -12,6 +12,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.*;
+import java.util.regex.Pattern;
 
 public class AuthPolicy {
 
@@ -19,10 +20,14 @@ public class AuthPolicy {
     public static final String COOKIE_NAME = "cookie";
     private static final Logger logger = LoggerFactory.getLogger(AuthPolicy.class);
 
+    // Pre-compiled regex patterns for performance
+    private static final Pattern API_KEY_PATTERN = Pattern.compile(".*(apikey|passkey).*");
+    private static final Pattern MTLS_PATTERN = Pattern.compile(".*(clientcert|sslcert|clientdn|sslclientsdn|sslclientverify|forwardedclientcert).*");
+
     private static boolean isApiKeyHeader(String headerName) {
         // Matches variations: x-api-key, x_api_key, api_key, api-key, apiKey, x-pass-key
         String normalized = headerName.toLowerCase().replaceAll("[_-]", "");
-        return normalized.matches(".*(apikey|passkey).*");
+        return API_KEY_PATTERN.matcher(normalized).matches();
     }
 
     private static boolean isMtlsHeader(String headerName, String value) {
@@ -31,7 +36,7 @@ public class AuthPolicy {
         }
         String normalized = headerName.toLowerCase().replaceAll("[_-]", "");
         // Check for common mTLS/client certificate headers
-        return normalized.matches(".*(clientcert|sslcert|clientdn|sslclientsdn|sslclientverify|forwardedclientcert).*");
+        return MTLS_PATTERN.matcher(normalized).matches();
     }
 
     private static List<ApiInfo.AuthType> findBearerBasicAuth(String header, String value){
