@@ -2,12 +2,15 @@ import { Box } from '@shopify/polaris'
 import UserMessage from './UserMessage'
 import AIMessage from './AIMessage'
 
-function ChatInterface({ conversations }) {
+function ChatInterface({ conversations, sort = true }) {
     if (!conversations || conversations.length === 0) {
         return <Box style={{ height: '400px', backgroundColor: '#ffffff' }} />
     }
 
-    const sortedConversations = [...conversations].sort((a, b) => a.creationTimestamp - b.creationTimestamp)
+    let sortedConversations = [...conversations]
+    if(sort){
+       sortedConversations = sortedConversations.sort((a, b) => a.creationTimestamp - b.creationTimestamp)
+    }
 
     return (
         <Box style={{ backgroundColor: '#ffffff', maxHeight: '70vh', overflowY: 'auto' }}>

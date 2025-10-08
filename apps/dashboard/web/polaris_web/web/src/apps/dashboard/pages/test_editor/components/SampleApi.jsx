@@ -17,6 +17,7 @@ import { mapLabel, getDashboardCategory } from "../../../../main/labelHelper";
 import EmptySampleApi from "./EmptySampleApi";
 import Store from "../../../store";
 import ChatContainer from "../../../components/shared/ChatContainer";
+import ChatInterface from "../../../components/shared/ChatInterface";
 
 const SampleApi = () => {
 
@@ -46,6 +47,7 @@ const SampleApi = () => {
 
     const tabs = [{ id: 'request', content: 'Request' }, { id: 'response', content: 'Response'}];
     const mapCollectionIdToName = func.mapCollectionIdToName(allCollections)
+    const [conversationsList, setConversationsList] = useState([])
 
     const [isChatBotOpen, setIsChatBotOpen] = useState(false)
     const [chatBotModal, setChatBotModal] = useState(false)
@@ -65,6 +67,7 @@ const SampleApi = () => {
         setSelectedCollectionId(null)
         setCopyCollectionId(null)
         setTestResult(null)
+        setConversationsList([])
         if(!selectedUrl){
             selectedUrl = defaultRequest
         }
@@ -125,6 +128,7 @@ const SampleApi = () => {
         fetchApiEndpoints(copyCollectionId)
         setCopySelectedApiEndpoint(null);
         setTestResult(null)
+        setConversationsList([])
     }, [copyCollectionId])
 
     useEffect(() => {
@@ -134,11 +138,15 @@ const SampleApi = () => {
             setEditorData({message: ''})
         }
         setTestResult(null)
+        setConversationsList([])
     }, [selectedApiEndpoint])
 
     useEffect(()=> {
         if(testResult){
-            setShowTestResult(true);
+            let temp = testResult?.agentConversationResults.length > 0;
+            setShowTestResult(!temp);
+            setChatBotModal(temp);
+            
         } else {
             setShowTestResult(false);
         }
@@ -286,6 +294,28 @@ const SampleApi = () => {
                 });
             }
             else setTestResult(resp)
+            if(resp?.agentConversationResults?.length > 0){
+                let conversationsListCopy = []
+                resp?.agentConversationResults.forEach(conversation => {
+                    let commonObj = {
+                        creationTimestamp: conversation.timestamp,
+                        conversationId: conversation.conversationId,
+                    }
+                    conversationsListCopy.push({
+                        ...commonObj,
+                        _id: "user_" + conversation.prompt,
+                        message: conversation.prompt,
+                        role: "user"
+                    })
+                    conversationsListCopy.push({
+                        ...commonObj,
+                        _id: "system_" + conversation.response,
+                        message: conversation.response,
+                        role: "system"
+                    })
+                })
+                setConversationsList(conversationsListCopy)
+            }
         } catch (err){
         }
         setLoading(false)
@@ -460,7 +490,7 @@ const SampleApi = () => {
                 large
             >
                 <Modal.Section>
-                    <ChatContainer />
+                    {conversationsList?.length > 0 ? <ChatInterface conversations={conversationsList} sort={false}/> : <ChatContainer/>}
                 </Modal.Section>
                 
             </Modal>
