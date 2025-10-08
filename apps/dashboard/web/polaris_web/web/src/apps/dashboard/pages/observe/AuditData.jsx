@@ -131,6 +131,7 @@ const convertDataIntoTableFormat = (auditRecord, collectionName) => {
     temp['apiAccessTypesComp'] = temp?.apiAccessTypes && temp?.apiAccessTypes.length > 0 && temp?.apiAccessTypes.join(', ') ;
     temp['lastDetectedComp'] = func.prettifyEpoch(temp?.lastDetected)
     temp['updatedTimestampComp'] = func.prettifyEpoch(temp?.updatedTimestamp)
+    temp['approvedAtComp'] = func.prettifyEpoch(temp?.approvedAt)
     temp['expiresAtComp'] = temp?.approvalConditions?.expiresAt ? (() => {
         const expirationDate = new Date(temp.approvalConditions.expiresAt * 1000);
         return expirationDate.toLocaleString('en-US', {
@@ -149,24 +150,27 @@ const convertDataIntoTableFormat = (auditRecord, collectionName) => {
                 <Text variant="bodyMd">{temp?.remarks}</Text>
                 {temp?.approvalConditions && (
                     <div style={{marginTop: '4px', fontSize: '12px', color: '#637381'}}>
-                        {temp?.justification && (
-                            <div><strong>Justification:</strong> {temp.justification}</div>
-                        )}
-                        {temp?.updatedTimestamp && (
-                            <div><strong>Approved at:</strong> {temp.updatedTimestampComp}</div>
-                        )}
-                        {temp?.expiresAtComp && (
-                            <div><strong>Expires At:</strong> {temp.expiresAtComp}</div>
-                        )}
-                        {temp?.approvalConditions?.allowedIps && (
-                            <div><strong>Allowed IPs:</strong> {temp.approvalConditions.allowedIps.join(', ')}</div>
-                        )}
-                        {temp?.approvalConditions?.allowedIpRange && (
-                            <div><strong>Allowed IP Ranges:</strong> {temp.approvalConditions.allowedIpRange}</div>
-                        )}
-                        {temp?.approvalConditions?.allowedUsers && (
-                            <div><strong>Allowed Users:</strong> {temp.approvalConditions.allowedUsers.join(', ')}</div>
-                        )}
+                        {(() => {
+                            const approvalDetails = [
+                                { condition: temp?.approvalConditions?.justification, label: 'Justification', value: temp.approvalConditions.justification },
+                                { condition: temp?.approvedAt, label: 'Approved at', value: temp.approvedAtComp },
+                                { condition: temp?.expiresAtComp, label: 'Expires At', value: temp.expiresAtComp },
+                                { condition: temp?.approvalConditions?.allowedIps, label: 'Allowed IPs', value: temp.approvalConditions.allowedIps?.join(', ') },
+                                { condition: temp?.approvalConditions?.allowedIpRange, label: 'Allowed IP Ranges', value: temp.approvalConditions.allowedIpRange },
+                                { condition: temp?.approvalConditions?.allowedUsers, label: 'Allowed Users', value: temp.approvalConditions.allowedUsers?.join(', ') }
+                            ];
+                            
+                            const elements = [];
+                            for (let i = 0; i < approvalDetails.length; i++) {
+                                const detail = approvalDetails[i];
+                                if (detail.condition) {
+                                    elements.push(
+                                        <div key={i}><strong>{detail.label}:</strong> {detail.value}</div>
+                                    );
+                                }
+                            }
+                            return elements;
+                        })()}
                     </div>
                 )}
             </div>
@@ -179,6 +183,7 @@ function AuditData() {
     const [loading, setLoading] = useState(true);
     const [modalOpen, setModalOpen] = useState(false);
     const [selectedAuditItem, setSelectedAuditItem] = useState(null);
+    const [teamData, setTeamData] = useState([]);
 
     const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), values.ranges[5]);
     const getTimeEpoch = (key) => {
@@ -235,6 +240,7 @@ function AuditData() {
                 content: <span style={{ color: '#D72C0D' }}>Disapprove</span>,
                 icon: RedCancelIcon,
                 onAction: () => {updateAuditData(item.hexId, "Rejected")},
+                destructive: true
             }
         ]}]
     }
@@ -270,6 +276,7 @@ function AuditData() {
         const usersResponse = await settingRequests.getTeamData()
         if (usersResponse) {
             filters[1].choices = usersResponse.map((user) => ({label: user.login, value: user.login}))
+            setTeamData(usersResponse); // Store team data for modal
         }
         filters[3].choices = Object.entries(collectionsMap).map(([id, name]) => ({ label: name, value: id }));
     }
@@ -333,6 +340,7 @@ function AuditData() {
                 }}
                 onApprove={updateAuditDataWithConditions}
                 auditItem={selectedAuditItem}
+                teamData={teamData}
             />
         </>
     )

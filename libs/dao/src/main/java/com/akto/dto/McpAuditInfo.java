@@ -30,7 +30,9 @@ public class McpAuditInfo {
     
     // Conditional approval fields
     private Map<String, Object> approvalConditions;
-    private String justification;
+    
+    // Approval timestamp - set when item is approved or conditionally approved
+    private Integer approvedAt;
 
     public String getHexId() {
         return this.id.toHexString();

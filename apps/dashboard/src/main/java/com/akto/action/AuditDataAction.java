@@ -131,15 +131,24 @@ public class AuditDataAction extends UserAction {
         try {
             ObjectId id = new ObjectId(hexId);
             
+            int currentTime = Context.now();
+            
             // Check if this is a conditional approval (approvalData exists) or simple approval
             if (approvalData != null) {
                 // Handle conditional approval
                 Map<String, Object> updateFields = new HashMap<>();
                 updateFields.put("remarks", approvalData.get("remarks"));
                 updateFields.put("markedBy", markedBy);
-                updateFields.put("updatedTimestamp", Context.now());
-                updateFields.put("approvalConditions", approvalData.get("conditions"));
-                updateFields.put("justification", approvalData.get("justification"));
+                updateFields.put("updatedTimestamp", currentTime);
+                updateFields.put("approvedAt", currentTime);
+                
+                // Structure approvalConditions with justification inside
+                Map<String, Object> conditions = (Map<String, Object>) approvalData.get("conditions");
+                if (conditions == null) {
+                    conditions = new HashMap<>();
+                }
+                conditions.put("justification", approvalData.get("justification"));
+                updateFields.put("approvalConditions", conditions);
                 
                 // Build the Updates object
                 List<Bson> updates = new ArrayList<>();
@@ -153,13 +162,19 @@ public class AuditDataAction extends UserAction {
                 );
             } else {
                 // Handle simple approval/rejection
+                List<Bson> updates = new ArrayList<>();
+                updates.add(Updates.set("remarks", remarks));
+                updates.add(Updates.set("markedBy", markedBy));
+                updates.add(Updates.set("updatedTimestamp", currentTime));
+                
+                // Set approvedAt only for approvals, not rejections
+                if ("Approved".equals(remarks)) {
+                    updates.add(Updates.set("approvedAt", currentTime));
+                }
+                
                 McpAuditInfoDao.instance.updateOne(
                     Filters.eq(Constants.ID, id), 
-                    Updates.combine(
-                        Updates.set("remarks", remarks), 
-                        Updates.set("markedBy", markedBy), 
-                        Updates.set("updatedTimestamp", Context.now())
-                    )
+                    Updates.combine(updates)
                 );
             }
         } catch (Exception e) {

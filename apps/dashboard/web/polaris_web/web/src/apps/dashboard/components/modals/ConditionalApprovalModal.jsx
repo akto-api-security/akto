@@ -16,12 +16,15 @@ import settingRequests from "../../pages/settings/api";
 import PersistStore from "../../../main/PersistStore";
 import UpdateIpsComponent from "../shared/UpdateIpsComponent";
 import DropdownSearch from "../shared/DropdownSearch";
+import { handleIpsChange } from "../shared/ipUtils";
+import func from "@/util/func";
 
 const ConditionalApprovalModal = ({ 
     isOpen, 
     onClose, 
     onApprove, 
-    auditItem 
+    auditItem,
+    teamData = []
 }) => {
     // Time restriction state
     const [timeRestricted, setTimeRestricted] = useState(false);
@@ -56,26 +59,15 @@ const ConditionalApprovalModal = ({
         { label: "Custom", value: "custom" }
     ];
 
-    // Fetch available users
+    // Set available users from passed team data
     useEffect(() => {
-        const fetchUsers = async () => {
-            try {
-                const response = await settingRequests.getTeamData();
-                if (response) {
-                    setAvailableUsers(response.map(user => ({
-                        value: user.login,
-                        label: user.login
-                    })));
-                }
-            } catch (error) {
-                console.error("Error fetching team data:", error);
-            }
-        };
-        
-        if (isOpen) {
-            fetchUsers();
+        if (teamData && teamData.length > 0) {
+            setAvailableUsers(teamData.map(user => ({
+                value: user.login,
+                label: user.login
+            })));
         }
-    }, [isOpen]);
+    }, [teamData]);
 
     // Reset form when modal opens/closes
     useEffect(() => {
@@ -84,30 +76,13 @@ const ConditionalApprovalModal = ({
         }
     }, [isOpen]);
 
-    // Handle IP/CIDR changes similar to settings page
-    const handleIpsChange = (ip, isAdded, type) => {
-        let ipList = ip.split(",");
-        ipList = ipList.map((x) => x.replace(/\s+/g, ''));
-        
-        if (type === 'ip') {
-            let updatedIps = [];
-            if (isAdded) {
-                updatedIps = [...specificIpsList, ...ipList];
-            } else {
-                updatedIps = specificIpsList.filter(item => item !== ip);
-            }
-            updatedIps = Array.from(new Set(updatedIps));
-            setSpecificIpsList(updatedIps);
-        } else if (type === 'cidr') {
-            let updatedIps = [];
-            if (isAdded) {
-                updatedIps = [...ipRangeList, ...ipList];
-            } else {
-                updatedIps = ipRangeList.filter(item => item !== ip);
-            }
-            updatedIps = Array.from(new Set(updatedIps));
-            setIpRangeList(updatedIps);
-        }
+    // Handle IP/CIDR changes using shared utility
+    const handleSpecificIpsChange = (ip, isAdded) => {
+        handleIpsChange(ip, isAdded, specificIpsList, setSpecificIpsList);
+    };
+
+    const handleCidrChange = (ip, isAdded) => {
+        handleIpsChange(ip, isAdded, ipRangeList, setIpRangeList);
     };
 
     const resetForm = () => {
@@ -154,7 +129,7 @@ const ConditionalApprovalModal = ({
                 };
                 conditions.expiresInHours = hoursMap[timeOption];
             }
-            const currentTimeSeconds = Math.floor(Date.now() / 1000);
+            const currentTimeSeconds = func.timeNow();
             const durationSeconds = conditions.expiresInHours * 60 * 60;
             conditions.expiresAt = Math.floor(currentTimeSeconds + durationSeconds);
         }
@@ -243,7 +218,7 @@ const ConditionalApprovalModal = ({
                             {/* Time Restriction */}
                             <FormLayout>
                                 <Checkbox
-                                    label="Time Restriction"
+                                    label="Time Duration Allowed"
                                     checked={timeRestricted}
                                     onChange={setTimeRestricted}
                                 />
@@ -273,7 +248,7 @@ const ConditionalApprovalModal = ({
 
                                 {/* IP Restriction */}
                                 <Checkbox
-                                    label="IP Restriction"
+                                    label="IPs Allowed"
                                     checked={ipRestricted}
                                     onChange={setIpRestricted}
                                 />
@@ -299,8 +274,8 @@ const ConditionalApprovalModal = ({
                                                     <UpdateIpsComponent
                                                         labelText="Add IP"
                                                         ipsList={specificIpsList}
-                                                        onSubmit={(val) => handleIpsChange(val, true, "ip")}
-                                                        onRemove={(val) => handleIpsChange(val, false, "ip")}
+                                                        onSubmit={(val) => handleSpecificIpsChange(val, true)}
+                                                        onRemove={(val) => handleSpecificIpsChange(val, false)}
                                                         type="ip"
                                                         showCard={false}
                                                         showTitle={false}
@@ -317,8 +292,8 @@ const ConditionalApprovalModal = ({
                                                     <UpdateIpsComponent
                                                         labelText="Add CIDR"
                                                         ipsList={ipRangeList}
-                                                        onSubmit={(val) => handleIpsChange(val, true, "cidr")}
-                                                        onRemove={(val) => handleIpsChange(val, false, "cidr")}
+                                                        onSubmit={(val) => handleCidrChange(val, true)}
+                                                        onRemove={(val) => handleCidrChange(val, false)}
                                                         type="cidr"
                                                         showCard={false}
                                                         showTitle={false}
@@ -331,7 +306,7 @@ const ConditionalApprovalModal = ({
 
                                 {/* User Restriction */}
                                 <Checkbox
-                                    label="User Restriction"
+                                    label="Users Allowed"
                                     checked={userRestricted}
                                     onChange={setUserRestricted}
                                 />
