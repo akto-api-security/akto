@@ -10,7 +10,7 @@ import PageWithMultipleCards from "../../components/layouts/PageWithMultipleCard
 import GithubServerTable from "../../components/tables/GithubServerTable";
 import { MethodBox } from "./GetPrettifyEndpoint";
 import { CellType } from "../../components/tables/rows/GithubRow";
-import { CircleTickMajor, CircleCancelMajor } from "@shopify/polaris-icons";
+import { CircleTickMajor, CircleCancelMajor, SettingsMajor } from "@shopify/polaris-icons";
 import { Icon } from "@shopify/polaris";
 import settingRequests from "../settings/api";
 import PersistStore from "../../../main/PersistStore";
@@ -219,13 +219,14 @@ function AuditData() {
 
     // Custom colored icons
     const GreenTickIcon = () => <Icon source={CircleTickMajor} tone="success" />;
+    const GreenSettingsIcon = () => <Icon source={SettingsMajor} tone="success" />;
     const RedCancelIcon = () => <Icon source={CircleCancelMajor} tone="critical" />;
 
     const getActionsList = (item) => {
         return [{title: 'Actions', items: [
             {
                 content: <span style={{ color: '#008060' }}>Conditional Approval</span>,
-                icon: GreenTickIcon,
+                icon: GreenSettingsIcon,
                 onAction: () => {
                     setSelectedAuditItem(item);
                     setModalOpen(true);
