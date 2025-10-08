@@ -44,16 +44,31 @@ public class InviteUserAction extends UserAction{
     public static final String NOT_ALLOWED_TO_INVITE = "you're not authorised to invite for this role";
     public static final String AKTO_DOMAIN = "akto.io";
 
-    public static Map<String, String> commonOrganisationsMap = new HashMap<>();
+    // Map domain to set of all related domains in the organization
+    public static Map<String, Set<String>> commonOrganisationsMap = new HashMap<>();
     private static final ExecutorService executor = Executors.newFixedThreadPool(1);
 
     private static final Pattern EMAIL_PATTERN = Pattern.compile("^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$");
 
     static {
-        commonOrganisationsMap.put("blinkhealth.com", "blinkhealth.com");
-        commonOrganisationsMap.put("blinkrx.com", "blinkhealth.com");
-        commonOrganisationsMap.put("hollywoodbets.net ", "betsoftware.com ");
-        commonOrganisationsMap.put("betsoftware.com ", "hollywoodbets.net ");
+        // Blink Health organization
+        Set<String> blinkHealthDomains = new HashSet<>(Arrays.asList(
+            "blinkhealth.com",
+            "blinkrx.com"
+        ));
+        for (String domain : blinkHealthDomains) {
+            commonOrganisationsMap.put(domain, blinkHealthDomains);
+        }
+
+        // Hollywood Bets organization
+        Set<String> hollywoodBetsDomains = new HashSet<>(Arrays.asList(
+            "hollywoodbets.net",
+            "betsoftware.com",
+            "betsolutions.net"
+        ));
+        for (String domain : hollywoodBetsDomains) {
+            commonOrganisationsMap.put(domain, hollywoodBetsDomains);
+        }
     }
 
     public static String validateEmail(String email, String adminLogin) {
@@ -93,16 +108,17 @@ public class InviteUserAction extends UserAction{
 
         if (("consulting-for."+adminDomain).equals(inviteeDomain)) return true;
 
-        String inviteeOrg = commonOrganisationsMap.get(inviteeDomain);
-        String adminOrg = commonOrganisationsMap.get(adminDomain);
+        Set<String> inviteeOrgDomains = commonOrganisationsMap.get(inviteeDomain);
+        Set<String> adminOrgDomains = commonOrganisationsMap.get(adminDomain);
 
-        loggerMaker.debugAndAddToDb("inviteeOrg: " + inviteeOrg);
-        loggerMaker.debugAndAddToDb("adminOrg: " + adminOrg);
-        if (inviteeOrg == null || adminOrg == null) return false;
+        loggerMaker.debugAndAddToDb("inviteeOrgDomains: " + inviteeOrgDomains);
+        loggerMaker.debugAndAddToDb("adminOrgDomains: " + adminOrgDomains);
+        if (inviteeOrgDomains == null || adminOrgDomains == null) return false;
 
-        if (inviteeOrg.equalsIgnoreCase(adminOrg)) return true;
+        // Check if both domains belong to the same organization by verifying mutual membership
+        if (adminOrgDomains.contains(inviteeDomain)) return true;
 
-        loggerMaker.debugAndAddToDb("inviteeOrg and adminOrg different");
+        loggerMaker.debugAndAddToDb("inviteeOrgDomains and adminOrgDomains different");
         return false;
     }
 
