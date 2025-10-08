@@ -66,7 +66,7 @@ function ThreatDashboardPage() {
             let summaryResponse = null
             try {
                 summaryResponse = await api.getDailyThreatActorsCount(startTimestamp, endTimestamp, [])
-                console.log(summaryResponse);
+                //console.log(summaryResponse);
                 if (summaryResponse) {
                     // Use actorsCounts latest entry for active actors similar to ThreatSummary.jsx
                     let activeActorsValue = summaryResponse.totalActive || 0
@@ -95,7 +95,7 @@ function ThreatDashboardPage() {
                     })
                 }
             } catch (err) {
-                console.error('Error fetching summary counts:', err)
+                //console.error('Error fetching summary counts:', err)
                 // Fall back to empty state
                 setSummaryMetrics({
                     currentPeriod: { totalAnalysed: 0, totalAttacks: 0, criticalActors: 0, activeThreats: 0 },
@@ -118,7 +118,7 @@ function ThreatDashboardPage() {
                     
                     const severityLevels = ["CRITICAL", "HIGH", "MEDIUM", "LOW"];
                     const severityColors = severityLevels.reduce((acc, s) => {
-                        acc[s] = func.getHexColorForSeverity(s);
+                        acc[s] = observeFunc.getColorForSensitiveData(s);
                         return acc;
                     }, {});
 
@@ -149,17 +149,12 @@ function ThreatDashboardPage() {
                 } 
             } catch (err) {
                 // Set empty state but keep structure for display
-                const severityColors = {
-                    "CRITICAL": "#E45357",
-                    "HIGH": "#EF864C",
-                    "MEDIUM": "#F6C564",
-                    "LOW": "#6FD1A6"
-                }
+                const severityLevels = ["CRITICAL", "HIGH", "MEDIUM", "LOW"];
                 const emptyFormattedSeverity = {}
-                Object.keys(severityColors).forEach(severity => {
+                severityLevels.forEach(severity => {
                     emptyFormattedSeverity[severity] = {
                         "text": 0,
-                        "color": severityColors[severity],
+                        "color": observeFunc.getColorForSensitiveData(severity),
                         "filterKey": severity
                     }
                 })
@@ -178,7 +173,7 @@ function ThreatDashboardPage() {
                     setTopAttackedApis(topApisResponse.topApis)
                 }
             } catch (err) {
-                console.error('Error fetching top APIs:', err)
+                //console.error('Error fetching top APIs:', err)
                 // Fall back to empty state
                 setTopAttackedApis([])
             }
@@ -217,9 +212,7 @@ function ThreatDashboardPage() {
         return (
             <HorizontalStack wrap={false}>
                 <Icon source={icon} color={color} />
-                <div className='custom-color'>
-                    <Text color={color}>{Math.abs(delta)}</Text>
-                </div>
+                <Text color={color}>{Math.abs(delta)}</Text>
             </HorizontalStack>
         )
     }
@@ -301,8 +294,8 @@ function ThreatDashboardPage() {
 
     const row2Cards = (
         <HorizontalGrid gap={5} columns={2}>
-            <div>{threatCategoriesCard}</div>
-            <div>{threatActorMapCard}</div>
+            {threatCategoriesCard}
+            {threatActorMapCard}
         </HorizontalGrid>
     )
 
@@ -311,19 +304,17 @@ function ThreatDashboardPage() {
     const threatStatusCard = (
         <InfoCard
             component={
-                <div style={{ marginTop: "20px" }}>
-                    <ChartypeComponent
-                        data={threatStatusBreakdown}
-                        navUrl="/dashboard/protection/threat-activity"
-                        title=""
-                        isNormal={true}
+                <ChartypeComponent
+                    data={threatStatusBreakdown}
+                    navUrl="/dashboard/protection/threat-activity"
+                    title=""
+                    isNormal={true}
                         boxHeight={'250px'}
                         chartOnLeft={true}
                         dataTableWidth="250px"
                         boxPadding={0}
                         pieInnerSize="50%"
                     />
-                </div>
             }
             title="Threat Status"
             titleToolTip="Distribution of threats by their current status"            
@@ -334,19 +325,17 @@ function ThreatDashboardPage() {
     const severityDistributionCard = (
         <InfoCard
             component={
-                <div style={{ marginTop: "20px" }}>
-                    <ChartypeComponent
-                        data={severityDistribution}
-                        navUrl="/dashboard/protection/threat-activity"
-                        title=""
-                        isNormal={true}
-                        boxHeight={'250px'}
-                        chartOnLeft={true}
-                        dataTableWidth="250px"
-                        boxPadding={0}
-                        pieInnerSize="50%"
-                    />
-                </div>
+                <ChartypeComponent
+                    data={severityDistribution}
+                    navUrl="/dashboard/protection/threat-activity"
+                    title=""
+                    isNormal={true}
+                    boxHeight={'250px'}
+                    chartOnLeft={true}
+                    dataTableWidth="250px"
+                    boxPadding={0}
+                    pieInnerSize="50%"
+                />
             }
             title="Threat Actors by Severity"
             titleToolTip="Distribution of threat actors categorized by severity level"
@@ -356,8 +345,8 @@ function ThreatDashboardPage() {
 
     const row5Cards = (
         <HorizontalGrid gap={5} columns={2}>
-            <div>{threatStatusCard}</div>
-            <div>{severityDistributionCard}</div>
+            {threatStatusCard}
+            {severityDistributionCard}
         </HorizontalGrid>
     )
 
@@ -377,15 +366,11 @@ function ThreatDashboardPage() {
             <Box maxWidth='400px'>
                 <GetPrettifyEndpoint method={api.method} url={api.endpoint} isNew={false} />
             </Box>,
-            <div style={{ textAlign: 'center' }}>
-                <Text variant='bodySm'>{api.attacks}</Text>
-            </div>,
-            <div style={{ display: 'flex', justifyContent: 'center' }}>
-                <div className={`badge-wrapper-${api.severity?.toUpperCase() || 'MEDIUM'}`}>
-                    <Badge>
-                        {api.severity}
-                    </Badge>
-                </div>
+            <Text variant='bodySm' alignment='center'>{api.attacks}</Text>,
+            <div className={`badge-wrapper-${api.severity?.toUpperCase() || 'MEDIUM'}`}>
+                <Badge>
+                    {api.severity}
+                </Badge>
             </div>
         ]))
     }
@@ -431,16 +416,14 @@ function ThreatDashboardPage() {
 
     const row4Cards = (
         <HorizontalGrid gap={5} columns={2}>
-            <div>{topHostsCard}</div>
-            <div>{topApisCard}</div>
+            {topHostsCard}
+            {topApisCard}
         </HorizontalGrid>
     )
 
     // Row 3: Stacked category breakdown (uses same API as Sankey)
     const row3Cards = (
-        <div>
-            <ThreatCategoryStackedChart startTimestamp={startTimestamp} endTimestamp={endTimestamp} />
-        </div>
+        <ThreatCategoryStackedChart startTimestamp={startTimestamp} endTimestamp={endTimestamp} />
     )
 
     const dashboardRows = [

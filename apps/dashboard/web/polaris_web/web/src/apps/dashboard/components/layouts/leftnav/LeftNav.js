@@ -302,7 +302,7 @@ export default function LeftNav() {
                 subNavigationItems: reportsSubNavigationItems,
                 key: "6",
             },
-            ...(window?.STIGG_FEATURE_WISE_ALLOWED?.THREAT_DETECTION?.isGranted || true ?  [{
+            ...(window?.STIGG_FEATURE_WISE_ALLOWED?.THREAT_DETECTION?.isGranted  ? [{
                     label: (
                         <Text variant="bodyMd" fontWeight="medium">
                             {mapLabel("Threat Detection", dashboardCategory)}
@@ -318,7 +318,7 @@ export default function LeftNav() {
                     url: "#",
                     key: "7",
                     subNavigationItems: [
-                        {
+                        ...(dashboardCategory === "API Security" ? [{
                             label: "Dashboard",
                             onClick: () => {
                                 navigate("/dashboard/protection/threat-dashboard");
@@ -326,7 +326,7 @@ export default function LeftNav() {
                                 setActive("active");
                             },
                             selected: leftNavSelected === "dashboard_threat_dashboard",
-                        },
+                        }] : []),
                         {
                             label: "Threat Actors",
                             onClick: () => {

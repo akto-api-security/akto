@@ -430,6 +430,10 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
     return threatActivityTimelines;
   }
 
+  public void setStartTs(int startTs) {
+    this.startTs = startTs;
+  }
+
   public void setEndTs(int endTs) {
     this.endTs = endTs;
   }
