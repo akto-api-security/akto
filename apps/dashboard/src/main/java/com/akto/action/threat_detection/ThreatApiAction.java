@@ -13,6 +13,7 @@ import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.Th
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatCategoryWiseCountResponse;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatSeverityWiseCountResponse;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.DailyActorsCountResponse.ActorsCount;
+import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchTopNDataResponse;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.HashMap;
 import java.util.List;
@@ -27,9 +28,13 @@ import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
 import org.apache.http.util.EntityUtils;
 import org.bson.Document;
+import lombok.Getter;
+import lombok.Setter;
 
 import static com.akto.action.threat_detection.utils.ThreatsUtils.getTemplates;
 
+@Getter
+@Setter
 public class ThreatApiAction extends AbstractThreatDetectionAction {
 
   List<DashboardThreatApi> apis;
@@ -325,96 +330,7 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
     return SUCCESS.toUpperCase();
   }
 
-  public int getSkip() {
-    return skip;
-  }
-
-  public void setSkip(int skip) {
-    this.skip = skip;
-  }
-
-  public static int getLimit() {
-    return LIMIT;
-  }
-
-  public long getTotal() {
-    return total;
-  }
-
-  public void setTotal(long total) {
-    this.total = total;
-  }
-
-  public List<DashboardThreatApi> getApis() {
-    return apis;
-  }
-
-  public void setApis(List<DashboardThreatApi> apis) {
-    this.apis = apis;
-  }
-
-  public Map<String, Integer> getSort() {
-    return sort;
-  }
-
-  public void setSort(Map<String, Integer> sort) {
-    this.sort = sort;
-  }
-
-  public List<ThreatCategoryCount> getCategoryCounts() {
-    return categoryCounts;
-  }
-
-  public void setCategoryCounts(List<ThreatCategoryCount> categoryCounts) {
-    this.categoryCounts = categoryCounts;
-  }
-
-  public List<DailyActorsCount> getActorsCounts() {
-    return actorsCounts;
-  }
-
-  public void setActorsCounts(List<DailyActorsCount> actorsCounts) {
-    this.actorsCounts = actorsCounts;
-  }
-
-  public int getStartTs() {
-    return startTs;
-  }
-
-  public void setStartTs(int startTs) {
-    this.startTs = startTs;
-  }
-
-  public int getEndTs() {
-    return endTs;
-  }
-
-  public void setEndTs(int endTs) {
-    this.endTs = endTs;
-  }
-
-  public List<ThreatActivityTimeline> getThreatActivityTimelines() {
-    return threatActivityTimelines;
-  }
-
-  public void setThreatActivityTimelines(List<ThreatActivityTimeline> threatActivityTimelines) {
-    this.threatActivityTimelines = threatActivityTimelines;
-  }
-
-  public List<String> getLatestAttack() {
-    return latestAttack;
-  }
-
-  public void setLatestAttack(List<String> latestAttack) {
-    this.latestAttack = latestAttack;
-  }
-
-  public int getTotalAnalysed() { return totalAnalysed; }
-  public int getTotalAttacks() { return totalAttacks; }
-  public int getCriticalActors() { return criticalActors; }
-  public int getTotalActive() { return totalActive; }
-  public int getTotalIgnored() { return totalIgnored; }
-  public int getTotalUnderReview() { return totalUnderReview; }
+  public static int getLimit() { return LIMIT; }
 
   public String fetchThreatTopNData() {
     HttpPost post = new HttpPost(String.format("%s/api/dashboard/get_top_n_data", this.getBackendUrl()));
@@ -439,8 +355,8 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
     try (CloseableHttpResponse resp = this.httpClient.execute(post)) {
       String responseBody = EntityUtils.toString(resp.getEntity());
 
-      ProtoMessageUtils.<com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchTopNDataResponse>toProtoMessage(
-        com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchTopNDataResponse.class, responseBody)
+      ProtoMessageUtils.<FetchTopNDataResponse>toProtoMessage(
+        FetchTopNDataResponse.class, responseBody)
           .ifPresent(
               m -> {
                 this.topApis = m.getTopApisList().stream()
@@ -460,12 +376,6 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
     return SUCCESS.toUpperCase();
   }
 
-  public List<TopApiData> getTopApis() {
-    return topApis;
-  }
-
-  public void setTopApis(List<TopApiData> topApis) {
-    this.topApis = topApis;
-  }
+  
 }
 
