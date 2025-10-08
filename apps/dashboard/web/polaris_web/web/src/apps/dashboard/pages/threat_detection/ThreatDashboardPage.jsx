@@ -62,27 +62,50 @@ function ThreatDashboardPage() {
         setLoading(true)
 
         try {
-            // Row 1: Summary metrics - Use dummy data
-            const summaryData = dummyData.getThreatSummaryData()
-            setSummaryMetrics({
-                currentPeriod: {
-                    totalAnalysed: summaryData.totalAnalysed,
-                    totalAttacks: summaryData.totalAttacks,
-                    criticalActors: summaryData.criticalActors,
-                    activeThreats: summaryData.totalActive,
-                },
-                previousPeriod: {
-                    totalAnalysed: summaryData.oldTotalAnalysed,
-                    totalAttacks: summaryData.oldTotalAttacks,
-                    criticalActors: summaryData.oldCriticalActors,
-                    activeThreats: summaryData.oldTotalActive,
+            // Row 1: Summary metrics - Use getDailyThreatActorsCount API
+            let summaryResponse = null
+            try {
+                summaryResponse = await api.getDailyThreatActorsCount(startTimestamp, endTimestamp, [])
+                console.log(summaryResponse);
+                if (summaryResponse) {
+                    // Use actorsCounts latest entry for active actors similar to ThreatSummary.jsx
+                    let activeActorsValue = summaryResponse.totalActive || 0
+                    if (summaryResponse?.actorsCounts && Array.isArray(summaryResponse.actorsCounts) && summaryResponse.actorsCounts.length > 0) {
+                        const last = summaryResponse.actorsCounts[summaryResponse.actorsCounts.length - 1]
+                        if (last && typeof last.totalActors !== 'undefined') {
+                            activeActorsValue = last.totalActors
+                        }
+                    }
+
+                    setSummaryMetrics({
+                        currentPeriod: {
+                            totalAnalysed: summaryResponse.totalAnalysed || 0,
+                            totalAttacks: summaryResponse.totalAttacks || 0,
+                            criticalActors: summaryResponse.criticalActors || 0,
+                            activeThreats: activeActorsValue,
+                        },
+                        previousPeriod: {
+                            // These would need to come from a separate API call with previous period timestamps
+                            // For now, using dummy data or setting to 0
+                            totalAnalysed: 0,
+                            totalAttacks: 0,
+                            criticalActors: 0,
+                            activeThreats: 0,
+                        }
+                    })
                 }
-            })
+            } catch (err) {
+                console.error('Error fetching summary counts:', err)
+                // Fall back to empty state
+                setSummaryMetrics({
+                    currentPeriod: { totalAnalysed: 0, totalAttacks: 0, criticalActors: 0, activeThreats: 0 },
+                    previousPeriod: { totalAnalysed: 0, totalAttacks: 0, criticalActors: 0, activeThreats: 0 }
+                })
+            }
 
             // Row 2: Sankey Chart and Map use APIs (handled in their components)
             
-            // Row 3: Threat Status (dummy) and Severity Distribution (API)
-            // Threat Status - Use dummy data
+            // Row 3: Threat Status - use dummy data for now
             const statusData = dummyData.getThreatStatusData()
             setThreatStatusBreakdown(statusData)
 
@@ -143,12 +166,22 @@ function ThreatDashboardPage() {
                 setSeverityDistribution(emptyFormattedSeverity)
             }
 
-            // Row 4: Top Attacked Hosts and APIs - Use dummy data
+            // Row 4: Top Attacked Hosts and APIs
+            // Top Attacked Hosts - Use dummy data
             const hostsData = dummyData.getTopHostsData()
             setTopAttackedHosts(hostsData)
 
-            const apisData = dummyData.getTopApisData()
-            setTopAttackedApis(apisData)
+            // Top Attacked APIs - Use API
+            try {
+                const topApisResponse = await api.fetchThreatTopNData(startTimestamp, endTimestamp, [], 10)
+                if (topApisResponse?.topApis && Array.isArray(topApisResponse.topApis)) {
+                    setTopAttackedApis(topApisResponse.topApis)
+                }
+            } catch (err) {
+                console.error('Error fetching top APIs:', err)
+                // Fall back to empty state
+                setTopAttackedApis([])
+            }
 
         } catch (error) {
             // console.error('Error fetching threat detection data:', error)

@@ -533,6 +533,33 @@ public class DashboardRouter implements ARouter {
                     .ifPresent(s -> ctx.response().setStatusCode(200).end(s));
             });
 
+        router
+            .post("/get_top_n_data")
+            .blockingHandler(ctx -> {
+                RequestBody reqBody = ctx.body();
+                com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchTopNDataRequest req = ProtoMessageUtils.<
+                com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchTopNDataRequest
+                >toProtoMessage(
+                    com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchTopNDataRequest.class,
+                    reqBody.asString()
+                ).orElse(null);
+
+                if (req == null) {
+                    ctx.response().setStatusCode(400).end("Invalid request");
+                    return;
+                }
+
+                ProtoMessageUtils.toString(
+                    threatActorService.fetchTopNData(
+                        ctx.get("accountId"),
+                        req.getStartTs(),
+                        req.getEndTs(),
+                        req.getLatestAttackList(),
+                        req.getLimit()
+                    )
+                ).ifPresent(s -> ctx.response().setStatusCode(200).end(s));
+            });
+
         return router;
     }
 }

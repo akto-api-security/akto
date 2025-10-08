@@ -51,6 +51,8 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
   int totalIgnored;
   int totalUnderReview;
 
+  List<TopApiData> topApis;
+
   // TODO: remove this, use API Executor.
   private final CloseableHttpClient httpClient;
 
@@ -208,6 +210,14 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
                           return new DailyActorsCount(smr.getTs(), smr.getTotalActors(), smr.getCriticalActors());
                         })
                     .collect(Collectors.toList());
+                
+                // Set summary counts
+                this.totalAnalysed = m.getTotalAnalysed();
+                this.totalAttacks = m.getTotalAttacks();
+                this.criticalActors = m.getCriticalActorsCount();
+                this.totalActive = m.getTotalActive();
+                this.totalIgnored = m.getTotalIgnored();
+                this.totalUnderReview = m.getTotalUnderReview();
               });
     } catch (Exception e) {
       e.printStackTrace();
@@ -443,4 +453,57 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
   public int getTotalActive() { return totalActive; }
   public int getTotalIgnored() { return totalIgnored; }
   public int getTotalUnderReview() { return totalUnderReview; }
+
+  public String fetchThreatTopNData() {
+    HttpPost post = new HttpPost(String.format("%s/api/dashboard/get_top_n_data", this.getBackendUrl()));
+    post.addHeader("Authorization", "Bearer " + this.getApiToken());
+    post.addHeader("Content-Type", "application/json");
+
+    List<String> templatesContext = getTemplates(this.latestAttack);
+
+    Map<String, Object> body = new HashMap<String, Object>() {
+      {
+        put("start_ts", startTs);
+        put("end_ts", endTs);
+        put("latestAttack", templatesContext);
+        put("limit", 10);
+      }
+    };
+    String msg = objectMapper.valueToTree(body).toString();
+
+    StringEntity requestEntity = new StringEntity(msg, ContentType.APPLICATION_JSON);
+    post.setEntity(requestEntity);
+
+    try (CloseableHttpResponse resp = this.httpClient.execute(post)) {
+      String responseBody = EntityUtils.toString(resp.getEntity());
+
+      ProtoMessageUtils.<com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchTopNDataResponse>toProtoMessage(
+        com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchTopNDataResponse.class, responseBody)
+          .ifPresent(
+              m -> {
+                this.topApis = m.getTopApisList().stream()
+                    .map(
+                        smr -> new TopApiData(
+                            smr.getEndpoint(),
+                            smr.getMethod(),
+                            smr.getAttacks(),
+                            smr.getSeverity()))
+                    .collect(Collectors.toList());
+              });
+    } catch (Exception e) {
+      e.printStackTrace();
+      return ERROR.toUpperCase();
+    }
+
+    return SUCCESS.toUpperCase();
+  }
+
+  public List<TopApiData> getTopApis() {
+    return topApis;
+  }
+
+  public void setTopApis(List<TopApiData> topApis) {
+    this.topApis = topApis;
+  }
 }
+
