@@ -6,11 +6,11 @@ import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleC
 import settingRequests from '../api'
 import { DeleteMajor, FileFilledMinor } from "@shopify/polaris-icons"
 import TooltipText from "../../../components/shared/TooltipText"
-import { isIP } from "is-ip"
-import isCidr from "is-cidr"
 import func from "@/util/func"
 import TextFieldWithInfo from '../../../components/shared/TextFieldWithInfo'
 import DropdownSearch from '../../../components/shared/DropdownSearch'
+import { handleIpsChange } from '../../../components/shared/ipUtils'
+import UpdateIpsComponent from '../../../components/shared/UpdateIpsComponent'
 
 function About() {
 
@@ -255,31 +255,13 @@ function About() {
     }
 
     
-    const handleIpsChange = async(ip, isAdded, type) => {
-        let ipList = ip.split(",")
-        ipList = ipList.map((x) => x.replace(/\s+/g, '') )
+    const handleCidrIpsChange = async(ip, isAdded, type) => {
         if(type === 'cidr'){
-            let updatedIps = []
-            if(isAdded){
-                updatedIps = [...privateCidrList, ...ipList]
-                
-            }else{
-                updatedIps = privateCidrList.filter(item => item !== ip);
-            }
-            updatedIps = Array.from(new Set(updatedIps))
-            setPrivateCidrList(updatedIps)
+            const updatedIps = handleIpsChange(ip, isAdded, privateCidrList, setPrivateCidrList);
             await settingRequests.configPrivateCidr(updatedIps)
             func.setToast(true, false, "Updated private CIDR ranges")
         }else{
-            let updatedIps = []
-            if(isAdded){
-                updatedIps = [...partnerIpsList, ...ipList]
-                
-            }else{
-                updatedIps = partnerIpsList.filter(item => item !== ip);
-            }
-            updatedIps = Array.from(new Set(updatedIps))
-            setPartnerIpsList(updatedIps)
+            const updatedIps = handleIpsChange(ip, isAdded, partnerIpsList, setPartnerIpsList);
             await settingRequests.configPartnerIps(updatedIps)
             func.setToast(true, false, "Updated partner IPs list")
         }
@@ -653,63 +635,6 @@ function About() {
         </LegacyCard>
     )
 
-    function UpdateIpsComponent({onSubmit, title, labelText, description, ipsList, onRemove, type, onApply}){
-        const [value, setValue] = useState('')
-        const onFormSubmit = (ip) => {
-            if(checkError(ip, type)){
-                func.setToast(true, true, "Invalid ip address")
-            }else{
-                setValue('')
-                onSubmit(ip)
-            }
-        }
-
-        const checkError = (localVal, localType) => {
-            localVal = localVal.replace(/\s+/g, '')
-            if (localVal.length === 0) return false
-            const values = localVal.split(",")
-            let valid = true;
-            for (let v of values) {
-                if(v.length === 0){
-                    return true
-                }
-                if(localType=== "cidr"){
-                    valid = valid && (isCidr(v) !== 0)
-                }else{
-                    valid = valid && (isIP(v))
-                }
-            }
-
-            return !valid
-        }
-
-        const isError = checkError(value, type)
-        return(
-            <LegacyCard title={<TitleComponent title={title} description={description} />}
-                actions={[
-                    { content: 'Apply', onAction: onApply }
-                ]}
-            >
-                <Divider />
-                <LegacyCard.Section>
-                    <VerticalStack gap={"2"}>
-                        <Form onSubmit={() => onFormSubmit(value)}>
-                            <TextField onChange={setValue} value={value} label={<Text color="subdued" fontWeight="medium" variant="bodySm">{labelText}</Text>} {...isError ? {error: "Invalid address"} : {}}/>
-                        </Form>
-                        <HorizontalStack gap={"2"}>
-                            {ipsList && ipsList.length > 0 && ipsList.map((ip, index) => {
-                                return(
-                                    <Tag key={index} onRemove={() => onRemove(ip)}>
-                                        <Text>{ip}</Text>
-                                    </Tag>
-                                )
-                            })}
-                        </HorizontalStack>
-                    </VerticalStack>
-                </LegacyCard.Section>
-            </LegacyCard>
-        )
-    }
 
     const components = [accountInfoComponent, 
                         !func.checkLocal() ? <UpdateIpsComponent 
@@ -718,8 +643,8 @@ function About() {
                             title={"Private CIDRs list"}
                             labelText="Add CIDR"
                             ipsList={privateCidrList}
-                            onSubmit={(val) => handleIpsChange(val,true,"cidr")}
-                            onRemove={(val) => handleIpsChange(val, false, "cidr")}
+                            onSubmit={(val) => handleCidrIpsChange(val,true,"cidr")}
+                            onRemove={(val) => handleCidrIpsChange(val, false, "cidr")}
                             onApply={() => applyIps()}
                             type={"cidr"}
                         /> : null,
@@ -729,8 +654,8 @@ function About() {
                             title={"Third parties IPs list"}
                             labelText="Add IP"
                             ipsList={partnerIpsList}
-                            onSubmit={(val) => handleIpsChange(val,true,"partner")}
-                            onRemove={(val) => handleIpsChange(val, false, "partner")}
+                            onSubmit={(val) => handleCidrIpsChange(val,true,"partner")}
+                            onRemove={(val) => handleCidrIpsChange(val, false, "partner")}
                             onApply={() => applyIps()}
                             type={"partner"}
                         /> : null,
