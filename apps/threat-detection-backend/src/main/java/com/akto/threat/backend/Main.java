@@ -9,6 +9,7 @@ import com.akto.kafka.KafkaConsumerConfig;
 import com.akto.kafka.KafkaProducerConfig;
 import com.akto.kafka.Serializer;
 import com.akto.log.LoggerMaker;
+import com.akto.threat.backend.dao.ThreatDetectionDaoInit;
 import com.akto.threat.backend.service.ApiDistributionDataService;
 import com.akto.threat.backend.service.MaliciousEventService;
 import com.akto.threat.backend.service.ThreatActorService;
@@ -29,8 +30,6 @@ public class Main {
 
   public static void main(String[] args) throws Exception {
 
-    DaoInit.init(new ConnectionString(System.getenv("AKTO_MONGO_CONN")));
-
     ConnectionString connectionString =
         new ConnectionString(System.getenv("AKTO_THREAT_PROTECTION_MONGO_CONN"));
     System.out.println("connectionString: " + connectionString);
@@ -47,6 +46,13 @@ public class Main {
             .build();
 
     MongoClient threatProtectionMongo = MongoClients.create(clientSettings);
+
+    // Initialize legacy DaoInit for AuthenticationInterceptor (ConfigsDao)
+    // ConfigsDao uses CommonContextDao which connects to "common" database
+    DaoInit.init(connectionString);
+
+    ThreatDetectionDaoInit.init(threatProtectionMongo);
+
     KafkaConfig internalKafkaConfig =
         KafkaConfig.newBuilder()
             .setBootstrapServers(System.getenv("THREAT_EVENTS_KAFKA_BROKER_URL"))

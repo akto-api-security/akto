@@ -3,6 +3,7 @@ package com.akto.threat.backend.service;
 import com.akto.dao.MCollection;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.billing.Organization;
+import com.akto.dto.threat_detection_backend.MaliciousEventDto;
 import com.akto.log.LoggerMaker;
 import com.akto.proto.generated.threat_detection.message.sample_request.v1.Metadata;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.DailyActorsCountResponse;
@@ -27,7 +28,6 @@ import com.akto.threat.backend.constants.MongoDBCollection;
 import com.akto.threat.backend.db.ActorInfoModel;
 import com.akto.threat.backend.dto.RateLimitConfigDTO;
 import com.akto.threat.backend.db.SplunkIntegrationModel;
-import com.akto.threat.backend.db.MaliciousEventModel.EventType;
 import com.akto.threat.backend.utils.ThreatUtils;
 import com.google.protobuf.TextFormat;
 import com.mongodb.client.*;
@@ -461,7 +461,7 @@ public class ThreatActorService {
     Bson filters = Filters.eq("refId", refId);
     FindIterable<Document> respList;
 
-    if (request.getEventType().equalsIgnoreCase(EventType.AGGREGATED.name())) {
+    if (request.getEventType().equalsIgnoreCase(MaliciousEventDto.EventType.AGGREGATED.name())) {
         Bson matchConditions = Filters.and(
             Filters.eq("actor", request.getActor()),
             Filters.gte("filterId", request.getFilterId())

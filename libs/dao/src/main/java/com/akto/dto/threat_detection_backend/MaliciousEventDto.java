@@ -1,10 +1,10 @@
-package com.akto.threat.backend.db;
+package com.akto.dto.threat_detection_backend;
 
 import com.akto.dto.type.URLMethods;
 
 import java.util.UUID;
 
-public class MaliciousEventModel {
+public class MaliciousEventDto {
 
   private String id;
   private String filterId;
@@ -44,9 +44,9 @@ public class MaliciousEventModel {
     GUARDRAIL
   }
 
-  public MaliciousEventModel() {}
+  public MaliciousEventDto() {}
 
-  private MaliciousEventModel(Builder builder) {
+  private MaliciousEventDto(Builder builder) {
     this.id = UUID.randomUUID().toString();
     this.filterId = builder.filterId;
     this.actor = builder.actor;
@@ -184,8 +184,8 @@ public class MaliciousEventModel {
       return this;
     }
 
-    public MaliciousEventModel build() {
-      return new MaliciousEventModel(this);
+    public MaliciousEventDto build() {
+      return new MaliciousEventDto(this);
     }
   }
 

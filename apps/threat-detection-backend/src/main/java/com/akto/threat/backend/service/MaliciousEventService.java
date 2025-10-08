@@ -1,5 +1,6 @@
 package com.akto.threat.backend.service;
 
+import com.akto.dto.threat_detection_backend.MaliciousEventDto;
 import com.akto.dto.type.URLMethods;
 import com.akto.kafka.Kafka;
 import com.akto.kafka.KafkaConfig;
@@ -16,7 +17,6 @@ import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.Ti
 import com.akto.proto.generated.threat_detection.service.malicious_alert_service.v1.RecordMaliciousEventRequest;
 import com.akto.threat.backend.constants.KafkaTopic;
 import com.akto.threat.backend.constants.MongoDBCollection;
-import com.akto.threat.backend.db.MaliciousEventModel;
 import com.akto.threat.backend.utils.KafkaUtils;
 import com.akto.threat.backend.utils.ThreatUtils;
 import com.akto.threat.backend.constants.StatusConstants;
@@ -24,7 +24,6 @@ import com.mongodb.client.*;
 import com.mongodb.client.model.Filters;
 
 import java.util.*;
-import java.util.List;
 
 import com.mongodb.client.model.Updates;
 import org.bson.Document;
@@ -45,25 +44,25 @@ public class MaliciousEventService {
   }
 
   // Convert string label to model Label enum
-  private static MaliciousEventModel.Label convertStringLabelToModelLabel(String labelString) {
+  private static MaliciousEventDto.Label convertStringLabelToModelLabel(String labelString) {
     if (labelString == null || labelString.isEmpty()) {
-      return MaliciousEventModel.Label.THREAT; // Default for backward compatibility
+      return MaliciousEventDto.Label.THREAT; // Default for backward compatibility
     }
 
     String normalized = labelString.toUpperCase().trim();
     switch (normalized) {
       case "THREAT":
-        return MaliciousEventModel.Label.THREAT;
+        return MaliciousEventDto.Label.THREAT;
       case "GUARDRAIL":
-        return MaliciousEventModel.Label.GUARDRAIL;
+        return MaliciousEventDto.Label.GUARDRAIL;
       default:
         logger.debug("Unknown label string: " + labelString + ", defaulting to THREAT");
-        return MaliciousEventModel.Label.THREAT;
+        return MaliciousEventDto.Label.THREAT;
     }
   }
 
   // Convert model Label enum to string
-  private static String convertModelLabelToString(MaliciousEventModel.Label modelLabel) {
+  private static String convertModelLabelToString(MaliciousEventDto.Label modelLabel) {
     if (modelLabel == null) {
       return "threat";
     }
@@ -79,11 +78,11 @@ public class MaliciousEventService {
   }
 
   // Helper method to apply label filter with backward compatibility
-  private static void applyLabelFilter(Document query, MaliciousEventModel.Label labelEnum) {
+  private static void applyLabelFilter(Document query, MaliciousEventDto.Label labelEnum) {
     List<Document> orConditions = new ArrayList<>();
     orConditions.add(new Document("label", labelEnum.name()));
 
-    if (labelEnum == MaliciousEventModel.Label.THREAT) {
+    if (labelEnum == MaliciousEventDto.Label.THREAT) {
       // For backward compatibility: treat null/missing label as "threat"
       orConditions.add(new Document("label", new Document("$exists", false)));
       orConditions.add(new Document("label", null));
@@ -112,16 +111,16 @@ public class MaliciousEventService {
 
     EventType eventType = evt.getEventType();
 
-    MaliciousEventModel.EventType maliciousEventType =
+    MaliciousEventDto.EventType maliciousEventType =
         EventType.EVENT_TYPE_AGGREGATED.equals(eventType)
-            ? MaliciousEventModel.EventType.AGGREGATED
-            : MaliciousEventModel.EventType.SINGLE;
+            ? MaliciousEventDto.EventType.AGGREGATED
+            : MaliciousEventDto.EventType.SINGLE;
 
     // Convert string label to model enum
-    MaliciousEventModel.Label label = convertStringLabelToModelLabel(evt.getLabel());
+    MaliciousEventDto.Label label = convertStringLabelToModelLabel(evt.getLabel());
 
-    MaliciousEventModel maliciousEventModel =
-        MaliciousEventModel.newBuilder()
+    MaliciousEventDto maliciousEventModel =
+        MaliciousEventDto.newBuilder()
             .setDetectedAt(evt.getDetectedAt())
             .setActor(actor)
             .setFilterId(filterId)
@@ -149,7 +148,7 @@ public class MaliciousEventService {
   }
 
   private static <T> Set<T> findDistinctFields(
-      MongoCollection<MaliciousEventModel> coll, String fieldName, Class<T> tClass, Bson filters) {
+      MongoCollection<MaliciousEventDto> coll, String fieldName, Class<T> tClass, Bson filters) {
     DistinctIterable<T> r = coll.distinct(fieldName, filters, tClass);
     Set<T> result = new HashSet<>();
     MongoCursor<T> cursor = r.cursor();
@@ -161,10 +160,10 @@ public class MaliciousEventService {
 
   public  ThreatActorFilterResponse fetchThreatActorFilters(
       String accountId, ThreatActorFilterRequest request) {
-    MongoCollection<MaliciousEventModel> coll =
+    MongoCollection<MaliciousEventDto> coll =
         this.mongoClient
             .getDatabase(accountId)
-            .getCollection("malicious_events", MaliciousEventModel.class);
+            .getCollection("malicious_events", MaliciousEventDto.class);
 
     Set<String> latestAttack =
         MaliciousEventService.<String>findDistinctFields(
@@ -183,10 +182,10 @@ public class MaliciousEventService {
 
   public FetchAlertFiltersResponse fetchAlertFilters(
       String accountId, FetchAlertFiltersRequest request) {
-    MongoCollection<MaliciousEventModel> coll =
+    MongoCollection<MaliciousEventDto> coll =
         this.mongoClient
             .getDatabase(accountId)
-            .getCollection("malicious_events", MaliciousEventModel.class);
+            .getCollection("malicious_events", MaliciousEventDto.class);
 
     Set<String> actors =
         MaliciousEventService.<String>findDistinctFields(
@@ -217,11 +216,11 @@ public class MaliciousEventService {
       return ListMaliciousRequestsResponse.newBuilder().build();
     }
 
-    MongoCollection<MaliciousEventModel> coll =
+    MongoCollection<MaliciousEventDto> coll =
         this.mongoClient
             .getDatabase(accountId)
             .getCollection(
-                MongoDBCollection.ThreatDetection.MALICIOUS_EVENTS, MaliciousEventModel.class);
+                MongoDBCollection.ThreatDetection.MALICIOUS_EVENTS, MaliciousEventDto.class);
 
     Document query = new Document();
     if (!filter.getActorsList().isEmpty()) {
@@ -280,12 +279,12 @@ public class MaliciousEventService {
 
     if (filter.hasLabel()) {
       String labelString = filter.getLabel();
-      MaliciousEventModel.Label labelEnum = convertStringLabelToModelLabel(labelString);
+      MaliciousEventDto.Label labelEnum = convertStringLabelToModelLabel(labelString);
       applyLabelFilter(query, labelEnum);
     }
 
     long total = coll.countDocuments(query);
-    try (MongoCursor<MaliciousEventModel> cursor =
+    try (MongoCursor<MaliciousEventDto> cursor =
         coll.find(query)
             .sort(new Document("detectedAt", sort.getOrDefault("detectedAt", -1)))
             .skip(skip)
@@ -293,7 +292,7 @@ public class MaliciousEventService {
             .cursor()) {
       List<ListMaliciousRequestsResponse.MaliciousEvent> maliciousEvents = new ArrayList<>();
       while (cursor.hasNext()) {
-        MaliciousEventModel evt = cursor.next();
+        MaliciousEventDto evt = cursor.next();
         String metadata = evt.getMetadata() != null ? evt.getMetadata() : "";
 
         maliciousEvents.add(
@@ -334,8 +333,8 @@ public class MaliciousEventService {
 
   public int updateMaliciousEventStatus(String accountId, List<String> eventIds, Map<String, Object> filterMap, String status) {
     try {
-      MongoCollection<MaliciousEventModel> coll = getMaliciousEventCollection(accountId);
-      MaliciousEventModel.Status eventStatus = MaliciousEventModel.Status.valueOf(status.toUpperCase());
+      MongoCollection<MaliciousEventDto> coll = getMaliciousEventCollection(accountId);
+      MaliciousEventDto.Status eventStatus = MaliciousEventDto.Status.valueOf(status.toUpperCase());
       Bson update = Updates.set("status", eventStatus.toString());
 
       Document query = buildQuery(eventIds, filterMap, "update");
@@ -357,7 +356,7 @@ public class MaliciousEventService {
 
   public int deleteMaliciousEvents(String accountId, List<String> eventIds, Map<String, Object> filterMap) {
     try {
-      MongoCollection<MaliciousEventModel> coll = getMaliciousEventCollection(accountId);
+      MongoCollection<MaliciousEventDto> coll = getMaliciousEventCollection(accountId);
       
       Document query = buildQuery(eventIds, filterMap, "delete");
       if (query == null) {
@@ -377,11 +376,11 @@ public class MaliciousEventService {
     }
   }
 
-  private MongoCollection<MaliciousEventModel> getMaliciousEventCollection(String accountId) {
+  private MongoCollection<MaliciousEventDto> getMaliciousEventCollection(String accountId) {
     return this.mongoClient
         .getDatabase(accountId)
         .getCollection(
-            MongoDBCollection.ThreatDetection.MALICIOUS_EVENTS, MaliciousEventModel.class);
+            MongoDBCollection.ThreatDetection.MALICIOUS_EVENTS, MaliciousEventDto.class);
   }
 
   private Document buildQuery(List<String> eventIds, Map<String, Object> filterMap, String operation) {
@@ -480,7 +479,7 @@ public class MaliciousEventService {
     // Handle label filter with backward compatibility
     String label = (String) filter.get("label");
     if (label != null && !label.isEmpty()) {
-      MaliciousEventModel.Label labelEnum = convertStringLabelToModelLabel(label);
+      MaliciousEventDto.Label labelEnum = convertStringLabelToModelLabel(label);
       applyLabelFilter(query, labelEnum);
     }
 
