@@ -1,5 +1,5 @@
 
-import { Text, HorizontalStack } from "@shopify/polaris"
+import { Text, HorizontalStack, VerticalStack, Box } from "@shopify/polaris"
 import { useEffect, useReducer, useState } from "react"
 import values from "@/util/values";
 import {produce} from "immer"
@@ -140,40 +140,45 @@ const convertDataIntoTableFormat = (auditRecord, collectionName) => {
             day: 'numeric',
             hour: '2-digit',
             minute: '2-digit',
-            hour12: true
+            hour12: true,
+            timeZone: window.TIME_ZONE === 'Us/Pacific' ? 'America/Los_Angeles' : window.TIME_ZONE
         });
     })() : null
     temp['remarksComp'] = (
         (temp?.remarks === null || temp?.remarks === "" || !temp?.remarks) ? 
-            <span style={{ color: '#D72C0D', fontWeight: 'bold', fontSize: '14px' }}>Pending...</span> : 
-            <div>
+            <Text variant="headingSm" color="critical" fontWeight="bold">Pending...</Text> : 
+            <VerticalStack gap="1">
                 <Text variant="bodyMd">{temp?.remarks}</Text>
                 {temp?.approvalConditions && (
-                    <div style={{marginTop: '4px', fontSize: '12px', color: '#637381'}}>
-                        {(() => {
-                            const approvalDetails = [
-                                { condition: temp?.approvalConditions?.justification, label: 'Justification', value: temp.approvalConditions.justification },
-                                { condition: temp?.approvedAt, label: 'Approved at', value: temp.approvedAtComp },
-                                { condition: temp?.expiresAtComp, label: 'Expires At', value: temp.expiresAtComp },
-                                { condition: temp?.approvalConditions?.allowedIps, label: 'Allowed IPs', value: temp.approvalConditions.allowedIps?.join(', ') },
-                                { condition: temp?.approvalConditions?.allowedIpRange, label: 'Allowed IP Ranges', value: temp.approvalConditions.allowedIpRange },
-                                { condition: temp?.approvalConditions?.allowedUsers, label: 'Allowed Users', value: temp.approvalConditions.allowedUsers?.join(', ') }
-                            ];
-                            
-                            const elements = [];
-                            for (let i = 0; i < approvalDetails.length; i++) {
-                                const detail = approvalDetails[i];
-                                if (detail.condition) {
-                                    elements.push(
-                                        <div key={i}><strong>{detail.label}:</strong> {detail.value}</div>
-                                    );
+                    <Box paddingBlockStart="1">
+                        <VerticalStack gap="0">
+                            {(() => {
+                                const approvalDetails = [
+                                    { condition: temp?.approvalConditions?.justification, label: 'Justification', value: temp.approvalConditions.justification },
+                                    { condition: temp?.approvedAt, label: 'Approved at', value: temp.approvedAtComp },
+                                    { condition: temp?.expiresAtComp, label: 'Expires At', value: temp.expiresAtComp },
+                                    { condition: temp?.approvalConditions?.allowedIps, label: 'Allowed IPs', value: temp.approvalConditions.allowedIps?.join(', ') },
+                                    { condition: temp?.approvalConditions?.allowedIpRange, label: 'Allowed IP Ranges', value: temp.approvalConditions.allowedIpRange },
+                                    { condition: temp?.approvalConditions?.allowedUsers, label: 'Allowed Users', value: temp.approvalConditions.allowedUsers?.join(', ') }
+                                ];
+                                
+                                const elements = [];
+                                for (let i = 0; i < approvalDetails.length; i++) {
+                                    const detail = approvalDetails[i];
+                                    if (detail.condition) {
+                                        elements.push(
+                                            <Text key={i} variant="bodySm" color="subdued">
+                                                <Text as="span" fontWeight="medium">{detail.label}:</Text> {detail.value}
+                                            </Text>
+                                        );
+                                    }
                                 }
-                            }
-                            return elements;
-                        })()}
-                    </div>
+                                return elements;
+                            })()}
+                        </VerticalStack>
+                    </Box>
                 )}
-            </div>
+            </VerticalStack>
     )
     temp['collectionName'] = collectionName;
     return temp;
