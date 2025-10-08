@@ -9,6 +9,7 @@ import com.akto.kafka.KafkaConsumerConfig;
 import com.akto.kafka.KafkaProducerConfig;
 import com.akto.kafka.Serializer;
 import com.akto.log.LoggerMaker;
+import com.akto.threat.backend.dao.MaliciousEventDao;
 import com.akto.threat.backend.dao.ThreatDetectionDaoInit;
 import com.akto.threat.backend.service.ApiDistributionDataService;
 import com.akto.threat.backend.service.MaliciousEventService;
@@ -72,10 +73,10 @@ public class Main {
     new FlushMessagesToDB(internalKafkaConfig, threatProtectionMongo).run();
 
     MaliciousEventService maliciousEventService =
-        new MaliciousEventService(internalKafkaConfig, threatProtectionMongo);
+        new MaliciousEventService(internalKafkaConfig, MaliciousEventDao.instance);
 
-    ThreatActorService threatActorService = new ThreatActorService(threatProtectionMongo);
-    ThreatApiService threatApiService = new ThreatApiService(threatProtectionMongo);
+    ThreatActorService threatActorService = new ThreatActorService(threatProtectionMongo, MaliciousEventDao.instance);
+    ThreatApiService threatApiService = new ThreatApiService(MaliciousEventDao.instance);
     ApiDistributionDataService apiDistributionDataService = new ApiDistributionDataService(threatProtectionMongo);
 
     new BackendVerticle(maliciousEventService, threatActorService, threatApiService, apiDistributionDataService).start();
