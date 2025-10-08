@@ -300,6 +300,47 @@ const settingRequests = {
         })
     },
 
+    // Azure DevOps Integration Methods
+    fetchAzureAdoIntegration() {
+        return request({
+            url: '/api/fetchAzureAdoIntegration',
+            method: 'post',
+            data: {}
+        })
+    },
+
+    fetchAzureAdoStatusMapping(projId, workItemType, organizationUrl, personalAccessToken){
+        return request({
+            url: '/api/azureado/fetchProjectStates',
+            method: 'post',
+            data: {projId, workItemType, organizationUrl, personalAccessToken}
+        })
+    },
+
+    addAzureAdoIntegrationV2(data) {
+        return request({
+            url: '/api/azureado/add',
+            method: 'post',
+            data: {...data}
+        })
+    },
+
+    deleteAzureAdoIntegratedProject(projId) {
+        return request({
+            url: '/api/azureado/delete',
+            method: 'post',
+            data: {projId}
+        })
+    },
+
+    testAzureAdoIntegration(organizationUrl, personalAccessToken, projId, workItemType) {
+        return request({
+            url: '/api/testAzureAdoIntegration',
+            method: 'post',
+            data: {organizationUrl, personalAccessToken, projId, workItemType}
+        })
+    },
+
     addOktaSso(clientId, clientSecret, authorisationServerId, oktaDomain, redirectUri) {
         return request({
             url: '/api/addOktaSso',
