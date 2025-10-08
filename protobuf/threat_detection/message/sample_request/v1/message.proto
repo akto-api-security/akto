@@ -25,8 +25,9 @@ message SampleMaliciousRequest {
   int32 api_collection_id = 5;
   string payload = 6;
   string filter_id = 7;
-  Metadata metadata = 8; 
+  Metadata metadata = 8;
   bool successful_exploit = 9;
+  string label = 10;  // Common values: "threat", "guardrail"
 }
 
 message SampleRequestKafkaEnvelope {

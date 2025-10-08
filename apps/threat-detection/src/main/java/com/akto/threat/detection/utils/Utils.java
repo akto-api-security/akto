@@ -40,12 +40,12 @@ public class Utils {
         return ipApiRateLimitFilter;
     }
 
-    public static SampleMaliciousRequest buildSampleMaliciousRequest(String actor, HttpResponseParams responseParam, FilterConfig apiFilter, RawApiMetadata metadata, List<SchemaConformanceError> errors, boolean successfulExploit) {
+    public static SampleMaliciousRequest buildSampleMaliciousRequest(String actor, HttpResponseParams responseParam, FilterConfig apiFilter, RawApiMetadata metadata, List<SchemaConformanceError> errors, boolean successfulExploit, String label) {
         Metadata.Builder metadataBuilder = Metadata.newBuilder();
         if(errors != null && !errors.isEmpty()) {
             metadataBuilder.addAllSchemaErrors(errors);
         }
-        
+
         SampleMaliciousRequest.Builder maliciousReqBuilder = SampleMaliciousRequest.newBuilder()
             .setUrl(responseParam.getRequestParams().getURL())
             .setMethod(responseParam.getRequestParams().getMethod())
@@ -54,7 +54,8 @@ public class Utils {
             .setApiCollectionId(responseParam.getRequestParams().getApiCollectionId())
             .setTimestamp(responseParam.getTime())
             .setFilterId(apiFilter.getId())
-            .setSuccessfulExploit(successfulExploit);
+            .setSuccessfulExploit(successfulExploit)
+            .setLabel(label);
 
         metadataBuilder.setCountryCode(metadata.getCountryCode());
         maliciousReqBuilder.setMetadata(metadataBuilder.build());

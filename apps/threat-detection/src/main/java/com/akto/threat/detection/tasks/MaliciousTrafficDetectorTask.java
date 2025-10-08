@@ -29,6 +29,7 @@ import com.akto.dto.HttpRequestParams;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.RawApi;
 import com.akto.dto.RawApiMetadata;
+import com.akto.dto.threat_detection_backend.MaliciousEventDto;
 import com.akto.dto.api_protection_parse_layer.AggregationRules;
 import com.akto.dto.api_protection_parse_layer.Rule;
 import com.akto.dto.monitoring.FilterConfig;
@@ -314,7 +315,7 @@ public class MaliciousTrafficDetectorTask implements Task {
 
         // Send event to BE.
         SampleMaliciousRequest maliciousReq = Utils.buildSampleMaliciousRequest(actor, responseParam,
-            ipApiRateLimitFilter, metadata, errors, successfulExploit);
+            ipApiRateLimitFilter, metadata, errors, successfulExploit, MaliciousEventDto.Label.THREAT.name().toLowerCase());
         generateAndPushMaliciousEventRequest(ipApiRateLimitFilter, actor, responseParam, maliciousReq,
             EventType.EVENT_TYPE_AGGREGATED);
 
@@ -374,7 +375,7 @@ public class MaliciousTrafficDetectorTask implements Task {
 
         SampleMaliciousRequest maliciousReq = null;
         if (!isAggFilter || !apiFilter.getInfo().getSubCategory().equalsIgnoreCase("API_LEVEL_RATE_LIMITING")) {
-          maliciousReq = Utils.buildSampleMaliciousRequest(actor, responseParam, apiFilter, metadata, errors, successfulExploit);
+          maliciousReq = Utils.buildSampleMaliciousRequest(actor, responseParam, apiFilter, metadata, errors, successfulExploit, MaliciousEventDto.Label.THREAT.name().toLowerCase());
         }
 
         if (!isAggFilter) {
@@ -392,7 +393,7 @@ public class MaliciousTrafficDetectorTask implements Task {
               }
               shouldNotify = this.apiCountWindowBasedThresholdNotifier.calcApiCount(apiHitCountKey, responseParam.getTime(), rule);
               if (shouldNotify) {
-                maliciousReq = Utils.buildSampleMaliciousRequest(actor, responseParam, apiFilter, metadata, errors, successfulExploit);
+                maliciousReq = Utils.buildSampleMaliciousRequest(actor, responseParam, apiFilter, metadata, errors, successfulExploit, MaliciousEventDto.Label.THREAT.name().toLowerCase());
               }
           } else {
               shouldNotify = this.windowBasedThresholdNotifier.shouldNotify(aggKey, maliciousReq, rule);
@@ -437,6 +438,7 @@ public class MaliciousTrafficDetectorTask implements Task {
             .setMetadata(maliciousReq.getMetadata())
             .setType("Rule-Based")
             .setSuccessfulExploit(maliciousReq.getSuccessfulExploit())
+            .setLabel(maliciousReq.getLabel())
             .build();
     MaliciousEventKafkaEnvelope envelope =
         MaliciousEventKafkaEnvelope.newBuilder()
