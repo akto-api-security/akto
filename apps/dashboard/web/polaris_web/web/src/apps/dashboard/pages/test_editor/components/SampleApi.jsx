@@ -146,7 +146,7 @@ const SampleApi = () => {
 
     useEffect(()=> {
         if(testResult){
-            let temp = testResult?.agentConversationResults.length > 0;
+            let temp =  testResult?.agentConversationResults ? testResult?.agentConversationResults?.length > 0 : false;
             setShowTestResult(!temp);
             setChatBotModal(temp);
             
