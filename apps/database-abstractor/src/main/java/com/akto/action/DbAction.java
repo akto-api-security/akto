@@ -409,6 +409,20 @@ public class DbAction extends ActionSupport {
         return Action.SUCCESS.toUpperCase();
     }
 
+    String transportType;
+    public String updateTransportType() {
+        try {
+            ApiCollection apiCollection = ApiCollectionsDao.instance.getMeta(apiCollectionId);
+            if (apiCollection != null) {
+                ApiCollectionsDao.instance.updateTransportType(apiCollection, transportType);
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "error in updateTransportType " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
     public String updateModuleInfo() {
         try {
             DbLayer.updateModuleInfo(moduleInfo);
@@ -4108,5 +4122,13 @@ public class DbAction extends ActionSupport {
 
     public void setUrlType(String urlType) {
         this.urlType = urlType;
+    }
+
+    public String getTransportType() {
+        return transportType;
+    }
+
+    public void setTransportType(String transportType) {
+        this.transportType = transportType;
     }
 }
