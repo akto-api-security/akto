@@ -1,0 +1,107 @@
+{
+	# Global options
+	admin localhost:2019
+	log {
+		level INFO
+	}
+}
+
+# MCP Proxy configuration
+:8080 {
+	# Log access
+	log {
+		output stdout
+		format console
+	}
+
+	# Handle Kite MCP proxy - all paths under /proxy/kite
+	handle /proxy/kite/* {
+		route {
+			# Threat detector reads config from environment variables
+			threat_detector
+
+			# Add CORS headers for browser-based MCP clients
+			header {
+				Access-Control-Allow-Origin *
+				Access-Control-Allow-Methods "GET, POST, OPTIONS"
+				Access-Control-Allow-Headers "Content-Type, Accept, Authorization"
+			}
+
+			# Strip /proxy/kite prefix and forward to Kite MCP server
+			uri strip_prefix /proxy/kite
+			
+			reverse_proxy https://mcp.kite.trade {
+				header_up Host mcp.kite.trade
+				header_up Accept text/event-stream
+				
+				# Preserve SSE headers
+				header_down Cache-Control "no-cache"
+				header_down X-Accel-Buffering "no"
+				
+				# Handle SSE - no buffering, extended timeouts for streaming
+				flush_interval -1
+				transport http {
+					read_timeout 300s
+					write_timeout 300s
+					dial_timeout 30s
+				}
+			}
+			
+		}
+	}
+
+	# Handle GitHub MCP proxy - all paths under /proxy/github  
+	handle /proxy/github/* {
+		route {
+			# Threat detector reads config from environment variables
+			threat_detector
+
+			# Add CORS headers for browser-based MCP clients
+			header {
+				Access-Control-Allow-Origin *
+				Access-Control-Allow-Methods "GET, POST, OPTIONS"
+				Access-Control-Allow-Headers "Content-Type, Accept, Authorization"
+			}
+
+			# Strip /proxy/github prefix and forward to GitHub MCP server
+			uri strip_prefix /proxy/github
+			
+			reverse_proxy https://api.githubcopilot.com {
+				header_up Host api.githubcopilot.com
+				header_up Accept text/event-stream
+				
+				# Preserve SSE headers
+				header_down Cache-Control "no-cache"
+				header_down X-Accel-Buffering "no"
+				
+				# Handle SSE streaming - no buffering
+				flush_interval -1
+			}
+			
+		}
+	}
+
+	# Handle OPTIONS preflight requests
+	handle /* {
+		@options method OPTIONS
+		handle @options {
+			header {
+				Access-Control-Allow-Origin *
+				Access-Control-Allow-Methods "GET, POST, OPTIONS"
+				Access-Control-Allow-Headers "Content-Type, Accept, Authorization"
+				Access-Control-Max-Age "3600"
+			}
+			respond "" 204
+		}
+	}
+
+	# Health check endpoint
+	handle /health {
+		respond "OK" 200
+	}
+
+	# Default response
+	handle {
+		respond "Not Found" 404
+	}
+}
