@@ -104,6 +104,9 @@ public class TestingRunResultDao extends AccountsContextDao<TestingRunResult> {
 
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), new String[]{TestingRunResult.END_TIMESTAMP}, false);
 
+    // add index for apiErrors map field for querying error flags/counts
+    MCollection.createIndexIfAbsent(getDBName(), getCollName(), new String[]{TestingRunResult.API_ERRORS}, false);
+
         String[] fieldNames = new String[]{TestingRunResult.END_TIMESTAMP, TestResult.TEST_RESULTS_ERRORS};
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, false);
 
