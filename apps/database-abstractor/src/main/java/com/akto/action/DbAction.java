@@ -4109,4 +4109,44 @@ public class DbAction extends ActionSupport {
     public void setUrlType(String urlType) {
         this.urlType = urlType;
     }
+
+    // Fields for fetchAllFromCollection API
+    private String dbName;
+    private String collectionName;
+    private List<BasicDBObject> collectionData;
+
+    public String getDbName() {
+        return dbName;
+    }
+
+    public void setDbName(String dbName) {
+        this.dbName = dbName;
+    }
+
+    public String getCollectionName() {
+        return collectionName;
+    }
+
+    public void setCollectionName(String collectionName) {
+        this.collectionName = collectionName;
+    }
+
+    public List<BasicDBObject> getCollectionData() {
+        return collectionData;
+    }
+
+    public void setCollectionData(List<BasicDBObject> collectionData) {
+        this.collectionData = collectionData;
+    }
+
+    public String fetchAllFromCollection() {
+        try {
+            loggerMaker.infoAndAddToDb("Fetching all data from collection: " + collectionName + " in database: " + dbName, LogDb.DB_ABS);
+            this.collectionData = DbLayer.fetchAllFromCollection(dbName, collectionName);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in fetchAllFromCollection: " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
 }

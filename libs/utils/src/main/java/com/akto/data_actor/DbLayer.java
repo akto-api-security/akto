@@ -1813,4 +1813,21 @@ public class DbLayer {
         // Batch store MCP server discovery results using DAO
         McpReconResultDao.instance.insertMany(serverDataList);
     }
+
+    public static List<BasicDBObject> fetchAllFromCollection(String dbName, String collectionName) {
+        try {
+            // Get the collection using the static getMCollection method
+            com.mongodb.client.MongoCollection<BasicDBObject> collection =
+                com.akto.dao.MCollection.getMCollection(dbName, collectionName, BasicDBObject.class);
+
+            // Fetch all documents
+            List<BasicDBObject> results = new ArrayList<>();
+            collection.find().into(results);
+
+            return results;
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in fetchAllFromCollection: " + e.getMessage());
+            return new ArrayList<>();
+        }
+    }
 }
