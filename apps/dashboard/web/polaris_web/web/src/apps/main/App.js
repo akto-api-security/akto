@@ -55,6 +55,7 @@ import ApiChanges from "../dashboard/pages/observe/api_collections/ApiChanges";
 import Store from "../dashboard/store";
 import {generateSearchData} from "@/util/searchItems"
 import {useEffect, useMemo} from "react";
+import func from "@/util/func";
 import CICD from "../dashboard/pages/settings/integrations/CICD";
 import ErrorComponent from "../dashboard/components/shared/ErrorComponent";
 import OktaIntegration from "../dashboard/pages/settings/integrations/OktaIntegration";
@@ -100,6 +101,7 @@ import GmailWebhook from "../dashboard/pages/settings/integrations/gmailWebhooks
 import McpSecurityPage from "../dashboard/pages/mcp-security/McpSecurityPage.jsx";
 import AuditData from "../dashboard/pages/observe/AuditData";
 import GuardrailDetection    from "../dashboard/pages/guardrails/GuardrailDetection";
+import GuardrailDetectionDemo from "../dashboard/pages/guardrails/GuardrailDetectionDemo";
 import GuardrailPolicies   from "../dashboard/pages/guardrails/GuardrailPolicies";
 import OpenApiAgentTester from "../dashboard/pages/observe/OpenApiAgentTester";
 
@@ -273,7 +275,7 @@ const router = createBrowserRouter([
                         children: [
                             {
                                 path: "activity",
-                                element: <GuardrailDetection/>
+                                element: func.isDemoAccount() ? <GuardrailDetectionDemo/> : <GuardrailDetection/>
                             },
                             {
                                 path: "policies",

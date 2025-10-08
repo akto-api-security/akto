@@ -25,6 +25,7 @@ public class MaliciousEventDto {
   private String metadata;
   private Boolean successfulExploit;
   private Status status;
+  private Label label;
 
 
   public enum EventType {
@@ -36,6 +37,11 @@ public class MaliciousEventDto {
     ACTIVE,
     UNDER_REVIEW,
     IGNORED
+  }
+
+  public enum Label {
+    THREAT,
+    GUARDRAIL
   }
 
   public MaliciousEventDto() {}
@@ -59,6 +65,7 @@ public class MaliciousEventDto {
     this.refId = builder.refId;
     this.status = builder.status != null ? builder.status : Status.ACTIVE;
     this.successfulExploit = builder.successfulExploit;
+    this.label = builder.label;
   }
 
   public static class Builder {
@@ -77,9 +84,10 @@ public class MaliciousEventDto {
     private String refId;
     private String type;
     private String severity;
-    private String metadata; 
+    private String metadata;
     private Status status;
     private Boolean successfulExploit;
+    private Label label;
 
     public Builder setFilterId(String filterId) {
       this.filterId = filterId;
@@ -168,6 +176,11 @@ public class MaliciousEventDto {
 
     public Builder setStatus(Status status) {
       this.status = status;
+      return this;
+    }
+
+    public Builder setLabel(Label label) {
+      this.label = label;
       return this;
     }
 
@@ -330,6 +343,14 @@ public class MaliciousEventDto {
 
   public void setStatus(Status status) {
     this.status = status;
+  }
+
+  public Label getLabel() {
+    return label;
+  }
+
+  public void setLabel(Label label) {
+    this.label = label;
   }
 
 }

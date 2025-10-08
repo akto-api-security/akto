@@ -196,17 +196,6 @@ public class ImpervaSchemaParser {
         return VALID_CONTENT_TYPES.contains(contentType);
     }
 
-    /**
-     * Checks if content-type is XML or SOAP based.
-     */
-    private static boolean isXmlContentType(String contentType) {
-        return contentType != null && (
-            contentType.contains("xml") ||
-            contentType.contains("soap")
-        );
-    }
-
-
     private static List<Pair<String, String>> generateSamples(
         ParameterDrillDown bodyParam,
         String contentType,
@@ -236,9 +225,7 @@ public class ImpervaSchemaParser {
     }
 
     private static String generatePayloadString(Object sampleData, String contentType) throws Exception {
-        if (isXmlContentType(contentType)) {
-            return generateXmlString(sampleData);
-        } else if (contentType.contains("yaml")) {
+        if (contentType.contains("yaml")) {
             return generateYamlString(sampleData);
         } else if (contentType.contains("x-www-form-urlencoded")) {
             return generateFormUrlencodedString(sampleData);

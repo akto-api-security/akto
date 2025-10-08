@@ -1179,6 +1179,10 @@ function ApiEndpoints(props) {
         </Modal>
     )
 
+    const canShowTags = () => {
+        return isApiGroup || isQueryPage;
+    }
+
     const apiEndpointTable = [<GithubSimpleTable
         key={currentKey}
         pageLimit={50}
@@ -1188,7 +1192,7 @@ function ApiEndpoints(props) {
         filters={[]}
         disambiguateLabel={disambiguateLabel}
         headers={headers.filter(x => {
-            if (!isApiGroup && (x.text === 'Collection' || x.text === 'Tags')) {
+            if (!canShowTags() && (x.text === 'Collection' || x.text === 'Tags')) {
                 return false;
             }
             return true;
@@ -1200,7 +1204,7 @@ function ApiEndpoints(props) {
         getFilteredItems={getFilteredItems}
         mode={IndexFiltersMode.Default}
         headings={headings.filter(x => {
-            if (!isApiGroup && (x.text === 'Collection' || x.text === 'Tags')) {
+            if (!canShowTags() && (x.text === 'Collection' || x.text === 'Tags')) {
                 return false;
             }
             return true;

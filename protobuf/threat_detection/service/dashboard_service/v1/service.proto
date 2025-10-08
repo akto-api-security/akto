@@ -29,6 +29,7 @@ message ListMaliciousRequestsResponse {
       string metadata = 17;
       string status = 18;
       bool successful_exploit = 19;
+      string label = 20;  // Common values: "threat", "guardrail"
     }
     repeated MaliciousEvent malicious_events = 1;
     uint64 total = 2;
@@ -50,6 +51,7 @@ message ListMaliciousRequestsRequest {
       repeated string latest_attack = 7;
       optional string status_filter = 8;
       optional bool successful_exploit = 9;
+      optional string label = 10;  // Common values: "threat", "guardrail"
     }
 
     // The number of alerts to return

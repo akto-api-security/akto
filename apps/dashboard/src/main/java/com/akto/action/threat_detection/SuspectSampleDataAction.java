@@ -51,7 +51,8 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
   int startTimestamp, endTimestamp;
   List<String> types;
   List<String> latestAttack;
-  Boolean successfulExploit; 
+  Boolean successfulExploit;
+  @Getter @Setter String label;
   @Getter @Setter String eventId;
   @Getter @Setter String status;
   @Getter @Setter boolean updateSuccess;
@@ -104,6 +105,10 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
 
     if (this.successfulExploit != null) {
       filter.put("successfulExploit", this.successfulExploit);
+    }
+
+    if (this.label != null && !this.label.isEmpty()) {
+      filter.put("label", this.label);
     }
 
     List<String> templates = getTemplates(latestAttack);
@@ -164,7 +169,8 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
                             smr.getPayload(),
                             smr.getMetadata(),
                             smr.getSuccessfulExploit(),
-                            smr.getStatus()))
+                            smr.getStatus(),
+                            smr.getLabel()))
                     .collect(Collectors.toList());
                 this.total = m.getTotal();
               });
@@ -241,12 +247,16 @@ public class SuspectSampleDataAction extends AbstractThreatDetectionAction {
     if (this.types != null && !this.types.isEmpty()) {
       filterBuilder.addAllTypes(this.types);
     }
-    if (this.latestAttack != null && !this.latestAttack.isEmpty()) {
-      List<String> templates = getTemplates(latestAttack);
+    // Always populate latestAttack with available templates, even if empty
+    List<String> templates = getTemplates(latestAttack);
+    if (!templates.isEmpty()) {
       filterBuilder.addAllLatestAttack(templates);
     }
     if (this.statusFilter != null) {
       filterBuilder.setStatusFilter(this.statusFilter);
+    }
+    if (this.label != null && !this.label.isEmpty()) {
+      filterBuilder.setLabel(this.label);
     }
 
     if (this.startTimestamp > 0 || this.endTimestamp > 0) {
