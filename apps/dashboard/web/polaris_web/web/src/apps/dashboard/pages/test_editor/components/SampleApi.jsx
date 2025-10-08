@@ -1,4 +1,4 @@
-import { Box, Button, Divider, Frame, HorizontalStack, LegacyTabs, Modal, Text, Tooltip} from "@shopify/polaris"
+import { Badge, Box, Button, Divider, Frame, HorizontalStack, LegacyTabs, Modal, Text, Tooltip, VerticalStack} from "@shopify/polaris"
 import {ChevronUpMinor } from "@shopify/polaris-icons"
 
 import { useEffect, useRef, useState } from "react";
@@ -18,6 +18,8 @@ import EmptySampleApi from "./EmptySampleApi";
 import Store from "../../../store";
 import ChatContainer from "../../../components/shared/ChatContainer";
 import ChatInterface from "../../../components/shared/ChatInterface";
+import LocalStore from "../../../../main/LocalStorageStore";
+import observeFunc from "../../observe/transform"
 
 const SampleApi = () => {
 
@@ -51,6 +53,7 @@ const SampleApi = () => {
 
     const [isChatBotOpen, setIsChatBotOpen] = useState(false)
     const [chatBotModal, setChatBotModal] = useState(false)
+    const subCategoryMap = LocalStore(state => state.subCategoryMap)
 
     useEffect(()=>{
         if(showEmptyLayout) return
@@ -385,6 +388,8 @@ const SampleApi = () => {
 
     )
 
+    const currentSeverity = selectedTest?.value !== undefined ? subCategoryMap[selectedTest?.value]?.superCategory?.severity._name : "HIGH";
+
     return (
         <div>
             <div className="editor-header">
@@ -489,8 +494,22 @@ const SampleApi = () => {
                 title="Chat with the agent"
                 large
             >
+                
                 <Modal.Section>
-                    {conversationsList?.length > 0 ? <ChatInterface conversations={conversationsList} sort={false}/> : <ChatContainer/>}
+                    <VerticalStack gap={"8"}>
+                        <VerticalStack gap={"4"}>
+                            <Box padding={"4"}>
+                                <HorizontalStack gap={"2"} wrap={false}>
+                                    <Text variant="headingMd" alignment="start" breakWord>{selectedTest?.label}</Text>
+                                    {testResult?.testingRunResult?.vulnerable === true ? <Box className={`badge-wrapper-${currentSeverity}`}><Badge size="medium" status={observeFunc.getColor(currentSeverity)}>{currentSeverity}</Badge></Box> : null}
+                                </HorizontalStack>
+                                <br/>
+                                <Divider/> 
+                            </Box>
+                            
+                        </VerticalStack>
+                        {conversationsList?.length > 0 ? <ChatInterface conversations={conversationsList} sort={false}/> : <ChatContainer/>}
+                    </VerticalStack>
                 </Modal.Section>
                 
             </Modal>
