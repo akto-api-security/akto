@@ -45,6 +45,7 @@ import com.akto.notifications.slack.SlackSender;
 import com.akto.util.enums.GlobalEnums;
 import com.akto.utils.CustomAuthUtil;
 import com.akto.utils.KafkaUtils;
+import com.akto.utils.LokiForwarder;
 import com.akto.utils.RedactAlert;
 import com.akto.utils.SampleDataLogs;
 import com.akto.dto.type.URLMethods;
@@ -136,6 +137,10 @@ public class DbAction extends ActionSupport {
     
     @Getter @Setter
     private List<McpReconResult> serverDataList;
+
+    // Cyborg logging fields
+    @Getter @Setter
+    private String logBatch;
 
     private ModuleInfo moduleInfo;
 
@@ -4108,5 +4113,29 @@ public class DbAction extends ActionSupport {
 
     public void setUrlType(String urlType) {
         this.urlType = urlType;
+    }
+
+    /**
+     * Receives log batches from mini-runtime and forwards to Loki
+     * Expected format: NDJSON (newline-delimited JSON)
+     * Each line: {"timestamp":..., "level":"...", "message":"...", ...}
+     */
+    public String receiveCyborgLogBatch() {
+        try {
+            if (logBatch == null || logBatch.isEmpty()) {
+                loggerMaker.errorAndAddToDb("Empty log batch received", LogDb.DB_ABS);
+                return Action.ERROR.toUpperCase();
+            }
+
+            loggerMaker.infoAndAddToDb("Received log batch of size: " + logBatch.length() + " bytes", LogDb.DB_ABS);
+
+            // Forward to Loki
+            LokiForwarder.forwardBatch(logBatch);
+
+            return Action.SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in receiveCyborgLogBatch: " + e.getMessage(), LogDb.DB_ABS);
+            return Action.ERROR.toUpperCase();
+        }
     }
 }
