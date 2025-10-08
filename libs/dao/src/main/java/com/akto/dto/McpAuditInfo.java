@@ -1,5 +1,6 @@
 package com.akto.dto;
 
+import java.util.Map;
 import java.util.Set;
 
 import org.bson.codecs.pojo.annotations.BsonIgnore;
@@ -26,6 +27,10 @@ public class McpAuditInfo {
     private String remarks;
     private Set<ApiInfo.ApiAccessType> apiAccessTypes;
     private int hostCollectionId;
+    
+    // Conditional approval fields
+    private Map<String, Object> approvalConditions;
+    private String justification;
 
     public String getHexId() {
         return this.id.toHexString();

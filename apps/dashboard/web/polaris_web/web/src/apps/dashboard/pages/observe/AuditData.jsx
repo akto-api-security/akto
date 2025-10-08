@@ -11,8 +11,10 @@ import GithubServerTable from "../../components/tables/GithubServerTable";
 import { MethodBox } from "./GetPrettifyEndpoint";
 import { CellType } from "../../components/tables/rows/GithubRow";
 import { CircleTickMajor, CircleCancelMajor } from "@shopify/polaris-icons";
+import { Icon } from "@shopify/polaris";
 import settingRequests from "../settings/api";
 import PersistStore from "../../../main/PersistStore";
+import ConditionalApprovalModal from "../../components/modals/ConditionalApprovalModal";
 
 const headings = [
     {
@@ -129,8 +131,45 @@ const convertDataIntoTableFormat = (auditRecord, collectionName) => {
     temp['apiAccessTypesComp'] = temp?.apiAccessTypes && temp?.apiAccessTypes.length > 0 && temp?.apiAccessTypes.join(', ') ;
     temp['lastDetectedComp'] = func.prettifyEpoch(temp?.lastDetected)
     temp['updatedTimestampComp'] = func.prettifyEpoch(temp?.updatedTimestamp)
+    temp['expiresAtComp'] = temp?.approvalConditions?.expiresAt ? (() => {
+        const expirationDate = new Date(temp.approvalConditions.expiresAt * 1000);
+        return expirationDate.toLocaleString('en-US', {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: true
+        });
+    })() : null
     temp['remarksComp'] = (
-        temp?.remarks === null? <Text variant="headingSm" color="critical">Pending...</Text> : <Text variant="bodyMd">{temp?.remarks}</Text>
+        (temp?.remarks === null || temp?.remarks === "" || !temp?.remarks) ? 
+            <span style={{ color: '#D72C0D', fontWeight: 'bold', fontSize: '14px' }}>Pending...</span> : 
+            <div>
+                <Text variant="bodyMd">{temp?.remarks}</Text>
+                {temp?.approvalConditions && (
+                    <div style={{marginTop: '4px', fontSize: '12px', color: '#637381'}}>
+                        {temp?.justification && (
+                            <div><strong>Justification:</strong> {temp.justification}</div>
+                        )}
+                        {temp?.updatedTimestamp && (
+                            <div><strong>Approved at:</strong> {temp.updatedTimestampComp}</div>
+                        )}
+                        {temp?.expiresAtComp && (
+                            <div><strong>Expires At:</strong> {temp.expiresAtComp}</div>
+                        )}
+                        {temp?.approvalConditions?.allowedIps && (
+                            <div><strong>Allowed IPs:</strong> {temp.approvalConditions.allowedIps.join(', ')}</div>
+                        )}
+                        {temp?.approvalConditions?.allowedIpRange && (
+                            <div><strong>Allowed IP Ranges:</strong> {temp.approvalConditions.allowedIpRange}</div>
+                        )}
+                        {temp?.approvalConditions?.allowedUsers && (
+                            <div><strong>Allowed Users:</strong> {temp.approvalConditions.allowedUsers.join(', ')}</div>
+                        )}
+                    </div>
+                )}
+            </div>
     )
     temp['collectionName'] = collectionName;
     return temp;
@@ -138,6 +177,8 @@ const convertDataIntoTableFormat = (auditRecord, collectionName) => {
 
 function AuditData() {
     const [loading, setLoading] = useState(true);
+    const [modalOpen, setModalOpen] = useState(false);
+    const [selectedAuditItem, setSelectedAuditItem] = useState(null);
 
     const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), values.ranges[5]);
     const getTimeEpoch = (key) => {
@@ -166,16 +207,33 @@ function AuditData() {
         window.location.reload();
     }
 
+    const updateAuditDataWithConditions = async (hexId, approvalData) => {
+        await api.updateAuditData(hexId, null, approvalData)
+        window.location.reload();
+    }
+
+    // Custom colored icons
+    const GreenTickIcon = () => <Icon source={CircleTickMajor} tone="success" />;
+    const RedCancelIcon = () => <Icon source={CircleCancelMajor} tone="critical" />;
+
     const getActionsList = (item) => {
         return [{title: 'Actions', items: [
             {
-                content: 'Mark as resolved',
-                icon: CircleTickMajor,
+                content: <span style={{ color: '#008060' }}>Conditional Approval</span>,
+                icon: GreenTickIcon,
+                onAction: () => {
+                    setSelectedAuditItem(item);
+                    setModalOpen(true);
+                },
+            },
+            {
+                content: <span style={{ color: '#008060' }}>Mark as resolved</span>,
+                icon: GreenTickIcon,
                 onAction: () => {updateAuditData(item.hexId, "Approved")},
             },
             {
-                content: 'Disapprove',
-                icon: CircleCancelMajor,
+                content: <span style={{ color: '#D72C0D' }}>Disapprove</span>,
+                icon: RedCancelIcon,
                 onAction: () => {updateAuditData(item.hexId, "Rejected")},
             }
         ]}]
@@ -235,36 +293,48 @@ function AuditData() {
     )
 
     return (
-        <PageWithMultipleCards
-        title={
-            <Text as="div" variant="headingLg">
-            Audit Data
-          </Text>
-        }
-        backUrl="/dashboard/observe"
-        primaryAction={primaryActions}
-        components = {[
-            <GithubServerTable
-                key={startTimestamp + endTimestamp + filters[1].choices.length}
-                headers={headings}
-                resourceName={resourceName} 
-                appliedFilters={[]}
-                sortOptions={sortOptions}
-                disambiguateLabel={disambiguateLabel}
-                loading={loading}
-                fetchData={fetchData}
-                filters={filters}
-                hideQueryField={false}
-                getStatus={func.getTestResultStatus}
-                useNewRow={true}
-                condensedHeight={true}
-                pageLimit={20}
-                headings={headings}
-                getActions = {(item) => getActionsList(item)}
-                hasRowActions={true}
+        <>
+            <PageWithMultipleCards
+            title={
+                <Text as="div" variant="headingLg">
+                Audit Data
+              </Text>
+            }
+            backUrl="/dashboard/observe"
+            primaryAction={primaryActions}
+            components = {[
+                <GithubServerTable
+                    key={startTimestamp + endTimestamp + filters[1].choices.length}
+                    headers={headings}
+                    resourceName={resourceName} 
+                    appliedFilters={[]}
+                    sortOptions={sortOptions}
+                    disambiguateLabel={disambiguateLabel}
+                    loading={loading}
+                    fetchData={fetchData}
+                    filters={filters}
+                    hideQueryField={false}
+                    getStatus={func.getTestResultStatus}
+                    useNewRow={true}
+                    condensedHeight={true}
+                    pageLimit={20}
+                    headings={headings}
+                    getActions = {(item) => getActionsList(item)}
+                    hasRowActions={true}
+                />
+            ]}
             />
-        ]}
-        />
+            
+            <ConditionalApprovalModal
+                isOpen={modalOpen}
+                onClose={() => {
+                    setModalOpen(false);
+                    setSelectedAuditItem(null);
+                }}
+                onApprove={updateAuditDataWithConditions}
+                auditItem={selectedAuditItem}
+            />
+        </>
     )
 }
 

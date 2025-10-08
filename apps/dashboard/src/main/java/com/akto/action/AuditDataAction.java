@@ -18,6 +18,7 @@ import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -120,6 +121,8 @@ public class AuditDataAction extends UserAction {
     String hexId;
     @Setter
     String remarks;
+    @Setter
+    Map<String, Object> approvalData;
 
     public String updateAuditData() {
         User user = getSUser();
@@ -127,7 +130,38 @@ public class AuditDataAction extends UserAction {
 
         try {
             ObjectId id = new ObjectId(hexId);
-            McpAuditInfoDao.instance.updateOne(Filters.eq(Constants.ID, id), Updates.combine(Updates.set("remarks", remarks), Updates.set("markedBy", markedBy), Updates.set("updatedTimestamp", Context.now())));
+            
+            // Check if this is a conditional approval (approvalData exists) or simple approval
+            if (approvalData != null) {
+                // Handle conditional approval
+                Map<String, Object> updateFields = new HashMap<>();
+                updateFields.put("remarks", approvalData.get("remarks"));
+                updateFields.put("markedBy", markedBy);
+                updateFields.put("updatedTimestamp", Context.now());
+                updateFields.put("approvalConditions", approvalData.get("conditions"));
+                updateFields.put("justification", approvalData.get("justification"));
+                
+                // Build the Updates object
+                List<Bson> updates = new ArrayList<>();
+                for (Map.Entry<String, Object> entry : updateFields.entrySet()) {
+                    updates.add(Updates.set(entry.getKey(), entry.getValue()));
+                }
+                
+                McpAuditInfoDao.instance.updateOne(
+                    Filters.eq(Constants.ID, id), 
+                    Updates.combine(updates)
+                );
+            } else {
+                // Handle simple approval/rejection
+                McpAuditInfoDao.instance.updateOne(
+                    Filters.eq(Constants.ID, id), 
+                    Updates.combine(
+                        Updates.set("remarks", remarks), 
+                        Updates.set("markedBy", markedBy), 
+                        Updates.set("updatedTimestamp", Context.now())
+                    )
+                );
+            }
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error updating audit data: " + e.getMessage(), LogDb.DASHBOARD);
             return ERROR.toUpperCase();
