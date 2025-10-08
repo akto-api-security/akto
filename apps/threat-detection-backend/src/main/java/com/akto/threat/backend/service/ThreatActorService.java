@@ -265,9 +265,9 @@ public class ThreatActorService {
 
       Document matchConditions = new Document();
 
-      if(latestAttackList != null && !latestAttackList.isEmpty()) {
-          matchConditions.append("filterId", new Document("$in", latestAttackList));
-      }
+    if(latestAttackList != null && !latestAttackList.isEmpty()) {
+        matchConditions.append("filterId", new Document("$in", latestAttackList));
+    }
 
       matchConditions.append("detectedAt", new Document("$lte", endTs));
         if (startTs > 0) {
@@ -387,9 +387,9 @@ public class ThreatActorService {
 
   public ThreatActivityTimelineResponse getThreatActivityTimeline(String accountId, long startTs, long endTs, List<String> latestAttackList) {
 
-    //   if(latestAttackList == null || latestAttackList.isEmpty()) {
-    //       return ThreatActivityTimelineResponse.newBuilder().build();
-    //   }
+    if(latestAttackList == null || latestAttackList.isEmpty()) {
+        return ThreatActivityTimelineResponse.newBuilder().build();
+    }
 
         List<ThreatActivityTimelineResponse.ActivityTimeline> timeline = new ArrayList<>();
         // long sevenDaysInSeconds = TimeUnit.DAYS.toSeconds(7);
@@ -402,9 +402,9 @@ public class ThreatActorService {
 
       Document match = new Document();
 
-    //   if(latestAttackList != null && !latestAttackList.isEmpty()) {
-    //       match.append("filterId", new Document("$in", latestAttackList));
-    //   }
+    if(latestAttackList != null && !latestAttackList.isEmpty()) {
+        match.append("filterId", new Document("$in", latestAttackList));
+    }
 
       // Stage 1: Match documents within the startTs and endTs range
       match.append("detectedAt", new Document("$gte", startTs).append("$lte", endTs));
@@ -469,85 +469,6 @@ public class ThreatActorService {
         return ThreatActivityTimelineResponse.newBuilder().addAllThreatActivityTimeline(timeline).build();
   }
 
-  public String getThreatSummaryCounts(String accountId, long startTs, long endTs, List<String> latestAttackList) {
-
-    MongoCollection<Document> coll = this.mongoClient
-        .getDatabase(accountId)
-        .getCollection(MongoDBCollection.ThreatDetection.MALICIOUS_EVENTS, Document.class);
-
-    Document match = new Document();
-
-    if (latestAttackList != null && !latestAttackList.isEmpty()) {
-      match.append("filterId", new Document("$in", latestAttackList));
-    }
-
-    if (startTs > 0 || endTs > 0) {
-      Document tsRange = new Document();
-      if (startTs > 0) tsRange.append("$gte", startTs);
-      if (endTs > 0) tsRange.append("$lte", endTs);
-      match.append("detectedAt", tsRange);
-    }
-
-    // total analysed
-    long totalAnalysed = coll.countDocuments(match);
-
-    // total attacks - treat as successfulExploit true
-    long totalAttacks = coll.countDocuments(new Document(match).append("successfulExploit", true));
-
-    // critical actors: highest severity per actor within range counted as HIGH
-    List<Document> criticalPipeline = new ArrayList<>();
-    if (!match.isEmpty()) criticalPipeline.add(new Document("$match", match));
-    criticalPipeline.add(new Document("$project",
-        new Document("actor", 1)
-            .append("severityPriority",
-                new Document("$switch",
-                    new Document("branches", Arrays.asList(
-                        new Document("case", new Document("$eq", Arrays.asList("$severity", "CRITICAL"))).append("then", 4),
-                        new Document("case", new Document("$eq", Arrays.asList("$severity", "HIGH"))).append("then", 3),
-                        new Document("case", new Document("$eq", Arrays.asList("$severity", "MEDIUM"))).append("then", 2),
-                        new Document("case", new Document("$eq", Arrays.asList("$severity", "LOW"))).append("then", 1))))
-                    .append("default", 0))));
-    criticalPipeline.add(new Document("$group",
-        new Document("_id", "$actor").append("severityPriority", new Document("$max", "$severityPriority"))));
-    criticalPipeline.add(new Document("$match", new Document("severityPriority", new Document("$gte", 3))));
-    criticalPipeline.add(new Document("$count", "criticalActors"));
-
-    int criticalActors = 0;
-    Document criticalDoc = coll.aggregate(criticalPipeline).first();
-    if (criticalDoc != null) {
-      criticalActors = criticalDoc.getInteger("criticalActors", 0);
-    }
-
-    // statuses
-    List<Document> statusPipeline = new ArrayList<>();
-    if (!match.isEmpty()) statusPipeline.add(new Document("$match", match));
-    statusPipeline.add(new Document("$group",
-        new Document("_id", "$status").append("count", new Document("$sum", 1))));
-
-    int totalActive = 0;
-    int totalIgnored = 0;
-    int totalUnderReview = 0;
-    try (MongoCursor<Document> cursor = coll.aggregate(statusPipeline).cursor()) {
-      while (cursor.hasNext()) {
-        Document d = cursor.next();
-        String status = d.getString("_id");
-        int c = d.getInteger("count", 0);
-        if ("ACTIVE".equalsIgnoreCase(status)) totalActive = c;
-        else if ("IGNORED".equalsIgnoreCase(status)) totalIgnored = c;
-        else if ("UNDER_REVIEW".equalsIgnoreCase(status)) totalUnderReview = c;
-      }
-    }
-
-    Document resp = new Document()
-        .append("totalAnalysed", (int) totalAnalysed)
-        .append("totalAttacks", (int) totalAttacks)
-        .append("criticalActors", criticalActors)
-        .append("totalActive", totalActive)
-        .append("totalIgnored", totalIgnored)
-        .append("totalUnderReview", totalUnderReview);
-
-    return resp.toJson();
-  }
 
   private String fetchMetadataString(Document doc){
     String metadataStr = doc.getString("metadata");

@@ -273,44 +273,6 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
     return SUCCESS.toUpperCase();
   }
 
-  public String fetchThreatSummaryCounts() {
-    HttpPost post = new HttpPost(String.format("%s/api/dashboard/get_threat_summary_counts", this.getBackendUrl()));
-    post.addHeader("Authorization", "Bearer " + this.getApiToken());
-    post.addHeader("Content-Type", "application/json");
-
-    List<String> templatesContext = getTemplates(this.latestAttack);
-
-    Map<String, Object> body = new HashMap<String, Object>() {
-      {
-        put("start_ts", startTs);
-        put("end_ts", endTs);
-        put("latestAttack", templatesContext);
-      }
-    };
-    String msg = objectMapper.valueToTree(body).toString();
-
-    StringEntity requestEntity = new StringEntity(msg, ContentType.APPLICATION_JSON);
-    post.setEntity(requestEntity);
-
-    try (CloseableHttpResponse resp = this.httpClient.execute(post)) {
-      String responseBody = EntityUtils.toString(resp.getEntity());
-
-      // Expecting JSON: { totalAnalysed, totalAttacks, criticalActors, totalActive, totalIgnored, totalUnderReview }
-      com.fasterxml.jackson.databind.JsonNode node = objectMapper.readTree(responseBody);
-      this.totalAnalysed = node.has("totalAnalysed") ? node.get("totalAnalysed").asInt() : 0;
-      this.totalAttacks = node.has("totalAttacks") ? node.get("totalAttacks").asInt() : 0;
-      this.criticalActors = node.has("criticalActors") ? node.get("criticalActors").asInt() : 0;
-      this.totalActive = node.has("totalActive") ? node.get("totalActive").asInt() : 0;
-      this.totalIgnored = node.has("totalIgnored") ? node.get("totalIgnored").asInt() : 0;
-      this.totalUnderReview = node.has("totalUnderReview") ? node.get("totalUnderReview").asInt() : 0;
-    } catch (Exception e) {
-      e.printStackTrace();
-      return ERROR.toUpperCase();
-    }
-
-    return SUCCESS.toUpperCase();
-  }
-
   public String fetchThreatApis() {
     HttpPost post = new HttpPost(String.format("%s/api/dashboard/list_threat_apis", this.getBackendUrl()));
     post.addHeader("Authorization", "Bearer " + this.getApiToken());
