@@ -1,16 +1,16 @@
 import CollectionComponent from "../../../components/CollectionComponent"
 import OperatorDropdown from "../../../components/layouts/OperatorDropdown";
-import { VerticalStack, Card, Button, HorizontalStack, Collapsible, Text, Box, Icon } from "@shopify/polaris";
+import { VerticalStack, Card, Button, HorizontalStack, Collapsible, Text, Box, Icon, Popover, ActionList } from "@shopify/polaris";
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards";
 import TitleWithInfo from "@/apps/dashboard/components/shared/TitleWithInfo"
 import React, { useState, useReducer, useCallback, useMemo, useEffect } from 'react'
 import { produce } from "immer"
 import ApiEndpoints from "./ApiEndpoints";
 import api from "../api"
-import { ChevronDownMinor, ChevronUpMinor } from "@shopify/polaris-icons"
+import { ChevronDownMinor, ChevronUpMinor, FileMinor } from "@shopify/polaris-icons"
 import func from "@/util/func";
 import SaveAsCollectionModal from "./api_query_component/SaveAsCollectionModal";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams, useNavigate } from "react-router-dom";
 import PersistStore from "../../../../main/PersistStore";
 import collectionsApi from "./api"
 import { getDashboardCategory, mapLabel } from "../../../../main/labelHelper";
@@ -25,8 +25,10 @@ function APIQuery() {
     const [active, setActive] = useState(false);
     const collectionsMap = PersistStore.getState().collectionsMap
     const [isUpdate, setIsUpdate] = useState(false)
+    const [moreActions, setMoreActions] = useState(false);
 
     const [searchParams, setSearchParams] = useSearchParams();
+    const navigate = useNavigate();
     const collectionId = (searchParams && searchParams.get("collectionId") !== null) ? searchParams.get("collectionId") : -1
 
     const getEmptyCondition = (type) => {
@@ -251,6 +253,47 @@ function APIQuery() {
 
     const primaryActionLabel = isUpdate ? 'Update conditions' : 'Save as API Group'
 
+    const findMissingUrls = useCallback(() => {
+        navigate(`/dashboard/observe/debug-endpoints`);
+        setMoreActions(false);
+    }, [navigate]);
+
+    const secondaryActionsComp = (
+        <HorizontalStack gap={2}>
+            <Popover
+                active={moreActions}
+                activator={(
+                    <Button onClick={() => setMoreActions(!moreActions)} disclosure removeUnderline>
+                        More Actions
+                    </Button>
+                )}
+                autofocusTarget="first-node"
+                onClose={() => { setMoreActions(false) }}
+            >
+                <Popover.Pane fixed>
+                    <ActionList
+                        actionRole="menuitem"
+                        sections={
+                            [
+                                {
+                                    title: 'Debug Mode',
+                                    items: [
+                                        {
+                                            content: 'Find Missing Urls',
+                                            onAction: findMissingUrls,
+                                            prefix: <Box><Icon source={FileMinor} /></Box>,
+                                            disabled: false 
+                                        }
+                                    ]
+                                }
+                            ]
+                        }
+                    />
+                </Popover.Pane>
+            </Popover>
+        </HorizontalStack>
+    )
+
     return (
         <PageWithMultipleCards
             title={
@@ -260,6 +303,7 @@ function APIQuery() {
                 />
             }
             primaryAction={<Button id={"explore-mode-query-page"} primary secondaryActions onClick={handleClick}>{primaryActionLabel}</Button>}
+            secondaryActions={secondaryActionsComp}
             components={components}
             backUrl="/dashboard/observe/inventory"
         />

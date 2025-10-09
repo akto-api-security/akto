@@ -64,4 +64,11 @@ export default {
             data: { crawlId }
         })
     },
+    findMissingUrls(missingUrls){
+        return request({
+            url: '/api/findMissingUrls',
+            method: 'post',
+            data: { missingUrls }
+        })
+    },
 }
