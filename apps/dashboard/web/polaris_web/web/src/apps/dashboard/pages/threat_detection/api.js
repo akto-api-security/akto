@@ -186,7 +186,7 @@ const threatDetectionRequests = {
             data: data
         })
     },
-    fetchThreatTopNData(startTs, endTs, latestAttack, limit = 10) {
+    fetchThreatTopNData(startTs, endTs, latestAttack, limit = 5) {
         return request({
             url: '/api/fetchThreatTopNData',
             method: 'post',

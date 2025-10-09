@@ -1,9 +1,45 @@
 import { useEffect, useState, useRef } from "react";
 import InfoCard from "../../dashboard/new_components/InfoCard";
-import { Spinner, Text } from "@shopify/polaris";
+import { Spinner, Text, SkeletonBodyText, SkeletonDisplayText } from "@shopify/polaris";
 import StackedAreaChart from "../../../components/charts/StackedAreaChart";
 import api from "../api";
 import dayjs from "dayjs";
+
+// ============================================================================
+// CONSTANTS
+// ============================================================================
+const CHART_CONFIG = {
+  TOP_CATEGORIES: 6,
+  HEIGHT: 380,
+  COLOR_SATURATION: 60,
+  COLOR_LIGHTNESS: 75,
+  GOLDEN_ANGLE: 137.5,
+  MILLISECOND_THRESHOLD: 1e12,
+};
+
+const BASE_COLORS = [
+  "#7FB3D5", // soft blue
+  "#85C1E9", // light sky
+  "#AED6F1", // pale blue
+  "#76D7C4", // mint
+  "#82E0AA", // light green
+  "#F7DC6F", // soft yellow
+  "#F8C471", // warm amber
+  "#F5B7B1", // pale coral
+  "#F1948A", // light red
+  "#D7BDE2", // lavender
+  "#BB8FCE", // muted purple
+  "#FADBD8", // pale pink
+];
+
+// ============================================================================
+// HELPER FUNCTIONS
+// ============================================================================
+
+/**
+ * Convert value to number with fallback
+ */
+const toNumber = (val, defaultVal = 0) => Number(val) || defaultVal;
 
 /**
  * Format internal names for display: snake_case to Title Case.
@@ -17,32 +53,225 @@ const formatName = (name) => {
 };
 
 /**
+ * Validate and normalize timestamp
+ */
+const normalizeTimestamp = (ts) => {
+  const num = toNumber(ts);
+  if (!num || num < 0) return 0;
+  return num > CHART_CONFIG.MILLISECOND_THRESHOLD ? Math.floor(num / 1000) : num;
+};
+
+/**
  * Generates a dynamic color palette for chart categories.
  * Extends with HSL colors using golden angle if more colors are needed.
  */
 const generateColorPalette = (count) => {
-  // Softer, pastel palette for better readability
-  const baseColors = [
-    "#7FB3D5", // soft blue
-    "#85C1E9", // light sky
-    "#AED6F1", // pale blue
-    "#76D7C4", // mint
-    "#82E0AA", // light green
-    "#F7DC6F", // soft yellow
-    "#F8C471", // warm amber
-    "#F5B7B1", // pale coral
-    "#F1948A", // light red
-    "#D7BDE2", // lavender
-    "#BB8FCE", // muted purple
-    "#FADBD8", // pale pink
-  ];
-  const colors = baseColors.slice();
+  const colors = BASE_COLORS.slice();
   while (colors.length < count) {
-    // generate soft pastels using golden angle with higher lightness
-    const hue = (colors.length * 137.5) % 360;
-    colors.push(`hsl(${hue}, 60%, 75%)`);
+    const hue = (colors.length * CHART_CONFIG.GOLDEN_ANGLE) % 360;
+    colors.push(`hsl(${hue}, ${CHART_CONFIG.COLOR_SATURATION}%, ${CHART_CONFIG.COLOR_LIGHTNESS}%)`);
   }
   return colors.slice(0, count);
+};
+
+/**
+ * Aggregate threat data by day and subcategory
+ */
+const aggregateDailyData = (timelines) => {
+  const dayMap = new Map();
+
+  (timelines || []).forEach((item) => {
+    const ts = normalizeTimestamp(item.ts || item.timestamp || item.time);
+    const dayKey = dayjs(ts * 1000).startOf("day").unix();
+
+    if (!dayMap.has(dayKey)) dayMap.set(dayKey, {});
+    const bucket = dayMap.get(dayKey);
+
+    const subList = item.subCategoryWiseData || [];
+    subList.forEach((s) => {
+      const rawKey = s.subcategory || "Unknown";
+      const key = String(rawKey).trim();
+      const cnt = toNumber(s?.activityCount);
+      bucket[key] = toNumber(bucket[key]) + cnt;
+    });
+  });
+
+  return dayMap;
+};
+
+/**
+ * Process threat data into chart series format
+ */
+const processChartData = (dayMap) => {
+  const dayKeys = Array.from(dayMap.keys()).sort((a, b) => a - b);
+
+  // Collect all unique subcategories
+  const subSet = new Set();
+  dayKeys.forEach((k) =>
+    Object.keys(dayMap.get(k)).forEach((sk) => subSet.add(sk))
+  );
+
+  if (!subSet.size) return null;
+
+  // Compute total counts per subcategory
+  const totals = {};
+  subSet.forEach((s) => { totals[s] = 0; });
+  dayKeys.forEach((k) => {
+    Object.entries(dayMap.get(k)).forEach(([sk, v]) => {
+      totals[sk] = toNumber(totals[sk]) + toNumber(v);
+    });
+  });
+
+  // Identify top N subcategories plus 'Other' group
+  const sortedSubs = Array.from(subSet).sort(
+    (a, b) => (totals[b] || 0) - (totals[a] || 0)
+  );
+  const topSubs = sortedSubs.slice(0, CHART_CONFIG.TOP_CATEGORIES);
+  const otherSubs = sortedSubs.slice(CHART_CONFIG.TOP_CATEGORIES);
+
+  // Build series map
+  const seriesMap = {};
+  topSubs.forEach((s) => { seriesMap[s] = dayKeys.map(() => 0); });
+  if (otherSubs.length) seriesMap["Other"] = dayKeys.map(() => 0);
+
+  dayKeys.forEach((k, di) => {
+    Object.entries(dayMap.get(k)).forEach(([sk, val]) => {
+      const numericVal = toNumber(val);
+      if (topSubs.includes(sk)) {
+        seriesMap[sk][di] = toNumber(seriesMap[sk][di]) + numericVal;
+      } else if (otherSubs.length) {
+        seriesMap["Other"][di] = toNumber(seriesMap["Other"][di]) + numericVal;
+      }
+    });
+  });
+
+  const seriesKeys = topSubs.concat(otherSubs.length ? ["Other"] : []);
+
+  return { seriesMap, seriesKeys, dayKeys, totals };
+};
+
+/**
+ * Calculate percentage distribution for legend
+ */
+const calculatePercentages = (seriesData) => {
+  const grandTotals = {};
+  let grandSum = 0;
+
+  seriesData.forEach((s) => {
+    const sum = (s.data || []).reduce((acc, v) => acc + toNumber(v[1]), 0);
+    grandTotals[s.rawName] = sum;
+    grandSum += sum;
+  });
+
+  return seriesData
+    .map((s) => ({
+      name: s.name,
+      rawName: s.rawName,
+      percent: grandSum > 0 ? Math.round((grandTotals[s.rawName] / grandSum) * 1000) / 10 : 0,
+      color: s.color,
+    }))
+    .sort((a, b) => b.percent - a.percent);
+};
+
+// ============================================================================
+// COMPONENTS
+// ============================================================================
+
+/**
+ * Skeleton loading component
+ */
+const ChartSkeleton = () => (
+  <div style={{ padding: "16px" }}>
+    <div style={{ display: "flex", gap: 20, marginBottom: 16 }}>
+      {[1, 2, 3, 4].map((i) => (
+        <div key={i} style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <div style={{ width: 12, height: 12, background: "#E5E7EB", borderRadius: 2 }} />
+          <SkeletonBodyText lines={1} />
+        </div>
+      ))}
+    </div>
+    <div style={{ height: CHART_CONFIG.HEIGHT }}>
+      <SkeletonDisplayText size="large" />
+      <SkeletonBodyText lines={8} />
+    </div>
+  </div>
+);
+
+/**
+ * Empty state component
+ */
+const EmptyState = ({ message }) => (
+  <div style={{ padding: 40, textAlign: "center" }}>
+    <Text variant="bodyMd" color="subdued">
+      {message}
+    </Text>
+  </div>
+);
+
+/**
+ * Error state component
+ */
+const ErrorState = ({ message }) => (
+  <div style={{ padding: 40, textAlign: "center" }}>
+    <Text variant="bodyMd" color="critical">
+      {message}
+    </Text>
+  </div>
+);
+
+/**
+ * Legend item component
+ */
+const LegendItem = ({ item, onToggle }) => (
+  <div
+    onClick={() => onToggle(item.name)}
+    title={item.visible === false ? "Click to show" : "Click to hide"}
+    style={{
+      display: "flex",
+      alignItems: "center",
+      gap: 8,
+      cursor: "pointer",
+      opacity: item.visible === false ? 0.45 : 1,
+    }}
+  >
+    <div
+      style={{
+        width: 12,
+        height: 12,
+        background: item.color,
+        borderRadius: 2,
+      }}
+    />
+    <Text variant="bodySm" color="subdued">
+      <Text variant="bodySm" fontWeight="bold" color="base">
+        {item.percent}%
+      </Text>{" "}
+      {item.name}
+    </Text>
+  </div>
+);
+
+/**
+ * Chart legend component
+ */
+const ChartLegend = ({ items, onToggle }) => {
+  if (!items || items.length === 0) return null;
+
+  return (
+    <div
+      style={{
+        display: "flex",
+        gap: 20,
+        alignItems: "center",
+        padding: "12px 16px",
+        borderBottom: "1px solid #E5E7EB",
+      }}
+    >
+      {items.map((item) => (
+        <LegendItem key={item.name} item={item} onToggle={onToggle} />
+      ))}
+    </div>
+  );
 };
 
 /**
@@ -50,6 +279,7 @@ const generateColorPalette = (count) => {
  */
 function ThreatCategoryStackedChart({ startTimestamp, endTimestamp }) {
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [chartData, setChartData] = useState([]);
   const [latestPercents, setLatestPercents] = useState([]);
   const [visibleSeries, setVisibleSeries] = useState({});
@@ -60,6 +290,8 @@ function ThreatCategoryStackedChart({ startTimestamp, endTimestamp }) {
 
     const loadThreatData = async () => {
       setLoading(true);
+      setError(null);
+
       try {
         // Fetch time-series threat activity for given range
         const resp = await api.getThreatActivityTimeline(
@@ -69,97 +301,25 @@ function ThreatCategoryStackedChart({ startTimestamp, endTimestamp }) {
 
         if (!mounted) return;
 
-        if (
-          !resp?.threatActivityTimelines ||
-          !resp.threatActivityTimelines.length
-        ) {
+        if (!resp?.threatActivityTimelines || !resp.threatActivityTimelines.length) {
           setChartData([]);
           setLatestPercents([]);
           return;
         }
 
         // Aggregate counts per day and subcategory
-        const dayMap = new Map();
-        (resp.threatActivityTimelines || []).forEach((item) => {
-          // Normalize and coerce timestamp 
-          let ts = Number(item.ts || item.timestamp || item.time) || 0;
-          if (ts > 1e12) ts = Math.floor(ts / 1000); // milliseconds -> seconds
-          const dayKey = dayjs(ts * 1000)
-            .startOf("day")
-            .unix();
-          if (!dayMap.has(dayKey)) dayMap.set(dayKey, {});
-          const bucket = dayMap.get(dayKey);
+        const dayMap = aggregateDailyData(resp.threatActivityTimelines);
 
-          // Use consistent API structure 
-          const subList = item.subCategoryWiseData || [];
+        // Process chart data
+        const processed = processChartData(dayMap);
 
-          subList.forEach((s) => {
-            // Normalize the category key (trim + fallback) and coerce count to number
-            const rawKey =
-              s.subcategory ||
-              s.subCategory ||
-              s.sub ||
-              s.subCategoryName ||
-              s.category ||
-              s.name ||
-              "Unknown";
-            const key = String(rawKey).trim();
-            const cnt = Number(s.activityCount ?? s.count ?? s.value ?? 0) || 0;
-
-            // Ensure numeric accumulation (avoid string concatenation)
-            bucket[key] = Number(bucket[key] || 0) + cnt;
-          });
-        });
-
-        const dayKeys = Array.from(dayMap.keys()).sort((a, b) => a - b);
-
-        // Collect all unique subcategories
-        const subSet = new Set();
-        dayKeys.forEach((k) =>
-          Object.keys(dayMap.get(k)).forEach((sk) => subSet.add(sk))
-        );
-        if (!subSet.size) {
+        if (!processed) {
           setChartData([]);
           setLatestPercents([]);
           return;
         }
 
-        // Compute total counts per subcategory (for prominence ranking)
-        const totals = {};
-        subSet.forEach((s) => {
-          totals[s] = 0;
-        });
-        dayKeys.forEach((k) => {
-          Object.entries(dayMap.get(k)).forEach(([sk, v]) => {
-            totals[sk] = Number(totals[sk] || 0) + (Number(v) || 0);
-          });
-        });
-
-        // Identify top N subcategories plus an 'Other' group
-        const TOP_N = 6;
-        const sortedSubs = Array.from(subSet).sort(
-          (a, b) => (totals[b] || 0) - (totals[a] || 0)
-        );
-        const topSubs = sortedSubs.slice(0, TOP_N);
-        const otherSubs = sortedSubs.slice(TOP_N);
-        const seriesMap = {};
-        topSubs.forEach((s) => {
-          seriesMap[s] = dayKeys.map(() => 0);
-        });
-        if (otherSubs.length) seriesMap["Other"] = dayKeys.map(() => 0);
-        dayKeys.forEach((k, di) => {
-          Object.entries(dayMap.get(k)).forEach(([sk, val]) => {
-            const numericVal = Number(val) || 0;
-            if (topSubs.includes(sk)) {
-              seriesMap[sk][di] = Number(seriesMap[sk][di] || 0) + numericVal;
-            } else if (otherSubs.length) {
-              seriesMap["Other"][di] =
-                Number(seriesMap["Other"][di] || 0) + numericVal;
-            }
-          });
-        });
-
-        const seriesKeys = topSubs.concat(otherSubs.length ? ["Other"] : []);
+        const { seriesMap, seriesKeys, dayKeys } = processed;
 
         // Assign color palette & format series for StackedChart
         const palette = generateColorPalette(seriesKeys.length);
@@ -174,43 +334,21 @@ function ThreatCategoryStackedChart({ startTimestamp, endTimestamp }) {
           visible: true,
         }));
 
-        // Compute header percentages using sums over the series data (ensures header matches chart)
-        const grandTotals = {};
-        let grandSum = 0;
-        seriesData.forEach((s) => {
-          const sum = (s.data || []).reduce(
-            (acc, v) => acc + (Number(v[1]) || 0), // v[1] is the y value
-            0
-          );
-          grandTotals[s.rawName] = sum;
-          grandSum += sum;
-        });
-
-        const initialLatest = seriesData
-          .map((s) => ({
-            name: s.name,
-            rawName: s.rawName,
-            percent:
-              grandSum > 0
-                ? Math.round(
-                    ((grandTotals[s.rawName] || 0) / grandSum) * 1000
-                  ) / 10
-                : 0,
-            color: s.color,
-          }))
-          .sort((a, b) => b.percent - a.percent);
+        // Calculate percentages for legend
+        const initialLatest = calculatePercentages(seriesData);
         setLatestPercents(initialLatest);
 
         // Store base data for toggling updates
         baseDataRef.current = {
           seriesData,
-          totals,
           seriesKeys,
         };
-                
+
         setChartData(seriesData);
       } catch (err) {
+        console.error("Failed to load threat activity data:", err);
         if (mounted) {
+          setError(err.message || "Failed to load threat activity data. Please try again.");
           setChartData([]);
           setLatestPercents([]);
         }
@@ -254,66 +392,15 @@ function ThreatCategoryStackedChart({ startTimestamp, endTimestamp }) {
       titleToolTip="Stacked area view showing distribution of activity across categories over time"
       component={
         loading ? (
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "center",
-              alignItems: "center",
-              height: "300px",
-            }}
-          >
-            <Spinner size="large" />
-          </div>
+          <ChartSkeleton />
+        ) : error ? (
+          <ErrorState message={error} />
         ) : (
           <>
-            {/* Header with latest percentages */}
-            {latestPercents.length > 0 && (
-              <div
-                style={{
-                  display: "flex",
-                  gap: 20,
-                  alignItems: "center",
-                  padding: "12px 16px",
-                  borderBottom: "1px solid #E5E7EB",
-                }}
-              >
-                {latestPercents.map((item) => (
-                  <div
-                    key={item.name}
-                    onClick={() => toggleSeries(item.name)}
-                    title={
-                      item.visible === false ? "Click to show" : "Click to hide"
-                    }
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 8,
-                      cursor: "pointer",
-                      opacity: item.visible === false ? 0.45 : 1,
-                    }}
-                  >
-                    <div
-                      style={{
-                        width: 12,
-                        height: 12,
-                        background: item.color,
-                        borderRadius: 2,
-                      }}
-                    />
-                    <Text variant="bodySm" color="subdued">
-                      <Text variant="bodySm" fontWeight="bold" color="base">
-                        {item.percent}%
-                      </Text>{" "}
-                      {item.name}
-                    </Text>
-                  </div>
-                ))}
-              </div>
-            )}
-            {/* Chart or no data found message */}
+            <ChartLegend items={latestPercents} onToggle={toggleSeries} />
             {chartData.length > 0 ? (
               <StackedAreaChart
-                height={380}
+                height={CHART_CONFIG.HEIGHT}
                 backgroundColor="#ffffff"
                 data={chartData}
                 yAxisTitle="Percentage"
@@ -360,11 +447,7 @@ function ThreatCategoryStackedChart({ startTimestamp, endTimestamp }) {
                 }}
               />
             ) : (
-              <div style={{ padding: 40, textAlign: "center" }}>
-                <Text variant="bodyMd" color="subdued">
-                  No threat activity data found for the selected time period.
-                </Text>
-              </div>
+              <EmptyState message="No threat activity data found for the selected time period." />
             )}
           </>
         )

@@ -167,7 +167,7 @@ function ThreatDashboardPage() {
 
             // Top Attacked APIs - Use API
             try {
-                const topApisResponse = await api.fetchThreatTopNData(startTimestamp, endTimestamp, [], 10)
+                const topApisResponse = await api.fetchThreatTopNData(startTimestamp, endTimestamp, [], 5)
                 if (topApisResponse?.topApis && Array.isArray(topApisResponse.topApis)) {
                     setTopAttackedApis(topApisResponse.topApis)
                 }
