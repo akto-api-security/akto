@@ -19,6 +19,7 @@ import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.Up
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.UpdateMaliciousEventStatusResponse;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.DeleteMaliciousEventsRequest;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.DeleteMaliciousEventsResponse;
+import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchTopNDataRequest;
 import com.akto.threat.backend.service.MaliciousEventService;
 import com.akto.threat.backend.service.ThreatActorService;
 import com.akto.threat.backend.service.ThreatApiService;
@@ -513,10 +514,10 @@ public class DashboardRouter implements ARouter {
             .post("/get_top_n_data")
             .blockingHandler(ctx -> {
                 RequestBody reqBody = ctx.body();
-                com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchTopNDataRequest req = ProtoMessageUtils.<
-                com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchTopNDataRequest
+                FetchTopNDataRequest req = ProtoMessageUtils.<
+                FetchTopNDataRequest
                 >toProtoMessage(
-                    com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchTopNDataRequest.class,
+                    FetchTopNDataRequest.class,
                     reqBody.asString()
                 ).orElse(null);
 
