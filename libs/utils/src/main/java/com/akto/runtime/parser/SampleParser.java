@@ -116,7 +116,7 @@ public class SampleParser {
         HttpResponseParams httpResponseParams = new HttpResponseParams(
                 type,statusCode, status, responseHeaders, payload, requestParams, time, accountId, isPending, source, message, sourceIP, destIP, direction, tags
         );
-        if(!tags.isEmpty()){
+        if(tags != null && !tags.isEmpty()){
             String tagLog = "K8 Pod Tags: " + tags + " Host: " + requestHeaders.getOrDefault("host", new ArrayList<>()) + " Url: " + url;
             printL(tagLog);
             if ((Utils.printDebugHostLog(httpResponseParams) != null) || Utils.printDebugUrlLog(url)) {
