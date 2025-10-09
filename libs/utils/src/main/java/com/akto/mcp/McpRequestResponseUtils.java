@@ -5,6 +5,7 @@ import com.akto.data_actor.DataActor;
 import com.akto.data_actor.DataActorFactory;
 import com.akto.dto.HttpResponseParams;
 import com.akto.dto.McpAuditInfo;
+import com.akto.dto.RawApi;
 import com.akto.jsonrpc.JsonRpcUtils;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
@@ -78,6 +79,21 @@ public final class McpRequestResponseUtils {
         boolean isMcpRequest =
             mcpJsonRpcModel != null && McpSchema.MCP_METHOD_SET.contains(mcpJsonRpcModel.getMethod());
         return new Pair<>(isMcpRequest, mcpJsonRpcModel);
+    }
+
+    public static boolean isMcpRequest(RawApi rawApi) {
+        String requestPayload = rawApi.getRequest().getBody();
+        if(StringUtils.isEmpty(requestPayload)) {
+            return false;
+        }
+        if(!requestPayload.contains(JsonRpcUtils.JSONRPC_KEY)) {
+            return false;
+        }
+        McpJsonRpcModel mcpJsonRpcModel = JSONUtils.fromJson(requestPayload, McpJsonRpcModel.class);
+        if(mcpJsonRpcModel == null) {
+            return false;
+        }
+        return McpSchema.MCP_METHOD_SET.contains(mcpJsonRpcModel.getMethod());
     }
 
     private static void handleMcpMethodCall(McpJsonRpcModel mcpJsonRpcModel, String requestPayload,
