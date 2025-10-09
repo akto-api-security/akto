@@ -32,6 +32,9 @@ public class TestResult extends GenericTestResult {
         INFO
     }
 
+    private String conversationId;
+    private boolean resultTypeAgentic;
+
     public enum TestError {
         NO_PATH("No sample data found for the API", true),
         NO_MESSAGE_WITH_AUTH_TOKEN("No sample data found for the API which contains the auth token", true),
@@ -137,5 +140,21 @@ public class TestResult extends GenericTestResult {
 
     public void setRequiresConfig(boolean requiresConfig) {
         this.requiresConfig = requiresConfig;
+    }
+
+    public String getConversationId() {
+        return conversationId;
+    }
+
+    public void setConversationId(String conversationId) {
+        this.conversationId = conversationId;
+    }
+
+    public boolean isResultTypeAgentic() {
+        return resultTypeAgentic;
+    }
+
+    public void setResultTypeAgentic(boolean resultTypeAgentic) {
+        this.resultTypeAgentic = resultTypeAgentic;
     }
 }
