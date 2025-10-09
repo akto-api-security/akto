@@ -37,6 +37,6 @@ public class SafeCorsFilter extends CrossOriginFilter {
 
     private boolean isValidAktoOrigin(String origin) {
         String host = origin.replaceFirst("^https?://", "").split(":")[0];
-        return host.equals("akto.io") || host.endsWith(".akto.io") || host.contains("localhost");
+        return host.equals("akto.io") || host.endsWith(".akto.io");
     }
 }
