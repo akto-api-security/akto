@@ -113,6 +113,44 @@ public class ClientActor extends DataActor {
         return dbAbsHost + "/api";
     }
 
+    @Override
+    public DeploymentConfig fetchDeploymentConfig(String deploymentId) {
+        Map<String, List<String>> headers = buildHeaders();
+        String endpoint = url + "/fetchDeploymentConfig?deploymentId=" + deploymentId;
+        OriginalHttpRequest request = new OriginalHttpRequest(endpoint, "", "GET", null, headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
+            if (response.getStatusCode() != 200 || response.getBody() == null) {
+                loggerMaker.errorAndAddToDb("non 2xx in fetchDeploymentConfig", LoggerMaker.LogDb.RUNTIME);
+                return null;
+            }
+            BasicDBObject payloadObj = BasicDBObject.parse(response.getBody());
+            BasicDBObject dcObj = (BasicDBObject) payloadObj.get("deploymentConfig");
+            if (dcObj == null) return null;
+            return objectMapper.readValue(dcObj.toJson(), DeploymentConfig.class);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in fetchDeploymentConfig " + e, LoggerMaker.LogDb.RUNTIME);
+            return null;
+        }
+    }
+
+    @Override
+    public void sendDeploymentConfig(String deploymentId, Map<String, String> envVars) {
+        Map<String, List<String>> headers = buildHeaders();
+        BasicDBObject obj = new BasicDBObject();
+        obj.put("deploymentId", deploymentId);
+        obj.put("envVars", envVars);
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/sendDeploymentConfig", "", "POST", obj.toString(), headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequestBackOff(request, true, null, false, null);
+            if (response.getStatusCode() != 200) {
+                loggerMaker.errorAndAddToDb("non 2xx in sendDeploymentConfig", LoggerMaker.LogDb.RUNTIME);
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in sendDeploymentConfig " + e, LoggerMaker.LogDb.RUNTIME);
+        }
+    }
+
     public AccountSettings fetchAccountSettings() {
         AccountSettings acc = null;
         for (int i=0; i < 5; i++) {
