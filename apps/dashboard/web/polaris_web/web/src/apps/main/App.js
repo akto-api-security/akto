@@ -105,6 +105,8 @@ import GuardrailDetectionDemo from "../dashboard/pages/guardrails/GuardrailDetec
 import GuardrailPolicies   from "../dashboard/pages/guardrails/GuardrailPolicies";
 import ThreatDashboardPage from "../dashboard/pages/threat_detection/ThreatDashboardPage";
 import OpenApiAgentTester from "../dashboard/pages/observe/OpenApiAgentTester";
+import DastProgress from "../dashboard/pages/observe/api_collections/DastProgress.jsx";
+import DastProgressSingle from "../dashboard/pages/observe/api_collections/DastProgressSingle.jsx";
 
 // if you add a component in a new path, please verify the search implementation in function -> 'getSearchItemsArr' in func.js
 
@@ -204,7 +206,15 @@ const router = createBrowserRouter([
                             {
                                 path: ":apiCollectionId/open-api-upload",
                                 element: <OpenApiAgentTester/>
-                            }
+                            },
+                            {
+                                path: "dast-progress",
+                                element: <DastProgress />
+                            },
+                            {
+                                path: "dast-progress/:crawlId",
+                                element: <DastProgressSingle />
+                            },
                         ]
                     },
                     {
