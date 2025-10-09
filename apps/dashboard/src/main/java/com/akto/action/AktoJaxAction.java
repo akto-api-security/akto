@@ -50,6 +50,9 @@ public class AktoJaxAction extends UserAction {
     private boolean accepted;
     private int timestamp;
     private String crawlId;
+    private String sourceUrl;
+    private String sourceXpath;
+    private String buttonText;
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(AktoJaxAction.class, LogDb.DASHBOARD);
 
@@ -189,7 +192,7 @@ public class AktoJaxAction extends UserAction {
                 return Action.ERROR.toUpperCase();
             }
 
-            CrawlerUrl crawlerUrl = new CrawlerUrl(url, accepted, timestamp, crawlId);
+            CrawlerUrl crawlerUrl = new CrawlerUrl(url, accepted, timestamp, crawlId, sourceUrl, sourceXpath, buttonText);
             CrawlerUrlDao.instance.insertOne(crawlerUrl);
 
             loggerMaker.infoAndAddToDb("Crawler URL saved successfully");
@@ -303,5 +306,29 @@ public class AktoJaxAction extends UserAction {
 
     public void setCrawlId(String crawlId) {
         this.crawlId = crawlId;
+    }
+
+    public String getSourceUrl() {
+        return sourceUrl;
+    }
+
+    public void setSourceUrl(String sourceUrl) {
+        this.sourceUrl = sourceUrl;
+    }
+
+    public String getSourceXpath() {
+        return sourceXpath;
+    }
+
+    public void setSourceXpath(String sourceXpath) {
+        this.sourceXpath = sourceXpath;
+    }
+
+    public String getButtonText() {
+        return buttonText;
+    }
+
+    public void setButtonText(String buttonText) {
+        this.buttonText = buttonText;
     }
 }
