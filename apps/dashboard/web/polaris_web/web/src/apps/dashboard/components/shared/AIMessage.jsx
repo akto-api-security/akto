@@ -1,4 +1,4 @@
-import { Box, HorizontalStack } from '@shopify/polaris'
+import { Box } from '@shopify/polaris'
 import ReactMarkdown from 'react-markdown'
 import { useState, useEffect } from 'react'
 
@@ -30,8 +30,8 @@ function AIMessage({ message, isStreaming = false }) {
 
     return (
         <Box padding={"3"} borderRadius="2" background="bg-subdued">
-            <Box maxWidth='800px'>
-                <div style={{display: 'flex', gap: '12px'}}>
+            <div style={{ width: '100%', maxWidth: '100%', overflow: 'hidden' }}>
+                <div style={{display: 'flex', gap: '12px', width: '100%'}}>
                     <Box style={{
                         width: '28px',
                         height: '28px',
@@ -50,7 +50,7 @@ function AIMessage({ message, isStreaming = false }) {
                             AI
                         </span>
                     </Box>
-                    <Box style={{ flex: 1, paddingTop: '2px' }}>
+                    <Box style={{ flex: 1, paddingTop: '2px', minWidth: 0, width: '100%' }}>
                         <div className="markdown-content">
                             <ReactMarkdown
                                 components={{
@@ -92,7 +92,7 @@ function AIMessage({ message, isStreaming = false }) {
                         )}
                     </Box>
                 </div>
-            </Box>
+            </div>
             <style jsx>{`
                 @keyframes blink {
                     0%, 50% { opacity: 1; }
@@ -102,6 +102,12 @@ function AIMessage({ message, isStreaming = false }) {
                 .markdown-content {
                     line-height: 1.6;
                     color: #333;
+                    width: 100%;
+                    max-width: 100%;
+                    overflow-wrap: break-word;
+                    word-wrap: break-word;
+                    word-break: break-word;
+                    hyphens: auto;
                 }
                 
                 .markdown-content .markdown-h1 {
@@ -158,6 +164,9 @@ function AIMessage({ message, isStreaming = false }) {
                     font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
                     font-size: 0.9em;
                     border: 1px solid #e1e5e9;
+                    overflow-wrap: break-word;
+                    word-wrap: break-word;
+                    word-break: break-all;
                 }
                 
                 .markdown-content .markdown-pre {
@@ -167,9 +176,14 @@ function AIMessage({ message, isStreaming = false }) {
                     padding: 1em;
                     margin: 1em 0;
                     overflow-x: auto;
+                    overflow-wrap: break-word;
+                    word-wrap: break-word;
+                    word-break: break-all;
+                    white-space: pre-wrap;
                     font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
                     font-size: 0.9em;
                     line-height: 1.4;
+                    max-width: 100%;
                 }
                 
                 .markdown-content .markdown-code-block {
@@ -227,7 +241,10 @@ function AIMessage({ message, isStreaming = false }) {
                 .markdown-content table {
                     border-collapse: collapse;
                     width: 100%;
+                    max-width: 100%;
                     margin: 1em 0;
+                    table-layout: fixed;
+                    overflow-wrap: break-word;
                 }
                 
                 .markdown-content th,
@@ -235,6 +252,9 @@ function AIMessage({ message, isStreaming = false }) {
                     border: 1px solid #e1e5e9;
                     padding: 0.5em;
                     text-align: left;
+                    word-wrap: break-word;
+                    overflow-wrap: break-word;
+                    word-break: break-word;
                 }
                 
                 .markdown-content th {
