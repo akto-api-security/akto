@@ -4109,4 +4109,66 @@ public class DbAction extends ActionSupport {
     public void setUrlType(String urlType) {
         this.urlType = urlType;
     }
+
+    // Fields for fetchMCPThreatProtectionTemplates API
+    private List<YamlTemplate> mcpThreatProtectionTemplates;
+    private Integer updatedAfter;
+
+    public List<YamlTemplate> getMcpThreatProtectionTemplates() {
+        return mcpThreatProtectionTemplates;
+    }
+
+    public void setMcpThreatProtectionTemplates(List<YamlTemplate> mcpThreatProtectionTemplates) {
+        this.mcpThreatProtectionTemplates = mcpThreatProtectionTemplates;
+    }
+
+    public Integer getUpdatedAfter() {
+        return updatedAfter;
+    }
+
+    public void setUpdatedAfter(Integer updatedAfter) {
+        this.updatedAfter = updatedAfter;
+    }
+
+    public String fetchMCPThreatProtectionTemplates() {
+        try {
+            loggerMaker.infoAndAddToDb("Fetching MCP threat protection templates with updatedAfter: " + updatedAfter, LogDb.DB_ABS);
+            this.mcpThreatProtectionTemplates = DbLayer.fetchMCPThreatProtectionTemplates(updatedAfter);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in fetchMCPThreatProtectionTemplates: " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
+
+    // Fields for fetchMcpAuditInfo API
+    private List<McpAuditInfo> mcpAuditInfoList;
+    private List<String> remarksList;
+
+    public List<McpAuditInfo> getMcpAuditInfoList() {
+        return mcpAuditInfoList;
+    }
+
+    public void setMcpAuditInfoList(List<McpAuditInfo> mcpAuditInfoList) {
+        this.mcpAuditInfoList = mcpAuditInfoList;
+    }
+
+    public List<String> getRemarksList() {
+        return remarksList;
+    }
+
+    public void setRemarksList(List<String> remarksList) {
+        this.remarksList = remarksList;
+    }
+
+    public String fetchMcpAuditInfo() {
+        try {
+            loggerMaker.infoAndAddToDb("Fetching MCP audit info with updatedAfter: " + updatedAfter + ", remarksList: " + remarksList, LogDb.DB_ABS);
+            this.mcpAuditInfoList = DbLayer.fetchMcpAuditInfo(updatedAfter, remarksList);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in fetchMcpAuditInfo: " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
 }

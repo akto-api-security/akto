@@ -4201,4 +4201,73 @@ public class ClientActor extends DataActor {
         }
     }
 
+    public List<YamlTemplate> fetchMCPThreatProtectionTemplates(Integer updatedAfter) {
+        List<YamlTemplate> templates = new ArrayList<>();
+
+        Map<String, List<String>> headers = buildHeaders();
+        BasicDBObject obj = new BasicDBObject();
+        if (updatedAfter != null) {
+            obj.put("updatedAfter", updatedAfter);
+        }
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/fetchMCPThreatProtectionTemplates", "", "POST", obj.toString(), headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb("invalid response in fetchMCPThreatProtectionTemplates", LoggerMaker.LogDb.RUNTIME);
+                return templates;
+            }
+            BasicDBObject payloadObj;
+            try {
+                payloadObj = BasicDBObject.parse(responsePayload);
+                BasicDBList objList = (BasicDBList) payloadObj.get("mcpThreatProtectionTemplates");
+                for (Object obj2: objList) {
+                    BasicDBObject templateObj = (BasicDBObject) obj2;
+                    templates.add(objectMapper.readValue(templateObj.toJson(), YamlTemplate.class));
+                }
+            } catch(Exception e) {
+                loggerMaker.errorAndAddToDb("error extracting response in fetchMCPThreatProtectionTemplates" + e, LoggerMaker.LogDb.RUNTIME);
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in fetchMCPThreatProtectionTemplates" + e, LoggerMaker.LogDb.RUNTIME);
+        }
+        return templates;
+    }
+
+    public List<McpAuditInfo> fetchMcpAuditInfo(Integer updatedAfter, List<String> remarksList) {
+        List<McpAuditInfo> mcpAuditInfoList = new ArrayList<>();
+
+        Map<String, List<String>> headers = buildHeaders();
+        BasicDBObject obj = new BasicDBObject();
+        if (updatedAfter != null) {
+            obj.put("updatedAfter", updatedAfter);
+        }
+        if (remarksList != null && !remarksList.isEmpty()) {
+            obj.put("remarksList", remarksList);
+        }
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/fetchMcpAuditInfo", "", "POST", obj.toString(), headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb("invalid response in fetchMcpAuditInfo", LoggerMaker.LogDb.RUNTIME);
+                return mcpAuditInfoList;
+            }
+            BasicDBObject payloadObj;
+            try {
+                payloadObj = BasicDBObject.parse(responsePayload);
+                BasicDBList objList = (BasicDBList) payloadObj.get("mcpAuditInfoList");
+                for (Object obj2: objList) {
+                    BasicDBObject auditInfoObj = (BasicDBObject) obj2;
+                    mcpAuditInfoList.add(objectMapper.readValue(auditInfoObj.toJson(), McpAuditInfo.class));
+                }
+            } catch(Exception e) {
+                loggerMaker.errorAndAddToDb("error extracting response in fetchMcpAuditInfo" + e, LoggerMaker.LogDb.RUNTIME);
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in fetchMcpAuditInfo" + e, LoggerMaker.LogDb.RUNTIME);
+        }
+        return mcpAuditInfoList;
+    }
+
 }

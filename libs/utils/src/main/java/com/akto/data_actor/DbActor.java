@@ -691,6 +691,14 @@ public class DbActor extends DataActor {
         DbLayer.storeMcpReconResultsBatch(serverDataList);
     }
 
+    public List<YamlTemplate> fetchMCPThreatProtectionTemplates(Integer updatedAfter) {
+        return DbLayer.fetchMCPThreatProtectionTemplates(updatedAfter);
+    }
+
+    public List<McpAuditInfo> fetchMcpAuditInfo(Integer updatedAfter, List<String> remarksList) {
+        return DbLayer.fetchMcpAuditInfo(updatedAfter, remarksList);
+    }
+
     public List<SlackWebhook> fetchSlackWebhooks() {
         return DbLayer.fetchSlackWebhooks();
     }
