@@ -9373,7 +9373,8 @@
             <result name="UNAUTHORIZED" type="json">
                  <param name="statusCode">403</param>
                  <param name="ignoreHierarchy">false</param>
-                 <param name="includeProperties">^actionErrors.*</param>
+                 <param name="includeProperties">^actorsCounts.*</param>
+                 <param name="includeProperties">^total.*</param>
             </result>
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">THREAT_PROTECTION</param>
@@ -9386,7 +9387,7 @@
                     name="includeProperties">^actionErrors.*</param>
             </result>
             <result name="SUCCESS" type="json">
-                <param name="includeProperties">.*</param>
+                <param name="includeProperties">^(actorsCounts|total).*</param>
             </result>
             <result name="ERROR" type="json">
                 <param name="statusCode">422</param>

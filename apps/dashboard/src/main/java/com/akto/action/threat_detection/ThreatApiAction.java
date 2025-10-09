@@ -48,10 +48,10 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
 
   @Getter int totalAnalysed;
   @Getter int totalAttacks;
-  @Getter int criticalActors;
-  @Getter int totalActive;
-  @Getter int totalIgnored;
-  @Getter int totalUnderReview;
+  @Getter int totalCriticalActors;
+  @Getter int totalActiveStatus;
+  @Getter int totalIgnoredStatus;
+  @Getter int totalUnderReviewStatus;
 
   @Getter List<TopApiData> topApis;
 
@@ -216,10 +216,10 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
                 // Set summary counts
                 this.totalAnalysed = m.getTotalAnalysed();
                 this.totalAttacks = m.getTotalAttacks();
-                this.criticalActors = m.getCriticalActorsCount();
-                this.totalActive = m.getTotalActive();
-                this.totalIgnored = m.getTotalIgnored();
-                this.totalUnderReview = m.getTotalUnderReview();
+                this.totalCriticalActors = m.getCriticalActorsCount();
+                this.totalActiveStatus = m.getTotalActive();
+                this.totalIgnoredStatus = m.getTotalIgnored();
+                this.totalUnderReviewStatus = m.getTotalUnderReview();
               });
     } catch (Exception e) {
       e.printStackTrace();
