@@ -2,6 +2,7 @@ package com.akto.action.test_editor;
 
 import com.akto.action.UserAction;
 import com.akto.action.testing_issues.IssuesAction;
+import com.akto.agent.AgenticUtils;
 import com.akto.dao.AccountSettingsDao;
 import com.akto.dao.AccountsDao;
 import com.akto.dao.CustomAuthTypeDao;
@@ -304,6 +305,8 @@ public class SaveTestEditorAction extends UserAction {
         ApiInfo.ApiInfoKey infoKey = new ApiInfo.ApiInfoKey(apiInfoKey.getInt(ApiInfo.ApiInfoKey.API_COLLECTION_ID),
                 apiInfoKey.getString(ApiInfo.ApiInfoKey.URL),
                 URLMethods.Method.valueOf(apiInfoKey.getString(ApiInfo.ApiInfoKey.METHOD)));
+
+        AgenticUtils.checkAndInitializeAgent(Collections.singleton(infoKey.getApiCollectionId()), true, testConfig.getApiSelectionFilters().getNode());
 
         if (account.getHybridTestingEnabled()) {
             ModuleInfo moduleInfo = ModuleInfoDao.instance.getMCollection().find(Filters.eq(ModuleInfo.MODULE_TYPE, ModuleInfo.ModuleType.MINI_TESTING)).sort(Sorts.descending(ModuleInfo.LAST_HEARTBEAT_RECEIVED)).limit(1).first();
