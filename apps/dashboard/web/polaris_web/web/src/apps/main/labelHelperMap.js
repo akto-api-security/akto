@@ -65,7 +65,8 @@ export const labelMap = {
     "API Security testing": "API Security testing",
     "tests selected": "tests selected",
     "testing": "testing",
-    "Test library":"Test library"
+    "Test library":"Test library",
+    "Endpoint Shield": "API Endpoint Shield"
   },
   "MCP Security": {
     "API Security Posture": "MCP Security Posture",
@@ -135,7 +136,8 @@ export const labelMap = {
     "API Security testing": "MCP Red teaming",
     "tests selected": "probes selected",
     "testing": "scanning",
-    "Test library":"Probe library"
+    "Test library":"Probe library",
+    "Endpoint Shield": "MCP Endpoint Shield"
   },
   "Gen AI": {
     "API Security Posture": "AI Agent Security Posture",
@@ -202,7 +204,8 @@ export const labelMap = {
     "API Security testing": "AI Agent Red teaming",
     "tests selected": "probes selected",
     "testing": "scanning",
-    "Test library":"Probe library"
+    "Test library":"Probe library",
+    "Endpoint Shield": "AI Agent Endpoint Shield"
   },
   "Agentic Security": {
     "API Security Posture": "Agentic Security Posture",
@@ -272,6 +275,7 @@ export const labelMap = {
     "API Security testing": "Agentic Red teaming",
     "tests selected": "probes selected",
     "testing": "scanning",
-    "Test library":"Probe library"
+    "Test library":"Probe library",
+    "Endpoint Shield": "Agentic Endpoint Shield"
   },
 }
