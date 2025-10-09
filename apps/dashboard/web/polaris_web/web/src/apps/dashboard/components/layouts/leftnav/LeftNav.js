@@ -283,6 +283,21 @@ export default function LeftNav() {
                 ],
                 key: "5",
             },
+            ...(dashboardCategory === "Agentic Security" && func.isDemoAccount() ? [{
+                label: (
+                    <Text variant="bodyMd" fontWeight="medium">
+                        Prompt Hardening
+                    </Text>
+                ),
+                icon: AutomationFilledMajor,
+                onClick: () => {
+                    handleSelect("dashboard_prompt_hardening");
+                    navigate("/dashboard/prompt-hardening");
+                    setActive("normal");
+                },
+                selected: leftNavSelected === "dashboard_prompt_hardening",
+                key: "prompt_hardening",
+            }] : []),
             {
                 url: "#",
                 label: (
