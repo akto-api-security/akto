@@ -330,8 +330,6 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
     return SUCCESS.toUpperCase();
   }
 
-  public static int getLimit() { return LIMIT; }
-
   public String fetchThreatTopNData() {
     HttpPost post = new HttpPost(String.format("%s/api/dashboard/get_top_n_data", this.getBackendUrl()));
     post.addHeader("Authorization", "Bearer " + this.getApiToken());
