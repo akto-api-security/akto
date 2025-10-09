@@ -1016,7 +1016,8 @@ public class Main {
                    loggerMaker.infoAndAddToDb("Found debug url: " + requestParams.getURL());
                }
            } catch (Exception e) {
-               loggerMaker.errorAndAddToDb(e, "Error while parsing kafka message " + e);
+               String payloadStr = payload != null ? payload.toString() : "null";
+               loggerMaker.errorAndAddToDb(e, "Error while parsing kafka message | Payload: " + payloadStr);
                continue;
            }
 
