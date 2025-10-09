@@ -51,9 +51,9 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
   @Getter int criticalActors;
   @Getter int totalActive;
   @Getter int totalIgnored;
-  int totalUnderReview;
+  @Getter int totalUnderReview;
 
-  List<TopApiData> topApis;
+  @Getter List<TopApiData> topApis;
 
   // TODO: remove this, use API Executor.
   private final CloseableHttpClient httpClient;
@@ -439,9 +439,6 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
   public void setLatestAttack(List<String> latestAttack) {
     this.latestAttack = latestAttack;
   }
-
   
-  public int getTotalUnderReview() { return totalUnderReview; }
-
 }
 
