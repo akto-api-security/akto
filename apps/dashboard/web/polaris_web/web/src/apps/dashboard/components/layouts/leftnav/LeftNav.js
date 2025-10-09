@@ -318,7 +318,7 @@ export default function LeftNav() {
                     url: "#",
                     key: "7",
                     subNavigationItems: [
-                        ...(dashboardCategory === "API Security" ? [{
+                        ...(dashboardCategory === "API Security" && func.isDemoAccount() ? [{
                             label: "Dashboard",
                             onClick: () => {
                                 navigate("/dashboard/protection/threat-dashboard");
