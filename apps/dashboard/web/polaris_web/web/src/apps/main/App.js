@@ -4,6 +4,7 @@ import SingleTestRunPage from "../dashboard/pages/testing/SingleTestRunPage/Sing
 import AllSensitiveData from "../dashboard/pages/observe/AllSensitiveData/AllSensitiveData";
 import ApiCollections from "../dashboard/pages/observe/api_collections/ApiCollections";
 import ApiQuery from "../dashboard/pages/observe/api_collections/APIQuery";
+import DebugEndpointsMode from "../dashboard/pages/observe/api_collections/DebugEndpointsMode";
 import ApiEndpoints from "../dashboard/pages/observe/api_collections/ApiEndpoints";
 import SensitiveDataExposure from "../dashboard/pages/observe/SensitiveDataExposure/SensitiveDataExposure";
 import SingleRequest from "../dashboard/pages/observe/SingleRequest/SingleRequest";
@@ -180,6 +181,10 @@ const router = createBrowserRouter([
                             {
                                 path: "query_mode",
                                 element: <ApiQuery/>
+                            },
+                            {
+                                path: "debug-endpoints",
+                                element: <DebugEndpointsMode/>
                             },
                             {
                                 path: "changes",
