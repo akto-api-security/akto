@@ -235,6 +235,25 @@ public class ClientActor extends DataActor {
         }
     }
 
+    @Override
+    public void updateTransportType(int apiCollectionId, String transportType) {
+        Map<String, List<String>> headers = buildHeaders();
+        BasicDBObject obj = new BasicDBObject();
+        obj.put("apiCollectionId", apiCollectionId);
+        obj.put("transportType", transportType);
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/updateTransportType", "", "POST", obj.toString(), headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+            if (response.getStatusCode() != 200) {
+                loggerMaker.errorAndAddToDb("non 2xx response in updateTransportType", LoggerMaker.LogDb.RUNTIME);
+                return;
+            }
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error updating transport type" + e + " apiCollectionId " + apiCollectionId
+                    + " transportType " + transportType, LoggerMaker.LogDb.RUNTIME);
+        }
+    }
+
     public APIConfig fetchApiConfig(String configName) {
         Map<String, List<String>> headers = buildHeaders();
         String queryParams = "?configName="+configName;

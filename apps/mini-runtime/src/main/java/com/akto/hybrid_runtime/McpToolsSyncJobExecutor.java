@@ -1,6 +1,7 @@
 package com.akto.hybrid_runtime;
 
 import com.akto.dao.context.Context;
+import com.akto.data_actor.DataActor;
 import com.akto.data_actor.DataActorFactory;
 import com.akto.dto.APIConfig;
 import com.akto.dto.AccountSettings;
@@ -32,6 +33,7 @@ import com.akto.mcp.McpSchema.Tool;
 import com.akto.testing.ApiExecutor;
 import com.akto.util.Constants;
 import com.akto.util.JSONUtils;
+import com.akto.util.McpSseEndpointHelper;
 import com.akto.util.Pair;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.module.SimpleModule;
@@ -57,11 +59,17 @@ public class McpToolsSyncJobExecutor {
 
     private static final LoggerMaker logger = new LoggerMaker(McpToolsSyncJobExecutor.class, LogDb.RUNTIME);
     private static final ObjectMapper mapper = new ObjectMapper();
+    public static final DataActor dataActor = DataActorFactory.fetchInstance();
     public static final String MCP_TOOLS_LIST_REQUEST_JSON =
         "{\"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"" + McpSchema.METHOD_TOOLS_LIST + "\", \"params\": {}}";
     public static final String MCP_RESOURCE_LIST_REQUEST_JSON =
         "{\"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"" + McpSchema.METHOD_RESOURCES_LIST + "\", \"params\": {}}";
     public static final String LOCAL_IP = "127.0.0.1";
+
+    // MCP Transport types
+    private static final String TRANSPORT_SSE = "SSE";
+    private static final String TRANSPORT_HTTP = "HTTP";
+
     private ServerCapabilities mcpServerCapabilities = null;
 
     public static final McpToolsSyncJobExecutor INSTANCE = new McpToolsSyncJobExecutor();
@@ -309,8 +317,8 @@ public class McpToolsSyncJobExecutor {
 
     public Pair<JSONRPCResponse, HttpResponseParams> getMcpMethodResponse(String host, String mcpMethod,
         String mcpMethodRequestJson, ApiCollection apiCollection) throws Exception {
-        OriginalHttpRequest mcpRequest = createRequest(host, mcpMethod, mcpMethodRequestJson);
-        String jsonrpcResponse = sendRequest(mcpRequest);
+        OriginalHttpRequest mcpRequest = createRequest(host, apiCollection, mcpMethodRequestJson);
+        String jsonrpcResponse = sendRequest(mcpRequest, apiCollection);
 
         JSONRPCResponse rpcResponse = (JSONRPCResponse) McpSchema.deserializeJsonRpcMessage(mapper, jsonrpcResponse);
 
@@ -333,8 +341,10 @@ public class McpToolsSyncJobExecutor {
         return new Pair<>(rpcResponse, responseParams);
     }
 
-    private OriginalHttpRequest createRequest(String host, String mcpMethod, String mcpMethodRequestJson) {
-        return new OriginalHttpRequest("",
+    private OriginalHttpRequest createRequest(String host, ApiCollection apiCollection, String mcpMethodRequestJson) {
+        String mcpEndpoint = apiCollection.getSseCallbackUrl();
+
+        return new OriginalHttpRequest(mcpEndpoint,
             null,
             HttpMethod.POST.name(),
             mcpMethodRequestJson,
@@ -347,13 +357,61 @@ public class McpToolsSyncJobExecutor {
         return "{\"Content-Type\":\"application/json\",\"Accept\":\"*/*\",\"host\":\"" + host + "\"}";
     }
 
-    private String sendRequest(OriginalHttpRequest request) throws Exception {
+
+    private String detectAndSetTransportType(OriginalHttpRequest request, ApiCollection apiCollection) throws Exception {
+        // Try SSE first if sseCallbackUrl is set
+        if (apiCollection.getSseCallbackUrl() != null && !apiCollection.getSseCallbackUrl().isEmpty()) {
+            try {
+                logger.info("Attempting to detect transport type for MCP server: {}", apiCollection.getHostName());
+
+                // Clone request for SSE detection to avoid modifying original
+                OriginalHttpRequest sseTestRequest = request.copy();
+                McpSseEndpointHelper.addSseEndpointHeader(sseTestRequest, apiCollection.getId());
+                ApiExecutor.sendRequestWithSse(sseTestRequest, true, null, false,
+                        new ArrayList<>(), false, true);
+
+                // If SSE works, update the collection
+                dataActor.updateTransportType(apiCollection.getId(), TRANSPORT_SSE);
+                logger.info("Detected SSE transport for MCP server: {}", apiCollection.getHostName());
+                return TRANSPORT_SSE;
+            } catch (Exception sseException) {
+                logger.info("SSE transport failed, falling back to HTTP transport: {}", sseException.getMessage());
+                // Fall back to HTTP - no need to test, just store it
+                dataActor.updateTransportType(apiCollection.getId(), TRANSPORT_HTTP);
+                return TRANSPORT_HTTP;
+            }
+        }
+
+        // Default to HTTP if no sseCallbackUrl
+        logger.info("No SSE callback URL found, using HTTP transport for: {}", apiCollection.getHostName());
+        dataActor.updateTransportType(apiCollection.getId(), TRANSPORT_HTTP);
+        return TRANSPORT_HTTP;
+    }
+    private String sendRequest(OriginalHttpRequest request, ApiCollection apiCollection) throws Exception {
         try {
-            OriginalHttpResponse response = ApiExecutor.sendRequestWithSse(request, true, null, false,
-                new ArrayList<>(), false, true);
+            String transportType = apiCollection.getMcpTransportType();
+
+            // If transport type is not set, try to detect it
+            if (transportType == null || transportType.isEmpty()) {
+                transportType = detectAndSetTransportType(request, apiCollection);
+            }
+
+            OriginalHttpResponse response;
+            if (TRANSPORT_HTTP.equals(transportType)) {
+                // Use standard HTTP POST for streamable responses
+                // Use sendRequestSkipSse to prevent ApiExecutor from trying SSE
+                logger.info("Using HTTP transport for MCP server: {}", apiCollection.getHostName());
+                response = ApiExecutor.sendRequestSkipSse(request, true, null, false, new ArrayList<>(), false);
+            } else {
+                // Use SSE transport
+                logger.info("Using SSE transport for MCP server: {}", apiCollection.getHostName());
+                McpSseEndpointHelper.addSseEndpointHeader(request, apiCollection.getId());
+                response = ApiExecutor.sendRequestWithSse(request, true, null, false,
+                        new ArrayList<>(), false, true);
+            }
             return response.getBody();
         } catch (Exception e) {
-            logger.error("Error while making request to MCP server.", e);
+            logger.error("Error while making request to MCP server: {}", e.getMessage(), e);
             throw e;
         }
     }
