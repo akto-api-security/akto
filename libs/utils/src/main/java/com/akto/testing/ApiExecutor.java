@@ -562,7 +562,7 @@ public class ApiExecutor {
 
         if (payload == null) payload = "";
         if (body == null) {// body not created by GRPC block yet
-            if (request.getHeaders().containsKey("charset")) {
+            if (request.getHeaders().containsKey("charset") || isJsonRpcRequest(request)) {
                 body = RequestBody.create(payload, null);
                 request.getHeaders().remove("charset");
             } else {
@@ -747,6 +747,7 @@ public class ApiExecutor {
     }
 
     private static boolean shouldInitiateSSEStream(OriginalHttpRequest request) {
+
         if (!isJsonRpcRequest(request)) {
             return false;
         }
@@ -764,6 +765,10 @@ public class ApiExecutor {
                     return false;
                 }
             }
+        }
+        // Check if x-akto-sse-endpoint header exists, return false if it doesn't
+        if (request.findHeaderValue("x-akto-sse-endpoint") == null) {
+            return false;
         }
         return true;
     }
