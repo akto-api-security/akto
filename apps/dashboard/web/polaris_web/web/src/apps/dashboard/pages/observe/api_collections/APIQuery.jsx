@@ -258,7 +258,9 @@ function APIQuery() {
         setMoreActions(false);
     }, [navigate]);
 
-    const secondaryActionsComp = (
+    const isAktoUser = window.USER_NAME && window.USER_NAME.includes('akto.io');
+
+    const secondaryActionsComp = isAktoUser ? (
         <HorizontalStack gap={2}>
             <Popover
                 active={moreActions}
@@ -282,7 +284,7 @@ function APIQuery() {
                                             content: 'Find Missing Urls',
                                             onAction: findMissingUrls,
                                             prefix: <Box><Icon source={FileMinor} /></Box>,
-                                            disabled: false 
+                                            disabled: false
                                         }
                                     ]
                                 }
@@ -292,7 +294,7 @@ function APIQuery() {
                 </Popover.Pane>
             </Popover>
         </HorizontalStack>
-    )
+    ) : null;
 
     return (
         <PageWithMultipleCards

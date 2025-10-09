@@ -1,4 +1,4 @@
-import { VerticalStack, Card, Button, HorizontalStack, Text, Box, TextField, Banner, Badge, IndexFiltersMode } from "@shopify/polaris";
+import { VerticalStack, Card, Button, HorizontalStack, Text, Box, TextField, Banner, Badge, IndexFiltersMode, Link } from "@shopify/polaris";
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards";
 import TitleWithInfo from "@/apps/dashboard/components/shared/TitleWithInfo"
 import React, { useState } from 'react'
@@ -6,6 +6,7 @@ import GithubServerTable from "../../../components/tables/GithubServerTable";
 import { CellType } from "../../../components/tables/rows/GithubRow";
 import func from "@/util/func";
 import collectionsApi from "./api"
+import { useNavigate } from "react-router-dom";
 
 const resourceName = {
     singular: "URL",
@@ -65,6 +66,7 @@ function DebugEndpointsMode() {
     const [loading, setLoading] = useState(false)
     const [urlsInput, setUrlsInput] = useState('');
     const [dataLoaded, setDataLoaded] = useState(false);
+    const navigate = useNavigate();
 
     const handleAnalyze = async () => {
         if (!urlsInput.trim()) {
@@ -172,6 +174,14 @@ function DebugEndpointsMode() {
         const transformedData = missingUrlsResults.map((result, index) => ({
             ...result,
             id: `${result.url}-${result.collectionId || index}`,
+            collectionId: result.collectionId ? (
+                <Link
+                    removeUnderline
+                    onClick={() => window.open("/dashboard/observe/inventory/" + result.collectionId, '_blank')}
+                >
+                    {result.collectionId}
+                </Link>
+            ) : '',
             apiInfoBadge: (
                 <Badge status={result.apiInfo ? "success" : "critical"}>
                     {result.apiInfo ? "Yes" : "No"}
