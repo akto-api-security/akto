@@ -46,14 +46,14 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave }) => {
     const [enableHarmfulCategories, setEnableHarmfulCategories] = useState(false);
     const [enablePromptAttacks, setEnablePromptAttacks] = useState(false);
     const [harmfulCategoriesSettings, setHarmfulCategoriesSettings] = useState({
-        hate: "high",
-        insults: "high",
-        sexual: "high",
-        violence: "high",
-        misconduct: "high",
+        hate: "HIGH",
+        insults: "HIGH",
+        sexual: "HIGH",
+        violence: "HIGH",
+        misconduct: "HIGH",
         useForResponses: false
     });
-    const [promptAttackLevel, setPromptAttackLevel] = useState("high");
+    const [promptAttackLevel, setPromptAttackLevel] = useState("HIGH");
 
     // Step 3: Denied topics
     const [deniedTopics, setDeniedTopics] = useState([]);
@@ -90,14 +90,14 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave }) => {
         setEnableHarmfulCategories(false);
         setEnablePromptAttacks(false);
         setHarmfulCategoriesSettings({
-            hate: "high",
-            insults: "high",
-            sexual: "high",
-            violence: "high",
-            misconduct: "high",
+            hate: "HIGH",
+            insults: "HIGH",
+            sexual: "HIGH",
+            violence: "HIGH",
+            misconduct: "HIGH",
             useForResponses: false
         });
-        setPromptAttackLevel("high");
+        setPromptAttackLevel("HIGH");
         setDeniedTopics([]);
         setFilterProfanity(false);
         setCustomWords([]);
@@ -285,7 +285,7 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave }) => {
                     Configure content filters by adjusting the degree of filtering to detect and block harmful user inputs and model responses that violate your usage policies.
                 </Text>
                 
-                <LegacyCard sectioned>
+                <div style={{ padding: "16px", border: "1px solid #d1d5db", borderRadius: "8px", backgroundColor: "#FFFFFF" }}>
                     <VerticalStack gap="4">
                         <Text variant="headingMd">Harmful categories</Text>
                         <Text variant="bodyMd" tone="subdued">
@@ -348,9 +348,9 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave }) => {
                             </VerticalStack>
                         )}
                     </VerticalStack>
-                </LegacyCard>
+                </div>
 
-                <LegacyCard sectioned>
+                <div style={{ padding: "16px", border: "1px solid #d1d5db", borderRadius: "8px", backgroundColor: "#FFFFFF" }}>
                     <VerticalStack gap="4">
                         <Text variant="headingMd">Prompt attacks</Text>
                         <Text variant="bodyMd" tone="subdued">
@@ -381,13 +381,12 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave }) => {
                             </Box>
                         )}
                     </VerticalStack>
-                </LegacyCard>
+                </div>
             </VerticalStack>
         </LegacyCard>
     );
 
     const renderStep3 = () => (
-        <LegacyCard sectioned>
             <VerticalStack gap="4">
                 <Text variant="headingMd">Add denied topics</Text>
                 <Text variant="bodyMd" tone="subdued">
@@ -404,7 +403,7 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave }) => {
                 </HorizontalStack>
 
                 {deniedTopics.length > 0 && (
-                    <LegacyCard>
+                    <div style={{ border: "1px solid #d1d5db", borderRadius: "8px", overflow: "hidden" }}>
                         <DataTable
                             columnContentTypes={['text', 'text', 'text']}
                             headings={['Name', 'Definition', 'Sample phrases']}
@@ -414,21 +413,20 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave }) => {
                                 `${topic.samplePhrases.length} phrase${topic.samplePhrases.length !== 1 ? 's' : ''}`
                             ])}
                         />
-                    </LegacyCard>
+                    </div>
                 )}
             </VerticalStack>
-        </LegacyCard>
+
     );
 
     const renderStep4 = () => (
-        <LegacyCard sectioned>
             <VerticalStack gap="4">
                 <Text variant="headingMd">Add word filters</Text>
                 <Text variant="bodyMd" tone="subdued">
                     Use these filters to block certain words and phrases in user inputs and model responses.
                 </Text>
                 
-                <LegacyCard sectioned>
+                <div style={{ padding: "16px", border: "1px solid #d1d5db", borderRadius: "8px", backgroundColor: "#FFFFFF" }}>
                     <VerticalStack gap="3">
                         <Text variant="headingMd">Profanity filter</Text>
                         <Checkbox
@@ -438,9 +436,9 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave }) => {
                             helpText="Enable this feature to block profane words in user inputs and model responses. The list of words is based on the global definition of profanity and is subject to change."
                         />
                     </VerticalStack>
-                </LegacyCard>
+                </div>
 
-                <LegacyCard sectioned>
+                <div style={{ padding: "16px", border: "1px solid #d1d5db", borderRadius: "8px", backgroundColor: "#FFFFFF" }}>
                     <VerticalStack gap="3">
                         <Text variant="headingMd">Add custom words and phrases</Text>
                         <Text variant="bodyMd" tone="subdued">
@@ -480,9 +478,8 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave }) => {
                             </Box>
                         )}
                     </VerticalStack>
-                </LegacyCard>
+                </div>
             </VerticalStack>
-        </LegacyCard>
     );
 
     const renderStep5 = () => (
@@ -507,7 +504,7 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave }) => {
                 </HorizontalStack>
 
                 {piiTypes.length > 0 && (
-                    <LegacyCard>
+                    <div style={{ border: "1px solid #d1d5db", borderRadius: "8px", overflow: "hidden" }}>
                         <DataTable
                             columnContentTypes={['text', 'text']}
                             headings={['Choose PII type', 'Guardrail behavior']}
@@ -516,7 +513,7 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave }) => {
                                 pii.behavior.charAt(0).toUpperCase() + pii.behavior.slice(1)
                             ])}
                         />
-                    </LegacyCard>
+                    </div>
                 )}
 
                 <Button onClick={() => setShowAddPiiModal(true)}>Add new PII</Button>
@@ -533,14 +530,13 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave }) => {
 
 
     const renderStep6 = () => (
-        <LegacyCard sectioned>
             <VerticalStack gap="4">
                 <Text variant="headingMd">Review and create</Text>
                 <Text variant="bodyMd" tone="subdued">
                     Review your guardrail configuration and create the guardrail.
                 </Text>
                 
-                <LegacyCard sectioned>
+                <div style={{ padding: "16px", border: "1px solid #d1d5db", borderRadius: "8px", backgroundColor: "#FFFFFF" }}>
                     <VerticalStack gap="3">
                         <Text variant="headingMd">Guardrail Summary</Text>
                         <Text variant="bodyMd"><strong>Name:</strong> {name || "Not specified"}</Text>
@@ -550,9 +546,8 @@ const CreateGuardrailModal = ({ isOpen, onClose, onSave }) => {
                         <Text variant="bodyMd"><strong>Word Filters:</strong> {filterProfanity || customWords.length > 0 ? "Enabled" : "Disabled"}</Text>
                         <Text variant="bodyMd"><strong>PII Filters:</strong> {piiTypes.length} types</Text>
                     </VerticalStack>
-                </LegacyCard>
+                </div>
             </VerticalStack>
-        </LegacyCard>
     );
 
     const renderCurrentStep = () => {

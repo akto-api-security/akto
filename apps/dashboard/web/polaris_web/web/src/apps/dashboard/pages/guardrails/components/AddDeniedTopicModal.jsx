@@ -147,7 +147,7 @@ const AddDeniedTopicModal = ({ isOpen, onClose, onSave, existingTopic = null }) 
                                         </HorizontalStack>
 
                                         {samplePhrases.length > 0 && (
-                                            <LegacyCard sectioned>
+                                            <div style={{ padding: "16px", border: "1px solid #d1d5db", borderRadius: "8px", backgroundColor: "#f9fafb" }}>
                                                 <VerticalStack gap="2">
                                                     <Text variant="headingMd">Sample phrases ({samplePhrases.length}/5)</Text>
                                                     {samplePhrases.map((phrase, index) => (
@@ -157,7 +157,7 @@ const AddDeniedTopicModal = ({ isOpen, onClose, onSave, existingTopic = null }) 
                                                                     padding: "8px 12px", 
                                                                     border: "1px solid #d1d5db", 
                                                                     borderRadius: "6px",
-                                                                    backgroundColor: "#f9fafb",
+                                                                    backgroundColor: "#ffffff",
                                                                     flexGrow: 1,
                                                                     marginRight: "8px"
                                                                 }}
@@ -173,7 +173,7 @@ const AddDeniedTopicModal = ({ isOpen, onClose, onSave, existingTopic = null }) 
                                                         </HorizontalStack>
                                                     ))}
                                                 </VerticalStack>
-                                            </LegacyCard>
+                                            </div>
                                         )}
                                     </VerticalStack>
                                 </Box>
