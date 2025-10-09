@@ -1,6 +1,7 @@
 package com.akto.testing;
 
 import com.akto.PayloadEncodeUtil;
+import com.akto.agent.AgenticUtils;
 import com.akto.crons.GetRunningTestsStatus;
 import com.akto.dao.context.Context;
 import com.akto.dao.test_editor.YamlTemplateDao;
@@ -276,6 +277,7 @@ public class TestExecutor {
 
             // create count down latch to know when inserting kafka records are completed.
             CountDownLatch latch = new CountDownLatch(apiInfoKeyList.size());
+            AgenticUtils.checkAndInitializeAgent(Main.extractApiCollectionIds(apiInfoKeyList), false, null);
             int tempRunTime = 10 * 60;
             if(!Constants.IS_NEW_TESTING_ENABLED){
                 tempRunTime = testingRun.getTestRunTime() <= 0 ? 30*60 : testingRun.getTestRunTime();

@@ -1,6 +1,8 @@
 package com.akto.testing;
 
 import com.akto.RuntimeMode;
+import com.akto.agent.AgentClient;
+import com.akto.agent.AgenticUtils;
 import com.akto.billing.UsageMetricUtils;
 import com.akto.crons.GetRunningTestsStatus;
 import com.akto.dao.context.Context;
@@ -118,6 +120,7 @@ public class Main {
         ApiInfo.ApiInfoKey infoKey = testingRunPlayground.getApiInfoKey();
 
         List<String> sampleData = testingRunPlayground.getSamples(); // get sample data from DB
+        AgenticUtils.checkAndInitializeAgent(Collections.singleton(infoKey.getApiCollectionId()), true, testConfig.getApiSelectionFilters().getNode());
 
         List<TestingRunResult.TestLog> testLogs = new ArrayList<>();
         Map<ApiInfo.ApiInfoKey, List<String>> sampleDataMap = new HashMap<>();
