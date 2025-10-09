@@ -562,7 +562,7 @@ public class ApiExecutor {
 
         if (payload == null) payload = "";
         if (body == null) {// body not created by GRPC block yet
-            if (request.getHeaders().containsKey("charset")) {
+            if (request.getHeaders().containsKey("charset") || isJsonRpcRequest(request)) {
                 body = RequestBody.create(payload, null);
                 request.getHeaders().remove("charset");
             } else {
@@ -753,6 +753,11 @@ public class ApiExecutor {
 
         if (!Method.POST.name().equalsIgnoreCase(request.getMethod())) {
             return true;
+        }
+
+        // Return false for streamable HTTP requests for MCP
+        if ("/mcp".equals(request.getPath())) {
+            return false;
         }
 
         for (Map.Entry<String, List<String>> entry : request.getHeaders().entrySet()) {
