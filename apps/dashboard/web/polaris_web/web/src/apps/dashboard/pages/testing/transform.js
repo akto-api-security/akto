@@ -1309,6 +1309,28 @@ getMissingConfigs(testResults){
       apiCollectionName: collectionsMap?.[api.apiCollectionId] || ""
     }));
     return testingEndpointsApisList;
+  },
+  prepareConversationsList(agentConversationResults){
+    let conversationsListCopy = []
+    agentConversationResults.forEach(conversation => {
+        let commonObj = {
+            creationTimestamp: conversation.timestamp,
+            conversationId: conversation.conversationId,
+        }
+        conversationsListCopy.push({
+            ...commonObj,
+            _id: "user_" + conversation.prompt,
+            message: conversation.prompt,
+            role: "user"
+        })
+        conversationsListCopy.push({
+            ...commonObj,
+            _id: "system_" + conversation.response,
+            message: conversation.response,
+            role: "system"
+        })
+    })
+    return conversationsListCopy;
   }
 }
 

@@ -35,6 +35,7 @@ import com.akto.dto.type.RequestTemplate;
 import com.akto.dto.type.SingleTypeInfo;
 import com.akto.dto.type.URLMethods;
 import com.akto.dto.type.URLTemplate;
+import com.akto.mcp.McpRequestResponseUtils;
 import com.akto.test_editor.Utils;
 import com.akto.test_editor.execution.VariableResolver;
 import com.akto.test_editor.filter.data_operands_impl.*;
@@ -132,6 +133,8 @@ public final class FilterAction {
                 return applyFilterOnCountryCode(filterActionRequest);
             case "nlp_classification":
                 return applyFilterOnNlpClassification(filterActionRequest);
+            case "test_type":
+                return applyFilterOnTestType(filterActionRequest);
                 
             default:
                 return new DataOperandsFilterResponse(false, null, null, null);
@@ -313,6 +316,21 @@ public final class FilterAction {
         ValidationResult res = invokeFilter(dataOperandFilterRequest);
         return new DataOperandsFilterResponse(res.getIsValid(), null, null, null, res.getValidationReason());
     }
+
+    // apply filter on test types
+    public DataOperandsFilterResponse applyFilterOnTestType(FilterActionRequest filterActionRequest) {
+        RawApi rawApi = filterActionRequest.fetchRawApiBasedOnContext();
+        if (rawApi == null || rawApi.getRequest() == null) {
+            return new DataOperandsFilterResponse(false, null, null, null);
+        }
+        boolean isMcpRequest = McpRequestResponseUtils.isMcpRequest(rawApi);
+        if (isMcpRequest) {
+            return new DataOperandsFilterResponse(true, null, null, null);
+        } else {
+            return new DataOperandsFilterResponse(false, null, null, null, "The request is not an MCP request");
+        }
+    }
+
 
     public DataOperandsFilterResponse applyFilterOnRequestPayload(FilterActionRequest filterActionRequest) {
 
