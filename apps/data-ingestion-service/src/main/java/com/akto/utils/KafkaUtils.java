@@ -44,7 +44,7 @@ public class KafkaUtils {
         obj.put("daemonset_id", payload.getDaemonset_id());
         obj.put("enabled_graph", payload.getEnabled_graph());
         obj.put("tag", payload.getTag());
-        kafkaProducer.send(obj.toString(), topicName);
+        kafkaProducer.send(obj.toString(), "akto.api.logs");
     }
 
 }
