@@ -80,7 +80,7 @@ function DastProgress() {
             setLoading(true)
             const resp = await api.fetchAllDastScans()
 
-            const crawlerRuns = resp.crawlerRuns || []
+            const crawlerRuns = resp || []
             const formattedData = crawlerRuns.map((run) => {
                 const duration = run.endTimestamp > 0 && run.startTimestamp > 0
                     ? func.prettifyEpochDuration(run.endTimestamp - run.startTimestamp)

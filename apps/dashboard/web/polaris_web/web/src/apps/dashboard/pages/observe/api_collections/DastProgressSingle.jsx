@@ -1,10 +1,9 @@
 import { useEffect, useState } from "react"
 import { useParams, useNavigate } from "react-router-dom"
-import { Box, IndexFiltersMode, Text, Page, Button, HorizontalStack, Badge, Card, VerticalStack, Divider } from "@shopify/polaris"
-import { ArrowLeftMinor } from "@shopify/polaris-icons"
+import { Box, IndexFiltersMode, Text, HorizontalStack, Badge, Card, VerticalStack, Divider } from "@shopify/polaris"
 import GithubSimpleTable from "@/apps/dashboard/components/tables/GithubSimpleTable"
-import request from "@/util/request"
 import func from "@/util/func"
+import api from "./api"
 import SpinnerCentered from "@/apps/dashboard/components/progress/SpinnerCentered"
 import TooltipText from "@/apps/dashboard/components/shared/TooltipText"
 import PageWithMultipleCards from "../../../components/layouts/PageWithMultipleCards"
@@ -54,13 +53,9 @@ function DastProgressSingle() {
     const fetchDastScan = async () => {
         try {
             setLoading(true)
-            const resp = await request({
-                url: '/api/fetchDastScan',
-                method: 'post',
-                data: { crawlId }
-            })
+            const resp = await api.fetchDastScan(crawlId)
 
-            const crawlerUrls = resp.crawlerUrls || []
+            const crawlerUrls = resp || []
             const formattedData = crawlerUrls.map((urlItem, index) => {
                 const status = urlItem.accepted ? "Visited" : "Rejected"
                 const statusColor = urlItem.accepted ? "success" : "warning"

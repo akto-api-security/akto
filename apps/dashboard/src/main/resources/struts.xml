@@ -2670,6 +2670,7 @@
                 <param name="featureLabel">AKTO_DAST</param>
             </interceptor-ref>
             <result name="SUCCESS"  type="json">
+                <param name="root">crawlId</param>
             </result>
             <result name="ERROR" type="json">
                 <param name="statusCode">422</param>
@@ -2700,6 +2701,7 @@
                 <param name="featureLabel">AKTO_DAST</param>
             </interceptor-ref>
             <result name="SUCCESS"  type="json">
+                <param name="root">crawlerRuns</param>
             </result>
             <result name="ERROR" type="json">
                 <param name="statusCode">422</param>
@@ -2730,6 +2732,7 @@
                 <param name="featureLabel">AKTO_DAST</param>
             </interceptor-ref>
             <result name="SUCCESS"  type="json">
+                <param name="root">crawlerUrls</param>
             </result>
             <result name="ERROR" type="json">
                 <param name="statusCode">422</param>

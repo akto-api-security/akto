@@ -8,7 +8,6 @@ import {
     StarFilledMinor,
     FinancesMinor,
     LockMajor,
-    AutomationFilledMajor,
 } from "@shopify/polaris-icons";
 import {useLocation, useNavigate} from "react-router-dom";
 
@@ -22,7 +21,7 @@ import func from "@/util/func";
 import Dropdown from "../Dropdown";
 import SessionStore from "../../../../main/SessionStore";
 import IssuesStore from "../../../pages/issues/issuesStore";
-import { mapLabel } from "../../../../main/labelHelper";
+import { CATEGORY_API_SECURITY, mapLabel } from "../../../../main/labelHelper";
 
 export default function LeftNav() {
     const navigate = useNavigate();
@@ -163,7 +162,7 @@ export default function LeftNav() {
                         },
                         selected: leftNavSelected === "dashboard_observe_sensitive",
                     },
-                    ...(window?.STIGG_FEATURE_WISE_ALLOWED?.AKTO_DAST?.isGranted ? [{
+                    ...(window?.STIGG_FEATURE_WISE_ALLOWED?.AKTO_DAST?.isGranted && dashboardCategory == CATEGORY_API_SECURITY ? [{
                         label: "DAST scans",
                         onClick: () => {
                             navigate("/dashboard/observe/dast-progress");

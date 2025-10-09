@@ -1,17 +1,28 @@
 package com.akto.dto;
 
+import lombok.Getter;
+import lombok.Setter;
+
 public class CrawlerUrl {
 
     public static final String URL = "url";
+    @Getter
+    @Setter
     private String url;
 
     public static final String ACCEPTED = "accepted";
+    @Getter
+    @Setter
     private boolean accepted;
 
     public static final String TIMESTAMP = "timestamp";
+    @Getter
+    @Setter
     private int timestamp;
 
     public static final String CRAWL_ID = "crawlId";
+    @Getter
+    @Setter
     private String crawlId;
 
     public CrawlerUrl() {
@@ -21,38 +32,6 @@ public class CrawlerUrl {
         this.url = url;
         this.accepted = accepted;
         this.timestamp = timestamp;
-        this.crawlId = crawlId;
-    }
-
-    public String getUrl() {
-        return url;
-    }
-
-    public void setUrl(String url) {
-        this.url = url;
-    }
-
-    public boolean isAccepted() {
-        return accepted;
-    }
-
-    public void setAccepted(boolean accepted) {
-        this.accepted = accepted;
-    }
-
-    public int getTimestamp() {
-        return timestamp;
-    }
-
-    public void setTimestamp(int timestamp) {
-        this.timestamp = timestamp;
-    }
-
-    public String getCrawlId() {
-        return crawlId;
-    }
-
-    public void setCrawlId(String crawlId) {
         this.crawlId = crawlId;
     }
 
