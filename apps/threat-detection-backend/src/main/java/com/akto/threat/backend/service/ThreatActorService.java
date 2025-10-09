@@ -22,6 +22,7 @@ import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.Th
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatActorByCountryRequest;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatActorByCountryResponse;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ListThreatActorResponse.ActivityData;
+import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchTopNDataResponse;
 import com.akto.ProtoMessageUtils;
 import com.akto.threat.backend.constants.MongoDBCollection;
 import com.akto.threat.backend.db.ActorInfoModel;
@@ -32,7 +33,6 @@ import com.akto.threat.backend.utils.ThreatUtils;
 import com.google.protobuf.TextFormat;
 import com.mongodb.client.*;
 import com.mongodb.client.model.Filters;
-import com.mongodb.client.model.Indexes;
 import com.mongodb.client.model.Updates;
 import com.mongodb.client.model.Sorts;
 
@@ -651,7 +651,7 @@ public class ThreatActorService {
         return ModifyThreatActorStatusResponse.newBuilder().build();
       }
 
-  public com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchTopNDataResponse fetchTopNData(
+  public FetchTopNDataResponse fetchTopNData(
       String accountId, long startTs, long endTs, List<String> latestAttackList, int limit) {
 
     MongoCollection<Document> coll = this.mongoClient
@@ -709,13 +709,13 @@ public class ThreatActorService {
     // Limit results
     pipeline.add(new Document("$limit", limit > 0 ? limit : 10));
 
-    List<com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchTopNDataResponse.TopApiData> topApis = new ArrayList<>();
+    List<FetchTopNDataResponse.TopApiData> topApis = new ArrayList<>();
 
     try (MongoCursor<Document> cursor = coll.aggregate(pipeline).cursor()) {
       while (cursor.hasNext()) {
         Document doc = cursor.next();
         topApis.add(
-            com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchTopNDataResponse.TopApiData.newBuilder()
+            FetchTopNDataResponse.TopApiData.newBuilder()
                 .setEndpoint(doc.getString("endpoint"))
                 .setMethod(doc.getString("method"))
                 .setAttacks(doc.getInteger("attacks"))
@@ -724,7 +724,7 @@ public class ThreatActorService {
       }
     }
 
-    return com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchTopNDataResponse.newBuilder()
+    return FetchTopNDataResponse.newBuilder()
         .addAllTopApis(topApis)
         .build();
   }
