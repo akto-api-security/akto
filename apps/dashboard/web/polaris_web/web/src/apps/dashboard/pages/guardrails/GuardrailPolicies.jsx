@@ -1,6 +1,7 @@
 import { useReducer, useState, useEffect } from "react";
 import { Box, EmptySearchResult, HorizontalStack, Popover, ActionList, Button, Icon, Badge} from '@shopify/polaris';
 import {CancelMinor, EditMinor, FileMinor, HideMinor, ViewMinor} from '@shopify/polaris-icons';
+import CreateGuardrailModal from "./components/CreateGuardrailModal";
 import DateRangeFilter from "../../components/layouts/DateRangeFilter";
 import PageWithMultipleCards from "../../components/layouts/PageWithMultipleCards";
 import func from "@/util/func";
@@ -73,7 +74,9 @@ const sortOptions = [
 
 function GuardrailPolicies() {
     const [showDetails, setShowDetails] = useState(false);
-    const [sampleData, setSampleData] = useState([])
+    const [sampleData, setSampleData] = useState([]);
+    const [showCreateModal, setShowCreateModal] = useState(false);
+    const [policyData, setPolicyData] = useState(guardRailData.policies);
   
 
     const emptyStateMarkup = (
@@ -82,8 +85,6 @@ function GuardrailPolicies() {
           withIllustration
         />
       );
-      
-    const policyData = guardRailData.policies
 
     const rowClicked = async(data) => {
         setShowDetails(true)
@@ -116,10 +117,55 @@ function GuardrailPolicies() {
     return actionItems
     }
 
+    const handleCreateGuardrail = async (guardrailData) => {
+        console.log("Creating guardrail:", guardrailData);
+        
+        // Determine severity based on configuration
+        let severity = "Low";
+        if (guardrailData.contentFilters?.harmfulCategories || guardrailData.contentFilters?.promptAttacks) {
+            severity = "High";
+        } else if (guardrailData.deniedTopics?.length > 0 || guardrailData.piiFilters?.length > 0) {
+            severity = "Medium";
+        }
+
+        // Determine category based on configuration
+        let category = "Content Safety";
+        if (guardrailData.piiFilters?.length > 0) {
+            category = "Data Privacy";
+        } else if (guardrailData.deniedTopics?.length > 0) {
+            category = "Topic Filtering";
+        }
+
+        const now = new Date();
+        const formattedDate = now.toLocaleDateString('en-US', { 
+            month: 'short', 
+            day: 'numeric', 
+            year: 'numeric' 
+        });
+
+        const newPolicy = {
+            id: Date.now().toString(),
+            policy: guardrailData.name,
+            category: category,
+            severity: severity.toUpperCase(),
+            severityComp: (
+                <div className={`badge-wrapper-${severity.toUpperCase()}`}>
+                    <Badge size="small">{severity.toUpperCase()}</Badge>
+                </div>
+            ),
+            createdTs: formattedDate,
+            yaml: `# ${guardrailData.name}\n# ${guardrailData.description || 'No description provided'}\n\nname: ${guardrailData.name}\ndescription: ${guardrailData.description || ''}\nblockedMessage: ${guardrailData.blockedMessage}\napplyToResponses: ${guardrailData.applyToResponses}\n\n# Configuration summary:\n# - Content filters: ${guardrailData.contentFilters?.harmfulCategories || guardrailData.contentFilters?.promptAttacks ? 'Enabled' : 'Disabled'}\n# - Denied topics: ${guardrailData.deniedTopics?.length || 0} topics\n# - Word filters: ${guardrailData.wordFilters?.profanity || (guardrailData.wordFilters?.custom?.length > 0) ? 'Enabled' : 'Disabled'}\n# - PII filters: ${guardrailData.piiFilters?.length || 0} types`
+        };
+
+        setPolicyData(prevPolicies => [...prevPolicies, newPolicy]);
+        func.setToast(true, false, "Guardrail created successfully");
+        setShowCreateModal(false);
+    };
+
 
       const components = [
         <GithubSimpleTable
-            key={0}
+            key={`policies-table-${policyData.length}`}
             resourceName={resourceName}
             useNewRow={true}
             headers={headings}
@@ -146,6 +192,12 @@ function GuardrailPolicies() {
             showDivider={true}
             newComp={true}
             isHandleClose={false}
+        />,
+        <CreateGuardrailModal
+            key={2}
+            isOpen={showCreateModal}
+            onClose={() => setShowCreateModal(false)}
+            onSave={handleCreateGuardrail}
         />
     ];
 
@@ -158,6 +210,7 @@ function GuardrailPolicies() {
                 />
             }
             isFirstPage={true}
+            primaryAction={<Button primary onClick={() => setShowCreateModal(true)}>Create Guardrail</Button>}
             components={components}
         />
 }
