@@ -177,4 +177,66 @@ public class AgentClient {
     public static boolean isRawApiValidForAgenticTest(RawApi rawApi) {
         return rawApi.getRequest().getHeaders().containsKey("x-agent-conversations");
     }
+    
+    public boolean performHealthCheck() {
+        try {
+            OriginalHttpRequest healthRequest = buildHealthCheckRequest();
+            OriginalHttpResponse response = ApiExecutor.sendRequest(healthRequest, true, testingRunConfig, false, new ArrayList<>(), true);
+            
+            return response.getStatusCode() == 200;
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Agent health check failed with exception: " + e.getMessage(), LogDb.TESTING);
+            return false;
+        }
+    }
+    public void initializeAgent(String sseUrl, String authorizationToken) {
+        try {
+            OriginalHttpRequest initRequest = buildInitializeRequest(sseUrl, authorizationToken);
+            ApiExecutor.sendRequest(initRequest, true, testingRunConfig, false, new ArrayList<>(), true);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Agent initialization failed with exception: " + e.getMessage(), LogDb.TESTING);
+        }
+    }
+    
+    private OriginalHttpRequest buildHealthCheckRequest() {
+        Map<String, List<String>> headers = new HashMap<>();
+        headers.put("Accept", Arrays.asList("application/json"));
+        
+        return new OriginalHttpRequest(
+            agentBaseUrl + "/health",
+            null,
+            "GET",
+            null,
+            headers,
+            null
+        );
+    }
+    
+    private OriginalHttpRequest buildInitializeRequest(String sseUrl, String authorizationToken) {
+        Map<String, List<String>> headers = new HashMap<>();
+        headers.put("Content-Type", Arrays.asList("application/json"));
+        headers.put("Accept", Arrays.asList("application/json"));
+       
+        
+        Map<String, Object> requestBody = new HashMap<>();
+        requestBody.put("sseUrl", sseUrl);
+        requestBody.put("authorization", authorizationToken);
+        
+        String body;
+        try {
+            body = objectMapper.writeValueAsString(requestBody);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error serializing initialize request body: " + e.getMessage(), LogDb.TESTING);
+            body = "{\"sseUrl\":\"" + sseUrl.replace("\"", "\\\"") + "\"}";
+        }
+        
+        return new OriginalHttpRequest(
+            agentBaseUrl + "/initializeMCP",
+            null,
+            "POST",
+            body,
+            headers,
+            null
+        );
+    }
 }
