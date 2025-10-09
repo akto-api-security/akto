@@ -30,6 +30,7 @@ message ListMaliciousRequestsResponse {
       string status = 18;
       bool successful_exploit = 19;
       string label = 20;  // Common values: "threat", "guardrail"
+      string host = 21;   // Host header from the request
     }
     repeated MaliciousEvent malicious_events = 1;
     uint64 total = 2;

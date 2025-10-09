@@ -419,6 +419,14 @@ public class MaliciousTrafficDetectorTask implements Task {
       HttpResponseParams responseParam,
       SampleMaliciousRequest maliciousReq,
       EventType eventType) {
+    
+    // Extract host from request headers
+    String host = null;
+    Map<String, List<String>> requestHeaders = responseParam.getRequestParams().getHeaders();
+    if (requestHeaders != null && requestHeaders.containsKey("host") && !requestHeaders.get("host").isEmpty()) {
+      host = requestHeaders.get("host").get(0);
+    }
+    
     MaliciousEventMessage maliciousEvent =
         MaliciousEventMessage.newBuilder()
             .setFilterId(apiFilter.getId())
@@ -437,6 +445,7 @@ public class MaliciousTrafficDetectorTask implements Task {
             .setMetadata(maliciousReq.getMetadata())
             .setType("Rule-Based")
             .setSuccessfulExploit(maliciousReq.getSuccessfulExploit())
+            .setHost(host != null ? host : "")
             .build();
     MaliciousEventKafkaEnvelope envelope =
         MaliciousEventKafkaEnvelope.newBuilder()
