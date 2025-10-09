@@ -9373,7 +9373,8 @@
             <result name="UNAUTHORIZED" type="json">
                  <param name="statusCode">403</param>
                  <param name="ignoreHierarchy">false</param>
-                 <param name="includeProperties">^actionErrors.*</param>
+                 <param name="includeProperties">^actorsCounts.*</param>
+                 <param name="includeProperties">^total.*</param>
             </result>
             <interceptor-ref name="roleAccessInterceptor">
                 <param name="featureLabel">THREAT_PROTECTION</param>
@@ -9386,13 +9387,45 @@
                     name="includeProperties">^actionErrors.*</param>
             </result>
             <result name="SUCCESS" type="json">
-                <param name="includeProperties">^actorsCounts.*</param>
+                <param name="includeProperties">^(actorsCounts|total).*</param>
             </result>
             <result name="ERROR" type="json">
                 <param name="statusCode">422</param>
                 <param name="ignoreHierarchy">false</param>
                 <param
                     name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/fetchThreatTopNData"
+            class="com.akto.action.threat_detection.ThreatApiAction"
+            method="fetchThreatTopNData">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="usageInterceptor">
+                <param name="featureLabel">THREAT_DETECTION</param>
+            </interceptor-ref>
+            <result name="UNAUTHORIZED" type="json">
+                 <param name="statusCode">403</param>
+                 <param name="ignoreHierarchy">false</param>
+                 <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">THREAT_PROTECTION</param>
+                <param name="accessType">READ</param>
+            </interceptor-ref>
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="SUCCESS" type="json">
+                <param name="includeProperties">^topApis.*</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
             </result>
         </action>
 
