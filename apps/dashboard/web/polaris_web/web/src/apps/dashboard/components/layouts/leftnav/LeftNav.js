@@ -181,6 +181,15 @@ export default function LeftNav() {
                         },
                         selected: leftNavSelected === "dashboard_observe_audit",
                     }] : []),
+                    ...((dashboardCategory === "MCP Security" || dashboardCategory === "Agentic Security") ? [{
+                        label: "Endpoint Shield",
+                        onClick: () => {
+                            navigate("/dashboard/observe/endpoint-shield");
+                            handleSelect("dashboard_observe_endpoint_shield");
+                            setActive("active");
+                        },
+                        selected: leftNavSelected === "dashboard_observe_endpoint_shield",
+                    }] : []),
                 ],
                 key: "3",
             },
