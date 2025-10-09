@@ -275,7 +275,7 @@ export default function LeftNav() {
                 ],
                 key: "5",
             },
-            ...(dashboardCategory === "Gen AI" && window.ACTIVE_ACCOUNT === 1667235738 ? [{
+            ...(dashboardCategory === "Agentic Security" && func.isDemoAccount() ? [{
                 label: (
                     <Text variant="bodyMd" fontWeight="medium">
                         Prompt Hardening
