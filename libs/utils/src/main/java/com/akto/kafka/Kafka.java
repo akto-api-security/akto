@@ -5,6 +5,8 @@ import org.apache.kafka.clients.producer.*;
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.util.Properties;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -110,7 +112,7 @@ public class Kafka {
     };
 
     ProducerRecord<String, String> record = new ProducerRecord<>(topic, message);
-    producer.send(record, new DemoProducerCallback(message));
+    producer.send(record, new DemoProducerCallback(message, topic));
   }
 
   public void close() {
@@ -164,15 +166,29 @@ public class Kafka {
 
   private class DemoProducerCallback implements Callback {
     private final String payload;
+    private final String topic;
 
-    public DemoProducerCallback(String payload) {
+    public DemoProducerCallback(String payload, String topic) {
       this.payload = payload;
+      this.topic = topic;
     }
 
     @Override
     public void onCompletion(RecordMetadata recordMetadata, Exception e) {
       if (e != null) {
-        loggerMaker.sendImpErrorLogs("onCompletion error stack trace: " + e.getLocalizedMessage() + " error message " + e.getMessage() + "stack trace " + e.getStackTrace() + ", payload: " + payload, LogDb.DATA_INGESTION);
+        StringWriter sw = new StringWriter();
+        PrintWriter pw = new PrintWriter(sw);
+        e.printStackTrace(pw);
+        String stackTrace = sw.toString();
+
+        loggerMaker.sendImpErrorLogs(
+          "Kafka onCompletion error: " + e.getMessage() +
+          " | Topic: " + topic +
+          " | Exception class: " + e.getClass().getName() +
+          " | Payload: " + payload +
+          " | Stack trace: " + stackTrace,
+          LogDb.DATA_INGESTION
+        );
       }
     }
   }
