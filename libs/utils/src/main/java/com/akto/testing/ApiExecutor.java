@@ -747,17 +747,13 @@ public class ApiExecutor {
     }
 
     private static boolean shouldInitiateSSEStream(OriginalHttpRequest request) {
+
         if (!isJsonRpcRequest(request)) {
             return false;
         }
 
         if (!Method.POST.name().equalsIgnoreCase(request.getMethod())) {
             return true;
-        }
-
-        // Return false for streamable HTTP requests for MCP
-        if ("/mcp".equals(request.getPath())) {
-            return false;
         }
 
         for (Map.Entry<String, List<String>> entry : request.getHeaders().entrySet()) {
@@ -769,6 +765,10 @@ public class ApiExecutor {
                     return false;
                 }
             }
+        }
+        // Check if x-akto-sse-endpoint header exists, return false if it doesn't
+        if (request.findHeaderValue("x-akto-sse-endpoint") == null) {
+            return false;
         }
         return true;
     }
