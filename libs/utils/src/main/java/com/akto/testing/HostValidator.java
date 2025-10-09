@@ -57,9 +57,9 @@ public class HostValidator {
 
         OkHttpClient client = HTTPClientHandler.instance.getHTTPClient(followRedirects, requestProtocol);
 
-        // if (!SKIP_SSRF_CHECK && !HostDNSLookup.isRequestValid(request.url().host())) {
-        //     throw new IllegalArgumentException("SSRF attack attempt");
-        // }
+        if (!SKIP_SSRF_CHECK && !HostDNSLookup.isRequestValid(request.url().host())) {
+            throw new IllegalArgumentException("SSRF attack attempt");
+        }
 
         Call call = client.newCall(request);
         Response response = null;
