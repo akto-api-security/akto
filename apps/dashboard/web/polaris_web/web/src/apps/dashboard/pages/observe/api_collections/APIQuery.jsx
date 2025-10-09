@@ -307,7 +307,7 @@ function APIQuery() {
             primaryAction={<Button id={"explore-mode-query-page"} primary secondaryActions onClick={handleClick}>{primaryActionLabel}</Button>}
             secondaryActions={secondaryActionsComp}
             components={components}
-            backUrl="/dashboard/observe/inventory"
+            backUrl="dashboard/observe/query_mode"
         />
     )
 }

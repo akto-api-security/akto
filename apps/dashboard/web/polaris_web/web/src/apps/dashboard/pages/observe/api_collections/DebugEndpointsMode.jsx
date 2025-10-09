@@ -96,7 +96,6 @@ function DebugEndpointsMode() {
                 return;
             }
 
-            console.log("Missing URLs Results:", response);
             setMissingUrlsResults(response);
             setDataLoaded(true);
             func.setToast(true, false, `Analysis complete! Found ${response.length} results.`);
@@ -169,7 +168,7 @@ function DebugEndpointsMode() {
         </Card>
     ) : null;
 
-    async function fetchData(sortKey, sortOrder, skip, limit, filters) {
+    async function fetchData(sortKey, sortOrder, skip, limit, filters, filterOperators, queryValue) {
         // Transform data for GithubServerTable
         const transformedData = missingUrlsResults.map((result, index) => ({
             ...result,
@@ -194,8 +193,15 @@ function DebugEndpointsMode() {
             ),
         }));
 
+        // Apply search filter
+        const filteredData = queryValue && typeof queryValue === 'string'
+            ? transformedData.filter(item =>
+                item.url.toLowerCase().includes(queryValue.toLowerCase())
+              )
+            : transformedData;
+
         // Apply sorting
-        const sortedData = [...transformedData].sort((a, b) => {
+        const sortedData = [...filteredData].sort((a, b) => {
             const aVal = a[sortKey] || '';
             const bVal = b[sortKey] || '';
             if (sortOrder === 1) {
@@ -210,7 +216,7 @@ function DebugEndpointsMode() {
 
         return {
             value: paginatedData,
-            total: transformedData.length
+            total: filteredData.length
         };
     }
 
@@ -229,7 +235,7 @@ function DebugEndpointsMode() {
             useNewRow={true}
             condensedHeight={true}
             mode={IndexFiltersMode.Default}
-            hideQueryField={true}
+            hideQueryField={false}
         />
     ) : null;
 
