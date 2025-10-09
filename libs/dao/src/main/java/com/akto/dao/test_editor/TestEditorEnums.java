@@ -28,7 +28,11 @@ public class TestEditorEnums {
         MAGIC_VALIDATE,
         NOT_MAGIC_VALIDATE,
         CATEGORY,
-        CONFIDENCE
+        CONFIDENCE,
+        ACTION,
+        TYPE,
+        PATTERN,
+        REPLACEMENT_STRING
     }
 
     public enum CollectionOperands {
@@ -227,7 +231,8 @@ public class TestEditorEnums {
         JWT_REPLACE_BODY,
         ATTACH_FILE,
         SEND_SSRF_REQ,
-        FOR_EACH_COMBINATION
+        FOR_EACH_COMBINATION,
+        ACTION
     }
 
     public enum NonTerminalExecutorDataOperands {
