@@ -221,6 +221,12 @@ message DailyActorsCountResponse {
   }
 
   repeated ActorsCount actors_counts = 1;
+  uint32 total_analysed = 2;
+  uint32 total_attacks = 3;
+  uint32 critical_actors_count = 4;
+  uint32 total_active = 5;
+  uint32 total_ignored = 6;
+  uint32 total_under_review = 7;
 }
 
 message ThreatActivityTimelineRequest {
@@ -362,4 +368,22 @@ message BucketStats {
   optional int32 p25 = 4;
   optional int32 p50 = 5; // median
   optional int32 p75 = 6;
+}
+
+message FetchTopNDataRequest {
+  uint32 start_ts = 1;
+  uint32 end_ts = 2;
+  repeated string latest_attack = 3;
+  uint32 limit = 4;
+}
+
+message FetchTopNDataResponse {
+  message TopApiData {
+    string endpoint = 1;
+    string method = 2;
+    uint32 attacks = 3;
+    string severity = 4;
+  }
+
+  repeated TopApiData top_apis = 1;
 }

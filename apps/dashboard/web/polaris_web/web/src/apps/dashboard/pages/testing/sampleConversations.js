@@ -147,3 +147,12 @@ User input is being directly inserted into the DOM without proper encoding or sa
         role: "system"
     }
 ]
+
+// Available models for the chat interface
+export const availableModels = [
+    { id: 'claude-3-sonnet', name: 'Claude-3.5-sonnet' },
+    { id: 'gpt-4o', name: 'GPT-4o' },
+    { id: 'gpt-4o-mini', name: 'GPT-4o-mini' },
+    { id: 'gpt-3.5-turbo', name: 'GPT-3.5-turbo' },
+    { id: 'gemini-1.5-flash', name: 'Gemini-1.5-flash' }
+]

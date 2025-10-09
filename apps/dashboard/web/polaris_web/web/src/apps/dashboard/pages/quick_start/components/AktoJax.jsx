@@ -64,7 +64,6 @@ const AktoJax = () => {
                 }
             })
         setTestRolesArr(testRoles)
-        setTestRole(testRoles?.[0]?.["value"])
     }
 
     useEffect(() => {

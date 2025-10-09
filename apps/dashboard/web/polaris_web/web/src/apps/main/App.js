@@ -30,6 +30,7 @@ import About from "../dashboard/pages/settings/about/About";
 import ThreatConfiguration from "../dashboard/pages/settings/threat_configuration/ThreatConfiguration";
 import Metrics from "../dashboard/pages/settings/metrics/Metrics";
 import TestEditor from "../dashboard/pages/test_editor/TestEditor";
+import PromptHardening from "../dashboard/pages/prompt_hardening/PromptHardening";
 import DataTypes from "../dashboard/pages/observe/data_types/DataTypes";
 import IssuesPage from "../dashboard/pages/issues/IssuesPage/IssuesPage";
 import CompliancePage from "../dashboard/pages/issues/IssuesPage/CompliancePage";
@@ -103,7 +104,10 @@ import AuditData from "../dashboard/pages/observe/AuditData";
 import GuardrailDetection    from "../dashboard/pages/guardrails/GuardrailDetection";
 import GuardrailDetectionDemo from "../dashboard/pages/guardrails/GuardrailDetectionDemo";
 import GuardrailPolicies   from "../dashboard/pages/guardrails/GuardrailPolicies";
+import ThreatDashboardPage from "../dashboard/pages/threat_detection/ThreatDashboardPage";
 import OpenApiAgentTester from "../dashboard/pages/observe/OpenApiAgentTester";
+import DastProgress from "../dashboard/pages/observe/api_collections/DastProgress.jsx";
+import DastProgressSingle from "../dashboard/pages/observe/api_collections/DastProgressSingle.jsx";
 
 // if you add a component in a new path, please verify the search implementation in function -> 'getSearchItemsArr' in func.js
 
@@ -203,7 +207,15 @@ const router = createBrowserRouter([
                             {
                                 path: ":apiCollectionId/open-api-upload",
                                 element: <OpenApiAgentTester/>
-                            }
+                            },
+                            {
+                                path: "dast-progress",
+                                element: <DastProgress />
+                            },
+                            {
+                                path: "dast-progress/:crawlId",
+                                element: <DastProgressSingle />
+                            },
                         ]
                     },
                     {
@@ -230,6 +242,10 @@ const router = createBrowserRouter([
                     {
                         path: "protection",
                         children: [
+                            {
+                                path: "threat-dashboard",
+                                element: <ThreatDashboardPage/>
+                            },
                             {
                                 path: "threat-activity",
                                 element: <ThreatDetectionPage/>
@@ -482,6 +498,14 @@ const router = createBrowserRouter([
             {
                 path: "test-editor",
                 element: <TestEditor/>
+            },
+            {
+                path: "prompt-hardening/:promptId",
+                element: <PromptHardening/>
+            },
+            {
+                path: "prompt-hardening",
+                element: <PromptHardening/>
             },
             {
                 path: "onboarding",
