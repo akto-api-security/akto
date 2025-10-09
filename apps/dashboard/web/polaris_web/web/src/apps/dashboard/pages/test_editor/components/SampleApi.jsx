@@ -13,6 +13,7 @@ import PersistStore from "../../../../main/PersistStore";
 import editorSetup from "./editor_config/editorSetup";
 import SampleData from "../../../components/shared/SampleData";
 import transform from "../../../components/shared/customDiffEditor";
+import testingFunc from "../../testing/transform";
 import { mapLabel, getDashboardCategory } from "../../../../main/labelHelper";
 import EmptySampleApi from "./EmptySampleApi";
 import Store from "../../../store";
@@ -298,25 +299,7 @@ const SampleApi = () => {
             }
             else setTestResult(resp)
             if(resp?.agentConversationResults?.length > 0){
-                let conversationsListCopy = []
-                resp?.agentConversationResults.forEach(conversation => {
-                    let commonObj = {
-                        creationTimestamp: conversation.timestamp,
-                        conversationId: conversation.conversationId,
-                    }
-                    conversationsListCopy.push({
-                        ...commonObj,
-                        _id: "user_" + conversation.prompt,
-                        message: conversation.prompt,
-                        role: "user"
-                    })
-                    conversationsListCopy.push({
-                        ...commonObj,
-                        _id: "system_" + conversation.response,
-                        message: conversation.response,
-                        role: "system"
-                    })
-                })
+                let conversationsListCopy = testingFunc.prepareConversationsList(resp?.agentConversationResults)
                 setConversationsList(conversationsListCopy)
             }
         } catch (err){
@@ -333,6 +316,10 @@ const SampleApi = () => {
     }, []);
 
     const showResults = () => {
+        if(testResult?.agentConversationResults?.length > 0){
+            setChatBotModal(!chatBotModal)
+            return;
+        }
         setShowTestResult(!showTestResult);
     }
 

@@ -31,7 +31,7 @@ function AIMessage({ message, isStreaming = false }) {
     return (
         <Box padding={"3"} borderRadius="2" background="bg-subdued">
             <Box maxWidth='800px'>
-                <HorizontalStack gap={"3"}>
+                <div style={{display: 'flex', gap: '12px'}}>
                     <Box style={{
                         width: '28px',
                         height: '28px',
@@ -91,7 +91,7 @@ function AIMessage({ message, isStreaming = false }) {
                             }} />
                         )}
                     </Box>
-                </HorizontalStack>
+                </div>
             </Box>
             <style jsx>{`
                 @keyframes blink {
