@@ -28,13 +28,13 @@ function ThreatDashboardPage() {
         currentPeriod: {
             totalAnalysed: 0,
             totalAttacks: 0,
-            criticalActors: 0,
+            totalCriticalActors: 0,
             activeThreats: 0,
         },
         previousPeriod: {
             totalAnalysed: 0,
             totalAttacks: 0,
-            criticalActors: 0,
+            totalCriticalActors: 0,
             activeThreats: 0,
         }
     })
@@ -66,7 +66,6 @@ function ThreatDashboardPage() {
             let summaryResponse = null
             try {
                 summaryResponse = await api.getDailyThreatActorsCount(startTimestamp, endTimestamp, [])
-                //console.log(summaryResponse);
                 if (summaryResponse) {
                     // Use actorsCounts latest entry for active actors similar to ThreatSummary.jsx
                     let activeActorsValue = summaryResponse.totalActive || 0
@@ -81,7 +80,7 @@ function ThreatDashboardPage() {
                         currentPeriod: {
                             totalAnalysed: summaryResponse.totalAnalysed || 0,
                             totalAttacks: summaryResponse.totalAttacks || 0,
-                            criticalActors: summaryResponse.criticalActors || 0,
+                            totalCriticalActors: summaryResponse.totalCriticalActors || 0,
                             activeThreats: activeActorsValue,
                         },
                         previousPeriod: {
@@ -89,7 +88,7 @@ function ThreatDashboardPage() {
                             // For now, using dummy data or setting to 0
                             totalAnalysed: 0,
                             totalAttacks: 0,
-                            criticalActors: 0,
+                            totalCriticalActors: 0,
                             activeThreats: 0,
                         }
                     })
@@ -98,8 +97,8 @@ function ThreatDashboardPage() {
                 //console.error('Error fetching summary counts:', err)
                 // Fall back to empty state
                 setSummaryMetrics({
-                    currentPeriod: { totalAnalysed: 0, totalAttacks: 0, criticalActors: 0, activeThreats: 0 },
-                    previousPeriod: { totalAnalysed: 0, totalAttacks: 0, criticalActors: 0, activeThreats: 0 }
+                    currentPeriod: { totalAnalysed: 0, totalAttacks: 0, totalCriticalActors: 0, activeThreats: 0 },
+                    previousPeriod: { totalAnalysed: 0, totalAttacks: 0, totalCriticalActors: 0, activeThreats: 0 }
                 })
             }
 
@@ -184,8 +183,8 @@ function ThreatDashboardPage() {
             // Set empty states on error
             setSeverityDistribution({})
             setSummaryMetrics({
-                currentPeriod: { totalAnalysed: 0, totalAttacks: 0, criticalActors: 0, activeThreats: 0 },
-                previousPeriod: { totalAnalysed: 0, totalAttacks: 0, criticalActors: 0, activeThreats: 0 }
+                currentPeriod: { totalAnalysed: 0, totalAttacks: 0, totalCriticalActors: 0, activeThreats: 0 },
+                previousPeriod: { totalAnalysed: 0, totalAttacks: 0, totalCriticalActors: 0, activeThreats: 0 }
             })
             setThreatStatusBreakdown({})
             setTopAttackedHosts([])
@@ -242,17 +241,17 @@ function ThreatDashboardPage() {
         },
         {
             title: 'Critical Actors',
-            data: observeFunc.formatNumberWithCommas(summaryMetrics.currentPeriod.criticalActors),
+            data: observeFunc.formatNumberWithCommas(summaryMetrics.currentPeriod.totalCriticalActors),
             variant: 'heading2xl',
             color: 'critical',
             byLineComponent: generateChangeIndicator(
-                summaryMetrics.currentPeriod.criticalActors, 
-                summaryMetrics.previousPeriod.criticalActors
+                summaryMetrics.currentPeriod.totalCriticalActors, 
+                summaryMetrics.previousPeriod.totalCriticalActors
             ),
-            smoothChartComponent: (<SmoothAreaChart tickPositions={[summaryMetrics.previousPeriod.criticalActors, summaryMetrics.currentPeriod.criticalActors]} />),
+            smoothChartComponent: (<SmoothAreaChart tickPositions={[summaryMetrics.previousPeriod.totalCriticalActors, summaryMetrics.currentPeriod.totalCriticalActors]} />),
         },
         {
-            title: 'Active Threats',
+            title: 'Active Actors',
             data: observeFunc.formatNumberWithCommas(summaryMetrics.currentPeriod.activeThreats),
             variant: 'heading2xl',
             color: 'warning',
