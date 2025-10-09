@@ -355,8 +355,7 @@ function ThreatDashboardPage() {
     const generateHostTableRows = (hosts) => {
         return hosts.map((host) => ([
             <Text variant='bodyMd'>{host.host}</Text>,
-            <Text variant='bodySm' alignment='end'>{host.attacks}</Text>,
-            <Text variant='bodySm' alignment='end'>{host.apis}</Text>
+            <Text variant='bodySm' alignment='end'>{host.attacks}</Text>
         ]))
     }
 
@@ -381,8 +380,8 @@ function ThreatDashboardPage() {
             component={
                 <Box>
                     <DataTable
-                        columnContentTypes={['text', 'numeric', 'numeric']}
-                        headings={['Host', 'Attacks', 'APIs']}
+                        columnContentTypes={['text', 'numeric']}
+                        headings={['Host', 'Attacks']}
                         rows={generateHostTableRows(topAttackedHosts)}
                         hoverable={false}
                         increasedTableDensity

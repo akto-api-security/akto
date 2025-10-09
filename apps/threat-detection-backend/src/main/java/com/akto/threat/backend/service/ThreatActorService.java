@@ -707,7 +707,7 @@ public class ThreatActorService {
     pipeline.add(new Document("$sort", new Document("attacks", -1)));
 
     // Limit results
-    pipeline.add(new Document("$limit", limit > 0 ? limit : 10));
+    pipeline.add(new Document("$limit", limit > 0 ? limit : 5));
 
     List<FetchTopNDataResponse.TopApiData> topApis = new ArrayList<>();
 
@@ -735,13 +735,11 @@ public class ThreatActorService {
 
     hostPipeline.add(new Document("$group",
         new Document("_id", "$host")
-            .append("attacks", new Document("$sum", 1))
-            .append("apisSet", new Document("$addToSet", "$latestApiEndpoint"))));
+            .append("attacks", new Document("$sum", 1))));
 
     hostPipeline.add(new Document("$project",
         new Document("host", "$_id")
-            .append("attacks", 1)
-            .append("apis", new Document("$size", "$apisSet"))));
+            .append("attacks", 1)));
 
     hostPipeline.add(new Document("$sort", new Document("attacks", -1)));
     hostPipeline.add(new Document("$limit", limit > 0 ? limit : 5));
@@ -754,7 +752,6 @@ public class ThreatActorService {
             FetchTopNDataResponse.TopHostData.newBuilder()
                 .setHost(doc.getString("host"))
                 .setAttacks(doc.getInteger("attacks", 0))
-                .setApis(doc.getInteger("apis", 0))
                 .build());
       }
     }

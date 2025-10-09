@@ -366,11 +366,10 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
                 this.topHosts = m.getTopHostsList().stream()
                     .map(smr -> new TopHostData(
                         smr.getHost(),
-                        smr.getAttacks(),
-                        smr.getApis()
+                        smr.getAttacks()
                     )).collect(Collectors.toList());
               });
-    } catch (Exception e) {
+    } catch (Exception e) {s
       e.printStackTrace();
       return ERROR.toUpperCase();
     }

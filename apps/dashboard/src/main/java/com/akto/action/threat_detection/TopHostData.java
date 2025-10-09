@@ -8,7 +8,6 @@ import lombok.Data;
 public class TopHostData {
     private String host;
     private int attacks;
-    private int apis;
 }
 
 
