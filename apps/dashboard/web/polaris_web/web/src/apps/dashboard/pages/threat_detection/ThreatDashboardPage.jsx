@@ -62,27 +62,50 @@ function ThreatDashboardPage() {
         setLoading(true)
 
         try {
-            // Row 1: Summary metrics - Use dummy data
-            const summaryData = dummyData.getThreatSummaryData()
-            setSummaryMetrics({
-                currentPeriod: {
-                    totalAnalysed: summaryData.totalAnalysed,
-                    totalAttacks: summaryData.totalAttacks,
-                    criticalActors: summaryData.criticalActors,
-                    activeThreats: summaryData.totalActive,
-                },
-                previousPeriod: {
-                    totalAnalysed: summaryData.oldTotalAnalysed,
-                    totalAttacks: summaryData.oldTotalAttacks,
-                    criticalActors: summaryData.oldCriticalActors,
-                    activeThreats: summaryData.oldTotalActive,
+            // Row 1: Summary metrics - Use getDailyThreatActorsCount API
+            let summaryResponse = null
+            try {
+                summaryResponse = await api.getDailyThreatActorsCount(startTimestamp, endTimestamp, [])
+                //console.log(summaryResponse);
+                if (summaryResponse) {
+                    // Use actorsCounts latest entry for active actors similar to ThreatSummary.jsx
+                    let activeActorsValue = summaryResponse.totalActive || 0
+                    if (summaryResponse?.actorsCounts && Array.isArray(summaryResponse.actorsCounts) && summaryResponse.actorsCounts.length > 0) {
+                        const last = summaryResponse.actorsCounts[summaryResponse.actorsCounts.length - 1]
+                        if (last && typeof last.totalActors !== 'undefined') {
+                            activeActorsValue = last.totalActors
+                        }
+                    }
+
+                    setSummaryMetrics({
+                        currentPeriod: {
+                            totalAnalysed: summaryResponse.totalAnalysed || 0,
+                            totalAttacks: summaryResponse.totalAttacks || 0,
+                            criticalActors: summaryResponse.criticalActors || 0,
+                            activeThreats: activeActorsValue,
+                        },
+                        previousPeriod: {
+                            // These would need to come from a separate API call with previous period timestamps
+                            // For now, using dummy data or setting to 0
+                            totalAnalysed: 0,
+                            totalAttacks: 0,
+                            criticalActors: 0,
+                            activeThreats: 0,
+                        }
+                    })
                 }
-            })
+            } catch (err) {
+                //console.error('Error fetching summary counts:', err)
+                // Fall back to empty state
+                setSummaryMetrics({
+                    currentPeriod: { totalAnalysed: 0, totalAttacks: 0, criticalActors: 0, activeThreats: 0 },
+                    previousPeriod: { totalAnalysed: 0, totalAttacks: 0, criticalActors: 0, activeThreats: 0 }
+                })
+            }
 
             // Row 2: Sankey Chart and Map use APIs (handled in their components)
             
-            // Row 3: Threat Status (dummy) and Severity Distribution (API)
-            // Threat Status - Use dummy data
+            // Row 3: Threat Status - use dummy data for now
             const statusData = dummyData.getThreatStatusData()
             setThreatStatusBreakdown(statusData)
 
@@ -95,7 +118,7 @@ function ThreatDashboardPage() {
                     
                     const severityLevels = ["CRITICAL", "HIGH", "MEDIUM", "LOW"];
                     const severityColors = severityLevels.reduce((acc, s) => {
-                        acc[s] = func.getHexColorForSeverity(s);
+                        acc[s] = observeFunc.getColorForSensitiveData(s);
                         return acc;
                     }, {});
 
@@ -126,29 +149,34 @@ function ThreatDashboardPage() {
                 } 
             } catch (err) {
                 // Set empty state but keep structure for display
-                const severityColors = {
-                    "CRITICAL": "#E45357",
-                    "HIGH": "#EF864C",
-                    "MEDIUM": "#F6C564",
-                    "LOW": "#6FD1A6"
-                }
+                const severityLevels = ["CRITICAL", "HIGH", "MEDIUM", "LOW"];
                 const emptyFormattedSeverity = {}
-                Object.keys(severityColors).forEach(severity => {
+                severityLevels.forEach(severity => {
                     emptyFormattedSeverity[severity] = {
                         "text": 0,
-                        "color": severityColors[severity],
+                        "color": observeFunc.getColorForSensitiveData(severity),
                         "filterKey": severity
                     }
                 })
                 setSeverityDistribution(emptyFormattedSeverity)
             }
 
-            // Row 4: Top Attacked Hosts and APIs - Use dummy data
+            // Row 4: Top Attacked Hosts and APIs
+            // Top Attacked Hosts - Use dummy data
             const hostsData = dummyData.getTopHostsData()
             setTopAttackedHosts(hostsData)
 
-            const apisData = dummyData.getTopApisData()
-            setTopAttackedApis(apisData)
+            // Top Attacked APIs - Use API
+            try {
+                const topApisResponse = await api.fetchThreatTopNData(startTimestamp, endTimestamp, [], 10)
+                if (topApisResponse?.topApis && Array.isArray(topApisResponse.topApis)) {
+                    setTopAttackedApis(topApisResponse.topApis)
+                }
+            } catch (err) {
+                //console.error('Error fetching top APIs:', err)
+                // Fall back to empty state
+                setTopAttackedApis([])
+            }
 
         } catch (error) {
             // console.error('Error fetching threat detection data:', error)
@@ -184,9 +212,7 @@ function ThreatDashboardPage() {
         return (
             <HorizontalStack wrap={false}>
                 <Icon source={icon} color={color} />
-                <div className='custom-color'>
-                    <Text color={color}>{Math.abs(delta)}</Text>
-                </div>
+                <Text color={color}>{Math.abs(delta)}</Text>
             </HorizontalStack>
         )
     }
@@ -268,8 +294,8 @@ function ThreatDashboardPage() {
 
     const row2Cards = (
         <HorizontalGrid gap={5} columns={2}>
-            <div>{threatCategoriesCard}</div>
-            <div>{threatActorMapCard}</div>
+            {threatCategoriesCard}
+            {threatActorMapCard}
         </HorizontalGrid>
     )
 
@@ -278,19 +304,17 @@ function ThreatDashboardPage() {
     const threatStatusCard = (
         <InfoCard
             component={
-                <div style={{ marginTop: "20px" }}>
-                    <ChartypeComponent
-                        data={threatStatusBreakdown}
-                        navUrl="/dashboard/protection/threat-activity"
-                        title=""
-                        isNormal={true}
+                <ChartypeComponent
+                    data={threatStatusBreakdown}
+                    navUrl="/dashboard/protection/threat-activity"
+                    title=""
+                    isNormal={true}
                         boxHeight={'250px'}
                         chartOnLeft={true}
                         dataTableWidth="250px"
                         boxPadding={0}
                         pieInnerSize="50%"
                     />
-                </div>
             }
             title="Threat Status"
             titleToolTip="Distribution of threats by their current status"            
@@ -301,19 +325,17 @@ function ThreatDashboardPage() {
     const severityDistributionCard = (
         <InfoCard
             component={
-                <div style={{ marginTop: "20px" }}>
-                    <ChartypeComponent
-                        data={severityDistribution}
-                        navUrl="/dashboard/protection/threat-activity"
-                        title=""
-                        isNormal={true}
-                        boxHeight={'250px'}
-                        chartOnLeft={true}
-                        dataTableWidth="250px"
-                        boxPadding={0}
-                        pieInnerSize="50%"
-                    />
-                </div>
+                <ChartypeComponent
+                    data={severityDistribution}
+                    navUrl="/dashboard/protection/threat-activity"
+                    title=""
+                    isNormal={true}
+                    boxHeight={'250px'}
+                    chartOnLeft={true}
+                    dataTableWidth="250px"
+                    boxPadding={0}
+                    pieInnerSize="50%"
+                />
             }
             title="Threat Actors by Severity"
             titleToolTip="Distribution of threat actors categorized by severity level"
@@ -323,8 +345,8 @@ function ThreatDashboardPage() {
 
     const row5Cards = (
         <HorizontalGrid gap={5} columns={2}>
-            <div>{threatStatusCard}</div>
-            <div>{severityDistributionCard}</div>
+            {threatStatusCard}
+            {severityDistributionCard}
         </HorizontalGrid>
     )
 
@@ -344,15 +366,11 @@ function ThreatDashboardPage() {
             <Box maxWidth='400px'>
                 <GetPrettifyEndpoint method={api.method} url={api.endpoint} isNew={false} />
             </Box>,
-            <div style={{ textAlign: 'center' }}>
-                <Text variant='bodySm'>{api.attacks}</Text>
-            </div>,
-            <div style={{ display: 'flex', justifyContent: 'center' }}>
-                <div className={`badge-wrapper-${api.severity?.toUpperCase() || 'MEDIUM'}`}>
-                    <Badge>
-                        {api.severity}
-                    </Badge>
-                </div>
+            <Text variant='bodySm' alignment='center'>{api.attacks}</Text>,
+            <div className={`badge-wrapper-${api.severity?.toUpperCase() || 'MEDIUM'}`}>
+                <Badge>
+                    {api.severity}
+                </Badge>
             </div>
         ]))
     }
@@ -398,16 +416,14 @@ function ThreatDashboardPage() {
 
     const row4Cards = (
         <HorizontalGrid gap={5} columns={2}>
-            <div>{topHostsCard}</div>
-            <div>{topApisCard}</div>
+            {topHostsCard}
+            {topApisCard}
         </HorizontalGrid>
     )
 
     // Row 3: Stacked category breakdown (uses same API as Sankey)
     const row3Cards = (
-        <div>
-            <ThreatCategoryStackedChart startTimestamp={startTimestamp} endTimestamp={endTimestamp} />
-        </div>
+        <ThreatCategoryStackedChart startTimestamp={startTimestamp} endTimestamp={endTimestamp} />
     )
 
     const dashboardRows = [

@@ -1,8 +1,7 @@
 import { useEffect, useState, useRef } from "react";
-import Highcharts from "highcharts";
-import HighchartsReact from "highcharts-react-official";
 import InfoCard from "../../dashboard/new_components/InfoCard";
-import { Spinner } from "@shopify/polaris";
+import { Spinner, Text } from "@shopify/polaris";
+import StackedAreaChart from "../../../components/charts/StackedAreaChart";
 import api from "../api";
 import dayjs from "dayjs";
 
@@ -51,10 +50,10 @@ const generateColorPalette = (count) => {
  */
 function ThreatCategoryStackedChart({ startTimestamp, endTimestamp }) {
   const [loading, setLoading] = useState(true);
-  const [options, setOptions] = useState(null);
+  const [chartData, setChartData] = useState([]);
   const [latestPercents, setLatestPercents] = useState([]);
   const [visibleSeries, setVisibleSeries] = useState({});
-  const baseOptionsRef = useRef(null);
+  const baseDataRef = useRef(null);
 
   useEffect(() => {
     let mounted = true;
@@ -74,7 +73,7 @@ function ThreatCategoryStackedChart({ startTimestamp, endTimestamp }) {
           !resp?.threatActivityTimelines ||
           !resp.threatActivityTimelines.length
         ) {
-          setOptions(null);
+          setChartData([]);
           setLatestPercents([]);
           return;
         }
@@ -82,7 +81,7 @@ function ThreatCategoryStackedChart({ startTimestamp, endTimestamp }) {
         // Aggregate counts per day and subcategory
         const dayMap = new Map();
         (resp.threatActivityTimelines || []).forEach((item) => {
-          // Normalize and coerce timestamp
+          // Normalize and coerce timestamp 
           let ts = Number(item.ts || item.timestamp || item.time) || 0;
           if (ts > 1e12) ts = Math.floor(ts / 1000); // milliseconds -> seconds
           const dayKey = dayjs(ts * 1000)
@@ -91,14 +90,8 @@ function ThreatCategoryStackedChart({ startTimestamp, endTimestamp }) {
           if (!dayMap.has(dayKey)) dayMap.set(dayKey, {});
           const bucket = dayMap.get(dayKey);
 
-          // Accept multiple naming conventions for the category list
-          const subList =
-            item.subCategoryWiseData ||
-            item.sub_category_wise_data ||
-            item.subCategoryData ||
-            item.categoryData ||
-            item.categories ||
-            [];
+          // Use consistent API structure 
+          const subList = item.subCategoryWiseData || [];
 
           subList.forEach((s) => {
             // Normalize the category key (trim + fallback) and coerce count to number
@@ -119,9 +112,6 @@ function ThreatCategoryStackedChart({ startTimestamp, endTimestamp }) {
         });
 
         const dayKeys = Array.from(dayMap.keys()).sort((a, b) => a - b);
-        const categories = dayKeys.map((k) =>
-          dayjs(k * 1000).format("ddd, D MMM")
-        );
 
         // Collect all unique subcategories
         const subSet = new Set();
@@ -129,7 +119,7 @@ function ThreatCategoryStackedChart({ startTimestamp, endTimestamp }) {
           Object.keys(dayMap.get(k)).forEach((sk) => subSet.add(sk))
         );
         if (!subSet.size) {
-          setOptions(null);
+          setChartData([]);
           setLatestPercents([]);
           return;
         }
@@ -171,30 +161,32 @@ function ThreatCategoryStackedChart({ startTimestamp, endTimestamp }) {
 
         const seriesKeys = topSubs.concat(otherSubs.length ? ["Other"] : []);
 
-        // Assign color palette & format series for chart
+        // Assign color palette & format series for StackedChart
         const palette = generateColorPalette(seriesKeys.length);
-        const series = seriesKeys.map((k, i) => ({
+        const seriesData = seriesKeys.map((k, i) => ({
           name: formatName(k),
           rawName: k,
-          data: seriesMap[k],
+          data: seriesMap[k].map((value, index) => [
+            dayKeys[index] * 1000, // x: timestamp in milliseconds
+            value // y: value
+          ]),
           color: palette[i],
-          fillOpacity: 0.9,
           visible: true,
         }));
 
         // Compute header percentages using sums over the series data (ensures header matches chart)
         const grandTotals = {};
         let grandSum = 0;
-        series.forEach((s) => {
+        seriesData.forEach((s) => {
           const sum = (s.data || []).reduce(
-            (acc, v) => acc + (Number(v) || 0),
+            (acc, v) => acc + (Number(v[1]) || 0), // v[1] is the y value
             0
           );
           grandTotals[s.rawName] = sum;
           grandSum += sum;
         });
 
-        const initialLatest = series
+        const initialLatest = seriesData
           .map((s) => ({
             name: s.name,
             rawName: s.rawName,
@@ -209,84 +201,17 @@ function ThreatCategoryStackedChart({ startTimestamp, endTimestamp }) {
           .sort((a, b) => b.percent - a.percent);
         setLatestPercents(initialLatest);
 
-        // Build Highcharts options
-        const opts = {
-          chart: {
-            type: "area",
-            height: 380,
-            backgroundColor: "#ffffff",
-            style: {
-              fontFamily:
-                '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
-            },
-          },
-          title: { text: undefined },
-          credits: { enabled: false },
-          xAxis: {
-            categories,
-            labels: { style: { color: "#6B7280", fontSize: "11px" } },
-            lineColor: "#E5E7EB",
-            tickColor: "#E5E7EB",
-          },
-          yAxis: {
-            title: { text: "" },
-            labels: {
-              formatter() {
-                return this.value + "%";
-              },
-              style: { color: "#6B7280", fontSize: "11px" },
-            },
-            max: 100,
-            gridLineColor: "#F3F4F6",
-          },
-          tooltip: {
-            shared: true,
-            useHTML: true,
-            backgroundColor: "rgba(255,255,255,0.95)",
-            borderColor: "#E5E7EB",
-            borderRadius: 8,
-            padding: 12,
-            style: { color: "#111827", fontSize: "12px" },
-            formatter() {
-              let total = 0;
-              this.points.forEach((p) => {
-                total += p.y;
-              });
-              let tooltipHtml = `<div style="font-weight: 600; margin-bottom: 8px;">${this.x}</div>`;
-              this.points.forEach((p) => {
-                const percentage =
-                  total > 0 ? ((p.y / total) * 100).toFixed(1) : 0;
-                tooltipHtml += `<div style="display: flex; align-items: center; margin: 4px 0;">
-                    <span style="display: inline-block; width: 10px; height: 10px; background: ${p.color}; border-radius: 2px; margin-right: 8px;"></span>
-                    <span style="flex: 1;">${p.series.name}:</span>
-                    <span style="font-weight: 600; margin-left: 8px;">${percentage}%</span>
-                  </div>`;
-              });
-              return tooltipHtml;
-            },
-          },
-          plotOptions: {
-            area: {
-              stacking: "percent",
-              marker: { enabled: false },
-              lineWidth: 0,
-              states: { hover: { lineWidthPlus: 0 } },
-            },
-          },
-          legend: { enabled: false },
-          series,
+        // Store base data for toggling updates
+        baseDataRef.current = {
+          seriesData,
+          totals,
+          seriesKeys,
         };
-
-        // keep base options and totals for toggling updates
-        baseOptionsRef.current = {
-          ...opts,
-          _totals: totals,
-          _seriesKeys: seriesKeys,
-        };
-        setOptions(opts);
+                
+        setChartData(seriesData);
       } catch (err) {
         if (mounted) {
-          setOptions(null);
+          setChartData([]);
           setLatestPercents([]);
         }
       } finally {
@@ -302,9 +227,9 @@ function ThreatCategoryStackedChart({ startTimestamp, endTimestamp }) {
 
   // When visibleSeries changes, update chart series visibility but keep percentages constant
   useEffect(() => {
-    if (!baseOptionsRef.current) return;
-    const base = baseOptionsRef.current;
-    const newSeries = (base.series || []).map((s) => ({
+    if (!baseDataRef.current) return;
+    const base = baseDataRef.current;
+    const newSeriesData = (base.seriesData || []).map((s) => ({
       ...s,
       visible: visibleSeries[s.name] !== false,
     }));
@@ -316,7 +241,7 @@ function ThreatCategoryStackedChart({ startTimestamp, endTimestamp }) {
       }))
     );
 
-    setOptions((prev) => ({ ...prev, series: newSeries }));
+    setChartData(newSeriesData);
   }, [visibleSeries]);
 
   const toggleSeries = (name) => {
@@ -340,7 +265,7 @@ function ThreatCategoryStackedChart({ startTimestamp, endTimestamp }) {
             <Spinner size="large" />
           </div>
         ) : (
-          <div style={{ width: "100%" }}>
+          <>
             {/* Header with latest percentages */}
             {latestPercents.length > 0 && (
               <div
@@ -375,34 +300,73 @@ function ThreatCategoryStackedChart({ startTimestamp, endTimestamp }) {
                         borderRadius: 2,
                       }}
                     />
-                    <div style={{ fontSize: 13, color: "#374151" }}>
-                      <span style={{ fontWeight: 600, color: "#111827" }}>
+                    <Text variant="bodySm" color="subdued">
+                      <Text variant="bodySm" fontWeight="bold" color="base">
                         {item.percent}%
-                      </span>{" "}
-                      <span style={{ color: "#6B7280" }}>{item.name}</span>
-                    </div>
+                      </Text>{" "}
+                      {item.name}
+                    </Text>
                   </div>
                 ))}
               </div>
             )}
             {/* Chart or no data found message */}
-            <div style={{ width: "100%", padding: "8px 0" }}>
-              {options ? (
-                <HighchartsReact highcharts={Highcharts} options={options} />
-              ) : (
-                <div
-                  style={{
-                    padding: 40,
-                    textAlign: "center",
-                    color: "#6B7280",
-                    fontSize: 14,
-                  }}
-                >
+            {chartData.length > 0 ? (
+              <StackedAreaChart
+                height={380}
+                backgroundColor="#ffffff"
+                data={chartData}
+                yAxisTitle="Percentage"
+                showGridLines={true}
+                customXaxis={{
+                  type: 'datetime',
+                  dateTimeLabelFormats: {
+                    day: '%b %e',
+                    month: '%b',
+                  },
+                  title: {
+                    text: 'Date',
+                  },
+                  visible: true,
+                  gridLineWidth: 0,
+                }}
+                defaultChartOptions={{
+                  tooltip: {
+                    shared: true,
+                    useHTML: true,
+                    backgroundColor: "rgba(255,255,255,0.95)",
+                    borderColor: "#E5E7EB",
+                    borderRadius: 8,
+                    padding: 12,
+                    style: { color: "#111827", fontSize: "12px" },
+                    formatter() {
+                      let total = 0;
+                      this.points.forEach((p) => {
+                        total += p.y;
+                      });
+                      let tooltipHtml = `<div style="font-weight: 600; margin-bottom: 8px;">${dayjs(this.x).format("ddd, D MMM")}</div>`;
+                      this.points.forEach((p) => {
+                        const percentage =
+                          total > 0 ? ((p.y / total) * 100).toFixed(1) : 0;
+                        tooltipHtml += `<div style="display: flex; align-items: center; margin: 4px 0;">
+                            <span style="display: inline-block; width: 10px; height: 10px; background: ${p.color}; border-radius: 2px; margin-right: 8px;"></span>
+                            <span style="flex: 1;">${p.series.name}:</span>
+                            <span style="font-weight: 600; margin-left: 8px;">${percentage}%</span>
+                          </div>`;
+                      });
+                      return tooltipHtml;
+                    },
+                  },
+                }}
+              />
+            ) : (
+              <div style={{ padding: 40, textAlign: "center" }}>
+                <Text variant="bodyMd" color="subdued">
                   No threat activity data found for the selected time period.
-                </div>
-              )}
-            </div>
-          </div>
+                </Text>
+              </div>
+            )}
+          </>
         )
       }
     />
