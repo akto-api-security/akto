@@ -12,6 +12,7 @@ public class Kafka {
   private static LoggerMaker logger = new LoggerMaker(Kafka.class, LogDb.TESTING);
   private KafkaProducer<String, String> producer;
   public boolean producerReady;
+  private static final LoggerMaker loggerMaker = new LoggerMaker(Kafka.class);
 
   public Kafka(KafkaConfig kafkaConfig) {
     this(
@@ -109,7 +110,7 @@ public class Kafka {
     };
 
     ProducerRecord<String, String> record = new ProducerRecord<>(topic, message);
-    producer.send(record, new DemoProducerCallback());
+    producer.send(record, new DemoProducerCallback(message));
   }
 
   public void close() {
@@ -162,11 +163,16 @@ public class Kafka {
   }
 
   private class DemoProducerCallback implements Callback {
+    private final String payload;
+
+    public DemoProducerCallback(String payload) {
+      this.payload = payload;
+    }
+
     @Override
     public void onCompletion(RecordMetadata recordMetadata, Exception e) {
       if (e != null) {
-        Kafka.this.close();
-        logger.error("onCompletion error: " + e.getMessage());
+        loggerMaker.sendImpErrorLogs("onCompletion error: " + e.getMessage() + ", payload: " + payload, LogDb.DATA_INGESTION);
       }
     }
   }

@@ -1326,7 +1326,7 @@ public class ClientActor extends DataActor {
 
     public Map<String, List<String>> buildHeaders() {
         Map<String, List<String>> headers = new HashMap<>();
-        headers.put("Authorization", Collections.singletonList(System.getenv("DATABASE_ABSTRACTOR_SERVICE_TOKEN")));
+        headers.put("Authorization", Collections.singletonList("eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJBa3RvIiwic3ViIjoiaW52aXRlX3VzZXIiLCJhY2NvdW50SWQiOjE2NjI2ODA0NjMsImlhdCI6MTc2MDAxNDkyMiwiZXhwIjoxNzc1NzM5NzIyfQ.KVMu5b5IPStXT7I_PrRf-1IOh4I3lmGII1JsWdYmJ50ixuwd-z21JMTCS7bQyGKzisjs1FPP1SSvpnowWheg5Da9QOWZX3RxtgiWomTzlU2BE6pvB_Z9Ga0W_yJkPInKyMtkSrVTYi2mB0ZMYP5WhOvxEbyZhZXCcpr7GmXfcX2p6N_sXzjNGWANufgghGrEYm67i4_PJvh_5r8kZHhSrQj5VNtGrQ0qPJzf6Zqvb7fOvXGZk6kY5DAG-UzsvPMJJR16o6b6ky4ONZSjvxl9Ff4UoowbqQhAsfzccDv9uoS1L721UqG5O-9N-cmNJEvbUaz1HHL6YlAy6Be7GiW5TQ"));
         return headers;
     }
 
