@@ -378,4 +378,8 @@ public abstract class DataActor {
 
     public abstract void storeMcpReconResultsBatch(List<McpReconResult> serverDataList);
 
+    public abstract List<YamlTemplate> fetchMCPThreatProtectionTemplates(Integer updatedAfter);
+
+    public abstract List<McpAuditInfo> fetchMcpAuditInfo(Integer updatedAfter, List<String> remarksList);
+
 }

@@ -1814,19 +1814,65 @@ public class DbLayer {
         McpReconResultDao.instance.insertMany(serverDataList);
     }
 
-    public static List<BasicDBObject> fetchAllFromCollection(String dbName, String collectionName) {
+    public static List<YamlTemplate> fetchMCPThreatProtectionTemplates(Integer updatedAfter) {
         try {
-            // Get the collection using the static getMCollection method
-            com.mongodb.client.MongoCollection<BasicDBObject> collection =
-                com.akto.dao.MCollection.getMCollection(dbName, collectionName, BasicDBObject.class);
+            // Use regex filter for case-insensitive "contains" match of "mcp" in content field
+            Bson contentFilter = Filters.regex(YamlTemplate.CONTENT, "mcp", "i");
 
-            // Fetch all documents
-            List<BasicDBObject> results = new ArrayList<>();
-            collection.find().into(results);
+            // Build filter based on whether updatedAfter is specified
+            Bson filter;
+            if (updatedAfter != null && updatedAfter > 0) {
+                // Combine content filter with updatedAt filter (greater than specified timestamp)
+                Bson updatedAtFilter = Filters.gt(YamlTemplate.UPDATED_AT, updatedAfter);
+                filter = Filters.and(contentFilter, updatedAtFilter);
+            } else {
+                // Only content filter
+                filter = contentFilter;
+            }
 
-            return results;
+            // Fetch templates matching the filter
+            List<YamlTemplate> mcpTemplates = FilterYamlTemplateDao.instance.findAll(filter);
+
+            return mcpTemplates;
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(e, "Error in fetchAllFromCollection: " + e.getMessage());
+            loggerMaker.errorAndAddToDb(e, "Error in fetchMCPThreatProtectionTemplates: " + e.getMessage());
+            return new ArrayList<>();
+        }
+    }
+
+    public static List<McpAuditInfo> fetchMcpAuditInfo(Integer updatedAfter, List<String> remarksList) {
+        try {
+            List<Bson> filters = new ArrayList<>();
+
+            // Add updatedTimestamp filter if specified
+            if (updatedAfter != null && updatedAfter > 0) {
+                filters.add(Filters.gt("updatedTimestamp", updatedAfter));
+            }
+
+            // Add remarks filter if specified (exact match any of the values, case-insensitive)
+            if (remarksList != null && !remarksList.isEmpty()) {
+                List<Bson> remarksFilters = new ArrayList<>();
+                for (String remark : remarksList) {
+                    if (remark != null && !remark.isEmpty()) {
+                        // Using ^...$ for exact match with case-insensitive flag
+                        remarksFilters.add(Filters.regex("remarks", "^" + remark + "$", "i"));
+                    }
+                }
+                // If we have any remarks filters, combine them with OR
+                if (!remarksFilters.isEmpty()) {
+                    filters.add(Filters.or(remarksFilters));
+                }
+            }
+
+            // Combine filters with AND (handles 0, 1, or multiple filters)
+            Bson finalFilter = filters.isEmpty() ? Filters.empty() : Filters.and(filters);
+
+            // Fetch MCP audit info matching the filter
+            List<McpAuditInfo> mcpAuditInfoList = McpAuditInfoDao.instance.findAll(finalFilter);
+
+            return mcpAuditInfoList;
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in fetchMcpAuditInfo: " + e.getMessage());
             return new ArrayList<>();
         }
     }
