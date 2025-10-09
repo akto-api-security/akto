@@ -29,9 +29,12 @@ import org.apache.http.impl.client.HttpClients;
 import org.apache.http.util.EntityUtils;
 import org.bson.Document;
 import lombok.Getter;
+import lombok.Setter;
 
 import static com.akto.action.threat_detection.utils.ThreatsUtils.getTemplates;
 
+@Getter
+@Setter
 public class ThreatApiAction extends AbstractThreatDetectionAction {
 
   List<DashboardThreatApi> apis;
@@ -46,11 +49,11 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
   int startTs;
   int endTs;
 
-  @Getter int totalAnalysed;
-  @Getter int totalAttacks;
-  @Getter int criticalActors;
-  @Getter int totalActive;
-  @Getter int totalIgnored;
+  int totalAnalysed;
+  int totalAttacks;
+  int criticalActors;
+  int totalActive;
+  int totalIgnored;
   int totalUnderReview;
 
   List<TopApiData> topApis;
@@ -372,78 +375,6 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
 
     return SUCCESS.toUpperCase();
   }
-
-  // Explicit getters/setters required by JSON serialization and frontend usage
-  public Map<String, Integer> getSort() {
-    return sort;
-  }
-
-  public void setSort(Map<String, Integer> sort) {
-    this.sort = sort;
-  }
-
-  public List<ThreatCategoryCount> getCategoryCounts() {
-    return categoryCounts;
-  }
-
-  public void setCategoryCounts(List<ThreatCategoryCount> categoryCounts) {
-    this.categoryCounts = categoryCounts;
-  }
-
-  public List<DailyActorsCount> getActorsCounts() {
-    return actorsCounts;
-  }
-
-  public void setActorsCounts(List<DailyActorsCount> actorsCounts) {
-    this.actorsCounts = actorsCounts;
-  }
-
-  public int getStartTs() {
-    return startTs;
-  }
-
-  public int getSkip() {
-    return skip;
-  }
-
-  public void setSkip(int skip) {
-    this.skip = skip;
-  }
-
-  public long getTotal() {
-    return total;
-  }
-
-  public void setTotal(long total) {
-    this.total = total;
-  }
-
-  public List<DashboardThreatApi> getApis() {
-    return apis;
-  }
-
-  public void setApis(List<DashboardThreatApi> apis) {
-    this.apis = apis;
-  }
-
-  public List<ThreatActivityTimeline> getThreatActivityTimelines() {
-    return threatActivityTimelines;
-  }
-
-  public void setStartTs(int startTs) {
-    this.startTs = startTs;
-  }
-
-  public void setEndTs(int endTs) {
-    this.endTs = endTs;
-  }
-
-  public void setLatestAttack(List<String> latestAttack) {
-    this.latestAttack = latestAttack;
-  }
-
-  
-  public int getTotalUnderReview() { return totalUnderReview; }
 
 }
 
