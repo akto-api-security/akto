@@ -172,7 +172,7 @@ public class Kafka {
     @Override
     public void onCompletion(RecordMetadata recordMetadata, Exception e) {
       if (e != null) {
-        loggerMaker.sendImpErrorLogs("onCompletion error: " + e.getMessage() + ", payload: " + payload, LogDb.DATA_INGESTION);
+        loggerMaker.sendImpErrorLogs("onCompletion error stack trace: " + e.getLocalizedMessage() + " error message " + e.getMessage() + "stack trace " + e.getStackTrace() + ", payload: " + payload, LogDb.DATA_INGESTION);
       }
     }
   }
