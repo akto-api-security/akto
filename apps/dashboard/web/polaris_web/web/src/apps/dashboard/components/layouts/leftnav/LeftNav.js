@@ -8,6 +8,7 @@ import {
     StarFilledMinor,
     FinancesMinor,
     LockMajor,
+    AutomationFilledMajor
 } from "@shopify/polaris-icons";
 import {useLocation, useNavigate} from "react-router-dom";
 
