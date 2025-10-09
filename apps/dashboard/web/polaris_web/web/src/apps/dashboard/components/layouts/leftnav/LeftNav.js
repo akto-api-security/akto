@@ -163,7 +163,7 @@ export default function LeftNav() {
                         },
                         selected: leftNavSelected === "dashboard_observe_sensitive",
                     },
-                    (window?.STIGG_FEATURE_WISE_ALLOWED?.AKTO_DAST?.isGranted && {
+                    ...(window?.STIGG_FEATURE_WISE_ALLOWED?.AKTO_DAST?.isGranted ? [{
                         label: "DAST scans",
                         onClick: () => {
                             navigate("/dashboard/observe/dast-progress");
@@ -171,7 +171,7 @@ export default function LeftNav() {
                             setActive("active");
                         },
                         selected: leftNavSelected === "dashboard_observe_dast_progress"
-                    }),
+                    }] : []),
                     ...((dashboardCategory === "MCP Security" || dashboardCategory === "Agentic Security") ? [{
                         label: "Audit Data",
                         onClick: () => {
