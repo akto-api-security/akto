@@ -360,7 +360,8 @@ public class Main {
     // REFERENCE: https://www.oreilly.com/library/view/kafka-the-definitive/9781491936153/ch04.html (But how do we Exit?)
     public static void main(String[] args) {
         String configName = System.getenv("AKTO_CONFIG_NAME");
-        String kafkaBrokerUrl = "kafka1:19092";
+        String topicName = getTopicName();
+        String kafkaBrokerUrl = System.getenv().getOrDefault("AKTO_KAFKA_BROKER_URL","kafka1:19092");
         String isKubernetes = System.getenv("IS_KUBERNETES");
         if (isKubernetes != null && isKubernetes.equalsIgnoreCase("true")) {
             loggerMaker.infoAndAddToDb("is_kubernetes: true");
@@ -453,6 +454,20 @@ public class Main {
                 loggerMaker.infoAndAddToDb("Finished executing MCP Tools Sync job");
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb(e, "Error while executing MCP Tools Sync Job");
+            }
+        }, 0, 24, TimeUnit.HOURS);
+
+        // schedule MCP Recon Sync job for 2 mins
+        loggerMaker.info("Scheduling MCP Recon Sync Job");
+        APIConfig finalApiConfigRecon = apiConfig;
+        scheduler.scheduleAtFixedRate(() -> {
+            Context.accountId.set(DataActor.actualAccountId);
+            try {
+                loggerMaker.infoAndAddToDb("Executing MCP Recon Sync job");
+                McpReconSyncJobExecutor.INSTANCE.runJob(finalApiConfigRecon);
+                loggerMaker.infoAndAddToDb("Finished executing MCP Recon Sync job");
+            } catch (Exception e) {
+                loggerMaker.errorAndAddToDb(e, "Error while executing MCP Recon Sync Job");
             }
         }, 0, 24, TimeUnit.HOURS);
 

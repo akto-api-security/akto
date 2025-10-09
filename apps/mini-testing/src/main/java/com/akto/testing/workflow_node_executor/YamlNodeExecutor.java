@@ -12,6 +12,7 @@ import com.akto.dto.ApiInfo.ApiInfoKey;
 import com.akto.test_editor.execution.Memory;
 import org.json.JSONObject;
 
+import com.akto.agent.AgentClient;
 import com.akto.dao.context.Context;
 import com.akto.dao.test_editor.TestEditorEnums;
 import com.akto.dao.test_editor.YamlTemplateDao;
@@ -36,7 +37,6 @@ import com.akto.dto.testing.YamlNodeDetails;
 import com.akto.sql.SampleDataAltDb;
 import com.akto.dto.testing.WorkflowTestResult.NodeResult;
 import com.akto.store.SampleMessageStore;
-import com.akto.store.TestingUtil;
 import com.akto.test_editor.execution.ExecutionListBuilder;
 import com.akto.test_editor.execution.Executor;
 import com.akto.test_editor.execution.ExecutorAlgorithm;
@@ -52,6 +52,9 @@ public class YamlNodeExecutor extends NodeExecutor {
     
     private static final Gson gson = new Gson();
     private static final DataActor dataActor = DataActorFactory.fetchInstance();
+    private final AgentClient agentClient = new AgentClient(
+        Constants.AGENT_BASE_URL
+    );
 
     public NodeResult processNode(Node node, Map<String, Object> varMap, Boolean allowAllStatusCodes, boolean debug, List<TestingRunResult.TestLog> testLogs, Memory memory) {
         List<String> testErrors = new ArrayList<>();
@@ -151,37 +154,43 @@ public class YamlNodeExecutor extends NodeExecutor {
             int tsBeforeReq = 0;
             int tsAfterReq = 0;
             try {
-                tsBeforeReq = Context.nowInMillis();
-                testResponse = ApiExecutor.sendRequest(testReq.getRequest(), followRedirect, testingRunConfig, debug, testLogs, Main.SKIP_SSRF_CHECK);
-                if (apiInfoKey != null && memory != null) {
-                    memory.fillResponse(testReq.getRequest(), testResponse, apiInfoKey.getApiCollectionId(), apiInfoKey.getUrl(), apiInfoKey.getMethod().name());
-                    memory.reset(apiInfoKey.getApiCollectionId(), apiInfoKey.getUrl(), apiInfoKey.getMethod().name());
+                TestResult res = null;
+                if (AgentClient.isRawApiValidForAgenticTest(testReq)) {
+                    // execute agentic test here
+                    res = agentClient.executeAgenticTest(testReq);
+                }else{
+                    tsBeforeReq = Context.nowInMillis();
+                    testResponse = ApiExecutor.sendRequest(testReq.getRequest(), followRedirect, testingRunConfig, debug, testLogs, Main.SKIP_SSRF_CHECK);
+                    if (apiInfoKey != null && memory != null) {
+                        memory.fillResponse(testReq.getRequest(), testResponse, apiInfoKey.getApiCollectionId(), apiInfoKey.getUrl(), apiInfoKey.getMethod().name());
+                        memory.reset(apiInfoKey.getApiCollectionId(), apiInfoKey.getUrl(), apiInfoKey.getMethod().name());
+                    }
+                    tsAfterReq = Context.nowInMillis();
+                    responseTimeArr.add(tsAfterReq - tsBeforeReq);
+                    ExecutionResult attempt = new ExecutionResult(singleReq.getSuccess(), singleReq.getErrMsg(), testReq.getRequest(), testResponse);
+                    res = executor.validate(attempt, sampleRawApi, varMap, logId, validatorNode, yamlNodeDetails.getApiInfoKey());
+                    try {
+                        message.add(convertOriginalReqRespToString(testReq.getRequest(), testResponse));
+                    } catch (Exception e) {
+                        ;
+                    }
+
+                    // save response in a list
+                    savedResponses = testResponse.getBody();
+                    statusCode = testResponse.getStatusCode();
+
+                    eventStreamResponse = com.akto.test_editor.Utils.buildEventStreamResponseIHttpFormat(testResponse);
+
+                    if (testResponse.getBody() == null) {
+                        responseLenArr.add(0);
+                    } else {
+                        responseLenArr.add(testResponse.getBody().length());
+                    }
                 }
-                tsAfterReq = Context.nowInMillis();
-                responseTimeArr.add(tsAfterReq - tsBeforeReq);
-                ExecutionResult attempt = new ExecutionResult(singleReq.getSuccess(), singleReq.getErrMsg(), testReq.getRequest(), testResponse);
-                TestResult res = executor.validate(attempt, sampleRawApi, varMap, logId, validatorNode, yamlNodeDetails.getApiInfoKey());
                 if (res != null) {
                     result.add(res);
                 }
                 vulnerable = res.getVulnerable();
-                try {
-                    message.add(convertOriginalReqRespToString(testReq.getRequest(), testResponse));
-                } catch (Exception e) {
-                    ;
-                }
-
-                // save response in a list
-                savedResponses = testResponse.getBody();
-                statusCode = testResponse.getStatusCode();
-
-                eventStreamResponse = com.akto.test_editor.Utils.buildEventStreamResponseIHttpFormat(testResponse);
-
-                if (testResponse.getBody() == null) {
-                    responseLenArr.add(0);
-                } else {
-                    responseLenArr.add(testResponse.getBody().length());
-                }
 
             } catch (Exception e) {
                 // TODO: handle exception

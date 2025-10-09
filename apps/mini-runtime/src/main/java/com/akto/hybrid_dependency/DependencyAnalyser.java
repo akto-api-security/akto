@@ -89,7 +89,7 @@ public class DependencyAnalyser {
         ApiCollection apiCollection = apiCollectionsMap.get(finalApiCollectionId);
         // for on prem customers always run dependency graph
         // for saas customers, run if flag is set true
-        boolean runDependencyAnalyser = apiCollection == null || apiCollection.isRunDependencyAnalyser() || DataActor.actualAccountId == 1745303931 || DataActor.actualAccountId == 1741069294 || DataActor.actualAccountId == 1749515934;
+        boolean runDependencyAnalyser = apiCollection == null || apiCollection.isRunDependencyAnalyser() || DataActor.actualAccountId == 1745303931 || DataActor.actualAccountId == 1741069294 || DataActor.actualAccountId == 1749515934 || DataActor.actualAccountId == 1753864648;
         if (!isOnPrem && (isHybrid && !runDependencyAnalyser)) {
             return;
         }

@@ -1,5 +1,6 @@
 package com.akto.test_editor.execution;
 
+import com.akto.agent.AgentClient;
 import com.akto.billing.UsageMetricUtils;
 import com.akto.dto.billing.FeatureAccess;
 import com.akto.gpt.handlers.gpt_prompts.TestExecutorModifier;
@@ -51,6 +52,9 @@ public class Executor {
 
     private static final LoggerMaker loggerMaker = new LoggerMaker(Executor.class, LogDb.TESTING);
     private static final DataActor dataActor = DataActorFactory.fetchInstance();
+    private final AgentClient agentClient = new AgentClient(
+        Constants.AGENT_BASE_URL
+    );
 
     public final String _HOST = "host";
 
@@ -182,25 +186,31 @@ public class Executor {
             }
             try {
                 // follow redirects = true for now
-                List<String> contentType = origRawApi.getRequest().getHeaders().getOrDefault("content-type", new ArrayList<>());
-                String contentTypeString = "";
-                if(!contentType.isEmpty()){
-                    contentTypeString = contentType.get(0);
-                }
-                if(!contentTypeString.isEmpty() && (contentTypeString.contains(HttpRequestResponseUtils.SOAP) || contentTypeString.contains(HttpRequestResponseUtils.XML))){
-                    // since we are storing a map for original raw payload, we need original raw url and method to float to api executor
-                    // we are adding custom header here and when sending request we will remove them
-                    testReq.getRequest().getHeaders().put("x-akto-original-url", Collections.singletonList(origRawApi.getRequest().getUrl()));
-                    testReq.getRequest().getHeaders().put("x-akto-original-method", Collections.singletonList(origRawApi.getRequest().getMethod()));   
-                }
+                TestResult res = null;
+                if (AgentClient.isRawApiValidForAgenticTest(testReq)) {
+                    // execute agentic test here
+                    res = agentClient.executeAgenticTest(testReq);
+                }else{
+                    List<String> contentType = origRawApi.getRequest().getHeaders().getOrDefault("content-type", new ArrayList<>());
+                    String contentTypeString = "";
+                    if(!contentType.isEmpty()){
+                        contentTypeString = contentType.get(0);
+                    }
+                    if(!contentTypeString.isEmpty() && (contentTypeString.contains(HttpRequestResponseUtils.SOAP) || contentTypeString.contains(HttpRequestResponseUtils.XML))){
+                        // since we are storing a map for original raw payload, we need original raw url and method to float to api executor
+                        // we are adding custom header here and when sending request we will remove them
+                        testReq.getRequest().getHeaders().put("x-akto-original-url", Collections.singletonList(origRawApi.getRequest().getUrl()));
+                        testReq.getRequest().getHeaders().put("x-akto-original-method", Collections.singletonList(origRawApi.getRequest().getMethod()));   
+                    }
 
-                // Add SSE endpoint header for MCP collections
-                McpSseEndpointHelper.addSseEndpointHeader(testReq.getRequest(), apiInfoKey.getApiCollectionId());
+                    // Add SSE endpoint header for MCP collections
+                    McpSseEndpointHelper.addSseEndpointHeader(testReq.getRequest(), apiInfoKey.getApiCollectionId());
 
-                testResponse = ApiExecutor.sendRequest(testReq.getRequest(), followRedirect, testingRunConfig, debug, testLogs, Main.SKIP_SSRF_CHECK);
-                requestSent = true;
-                ExecutionResult attempt = new ExecutionResult(singleReq.getSuccess(), singleReq.getErrMsg(), testReq.getRequest(), testResponse);
-                TestResult res = validate(attempt, sampleRawApi, varMap, logId, validatorNode, apiInfoKey);
+                    testResponse = ApiExecutor.sendRequest(testReq.getRequest(), followRedirect, testingRunConfig, debug, testLogs, Main.SKIP_SSRF_CHECK);
+                    requestSent = true;
+                    ExecutionResult attempt = new ExecutionResult(singleReq.getSuccess(), singleReq.getErrMsg(), testReq.getRequest(), testResponse);
+                    res = validate(attempt, sampleRawApi, varMap, logId, validatorNode, apiInfoKey);
+                }
                 if (res != null) {
                     result.add(res);
                 }
@@ -643,6 +653,9 @@ public class Executor {
                 }else{
                     return new ExecutorSingleOperationResp(false, response.getString("error"));
                 }
+            case "conversations_list":
+                List<String> conversationsList = (List<String>) value;
+                return Operations.addHeader(rawApi, "x-agent-conversations", String.join(",", conversationsList));
             case "attach_file":
                 return Operations.addHeader(rawApi, Constants.AKTO_ATTACH_FILE , key.toString());
             case "add_body_param":

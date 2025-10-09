@@ -12,12 +12,32 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.*;
+import java.util.regex.Pattern;
 
 public class AuthPolicy {
 
     public static final String AUTHORIZATION_HEADER_NAME = "authorization";
     public static final String COOKIE_NAME = "cookie";
     private static final Logger logger = LoggerFactory.getLogger(AuthPolicy.class);
+
+    // Pre-compiled regex patterns for performance
+    private static final Pattern API_KEY_PATTERN = Pattern.compile(".*(apikey|passkey).*");
+    private static final Pattern MTLS_PATTERN = Pattern.compile(".*(clientcert|sslcert|clientdn|sslclientsdn|sslclientverify|forwardedclientcert).*");
+
+    private static boolean isApiKeyHeader(String headerName) {
+        // Matches variations: x-api-key, x_api_key, api_key, api-key, apiKey, x-pass-key
+        String normalized = headerName.toLowerCase().replaceAll("[_-]", "");
+        return API_KEY_PATTERN.matcher(normalized).matches();
+    }
+
+    private static boolean isMtlsHeader(String headerName, String value) {
+        if (value == null || value.trim().isEmpty()) {
+            return false;
+        }
+        String normalized = headerName.toLowerCase().replaceAll("[_-]", "");
+        // Check for common mTLS/client certificate headers
+        return MTLS_PATTERN.matcher(normalized).matches();
+    }
 
     private static List<ApiInfo.AuthType> findBearerBasicAuth(String header, String value){
         value = value.trim();
@@ -93,11 +113,21 @@ public class AuthPolicy {
             }
         }
 
-        // find bearer or basic tokens in any header
+        // find bearer or basic tokens in any header, and check for API_KEY and MTLS
         for (String header : headers.keySet()) {
             List<String> headerValues = headers.getOrDefault(header, new ArrayList<>());
             for (String value : headerValues) {
                 authTypes.addAll(findBearerBasicAuth(header, value));
+
+                // Check for API_KEY
+                if (isApiKeyHeader(header)) {
+                    authTypes.add(ApiInfo.AuthType.API_KEY);
+                }
+
+                // Check for MTLS
+                if (isMtlsHeader(header, value)) {
+                    authTypes.add(ApiInfo.AuthType.MTLS);
+                }
             }
         }
 
