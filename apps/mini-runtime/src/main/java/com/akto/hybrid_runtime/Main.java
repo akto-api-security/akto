@@ -1017,7 +1017,9 @@ public class Main {
                }
            } catch (Exception e) {
                String payloadStr = payload != null ? payload.toString() : "null";
-               loggerMaker.errorAndAddToDb(e, "Error while parsing kafka message | Payload: " + payloadStr);
+               String payloadSnippet = payloadStr.substring(0, Math.min(50000, payloadStr.length()));
+               loggerMaker.errorAndAddToDb(e, "Error while parsing kafka message | Payload length: " + payloadStr.length() +
+                   " | First 50000 chars: " + payloadSnippet);
                continue;
            }
 
