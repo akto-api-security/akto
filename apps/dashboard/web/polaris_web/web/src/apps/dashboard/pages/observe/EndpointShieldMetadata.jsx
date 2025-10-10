@@ -1,5 +1,5 @@
 import { Text, HorizontalStack, VerticalStack, Box, Badge, Button, Icon, Tooltip, Avatar } from "@shopify/polaris"
-import { useEffect, useReducer, useState, useRef } from "react"
+import { useEffect, useReducer, useState, useRef, useMemo, useCallback } from "react"
 import { useNavigate } from "react-router-dom"
 import { motion, AnimatePresence } from 'framer-motion'
 import { CaretDownMinor, CodeMinor, DynamicSourceMinor, EmailMajor, ClockMinor, CalendarMinor } from '@shopify/polaris-icons'
@@ -18,85 +18,55 @@ import { mapLabel } from "../../../main/labelHelper";
 import FlyLayout from "../../components/layouts/FlyLayout";
 import LayoutWithTabs from "../../components/layouts/LayoutWithTabs";
 
+// Helper function to create table heading configuration
+const createHeading = (text, value = null, sortKey = null) => ({
+    text,
+    value: value || text.toLowerCase().replace(/ /g, ''),
+    title: text,
+    type: CellType.TEXT,
+    sortActive: true,
+    sortKey: sortKey || (value || text.toLowerCase().replace(/ /g, ''))
+});
+
 const headings = [
-    {
-        text: "Agent ID",
-        value: "agentId",
-        title: "Agent ID",
-        type: CellType.TEXT,
-        sortActive: true,
-        sortKey: 'agentId'
-    },
-    {
-        text: "Device ID",
-        value: "deviceId",
-        title: "Device ID",
-        type: CellType.TEXT,
-        sortActive: true,
-        sortKey: 'deviceId'
-    },
-    {
-        text: "Username",
-        value: "username",
-        title: "Username",
-        type: CellType.TEXT,
-        sortActive: true,
-        sortKey: 'username'
-    },
-    {
-        text: "Email",
-        value: "email",
-        title: "Email",
-        type: CellType.TEXT,
-        sortActive: true,
-        sortKey: 'email'
-    },
-    {
-        title: 'Last Heartbeat',
-        text: "Last Heartbeat",
-        value: "lastHeartbeatComp",
-        sortActive: true,
-        sortKey: 'lastHeartbeat',
-        type: CellType.TEXT
-    },
-    {
-        title: 'Last Deployed',
-        text: "Last Deployed",
-        value: "lastDeployedComp",
-        sortKey: 'lastDeployed',
-        sortActive: true,
-        type: CellType.TEXT
-    }
+    createHeading("Agent ID", "agentId"),
+    createHeading("Device ID", "deviceId"),
+    createHeading("Username", "username"),
+    createHeading("Email", "email"),
+    createHeading("Last Heartbeat", "lastHeartbeatComp", "lastHeartbeat"),
+    createHeading("Last Deployed", "lastDeployedComp", "lastDeployed")
 ]
 
+// Helper function to create sort options for a column
+const createSortOptions = (label, sortKey, columnIndex, isTimeField = false) => {
+    const descLabel = isTimeField ? 'Newest' : 'Z-A';
+    const ascLabel = isTimeField ? 'Oldest' : 'A-Z';
+    return [
+        { label, value: `${sortKey} desc`, directionLabel: descLabel, sortKey, columnIndex },
+        { label, value: `${sortKey} asc`, directionLabel: ascLabel, sortKey, columnIndex }
+    ];
+};
+
 const sortOptions = [
-    { label: 'Agent ID', value: 'agentId desc', directionLabel: 'Z-A', sortKey: 'agentId', columnIndex: 1 },
-    { label: 'Agent ID', value: 'agentId asc', directionLabel: 'A-Z', sortKey: 'agentId', columnIndex: 1 },
-    { label: 'Device ID', value: 'deviceId desc', directionLabel: 'Z-A', sortKey: 'deviceId', columnIndex: 2 },
-    { label: 'Device ID', value: 'deviceId asc', directionLabel: 'A-Z', sortKey: 'deviceId', columnIndex: 2 },
-    { label: 'Username', value: 'username desc', directionLabel: 'Z-A', sortKey: 'username', columnIndex: 3 },
-    { label: 'Username', value: 'username asc', directionLabel: 'A-Z', sortKey: 'username', columnIndex: 3 },
-    { label: 'Email', value: 'email desc', directionLabel: 'Z-A', sortKey: 'email', columnIndex: 4 },
-    { label: 'Email', value: 'email asc', directionLabel: 'A-Z', sortKey: 'email', columnIndex: 4 },
-    { label: 'Last Heartbeat', value: 'lastHeartbeat desc', directionLabel: 'Newest', sortKey: 'lastHeartbeat', columnIndex: 5 },
-    { label: 'Last Heartbeat', value: 'lastHeartbeat asc', directionLabel: 'Oldest', sortKey: 'lastHeartbeat', columnIndex: 5 },
-    { label: 'Last Deployed', value: 'lastDeployed desc', directionLabel: 'Newest', sortKey: 'lastDeployed', columnIndex: 6 },
-    { label: 'Last Deployed', value: 'lastDeployed asc', directionLabel: 'Oldest', sortKey: 'lastDeployed', columnIndex: 6 },
+    ...createSortOptions('Agent ID', 'agentId', 1),
+    ...createSortOptions('Device ID', 'deviceId', 2),
+    ...createSortOptions('Username', 'username', 3),
+    ...createSortOptions('Email', 'email', 4),
+    ...createSortOptions('Last Heartbeat', 'lastHeartbeat', 5, true),
+    ...createSortOptions('Last Deployed', 'lastDeployed', 6, true)
 ];
 
+// Helper function to create filter configuration
+const createFilter = (key, label) => ({
+    key,
+    label,
+    title: label,
+    choices: []
+});
+
 const filters = [
-    {
-        key: 'username',
-        label: 'Username',
-        title: 'Username',
-        choices: [],
-    },
-    {
-        key: 'email',
-        label: 'Email',
-        title: 'Email',
-        choices: [],
-    }
+    createFilter('username', 'Username'),
+    createFilter('email', 'Email')
 ]
 
 const resourceName = {
@@ -104,22 +74,33 @@ const resourceName = {
     plural: 'agents',
 };
 
+// Constants for better maintainability
+const LOG_STREAMING_DELAY_MS = 500;
+const ANIMATION_DURATION = 0.2;
+const LOG_LEVEL_TONES = {
+    INFO: 'info',
+    WARNING: 'warning',
+    ERROR: 'critical'
+};
+const ICON_SIZE = { maxWidth: "1rem", maxHeight: "1rem" };
+const LOG_TIMESTAMP_WIDTH = "180px";
+const LOG_LEVEL_WIDTH = "60px";
+
 const convertDataIntoTableFormat = (agentData) => {
-    let temp = {...agentData}
-    temp['lastHeartbeatComp'] = func.prettifyEpoch(temp?.lastHeartbeat)
-    temp['lastDeployedComp'] = func.prettifyEpoch(temp?.lastDeployed)
-    return temp;
+    return {
+        ...agentData,
+        lastHeartbeatComp: func.prettifyEpoch(agentData?.lastHeartbeat),
+        lastDeployedComp: func.prettifyEpoch(agentData?.lastDeployed)
+    };
 }
 
 // Use fixed dummy data from external file
-const generateDummyData = () => {
-    return getMcpEndpointShieldData();
-}
+const generateDummyData = () => getMcpEndpointShieldData();
 
 // Reusable component for rendering metadata fields with icon and tooltip
 const MetadataField = ({ icon, tooltip, value }) => (
     <HorizontalStack wrap={false} gap="1">
-        <div style={{ maxWidth: "1rem", maxHeight: "1rem" }}>
+        <div style={ICON_SIZE}>
             <Tooltip content={tooltip} dismissOnMouseOut>
                 <Icon source={icon} color="subdued" />
             </Tooltip>
@@ -129,6 +110,15 @@ const MetadataField = ({ icon, tooltip, value }) => (
         </Text>
     </HorizontalStack>
 );
+
+// Metadata fields configuration
+const getMetadataFields = (agent) => [
+    { icon: CodeMinor, tooltip: "Agent ID", value: agent.agentId },
+    { icon: DynamicSourceMinor, tooltip: "Device ID", value: agent.deviceId },
+    { icon: EmailMajor, tooltip: "Email", value: agent.email },
+    { icon: ClockMinor, tooltip: "Last Heartbeat", value: func.prettifyEpoch(agent.lastHeartbeat) },
+    { icon: CalendarMinor, tooltip: "Last Deployed", value: func.prettifyEpoch(agent.lastDeployed) }
+];
 
 function EndpointShieldMetadata() {
     const navigate = useNavigate();
@@ -159,14 +149,14 @@ function EndpointShieldMetadata() {
     }
 
     // Save description for the selected agent
-    const handleSaveDescription = () => {
+    const handleSaveDescription = useCallback(() => {
         setDescription(editableDescription);
         setIsEditingDescription(false);
         func.setToast(true, false, "Description saved");
-    };
+    }, [editableDescription]);
 
     // Handle agent row click to open flyout with details
-    const handleRowClick = (agent) => {
+    const handleRowClick = useCallback((agent) => {
         setSelectedAgent(agent);
         const servers = getMcpServersByAgent(agent.agentId, agent.deviceId);
         const logs = getAgentLogs(agent.agentId);
@@ -179,7 +169,7 @@ function EndpointShieldMetadata() {
         setEditableDescription("");
         setIsEditingDescription(false);
         setShowFlyout(true);
-    };
+    }, []);
 
     // Simulate live log streaming
     useEffect(() => {
@@ -195,7 +185,7 @@ function EndpointShieldMetadata() {
             } else {
                 clearInterval(interval);
             }
-        }, 500); // Add one log every 500ms
+        }, LOG_STREAMING_DELAY_MS);
 
         return () => clearInterval(interval);
     }, [agentLogs, showFlyout]);
@@ -221,7 +211,7 @@ function EndpointShieldMetadata() {
                     style={{ backgroundColor: '#F6F6F7' }}
                 >
                     <HorizontalStack gap="2" align="start">
-                        <motion.div animate={{ rotate: isLogsExpanded ? 0 : 270 }} transition={{ duration: 0.2 }}>
+                        <motion.div animate={{ rotate: isLogsExpanded ? 0 : 270 }} transition={{ duration: ANIMATION_DURATION }}>
                             <CaretDownMinor height={20} width={20} />
                         </motion.div>
                         <HorizontalStack gap="2" align="start">
@@ -240,7 +230,7 @@ function EndpointShieldMetadata() {
                             open: { height: "auto", opacity: 1 },
                             closed: { height: 0, opacity: 0 }
                         }}
-                        transition={{ duration: 0.2 }}
+                        transition={{ duration: ANIMATION_DURATION }}
                         className="overflow-hidden"
                     >
                         <div
@@ -252,19 +242,19 @@ function EndpointShieldMetadata() {
                                         key={`${index}-${log.message}`}
                                         initial={{ opacity: 0, y: -10 }}
                                         animate={{ opacity: 1, y: 0 }}
-                                        transition={{ duration: 0.2 }}
+                                        transition={{ duration: ANIMATION_DURATION }}
                                         className="ml-3 p-0.5 hover:bg-[var(--background-selected)]"
                                     >
                                         <HorizontalStack gap="3" align="start">
-                                            <Box minWidth="180px">
+                                            <Box minWidth={LOG_TIMESTAMP_WIDTH}>
                                                 <Text variant="bodySm" fontWeight="medium" tone="subdued">
                                                     {func.epochToDateTime(log.timestamp)}
                                                 </Text>
                                             </Box>
-                                            <Box minWidth="60px">
+                                            <Box minWidth={LOG_LEVEL_WIDTH}>
                                                 <Badge
                                                     size="small"
-                                                    tone={log.level === 'INFO' ? 'info' : log.level === 'WARNING' ? 'warning' : 'critical'}
+                                                    tone={LOG_LEVEL_TONES[log.level] || 'info'}
                                                 >
                                                     {log.level}
                                                 </Badge>
@@ -285,29 +275,38 @@ function EndpointShieldMetadata() {
         );
     };
 
+    // Helper function to create simple table header
+    const createSimpleHeader = (text, value = null) => ({
+        text,
+        title: text,
+        value: value || text.toLowerCase().replace(/ /g, '')
+    });
+
     const mcpServersHeaders = [
-        { text: "Server Name", title: "Server Name", value: "serverName" },
-        { text: "Server URL", title: "Server URL", value: "serverUrl" },
-        { text: "Last Seen", title: "Last Seen", value: "lastSeenFormatted" }
+        createSimpleHeader("Server Name", "serverName"),
+        createSimpleHeader("Server URL", "serverUrl"),
+        createSimpleHeader("Last Seen", "lastSeenFormatted")
     ];
 
-    const mcpServersTableData = mcpServers.map(server => ({
-        serverName: server.serverName,
-        serverUrl: server.serverUrl,
-        lastSeenFormatted: func.prettifyEpoch(server.lastSeen),
-        lastSeen: server.lastSeen,
-        collectionName: server.collectionName
-    }));
+    // Memoize table data transformation to avoid recalculation on every render
+    const mcpServersTableData = useMemo(() =>
+        mcpServers.map(server => ({
+            serverName: server.serverName,
+            serverUrl: server.serverUrl,
+            lastSeenFormatted: func.prettifyEpoch(server.lastSeen),
+            lastSeen: server.lastSeen,
+            collectionName: server.collectionName
+        })), [mcpServers]);
 
     // Navigate to MCP collection page when server is clicked
-    const handleServerClick = (server) => {
+    const handleServerClick = useCallback((server) => {
         const collection = allCollections.find(col => col.name === server.collectionName);
         if (collection) {
             navigate(`/dashboard/observe/inventory/${collection.id}`);
         } else {
             func.setToast(true, true, `Collection "${server.collectionName}" not found`);
         }
-    };
+    }, [allCollections, navigate]);
 
     const McpServersTab = {
         id: 'mcp-servers',
@@ -522,31 +521,14 @@ function EndpointShieldMetadata() {
                                 </Box>
                                 <Box>
                                     <HorizontalStack gap="2" align="start">
-                                        <MetadataField
-                                            icon={CodeMinor}
-                                            tooltip="Agent ID"
-                                            value={selectedAgent.agentId}
-                                        />
-                                        <MetadataField
-                                            icon={DynamicSourceMinor}
-                                            tooltip="Device ID"
-                                            value={selectedAgent.deviceId}
-                                        />
-                                        <MetadataField
-                                            icon={EmailMajor}
-                                            tooltip="Email"
-                                            value={selectedAgent.email}
-                                        />
-                                        <MetadataField
-                                            icon={ClockMinor}
-                                            tooltip="Last Heartbeat"
-                                            value={func.prettifyEpoch(selectedAgent.lastHeartbeat)}
-                                        />
-                                        <MetadataField
-                                            icon={CalendarMinor}
-                                            tooltip="Last Deployed"
-                                            value={func.prettifyEpoch(selectedAgent.lastDeployed)}
-                                        />
+                                        {getMetadataFields(selectedAgent).map((field, index) => (
+                                            <MetadataField
+                                                key={index}
+                                                icon={field.icon}
+                                                tooltip={field.tooltip}
+                                                value={field.value}
+                                            />
+                                        ))}
                                     </HorizontalStack>
                                 </Box>
                             </VerticalStack>
