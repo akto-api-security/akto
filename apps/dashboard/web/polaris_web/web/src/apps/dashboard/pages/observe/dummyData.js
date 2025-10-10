@@ -47,3 +47,67 @@ export const getMcpEndpointShieldData = () => {
         }
     ];
 };
+
+// MCP Servers detected by each agent
+export const getMcpServersByAgent = (agentId, deviceId) => {
+    const serversByAgent = {
+        default: [
+            {
+                serverName: 'akto_mcp_server',
+                serverUrl: 'docker run --rm -i akto-api-security/akto-mcp-server',
+                detected: true,
+                lastSeen: Date.now() / 1000 - 3600,
+                collectionName: `${deviceId}.akto_mcp_server`
+            },
+            {
+                serverName: 'playwright-mcp',
+                serverUrl: 'python -m playwright_mcp',
+                detected: true,
+                lastSeen: Date.now() / 1000 - 7200,
+                collectionName: `${deviceId}.playwright-mcp`
+            },
+            {
+                serverName: 'text-editor-mcp',
+                serverUrl: 'npx -y text-editor-mcp',
+                detected: true,
+                lastSeen: Date.now() / 1000 - 1800,
+                collectionName: `${deviceId}.text-editor-mcp`
+            }
+        ]
+    };
+
+    return serversByAgent[agentId] || serversByAgent.default;
+};
+
+// Agent Logs
+export const getAgentLogs = (agentId) => {
+    const now = Math.floor(Date.now() / 1000);
+
+    return [
+        {
+            timestamp: now - 300, // 5 minutes ago
+            level: 'INFO',
+            message: 'Agent heartbeat sent successfully'
+        },
+        {
+            timestamp: now - 900, // 15 minutes ago
+            level: 'INFO',
+            message: 'Discovered MCP server: akto_mcp_server'
+        },
+        {
+            timestamp: now - 1800, // 30 minutes ago
+            level: 'INFO',
+            message: 'Discovered MCP server: playwright-mcp'
+        },
+        {
+            timestamp: now - 2700, // 45 minutes ago
+            level: 'INFO',
+            message: 'Discovered MCP server: text-editor-mcp'
+        },
+        {
+            timestamp: now - 3600, // 1 hour ago
+            level: 'INFO',
+            message: 'Agent started monitoring'
+        }
+    ];
+};
