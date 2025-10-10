@@ -1,15 +1,22 @@
-import { Text, HorizontalStack, VerticalStack, Box } from "@shopify/polaris"
-import { useEffect, useReducer, useState } from "react"
+import { Text, HorizontalStack, VerticalStack, Box, Badge, Button, Icon, Tooltip, Avatar } from "@shopify/polaris"
+import { useEffect, useReducer, useState, useRef } from "react"
+import { useNavigate } from "react-router-dom"
+import { motion, AnimatePresence } from 'framer-motion'
+import { CaretDownMinor, CodeMinor, DynamicSourceMinor, EmailMajor, ClockMinor, CalendarMinor } from '@shopify/polaris-icons'
+import InlineEditableText from "../../components/shared/InlineEditableText"
 import values from "@/util/values";
 import {produce} from "immer"
 import func from "@/util/func"
 import DateRangeFilter from "../../components/layouts/DateRangeFilter";
 import PageWithMultipleCards from "../../components/layouts/PageWithMultipleCards";
 import GithubServerTable from "../../components/tables/GithubServerTable";
+import GithubSimpleTable from "../../components/tables/GithubSimpleTable";
 import { CellType } from "../../components/tables/rows/GithubRow";
-import { getMcpEndpointShieldData } from "./dummyData";
+import { getMcpEndpointShieldData, getMcpServersByAgent, getAgentLogs } from "./dummyData";
 import PersistStore from "../../../main/PersistStore";
 import { mapLabel } from "../../../main/labelHelper";
+import FlyLayout from "../../components/layouts/FlyLayout";
+import LayoutWithTabs from "../../components/layouts/LayoutWithTabs";
 
 const headings = [
     {
@@ -109,10 +116,36 @@ const generateDummyData = () => {
     return getMcpEndpointShieldData();
 }
 
+// Reusable component for rendering metadata fields with icon and tooltip
+const MetadataField = ({ icon, tooltip, value }) => (
+    <HorizontalStack wrap={false} gap="1">
+        <div style={{ maxWidth: "1rem", maxHeight: "1rem" }}>
+            <Tooltip content={tooltip} dismissOnMouseOut>
+                <Icon source={icon} color="subdued" />
+            </Tooltip>
+        </div>
+        <Text variant="bodySm" color="subdued">
+            {value}
+        </Text>
+    </HorizontalStack>
+);
+
 function EndpointShieldMetadata() {
+    const navigate = useNavigate();
     const [loading, setLoading] = useState(false);
     const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), values.ranges[5]);
     const dashboardCategory = PersistStore((state) => state.dashboardCategory) || "API Security";
+    const allCollections = PersistStore((state) => state.allCollections) || [];
+    const [selectedAgent, setSelectedAgent] = useState(null);
+    const [showFlyout, setShowFlyout] = useState(false);
+    const [mcpServers, setMcpServers] = useState([]);
+    const [agentLogs, setAgentLogs] = useState([]);
+    const [displayedLogs, setDisplayedLogs] = useState([]);
+    const [isLogsExpanded, setIsLogsExpanded] = useState(true);
+    const [description, setDescription] = useState("");
+    const [isEditingDescription, setIsEditingDescription] = useState(false);
+    const [editableDescription, setEditableDescription] = useState("");
+    const copyRef = useRef(null);
 
     const getTimeEpoch = (key) => {
         return Math.floor(Date.parse(currDateRange.period[key]) / 1000)
@@ -124,6 +157,195 @@ function EndpointShieldMetadata() {
     function disambiguateLabel(key, value) {
         return func.convertToDisambiguateLabelObj(value, null, 2)
     }
+
+    // Save description for the selected agent
+    const handleSaveDescription = () => {
+        setDescription(editableDescription);
+        setIsEditingDescription(false);
+        func.setToast(true, false, "Description saved");
+    };
+
+    // Handle agent row click to open flyout with details
+    const handleRowClick = (agent) => {
+        setSelectedAgent(agent);
+        const servers = getMcpServersByAgent(agent.agentId, agent.deviceId);
+        const logs = getAgentLogs(agent.agentId);
+        setMcpServers(servers);
+        // Reverse logs array so oldest appears first in the UI
+        const reversedLogs = [...logs].reverse();
+        setAgentLogs(reversedLogs);
+        setDisplayedLogs([]);
+        setDescription("");
+        setEditableDescription("");
+        setIsEditingDescription(false);
+        setShowFlyout(true);
+    };
+
+    // Simulate live log streaming
+    useEffect(() => {
+        if (agentLogs.length === 0 || !showFlyout) {
+            return;
+        }
+
+        let currentIndex = 0;
+        const interval = setInterval(() => {
+            if (currentIndex < agentLogs.length) {
+                setDisplayedLogs(prev => [...prev, agentLogs[currentIndex]]);
+                currentIndex++;
+            } else {
+                clearInterval(interval);
+            }
+        }, 500); // Add one log every 500ms
+
+        return () => clearInterval(interval);
+    }, [agentLogs, showFlyout]);
+
+    const renderLogs = () => {
+        if (!displayedLogs || displayedLogs.length === 0) {
+            return (
+                <Box padding="4" background="bg-surface">
+                    <Text variant="bodyMd" color="subdued">Loading logs...</Text>
+                </Box>
+            );
+        }
+
+        return (
+            <div
+                className={`rounded-lg overflow-hidden border border-[#C9CCCF] bg-[#F6F6F7] p-2 flex flex-col ${isLogsExpanded ? "gap-1" : "gap-0"}`}
+            >
+                <Button
+                    variant="plain"
+                    fullWidth
+                    onClick={() => setIsLogsExpanded(!isLogsExpanded)}
+                    textAlign="left"
+                    style={{ backgroundColor: '#F6F6F7' }}
+                >
+                    <HorizontalStack gap="2" align="start">
+                        <motion.div animate={{ rotate: isLogsExpanded ? 0 : 270 }} transition={{ duration: 0.2 }}>
+                            <CaretDownMinor height={20} width={20} />
+                        </motion.div>
+                        <HorizontalStack gap="2" align="start">
+                            <Text as="dd">
+                                Agent
+                            </Text>
+                            <Badge tone="info">Current</Badge>
+                        </HorizontalStack>
+                    </HorizontalStack>
+                </Button>
+
+                <AnimatePresence>
+                    <motion.div
+                        animate={isLogsExpanded ? "open" : "closed"}
+                        variants={{
+                            open: { height: "auto", opacity: 1 },
+                            closed: { height: 0, opacity: 0 }
+                        }}
+                        transition={{ duration: 0.2 }}
+                        className="overflow-hidden"
+                    >
+                        <div
+                            className="bg-[#F6F6F7] max-h-[45vh] overflow-auto ml-2.5 pt-0 space-y-1 border-l border-[#D2D5D8]"
+                        >
+                            <AnimatePresence initial={false}>
+                                {displayedLogs.map((log, index) => (
+                                    <motion.div
+                                        key={`${index}-${log.message}`}
+                                        initial={{ opacity: 0, y: -10 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        transition={{ duration: 0.2 }}
+                                        className="ml-3 p-0.5 hover:bg-[var(--background-selected)]"
+                                    >
+                                        <HorizontalStack gap="3" align="start">
+                                            <Box minWidth="180px">
+                                                <Text variant="bodySm" fontWeight="medium" tone="subdued">
+                                                    {func.epochToDateTime(log.timestamp)}
+                                                </Text>
+                                            </Box>
+                                            <Box minWidth="60px">
+                                                <Badge
+                                                    size="small"
+                                                    tone={log.level === 'INFO' ? 'info' : log.level === 'WARNING' ? 'warning' : 'critical'}
+                                                >
+                                                    {log.level}
+                                                </Badge>
+                                            </Box>
+                                            <Box>
+                                                <Text variant="bodySm" as="p">
+                                                    {log.message}
+                                                </Text>
+                                            </Box>
+                                        </HorizontalStack>
+                                    </motion.div>
+                                ))}
+                            </AnimatePresence>
+                        </div>
+                    </motion.div>
+                </AnimatePresence>
+            </div>
+        );
+    };
+
+    const mcpServersHeaders = [
+        { text: "Server Name", title: "Server Name", value: "serverName" },
+        { text: "Server URL", title: "Server URL", value: "serverUrl" },
+        { text: "Last Seen", title: "Last Seen", value: "lastSeenFormatted" }
+    ];
+
+    const mcpServersTableData = mcpServers.map(server => ({
+        serverName: server.serverName,
+        serverUrl: server.serverUrl,
+        lastSeenFormatted: func.prettifyEpoch(server.lastSeen),
+        lastSeen: server.lastSeen,
+        collectionName: server.collectionName
+    }));
+
+    // Navigate to MCP collection page when server is clicked
+    const handleServerClick = (server) => {
+        const collection = allCollections.find(col => col.name === server.collectionName);
+        if (collection) {
+            navigate(`/dashboard/observe/inventory/${collection.id}`);
+        } else {
+            func.setToast(true, true, `Collection "${server.collectionName}" not found`);
+        }
+    };
+
+    const McpServersTab = {
+        id: 'mcp-servers',
+        content: 'MCP Servers',
+        component: (
+            <Box paddingBlockStart={"4"}>
+                <GithubSimpleTable
+                    key="mcp-servers-table"
+                    data={mcpServersTableData}
+                    resourceName={{ singular: "server", plural: "servers" }}
+                    headers={mcpServersHeaders}
+                    headings={mcpServersHeaders}
+                    useNewRow={true}
+                    condensedHeight={true}
+                    hideQueryField={true}
+                    loading={false}
+                    pageLimit={10}
+                    showFooter={false}
+                    onRowClick={handleServerClick}
+                    rowClickable={true}
+                />
+            </Box>
+        ),
+        panelID: 'mcp-servers-panel',
+    };
+
+    const AgentLogsTab = {
+        id: 'agent-logs',
+        content: 'Agent Logs',
+        component: (
+            <Box paddingBlockStart={"4"}>
+                <VerticalStack gap="2">
+                    {renderLogs()}
+                </VerticalStack>
+            </Box>
+        ),
+        panelID: 'agent-logs-panel',
+    };
 
     async function fetchData(sortKey, sortOrder, skip, limit, filters, filterOperators, queryValue){
         setLoading(true);
@@ -224,33 +446,119 @@ function EndpointShieldMetadata() {
     )
 
     return (
-        <PageWithMultipleCards
-            title={
-                <Text as="div" variant="headingLg">
-                    {mapLabel("Endpoint Shield", dashboardCategory)}
-                </Text>
-            }
-            backUrl="/dashboard/observe"
-            primaryAction={primaryActions}
-            components = {[
-                <GithubServerTable
-                    key={startTimestamp + endTimestamp}
-                    headers={headings}
-                    resourceName={resourceName}
-                    appliedFilters={[]}
-                    sortOptions={sortOptions}
-                    disambiguateLabel={disambiguateLabel}
-                    loading={loading}
-                    fetchData={fetchData}
-                    filters={filters}
-                    hideQueryField={false}
-                    useNewRow={true}
-                    condensedHeight={true}
-                    pageLimit={20}
-                    headings={headings}
+        <>
+            <PageWithMultipleCards
+                title={
+                    <Text as="div" variant="headingLg">
+                        {mapLabel("Endpoint Shield", dashboardCategory)}
+                    </Text>
+                }
+                backUrl="/dashboard/observe"
+                primaryAction={primaryActions}
+                components = {[
+                    <GithubServerTable
+                        key={startTimestamp + endTimestamp}
+                        headers={headings}
+                        resourceName={resourceName}
+                        appliedFilters={[]}
+                        sortOptions={sortOptions}
+                        disambiguateLabel={disambiguateLabel}
+                        loading={loading}
+                        fetchData={fetchData}
+                        filters={filters}
+                        hideQueryField={false}
+                        useNewRow={true}
+                        condensedHeight={true}
+                        pageLimit={20}
+                        headings={headings}
+                        onRowClick={handleRowClick}
+                        rowClickable={true}
+                    />
+                ]}
+            />
+            {selectedAgent && (
+                <FlyLayout
+                    show={showFlyout}
+                    setShow={setShowFlyout}
+                    title="Agent Details"
+                    components={[
+                        <HorizontalStack align="space-between" wrap={false} key="agent-heading">
+                            <VerticalStack gap="2">
+                                <HorizontalStack gap="2" wrap={false}>
+                                    <Text variant="headingMd" as="h2">
+                                        {selectedAgent.username}
+                                    </Text>
+                                    <Box paddingBlockStart={"05"}>
+                                        <Button plain onClick={() => func.copyToClipboard(selectedAgent.agentId, copyRef, "Agent ID copied")}>
+                                            <Tooltip content="Copy Agent ID" dismissOnMouseOut>
+                                                <div className="reduce-size">
+                                                    <Avatar size="extraSmall" source="/public/copy_icon.svg" />
+                                                </div>
+                                            </Tooltip>
+                                            <Box ref={copyRef} />
+                                        </Button>
+                                    </Box>
+                                </HorizontalStack>
+                                <Box maxWidth="32vw">
+                                    {isEditingDescription ? (
+                                        <InlineEditableText
+                                            textValue={editableDescription}
+                                            setTextValue={setEditableDescription}
+                                            handleSaveClick={handleSaveDescription}
+                                            setIsEditing={setIsEditingDescription}
+                                            placeholder="Add a brief description"
+                                            maxLength={64}
+                                        />
+                                    ) : (
+                                        <Button plain removeUnderline onClick={() => {
+                                            setEditableDescription(description);
+                                            setIsEditingDescription(true);
+                                        }} textAlign="left">
+                                            <Text as="span" variant="bodyMd" color={description ? "subdued" : undefined} alignment="start">
+                                                {description || "Add description"}
+                                            </Text>
+                                        </Button>
+                                    )}
+                                </Box>
+                                <Box>
+                                    <HorizontalStack gap="2" align="start">
+                                        <MetadataField
+                                            icon={CodeMinor}
+                                            tooltip="Agent ID"
+                                            value={selectedAgent.agentId}
+                                        />
+                                        <MetadataField
+                                            icon={DynamicSourceMinor}
+                                            tooltip="Device ID"
+                                            value={selectedAgent.deviceId}
+                                        />
+                                        <MetadataField
+                                            icon={EmailMajor}
+                                            tooltip="Email"
+                                            value={selectedAgent.email}
+                                        />
+                                        <MetadataField
+                                            icon={ClockMinor}
+                                            tooltip="Last Heartbeat"
+                                            value={func.prettifyEpoch(selectedAgent.lastHeartbeat)}
+                                        />
+                                        <MetadataField
+                                            icon={CalendarMinor}
+                                            tooltip="Last Deployed"
+                                            value={func.prettifyEpoch(selectedAgent.lastDeployed)}
+                                        />
+                                    </HorizontalStack>
+                                </Box>
+                            </VerticalStack>
+                        </HorizontalStack>,
+                        <LayoutWithTabs
+                            key="tabs"
+                            tabs={[McpServersTab, AgentLogsTab]}
+                        />
+                    ]}
                 />
-            ]}
-        />
+            )}
+        </>
     )
 }
 
