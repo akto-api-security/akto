@@ -300,7 +300,9 @@ function EndpointShieldMetadata() {
 
     // Navigate to MCP collection page when server is clicked
     const handleServerClick = useCallback((server) => {
-        const collection = allCollections.find(col => col.name === server.collectionName);
+        const collection = allCollections.find(col =>
+            col.name === server.collectionName || col.displayName === server.collectionName
+        );
         if (collection) {
             navigate(`/dashboard/observe/inventory/${collection.id}`);
         } else {
