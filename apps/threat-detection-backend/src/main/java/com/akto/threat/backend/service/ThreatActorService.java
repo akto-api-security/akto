@@ -707,7 +707,7 @@ public class ThreatActorService {
     pipeline.add(new Document("$sort", new Document("attacks", -1)));
 
     // Limit results
-    pipeline.add(new Document("$limit", limit > 0 ? limit : 10));
+    pipeline.add(new Document("$limit", limit > 0 ? limit : 5));
 
     List<FetchTopNDataResponse.TopApiData> topApis = new ArrayList<>();
 
@@ -724,8 +724,41 @@ public class ThreatActorService {
       }
     }
 
+    // Build pipeline for top hosts based on 'host' field
+    List<Document> hostPipeline = new ArrayList<>();
+    if (!match.isEmpty()) {
+      hostPipeline.add(new Document("$match", match));
+    }
+    // Only consider documents where host exists and is not empty
+    hostPipeline.add(new Document("$match", new Document("host", new Document("$ne", null))));
+    hostPipeline.add(new Document("$match", new Document("host", new Document("$ne", ""))));
+
+    hostPipeline.add(new Document("$group",
+        new Document("_id", "$host")
+            .append("attacks", new Document("$sum", 1))));
+
+    hostPipeline.add(new Document("$project",
+        new Document("host", "$_id")
+            .append("attacks", 1)));
+
+    hostPipeline.add(new Document("$sort", new Document("attacks", -1)));
+    hostPipeline.add(new Document("$limit", limit > 0 ? limit : 5));
+
+    List<FetchTopNDataResponse.TopHostData> topHosts = new ArrayList<>();
+    try (MongoCursor<Document> cursor = coll.aggregate(hostPipeline).cursor()) {
+      while (cursor.hasNext()) {
+        Document doc = cursor.next();
+        topHosts.add(
+            FetchTopNDataResponse.TopHostData.newBuilder()
+                .setHost(doc.getString("host"))
+                .setAttacks(doc.getInteger("attacks", 0))
+                .build());
+      }
+    }
+
     return FetchTopNDataResponse.newBuilder()
         .addAllTopApis(topApis)
+        .addAllTopHosts(topHosts)
         .build();
   }
 }
