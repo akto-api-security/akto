@@ -544,6 +544,8 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
   }
 
   const key = startTimestamp + endTimestamp;
+  const stableFilterKey = "/dashboard/protection/threat-activity";
+  const persistedFilters = (PersistStore.getState().filtersMap?.[stableFilterKey]?.filters) || [];
   return (
     <GithubServerTable
       key={key}
@@ -556,6 +558,8 @@ function SusDataTable({ currDateRange, rowClicked, triggerRefresh, label = LABEL
       loading={loading}
       fetchData={fetchData}
       filters={filters}
+      filterStateUrl={stableFilterKey}
+      appliedFilters={persistedFilters}
       selectable={true}
       promotedBulkActions={promotedBulkActions}
       headings={headers}
