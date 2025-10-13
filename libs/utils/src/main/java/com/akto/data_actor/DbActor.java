@@ -17,6 +17,7 @@ import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.testing.AccessMatrixTaskInfo;
 import com.akto.dto.testing.AccessMatrixUrlToRole;
+import com.akto.dto.testing.AgentConversationResult;
 import com.akto.dto.testing.EndpointLogicalGroup;
 import com.akto.dto.testing.LoginFlowStepsData;
 import com.akto.dto.testing.OtpTestData;
@@ -701,5 +702,10 @@ public class DbActor extends DataActor {
 
     public List<SlackWebhook> fetchSlackWebhooks() {
         return DbLayer.fetchSlackWebhooks();
+    }
+    
+    @Override
+    public void storeConversationResults(List<AgentConversationResult> conversationResults) {
+        DbLayer.storeConversationResults(conversationResults);
     }
 }
