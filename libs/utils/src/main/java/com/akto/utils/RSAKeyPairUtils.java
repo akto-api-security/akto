@@ -62,6 +62,8 @@ public class RSAKeyPairUtils {
                 Constants.setPublicKey(publicKey);
 
                 logger.info("Successfully set RSA keys in Constants");
+            } else {
+                logger.error("RSA keys config not found in db");
             }
         } catch (Exception e) {
             logger.error("Error while fetching RSA keys from db", e);
