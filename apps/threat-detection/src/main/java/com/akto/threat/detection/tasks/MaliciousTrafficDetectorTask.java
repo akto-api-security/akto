@@ -9,6 +9,7 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
 
 import org.apache.commons.lang3.math.NumberUtils;
@@ -103,6 +104,8 @@ public class MaliciousTrafficDetectorTask implements Task {
   private boolean apiDistributionEnabled;
   private ApiCountCacheLayer apiCacheCountLayer;
   private static List<FilterConfig> successfulExploitFilters = new ArrayList<>();
+  private final AtomicInteger applyFilterLogCount = new AtomicInteger(0);
+  private static final int MAX_APPLY_FILTER_LOGS = 1000;
 
   public MaliciousTrafficDetectorTask(
       KafkaConfig trafficConfig, KafkaConfig internalConfig, RedisClient redisClient, DistributionCalculator distributionCalculator, boolean apiDistributionEnabled) throws Exception {
@@ -349,6 +352,13 @@ public class MaliciousTrafficDetectorTask implements Task {
 
       }else {
         hasPassedFilter = threatDetector.applyFilter(apiFilter, responseParam, rawApi, apiInfoKey);
+
+        if (applyFilterLogCount.get() < MAX_APPLY_FILTER_LOGS) {
+          logger.warnAndAddToDb("applyFilter - apiInfoKey: " + apiInfoKey.toString() +
+                                ", filterId: " + apiFilter.getId() +
+                                ", result: " + hasPassedFilter);
+          applyFilterLogCount.incrementAndGet();
+        }
       }
 
       // If a request passes any of the filter, then it's a malicious request,
