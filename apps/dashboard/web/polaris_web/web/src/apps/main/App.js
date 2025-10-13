@@ -4,6 +4,7 @@ import SingleTestRunPage from "../dashboard/pages/testing/SingleTestRunPage/Sing
 import AllSensitiveData from "../dashboard/pages/observe/AllSensitiveData/AllSensitiveData";
 import ApiCollections from "../dashboard/pages/observe/api_collections/ApiCollections";
 import ApiQuery from "../dashboard/pages/observe/api_collections/APIQuery";
+import DebugEndpointsMode from "../dashboard/pages/observe/api_collections/DebugEndpointsMode";
 import ApiEndpoints from "../dashboard/pages/observe/api_collections/ApiEndpoints";
 import SensitiveDataExposure from "../dashboard/pages/observe/SensitiveDataExposure/SensitiveDataExposure";
 import SingleRequest from "../dashboard/pages/observe/SingleRequest/SingleRequest";
@@ -30,6 +31,7 @@ import About from "../dashboard/pages/settings/about/About";
 import ThreatConfiguration from "../dashboard/pages/settings/threat_configuration/ThreatConfiguration";
 import Metrics from "../dashboard/pages/settings/metrics/Metrics";
 import TestEditor from "../dashboard/pages/test_editor/TestEditor";
+import PromptHardening from "../dashboard/pages/prompt_hardening/PromptHardening";
 import DataTypes from "../dashboard/pages/observe/data_types/DataTypes";
 import IssuesPage from "../dashboard/pages/issues/IssuesPage/IssuesPage";
 import CompliancePage from "../dashboard/pages/issues/IssuesPage/CompliancePage";
@@ -100,10 +102,14 @@ import GmailWebhookCore from "../dashboard/pages/settings/integrations/gmailWebh
 import GmailWebhook from "../dashboard/pages/settings/integrations/gmailWebhooks/GmailWebhook";
 import McpSecurityPage from "../dashboard/pages/mcp-security/McpSecurityPage.jsx";
 import AuditData from "../dashboard/pages/observe/AuditData";
+import EndpointShieldMetadata from "../dashboard/pages/observe/EndpointShieldMetadata";
 import GuardrailDetection    from "../dashboard/pages/guardrails/GuardrailDetection";
 import GuardrailDetectionDemo from "../dashboard/pages/guardrails/GuardrailDetectionDemo";
 import GuardrailPolicies   from "../dashboard/pages/guardrails/GuardrailPolicies";
+import ThreatDashboardPage from "../dashboard/pages/threat_detection/ThreatDashboardPage";
 import OpenApiAgentTester from "../dashboard/pages/observe/OpenApiAgentTester";
+import DastProgress from "../dashboard/pages/observe/api_collections/DastProgress.jsx";
+import DastProgressSingle from "../dashboard/pages/observe/api_collections/DastProgressSingle.jsx";
 
 // if you add a component in a new path, please verify the search implementation in function -> 'getSearchItemsArr' in func.js
 
@@ -177,6 +183,10 @@ const router = createBrowserRouter([
                                 element: <ApiQuery/>
                             },
                             {
+                                path: "debug-endpoints",
+                                element: <DebugEndpointsMode/>
+                            },
+                            {
                                 path: "changes",
                                 element: <ApiChanges/>
                             },
@@ -201,9 +211,21 @@ const router = createBrowserRouter([
                                 element: <AuditData/>
                             },
                             {
+                                path: "endpoint-shield",
+                                element: <EndpointShieldMetadata/>
+                            },
+                            {
                                 path: ":apiCollectionId/open-api-upload",
                                 element: <OpenApiAgentTester/>
-                            }
+                            },
+                            {
+                                path: "dast-progress",
+                                element: <DastProgress />
+                            },
+                            {
+                                path: "dast-progress/:crawlId",
+                                element: <DastProgressSingle />
+                            },
                         ]
                     },
                     {
@@ -230,6 +252,10 @@ const router = createBrowserRouter([
                     {
                         path: "protection",
                         children: [
+                            {
+                                path: "threat-dashboard",
+                                element: <ThreatDashboardPage/>
+                            },
                             {
                                 path: "threat-activity",
                                 element: <ThreatDetectionPage/>
@@ -482,6 +508,14 @@ const router = createBrowserRouter([
             {
                 path: "test-editor",
                 element: <TestEditor/>
+            },
+            {
+                path: "prompt-hardening/:promptId",
+                element: <PromptHardening/>
+            },
+            {
+                path: "prompt-hardening",
+                element: <PromptHardening/>
             },
             {
                 path: "onboarding",

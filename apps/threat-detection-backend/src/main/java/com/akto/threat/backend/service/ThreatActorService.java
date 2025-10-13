@@ -23,6 +23,7 @@ import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.Th
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatActorByCountryRequest;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatActorByCountryResponse;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ListThreatActorResponse.ActivityData;
+import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchTopNDataResponse;
 import com.akto.ProtoMessageUtils;
 import com.akto.threat.backend.constants.MongoDBCollection;
 import com.akto.threat.backend.db.ActorInfoModel;
@@ -32,7 +33,6 @@ import com.akto.threat.backend.utils.ThreatUtils;
 import com.google.protobuf.TextFormat;
 import com.mongodb.client.*;
 import com.mongodb.client.model.Filters;
-import com.mongodb.client.model.Indexes;
 import com.mongodb.client.model.Updates;
 import com.mongodb.client.model.Sorts;
 
@@ -251,9 +251,9 @@ public class ThreatActorService {
 
   public DailyActorsCountResponse getDailyActorCounts(String accountId, long startTs, long endTs, List<String> latestAttackList) {
 
-      if(latestAttackList == null || latestAttackList.isEmpty()) {
-          return DailyActorsCountResponse.newBuilder().build();
-      }
+    if(latestAttackList == null || latestAttackList.isEmpty()) {
+        return DailyActorsCountResponse.newBuilder().build();
+    }
 
     List<DailyActorsCountResponse.ActorsCount> actors = new ArrayList<>();
     MongoCollection<Document> coll = this.mongoClient
@@ -265,9 +265,9 @@ public class ThreatActorService {
 
       Document matchConditions = new Document();
 
-      if(latestAttackList != null && !latestAttackList.isEmpty()) {
-          matchConditions.append("filterId", new Document("$in", latestAttackList));
-      }
+    if(latestAttackList != null && !latestAttackList.isEmpty()) {
+        matchConditions.append("filterId", new Document("$in", latestAttackList));
+    }
 
       matchConditions.append("detectedAt", new Document("$lte", endTs));
         if (startTs > 0) {
@@ -337,14 +337,59 @@ public class ThreatActorService {
             }
         }
 
-        return DailyActorsCountResponse.newBuilder().addAllActorsCounts(actors).build();
+        // Calculate summary counts using direct MongoDB queries
+        // Total analysed - count all documents matching the filter
+        long totalAnalysed = coll.countDocuments(matchConditions);
+
+        // Total attacks - count documents with successfulExploit = true
+        long totalAttacks = coll.countDocuments(new Document(matchConditions).append("successfulExploit", true));
+
+        int criticalActorsCount = 0;
+        for (DailyActorsCountResponse.ActorsCount ac : actors) {
+            criticalActorsCount += ac.getCriticalActors();
+        }
+        // Status aggregation for totalActive, totalIgnored, totalUnderReview
+        List<Document> statusPipeline = new ArrayList<>();
+        if (!matchConditions.isEmpty()) {
+            statusPipeline.add(new Document("$match", matchConditions));
+        }
+        statusPipeline.add(new Document("$group",
+            new Document("_id", "$status").append("count", new Document("$sum", 1))));
+
+        int totalActive = 0;
+        int totalIgnored = 0;
+        int totalUnderReview = 0;
+        try (MongoCursor<Document> cursor = coll.aggregate(statusPipeline).cursor()) {
+            while (cursor.hasNext()) {
+                Document d = cursor.next();
+                String status = d.getString("_id");
+                int c = d.getInteger("count", 0);
+                if ("ACTIVE".equalsIgnoreCase(status)) {
+                    totalActive = c;
+                } else if ("IGNORED".equalsIgnoreCase(status)) {
+                    totalIgnored = c;
+                } else if ("UNDER_REVIEW".equalsIgnoreCase(status)) {
+                    totalUnderReview = c;
+                }
+            }
+        }
+
+        return DailyActorsCountResponse.newBuilder()
+            .addAllActorsCounts(actors)
+            .setTotalAnalysed((int) totalAnalysed)
+            .setTotalAttacks((int) totalAttacks)
+            .setCriticalActorsCount(criticalActorsCount)
+            .setTotalActive(totalActive)
+            .setTotalIgnored(totalIgnored)
+            .setTotalUnderReview(totalUnderReview)
+            .build();
   }
 
   public ThreatActivityTimelineResponse getThreatActivityTimeline(String accountId, long startTs, long endTs, List<String> latestAttackList) {
 
-      if(latestAttackList == null || latestAttackList.isEmpty()) {
-          return ThreatActivityTimelineResponse.newBuilder().build();
-      }
+    if(latestAttackList == null || latestAttackList.isEmpty()) {
+        return ThreatActivityTimelineResponse.newBuilder().build();
+    }
 
         List<ThreatActivityTimelineResponse.ActivityTimeline> timeline = new ArrayList<>();
         // long sevenDaysInSeconds = TimeUnit.DAYS.toSeconds(7);
@@ -357,9 +402,9 @@ public class ThreatActorService {
 
       Document match = new Document();
 
-      if(latestAttackList != null && !latestAttackList.isEmpty()) {
-          match.append("filterId", new Document("$in", latestAttackList));
-      }
+    if(latestAttackList != null && !latestAttackList.isEmpty()) {
+        match.append("filterId", new Document("$in", latestAttackList));
+    }
 
       // Stage 1: Match documents within the startTs and endTs range
       match.append("detectedAt", new Document("$gte", startTs).append("$lte", endTs));
@@ -423,6 +468,7 @@ public class ThreatActorService {
 
         return ThreatActivityTimelineResponse.newBuilder().addAllThreatActivityTimeline(timeline).build();
   }
+
 
   private String fetchMetadataString(Document doc){
     String metadataStr = doc.getString("metadata");
@@ -604,4 +650,83 @@ public class ThreatActorService {
 
         return ModifyThreatActorStatusResponse.newBuilder().build();
       }
+
+  public FetchTopNDataResponse fetchTopNData(
+      String accountId, long startTs, long endTs, List<String> latestAttackList, int limit) {
+
+    MongoCollection<Document> coll = this.mongoClient
+        .getDatabase(accountId)
+        .getCollection(MongoDBCollection.ThreatDetection.MALICIOUS_EVENTS, Document.class);
+
+    List<Document> pipeline = new ArrayList<>();
+
+    // Match stage
+    Document match = new Document();
+    if (latestAttackList != null && !latestAttackList.isEmpty()) {
+      match.append("filterId", new Document("$in", latestAttackList));
+    }
+    if (startTs > 0 || endTs > 0) {
+      Document tsRange = new Document();
+      if (startTs > 0) tsRange.append("$gte", startTs);
+      if (endTs > 0) tsRange.append("$lte", endTs);
+      match.append("detectedAt", tsRange);
+    }
+    if (!match.isEmpty()) {
+      pipeline.add(new Document("$match", match));
+    }
+
+    // Group by endpoint and method, count attacks, get max severity
+    pipeline.add(new Document("$group",
+        new Document("_id", new Document("endpoint", "$latestApiEndpoint").append("method", "$latestApiMethod"))
+            .append("attacks", new Document("$sum", 1))
+            .append("maxSeverityPriority",
+                new Document("$max",
+                    new Document("$switch",
+                        new Document("branches", Arrays.asList(
+                            new Document("case", new Document("$eq", Arrays.asList("$severity", "CRITICAL"))).append("then", 4),
+                            new Document("case", new Document("$eq", Arrays.asList("$severity", "HIGH"))).append("then", 3),
+                            new Document("case", new Document("$eq", Arrays.asList("$severity", "MEDIUM"))).append("then", 2),
+                            new Document("case", new Document("$eq", Arrays.asList("$severity", "LOW"))).append("then", 1)))
+                        .append("default", 0))))));
+
+    // Project to convert severity priority back to string
+    pipeline.add(new Document("$project",
+        new Document("endpoint", "$_id.endpoint")
+            .append("method", "$_id.method")
+            .append("attacks", 1)
+            .append("severity",
+                new Document("$switch",
+                    new Document("branches", Arrays.asList(
+                        new Document("case", new Document("$eq", Arrays.asList("$maxSeverityPriority", 4))).append("then", "CRITICAL"),
+                        new Document("case", new Document("$eq", Arrays.asList("$maxSeverityPriority", 3))).append("then", "HIGH"),
+                        new Document("case", new Document("$eq", Arrays.asList("$maxSeverityPriority", 2))).append("then", "MEDIUM"),
+                        new Document("case", new Document("$eq", Arrays.asList("$maxSeverityPriority", 1))).append("then", "LOW")))
+                    .append("default", "UNKNOWN")))));
+
+    // Sort by attacks descending
+    pipeline.add(new Document("$sort", new Document("attacks", -1)));
+
+    // Limit results
+    pipeline.add(new Document("$limit", limit > 0 ? limit : 10));
+
+    List<FetchTopNDataResponse.TopApiData> topApis = new ArrayList<>();
+
+    try (MongoCursor<Document> cursor = coll.aggregate(pipeline).cursor()) {
+      while (cursor.hasNext()) {
+        Document doc = cursor.next();
+        topApis.add(
+            FetchTopNDataResponse.TopApiData.newBuilder()
+                .setEndpoint(doc.getString("endpoint"))
+                .setMethod(doc.getString("method"))
+                .setAttacks(doc.getInteger("attacks"))
+                .setSeverity(doc.getString("severity"))
+                .build());
+      }
+    }
+
+    return FetchTopNDataResponse.newBuilder()
+        .addAllTopApis(topApis)
+        .build();
+  }
 }
+

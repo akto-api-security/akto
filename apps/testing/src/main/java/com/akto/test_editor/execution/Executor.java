@@ -1,5 +1,6 @@
 package com.akto.test_editor.execution;
 
+import com.akto.agent.AgentClient;
 import com.akto.billing.UsageMetricUtils;
 import com.akto.dao.billing.OrganizationsDao;
 import java.util.*;
@@ -35,9 +36,7 @@ import com.akto.util.Constants;
 import com.akto.util.CookieTransformer;
 import com.akto.util.HttpRequestResponseUtils;
 import com.akto.util.modifier.JWTPayloadReplacer;
-import com.alibaba.fastjson2.JSON;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.google.api.client.http.HttpResponse;
 
 import java.net.URI;
 
@@ -62,6 +61,9 @@ public class Executor {
     private static final LoggerMaker loggerMaker = new LoggerMaker(Executor.class, LogDb.TESTING);
 
     public final String _HOST = "host";
+    private final AgentClient agentClient = new AgentClient(
+        Constants.AGENT_BASE_URL
+    );
 
     public static void modifyRawApiUsingTestRole(String logId, TestingRunConfig testingRunConfig, RawApi sampleRawApi, ApiInfo.ApiInfoKey apiInfoKey){
         if (testingRunConfig != null && StringUtils.isNotBlank(testingRunConfig.getTestRoleId())) {
@@ -199,39 +201,46 @@ public class Executor {
             }
             try {
                 // follow redirects = true for now
-                String url = testReq.getRequest().getUrl();
-                if (url.contains("sampl-aktol-1exannwybqov-67928726")) {
-                    try {
-                        URI uri = new URI(url);
-                        String newUrl = "https://vulnerable-server.akto.io" + uri.getPath();
-                        testReq.getRequest().setUrl(newUrl);
-                    } catch (Exception e) {
-                        // TODO: handle exception
+                TestResult res = null;
+                if (AgentClient.isRawApiValidForAgenticTest(testReq)) {
+                    // execute agentic test here
+                    res = agentClient.executeAgenticTest(testReq);
+                }else{
+                    String url = testReq.getRequest().getUrl();
+                    if (url.contains("sampl-aktol-1exannwybqov-67928726")) {
+                        try {
+                            URI uri = new URI(url);
+                            String newUrl = "https://vulnerable-server.akto.io" + uri.getPath();
+                            testReq.getRequest().setUrl(newUrl);
+                        } catch (Exception e) {
+                            // TODO: handle exception
+                        }
                     }
-                }
-                List<String> contentType = origRawApi.getRequest().getHeaders().getOrDefault("content-type", new ArrayList<>());
-                String contentTypeString = "";
-                if(!contentType.isEmpty()){
-                    contentTypeString = contentType.get(0);
-                }
-                if(!contentTypeString.isEmpty() && (contentTypeString.contains(HttpRequestResponseUtils.SOAP) || contentTypeString.contains(HttpRequestResponseUtils.XML))){
-                    // since we are storing a map for original raw payload, we need original raw url and method to float to api executor
-                    // we are adding custom header here and when sending request we will remove them
-                    testReq.getRequest().getHeaders().put("x-akto-original-url", Collections.singletonList(origRawApi.getRequest().getUrl()));
-                    testReq.getRequest().getHeaders().put("x-akto-original-method", Collections.singletonList(origRawApi.getRequest().getMethod()));   
-                }
+                    List<String> contentType = origRawApi.getRequest().getHeaders().getOrDefault("content-type", new ArrayList<>());
+                    String contentTypeString = "";
+                    if(!contentType.isEmpty()){
+                        contentTypeString = contentType.get(0);
+                    }
+                    if(!contentTypeString.isEmpty() && (contentTypeString.contains(HttpRequestResponseUtils.SOAP) || contentTypeString.contains(HttpRequestResponseUtils.XML))){
+                        // since we are storing a map for original raw payload, we need original raw url and method to float to api executor
+                        // we are adding custom header here and when sending request we will remove them
+                        testReq.getRequest().getHeaders().put("x-akto-original-url", Collections.singletonList(origRawApi.getRequest().getUrl()));
+                        testReq.getRequest().getHeaders().put("x-akto-original-method", Collections.singletonList(origRawApi.getRequest().getMethod()));   
+                    }
 
-                // Add SSE endpoint header for MCP collections
-                McpSseEndpointHelper.addSseEndpointHeader(testReq.getRequest(), apiInfoKey.getApiCollectionId());
+                    // Add SSE endpoint header for MCP collections
+                    McpSseEndpointHelper.addSseEndpointHeader(testReq.getRequest(), apiInfoKey.getApiCollectionId());
 
-                testResponse = ApiExecutor.sendRequest(testReq.getRequest(), followRedirect, testingRunConfig, debug, testLogs, Utils.SKIP_SSRF_CHECK, false);
-                requestSent = true;
-                ExecutionResult attempt = new ExecutionResult(singleReq.getSuccess(), singleReq.getErrMsg(), testReq.getRequest(), testResponse);
-                TestResult res = validate(attempt, sampleRawApi, varMap, logId, validatorNode, apiInfoKey);
+                    testResponse = ApiExecutor.sendRequest(testReq.getRequest(), followRedirect, testingRunConfig, debug, testLogs, Utils.SKIP_SSRF_CHECK, false);
+                    requestSent = true;
+                    ExecutionResult attempt = new ExecutionResult(singleReq.getSuccess(), singleReq.getErrMsg(), testReq.getRequest(), testResponse);
+                    res = validate(attempt, sampleRawApi, varMap, logId, validatorNode, apiInfoKey);
+                }
                 if (res != null) {
                     result.add(res);
                 }
                 vulnerable = res.getVulnerable();
+                
             } catch(Exception e) {
                 testLogs.add(new TestingRunResult.TestLog(TestingRunResult.TestLogType.ERROR, "Error executing test request: " + e.getMessage()));
                 error_messages.add("Error executing test request: " + e.getMessage());
@@ -736,6 +745,12 @@ public class Executor {
                 }else{
                     return new ExecutorSingleOperationResp(false, response.getString("error"));
                 }
+            case "conversations_list":
+                // conversations list will be the variable of wordlists, hence it will come in key after being resolved
+                // we need to use them in AgentClient so just add those in any request headers of raw-api
+                List<String> conversationsList = (List<String>) value;
+                return Operations.addHeader(rawApi, "x-agent-conversations", String.join(",", conversationsList));
+                
             case "attach_file":
                 return Operations.addHeader(rawApi, Constants.AKTO_ATTACH_FILE , key.toString());
 

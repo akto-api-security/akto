@@ -130,22 +130,25 @@ function TestRunResultPage(props) {
   }
 
   async function fetchData() {
-    if (hexId2 != undefined) {
-      if (testingRunResult == undefined) {
+    if (hexId2 !== undefined) {
+      if (testingRunResult === undefined) {
         let res = await api.fetchTestRunResultDetails(hexId2)
         testingRunResult = res.testingRunResult;
       }
-      if (runIssues == undefined) {
+      if (runIssues === undefined) {
         let res = await api.fetchIssueFromTestRunResultDetails(hexId2)
         runIssues = res.runIssues;
       }
-
-      let res = await api.fetchConversationsFromTestRunResultHexId(hexId2)
-      const conversations = res?.conversations;
-      if(conversations != null) {
-        setConversations(conversations)
+      if(testingRunResult?.testResults?.length > 0){
+        let conversationId = testingRunResult.testResults[0].conversationId;
+        if(conversationId){
+          let res = await api.fetchConversationsFromConversationId(conversationId);
+          if(res && res.length > 0){
+            const conversationsList = transform.prepareConversationsList(res)
+            setConversations(conversationsList);
+          }
+        }
       }
-
       setShowDetails(true)
     }
     setData(testingRunResult, runIssues);

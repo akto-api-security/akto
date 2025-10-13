@@ -323,6 +323,25 @@ public class ConfigParser {
         return true;
     }
 
+    public static boolean isFilterNodeValidForAgenticTest(FilterNode filterNode) {
+        List<FilterNode> childNodes = filterNode.getChildNodes();
+        for (FilterNode childNode : childNodes) {
+            if (childNode.getOperand().equalsIgnoreCase(TermOperands.TEST_TYPE.toString())) {
+                Object values = childNode.getValues();
+                if (values instanceof List) {
+                    List<Map<String,String>> listValues = (List<Map<String,String>>) values;
+                    if (listValues.size() != 1) {
+                        return false;
+                    }
+                    Map<String,String> typeValueObj = listValues.get(0);
+                    String typeValue = typeValueObj.get("eq");
+                    return typeValue.equalsIgnoreCase("AGENTIC");
+                }
+            }
+        }
+        return false;
+    }
+    
     public Boolean isListOfDouble(Object value) {
         if(!(value instanceof List)) {
             return false;

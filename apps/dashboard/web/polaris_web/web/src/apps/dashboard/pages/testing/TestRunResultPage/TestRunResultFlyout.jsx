@@ -494,7 +494,7 @@ function TestRunResultFlyout(props) {
         return {
             id: 'evidence',
             content: "Evidence",
-            component: <ChatInterface conversations={conversations} />
+            component: <ChatInterface conversations={conversations} sort={false}/>
         }
     }, [selectedTestRunResult, conversations])
     
@@ -507,7 +507,7 @@ function TestRunResultFlyout(props) {
         }
     }, [selectedTestRunResult, dataExpired, issueDetails, refreshFlag])
 
-    const finalResultTab = selectedTestRunResult?.conversationId != null && conversations?.length > 0 ? conversationTab : ValuesTab
+    const finalResultTab = conversations?.length > 0 ? conversationTab : ValuesTab
 
     function RowComp ({cardObj}){
         const {title, value, tooltipContent} = cardObj
