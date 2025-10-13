@@ -48,6 +48,7 @@ import com.akto.dao.test_editor.TestingRunPlaygroundDao;
 import com.akto.dao.test_editor.YamlTemplateDao;
 import com.akto.dao.testing.AccessMatrixTaskInfosDao;
 import com.akto.dao.testing.AccessMatrixUrlToRolesDao;
+import com.akto.dao.testing.AgentConversationResultDao;
 import com.akto.dao.testing.EndpointLogicalGroupDao;
 import com.akto.dao.testing.LoginFlowStepsDao;
 import com.akto.dao.testing.TestRolesDao;
@@ -77,6 +78,7 @@ import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.testing.AccessMatrixTaskInfo;
 import com.akto.dto.testing.AccessMatrixUrlToRole;
+import com.akto.dto.testing.AgentConversationResult;
 import com.akto.dto.testing.EndpointLogicalGroup;
 import com.akto.dto.testing.LoginFlowStepsData;
 import com.akto.dto.testing.OtpTestData;
@@ -1875,5 +1877,9 @@ public class DbLayer {
             loggerMaker.errorAndAddToDb(e, "Error in fetchMcpAuditInfo: " + e.getMessage());
             return new ArrayList<>();
         }
+    }
+
+    public static void storeConversationResults(List<AgentConversationResult> conversationResults) {
+        AgentConversationResultDao.instance.insertMany(conversationResults);
     }
 }

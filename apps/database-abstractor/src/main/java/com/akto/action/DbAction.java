@@ -2863,6 +2863,19 @@ public class DbAction extends ActionSupport {
         }
         return Action.SUCCESS.toUpperCase();
     }
+
+    @Getter
+    List<AgentConversationResult> conversationResults;
+
+    public String storeConversationResults() {
+        try {
+            DbLayer.storeConversationResults(conversationResults);
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb(e, "Error in storeConversationResults " + e.toString());
+            return Action.ERROR.toUpperCase();
+        }
+        return Action.SUCCESS.toUpperCase();
+    }
     
     public String storeMcpReconResultsBatch() {
         try {
