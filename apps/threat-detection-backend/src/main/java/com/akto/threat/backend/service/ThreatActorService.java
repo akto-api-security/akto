@@ -660,20 +660,17 @@ public class ThreatActorService {
 
     List<Document> pipeline = new ArrayList<>();
 
-    // Match stage
-    Document match = new Document();
-    if (latestAttackList != null && !latestAttackList.isEmpty()) {
-      match.append("filterId", new Document("$in", latestAttackList));
-    }
-    if (startTs > 0 || endTs > 0) {
-      Document tsRange = new Document();
-      if (startTs > 0) tsRange.append("$gte", startTs);
-      if (endTs > 0) tsRange.append("$lte", endTs);
-      match.append("detectedAt", tsRange);
-    }
-    if (!match.isEmpty()) {
-      pipeline.add(new Document("$match", match));
-    }
+        // Match stage (only apply time range filter; ignore latestAttackList)
+        Document match = new Document();
+        if (startTs > 0 || endTs > 0) {
+            Document tsRange = new Document();
+            if (startTs > 0) tsRange.append("$gte", startTs);
+            if (endTs > 0) tsRange.append("$lte", endTs);
+            match.append("detectedAt", tsRange);
+        }
+        if (!match.isEmpty()) {
+            pipeline.add(new Document("$match", match));
+        }
 
     // Group by endpoint and method, count attacks, get max severity
     pipeline.add(new Document("$group",
