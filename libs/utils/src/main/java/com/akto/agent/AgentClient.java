@@ -1,6 +1,7 @@
 package com.akto.agent;
 
-import com.akto.dao.testing.AgentConversationResultDao;
+import com.akto.data_actor.DataActor;
+import com.akto.data_actor.DataActorFactory;
 import com.akto.dto.OriginalHttpRequest;
 import com.akto.dto.OriginalHttpResponse;
 import com.akto.dto.RawApi;
@@ -27,6 +28,8 @@ public class AgentClient {
     
     private final String agentBaseUrl;
     private final TestingRunConfig testingRunConfig;
+    private static final DataActor dataActor = DataActorFactory.fetchInstance();
+
     
     public AgentClient(String agentBaseUrl) {
         this.agentBaseUrl = agentBaseUrl.endsWith("/") ? agentBaseUrl.substring(0, agentBaseUrl.length() - 1) : agentBaseUrl;
@@ -167,10 +170,9 @@ public class AgentClient {
 
     private void storeConversationResults(List<AgentConversationResult> conversationResults) {
         try {
-            AgentConversationResultDao.instance.insertMany(conversationResults);
-            loggerMaker.infoAndAddToDb("Stored " + conversationResults.size() + " conversation results in MongoDB");
+            dataActor.storeConversationResults(conversationResults);
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("Error storing conversation results: " + e.getMessage(), LogDb.TESTING);
+            loggerMaker.error("Error storing conversation results: " + e.getMessage(), LogDb.TESTING);
         }
     }
 
