@@ -16,6 +16,7 @@ import com.akto.dto.test_editor.TestingRunPlayground;
 import com.akto.dto.test_editor.YamlTemplate;
 import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.test_run_findings.TestingRunIssues;
+import com.akto.dto.testing.AgentConversationResult;
 import com.akto.dto.testing.AccessMatrixTaskInfo;
 import com.akto.dto.testing.AccessMatrixUrlToRole;
 import com.akto.dto.testing.EndpointLogicalGroup;
@@ -313,4 +314,6 @@ public abstract class DataActor {
     public abstract void updateMcpReconRequestStatus(String requestId, String status, int serversFound);
     
     public abstract void storeMcpReconResultsBatch(List<McpReconResult> serverDataList);
+
+    public abstract void storeConversationResults(List<AgentConversationResult> conversationResults);
 }
