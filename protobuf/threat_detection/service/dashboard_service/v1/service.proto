@@ -388,7 +388,6 @@ message FetchTopNDataResponse {
   message TopHostData {
     string host = 1;
     uint32 attacks = 2;
-    uint32 apis = 3;
   }
 
   repeated TopApiData top_apis = 1;
