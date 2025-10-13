@@ -41,6 +41,7 @@ import com.akto.dto.test_run_findings.TestingIssuesId;
 import com.akto.dto.test_run_findings.TestingRunIssues;
 import com.akto.dto.testing.AccessMatrixTaskInfo;
 import com.akto.dto.testing.AccessMatrixUrlToRole;
+import com.akto.dto.testing.AgentConversationResult;
 import com.akto.dto.testing.EndpointLogicalGroup;
 import com.akto.dto.testing.LoginFlowStepsData;
 import com.akto.dto.testing.OtpTestData;
@@ -4154,5 +4155,23 @@ public class ClientActor extends DataActor {
         }
     }
 
+    @Override
+    public void storeConversationResults(List<AgentConversationResult> conversationResults) {
+        Map<String, List<String>> headers = buildHeaders();
+        BasicDBObject obj = new BasicDBObject();
+        obj.put("conversationResults", conversationResults);
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/storeConversationResults", "", "POST", obj.toString(), headers, "");
+        try {
+            OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
+            String responsePayload = response.getBody();
+            if (response.getStatusCode() != 200 || responsePayload == null) {
+                loggerMaker.errorAndAddToDb("non 2xx response in storeConversationResults", LoggerMaker.LogDb.RUNTIME);
+                return;
+            }
+        }
+        catch (Exception e) {
+            loggerMaker.errorAndAddToDb("error in storeConversationResults" + e, LoggerMaker.LogDb.RUNTIME);
+        }
+    }
 
 }
