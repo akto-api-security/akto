@@ -139,7 +139,7 @@ public class MaliciousEventService {
             .setMetadata(evt.getMetadata().toString())
             .setSuccessfulExploit(evt.getSuccessfulExploit())
             .setLabel(label)
-            .setHost(evt.getHost())
+            .setHost(evt.getHost() != null ? evt.getHost() : "")
             .build();
 
     this.kafka.send(

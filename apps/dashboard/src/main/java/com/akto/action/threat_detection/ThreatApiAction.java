@@ -369,7 +369,7 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
                         smr.getAttacks()
                     )).collect(Collectors.toList());
               });
-    } catch (Exception e) {s
+    } catch (Exception e) {
       e.printStackTrace();
       return ERROR.toUpperCase();
     }

@@ -662,6 +662,11 @@ public class ThreatActorService {
 
         // Match stage (only apply time range filter; ignore latestAttackList)
         Document match = new Document();
+        
+        if (latestAttackList != null && !latestAttackList.isEmpty()) {
+            match.append("filterId", new Document("$in", latestAttackList));
+        }
+
         if (startTs > 0 || endTs > 0) {
             Document tsRange = new Document();
             if (startTs > 0) tsRange.append("$gte", startTs);
