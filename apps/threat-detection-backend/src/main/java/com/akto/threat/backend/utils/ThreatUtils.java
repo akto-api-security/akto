@@ -48,6 +48,25 @@ public class ThreatUtils {
         requiredIndexes.put("detectedAt_-1_actor_1", Indexes.compoundIndex(Indexes.descending("detectedAt"), Indexes.ascending("actor")));
         requiredIndexes.put("actor_1_detectedAt_-1", Indexes.compoundIndex(Indexes.ascending("actor"), Indexes.descending("detectedAt")));
         requiredIndexes.put("filterId_1", Indexes.ascending("filterId"));
+        
+        // Indexes for fetchTopNData: top APIs aggregation (group by endpoint+method, filter by detectedAt)
+        requiredIndexes.put("detectedAt_1_latestApiEndpoint_1_latestApiMethod_1", 
+            Indexes.ascending("detectedAt", "latestApiEndpoint", "latestApiMethod"));
+        
+        // Indexes for fetchTopNData: top hosts aggregation (group by host, filter by detectedAt)
+        requiredIndexes.put("detectedAt_1_host_1", 
+            Indexes.compoundIndex(Indexes.ascending("detectedAt"), Indexes.ascending("host")));
+        
+        // Indexes for getDailyActorCounts: filter by filterId+detectedAt, group by actor+severity
+        requiredIndexes.put("filterId_1_detectedAt_1_actor_1", 
+            Indexes.ascending("filterId", "detectedAt", "actor"));
+        
+        requiredIndexes.put("filterId_1_detectedAt_1_severity_1", 
+            Indexes.ascending("filterId", "detectedAt", "severity"));
+        
+        // Indexes for getSeverityWiseCount: filter by severity+detectedAt+filterId (uses countDocuments)
+        requiredIndexes.put("severity_1_detectedAt_1_filterId_1", 
+            Indexes.ascending("severity", "detectedAt", "filterId"));
 
         for (Map.Entry<String, Bson> entry : requiredIndexes.entrySet()) {
             if (!existingIndexes.contains(entry.getKey())) {
