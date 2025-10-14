@@ -16,8 +16,8 @@ import {
 import { ChevronDownMinor, DeleteMajor, PlusMinor } from "@shopify/polaris-icons";
 
 const AddDeniedTopicModal = ({ isOpen, onClose, onSave, existingTopic = null }) => {
-    const [name, setName] = useState(existingTopic?.name || "");
-    const [definition, setDefinition] = useState(existingTopic?.definition || "");
+    const [name, setName] = useState(existingTopic?.topic || "");
+    const [definition, setDefinition] = useState(existingTopic?.description || "");
     const [samplePhrases, setSamplePhrases] = useState(existingTopic?.samplePhrases || []);
     const [newPhrase, setNewPhrase] = useState("");
     const [showSamplePhrases, setShowSamplePhrases] = useState(false);
@@ -55,8 +55,8 @@ const AddDeniedTopicModal = ({ isOpen, onClose, onSave, existingTopic = null }) 
         setLoading(true);
         try {
             const topicData = {
-                name: name.trim(),
-                definition: definition.trim(),
+                topic: name.trim(),
+                description: definition.trim(),
                 samplePhrases: samplePhrases
             };
             

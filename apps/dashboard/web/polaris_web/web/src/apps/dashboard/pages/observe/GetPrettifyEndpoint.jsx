@@ -13,6 +13,8 @@ export const getMethod = (url, method) => {
             return "RESOURCE";
         }else if(url.includes("prompt")){
             return "PROMPT";
+        }else if(url.includes("server")){
+            return "SERVER";
         }
     }
     return method;
