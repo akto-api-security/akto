@@ -2864,8 +2864,15 @@ public class DbAction extends ActionSupport {
         return Action.SUCCESS.toUpperCase();
     }
 
-    @Getter
     List<AgentConversationResult> conversationResults;
+
+    public List<AgentConversationResult> getConversationResults() {
+        return conversationResults;
+    }
+
+    public void setConversationResults(List<AgentConversationResult> conversationResults) {
+        this.conversationResults = conversationResults;
+    }
 
     public String storeConversationResults() {
         try {
