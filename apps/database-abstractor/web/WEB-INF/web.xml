@@ -5,15 +5,15 @@
          version="3.0">
     <display-name>database-abstractor</display-name>
 
-    <filter>
+    <!-- <filter>
         <filter-name>AuthFilter</filter-name>
         <filter-class>com.akto.filter.AuthFilter</filter-class>
-    </filter>
+    </filter> -->
 
-    <filter-mapping>
+    <!-- <filter-mapping>
         <filter-name>AuthFilter</filter-name>
         <url-pattern>/api/*</url-pattern>
-    </filter-mapping>
+    </filter-mapping> -->
 
     <filter>
         <filter-name>struts2</filter-name>
