@@ -26,7 +26,6 @@ public class MaliciousEventDto {
   private Boolean successfulExploit;
   private Status status;
   private Label label;
-  private String host;
 
 
   public enum EventType {
@@ -67,7 +66,6 @@ public class MaliciousEventDto {
     this.status = builder.status != null ? builder.status : Status.ACTIVE;
     this.successfulExploit = builder.successfulExploit;
     this.label = builder.label;
-    this.host = builder.host;
   }
 
   public static class Builder {
@@ -90,7 +88,6 @@ public class MaliciousEventDto {
     private Status status;
     private Boolean successfulExploit;
     private Label label;
-    private String host;
 
     public Builder setFilterId(String filterId) {
       this.filterId = filterId;
@@ -184,11 +181,6 @@ public class MaliciousEventDto {
 
     public Builder setLabel(Label label) {
       this.label = label;
-      return this;
-    }
-
-    public Builder setHost(String host) {
-      this.host = host;
       return this;
     }
 
@@ -359,14 +351,6 @@ public class MaliciousEventDto {
 
   public void setLabel(Label label) {
     this.label = label;
-  }
-
-  public String getHost() {
-    return host;
-  }
-
-  public void setHost(String host) {
-    this.host = host;
   }
 
 }
