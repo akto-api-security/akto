@@ -50,6 +50,7 @@ public class ThreatActorService {
 
   private final MongoClient mongoClient;
   private final MaliciousEventDao maliciousEventDao;
+  private final com.akto.threat.backend.dao.ThreatConfigurationDao threatConfigurationDao = com.akto.threat.backend.dao.ThreatConfigurationDao.instance;
   private static final LoggerMaker loggerMaker = new LoggerMaker(ThreatActorService.class, LoggerMaker.LogDb.THREAT_DETECTION);
 
   public ThreatActorService(MongoClient mongoClient, MaliciousEventDao maliciousEventDao) {
@@ -59,9 +60,7 @@ public class ThreatActorService {
 
   public ThreatConfiguration fetchThreatConfiguration(String accountId) {
     ThreatConfiguration.Builder builder = ThreatConfiguration.newBuilder();
-    MongoCollection<Document> coll = this.mongoClient
-        .getDatabase(accountId)
-        .getCollection(MongoDBCollection.ThreatDetection.THREAT_CONFIGURATION, Document.class);
+    MongoCollection<Document> coll = this.threatConfigurationDao.getCollection(accountId);
     Document doc = coll.find().first();
     if (doc != null) {
         // Handle actor configuration
@@ -94,10 +93,7 @@ public class ThreatActorService {
 
   public ThreatConfiguration modifyThreatConfiguration(String accountId, ThreatConfiguration updatedConfig) {
     ThreatConfiguration.Builder builder = ThreatConfiguration.newBuilder();
-    MongoCollection<Document> coll =
-        this.mongoClient
-            .getDatabase(accountId)
-            .getCollection(MongoDBCollection.ThreatDetection.THREAT_CONFIGURATION, Document.class);
+    MongoCollection<Document> coll = this.threatConfigurationDao.getCollection(accountId);
 
     Document newDoc = new Document();
     
