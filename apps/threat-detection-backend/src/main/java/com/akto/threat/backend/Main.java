@@ -12,6 +12,7 @@ import com.akto.log.LoggerMaker;
 import com.akto.threat.backend.dao.MaliciousEventDao;
 import com.akto.threat.backend.dao.ThreatDetectionDaoInit;
 import com.akto.threat.backend.service.ApiDistributionDataService;
+import com.akto.threat.backend.dao.ApiDistributionDataDao;
 import com.akto.threat.backend.service.MaliciousEventService;
 import com.akto.threat.backend.service.ThreatActorService;
 import com.akto.threat.backend.service.ThreatApiService;
@@ -77,7 +78,7 @@ public class Main {
 
     ThreatActorService threatActorService = new ThreatActorService(threatProtectionMongo, MaliciousEventDao.instance);
     ThreatApiService threatApiService = new ThreatApiService(MaliciousEventDao.instance);
-    ApiDistributionDataService apiDistributionDataService = new ApiDistributionDataService(threatProtectionMongo);
+    ApiDistributionDataService apiDistributionDataService = new ApiDistributionDataService(ApiDistributionDataDao.instance);
 
     new BackendVerticle(maliciousEventService, threatActorService, threatApiService, apiDistributionDataService).start();
   }
