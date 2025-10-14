@@ -4158,9 +4158,24 @@ public class ClientActor extends DataActor {
     @Override
     public void storeConversationResults(List<AgentConversationResult> conversationResults) {
         Map<String, List<String>> headers = buildHeaders();
-        BasicDBObject obj = new BasicDBObject();
-        obj.put("conversationResults", conversationResults);
-        OriginalHttpRequest request = new OriginalHttpRequest(url + "/storeConversationResults", "", "POST", obj.toString(), headers, "");
+        
+        List<Document> docs = new ArrayList<>();
+        for (AgentConversationResult r : conversationResults) {
+            Document d = new Document()
+                    .append("conversationId", r.getConversationId())
+                    .append("prompt", r.getPrompt())
+                    .append("response", r.getResponse())
+                    .append("conversation", r.getConversation())
+                    .append("timestamp", r.getTimestamp())
+                    .append("validation", r.isValidation());
+
+            docs.add(d);
+        }
+
+        Document wrapper = new Document("conversationResults", docs);
+        String jsonBody = wrapper.toJson();
+        
+        OriginalHttpRequest request = new OriginalHttpRequest(url + "/storeConversationResults", "", "POST", jsonBody, headers, "");
         try {
             OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, null, false, null);
             String responsePayload = response.getBody();
