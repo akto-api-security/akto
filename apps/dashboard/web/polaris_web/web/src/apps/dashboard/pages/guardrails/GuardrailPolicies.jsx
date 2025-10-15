@@ -59,6 +59,18 @@ const headings = [
     type: CellType.TEXT,
   },
   {
+    text: "Created by",
+    title: "Created by",
+    value: "createdBy",
+    type: CellType.TEXT,
+  },
+  {
+    text: "Updated by",
+    title: "Updated by", 
+    value: "updatedBy",
+    type: CellType.TEXT,
+  },
+  {
     title: '',
     type: CellType.ACTION,
   }
@@ -149,6 +161,8 @@ function GuardrailPolicies() {
                         ),
                         createdTs: func.prettifyEpoch(policy.createdTimestamp),
                         updatedTs: func.prettifyEpoch(policy.updatedTimestamp),
+                        createdBy: policy.createdBy || "N/A",
+                        updatedBy: policy.updatedBy || "N/A",
                         originalData: policy
                     }));
                 setPolicyData(formattedPolicies);
@@ -264,24 +278,18 @@ function GuardrailPolicies() {
             setLoading(true);
             const newStatus = !policy.originalData.active;
             
-            // Prepare full policy data for update API
-            const policyData = {
-                name: policy.originalData.name,
-                description: policy.originalData.description || '',
-                blockedMessage: policy.originalData.blockedMessage || '',
-                severity: policy.originalData.severity,
-                selectedMcpServers: policy.originalData.selectedMcpServers || [],
-                selectedAgentServers: policy.originalData.selectedAgentServers || [],
-                deniedTopics: policy.originalData.deniedTopics || [],
-                piiTypes: policy.originalData.piiTypes || [],
-                regexPatterns: policy.originalData.regexPatterns || [],
-                contentFiltering: policy.originalData.contentFiltering || {},
-                applyOnResponse: policy.originalData.applyOnResponse || false,
-                applyOnRequest: policy.originalData.applyOnRequest || false,
+            // Prepare request payload with nested policy object
+            const updatedPolicy = {
+                ...policy.originalData,
                 active: newStatus
             };
-
-            await api.updateGuardrailPolicy(policy.originalData.hexId, policyData);
+            
+            const requestPayload = {
+                policy: updatedPolicy,
+                hexId: policy.originalData.hexId
+            };
+            
+            await api.createGuardrailPolicy(requestPayload);
             
             func.setToast(true, false, `Guardrail ${newStatus ? 'activated' : 'deactivated'} successfully`);
             // Refresh the page to ensure data gets updated on screen
@@ -347,8 +355,8 @@ function GuardrailPolicies() {
                 severity = "Medium";
             }
 
-            // Prepare data for backend
-            const policyData = {
+            // Prepare GuardrailPolicies object for backend
+            const guardrailPolicyObject = {
                 name: guardrailData.name,
                 description: guardrailData.description || '',
                 blockedMessage: guardrailData.blockedMessage || '',
@@ -357,22 +365,29 @@ function GuardrailPolicies() {
                 selectedAgentServers: guardrailData.selectedAgentServers || [],
                 deniedTopics: guardrailData.deniedTopics || [],
                 piiTypes: guardrailData.piiFilters || [],
+                regexPatterns: guardrailData.regexPatterns || [],
                 contentFiltering: guardrailData.contentFilters || {},
                 applyOnResponse: guardrailData.applyOnResponse || false,
                 applyOnRequest: guardrailData.applyOnRequest || false,
                 active: true
             };
 
+            // Prepare request payload with nested policy object
+            const requestPayload = {
+                policy: guardrailPolicyObject,
+                hexId: isEditMode && guardrailData.hexId ? guardrailData.hexId : null
+            };
+
             let response;
             if (isEditMode && guardrailData.hexId) {
                 // Update existing policy
-                response = await api.updateGuardrailPolicy(guardrailData.hexId, policyData);
+                response = await api.createGuardrailPolicy(requestPayload);
                 if (response) {
                     func.setToast(true, false, "Guardrail updated successfully");
                 }
             } else {
                 // Create new policy
-                response = await api.createGuardrailPolicy(policyData);
+                response = await api.createGuardrailPolicy(requestPayload);
                 if (response) {
                     func.setToast(true, false, "Guardrail created successfully");
                 }

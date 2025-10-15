@@ -1,11 +1,10 @@
 import request from "../../../../util/request"
 
 export default {
-    async fetchGuardrailPolicies(skip = 0, limit = 20) {
+    async fetchGuardrailPolicies() {
         const resp = await request({
             url: '/api/fetchGuardrailPolicies',
-            method: 'post',
-            data: { skip, limit }
+            method: 'post'
         })
         return resp
     },
@@ -19,12 +18,4 @@ export default {
         return resp
     },
 
-    async updateGuardrailPolicy(hexId, policyData) {
-        const resp = await request({
-            url: '/api/updateGuardrailPolicy',
-            method: 'post',
-            data: { hexId, ...policyData }
-        })
-        return resp
-    },
 }

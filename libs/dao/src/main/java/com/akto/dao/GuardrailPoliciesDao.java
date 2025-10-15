@@ -3,6 +3,7 @@ package com.akto.dao;
 import com.akto.dto.GuardrailPolicies;
 import com.akto.dao.context.Context;
 import com.mongodb.BasicDBObject;
+import com.mongodb.client.model.Filters;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -53,24 +54,7 @@ public class GuardrailPoliciesDao extends AccountsContextDao<GuardrailPolicies> 
     public List<GuardrailPolicies> findAllSortedByCreatedTimestamp(int skip, int limit) {
         BasicDBObject sort = new BasicDBObject();
         sort.put("createdTimestamp", -1); // descending order (newest first)
-        
-        return this.getMCollection().find(new BasicDBObject())
-            .sort(sort)
-            .skip(skip)
-            .limit(limit)
-            .into(new ArrayList<>());
-    }
-
-    public List<GuardrailPolicies> findActiveGuardrails() {
-        BasicDBObject query = new BasicDBObject();
-        query.put("isActive", true);
-        
-        BasicDBObject sort = new BasicDBObject();
-        sort.put("createdTimestamp", -1); // descending order (newest first)
-        
-        return this.getMCollection().find(query)
-            .sort(sort)
-            .into(new ArrayList<>());
+        return instance.findAll(Filters.empty(), skip, limit, sort);
     }
 
     public long getTotalCount() {

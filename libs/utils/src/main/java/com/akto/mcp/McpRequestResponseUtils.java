@@ -132,33 +132,37 @@ public final class McpRequestResponseUtils {
         }
 
         if (auditInfo != null) {
-            try {
-                // Check if record with same type, resourceName, and hostCollectionId already exists
-                BasicDBObject findQuery = new BasicDBObject();
-                findQuery.put("type", auditInfo.getType());
-                findQuery.put("resourceName", auditInfo.getResourceName());
-                findQuery.put("hostCollectionId", auditInfo.getHostCollectionId());
-                
-                McpAuditInfo existingRecord = McpAuditInfoDao.instance.findOne(findQuery);
-                
-                if (existingRecord != null) {
-                    // Update the existing record with new lastDetected timestamp
-                    BasicDBObject update = new BasicDBObject();
-                    update.put(MCollection.SET, new BasicDBObject("lastDetected", auditInfo.getLastDetected()));
-                    
-                    McpAuditInfoDao.instance.updateOne(findQuery, update);
-                    logger.info("Updated existing MCP audit record for type: " + auditInfo.getType() + 
-                               ", resourceName: " + auditInfo.getResourceName());
-                } else {
-                    // Insert new record
-                    McpAuditInfoDao.instance.insertOne(auditInfo);
-                    logger.info("Inserted new MCP audit record for type: " + auditInfo.getType() + 
-                               ", resourceName: " + auditInfo.getResourceName());
-                }
-            } catch (Exception e) {
-                logger.error("Error handling MCP audit data log", e);
-            }
+            setAuditData(auditInfo);
         }
         responseParams.getRequestParams().setUrl(url);
+    }
+
+    public static void setAuditData(McpAuditInfo auditInfo) {
+        try {
+            // Check if record with same type, resourceName, and hostCollectionId already exists
+            BasicDBObject findQuery = new BasicDBObject();
+            findQuery.put("type", auditInfo.getType());
+            findQuery.put("resourceName", auditInfo.getResourceName());
+            findQuery.put("hostCollectionId", auditInfo.getHostCollectionId());
+
+            McpAuditInfo existingRecord = McpAuditInfoDao.instance.findOne(findQuery);
+
+            if (existingRecord != null) {
+                // Update the existing record with new lastDetected timestamp
+                BasicDBObject update = new BasicDBObject();
+                update.put(MCollection.SET, new BasicDBObject("lastDetected", auditInfo.getLastDetected()));
+
+                McpAuditInfoDao.instance.updateOne(findQuery, update);
+                logger.info("Updated existing MCP audit record for type: " + auditInfo.getType() +
+                           ", resourceName: " + auditInfo.getResourceName());
+            } else {
+                // Insert new record
+                McpAuditInfoDao.instance.insertOne(auditInfo);
+                logger.info("Inserted new MCP audit record for type: " + auditInfo.getType() +
+                           ", resourceName: " + auditInfo.getResourceName());
+            }
+        } catch (Exception e) {
+            logger.error("Error handling MCP audit data log", e);
+        }
     }
 }

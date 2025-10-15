@@ -8,6 +8,7 @@ import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.Constants;
 import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.UpdateOptions;
 import com.mongodb.client.model.Updates;
 
 import lombok.Getter;
@@ -21,65 +22,25 @@ import java.util.Map;
 
 public class GuardrailPoliciesAction extends UserAction {
     private static final LoggerMaker loggerMaker = new LoggerMaker(GuardrailPoliciesAction.class, LogDb.DASHBOARD);
-    
+
+
     @Getter
-    private List<GuardrailPolicies> guardrailPolicies;
-    
-    @Getter
-    private long total;
-    
-    // Pagination parameters
     @Setter
-    private int limit;
-    @Setter
-    private int skip;
-    
-    // For creating/updating guardrails
-    @Setter
-    private String name;
-    @Setter
-    private String description;
-    @Setter
-    private String blockedMessage;
-    @Setter
-    private String severity;
-    @Setter
-    private String selectedCollection;
-    @Setter
-    private String selectedModel;
-    @Setter
-    private List<GuardrailPolicies.DeniedTopic> deniedTopics;
-    @Setter
-    private List<GuardrailPolicies.PiiType> piiTypes;
-    @Setter
-    private List<String> regexPatterns;
-    @Setter
-    private Map<String, Object> contentFiltering;
-    @Setter
-    private boolean active;
-    @Setter
-    private List<String> selectedMcpServers;
-    @Setter
-    private List<String> selectedAgentServers;
-    @Setter
-    private boolean applyOnResponse;
-    @Setter
-    private boolean applyOnRequest;
-    
+    GuardrailPolicies policy;
     // For updating existing policies
     @Setter
     private String hexId;
 
+    @Getter
+    private List<GuardrailPolicies> guardrailPolicies;
+
+    @Getter
+    private long total;
+
+
     public String fetchGuardrailPolicies() {
         try {
-            if (limit <= 0) {
-                limit = 20;
-            }
-            if (skip < 0) {
-                skip = 0;
-            }
-            
-            this.guardrailPolicies = GuardrailPoliciesDao.instance.findAllSortedByCreatedTimestamp(skip, limit);
+            this.guardrailPolicies  = GuardrailPoliciesDao.instance.findAllSortedByCreatedTimestamp(0, 20);
             this.total = GuardrailPoliciesDao.instance.getTotalCount();
             
             loggerMaker.info("Fetched " + guardrailPolicies.size() + " guardrail policies out of " + total + " total");
@@ -96,30 +57,68 @@ public class GuardrailPoliciesAction extends UserAction {
             User user = getSUser();
             int currentTime = Context.now();
             
-            GuardrailPolicies policy = new GuardrailPolicies(
-                name,
-                description,
-                blockedMessage,
-                severity,
-                currentTime, // createdTimestamp
-                currentTime, // updatedTimestamp
-                user.getLogin(), // createdBy
-                selectedCollection,
-                selectedModel,
-                deniedTopics,
-                piiTypes,
-                regexPatterns,
-                contentFiltering,
-                selectedMcpServers,
-                selectedAgentServers,
-                applyOnResponse,
-                applyOnRequest,
-                active
+            loggerMaker.info("createGuardrailPolicy called with hexId: " + hexId);
+            loggerMaker.info("Policy object received: " + (policy != null ? policy.getName() : "null"));
+
+            // Ensure policy object has required timestamps and user info
+            if (hexId != null && !hexId.isEmpty()) {
+                // Update existing - keep original createdTimestamp, update updatedTimestamp and updatedBy
+                if (policy.getUpdatedTimestamp() == 0) {
+                    policy.setUpdatedTimestamp(currentTime);
+                }
+                policy.setUpdatedBy(user.getLogin()); // Always update who modified it
+            } else {
+                // Create new - only set creation fields, not update fields
+                if (policy.getCreatedTimestamp() == 0) {
+                    policy.setCreatedTimestamp(currentTime);
+                }
+                if (policy.getCreatedBy() == null || policy.getCreatedBy().isEmpty()) {
+                    policy.setCreatedBy(user.getLogin());
+                }
+                // Don't set updatedTimestamp and updatedBy for new records
+            }
+
+            // Use upsert operation
+            Bson filter = (hexId != null && !hexId.isEmpty()) 
+                ? Filters.eq(Constants.ID, new ObjectId(hexId))
+                : Filters.eq("name", policy.getName()); // or use another unique identifier
+            
+            List<Bson> updates = new ArrayList<>();
+            updates.add(Updates.set("name", policy.getName()));
+            updates.add(Updates.set("description", policy.getDescription()));
+            updates.add(Updates.set("blockedMessage", policy.getBlockedMessage()));
+            updates.add(Updates.set("severity", policy.getSeverity()));
+            updates.add(Updates.set("selectedCollection", policy.getSelectedCollection()));
+            updates.add(Updates.set("selectedModel", policy.getSelectedModel()));
+            updates.add(Updates.set("deniedTopics", policy.getDeniedTopics()));
+            updates.add(Updates.set("piiTypes", policy.getPiiTypes()));
+            updates.add(Updates.set("regexPatterns", policy.getRegexPatterns()));
+            updates.add(Updates.set("contentFiltering", policy.getContentFiltering()));
+            updates.add(Updates.set("selectedMcpServers", policy.getSelectedMcpServers()));
+            updates.add(Updates.set("selectedAgentServers", policy.getSelectedAgentServers()));
+            updates.add(Updates.set("applyOnResponse", policy.isApplyOnResponse()));
+            updates.add(Updates.set("applyOnRequest", policy.isApplyOnRequest()));
+            updates.add(Updates.set("active", policy.isActive()));
+            
+            // Only set createdBy and createdTimestamp on insert
+            updates.add(Updates.setOnInsert("createdBy", user.getLogin()));
+            updates.add(Updates.setOnInsert("createdTimestamp", currentTime));
+            
+            // Only set updatedTimestamp and updatedBy on actual updates (when hexId exists)
+            if (hexId != null && !hexId.isEmpty()) {
+                updates.add(Updates.set("updatedTimestamp", currentTime));
+                updates.add(Updates.set("updatedBy", user.getLogin()));
+            }
+
+            // Perform upsert using updateOne with upsert option
+            GuardrailPoliciesDao.instance.getMCollection().updateOne(
+                filter, 
+                Updates.combine(updates),
+                new UpdateOptions().upsert(true)
             );
             
-            GuardrailPoliciesDao.instance.insertOne(policy);
-            
-            loggerMaker.info("Created new guardrail policy: " + name + " by user: " + user.getLogin());
+            String action = (hexId != null && !hexId.isEmpty()) ? "Updated" : "Created";
+            loggerMaker.info(action + " guardrail policy: " + policy.getName() + " by user: " + user.getLogin());
             
             return SUCCESS.toUpperCase();
         } catch (Exception e) {
@@ -128,46 +127,4 @@ public class GuardrailPoliciesAction extends UserAction {
         }
     }
 
-    public String updateGuardrailPolicy() {
-        try {
-            User user = getSUser();
-            int currentTime = Context.now();
-            ObjectId id = new ObjectId(hexId);
-            
-            List<Bson> updates = new ArrayList<>();
-            updates.add(Updates.set("name", name));
-            updates.add(Updates.set("description", description));
-            updates.add(Updates.set("blockedMessage", blockedMessage));
-            updates.add(Updates.set("severity", severity));
-            updates.add(Updates.set("selectedCollection", selectedCollection));
-            updates.add(Updates.set("selectedModel", selectedModel));
-            updates.add(Updates.set("deniedTopics", deniedTopics));
-            updates.add(Updates.set("piiTypes", piiTypes));
-            updates.add(Updates.set("regexPatterns", regexPatterns));
-            updates.add(Updates.set("contentFiltering", contentFiltering));
-            updates.add(Updates.set("selectedMcpServers", selectedMcpServers));
-            updates.add(Updates.set("selectedAgentServers", selectedAgentServers));
-            updates.add(Updates.set("applyOnResponse", applyOnResponse));
-            updates.add(Updates.set("applyOnRequest", applyOnRequest));
-            updates.add(Updates.set("active", active));
-            updates.add(Updates.set("updatedTimestamp", currentTime));
-            
-            GuardrailPoliciesDao.instance.updateOne(
-                Filters.eq(Constants.ID, id), 
-                Updates.combine(updates)
-            );
-            
-            loggerMaker.info("Updated guardrail policy: " + name + " by user: " + user.getLogin());
-            
-            return SUCCESS.toUpperCase();
-        } catch (Exception e) {
-            loggerMaker.errorAndAddToDb("Error updating guardrail policy: " + e.getMessage(), LogDb.DASHBOARD);
-            return ERROR.toUpperCase();
-        }
-    }
-
-    @Override
-    public String execute() throws Exception {
-        return "";
-    }
 }

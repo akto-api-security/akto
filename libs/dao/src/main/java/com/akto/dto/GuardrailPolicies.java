@@ -27,6 +27,7 @@ public class GuardrailPolicies {
     private int createdTimestamp;
     private int updatedTimestamp;
     private String createdBy;
+    private String updatedBy;
     
     // Step 2: System Selection
     private String selectedCollection;
@@ -61,7 +62,7 @@ public class GuardrailPolicies {
     }
 
     public GuardrailPolicies(String name, String description, String blockedMessage, String severity, int createdTimestamp, 
-                           int updatedTimestamp, String createdBy, String selectedCollection, 
+                           int updatedTimestamp, String createdBy, String updatedBy, String selectedCollection, 
                            String selectedModel, List<DeniedTopic> deniedTopics, List<PiiType> piiTypes,
                            List<String> regexPatterns, Map<String, Object> contentFiltering, List<String> selectedMcpServers,
                            List<String> selectedAgentServers, boolean applyOnResponse, boolean applyOnRequest,
@@ -73,6 +74,7 @@ public class GuardrailPolicies {
         this.createdTimestamp = createdTimestamp;
         this.updatedTimestamp = updatedTimestamp;
         this.createdBy = createdBy;
+        this.updatedBy = updatedBy;
         this.selectedCollection = selectedCollection;
         this.selectedModel = selectedModel;
         this.deniedTopics = deniedTopics;
