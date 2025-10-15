@@ -20,7 +20,7 @@ public class IngestionAction extends ActionSupport {
     List<IngestDataBatch> batchData;
     private static final LoggerMaker loggerMaker = new LoggerMaker(IngestionAction.class, LoggerMaker.LogDb.DATA_INGESTION);
 
-    private static int MAX_INFO_PRINT = 5000;
+    private static int MAX_INFO_PRINT = 500;
     private boolean success;
 
     private static final int ACCOUNT_ID_TO_ADD_DEFAULT_DATA = getAccountId();
@@ -41,7 +41,6 @@ public class IngestionAction extends ActionSupport {
                 }
 
                 KafkaUtils.insertData(payload);
-                printLogs("Data has been inserted to kafka.");
             }
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb("Error while inserting data to Kafka: " + e.getMessage(), LoggerMaker.LogDb.DATA_INGESTION);
@@ -50,7 +49,7 @@ public class IngestionAction extends ActionSupport {
         return Action.SUCCESS.toUpperCase();
     }
 
-    private static void printLogs(String msg) {
+    public static void printLogs(String msg) {
         MAX_INFO_PRINT--;
         if(MAX_INFO_PRINT > 0) {
             loggerMaker.warnAndAddToDb(msg);
