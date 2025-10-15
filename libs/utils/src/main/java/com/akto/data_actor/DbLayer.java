@@ -16,6 +16,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import com.akto.bulk_update_util.ApiInfoBulkUpdate;
 import com.akto.dao.*;
+import com.akto.dao.CyborgLogsDao;
 import com.akto.dao.filter.MergedUrlsDao;
 import com.akto.dao.graph.SvcToSvcGraphEdgesDao;
 import com.akto.dao.graph.SvcToSvcGraphNodesDao;
@@ -679,6 +680,10 @@ public class DbLayer {
 
     public static void insertProtectionLog(Log log) {
         ProtectionLogsDao.instance.insertOne(log);
+    }
+
+    public static void insertCyborgLog(Log log) {
+        CyborgLogsDao.instance.insertOne(log);
     }
 
     public static void modifyHybridSaasSetting(boolean isHybridSaas) {
