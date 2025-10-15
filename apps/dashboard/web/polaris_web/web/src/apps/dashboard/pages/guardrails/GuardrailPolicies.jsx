@@ -168,7 +168,6 @@ function GuardrailPolicies() {
                 setPolicyData(formattedPolicies);
             }
         } catch (error) {
-            console.error("Error fetching guardrail policies:", error);
             func.setToast(true, true, "Failed to load guardrail policies");
         } finally {
             setLoading(false);
@@ -295,7 +294,6 @@ function GuardrailPolicies() {
             // Refresh the page to ensure data gets updated on screen
             window.location.reload();
         } catch (error) {
-            console.error("Error toggling guardrail status:", error);
             func.setToast(true, true, "Failed to update guardrail status");
             setLoading(false);
         }
@@ -406,7 +404,6 @@ function GuardrailPolicies() {
                 }
             }
         } catch (error) {
-            console.error(isEditMode ? "Error updating guardrail:" : "Error creating guardrail:", error);
             func.setToast(true, true, isEditMode ? "Failed to update guardrail" : "Failed to create guardrail");
         } finally {
             setLoading(false);

@@ -35,10 +35,7 @@ public class GuardrailPoliciesDao extends AccountsContextDao<GuardrailPolicies> 
             clients[0].getDatabase(Context.accountId.get()+"").createCollection(getCollName());
         }
 
-        String[] fieldNames = {"name"};
-        MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, false);
-
-        fieldNames = new String[]{"createdTimestamp"};
+        String[] fieldNames = {"createdTimestamp"};
         MCollection.createIndexIfAbsent(getDBName(), getCollName(), fieldNames, false);
 
         fieldNames = new String[]{"updatedTimestamp"};
