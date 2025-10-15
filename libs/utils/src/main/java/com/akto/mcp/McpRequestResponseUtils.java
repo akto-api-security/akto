@@ -14,12 +14,13 @@ import com.akto.utils.JsonUtils;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mongodb.BasicDBObject;
-import java.util.Arrays;
-import java.util.HashSet;
-import java.util.Set;
+
+import java.util.*;
+
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
+
 
 import static com.akto.util.Constants.*;
 
@@ -150,7 +151,7 @@ public final class McpRequestResponseUtils {
             if (existingRecord != null) {
                 // Update the existing record with new lastDetected timestamp
                 BasicDBObject update = new BasicDBObject();
-                update.put(MCollection.SET, new BasicDBObject("lastDetected", auditInfo.getLastDetected()));
+                update.put(MCollection.SET, new BasicDBObject("lastDetected", Context.now()));
 
                 McpAuditInfoDao.instance.updateOne(findQuery, update);
                 logger.info("Updated existing MCP audit record for type: " + auditInfo.getType() +
