@@ -35,7 +35,7 @@ public class McpAuditInfo {
     private Integer approvedAt;
 
     public String getHexId() {
-        return this.id.toHexString();
+        return this.id != null ? this.id.toHexString() : null;
     }
 
     public McpAuditInfo(int lastDetected, String markedBy, String type, int updatedTimestamp, String resourceName, String remarks, Set<ApiInfo.ApiAccessType> apiAccessTypes, int hostCollectionId) {

@@ -1774,7 +1774,25 @@ public class DbLayer {
     }
 
     public static void insertMCPAuditDataLog(McpAuditInfo auditInfo) {
-        McpAuditInfoDao.instance.insertOne(auditInfo);
+
+            // Check if record with same type, resourceName, and hostCollectionId already exists
+            BasicDBObject findQuery = new BasicDBObject();
+            findQuery.put("type", auditInfo.getType());
+            findQuery.put("resourceName", auditInfo.getResourceName());
+            findQuery.put("hostCollectionId", auditInfo.getHostCollectionId());
+
+            McpAuditInfo existingRecord = McpAuditInfoDao.instance.findOne(findQuery);
+
+            if (existingRecord != null) {
+                // Update the existing record with new lastDetected timestamp
+                BasicDBObject update = new BasicDBObject();
+                update.put(MCollection.SET, new BasicDBObject("lastDetected", Context.now()));
+                McpAuditInfoDao.instance.updateOne(findQuery, update);
+            } else {
+                // Insert new record
+                McpAuditInfoDao.instance.insertOne(auditInfo);
+            }
+
     }
 
     public static List<SlackWebhook> fetchSlackWebhooks() {
