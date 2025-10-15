@@ -69,6 +69,7 @@ const onFunc = {
             case "TOOL": return `var(--color-tool)`;
             case "RESOURCE": return `var(--color-resource)`;
             case "PROMPT": return `var(--color-prompt)`;
+            case "SERVER": return `var(--color-server)`;
             default:
                 return "";
         }

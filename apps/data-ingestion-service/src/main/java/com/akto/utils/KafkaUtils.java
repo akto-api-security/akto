@@ -1,6 +1,7 @@
 package com.akto.utils;
 
 import com.akto.log.LoggerMaker;
+import com.akto.action.IngestionAction;
 import com.akto.dao.context.Context;
 import com.akto.dto.IngestDataBatch;
 import com.akto.kafka.Kafka;
@@ -44,7 +45,9 @@ public class KafkaUtils {
         obj.put("daemonset_id", payload.getDaemonset_id());
         obj.put("enabled_graph", payload.getEnabled_graph());
         obj.put("tag", payload.getTag());
+
         kafkaProducer.send(obj.toString(), topicName);
+        IngestionAction.printLogs("Inserted to kafka: " + obj.toString());
     }
 
 }
