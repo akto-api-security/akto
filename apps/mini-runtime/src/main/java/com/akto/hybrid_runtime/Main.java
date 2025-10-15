@@ -288,7 +288,7 @@ public class Main {
         loggerMaker.infoAndAddToDb("Fetched account settings for account ");
 
         if (DataActor.actualAccountId == 1759692400) {
-            maxPollRecordsConfigTemp = 10000;
+            maxPollRecordsConfigTemp = 200;
         }
 
         int maxPollRecordsConfig = maxPollRecordsConfigTemp;
