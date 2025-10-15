@@ -573,7 +573,7 @@ public class Main {
             try {
                  
                 printL(r.value());
-                if(DataActor.actualAccountId == 1759692400 && LOG_DEBUG_RECORDS > 0){
+                if(LOG_DEBUG_RECORDS > 0){
                     LOG_DEBUG_RECORDS--;
                     loggerMaker.infoAndAddToDb("Kafka record recieved" + r.value());
                 }
