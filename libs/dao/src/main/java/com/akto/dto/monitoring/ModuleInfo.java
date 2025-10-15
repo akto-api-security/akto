@@ -73,7 +73,8 @@ public class ModuleInfo {
         K8S,
         EBPF,
         THREAT_DETECTION,
-        MCP_ENDPOINT_SHIELD
+        MCP_ENDPOINT_SHIELD,
+        DATA_INGESTION
     }
 
 }
