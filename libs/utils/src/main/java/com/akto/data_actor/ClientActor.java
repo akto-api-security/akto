@@ -3219,6 +3219,7 @@ public class ClientActor extends DataActor {
             try {
                 payloadObj =  BasicDBObject.parse(responsePayload);
                 BasicDBObject dataControlSettings = (BasicDBObject) payloadObj.get("dataControlSettings");
+                if (dataControlSettings == null) return null;
                 return objectMapper.readValue(dataControlSettings.toJson(), DataControlSettings.class);
             } catch(Exception e) {
                 loggerMaker.errorAndAddToDb("error extracting response in fetchDataControlSettings" + e, LoggerMaker.LogDb.RUNTIME);
