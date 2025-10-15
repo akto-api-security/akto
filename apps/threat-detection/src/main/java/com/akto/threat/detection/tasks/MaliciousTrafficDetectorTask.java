@@ -151,6 +151,7 @@ public class MaliciousTrafficDetectorTask implements Task {
     this.apiDistributionEnabled = apiDistributionEnabled;
   }
 
+  private int MAX_KAFKA_DEBUG_MSGS = 100;
   public void run() {
     this.kafkaConsumer.subscribe(Collections.singletonList("akto.api.logs2"));
     ExecutorService pollingExecutor = Executors.newSingleThreadExecutor();
@@ -165,6 +166,10 @@ public class MaliciousTrafficDetectorTask implements Task {
             try {
               for (ConsumerRecord<String, byte[]> record : records) {
                 HttpResponseParam httpResponseParam = HttpResponseParam.parseFrom(record.value());
+                if(MAX_KAFKA_DEBUG_MSGS > 0){
+                  MAX_KAFKA_DEBUG_MSGS--;
+                  logger.infoAndAddToDb("Kafka record recieved " + httpResponseParam.toString());
+                }
                 if(ignoreTrafficFilter(httpResponseParam)){
                   continue;
                 }
