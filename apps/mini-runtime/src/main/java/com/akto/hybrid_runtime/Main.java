@@ -275,7 +275,7 @@ public class Main {
             syncImmediately = true;
             fetchAllSTI = false;
         }
-        int maxPollRecordsConfig = Integer.parseInt(System.getenv("AKTO_KAFKA_MAX_POLL_RECORDS_CONFIG") != null
+        int maxPollRecordsConfigTemp = Integer.parseInt(System.getenv("AKTO_KAFKA_MAX_POLL_RECORDS_CONFIG") != null
                 ? System.getenv("AKTO_KAFKA_MAX_POLL_RECORDS_CONFIG")
                 : "100");
 
@@ -286,6 +286,12 @@ public class Main {
         }
         DataActor.actualAccountId = aSettings.getId();
         loggerMaker.infoAndAddToDb("Fetched account settings for account ");
+
+        if (DataActor.actualAccountId == 1759692400) {
+            maxPollRecordsConfigTemp = 10000;
+        }
+
+        int maxPollRecordsConfig = maxPollRecordsConfigTemp;
 
         DataControlFetcher.init(dataActor);
 
@@ -579,15 +585,20 @@ public class Main {
                     loggerMaker.info("Committing offset at position: " + lastSyncOffset);
                 }
 
-                if (tryForCollectionName(r.value())) {
+                if (DataActor.actualAccountId != 1759692400 && tryForCollectionName(r.value())) {
                     continue;
                 }
-
+                
                 httpResponseParams = HttpCallParser.parseKafkaMessage(r.value());
                 if (httpResponseParams == null) {
                     loggerMaker.error("httpresponse params was skipped due to invalid json requestBody");
                     continue;
                 }
+
+                if (httpResponseParams.getRequestParams().getURL().contains("api/ingestData")) {
+                    continue;
+                }
+
                 HttpRequestParams requestParams = httpResponseParams.getRequestParams();
                 String debugHost = Utils.printDebugHostLog(httpResponseParams);
                 if (debugHost != null) {
@@ -691,7 +702,7 @@ public class Main {
                 accWiseResponse = filterBasedOnHeaders(accWiseResponse, accountInfo.accountSettings);
                 loggerMaker.infoAndAddToDb("Initiating sync function for account: " + accountId);
                 parser.syncFunction(accWiseResponse, syncImmediately, fetchAllSTI, accountInfo.accountSettings);
-                loggerMaker.debugInfoAddToDb("Sync function completed for account: " + accountId);
+                loggerMaker.infoAndAddToDb("Sync function completed for account: " + accountId);
 
                 sendToCentralKafka(centralKafkaTopicName, accWiseResponse);
             } catch (Exception e) {
