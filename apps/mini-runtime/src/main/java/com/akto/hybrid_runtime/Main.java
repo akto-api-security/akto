@@ -547,7 +547,7 @@ public class Main {
                     syncImmediately,
                     centralKafkaTopicName);
                 AllMetrics.instance.setRuntimeProcessLatency(System.currentTimeMillis()-start);
-                loggerMaker.info("Processed " + responseParamsToAccountMap.size() + " accounts in " + (System.currentTimeMillis()-start) + " ms");
+                loggerMaker.infoAndAddToDb("Processed " + responseParamsToAccountMap.size() + " accounts in " + (System.currentTimeMillis()-start) + " ms");
             }
 
         } catch (WakeupException ignored) {
@@ -582,7 +582,7 @@ public class Main {
                 }
 
                 if (lastSyncOffset % 100 == 0) {
-                    loggerMaker.info("Committing offset at position: " + lastSyncOffset);
+                    loggerMaker.infoAndAddToDb("Committing offset at position: " + lastSyncOffset);
                 }
 
                 if (DataActor.actualAccountId != 1759692400 && tryForCollectionName(r.value())) {
@@ -608,7 +608,7 @@ public class Main {
                     loggerMaker.infoAndAddToDb("Found debug url: " + requestParams.getURL());
                 }
             } catch (Exception e) {
-                loggerMaker.errorAndAddToDb(e, "Error while parsing kafka message " + e);
+                loggerMaker.errorAndAddToDb(e, "Error while parsing kafka message: " + r.value() + e);
                 continue;
             }
             String accountId = httpResponseParams.getAccountId();
