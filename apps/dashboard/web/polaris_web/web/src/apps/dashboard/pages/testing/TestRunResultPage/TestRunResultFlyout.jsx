@@ -46,9 +46,6 @@ function TestRunResultFlyout(props) {
 
     const [vulnerabilityAnalysisError, setVulnerabilityAnalysisError] = useState(null)
     const [refreshFlag, setRefreshFlag] = useState(Date.now().toString())
-
-    // modify testing run result and headers
-    const infoStateFlyout = infoState && infoState.length > 0 ? infoState.filter((item) => item.title !== 'Jira') : []
     
     const fetchRemediationInfo = useCallback (async (testId) => {
         if (testId && testId.length > 0) {
@@ -529,6 +526,35 @@ function TestRunResultFlyout(props) {
         <GridRows columns={3} items={rowItems} CardComponent={RowComp} />
     )
 
+    function MoreInformationComp({ infoState }){
+        infoState = infoState.filter((item) => item.title !== 'Jira')
+
+        return(
+            <VerticalStack gap={"2"}>
+                {
+                    infoState.map((info, index) => {
+                        const {title, content, tooltipContent} = info
+
+                        if (content === null || content === undefined || content === "") return null
+
+                        return(
+                            <Box key={index}>
+                                <VerticalStack gap={"2"}>
+                                    <TitleWithInfo
+                                        textProps={{ variant: "bodyMd", fontWeight: "semibold" }}
+                                        titleText={title}
+                                        tooltipContent={tooltipContent}
+                                    />
+                                    {content}
+                                </VerticalStack>
+                            </Box>
+                        )
+                    })
+                }
+            </VerticalStack>
+        )
+    }
+
     const overviewComp = (
         <Box padding={"4"}>
             <VerticalStack gap={"5"}>
@@ -547,6 +573,12 @@ function TestRunResultFlyout(props) {
                 </VerticalStack>
                 <Divider />
                 {testResultDetailsComp}  
+                {infoState && typeof infoState === 'object' && infoState.length > 0 ? (
+                    <>
+                        <Divider />
+                        <MoreInformationComp infoState={infoState} />
+                    </>
+                ) : null}
             </VerticalStack>
         </Box>
     )
