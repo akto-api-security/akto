@@ -288,7 +288,7 @@ public class Main {
         loggerMaker.infoAndAddToDb("Fetched account settings for account ");
 
         if (DataActor.actualAccountId == 1759692400) {
-            maxPollRecordsConfigTemp = 10000;
+            maxPollRecordsConfigTemp = 200;
         }
 
         int maxPollRecordsConfig = maxPollRecordsConfigTemp;
@@ -565,7 +565,7 @@ public class Main {
         }
     }
 
-
+    private static int LOG_DEBUG_RECORDS = 100; 
     private static void bulkParseTrafficToResponseParams(long lastSyncOffset, ConsumerRecords<String, String> records,
             Map<String, List<HttpResponseParams>> responseParamsToAccountMap) {
         for (ConsumerRecord<String,String> r: records) {
@@ -573,6 +573,10 @@ public class Main {
             try {
                  
                 printL(r.value());
+                if(DataActor.actualAccountId == 1759692400 && LOG_DEBUG_RECORDS > 0){
+                    LOG_DEBUG_RECORDS--;
+                    loggerMaker.infoAndAddToDb("Kafka record recieved" + r.value());
+                }
                 AllMetrics.instance.setRuntimeKafkaRecordCount(1);
                 AllMetrics.instance.setRuntimeKafkaRecordSize(r.value().length());
 
