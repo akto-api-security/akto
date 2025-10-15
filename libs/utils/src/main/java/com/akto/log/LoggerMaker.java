@@ -95,7 +95,7 @@ public class LoggerMaker  {
     private LogDb db;
 
     public enum LogDb {
-        TESTING,RUNTIME,DASHBOARD,BILLING, ANALYSER, DB_ABS, THREAT_DETECTION, DATA_INGESTION
+        TESTING,RUNTIME,DASHBOARD,BILLING, ANALYSER, DB_ABS, THREAT_DETECTION, DATA_INGESTION, CYBORG
     }
 
     private static AccountSettings accountSettings = null;
@@ -291,6 +291,9 @@ public class LoggerMaker  {
                 // Add db for db-abs
                 case THREAT_DETECTION:
                     dataActor.insertProtectionLog(log);
+                    break;
+                case CYBORG:
+                    LogsDao.instance.insertOne(log);
                     break;
                 default:
                     break;

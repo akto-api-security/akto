@@ -16,7 +16,7 @@ import java.util.function.Consumer;
 
 public class Cron {
 
-    private static final LoggerMaker loggerMaker = new LoggerMaker(Cron.class);
+    private static final LoggerMaker loggerMaker = new LoggerMaker(Cron.class, LoggerMaker.LogDb.CYBORG);
     ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
 
     public void cron(boolean isHybridSaas) {
@@ -44,25 +44,25 @@ public class Cron {
 
     public void triggerMerging(int accountId) {
         if (!Lock.acquireLock(accountId)) {
-            loggerMaker.infoAndAddToDb("Unable to acquire lock, merging process ignored for account " + accountId, LoggerMaker.LogDb.RUNTIME);
+            loggerMaker.infoAndAddToDb("Unable to acquire lock, merging process ignored for account " + accountId);
             return;
         }
-        loggerMaker.infoAndAddToDb("Acquired lock, starting merging process for account " + accountId, LoggerMaker.LogDb.RUNTIME);
+        loggerMaker.infoAndAddToDb("Acquired lock, starting merging process for account " + accountId);
         List<Integer> apiCollectionIds = DbLayer.fetchApiCollectionIds();
         AccountSettings accountSettings = DbLayer.fetchAccountSettings(accountId);
         try {
             for (int apiCollectionId : apiCollectionIds) {
                 int start = Context.now();
                 loggerMaker.infoAndAddToDb("Started merging API collection " + apiCollectionId +
-                        " accountId " + accountId, LoggerMaker.LogDb.RUNTIME);
+                        " accountId " + accountId);
                 try {
                     MergingLogic.mergeUrlsAndSave(apiCollectionId, true, accountSettings.isAllowMergingOnVersions());
                     loggerMaker.infoAndAddToDb("Finished merging API collection " +
                             apiCollectionId + " accountId " + accountId + " in " + (Context.now() - start)
-                            + " seconds", LoggerMaker.LogDb.RUNTIME);
+                            + " seconds");
                 } catch (Exception e) {
                     loggerMaker.errorAndAddToDb("Error merging Api collection" + apiCollectionId +
-                            " accountId " + accountId + e.getMessage(), LoggerMaker.LogDb.RUNTIME);
+                            " accountId " + accountId + e.getMessage(), LoggerMaker.LogDb.CYBORG);
                 }
             }
             DependencyFlow dependencyFlow = new DependencyFlow();
@@ -71,7 +71,7 @@ public class Cron {
         } catch (Exception e) {
             String err = e.getStackTrace().length > 0 ? e.getStackTrace()[0].toString() : e.getMessage();
             loggerMaker.errorAndAddToDb("error in mergeUrlsAndSave: " + " accountId " + accountId
-                    + err, LoggerMaker.LogDb.RUNTIME);
+                    + err, LoggerMaker.LogDb.CYBORG);
             e.printStackTrace();
         }
         Lock.releaseLock(accountId);
