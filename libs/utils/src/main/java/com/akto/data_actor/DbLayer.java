@@ -681,6 +681,10 @@ public class DbLayer {
         ProtectionLogsDao.instance.insertOne(log);
     }
 
+    public static void insertCyborgLog(Log log) {
+        com.akto.dao.CyborgLogsDao.instance.insertOne(log);
+    }
+
     public static void modifyHybridSaasSetting(boolean isHybridSaas) {
         Integer accountId = Context.accountId.get();
         AccountsDao.instance.updateOne(Filters.eq("_id", accountId), Updates.set(Account.HYBRID_SAAS_ACCOUNT, isHybridSaas));

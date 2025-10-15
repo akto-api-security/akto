@@ -293,7 +293,7 @@ public class LoggerMaker  {
                     dataActor.insertProtectionLog(log);
                     break;
                 case CYBORG:
-                    LogsDao.instance.insertOne(log);
+                    dataActor.insertCyborgLog(log);
                     break;
                 default:
                     break;

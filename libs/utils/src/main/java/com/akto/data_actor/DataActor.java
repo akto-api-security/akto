@@ -371,6 +371,8 @@ public abstract class DataActor {
 
     public abstract void insertDataIngestionLog(Log log);
 
+    public abstract void insertCyborgLog(Log log);
+
     public abstract void insertMCPAuditDataLog(McpAuditInfo auditInfo);
 
     public abstract List<McpReconRequest> fetchPendingMcpReconRequests();
