@@ -532,22 +532,25 @@ function TestRunResultFlyout(props) {
         return(
             <VerticalStack gap={"2"}>
                 {
-                    infoState.map((info, index) => {
-                        const {title, content, tooltipContent} = info
+                    infoState.map((item, index) => {
+                        const {title, content, tooltipContent, icon} = item
 
                         if (content === null || content === undefined || content === "") return null
 
-                        return(
-                            <Box key={index}>
-                                <VerticalStack gap={"2"}>
-                                    <TitleWithInfo
-                                        textProps={{ variant: "bodyMd", fontWeight: "semibold" }}
-                                        titleText={title}
-                                        tooltipContent={tooltipContent}
-                                    />
+                        return (
+                            <VerticalStack gap={"5"} key={index}>
+                                <VerticalStack gap={"2"} >
+                                    <HorizontalStack gap="1_5-experimental">
+                                        <Box><Icon source={icon} color='subdued' /></Box>
+                                        <TitleWithInfo
+                                            textProps={{ variant: "bodyMd", fontWeight: "semibold", color: "subdued" }}
+                                            titleText={title}
+                                            tooltipContent={tooltipContent}
+                                        />
+                                    </HorizontalStack>
                                     {content}
                                 </VerticalStack>
-                            </Box>
+                            </VerticalStack>
                         )
                     })
                 }
