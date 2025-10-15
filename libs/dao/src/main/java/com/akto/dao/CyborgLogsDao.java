@@ -38,7 +38,7 @@ public class CyborgLogsDao extends AccountsContextDao<Log> {
 
     @Override
     public String getCollName() {
-        return "cyborg_logs";
+        return "logs_cyborg";
     }
 
     @Override
