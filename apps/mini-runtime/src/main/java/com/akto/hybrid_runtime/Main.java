@@ -565,7 +565,7 @@ public class Main {
         }
     }
 
-    private static int LOG_DEBUG_RECORDS = 10; 
+    private static int LOG_DEBUG_RECORDS = 100; 
     private static void bulkParseTrafficToResponseParams(long lastSyncOffset, ConsumerRecords<String, String> records,
             Map<String, List<HttpResponseParams>> responseParamsToAccountMap) {
         for (ConsumerRecord<String,String> r: records) {
