@@ -166,7 +166,7 @@ public class Kafka {
     public void onCompletion(RecordMetadata recordMetadata, Exception e) {
       if (e != null) {
         Kafka.this.close();
-        logger.errorAndAddToDb("onCompletion error: " + e.getMessage(), LogDb.DATA_INGESTION);
+        logger.error("onCompletion error: " + e.getMessage());
       }
     }
   }

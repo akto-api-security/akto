@@ -6,7 +6,7 @@ public class DataActorFactory {
 
     public static DataActor fetchInstance() {
 
-        boolean hybridSaas = true;
+        boolean hybridSaas = RuntimeMode.isHybridDeployment();;
         if (hybridSaas) {
             return new ClientActor();
         } else {
