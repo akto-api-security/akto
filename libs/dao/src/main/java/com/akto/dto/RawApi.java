@@ -25,6 +25,19 @@ public class RawApi {
         this.originalMessage = originalMessage;
     }
 
+    public static RawApi buildFromMessage(String message, boolean checkResponsePayloadParsing) {
+        if(!checkResponsePayloadParsing){
+            return buildFromMessage(message);
+        }else{
+            OriginalHttpRequest request = new OriginalHttpRequest();
+            request.buildFromSampleMessage(message);
+            OriginalHttpResponse response = new OriginalHttpResponse();
+            response.buildFromSampleMessage(message, checkResponsePayloadParsing);
+
+            return new RawApi(request, response, message);
+        }
+    }
+
     public static RawApi buildFromMessage(String message) {
         OriginalHttpRequest request = new OriginalHttpRequest();
         request.buildFromSampleMessage(message);

@@ -311,7 +311,7 @@ public class TestExecutor {
                         OriginalReqResPayloadInformation.getInstance().getOriginalReqPayloadMap().put(key, originalRequestPayload);
                     }
                 }
-                RawApi rawApi = RawApi.buildFromMessage(sample);
+                RawApi rawApi = RawApi.buildFromMessage(sample, true);
                 if(rawApi != null){
                     TestingConfigurations.getInstance().getRawApiMap().put(apiInfoKey, rawApi);
                 }
@@ -805,7 +805,7 @@ public class TestExecutor {
         ObjectId testRunResultSummaryId, TestConfig testConfig, TestingRunConfig testingRunConfig, boolean debug, List<TestingRunResult.TestLog> testLogs, String message) {
             RawApi rawApi = TestingConfigurations.getInstance().getRawApiMap().get(apiInfoKey);
             if (rawApi == null) {
-                rawApi = RawApi.buildFromMessage(message);
+                rawApi = RawApi.buildFromMessage(message, true);
                 TestingConfigurations.getInstance().getRawApiMap().put(apiInfoKey, rawApi);
             }
             TestRoles attackerTestRole = Executor.fetchOrFindAttackerRole();
@@ -837,7 +837,7 @@ public class TestExecutor {
                 } catch (Exception e) {
                 }
                 if (msg != null) {
-                    rawApi = RawApi.buildFromMessage(msg);
+                    rawApi = RawApi.buildFromMessage(msg, true);
                 }
                 AllMetrics.instance.setSampleDataFetchLatency(System.currentTimeMillis() - start);
             } catch (Exception e) {
@@ -941,7 +941,7 @@ public class TestExecutor {
                         if (formattedMessage == null) {
                             continue;
                         }
-                        RawApi rawApiToBeReplayed = RawApi.buildFromMessage(formattedMessage);
+                        RawApi rawApiToBeReplayed = RawApi.buildFromMessage(formattedMessage, true);
                         if (rawApiToBeReplayed.getResponse().getStatusCode() >= 300) {
                             loggerMaker.infoAndAddToDb("cleanUpTestArtifacts rawApiToBeReplayed status code invalid: " + rawApiToBeReplayed.getResponse().getStatusCode(), LogDb.TESTING);
                             continue;
@@ -962,7 +962,7 @@ public class TestExecutor {
                                             loggerMaker.infoAndAddToDb(String.format("cleanUpTestArtifacts samples not found for: %s %s %s", node.getApiCollectionIdReq(), node.getUrlReq(), node.getMethodReq()));
                                             continue;
                                         } else {
-                                            RawApi nextApi = RawApi.buildFromMessage(samples.get(0));
+                                            RawApi nextApi = RawApi.buildFromMessage(samples.get(0), true);
 
                                             List<KVPair> kvPairs = new ArrayList<>();
                                             boolean fullReplace = true;

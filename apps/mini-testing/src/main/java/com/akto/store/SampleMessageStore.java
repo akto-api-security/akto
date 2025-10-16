@@ -118,7 +118,7 @@ public class SampleMessageStore {
             }
             AllMetrics.instance.setMultipleSampleDataFetchLatency(System.currentTimeMillis() - start);
             for(String message: samples){
-                messages.add(RawApi.buildFromMessage(message));
+                messages.add(RawApi.buildFromMessage(message, true));
             }
 
             if (messages.isEmpty()) {
@@ -128,7 +128,7 @@ public class SampleMessageStore {
 
                 for (String message : dbSamples) {
                     try {
-                        messages.add(RawApi.buildFromMessage(message));
+                        messages.add(RawApi.buildFromMessage(message, true));
                     } catch (Exception e) {
                         loggerMaker.errorAndAddToDb("Error while building RawAPI for " + apiInfoKey + " : " + e,
                                 LogDb.TESTING);
