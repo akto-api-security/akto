@@ -1,17 +1,19 @@
 import logging
+import time
 from typing import Dict, Any, List
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from llm_guard import input_scanners, output_scanners
 
 logging.basicConfig(
-    level=logging.ERROR,
+    level=logging.INFO,
     format='%(levelname)s - %(message)s'
 )
 logging.getLogger("llm_guard").setLevel(logging.ERROR)
 logging.getLogger("presidio").setLevel(logging.ERROR)
 logging.getLogger("transformers").setLevel(logging.ERROR)
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
 app = FastAPI(title="Agent Guard Scanner Service", version="1.0.0")
 scanner_cache = {}
@@ -108,15 +110,25 @@ async def list_scanners():
 
 @app.post("/scan", response_model=ScanResponse)
 async def scan_text(request: ScanRequest):
+    start_time = time.time()
+
     try:
+        logger.info(f"Starting scan: scanner={request.scanner_name}, type={request.scanner_type}, text_length={len(request.text)}")
+
         scanner = get_scanner(request.scanner_type, request.scanner_name, request.config)
-        
+
+        scan_start = time.time()
         if request.scanner_type == "output":
             prompt = request.config.get("prompt", "")
             sanitized_output, is_valid, risk_score = scanner.scan(prompt, request.text)
         else:
             sanitized_output, is_valid, risk_score = scanner.scan(request.text)
-        
+        scan_duration = (time.time() - scan_start) * 1000
+
+        total_duration = (time.time() - start_time) * 1000
+
+        logger.info(f"Scan completed: scanner={request.scanner_name}, is_valid={is_valid}, risk_score={risk_score:.3f}, scan_time={scan_duration:.2f}ms, total_time={total_duration:.2f}ms")
+
         return ScanResponse(
             scanner_name=request.scanner_name,
             is_valid=is_valid,
@@ -126,12 +138,17 @@ async def scan_text(request: ScanRequest):
                 "original_length": len(request.text),
                 "sanitized_length": len(sanitized_output),
                 "scanner_type": request.scanner_type,
+                "scan_time_ms": round(scan_duration, 2),
+                "total_time_ms": round(total_duration, 2)
             }
         )
     except ValueError as e:
+        total_duration = (time.time() - start_time) * 1000
+        logger.error(f"Scan validation error: scanner={request.scanner_name}, error={str(e)}, time={total_duration:.2f}ms")
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        logger.error(f"Scan failed: {str(e)}")
+        total_duration = (time.time() - start_time) * 1000
+        logger.error(f"Scan failed: scanner={request.scanner_name}, error={str(e)}, time={total_duration:.2f}ms")
         raise HTTPException(status_code=500, detail=f"Scan failed: {str(e)}")
 
 @app.post("/scan/batch", response_model=List[ScanResponse])
