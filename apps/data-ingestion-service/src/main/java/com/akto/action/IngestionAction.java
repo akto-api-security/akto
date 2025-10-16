@@ -34,7 +34,7 @@ public class IngestionAction extends ActionSupport {
             String requestHeaders = batch.getRequestHeaders();
             if (requestHeaders != null) {
                 String lowerHeaders = requestHeaders.toLowerCase();
-                if (lowerHeaders.contains("host:") || lowerHeaders.contains("host :")) {
+                if (lowerHeaders.contains("\"host\":") || lowerHeaders.contains("\"host \":")) {
                     if (lowerHeaders.contains("hollywoodbets") ||
                         lowerHeaders.contains("betsolutions") ||
                         lowerHeaders.contains("betsoft")) {
