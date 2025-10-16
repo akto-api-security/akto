@@ -30,6 +30,7 @@ public class HttpResponseParams {
     String direction;
     // K8 pod tags in JSON string
     String tags;
+    List<String> parentMcpToolNames;
 
     public HttpResponseParams() {}
 
@@ -42,7 +43,7 @@ public class HttpResponseParams {
 
     public HttpResponseParams(String type, int statusCode, String status, Map<String, List<String>> headers, String payload,
                               HttpRequestParams requestParams, int time, String accountId, boolean isPending, Source source,
-                              String orig, String sourceIP, String destIP, String direction, String tags) {
+                              String orig, String sourceIP, String destIP, String direction, String tags, List<String> parentMcpToolNames) {
         this.type = type;
         this.statusCode = statusCode;
         this.status = status;
@@ -58,6 +59,7 @@ public class HttpResponseParams {
         this.destIP = destIP;
         this.direction = direction;
         this.tags = tags;
+        this.parentMcpToolNames = parentMcpToolNames;;
     }
 
     public HttpResponseParams(String type, int statusCode, String status, Map<String, List<String>> headers, String payload,
@@ -251,5 +253,13 @@ public class HttpResponseParams {
 
     public void setPending(boolean pending) {
         isPending = pending;
+    }
+
+    public List<String> getParentMcpToolNames() {
+        return parentMcpToolNames;
+    }
+
+    public void setParentMcpToolNames(List<String> parentMcpToolNames) {
+        this.parentMcpToolNames = parentMcpToolNames;
     }
 }
