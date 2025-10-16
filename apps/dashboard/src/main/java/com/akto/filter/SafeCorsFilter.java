@@ -18,15 +18,13 @@ public class SafeCorsFilter extends CrossOriginFilter {
             throws IOException, ServletException {
 
         try {
-            if (DashboardMode.isSaasDeployment()) {
-                HttpServletRequest httpRequest = (HttpServletRequest) request;
-                String origin = httpRequest.getHeader("Origin");
+            HttpServletRequest httpRequest = (HttpServletRequest) request;
+            String origin = httpRequest.getHeader("Origin");
 
-                if (origin != null && !isValidAktoOrigin(origin)) {
-                    HttpServletResponse httpResponse = (HttpServletResponse) response;
-                    httpResponse.setStatus(HttpServletResponse.SC_FORBIDDEN);
-                    return;
-                }
+            if (origin != null && !isValidAktoOrigin(origin)) {
+                HttpServletResponse httpResponse = (HttpServletResponse) response;
+                httpResponse.setStatus(HttpServletResponse.SC_FORBIDDEN);
+                return;
             }
         } catch (Exception e) {
             System.out.println("error chacking cors filer" + e.getMessage());
