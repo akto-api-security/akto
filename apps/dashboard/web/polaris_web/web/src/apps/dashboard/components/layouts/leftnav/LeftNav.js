@@ -401,22 +401,22 @@ export default function LeftNav() {
                         },
                     ],
                 }] : []),
-                ...(window?.STIGG_FEATURE_WISE_ALLOWED?.AI_AGENTS?.isGranted && dashboardCategory==="API Security" ? [{
-                label: (
-                    <Text variant="bodyMd" fontWeight="medium">
-                        AI Agents
-                    </Text>
-                ),
-                icon: StarFilledMinor,
-                onClick: () => {
-                    handleSelect("agent_team_members");
-                    navigate("/dashboard/agent-team/members");
-                    setActive("normal");
-                },
-                selected: leftNavSelected.includes("agent_team"),
-                url: "#",
-                key: "8",
-            }] : []),
+            // ...(window?.STIGG_FEATURE_WISE_ALLOWED?.AI_AGENTS?.isGranted && dashboardCategory === "API Security" ? [{
+            //     label: (
+            //         <Text variant="bodyMd" fontWeight="medium">
+            //             AI Agents
+            //         </Text>
+            //     ),
+            //     icon: StarFilledMinor,
+            //     onClick: () => {
+            //         handleSelect("agent_team_members");
+            //         navigate("/dashboard/agent-team/members");
+            //         setActive("normal");
+            //     },
+            //     selected: leftNavSelected.includes("agent_team"),
+            //     url: "#",
+            //     key: "8",
+            // }] : []),
             ...(dashboardCategory === "MCP Security" ? [{
                 label: (
                     <Text variant="bodyMd" fontWeight="medium">
