@@ -238,10 +238,11 @@ public class LoggerMaker  {
 
         }
     }
-
+    public static final String uuid = java.util.UUID.randomUUID().toString();
     public void sendImpWarnAndAddToDb(String info, LogDb db) {
+
         String accountId = Context.accountId.get() != null ? Context.accountId.get().toString() : "NA";
-        String infoMessage = "acc: " + accountId + ", " + info;
+        String infoMessage = "acc : " + uuid + " " + accountId + ", " + info;
         logger.info(infoMessage);
         try{
             insert(infoMessage, "warn",db);
