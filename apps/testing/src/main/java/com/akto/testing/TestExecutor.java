@@ -4,6 +4,7 @@ package com.akto.testing;
 import static com.akto.test_editor.execution.Build.modifyRequest;
 import static com.akto.testing.Utils.writeJsonContentInFile;
 
+import com.akto.agent.AgenticUtils;
 import com.akto.crons.GetRunningTestsStatus;
 import com.akto.dao.ActivitiesDao;
 import com.akto.dao.ApiInfoDao;
@@ -320,6 +321,9 @@ public class TestExecutor {
         Map<ApiInfoKey, String> apiInfoKeyToHostMap = new HashMap<>();
 
         TestingConfigurations.getInstance().init(testingUtil, testingRun.getTestingRunConfig(), debug, testConfigMap, testingRun.getMaxConcurrentRequests());
+
+        Set<Integer> apiCollectionIds = Main.extractApiCollectionIds(apiInfoKeyList);
+        AgenticUtils.checkAndInitializeAgent(apiCollectionIds, false, null);
 
         if(!shouldInitOnly){
             int maxThreads = Math.min(testingRunSubCategories.size(), 500);

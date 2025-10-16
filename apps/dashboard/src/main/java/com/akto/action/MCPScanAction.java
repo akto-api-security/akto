@@ -8,8 +8,10 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
+import com.akto.dao.MCollection;
 import com.akto.dao.McpAuditInfoDao;
 import com.akto.dto.McpAuditInfo;
+import com.mongodb.BasicDBObject;
 import org.bson.conversions.Bson;
 import com.akto.dao.ApiCollectionsDao;
 import com.akto.dao.context.Context;
@@ -26,6 +28,7 @@ import com.mongodb.client.model.ReturnDocument;
 import com.mongodb.client.model.Updates;
 import com.opensymphony.xwork2.Action;
 
+import static com.akto.mcp.McpRequestResponseUtils.setAuditData;
 import static com.akto.util.Constants.AKTO_MCP_SERVER_TAG;
 
 public class MCPScanAction extends UserAction {
@@ -68,7 +71,8 @@ public class MCPScanAction extends UserAction {
                             hostName, "", null,
                             collectionId
                     );
-                    McpAuditInfoDao.instance.insertOne(auditInfo);
+
+                    setAuditData(auditInfo);
                 } catch (Exception e) {
                     loggerMaker.error("Exception while inserting McpAuditInfo: " + e.getMessage(), LogDb.DASHBOARD);
                 }

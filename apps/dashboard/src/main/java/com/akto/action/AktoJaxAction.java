@@ -2,13 +2,18 @@ package com.akto.action;
 
 import com.akto.ApiRequest;
 import com.akto.dao.ApiCollectionsDao;
+import com.akto.dao.CrawlerRunDao;
+import com.akto.dao.CrawlerUrlDao;
 import com.akto.dao.context.Context;
 import com.akto.dao.testing.TestRolesDao;
 import com.akto.dto.ApiCollection;
+import com.akto.dto.CrawlerRun;
+import com.akto.dto.CrawlerUrl;
 import com.akto.dto.RecordedLoginFlowInput;
 import com.akto.dto.testing.AuthMechanism;
 import com.akto.dto.testing.TestRoles;
 import com.akto.log.LoggerMaker;
+import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.Constants;
 import com.akto.util.RecordedLoginFlowUtil;
 import com.akto.utils.Utils;
@@ -40,13 +45,22 @@ public class AktoJaxAction extends UserAction {
 
     private String apiCollectionId;
 
-    private static final LoggerMaker loggerMaker = new LoggerMaker(AktoJaxAction.class, LoggerMaker.LogDb.DASHBOARD);
+    // Fields for saveCrawlerUrl API
+    private String url;
+    private boolean accepted;
+    private int timestamp;
+    private String crawlId;
+    private String sourceUrl;
+    private String sourceXpath;
+    private String buttonText;
+
+    private static final LoggerMaker loggerMaker = new LoggerMaker(AktoJaxAction.class, LogDb.DASHBOARD);
 
     public String initiateCrawler() {
         try {
-            loggerMaker.infoAndAddToDb("Initializing Crawler", LoggerMaker.LogDb.DASHBOARD);
+            loggerMaker.infoAndAddToDb("Initializing Crawler");
             String url = System.getenv("AKTOJAX_SERVICE_URL") + "/triggerCrawler";
-            loggerMaker.infoAndAddToDb("Crawler service url: " + url, LoggerMaker.LogDb.DASHBOARD);
+            loggerMaker.infoAndAddToDb("Crawler service url: " + url);
 
             URL parsedUrl = new URL(hostname);
             String host = parsedUrl.getHost();
@@ -73,7 +87,9 @@ public class AktoJaxAction extends UserAction {
                 }
             }
 
-            loggerMaker.infoAndAddToDb("Crawler collection id: " + collectionId, LoggerMaker.LogDb.DASHBOARD);
+            loggerMaker.infoAndAddToDb("Crawler collection id: " + collectionId);
+
+            String crawlId = UUID.randomUUID().toString();
 
             JSONObject requestBody = new JSONObject();
             requestBody.put("hostname", hostname);
@@ -82,6 +98,7 @@ public class AktoJaxAction extends UserAction {
             requestBody.put("collectionId", collectionId);
             requestBody.put("accountId", Context.accountId.get());
             requestBody.put("outscopeUrls", outscopeUrls);
+            requestBody.put("crawlId", crawlId);
 
             if(!StringUtils.isEmpty(username) && !StringUtils.isEmpty(password)) {
                 requestBody.put("username", username);
@@ -107,26 +124,36 @@ public class AktoJaxAction extends UserAction {
                         requestBody.put("cookies", allCookies);
                     }
                 } catch (Exception e) {
-                    loggerMaker.errorAndAddToDb("Error while fetching cookies from test role: " + e.getMessage(), LoggerMaker.LogDb.DASHBOARD);
+                    loggerMaker.errorAndAddToDb("Error while fetching cookies from test role: " + e.getMessage());
                 }
             }
 
             String reqData = requestBody.toString();
 
-            loggerMaker.infoAndAddToDb("Crawler request data: " + reqData, LoggerMaker.LogDb.DASHBOARD);
+            loggerMaker.infoAndAddToDb("Crawler request data: " + reqData);
 
             JsonNode node = ApiRequest.postRequest(new HashMap<>(), url, reqData);
             String status = node.get("status").textValue();
 
-            loggerMaker.infoAndAddToDb("Crawler status: " + status, LoggerMaker.LogDb.DASHBOARD);
+            loggerMaker.infoAndAddToDb("Crawler status: " + status);
 
             if(status.equalsIgnoreCase("success")) {
+                int currentTimestamp = Context.now();
+                CrawlerRun crawlerRun = new CrawlerRun(
+                    getSUser().getLogin(),
+                    currentTimestamp,
+                    0,
+                    crawlId,
+                    hostname,
+                    outscopeUrls
+                );
+                CrawlerRunDao.instance.insertOne(crawlerRun);
                 return Action.SUCCESS.toUpperCase();
             } else {
                 return Action.ERROR.toUpperCase();
             }
         } catch (Exception e) {
-            loggerMaker.error("Error while initiating the Akto crawler. Error: " + e.getMessage(), LoggerMaker.LogDb.DASHBOARD);
+            loggerMaker.error("Error while initiating the Akto crawler. Error: " + e.getMessage());
             e.printStackTrace();
             return Action.ERROR.toUpperCase();
         }
@@ -136,7 +163,7 @@ public class AktoJaxAction extends UserAction {
         String topic = System.getenv("AKTO_KAFKA_TOPIC_NAME");
         if (topic == null) topic = "akto.api.logs";
 
-        loggerMaker.infoAndAddToDb("uploadCrawlerData() - Crawler topic: " + topic, LoggerMaker.LogDb.DASHBOARD);
+        loggerMaker.infoAndAddToDb("uploadCrawlerData() - Crawler topic: " + topic);
 
         // fetch collection id
         ApiCollection apiCollection = ApiCollectionsDao.instance.findOne(Filters.eq("_id", Integer.valueOf(apiCollectionId)));
@@ -146,14 +173,35 @@ public class AktoJaxAction extends UserAction {
         }
 
         try {
-            loggerMaker.infoAndAddToDb("uploadCrawlerData() - Pushing crawler data to kafka", LoggerMaker.LogDb.DASHBOARD);
+            loggerMaker.infoAndAddToDb("uploadCrawlerData() - Pushing crawler data to kafka");
             Utils.pushDataToKafka(apiCollection.getId(), topic, Arrays.asList(crawlerData), new ArrayList<>(), true, true, true);
         } catch (Exception e) {
-            loggerMaker.errorAndAddToDb(e, "Exception while inserting crawler data", LoggerMaker.LogDb.DASHBOARD);
+            loggerMaker.errorAndAddToDb(e, "Exception while inserting crawler data");
             e.printStackTrace();
         }
 
         return Action.SUCCESS.toUpperCase();
+    }
+
+    public String saveCrawlerUrl() {
+        try {
+            loggerMaker.infoAndAddToDb("Saving crawler URL");
+
+            if (StringUtils.isEmpty(url) || StringUtils.isEmpty(crawlId)) {
+                addActionError("URL and crawl ID are required");
+                return Action.ERROR.toUpperCase();
+            }
+
+            CrawlerUrl crawlerUrl = new CrawlerUrl(url, accepted, timestamp, crawlId, sourceUrl, sourceXpath, buttonText);
+            CrawlerUrlDao.instance.insertOne(crawlerUrl);
+
+            loggerMaker.infoAndAddToDb("Crawler URL saved successfully");
+            return Action.SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error while saving crawler URL: " + e.getMessage());
+            e.printStackTrace();
+            return Action.ERROR.toUpperCase();
+        }
     }
 
     public String getHostname() {
@@ -226,5 +274,61 @@ public class AktoJaxAction extends UserAction {
 
     public void setOutscopeUrls(String outscopeUrls) {
         this.outscopeUrls = outscopeUrls;
+    }
+
+    public String getUrl() {
+        return url;
+    }
+
+    public void setUrl(String url) {
+        this.url = url;
+    }
+
+    public boolean isAccepted() {
+        return accepted;
+    }
+
+    public void setAccepted(boolean accepted) {
+        this.accepted = accepted;
+    }
+
+    public int getTimestamp() {
+        return timestamp;
+    }
+
+    public void setTimestamp(int timestamp) {
+        this.timestamp = timestamp;
+    }
+
+    public String getCrawlId() {
+        return crawlId;
+    }
+
+    public void setCrawlId(String crawlId) {
+        this.crawlId = crawlId;
+    }
+
+    public String getSourceUrl() {
+        return sourceUrl;
+    }
+
+    public void setSourceUrl(String sourceUrl) {
+        this.sourceUrl = sourceUrl;
+    }
+
+    public String getSourceXpath() {
+        return sourceXpath;
+    }
+
+    public void setSourceXpath(String sourceXpath) {
+        this.sourceXpath = sourceXpath;
+    }
+
+    public String getButtonText() {
+        return buttonText;
+    }
+
+    public void setButtonText(String buttonText) {
+        this.buttonText = buttonText;
     }
 }
