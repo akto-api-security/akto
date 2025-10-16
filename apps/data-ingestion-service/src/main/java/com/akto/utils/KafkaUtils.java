@@ -21,7 +21,7 @@ public class KafkaUtils {
     }
 
     public static void insertData(IngestDataBatch payload) {
-        String topicName = System.getenv().getOrDefault("AKTO_KAFKA_TOPIC_NAME", "akto.api.logs");
+        String topicName = "akto.api.logs";
         BasicDBObject obj = new BasicDBObject();
         obj.put("path", payload.getPath());
         obj.put("requestHeaders", payload.getRequestHeaders());
