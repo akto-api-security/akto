@@ -162,7 +162,7 @@ public class LoggerMaker  {
         }
         logger.error(err);
         try{
-            //insert(err, "error", db);
+            insert(err, "error", db);
         } catch (Exception e){
 
         }
@@ -222,7 +222,7 @@ public class LoggerMaker  {
         String infoMessage = "acc: " + accountId + ", " + info;
         logger.info(infoMessage);
         try{
-            //insert(infoMessage, "info",db);
+            insert(infoMessage, "info",db);
         } catch (Exception e){
 
         }
@@ -233,7 +233,7 @@ public class LoggerMaker  {
         String infoMessage = "acc: " + accountId + ", " + info;
         logger.info(infoMessage);
         try{
-            //insert(infoMessage, "warn",db);
+            insert(infoMessage, "warn",db);
         } catch (Exception e){
 
         }
@@ -388,7 +388,7 @@ public class LoggerMaker  {
         String debugMessage = "acc: " + accountId + ", " + message;
         debug(debugMessage);
         try{
-            //insert(debugMessage, "debug", db);
+            insert(debugMessage, "debug", db);
         } catch (Exception e){
 
         }
