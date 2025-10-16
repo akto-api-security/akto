@@ -1,0 +1,62 @@
+# Vector configuration for Akto Data Ingestion Service
+# Sends logs to OpenObserve
+
+[sources.data_ingestion_logs]
+type = "file"
+include = ["/Users/mann/workspace/akto/logs/data-ingestion.log"]
+read_from = "beginning"  # For local testing, read from beginning
+data_dir = "/Users/mann/workspace/akto/apps/data-ingestion-service/vector-data"
+
+[transforms.parse_logs]
+type = "remap"
+inputs = ["data_ingestion_logs"]
+source = '''
+# Parse the log line format from SLF4J SimpleLogger
+# Example: 2025-10-16T13:45:23.123+00:00 [thread-name] INFO com.akto.Class - Message
+
+parsed, err = parse_regex(.message, r'^(?P<timestamp>[^\s]+)\s+\[(?P<thread>[^\]]+)\]\s+(?P<level>\w+)\s+(?P<logger>[^\s]+)\s+-\s+(?P<message>.*)$')
+if err == null {
+    . = parsed
+    # Ensure timestamp is in RFC3339 format
+    .timestamp = parse_timestamp!(.timestamp, format: "%+")
+} else {
+    # If parsing fails, keep original message
+    .level = "UNKNOWN"
+    .timestamp = now()
+}
+
+# Add service metadata
+.service = "data-ingestion-service"
+.environment = get_env_var("ENVIRONMENT") ?? "production"
+
+# Set organization - can be overridden by OPENOBSERVE_ORG env var
+.organization = get_env_var("OPENOBSERVE_ORG") ?? "default"
+'''
+
+[sinks.openobserve]
+type = "http"
+inputs = ["parse_logs"]
+# Dynamic URI using the organization field from the log event
+uri = "http://localhost:5080/api/{{ organization }}/data-ingestion/_json"
+method = "post"
+
+[sinks.openobserve.auth]
+strategy = "basic"
+user = "root@example.com"
+password = "Complexpass#123"
+
+[sinks.openobserve.encoding]
+codec = "json"
+timestamp_format = "rfc3339"
+
+[sinks.openobserve.request]
+compression = "gzip"
+
+[sinks.openobserve.healthcheck]
+enabled = false
+
+# Optional: Also log to console for debugging
+[sinks.console]
+type = "console"
+inputs = ["parse_logs"]
+encoding.codec = "json"
