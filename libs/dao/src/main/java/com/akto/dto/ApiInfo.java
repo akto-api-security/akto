@@ -52,6 +52,9 @@ public class ApiInfo {
     public static final String RATE_LIMIT_CONFIDENCE = "rateLimitConfidence";
     private float rateLimitConfidence;
 
+    public static final String PARENT_MCP_TOOL_NAMES = "parentMcpToolNames";
+    private List<String> parentMcpToolNames;
+
     public enum AuthType {
         UNAUTHENTICATED, BASIC, AUTHORIZATION_HEADER, JWT, API_TOKEN, BEARER, CUSTOM, API_KEY, MTLS
     }
@@ -399,4 +402,11 @@ public class ApiInfo {
         this.rateLimitConfidence = rateLimitConfidence;
     }
 
+    public List<String> getParentMcpToolNames() {
+        return parentMcpToolNames;
+    }
+
+    public void setParentMcpToolNames(List<String> parentMcpToolNames) {
+        this.parentMcpToolNames = parentMcpToolNames;
+    }
 }
