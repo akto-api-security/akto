@@ -80,9 +80,6 @@ jobs:
           wget -O filetypes.json https://raw.githubusercontent.com/akto-api-security/akto/master/pii-types/filetypes.json
           wget -O automated_api_groups.csv https://raw.githubusercontent.com/akto-api-security/akto/master/automated-api-groups/automated-api-groups.csv
 
-      - name: Prepare Dashboard polaris UI
-        working-directory: ./apps/dashboard/web/polaris_web
-        run: npm install && export RELEASE_VERSION=${{github.event.inputs.release_version}} && npm run build
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v1
         with:
@@ -90,8 +87,6 @@ jobs:
           aws-secret-access-key: ${{secrets.AWS_SECRET_ACCESS_KEY}}
           aws-region: ap-south-1
 
-      - name: Deploy polaris site to S3 bucket
-        run: aws s3 sync ./apps/dashboard/web/polaris_web/web/dist s3://dashboard-on-cdn/polaris_web/${{github.event.inputs.release_version}}/dist --delete
       - name: Run mvn package
         if: ${{github.event.inputs.skipTests == 'False' }}
         run: mvn package -Dakto-image-tag=${{ github.event.inputs.release_version }} -Dakto-build-time=$(eval "date +%s") -Dakto-release-version=${{github.event.inputs.release_version}}
