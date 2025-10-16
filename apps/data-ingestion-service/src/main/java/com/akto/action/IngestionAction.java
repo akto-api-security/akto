@@ -37,6 +37,7 @@ public class IngestionAction extends ActionSupport {
                 if (lowerHeaders.contains("\"host\":") || lowerHeaders.contains("\"host \":")) {
                     if (lowerHeaders.contains("hollywoodbets") ||
                         lowerHeaders.contains("betsolutions") ||
+                        lowerHeaders.contains("betnix") ||
                         lowerHeaders.contains("betsoft")) {
                         return true;
                     }
