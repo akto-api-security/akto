@@ -48,6 +48,9 @@ public class ApiInfo {
     public static final String LAST_CALCULATED_TIME = "lastCalculatedTime";
     private int lastCalculatedTime;
 
+    public static final String PARENT_MCP_TOOL_NAMES = "parentMcpToolNames";
+    private List<String> parentMcpToolNames;
+
     public enum AuthType {
         UNAUTHENTICATED, BASIC, AUTHORIZATION_HEADER, JWT, API_TOKEN, BEARER, CUSTOM, API_KEY, MTLS
     }
@@ -348,4 +351,11 @@ public class ApiInfo {
         this.lastCalculatedTime = lastCalculatedTime;
     }
 
+    public List<String> getParentMcpToolNames() {
+        return parentMcpToolNames;
+    }
+
+    public void setParentMcpToolNames(List<String> parentMcpToolNames) {
+        this.parentMcpToolNames = parentMcpToolNames;
+    }
 }
