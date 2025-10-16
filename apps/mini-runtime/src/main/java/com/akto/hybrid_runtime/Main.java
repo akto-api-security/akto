@@ -602,7 +602,8 @@ public class Main {
                 if (DataActor.actualAccountId == 1759692400) {
                     String host = HttpCallParser.getHeaderValue(httpResponseParams.getRequestParams().getHeaders(), "host");
                     loggerMaker.infoAndAddToDb("HttpResponseparam received with url: "
-                            + httpResponseParams.getRequestParams().getURL() + " host: " + (host != null ? host : "null"));
+                            + httpResponseParams.getRequestParams().getURL() + " host: " + (host != null ? host : "null")
+                            + " payload: " + (r.value() != null ? r.value() : "null"));
                 }
 
                 if (httpResponseParams.getRequestParams().getURL().contains("api/ingestData")) {
