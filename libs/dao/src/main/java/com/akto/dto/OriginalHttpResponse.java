@@ -35,23 +35,33 @@ public class OriginalHttpResponse {
         if(!checkResponsePayloadParsing){
             buildFromSampleMessage(message);
         }else{
-            Map<String, Object> json = gson.fromJson(message, Map.class);
-            this.headers = OriginalHttpRequest.buildHeadersMap(json, "responseHeaders");
-            if(this.headers.containsKey("content-type")){
-                List<String> contentType = this.headers.get("content-type");
-                boolean isTextOrHtml = false;
-                if(contentType != null && !contentType.isEmpty()){
-                    String contentTypeValue = contentType.get(0);
-                    if(contentTypeValue.contains("text/") || contentTypeValue.contains("html")){
-                        isTextOrHtml = true;
+            try {
+                Map<String, Object> json = gson.fromJson(message, Map.class);
+                this.headers = OriginalHttpRequest.buildHeadersMap(json, "responseHeaders");
+                if(this.headers.containsKey("content-type")){
+                    List<String> contentType = this.headers.get("content-type");
+                    boolean isTextOrHtml = false;
+                    if(contentType != null && !contentType.isEmpty()){
+                        String contentTypeValue = contentType.get(0);
+                        if(contentTypeValue.contains("text/") || contentTypeValue.contains("html")){
+                            isTextOrHtml = true;
+                        }
+                    }
+                    if(!isTextOrHtml){
+                        this.body = json.get("responsePayload").toString();
+                    }else{
+                        this.body = null;
                     }
                 }
-                if(isTextOrHtml){
-                    this.body = json.get("responsePayload").toString();
-                }else{
-                    this.body = null;
+                Object obj = json.get("statusCode");
+                if(obj instanceof Double){
+                    obj = ((Double) obj).intValue();
                 }
+                this.statusCode = Integer.parseInt(obj.toString());
+            } catch (Exception e) {
+                buildFromSampleMessage(message);
             }
+            
         }
     }
 
