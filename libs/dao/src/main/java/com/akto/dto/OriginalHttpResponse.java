@@ -1,5 +1,6 @@
 package com.akto.dto;
 
+import com.akto.dao.context.Context;
 import com.akto.util.HttpRequestResponseUtils;
 import com.google.gson.Gson;
 
@@ -28,6 +29,30 @@ public class OriginalHttpResponse {
 
     public OriginalHttpResponse copy() {
         return new OriginalHttpResponse(this.body, new HashMap<>(this.headers), this.statusCode);
+    }
+
+    public void buildFromSampleMessage(String message, boolean checkResponsePayloadParsing) {
+        if(!checkResponsePayloadParsing){
+            buildFromSampleMessage(message);
+        }else{
+            Map<String, Object> json = gson.fromJson(message, Map.class);
+            this.headers = OriginalHttpRequest.buildHeadersMap(json, "responseHeaders");
+            if(this.headers.containsKey("content-type")){
+                List<String> contentType = this.headers.get("content-type");
+                boolean isTextOrHtml = false;
+                if(contentType != null && !contentType.isEmpty()){
+                    String contentTypeValue = contentType.get(0);
+                    if(contentTypeValue.contains("text/") || contentTypeValue.contains("html")){
+                        isTextOrHtml = true;
+                    }
+                }
+                if(isTextOrHtml){
+                    this.body = json.get("responsePayload").toString();
+                }else{
+                    this.body = null;
+                }
+            }
+        }
     }
 
     public void buildFromSampleMessage(String message) {
