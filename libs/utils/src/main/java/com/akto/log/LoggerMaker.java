@@ -239,6 +239,17 @@ public class LoggerMaker  {
         }
     }
 
+    public void sendImpWarnAndAddToDb(String info, LogDb db) {
+        String accountId = Context.accountId.get() != null ? Context.accountId.get().toString() : "NA";
+        String infoMessage = "acc: " + accountId + ", " + info;
+        logger.info(infoMessage);
+        try{
+            insert(infoMessage, "warn",db);
+        } catch (Exception e){
+
+        }
+    }
+
     public void errorAndAddToDb(String err) {
         errorAndAddToDb(err, this.db);
     }
@@ -249,6 +260,10 @@ public class LoggerMaker  {
 
     public void warnAndAddToDb(String info) {
         warnAndAddToDb(info, this.db);
+    }
+
+    public void sendImpWarnAndAddToDb(String info) {
+        sendImpWarnAndAddToDb(info, this.db);
     }
 
     private Boolean checkUpdate(){

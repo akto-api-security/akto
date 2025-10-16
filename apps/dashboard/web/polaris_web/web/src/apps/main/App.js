@@ -4,6 +4,7 @@ import SingleTestRunPage from "../dashboard/pages/testing/SingleTestRunPage/Sing
 import AllSensitiveData from "../dashboard/pages/observe/AllSensitiveData/AllSensitiveData";
 import ApiCollections from "../dashboard/pages/observe/api_collections/ApiCollections";
 import ApiQuery from "../dashboard/pages/observe/api_collections/APIQuery";
+import DebugEndpointsMode from "../dashboard/pages/observe/api_collections/DebugEndpointsMode";
 import ApiEndpoints from "../dashboard/pages/observe/api_collections/ApiEndpoints";
 import SensitiveDataExposure from "../dashboard/pages/observe/SensitiveDataExposure/SensitiveDataExposure";
 import SingleRequest from "../dashboard/pages/observe/SingleRequest/SingleRequest";
@@ -101,6 +102,7 @@ import GmailWebhookCore from "../dashboard/pages/settings/integrations/gmailWebh
 import GmailWebhook from "../dashboard/pages/settings/integrations/gmailWebhooks/GmailWebhook";
 import McpSecurityPage from "../dashboard/pages/mcp-security/McpSecurityPage.jsx";
 import AuditData from "../dashboard/pages/observe/AuditData";
+import EndpointShieldMetadata from "../dashboard/pages/observe/EndpointShieldMetadata";
 import GuardrailDetection    from "../dashboard/pages/guardrails/GuardrailDetection";
 import GuardrailDetectionDemo from "../dashboard/pages/guardrails/GuardrailDetectionDemo";
 import GuardrailPolicies   from "../dashboard/pages/guardrails/GuardrailPolicies";
@@ -181,6 +183,10 @@ const router = createBrowserRouter([
                                 element: <ApiQuery/>
                             },
                             {
+                                path: "debug-endpoints",
+                                element: <DebugEndpointsMode/>
+                            },
+                            {
                                 path: "changes",
                                 element: <ApiChanges/>
                             },
@@ -203,6 +209,10 @@ const router = createBrowserRouter([
                             {
                                 path: "audit",
                                 element: <AuditData/>
+                            },
+                            {
+                                path: "endpoint-shield",
+                                element: <EndpointShieldMetadata/>
                             },
                             {
                                 path: ":apiCollectionId/open-api-upload",

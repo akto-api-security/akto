@@ -1089,9 +1089,7 @@ getRowInfo(severity, apiInfo,jiraIssueUrl, sensitiveData, isIgnored, azureBoards
     {
       title: mapLabel('API', getDashboardCategory()),
       value: (
-        <HorizontalStack gap={"1"}>
-          <GetPrettifyEndpoint method={apiInfo.id.method} url={apiInfo.id.url} />
-        </HorizontalStack>
+          <GetPrettifyEndpoint methodBoxWidth="38px" maxWidth="180px" method={apiInfo.id.method} url={apiInfo.id.url} />
       ),
       tooltipContent: "Name of the api on which test is run"
     },

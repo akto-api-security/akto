@@ -181,6 +181,15 @@ export default function LeftNav() {
                         },
                         selected: leftNavSelected === "dashboard_observe_audit",
                     }] : []),
+                    ...((dashboardCategory === "MCP Security" || dashboardCategory === "Agentic Security") ? [{
+                        label: "Endpoint Shield",
+                        onClick: () => {
+                            navigate("/dashboard/observe/endpoint-shield");
+                            handleSelect("dashboard_observe_endpoint_shield");
+                            setActive("active");
+                        },
+                        selected: leftNavSelected === "dashboard_observe_endpoint_shield",
+                    }] : []),
                 ],
                 key: "3",
             },
@@ -392,22 +401,22 @@ export default function LeftNav() {
                         },
                     ],
                 }] : []),
-                ...(window?.STIGG_FEATURE_WISE_ALLOWED?.AI_AGENTS?.isGranted && dashboardCategory==="API Security" ? [{
-                label: (
-                    <Text variant="bodyMd" fontWeight="medium">
-                        AI Agents
-                    </Text>
-                ),
-                icon: StarFilledMinor,
-                onClick: () => {
-                    handleSelect("agent_team_members");
-                    navigate("/dashboard/agent-team/members");
-                    setActive("normal");
-                },
-                selected: leftNavSelected.includes("agent_team"),
-                url: "#",
-                key: "8",
-            }] : []),
+            // ...(window?.STIGG_FEATURE_WISE_ALLOWED?.AI_AGENTS?.isGranted && dashboardCategory === "API Security" ? [{
+            //     label: (
+            //         <Text variant="bodyMd" fontWeight="medium">
+            //             AI Agents
+            //         </Text>
+            //     ),
+            //     icon: StarFilledMinor,
+            //     onClick: () => {
+            //         handleSelect("agent_team_members");
+            //         navigate("/dashboard/agent-team/members");
+            //         setActive("normal");
+            //     },
+            //     selected: leftNavSelected.includes("agent_team"),
+            //     url: "#",
+            //     key: "8",
+            // }] : []),
             ...(dashboardCategory === "MCP Security" ? [{
                 label: (
                     <Text variant="bodyMd" fontWeight="medium">

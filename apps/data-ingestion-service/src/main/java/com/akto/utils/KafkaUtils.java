@@ -1,6 +1,7 @@
 package com.akto.utils;
 
 import com.akto.log.LoggerMaker;
+import com.akto.action.IngestionAction;
 import com.akto.dao.context.Context;
 import com.akto.dto.IngestDataBatch;
 import com.akto.kafka.Kafka;
@@ -20,7 +21,7 @@ public class KafkaUtils {
     }
 
     public static void insertData(IngestDataBatch payload) {
-        String topicName = System.getenv().getOrDefault("AKTO_KAFKA_TOPIC_NAME", "akto.api.logs");
+        String topicName = "akto.api.logs";
         BasicDBObject obj = new BasicDBObject();
         obj.put("path", payload.getPath());
         obj.put("requestHeaders", payload.getRequestHeaders());
@@ -45,6 +46,7 @@ public class KafkaUtils {
         obj.put("enabled_graph", payload.getEnabled_graph());
         obj.put("tag", payload.getTag());
         kafkaProducer.send(obj.toString(), "akto.api.logs");
+        IngestionAction.printLogs("Inserted to kafka: " + obj.toString());
     }
 
 }
