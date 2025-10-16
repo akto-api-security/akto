@@ -302,7 +302,20 @@ func setupRouter(service *Service) *gin.Engine {
 
 func main() {
 	scannerClient := NewScannerClient(pythonServiceURL)
+	// waitForPythonService(scannerClient);
 
+	service := NewService(scannerClient)
+	router := setupRouter(service)
+
+	printEnvVariables()
+	port := getEnv("PORT", "8091")
+	log.Printf("Starting go-service on :%s", port)
+	if err := router.Run(":" + port); err != nil {
+		log.Fatalf("Failed to start: %v", err)
+	}
+}
+
+func waitForPythonService(scannerClient *ScannerClient) {
 	log.Println("Waiting for Python scanner service to be ready...")
 	for i := 0; i < 30; i++ {
 		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
@@ -320,13 +333,10 @@ func main() {
 
 		time.Sleep(2 * time.Second)
 	}
+}
 
-	service := NewService(scannerClient)
-	router := setupRouter(service)
-
-	port := getEnv("PORT", "8091")
-	log.Printf("Starting on :%s", port)
-	if err := router.Run(":" + port); err != nil {
-		log.Fatalf("Failed to start: %v", err)
-	}
+func printEnvVariables() {
+	log.Printf("PORT: %s", os.Getenv("PORT"))
+	log.Printf("PYTHON_SERVICE_URL: %s", os.Getenv("PYTHON_SERVICE_URL"))
+	log.Printf("GIN_MODE: %s", os.Getenv("GIN_MODE"))
 }

@@ -1,7 +1,7 @@
 services:
   python-service:
     build:
-      context: ./python-service
+      context: ./python-service/container
       dockerfile: Dockerfile
     container_name: agent-guard-python
     ports:
@@ -30,7 +30,7 @@ services:
 
   go-service:
     build:
-      context: ./go-service
+      context: ./go-service/container
       dockerfile: Dockerfile
     container_name: agent-guard-go
     ports:
