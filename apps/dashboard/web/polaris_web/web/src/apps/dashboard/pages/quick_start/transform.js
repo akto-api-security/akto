@@ -814,6 +814,24 @@ const azurefuncObj = {
     key: "Azure Functions",
 }
 
+const cloudflarewarpObj = {
+    icon: '/public/cloudflare.svg',
+    label: "Cloudflare WARP",
+    text: "Cloudflare WARP setup is recommended if you use Cloudflare WARP for secure, accelerated device-to-internet connectivity.",
+    docsUrl: 'https://docs.akto.io/traffic-connector/api-gateways/connect-akto-with-cloudflare',
+    key: "CLOUDFLARE_WARP",
+    component: <AddOnComponenet/>
+}
+
+const zscalerObj = {
+    icon: '/public/zscaler_logo.svg',
+    label: "Zscaler",
+    text: "Zscaler setup is recommended if your organization uses Zscaler for secure, zero-trust internet and app access.",
+    docsUrl: 'https://docs.akto.io/traffic-connector/api-gateways/connect-akto-with-cloudflare',
+    key: "Zscaler",
+    component: <AddOnComponenet/>
+}
+
 
 const quick_start_policy_lines= [
     `{`,
@@ -1427,9 +1445,15 @@ const quickStartFunc = {
             goObj, javaObj, nodejsObj, pythonObj
         ];
 
+        // Secure Web Network
+        const secureWebNetwork = [
+        cloudflarewarpObj, zscalerObj
+        ];
+
        if(func.checkLocal()){
            return {
-               "Manual": manual
+               "Manual": manual,
+               "Secure Web Network": secureWebNetwork,
            }
        }
 
@@ -1462,6 +1486,7 @@ const quickStartFunc = {
             "Akto SDK": aktoSdk,
             "Virtual Machines": vm,
             "Source Code": sourceCode,
+            "Secure Web Networks": secureWebNetwork,
         }
 
         return connectors;
@@ -1485,7 +1510,8 @@ const quickStartFunc = {
             openApiObj, beanStalkObj, eksObj, dockerObj, envoyObj, mcpScanObj, mcpProxyObj, mcpGateway, mcpWrapperObj, impervaImportObj,
             harFileUploadObj, kongObj, tcpObj, mirroringObj, hybridSaasObj, apiInventoryFromSourceCodeObj,
             ebpfObj, ebpfMTLSObj, istioObj, pythonObj, awsApiGatewayObj, awsLambdaObj,
-            apigeeObj, iisObj, azureObj, cloudflareObj, f5Obj, goObj, haproxyObj, javaObj, kongmeshObj, layer7Obj, nodejsObj, openshiftObj, threescaleObj, githubObj, gitlabObj, bitbucketObj, aktoJaxObj
+            apigeeObj, iisObj, azureObj, cloudflareObj, f5Obj, goObj, haproxyObj, javaObj, kongmeshObj, layer7Obj, nodejsObj, openshiftObj, threescaleObj, githubObj, gitlabObj, bitbucketObj, aktoJaxObj,
+            cloudflarewarpObj, zscalerObj
         ]
 
         if(isGenAISecurityCategory() || isAgenticSecurityCategory()){
