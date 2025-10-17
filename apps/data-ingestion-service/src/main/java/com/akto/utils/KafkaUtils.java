@@ -46,7 +46,7 @@ public class KafkaUtils {
         obj.put("enabled_graph", payload.getEnabled_graph());
         obj.put("tag", payload.getTag());
         kafkaProducer.send(obj.toString(), "akto.api.logs");
-        IngestionAction.printLogs("Inserted to kafka: " + obj.toString());
+        //IngestionAction.printLogs("Inserted to kafka: " + obj.toString());
     }
 
 }
