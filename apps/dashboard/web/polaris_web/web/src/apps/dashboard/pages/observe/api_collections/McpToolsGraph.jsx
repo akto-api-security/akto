@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Box, Text, VerticalStack, HorizontalStack, Card, Badge } from '@shopify/polaris';
+import { Box, Text, VerticalStack, HorizontalStack, Card, Badge, Avatar } from '@shopify/polaris';
 import ReactFlow, { Background, Handle, Position, getBezierPath } from 'react-flow-renderer';
 import 'react-flow-renderer/dist/style.css';
 import 'react-flow-renderer/dist/theme-default.css';
@@ -40,10 +40,10 @@ function McpNode({ data }) {
   return (
     <>
       <Handle type="target" position={Position.Left} />
-      <div style={{ cursor: "pointer" }}>
+      <Box style={{ cursor: "pointer" }}>
         <VerticalStack gap={2}>
           <Card padding={0}>
-            <div style={{
+            <Box style={{
               border: `1px solid ${colors.borderColor}`,
               borderRadius: '8px',
               backgroundColor: colors.backgroundColor
@@ -59,18 +59,16 @@ function McpNode({ data }) {
                     {typeof IconComponent === 'string' ? (
                       <img src={IconComponent} alt="icon" style={{ width: '16px', height: '16px' }} />
                     ) : component.nodeType === 'api' ? (
-                      <div style={{
-                        width: '16px',
-                        height: '16px',
-                        borderRadius: '3px',
+                      <Box style={{
+                        borderRadius: '4px',
                         backgroundColor: '#3b82f6',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        padding: '10px'
+                        padding: '3px 4px'
                       }}>
-                        <span style={{ color: 'white', fontSize: '10px', fontWeight: 'bold' }}>API</span>
-                      </div>
+                        <Text variant='bodySm' color='text-inverse' fontWeight='bold' as="span">API</Text>
+                      </Box>
                     ) : (
                       <AutomationMajor style={{ width: '16px', height: '16px' }} />
                     )}
@@ -82,10 +80,10 @@ function McpNode({ data }) {
                   </HorizontalStack>
                 </VerticalStack>
               </Box>
-            </div>
+            </Box>
           </Card>
         </VerticalStack>
-      </div>
+      </Box>
       <Handle type="source" position={Position.Right} id="b" />
     </>
   );
@@ -136,14 +134,14 @@ function McpEdge({ id, sourceX, sourceY, targetX, targetY, sourcePosition, targe
             width={150}
             height={60}
           >
-            <div xmlns="http://www.w3.org/1999/xhtml" style={{
+            <Box xmlns="http://www.w3.org/1999/xhtml" style={{
               display: 'flex',
               justifyContent: 'center',
               alignItems: 'center',
               height: '100%',
               width: '100%'
             }}>
-            </div>
+            </Box>
           </foreignObject>
         )}
       </g>
@@ -355,6 +353,19 @@ function McpToolsGraph({ apiCollectionId }) {
     return null;
   }
 
+
+
+  const getBadgeComponentColor = (type) => {
+    switch (type) {
+      case 'tool':
+        return 'info';
+      case 'api':
+        return 'critical';
+      default:
+        return 'gray';
+    }
+  };
+
   return (
     <Card>
       <Box padding="4">
@@ -372,7 +383,7 @@ function McpToolsGraph({ apiCollectionId }) {
           </HorizontalStack>
 
           <VerticalStack gap="2">
-            <div style={{ height: "500px", border: '1px solid #e1e5e9', borderRadius: '8px', position: 'relative' }}>
+            <Box style={{ height: "500px", border: '1px solid #e1e5e9', borderRadius: '8px', position: 'relative' }}>
               <ReactFlow
                 nodes={nodes}
                 edges={edges}
@@ -393,7 +404,7 @@ function McpToolsGraph({ apiCollectionId }) {
               >
                 <Background color="#e1e5e9" gap={16} />
               </ReactFlow>
-            </div>
+            </Box>
           </VerticalStack>
 
           {/* Selected Component Details */}
@@ -411,7 +422,7 @@ function McpToolsGraph({ apiCollectionId }) {
                     <Box>
                       <VerticalStack gap="1">
                         <Text variant="bodySm" color="subdued">
-                          <strong>Full URL:</strong>
+                          <Text as="span" fontWeight="bold">Full URL:</Text>
                         </Text>
                         <Box
                           padding="2"
@@ -425,7 +436,7 @@ function McpToolsGraph({ apiCollectionId }) {
                         >
                           <Text variant="bodySm" as="span">
                             {selectedComponent.method && (
-                              <Badge status="info" tone="info">{selectedComponent.method}</Badge>
+                              <Badge status={getBadgeComponentColor(selectedComponent.nodeType)} tone={getBadgeComponentColor(selectedComponent.nodeType)}>{selectedComponent.method}</Badge>
                             )}{' '}
                             {selectedComponent.fullUrl}
                           </Text>
@@ -436,10 +447,10 @@ function McpToolsGraph({ apiCollectionId }) {
 
                   <HorizontalStack gap="4">
                     <Text variant="bodySm">
-                      <strong>Type:</strong> {selectedComponent.type}
+                      <Text as="span" fontWeight="bold">Type:</Text> {selectedComponent.type}
                     </Text>
                     <Text variant="bodySm">
-                      <strong>Node Type:</strong> {selectedComponent.nodeType}
+                      <Text as="span" fontWeight="bold">Node Type:</Text> {selectedComponent.nodeType}
                     </Text>
                   </HorizontalStack>
                 </VerticalStack>
