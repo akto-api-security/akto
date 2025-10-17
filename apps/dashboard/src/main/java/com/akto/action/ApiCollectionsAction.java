@@ -1362,26 +1362,48 @@ public class ApiCollectionsAction extends UserAction {
 
         Map<ApiInfoKey, List<ApiInfoKey>> toolApiCallsMap = new HashMap<>();
 
-        Context.contextSource.set(CONTEXT_SOURCE.API);
+        // Collect all tool names in a single list
+        List<String> allMcpToolNames = new ArrayList<>();
+        Map<String, ApiInfoKey> toolNameToKeyMap = new HashMap<>();
+
         for(ApiInfo mcpToolInfo : mcpToolsList) {
             String toolUrl = mcpToolInfo.getId().getUrl();
             String[] urlSegments = toolUrl.split("/");
             String mcpToolName = urlSegments[urlSegments.length - 1];
 
-            List<ApiInfo> apiCallsForTool = ApiInfoDao.instance.findAll(
-                Filters.in(ApiInfo.PARENT_MCP_TOOL_NAMES, mcpToolName),
-                Projections.include(Constants.ID)
-            );
+            allMcpToolNames.add(mcpToolName);
+            toolNameToKeyMap.put(mcpToolName, mcpToolInfo.getId());
 
-            List<ApiInfoKey> apiCallIds = new ArrayList<>();
-            for(ApiInfo apiCall : apiCallsForTool) {
-                apiCallIds.add(apiCall.getId());
-            }
-
-            toolApiCallsMap.put(mcpToolInfo.getId(), apiCallIds);
+            // Initialize empty list for each tool
+            toolApiCallsMap.put(mcpToolInfo.getId(), new ArrayList<>());
         }
 
-        Context.contextSource.set(currentContextSource);
+        // Single DB call to get all API calls for all tools at once
+        if (!allMcpToolNames.isEmpty()) {
+            Context.contextSource.set(CONTEXT_SOURCE.API);
+
+            List<ApiInfo> allApiCalls = ApiInfoDao.instance.findAll(
+                Filters.in(ApiInfo.PARENT_MCP_TOOL_NAMES, allMcpToolNames),
+                Projections.include(Constants.ID, ApiInfo.PARENT_MCP_TOOL_NAMES)
+            );
+
+            // Group API calls by their parent tool names
+            for(ApiInfo apiCall : allApiCalls) {
+                List<String> parentToolNames = apiCall.getParentMcpToolNames();
+                if (parentToolNames != null) {
+                    for (String toolName : parentToolNames) {
+                        ApiInfoKey toolKey = toolNameToKeyMap.get(toolName);
+                        if (toolKey != null) {
+                            toolApiCallsMap.get(toolKey).add(apiCall.getId());
+                        }
+                    }
+                }
+            }
+
+            Context.contextSource.set(currentContextSource);
+        } else {
+            Context.contextSource.set(currentContextSource);
+        }
 
         if(this.response == null) {
             this.response = new BasicDBObject();
