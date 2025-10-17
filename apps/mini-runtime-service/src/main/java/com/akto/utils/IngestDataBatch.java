@@ -1,4 +1,7 @@
 package com.akto.utils;
+
+import java.util.List;
+
 @lombok.Getter
 @lombok.Setter
 @lombok.AllArgsConstructor
@@ -27,5 +30,6 @@ public class IngestDataBatch {
     String daemonset_id;
     String enabled_graph;
     String tag;
+    List<String> parentMcpToolNames;
 
 }
