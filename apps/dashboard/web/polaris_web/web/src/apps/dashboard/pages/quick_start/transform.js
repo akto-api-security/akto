@@ -818,16 +818,16 @@ const cloudflareWarpObj = {
     icon: '/public/cloudflare.svg',
     label: "Cloudflare WARP",
     text: "Cloudflare WARP setup is recommended, if you use Cloudflare WARP for secure, accelerated device-to-internet connectivity.",
-    docsUrl: 'https://docs.akto.io/traffic-connector/azure-services/connect-akto-with-azure-functions',
+    docsUrl: 'https://docs.akto.io/traffic-connector',
     component: <AddOnComponenet/>,
     key: "CLOUDFLARE_WARP",
 }
 
 const zscalerObj = {
     icon: '/public/zscaler_logo.svg',
-    label: "zscaler",
+    label: "Zscaler",
     text: "Zscaler setup is recommended,if your organization uses Zscaler for secure, zero-trust internet and app access.",
-    docsUrl: 'https://docs.akto.io/traffic-connector/azure-services/connect-akto-with-azure-functions',
+    docsUrl: 'https://docs.akto.io/traffic-connector',
     component: <AddOnComponenet/>,
     key: "ZSCALER",
 }
