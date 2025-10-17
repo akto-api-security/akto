@@ -62,7 +62,7 @@ function ParamsCard({dataObj, handleDelete, showEdit}) {
                         <Box paddingInlineStart={4}>
                             <VerticalStack gap={2}>
                                 <LineComponent title={"Token type :"} value={authMechanism.type}/>
-                                <HorizontalStack gap="4" blockAlign="center">
+                                <HorizontalStack gap="2" blockAlign="center">
                                     <Box maxWidth='200px'>
                                         <TooltipText tooltip={"Token values"} text={"Token values :"} textProps={{variant:"bodyMd", fontWeight: "medium"}} />
                                     </Box>
@@ -72,7 +72,7 @@ function ParamsCard({dataObj, handleDelete, showEdit}) {
                                         aria-label={hideValues ? 'Show token values' : 'Hide token values'}
                                         onClick={() => setHideValues(!hideValues)}
                                         onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setHideValues(!hideValues) } }}
-                                        style={{ cursor: 'pointer' }}
+                                        style={{ cursor: 'pointer', padding: '4px', lineHeight: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
                                     >
                                         <Icon source={hideValues ? ViewMinor : HideMinor} />
                                     </Box>
