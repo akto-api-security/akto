@@ -33,7 +33,7 @@ import { SelectSource } from "./SelectSource"
 import InlineEditableText from "../../../components/shared/InlineEditableText"
 import IssuesApi from "../../issues/api"
 import SequencesFlow from "./SequencesFlow"
-import { CATEGORY_MCP_SECURITY, getDashboardCategory, isCategory, mapLabel } from "../../../../main/labelHelper"
+import { CATEGORY_API_SECURITY, getDashboardCategory, isCategory, mapLabel } from "../../../../main/labelHelper"
 import AgentDiscoverGraph from "./AgentDiscoverGraph"
 import McpToolsGraph from "./McpToolsGraph"
 
@@ -1256,7 +1256,7 @@ function ApiEndpoints(props) {
                 <SequencesFlow key="sequences-flow" apiCollectionId={apiCollectionId}  />
             ] : [
                 func.isDemoAccount() ? <AgentDiscoverGraph key="agent-discover-graph" apiCollectionId={apiCollectionId} /> : <></>,
-                isCategory(CATEGORY_MCP_SECURITY) && <McpToolsGraph key="mcp-tools-graph" apiCollectionId={apiCollectionId} />,
+                (!isCategory(CATEGORY_API_SECURITY)) && <McpToolsGraph key="mcp-tools-graph" apiCollectionId={apiCollectionId} />,
                 (coverageInfo[apiCollectionId] === 0 || !(coverageInfo.hasOwnProperty(apiCollectionId)) ? <TestrunsBannerComponent key={"testrunsBanner"} onButtonClick={() => setRunTests(true)} isInventory={true}  disabled={collectionsObj?.isOutOfTestingScope || false}/> : null),
                 <div className="apiEndpointsTable" key="table">
                     {apiEndpointTable}
