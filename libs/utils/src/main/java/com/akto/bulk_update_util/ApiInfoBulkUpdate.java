@@ -54,6 +54,15 @@ public class ApiInfoBulkUpdate {
 
             subUpdates.add(Updates.setOnInsert(SingleTypeInfo._COLLECTION_IDS, Arrays.asList(apiInfo.getId().getApiCollectionId())));
 
+            // parentMcpToolNames
+            List<String> parentMcpToolNames = apiInfo.getParentMcpToolNames();
+            if (parentMcpToolNames == null || parentMcpToolNames.isEmpty()) {
+                // to make sure no field is null (so setting empty objects)
+                subUpdates.add(Updates.setOnInsert(ApiInfo.PARENT_MCP_TOOL_NAMES, new ArrayList<>()));
+            } else {
+                subUpdates.add(Updates.addEachToSet(ApiInfo.PARENT_MCP_TOOL_NAMES, parentMcpToolNames));
+            }
+
             updates.add(
                     new UpdateOneModel<>(
                             ApiInfoDao.getFilter(apiInfo.getId()),
