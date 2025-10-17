@@ -1,5 +1,6 @@
 package com.akto.dto.monitoring;
 
+import java.util.Map;
 import java.util.UUID;
 
 public class ModuleInfo {
@@ -11,6 +12,8 @@ public class ModuleInfo {
     public static final String LAST_HEARTBEAT_RECEIVED = "lastHeartbeatReceived";
     private int lastHeartbeatReceived;
     private String name;
+    public static final String ADDITIONAL_DATA = "additionalData";
+    private Map<String, Object> additionalData;
 
     public ModuleType getModuleType() {
         return moduleType;
@@ -61,6 +64,14 @@ public class ModuleInfo {
 
     public void setName(String name) {
         this.name = name;
+    }
+
+    public Map<String, Object> getAdditionalData() {
+        return additionalData;
+    }
+
+    public void setAdditionalData(Map<String, Object> additionalData) {
+        this.additionalData = additionalData;
     }
 
     public enum ModuleType {
