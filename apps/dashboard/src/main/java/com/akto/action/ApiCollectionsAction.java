@@ -1355,6 +1355,11 @@ public class ApiCollectionsAction extends UserAction {
     public String fetchMcpToolsApiCalls() {
         CONTEXT_SOURCE currentContextSource = Context.contextSource.get();
 
+        if(currentContextSource.equals(CONTEXT_SOURCE.API)) {
+            addActionError("Invalid dashboard category: " + currentContextSource.name());
+            return ERROR.toUpperCase();
+        }
+
         List<ApiInfo> mcpToolsList = ApiInfoDao.instance.findAll(
             Filters.eq(ApiInfo.ID_API_COLLECTION_ID, apiCollectionId),
             Projections.include(Constants.ID)
@@ -1399,11 +1404,9 @@ public class ApiCollectionsAction extends UserAction {
                     }
                 }
             }
-
-            Context.contextSource.set(currentContextSource);
-        } else {
-            Context.contextSource.set(currentContextSource);
         }
+
+        Context.contextSource.set(currentContextSource);
 
         if(this.response == null) {
             this.response = new BasicDBObject();
