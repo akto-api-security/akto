@@ -1,9 +1,10 @@
 import { Button, ButtonGroup, LegacyCard, Text, DataTable, VerticalStack } from "@shopify/polaris"
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import settingRequests from "../api";
 import func from "@/util/func";
 import LogsContainer from "./LogsContainer";
 import Dropdown from "../../../components/layouts/Dropdown"
+import SingleDate from "../../../components/layouts/SingleDate"
 import { saveAs } from 'file-saver'
 
 const Logs = () => {
@@ -17,6 +18,10 @@ const Logs = () => {
     })
     const [ loading, setLoading ] = useState(false)
     const [ moduleInfos, setModuleInfos ] = useState([])
+    const [ selectedDate, setSelectedDate ] = useState(new Date())
+    const [ selectedHour, setSelectedHour ] = useState(new Date().getHours())
+    const [ selectedMinutes, setSelectedMinutes ] = useState("5")
+    const [ currentWindowStartMs, setCurrentWindowStartMs ] = useState(null)
     const logGroupSelected = logs.logGroup !== ''
     const hasAccess = func.checkUserValidForIntegrations()
 
@@ -33,18 +38,19 @@ const Logs = () => {
        setLogs(previousState => ({ ...previousState, logData: [], logGroup: logGroup }))
     }
     
-    const fetchLogsFromDb = async (startTime, endTime, refresh = false) => {
-        if (logs.logGroup !== '') {
+    const fetchLogsFromDb = useCallback(async (startTime, endTime, refresh = false, group) => {
+        const activeGroup = group ?? logs.logGroup
+        if (activeGroup !== '') {
             setLoading(true)
             const logsResponse = await settingRequests.fetchLogsFromDb(
                 Math.floor(startTime / 1000), 
                 Math.floor(endTime  / 1000),
-                logs.logGroup
+                activeGroup
             )
             
             setLogs(previousState => (
                 {
-                    ...logs,
+                    ...previousState,
                     startTime: startTime,
                     endTime: endTime,
                     logData: refresh ? [...logsResponse.logs] : [...logsResponse.logs, ...previousState.logData]
@@ -52,7 +58,7 @@ const Logs = () => {
 
             setLoading(false)
         }
-    }
+    }, [logs.logGroup])
 
     const fetchModuleInfo = async () => {
         const response = await settingRequests.fetchModuleInfo();
@@ -66,7 +72,7 @@ const Logs = () => {
             fetchLogsFromDb(startTime, endTime)
             fetchModuleInfo()
         }
-    }, [logs.logGroup])
+    }, [logs.logGroup, hasAccess, fiveMins, fetchLogsFromDb])
 
    const exportLogsCsv = () => {
         let headers = ['timestamp', 'log'];
@@ -80,20 +86,70 @@ const Logs = () => {
         saveAs(blob, "log.csv");
    } 
 
-    const handleRefresh = () => {
-        const startTime = Date.now() - fiveMins;
-        const endTime = Date.now();
-        if(hasAccess){
-            fetchLogsFromDb(startTime, endTime, true)
+    // Removed old refresh controls; loading is handled via Load button with selected window
+
+    const minuteWindowOptions = useMemo(() => ([
+        { label: "+5 minutes", value: "5" },
+        { label: "+10 minutes", value: "10" },
+        { label: "+15 minutes", value: "15" }
+    ]), [])
+
+    const hourOptions = useMemo(() => Array.from({ length: 24 }, (_, h) => {
+        const pad = (n) => String(n).padStart(2, '0')
+        return { label: `${pad(h)}:00 - ${pad(h)}:59`, value: String(h) }
+    }), [])
+
+    const handleSelectHour = (value) => {
+        const hourNum = Number(value)
+        setSelectedHour(hourNum)
+        const date = selectedDate || new Date()
+        const { start } = getHourWindowRange(date, hourNum)
+        const stepMs = Number(selectedMinutes) * 60 * 1000
+        setCurrentWindowStartMs(start)
+        if (hasAccess) {
+            fetchLogsFromDb(start, start + stepMs, true)
             fetchModuleInfo()
         }
     }
 
-    const handlePreviousFiveMinutesLogs = () => {
-        const startTime = logs.startTime - fiveMins;
-        const endTime = logs.startTime;
-        if(hasAccess){
-            fetchLogsFromDb(startTime, endTime)
+    const singleDateDispatch = ({ obj }) => {
+        const newDate = obj && (obj.date || obj.End || obj.end)
+        if (newDate) {
+            setSelectedDate(newDate)
+            const hour = typeof selectedHour === 'number' ? selectedHour : new Date().getHours()
+            const { start } = getHourWindowRange(newDate, hour)
+            const stepMs = Number(selectedMinutes) * 60 * 1000
+            setCurrentWindowStartMs(start)
+            if (hasAccess) {
+                fetchLogsFromDb(start, start + stepMs, true)
+                fetchModuleInfo()
+            }
+        }
+    }
+
+    function getHourWindowRange(date, hour) {
+        const base = date ? new Date(date) : new Date()
+        const d = new Date(base.getFullYear(), base.getMonth(), base.getDate(), hour, 0, 0, 0)
+        const start = d.getTime()
+        const end = start + 60 * 60 * 1000
+        return { start, end }
+    }
+
+    // Reset current window tracker when date or hour changes
+    useEffect(() => {
+        setCurrentWindowStartMs(null)
+    }, [selectedDate, selectedHour])
+
+    const handleSelectMinuteWindow = (minutes) => {
+        setSelectedMinutes(String(minutes))
+        const date = selectedDate || new Date()
+        const hour = typeof selectedHour === 'number' ? selectedHour : new Date().getHours()
+        const { start } = getHourWindowRange(date, hour)
+        const windowEnd = start + Number(minutes) * 60 * 1000
+        setCurrentWindowStartMs(start)
+        if (hasAccess) {
+            fetchLogsFromDb(start, windowEnd, true)
+            fetchModuleInfo()
         }
     }
 
@@ -121,16 +177,54 @@ const Logs = () => {
                 </Text>
                 <br />
 
-                <div style={{ display: "grid", gridTemplateColumns: "auto max-content", gap: "10px"}}>
+                <div style={{ display: "grid", gridTemplateColumns: "auto max-content", gap: "10px", alignItems: "center"}}>
                     <Dropdown
                         menuItems={logGroupOptions}
                         initial="Dashboard"
                         selected={handleSelectLogGroup}
                         />
                     <ButtonGroup segmented>
-                        <Button onClick={handleRefresh} disabled={!logGroupSelected}>Refresh</Button>
-                        <Button onClick={handlePreviousFiveMinutesLogs} disabled={!logGroupSelected}>-5 minutes</Button>
+                        <Button onClick={() => {
+                            const date = selectedDate || new Date()
+                            const hour = typeof selectedHour === 'number' ? selectedHour : new Date().getHours()
+                            const { start: hourStart, end: hourEnd } = getHourWindowRange(date, hour)
+                            const stepMs = Number(selectedMinutes) * 60 * 1000
+                            const currStart = currentWindowStartMs == null ? hourStart : currentWindowStartMs
+                            let baseStart = currStart
+                            if (baseStart < hourStart || baseStart >= hourEnd) {
+                                baseStart = hourStart
+                            }
+                            let nextStart = baseStart + stepMs
+                            if (nextStart + stepMs > hourEnd) {
+                                nextStart = hourStart
+                            }
+                            const nextEnd = nextStart + stepMs
+                            setCurrentWindowStartMs(nextStart)
+                            if (hasAccess) {
+                                fetchLogsFromDb(nextStart, nextEnd, true)
+                                fetchModuleInfo()
+                            }
+                        }} disabled={loading || !logGroupSelected}>Refresh</Button>
+                        <Dropdown
+                            menuItems={minuteWindowOptions}
+                            initial={selectedMinutes}
+                            selected={handleSelectMinuteWindow}
+                        />
                     </ButtonGroup>
+                </div>
+
+                <div style={{ display: "grid", gridTemplateColumns: "1fr max-content", gap: "10px", alignItems: "center", marginTop: "10px"}}>
+                    <SingleDate
+                        dispatch={singleDateDispatch}
+                        data={selectedDate}
+                        dataKey={"date"}
+                        index={0}
+                    />
+                    <Dropdown
+                        menuItems={hourOptions}
+                        initial={String(selectedHour)}
+                        selected={handleSelectHour}
+                    />
                 </div>
               
                 <br />
