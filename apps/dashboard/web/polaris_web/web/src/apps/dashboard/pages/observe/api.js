@@ -967,6 +967,17 @@ export default {
             }
         })
         return resp
+    },
+
+    async fetchMcpToolsApiCalls(apiCollectionId) {
+        const resp = await request({
+            url: '/api/fetchMcpToolsApiCalls',
+            method: 'post',
+            data: {
+                apiCollectionId: apiCollectionId
+            }
+        })
+        return resp
     }
 
 }
