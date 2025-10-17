@@ -1,7 +1,7 @@
-import { Box, Button, HorizontalStack, Text, VerticalStack } from '@shopify/polaris'
+import { Box, Button, HorizontalStack, Text, VerticalStack, Icon } from '@shopify/polaris'
 import React, { useState } from 'react'
 import TooltipText from "../../../components/shared/TooltipText"
-import { DeleteMajor } from "@shopify/polaris-icons"
+import { DeleteMajor, ViewMinor, HideMinor } from "@shopify/polaris-icons"
 
 function ParamsCard({dataObj, handleDelete, showEdit}) {
     const [hideValues, setHideValues] = useState(true)
@@ -33,10 +33,13 @@ function ParamsCard({dataObj, handleDelete, showEdit}) {
                 {valuesList.map((param,index) => {
                     return(
                         <HorizontalStack blockAlign="start" gap={"4"} key={index}>
-                            <LineComponent title={(param.key || '-') + " :"} value={(hideValues ? '********' : (param.value || '-'))} />
-                            {param.showHeader !== null ? 
-                                <HorizontalStack blockAlign="start" gap={1}><Box borderInlineEndWidth='1' borderColor="border-subdued" minHeight='20px'/><LineComponent title={"Position :"} value={param.where}/></HorizontalStack>
-                            :null}
+                            <LineComponent title={(param.key || '-') + " :"} value={(param.value || '-')} />
+                            {param.showHeader !== null ? (
+                                <HorizontalStack blockAlign="start" gap={1}>
+                                    <Box borderInlineEndWidth='1' borderColor="border-subdued" minHeight='20px'/>
+                                    <LineComponent title={"Position :"} value={param.where}/>
+                                </HorizontalStack>
+                            ) : null}
                         </HorizontalStack>
                     )
                 })}
@@ -63,14 +66,23 @@ function ParamsCard({dataObj, handleDelete, showEdit}) {
                                     <Box maxWidth='200px'>
                                         <TooltipText tooltip={"Token values"} text={"Token values :"} textProps={{variant:"bodyMd", fontWeight: "medium"}} />
                                     </Box>
-                                    <Button size="slim" onClick={() => setHideValues(!hideValues)}>
-                                        {hideValues ? 'Show' : 'Hide'}
-                                    </Button>
+                                    <Box
+                                        role="button"
+                                        tabIndex={0}
+                                        aria-label={hideValues ? 'Show token values' : 'Hide token values'}
+                                        onClick={() => setHideValues(!hideValues)}
+                                        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setHideValues(!hideValues) } }}
+                                        style={{ cursor: 'pointer' }}
+                                    >
+                                        <Icon source={hideValues ? ViewMinor : HideMinor} />
+                                    </Box>
                                 </HorizontalStack>
                             </VerticalStack>
-                            <Box paddingInlineStart={4}>
-                                <ParamsList valuesList={authMechanism.authParams} />
-                            </Box>
+                            {!hideValues ? (
+                                <Box paddingInlineStart={4}>
+                                    <ParamsList valuesList={authMechanism.authParams} />
+                                </Box>
+                            ) : null}
                         </Box>
                     </VerticalStack>
 
