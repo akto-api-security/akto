@@ -547,7 +547,7 @@ public class Main {
                     syncImmediately,
                     centralKafkaTopicName);
                 AllMetrics.instance.setRuntimeProcessLatency(System.currentTimeMillis()-start);
-                loggerMaker.infoAndAddToDb("Processed " + responseParamsToAccountMap.size() + " accounts in " + (System.currentTimeMillis()-start) + " ms");
+                loggerMaker.infoAndAddToDb("Processed " + responseParamsToAccountMap.size() + " total records " + records.count() + " accounts in " + (System.currentTimeMillis()-start) + " ms");
             }
 
         } catch (WakeupException ignored) {
@@ -603,15 +603,14 @@ public class Main {
                     continue;
                 }
 
-                // if (DataActor.actualAccountId == 1759692400) {
-                //     String host = HttpCallParser.getHeaderValue(httpResponseParams.getRequestParams().getHeaders(), "host");
-                //     loggerMaker.infoAndAddToDb("HttpResponseparam received with url: "
-                //             + httpResponseParams.getRequestParams().getURL() + " host: " + (host != null ? host : "null")
-                //             + " payload: " + (r.value() != null ? r.value() : "null"));
-                // }
-
                 if (httpResponseParams.getRequestParams().getURL().contains("api/ingestData")) {
                     continue;
+                }
+
+                if (DataActor.actualAccountId == 1759692400) {
+                    String host = HttpCallParser.getHeaderValue(httpResponseParams.getRequestParams().getHeaders(), "host");
+                    loggerMaker.infoAndAddToDb("HttpResponseparam received with url: "
+                            + httpResponseParams.getRequestParams().getURL() + " host: " + (host != null ? host : "null"));
                 }
 
                 HttpRequestParams requestParams = httpResponseParams.getRequestParams();
