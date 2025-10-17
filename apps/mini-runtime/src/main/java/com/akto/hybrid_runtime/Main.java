@@ -288,7 +288,7 @@ public class Main {
         loggerMaker.infoAndAddToDb("Fetched account settings for account ");
 
         if (DataActor.actualAccountId == 1759692400) {
-            maxPollRecordsConfigTemp = 200;
+            maxPollRecordsConfigTemp = 5000;
         }
 
         int maxPollRecordsConfig = maxPollRecordsConfigTemp;
@@ -585,7 +585,11 @@ public class Main {
                     continue;
                 }
 
-                if (lastSyncOffset % 100 == 0) {
+                if (DataActor.actualAccountId != 1759692400 && lastSyncOffset % 100 == 0) {
+                    loggerMaker.infoAndAddToDb("Committing offset at position: " + lastSyncOffset);
+                }
+
+                if (DataActor.actualAccountId == 1759692400 && lastSyncOffset % 1000 == 0) {
                     loggerMaker.infoAndAddToDb("Committing offset at position: " + lastSyncOffset);
                 }
 
