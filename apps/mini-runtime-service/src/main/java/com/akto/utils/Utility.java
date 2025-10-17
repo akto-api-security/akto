@@ -64,8 +64,9 @@ public class Utility {
 
         // JSON string of K8 POD tags
         String tags = payloadData.getTag() != null ? payloadData.getTag() : "";
+        List<String> parentMcpToolNames = payloadData.getParentMcpToolNames() != null ? payloadData.getParentMcpToolNames() : new ArrayList<>();
         HttpResponseParams httpResponseParams = new HttpResponseParams(
-                type,statusCode, status, responseHeaders, payload, requestParams, time, accountId, isPending, source, mapper.writeValueAsString(payloadData), sourceIP, destIP, direction, tags
+                type,statusCode, status, responseHeaders, payload, requestParams, time, accountId, isPending, source, mapper.writeValueAsString(payloadData), sourceIP, destIP, direction, tags, parentMcpToolNames
         );
         if(!tags.isEmpty()){
             String tagLog = "K8 Pod Tags: " + tags + " Host: " + requestHeaders.getOrDefault("host", new ArrayList<>()) + " Url: " + url;

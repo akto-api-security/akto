@@ -210,6 +210,8 @@ public class AktoPolicyNew {
 
         apiInfo.setLastSeen(httpResponseParams.getTimeOrNow());
 
+        apiInfo.setParentMcpToolNames(httpResponseParams.getParentMcpToolNames());
+
     }
 
     public PolicyCatalog getApiInfoFromMap(ApiInfo.ApiInfoKey apiInfoKey) {
