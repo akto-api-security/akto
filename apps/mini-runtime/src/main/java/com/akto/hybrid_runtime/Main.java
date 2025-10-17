@@ -599,12 +599,12 @@ public class Main {
                     continue;
                 }
 
-                if (DataActor.actualAccountId == 1759692400) {
-                    String host = HttpCallParser.getHeaderValue(httpResponseParams.getRequestParams().getHeaders(), "host");
-                    loggerMaker.infoAndAddToDb("HttpResponseparam received with url: "
-                            + httpResponseParams.getRequestParams().getURL() + " host: " + (host != null ? host : "null")
-                            + " payload: " + (r.value() != null ? r.value() : "null"));
-                }
+                // if (DataActor.actualAccountId == 1759692400) {
+                //     String host = HttpCallParser.getHeaderValue(httpResponseParams.getRequestParams().getHeaders(), "host");
+                //     loggerMaker.infoAndAddToDb("HttpResponseparam received with url: "
+                //             + httpResponseParams.getRequestParams().getURL() + " host: " + (host != null ? host : "null")
+                //             + " payload: " + (r.value() != null ? r.value() : "null"));
+                // }
 
                 if (httpResponseParams.getRequestParams().getURL().contains("api/ingestData")) {
                     continue;
@@ -612,12 +612,12 @@ public class Main {
 
                 HttpRequestParams requestParams = httpResponseParams.getRequestParams();
                 String debugHost = Utils.printDebugHostLog(httpResponseParams);
-                if (debugHost != null) {
-                    loggerMaker.infoAndAddToDb("Found debug host: " + debugHost + " in url: " + requestParams.getMethod() + " " + requestParams.getURL());
-                }
-                if (Utils.printDebugUrlLog(requestParams.getURL())) {
-                    loggerMaker.infoAndAddToDb("Found debug url: " + requestParams.getURL());
-                }
+                // if (debugHost != null) {
+                //     loggerMaker.infoAndAddToDb("Found debug host: " + debugHost + " in url: " + requestParams.getMethod() + " " + requestParams.getURL());
+                // }
+                // if (Utils.printDebugUrlLog(requestParams.getURL())) {
+                //     loggerMaker.infoAndAddToDb("Found debug url: " + requestParams.getURL());
+                // }
             } catch (Exception e) {
                 loggerMaker.errorAndAddToDb(e, "Error while parsing kafka message: " + r.value() + e);
                 continue;
@@ -701,7 +701,7 @@ public class Main {
                 List<HttpResponseParams> accWiseResponse = responseParamsToAccountMap.get(accountId);
 
                 // send to protobuf kafka topic (separate from central kafka)
-                loggerMaker.infoAndAddToDb("Sending " + accWiseResponse.size() +" records to protobuf kafka topic");
+                //loggerMaker.infoAndAddToDb("Sending " + accWiseResponse.size() +" records to protobuf kafka topic");
                 for (HttpResponseParams httpResponseParams: accWiseResponse) {
                     try {
                         sendToProtobufKafka(httpResponseParams);
@@ -960,11 +960,11 @@ public class Main {
                 if (exception != null) {
                     loggerMaker.errorAndAddToDb(exception, "Error sending protobuf message to kafka: " + exception.getMessage());
                 } else {
-                    loggerMaker.errorAndAddToDb("Successfully sent protobuf message to akto.api.logs2 topic with offset: " + metadata.offset());
+                    //loggerMaker.errorAndAddToDb("Successfully sent protobuf message to akto.api.logs2 topic with offset: " + metadata.offset());
                 }
             });
 
-            loggerMaker.errorAndAddToDb("Finished sending data ");       
+            //loggerMaker.errorAndAddToDb("Finished sending data ");       
             
         } catch (Exception e) {
             loggerMaker.errorAndAddToDb(e, "Error converting HttpResponseParams to protobuf: " + e.getMessage());
