@@ -31,20 +31,20 @@ public class IngestionAction extends ActionSupport {
         }
 
 
-        // for (IngestDataBatch batch : batchData) {
-        //     String requestHeaders = batch.getRequestHeaders();
-        //     if (requestHeaders != null) {
-        //         String lowerHeaders = requestHeaders.toLowerCase();
-        //         if (lowerHeaders.contains("\"host\":") || lowerHeaders.contains("\"host \":")) {
-        //             if (lowerHeaders.contains("hollywoodbets") ||
-        //                 lowerHeaders.contains("betsolutions") ||
-        //                 lowerHeaders.contains("betnix") ||
-        //                 lowerHeaders.contains("betsoft")) {
-        //                 return true;
-        //             }
-        //         }
-        //     }
-        // }
+        for (IngestDataBatch batch : batchData) {
+            String requestHeaders = batch.getRequestHeaders();
+            if (requestHeaders != null) {
+                String lowerHeaders = requestHeaders.toLowerCase();
+                if (lowerHeaders.contains("\"host\":") || lowerHeaders.contains("\"host \":")) {
+                    if (lowerHeaders.contains("hollywoodbets") ||
+                        lowerHeaders.contains("betsolutions") ||
+                        lowerHeaders.contains("betnix") ||
+                        lowerHeaders.contains("betsoft")) {
+                        return true;
+                    }
+                }
+            }
+        }
 
         return true;
     }
@@ -80,11 +80,11 @@ public class IngestionAction extends ActionSupport {
     public static void printLogs(String msg) {
         MAX_INFO_PRINT--;
         if(MAX_INFO_PRINT > 0) {
-            loggerMaker.warnAndAddToDb(msg);
+            loggerMaker.sendImpWarnAndAddToDb(msg);
         }
 
         if(MAX_INFO_PRINT == 0) {
-            loggerMaker.warnAndAddToDb("Debug log print limit reached.");
+            loggerMaker.sendImpWarnAndAddToDb("Debug log print limit reached.");
         }
     }
 
