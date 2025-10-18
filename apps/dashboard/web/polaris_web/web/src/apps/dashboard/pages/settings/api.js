@@ -613,11 +613,11 @@ const settingRequests = {
             data: {email}
         })
     },
-    async fetchModuleInfo() {
+    async fetchModuleInfo(filter = {}) {
         return await request({
             url: '/api/fetchModuleInfo',
             method: 'post',
-            data: {}
+            data: { filter }
         })
     },
     async fetchCloudflareWafIntegration() {

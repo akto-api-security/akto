@@ -188,11 +188,11 @@ function EndpointShieldMetadata() {
     // Fetch module info from API
     const fetchModuleInfo = useCallback(async () => {
         try {
-            const response = await settingRequests.fetchModuleInfo();
-            const moduleInfos = response.moduleInfos || [];
-
-            // Filter for MCP Endpoint Shield modules
-            const endpointShieldModules = moduleInfos.filter(m => m.moduleType === MODULE_TYPE.MCP_ENDPOINT_SHIELD);
+            // Fetch only MCP Endpoint Shield modules using filter
+            const response = await settingRequests.fetchModuleInfo({
+                moduleType: MODULE_TYPE.MCP_ENDPOINT_SHIELD
+            });
+            const endpointShieldModules = response.moduleInfos || [];
 
             // Get domain once for all agents
             const domain = await fetchAccountDomain();
