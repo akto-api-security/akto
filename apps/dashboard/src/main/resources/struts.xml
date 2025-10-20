@@ -563,6 +563,15 @@
             </result>
         </action>
 
+        <action name="okta-initiate-login" class="com.akto.action.SignupAction" method="oktaInitiateLogin">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <result name="SUCCESS"   type="json"/>
+            <result name="ERROR" type="json">
+                <param name="root">code</param>
+            </result>
+        </action>
+
         <action name="signup-azure-saml" class="com.akto.action.SignupAction" method="registerViaAzure">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />

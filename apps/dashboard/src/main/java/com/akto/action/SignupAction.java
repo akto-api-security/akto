@@ -73,6 +73,7 @@ import lombok.Setter;
 import java.io.IOException;
 import java.security.interfaces.RSAPublicKey;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -694,6 +695,83 @@ public class SignupAction implements Action, ServletResponseAware, ServletReques
 
         String authorisationUrl = OktaLogin.getAuthorisationUrl(emailId, this.signupEmailId, this.signupInvitationCode);
         servletResponse.sendRedirect(authorisationUrl);
+        return SUCCESS.toUpperCase();
+    }
+
+    public String oktaInitiateLogin() throws IOException {
+        logger.debug("Okta-initiated login flow started");
+
+        Config.OktaConfig oktaConfig = null;
+        int accountId = -1;
+
+        String queryString = servletRequest.getQueryString();
+        String accountIdParam = null;
+        if(queryString != null && !queryString.isEmpty()) {
+            accountIdParam = Util.getValueFromQueryString(queryString, "accountId");
+        }
+
+        if(accountIdParam != null && !accountIdParam.isEmpty()) {
+            try {
+                accountId = Integer.parseInt(accountIdParam);
+                logger.debug("Using accountId from query parameter: " + accountId);
+            } catch (NumberFormatException e) {
+                logger.error("Invalid accountId in query parameter: " + accountIdParam);
+            }
+        }
+
+        oktaConfig = Config.getOktaConfig(accountId);
+
+        if(oktaConfig == null && DashboardMode.isOnPremDeployment()) {
+            logger.debug("Trying OktaLogin.getInstance() for on-prem deployment");
+            Context.accountId.set(1_000_000);
+            OktaLogin oktaLoginInstance = OktaLogin.getInstance();
+            if(oktaLoginInstance != null) {
+                oktaConfig = oktaLoginInstance.getOktaConfig();
+            }
+        }
+
+        if(oktaConfig == null) {
+            logger.error("No Okta configuration found, redirecting to SSO login page");
+            servletResponse.sendRedirect(SSO_URL);
+            return ERROR.toUpperCase();
+        }
+
+        logger.debug("Okta config found - ClientId: " + oktaConfig.getClientId() +
+                    ", Domain: " + oktaConfig.getOktaDomainUrl() +
+                    ", RedirectUri: " + oktaConfig.getRedirectUri() +
+                    ", AuthServerId: " + oktaConfig.getAuthorisationServerId());
+
+        Map<String, String> paramMap = new HashMap<>();
+        paramMap.put("client_id", oktaConfig.getClientId());
+        paramMap.put("redirect_uri", oktaConfig.getRedirectUri());
+        paramMap.put("response_type", "code");
+        paramMap.put("scope", "openid%20email%20profile");
+
+        String stateParam;
+        if(DashboardMode.isOnPremDeployment()) {
+            stateParam = String.valueOf(accountId);
+            logger.debug("Using plain state for on-prem: " + stateParam);
+        } else {
+            BasicDBObject stateObj = new BasicDBObject("accountId", String.valueOf(accountId));
+            String stateJson = stateObj.toJson();
+            stateParam = java.util.Base64.getEncoder().encodeToString(stateJson.getBytes());
+            logger.debug("Using Base64-encoded JSON state for SaaS: " + stateJson);
+        }
+        paramMap.put("state", stateParam);
+        // Add nonce for added security (some Okta policies require this)
+        paramMap.put("nonce", UUID.randomUUID().toString());
+
+        String queryStringParams = SsoUtils.getQueryString(paramMap);
+
+        String authUrl = "https://" + oktaConfig.getOktaDomainUrl() + "/oauth2/";
+        if(oktaConfig.getAuthorisationServerId() != null && !oktaConfig.getAuthorisationServerId().isEmpty()) {
+            authUrl += oktaConfig.getAuthorisationServerId() + "/";
+        }
+        authUrl += "v1/authorize?" + queryStringParams;
+
+        logger.debug("Final authorization URL: " + authUrl);
+        logger.debug("Redirecting to Okta authorization URL for accountId: " + accountId);
+        servletResponse.sendRedirect(authUrl);
         return SUCCESS.toUpperCase();
     }
 
