@@ -1,8 +1,6 @@
 package com.akto.threat.backend.service;
 
-import com.akto.dao.MCollection;
 import com.akto.dto.HttpResponseParams;
-import com.akto.dto.billing.Organization;
 import com.akto.dto.threat_detection_backend.MaliciousEventDto;
 import com.akto.log.LoggerMaker;
 import com.akto.proto.generated.threat_detection.message.sample_request.v1.Metadata;
@@ -329,12 +327,12 @@ public class ThreatActorService {
             }
         }
 
-        // Calculate summary counts using direct MongoDB queries
+        // Calculate summary counts using MaliciousEventDao
         // Total analysed - count all documents matching the filter
-        long totalAnalysed = coll.countDocuments(matchConditions);
+        long totalAnalysed = maliciousEventDao.getCollection(accountId).countDocuments(matchConditions);
 
         // Total attacks - count documents with successfulExploit = true
-        long totalAttacks = coll.countDocuments(new Document(matchConditions).append("successfulExploit", true));
+        long totalAttacks = maliciousEventDao.getCollection(accountId).countDocuments(new Document(matchConditions).append("successfulExploit", true));
 
         int criticalActorsCount = 0;
         for (DailyActorsCountResponse.ActorsCount ac : actors) {
@@ -351,7 +349,7 @@ public class ThreatActorService {
         int totalActive = 0;
         int totalIgnored = 0;
         int totalUnderReview = 0;
-        try (MongoCursor<Document> cursor = coll.aggregate(statusPipeline).cursor()) {
+        try (MongoCursor<Document> cursor = maliciousEventDao.aggregateRaw(accountId, statusPipeline).cursor()) {
             while (cursor.hasNext()) {
                 Document d = cursor.next();
                 String status = d.getString("_id");
@@ -637,10 +635,6 @@ public class ThreatActorService {
   public FetchTopNDataResponse fetchTopNData(
       String accountId, long startTs, long endTs, List<String> latestAttackList, int limit) {
 
-    MongoCollection<Document> coll = this.mongoClient
-        .getDatabase(accountId)
-        .getCollection(MongoDBCollection.ThreatDetection.MALICIOUS_EVENTS, Document.class);
-
     List<Document> pipeline = new ArrayList<>();
 
     // Match stage
@@ -694,7 +688,7 @@ public class ThreatActorService {
 
     List<FetchTopNDataResponse.TopApiData> topApis = new ArrayList<>();
 
-    try (MongoCursor<Document> cursor = coll.aggregate(pipeline).cursor()) {
+    try (MongoCursor<Document> cursor = maliciousEventDao.aggregateRaw(accountId, pipeline).cursor()) {
       while (cursor.hasNext()) {
         Document doc = cursor.next();
         topApis.add(
