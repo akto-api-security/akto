@@ -12,9 +12,7 @@ import PageWithMultipleCards from "../../components/layouts/PageWithMultipleCard
 import GithubServerTable from "../../components/tables/GithubServerTable";
 import GithubSimpleTable from "../../components/tables/GithubSimpleTable";
 import { CellType } from "../../components/tables/rows/GithubRow";
-import { getMcpServersByAgent, getAgentLogs } from "./dummyData";
-import EndpointShieldMetadataDemo from "./EndpointShieldMetadataDemo";
-import settingRequests from "../settings/api";
+import { getMcpEndpointShieldData, getMcpServersByAgent, getAgentLogs } from "./dummyData";
 import PersistStore from "../../../main/PersistStore";
 import { mapLabel } from "../../../main/labelHelper";
 import FlyLayout from "../../components/layouts/FlyLayout";
@@ -77,9 +75,6 @@ const resourceName = {
 };
 
 // Constants for better maintainability
-const MODULE_TYPE = {
-    MCP_ENDPOINT_SHIELD: 'MCP_ENDPOINT_SHIELD'
-};
 const LOG_STREAMING_DELAY_MS = 500;
 const ANIMATION_DURATION = 0.2;
 const LOG_LEVEL_TONES = {
@@ -90,7 +85,6 @@ const LOG_LEVEL_TONES = {
 const ICON_SIZE = { maxWidth: "1rem", maxHeight: "1rem" };
 const LOG_TIMESTAMP_WIDTH = "180px";
 const LOG_LEVEL_WIDTH = "60px";
-const DEFAULT_VALUE = '-';
 
 const convertDataIntoTableFormat = (agentData) => {
     return {
@@ -100,25 +94,22 @@ const convertDataIntoTableFormat = (agentData) => {
     };
 }
 
-// Reusable component for rendering metadata fields with icon and tooltip
-const MetadataField = ({ icon, tooltip, value }) => {
-    if (!value || value === DEFAULT_VALUE) {
-        return null;
-    }
+// Use fixed dummy data from external file
+const generateDummyData = () => getMcpEndpointShieldData();
 
-    return (
-        <HorizontalStack wrap={false} gap="1">
-            <div style={ICON_SIZE}>
-                <Tooltip content={tooltip} dismissOnMouseOut>
-                    <Icon source={icon} color="subdued" />
-                </Tooltip>
-            </div>
-            <Text variant="bodySm" color="subdued">
-                {value}
-            </Text>
-        </HorizontalStack>
-    );
-};
+// Reusable component for rendering metadata fields with icon and tooltip
+const MetadataField = ({ icon, tooltip, value }) => (
+    <HorizontalStack wrap={false} gap="1">
+        <div style={ICON_SIZE}>
+            <Tooltip content={tooltip} dismissOnMouseOut>
+                <Icon source={icon} color="subdued" />
+            </Tooltip>
+        </div>
+        <Text variant="bodySm" color="subdued">
+            {value}
+        </Text>
+    </HorizontalStack>
+);
 
 // Metadata fields configuration
 const getMetadataFields = (agent) => [
@@ -129,14 +120,7 @@ const getMetadataFields = (agent) => [
     { icon: CalendarMinor, tooltip: "Last Deployed", value: func.prettifyEpoch(agent.lastDeployed) }
 ];
 
-function EndpointShieldMetadata() {
-    const isDemoAccount = func.isDemoAccount();
-
-    // Show demo version for demo accounts
-    if (isDemoAccount) {
-        return <EndpointShieldMetadataDemo />;
-    }
-
+function EndpointShieldMetadataDemo() {
     const navigate = useNavigate();
     const [loading, setLoading] = useState(false);
     const [currDateRange, dispatchCurrDateRange] = useReducer(produce((draft, action) => func.dateRangeReducer(draft, action)), values.ranges[5]);
@@ -151,8 +135,6 @@ function EndpointShieldMetadata() {
     const [description, setDescription] = useState("");
     const [isEditingDescription, setIsEditingDescription] = useState(false);
     const [editableDescription, setEditableDescription] = useState("");
-    const [endpointShieldData, setEndpointShieldData] = useState(null);
-    const [accountDomain, setAccountDomain] = useState(null);
     const copyRef = useRef(null);
 
     const getTimeEpoch = (key) => {
@@ -166,79 +148,6 @@ function EndpointShieldMetadata() {
         return func.convertToDisambiguateLabelObj(value, null, 2)
     }
 
-    // Fetch account domain from team data (once)
-    const fetchAccountDomain = useCallback(async () => {
-        if (accountDomain !== null) return accountDomain; // Already fetched
-
-        try {
-            const teamDataResp = await settingRequests.getTeamData();
-            // The response is an array directly, not an object with users property
-            const users = Array.isArray(teamDataResp) ? teamDataResp : [];
-
-            // Extract domain from the first email that has one
-            for (const user of users) {
-                if (user.login && user.login.includes('@')) {
-                    const emailParts = user.login.split('@');
-                    if (emailParts.length === 2 && emailParts[1]) {
-                        setAccountDomain(emailParts[1]);
-                        return emailParts[1];
-                    }
-                }
-            }
-        } catch (err) {
-            console.warn("Could not fetch team data for domain:", err);
-        }
-
-        setAccountDomain(DEFAULT_VALUE); // Fallback to '-' if no domain found
-        return DEFAULT_VALUE;
-    }, [accountDomain]);
-
-    // Fetch module info from API
-    const fetchModuleInfo = useCallback(async () => {
-        try {
-            // Fetch only MCP Endpoint Shield modules using filter
-            const response = await settingRequests.fetchModuleInfo({
-                moduleType: MODULE_TYPE.MCP_ENDPOINT_SHIELD
-            });
-            const endpointShieldModules = response.moduleInfos || [];
-
-            // Get domain once for all agents
-            const domain = await fetchAccountDomain();
-
-            // Transform module data to match the expected format
-            const agents = endpointShieldModules.map(module => {
-                const username = module.additionalData?.username || DEFAULT_VALUE;
-                let email = module.additionalData?.email;
-
-                // If email is not present, construct it from username and domain
-                if (!email && username !== DEFAULT_VALUE && domain !== DEFAULT_VALUE) {
-                    email = `${username}@${domain}`;
-                } else if (!email) {
-                    email = DEFAULT_VALUE;
-                }
-
-                return {
-                    agentId: module.id,
-                    deviceId: module.name,
-                    username,
-                    email,
-                    lastHeartbeat: module.lastHeartbeatReceived || 0,
-                    lastDeployed: module.startedTs || 0,
-                    // Store full module data for flyout details
-                    _moduleData: module
-                };
-            });
-
-            setEndpointShieldData({ agents });
-        } catch (error) {
-            console.error("Error fetching module info:", error);
-        }
-    }, [fetchAccountDomain]);
-
-    useEffect(() => {
-        fetchModuleInfo();
-    }, [fetchModuleInfo]);
-
     // Save description for the selected agent
     const handleSaveDescription = useCallback(() => {
         setDescription(editableDescription);
@@ -249,14 +158,11 @@ function EndpointShieldMetadata() {
     // Handle agent row click to open flyout with details
     const handleRowClick = useCallback((agent) => {
         setSelectedAgent(agent);
-
-        // Get MCP servers and logs from dummy data
-        const serversData = getMcpServersByAgent(agent.agentId, agent.deviceId);
-        const logsData = getAgentLogs(agent.agentId);
-
-        setMcpServers(serversData);
+        const servers = getMcpServersByAgent(agent.agentId, agent.deviceId);
+        const logs = getAgentLogs(agent.agentId);
+        setMcpServers(servers);
         // Reverse logs array so oldest appears first in the UI
-        const reversedLogs = [...logsData].reverse();
+        const reversedLogs = [...logs].reverse();
         setAgentLogs(reversedLogs);
         setDisplayedLogs([]);
         setDescription("");
@@ -442,17 +348,17 @@ function EndpointShieldMetadata() {
         panelID: 'agent-logs-panel',
     };
 
-    const fetchData = useCallback(async (sortKey, sortOrder, skip, limit, filters, _filterOperators, queryValue) => {
+    async function fetchData(sortKey, sortOrder, skip, limit, filters, filterOperators, queryValue){
         setLoading(true);
-        let ret = [];
+        let ret = []
         let total = 0;
 
         try {
-            // Get agents data from fetched module info
-            const agentsData = endpointShieldData?.agents || [];
+            // Generate dummy data
+            const allDummyData = generateDummyData();
 
             // Apply filters
-            const filteredData = agentsData.filter(agent => {
+            let filteredData = allDummyData.filter(agent => {
                 // Date range filter
                 if (agent.lastHeartbeat < startTimestamp || agent.lastHeartbeat > endTimestamp) {
                     return false;
@@ -472,10 +378,10 @@ function EndpointShieldMetadata() {
                 if (queryValue) {
                     const searchLower = queryValue.toLowerCase();
                     const matchesSearch =
-                        agent.agentId?.toLowerCase().includes(searchLower) ||
-                        agent.deviceId?.toLowerCase().includes(searchLower) ||
-                        agent.username?.toLowerCase().includes(searchLower) ||
-                        agent.email?.toLowerCase().includes(searchLower);
+                        agent.agentId.toLowerCase().includes(searchLower) ||
+                        agent.deviceId.toLowerCase().includes(searchLower) ||
+                        agent.username.toLowerCase().includes(searchLower) ||
+                        agent.email.toLowerCase().includes(searchLower);
                     if (!matchesSearch) return false;
                 }
 
@@ -493,9 +399,11 @@ function EndpointShieldMetadata() {
                         bVal = bVal.toLowerCase();
                     }
 
-                    return sortOrder === 'asc'
-                        ? (aVal > bVal ? 1 : -1)
-                        : (aVal < bVal ? 1 : -1);
+                    if (sortOrder === 'asc') {
+                        return aVal > bVal ? 1 : -1;
+                    } else {
+                        return aVal < bVal ? 1 : -1;
+                    }
                 });
             }
 
@@ -507,25 +415,22 @@ function EndpointShieldMetadata() {
             ret = paginatedData.map(agent => convertDataIntoTableFormat(agent));
 
         } catch (error) {
-            console.error("Error fetching MCP Endpoint Shield metadata:", error);
-        } finally {
-            setLoading(false);
+            console.error("Error fetching MCP Endpoint Shield metadata:", error)
         }
 
-        return { value: ret, total };
-    }, [endpointShieldData, startTimestamp, endTimestamp]);
+        setLoading(false);
+        return {value: ret, total: total};
+    }
 
     useEffect(() => {
-        // Populate filter choices with unique values from fetched data
-        if (endpointShieldData?.agents) {
-            const agentsData = endpointShieldData.agents;
-            const uniqueUsernames = [...new Set(agentsData.map(a => a.username).filter(Boolean))];
-            const uniqueEmails = [...new Set(agentsData.map(a => a.email).filter(Boolean))];
+        // Populate filter choices with unique values from dummy data
+        const dummyData = generateDummyData();
+        const uniqueUsernames = [...new Set(dummyData.map(a => a.username))];
+        const uniqueEmails = [...new Set(dummyData.map(a => a.email))];
 
-            filters[0].choices = uniqueUsernames.map(username => ({ label: username, value: username }));
-            filters[1].choices = uniqueEmails.map(email => ({ label: email, value: email }));
-        }
-    }, [endpointShieldData])
+        filters[0].choices = uniqueUsernames.map(username => ({ label: username, value: username }));
+        filters[1].choices = uniqueEmails.map(email => ({ label: email, value: email }));
+    }, [])
 
     const primaryActions = (
         <HorizontalStack gap={"2"}>
@@ -553,7 +458,7 @@ function EndpointShieldMetadata() {
                 primaryAction={primaryActions}
                 components = {[
                     <GithubServerTable
-                        key={startTimestamp + endTimestamp + (endpointShieldData ? "loaded" : "loading")}
+                        key={startTimestamp + endTimestamp}
                         headers={headings}
                         resourceName={resourceName}
                         appliedFilters={[]}
@@ -641,4 +546,4 @@ function EndpointShieldMetadata() {
     )
 }
 
-export default EndpointShieldMetadata
+export default EndpointShieldMetadataDemo
