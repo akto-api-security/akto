@@ -83,7 +83,7 @@ import java.util.regex.Pattern;
 
 public class DbAction extends ActionSupport {
     static final ScheduledExecutorService service = Executors.newSingleThreadScheduledExecutor();
-    private static final Set<String> IGNORED_SUB_TYPES_FOR_ACCOUNT_1736798101 = new HashSet<>(Arrays.asList(
+    private static final Set<String> IGNORED_SUB_TYPES = new HashSet<>(Arrays.asList(
         "GENERIC", "FLOAT", "NULL", "INTEGER_32", "FALSE", "TRUE", "INTEGER_64", "UUID", "DICT"
     ));
     long count;
@@ -612,7 +612,7 @@ public class DbAction extends ActionSupport {
 
                         // Filter for account 1736798101: ignore updates with isHeader=false and specific subTypes
                         if (accId == 1736798101 && isHeader != null && !isHeader && subType != null) {
-                            if (IGNORED_SUB_TYPES_FOR_ACCOUNT_1736798101.contains(subType.toUpperCase())) {
+                            if (IGNORED_SUB_TYPES.contains(subType.toUpperCase())) {
                                 ignore = true;
                             }
                         }
@@ -699,7 +699,7 @@ public class DbAction extends ActionSupport {
 
                     // Filter for account 1736798101: ignore updates with isHeader=false and specific subTypes
                     if (accId == 1736798101 && !isHeader && subType != null) {
-                        if (IGNORED_SUB_TYPES_FOR_ACCOUNT_1736798101.contains(subType.toUpperCase())) {
+                        if (IGNORED_SUB_TYPES.contains(subType.toUpperCase())) {
                             ignore = true;
                         }
                     }
