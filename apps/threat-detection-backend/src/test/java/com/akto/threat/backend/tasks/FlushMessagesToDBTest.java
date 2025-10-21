@@ -1,12 +1,12 @@
 package com.akto.threat.backend.tasks;
 
+import com.akto.dto.threat_detection_backend.MaliciousEventDto;
 import com.akto.kafka.KafkaConfig;
 import com.akto.threat.backend.cache.IgnoredEventCache;
 import com.akto.threat.backend.constants.MongoDBCollection;
 import com.akto.threat.backend.db.AggregateSampleMaliciousEventModel;
 import com.akto.kafka.KafkaConsumerConfig;
 import com.akto.kafka.Serializer;
-import com.akto.threat.backend.db.MaliciousEventModel;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.Gson;
 import com.mongodb.client.MongoClient;
@@ -43,10 +43,10 @@ public class FlushMessagesToDBTest {
     private MongoDatabase mongoDatabase;
 
     @Mock
-    private MongoCollection<MaliciousEventModel> maliciousEventCollection;
+    private MongoCollection<MaliciousEventDto> maliciousEventCollection;
 
     @Mock
-    private MongoCollection<AggregateSampleMaliciousEventModel> aggregateEventCollection;
+    private MongoCollection<MaliciousEventDto> aggregateEventCollection;
 
     @Mock
     private KafkaConsumer<String, String> kafkaConsumer;
@@ -72,9 +72,9 @@ public class FlushMessagesToDBTest {
 
         // Setup MongoDB mocks
         when(mongoClient.getDatabase(anyString())).thenReturn(mongoDatabase);
-        when(mongoDatabase.getCollection(eq(MongoDBCollection.ThreatDetection.MALICIOUS_EVENTS), eq(MaliciousEventModel.class)))
+        when(mongoDatabase.getCollection(eq(MongoDBCollection.ThreatDetection.MALICIOUS_EVENTS), eq(MaliciousEventDto.class)))
             .thenReturn(maliciousEventCollection);
-        when(mongoDatabase.getCollection(eq(MongoDBCollection.ThreatDetection.AGGREGATE_SAMPLE_MALICIOUS_REQUESTS), eq(AggregateSampleMaliciousEventModel.class)))
+        when(mongoDatabase.getCollection(eq(MongoDBCollection.ThreatDetection.AGGREGATE_SAMPLE_MALICIOUS_REQUESTS), eq(MaliciousEventDto.class)))
             .thenReturn(aggregateEventCollection);
     }
 
@@ -92,9 +92,9 @@ public class FlushMessagesToDBTest {
     @Test
     public void testProcessMaliciousEvent_IgnoredInCache_SkipsInsertion() throws Exception {
         String accountId = "1000";
-        MaliciousEventModel.Status status = MaliciousEventModel.Status.ACTIVE;
+        MaliciousEventDto.Status status = MaliciousEventDto.Status.ACTIVE;
 
-        MaliciousEventModel event = MaliciousEventModel.newBuilder()
+        MaliciousEventDto event = MaliciousEventDto.newBuilder()
             .setLatestApiEndpoint("/api/test")
             .setFilterId("filter-1")
             .setStatus(status)
@@ -123,16 +123,16 @@ public class FlushMessagesToDBTest {
             writeMessage.invoke(instance, jsonMessage);
 
             // Verify that insertOne was NOT called since event is ignored
-            verify(maliciousEventCollection, never()).insertOne(any(MaliciousEventModel.class));
+            verify(maliciousEventCollection, never()).insertOne(any(MaliciousEventDto.class));
         }
     }
 
     @Test
     public void testProcessMaliciousEvent_NotIgnored_InsertsEvent() throws Exception {
         String accountId = "1000";
-        MaliciousEventModel.Status status = MaliciousEventModel.Status.ACTIVE;
+        MaliciousEventDto.Status status = MaliciousEventDto.Status.ACTIVE;
 
-        MaliciousEventModel event = MaliciousEventModel.newBuilder()
+        MaliciousEventDto event = MaliciousEventDto.newBuilder()
             .setLatestApiEndpoint("/api/test2")
             .setFilterId("filter-2")
             .setStatus(status)
@@ -160,10 +160,10 @@ public class FlushMessagesToDBTest {
             writeMessage.invoke(instance, jsonMessage);
 
             // Verify that insertOne was called since event is not ignored
-            ArgumentCaptor<MaliciousEventModel> captor = ArgumentCaptor.forClass(MaliciousEventModel.class);
+            ArgumentCaptor<MaliciousEventDto> captor = ArgumentCaptor.forClass(MaliciousEventDto.class);
             verify(maliciousEventCollection, times(1)).insertOne(captor.capture());
 
-            MaliciousEventModel insertedEvent = captor.getValue();
+            MaliciousEventDto insertedEvent = captor.getValue();
             assertEquals(event.getId(), insertedEvent.getId());
             assertEquals(event.getLatestApiEndpoint(), insertedEvent.getLatestApiEndpoint());
             assertEquals(event.getFilterId(), insertedEvent.getFilterId());
@@ -258,10 +258,10 @@ public class FlushMessagesToDBTest {
         List<ConsumerRecord<String, String>> recordsList = new ArrayList<>();
 
         for (int i = 0; i < 3; i++) {
-            MaliciousEventModel event = MaliciousEventModel.newBuilder()
+            MaliciousEventDto event = MaliciousEventDto.newBuilder()
                 .setLatestApiEndpoint("/api/test" + i)
                 .setFilterId("filter-" + i)
-                .setStatus(MaliciousEventModel.Status.ACTIVE)
+                .setStatus(MaliciousEventDto.Status.ACTIVE)
                 .setDetectedAt(System.currentTimeMillis())
                 .build();
             event.setId("event-" + i);
@@ -296,7 +296,7 @@ public class FlushMessagesToDBTest {
             processRecords.invoke(instance, records);
 
             // Verify that insertOne was called 3 times
-            verify(maliciousEventCollection, times(3)).insertOne(any(MaliciousEventModel.class));
+            verify(maliciousEventCollection, times(3)).insertOne(any(MaliciousEventDto.class));
         }
     }
 
@@ -329,10 +329,10 @@ public class FlushMessagesToDBTest {
         String apiEndpoint = "/api/secure";
         String filterId = "sql-injection";
 
-        MaliciousEventModel event = MaliciousEventModel.newBuilder()
+        MaliciousEventDto event = MaliciousEventDto.newBuilder()
             .setLatestApiEndpoint(apiEndpoint)
             .setFilterId(filterId)
-            .setStatus(MaliciousEventModel.Status.ACTIVE)
+            .setStatus(MaliciousEventDto.Status.ACTIVE)
             .setDetectedAt(System.currentTimeMillis())
             .build();
         event.setId("event-test");

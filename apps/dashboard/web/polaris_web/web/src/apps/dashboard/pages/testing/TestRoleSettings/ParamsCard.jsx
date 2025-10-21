@@ -1,9 +1,10 @@
-import { Box, Button, HorizontalStack, Text, VerticalStack } from '@shopify/polaris'
-import React from 'react'
+import { Box, Button, HorizontalStack, Text, VerticalStack, Icon } from '@shopify/polaris'
+import React, { useState } from 'react'
 import TooltipText from "../../../components/shared/TooltipText"
-import { DeleteMajor } from "@shopify/polaris-icons"
+import { DeleteMajor, ViewMinor, HideMinor } from "@shopify/polaris-icons"
 
 function ParamsCard({dataObj, handleDelete, showEdit}) {
+    const [hideValues, setHideValues] = useState(true)
     const authMechanism = dataObj.authMechanism
     const headerConditions = dataObj.headerKVPairs || {}
     const headerKey = Object.keys(headerConditions).length > 0 ? Object.keys(headerConditions)[0] : ''
@@ -33,9 +34,12 @@ function ParamsCard({dataObj, handleDelete, showEdit}) {
                     return(
                         <HorizontalStack blockAlign="start" gap={"4"} key={index}>
                             <LineComponent title={(param.key || '-') + " :"} value={(param.value || '-')} />
-                            {param.showHeader !== null ? 
-                                <HorizontalStack blockAlign="start" gap={1}><Box borderInlineEndWidth='1' borderColor="border-subdued" minHeight='20px'/><LineComponent title={"Position :"} value={param.where}/></HorizontalStack>
-                            :null}
+                            {param.showHeader !== null ? (
+                                <HorizontalStack blockAlign="start" gap={1}>
+                                    <Box borderInlineEndWidth='1' borderColor="border-subdued" minHeight='20px'/>
+                                    <LineComponent title={"Position :"} value={param.where}/>
+                                </HorizontalStack>
+                            ) : null}
                         </HorizontalStack>
                     )
                 })}
@@ -58,11 +62,27 @@ function ParamsCard({dataObj, handleDelete, showEdit}) {
                         <Box paddingInlineStart={4}>
                             <VerticalStack gap={2}>
                                 <LineComponent title={"Token type :"} value={authMechanism.type}/>
-                                <LineComponent title={"Token values :"} />
+                                <HorizontalStack gap="2" blockAlign="center">
+                                    <Box maxWidth='200px'>
+                                        <TooltipText tooltip={"Token values"} text={"Token values :"} textProps={{variant:"bodyMd", fontWeight: "medium"}} />
+                                    </Box>
+                                    <Box
+                                        role="button"
+                                        tabIndex={0}
+                                        aria-label={hideValues ? 'Show token values' : 'Hide token values'}
+                                        onClick={() => setHideValues(!hideValues)}
+                                        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setHideValues(!hideValues) } }}
+                                        style={{ cursor: 'pointer', padding: '4px', lineHeight: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
+                                    >
+                                        <Icon source={hideValues ? ViewMinor : HideMinor} />
+                                    </Box>
+                                </HorizontalStack>
                             </VerticalStack>
-                            <Box paddingInlineStart={4}>
-                                <ParamsList valuesList={authMechanism.authParams} />
-                            </Box>
+                            {!hideValues ? (
+                                <Box paddingInlineStart={4}>
+                                    <ParamsList valuesList={authMechanism.authParams} />
+                                </Box>
+                            ) : null}
                         </Box>
                     </VerticalStack>
 

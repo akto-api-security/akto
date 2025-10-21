@@ -19,6 +19,7 @@ import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.Up
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.UpdateMaliciousEventStatusResponse;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.DeleteMaliciousEventsRequest;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.DeleteMaliciousEventsResponse;
+import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchTopNDataRequest;
 import com.akto.threat.backend.service.MaliciousEventService;
 import com.akto.threat.backend.service.ThreatActorService;
 import com.akto.threat.backend.service.ThreatApiService;
@@ -507,6 +508,33 @@ public class DashboardRouter implements ARouter {
 
                 ProtoMessageUtils.toString(resp)
                     .ifPresent(s -> ctx.response().setStatusCode(200).end(s));
+            });
+
+        router
+            .post("/get_top_n_data")
+            .blockingHandler(ctx -> {
+                RequestBody reqBody = ctx.body();
+                FetchTopNDataRequest req = ProtoMessageUtils.<
+                FetchTopNDataRequest
+                >toProtoMessage(
+                    FetchTopNDataRequest.class,
+                    reqBody.asString()
+                ).orElse(null);
+
+                if (req == null) {
+                    ctx.response().setStatusCode(400).end("Invalid request");
+                    return;
+                }
+
+                ProtoMessageUtils.toString(
+                    threatActorService.fetchTopNData(
+                        ctx.get("accountId"),
+                        req.getStartTs(),
+                        req.getEndTs(),
+                        req.getLatestAttackList(),
+                        req.getLimit()
+                    )
+                ).ifPresent(s -> ctx.response().setStatusCode(200).end(s));
             });
 
         return router;

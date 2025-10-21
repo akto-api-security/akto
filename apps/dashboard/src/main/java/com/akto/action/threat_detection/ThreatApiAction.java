@@ -13,6 +13,7 @@ import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.Th
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatCategoryWiseCountResponse;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.ThreatSeverityWiseCountResponse;
 import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.DailyActorsCountResponse.ActorsCount;
+import com.akto.proto.generated.threat_detection.service.dashboard_service.v1.FetchTopNDataResponse;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.HashMap;
 import java.util.List;
@@ -27,6 +28,7 @@ import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
 import org.apache.http.util.EntityUtils;
 import org.bson.Document;
+import lombok.Getter;
 
 import static com.akto.action.threat_detection.utils.ThreatsUtils.getTemplates;
 
@@ -43,6 +45,15 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
   List<String> latestAttack;
   int startTs;
   int endTs;
+
+  @Getter int totalAnalysed;
+  @Getter int totalAttacks;
+  @Getter int totalCriticalActors;
+  @Getter int totalActiveStatus;
+  @Getter int totalIgnoredStatus;
+  @Getter int totalUnderReviewStatus;
+
+  @Getter List<TopApiData> topApis;
 
   // TODO: remove this, use API Executor.
   private final CloseableHttpClient httpClient;
@@ -201,6 +212,14 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
                           return new DailyActorsCount(smr.getTs(), smr.getTotalActors(), smr.getCriticalActors());
                         })
                     .collect(Collectors.toList());
+                
+                // Set summary counts
+                this.totalAnalysed = m.getTotalAnalysed();
+                this.totalAttacks = m.getTotalAttacks();
+                this.totalCriticalActors = m.getCriticalActorsCount();
+                this.totalActiveStatus = m.getTotalActive();
+                this.totalIgnoredStatus = m.getTotalIgnored();
+                this.totalUnderReviewStatus = m.getTotalUnderReview();
               });
     } catch (Exception e) {
       e.printStackTrace();
@@ -308,34 +327,51 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
     return SUCCESS.toUpperCase();
   }
 
-  public int getSkip() {
-    return skip;
+  public String fetchThreatTopNData() {
+    HttpPost post = new HttpPost(String.format("%s/api/dashboard/get_top_n_data", this.getBackendUrl()));
+    post.addHeader("Authorization", "Bearer " + this.getApiToken());
+    post.addHeader("Content-Type", "application/json");
+
+    List<String> templatesContext = getTemplates(this.latestAttack);
+
+    Map<String, Object> body = new HashMap<String, Object>() {
+      {
+        put("start_ts", startTs);
+        put("end_ts", endTs);
+        put("latestAttack", templatesContext);
+        put("limit", 5);
+      }
+    };
+    String msg = objectMapper.valueToTree(body).toString();
+
+    StringEntity requestEntity = new StringEntity(msg, ContentType.APPLICATION_JSON);
+    post.setEntity(requestEntity);
+
+    try (CloseableHttpResponse resp = this.httpClient.execute(post)) {
+      String responseBody = EntityUtils.toString(resp.getEntity());
+
+      ProtoMessageUtils.<FetchTopNDataResponse>toProtoMessage(
+        FetchTopNDataResponse.class, responseBody)
+          .ifPresent(
+              m -> {
+                this.topApis = m.getTopApisList().stream()
+                    .map(
+                        smr -> new TopApiData(
+                            smr.getEndpoint(),
+                            smr.getMethod(),
+                            smr.getAttacks(),
+                            smr.getSeverity()))
+                    .collect(Collectors.toList());
+              });
+    } catch (Exception e) {
+      e.printStackTrace();
+      return ERROR.toUpperCase();
+    }
+
+    return SUCCESS.toUpperCase();
   }
 
-  public void setSkip(int skip) {
-    this.skip = skip;
-  }
-
-  public static int getLimit() {
-    return LIMIT;
-  }
-
-  public long getTotal() {
-    return total;
-  }
-
-  public void setTotal(long total) {
-    this.total = total;
-  }
-
-  public List<DashboardThreatApi> getApis() {
-    return apis;
-  }
-
-  public void setApis(List<DashboardThreatApi> apis) {
-    this.apis = apis;
-  }
-
+  // Explicit getters/setters required by JSON serialization and frontend usage
   public Map<String, Integer> getSort() {
     return sort;
   }
@@ -364,31 +400,45 @@ public class ThreatApiAction extends AbstractThreatDetectionAction {
     return startTs;
   }
 
-  public void setStartTs(int startTs) {
-    this.startTs = startTs;
+  public int getSkip() {
+    return skip;
   }
 
-  public int getEndTs() {
-    return endTs;
+  public void setSkip(int skip) {
+    this.skip = skip;
   }
 
-  public void setEndTs(int endTs) {
-    this.endTs = endTs;
+  public long getTotal() {
+    return total;
+  }
+
+  public void setTotal(long total) {
+    this.total = total;
+  }
+
+  public List<DashboardThreatApi> getApis() {
+    return apis;
+  }
+
+  public void setApis(List<DashboardThreatApi> apis) {
+    this.apis = apis;
   }
 
   public List<ThreatActivityTimeline> getThreatActivityTimelines() {
     return threatActivityTimelines;
   }
 
-  public void setThreatActivityTimelines(List<ThreatActivityTimeline> threatActivityTimelines) {
-    this.threatActivityTimelines = threatActivityTimelines;
+  public void setStartTs(int startTs) {
+    this.startTs = startTs;
   }
 
-  public List<String> getLatestAttack() {
-    return latestAttack;
+  public void setEndTs(int endTs) {
+    this.endTs = endTs;
   }
 
   public void setLatestAttack(List<String> latestAttack) {
     this.latestAttack = latestAttack;
   }
+  
 }
+

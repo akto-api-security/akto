@@ -1254,12 +1254,16 @@ function ApiCollections(props) {
 
     const handleSelectedTab = (selectedIndex) => {
         setSelected(selectedIndex)
-    }      
+    }
+
+    const filterTreeViewData = (data) => {
+        return data.filter((x) => (!x?.deactivated && x?.type !== "API_GROUP" && x?.urlsCount > 1));
+    }
 
     const tableComponent = (
         centerView === CenterViewType.Tree ?
         <TreeViewTable
-            collectionsArr={normalData.filter((x) => (!x?.deactivated && x?.type !== "API_GROUP"))}
+            collectionsArr={filterTreeViewData(normalData)}
             sortOptions={sortOptions}
             resourceName={resourceName}
             tableHeaders={headers.filter((x) => x.shouldMerge !== undefined)}

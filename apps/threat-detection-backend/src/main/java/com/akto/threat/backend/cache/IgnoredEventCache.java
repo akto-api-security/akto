@@ -1,10 +1,10 @@
 package com.akto.threat.backend.cache;
 
+import com.akto.dto.threat_detection_backend.MaliciousEventDto;
 import com.akto.log.LoggerMaker;
 import com.akto.threat.backend.service.MaliciousEventService;
 import com.akto.threat.backend.constants.MongoDBCollection;
 import com.akto.threat.backend.constants.StatusConstants;
-import com.akto.threat.backend.db.MaliciousEventModel;
 import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoCursor;
@@ -53,15 +53,15 @@ public class IgnoredEventCache {
             Set<String> ignoredSet = ConcurrentHashMap.newKeySet();
 
             // Query DB for all ignored events
-            MongoCollection<MaliciousEventModel> collection = mongoClient
+            MongoCollection<MaliciousEventDto> collection = mongoClient
                 .getDatabase(accountId)
-                .getCollection(MongoDBCollection.ThreatDetection.MALICIOUS_EVENTS, MaliciousEventModel.class);
+                .getCollection(MongoDBCollection.ThreatDetection.MALICIOUS_EVENTS, MaliciousEventDto.class);
 
             Bson filter = Filters.eq("status", StatusConstants.IGNORED);
 
-            try (MongoCursor<MaliciousEventModel> cursor = collection.find(filter).cursor()) {
+            try (MongoCursor<MaliciousEventDto> cursor = collection.find(filter).cursor()) {
                 while (cursor.hasNext()) {
-                    MaliciousEventModel event = cursor.next();
+                    MaliciousEventDto event = cursor.next();
                     String cacheKey = getCacheKey(event.getLatestApiEndpoint(), event.getFilterId());
                     ignoredSet.add(cacheKey);
                 }
