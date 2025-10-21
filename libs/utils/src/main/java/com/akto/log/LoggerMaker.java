@@ -157,9 +157,6 @@ public class LoggerMaker  {
     }
 
     protected String basicError(String err, LogDb db) {
-        if (Context.accountId.get() != null) {
-            err = String.format("%s\naccountId: %d", err, Context.accountId.get());
-        }
         String formatted = getFormattedMessage(err);
         logger.error(formatted);
         try{
