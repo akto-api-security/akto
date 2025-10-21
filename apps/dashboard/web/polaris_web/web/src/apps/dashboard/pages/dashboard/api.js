@@ -61,11 +61,11 @@ const api = {
         })
     },
 
-    fetchMcpdata: async (filterType) => {
+    fetchMcpdata: async (filterType, contextType = null) => {
         return await request({
             url: '/api/fetchMcpdata',
             method: 'post',
-            data: { filterType }
+            data: { filterType, contextType }
         })
     },
 

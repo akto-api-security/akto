@@ -42,6 +42,17 @@ export default function LeftNav() {
 
     const handleSelect = (selectedId) => {
         setLeftNavSelected(selectedId);
+        // Store navigation state in sessionStorage for other components to access
+        sessionStorage.setItem('leftNavSelected', selectedId);
+        
+        // Dispatch custom event to notify other components of navigation change
+        const navigationChangeEvent = new CustomEvent('navigationChanged', {
+            detail: { 
+                selectedId: selectedId,
+                timestamp: Date.now()
+            }
+        });
+        window.dispatchEvent(navigationChangeEvent);
     };
 
     const handleAccountChange = async (selected) => {
@@ -85,8 +96,53 @@ export default function LeftNav() {
 
     const dashboardCategory = PersistStore((state) => state.dashboardCategory) || "API Security";
 
+    // Helper function to duplicate navigation items with different prefix and independent selection
+    const duplicateNavItems = (items, prefix, startKey = 100) => {
+        return items.map((item, index) => {
+            const newKey = item.key ? `${prefix}_${item.key}` : `${prefix}_${startKey + index}`;
+            const originalSelected = item.selected;
+            
+            return {
+                ...item,
+                key: newKey,
+                // Each section has independent selection state
+                selected: originalSelected !== undefined ? leftNavSelected === newKey : undefined,
+                onClick: item.onClick ? () => {
+                    const originalHandler = item.onClick;
+                    originalHandler();
+                    // Set selection specific to this section
+                    handleSelect(newKey);
+                } : undefined,
+                subNavigationItems: item.subNavigationItems ? item.subNavigationItems.map((subItem, subIndex) => {
+                    // Create unique keys for sub-navigation items
+                    const originalSubSelected = subItem.selected;
+                    const subNavKey = originalSubSelected ? 
+                        leftNavSelected.replace('dashboard_', `${prefix}_dashboard_`) : 
+                        `${prefix}_sub_${subIndex}`;
+                    
+                    return {
+                        ...subItem,
+                        // Sub-items are selected only if they match this section's prefix
+                        selected: originalSubSelected !== undefined ? 
+                            leftNavSelected.startsWith(prefix) && 
+                            leftNavSelected === subNavKey
+                            : undefined,
+                        onClick: subItem.onClick ? () => {
+                            const originalHandler = subItem.onClick;
+                            originalHandler();
+                            // Extract the base selection pattern and add section prefix
+                            const basePattern = leftNavSelected.replace(/^(cloud_|endpoint_)/, '');
+                            handleSelect(`${prefix}_${basePattern}`);
+                        } : undefined,
+                    };
+                }) : undefined
+            };
+        });
+    };
+
     const navItems = useMemo(() => {
-        let items = [
+        // Account dropdown (stays at the top)
+        const accountSection = [
             {
                 label: (!func.checkLocal()) ? (
                     <Box paddingBlockEnd={"2"}>
@@ -100,6 +156,10 @@ export default function LeftNav() {
 
                 ) : null
             },
+        ];
+
+        // Main navigation items (to be duplicated)
+        const mainNavItems = [
             {
                 label: mapLabel("API Security Posture", dashboardCategory),
                 icon: ReportFilledMinor,
@@ -487,24 +547,74 @@ export default function LeftNav() {
                     }
                 ]
             }] : [])
-        ]
+        ];
 
-        const exists = items.find(item => item.key === "quick_start")
+        // Add Quick Start if it doesn't exist
+        const quickStartItem = {
+            label: "Quick Start",
+            icon: AppsFilledMajor,
+            onClick: () => {
+                handleSelect("dashboard_quick_start")
+                navigate("/dashboard/quick-start")
+                setActive("normal")
+            },
+            selected: leftNavSelected === "dashboard_quick_start",
+            key: "quick_start",
+        };
+
+        const exists = mainNavItems.find(item => item.key === "quick_start");
         if (!exists) {
-            items.splice(1, 0, {
-                label: "Quick Start",
-                icon: AppsFilledMajor,
-                onClick: () => {
-                    handleSelect("dashboard_quick_start")
-                    navigate("/dashboard/quick-start")
-                    setActive("normal")
-                },
-                selected: leftNavSelected === "dashboard_quick_start",
-                key: "quick_start",
-            })
+            mainNavItems.splice(0, 0, quickStartItem);
         }
 
-        return items
+        // Conditionally create Cloud Security and Endpoint Security sections
+        // Only show divisions for MCP Security and Agentic Security
+        const shouldShowDivisions = dashboardCategory === "MCP Security" || dashboardCategory === "Agentic Security";
+        
+        let allItems;
+        if (shouldShowDivisions) {
+            // Create Cloud Security and Endpoint Security sections
+            const cloudSecurityItems = duplicateNavItems(mainNavItems, "cloud", 200);
+            const endpointSecurityItems = duplicateNavItems(mainNavItems, "endpoint", 300);
+
+            allItems = [
+                ...accountSection,
+                // Cloud Security Section Header
+                {
+                    label: (
+                        <Box paddingBlockStart="4" paddingBlockEnd="2">
+                            <div style={{ color: '#000000', fontWeight: 'bold', fontSize: '16px' }}>
+                                Cloud Security
+                            </div>
+                        </Box>
+                    ),
+                    key: "cloud_header",
+                    disabled: true,
+                },
+                ...cloudSecurityItems,
+                // Endpoint Security Section Header  
+                {
+                    label: (
+                        <Box paddingBlockStart="4" paddingBlockEnd="2">
+                            <div style={{ color: '#000000', fontWeight: 'bold', fontSize: '16px' }}>
+                                Endpoint Security
+                            </div>
+                        </Box>
+                    ),
+                    key: "endpoint_header", 
+                    disabled: true,
+                },
+                ...endpointSecurityItems
+            ];
+        } else {
+            // For API Security and other categories, show normal navigation without divisions
+            allItems = [
+                ...accountSection,
+                ...mainNavItems
+            ];
+        }
+
+        return allItems
     }, [dashboardCategory, leftNavSelected])
 
     const navigationMarkup = (

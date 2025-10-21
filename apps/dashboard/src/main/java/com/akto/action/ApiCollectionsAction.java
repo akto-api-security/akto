@@ -95,6 +95,8 @@ public class ApiCollectionsAction extends UserAction {
     int mcpDataCount;
     @Setter
     String type;
+    @Setter
+    String contextType;
     @Getter
     List<McpAuditInfo> auditAlerts;
 
@@ -116,10 +118,15 @@ public class ApiCollectionsAction extends UserAction {
      * Only populates MCP URLs when dashboard context is not API security.
      */
     private void populateCollectionUrls(ApiCollection apiCollection) {
-        // Do not populate MCP URLs if dashboard context is API security
-        if (Context.contextSource.get() != null && Context.contextSource.get() == GlobalEnums.CONTEXT_SOURCE.MCP) {
-            apiCollectionUrlService.populateMcpCollectionUrls(apiCollection);
-        }else {
+        try {
+            // Do not populate MCP URLs if dashboard context is API security
+            GlobalEnums.CONTEXT_SOURCE contextSource = Context.contextSource.get();
+            if (contextSource != null && contextSource == GlobalEnums.CONTEXT_SOURCE.MCP) {
+                apiCollectionUrlService.populateMcpCollectionUrls(apiCollection);
+            } else {
+                apiCollection.setUrls(new HashSet<>());
+            }
+        } catch (Exception e) {
             apiCollection.setUrls(new HashSet<>());
         }
     }
@@ -237,7 +244,18 @@ public class ApiCollectionsAction extends UserAction {
     }
 
     public String fetchAllCollectionsBasic() {
-        UsersCollectionsList.deleteContextCollectionsForUser(Context.accountId.get(), Context.contextSource.get());
+        try {
+            // Safely delete context collections for user - handle potential null context source
+            Integer accountId = Context.accountId.get();
+            GlobalEnums.CONTEXT_SOURCE contextSource = Context.contextSource.get();
+            if (accountId != null) {
+                UsersCollectionsList.deleteContextCollectionsForUser(accountId, contextSource);
+            }
+        } catch (Exception e) {
+            // Log the error but don't fail the entire request
+            loggerMaker.errorAndAddToDb(e, "Error deleting context collections for user", LogDb.DASHBOARD);
+        }
+        
         this.apiCollections = ApiCollectionsDao.instance.findAll(Filters.empty(), Projections.exclude("urls"));
         this.apiCollections = fillApiCollectionsUrlCount(this.apiCollections, Filters.nin(SingleTypeInfo._API_COLLECTION_ID, deactivatedCollections));
         return Action.SUCCESS.toUpperCase();
@@ -1171,7 +1189,27 @@ public class ApiCollectionsAction extends UserAction {
         Bson mcpTagFilter = Filters.elemMatch(ApiCollection.TAGS_STRING,
             Filters.eq("keyName", com.akto.util.Constants.AKTO_MCP_SERVER_TAG)
         );
-        List<ApiCollection> mcpCollections = ApiCollectionsDao.instance.findAll(mcpTagFilter, null);
+        List<ApiCollection> allMcpCollections = ApiCollectionsDao.instance.findAll(mcpTagFilter, null);
+        
+        // Filter collections based on contextType (cloud vs endpoint)
+        List<ApiCollection> mcpCollections = allMcpCollections;
+        if (contextType != null && !contextType.isEmpty()) {
+            mcpCollections = allMcpCollections.stream()
+                .filter(collection -> {
+                    boolean isEndpointCollection = collection.getTagsList() != null && 
+                        collection.getTagsList().stream().anyMatch(tag -> 
+                            "ENDPOINT".equals(tag.getSource())
+                        );
+                    
+                    if ("endpoint".equals(contextType)) {
+                        return isEndpointCollection;
+                    } else { // "cloud" context
+                        return !isEndpointCollection;
+                    }
+                })
+                .collect(Collectors.toList());
+        }
+        
         List<Integer> mcpCollectionIds = mcpCollections.stream().map(ApiCollection::getId).collect(Collectors.toList());
 
         switch (filterType) {
@@ -1224,21 +1262,24 @@ public class ApiCollectionsAction extends UserAction {
             case "TOOLS":
                 Bson toolsFilter = Filters.and(
                         Filters.eq("type", Constants.AKTO_MCP_TOOL),
-                        Filters.ne("remarks", "Rejected")
+                        Filters.ne("remarks", "Rejected"),
+                        mcpCollectionIds.isEmpty() ? Filters.exists("hostCollectionId") : Filters.in("hostCollectionId", mcpCollectionIds)
                 );
                 this.mcpDataCount = (int) McpAuditInfoDao.instance.count(toolsFilter);
                 break;
             case "PROMPTS":
                 Bson promptsFilter = Filters.and(
                         Filters.eq("type", Constants.AKTO_MCP_PROMPT),
-                        Filters.ne("remarks", "Rejected")
+                        Filters.ne("remarks", "Rejected"),
+                        mcpCollectionIds.isEmpty() ? Filters.exists("hostCollectionId") : Filters.in("hostCollectionId", mcpCollectionIds)
                 );
                 this.mcpDataCount = (int) McpAuditInfoDao.instance.count(promptsFilter);
                 break;
             case "RESOURCES":
                 Bson resourcesFilter = Filters.and(
                         Filters.eq("type", Constants.AKTO_MCP_RESOURCE),
-                        Filters.ne("remarks", "Rejected")
+                        Filters.ne("remarks", "Rejected"),
+                        mcpCollectionIds.isEmpty() ? Filters.exists("hostCollectionId") : Filters.in("hostCollectionId", mcpCollectionIds)
                 );
                 this.mcpDataCount = (int) McpAuditInfoDao.instance.count(resourcesFilter);
                 break;
@@ -1246,7 +1287,8 @@ public class ApiCollectionsAction extends UserAction {
             case "MCP_SERVER":
                 Bson mcpServerFilter = Filters.and(
                         Filters.eq("type", Constants.AKTO_MCP_SERVER),
-                        Filters.ne("remarks", "Rejected")
+                        Filters.ne("remarks", "Rejected"),
+                        mcpCollectionIds.isEmpty() ? Filters.exists("hostCollectionId") : Filters.in("hostCollectionId", mcpCollectionIds)
                 );
                 this.mcpDataCount = (int) McpAuditInfoDao.instance.count(mcpServerFilter);
                 break;
@@ -1314,11 +1356,28 @@ public class ApiCollectionsAction extends UserAction {
                 Bson guardRailTagFilter = Filters.elemMatch(ApiCollection.TAGS_STRING,
                     Filters.eq("keyName", Constants.AKTO_GUARD_RAIL_TAG)
                 );
-                // Use projection to only fetch IDs, reducing memory usage
-                List<ApiCollection> guardRailCollections = ApiCollectionsDao.instance.findAll(
-                    guardRailTagFilter, 
-                    Projections.include(ApiCollection.ID)
-                );
+                // Fetch collections with full data to apply context filtering
+                List<ApiCollection> allGuardRailCollections = ApiCollectionsDao.instance.findAll(guardRailTagFilter, null);
+                
+                // Filter collections based on contextType (cloud vs endpoint)
+                List<ApiCollection> guardRailCollections = allGuardRailCollections;
+                if (contextType != null && !contextType.isEmpty()) {
+                    guardRailCollections = allGuardRailCollections.stream()
+                        .filter(collection -> {
+                            boolean isEndpointCollection = collection.getTagsList() != null && 
+                                collection.getTagsList().stream().anyMatch(tag -> 
+                                    "ENDPOINT".equals(tag.getSource())
+                                );
+                            
+                            if ("endpoint".equals(contextType)) {
+                                return isEndpointCollection;
+                            } else { // "cloud" context
+                                return !isEndpointCollection;
+                            }
+                        })
+                        .collect(Collectors.toList());
+                }
+                
                 List<Integer> guardRailCollectionIds = guardRailCollections.stream()
                     .map(ApiCollection::getId)
                     .collect(Collectors.toList());

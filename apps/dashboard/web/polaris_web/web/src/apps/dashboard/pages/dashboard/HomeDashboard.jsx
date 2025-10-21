@@ -377,8 +377,33 @@ function HomeDashboard() {
         return completeData.sort((a, b) => a[0] - b[0]);
     };
 
+    const getNavigationSection = () => {
+        try {
+            const leftNavSelected = sessionStorage.getItem('leftNavSelected');
+            
+            // Handle null/undefined cases
+            if (!leftNavSelected) {
+                return 'cloud';
+            }
+            
+            const navString = leftNavSelected.toString().toLowerCase();
+            
+            if (navString.startsWith('cloud_') || navString.includes('cloud')) {
+                return 'cloud';
+            } else if (navString.startsWith('endpoint_') || navString.includes('endpoint')) {
+                return 'endpoint';
+            }
+            
+            return 'cloud';
+            
+        } catch (error) {
+            return 'cloud'; // Safe fallback
+        }
+    };
+
     const fetchData = async () => {
         setLoading(true)
+        const currentNavigationSection = getNavigationSection();
         // all apis
         let apiPromises = [
             observeApi.getUserEndpoints(),
@@ -387,16 +412,16 @@ function HomeDashboard() {
             api.fetchEndpointsCount(startTimestamp, endTimestamp),
             testingApi.fetchSeverityInfoForIssues({}, [], 0),
             api.getApiInfoForMissingData(0, endTimestamp),
-            api.fetchMcpdata('TOTAL_APIS'),
-            api.fetchMcpdata('THIRD_PARTY_APIS'),
-            api.fetchMcpdata('RECENT_OPEN_ALERTS'),
-            api.fetchMcpdata('CRITICAL_APIS'),
-            api.fetchMcpdata('TOOLS'),
-            api.fetchMcpdata('PROMPTS'),
-            api.fetchMcpdata('RESOURCES'),
-            api.fetchMcpdata('MCP_SERVER'),
-            api.fetchMcpdata('POLICY_GUARDRAIL_APIS'),
-            api.fetchMcpdata('TOP_3_APPLICATIONS_BY_TRAFFIC')
+            api.fetchMcpdata('TOTAL_APIS', currentNavigationSection),
+            api.fetchMcpdata('THIRD_PARTY_APIS', currentNavigationSection),
+            api.fetchMcpdata('RECENT_OPEN_ALERTS', currentNavigationSection),
+            api.fetchMcpdata('CRITICAL_APIS', currentNavigationSection),
+            api.fetchMcpdata('TOOLS', currentNavigationSection),
+            api.fetchMcpdata('PROMPTS', currentNavigationSection),
+            api.fetchMcpdata('RESOURCES', currentNavigationSection),
+            api.fetchMcpdata('MCP_SERVER', currentNavigationSection),
+            api.fetchMcpdata('POLICY_GUARDRAIL_APIS', currentNavigationSection),
+            api.fetchMcpdata('TOP_3_APPLICATIONS_BY_TRAFFIC', currentNavigationSection)
         ];
 
         let results = await Promise.allSettled(apiPromises);
