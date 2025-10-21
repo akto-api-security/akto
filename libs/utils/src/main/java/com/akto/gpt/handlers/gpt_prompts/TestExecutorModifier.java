@@ -7,7 +7,9 @@ import org.json.JSONObject;
 
 import com.mongodb.BasicDBObject;
 
-public class TestExecutorModifier extends PromptHandler {
+public class TestExecutorModifier extends AzureOpenAIPromptHandler {
+
+    // TODO: use abstract class to decide which prompt handler to use
 
     static final int MAX_QUERY_LENGTH = 100000;
     public static final String _REQUEST = "request";
