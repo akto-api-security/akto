@@ -16,6 +16,7 @@ import com.akto.dto.testing.AuthMechanism;
 import com.akto.dto.testing.AuthParam;
 import com.akto.dto.testing.TestRoles;
 import com.akto.util.Constants;
+import com.akto.util.enums.LoginFlowEnums;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Projections;
 
@@ -63,6 +64,20 @@ public class AgenticUtils {
                 }
                 agentClient.initializeAgent(sseUrl, authorization);
             }
+        }
+    }
+
+    public static String getTestModeFromRole() {
+        TestRoles role = TestRolesDao.instance.findOne(Filters.eq(TestRoles.NAME, "MCP_AUTHENTICATION_ROLE"));
+        AuthMechanism authMechanism = role.findMatchingAuthMechanism(null);
+        if(authMechanism == null || authMechanism.getType() == null){
+            return "auto";
+        }
+
+        if(authMechanism.getType().equals(LoginFlowEnums.AuthMechanismTypes.HARDCODED.toString())){
+            return "userMcpAgent";
+        }else{
+            return "userAiAgent";
         }
     }
 }
