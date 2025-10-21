@@ -3,5 +3,6 @@ fastapi==0.104.1
 uvicorn[standard]==0.24.0
 pydantic==2.5.0
 numpy<2
-optimum[onnxruntime]>=1.16.0
+torch>=2.1.0
+optimum[onnxruntime]>=1.16.0,<1.22.0
 

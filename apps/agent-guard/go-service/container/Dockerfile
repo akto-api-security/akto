@@ -3,13 +3,13 @@ FROM golang:1.21-alpine AS builder
 WORKDIR /app
 
 # Copy go mod files
-COPY go.mod go.sum ./
+COPY src/go.mod src/go.sum ./
 
 # Download dependencies
 RUN go mod download
 
 # Copy source code
-COPY *.go ./
+COPY src/*.go ./
 
 # Build the application
 RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o scanner-orchestrator .
@@ -25,7 +25,7 @@ WORKDIR /root/
 COPY --from=builder /app/scanner-orchestrator .
 
 # Expose port
-EXPOSE 8080
+EXPOSE 8091
 
 # Run the application
 CMD ["./scanner-orchestrator"]
