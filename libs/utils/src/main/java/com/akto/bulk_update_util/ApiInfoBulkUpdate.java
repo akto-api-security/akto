@@ -54,10 +54,10 @@ public class ApiInfoBulkUpdate {
 
             subUpdates.add(Updates.setOnInsert(SingleTypeInfo._COLLECTION_IDS, Arrays.asList(apiInfo.getId().getApiCollectionId())));
 
-            // parentMcpToolNames
-            subUpdates.add(Updates.setOnInsert(ApiInfo.PARENT_MCP_TOOL_NAMES, new ArrayList<>()));
             List<String> parentMcpToolNames = apiInfo.getParentMcpToolNames();
-            if (parentMcpToolNames != null && !parentMcpToolNames.isEmpty()) {
+            if (parentMcpToolNames == null || parentMcpToolNames.isEmpty()) {
+                subUpdates.add(Updates.setOnInsert(ApiInfo.PARENT_MCP_TOOL_NAMES, new ArrayList<>()));
+            } else {
                 subUpdates.add(Updates.addEachToSet(ApiInfo.PARENT_MCP_TOOL_NAMES, parentMcpToolNames));
             }
 
