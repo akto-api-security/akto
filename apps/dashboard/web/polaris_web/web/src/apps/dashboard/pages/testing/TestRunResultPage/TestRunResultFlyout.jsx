@@ -46,9 +46,6 @@ function TestRunResultFlyout(props) {
 
     const [vulnerabilityAnalysisError, setVulnerabilityAnalysisError] = useState(null)
     const [refreshFlag, setRefreshFlag] = useState(Date.now().toString())
-
-    // modify testing run result and headers
-    const infoStateFlyout = infoState && infoState.length > 0 ? infoState.filter((item) => item.title !== 'Jira') : []
     
     const fetchRemediationInfo = useCallback (async (testId) => {
         if (testId && testId.length > 0) {
@@ -494,7 +491,7 @@ function TestRunResultFlyout(props) {
         return {
             id: 'evidence',
             content: "Evidence",
-            component: <ChatInterface conversations={conversations} />
+            component: <ChatInterface conversations={conversations} sort={false}/>
         }
     }, [selectedTestRunResult, conversations])
     
@@ -507,7 +504,7 @@ function TestRunResultFlyout(props) {
         }
     }, [selectedTestRunResult, dataExpired, issueDetails, refreshFlag])
 
-    const finalResultTab = selectedTestRunResult?.conversationId != null && conversations?.length > 0 ? conversationTab : ValuesTab
+    const finalResultTab = conversations?.length > 0 ? conversationTab : ValuesTab
 
     function RowComp ({cardObj}){
         const {title, value, tooltipContent} = cardObj
@@ -529,6 +526,38 @@ function TestRunResultFlyout(props) {
         <GridRows columns={3} items={rowItems} CardComponent={RowComp} />
     )
 
+    function MoreInformationComp({ infoState }){
+        infoState = infoState.filter((item) => item.title !== 'Jira')
+
+        return(
+            <VerticalStack gap={"2"}>
+                {
+                    infoState.map((item, index) => {
+                        const {title, content, tooltipContent, icon} = item
+
+                        if (content === null || content === undefined || content === "") return null
+
+                        return (
+                            <VerticalStack gap={"5"} key={index}>
+                                <VerticalStack gap={"2"} >
+                                    <HorizontalStack gap="1_5-experimental">
+                                        <Box><Icon source={icon} color='subdued' /></Box>
+                                        <TitleWithInfo
+                                            textProps={{ variant: "bodyMd", fontWeight: "semibold", color: "subdued" }}
+                                            titleText={title}
+                                            tooltipContent={tooltipContent}
+                                        />
+                                    </HorizontalStack>
+                                    {content}
+                                </VerticalStack>
+                            </VerticalStack>
+                        )
+                    })
+                }
+            </VerticalStack>
+        )
+    }
+
     const overviewComp = (
         <Box padding={"4"}>
             <VerticalStack gap={"5"}>
@@ -547,6 +576,12 @@ function TestRunResultFlyout(props) {
                 </VerticalStack>
                 <Divider />
                 {testResultDetailsComp}  
+                {infoState && typeof infoState === 'object' && infoState.length > 0 ? (
+                    <>
+                        <Divider />
+                        <MoreInformationComp infoState={infoState} />
+                    </>
+                ) : null}
             </VerticalStack>
         </Box>
     )

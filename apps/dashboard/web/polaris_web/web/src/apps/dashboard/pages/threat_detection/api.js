@@ -126,11 +126,11 @@ const threatDetectionRequests = {
             data: {startTs, endTs}
         })
     },
-    getDailyThreatActorsCount(startTs, endTs) {
+    getDailyThreatActorsCount(startTs, endTs, latestAttack) {
         return request({
             url: '/api/getDailyThreatActorsCount',
             method: 'post',
-            data: {startTs, endTs}
+            data: {startTs, endTs, latestAttack: latestAttack || []}
         })
     },
     fetchSensitiveParamsForEndpoints (urls) {
@@ -184,6 +184,13 @@ const threatDetectionRequests = {
             url: '/api/deleteMaliciousEvents',
             method: 'post',
             data: data
+        })
+    },
+    fetchThreatTopNData(startTs, endTs, latestAttack, limit = 5) {
+        return request({
+            url: '/api/fetchThreatTopNData',
+            method: 'post',
+            data: {startTs, endTs, latestAttack: latestAttack || [], limit}
         })
     }
 }

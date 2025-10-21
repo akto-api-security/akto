@@ -40,35 +40,37 @@ public class Main {
 
   public static void main(String[] args) throws Exception {
 
-    while (true) {
+    boolean isHybridDeployment = RuntimeMode.isHybridDeployment();
 
-      int accountId = ClientActor.getAccountId();
+    if (isHybridDeployment) {
+      while (true) {
 
-      Organization organization = dataActor.fetchOrganization(accountId);
-      if (organization == null) {
-        logger.errorAndAddToDb("Organization not found for account id: " + accountId);
+        int accountId = ClientActor.getAccountId();
+
+        Organization organization = dataActor.fetchOrganization(accountId);
+        if (organization == null) {
+          logger.errorAndAddToDb("Organization not found for account id: " + accountId);
+          Thread.sleep(30000);
+          continue;
+        }
+        HashMap<String, FeatureAccess> featureWiseAllowed = organization.getFeatureWiseAllowed();
+        if(featureWiseAllowed == null) {
+            featureWiseAllowed = new HashMap<>();
+        }
+
+        FeatureAccess allowed = featureWiseAllowed.getOrDefault("THREAT_DETECTION", FeatureAccess.noAccess);
+        if (allowed.getIsGranted()) {
+          break;
+        }
+
         Thread.sleep(30000);
-        continue;
       }
-      HashMap<String, FeatureAccess> featureWiseAllowed = organization.getFeatureWiseAllowed();
-      if(featureWiseAllowed == null) {
-          featureWiseAllowed = new HashMap<>();
-      }
-
-      FeatureAccess allowed = featureWiseAllowed.getOrDefault("THREAT_DETECTION", FeatureAccess.noAccess);
-      if (allowed.getIsGranted()) {
-        break;
-      }
-
-      Thread.sleep(30000);
     }
 
     RedisClient localRedis = null;
 
     logger.warnAndAddToDb("aggregation rules enabled " + aggregationRulesEnabled);
     ModuleInfoWorker.init(ModuleInfo.ModuleType.THREAT_DETECTION, dataActor);
-
-    boolean isHybridDeployment = RuntimeMode.isHybridDeployment();
     if (!isHybridDeployment) {
         DaoInit.init(new ConnectionString(System.getenv("AKTO_MONGO_CONN")));
     }
