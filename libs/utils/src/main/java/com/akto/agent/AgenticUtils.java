@@ -16,6 +16,7 @@ import com.akto.dto.testing.AuthMechanism;
 import com.akto.dto.testing.AuthParam;
 import com.akto.dto.testing.TestRoles;
 import com.akto.util.Constants;
+import com.akto.util.enums.LoginFlowEnums;
 
 public class AgenticUtils {
     private static final AgentClient agentClient = new AgentClient(Constants.AGENT_BASE_URL);
@@ -71,6 +72,20 @@ public class AgenticUtils {
                 }
                 agentClient.initializeAgent(sseUrl, authorization);
             }
+        }
+    }
+
+    public static String getTestModeFromRole() {
+        TestRoles role = dataActor.fetchTestRole("MCP_AUTHENTICATION_ROLE");
+        AuthMechanism authMechanism = role.findMatchingAuthMechanism(null);
+        if(authMechanism == null || authMechanism.getType() == null){
+            return "auto";
+        }
+
+        if(authMechanism.getType().equals(LoginFlowEnums.AuthMechanismTypes.HARDCODED.toString())){
+            return "userMcpAgent";
+        }else{
+            return "userAiAgent";
         }
     }
 }
