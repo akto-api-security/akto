@@ -20,6 +20,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+import static com.akto.agent.AgenticUtils.getTestModeFromRole;
+
 public class AgentClient {
     
     private static final LoggerMaker loggerMaker = new LoggerMaker(AgentClient.class, LogDb.TESTING);
@@ -42,9 +44,10 @@ public class AgentClient {
         String conversationId = UUID.randomUUID().toString();
         String prompts = rawApi.getRequest().getHeaders().get("x-agent-conversations").get(0);
         List<String> promptsList = Arrays.asList(prompts.split(","));
+        String testMode = getTestModeFromRole();
         
         try {
-            List<AgentConversationResult> conversationResults = processConversations(promptsList, conversationId);
+            List<AgentConversationResult> conversationResults = processConversations(promptsList, conversationId, testMode);
             
             boolean isVulnerable = conversationResults.get(conversationResults.size() - 1).isValidation();
             List<String> errors = new ArrayList<>();
@@ -79,12 +82,12 @@ public class AgentClient {
         }
     }
     
-    public List<AgentConversationResult> processConversations(List<String> prompts, String conversationId) throws Exception {
+    public List<AgentConversationResult> processConversations(List<String> prompts, String conversationId, String testMode) throws Exception {
         List<AgentConversationResult> results = new ArrayList<>();
         
         for (String prompt : prompts) {
             try {
-                AgentConversationResult result = sendChatRequest(prompt, conversationId);
+                AgentConversationResult result = sendChatRequest(prompt, conversationId, testMode);
                 results.add(result);
                 
                 if (!result.isValidation()) {
@@ -101,8 +104,8 @@ public class AgentClient {
         return results;
     }
     
-    public AgentConversationResult sendChatRequest(String prompt, String conversationId) throws Exception {
-        OriginalHttpRequest request = buildChatRequest(prompt);
+    public AgentConversationResult sendChatRequest(String prompt, String conversationId, String testMode) throws Exception {
+        OriginalHttpRequest request = buildChatRequest(prompt, testMode, conversationId);
         OriginalHttpResponse response = ApiExecutor.sendRequest(request, true, testingRunConfig, false, new ArrayList<>(), false);
         
         if (response.getStatusCode() != 200) {
@@ -112,13 +115,15 @@ public class AgentClient {
         return parseResponse(response.getBody(), conversationId, prompt);
     }
     
-    private OriginalHttpRequest buildChatRequest(String prompt) {
+    private OriginalHttpRequest buildChatRequest(String prompt, String testMode, String conversationId) {
         Map<String, List<String>> headers = new HashMap<>();
         headers.put("Content-Type", Arrays.asList("application/json"));
         headers.put("Accept", Arrays.asList("application/json"));
         
         Map<String, Object> requestBody = new HashMap<>();
         requestBody.put("prompt", prompt);
+        requestBody.put("conversationId", conversationId);
+        requestBody.put("agentType", testMode);
         
         String body;
         try {
