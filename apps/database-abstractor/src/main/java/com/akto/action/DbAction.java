@@ -611,7 +611,7 @@ public class DbAction extends ActionSupport {
                         }
 
                         // Filter for account 1736798101: ignore updates with isHeader=false and specific subTypes
-                        if (accId == 1736798101 && isHeader != null && !isHeader && subType != null) {
+                        if (accId == 1736798101 && !isHeader && subType != null) {
                             if (IGNORED_SUB_TYPES.contains(subType.toUpperCase())) {
                                 ignore = true;
                             }
