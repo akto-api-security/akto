@@ -83,6 +83,9 @@ import java.util.regex.Pattern;
 
 public class DbAction extends ActionSupport {
     static final ScheduledExecutorService service = Executors.newSingleThreadScheduledExecutor();
+    private static final Set<String> IGNORED_SUB_TYPES_FOR_ACCOUNT_1736798101 = new HashSet<>(Arrays.asList(
+        "GENERIC", "FLOAT", "NULL", "INTEGER_32", "FALSE", "TRUE", "INTEGER_64", "UUID", "DICT"
+    ));
     long count;
     List<CustomDataTypeMapper> customDataTypes;
     List<AktoDataType> aktoDataTypes;
@@ -575,6 +578,8 @@ public class DbAction extends ActionSupport {
                         int apiCollectionId = -1;
                         int responseCode = 0; // Default to 0 if not provided
                         String url = null, method = null, param = null;
+                        Boolean isHeader = true;
+                        String subType = null;
                         for (Map.Entry<String, Object> entry : bulkUpdate.getFilters().entrySet()) {
                             if (entry.getKey().equalsIgnoreCase(SingleTypeInfo._API_COLLECTION_ID)) {
                                 String valStr = entry.getValue().toString();
@@ -598,6 +603,17 @@ public class DbAction extends ActionSupport {
                                 }
                             } else if(entry.getKey().equalsIgnoreCase(SingleTypeInfo._PARAM)){
                                 param = entry.getValue().toString();
+                            } else if(entry.getKey().equalsIgnoreCase(SingleTypeInfo._IS_HEADER)){
+                                isHeader = Boolean.valueOf(entry.getValue().toString());
+                            } else if(entry.getKey().equalsIgnoreCase(SingleTypeInfo.SUB_TYPE)){
+                                subType = entry.getValue().toString();
+                            }
+                        }
+
+                        // Filter for account 1736798101: ignore updates with isHeader=false and specific subTypes
+                        if (accId == 1736798101 && isHeader != null && !isHeader && subType != null) {
+                            if (IGNORED_SUB_TYPES_FOR_ACCOUNT_1736798101.contains(subType.toUpperCase())) {
+                                ignore = true;
                             }
                         }
                         // Check URL skip rules after we have all the parameters
@@ -649,6 +665,8 @@ public class DbAction extends ActionSupport {
                     boolean ignore = false;
                     String url = null;
                     int responseCode = 0; // Default to 0 if not provided
+                    Boolean isHeader = true;
+                    String subType = null;
                     for (Map.Entry<String, Object> entry : bulkUpdate.getFilters().entrySet()) {
                         if (entry.getKey().equalsIgnoreCase("isUrlParam")) {
                             continue;
@@ -668,8 +686,21 @@ public class DbAction extends ActionSupport {
                                 break;
                             }
                             filters.add(Filters.eq(entry.getKey(), val));
+                        } else if (entry.getKey().equalsIgnoreCase(SingleTypeInfo._IS_HEADER)) {
+                            isHeader = Boolean.valueOf(entry.getValue().toString());
+                            filters.add(Filters.eq(entry.getKey(), entry.getValue()));
+                        } else if (entry.getKey().equalsIgnoreCase(SingleTypeInfo.SUB_TYPE)) {
+                            subType = entry.getValue().toString();
+                            filters.add(Filters.eq(entry.getKey(), entry.getValue()));
                         } else {
                             filters.add(Filters.eq(entry.getKey(), entry.getValue()));
+                        }
+                    }
+
+                    // Filter for account 1736798101: ignore updates with isHeader=false and specific subTypes
+                    if (accId == 1736798101 && !isHeader && subType != null) {
+                        if (IGNORED_SUB_TYPES_FOR_ACCOUNT_1736798101.contains(subType.toUpperCase())) {
+                            ignore = true;
                         }
                     }
 
