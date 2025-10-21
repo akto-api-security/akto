@@ -157,16 +157,17 @@ public class LoggerMaker  {
     }
 
     protected String basicError(String err, LogDb db) {
-        if(Context.accountId.get() != null){
+        if (Context.accountId.get() != null) {
             err = String.format("%s\naccountId: %d", err, Context.accountId.get());
         }
-        logger.error(err);
+        String formatted = getFormattedMessage(err);
+        logger.error(formatted);
         try{
-            insert(err, "error", db);
+            insert(formatted, "error", db);
         } catch (Exception e){
 
         }
-        return err;
+        return formatted;
     }
 
     public void errorAndAddToDb(String err, LogDb db) {
@@ -208,8 +209,7 @@ public class LoggerMaker  {
 
     @Deprecated
     public void infoAndAddToDb(String info, LogDb db) {
-        String accountId = Context.accountId.get() != null ? Context.accountId.get().toString() : "NA";
-        String infoMessage = "accountId: " + accountId + ", " + info;
+        String infoMessage = getFormattedMessage(info);
         logger.info(infoMessage);
         try{
             insert(infoMessage, "info",db);
@@ -219,8 +219,7 @@ public class LoggerMaker  {
     }
 
     public void warnAndAddToDb(String info, LogDb db) {
-        String accountId = Context.accountId.get() != null ? Context.accountId.get().toString() : "NA";
-        String infoMessage = "accountId: " + accountId + ", " + info;
+        String infoMessage = getFormattedMessage(info);
         logger.info(infoMessage);
         try{
             insert(infoMessage, "warn",db);
@@ -331,27 +330,27 @@ public class LoggerMaker  {
     }
 
     public void info(String message, Object... vars) {
-        String accountId = Context.accountId.get() != null ? Context.accountId.get().toString() : "NA";
-        String formattedMessage = "accountId: " + accountId + ", " + message;
-        logger.info(formattedMessage, vars);
+        logger.info(getFormattedMessage(message), vars);
     }
 
     public void error(String errorMessage, Object... vars) {
-        String accountId = Context.accountId.get() != null ? Context.accountId.get().toString() : "NA";
-        String formattedMessage = "accountId: " + accountId + ", " + errorMessage;
-        logger.error(formattedMessage, vars);
+        logger.error(getFormattedMessage(errorMessage), vars);
     }
 
     public void debug(String message, Object... vars) {
-        String accountId = Context.accountId.get() != null ? Context.accountId.get().toString() : "NA";
-        String formattedMessage = "accountId: " + accountId + ", " + message;
-        logger.debug(formattedMessage, vars);
+        logger.debug(getFormattedMessage(message), vars);
     }
 
     public void warn(String message, Object... vars) {
+        logger.warn(getFormattedMessage(message), vars);
+    }
+
+    /**
+     * Helper to prefix the message with accountId consistently.
+     */
+    private String getFormattedMessage(String message) {
         String accountId = Context.accountId.get() != null ? Context.accountId.get().toString() : "NA";
-        String formattedMessage = "accountId: " + accountId + ", " + message;
-        logger.warn(formattedMessage, vars);
+        return "accountId: " + accountId + ", " + message;
     }
 
     public void debugAndAddToDb(String message) {
@@ -367,8 +366,7 @@ public class LoggerMaker  {
     }
 
     public void debugAndAddToDb(String message, LogDb db) {
-        String accountId = Context.accountId.get() != null ? Context.accountId.get().toString() : "NA";
-        String debugMessage = "accountId: " + accountId + ", " + message;
+        String debugMessage = getFormattedMessage(message);
         debug(debugMessage);
         try{
             insert(debugMessage, "debug", db);
