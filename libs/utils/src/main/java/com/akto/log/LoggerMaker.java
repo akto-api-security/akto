@@ -347,7 +347,7 @@ public class LoggerMaker  {
      */
     private String getFormattedMessage(String message) {
         String accountId = Context.accountId.get() != null ? Context.accountId.get().toString() : "NA";
-        return "accountId: " + accountId + ", " + message;
+        return "accountId: " + accountId + " message: " + message;
     }
 
     public void debugAndAddToDb(String message) {
