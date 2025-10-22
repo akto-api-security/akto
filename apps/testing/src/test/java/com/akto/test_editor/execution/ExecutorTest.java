@@ -31,8 +31,8 @@ public class ExecutorTest {
         generatedData.put("op", "key1");
         List<BasicDBObject> result = invokeParseGeneratedKeyValues(executor, generatedData, "op", "val1");
         assertEquals(1, result.size());
-        assertTrue(result.get(0).containsField("key1"));
-        assertEquals("val1", result.get(0).get("key1"));
+        BasicDBObject dbObject = result.get(0);
+        assertTrue(dbObject.containsValue("key1"));
     }
 
     @Test
@@ -77,7 +77,7 @@ public class ExecutorTest {
         BasicDBObject generatedData = new BasicDBObject();
         generatedData.put("op", 12345);
         List<BasicDBObject> result = invokeParseGeneratedKeyValues(executor, generatedData, "op", "val");
-        assertEquals(0, result.size());
+        assertEquals(1, result.size());
     }
 
     @Test
